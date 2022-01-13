@@ -1,0 +1,6 @@
+templates:
+  - name: pytorch_ddp
+    image: python:3.9
+    commands:
+      - pip3 install pyyaml
+      - python3 main.py
