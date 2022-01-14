@@ -77,7 +77,7 @@ if __name__ == '__main__':
         f"--nnode={nnode} "
         f"--node_rank=0 "
         f"--nproc_per_node=1 "
-        f"--master_addr=$JOB_HOST_NAME "
+        f"--master_addr=$HOST_NAME "
         f"--master_port=12345 {training_script} "
         f"--local_world_size=1"
     )
@@ -99,13 +99,12 @@ if __name__ == '__main__':
             f"--nnode={nnode} "
             f"--node_rank={index + 1} "
             f"--nproc_per_node=1 "
-            f"--dependent_addr=$JOB_HOST_NAME "
-            f"--dependent_port=$MASTER_JOB_PORT_12345 {training_script} "
+            f"--master_addr=$MASTER_JOB_HOST_NAME "
+            f"--master_port=$MASTER_JOB_PORT_12345 {training_script} "
             f"--local_world_size=1"
         )
         dependent_job = {
-            "image": f"python:{python_version}",
-            "commands": dependent_commands,
+            "image": f"python:{python_version}",            "commands": dependent_commands,
             "ports": None,
             "resources": None,
             "working_dir": workflow_data["params"]["working_dir"] if workflow_data["params"].get(
