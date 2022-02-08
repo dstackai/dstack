@@ -1,0 +1,20 @@
+# This is just an example
+user_name: cheptsov
+run_name: slim-octopus-3
+workflow_name: ddp
+repo_url: https://github.com/dstackai/pytorch-examples.git
+repo_branch: master
+repo_diff:
+variables:
+previous_job_ids:
+template:
+  working_dir: distributed/ddp
+  python:
+    version: 3.9
+    requirements: requirements.txt
+  training_script: example.py
+  nodes:
+    count: 2
+    resources:
+      gpu:
+        count: 1

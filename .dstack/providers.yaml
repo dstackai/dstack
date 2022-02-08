@@ -1,5 +1,5 @@
-templates:
-  - name: pytorch_ddp
+providers:
+  - name: pytorch-ddp
     image: python:3.9
     commands:
       - pip3 install -r requirements.txt

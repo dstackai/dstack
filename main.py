@@ -7,6 +7,7 @@ import requests as requests
 import yaml
 
 
+# TODO: Support template.nodes.resources
 def submit(job, workflow_data, server, token):
     headers = {
         "Content-Type": f"application/json; charset=utf-8",
@@ -22,13 +23,13 @@ def submit(job, workflow_data, server, token):
         "repo_hash": workflow_data["repo_hash"],
         "repo_diff": workflow_data["repo_diff"],
         "variables": workflow_data["variables"],
-        "resources": job.resources,
+        "requirements": job.requirements,
         "image": job.image,
         "commands": job.commands,
         "ports": job.ports,
         "working_dir": workflow_data["working_dir"]
     }
-    response = requests.request(method="POST", url=f"{server}/jobs/stop",
+    response = requests.request(method="POST", url=f"{server}/jobs/submit",
                                 data=json.dumps(data).encode("utf-8"),
                                 headers=headers)
     if response.status_code != 200:
@@ -51,17 +52,17 @@ if __name__ == '__main__':
 
     with workflow_file.open() as f:
         workflow_data = yaml.load(f, yaml.FullLoader)
-    if not workflow_data.get("params") or not workflow_data["params"].get("nodes") \
-            or not workflow_data["params"]["nodes"].get("count"):
+    if not workflow_data.get("template") or not workflow_data["template"].get("nodes") \
+            or not workflow_data["template"]["nodes"].get("count"):
         sys.exit("params.nodes.count in workflows.yaml is not specified")
-    if type(workflow_data["params"]["nodes"].get("count")) is not int \
-            or workflow_data["params"]["nodes"]["count"] < 2:
+    if type(workflow_data["template"]["nodes"].get("count")) is not int \
+            or workflow_data["template"]["nodes"]["count"] < 2:
         sys.exit("params.nodes.count in workflows.yaml should be an integer > 1")
-    if not workflow_data["params"].get("training_script"):
+    if not workflow_data["template"].get("training_script"):
         sys.exit("params.training_script in workflows.yaml is not specified")
     print("WORKFLOW DATA: " + str(workflow_data))
-    nnode = workflow_data["params"]["nodes"]["count"]
-    training_script = workflow_data["params"]["training_script"]
+    nnode = workflow_data["template"]["nodes"]["count"]
+    training_script = workflow_data["template"]["training_script"]
     # create 1 master job
     # create nodes - 1 jobs that refer to the master job
     if workflow_data.get("python") and workflow_data.get["python"].get("version"):
@@ -85,8 +86,9 @@ if __name__ == '__main__':
         "image": f"python:{python_version}",
         "commands": master_commands,
         "ports": [12345],
-        "resources": None,
-        "working_dir": workflow_data["params"]["working_dir"] if workflow_data["params"].get("working_dir") else None
+        "requirements": None,
+        "working_dir": workflow_data["template"]["working_dir"] if workflow_data["template"].get(
+            "working_dir") else None
     }
     print("MASTER JOB:" + str(master_job))
     # submit(master_job, workflow_data, os.environ["DSTACK_SERVER"], os.environ["DSTACK_TOKEN"])
@@ -104,10 +106,10 @@ if __name__ == '__main__':
             f"--local_world_size=1"
         )
         dependent_job = {
-            "image": f"python:{python_version}",            "commands": dependent_commands,
+            "image": f"python:{python_version}", "commands": dependent_commands,
             "ports": None,
-            "resources": None,
-            "working_dir": workflow_data["params"]["working_dir"] if workflow_data["params"].get(
+            "requirements": None,
+            "working_dir": workflow_data["template"]["working_dir"] if workflow_data["template"].get(
                 "working_dir") else None
         }
         print("DEPENDANT JOB #" + str(index + 1) + ": " + str(dependent_job))
