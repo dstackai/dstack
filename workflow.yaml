@@ -7,14 +7,13 @@ repo_branch: master
 repo_diff:
 variables:
 previous_job_ids:
-template:
-  working_dir: distributed/ddp
-  python:
-    version: 3.9
-    requirements: requirements.txt
-  training_script: example.py
-  nodes:
-    count: 2
-    resources:
-      gpu:
-        count: 1
+working_dir: distributed/ddp
+python:
+  version: 3.9
+  requirements: requirements.txt
+training_script: example.py
+nodes:
+  count: 2
+  resources:
+    gpu:
+      count: 1

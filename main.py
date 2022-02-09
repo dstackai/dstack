@@ -52,20 +52,20 @@ if __name__ == '__main__':
 
     with workflow_file.open() as f:
         workflow_data = yaml.load(f, yaml.FullLoader)
-    if not workflow_data.get("template") or not workflow_data["template"].get("nodes") \
-            or not workflow_data["template"]["nodes"].get("count"):
+    if not workflow_data.get("nodes") \
+            or not workflow_data["nodes"].get("count"):
         sys.exit("params.nodes.count in workflows.yaml is not specified")
-    if type(workflow_data["template"]["nodes"].get("count")) is not int \
-            or workflow_data["template"]["nodes"]["count"] < 2:
+    if type(workflow_data["nodes"].get("count")) is not int \
+            or workflow_data["nodes"]["count"] < 2:
         sys.exit("params.nodes.count in workflows.yaml should be an integer > 1")
-    if not workflow_data["template"].get("training_script"):
+    if not workflow_data.get("training_script"):
         sys.exit("params.training_script in workflows.yaml is not specified")
     print("WORKFLOW DATA: " + str(workflow_data))
-    nnode = workflow_data["template"]["nodes"]["count"]
-    training_script = workflow_data["template"]["training_script"]
+    nnode = workflow_data["nodes"]["count"]
+    training_script = workflow_data["training_script"]
     # create 1 master job
     # create nodes - 1 jobs that refer to the master job
-    if workflow_data.get("python") and workflow_data.get["python"].get("version"):
+    if workflow_data.get("python") and workflow_data["python"].get("version"):
         python_version = workflow_data["python"]["version"]
     else:
         python_version = "3.9"
@@ -87,7 +87,7 @@ if __name__ == '__main__':
         "commands": master_commands,
         "ports": [12345],
         "requirements": None,
-        "working_dir": workflow_data["template"]["working_dir"] if workflow_data["template"].get(
+        "working_dir": workflow_data["working_dir"] if workflow_data.get(
             "working_dir") else None
     }
     print("MASTER JOB:" + str(master_job))
@@ -109,7 +109,7 @@ if __name__ == '__main__':
             "image": f"python:{python_version}", "commands": dependent_commands,
             "ports": None,
             "requirements": None,
-            "working_dir": workflow_data["template"]["working_dir"] if workflow_data["template"].get(
+            "working_dir": workflow_data["working_dir"] if workflow_data.get(
                 "working_dir") else None
         }
         print("DEPENDANT JOB #" + str(index + 1) + ": " + str(dependent_job))
