@@ -8,12 +8,9 @@ repo_diff:
 variables:
 previous_job_ids:
 working_dir: distributed/ddp
-python:
-  version: 3.9
-  requirements: requirements.txt
+python: 3.9
+requirements: requirements.txt
 training_script: example.py
-nodes:
-  count: 2
-  resources:
-    gpu:
-      count: 1
+resources:
+  nodes: 2
+  gpu: 1

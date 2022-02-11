@@ -52,27 +52,27 @@ if __name__ == '__main__':
 
     with workflow_file.open() as f:
         workflow_data = yaml.load(f, yaml.FullLoader)
-    if not workflow_data.get("nodes") \
-            or not workflow_data["nodes"].get("count"):
-        sys.exit("params.nodes.count in workflows.yaml is not specified")
-    if type(workflow_data["nodes"].get("count")) is not int \
-            or workflow_data["nodes"]["count"] < 2:
-        sys.exit("params.nodes.count in workflows.yaml should be an integer > 1")
+    if not workflow_data.get("resources") \
+            or not workflow_data["resources"].get("nodes"):
+        sys.exit("resources.nodes in workflows.yaml is not specified")
+    if type(workflow_data["resources"].get("nodes")) is not int \
+            or workflow_data["resources"]["nodes"] < 2:
+        sys.exit("resources.nodes in workflows.yaml should be an integer > 1")
     if not workflow_data.get("training_script"):
-        sys.exit("params.training_script in workflows.yaml is not specified")
+        sys.exit("training_script in workflows.yaml is not specified")
     print("WORKFLOW DATA: " + str(workflow_data))
-    nnode = workflow_data["nodes"]["count"]
+    nnode = workflow_data["resources"]["nodes"]
     training_script = workflow_data["training_script"]
     # create 1 master job
     # create nodes - 1 jobs that refer to the master job
-    if workflow_data.get("python") and workflow_data["python"].get("version"):
-        python_version = workflow_data["python"]["version"]
+    if workflow_data.get("python"):
+        python_version = workflow_data["python"]
     else:
         python_version = "3.9"
     master_commands = []
-    python_requirements_specified = workflow_data.get("python") and workflow_data["python"].get("requirements")
+    python_requirements_specified = workflow_data.get("requirements")
     if python_requirements_specified:
-        master_commands.append("pip3 install -r " + workflow_data["python"]["requirements"])
+        master_commands.append("pip3 install -r " + workflow_data["requirements"])
     master_commands.append(
         f"python3 -m torch.distributed.launch "
         f"--nnode={nnode} "
@@ -95,7 +95,7 @@ if __name__ == '__main__':
     for index in range(nnode - 1):
         dependent_commands = []
         if python_requirements_specified:
-            dependent_commands.append("pip3 install -r " + workflow_data["python"]["requirements"])
+            dependent_commands.append("pip3 install -r " + workflow_data["requirements"])
         dependent_commands.append(
             f"python3 -m torch.distributed.launch "
             f"--nnode={nnode} "
@@ -109,8 +109,7 @@ if __name__ == '__main__':
             "image": f"python:{python_version}", "commands": dependent_commands,
             "ports": None,
             "requirements": None,
-            "working_dir": workflow_data["working_dir"] if workflow_data.get(
-                "working_dir") else None
+            "working_dir": workflow_data["working_dir"] if workflow_data.get("working_dir") else None
         }
         print("DEPENDANT JOB #" + str(index + 1) + ": " + str(dependent_job))
         # submit(dependent_job, workflow_data, os.environ["DSTACK_SERVER"], os.environ["DSTACK_TOKEN"])
