@@ -1,57 +1,11 @@
-import json
 import os
 import sys
-from pathlib import Path
 
-import requests as requests
-import yaml
-
-
-# TODO: Support template.nodes.resources
-def submit(job, workflow_data, server, token):
-    headers = {
-        "Content-Type": f"application/json; charset=utf-8",
-        "Authorization": f"Bearer {token}"
-    }
-    data = {
-        "user_name": workflow_data["user_name"],
-        "run_name": workflow_data["run_name"],
-        "workflow_name": workflow_data["workflow_name"],
-        "previous_job_ids": workflow_data["previous_job_ids"],
-        "repo_url": workflow_data["repo_url"],
-        "repo_branch": workflow_data["repo_branch"],
-        "repo_hash": workflow_data["repo_hash"],
-        "repo_diff": workflow_data["repo_diff"],
-        "variables": workflow_data["variables"],
-        "requirements": job.requirements,
-        "image": job.image,
-        "commands": job.commands,
-        "ports": job.ports,
-        "working_dir": workflow_data["working_dir"]
-    }
-    response = requests.request(method="POST", url=f"{server}/jobs/submit",
-                                data=json.dumps(data).encode("utf-8"),
-                                headers=headers)
-    if response.status_code != 200:
-        response.raise_for_status()
-    return response.json().get("job_id")
-
+from common import read_workflow_data, submit
 
 if __name__ == '__main__':
-    if not os.environ.get("DSTACK_SERVER"):
-        sys.exit("DSTACK_SERVER environment variable is not specified")
-    if not os.environ.get("DSTACK_TOKEN"):
-        sys.exit("DSTACK_SERVER environment variable is not specified")
-    if not os.environ.get("REPO_PATH"):
-        sys.exit("REPO_PATH environment variable is not specified")
-    if not os.path.isdir(os.environ["REPO_PATH"]):
-        sys.exit("REPO_PATH environment variable doesn't point to a valid directory: " + os.environ["REPO_PATH"])
-    workflow_file = Path("workflow.yaml")
-    if not workflow_file.is_file():
-        sys.exit("workflow.yaml is missing")
+    workflow_data = read_workflow_data()
 
-    with workflow_file.open() as f:
-        workflow_data = yaml.load(f, yaml.FullLoader)
     if not workflow_data.get("resources") \
             or not workflow_data["resources"].get("nodes"):
         sys.exit("resources.nodes in workflows.yaml is not specified")
@@ -60,7 +14,6 @@ if __name__ == '__main__':
         sys.exit("resources.nodes in workflows.yaml should be an integer > 1")
     if not workflow_data.get("training_script"):
         sys.exit("training_script in workflows.yaml is not specified")
-    print("WORKFLOW DATA: " + str(workflow_data))
     nnode = workflow_data["resources"]["nodes"]
     training_script = workflow_data["training_script"]
     # create 1 master job
@@ -90,8 +43,7 @@ if __name__ == '__main__':
         "working_dir": workflow_data["working_dir"] if workflow_data.get(
             "working_dir") else None
     }
-    print("MASTER JOB:" + str(master_job))
-    # submit(master_job, workflow_data, os.environ["DSTACK_SERVER"], os.environ["DSTACK_TOKEN"])
+    submit(master_job, workflow_data, os.environ["DSTACK_SERVER"], os.environ["DSTACK_TOKEN"])
     for index in range(nnode - 1):
         dependent_commands = []
         if python_requirements_specified:
@@ -108,8 +60,7 @@ if __name__ == '__main__':
         dependent_job = {
             "image": f"python:{python_version}", "commands": dependent_commands,
             "ports": None,
-            "requirements": None,
+            "resources": None,
             "working_dir": workflow_data["working_dir"] if workflow_data.get("working_dir") else None
         }
-        print("DEPENDANT JOB #" + str(index + 1) + ": " + str(dependent_job))
-        # submit(dependent_job, workflow_data, os.environ["DSTACK_SERVER"], os.environ["DSTACK_TOKEN"])
+        submit(dependent_job, workflow_data, os.environ["DSTACK_SERVER"], os.environ["DSTACK_TOKEN"])
