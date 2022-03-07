@@ -26,7 +26,7 @@ def submit(job, workflow_data, server, token):
         "image": job["image"],
         "commands": job["commands"],
         "ports": job.get("ports"),
-        "working_dir": workflow_data.get("working_dir")
+        "working_dir": job.get("working_dir")
     }
     print("Request: " + str(request_json))
     response = requests.request(method="POST", url=f"{server}/jobs/submit",
