@@ -10,7 +10,6 @@ if __name__ == '__main__':
         sys.exit("python_script in workflows.yaml is not specified")
     python_script = workflow_data["python_script"]
     python_version = workflow_data.get("python") or "3.9"
-    artifacts = workflow_data.get("python_script")
     commands = []
     python_requirements_specified = workflow_data.get("requirements")
     if python_requirements_specified:
@@ -18,7 +17,8 @@ if __name__ == '__main__':
     commands.append(
         f"python3 {python_script}"
     )
-    working_dir = workflow_data.get("working_dir")
+    artifacts = workflow_data["artifacts"] if workflow_data.get("artifacts") else None
+    working_dir = workflow_data["working_dir"] if workflow_data.get("working_dir") else None
     job = {
         "image": f"python:{python_version}",
         "commands": commands,

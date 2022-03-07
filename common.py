@@ -36,7 +36,10 @@ def submit(job, workflow_data, server, token):
         response.raise_for_status()
     response_json = response.json()
     print("Response: " + str(response_json))
-    return response_json.get("job_id")
+    if response.status_code == 200:
+        return response_json.get("job_id")
+    else:
+        response.raise_for_status()
 
 
 def read_workflow_data():
