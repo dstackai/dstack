@@ -23,7 +23,7 @@ def submit(job, workflow_data, server, token):
         "repo_diff": workflow_data.get("repo_diff"),
         "variables": workflow_data.get("variables"),
         "resources": job.get("resources"),
-        "image": job["image"],
+        "image_name": job["image_name"],
         "commands": job["commands"],
         "ports": job.get("ports"),
         "working_dir": job.get("working_dir")
