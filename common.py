@@ -22,6 +22,7 @@ def submit(job, workflow_data, server, token):
         "repo_hash": workflow_data["repo_hash"],
         "repo_diff": workflow_data.get("repo_diff"),
         "variables": workflow_data.get("variables"),
+        "artifacts": job.get("artifacts"),
         "resources": job.get("resources"),
         "image_name": job["image_name"],
         "commands": job["commands"],
