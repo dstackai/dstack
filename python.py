@@ -20,7 +20,7 @@ if __name__ == '__main__':
     artifacts = workflow_data["artifacts"] if workflow_data.get("artifacts") else None
     working_dir = workflow_data["working_dir"] if workflow_data.get("working_dir") else None
     job = {
-        "image": f"python:{python_version}",
+        "image_name": f"python:{python_version}",
         "commands": commands,
         "ports": None,
         "resources": None,
