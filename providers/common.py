@@ -7,7 +7,7 @@ import requests as requests
 import yaml
 
 
-def submit(job, workflow_data, server, token):
+def submit(job_data, workflow_data, server, token):
     headers = {
         "Content-Type": f"application/json; charset=utf-8",
         "Authorization": f"Bearer {token}"
@@ -16,18 +16,18 @@ def submit(job, workflow_data, server, token):
         "user_name": workflow_data["user_name"],
         "run_name": workflow_data["run_name"],
         "workflow_name": workflow_data["workflow_name"],
-        "previous_job_ids": workflow_data.get("previous_job_ids"),
+        "previous_job_ids": workflow_data.get("previous_job_ids") or None,
         "repo_url": workflow_data["repo_url"],
         "repo_branch": workflow_data["repo_branch"],
         "repo_hash": workflow_data["repo_hash"],
-        "repo_diff": workflow_data.get("repo_diff"),
-        "variables": workflow_data.get("variables"),
-        "artifacts": job.get("artifacts"),
-        "resources": job.get("resources"),
-        "image_name": job["image_name"],
-        "commands": job["commands"],
-        "ports": job.get("ports"),
-        "working_dir": job.get("working_dir")
+        "repo_diff": workflow_data.get("repo_diff") or None,
+        "variables": workflow_data.get("variables") or None,
+        "artifacts": job_data.get("artifacts") or None,
+        "resources": job_data.get("resources") or None,
+        "image_name": job_data["image_name"],
+        "commands": job_data["commands"],
+        "ports": job_data.get("ports") or None,
+        "working_dir": job_data.get("working_dir") or None
     }
     print("Request: " + str(request_json))
     response = requests.request(method="POST", url=f"{server}/jobs/submit",

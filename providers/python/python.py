@@ -17,14 +17,14 @@ if __name__ == '__main__':
     commands.append(
         f"python3 {python_script}"
     )
-    artifacts = workflow_data["artifacts"] if workflow_data.get("artifacts") else None
-    working_dir = workflow_data["working_dir"] if workflow_data.get("working_dir") else None
-    job = {
+    job_data = {
         "image_name": f"python:{python_version}",
-        "commands": commands,
-        "ports": None,
-        "resources": None,
-        "working_dir": working_dir,
-        "artifacts": [a for a in artifacts] if artifacts else None
+        "commands": commands
     }
-    submit(job, workflow_data, os.environ["DSTACK_SERVER"], os.environ["DSTACK_TOKEN"])
+    if workflow_data.get("artifacts"):
+        job_data["artifacts"] = workflow_data["artifacts"]
+    if workflow_data.get("working_dir"):
+        job_data["working_dir"] = workflow_data["working_dir"]
+    # TODO: Handle resources
+    # TODO: Handle ports
+    submit(job_data, workflow_data, os.environ["DSTACK_SERVER"], os.environ["DSTACK_TOKEN"])

@@ -1,1 +1,2 @@
-shyaml
+requests
+pyyaml
