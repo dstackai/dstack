@@ -2,11 +2,13 @@ providers:
   - name: python
     image: python:3.9
     commands:
-      - pip3 install -r requirements.txt
-      - python3 python.py
-
-  - name: pytorch/ddp
+      - pip3 install -r providers/python/requirements.txt
+      - PYTHONPATH=providers python3 providers/python/python.py
+  - name: curl
     image: python:3.9
     commands:
-      - pip3 install -r requirements.txt
-      - python3 ddp.py
+      - [[ ! -f workflow.yaml ]] && echo "workflow.yaml is missing!" && exit 1
+      - pip3 install -r providers/curl/requirements.txt
+      - URL=`cat workflow.yaml | shyaml get-value url`
+      - OUTPUT=`cat workflow.yaml | shyaml get-value output`
+      - curl $URL -o $OUTPUT
