@@ -1,7 +1,8 @@
 import os
 import sys
 
-from common import read_workflow_data, submit
+from common import read_workflow_data, submit, get_resources
+
 
 if __name__ == '__main__':
     workflow_data = read_workflow_data()
@@ -31,6 +32,8 @@ if __name__ == '__main__':
         job_data["artifacts"] = workflow_data["artifacts"]
     if workflow_data.get("working_dir"):
         job_data["working_dir"] = workflow_data["working_dir"]
-    # TODO: Handle resources
+    resources = get_resources(workflow_data)
+    if resources:
+        job_data["resources"] = resources
     # TODO: Handle ports
     submit(job_data, workflow_data, os.environ["DSTACK_SERVER"], os.environ["DSTACK_TOKEN"])

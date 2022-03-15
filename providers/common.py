@@ -57,3 +57,31 @@ def read_workflow_data():
         sys.exit("workflow.yaml is missing")
     with workflow_file.open() as f:
         return yaml.load(f, yaml.FullLoader)
+
+
+def get_resources(workflow_data):
+    if workflow_data.get("resources"):
+        resources = {}
+        if workflow_data["resources"].get("cpu"):
+            if type(workflow_data["resources"]["cpu"]) is not int:
+                sys.exit("resources.cpu in workflows.yaml should be an integer")
+            resources["cpu"] = {
+                "count": workflow_data["resources"]["cpu"]
+            }
+        if workflow_data["resources"].get("memory"):
+            resources["memory"] = workflow_data["resources"]["memory"]
+        if type(workflow_data["resources"].get("gpu")) is int:
+            resources["cpu"] = {
+                "count": workflow_data["resources"]["gpu"]
+            }
+        for resource_name in workflow_data["resources"]:
+            if resource_name.endswith("/gpu") and len(resource_name) > 4:
+                if type(workflow_data["resources"][resource_name]) is not int:
+                    sys.exit(f"resources.'{resource_name}' in workflows.yaml should be an integer")
+                resources["gpu"] = {
+                    "name": resource_name[:-4],
+                    "count": workflow_data["resources"][resource_name]
+                }
+        return resources
+    else:
+        return None
