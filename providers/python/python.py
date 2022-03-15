@@ -10,12 +10,18 @@ if __name__ == '__main__':
         sys.exit("python_script in workflows.yaml is not specified")
     python_script = workflow_data["python_script"]
     python_version = workflow_data.get("python") or "3.9"
+    environment = workflow_data.get("environment") or {}
     commands = []
     python_requirements_specified = workflow_data.get("requirements")
     if python_requirements_specified:
         commands.append("pip3 install -r " + workflow_data["requirements"])
+    environment_init = ""
+    if environment:
+        for name in environment:
+            escaped_value = environment[name].replace('"', '\\"')
+            environment_init += f"{name}=\"{escaped_value}\" "
     commands.append(
-        f"python3 {python_script}"
+        f"{environment_init}python3 {python_script}"
     )
     job_data = {
         "image_name": f"python:{python_version}",
