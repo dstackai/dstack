@@ -7,7 +7,7 @@ providers:
   - name: curl
     image: python:3.9
     commands:
-      - [[ ! -f workflow.yaml ]] && echo "workflow.yaml is missing!" && exit 1
+      - '[[ ! -f workflow.yaml ]] && echo "workflow.yaml is missing!" && exit 1'
       - pip3 install -r providers/curl/requirements.txt
       - URL=`cat workflow.yaml | shyaml get-value url`
       - OUTPUT=`cat workflow.yaml | shyaml get-value output`
