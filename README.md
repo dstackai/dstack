@@ -1,12 +1,15 @@
 # dstack
 
+dstack is an open-core platform that helps define and run deep learning workflows, provision infrastructure on-demand, 
+manage data, and version models.
+
 This repository contains dstack's open-source and public code, documentation, and other key resources:
 
 * [`providers`](providers): The source code of the built-in dstack workflow providers
+* [`cli`](cli): The source code of the dstack CLI pip package
 
 Here's the list of other packages that are expected to be included into this repository with their source code soon:
 
-* `cli`: The source code of the dstack CLI pip package
 * `runner`: The source code of the program that runs dstack workflows
 * `server`: The source code of the program that orchestrates dstack runs and jobs and provides a user interface
 * `docs`: A user guide to the whole dstack platform ([docs.dstack.ai](https://docs.dstack.ai))
