@@ -51,7 +51,7 @@ jobs:
           pip install wheel twine
       - name: Upload pip package
         run: |
-          VERSION=expr ${{ github.run_number }} + 150
+          VERSION=$((${{ github.run_number }} + 150))
           echo "__version__ = \"$VERSION\"" > dstack/version.py
           python setup.py bdist_wheel
           python -m twine upload --repository testpypi --username ${{ secrets.TESTPYPI_USERNAME }} --password ${{ secrets.TESTPYPI_PASSWORD }} dist/*
