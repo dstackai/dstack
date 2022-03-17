@@ -1,5 +1,16 @@
 name: Build
 
+on:
+  push:
+    branches:
+      - 'master'
+  create:
+    tags:
+      - '*'
+  pull_request:
+    branches:
+      - 'master'
+
 cli-test-master:
   if: github.ref == 'refs/heads/master'
   runs-on: ${{ matrix.os }}
