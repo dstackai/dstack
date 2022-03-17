@@ -1,4 +1,3 @@
-wheel
 requests
 pyyaml
 gitpython

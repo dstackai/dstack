@@ -49,9 +49,13 @@ jobs:
         uses: actions/setup-python@v2
         with:
           python-version: 3.9
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+          pip install wheel twine
       - name: Upload pip package
         run: |
           echo "__version__ = \"${{ github.run_number }}\"" > dstack/version.py
           python setup.py bdist_wheel
-          pip install twine
           python -m twine upload --repository testpypi --username ${{ secrets.TESTPYPI_USERNAME }} --password ${{ secrets.TESTPYPI_PASSWORD }} dist/*
