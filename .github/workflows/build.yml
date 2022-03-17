@@ -65,6 +65,7 @@ jobs:
         with:
           repository: dstackai/dstackai.github.io
           path: ./dstackai.github.io
+          token: ${{ secrets.GH_TOKEN }}
       - uses: actions/setup-python@v2
         with:
           python-version: 3.x
