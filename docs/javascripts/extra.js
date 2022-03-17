@@ -1,0 +1,1 @@
+window.$crisp=[];window.CRISP_WEBSITE_ID="ce56e3b2-a23e-4d3f-9e80-e08c61a2b3cb";(function(){d=document;s=d.createElement("script");s.src="https://client.crisp.chat/l.js";s.async=1;d.getElementsByTagName("head")[0].appendChild(s);$crisp.push(["do", "chat:hide"]); })();
