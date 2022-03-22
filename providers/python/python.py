@@ -10,7 +10,9 @@ if __name__ == '__main__':
     if not workflow_data.get("python_script"):
         sys.exit("python_script in workflows.yaml is not specified")
     python_script = workflow_data["python_script"]
-    python_version = workflow_data.get("python") or "3.9"
+    python_version = workflow_data.get("python") or "3.10"
+    if python_version not in ["3.10", "3.9", "3.8", "3.7"]:
+        sys.exit("python_script in workflows.yaml must be one of ['3.10', '3.9', '3.8', '3.7']")
     environment = workflow_data.get("environment") or {}
     commands = []
     python_requirements_specified = workflow_data.get("requirements")
@@ -25,7 +27,7 @@ if __name__ == '__main__':
         f"{environment_init}python3 {python_script}"
     )
     job_data = {
-        "image_name": f"python:{python_version}",
+        "image_name": f"dstackai/python:{python_version}-cuda-11.6.0",
         "commands": commands
     }
     if workflow_data.get("artifacts"):
