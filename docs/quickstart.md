@@ -2,38 +2,37 @@
 
 ## Introduction
 
-dstack is a tool that lets you and others define AI workflows and run them on any infrastructure
-in a reproducible manner.
-
-This tutorial teaches you dstack essentials like workflows, runs, and runners. You'll set up 
-runners, and run a basic workflow.
+This tutorial teaches you dstack essentials such as workflows, runs, jobs, artifacts, and runners.
 
 To complete this tutorial, you'll need a [dstack.ai](https://dstack.ai) account.
 
 ## Set up runners
 
-Runners are machines that runs workflows (submitted by the user). dstack supports two types of runners: `On-demand
-runners` and `Self-hosted runners`. 
+Runners are machines that run submitted workflows. dstack supports two types of runners: the `on-demand` runners and `self-hosted` runners. 
 
-`On-demand runners` are created automatically by dstack in the user's 
-cloud account when there is a need. `Self-hosted runners` are set up manually by the user.
+Thee `on-demand` are runners created automatically by dstack (in the user's 
+cloud account) for the time of running workflows. The `self-hosted` runners are set up manually to run workflows
+using the user's own hardware.
 
 ### Option 1: Set up on-demand runners
 
-To use `On-demand runners`, go to the `Settings`, then `AWS`.
+To use the `on-demand` runners, go to the `Settings`, then `AWS`.
 
 Here, you have to provide `AWS Access Key ID` and `AWS Secret Access Key` that have the
 [corresponding](on-demand-runners.md#aws-credentials) permissions to create EC2 instances in you AWS account.
 
-Once you provided credentials, use the `Add limit` button to configure limits.
+Once you've provided credentials, use the `Add limit` button to configure limits:
 
 ![](images/dstack_on_demand_settings.png){ lazy=true width="1060" }
 
+The configured limits represent the maximum number of EC2 instances of the specific type and in the specific region, that
+dstack can create at one time to run workflows.
+
 ### Option 2: Set up self-hosted runners
 
-As an alternative to `On-demand runners`, you can register your own servers with dstack as `Self-hosted runners`.
+As an alternative to `on-demand` runners, you can run workflows on your own hardware. 
 
-In order to register your server with dstack, you have to run the following command on the server:
+To do that, you have to run the following command on your server:
 
 ```bash
 curl -fsSL https://get.dstack.ai/runner -o get-dstack-runner.sh
@@ -42,12 +41,11 @@ dstack-runner config --token <token>
 dstack-runner start
 ```
 
-!!! info ""
-    The `token` value can be found in `Settings`:
+The `token` value can be found in `Settings`:
 
 ![](images/dstack_quickstart_token.png){ lazy=true width="1060" }
 
-If you've done this step properly, you'll see your server in `Runners`.
+If you've done this step properly, you'll see your server on the `Runners` page:
 
 ![](images/dstack_quickstart_runners.png){ lazy=true width="1060" }
 
@@ -78,24 +76,22 @@ whilst the second workflow trains a model using the output of the first workflow
     ```yaml
     workflows:
       - name: download-mnist
-        image: python:3.9
-        commands:
-          - pip install -r requirements.txt
-          - python3 download.py
+        provider: python
+        requirements: requirements.txt
+        python_script: download.py
         artifacts:
           - data
     
       - name: train-mnist
-        image: pytorch/pytorch:1.10.0-cuda11.3-cudnn8-runtime
-        commands:
-          - pip install -r requirements.txt
-          - python3 train.py $variables_as_args
+        provider: python
+        requirements: requirements.txt
+        python_script: train.py
         artifacts:
           - model
         depends-on:
           - download-mnist
         resources:
-          gpu: 1     
+          gpu: ${{ gpu }}     
     ```
 
 === ".dstack/variables.yaml"
@@ -103,6 +99,7 @@ whilst the second workflow trains a model using the output of the first workflow
     ```yaml
     variables:
      train-mnist:
+       gpu: 1
        batch-size: 64
        test-batch-size: 1000
        epochs: 1
@@ -117,29 +114,29 @@ whilst the second workflow trains a model using the output of the first workflow
 Go ahead, and run the `train-mnist` workflow using the following command:
 
 ```bash
-dstack run train-mnist
+dstack run train-mnist 
 ```
 
 If you want to change any of the variables, you can do that in `.dstack/variables.yaml`, or from the CLI:
 
 ```bash
-dstack run train-mnist --epoch 14 --seed 2
+dstack run train-mnist --gpu 2 --epoch 100 --seed 2
 ```
 
-When you run `train-mnist`, it will create a run with two jobs: one for `train-mnist` and one for `download-mnist` 
-because `train-mnist` depends on `download-mnist`:
+When you run `train-mnist`, because `train-mnist` depends on `download-mnist`, dstack will create a run with two jobs: 
+one for `train-mnist` and one for `download-mnist`:
 
 ![](images/dstack_quickstart_runs.png){ lazy=true width="1060" }
 
 ## Tag runs
 
-Once the run is finished, you can mark it with a tag. You can add a tag either via the user interface of via the command line.
+When the run is finished, you can assign a tag to it, e.g. `latest`:
 
 ```bash
 dstack tag cowardly-goose-1 latest
 ```
 
-Now, you can refer to this run in `.dstack/workflows.yaml`:
+Now, you can refer to this tagged workflow from `.dstack/workflows.yaml`:
 
 ```yaml
    workflows:
@@ -164,12 +161,21 @@ Now, you can refer to this run in `.dstack/workflows.yaml`:
          gpu: 1     
 ```
 
-In this case, dstack will not trigger the `download-mnist` workflow and instead will use the artifacts of the tagged run.
+Now, if you run the `train-mnist` workflow, dstack won't create a job for the `download-mnist` workflow.
+Instead, it will use the artifacts of the tagged workflow.
 
-!!! info "What's next"
+!!! info ""
+    Keep in mind that you can tag as many runs as you want. When you refer to a workflow via its tag, 
+    dstack will use the job that has the corresponding tag, workflow name, and variables.
 
-    Now, if you haven't yet, it's time to give a try to dstack yourself. Go ahead, configure runners,
-    and submit your first workflow. 
+!!! warning "Don't have an AWS account or your own hardware?"
+    First, if you'd like to use dstack with other cloud vendors, please upvote the corresponding requests:
+    [GCP](https://github.com/dstackai/dstack/issues/1) and [Azure](https://github.com/dstackai/dstack/issues/2).
 
-    Have questions or need support? Contact us in a [chat](javascript:$crisp.push(['do', 'chat:show']\);$crisp.push(['do', 'chat:open']\);), 
-    or join our [Slack channel](https://join.slack.com/t/dstackai/shared_invite/zt-xdnsytie-D4qU9BvJP8vkbkHXdi6clQ).
+    If you'd like to use dstack with your existing Kubernetes cluster, upvote [this request](https://github.com/dstackai/dstack/issues/4).
+
+    Finally, if you'd like dstack to manage infrastructure on its own so you can pay directly to dstack for computing 
+    instances, please upvote [this request](https://github.com/dstackai/dstack/issues/3).
+
+It's now time to give a try to dstack, and run your first workflow.
+
