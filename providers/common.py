@@ -47,7 +47,7 @@ def read_workflow_data():
     if not os.environ.get("DSTACK_SERVER"):
         sys.exit("DSTACK_SERVER environment variable is not specified")
     if not os.environ.get("DSTACK_TOKEN"):
-        sys.exit("DSTACK_SERVER environment variable is not specified")
+        sys.exit("DSTACK_TOKEN environment variable is not specified")
     if not os.environ.get("REPO_PATH"):
         sys.exit("REPO_PATH environment variable is not specified")
     if not os.path.isdir(os.environ["REPO_PATH"]):
@@ -63,24 +63,24 @@ def get_resources(workflow_data):
     if workflow_data.get("resources"):
         resources = {}
         if workflow_data["resources"].get("cpu"):
-            if type(workflow_data["resources"]["cpu"]) is not int:
+            if not str(workflow_data["resources"]["cpu"]).isnumeric():
                 sys.exit("resources.cpu in workflows.yaml should be an integer")
             resources["cpu"] = {
-                "count": workflow_data["resources"]["cpu"]
+                "count": int(workflow_data["resources"]["cpu"])
             }
         if workflow_data["resources"].get("memory"):
             resources["memory"] = workflow_data["resources"]["memory"]
-        if type(workflow_data["resources"].get("gpu")) is int:
-            resources["cpu"] = {
-                "count": workflow_data["resources"]["gpu"]
+        if str(workflow_data["resources"].get("gpu")).isnumeric():
+            resources["gpu"] = {
+                "count": int(workflow_data["resources"]["gpu"])
             }
         for resource_name in workflow_data["resources"]:
             if resource_name.endswith("/gpu") and len(resource_name) > 4:
-                if type(workflow_data["resources"][resource_name]) is not int:
+                if not str(workflow_data["resources"][resource_name]).isnumeric():
                     sys.exit(f"resources.'{resource_name}' in workflows.yaml should be an integer")
                 resources["gpu"] = {
                     "name": resource_name[:-4],
-                    "count": workflow_data["resources"][resource_name]
+                    "count": int(workflow_data["resources"][resource_name])
                 }
         return resources
     else:
