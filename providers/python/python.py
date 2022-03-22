@@ -17,14 +17,14 @@ if __name__ == '__main__':
     commands = []
     python_requirements_specified = workflow_data.get("requirements")
     if python_requirements_specified:
-        commands.append("pip3 install -r " + workflow_data["requirements"])
+        commands.append("pip install -r " + workflow_data["requirements"])
     environment_init = ""
     if environment:
         for name in environment:
             escaped_value = environment[name].replace('"', '\\"')
             environment_init += f"{name}=\"{escaped_value}\" "
     commands.append(
-        f"{environment_init}python3 {python_script}"
+        f"{environment_init}python {python_script}"
     )
     job_data = {
         "image_name": f"dstackai/python:{python_version}-cuda-11.6.0",
