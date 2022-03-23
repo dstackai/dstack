@@ -2,6 +2,7 @@ import collections
 import hashlib
 import json
 import os
+import sys
 import typing as ty
 from itertools import groupby
 from pathlib import Path
@@ -36,17 +37,18 @@ def load_repo_data():
     # TODO: Allow to override the current working directory, e.g. via --dir
     cwd = os.getcwd()
     repo = Repo(cwd)
-    # TODO: Doesn't support multiple remotes
-    repo_branch = repo.active_branch.name
-    # TODO: Doesn't support if no remote is configured or branch is untracked
-    # TODO: Support multiple remotes
-    remote_name = repo.active_branch.tracking_branch().remote_name
-    repo_hash = repo.commit(remote_name).hexsha
-    repo_url = repo.remote(remote_name).url
+    tracking_branch = repo.active_branch.tracking_branch()
+    if tracking_branch:
+        repo_branch = tracking_branch.remote_head
+        remote_name = tracking_branch.remote_name
+        repo_hash = tracking_branch.repo.head.commit.hexsha
+        repo_url = repo.remote(remote_name).url
 
-    # TODO: Doesn't support untracked changes
-    repo_diff = repo.git.diff(remote_name)
-    return repo_url, repo_branch, repo_hash, repo_diff
+        # TODO: Doesn't support unstaged changes
+        repo_diff = repo.git.diff(repo_hash)
+        return repo_url, repo_branch, repo_hash, repo_diff
+    else:
+        sys.exit(f"No tracked branch configured for branch {repo.active_branch.name}")
 
 
 def load_workflows():
