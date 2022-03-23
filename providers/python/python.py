@@ -27,9 +27,9 @@ if __name__ == '__main__':
         f"{environment_init}python {python_script}"
     )
     resources = get_resources(workflow_data)
-    cuda = resources.get("gpu") and resources.get("gpu").get("count") > 0
+    gpu = resources and resources.get("gpu") and resources.get("gpu").get("count") > 0
     job_data = {
-        "image_name": f"dstackai/python:{python_version}-cuda-11.6.0" if cuda else f"python:{python_version}",
+        "image_name": f"dstackai/python:{python_version}-cuda-11.6.0" if gpu else f"python:{python_version}",
         "commands": commands
     }
     if workflow_data.get("artifacts"):
