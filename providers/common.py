@@ -65,23 +65,32 @@ def get_resources(workflow_data):
         if workflow_data["resources"].get("cpu"):
             if not str(workflow_data["resources"]["cpu"]).isnumeric():
                 sys.exit("resources.cpu in workflows.yaml should be an integer")
-            resources["cpu"] = {
-                "count": int(workflow_data["resources"]["cpu"])
-            }
+            cpu = int(workflow_data["resources"]["cpu"])
+            if cpu > 0:
+                resources["cpu"] = {
+                    "count": cpu
+                }
         if workflow_data["resources"].get("memory"):
             resources["memory"] = workflow_data["resources"]["memory"]
         if str(workflow_data["resources"].get("gpu")).isnumeric():
-            resources["gpu"] = {
-                "count": int(workflow_data["resources"]["gpu"])
-            }
+            gpu = int(workflow_data["resources"]["gpu"])
+            if gpu > 0:
+                resources["gpu"] = {
+                    "count": gpu
+                }
         for resource_name in workflow_data["resources"]:
             if resource_name.endswith("/gpu") and len(resource_name) > 4:
                 if not str(workflow_data["resources"][resource_name]).isnumeric():
                     sys.exit(f"resources.'{resource_name}' in workflows.yaml should be an integer")
-                resources["gpu"] = {
-                    "name": resource_name[:-4],
-                    "count": int(workflow_data["resources"][resource_name])
-                }
-        return resources
+                gpu = int(workflow_data["resources"][resource_name])
+                if gpu > 0:
+                    resources["gpu"] = {
+                        "name": resource_name[:-4],
+                        "count": gpu
+                    }
+        if len(resources) > 0:
+            return resources
+        else:
+            return None
     else:
         return None
