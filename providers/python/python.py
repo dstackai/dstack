@@ -1,8 +1,8 @@
 import os
 import sys
+from pathlib import Path
 
 from common import read_workflow_data, submit, get_resources
-
 
 if __name__ == '__main__':
     workflow_data = read_workflow_data()
@@ -39,4 +39,11 @@ if __name__ == '__main__':
     if resources:
         job_data["resources"] = resources
     # TODO: Handle ports
-    submit(job_data, workflow_data, os.environ["DSTACK_SERVER"], os.environ["DSTACK_TOKEN"])
+
+    job_ids_file = Path("job-ids.csv")
+    if not job_ids_file.is_file():
+        sys.exit("job-ids.csv is missing")
+    jobId = submit(job_data, workflow_data, os.environ["DSTACK_SERVER"], os.environ["DSTACK_TOKEN"])
+
+    with open(job_ids_file, 'w') as f:
+        f.write(','.join(jobId))
