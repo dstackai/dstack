@@ -43,7 +43,9 @@ if __name__ == '__main__':
     job_ids_file = Path("job-ids.csv")
     if not job_ids_file.is_file():
         sys.exit("job-ids.csv is missing")
+    jobIds = []
     jobId = submit(job_data, workflow_data, os.environ["DSTACK_SERVER"], os.environ["DSTACK_TOKEN"])
+    jobIds.append(jobId)
 
     with open(job_ids_file, 'w') as f:
-        f.write(','.join(jobId))
+        f.write(','.join(jobIds))
