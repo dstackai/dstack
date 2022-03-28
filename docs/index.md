@@ -3,6 +3,10 @@
 dstack is an open-core platform to train deep learning models 🧪, provision infrastructure on-demand 🤖, 
 manage data 📦 , and version models 🧬.
 
+<div class="video-wrapper">
+    <iframe width="560" height="315" src="https://www.youtube.com/embed/7ZfH3h0VM50"  frameborder="0"  allowfullscreen></iframe>
+</div>
+
 ## Principles
 
 As an AI researcher 👩🏽‍🔬, you always want to focus on the experiments 🧪 with the model and its architecture 🏛.
