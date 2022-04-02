@@ -64,8 +64,9 @@ nav:
   - Get started:
     - Overview: index.md
     - Quickstart: quickstart.md
+#    - Concepts: concepts.md
 #    - FAQ: faq.md
-#  - Guides:
+#  - Reference:
 #    - Workflows: workflows.md
 #    - Runners:
 #      - On-demand runners: on-demand-runners.md

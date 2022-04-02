@@ -1,7 +1,14 @@
 # dstack
 
-dstack is an open-core platform that helps define and run deep learning workflows, provision infrastructure on-demand, 
-manage data, and version models.
+#### dstack is a new open-core platform that automates data and training workflows. 
+
+dstack allows you to define workflows and
+their infrastructure requirements as code. The platform provisions infrastructure on demand, and versions data and
+models. It allows you to use any frameworks, experiment trackers, cloud vendors, or hardware.
+
+[<img src="https://dstack.ai/e511bbfdd6bcbe59f6d8.png" width="560" height="315"/>](https://www.youtube.com/watch?v=7ZfH3h0VM50)
+
+## Repository
 
 This repository contains dstack's open-source and public code, documentation, and other key resources:
 
