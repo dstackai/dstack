@@ -114,8 +114,10 @@ class Provider:
                     del workflow_data["repo_diff"]
                     del workflow_data["variables"]
                     del workflow_data["previous_job_ids"]
-                    if not workflow_data.get("working_dir"):
-                        # Delete if it's empty
+                    if "working_dir" in workflow_data and workflow_data.get("working_dir") == '':
+                        # This is a workaround to delete empty working_dir;
+                        # TODO: This must be fixed in dstack-runner
+                        #   Empty working_dir must not be included into workflow.yaml
                         del workflow_data["working_dir"]
                     validate(workflow_data, yaml.load(f, yaml.FullLoader))
                 except ValidationError as e:
