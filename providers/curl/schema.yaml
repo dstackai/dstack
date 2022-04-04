@@ -1,0 +1,14 @@
+type: object
+additionalProperties: false
+properties:
+  url:
+    type: string
+  output:
+    type: string
+  artifacts:
+    type: array
+    items:
+      type: string
+required:
+  - url
+  - output

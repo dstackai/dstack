@@ -1,2 +1,4 @@
 requests
 pyyaml
+jsonschema
+dstack
