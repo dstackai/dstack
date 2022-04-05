@@ -6,7 +6,7 @@ Typical data and training pipelines consist of multiple steps. These steps may i
 preparing data, training, validating, testing a model, etc. In dstack, each of these steps is called a `Workflow`.
 Learn more on how to [define workflows](workflows.md).
 
-### 🧩 Workflow provider
+### 🧩 Provider
 
 A workflow `Provider` is a program that defines how a `Workflow` materializes into actual `Jobs` that 
 process and output data according to the workflow parameters.

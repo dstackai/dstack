@@ -1,36 +1,31 @@
 # Quickstart
 
-## Introduction
+## Step 1: Set up runners
 
-This tutorial teaches you dstack essentials such as workflows, runs, jobs, artifacts, and runners.
+`Runners` are machines that run submitted `Workflows`. dstack supports two types of `Runners`: the `on-demand` `Runners`
+and `self-hosted` `Runners`. 
 
-To complete this tutorial, you'll need a [dstack.ai](https://dstack.ai) account.
-
-## Set up runners
-
-Runners are machines that run submitted workflows. dstack supports two types of runners: the `on-demand` runners and `self-hosted` runners. 
-
-Thee `on-demand` are runners created automatically by dstack (in the user's 
-cloud account) for the time of running workflows. The `self-hosted` runners are set up manually to run workflows
+The `on-demand` `Runners` are created automatically by dstack (in the computing vendor, configured by the user, e.g. `AWS`) 
+for the time of running `Workflows`. The `self-hosted` `Runners` can be set up manually to run `Workflows`
 using the user's own hardware.
 
 ### Option 1: Set up on-demand runners
 
-To use the `on-demand` runners, go to the `Settings`, then `AWS`.
+To use the `on-demand` `Runners`, go to the `Settings`, then `AWS`.
 
 Here, you have to provide `AWS Access Key ID` and `AWS Secret Access Key` that have the
-[corresponding](on-demand-runners.md#aws-credentials) permissions to create EC2 instances in you AWS account.
+[corresponding](on-demand-runners.md#aws-credentials) permissions to create EC2 instances in your `AWS` account.
 
-Once you've provided credentials, use the `Add limit` button to configure limits:
+Once you've provided `Credentials`, use the `Add limit` button to configure limits:
 
 ![](images/dstack_on_demand_settings.png){ lazy=true width="1060" }
 
-The configured limits represent the maximum number of EC2 instances of the specific type and in the specific region, that
-dstack can create at one time to run workflows.
+The configured `Limits` represent the maximum number of EC2 instances of the specific `Instance Type` and in the specific `Region`, that
+dstack can create at one time to run `Workflows`.
 
 ### Option 2: Set up self-hosted runners
 
-As an alternative to `on-demand` runners, you can run workflows on your own hardware. 
+As an alternative to `on-demand` `Runners`, you can run `Workflows` on your own hardware. 
 
 To do that, you have to run the following command on your server:
 
@@ -41,7 +36,7 @@ dstack-runner config --token <token>
 dstack-runner start
 ```
 
-The `token` value can be found in `Settings`:
+Your `token` value can be found in `Settings`:
 
 ![](images/dstack_quickstart_token.png){ lazy=true width="1060" }
 
@@ -49,18 +44,18 @@ If you've done this step properly, you'll see your server on the `Runners` page:
 
 ![](images/dstack_quickstart_runners.png){ lazy=true width="1060" }
 
-## Install the CLI
+## Step 2: Install the CLI
 
-Now, to be able to run and manage workflows interactively, install the dstack CLI.
+Now, to be able to run `Workflows`, install and configure the dstack `CLI`:
 
 ```bash
 pip install dstack -U
 dstack config --token <token> 
 ```
 
-## Clone the repository
+## Step 3: Clone the repo
 
-In this tutorial, we'll run workflows defined in 
+In this tutorial, we'll run `Workflows` defined in 
 [`github.com/dstackai/dstack-examples`](https://github.com/dstackai/dstack-examples).
 
 ```bash
@@ -68,8 +63,8 @@ git clone https://github.com/dstackai/dstack-examples.git
 cd dstack-examples
 ```
 
-This project includes two workflows: `download-mnist` and `train-mnist`. The frst workflow downloads the [MNIST](http://yann.lecun.com/exdb/mnist/) dataset,
-whilst the second workflow trains a model using the output of the first workflow as an input:
+This project includes two `Workflows`: `download-mnist` and `train-mnist`. The frst `Workflow` downloads the [MNIST](http://yann.lecun.com/exdb/mnist/) dataset,
+whilst the second `Workflow` trains a model using the output of the first `Workflow` as an input:
 
 === ".dstack/workflows.yaml"
 
@@ -109,34 +104,34 @@ whilst the second workflow trains a model using the output of the first workflow
        log-interval: 10
     ```
 
-## Run workflows
+## Step 4: Run workflows
 
-Go ahead, and run the `train-mnist` workflow using the following command:
+Go ahead, and run the `train-mnist` `Workflow` using the following command:
 
 ```bash
 dstack run train-mnist 
 ```
 
-If you want to change any of the variables, you can do that in `.dstack/variables.yaml`, or from the CLI:
+If you want to change any of the `Variables`, you can do that in `.dstack/variables.yaml`, or from the `CLI`:
 
 ```bash
 dstack run train-mnist --gpu 2 --epoch 100 --seed 2
 ```
 
-When you run `train-mnist`, because `train-mnist` depends on `download-mnist`, dstack will create a run with two jobs: 
+When you run `train-mnist`, because `train-mnist` depends on `download-mnist`, dstack will create a run with two `Jobs`: 
 one for `train-mnist` and one for `download-mnist`:
 
 ![](images/dstack_quickstart_runs.png){ lazy=true width="1060" }
 
-## Tag runs
+## Step 5: Tag runs
 
-When the run is finished, you can assign a tag to it, e.g. `latest`:
+When the `Run` is finished, you can assign a `Tag` to it, e.g. `latest`:
 
 ```bash
 dstack tag cowardly-goose-1 latest
 ```
 
-Now, you can refer to this tagged workflow from `.dstack/workflows.yaml`:
+Now, you can refer to this tagged `Workflow` from `.dstack/workflows.yaml`:
 
 ```yaml
    workflows:
@@ -159,12 +154,12 @@ Now, you can refer to this tagged workflow from `.dstack/workflows.yaml`:
          gpu: 1     
 ```
 
-Now, if you run the `train-mnist` workflow, dstack won't create a job for the `download-mnist` workflow.
-Instead, it will use the artifacts of the tagged workflow.
+Now, if you run the `train-mnist` `Workflow`, dstack won't create a `Job` for the `download-mnist` `Workflow`.
+Instead, it will reuse the `Artifacts` of the tagged `Workflow`.
 
 !!! info ""
-    Keep in mind that you can tag as many runs as you want. When you refer to a workflow via its tag, 
-    dstack will use the job that has the corresponding tag, workflow name, and variables.
+    Keep in mind that you can `Tag` as many `Runs` as you want. When you refer to a `Workflow` via a `Tag`, 
+    dstack will use the `Job` that has the corresponding `Tag`, workflow name, and `Variables`.
 
 !!! warning "Don't have an AWS account or your own hardware?"
     First, if you'd like to use dstack with other cloud vendors, please upvote the corresponding requests:
@@ -175,5 +170,5 @@ Instead, it will use the artifacts of the tagged workflow.
     Finally, if you'd like dstack to manage infrastructure on its own so you can pay directly to dstack for computing 
     instances, please upvote [this request](https://github.com/dstackai/dstack/issues/3).
 
-It's now time to give a try to dstack, and run your first workflow.
+It's now time to give a try to dstack, and run your first `Workflow`.
 

@@ -1,9 +1,9 @@
 # What is dstack?
 
-##### dstack is a new open-core platform that automates data and training workflows. 
+##### dstack is a open-core platform that automates data and training workflows
 
 dstack allows you to define workflows and their infrastructure requirements as code. 
-The platform provisions infrastructure on demand, and versions data and models.
+The platform provisions infrastructure on-demand, and versions data and models.
 It allows you to use any frameworks, experiment trackers, cloud vendors, or hardware.
 
 <div class="video-wrapper">
@@ -14,11 +14,11 @@ It allows you to use any frameworks, experiment trackers, cloud vendors, or hard
 
 ### 🤖 Infrastructure as code
 
-As data and training workflows require processing and moving huge amounts of data, they typically involve
+Typical data and training workflows deal with processing huge amounts of data. They typically involve
 piping together numerous tasks that may have different hardware requirements.
 
 dstack allows you to define workflows and infrastructure requirements as code using declarative config files. 
-When you run a workflow, dstack provisions the required infrastructure and tears it down afterward.
+When you run a workflow, dstack provisions the required infrastructure on-demand.
 
 When defining a workflow, you can either use the built-in providers (that support specific use-cases), 
 or create your own providers for custom use-cases using the dstack SDK.
@@ -49,7 +49,7 @@ any computing vendors or your own hardware.
 
 #### Configuration files
 
-Workflows must be defined in the `./dstack/workflows.yaml` file inside your project directory. 
+Workflows are defined in the `.dstack/workflows.yaml` file within your project. 
 
 If you plan to pass variables to your workflows when you run them, you have to describe these variables in the 
 `.dstack/variables.yaml` file, next to workflows.
