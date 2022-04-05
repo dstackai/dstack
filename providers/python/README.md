@@ -18,7 +18,7 @@ Here's the list of parameters supported by the provider:
 
 Example:
 
-```bash
+```yaml
 workflows:
   - name: download-model  
     provider: python

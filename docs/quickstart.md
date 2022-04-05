@@ -141,18 +141,16 @@ Now, you can refer to this tagged workflow from `.dstack/workflows.yaml`:
 ```yaml
    workflows:
      - name: download-mnist
-       image: python:3.9
-       commands:
-         - pip install -r requirements.txt
-         - python3 download.py
+       provider: python
+       requirements: requirements.txt
+       python_script: download.py
        artifacts:
          - data
 
      - name: train-mnist
-       image: pytorch/pytorch:1.10.0-cuda11.3-cudnn8-runtime
-       commands:
-         - pip install -r requirements.txt
-         - python3 train.py $variables_as_args
+       provider: python
+       requirements: requirements.txt
+       python_script: train.py
        artifacts:
          - model
        depends-on:

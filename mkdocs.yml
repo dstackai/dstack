@@ -66,8 +66,8 @@ nav:
     - Quickstart: quickstart.md
 #    - Concepts: concepts.md
 #    - FAQ: faq.md
-#  - Reference:
-#    - Workflows: workflows.md
+  - Reference:
+    - Workflows: workflows.md
 #    - Runners:
 #      - On-demand runners: on-demand-runners.md
 #      - Self-hosted runners: self-hosted-runners.md
@@ -76,4 +76,4 @@ nav:
   - Help:
     - Issue tracker: https://github.com/dstackai/dstack/issues
     - Slack community: https://join.slack.com/t/dstackai/shared_invite/zt-xdnsytie-D4qU9BvJP8vkbkHXdi6clQ
-    - Support 💬: "javascript:$crisp.push(['do', 'chat:show']);$crisp.push(['do', 'chat:open']);"
+    - Open a chat 💬: "javascript:$crisp.push(['do', 'chat:show']);$crisp.push(['do', 'chat:open']);"
