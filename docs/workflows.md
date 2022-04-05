@@ -7,14 +7,18 @@
 [//]: # (your workflows, you can run any of them either manually or via external triggers. As workflows are running,)
 [//]: # (dstack provisions the required infrastructure on-demand and tears it down once the workflows are finished.)
 
-## Configuration files
+[//]: # (## Define files)
 
 Workflows are defined in the `.dstack/workflows.yaml` file within your project.
 
 If you'd like to parametrize your workflows, you can define variables in the `.dstack/variables.yaml` file next to your
 workflows.
 
-Every workflow may have the following parameters:
+### Workflow syntax
+
+The root element of the `.dstack/workflows.yaml` file is always `workflows`. 
+
+It's an array of workflow, where each item may have the following parameters:
 
 | Name         | Required | Description                                                |
 |--------------|----------|------------------------------------------------------------|
@@ -71,7 +75,7 @@ Here's an example:
         tgpu: 1
     ```
 
-### Depends-on
+### Dependencies
 
 In the example above, if we run the `train` workflow, dstack will run two workflows sequentially: `prepare` and `train`.
 
@@ -86,15 +90,23 @@ depends-on:
  - prepare:latest
 ```
 
-## Providers
+### Providers
 
-A workflow provider is program that is responsible for creating the actual jobs per workflow according to the 
-workflow parameters. dstack allows you to use any of the built-in providers (e.g. `python`) or build and use 
-custom providers.
+A workflow provider is program that creates the actual jobs per workflow according to the 
+workflow parameters. You can use either the built-in providers or custom providers.
 
-### Built-in providers
+!!! info ""
+    If you'd like to use a custom provider from another repository, you must use the following syntax:
+    
+    ```yaml
+    provider:
+      repo: https://github.com/dstackai/dstack
+      name: python
+    ```
 
-Below is the reference for the built-in providers.
+Below, is the list of built-in providers:
+
+[//]: # (TODO: Move built-in providers into a separate guide)
 
 #### Python
 
@@ -155,3 +167,10 @@ workflows:
     artifacts:
       - raw_dataset
 ```
+
+[//]: # (#### Custom providers)
+
+[//]: # (If you'd like to implement your custom logic of creating jobs per workflow, you can build your own custom provider. )
+[//]: # (Learn more on how this can be done by reading the [corresponding guide]&#40;custom-providers.md&#41;.)
+
+[//]: # (TODO: Running workflows)

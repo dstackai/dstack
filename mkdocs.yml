@@ -63,16 +63,19 @@ plugins:
 nav:
   - Get started:
     - Overview: index.md
+    - Concepts: concepts.md
     - Quickstart: quickstart.md
 #    - Concepts: concepts.md
 #    - FAQ: faq.md
-  - Reference:
+  - Guides:
     - Workflows: workflows.md
 #    - Runners:
 #      - On-demand runners: on-demand-runners.md
 #      - Self-hosted runners: self-hosted-runners.md
 #  - Examples:
 #      - GPT-2: gpt-2.md
+#  - Advanced:
+#    - Custom providers: custom-providers.md
   - Help:
     - Issue tracker: https://github.com/dstackai/dstack/issues
     - Slack community: https://join.slack.com/t/dstackai/shared_invite/zt-xdnsytie-D4qU9BvJP8vkbkHXdi6clQ
