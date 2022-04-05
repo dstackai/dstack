@@ -161,14 +161,4 @@ Instead, it will reuse the `Artifacts` of the tagged `Workflow`.
     Keep in mind that you can `Tag` as many `Runs` as you want. When you refer to a `Workflow` via a `Tag`, 
     dstack will use the `Job` that has the corresponding `Tag`, workflow name, and `Variables`.
 
-!!! warning "Don't have an AWS account or your own hardware?"
-    First, if you'd like to use dstack with other cloud vendors, please upvote the corresponding requests:
-    [GCP](https://github.com/dstackai/dstack/issues/1) and [Azure](https://github.com/dstackai/dstack/issues/2).
-
-    If you'd like to use dstack with your existing Kubernetes cluster, upvote [this request](https://github.com/dstackai/dstack/issues/4).
-
-    Finally, if you'd like dstack to manage infrastructure on its own so you can pay directly to dstack for computing 
-    instances, please upvote [this request](https://github.com/dstackai/dstack/issues/3).
-
 It's now time to give a try to dstack, and run your first `Workflow`.
-

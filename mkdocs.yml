@@ -69,7 +69,7 @@ nav:
 #    - FAQ: faq.md
   - Guides:
     - Workflows: workflows.md
-#    - Runners:
+    - Runners: runners.md
 #      - On-demand runners: on-demand-runners.md
 #      - Self-hosted runners: self-hosted-runners.md
 #  - Examples:

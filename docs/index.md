@@ -17,11 +17,11 @@ It allows you to use any frameworks, experiment trackers, cloud vendors, or hard
 Typical data and training workflows deal with processing huge amounts of data. They typically involve
 piping together numerous tasks that may have different hardware requirements.
 
-dstack allows you to define workflows and infrastructure requirements as code using declarative config files. 
+dstack allows you to define workflows and infrastructure requirements as code using declarative `Configuration files`. 
 When you run a workflow, dstack provisions the required infrastructure on-demand.
 
 When defining a workflow, you can either use the built-in providers (that support specific use-cases), 
-or create your own providers for custom use-cases using the dstack SDK.
+or create custom providers for specific use-cases using dstack's Python API.
 
 ### 🧬 Made for continuous training
 
@@ -35,12 +35,12 @@ dstack allows you to build a pipeline that can run on a regular basis.
 
 dstack allows you to collaborate in multiple ways. On the one hand, the outputs of workflows, such as data and models
 can be tagged and reused in other workflows within your team or across.
-On the other hand, it's possible to reuse the workflow providers built by other teams or by the community.
+On the other hand, it's possible to reuse the providers built by other teams or by the community.
 
 ### 🪛 Technology-agnostic
 
-With dstack, you can use any languages (Python, R, Scala, or any other), any frameworks (including the distributed
-frameworks, such as Dask, Ray, Spark, Tensorflow, PyTorch, and any others), any experiment trackers,
+With dstack, you can use any languages (`Python`, `R`, `Scala`, or any other), any frameworks (including the distributed
+frameworks, such as `Dask`, `Ray`, `Spark`, `Tensorflow`, `PyTorch`, and any others), any experiment trackers,
 any computing vendors or your own hardware.
 
 ## Quick tour
@@ -49,10 +49,10 @@ any computing vendors or your own hardware.
 
 #### Configuration files
 
-Workflows are defined in the `.dstack/workflows.yaml` file within your project. 
+`Workflows` are defined in the `.dstack/workflows.yaml` file within your project. 
 
-If you plan to pass variables to your workflows when you run them, you have to describe these variables in the 
-`.dstack/variables.yaml` file, next to workflows.
+If you plan to pass `Variables` to your `Workflows` when you run them, you have to describe these `Variables` in the 
+`.dstack/variables.yaml` file, next to `Workflows`.
 
 === ".dstack/workflows.yaml"
 
@@ -77,14 +77,14 @@ If you plan to pass variables to your workflows when you run them, you have to d
 
 #### Command-line interface
 
-To run this workflow, use the following command of the dstack CLI:
+To run this `Workflow`, use the following command of the dstack `CLI`:
 
 ```bash
 dstack run prepare --pgpu 4
 ```
 
-Once you do that, you'll see this run in the user interface. Shortly, dstack will assign it to one of the available 
-runners or to a runner provisioned from a cloud account that is configured for your account.
+Once you do that, you'll see this `Run` in the `User interface`. Shortly, dstack will assign it to one of the available 
+`Runners` or to a `Runner` provisioned from a computing vendor that is configured for your account.
 
 #### Tags
 
@@ -126,19 +126,19 @@ If you do that, you later can refer to this tagged workflow from other workflows
         tgpu: 1
     ```
 
-When you run the `train` workflow, dstack will mount to it the `data` folder produced by the `prepare:latest`.
+When you run the `train` `Workflow`, dstack will mount to it the `data` folder produced by the `prepare:latest`.
 
 ### 🤖 Runners
 
-There are two ways to provision infrastructure: by using `on-demand` or `self-hosted` runners.
+There are two ways to provision infrastructure: by using `on-demand` or `self-hosted` `Runners`.
 
 #### On-demand runners
 
-To use on-demand runners, go to the `Settings`, then `AWS`, provide your credentials, and configure limits:
+To use `on-demand` `Runners`, go to the `Settings`, then `AWS`, provide your `Credentials`, and configure `Limits`:
 
 ![](images/dstack_on_demand_settings.png){ lazy=true width="925" }
 
-Once you configure these limits, runners will be provisioned automatically for the time of the run.
+Once you configure these `Limits`, `Runners` will be provisioned automatically for the time of the run.
 
 #### Self-hosted runners
 
@@ -150,6 +150,3 @@ To use your own server with dstack, you need to install the `dstack-runner` daem
 curl -fsSL https://get.dstack.ai/runner -o get-dstack-runner.sh
 sudo sh get-dstack-runner.sh
 ```
-
-For a more detailed tutorial on how to get started with dstack, proceed
-to [Quickstart](quickstart.md).

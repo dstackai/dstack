@@ -8,19 +8,19 @@ Learn more on how to [define workflows](workflows.md).
 
 ### 🧩 Provider
 
-A workflow `Provider` is a program that defines how a `Workflow` materializes into actual `Jobs` that 
+A `Provider` is a program that defines how a `Workflow` materializes into actual `Jobs` that 
 process and output data according to the workflow parameters.
 
 ### 🏃‍♀️ Run
 
-Once you run a `Workflow`, the running instance of this workflow is called a `Run`. All jobs created by the workflow
-provider are linked to this run.
+Once you run a `Workflow`, the running instance of this workflow is called a `Run`. All `Jobs` created by the
+`Provider` are linked to this `Run`.
 
 ### ⚙️ Job
 
-When you run a `Workflow`, the `Provider` creates the actual `Jobs` that run this workflow.
+When you run a `Workflow`, the `Provider` creates the actual `Jobs` that run this `Workflow`.
 
-Every `Job` is associated with a repo with the sources, a Docker image, commands, exposed ports, an ID of the primary job (in
+Every `Job` is associated with a repo with the sources, a Docker image, commands, exposed ports, an ID of the primary `Job` (in
 case there should be communication between `Jobs`), the input `Artifacts` (e.g. from other runs), 
 the hardware requirements (e.g. the number or a name of GPU, memory, etc.), and finally the output `Artifacts`.
 
