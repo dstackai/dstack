@@ -16,20 +16,20 @@ theme:
       scheme: default
       primary: white
       accent: lilac
-#      toggle:
-#        icon: material/weather-night
-#        name: Switch to dark mode
-#    - media: "(prefers-color-scheme: dark)"
-#      scheme: slate
-#      primary: black
-#      accent: light blue
-#      toggle:
-#        icon: material/weather-sunny
-#        name: Switch to light mode
+  #      toggle:
+  #        icon: material/weather-night
+  #        name: Switch to dark mode
+  #    - media: "(prefers-color-scheme: dark)"
+  #      scheme: slate
+  #      primary: black
+  #      accent: light blue
+  #      toggle:
+  #        icon: material/weather-sunny
+  #        name: Switch to light mode
   features:
     - toc.integrate
     - navigation.sections
-#    - navigation.expand
+    #    - navigation.expand
     - navigation.top
 markdown_extensions:
   - pymdownx.emoji:
@@ -56,27 +56,20 @@ extra:
   analytics:
     provider: google
     property: UA-4493451-5
-plugins:
-    - redirects:
-        redirect_maps:
-            'installation.md': 'quickstart.md'
+#plugins:
+#    - redirects:
+#        redirect_maps:
+#            'installation.md': 'quickstart.md'
 nav:
   - Get started:
-    - Overview: index.md
-    - Concepts: concepts.md
-    - Quickstart: quickstart.md
-#    - Concepts: concepts.md
-#    - FAQ: faq.md
+      - Overview: index.md
+      - Concepts: concepts.md
+      - Quickstart: quickstart.md
   - Guides:
-    - Workflows: workflows.md
-    - Runners: runners.md
-#      - On-demand runners: on-demand-runners.md
-#      - Self-hosted runners: self-hosted-runners.md
-#  - Examples:
-#      - GPT-2: gpt-2.md
-#  - Advanced:
-#    - Custom providers: custom-providers.md
+      - Workflows: workflows.md
+      - Runners: runners.md
+      - Custom providers: custom-providers.md
   - Help:
-    - Issue tracker: https://github.com/dstackai/dstack/issues
-    - Slack community: https://join.slack.com/t/dstackai/shared_invite/zt-xdnsytie-D4qU9BvJP8vkbkHXdi6clQ
-    - Open a chat 💬: "javascript:$crisp.push(['do', 'chat:show']);$crisp.push(['do', 'chat:open']);"
+      - Issue tracker: https://github.com/dstackai/dstack/issues
+      - Slack community: https://join.slack.com/t/dstackai/shared_invite/zt-xdnsytie-D4qU9BvJP8vkbkHXdi6clQ
+      - Open a chat 💬: "javascript:$crisp.push(['do', 'chat:show']);$crisp.push(['do', 'chat:open']);"

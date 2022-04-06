@@ -6,15 +6,15 @@ Typical data and training pipelines consist of multiple steps. These steps may i
 preparing data, training, validating, testing a model, etc. In dstack, each of these steps is called a `Workflow`.
 Learn more on how to [define workflows](workflows.md).
 
-### 🧩 Provider
-
-A `Provider` is a program that defines how a `Workflow` materializes into actual `Jobs` that 
-process and output data according to the workflow parameters.
-
 ### 🏃‍♀️ Run
 
 Once you run a `Workflow`, the running instance of this workflow is called a `Run`. All `Jobs` created by the
 `Provider` are linked to this `Run`.
+
+### 🧩 Provider
+
+A `Provider` is a program that materializes a `Workflow` into actual `Jobs` that 
+process and output data according to the `Workflow` parameters.
 
 ### ⚙️ Job
 
@@ -29,8 +29,8 @@ the hardware requirements (e.g. the number or a name of GPU, memory, etc.), and 
 Every `Job` may produce output `Artifacts`. When a `Job` is running, dstack stores the output `Artifacts` for 
 every `Job` in real-time.
 
-If a `Workflow` depends on another `Workflow`, all output `Artifacts` of every `Job` of that other `Workflow` will be
-mounted as input `Artifacts` to every `Job` of your `Workflow` when it runs.
+If your `Job` depends on some another `Job`, all output `Artifacts` of that other `Job` will be
+mounted as input `Artifacts` to your `Job`.
 
 ### 🏷 Tags
 
@@ -42,4 +42,4 @@ By using `Tags`, it's possible to version data and models, and reuse it within t
 A `Runner` is a machine that runs `Jobs`. `Runners` are provisioned by dstack on-demand from the configured
 `Computing Vendors` (such as AWS, GCP, Azure, and others.) As an alternative to on-demand `Runners`, it's also possible 
 to use your own hardware as `Runners` (this is called self-hosted `Runners`). 
-Learn more on how to [set up runners](quickstart.md#set-up-runners).
+Learn more on how to [set up runners](runners.md).

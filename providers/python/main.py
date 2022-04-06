@@ -25,8 +25,8 @@ class PythonProvider(Provider):
         )]
 
     def _image_name(self) -> str:
-        gpu = self.resources and self.resources.gpu
-        return f"dstackai/python:{self.python_version}-cuda-11.6.0" if gpu else f"python:{self.python_version}"
+        cuda_is_required = self.resources and self.resources.gpu
+        return f"dstackai/python:{self.python_version}-cuda-11.6.0" if cuda_is_required else f"python:{self.python_version}"
 
     def _commands(self):
         commands = []

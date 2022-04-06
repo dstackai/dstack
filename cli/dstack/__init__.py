@@ -37,22 +37,22 @@ class JobRef:
 
 
 class Job(JobRef):
-    def __init__(self, id: Optional[str] = None,
-                 image_name: Optional[str] = None,
-                 commands: Optional[List[str]] = None,
+    def __init__(self,
+                 image_name: str,
+                 commands: List[str],
                  working_dir: Optional[str] = None,
                  artifacts: Optional[List[str]] = None,
-                 ports: typing.Dict[int, int] = None,
+                 ports: List[int] = None,
                  resources: Optional[ResourceRequirements] = None,
-                 previous_jobs: Optional[List[JobRef]] = None):
-        self.id = id
+                 depends_on: Optional[List[JobRef]] = None):
+        self.id = None
         self.image_name = image_name
         self.commands = commands
         self.working_dir = working_dir
         self.ports = ports
         self.artifacts = artifacts
         self.resources = resources
-        self.previous_jobs = previous_jobs
+        self.depends_on = depends_on
 
     def get_id(self) -> Optional[str]:
         return self.id
@@ -68,7 +68,7 @@ class Workflow:
 
 
 class Provider:
-    def __init__(self, schema: Optional[str]):
+    def __init__(self, schema: Optional[str] = None):
         self.workflow = Workflow(self._load_workflow_data())
         self.schema = schema
         # TODO: Move here workflow related fields, such as varialbes, etc
@@ -177,8 +177,8 @@ class Provider:
         if self.workflow.data.get("previous_job_ids"):
             for jid in self.workflow.data.get("previous_job_ids"):
                 previous_job_ids.append(str(jid))
-        if job.previous_jobs:
-            for j in job.previous_jobs:
+        if job.depends_on:
+            for j in job.depends_on:
                 previous_job_ids.append(j.get_id())
         resources = None
         if job.resources:
@@ -211,7 +211,7 @@ class Provider:
             "resources": resources,
             "image_name": job.image_name,
             "commands": job.commands,
-            "ports": job.ports,
+            "ports": {port: None for port in job.ports} if job.ports else None,
             "working_dir": job.working_dir
         }
         print("Request: " + str(request_json))

@@ -14,18 +14,18 @@
 If you plan to pass `Variables` to your `Workflows` when you run them, you have to describe these `Variables` in the 
 `.dstack/variables.yaml` file, next to `Workflows`.
 
-### Workflow syntax
+### Syntax
 
 The root element of the `.dstack/workflows.yaml` file is always `workflows`. 
 
 It's an array, where each item represents a `Workflow` and may have the following parameters:
 
-| Name         | Required | Description                                                |
-|--------------|----------|------------------------------------------------------------|
-| `name`       | Yes      | The name of our workflow                                   |
-| `provider`   | Yes      | The provider that we want to use for our workflow          |
-| `depends-on` | No       | The list of other workflows our workflow depends on if any |
-| `...`        |          | Any parameters required by the provider                    |
+| Name         | Required         | Description                                                |
+|--------------|------------------|------------------------------------------------------------|
+| `name`       | :material-check: | The name of our workflow                                   |
+| `provider`   | :material-check: | The provider that we want to use for our workflow          |
+| `depends-on` |                  | The list of other workflows our workflow depends on if any |
+| `...`        |                  | Any parameters required by the provider                    |
 
 Here's an example:
 
@@ -92,7 +92,7 @@ A `Provider` is program that creates the actual `Jobs` per `Workflow` according 
 `Providers`.
 
 !!! info ""
-    If you'd like to use a custom provider from another repository, you must use the following syntax:
+    If you want to use a custom `Provider` from another repository, use the following syntax:
     
     ```yaml
     provider:
@@ -100,9 +100,7 @@ A `Provider` is program that creates the actual `Jobs` per `Workflow` according 
       name: python
     ```
 
-Below, is the list of built-in `Providers`:
-
-[//]: # (TODO: Move built-in providers into a separate guide)
+Below, is the list of built-in `Providers`.
 
 #### Python
 
@@ -110,17 +108,17 @@ The `python` `Provider` runs a Python script on a single machine with required r
 
 Here's the supported parameters:
 
-| Parameter             | Required | Description                                         |
-|-----------------------|----------|-----------------------------------------------------|
-| `python_script`       | Yes      | The Python script with arguments                    |
-| `requirements`        | No       | The list of Python packages required by the script. |
-| `python`              | No       | The major Python version. By default, is `3.10`.    |
-| `environment`         | No       | The list of environment variables and their values  |
-| `artifacts`           | No       | The list of output artifacts                        |
-| `resources`           | No       | The resources required to run the workflow          |
-| `resources.cpu`       | No       | The required number of CPUs                         |
-| `resources.memory`    | No       | The required amount of memory                       |
-| `resources.gpu`       | No       | The required number of GPUs                         |
+| Parameter             | Required         | Description                                         |
+|-----------------------|------------------|-----------------------------------------------------|
+| `python_script`       | :material-check: | The Python script with arguments                    |
+| `requirements`        |                  | The list of Python packages required by the script. |
+| `python`              |                  | The major Python version. By default, is `3.10`.    |
+| `environment`         |                  | The list of environment variables and their values  |
+| `artifacts`           |                  | The list of output artifacts                        |
+| `resources`           |                  | The resources required to run the workflow          |
+| `resources.cpu`       |                  | The required number of CPUs                         |
+| `resources.memory`    |                  | The required amount of memory                       |
+| `resources.gpu`       |                  | The required number of GPUs                         |
 
 Here's an example:
 
@@ -164,10 +162,10 @@ workflows:
       - raw_dataset
 ```
 
-[//]: # (#### Custom providers)
+#### Custom providers
 
-[//]: # (If you'd like to implement your custom logic of creating `Jobs` per `Workflow`, you can build your own custom `Provider`. )
-[//]: # (Learn more on how this can be done by reading the [corresponding guide]&#40;custom-providers.md&#41;.)
+If you'd like to implement your custom logic of creating `Jobs` per `Workflow`, you can build your own custom `Provider`. 
+Learn more on how this can be done by reading the [corresponding guide](custom-providers.md).
 
 ### Examples
 
