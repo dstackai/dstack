@@ -9,3 +9,8 @@ providers:
     commands:
       - pip3 install -r providers/curl/requirements.txt
       - PYTHONPATH=providers python3 providers/curl/main.py
+  - name: docker
+    image: python:3.9
+    commands:
+      - pip3 install -r providers/docker/requirements.txt
+      - PYTHONPATH=providers python3 providers/docker/main.py

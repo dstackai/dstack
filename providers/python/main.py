@@ -13,6 +13,7 @@ class PythonProvider(Provider):
         self.environment = self.workflow.data.get("environment") or {}
         self.artifacts = self.workflow.data.get("artifacts")
         self.working_dir = self.workflow.data.get("working_dir")
+        self.resources = self._resources()
         self.image_name = self._image_name()
 
     def create_jobs(self) -> List[Job]:

@@ -39,7 +39,7 @@ class JobRef:
 class Job(JobRef):
     def __init__(self,
                  image_name: str,
-                 commands: List[str],
+                 commands: Optional[List[str]] = None,
                  working_dir: Optional[str] = None,
                  artifacts: Optional[List[str]] = None,
                  ports: List[int] = None,
@@ -71,8 +71,7 @@ class Provider:
     def __init__(self, schema: Optional[str] = None):
         self.workflow = Workflow(self._load_workflow_data())
         self.schema = schema
-        # TODO: Move here workflow related fields, such as varialbes, etc
-        self.resources = self._resources()
+        # TODO: Move here workflow related fields, such as variables, etc
         self._validate_schema()
         pass
 

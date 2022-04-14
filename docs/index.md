@@ -61,7 +61,7 @@ If you plan to pass `Variables` to your `Workflows` when you run them, you have 
       - name: prepare
         provider: python
         python_script: prepare.py
-        output:
+        artifacts:
           - data
         resources:
           gpu: ${{ pgpu }}
