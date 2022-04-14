@@ -24,7 +24,7 @@ The `on-demand` `Runners` are created automatically by dstack (in the computing 
 for the time of running `Workflows`. The `self-hosted` `Runners` can be set up manually to run `Workflows`
 using the user's own hardware.
 
-### Option 1: Set up on-demand runners
+#### Option 1: Set up on-demand runners
 
 To use the `on-demand` `Runners`, go to the `Settings`, then `AWS`.
 
@@ -38,7 +38,7 @@ Once you've provided `Credentials`, use the `Add limit` button to configure limi
 The configured `Limits` represent the maximum number of EC2 instances of the specific `Instance Type` and in the specific `Region`, that
 dstack can create at one time to run `Workflows`.
 
-### Option 2: Set up self-hosted runners
+#### Option 2: Set up self-hosted runners
 
 As an alternative to `on-demand` `Runners`, you can run `Workflows` on your own hardware. 
 
@@ -59,7 +59,7 @@ If you've done this step properly, you'll see your server on the `Runners` page:
 
 <img src="docs/images/dstack_quickstart_runners.png" width="1060" />
 
-## Step 2: Install the CLI
+### Step 2: Install the CLI
 
 Now, to be able to run `Workflows`, install and configure the dstack `CLI`:
 
@@ -68,7 +68,7 @@ pip install dstack -U
 dstack config --token <token> 
 ```
 
-## Step 3: Clone the repo
+### Step 3: Clone the repo
 
 Just to get started, we'll run `Workflows` defined in 
 [`github.com/dstackai/dstack-examples`](https://github.com/dstackai/dstack-examples).
@@ -119,7 +119,7 @@ variables:
    log-interval: 10
 ```
 
-## Step 4: Run workflows
+### Step 4: Run workflows
 
 Go ahead, and run the `train-mnist` `Workflow` using the following command:
 
@@ -138,7 +138,7 @@ one for `train-mnist` and one for `download-mnist`:
 
 <img src="docs/images/dstack_quickstart_runs.png" width="1060" />
 
-## Step 5: Tag runs
+### Step 5: Tag runs
 
 When the `Run` is finished, you can assign a `Tag` to it, e.g. `latest`:
 
