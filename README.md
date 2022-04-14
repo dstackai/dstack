@@ -4,14 +4,14 @@ An open-core platform to automate data and training workflows, provision infrast
 
 ## High Level Features
 
-* dstack allows you to define workflows and infrastructure requirements as code using declarative Configuration files.
+* Define workflows and infrastructure requirements as code using declarative configuration files.
  When you run a workflow, dstack provisions the required infrastructure on-demand.
-* Either use your existing hardware or provision infrastructure on-demand in your own cloud account (e.g. AWS, GCP,
-  Azure, etc.).
+* Either use your existing hardware or provision infrastructure on-demand in your existing cloud account (e.g. AWS, GCP,
+  Azure, etc.)
 * Version data and models produced by workflows automatically. Assign tags to successful runs to refer to their
   artifacts from other workflows.
-* When defining a workflow, you can either use the built-in providers (that support specific use-cases), or create
-  custom providers for specific use-cases using dstack's Python API.
+* Use the built-in workflow providers (that support specific use-cases), or create custom providers for specific
+  use-cases using dstack's Python API.
 
 ## Getting Started
 
