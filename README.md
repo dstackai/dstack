@@ -2,6 +2,8 @@
 
 An open-core platform to automate data and training workflows, provision infrastructure, and version data and models.
 
+<img src="docs/images/dstack-tags-and-artifacts.png" width="1060" />
+
 ## High Level Features
 
 * Define workflows and infrastructure requirements as code using declarative configuration files.
