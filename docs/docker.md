@@ -4,7 +4,8 @@ The easiest way to run dstack on-premise is by using its public Docker
 image: [`dstackai/dstack`](https://hub.docker.com/r/dstackai/dstack).
 
 !!! info ""
-    Note, because dstack runners and CLI have to communicate with the dstack `Server,E    the` server must be accessible from the network where runners and the CLI are running.
+    Note, because dstack runners and CLI have to communicate with the dstack `Server` must be accessible from the network
+    where runners and the CLI are running.
 
 ## Docker image
 
