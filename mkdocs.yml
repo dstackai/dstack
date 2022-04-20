@@ -69,6 +69,7 @@ nav:
       - Workflows: workflows.md
       - Runners: runners.md
       - Custom providers: custom-providers.md
+      - Deploy on-premise: docker.md
   - Help:
       - Issue tracker: https://github.com/dstackai/dstack/issues
       - Slack community: https://join.slack.com/t/dstackai/shared_invite/zt-xdnsytie-D4qU9BvJP8vkbkHXdi6clQ
