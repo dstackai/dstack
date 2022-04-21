@@ -2,6 +2,8 @@
 
 dstack is a modern open platform that automates data and training workflows, provisions infrastructure, and versions data and models.
 
+<img src="docs/images/splash.png" width="1060" />
+
 ## Key features
 
 * **Declarative workflows**: Define workflows and infrastructure requirements as code using declarative configuration
@@ -15,162 +17,56 @@ dstack is a modern open platform that automates data and training workflows, pro
 * **Providers marketplace**: Use the built-in workflow providers (that support specific use-cases), or create custom providers for specific
   use-cases using dstack's Python API.
 
-<img src="docs/images/splash.png" width="1060" />
+## How dstack works
 
-## Getting started
-
-### Step 1: Set up runners
-
-Runners are machines that run submitted workflows. dstack supports two types of runners: "on-demand"
-and "self-hosted". 
-
-#### Option 1: Set up on-demand runners
-
-To use on-demand runners, go to the settings, then `AWS`.
-
-Here, you have to provide `AWS Access Key ID` and `AWS Secret Access Key` that have the
-corresponding permissions to create EC2 instances in your `AWS` account.
-
-Once you've specified credentials, click the `Add limit` button to configure limits:
-
-<img src="docs/images/dstack_on_demand_settings.png" width="1060" />
-
-The configured limits represent the maximum number of EC2 instances of the specific `Instance Type` and in the specific `Region`, that
-dstack can create at one time to run workflows.
-
-#### Option 2: Set up self-hosted runners
-
-As an alternative to on-demand runners, you can run workflows on your own hardware. 
-
-To do that, you have to run the following command on your server:
-
-```bash
-curl -fsSL https://get.dstack.ai/runner -o get-dstack-runner.sh
-sudo sh get-dstack-runner.sh
-dstack-runner config --token <token>
-dstack-runner start
-```
-
-Your `token` value can be found in settings:
-
-<img src="docs/images/dstack_quickstart_token.png" width="1060" />
-
-If you've done this step properly, you'll see your server on the runners page:
-
-<img src="docs/images/dstack_quickstart_runners.png" width="1060" />
-
-### Step 2: Install the CLI
-
-Now, to be able to run workflows, install and configure the dstack CLI:
-
-```bash
-pip install dstack -U
-dstack config --token <token> 
-```
-
-### Step 3: Clone the repo
-
-Just to get started, we'll run workflows defined in 
-[`github.com/dstackai/dstack-examples`](https://github.com/dstackai/dstack-examples).
-
-```bash
-git clone https://github.com/dstackai/dstack-examples.git
-cd dstack-examples
-```
-
-The project includes two workflows: `download-mnist` and `train-mnist`. The frst workflow downloads the [MNIST](http://yann.lecun.com/exdb/mnist/) dataset,
-whilst the second workflow trains a model using the output of the first workflow as an input:
-
-`.dstack/workflows.yaml`:
+Workflows are defined in the `.dstack/workflows.yaml` file within your project. Here's an example:
 
 ```yaml
 workflows:
-  - name: download-mnist
+  # This workflow loads and prepares data 
+  - name: prepare
+    # This workflow uses `python` provider
     provider: python
-    requirements: requirements.txt
-    python_script: download.py
+    python_script: prepare.py
+    # The `data` folder will be saved in real-time as an output artifact
     artifacts:
       - data
 
-  - name: train-mnist
+  # This workflow trains a model using the data from the `prepare` workflow
+  - name: train
+    # This workflow uses `python` provider
     provider: python
-    requirements: requirements.txt
     python_script: train.py
+    # The `checkpoint` folder will be saved in real-time as an output artifact
     artifacts:
-      - model
+      - checkpoint
+    # This workflow depends on the output artifacts of the `prepare` workflow with the tag `latest`
     depends-on:
-      - download-mnist
+      - prepare:latest
+    # Here we define what resources our workflow needs to run. 
     resources:
-      gpu: ${{ gpu }}     
+      memory: 64GB
+      # You can parametrize any property of a workflow using variables 
+      gpu: ${{ gpu }}    
 ```
 
-`.dstack/variables.yaml`:
-
-```yaml
-variables:
- train-mnist:
-   gpu: 1
-   batch-size: 64
-   test-batch-size: 1000
-   epochs: 1
-   lr: 1.0
-   gamma: 0.7
-   seed: 1
-   log-interval: 10
-```
-
-### Step 4: Run workflows
-
-Go ahead, and run the `train-mnist` workflow using the following command:
+Workflows can be run via the CLI:
 
 ```bash
-dstack run train-mnist 
+dstack run train --gpu 2 --epoch 100 --seed 2
 ```
 
-If you want to change any of the variables, you can do that in `.dstack/variables.yaml`, or from the CLI:
+Once you run a workflow, dstack will build a graph of dependencies, and trigger the corresponding providers 
+to create actual jobs. Once jobs are created, dstack will provision the required infrastructure (either
+in your own cloud account, or in your own hardware if any).
 
-```bash
-dstack run train-mnist --gpu 2 --epoch 100 --seed 2
-```
+You can either use the built-in providers, the providers built by the community, or
+create [custom providers](https://docs.dstack.ai/custom-providers)
+for custom use-cases using the dstack AI.
 
-When you run `train-mnist`, because `train-mnist` depends on `download-mnist`, dstack will create a run with two jobs: 
-one for `train-mnist` and one for `download-mnist`:
+As jobs are running, dstack tracks the output logs and artifacts in realtime.
 
-<img src="docs/images/dstack_quickstart_runs.png" width="1060" />
-
-### Step 5: Tag runs
-
-When the `Run` is finished, you can assign a tag to it, e.g. `latest`:
-
-```bash
-dstack tag cowardly-goose-1 latest
-```
-
-Now, you can refer to this tagged workflow from `.dstack/workflows.yaml`:
-
-```yaml
-   workflows:
-     - name: download-mnist
-       provider: python
-       requirements: requirements.txt
-       python_script: download.py
-       artifacts:
-         - data
-
-     - name: train-mnist
-       provider: python
-       requirements: requirements.txt
-       python_script: train.py
-       artifacts:
-         - model
-       depends-on:
-         - download-mnist:latest
-       resources:
-         gpu: 1     
-```
-
-Now, if you run the `train-mnist` workflow, dstack won't create a job for the `download-mnist` workflow.
-Instead, it will reuse the artifacts of the tagged workflow.
+Finally, once a run is successful, you can assign a tag to it and reuse it from other workflows.
 
 ## Repository
 
