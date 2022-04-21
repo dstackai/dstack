@@ -1,6 +1,6 @@
-# Deploy on-premise
+# Install on-premise
 
-The easiest way to run dstack on-premise is by using its public Docker
+The easiest way to install dstack on-premise is by using its public Docker
 image: [`dstackai/dstack`](https://hub.docker.com/r/dstackai/dstack).
 
 !!! info ""
