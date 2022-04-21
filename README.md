@@ -1,8 +1,6 @@
-# dstack: Automate data & training workflows effortlessly 
+# 🧬dstack
 
-An open platform to automate data and training workflows, provision infrastructure, and version data and models.
-
-<img src="docs/images/splash.png" width="1060" />
+dstack is a modern open platform that automates data and training workflows, provisions infrastructure, and versions data and models.
 
 ## Key features
 
@@ -16,6 +14,8 @@ An open platform to automate data and training workflows, provision infrastructu
   artifacts from other workflows.
 * **Providers marketplace**: Use the built-in workflow providers (that support specific use-cases), or create custom providers for specific
   use-cases using dstack's Python API.
+
+<img src="docs/images/splash.png" width="1060" />
 
 ## Getting started
 
