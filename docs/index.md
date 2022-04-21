@@ -1,6 +1,6 @@
 # What is dstack?
 
-##### dstack is a open-core platform that automates data and training workflows
+##### dstack is an open platform that automates data and training workflows
 
 dstack allows you to define workflows and their infrastructure requirements as code. 
 The platform provisions infrastructure on-demand, and versions data and models.
