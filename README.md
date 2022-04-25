@@ -6,9 +6,9 @@ dstack is the modern CI/CD made for training models
 
 * **Automate training workflows**: Define workflows and infrastructure requirements as code using declarative configuration
   files. 
-* **Use a cloud vendor of your choice**: You can either provision infrastructure on-demand in your existing cloud account (e.g. AWS, GCP,
+* **Use a cloud vendor of your choice**: Provision infrastructure on-demand in your existing cloud account (e.g. AWS, GCP,
   Azure, etc.) or use your existing hardware.
-* **Version and reuse data and models**: Version data and models produced by workflows automatically. Assign tags to successful runs to refer to their
+* **Version and reuse artifacts**: Version data and models produced by workflows automatically. Assign tags to successful runs to refer to their
   artifacts from other workflows.
 * **Providers marketplace**: Use the built-in workflow providers (that support specific use-cases), or create custom providers for specific
   use-cases using dstack's SDK.
@@ -71,7 +71,7 @@ Finally, once a run is successful, you can assign a tag to it and reuse it from 
 The easiest way to install dstack on-premise is by using its public Docker
 image: [`dstackai/dstack`](https://hub.docker.com/r/dstackai/dstack)
 
-[Sign up for early access to the in-cloud-version](https://tally.so/r/n9zzGm)
+**[Sign up for early access to the in-cloud-version](https://tally.so/r/n9zzGm)**
 
 ## Repository
 
