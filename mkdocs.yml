@@ -63,13 +63,13 @@ extra:
 nav:
   - Get started:
       - Overview: index.md
-      - Concepts: concepts.md
       - Quickstart: quickstart.md
   - Guides:
+#      - Concepts: concepts.md
       - Workflows: workflows.md
       - Runners: runners.md
       - Custom providers: custom-providers.md
-      - Deploy on-premise: docker.md
+      - Docker: docker.md
   - Help:
       - Issue tracker: https://github.com/dstackai/dstack/issues
       - Slack community: https://join.slack.com/t/dstackai/shared_invite/zt-xdnsytie-D4qU9BvJP8vkbkHXdi6clQ

@@ -1,14 +1,14 @@
 # Custom providers
 
-A `Provider` is a program that defines how a `Workflow` materializes into actual `Jobs` that process and output data
+A provider is a program that defines how a workflow materializes into actual jobs that process and output data
 according to the workflow parameters.
 
-While dstack offers the built-in `Providers`, the users of dstack can define and use custom `Providers`. Read on to
-learn how to build custom `Providers`.
+While dstack offers the built-in providers, the users of dstack can define and use custom providers. Read on to
+learn how to build custom providers.
 
 ## Define providers
 
-`Providers` must be defined in the `.dstack/providers.yaml` file.
+Providers must be defined in the `.dstack/providers.yaml` file.
 
 ### Syntax
 
@@ -16,11 +16,11 @@ The root element of the `.dstack/providers.yaml` file is always `providers`.
 
 It's an array, where each item represents a `Provider` and may have the following parameters:
 
-| Name       | Required           | Description                                       |
-|------------|--------------------|---------------------------------------------------|
-| `name`     | :material-check:   | The name of our workflow                          |
-| `image`    | :material-check:   | The name of the Docker image                      |
-| `commands` | :material-check:   | The list of the commands that start the `Provider` |
+| Name       | Required         | Description                                        |
+|------------|------------------|----------------------------------------------------|
+| `name`     | :material-check: | The name of our workflow                           |
+| `image`    | :material-check: | The name of the Docker image                       |
+| `commands` | :material-check: | The list of the commands that start the `Provider` |
 
 Here's an example:
 
@@ -35,9 +35,9 @@ Here's an example:
             - PYTHONPATH=providers python3 providers/curl/main.py
     ```
 
-## Implement providers
+## Build providers
 
-dstack offers a `Python API` to implement `Providers`.
+dstack offers a Python API to build custom providers.
 
 Here's an example:
 
@@ -74,11 +74,11 @@ Here's an example:
 
 #### Define a schema YAML file (optional)
 
-A `Provider` may have any number of parameters, which users will have to fill in their `.dstack/workflows.yaml` file
-when using the `Provider`. For example, the `curl` provider from above has three parameters:
+A provider may have any number of parameters, which users will have to fill in their `.dstack/workflows.yaml` file
+when using the provider. For example, the `curl` provider from above has three parameters:
 `url`, `output`, and `artifacts`.
 
-If you want the `Provider` to validate whether the parameters are filled correctly, you can define the `Provider`
+If you want the provider to validate whether the parameters are filled correctly, you can define a provider
 schema, e.g. the following way:
 
 === "providers/curl/schema.yaml"
@@ -100,16 +100,16 @@ schema, e.g. the following way:
       - output
     ```
 
-#### Define a Provider class
+#### Define a provider class
 
-The next step is defining a Python class of your `Provider` that must inherit from the `dstack.Provider` class.
+The next step is defining a Python class of your provider that must inherit from the `dstack.Provider` class.
 
-Define the `__init__` function that initializes the `Provider` and reads its parameters:
+Define the `__init__` function that initializes the provider and reads its parameters:
 
 a. Call the function from the super class. If you defined a schema in the previous step, pass its path to the `schema`
 argument.
 
-b. Read the parameters of your `Provider` from the `self.workflow.data` dictionary.
+b. Read the parameters of your provider from the `self.workflow.data` dictionary.
 
 ```python
 def __init__(self):
@@ -119,8 +119,8 @@ def __init__(self):
     self.artifacts = self.workflow.data["artifacts"]
 ```
 
-Implement the `create_jobs` function that creates the actual `Jobs`. Use the `dstack.Job` class to create instances
-of `Jobs`.
+Implement the `create_jobs` function that creates the actual jobs. Use the `dstack.Job` class to create instances
+of jobs.
 
 ```python
 def create_jobs(self) -> List[Job]:
@@ -147,7 +147,7 @@ The `dstack.Job` class has the following arguments:
 
 ## Test providers
 
-In order to test your `Provider`, simply define a `Workflow` that uses your `Provider` in the same project repository.
+In order to test your provider, simply define a workflow that uses your provider in the same project repository.
 
 Here's an example:
 
@@ -167,12 +167,12 @@ And then, run it:
 dstack run tinyshakespeare
 ```
 
-Once your `Run` is assigned to a `Runner` and starts running, you'll see the output of your `Provider` in the `Logs` 
-of your `Run`.
+Once your run is assigned to a runner and starts running, you'll see the output of your provider in the logs 
+of your run.
 
 ## Use providers
 
-If you want to use a `Provider` from another repository, use the following syntax.
+If you want to use a provider from another repository, use the following syntax.
 
 Here's an example:
     

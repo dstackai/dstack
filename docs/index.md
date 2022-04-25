@@ -1,14 +1,9 @@
 # What is dstack?
 
-##### dstack is an open platform that automates data and training workflows
+##### dstack is the modern CI/CD made for training models
 
-dstack allows you to define workflows and their infrastructure requirements as code. 
-The platform provisions infrastructure on-demand, and versions data and models.
-It allows you to use any frameworks, experiment trackers, cloud vendors, or hardware.
-
-<div class="video-wrapper">
-    <iframe width="560" height="315" src="https://www.youtube.com/embed/7ZfH3h0VM50"  frameborder="0"  allowfullscreen></iframe>
-</div>
+dstack allows you to automate training workflows, version and reuse
+data and models using a cloud vendor of your choice.
 
 ## Principles
 
@@ -17,7 +12,7 @@ It allows you to use any frameworks, experiment trackers, cloud vendors, or hard
 Typical data and training workflows deal with processing huge amounts of data. They typically involve
 piping together numerous tasks that may have different hardware requirements.
 
-dstack allows you to define workflows and infrastructure requirements as code using declarative `Configuration files`. 
+dstack allows you to define workflows and infrastructure requirements as code using declarative configuration files. 
 When you run a workflow, dstack provisions the required infrastructure on-demand.
 
 When defining a workflow, you can either use the built-in providers (that support specific use-cases), 
@@ -49,10 +44,10 @@ any computing vendors or your own hardware.
 
 #### Configuration files
 
-`Workflows` are defined in the `.dstack/workflows.yaml` file within your project. 
+Workflows are defined in the `.dstack/workflows.yaml` file within your project. 
 
-If you plan to pass `Variables` to your `Workflows` when you run them, you have to describe these `Variables` in the 
-`.dstack/variables.yaml` file, next to `Workflows`.
+If you plan to pass variables to your workflows when you run them, you have to describe these variables in the 
+`.dstack/variables.yaml` file, next to workflows.
 
 === ".dstack/workflows.yaml"
 
@@ -83,8 +78,8 @@ To run this `Workflow`, use the following command of the dstack `CLI`:
 dstack run prepare --pgpu 4
 ```
 
-Once you do that, you'll see this `Run` in the `User interface`. Shortly, dstack will assign it to one of the available 
-`Runners` or to a `Runner` provisioned from a computing vendor that is configured for your account.
+Once you do that, you'll see this run in the user interface. Shortly, dstack will assign it to one of the available 
+runners or to a runner provisioned from a computing vendor that is configured for your account.
 
 #### Tags
 
@@ -126,19 +121,19 @@ If you do that, you later can refer to this tagged workflow from other workflows
         tgpu: 1
     ```
 
-When you run the `train` `Workflow`, dstack will mount to it the `data` folder produced by the `prepare:latest`.
+When you run the `train` workflow, dstack will mount to it the `data` folder produced by the `prepare:latest`.
 
 ### 🤖 Runners
 
-There are two ways to provision infrastructure: by using `on-demand` or `self-hosted` `Runners`.
+There are two ways to provision infrastructure: by using on-demand or self-hosted runners.
 
 #### On-demand runners
 
-To use `on-demand` `Runners`, go to the `Settings`, then `AWS`, provide your `Credentials`, and configure `Limits`:
+To use on-demand runners, go to the `Settings`, then `AWS`, provide your credentials, and configure limits:
 
 ![](images/dstack_on_demand_settings.png){ lazy=true width="925" }
 
-Once you configure these `Limits`, `Runners` will be provisioned automatically for the time of the run.
+Once you configure these limits, runners will be provisioned automatically for the time of the run.
 
 #### Self-hosted runners
 

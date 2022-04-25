@@ -9,16 +9,16 @@
 
 ## Define workflows
 
-`Workflows` are defined in the `.dstack/workflows.yaml` file within your project.
+Workflows are defined in the `.dstack/workflows.yaml` file within your project.
 
-If you plan to pass `Variables` to your `Workflows` when you run them, you have to describe these `Variables` in the 
-`.dstack/variables.yaml` file, next to `Workflows`.
+If you plan to pass variables to your workflows when you run them, you have to describe these variables in the 
+`.dstack/variables.yaml` file, next to workflows.
 
 ### Syntax
 
 The root element of the `.dstack/workflows.yaml` file is always `workflows`. 
 
-It's an array, where each item represents a `Workflow` and may have the following parameters:
+It's an array, where each item represents a workflow and may have the following parameters:
 
 | Name         | Required         | Description                                                |
 |--------------|------------------|------------------------------------------------------------|
@@ -72,13 +72,13 @@ Here's an example:
 
 ### Dependencies
 
-In the example above, if we run the `train` `Workflow`, dstack will run two `Workflows` sequentially: `prepare` and `train`.
+In the example above, if we run the `train` workflow, dstack will run two workflows sequentially: `prepare` and `train`.
 
-If you'd like to avoid running the `prepare` `Workflow` when running the `train` `Workflow`, and instead you'd like to use
-the output of one of the previous `Runs`, you can use `Tags`.
+If you'd like to avoid running the `prepare` workflow when running the `train` workflow, and instead you'd like to use
+the output of one of the previous runs, you can use tags.
 
-To do that, you'll have to run the `prepare` `Workflow` once, then assign a `Tag` to it (e.g. `latest`), and then, refer to
-this `Tag` from the `train` `Workflow`:
+To do that, you'll have to run the `prepare` workflow once, then assign a tag to it (e.g. `latest`), and then, refer to
+this tag from the `train` workflow:
 
 ```yaml
 depends-on:
@@ -87,12 +87,12 @@ depends-on:
 
 ### Providers
 
-A `Provider` is program that creates the actual `Jobs` per `Workflow` according to the 
-`Workflow` parameters (specified in `.dstack/workflows.yaml`). You can use either the built-in `Providers` or custom 
-`Providers`.
+A provider is program that creates the actual jobs per workflow according to the 
+workflow parameters (specified in `.dstack/workflows.yaml`). You can use either the built-in providers or custom 
+providers.
 
 !!! info ""
-    If you want to use a custom `Provider` from another repository, use the following syntax:
+    If you want to use a custom provider from another repository, use the following syntax:
     
     ```yaml
     provider:
@@ -100,11 +100,11 @@ A `Provider` is program that creates the actual `Jobs` per `Workflow` according 
       name: python
     ```
 
-Below, is the list of built-in `Providers`.
+Below, is the list of built-in providers.
 
 #### Docker
 
-The `Docker` `Provider` runs a Docker image on a single machine with required resources.
+The `docker` provider runs a Docker image on a single machine with required resources.
 
 Here's the list of parameters supported by the provider:
 
@@ -137,7 +137,7 @@ workflows:
 
 #### Python
 
-The `python` `Provider` runs a Python script on a single machine with required resources.
+The `python` provider runs a Python script on a single machine with required resources.
 
 Here's the supported parameters:
 
@@ -173,7 +173,7 @@ workflows:
 
 #### Curl
 
-The `curl` `Provider` downloads a file by a URL.
+The `curl` provider downloads a file by a URL.
 
 Here's the supported parameters:
 
@@ -197,28 +197,28 @@ workflows:
 
 #### Custom providers
 
-If you'd like to implement your custom logic of creating `Jobs` per `Workflow`, you can build your own custom `Provider`. 
+If you'd like to implement your custom logic of creating jobs per workflow, you can build your own custom provider. 
 Learn more on how this can be done by reading the [corresponding guide](custom-providers.md).
 
 ### Examples
 
-You can find some examples of `Workflows` in [`dstackai/dstack-examples`](https://github.com/dstackai/dstack-examples) 
-GitHub repository. Feel free to clone the repository and run any of the `Workflows` defined there. 
+You can find some examples of workflows in [`dstackai/dstack-examples`](https://github.com/dstackai/dstack-examples) 
+GitHub repository. Feel free to clone the repository and run any of the workflows defined there. 
 
 ## Run workflows
 
 !!! warning ""
-    Note, before you can run `Workflows`, you have to [set up runners](quickstart.md#step-1-set-up-runners).
+    Note, before you can run workflows, you have to [set up runners](quickstart.md#step-1-set-up-runners).
 
 ### Install the CLI
 
-Before you can run workflows, you have to install the dstack `CLI`:
+Before you can run workflows, you have to install the dstack CLI:
 
 ```bash
 pip install dstack -U
 ```
 
-Then, you have to configure the `CLI` with your `Token`:
+Then, you have to configure the CLI with your token:
 
 ```bash
 dstack config --token <token>
@@ -228,7 +228,7 @@ Your `token` value can be found in `Settings`:
 
 ![](images/dstack_quickstart_token.png){ lazy=true width="1060" }
 
-Once the `CLI` is installed and configured, you can go ahead and run any `Workflow` defined in
+Once the CLI is installed and configured, you can go ahead and run any workflow defined in
 your `.dstack/workflows.yaml` file.
 
 ### Run workflows
@@ -237,7 +237,7 @@ your `.dstack/workflows.yaml` file.
 dstack run train-mnist 
 ```
 
-In case you want to override any of the `Variables` defined in `.dstack/variables.yaml` in your `Run`, you can do it
+In case you want to override any of the variables defined in `.dstack/variables.yaml` in your run, you can do it
 the following way:
 
 ```bash
@@ -245,20 +245,20 @@ dstack run train-mnist --gpu 2 --epoch 100 --seed 2
 ```
 
 !!! warning "Git"
-    In order to run `Workflows` defined in a project, the project must be under `Git`. 
-    As to local changes, you don't have to commit them before running the `Workflow`. 
+    In order to run workflows defined in a project, the project must be under Git. 
+    As to local changes, you don't have to commit them before running the workflow. 
     dstack will track them automatically.
 
-Once you run a `Workflow`, you'll see it in the `User Interface`. 
-Once the `Provider` creates the `Jobs`, you'll see the `Jobs` under the `Run` if you select this `Run`.
+Once you run a workflow, you'll see it in the user interface. 
+Once the provider creates the jobs, you'll see the jobs under the run if you select this run.
 
 ![](images/dstack_quickstart_runs.png){ lazy=true width="1060" }
 
 ## Tag runs
 
-When the `Run` is finished, you can assign a `Tag` to it, e.g. `latest`, either via the `User Interface` or the `CLI`.
+When the run is finished, you can assign a tag to it, e.g. `latest`, either via the user interface or the CLI.
 
-Here's how to do it via the `CLI`:
+Here's how to do it via the CLI:
 
 ```bash
 dstack tag cowardly-goose-1 latest

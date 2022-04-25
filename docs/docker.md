@@ -1,4 +1,4 @@
-# Install on-premise
+# Docker
 
 The easiest way to install dstack on-premise is by using its public Docker
 image: [`dstackai/dstack`](https://hub.docker.com/r/dstackai/dstack).
@@ -77,9 +77,9 @@ use the following values:
 ### Runners and CLI
 
 !!! tip ""
-    If you're using `On-demand` `Runners`, the dstack `Server` will configure them automatically.
+    If you're using on-demand runners, the dstack server will configure them automatically.
 
-If you're using `Self-hosted` `Runners`, you'll have to specify them the correct URL of the dstack `Server API Endpoint`:
+If you're using self-hosted runners, you'll have to specify them the correct URL of the dstack server API endpoint:
 
 ```bash
 dstack-runner config --token <token> --server <server API endpoint>
@@ -91,7 +91,7 @@ The same when configuring the CLI:
 dstack config --token <token> --server <server API endpoint>
 ```
 
-When specifying `server API endpoint`, make sure to add `/api` to the end of the address at which the dstack `Server` is running.
-It's the address of the dstack `Server API Endpoint` address.
-For example, if the `Server` is available at `https://your-dstack-hostname:3000`, the `--server` value 
+When specifying server API endpoint, make sure to add `/api` to the end of the address at which the dstack server is running.
+It's the address of the dstack server API endpoint address.
+For example, if the server is available at `https://your-dstack-hostname:3000`, the `--server` value 
 must be `https://your-dstack-hostname:3000/api`.
