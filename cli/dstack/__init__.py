@@ -210,7 +210,7 @@ class Provider:
             "resources": resources,
             "image_name": job.image_name,
             "commands": job.commands,
-            "ports": {port: None for port in job.ports} if job.ports else None,
+            "ports": {str(port): None for port in job.ports} if job.ports else None,
             "working_dir": job.working_dir
         }
         print("Request: " + str(request_json))
