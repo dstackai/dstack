@@ -10,6 +10,7 @@ class DockerProvider(Provider):
         self.commands = self.workflow.data.get("commands")
         self.artifacts = self.workflow.data.get("artifacts")
         self.working_dir = self.workflow.data.get("working_dir")
+        self.ports = self.workflow.data.get("ports")
         self.resources = self._resources()
 
     def create_jobs(self) -> List[Job]:
@@ -18,7 +19,8 @@ class DockerProvider(Provider):
             commands=self.commands,
             working_dir=self.working_dir,
             resources=self.resources,
-            artifacts=self.artifacts
+            artifacts=self.artifacts,
+            ports=self.ports
         )]
 
 
