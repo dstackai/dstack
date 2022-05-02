@@ -37,7 +37,7 @@ Here's an example:
       - name: prepare
         # This workflow uses `python` provider
         provider: python
-        python_script: prepare.py
+        script: prepare.py
         # The `data` folder will be tracked as an output artifact
         artifacts:
           - data
@@ -49,7 +49,7 @@ Here's an example:
       - name: train
         # This workflow uses `python` provider
         provider: python
-        python_script: train.py
+        script: train.py
         # The `checkpoint` folder will be tracked as an output artifact
         artifacts:
           - checkpoint
@@ -108,15 +108,16 @@ The `docker` provider runs a Docker image on a single machine with required reso
 
 Here's the list of parameters supported by the provider:
 
-| Parameter          | Required | Description                                         |
-|--------------------|----------|-----------------------------------------------------|
-| `image`            | Yes      | The Docker image.                                   |
-| `commands`         | No       | The list of commands to run.                        |
-| `artifacts`        | No       | The list of output artifacts.                       |
-| `resources`        | No       | The resources required to run the workflow.         |
-| `resources.cpu`    | No       | The required number of CPUs.                        |
-| `resources.memory` | No       | The required amount of memory.                      |
-| `resources.gpu`    | No       | The required number of GPUs.                        |
+| Parameter          | Required | Description                                 |
+|--------------------|----------|---------------------------------------------|
+| `image`            | Yes      | The Docker image.                           |
+| `commands`         | No       | The list of commands to run.                |
+| `ports`            | No       | The list of ports to open.                  |
+| `artifacts`        | No       | The list of output artifacts.               |
+| `resources`        | No       | The resources required to run the workflow. |
+| `resources.cpu`    | No       | The required number of CPUs.                |
+| `resources.memory` | No       | The required amount of memory.              |
+| `resources.gpu`    | No       | The required number of GPUs.                |
 
 Example:
 
@@ -143,7 +144,7 @@ Here's the supported parameters:
 
 | Parameter             | Required         | Description                                         |
 |-----------------------|------------------|-----------------------------------------------------|
-| `python_script`       | :material-check: | The Python script with arguments                    |
+| `script`       | :material-check: | The Python script with arguments                    |
 | `requirements`        |                  | The list of Python packages required by the script. |
 | `python`              |                  | The major Python version. By default, is `3.10`.    |
 | `environment`         |                  | The list of environment variables and their values  |
@@ -160,7 +161,7 @@ workflows:
   - name: download-model  
     provider: python
     requirements: requirements.txt
-    python_script: download_model.py
+    script: download_model.py
     environment:
       PYTHONPATH: src
     artifacts:

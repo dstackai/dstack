@@ -8,6 +8,14 @@ properties:
   python:
     type: string
     enum: [ "3.10", "3.9", "3.8", "3.7" ]
+  script:
+    type: string
+  version:
+    oneOf:
+      - type: string
+        enum: [ "3.10", "3.9", "3.8", "3.7" ]
+      - type: number
+        enum: [ 3.10, 3.9, 3.8, 3.7 ]
   working_dir:
     type: string
   resources:
@@ -27,5 +35,5 @@ properties:
     type: array
     items:
       type: string
-required:
-  - python_script
+#required:
+#  - script

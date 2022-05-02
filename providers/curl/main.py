@@ -12,7 +12,7 @@ class CurlProvider(Provider):
 
     def create_jobs(self) -> List[Job]:
         return [Job(
-            image_name="python:3.9",
+            image="python:3.9",
             commands=[
                 f"curl {self.url} -o {self.output}"
             ],

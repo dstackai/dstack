@@ -55,7 +55,7 @@ If you plan to pass variables to your workflows when you run them, you have to d
     workflows:
       - name: prepare
         provider: python
-        python_script: prepare.py
+        script: prepare.py
         artifacts:
           - data
         resources:
@@ -93,7 +93,7 @@ If you do that, you later can refer to this tagged workflow from other workflows
     workflows:
       - name: prepare
         provider: python
-        python_script: prepare.py
+        script: prepare.py
         artifacts:
           - data
         resources:
@@ -101,7 +101,7 @@ If you do that, you later can refer to this tagged workflow from other workflows
 
       - name: train
         provider: python
-        python_script: train.py
+        script: train.py
         artifacts:
           - checkpoint
         depends-on:

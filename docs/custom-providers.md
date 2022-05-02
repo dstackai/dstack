@@ -58,7 +58,7 @@ Here's an example:
     
         def create_jobs(self) -> List[Job]:
             return [Job(
-                image_name="python:3.9",
+                image="python:3.9",
                 commands=[
                     f"curl {self.url} -o {self.output}"
                 ],
@@ -125,7 +125,7 @@ of jobs.
 ```python
 def create_jobs(self) -> List[Job]:
     return [Job(
-        image_name="python:3.9",
+        image="python:3.9",
         commands=[
             f"curl {self.url} -o {self.output}"
         ],
@@ -135,15 +135,17 @@ def create_jobs(self) -> List[Job]:
 
 The `dstack.Job` class has the following arguments:
 
-| Name          | Type                          | Required         | Description                                                                                                 |
-|---------------|-------------------------------|------------------|-------------------------------------------------------------------------------------------------------------|
-| `image_name`  | `str`                         | :material-check: | The name of the Docker image of the `Job`                                                                   |
-| `commands`    | `List[str]`                   | :material-check: | The list of the commands that start the container of the `Job`                                              |
-| `working_dir` | `str`                         | :material-check: | The working directory of the `Job` container                                                                |
-| `artifacts`   | `List[str]`                   |                  | The list of folders inside the `Job` container <br/>that has to be stored as output `Artifacts` of the `Job` |
-| `ports`       | `List[int]`                   |                  | The list of ports exposed by the `Job` container                                                            |
-| `resources`   | `dstack.ResourceRequirements` |                  | The resource required by the `Job`, incl. CPU, memory, and GPU                                              |
-| `depends_on`  | `List[dstack.Job]`            |                  | The list of other `Jobs` the `Job` is pending on                                                            |
+| Name          | Type                          | Required         | Description                                                                                            |
+|---------------|-------------------------------|------------------|--------------------------------------------------------------------------------------------------------|
+| `image`       | `str`                         | :material-check: | The name of the Docker image of the Job                                                                |
+| `commands`    | `List[str]`                   | :material-check: | The list of the commands that start the container of the Job                                           |
+| `ports`       | `List[int]`                   | :material-check: | The list of ports that the container of the Job should open                                            |
+| `working_dir` | `str`                         | :material-check: | The working directory of the Job container                                                             |
+| `artifacts`   | `List[str]`                   |                  | The list of folders inside the Job container <br/>that has to be stored as output artifacts of the Job |
+| `ports`       | `List[int]`                   |                  | The list of ports exposed by the Job container                                                         |
+| `resources`   | `dstack.ResourceRequirements` |                  | The resource required by the Job, incl. CPU, memory, and GPU                                           |
+| `depends_on`  | `List[dstack.Job]`            |                  | The list of other `Jobs` the Job is pending on                                                         |
+| `master`      | `dstack.Job`                  |                  | The master job (in case the current job must <br/>communicate with the master job)                     |
 
 ## Test providers
 

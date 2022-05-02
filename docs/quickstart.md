@@ -73,14 +73,14 @@ whilst the second workflow trains a model using the output of the first workflow
       - name: download-mnist
         provider: python
         requirements: requirements.txt
-        python_script: download.py
+        script: download.py
         artifacts:
           - data
     
       - name: train-mnist
         provider: python
         requirements: requirements.txt
-        python_script: train.py
+        script: train.py
         artifacts:
           - model
         depends-on:
@@ -138,14 +138,14 @@ Now, you can refer to this tagged workflow from `.dstack/workflows.yaml`:
      - name: download-mnist
        provider: python
        requirements: requirements.txt
-       python_script: download.py
+       script: download.py
        artifacts:
          - data
 
      - name: train-mnist
        provider: python
        requirements: requirements.txt
-       python_script: train.py
+       script: train.py
        artifacts:
          - model
        depends-on:

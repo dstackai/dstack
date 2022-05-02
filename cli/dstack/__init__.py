@@ -1,7 +1,6 @@
 import json
 import os
 import sys
-import typing
 from abc import abstractmethod
 from pathlib import Path
 from typing import Optional, List
@@ -11,16 +10,16 @@ import yaml
 from jsonschema import validate, ValidationError
 
 
-class GpuResourceRequirements:
+class Gpu:
     def __init__(self, count: Optional[int] = None, memory: Optional[str] = None, name: Optional[str] = None):
         self.count = count
         self.memory = memory
         self.name = name
 
 
-class ResourceRequirements:
+class Resources:
     def __init__(self, cpu: Optional[int] = None, memory: Optional[str] = None,
-                 gpu: Optional[GpuResourceRequirements] = None):
+                 gpu: Optional[Gpu] = None):
         self.cpu = cpu
         self.memory = memory
         self.gpu = gpu
@@ -38,21 +37,23 @@ class JobRef:
 
 class Job(JobRef):
     def __init__(self,
-                 image_name: str,
+                 image: str,
                  commands: Optional[List[str]] = None,
                  working_dir: Optional[str] = None,
                  artifacts: Optional[List[str]] = None,
                  ports: List[int] = None,
-                 resources: Optional[ResourceRequirements] = None,
-                 depends_on: Optional[List[JobRef]] = None):
+                 resources: Optional[Resources] = None,
+                 depends_on: Optional[List[JobRef]] = None,
+                 master: Optional[JobRef] = None):
         self.id = None
-        self.image_name = image_name
+        self.image = image
         self.commands = commands
         self.working_dir = working_dir
         self.ports = ports
         self.artifacts = artifacts
         self.resources = resources
         self.depends_on = depends_on
+        self.master = master
 
     def get_id(self) -> Optional[str]:
         return self.id
@@ -122,9 +123,9 @@ class Provider:
                 except ValidationError as e:
                     sys.exit(f"There a syntax error in {os.getcwd()}/.dstack/workflows.yaml:\n\n{e}")
 
-    def _resources(self) -> Optional[ResourceRequirements]:
+    def _resources(self) -> Optional[Resources]:
         if self.workflow.data.get("resources"):
-            resources = ResourceRequirements()
+            resources = Resources()
             if self.workflow.data["resources"].get("cpu"):
                 if not str(self.workflow.data["resources"]["cpu"]).isnumeric():
                     sys.exit("resources.cpu in workflows.yaml should be an integer")
@@ -136,14 +137,14 @@ class Provider:
             if str(self.workflow.data["resources"].get("gpu")).isnumeric():
                 gpu = int(self.workflow.data["resources"]["gpu"])
                 if gpu > 0:
-                    resources.gpu = GpuResourceRequirements(gpu)
+                    resources.gpu = Gpu(gpu)
             for resource_name in self.workflow.data["resources"]:
                 if resource_name.endswith("/gpu") and len(resource_name) > 4:
                     if not str(self.workflow.data["resources"][resource_name]).isnumeric():
                         sys.exit(f"resources.'{resource_name}' in workflows.yaml should be an integer")
                     gpu = int(self.workflow.data["resources"][resource_name])
                     if gpu > 0:
-                        resources.gpu = GpuResourceRequirements(gpu, name=resource_name[:-4])
+                        resources.gpu = Gpu(gpu, name=resource_name[:-4])
             if resources.cpu or resources.memory or resources.gpu:
                 return resources
             else:
@@ -208,10 +209,11 @@ class Provider:
             "variables": self.workflow.data.get("variables") or None,
             "artifacts": job.artifacts,
             "resources": resources,
-            "image_name": job.image_name,
+            "image_name": job.image,
             "commands": job.commands,
             "ports": {str(port): None for port in job.ports} if job.ports else None,
-            "working_dir": job.working_dir
+            "working_dir": job.working_dir,
+            "master_job_id": job.master.get_id() if job.master else None
         }
         print("Request: " + str(request_json))
         response = requests.request(method="POST", url=f"{os.environ['DSTACK_SERVER']}/jobs/submit",

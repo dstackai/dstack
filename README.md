@@ -25,7 +25,7 @@ workflows:
   - name: prepare
     # This workflow uses `python` provider
     provider: python
-    python_script: prepare.py
+    script: prepare.py
     # The `data` folder will be saved in real-time as an output artifact
     artifacts:
       - data
@@ -34,7 +34,7 @@ workflows:
   - name: train
     # This workflow uses `python` provider
     provider: python
-    python_script: train.py
+    script: train.py
     # The `checkpoint` folder will be saved in real-time as an output artifact
     artifacts:
       - checkpoint
