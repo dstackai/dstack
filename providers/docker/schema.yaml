@@ -7,6 +7,9 @@ properties:
     type: array
     items:
       type: string
+  environment:
+    type: object
+    additionalProperties: true
   working_dir:
     type: string
   resources:

@@ -3,7 +3,7 @@ import os
 import sys
 from abc import abstractmethod
 from pathlib import Path
-from typing import Optional, List
+from typing import Optional, List, Dict
 
 import requests
 import yaml
@@ -39,6 +39,7 @@ class Job(JobRef):
     def __init__(self,
                  image: str,
                  commands: Optional[List[str]] = None,
+                 environment: Dict[str, str] = None,
                  working_dir: Optional[str] = None,
                  artifacts: Optional[List[str]] = None,
                  ports: List[int] = None,
@@ -48,6 +49,7 @@ class Job(JobRef):
         self.id = None
         self.image = image
         self.commands = commands
+        self.environment = environment
         self.working_dir = working_dir
         self.ports = ports
         self.artifacts = artifacts
@@ -212,6 +214,7 @@ class Provider:
             "image_name": job.image,
             "commands": job.commands,
             "ports": {str(port): None for port in job.ports} if job.ports else None,
+            "environment": job.environment,
             "working_dir": job.working_dir,
             "master_job_id": job.master.get_id() if job.master else None
         }

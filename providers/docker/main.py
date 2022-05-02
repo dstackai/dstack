@@ -9,6 +9,7 @@ class DockerProvider(Provider):
         self.image = self.workflow.data["image"]
         self.commands = self.workflow.data.get("commands")
         self.artifacts = self.workflow.data.get("artifacts")
+        self.environment = self.workflow.data.get("environment")
         self.working_dir = self.workflow.data.get("working_dir")
         self.ports = self.workflow.data.get("ports")
         self.resources = self._resources()
@@ -17,6 +18,7 @@ class DockerProvider(Provider):
         return [Job(
             image=self.image,
             commands=self.commands,
+            environment=self.environment,
             working_dir=self.working_dir,
             resources=self.resources,
             artifacts=self.artifacts,
