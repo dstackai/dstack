@@ -6,6 +6,7 @@ import time
 from argparse import Namespace
 from collections import defaultdict
 from datetime import datetime, timedelta
+from json import JSONDecodeError
 
 from botocore.exceptions import ClientError, ParamValidationError
 from botocore.utils import parse_timestamp, datetime2timestamp
@@ -125,7 +126,10 @@ def logs_func(args: Namespace):
             paginator = client.get_paginator('filter_log_events')
             for page in paginator.paginate(**filter_logs_events_kwargs):
                 for event in page['events']:
-                    print(json.loads(event["message"].strip())["log"])
+                    try:
+                        print(json.loads(event["message"].strip())["log"])
+                    except JSONDecodeError:
+                        pass
 
     except InvalidGitRepositoryError:
         sys.exit(f"{os.getcwd()} is not a Git repo")

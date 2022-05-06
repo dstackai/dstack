@@ -142,7 +142,8 @@ def get_runs_v2(args, profile):
     response = request(method="GET", url=f"{profile.server}/runs/workflows/query", params=params, headers=headers,
                        verify=profile.verify)
     response.raise_for_status()
-    runs = sorted(response.json()["runs"], key=lambda job: job["updated_at"])
+    # runs = sorted(response.json()["runs"], key=lambda job: job["updated_at"])
+    runs = reversed(response.json()["runs"])
     return runs
 
 
