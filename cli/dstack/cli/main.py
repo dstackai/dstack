@@ -3,8 +3,8 @@ from argparse import ArgumentParser, SUPPRESS
 
 import colorama
 
-from dstack.cli import logs, run, stop, aws, artifacts, status, runners, init, \
-    on_demand, resume, prune, tag, untag, config
+from dstack.cli import logs, run, stop, aws, artifacts, runs, runners, init, \
+    on_demand, restart, prune, tag, untag, config
 from dstack.version import __version__ as version
 
 
@@ -19,19 +19,22 @@ def main():
     subparsers = parser.add_subparsers()
 
     artifacts.register_parsers(subparsers)
-    on_demand.register_parsers(subparsers)
-    aws.register_parsers(subparsers)
+    # on_demand.register_parsers(subparsers)
+    # aws.register_parsers(subparsers)
     config.register_parsers(subparsers)
     init.register_parsers(subparsers)
     # login.register_parsers(subparsers)
     # logout.register_parsers(subparsers)
     logs.register_parsers(subparsers)
     prune.register_parsers(subparsers)
-    resume.register_parsers(subparsers)
+    # TODO: Rename to restart
+    restart.register_parsers(subparsers)
     run.register_parsers(subparsers, parser)
+    # TODO: Hide
     runners.register_parsers(subparsers)
-    status.register_parsers(subparsers)
+    runs.register_parsers(subparsers)
     stop.register_parsers(subparsers)
+    # TODO: Merge tag and untag to tags
     tag.register_parsers(subparsers)
     # token.register_parsers(subparsers)
     untag.register_parsers(subparsers)

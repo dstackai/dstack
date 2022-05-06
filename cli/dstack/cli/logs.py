@@ -11,7 +11,7 @@ from botocore.exceptions import ClientError, ParamValidationError
 from botocore.utils import parse_timestamp, datetime2timestamp
 from git import InvalidGitRepositoryError
 
-from dstack.cli.common import get_job, get_user_info, boto3_client
+from dstack.cli.common import get_user_info, boto3_client, get_jobs
 from dstack.config import get_config, ConfigurationError
 
 SLEEP_SECONDS = 1
@@ -100,13 +100,14 @@ def logs_func(args: Namespace):
         profile = dstack_config.get_profile("default")
         user_info = get_user_info(profile)
 
-        filter_logs_events_kwargs = {"interleaved": True, "startTime": to_epoch_millis(args.since)}
-        job = get_job(args.run_name_or_job_id, profile)
-        if job is not None:
-            filter_logs_events_kwargs["logGroupName"] = f"{user_info['user_name']}/{job['run_name']}"
-            filter_logs_events_kwargs["logStreamNames"] = [job['job_id']]
-        else:
-            filter_logs_events_kwargs["logGroupName"] = f"{user_info['user_name']}/{args.run_name_or_job_id}"
+        filter_logs_events_kwargs = {"interleaved": True, "startTime": to_epoch_millis(args.since),
+                                     "logGroupName": f"{user_info['user_name']}/{args.run_name}"}
+        if args.workflow_name is not None:
+            jobs = list(filter(lambda j: j["workflow_name"] == args.workflow_name, get_jobs(args.run_name, profile)))
+            if len(jobs) == 0:
+                # TODO: Handle not found error
+                sys.exit(0)
+            filter_logs_events_kwargs["logStreamNames"] = [job['job_id'] for job in jobs]
 
         client = boto3_client(user_info, "logs")
 
@@ -133,11 +134,12 @@ def logs_func(args: Namespace):
 
 
 def register_parsers(main_subparsers):
-    parser = main_subparsers.add_parser("logs", help="Show logs of a run or job")
+    parser = main_subparsers.add_parser("logs", help="Show logs")
 
     # TODO: Make run_name_or_job_id optional
     # TODO: Add --format (short|detailed)
-    parser.add_argument("run_name_or_job_id", metavar="(RUN | JOB)", type=str)
+    parser.add_argument("run_name", metavar="RUN", type=str)
+    parser.add_argument("workflow_name", metavar="WORKFLOW", type=str, nargs="?")
     parser.add_argument("--follow", "-f", help="Whether to continuously poll for new logs. By default, the command "
                                                "will exit once there are no more logs to display. To exit from this "
                                                "mode, use Control-C.", action="store_true")

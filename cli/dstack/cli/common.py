@@ -134,14 +134,15 @@ def get_jobs(run_name: ty.Optional[str], profile):
     return jobs
 
 
-def get_runs(args, profile):
-    headers, params = headers_and_params(profile, args.run_name, True)
-    if args.n is not None:
-        params["n"] = args.n
-    response = request(method="GET", url=f"{profile.server}/runs/query", params=params, headers=headers,
+def get_runs_v2(args, profile):
+    headers, params = headers_and_params(profile, None, False)
+    # del params["repo_url"]
+    if args.all:
+        params["n"] = 1000
+    response = request(method="GET", url=f"{profile.server}/runs/workflows/query", params=params, headers=headers,
                        verify=profile.verify)
     response.raise_for_status()
-    runs = sorted(response.json()["runs"], key=lambda job: (job["updated_at"]))
+    runs = sorted(response.json()["runs"], key=lambda job: job["updated_at"])
     return runs
 
 
@@ -166,65 +167,47 @@ def get_job(job_id, profile):
         response.raise_for_status()
 
 
-def print_runs_and_jobs(profile, args):
-    runs = get_runs(args, profile)
-    runs_by_name = dict([(run_name, list(run)[0]) for run_name, run in groupby(runs, lambda run: run["run_name"])])
-    jobs_by_run_name = dict(
-        [(run["run_name"], get_jobs(run["run_name"], profile)) for run in runs])
-    sorted_jobs_by_run_name = sorted(
-        [(run_name, sorted(run_jobs, key=lambda job: job["updated_at"])) for run_name, run_jobs in
-         jobs_by_run_name.items()],
-        key=lambda run_name_and_jobs: run_name_and_jobs[1][-1]["updated_at"] if len(run_name_and_jobs[1]) > 0 else
-        runs_by_name[run_name_and_jobs[0]]["updated_at"])
+def pretty_repo_url(repo_url):
+    r = repo_url
+    if r.endswith(".git"):
+        r = r[:-4]
+    if r.startswith("https://github.com"):
+        r = r[19:]
+    return r
+
+
+def print_runs(profile, args):
+    runs = get_runs_v2(args, profile)
+    runs_by_name = [(run_name, list(run)) for run_name, run in groupby(runs, lambda run: run["run_name"])]
     table_headers = [
         f"{colorama.Fore.LIGHTMAGENTA_EX}RUN{colorama.Fore.RESET}",
-        f"{colorama.Fore.LIGHTMAGENTA_EX}TAG{colorama.Fore.RESET}",
-        f"{colorama.Fore.LIGHTMAGENTA_EX}JOB{colorama.Fore.RESET}",
         f"{colorama.Fore.LIGHTMAGENTA_EX}WORKFLOW{colorama.Fore.RESET}",
-        f"{colorama.Fore.LIGHTMAGENTA_EX}VARIABLES{colorama.Fore.RESET}",
-        f"{colorama.Fore.LIGHTMAGENTA_EX}SUBMITTED{colorama.Fore.RESET}",
-        f"{colorama.Fore.LIGHTMAGENTA_EX}RUNNER{colorama.Fore.RESET}",
-        f"{colorama.Fore.LIGHTMAGENTA_EX}STATUS{colorama.Fore.RESET}"
-        # f"{colorama.Fore.LIGHTMAGENTA_EX}DURATION{colorama.Fore.RESET}",
-        # f"{colorama.Fore.LIGHTMAGENTA_EX}ARTIFACTS{colorama.Fore.RESET}"
+        # f"{colorama.Fore.LIGHTMAGENTA_EX}REPO{colorama.Fore.RESET}",
+        f"{colorama.Fore.LIGHTMAGENTA_EX}STATUS{colorama.Fore.RESET}",
+        # f"{colorama.Fore.LIGHTMAGENTA_EX}PORTS{colorama.Fore.RESET}",
+        f"{colorama.Fore.LIGHTMAGENTA_EX}ARTIFACTS{colorama.Fore.RESET}",
+        f"{colorama.Fore.LIGHTMAGENTA_EX}UPDATED{colorama.Fore.RESET}",
+        f"{colorama.Fore.LIGHTMAGENTA_EX}TAG{colorama.Fore.RESET}",
     ]
     table_rows = []
-    for run_name, run_jobs in sorted_jobs_by_run_name:
-        run = runs_by_name[run_name]
-
-        _, run_submitted_at = pretty_duration_and_submitted_at(run)
-        run_status = run["status"].upper()
-        runner_name = get_runner_name(run)
-        table_rows.append([
-            colored(run_status, run["run_name"], not args.no_jobs),
-            colored(run_status,
-                    "*" if run["tag_name"] == run["run_name"] else run["tag_name"] if run["tag_name"] else "<none>",
-                    not args.no_jobs),
-            "",
-            colored(run_status, run["workflow_name"], not args.no_jobs),
-            colored(run_status, pretty_variables(run["variables"]), not args.no_jobs),
-            colored(run_status, run_submitted_at, not args.no_jobs),
-            colored(run_status, runner_name, not args.no_jobs),
-            colored(run_status, run_status, not args.no_jobs)
-            # colored(run_status, run_duration, not args.no_jobs),
-            # ""
-        ])
-        if not args.no_jobs:
-            for job in run_jobs:
-                _, submitted_at = pretty_duration_and_submitted_at(job)
-                status = job["status"].upper()
-                table_rows.append([
-                    "",
-                    "",
-                    colored(status, job["job_id"]),
-                    colored(status, job["workflow_name"]),
-                    colored(status, pretty_variables(job["variables"])),
-                    colored(status, submitted_at),
-                    colored(status, get_runner_name(job)),
-                    colored(status, status)
-                    # colored(status, duration),
-                    # colored(status, __job_artifacts(job["artifact_paths"]))
-                ])
+    for run_name, workflows in runs_by_name:
+        for i in range(len(workflows)):
+            workflow = workflows[i]
+            workflow_status = workflow["status"].upper()
+            _, updated_at = pretty_duration_and_submitted_at(workflow.get("updated_at"))
+            status = workflow["status"].upper()
+            table_rows.append([
+                colored(workflow_status, workflow["run_name"]) if i == 0 else "",
+                colored(status, workflow["workflow_name"]),
+                # colored(status, pretty_repo_url(workflow["repo_url"])),
+                colored(status, status),
+                # colored(workflow_status, "<none>"),
+                colored(status, __job_artifacts(workflow["artifact_paths"])),
+                colored(status, updated_at),
+                colored(workflow_status,
+                        "*" if workflow["tag_name"] == workflow["run_name"] else workflow[
+                            "tag_name"] if workflow["tag_name"] else "<none>"),
+            ])
 
     print(tabulate(table_rows, headers=table_headers, tablefmt="plain"))
 
@@ -281,11 +264,9 @@ def colored(status: str, val: str, bright: bool = False):
     return f"{colorama.Style.BRIGHT}{c}{colorama.Style.RESET_ALL}" if bright else c
 
 
-def pretty_duration_and_submitted_at(job):
-    submitted_at = job.get("submitted_at")
-    started_at = job.get("started_at")
-    if started_at is not None and job.get("finished_at") is not None:
-        _finished_at_milli = round(job.get("finished_at") / 1000)
+def pretty_duration_and_submitted_at(submitted_at, started_at = None, finished_at = None):
+    if started_at is not None and finished_at is not None:
+        _finished_at_milli = round(finished_at / 1000)
         duration_milli = _finished_at_milli - round(started_at / 1000)
         hours, remainder = divmod(duration_milli, 3600)
         minutes, seconds = divmod(remainder, 60)
@@ -358,10 +339,10 @@ def __job_ids(ids):
 
 
 def __job_artifacts(paths):
-    if paths is not None:
+    if paths is not None and len(paths) > 0:
         return "\n".join(map(lambda path: short_artifact_path(path), paths))
     else:
-        return ""
+        return "<none>"
 
 
 def short_artifact_path(path):

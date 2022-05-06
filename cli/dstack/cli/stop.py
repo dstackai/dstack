@@ -4,6 +4,7 @@ from argparse import Namespace
 
 import colorama
 import requests
+from dstack.cli.common import get_jobs
 
 from dstack.config import get_config, ConfigurationError
 
@@ -18,36 +19,37 @@ def default_stop_workflow(args: Namespace):
         }
         if profile.token is not None:
             headers["Authorization"] = f"Bearer {profile.token}"
-        data = {"job_id": args.run_name_or_job_id}
-        if args.abort is True:
-            data["abort"] = True
-        response = requests.request(method="POST", url=f"{profile.server}/jobs/stop",
-                                    data=json.dumps(data).encode("utf-8"),
-                                    headers=headers, verify=profile.verify)
-        if response.status_code == 404:
-            data = {"run_name": args.run_name_or_job_id}
-            if args.abort is True:
-                data["abort"] = True
+
+        if args.workflow_name is not None:
+            jobs = list(filter(lambda j: j["workflow_name"] == args.workflow_name, get_jobs(args.run_name, profile)))
+            # TODO: Handle not found error
+            for job in jobs:
+                # TODO: Do it in batch
+                # TODO: Do it in the right order
+                data = {"job_id": job["job_id"], "abort": args.abort is True}
+                response = requests.request(method="POST", url=f"{profile.server}/jobs/stop",
+                                            data=json.dumps(data).encode("utf-8"),
+                                            headers=headers, verify=profile.verify)
+                if response.status_code != 200:
+                    response.raise_for_status()
+        else:
+            data = {"run_name": args.run_name, "abort": args.abort is True}
             response = requests.request(method="POST", url=f"{profile.server}/runs/stop",
                                         data=json.dumps(data).encode("utf-8"),
                                         headers=headers, verify=profile.verify)
-            if response.status_code == 404:
-                sys.exit(f"No run or job '{args.run_name_or_job_id}' is found")
-            elif response.status_code != 200:
+            if response.status_code != 200:
                 response.raise_for_status()
-            else:
-                print(f"{colorama.Fore.LIGHTBLACK_EX}OK{colorama.Fore.RESET}")
-        elif response.status_code != 200:
-            response.raise_for_status()
+        print(f"{colorama.Fore.LIGHTBLACK_EX}OK{colorama.Fore.RESET}")
     except ConfigurationError:
         sys.exit(f"Call 'dstack config' first")
 
 
 def register_parsers(main_subparsers):
-    parser = main_subparsers.add_parser("stop", help="Stop a run or job")
+    parser = main_subparsers.add_parser("stop", help="Stop a run")
 
-    parser.add_argument('run_name_or_job_id', metavar='(RUN | JOB)', type=str)
-    parser.add_argument("-a", "--abort", help="Abort a run or job, i.e. don't upload artifacts", dest="abort",
+    parser.add_argument("run_name", metavar="RUN", type=str)
+    parser.add_argument("workflow_name", metavar="WORKFLOW", type=str, nargs="?")
+    parser.add_argument("-a", "--abort", help="Don't wait for a graceful stop", dest="abort",
                         action="store_true")
 
     parser.set_defaults(func=default_stop_workflow)
