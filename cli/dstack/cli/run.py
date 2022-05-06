@@ -81,7 +81,7 @@ def register_parsers(main_subparsers, main_parser):
                                                     data=data_bytes,
                                                     headers=headers, verify=profile.verify)
                         if response.status_code == 200:
-                            runs_func(Namespace(run_name=response.json().get("run_name"), n=1, no_jobs=False))
+                            runs_func(Namespace(run_name=response.json().get("run_name"), all=False))
                             if args.follow:
                                 logs_func(Namespace(run_name_or_job_id=response.json().get("run_name"),
                                                     follow=True, since="1d"))
