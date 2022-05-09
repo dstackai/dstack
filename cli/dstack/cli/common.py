@@ -187,7 +187,7 @@ def print_runs(profile, args):
         f"{colorama.Fore.LIGHTMAGENTA_EX}STATUS{colorama.Fore.RESET}",
         # f"{colorama.Fore.LIGHTMAGENTA_EX}PORTS{colorama.Fore.RESET}",
         f"{colorama.Fore.LIGHTMAGENTA_EX}ARTIFACTS{colorama.Fore.RESET}",
-        f"{colorama.Fore.LIGHTMAGENTA_EX}UPDATED{colorama.Fore.RESET}",
+        f"{colorama.Fore.LIGHTMAGENTA_EX}SUBMITTED{colorama.Fore.RESET}",
         f"{colorama.Fore.LIGHTMAGENTA_EX}TAG{colorama.Fore.RESET}",
     ]
     table_rows = []
@@ -195,7 +195,7 @@ def print_runs(profile, args):
         for i in range(len(workflows)):
             workflow = workflows[i]
             workflow_status = workflow["status"].upper()
-            _, updated_at = pretty_duration_and_submitted_at(workflow.get("updated_at"))
+            _, submitted_at = pretty_duration_and_submitted_at(workflow.get("submitted_at"))
             status = workflow["status"].upper()
             table_rows.append([
                 colored(workflow_status, workflow["run_name"]) if i == 0 else "",
@@ -204,7 +204,7 @@ def print_runs(profile, args):
                 colored(status, status),
                 # colored(workflow_status, "<none>"),
                 colored(status, __job_artifacts(workflow["artifact_paths"])),
-                colored(status, updated_at),
+                colored(status, submitted_at),
                 colored(workflow_status,
                         "*" if workflow["tag_name"] == workflow["run_name"] else workflow[
                             "tag_name"] if workflow["tag_name"] else "<none>"),
