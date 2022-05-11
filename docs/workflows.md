@@ -142,17 +142,17 @@ The `python` provider runs a Python script on a single machine with required res
 
 Here's the supported parameters:
 
-| Parameter             | Required         | Description                                         |
-|-----------------------|------------------|-----------------------------------------------------|
-| `script`       | :material-check: | The Python script with arguments                    |
-| `requirements`        |                  | The list of Python packages required by the script. |
-| `python`              |                  | The major Python version. By default, is `3.10`.    |
-| `environment`         |                  | The list of environment variables and their values  |
-| `artifacts`           |                  | The list of output artifacts                        |
-| `resources`           |                  | The resources required to run the workflow          |
-| `resources.cpu`       |                  | The required number of CPUs                         |
-| `resources.memory`    |                  | The required amount of memory                       |
-| `resources.gpu`       |                  | The required number of GPUs                         |
+| Parameter          | Required         | Description                                         |
+|--------------------|------------------|-----------------------------------------------------|
+| `script`           | :material-check: | The Python script with arguments                    |
+| `requirements`     |                  | The list of Python packages required by the script. |
+| `version`          |                  | The major Python version. By default, is `3.10`.    |
+| `environment`      |                  | The list of environment variables and their values  |
+| `artifacts`        |                  | The list of output artifacts                        |
+| `resources`        |                  | The resources required to run the workflow          |
+| `resources.cpu`    |                  | The required number of CPUs                         |
+| `resources.memory` |                  | The required amount of memory                       |
+| `resources.gpu`    |                  | The required number of GPUs                         |
 
 Here's an example:
 
