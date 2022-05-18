@@ -1,4 +1,4 @@
-FROM nvidia/cuda:11.6.0-base-ubuntu20.04
+FROM nvidia/cuda:11.1.1-base-ubuntu20.04
 
 RUN apt update \
   && apt upgrade -y \
@@ -9,8 +9,8 @@ RUN apt update \
   && apt -y install curl \
   && apt install software-properties-common -y \
   && add-apt-repository ppa:deadsnakes/ppa -y \
-  && apt -y install python3.7 \
+  && apt -y install python3.9 \
   && apt -y install python3-distutils \
   && curl https://bootstrap.pypa.io/get-pip.py -o get-pip.py \
-  && python3.7 get-pip.py \
-  && ln -s /usr/bin/python3.7 /usr/bin/python
+  && python3.9 get-pip.py \
+  && ln -s /usr/bin/python3.9 /usr/bin/python
