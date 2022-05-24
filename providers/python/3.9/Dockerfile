@@ -1,6 +1,7 @@
-FROM nvidia/cuda:11.1.1-base-ubuntu20.04
+FROM nvidia/cuda:11.1-base-ubuntu20.04
 
-RUN apt update \
+RUN apt-key adv --fetch-keys https://developer.download.nvidia.com/compute/cuda/repos/ubuntu2004/x86_64/3bf863cc.pub \
+  && apt update \
   && apt upgrade -y \
   && export DEBIAN_FRONTEND=noninteractive \
   && ln -fs /usr/share/zoneinfo/America/New_York /etc/localtime \

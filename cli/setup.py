@@ -36,7 +36,9 @@ setup(
         "tqdm",
         "jsonschema",
         "botocore",
-        "python-dateutil"
+        "python-dateutil",
+        "paramiko",
+        "git-url-parse"
     ],
     classifiers=[
         "Development Status :: 2 - Pre-Alpha",

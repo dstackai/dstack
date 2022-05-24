@@ -8,3 +8,5 @@ tqdm
 jsonschema
 botocore
 python-dateutil
+paramiko
+git-url-parse

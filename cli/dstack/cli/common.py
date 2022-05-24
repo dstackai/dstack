@@ -1,5 +1,4 @@
 import collections
-import hashlib
 import json
 import os
 import sys
@@ -9,12 +8,12 @@ from pathlib import Path
 
 import boto3
 import colorama
+import giturlparse
 import yaml
-from boto3.s3 import transfer
 from git import Repo
+from paramiko.config import SSHConfig
 from requests import request
 from tabulate import tabulate
-from tqdm import tqdm
 
 from dstack.config import get_config
 
@@ -43,6 +42,19 @@ def load_repo_data():
         remote_name = tracking_branch.remote_name
         repo_hash = tracking_branch.repo.head.commit.hexsha
         repo_url = repo.remote(remote_name).url
+
+        repo_url_parsed = giturlparse.parse(repo_url)
+
+        if repo_url_parsed.protocol == "ssh":
+            ssh_config_path = os.path.expanduser('~/.ssh/config')
+            if os.path.exists(ssh_config_path):
+                fp = open(ssh_config_path, 'r')
+                config = SSHConfig()
+                config.parse(fp)
+                repo_url = repo_url.replace(repo_url_parsed.resource,
+                                            config.lookup(repo_url_parsed.resource)['hostname'])
+                # TODO: Detect and pass private key too
+                fp.close()
 
         # TODO: Doesn't support unstaged changes
         repo_diff = repo.git.diff(repo_hash)
@@ -367,68 +379,6 @@ def list_artifact_files(client, artifacts_s3_bucket, artifact_path):
 
     return [(obj["Key"][len(artifact_path):].lstrip("/"), obj["Size"]) for obj in
             (response.get("Contents") or [])]
-
-
-def download_artifact(client, artifacts_s3_bucket, artifact_path, output_dir=None):
-    output_path = Path(output_dir if output_dir is not None else os.getcwd())
-
-    response = client.list_objects(Bucket=artifacts_s3_bucket, Prefix=artifact_path)
-
-    total_size = 0
-    keys = []
-    etags = []
-    for obj in response.get("Contents") or []:
-        key = obj["Key"]
-        etag = obj["ETag"]
-        dest_path = dest_file_path(key, output_path)
-        if dest_path.exists():
-            etag_path = etag_file_path(key, output_path)
-            if etag_path.exists():
-                if etag_path.read_text() != etag:
-                    os.remove(etag_path)
-                    os.remove(dest_path)
-                else:
-                    continue
-
-        total_size += obj["Size"]
-        if obj["Size"] > 0 and not key.endswith("/"):
-            # Skip empty files that designate folders (required by FUSE)
-            keys.append(key)
-            etags.append(etag)
-
-    downloader = transfer.S3Transfer(client, transfer.TransferConfig(), transfer.OSUtils())
-
-    # TODO: Make download files in parallel
-    with tqdm(total=total_size, unit='B', unit_scale=True, unit_divisor=1024,
-              desc=f"Downloading artifact '{short_artifact_path(artifact_path)}'") as pbar:
-        for i in range(len(keys)):
-            key = keys[i]
-            etag = etags[i]
-
-            def callback(size):
-                pbar.update(size)
-
-            file_path = dest_file_path(key, output_path)
-            file_path.parent.mkdir(parents=True, exist_ok=True)
-
-            downloader.download_file(artifacts_s3_bucket, key, str(file_path), callback=callback)
-
-            etag_path = Path(etag_file_path(key, output_path))
-            etag_path.parent.mkdir(parents=True, exist_ok=True)
-            etag_path.write_text(etag)
-
-
-def dest_file_path(key, output_path):
-    return output_path / Path(short_artifact_path(key))
-
-
-def etag_file_path(key, output_path):
-    return cache_dir() / Path(str(hashlib.md5(str(Path(output_path).absolute()).encode('utf-8')).hexdigest())) / Path(
-        key + ".etag")
-
-
-def cache_dir():
-    return Path.home() / Path(".dstack/.cache")
 
 
 def get_user_info(profile):
