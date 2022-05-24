@@ -206,6 +206,12 @@ def upload_func(args: Namespace):
         sys.exit(f"Call 'dstack config' first")
 
 
+def __remove_prefix(text, prefix):
+    if text.startswith(prefix):
+        return text[len(prefix):]
+    return text
+
+
 def upload_artifact(client, artifacts_s3_bucket, artifact_path, local_dir):
     total_size = 0
     for root, sub_dirs, files in os.walk(local_dir):
@@ -224,9 +230,8 @@ def upload_artifact(client, artifacts_s3_bucket, artifact_path, local_dir):
         for root, sub_dirs, files in os.walk(local_dir):
             for filename in files:
                 file_path = os.path.join(root, filename)
-                file_size = os.path.getsize(file_path)
 
-                key = artifact_path + str(file_path).removeprefix(str(Path(local_dir).absolute()))
+                key = artifact_path + __remove_prefix(str(file_path), str(Path(local_dir).absolute()))
                 uploader.upload_file(
                     str(file_path),
                     artifacts_s3_bucket,
