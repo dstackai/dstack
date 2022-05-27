@@ -218,7 +218,10 @@ class Provider:
             "working_dir": job.working_dir,
             "master_job_id": job.master.get_id() if job.master else None
         }
-        print("Request: " + str(request_json))
+        request_json_copy = dict(request_json)
+        if self.workflow.data["repo_diff"]:
+            request_json_copy["repo_diff"] = "<hidden, length is " + str(len(self.workflow.data["repo_diff"])) + ">"
+        print("Request: " + str(request_json_copy))
         response = requests.request(method="POST", url=f"{os.environ['DSTACK_SERVER']}/jobs/submit",
                                     data=json.dumps(request_json).encode("utf-8"),
                                     headers=headers)

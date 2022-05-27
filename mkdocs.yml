@@ -1,7 +1,7 @@
 site_name: dstack
-repo_url: https://github.com/dstackai/dstack
-repo_name: dstackai/dstack
-edit_uri: edit/master/docs/
+#repo_url: https://github.com/dstackai/dstack
+#repo_name: dstackai/dstack
+#edit_uri: edit/master/docs/
 theme:
   name: material
   logo: assets/dstack_notext.png
@@ -29,7 +29,7 @@ theme:
   features:
     - toc.integrate
     - navigation.sections
-    #    - navigation.expand
+#    - navigation.expand
     - navigation.top
 markdown_extensions:
   - pymdownx.emoji:
@@ -65,12 +65,10 @@ nav:
       - Overview: index.md
       - Quickstart: quickstart.md
   - Guides:
-#      - Concepts: concepts.md
       - Workflows: workflows.md
       - Runners: runners.md
       - Custom providers: custom-providers.md
       - Docker: docker.md
   - Help:
-      - Issue tracker: https://github.com/dstackai/dstack/issues
       - Slack community: https://join.slack.com/t/dstackai/shared_invite/zt-xdnsytie-D4qU9BvJP8vkbkHXdi6clQ
-      - Open a chat 💬: "javascript:$crisp.push(['do', 'chat:show']);$crisp.push(['do', 'chat:open']);"
+      - Issue tracker: https://github.com/dstackai/dstack/issues
