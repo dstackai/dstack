@@ -1,147 +1,41 @@
 # What is dstack?
 
-##### dstack is the modern CI/CD made for training models
+##### Automate continuous training workflows and version training data
 
-dstack allows you to automate training workflows, version and reuse
-data and models using a cloud vendor of your choice.
+🚀 With dstack, you don't need sophisticated MLOps platforms anymore – just as you don't need to manually manage your 
+ infrastructure or version your data yourself.
 
-## Principles
-
-### 🤖 Infrastructure as code
-
-Typical data and training workflows deal with processing huge amounts of data. They typically involve
-piping together numerous tasks that may have different hardware requirements.
-
-dstack allows you to define workflows and infrastructure requirements as code using declarative configuration files. 
-When you run a workflow, dstack provisions the required infrastructure on-demand.
-
-When defining a workflow, you can either use the built-in providers (that support specific use-cases), 
-or create custom providers for specific use-cases using dstack's Python API.
-
-### 🧬 Made for continuous training
-
-Training models doesn't end when you ship your model to production. It only starts there. Once your model is deployed,
-it’s critical to observe the model, back-track issues that occur to the model to the steps of the training pipeline, fix
-these issues, re-train on new data, validate, and re-deploy your model.
-
-dstack allows you to build a pipeline that can run on a regular basis.
-
-### 🤝 Designed for collaboration and reuse
-
-dstack allows you to collaborate in multiple ways. On the one hand, the outputs of workflows, such as data and models
-can be tagged and reused in other workflows within your team or across.
-On the other hand, it's possible to reuse the providers built by other teams or by the community.
-
-### 🪛 Technology-agnostic
-
-With dstack, you can use any languages (`Python`, `R`, `Scala`, or any other), any frameworks (including the distributed
-frameworks, such as `Dask`, `Ray`, `Spark`, `Tensorflow`, `PyTorch`, and any others), any experiment trackers,
-any computing vendors or your own hardware.
-
-## Quick tour
-
-### 🧬 Workflows
-
-#### Configuration files
-
-Workflows are defined in the `.dstack/workflows.yaml` file within your project. 
-
-If you plan to pass variables to your workflows when you run them, you have to describe these variables in the 
-`.dstack/variables.yaml` file, next to workflows.
-
-=== ".dstack/workflows.yaml"
-
-    ```yaml
-    workflows:
-      - name: prepare
-        provider: python
-        script: prepare.py
-        artifacts:
-          - data
-        resources:
-          gpu: ${{ pgpu }}
-    ```
-
-=== ".dstack/variables.yaml"
-
-    ```yaml
-    variables:
-      prepare:
-        pgpu: 1
-    ```
-
-#### Command-line interface
-
-To run this `Workflow`, use the following command of the dstack `CLI`:
-
-```bash
-dstack run prepare --pgpu 4
-```
-
-Once you do that, you'll see this run in the user interface. Shortly, dstack will assign it to one of the available 
-runners or to a runner provisioned from a computing vendor that is configured for your account.
-
-#### Tags
-
-When the run is completed, you can assign a tag to it, e.g. `latest`. 
+!!! info ""
+    dstack allows you to run training from your IDE without having to commit local changes to Git before every run. 
+    At the same time, dstack tracks uncommitted changes and also saves output artifacts of your workflows automatically.
     
-If you do that, you later can refer to this tagged workflow from other workflows:
+    Using dstack is very easy. All you need to do is link your cloud account to dstack, and add declarative configuration 
+    files to your project. Then you can run any workflow from the CLI, and dstack will take care of the rest.
 
-=== ".dstack/workflows.yaml"
+#### Why use dstack?
 
-    ```yaml
-    workflows:
-      - name: prepare
-        provider: python
-        script: prepare.py
-        artifacts:
-          - data
-        resources:
-          gpu: ${{ pgpu }}
+- **Infrastructure**: No more pain with setting up infrastructure. Define what infrastructure you need in your configuration files,
+  and dstack will automatically set up the required infrastructure in your cloud and will tear it down once it's not needed.
+- **Reproducibility**: Every workflow is fully reproducibly
+- **Data versioning**: All output artifacts are tracked automatically in real-time as your workflows is running.
+  You can assign a tag to any run, and reuse its artifacts from other workflows.
 
-      - name: train
-        provider: python
-        script: train.py
-        artifacts:
-          - checkpoint
-        depends-on:
-          - prepare:latest
-        resources:
-          gpu: ${{ tgpu }}     
-    ```
+#### More reasons to use dstack:
 
-=== ".dstack/variables.yaml"
+- **Python scripts**: dstack makes it very easy to run trainings with Python scripts.
+- **Git**: Fully integrated with Git. To run a workflow, you don't have to commit local changes. dstack tracks it automatically.
+- **Interruptible workflows**: dstack helps you use interruptible (cheaper) instances for long trainings as it may save checkpoints in real-time
+  and resume from where it finished.
+- **Easy to use**: No changes in your code is required. Just add configuration files and run workflows via the CLI.
+- **Interoperability**: A variety of built-in providers that support various use-cases, as well as an API to extend the platform if needed.
 
-    ```yaml
-    variables:
-      prepare:
-        pgpu: 1
+**Here's what you can do with dstack:**
 
-      train:
-        tgpu: 1
-    ```
-
-When you run the `train` workflow, dstack will mount to it the `data` folder produced by the `prepare:latest`.
-
-### 🤖 Runners
-
-There are two ways to provision infrastructure: by using on-demand or self-hosted runners.
-
-#### On-demand runners
-
-To use on-demand runners, go to the `Settings`, then `AWS`, provide your credentials, and configure limits:
-
-![](images/dstack_on_demand_settings.png){ lazy=true width="925" }
-
-Once you configure these limits, runners will be provisioned automatically for the time of the run.
-
-#### Self-hosted runners
-
-As an alternative to on-demand runners, you can use your own hardware to run workflows.
-
-To use your own server with dstack, you need to install the `dstack-runner` daemon there:
-
-```bash
-curl -fsSL https://get.dstack.ai/runner -o get-dstack-runner.sh
-sudo sh get-dstack-runner.sh
-```
+- **Infrastructure as code**: Forget about infrastructure. Just define your workflows and the resources they need declaratively and run your workflows
+  interactively via the CLI.
+- **Use existing cloud**: Use your existing cloud account to provision infrastructure. You only need to provide dstack credentials to 
+  create EC2 instances.
+- **Version and reuse data**: Version and reuse data. The output artifacts are saved automatically. Put a tag to a particular run, and reuse its 
+  artifacts from other workflows.
+- **Track experiments**: Use a experiment tracker of your choice to track metrics, incl. W&B, Comet, Neptune, etc.
+- **Automate workflows**: Automate preparing data, training, validating, and deployment of your models.
