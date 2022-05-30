@@ -9,26 +9,30 @@ To complete this quickstart guide, ensure the following:
 * You've [signed up](https://dstack.ai/signup) with dstack
 * You have an existing AWS account (otherwise, [sign up](https://portal.aws.amazon.com/billing/signup) for AWS beforehand)
 * You have Git installed locally
-* You have Python 3.7 (or higher) and pip installed locally 
+* You have Python 3.7 (or higher) and pip installed locally
+
+!!! info ""
+    Currently, dstack supports only AWS. GCP and Azure support is under a private beta. To 
+    try GCP and Azure support, drop an email to `hello@dstack.ai`.
 
 ## Step 1: Link your AWS account
 
-To let dstack provision infrastructure for running workflows in your cloud account, you have to provide
+To let dstack provision the infrastructure required for your workflows in your AWS account, you have to provide
 dstack the corresponding credentials. To do that, go to the `Settings`, and then `AWS`.
 
 Here, provide `AWS Access Key ID` and `AWS Secret Access Key` that have the
 [corresponding](runners.md#on-demand-runners) permissions to create EC2 instances in your AWS account.
 
-Once you've specified credentials, use the `Add limit` button to configure limits:
+Once you've provided the credentials, use the `Add limit` button to configure the limits:
 
 ![](images/dstack_on_demand_settings.png){ lazy=true width="1060" }
 
-The `Limits` instruct dstack about the maximum number of EC2 instances of the specific `Instance Type` and in the specific `Region`, that
-dstack can create at one time.
+The limits tell dstack what maximum number of EC2 instances of the specific instance type and i particular region
+dstack can provision.
 
 ## Step 2: Install the CLI
 
-To run workflows, you need the dstack CLI. Here's how to install and configure it:
+To run workflows, you'll need the dstack CLI. Here's how to install and configure it:
 
 ```bash
 pip install dstack -U

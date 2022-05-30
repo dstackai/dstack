@@ -65,6 +65,7 @@ nav:
       - Overview: index.md
       - Quickstart: quickstart.md
   - Basics:
+      - Setup: setup.md
       - Workflows: workflows.md
       - Runners: runners.md
       - Custom providers: custom-providers.md
