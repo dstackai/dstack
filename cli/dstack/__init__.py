@@ -42,6 +42,7 @@ class Job(JobRef):
                  environment: Dict[str, str] = None,
                  working_dir: Optional[str] = None,
                  artifacts: Optional[List[str]] = None,
+                 port_count: int = 0,
                  ports: List[int] = None,
                  resources: Optional[Resources] = None,
                  depends_on: Optional[List[JobRef]] = None,
@@ -51,6 +52,7 @@ class Job(JobRef):
         self.commands = commands
         self.environment = environment
         self.working_dir = working_dir
+        self.port_count = port_count
         self.ports = ports
         self.artifacts = artifacts
         self.resources = resources
@@ -213,7 +215,8 @@ class Provider:
             "resources": resources,
             "image_name": job.image,
             "commands": job.commands,
-            "ports": {str(port): None for port in job.ports} if job.ports else None,
+            "port_count": job.port_count if job.port_count else None,
+            "ports": {str(port) for port in job.ports} if job.ports else None,
             "environment": job.environment,
             "working_dir": job.working_dir,
             "master_job_id": job.master.get_id() if job.master else None
