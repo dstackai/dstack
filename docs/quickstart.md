@@ -4,7 +4,7 @@ This quickstart guide will introduce you to the key concepts and help you with t
 
 ## Prerequisites
 
-To complete this quickstart guide, ensure the following:
+Before you'll follow this quickstart guide, ensure the following:
 
 * You've [signed up](https://dstack.ai/signup) with dstack
 * You have an existing AWS account (otherwise, [sign up](https://portal.aws.amazon.com/billing/signup) for AWS beforehand)
@@ -166,3 +166,5 @@ To download the artifacts locally, use the following CLI command:
 ```bash
 dstack artifacts download <run-name>
 ```
+
+[//]: # (TODO: Add screenshots)

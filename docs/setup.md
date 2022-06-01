@@ -4,7 +4,7 @@ This guide will walk you through the main steps that you have to take before you
 
 ## Prerequisites
 
-To complete this guide, ensure the following:
+Before you'll follow this guide, ensure the following:
 
 * You've [signed up](https://dstack.ai/signup) with dstack
 * You have an existing AWS account (otherwise, [sign up](https://portal.aws.amazon.com/billing/signup) for AWS beforehand)
@@ -47,7 +47,8 @@ Your token value can be found in `Settings`:
 
 In order to run workflows remotely, dstack will need access to your project Git repository.
 
-!!! "This is why you have to use the CLI from the directory where you cloned your project Git repository"
+!!! info ""
+    This is why you have to use the CLI from the directory where you cloned your project Git repository
 
 There are two ways to grant dstack access to your Git repository:
 
@@ -117,5 +118,7 @@ The configured secrets are passed to the workflows as environment variables.
 Here's an example of how you can access them from Python: 
 
 ```python
+import os
+
 wandb_api_key = os.environ.get("WANDB_API_KEY")
 ```
