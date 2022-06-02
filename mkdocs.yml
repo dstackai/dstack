@@ -56,20 +56,21 @@ extra:
   analytics:
     provider: google
     property: UA-4493451-5
-#plugins:
-#    - redirects:
-#        redirect_maps:
-#            'installation.md': 'quickstart.md'
+plugins:
+    - redirects:
+        redirect_maps:
+            'workflows.md': 'define-workflows.md'
 nav:
   - Get started:
       - Overview: index.md
       - Quickstart: quickstart.md
   - Basics:
       - Setup: setup.md
-      - Workflows: workflows.md
-      - Runners: runners.md
-      - Custom providers: custom-providers.md
-      - Docker: docker.md
+      - Define workflows: define-workflows.md
+      - Run workflows: run-workflows.md
+#      - Runners: runners.md
+#      - Custom providers: custom-providers.md
+#      - Docker: docker.md
   - Help:
       - Slack community: https://join.slack.com/t/dstackai/shared_invite/zt-xdnsytie-D4qU9BvJP8vkbkHXdi6clQ
       - Issue tracker: https://github.com/dstackai/dstack/issues
