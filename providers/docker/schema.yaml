@@ -21,6 +21,8 @@ properties:
         type: string
       gpu:
         type: integer
+      shm_size:
+        type: string
     additionalProperties: false
   artifacts:
     type: array

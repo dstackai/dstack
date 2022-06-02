@@ -19,10 +19,11 @@ class Gpu:
 
 class Resources:
     def __init__(self, cpu: Optional[int] = None, memory: Optional[str] = None,
-                 gpu: Optional[Gpu] = None):
+                 gpu: Optional[Gpu] = None, shm_size: Optional[str] = None):
         self.cpu = cpu
         self.memory = memory
         self.gpu = gpu
+        self.shm_size = shm_size
 
 
 class JobRef:
@@ -149,7 +150,9 @@ class Provider:
                     gpu = int(self.workflow.data["resources"][resource_name])
                     if gpu > 0:
                         resources.gpu = Gpu(gpu, name=resource_name[:-4])
-            if resources.cpu or resources.memory or resources.gpu:
+            if self.workflow.data["resources"].get("shm_size"):
+                resources.shm_size = self.workflow.data["resources"]["shm_size"]
+            if resources.cpu or resources.memory or resources.gpu or resources.shm_size:
                 return resources
             else:
                 return None
@@ -201,6 +204,8 @@ class Provider:
                     resources["gpu"]["memory"] = job.resources.gpu.memory
                 if job.resources.gpu.name:
                     resources["gpu"]["name"] = job.resources.gpu.name
+            if job.resources.shm_size:
+                resources["shm_size"] = job.resources.shm_size
         request_json = {
             "user_name": self.workflow.data["user_name"],
             "run_name": self.workflow.data["run_name"],
