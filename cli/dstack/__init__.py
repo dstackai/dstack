@@ -43,8 +43,8 @@ class Job(JobRef):
                  environment: Dict[str, str] = None,
                  working_dir: Optional[str] = None,
                  artifacts: Optional[List[str]] = None,
-                 port_count: int = 0,
-                 ports: List[int] = None,
+                 port_count: Optional[int] = None,
+                 ports: Optional[List[int]] = None,
                  resources: Optional[Resources] = None,
                  depends_on: Optional[List[JobRef]] = None,
                  master: Optional[JobRef] = None):
