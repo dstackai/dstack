@@ -221,7 +221,7 @@ class Provider:
             "image_name": job.image,
             "commands": job.commands,
             "port_count": job.port_count if job.port_count else None,
-            "ports": {str(port) for port in job.ports} if job.ports else None,
+            "ports": [str(port) for port in job.ports] if job.ports else None,
             "environment": job.environment,
             "working_dir": job.working_dir,
             "master_job_id": job.master.get_id() if job.master else None
