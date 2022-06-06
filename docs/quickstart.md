@@ -168,3 +168,5 @@ dstack artifacts download <run-name>
 ```
 
 [//]: # (TODO: Add screenshots)
+
+[//]: # (TODO: Tell about dstack artifacts upload)

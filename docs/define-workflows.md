@@ -88,6 +88,8 @@ The `train` workflow will then use the output artifacts from the tagged `downloa
 !!! tip ""
     Tags allow you to version the outputs of workflows and reuse their output artifacts in other workflows.
 
+[//]: # (TODO: Tell about dstack artifacts upload)
+
 ## Provider-specific properties
 
 Each workflow must include a `provider` property. This property tells which program will run the workflow.
@@ -158,7 +160,24 @@ import os
 batch_size = os.environ.get("BATCH_SIZE")
 ```
 
-!!! tip ""
+!!! info ""
     If you want, you can also use variables within the `.dstack/workflows.yaml` file, via the following syntax: `${{ variable_name }}`.
 
 Any variable can be overridden via the CLI when you run a workflow.
+
+## Secrets
+
+If you plan to use third-party services from your workflows, you can use dstack's secrets 
+to securely pass passwords and tokens.
+
+Adding secrets can be done via `Settings`.
+
+The configured secrets are passed to the workflows as environment variables. 
+
+Here's an example of how you can access them from Python: 
+
+```python
+import os
+
+wandb_api_key = os.environ.get("WANDB_API_KEY")
+```
