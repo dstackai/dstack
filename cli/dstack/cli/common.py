@@ -3,7 +3,6 @@ import json
 import os
 import sys
 import typing as ty
-from itertools import groupby
 from pathlib import Path
 
 import boto3
@@ -146,19 +145,6 @@ def get_jobs(run_name: ty.Optional[str], profile):
     return jobs
 
 
-def get_runs_v2(args, profile):
-    headers, params = headers_and_params(profile, None, False)
-    # del params["repo_url"]
-    if args.all:
-        params["n"] = 1000
-    response = request(method="GET", url=f"{profile.server}/runs/workflows/query", params=params, headers=headers,
-                       verify=profile.verify)
-    response.raise_for_status()
-    # runs = sorted(response.json()["runs"], key=lambda job: job["updated_at"])
-    runs = reversed(response.json()["runs"])
-    return runs
-
-
 def get_runners(profile):
     headers, params = headers_and_params(profile, None, require_repo=False)
     response = request(method="GET", url=f"{profile.server}/runners/query", params=params, headers=headers,
@@ -187,42 +173,6 @@ def pretty_repo_url(repo_url):
     if r.startswith("https://github.com"):
         r = r[19:]
     return r
-
-
-def print_runs(profile, args):
-    runs = get_runs_v2(args, profile)
-    runs_by_name = [(run_name, list(run)) for run_name, run in groupby(runs, lambda run: run["run_name"])]
-    table_headers = [
-        f"{colorama.Fore.LIGHTMAGENTA_EX}RUN{colorama.Fore.RESET}",
-        f"{colorama.Fore.LIGHTMAGENTA_EX}WORKFLOW{colorama.Fore.RESET}",
-        # f"{colorama.Fore.LIGHTMAGENTA_EX}REPO{colorama.Fore.RESET}",
-        f"{colorama.Fore.LIGHTMAGENTA_EX}STATUS{colorama.Fore.RESET}",
-        # f"{colorama.Fore.LIGHTMAGENTA_EX}PORTS{colorama.Fore.RESET}",
-        f"{colorama.Fore.LIGHTMAGENTA_EX}ARTIFACTS{colorama.Fore.RESET}",
-        f"{colorama.Fore.LIGHTMAGENTA_EX}SUBMITTED{colorama.Fore.RESET}",
-        f"{colorama.Fore.LIGHTMAGENTA_EX}TAG{colorama.Fore.RESET}",
-    ]
-    table_rows = []
-    for run_name, workflows in runs_by_name:
-        for i in range(len(workflows)):
-            workflow = workflows[i]
-            workflow_status = workflow["status"].upper()
-            _, submitted_at = pretty_duration_and_submitted_at(workflow.get("submitted_at"))
-            status = workflow["status"].upper()
-            table_rows.append([
-                colored(workflow_status, workflow["run_name"]) if i == 0 else "",
-                colored(status, workflow["workflow_name"]),
-                # colored(status, pretty_repo_url(workflow["repo_url"])),
-                colored(status, status),
-                # colored(workflow_status, "<none>"),
-                colored(status, __job_artifacts(workflow["artifact_paths"])),
-                colored(status, submitted_at),
-                colored(workflow_status,
-                        "*" if workflow["tag_name"] == workflow["run_name"] else workflow[
-                            "tag_name"] if workflow["tag_name"] else "<none>"),
-            ])
-
-    print(tabulate(table_rows, headers=table_headers, tablefmt="plain"))
 
 
 def get_runner_name(run_or_job):
@@ -277,27 +227,6 @@ def colored(status: str, val: str, bright: bool = False):
     return f"{colorama.Style.BRIGHT}{c}{colorama.Style.RESET_ALL}" if bright else c
 
 
-def pretty_duration_and_submitted_at(submitted_at, started_at = None, finished_at = None):
-    if started_at is not None and finished_at is not None:
-        _finished_at_milli = round(finished_at / 1000)
-        duration_milli = _finished_at_milli - round(started_at / 1000)
-        hours, remainder = divmod(duration_milli, 3600)
-        minutes, seconds = divmod(remainder, 60)
-        duration_str = ""
-        if int(hours) > 0:
-            duration_str += "{} hours".format(int(hours))
-        if int(minutes) > 0:
-            if int(hours) > 0:
-                duration_str += " "
-            duration_str += "{} mins".format(int(minutes))
-        if int(hours) == 0 and int(minutes) == 0:
-            duration_str = "{} secs".format(int(seconds))
-    else:
-        duration_str = "<none>"
-    submitted_at_str = pretty_date(round(submitted_at / 1000)) if submitted_at is not None else "<none>"
-    return duration_str, submitted_at_str
-
-
 def print_runners(profile):
     runners = get_runners(profile)
     table_headers = [f"{colorama.Fore.LIGHTMAGENTA_EX}RUNNER{colorama.Fore.RESET}",
@@ -349,13 +278,6 @@ def __job_ids(ids):
         return ", ".join(ids)
     else:
         return ""
-
-
-def __job_artifacts(paths):
-    if paths is not None and len(paths) > 0:
-        return "\n".join(map(lambda path: short_artifact_path(path), paths))
-    else:
-        return "<none>"
 
 
 def short_artifact_path(path):
