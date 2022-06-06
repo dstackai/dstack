@@ -10,6 +10,7 @@ class PythonProvider(Provider):
         self.script = self.workflow.data.get("python_script") or self.workflow.data["script"]
         # TODO: Handle numbers such as 3.1 (e.g. require to use strings)
         self.version = str(self.workflow.data.get("version") or self.workflow.data.get("python") or "3.10")
+        self.args = self.workflow.data.get("args")
         self.requirements = self.workflow.data.get("requirements")
         self.environment = self.workflow.data.get("environment") or {}
         self.artifacts = self.workflow.data.get("artifacts")
@@ -21,6 +22,7 @@ class PythonProvider(Provider):
         return [Job(
             image=self.image,
             commands=self._commands(),
+            environment=self.environment,
             working_dir=self.working_dir,
             resources=self.resources,
             artifacts=self.artifacts
@@ -34,13 +36,14 @@ class PythonProvider(Provider):
         commands = []
         if self.requirements:
             commands.append("pip install -r " + self.requirements)
-        environment_init = ""
-        if self.environment:
-            for name in self.environment:
-                escaped_value = self.environment[name].replace('"', '\\"')
-                environment_init += f"{name}=\"{escaped_value}\" "
+        args_init = ""
+        if self.args:
+            if isinstance(self.args, str):
+                args_init += " " + self.args
+            if isinstance(self.args, list):
+                args_init += " " + ",".join(map(lambda arg: "\"" + arg.replace('"', '\\"') + "\"", self.args))
         commands.append(
-            f"{environment_init}python {self.script}"
+            f"python {self.script}{args_init}"
         )
         return commands
 

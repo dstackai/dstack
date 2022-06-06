@@ -10,6 +10,12 @@ properties:
     enum: [ "3.10", "3.9", "3.8", "3.7" ]
   script:
     type: string
+  args:
+    oneOf:
+      - type: string
+      - type: array
+        items:
+          type: string
   version:
     oneOf:
       - type: string
@@ -26,9 +32,21 @@ properties:
       memory:
         type: string
       gpu:
-        type: integer
+        oneOf:
+          - type: integer
+          - type: object
+            additionalProperties: false
+            properties:
+              count:
+                type: integer
+              name:
+                type: string
+              memory:
+                type: string
       shm_size:
         type: string
+      interruptible:
+        type: boolean
     additionalProperties: false
   environment:
     type: object

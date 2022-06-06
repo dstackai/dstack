@@ -20,17 +20,27 @@ properties:
       memory:
         type: string
       gpu:
-        type: integer
+        oneOf:
+          - type: integer
+          - type: object
+            additionalProperties: false
+            properties:
+              count:
+                type: integer
+              name:
+                type: string
+              memory:
+                type: string
       shm_size:
         type: string
+      interruptible:
+        type: boolean
     additionalProperties: false
   artifacts:
     type: array
     items:
       type: string
   ports:
-    type: array
-    items:
-      type: integer
+    type: integer
 required:
   - image
