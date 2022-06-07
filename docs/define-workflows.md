@@ -25,23 +25,19 @@ Here's a basic example of how workflows can be defined:
 
     ```yaml
     workflows:
-      # This workflow downloads the training data 
       - name: download
+        help: "Downloads the training data" 
         provider: python
-        script: download.py
-        artifacts:
-          - data
+        script: "download.py"
+        artifacts: ["data"]
     
-      # This workflow trains a model using the data from the `download` workflow
       - name: train
-        # This workflow uses the artifacts of the `download` workflow tagged `latest`
+        help: "Trains a model and saves the checkpoints"
         depends-on:
           - download:latest
         provider: python
-        script: train.py
-        artifacts:
-          - model
-        # What resources the workflow needs 
+        script: "train.py"
+        artifacts: ["model"]
         resources:
           memory: 64GB
           gpu: 4
