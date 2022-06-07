@@ -21,9 +21,10 @@ def register_parsers(main_subparsers, main_parser):
     variables = load_variables()
     workflows = (workflows_yaml.get("workflows") or []) if workflows_yaml is not None else []
     workflow_names = [w.get("name") for w in workflows]
+    workflow_helps = {w.get("name"): w.get("help") for w in workflows}
     subparsers = parser.add_subparsers()
     for workflow_name in workflow_names:
-        workflow_parser = subparsers.add_parser(workflow_name, help=f"Run the '{workflow_name}' workflow")
+        workflow_parser = subparsers.add_parser(workflow_name, help=workflow_helps.get(workflow_name))
         workflow_parser.add_argument("--follow", "-f",
                                      help="Whether to continuously poll and print logs of the workflow. "
                                           "By default, the command doesn't print logs. To exit from this "

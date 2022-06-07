@@ -15,7 +15,7 @@ Before you'll follow this quickstart guide, ensure the following:
     Currently, dstack supports only AWS. GCP and Azure support is under a private beta. To 
     try GCP and Azure support, drop an email to `hello@dstack.ai`.
 
-## Step 1: Link your AWS account
+## Step 1: Link your cloud account
 
 To let dstack provision the infrastructure required for your workflows in your AWS account, you have to provide
 dstack the corresponding credentials. To do that, go to the `Settings`, and then `AWS`.
@@ -25,7 +25,7 @@ Here, provide `AWS Access Key ID` and `AWS Secret Access Key` that have the
 
 Once you've provided the credentials, use the `Add limit` button to configure the limits:
 
-![](images/dstack_on_demand_settings.png){ lazy=true width="1060" }
+![](images/dstack_on_demand_settings.png){ lazy=true width="1080" }
 
 The limits tell dstack what maximum number of EC2 instances of the specific instance type and i particular region
 dstack can provision.
@@ -62,20 +62,20 @@ the following content:
     ```yaml
     workflows:
       - name: download
+        help: "Downloads the MNIST dataset"
         provider: python
-        script: download.py
-        requirements: requirements.txt
-        artifacts:
-          - data
+        script: "download.py"
+        requirements: "requirements.txt"
+        artifacts: ["data"]
 
       - name: train
-        provider: python
-        script: train.py
-        requirements: requirements.txt
+        help: "Trains a model and saves the checkpoints"
         depends-on:
           - download:latest
-        artifacts:
-          - model
+        provider: python
+        script: "train.py"
+        requirements: "requirements.txt"
+        artifacts: ["model"]
         resources:
           gpu: 1
     ```

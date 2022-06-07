@@ -15,7 +15,7 @@ Before you'll follow this guide, ensure the following:
     Currently, dstack supports only AWS. GCP and Azure support is under a private beta. To 
     try GCP and Azure support, drop an email to `hello@dstack.ai`.
 
-## Step 1: Link your AWS account
+## Step 1: Link your cloud account
 
 To let dstack provision the infrastructure required for your workflows in your AWS account, you have to provide
 dstack the corresponding credentials. To do that, go to the `Settings`, and then `AWS`.
