@@ -1,0 +1,30 @@
+type: object
+additionalProperties: false
+properties:
+  version:
+    type: string
+  requirements:
+    type: string
+  script:
+    type: string
+  environment:
+    type: object
+    additionalProperties: true
+  working_dir:
+    type: string
+  resources:
+    type: object
+    properties:
+      nodes:
+        type: integer
+      cpu:
+        type: integer
+      memory:
+        type: string
+      gpu:
+        type: integer
+    additionalProperties: false
+  artifacts:
+    type: array
+    items:
+      type: string
