@@ -24,3 +24,8 @@ providers:
     commands:
       - pip3 install -r providers/jupyterlab/requirements.txt
       - PYTHONPATH=providers python3 providers/jupyterlab/main.py
+  - name: jupyter
+    image: python:3.9
+    commands:
+      - pip3 install -r providers/jupyter/requirements.txt
+      - PYTHONPATH=providers python3 providers/jupyter/main.py
