@@ -3,6 +3,7 @@ from typing import List
 from dstack import Provider, Job
 
 
+# TODO: Provide job.applications (incl. application name, and query)
 class JupyterProvider(Provider):
     def __init__(self):
         super().__init__(schema="providers/python/schema.yaml")

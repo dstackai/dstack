@@ -24,7 +24,7 @@ Example:
 ```yaml
 workflows:
   - name: notebook  
-    provider: jupyter
+    provider: jupyter@experimental
     artifacts:
       - output
     resources:

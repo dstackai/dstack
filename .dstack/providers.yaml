@@ -29,3 +29,8 @@ providers:
     commands:
       - pip3 install -r providers/jupyter/requirements.txt
       - PYTHONPATH=providers python3 providers/jupyter/main.py
+  - name: vscode
+    image: python:3.9
+    commands:
+      - pip3 install -r providers/vscode/requirements.txt
+      - PYTHONPATH=providers python3 providers/vscode/main.py
