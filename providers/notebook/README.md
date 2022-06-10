@@ -1,4 +1,4 @@
-# dstack jupyterlab provider
+# dstack notebook provider
 
 This provider runs a Jupyter notebook instance on a single machine with required resources.
 
@@ -24,7 +24,7 @@ Example:
 ```yaml
 workflows:
   - name: notebook  
-    provider: jupyter@experimental
+    provider: notebook@experimental
     artifacts:
       - output
     resources:

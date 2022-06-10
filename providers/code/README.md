@@ -1,13 +1,13 @@
-# dstack jupyter provider
+# dstack code provider
 
-This provider runs a JupyterLab instance on a single machine with required resources.
+This provider runs an [OpenVSCode Server](https://github.com/gitpod-io/openvscode-server) on a single machine with required resources.
 
 Here's the list of parameters supported by the provider:
 
 | Parameter                 | Required | Description                                                          |
 |---------------------------|----------|----------------------------------------------------------------------|
 | `requirements`            | No       | The list of Python packages to pre-install                           |
-| `version`                 | No       | The JupyterLab version                                               |
+| `version`                 | No       | The OpenVSCode version. By default, it's `1.67.2`.                   |
 | `python`                  | No       | The major Python version. By default, it's `3.10`.                   |
 | `environment`             | No       | The list of environment variables and their values                   |
 | `artifacts`               | No       | The list of output artifacts                                         |
@@ -23,8 +23,8 @@ Example:
 
 ```yaml
 workflows:
-  - name: lab  
-    provider: jupyterlab@experimental
+  - name: ide  
+    provider: code@experimental
     artifacts:
       - output
     resources:
