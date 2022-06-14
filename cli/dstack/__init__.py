@@ -102,6 +102,7 @@ class Provider:
         pass
 
     def start(self):
+        print("Workflow data: " + str(self.workflow.data))
         jobs = self.create_jobs()
         # TODO: Handle previous jobs and master job
         for job in jobs:
@@ -128,13 +129,22 @@ class Provider:
                     workflow_data = dict(self.workflow.data)
                     del workflow_data["user_name"]
                     del workflow_data["run_name"]
-                    del workflow_data["workflow_name"]
+                    if "workflow_name" in workflow_data:
+                        del workflow_data["workflow_name"]
                     del workflow_data["repo_url"]
                     del workflow_data["repo_branch"]
                     del workflow_data["repo_hash"]
                     del workflow_data["repo_diff"]
                     del workflow_data["variables"]
                     del workflow_data["previous_job_ids"]
+                    if "provider_name" in workflow_data:
+                        del workflow_data["provider_name"]
+                    if "provider_branch" in workflow_data:
+                        del workflow_data["provider_branch"]
+                    if "provider_args" in workflow_data:
+                        del workflow_data["provider_args"]
+                    if "depends-on" in workflow_data:
+                        del workflow_data["depends_on"]
                     if "working_dir" in workflow_data and workflow_data.get("working_dir") == '':
                         # This is a workaround to delete empty working_dir;
                         # TODO: This must be fixed in dstack-runner
@@ -229,7 +239,7 @@ class Provider:
         request_json = {
             "user_name": self.workflow.data["user_name"],
             "run_name": self.workflow.data["run_name"],
-            "workflow_name": self.workflow.data["workflow_name"],
+            "workflow_name": self.workflow.data.get("workflow_name") or None,
             "previous_job_ids": previous_job_ids or None,
             "repo_url": self.workflow.data["repo_url"],
             "repo_branch": self.workflow.data["repo_branch"],
