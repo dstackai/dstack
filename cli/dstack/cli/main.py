@@ -43,7 +43,8 @@ def main():
         parser.print_help()
         exit(1)
 
-    args = parser.parse_args()
+    args, unknown = parser.parse_known_args()
+    args.unknown = unknown
     args.func(args)
 
 
