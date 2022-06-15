@@ -48,7 +48,7 @@ class DockerProvider(Provider):
         if args.ports:
             self.workflow.data["ports"] = args.ports
         if args.artifact:
-            self.workflow.data["artifacts"] = args.artifacts
+            self.workflow.data["artifacts"] = args.artifact
         if args.working_dir:
             self.workflow.data["working_dir"] = args.working_dir
         if args.env:
