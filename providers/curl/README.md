@@ -10,7 +10,7 @@ Here's the list of parameters supported by the provider:
 | `output`      | Yes      | The path to store the file.      |
 | `artifacts`   | No       | The list of output artifacts.    |
 
-Example:
+Workflow wxample:
 
 ```yaml
 workflows:
@@ -20,4 +20,10 @@ workflows:
     output: raw_dataset/input.txt
     artifacts:
       - raw_dataset
+```
+
+Command line example:
+
+```bash
+dstack run curl https://github.com/karpathy/char-rnn/blob/master/data/tinyshakespeare/input.txt -o raw_dataset/input.txt --artifact raw_dataset
 ```

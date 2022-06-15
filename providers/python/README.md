@@ -6,7 +6,7 @@ Here's the list of parameters supported by the provider:
 
 | Parameter                 | Required | Description                                                          |
 |---------------------------|----------|----------------------------------------------------------------------|
-| `script`                  | Yes      | The Python script to run                                             |
+| `file`                    | Yes      | The Python file to run                                               |
 | `args`                    | No       | The arguments for the Python script                                  |
 | `requirements`            | No       | The list of Python packages required by the script                   |
 | `version`                 | No       | The major Python version. By default, it's `3.10`.                   |
@@ -20,14 +20,15 @@ Here's the list of parameters supported by the provider:
 | `resources.gpu.count`     | No       | The required number of GPUs                                          |
 | `resources.interruptible` | No       | `True` if the workflow can be interrupted. By default, it's `False`. |
 
-Example:
+Workflow example:
 
 ```yaml
 workflows:
   - name: download-model  
     provider: python
     requirements: requirements.txt
-    script: download_model.py
+    file: download_model.py
+    args: ["--model", "117M"]
     environment:
       PYTHONPATH: src
     artifacts:
@@ -36,4 +37,10 @@ workflows:
       cpu: 2
       memory: 32GB
       gpu: 1
+```
+
+Command line example:
+
+```bash
+dstack run python download_model.py --model 117M -e PYTHONPATH=src --artifact models --cpu 2 --memory 32GB --gpu 1
 ```

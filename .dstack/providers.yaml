@@ -3,14 +3,14 @@ providers:
     image: python:3.9
     commands:
       - pip3 install -r providers/python/requirements.txt
-      - PYTHONPATH=providers python3 providers/python/main.py
+      - PYTHONPATH=providers:cli python3 providers/python/main.py
   - name: curl
     image: python:3.9
     commands:
       - pip3 install -r providers/curl/requirements.txt
-      - PYTHONPATH=providers python3 providers/curl/main.py
+      - PYTHONPATH=providers:cli python3 providers/curl/main.py
   - name: docker
     image: python:3.9
     commands:
       - pip3 install -r providers/docker/requirements.txt
-      - PYTHONPATH=providers python3 providers/docker/main.py
+      - PYTHONPATH=providers:cli python3 providers/docker/main.py
