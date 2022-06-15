@@ -49,7 +49,7 @@ class PythonProvider(Provider):
         if args.requirements:
             self.workflow.data["requirements"] = args.requirements
         if args.artifact:
-            self.workflow.data["artifacts"] = args.artifacts
+            self.workflow.data["artifacts"] = args.artifact
         if args.working_dir:
             self.workflow.data["working_dir"] = args.working_dir
         if args.env:
