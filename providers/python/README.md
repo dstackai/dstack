@@ -55,3 +55,9 @@ Example:
 ```bash
 dstack run python download_model.py --model 117M -e PYTHONPATH=src --artifact models --cpu 2 --memory 32GB --gpu 1
 ```
+
+Command line example:
+
+```bash
+dstack run python download_model.py --model 117M -e PYTHONPATH=src --artifact models --cpu 2 --memory 32GB --gpu 1
+```
