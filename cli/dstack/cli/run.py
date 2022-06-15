@@ -11,12 +11,13 @@ from jsonschema import validate, ValidationError
 
 from dstack.cli.logs import logs_func
 from dstack.cli.schema import workflows_schema_yaml
-from dstack.cli.common import load_workflows, load_variables, load_repo_data
+from dstack.cli.common import load_workflows, load_variables, load_repo_data, load_providers
 from dstack.cli.runs import runs_func
 from dstack.config import get_config, ConfigurationError
 
 
-# TODO: Support dstack run (WORKFLOW | PROVIDER[:BRANCH]) --dry-run
+# TODO: Support dstack run (WORKFLOW | PROVIDER[:BRANCH]) --dry-run (dry-run is a boolean property of a run,
+#  the dry-run arguments automatically enables --follow)
 # TODO: Support dstack run (WORKFLOW | PROVIDER[:BRANCH]) --help
 def register_parsers(main_subparsers, main_parser):
     parser = main_subparsers.add_parser("run", help="Run a workflow or provider"
@@ -30,14 +31,18 @@ def register_parsers(main_subparsers, main_parser):
                         help="Override workflow workflow_variables")
     parser.add_argument("args", metavar="ARGS", nargs=argparse.ZERO_OR_MORE, help="Override provider arguments")
     workflows_yaml = load_workflows()
+    providers_yaml = load_providers()
     workflow_variables = load_variables()
     workflows = (workflows_yaml.get("workflows") or []) if workflows_yaml is not None else []
+    providers = (providers_yaml.get("providers") or []) if providers_yaml is not None else []
     workflow_names = [w.get("name") for w in workflows]
+    provider_names = [p.get("name") for p in providers]
     workflow_providers = {w.get("name"): w.get("provider") for w in workflows}
 
     def default_run_func(args):
         try:
-            validate(workflows_yaml, yaml.load(workflows_schema_yaml, Loader=yaml.FullLoader))
+            if workflows:
+                validate(workflows_yaml, yaml.load(workflows_schema_yaml, Loader=yaml.FullLoader))
             repo_url, repo_branch, repo_hash, repo_diff = load_repo_data()
             dstack_config = get_config()
             # # TODO: Support non-default profiles
@@ -73,6 +78,13 @@ def register_parsers(main_subparsers, main_parser):
                     provider_branch = tokens[1]
                 else:
                     provider_name = args.workflow_or_provider
+
+                # TODO: Support --repo to enable providers from other repos
+                if not provider_branch:
+                    if provider_name not in (provider_names + ["python", "cli", "docker"]):
+                        sys.exit(f"No workflow or provider with the name `{provider_name}` is found.\n"
+                                 f"If you're referring to a workflow, make sure it is defined in .dstack/workflows.yaml.\n"
+                                 f"If you're referring to a provider, make sure it is defined in .dstack/providers.yaml.")
 
                 if workflow_variables.get("global"):
                     for idx, arg in enumerate(provider_args[:]):

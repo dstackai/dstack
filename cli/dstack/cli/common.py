@@ -74,6 +74,18 @@ def load_workflows():
         return None
 
 
+def load_providers():
+    root_folder = Path(os.getcwd()) / ".dstack"
+    if root_folder.exists():
+        providers_file = root_folder / "providers.yaml"
+        if providers_file.exists():
+            return yaml.load(providers_file.open(), Loader=yaml.FullLoader)
+        else:
+            return None
+    else:
+        return None
+
+
 def pretty_date(time: ty.Any = False):
     """
     Get a datetime object or a int() Epoch timestamp and return a

@@ -52,7 +52,7 @@ class DockerProvider(Provider):
         if args.working_dir:
             self.workflow.data["working_dir"] = args.working_dir
         if args.env:
-            environment = self.workflow.data.environment or {}
+            environment = self.workflow.data.get("environment") or {}
             for e in args.env:
                 if "=" in e:
                     tokens = e.split("=", maxsplit=1)

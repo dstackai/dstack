@@ -1,6 +1,6 @@
 # What is dstack?
 
-##### Automate continuous training workflows and version training data
+##### The cloud-first platform for continuous training and versioning data
 
 🚀 With dstack, you don't need sophisticated MLOps platforms anymore – just as you don't need to manually manage your 
  infrastructure or version your data yourself.

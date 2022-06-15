@@ -1,6 +1,6 @@
 # 🧬dstack
 
-Machine learning infrastructure as code
+The cloud-first platform for continuous training and versioning data
 
 ## Repository
 
