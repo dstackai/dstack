@@ -16,10 +16,12 @@ from dstack.cli.runs import runs_func
 from dstack.config import get_config, ConfigurationError
 
 
+# TODO: Support dstack run (WORKFLOW | PROVIDER[:BRANCH]) --dry-run
+# TODO: Support dstack run (WORKFLOW | PROVIDER[:BRANCH]) --help
 def register_parsers(main_subparsers, main_parser):
     parser = main_subparsers.add_parser("run", help="Run a workflow or provider"
                                         )
-    parser.add_argument("workflow_or_provider", metavar="(WORKFLOW | PROVIDER)", type=str,
+    parser.add_argument("workflow_or_provider", metavar="(WORKFLOW | PROVIDER[:BRANCH])", type=str,
                         help="A name of a workflow or a provider")
     parser.add_argument("--follow", "-f", help="Whether to continuously poll for new logs. By default, the command "
                                                "will exit once there are no more logs to display. To exit from this "

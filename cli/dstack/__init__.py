@@ -92,13 +92,18 @@ class Workflow:
 class Provider:
     def __init__(self, schema: Optional[str] = None):
         self.workflow = Workflow(self._load_workflow_data())
+        self.provider_args = [str(arg) for arg in self.workflow.data["provider_args"]] if self.workflow.data.get("provider_args") else []
+        self.workflow_name = self.workflow.data.get("workflow_name")
+        self.parse_args()
         self.schema = schema
         # TODO: Move here workflow related fields, such as variables, etc
         self._validate_schema()
-        pass
 
     @abstractmethod
     def create_jobs(self) -> List[Job]:
+        pass
+
+    def parse_args(self):
         pass
 
     def start(self):

@@ -3,12 +3,12 @@ additionalProperties: false
 properties:
   requirements:
     type: string
-  python_script:
+  script:
     type: string
   python:
     type: string
     enum: [ "3.10", "3.9", "3.8", "3.7" ]
-  script:
+  file:
     type: string
   args:
     oneOf:
