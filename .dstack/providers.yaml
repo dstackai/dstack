@@ -18,19 +18,19 @@ providers:
     image: python:3.9
     commands:
       - pip3 install -r providers/torchrun/requirements.txt
-      - PYTHONPATH=providers python3 providers/torchrun/main.py
+      - PYTHONPATH=providers:cli python3 providers/torchrun/main.py
   - name: lab
     image: python:3.9
     commands:
       - pip3 install -r providers/lab/requirements.txt
-      - PYTHONPATH=providers python3 providers/lab/main.py
+      - PYTHONPATH=providers:cli python3 providers/lab/main.py
   - name: notebook
     image: python:3.9
     commands:
       - pip3 install -r providers/notebook/requirements.txt
-      - PYTHONPATH=providers python3 providers/notebook/main.py
+      - PYTHONPATH=providers:cli python3 providers/notebook/main.py
   - name: code
     image: python:3.9
     commands:
       - pip3 install -r providers/vscode/requirements.txt
-      - PYTHONPATH=providers python3 providers/code/main.py
+      - PYTHONPATH=providers:cli python3 providers/code/main.py
