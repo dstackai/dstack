@@ -52,11 +52,20 @@ def register_parsers(main_subparsers, main_parser):
 
             workflow_name = None
             provider_name = None
+            provider_repo = None
             provider_branch = None
             variables = {}
             if args.workflow_or_provider in workflow_names:
                 workflow_name = args.workflow_or_provider
-                provider_name = workflow_providers[workflow_name]
+                if isinstance(workflow_providers[workflow_name], str):
+                    provider_name = workflow_providers[workflow_name]
+                else:
+                    provider_name = workflow_providers[workflow_name]["name"]
+                    provider_repo = workflow_providers[workflow_name]["repo"]
+                if "@" in provider_name:
+                    tokens = provider_name.split('@', maxsplit=1)
+                    provider_name = tokens[0]
+                    provider_branch = tokens[1]
 
                 for idx, arg in enumerate(provider_args[:]):
                     if arg.startswith('--'):
@@ -106,12 +115,13 @@ def register_parsers(main_subparsers, main_parser):
             data = {
                 "workflow_name": workflow_name,
                 "provider_name": provider_name,
+                "provider_repo": provider_repo,
                 "provider_branch": provider_branch,
                 "provider_args": provider_args,
                 "repo_url": repo_url,
                 "repo_branch": repo_branch,
                 "repo_hash": repo_hash,
-                "workflow_variables": variables
+                "variables": variables
             }
             if repo_diff:
                 data["repo_diff"] = repo_diff
