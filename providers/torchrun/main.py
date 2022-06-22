@@ -76,7 +76,7 @@ class PytorchDDPProvider(Provider):
         return jobs
 
     def parse_args(self):
-        parser = ArgumentParser(prog="dstack run python")
+        parser = ArgumentParser(prog="dstack run torchrun")
         if not self.workflow.data.get("workflow_name"):
             parser.add_argument("file", metavar="FILE", type=str)
         parser.add_argument("-r", "--requirements", type=str, nargs="?")
