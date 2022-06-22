@@ -28,7 +28,7 @@ class PytorchDDPProvider(Provider):
         nproc = ""
         if self.resources.gpu:
             nproc = f"--nproc_per_node={self.resources.gpu.count}"
-        nodes = self.workflow.data["resources"].get("nodes")
+        nodes = self.workflow.data["resources"].get("nodes") or 1
         args_init = ""
         if self.args:
             if isinstance(self.args, str):
@@ -91,6 +91,7 @@ class PytorchDDPProvider(Provider):
         parser.add_argument("--gpu-name", type=str, nargs="?")
         parser.add_argument("--gpu-memory", type=str, nargs="?")
         parser.add_argument("--shm-size", type=str, nargs="?")
+        parser.add_argument("--nodes", type=int, nargs="?")
         if not self.workflow.data.get("workflow_name"):
             parser.add_argument("args", metavar="ARGS", nargs=argparse.ZERO_OR_MORE)
         args, unknown = parser.parse_known_args(self.provider_args)
@@ -118,6 +119,8 @@ class PytorchDDPProvider(Provider):
         if args.cpu or args.memory or args.gpu or args.gpu_name or args.gpu_memory or args.shm_size:
             resources = self.workflow.data["resources"] or {}
             self.workflow.data["resources"] = resources
+            if args.nodes:
+                resources["nodes"] = args.nodes
             if args.cpu:
                 resources["cpu"] = args.cpu
             if args.memory:
