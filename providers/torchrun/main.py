@@ -17,7 +17,6 @@ class PytorchDDPProvider(Provider):
         self.working_dir = self.workflow.data.get("working_dir")
         self.resources = self._resources()
         self.args = self.workflow.data.get("args")
-        self.parse_args()
 
     def _image(self):
         cuda_is_required = self.resources and self.resources.gpu
@@ -28,9 +27,14 @@ class PytorchDDPProvider(Provider):
         if self.requirements:
             commands.append("pip3 install -r " + self.requirements)
         nproc = ""
-        if self.resources.gpu:
-            nproc = f"--nproc_per_node={self.resources.gpu.count}"
-        nodes = self.workflow.data["resources"].get("nodes") or 1
+        if self.resources:
+            if self.resources.gpu:
+                nproc = f"--nproc_per_node={self.resources.gpu.count}"
+        else:
+            nproc = f"--nproc_per_node=1"
+        nodes = 1
+        if self.workflow.data.get("resources"):
+            nodes = self.workflow.data["resources"].get("nodes") or 1
         args_init = ""
         if self.args:
             if isinstance(self.args, str):
