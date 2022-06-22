@@ -16,6 +16,7 @@ class PytorchDDPProvider(Provider):
         self.working_dir = self.workflow.data.get("working_dir")
         self.resources = self._resources()
         self.args = self.workflow.data.get("args")
+        self.parse_args()
 
     def _image(self):
         cuda_is_required = self.resources and self.resources.gpu
@@ -82,9 +83,7 @@ class PytorchDDPProvider(Provider):
         parser.add_argument("-r", "--requirements", type=str, nargs="?")
         parser.add_argument('-e', '--env', action='append', nargs="?")
         parser.add_argument('--artifact', action='append', nargs="?")
-        # TODO: Support depends-on
         parser.add_argument("--working-dir", type=str, nargs="?")
-        # parser.add_argument('--depends-on', action='append', nargs="?")
         parser.add_argument("--cpu", type=int, nargs="?")
         parser.add_argument("--memory", type=str, nargs="?")
         parser.add_argument("--gpu", type=int, nargs="?")
