@@ -1,6 +1,7 @@
 from typing import List
 import sys
 from argparse import ArgumentParser
+import argparse
 
 from dstack import Provider, Job
 
