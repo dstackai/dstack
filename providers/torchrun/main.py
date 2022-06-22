@@ -48,11 +48,11 @@ class PytorchDDPProvider(Provider):
 
     def create_jobs(self) -> List[Job]:
         nodes = 1
-        if self.workflow.data["resources"].get("nodes"):
-            if not str(self.workflow.data["resources"]["nodes"]).isnumeric():
+        if self.workflow.data.get("resources").get("nodes"):
+            if not str(self.workflow.data.get("resources")["nodes"]).isnumeric():
                 sys.exit("resources.nodes in workflows.yaml should be an integer")
-            if int(self.workflow.data["resources"]["nodes"]) > 1:
-                nodes = int(self.workflow.data["resources"]["nodes"])
+            if int(self.workflow.data.get("resources").get("nodes")) > 1:
+                nodes = int(self.workflow.data.get("resources").get("nodes"))
         master_job = Job(
             image=self._image(),
             commands=self._commands(0),
@@ -116,8 +116,8 @@ class PytorchDDPProvider(Provider):
                 else:
                     environment[e] = ""
             self.workflow.data["environment"] = environment
-        if args.cpu or args.memory or args.gpu or args.gpu_name or args.gpu_memory or args.shm_size:
-            resources = self.workflow.data["resources"] or {}
+        if args.nodes or args.cpu or args.memory or args.gpu or args.gpu_name or args.gpu_memory or args.shm_size:
+            resources = self.workflow.data.get("resources") or {}
             self.workflow.data["resources"] = resources
             if args.nodes:
                 resources["nodes"] = args.nodes
