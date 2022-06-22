@@ -48,7 +48,7 @@ class PytorchDDPProvider(Provider):
 
     def create_jobs(self) -> List[Job]:
         nodes = 1
-        if self.workflow.data.get("resources").get("nodes"):
+        if self.workflow.data.get("resources") and self.workflow.data.get("resources").get("nodes"):
             if not str(self.workflow.data.get("resources")["nodes"]).isnumeric():
                 sys.exit("resources.nodes in workflows.yaml should be an integer")
             if int(self.workflow.data.get("resources").get("nodes")) > 1:
