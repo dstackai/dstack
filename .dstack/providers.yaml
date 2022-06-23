@@ -32,5 +32,10 @@ providers:
   - name: code
     image: python:3.9
     commands:
-      - pip3 install -r providers/vscode/requirements.txt
+      - pip3 install -r providers/code/requirements.txt
       - PYTHONPATH=providers:cli python3 providers/code/main.py
+  - name: streamlit
+    image: python:3.9
+    commands:
+      - pip3 install -r providers/streamlit/requirements.txt
+      - PYTHONPATH=providers:cli python3 providers/streamlit/main.py
