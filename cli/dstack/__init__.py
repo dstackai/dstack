@@ -170,10 +170,16 @@ class Provider:
                     resources.cpu = cpu
             if self.workflow.data["resources"].get("memory"):
                 resources.memory = self.workflow.data["resources"]["memory"]
-            if str(self.workflow.data["resources"].get("gpu")).isnumeric():
-                gpu = int(self.workflow.data["resources"]["gpu"])
-                if gpu > 0:
-                    resources.gpu = Gpu(gpu)
+            gpu = self.workflow.data["resources"].get("gpu")
+            if gpu:
+                if str(gpu).isnumeric():
+                    gpu = int(self.workflow.data["resources"]["gpu"])
+                    if gpu > 0:
+                        resources.gpu = Gpu(gpu)
+                elif str(gpu.get("count")).isnumeric():
+                    gpu = int(gpu.get("count"))
+                    if gpu > 0:
+                        resources.gpu = Gpu(gpu)
             for resource_name in self.workflow.data["resources"]:
                 if resource_name.endswith("/gpu") and len(resource_name) > 4:
                     if not str(self.workflow.data["resources"][resource_name]).isnumeric():
