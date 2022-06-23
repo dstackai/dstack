@@ -10,6 +10,8 @@ properties:
     enum: [ "3.10", "3.9", "3.8", "3.7" ]
   file:
     type: string
+  nodes:
+    type: integer
   args:
     oneOf:
       - type: string
@@ -27,8 +29,6 @@ properties:
   resources:
     type: object
     properties:
-      nodes:
-        type: integer
       cpu:
         type: integer
       memory:
@@ -57,4 +57,3 @@ properties:
     type: array
     items:
       type: string
-
