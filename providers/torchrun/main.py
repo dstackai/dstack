@@ -1,9 +1,8 @@
-from typing import List
-import sys
+from typing import List, Optional
 from argparse import ArgumentParser
 import argparse
 
-from dstack import Provider, Job
+from dstack import Provider, Job, Resources, Gpu
 
 
 class PytorchDDPProvider(Provider):
@@ -15,33 +14,33 @@ class PytorchDDPProvider(Provider):
         self.environment = self.workflow.data.get("environment") or {}
         self.artifacts = self.workflow.data.get("artifacts")
         self.working_dir = self.workflow.data.get("working_dir")
+        self.nodes = self.workflow.data.get("nodes") or 1
         self.resources = self._resources()
         self.args = self.workflow.data.get("args")
 
+    def _resources(self) -> Optional[Resources]:
+        resources = super()._resources()
+        if resources.gpu is None:
+            resources.gpu = Gpu(1)
+        return resources
+
     def _image(self):
-        cuda_is_required = self.resources and self.resources.gpu
-        return f"dstackai/python:{self.version}-cuda-11.1" if cuda_is_required else f"python:{self.version}"
+        return f"dstackai/python:{self.version}-cuda-11.1"
 
     def _commands(self, node_rank):
         commands = []
         if self.requirements:
             commands.append("pip3 install -r " + self.requirements)
         nproc = ""
-        if self.resources:
-            if self.resources.gpu:
-                nproc = f"--nproc_per_node={self.resources.gpu.count}"
-        else:
-            nproc = f"--nproc_per_node=1"
-        nodes = 1
-        if self.workflow.data.get("resources"):
-            nodes = self.workflow.data["resources"].get("nodes") or 1
+        if self.resources.gpu:
+            nproc = f"--nproc_per_node={self.resources.gpu.count}"
         args_init = ""
         if self.args:
             if isinstance(self.args, str):
                 args_init += " " + self.args
             if isinstance(self.args, list):
                 args_init += " " + ",".join(map(lambda arg: "\"" + arg.replace('"', '\\"') + "\"", self.args))
-        torchrun_command = f"torchrun {nproc} --nnodes={nodes} --node_rank={node_rank}"
+        torchrun_command = f"torchrun {nproc} --nnodes={self.nodes} --node_rank={node_rank}"
         if node_rank == 0:
             commands.append(
                 f"{torchrun_command} --master_addr $JOB_HOSTNAME --master_port $JOB_PORT_0 {self.script} {args_init}"
@@ -53,12 +52,6 @@ class PytorchDDPProvider(Provider):
         return commands
 
     def create_jobs(self) -> List[Job]:
-        nodes = 1
-        if self.workflow.data.get("resources") and self.workflow.data.get("resources").get("nodes"):
-            if not str(self.workflow.data.get("resources")["nodes"]).isnumeric():
-                sys.exit("resources.nodes in workflows.yaml should be an integer")
-            if int(self.workflow.data.get("resources").get("nodes")) > 1:
-                nodes = int(self.workflow.data.get("resources").get("nodes"))
         master_job = Job(
             image=self._image(),
             commands=self._commands(0),
@@ -69,8 +62,8 @@ class PytorchDDPProvider(Provider):
             port_count=1,
         )
         jobs = [master_job]
-        if nodes > 1:
-            for i in range(nodes - 1):
+        if self.nodes > 1:
+            for i in range(self.nodes - 1):
                 jobs.append(Job(
                     image=self._image(),
                     commands=self._commands(i+1),
@@ -95,7 +88,7 @@ class PytorchDDPProvider(Provider):
         parser.add_argument("--gpu-name", type=str, nargs="?")
         parser.add_argument("--gpu-memory", type=str, nargs="?")
         parser.add_argument("--shm-size", type=str, nargs="?")
-        parser.add_argument("--nodes", type=int, nargs="?")
+        parser.add_argument("--nnodes", type=int, nargs="?")
         if not self.workflow.data.get("workflow_name"):
             parser.add_argument("args", metavar="ARGS", nargs=argparse.ZERO_OR_MORE)
         args, unknown = parser.parse_known_args(self.provider_args)
@@ -120,11 +113,11 @@ class PytorchDDPProvider(Provider):
                 else:
                     environment[e] = ""
             self.workflow.data["environment"] = environment
-        if args.nodes or args.cpu or args.memory or args.gpu or args.gpu_name or args.gpu_memory or args.shm_size:
+        if args.nnodes:
+            self.workflow.data["nodes"] = args.nnodes
+        if args.cpu or args.memory or args.gpu or args.gpu_name or args.gpu_memory or args.shm_size:
             resources = self.workflow.data.get("resources") or {}
             self.workflow.data["resources"] = resources
-            if args.nodes:
-                resources["nodes"] = args.nodes
             if args.cpu:
                 resources["cpu"] = args.cpu
             if args.memory:
