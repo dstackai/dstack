@@ -39,7 +39,7 @@ def load_repo_data():
     if tracking_branch:
         repo_branch = tracking_branch.remote_head
         remote_name = tracking_branch.remote_name
-        repo_hash = tracking_branch.repo.head.commit.hexsha
+        repo_hash = tracking_branch.commit.hexsha
         repo_url = repo.remote(remote_name).url
 
         repo_url_parsed = giturlparse.parse(repo_url)
