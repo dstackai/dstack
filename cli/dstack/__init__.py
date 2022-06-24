@@ -38,6 +38,18 @@ class JobRef:
         pass
 
 
+class App:
+    def __init__(self,
+                 port_index: int,
+                 app_name: str,
+                 url_path: Optional[str] = None,
+                 url_query_params: Optional[Dict[str, str]] = None):
+        self.port_index = port_index
+        self.app_name = app_name
+        self.url_path = url_path
+        self.url_query_params = url_query_params
+
+
 class Job(JobRef):
     def __init__(self,
                  image: str,
@@ -49,7 +61,8 @@ class Job(JobRef):
                  ports: Optional[List[int]] = None,
                  resources: Optional[Resources] = None,
                  depends_on: Optional[List[JobRef]] = None,
-                 master: Optional[JobRef] = None):
+                 master: Optional[JobRef] = None,
+                 apps: Optional[List[App]] = None):
         self.id = None
         self.image = image
         self.commands = commands
@@ -61,6 +74,7 @@ class Job(JobRef):
         self.resources = resources
         self.depends_on = depends_on
         self.master = master
+        self.apps = apps
 
     def get_id(self) -> Optional[str]:
         return self.id
@@ -156,10 +170,16 @@ class Provider:
                     resources.cpu = cpu
             if self.workflow.data["resources"].get("memory"):
                 resources.memory = self.workflow.data["resources"]["memory"]
-            if str(self.workflow.data["resources"].get("gpu")).isnumeric():
-                gpu = int(self.workflow.data["resources"]["gpu"])
-                if gpu > 0:
-                    resources.gpu = Gpu(gpu)
+            gpu = self.workflow.data["resources"].get("gpu")
+            if gpu:
+                if str(gpu).isnumeric():
+                    gpu = int(self.workflow.data["resources"]["gpu"])
+                    if gpu > 0:
+                        resources.gpu = Gpu(gpu)
+                elif str(gpu.get("count")).isnumeric():
+                    gpu = int(gpu.get("count"))
+                    if gpu > 0:
+                        resources.gpu = Gpu(gpu)
             for resource_name in self.workflow.data["resources"]:
                 if resource_name.endswith("/gpu") and len(resource_name) > 4:
                     if not str(self.workflow.data["resources"][resource_name]).isnumeric():
@@ -245,7 +265,13 @@ class Provider:
             "ports": [str(port) for port in job.ports] if job.ports else None,
             "environment": job.environment,
             "working_dir": job.working_dir,
-            "master_job_id": job.master.get_id() if job.master else None
+            "master_job_id": job.master.get_id() if job.master else None,
+            "apps": [{
+                "port_index": app.port_index,
+                "app_name": app.app_name,
+                "url_path": app.url_path if app.url_path else None,
+                "url_query_params": app.url_query_params if app.url_query_params else None,
+            } for app in job.apps] if job.apps else None
         }
         request_json_copy = dict(request_json)
         if self.workflow.data["repo_diff"]:

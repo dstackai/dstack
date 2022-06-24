@@ -119,7 +119,7 @@ def list_func(args: Namespace):
         sys.exit(f"Call 'dstack config' first")
 
 
-def submit_run_and_job(profile, workflow_name: str, artifacts: typing.List[str],
+def submit_run_and_job(profile, workflow_name: typing.Optional[str], artifacts: typing.List[str],
                        tag_name: typing.Optional[str] = None):
     repo_url, repo_branch, repo_hash, repo_diff = load_repo_data()
 
@@ -188,7 +188,7 @@ def upload_func(args: Namespace):
             else:
                 exit(f"The '{local_dir}' path doesn't refer to an existing directory")
 
-        run_name, job_id = submit_run_and_job(profile, args.workflow_name or "upload",
+        run_name, job_id = submit_run_and_job(profile, args.workflow_name,
                                               artifacts, tag_name=args.tag_name)
 
         artifacts_s3_bucket = user_info["user_configuration"]["artifacts_s3_bucket"] if user_info.get(
