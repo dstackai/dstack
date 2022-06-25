@@ -27,7 +27,7 @@ class PythonProvider(Provider):
             parser.add_argument("file", metavar="FILE", type=str)
         parser.add_argument("-r", "--requirements", type=str, nargs="?")
         parser.add_argument('-e', '--env', action='append', nargs="?")
-        parser.add_argument('--artifact', action='append', nargs="?")
+        parser.add_argument('-a', '--artifact', action='append', nargs="?")
         # TODO: Support depends-on
         parser.add_argument("--working-dir", type=str, nargs="?")
         # parser.add_argument('--depends-on', action='append', nargs="?")

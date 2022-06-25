@@ -15,6 +15,11 @@ from dstack.cli.common import load_workflows, load_variables, load_repo_data, lo
 from dstack.cli.runs import runs_func
 from dstack.config import get_config, ConfigurationError
 
+# TODO: This is hard-coding, must be refactored
+built_in_providers = ["python", "cli", "docker",
+                      "curl", "torchrun", "lab", "notebook",
+                      "code", "streamlit"]
+
 
 # TODO: Support dstack run (WORKFLOW | PROVIDER[:BRANCH]) --dry-run (dry-run is a boolean property of a run,
 #  the dry-run arguments automatically enables --follow)
@@ -90,7 +95,7 @@ def register_parsers(main_subparsers, main_parser):
 
                 # TODO: Support --repo to enable providers from other repos
                 if not provider_branch:
-                    if provider_name not in (provider_names + ["python", "cli", "docker"]):
+                    if provider_name not in (provider_names + built_in_providers):
                         sys.exit(f"No workflow or provider with the name `{provider_name}` is found.\n"
                                  f"If you're referring to a workflow, make sure it is defined in .dstack/workflows.yaml.\n"
                                  f"If you're referring to a provider, make sure it is defined in .dstack/providers.yaml.")

@@ -28,7 +28,7 @@ Here's a basic example of how workflows can be defined:
       - name: download
         help: "Downloads the training data" 
         provider: python
-        script: "download.py"
+        file: "download.py"
         artifacts: ["data"]
     
       - name: train
@@ -36,11 +36,10 @@ Here's a basic example of how workflows can be defined:
         depends-on:
           - download:latest
         provider: python
-        script: "train.py"
+        file: "train.py"
         artifacts: ["model"]
         resources:
-          memory: 64GB
-          gpu: 4
+          gpu: 1
     ```
 
 !!! tip "Source code"
@@ -95,15 +94,16 @@ Each workflow must include a `provider` property. This property tells which prog
 The most common provider is `python`. It supports the following properties:
 
 
-| Parameter      | Required         | Description                                                     |
-|----------------|------------------|-----------------------------------------------------------------|
-| `script`       | :material-check: | The path to the Python script (followed by arguments if any)    |
-| `requirements` |                  | The path to the `requirements.txt` file                         |
-| `version`      |                  | The major version of Python. The default value is `"3.10"`.     |
-| `environment`  |                  | Environment variables                                           |
-| `working_dir`  |                  | The working directory. The default value is the root directory. |
-| `artifacts`    |                  | The paths to the folders to save as output artifacts            |
-| `resources`    |                  | System resources requirements (memory, CPU, GPU, etc.)          |
+| Parameter      | Required         | Description                                                                  |
+|----------------|------------------|------------------------------------------------------------------------------|
+| `file`         | :material-check: | The path to the Python script                                                |
+| `args`         |                  | The list of arguments for the Python script                                  |
+| `requirements` |                  | The path to the `requirements.txt` file                                      |
+| `version`      |                  | The major version of Python. The default value is `"3.10"`.                  |
+| `environment`  |                  | Environment variables                                                        |
+| `working_dir`  |                  | The working directory. The default value is the root directory.              |
+| `artifacts`    |                  | The paths to the folders to save as output artifacts                         |
+| `resources`    |                  | The hardware resources required to run the workflow (memory, CPU, GPU, etc.) |
 
 [//]: # (TODO: Environment variables)
 
@@ -117,11 +117,16 @@ The most common provider is `python`. It supports the following properties:
 
 Here's the list of all built-in providers:
 
-| Name                                                                      | Description                                                       |
-|---------------------------------------------------------------------------|-------------------------------------------------------------------|
-| [python](https://github.com/dstackai/dstack/tree/master/providers/python) | Runs a Python script on a single machine with specified resources |
-| [docker](https://github.com/dstackai/dstack/tree/master/providers/docker) | Runs a Docker image on a single machine with specified resources  |
-| [curl](https://github.com/dstackai/dstack/tree/master/providers/curl)     | Downloads a file by a URL                                         |
+| Name                                                                                   | Description                                               |
+|----------------------------------------------------------------------------------------|-----------------------------------------------------------|
+| [python](https://github.com/dstackai/dstack/tree/master/providers/python#readme)       | Runs a Python script                                      |
+| [streamlit](https://github.com/dstackai/dstack/tree/master/providers/streamlit#readme) | Launches a Streamlit application                          |
+| [lab](https://github.com/dstackai/dstack/tree/master/providers/lab#readme)             | Launches a JupyterLab application                         |
+| [torchrun](https://github.com/dstackai/dstack/tree/master/providers/torchrun#readme)   | Runs a PyTorch training script on multiple nodes with GPU |
+| [code](https://github.com/dstackai/dstack/tree/master/providers/code#readme)           | Launches a VS Code application                            |
+| [notebook](https://github.com/dstackai/dstack/tree/master/providers/notebook#readme)   | Launches a Jupyter notebook application                   |
+| [docker](https://github.com/dstackai/dstack/tree/master/providers/docker#readme)       | Runs a Docker image                                       |
+| [curl](https://github.com/dstackai/dstack/tree/master/providers/curl#readme)           | Downloads the contents of a URL                           |
 
 !!! info ""
     You can extend dstack by building [custom providers](custom-providers.md) using dstack's Python API.

@@ -1,22 +1,35 @@
-# dstack streamlit provider
+<div align="center">
+<img src="/docs/assets/logo.svg" width="200px"/>    
 
-This provider runs a Streamlit application on a single machine with required resources.
+A provider that launches a Streamlit application
+______________________________________________________________________
 
-# Workflow
+[![License](https://img.shields.io/badge/License-Apache_2.0-blue.svg)](https://opensource.org/licenses/Apache-2.0)
+
+</div>
+
+# About
+
+This provider launches a Streamlit application. You can specify a file with requirements, a version of Streamlit, 
+a version of Python, provide environment variables and arguments to your application, 
+specify which folders to save as output artifacts,
+dependencies to other workflows if any, and finally the resources the application needs (CPU, GPU, memory, etc).
+
+# Workflows
 
 Example:
 
 ```yaml
 workflows:
-  - name: streamlit  
+  - name: app  
     provider: streamlit
     target: app.py
-    depends
     resources:
       gpu: 1
 ```
 
-Here's the list of parameters supported by the provider:
+<details>
+<summary>All workflow parameters supported by the provider</summary>
 
 | Parameter                 | Required | Description                                                          |
 |---------------------------|----------|----------------------------------------------------------------------|
@@ -33,18 +46,23 @@ Here's the list of parameters supported by the provider:
 | `resources.gpu.name`      | No       | The name of the GPU brand (e.g. "V100", etc.)                        |
 | `resources.gpu.count`     | No       | The required number of GPUs                                          |
 | `resources.interruptible` | No       | `True` if the workflow can be interrupted. By default, it's `False`. |
+</details>
 
 ## Command line
 
+Here's how to use this provider from the command line:
+
+```bash
 usage: dstack run streamlit [-h] [-r [REQUIREMENTS]] [-e [ENV]]
-                         [--artifact [ARTIFACT]] [--working-dir [WORKING_DIR]]
+                         [-a [ARTIFACT]] [--working-dir [WORKING_DIR]]
                          [--cpu [CPU]] [--memory [MEMORY]] [--gpu [GPU]]
                          [--gpu-name [GPU_NAME]] [--gpu-memory [GPU_MEMORY]]
                          [--shm-size [SHM_SIZE]]
                          TARGET [ARGS ...]
+```
 
 Example:
 
 ```bash
-dstack run streamlit app.py --gpu 1
+dstack run streamlit app.py -r requirements.txt --gpu 1
 ```

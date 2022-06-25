@@ -1,13 +1,38 @@
-# dstack lab provider
+<div align="center">
+<img src="/docs/assets/logo.svg" width="200px"/>    
 
-This provider runs a JupyterLab instance on a single machine with required resources.
+A provider that launches a JupyterLab application
+______________________________________________________________________
 
-Here's the list of parameters supported by the provider:
+[![License](https://img.shields.io/badge/License-Apache_2.0-blue.svg)](https://opensource.org/licenses/Apache-2.0)
+
+</div>
+
+# About
+
+This provider launches a JupyterLab application. You can specify a file with requirements, a version of Python,
+a version of Jupyter, provide environment variables to the application, specify which folders to save as output artifacts,
+dependencies to other workflows if any, and finally the resources the application needs (CPU, GPU, memory, etc).
+
+## Workflows
+
+```yaml
+workflows:
+  - name: lab
+    provider: lab
+    artifacts:
+      - output
+    resources:
+      gpu: 1
+```
+
+<details>
+<summary>All workflow parameters supported by the provider</summary>
 
 | Parameter                 | Required | Description                                                          |
 |---------------------------|----------|----------------------------------------------------------------------|
 | `requirements`            | No       | The list of Python packages to pre-install                           |
-| `version`                 | No       | The JupyterLab version                                               |
+| `version`                 | No       | The Jupyter version                                                  |
 | `python`                  | No       | The major Python version. By default, it's `3.10`.                   |
 | `environment`             | No       | The list of environment variables and their values                   |
 | `artifacts`               | No       | The list of output artifacts                                         |
@@ -18,17 +43,22 @@ Here's the list of parameters supported by the provider:
 | `resources.gpu.name`      | No       | The name of the GPU brand (e.g. "V100", etc.)                        |
 | `resources.gpu.count`     | No       | The required number of GPUs                                          |
 | `resources.interruptible` | No       | `True` if the workflow can be interrupted. By default, it's `False`. |
+</details>
+
+## Command line
+
+Here's how to use this provider from the command line:
+
+```bash
+usage: dstack run lab [-h] [-r [REQUIREMENTS]] [-e [ENV]] [-a [ARTIFACT]]
+                           [--working-dir [WORKING_DIR]] [--cpu [CPU]]
+                           [--memory [MEMORY]] [--gpu [GPU]]
+                           [--gpu-name [GPU_NAME]] [--gpu-memory [GPU_MEMORY]]
+                           [--shm-size [SHM_SIZE]]
+```
 
 Example:
 
-```yaml
-workflows:
-  - name: lab  
-    provider: lab@experimental
-    artifacts:
-      - output
-    resources:
-      cpu: 2
-      memory: 32GB
-      gpu: 1
+```bash
+dstack run lab --gpu 1 -a output 
 ```

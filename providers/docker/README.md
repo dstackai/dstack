@@ -1,10 +1,22 @@
-# dstack docker provider
+<div align="center">
+<img src="/docs/assets/logo.svg" width="200px"/>    
 
-This provider runs a Docker image on a single machine with required resources.
+A provider that runs a Docker image
+______________________________________________________________________
 
-## Workflow
+[![License](https://img.shields.io/badge/License-Apache_2.0-blue.svg)](https://opensource.org/licenses/Apache-2.0)
 
-Example:
+</div>
+
+# About
+
+This provider runs a Docker image. You can specify an image, a bash command to run inside the container,
+environment variables, specify which folders to save as output artifacts,
+dependencies to other workflows if any, and finally the resources the container needs (CPU, GPU, memory, etc).
+
+## Workflows
+
+Here's how to use this provider in `.dstack/workflows.yaml`:
 
 ```yaml
 workflows:
@@ -17,11 +29,11 @@ workflows:
     artifacts:
       - output
     resources:
-      cpu: 1
-      memory: 1GB
+      gpu: 1
 ```
 
-Here's the list of all parameters supported by the provider:
+<details>
+<summary>All workflow parameters supported by the provider</summary>
 
 | Parameter                 | Required | Description                                                          |
 |---------------------------|----------|----------------------------------------------------------------------|
@@ -36,12 +48,14 @@ Here's the list of all parameters supported by the provider:
 | `resources.gpu.name`      | No       | The name of the GPU brand (e.g. "V100", etc.)                        |
 | `resources.gpu.count`     | No       | The required number of GPUs                                          |
 | `resources.interruptible` | No       | `True` if the workflow can be interrupted. By default, it's `False`. |
-
+</details>
 
 ## Command line 
 
+Here's how to use this provider from the command line:
+
 ```bash
-usage: dstack run docker [-h] [-e [ENV]] [--artifact [ARTIFACT]]
+usage: dstack run docker [-h] [-e [ENV]] [-a [ARTIFACT]]
                          [--working-dir [WORKING_DIR]] [--ports [PORTS]]
                          [--cpu [CPU]] [--memory [MEMORY]] [--gpu [GPU]]
                          [--gpu-name [GPU_NAME]] [--gpu-memory [GPU_MEMORY]]
@@ -52,5 +66,5 @@ usage: dstack run docker [-h] [-e [ENV]] [--artifact [ARTIFACT]]
 Example:
 
 ```bash
-dstack run docker --artifact output --cpu 1 --memory 1GB ubuntu
+dstack run docker hello-world
 ```

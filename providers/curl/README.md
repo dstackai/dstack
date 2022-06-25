@@ -1,37 +1,53 @@
-# dstack python provider
+<div align="center">
+<img src="/docs/assets/logo.svg" width="200px"/>    
 
-This provider downloads a file by a URL.
+A provider that downloads the contents of a URL
+______________________________________________________________________
 
-## Workflow 
+[![License](https://img.shields.io/badge/License-Apache_2.0-blue.svg)](https://opensource.org/licenses/Apache-2.0)
 
-Example:
+</div>
+
+# About
+
+This provider downloads the contents of a URL. You can specify a URL to download from, a filename to save the URL contents as,
+and finally which folders to save as output artifacts. 
+.
+
+## Workflows
+
+Here's how to use this provider in `.dstack/workflows.yaml`:
 
 ```yaml
 workflows:
-  - name: download-dataset
+  - name: download
     provider: curl
     url: https://github.com/karpathy/char-rnn/blob/master/data/tinyshakespeare/input.txt
-    output: raw_dataset/input.txt
+    output: dataset/input.txt
     artifacts:
-      - raw_dataset
+      - dataset
 ```
 
-Here's the list of parameters supported by the provider:
+<details>
+<summary>All workflow parameters supported by the provider</summary>
 
 | Parameter     | Required | Description                      |
 |---------------|----------|----------------------------------|
 | `url`         | Yes      | The URL of the file to download. |
 | `output`      | Yes      | The path to store the file.      |
 | `artifacts`   | No       | The list of output artifacts.    |
+</details>
 
 ## Command line
 
+Here's how to use this provider from the command line:
+
 ```bash
-usage: dstack run curl [-h] --artifact [ARTIFACT] -o [OUTPUT] URL
+usage: dstack run curl [-h] -a [ARTIFACT] -o [OUTPUT] URL
 ```
 
 Example:
 
 ```bash
-dstack run curl https://github.com/karpathy/char-rnn/blob/master/data/tinyshakespeare/input.txt -o raw_dataset/input.txt --artifact raw_dataset
+dstack run curl https://github.com/karpathy/char-rnn/blob/master/data/tinyshakespeare/input.txt -o dataset/input.txt -a dataset
 ```

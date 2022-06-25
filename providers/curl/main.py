@@ -17,7 +17,7 @@ class CurlProvider(Provider):
         if not self.workflow.data.get("workflow_name"):
             parser.add_argument("url", metavar="URL", type=str)
         # TODO: Support other curl options, such as -O
-        parser.add_argument('--artifact', action='append', nargs="?", required=True)
+        parser.add_argument('-a', '--artifact', action='append', nargs="?", required=True)
         parser.add_argument("-o", "--output", type=str, nargs="?", required=True)
         args, unknown = parser.parse_known_args(self.provider_args)
         args.unknown = unknown

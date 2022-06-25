@@ -64,7 +64,7 @@ the following content:
       - name: download
         help: "Downloads the MNIST dataset"
         provider: python
-        script: "download.py"
+        file: "download.py"
         requirements: "requirements.txt"
         artifacts: ["data"]
 
@@ -73,7 +73,7 @@ the following content:
         depends-on:
           - download:latest
         provider: python
-        script: "train.py"
+        file: "train.py"
         requirements: "requirements.txt"
         artifacts: ["model"]
         resources:
@@ -136,6 +136,8 @@ When you run a workflow, dstack passes its variables to the workflow script.
 Inside your script, you can read them from environment variables:
 
 ```python
+import os
+
 batch_size = os.environ.get("BATCH_SIZE")
 ```
 

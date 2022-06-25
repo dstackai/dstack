@@ -1,63 +1,70 @@
-# dstack python provider
+<div align="center">
+<img src="/docs/assets/logo.svg" width="200px"/>    
 
-This provider runs a Python script on a single machine with required resources.
+A provider that runs a Python script
+______________________________________________________________________
 
-## Workflow 
+[![License](https://img.shields.io/badge/License-Apache_2.0-blue.svg)](https://opensource.org/licenses/Apache-2.0)
 
-Example:
+</div>
+
+# About
+
+This provider runs a Python script. You can specify a file with requirements, a version of Python,
+provide environment variables and arguments to your script, specify which folders to save as output artifacts,
+dependencies to other workflows if any, and finally the resources the script needs (CPU, GPU, memory, etc).
+
+## Workflows
+
+Here's how to use this provider in `.dstack/workflows.yaml`:
 
 ```yaml
 workflows:
-  - name: download-model  
+  - name: train  
     provider: python
     requirements: requirements.txt
-    file: download_model.py
-    args: ["--model", "117M"]
-    environment:
-      PYTHONPATH: src
+    file: train.py
     artifacts:
-      - models
+      - checkpoint
     resources:
-      cpu: 2
-      memory: 32GB
       gpu: 1
 ```
 
-Here's the list of parameters supported by the provider:
+<details>
+<summary>All workflow parameters supported by the provider</summary>
 
 | Parameter                 | Required | Description                                                          |
 |---------------------------|----------|----------------------------------------------------------------------|
 | `file`                    | Yes      | The Python file to run                                               |
-| `args`                    | No       | The arguments for the Python script                                  |
+| `args`                    | No       | The list of arguments for the Python script                          |
 | `requirements`            | No       | The list of Python packages required by the script                   |
 | `version`                 | No       | The major Python version. By default, it's `3.10`.                   |
 | `environment`             | No       | The list of environment variables and their values                   |
 | `artifacts`               | No       | The list of output artifacts                                         |
-| `resources`               | No       | The resources required to run the workflow                           |
+| `resources`               | No       | The hardware resources required to run the workflow                  |
 | `resources.cpu`           | No       | The required number of CPUs                                          |
 | `resources.memory`        | No       | The required amount of memory                                        |
 | `resources.gpu`           | No       | The required number of GPUs                                          |
 | `resources.gpu.name`      | No       | The name of the GPU brand (e.g. "V100", etc.)                        |
 | `resources.gpu.count`     | No       | The required number of GPUs                                          |
 | `resources.interruptible` | No       | `True` if the workflow can be interrupted. By default, it's `False`. |
+</details>
 
 ## Command line
 
+Here's how to use this provider from the command line:
+
+```bash
 usage: dstack run python [-h] [-r [REQUIREMENTS]] [-e [ENV]]
-                         [--artifact [ARTIFACT]] [--working-dir [WORKING_DIR]]
+                         [-a [ARTIFACT]] [--working-dir [WORKING_DIR]]
                          [--cpu [CPU]] [--memory [MEMORY]] [--gpu [GPU]]
                          [--gpu-name [GPU_NAME]] [--gpu-memory [GPU_MEMORY]]
                          [--shm-size [SHM_SIZE]]
                          FILE [ARGS ...]
+```
 
 Example:
 
 ```bash
-dstack run python download_model.py --model 117M -e PYTHONPATH=src --artifact models --cpu 2 --memory 32GB --gpu 1
-```
-
-Command line example:
-
-```bash
-dstack run python download_model.py --model 117M -e PYTHONPATH=src --artifact models --cpu 2 --memory 32GB --gpu 1
+dstack run python train.py -r requirements.txt -a checkpoint --gpu 1 
 ```
