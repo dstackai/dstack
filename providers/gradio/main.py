@@ -7,10 +7,10 @@ from dstack import Provider, Job, App
 
 
 # TODO: Provide job.applications (incl. application name, and query)
-class StreamlitProvider(Provider):
+class Gradiorovider(Provider):
     def __init__(self):
-        super().__init__(schema="providers/streamlit/schema.yaml")
-        self.target = self.workflow.data["target"]
+        super().__init__(schema="providers/gradio/schema.yaml")
+        self.file = self.workflow.data["file"]
         # TODO: Handle numbers such as 3.1 (e.g. require to use strings)
         self.python = str(self.workflow.data.get("python") or "3.10")
         self.version = self.workflow.data.get("version")
@@ -23,9 +23,9 @@ class StreamlitProvider(Provider):
         self.image = self._image()
 
     def parse_args(self):
-        parser = ArgumentParser(prog="dstack run python")
+        parser = ArgumentParser(prog="dstack run gradio")
         if not self.workflow.data.get("workflow_name"):
-            parser.add_argument("target", metavar="TARGET", type=str)
+            parser.add_argument("file", metavar="FILE", type=str)
         parser.add_argument("-r", "--requirements", type=str, nargs="?")
         parser.add_argument('-e', '--env', action='append', nargs="?")
         parser.add_argument('-a', '--artifact', action='append', nargs="?")
@@ -43,7 +43,7 @@ class StreamlitProvider(Provider):
         args, unknown = parser.parse_known_args(self.provider_args)
         args.unknown = unknown
         if not self.workflow.data.get("workflow_name"):
-            self.workflow.data["target"] = args.target
+            self.workflow.data["file"] = args.file
             _args = args.unknown + args.args
             if _args:
                 self.workflow.data["args"] = _args
@@ -93,10 +93,10 @@ class StreamlitProvider(Provider):
             working_dir=self.working_dir,
             resources=self.resources,
             artifacts=self.artifacts,
-            port_count=2,
+            port_count=1,
             apps=[App(
-                port_index=1,
-                app_name="Streamlit",
+                port_index=0,
+                app_name="Gradio",
             )]
         )]
 
@@ -106,7 +106,7 @@ class StreamlitProvider(Provider):
 
     def _commands(self):
         commands = [
-            "pip install streamlit" + (f"=={self.version}" if self.version else ""),
+            "pip install gradio" + (f"=={self.version}" if self.version else ""),
         ]
         args_init = ""
         if self.args:
@@ -115,12 +115,11 @@ class StreamlitProvider(Provider):
             if isinstance(self.args, list):
                 args_init += " " + ",".join(map(lambda arg: "\"" + arg.replace('"', '\\"') + "\"", self.args))
         commands.append(
-            f"streamlit run --server.port $JOB_PORT_1 --server.enableCORS=true --browser.serverAddress 0.0.0.0 "
-            f"--server.headless true {self.target}{args_init} "
+            f"GRADIO_SERVER_PORT=$JOB_PORT_0 GRADIO_SERVER_NAME=0.0.0.0 python {self.file}{args_init}"
         )
         return commands
 
 
 if __name__ == '__main__':
-    provider = StreamlitProvider()
+    provider = Gradiorovider()
     provider.start()

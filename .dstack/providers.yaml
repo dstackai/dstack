@@ -39,3 +39,8 @@ providers:
     commands:
       - pip3 install -r providers/streamlit/requirements.txt
       - PYTHONPATH=providers:cli python3 providers/streamlit/main.py
+  - name: gradio
+    image: python:3.9
+    commands:
+      - pip3 install -r providers/gradio/requirements.txt
+      - PYTHONPATH=providers:cli python3 providers/gradio/main.py

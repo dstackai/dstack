@@ -121,6 +121,7 @@ Here's the list of all built-in providers:
 |----------------------------------------------------------------------------------------|-----------------------------------------------------------|
 | [python](https://github.com/dstackai/dstack/tree/master/providers/python#readme)       | Runs a Python script                                      |
 | [streamlit](https://github.com/dstackai/dstack/tree/master/providers/streamlit#readme) | Launches a Streamlit application                          |
+| [gradio](https://github.com/dstackai/dstack/tree/master/providers/gradio#readme)       | Launches a Gradio application                             |
 | [lab](https://github.com/dstackai/dstack/tree/master/providers/lab#readme)             | Launches a JupyterLab application                         |
 | [torchrun](https://github.com/dstackai/dstack/tree/master/providers/torchrun#readme)   | Runs a PyTorch training script on multiple nodes with GPU |
 | [code](https://github.com/dstackai/dstack/tree/master/providers/code#readme)           | Launches a VS Code application                            |

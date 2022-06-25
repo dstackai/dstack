@@ -1,3 +1,5 @@
+import os
+import shutil
 from pathlib import Path
 
 from setuptools import setup
@@ -8,12 +10,17 @@ def get_version():
     return text.split("=")[1].strip()[1:-1]
 
 
+parent_path = Path(os.path.dirname(os.getcwd()))
+shutil.copyfile(parent_path / ".dstack" / "providers.yaml", Path("dstack") / "cli" / "providers.yaml")
+
 setup(
     name="dstack",
     version=get_version(),
     author="peterschmidt85",
     author_email="andrey@dstack.ai",
     packages=["dstack", "dstack.cli"],
+    package_data={'': ['providers.yaml']},
+    include_package_data=True,
     scripts=[],
     entry_points={
         "console_scripts": ["dstack=dstack.cli.main:main"],
