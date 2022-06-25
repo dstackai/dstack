@@ -1,6 +1,16 @@
-# 🧬dstack
+<div align="center">
+<img src="https://raw.githubusercontent.com/dstackai/dstack/master/docs/assets/logo.svg" width="200px"/>    
 
-The cloud-first platform for continuous training and versioning data
+Your new home for building AI apps
+______________________________________________________________________
+
+[![pypi](https://badge.fury.io/py/dstack.svg)](https://badge.fury.io/py/dstack)
+[![stat](https://pepy.tech/badge/dstack)](https://pepy.tech/project/dstack)
+[![slack](https://img.shields.io/badge/Join%20Slack%20channel-grey.svg?logo=slack)](https://join.slack.com/t/dstackai/shared_invite/zt-xdnsytie-D4qU9BvJP8vkbkHXdi6clQ)
+
+[//]: # ([![twitter]&#40;https://img.shields.io/twitter/follow/dstackai.svg?style=social&label=Follow&#41;]&#40;https://twitter.com/dstackai&#41;)
+
+</div>
 
 ## Repository
 

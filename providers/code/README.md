@@ -50,15 +50,15 @@ workflows:
 Here's how to use this provider from the command line:
 
 ```bash
-usage: dstack run notebook [-h] [-r [REQUIREMENTS]] [-e [ENV]] [-a [ARTIFACT]]
-                           [--working-dir [WORKING_DIR]] [--cpu [CPU]]
-                           [--memory [MEMORY]] [--gpu [GPU]]
-                           [--gpu-name [GPU_NAME]] [--gpu-memory [GPU_MEMORY]]
-                           [--shm-size [SHM_SIZE]]
+usage: dstack run code [-h] [-r [REQUIREMENTS]] [-e [ENV]] [-a [ARTIFACT]]
+                       [--working-dir [WORKING_DIR]] [--cpu [CPU]]
+                       [--memory [MEMORY]] [--gpu [GPU]]
+                       [--gpu-name [GPU_NAME]] [--gpu-memory [GPU_MEMORY]]
+                       [--shm-size [SHM_SIZE]]
 ```
 
 Example:
 
 ```bash
-dstack run notebook --gpu 1 -a output 
+dstack run code --gpu 1 -a output 
 ```
