@@ -44,7 +44,7 @@ def register_parsers(main_subparsers, main_parser):
     workflow_variables = load_variables()
     workflows = (workflows_yaml.get("workflows") or []) if workflows_yaml is not None else []
     providers = (providers_yaml.get("providers") or []) if providers_yaml is not None else []
-    built_in_providers = (built_in_providers_yaml.get("providers") or []) if providers_yaml is not None else []
+    built_in_providers = (built_in_providers_yaml.get("providers") or []) if built_in_providers_yaml is not None else []
     workflow_names = [w.get("name") for w in workflows]
     provider_names = [p.get("name") for p in providers]
     built_in_provider_names = [p.get("name") for p in built_in_providers]
