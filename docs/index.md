@@ -73,7 +73,8 @@ $ █
 Some providers allow to launch interactive applications, including [JupyterLab](https://github.com/dstackai/dstack/tree/master/providers/lab/#readme),
 [VS Code](https://github.com/dstackai/dstack/tree/master/providers/code/#readme), 
 [Streamlit](https://github.com/dstackai/dstack/tree/master/providers/streamlit/#readme), 
-[Gradio](https://github.com/dstackai/dstack/tree/master/providers/gradio/#readme), and 
+[Gradio](https://github.com/dstackai/dstack/tree/master/providers/gradio/#readme), 
+[FastAPI](https://github.com/dstackai/dstack/tree/master/providers/fastapi/#readme), or
 anything else.
 
 Here's an example of the command that launches a VS Code application:

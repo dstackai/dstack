@@ -19,6 +19,7 @@ Here's the list of the built-in providers:
 | [python](python/README.md)       | Runs a Python script                                      |
 | [streamlit](streamlit/README.md) | Launches a Streamlit application                          |
 | [gradio](gradio/README.md)       | Launches a Gradio application                             |
+| [fastapi](fastapi/README.md)     | Launches a FastAPI application                            |
 | [lab](lab/README.md)             | Launches a JupyterLab application                         |
 | [torchrun](torchrun/README.md)   | Runs a PyTorch training script on multiple nodes with GPU |
 | [code](code/README.md)           | Launches a VS Code application                            |
