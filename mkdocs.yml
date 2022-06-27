@@ -29,7 +29,7 @@ theme:
   features:
     - toc.integrate
     - navigation.sections
-#    - navigation.expand
+    - navigation.expand
     - navigation.top
 markdown_extensions:
   - pymdownx.emoji:
@@ -39,6 +39,7 @@ markdown_extensions:
   - def_list
   - admonition
   - pymdownx.highlight
+  - pymdownx.details
   - pymdownx.superfences
   - pymdownx.tabbed:
       alternate_style: true
@@ -66,8 +67,10 @@ nav:
       - Quickstart: quickstart.md
   - Basics:
       - Setup: setup.md
-      - Define workflows: define-workflows.md
-      - Run workflows: run-workflows.md
+      - Workflows: workflows.md
+      - Run command:
+        - Run workflows: run-workflows.md
+        - Run providers: run-providers.md
 #      - Runners: runners.md
 #      - Custom providers: custom-providers.md
 #      - Docker: docker.md

@@ -3,8 +3,8 @@ from argparse import ArgumentParser, SUPPRESS
 
 import colorama
 
-from dstack.cli import logs, run, stop, aws, artifacts, runs, runners, init, \
-    on_demand, restart, prune, tag, untag, config
+from dstack.cli import app, logs, run, stop, artifacts, runs, runners, init, \
+    restart, prune, tag, untag, config
 from dstack.version import __version__ as version
 
 
@@ -18,6 +18,7 @@ def main():
                         help='Show this help message and exit')
     subparsers = parser.add_subparsers()
 
+    app.register_parsers(subparsers)
     artifacts.register_parsers(subparsers)
     # on_demand.register_parsers(subparsers)
     # aws.register_parsers(subparsers)

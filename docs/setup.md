@@ -2,37 +2,9 @@
 
 This guide will walk you through the main steps that you have to take before you can use dstack with your project. 
 
-## Prerequisites
+## Install the CLI
 
-Before you'll follow this guide, ensure the following:
-
-* You've [signed up](https://dstack.ai/signup) with dstack
-* You have an existing AWS account (otherwise, [sign up](https://portal.aws.amazon.com/billing/signup) for AWS beforehand)
-* You have Git installed locally
-* You have Python 3.7 (or higher) and pip installed locally
-
-!!! info ""
-    Currently, dstack supports only AWS. GCP and Azure support is under a private beta. To 
-    try GCP and Azure support, drop an email to `hello@dstack.ai`.
-
-## Step 1: Link your cloud account
-
-To let dstack provision the infrastructure required for your workflows in your AWS account, you have to provide
-dstack the corresponding credentials. To do that, go to the `Settings`, and then `AWS`.
-
-Here, provide `AWS Access Key ID` and `AWS Secret Access Key` that have the
-[corresponding](runners.md#on-demand-runners) permissions to create EC2 instances in your AWS account.
-
-Once you've provided the credentials, use the `Add limit` button to configure the limits:
-
-![](images/dstack_on_demand_settings.png){ lazy=true width="1060" }
-
-The limits tell dstack what maximum number of EC2 instances of the specific instance type and i particular region
-dstack can provision.
-
-## Step 2: Install the CLI
-
-To run workflows, you'll need the dstack CLI. Here's how to install and configure it:
+To run workflows or providers, you'll need the dstack CLI. Here's how to install and configure it:
 
 ```bash
 pip install dstack -U
@@ -43,12 +15,19 @@ Your token value can be found in `Settings`:
 
 ![](images/dstack_quickstart_token.png){ lazy=true width="1060" }
 
-## Step 3: Configure Git credentials
+## Link your cloud account
 
-In order to run workflows remotely, dstack will need access to your project Git repository.
+To let dstack provision the infrastructure required for your workflows in your AWS account, you have to provide
+dstack the corresponding credentials. To do that, go to the `Settings`, and then `AWS`.
 
-!!! info ""
-    This is why you have to use the CLI from the directory where you cloned your project Git repository
+Here, provide `AWS Access Key ID` and `AWS Secret Access Key` that have the
+[corresponding](runners.md#on-demand-runners) permissions to create EC2 instances in your AWS account.
+
+![](images/dstack_on_demand_settings.png){ lazy=true width="1060" }
+
+## Add Git credentials
+
+In case your project is private, dstack needs credentials to access to your project repository for read.
 
 There are two ways to grant dstack access to your Git repository:
 
@@ -106,7 +85,7 @@ If the private key is not correct, you'll see an authorization error. If there i
     If you are not sure about how to best clone your Git repository, the easiest and most secure option
     is always cloning it via GitHub's CLI using HTTPS protocol.
 
-## Step 4: Configuring secrets
+## Add secrets
 
 If you plan to use third-party services from your workflows, you can use dstack's secrets 
 to securely pass passwords and tokens.

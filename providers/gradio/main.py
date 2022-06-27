@@ -96,7 +96,7 @@ class Gradiorovider(Provider):
             port_count=1,
             apps=[App(
                 port_index=0,
-                app_name="Gradio",
+                app_name="gradio",
             )]
         )]
 

@@ -23,7 +23,7 @@ class StreamlitProvider(Provider):
         self.image = self._image()
 
     def parse_args(self):
-        parser = ArgumentParser(prog="dstack run python")
+        parser = ArgumentParser(prog="dstack run streamlit")
         if not self.workflow.data.get("workflow_name"):
             parser.add_argument("target", metavar="TARGET", type=str)
         parser.add_argument("-r", "--requirements", type=str, nargs="?")
@@ -96,7 +96,7 @@ class StreamlitProvider(Provider):
             port_count=2,
             apps=[App(
                 port_index=1,
-                app_name="Streamlit",
+                app_name="streamlit",
             )]
         )]
 

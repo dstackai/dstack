@@ -87,7 +87,7 @@ class CodeProvider(Provider):
             port_count=1,
             apps=[App(
                 port_index=0,
-                app_name="VS Code",
+                app_name="code",
                 url_query_params={
                     "tkn": connection_token,
                     "folder": "/workflow"

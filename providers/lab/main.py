@@ -86,7 +86,7 @@ class LabProvider(Provider):
             port_count=1,
             apps=[App(
                 port_index=0,
-                app_name="Jupyter",
+                app_name="lab",
                 url_path="lab",
                 url_query_params={
                     "token": token

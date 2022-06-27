@@ -1,41 +1,104 @@
 # What is dstack?
 
-##### The cloud-first platform for continuous training and versioning data
+dstack is a platform that makes it very easy to build and share AI apps.
+It allows you to prepare data, train models, run AI apps, and collaborate within one 
+simple yet extensible platform.
 
-🚀 With dstack, you don't need sophisticated MLOps platforms anymore – just as you don't need to manually manage your 
- infrastructure or version your data yourself.
+### Workflows
 
-!!! info ""
-    dstack allows you to run training from your IDE without having to commit local changes to Git before every run. 
-    At the same time, dstack tracks uncommitted changes and also saves output artifacts of your workflows automatically.
+Define common tasks as workflows and run them locally or in the cloud. 
+Configure output artifacts, hardware requirements, and dependencies to other workflow if any.
+
+=== ".dstack/workflows.yaml"
+    ```yaml
+    workflows:
+      - name: prepare
+        provider: python
+        file: "prepare.py"
+        artifacts: ["data"]
     
-    Using dstack is very easy. All you need to do is link your cloud account to dstack, and add declarative configuration 
-    files to your project. Then you can run any workflow from the CLI, and dstack will take care of the rest.
+      - name: train
+        depends-on:
+          - prepare:latest
+        provider: python
+        file: "train.py"
+        artifacts: ["checkpoint"]
+        resources:
+          gpu: 4
+          
+      - name: app
+        depends-on:
+          - train:latest
+        provider: streamlit
+        target: "app.py"
+    ```
 
-#### Why use dstack?
+### Run command
 
-- **Infrastructure**: No more pain with setting up infrastructure. Define what infrastructure you need in your configuration files,
-  and dstack will automatically set up the required infrastructure in your cloud and will tear it down once it's not needed.
-- **Reproducibility**: Every workflow is fully reproducibly
-- **Data versioning**: All output artifacts are tracked automatically in real-time as your workflows is running.
-  You can assign a tag to any run, and reuse its artifacts from other workflows.
+Run workflows, providers, and apps locally or in the cloud with single command from your terminal.
 
-#### More reasons to use dstack:
+For every run, local or remote, dstack mounts your local repository with local changes, artifacts from dependencies, and track logs and output artifacts in real-time.
 
-- **Python scripts**: dstack makes it very easy to run trainings with Python scripts.
-- **Git**: Fully integrated with Git. To run a workflow, you don't have to commit local changes. dstack tracks it automatically.
-- **Interruptible workflows**: dstack helps you use interruptible (cheaper) instances for long trainings as it may save checkpoints in real-time
-  and resume from where it finished.
-- **Easy to use**: No changes in your code is required. Just add configuration files and run workflows via the CLI.
-- **Interoperability**: A variety of built-in providers that support various use-cases, as well as an API to extend the platform if needed.
+#### Workflows
 
-**Here's what you can do with dstack:**
+Here's how to run a workflow:
 
-- **Infrastructure as code**: Forget about infrastructure. Just define your workflows and the resources they need declaratively and run your workflows
-  interactively via the CLI.
-- **Use existing cloud**: Use your existing cloud account to provision infrastructure. You only need to provide dstack credentials to 
-  create EC2 instances.
-- **Version and reuse data**: Version and reuse data. The output artifacts are saved automatically. Put a tag to a particular run, and reuse its 
-  artifacts from other workflows.
-- **Track experiments**: Use a experiment tracker of your choice to track metrics, incl. W&B, Comet, Neptune, etc.
-- **Automate workflows**: Automate preparing data, training, validating, and deployment of your models.
+```bash
+$ dstack run train \
+  --epoch 100 --seed 2 --batch-size 128
+
+RUN         WORKFLOW  PROVIDER  STATUS     APP     ARTIFACTS  SUBMITTED  TAG                    
+nice-fox-1  train     python    SUBMITTED  <none>  <none>     now        <none>
+
+$ █
+```
+
+#### Providers
+
+As an alternative to workflows, you can run any providers directly: 
+
+```bash
+$ dstack run python train.py \
+  --epoch 100 --seed 2 --batch-size 128 \
+  --depends-on prepare:latest --artifact checkpoint --gpu 1
+
+RUN         WORKFLOW  PROVIDER  STATUS     APP     ARTIFACTS   SUBMITTED  TAG                    
+nice-fox-1  <none>    python    SUBMITTED  <none>  checkpoint  now        <none>
+
+$ █
+```
+
+#### Applications
+
+Some providers allow to launch interactive applications, including [JupyterLab](https://github.com/dstackai/dstack/tree/master/providers/lab/#readme),
+[VS Code](https://github.com/dstackai/dstack/tree/master/providers/code/#readme), 
+[Streamlit](https://github.com/dstackai/dstack/tree/master/providers/streamlit/#readme), 
+[Gradio](https://github.com/dstackai/dstack/tree/master/providers/gradio/#readme), and 
+anything else.
+
+Here's an example of the command that launches a VS Code application:
+
+```bash
+$ dstack run code \
+    --artifact output \
+    --gpu 1
+
+RUN         WORKFLOW  PROVIDER  STATUS     APP   ARTIFACTS  SUBMITTED  TAG                    
+nice-fox-1  <none>    code      SUBMITTED  code  output     now        <none>
+
+$ █
+```
+!!! info "Supported providers"
+    You are welcome to use a variety of the [built-in providers](https://github.com/dstackai/dstack/tree/master/providers/#readme), 
+    or the providers from the community.
+
+### Artifacts and tags
+
+For every run, output artifacts, e.g. with data, models, or apps, are saved in real-time.
+
+Use tags to version artifacts to reuse them from other workflows or to share them with others.
+
+### Multi-cloud
+
+You can configure and use your own cloud accounts, such as AWS, GCP, or Azure, to run workflows,
+providers and applications.

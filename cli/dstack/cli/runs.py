@@ -30,11 +30,12 @@ def print_runs(profile, args):
     table_headers = [
         f"{colorama.Fore.LIGHTMAGENTA_EX}RUN{colorama.Fore.RESET}",
         f"{colorama.Fore.LIGHTMAGENTA_EX}WORKFLOW{colorama.Fore.RESET}",
+        f"{colorama.Fore.LIGHTMAGENTA_EX}PROVIDER{colorama.Fore.RESET}",
         # f"{colorama.Fore.LIGHTMAGENTA_EX}REPO{colorama.Fore.RESET}",
         f"{colorama.Fore.LIGHTMAGENTA_EX}STATUS{colorama.Fore.RESET}",
-        f"{colorama.Fore.LIGHTMAGENTA_EX}SUBMITTED{colorama.Fore.RESET}",
-        # f"{colorama.Fore.LIGHTMAGENTA_EX}PORTS{colorama.Fore.RESET}",
+        f"{colorama.Fore.LIGHTMAGENTA_EX}APP{colorama.Fore.RESET}",
         f"{colorama.Fore.LIGHTMAGENTA_EX}ARTIFACTS{colorama.Fore.RESET}",
+        f"{colorama.Fore.LIGHTMAGENTA_EX}SUBMITTED{colorama.Fore.RESET}",
         f"{colorama.Fore.LIGHTMAGENTA_EX}TAG{colorama.Fore.RESET}",
     ]
     table_rows = []
@@ -46,12 +47,14 @@ def print_runs(profile, args):
             status = workflow["status"].upper()
             table_rows.append([
                 colored(workflow_status, workflow["run_name"]) if i == 0 else "",
-                colored(status, workflow["workflow_name"]),
+                colored(status, workflow["workflow_name"] or "<none>"),
+                colored(status, workflow["provider_name"] or "<none>"),
                 # colored(status, pretty_repo_url(workflow["repo_url"])),
                 colored(status, status),
-                colored(status, submitted_at),
                 # colored(workflow_status, "<none>"),
+                colored(status, __job_apps(workflow.get("apps"))),
                 colored(status, __job_artifacts(workflow["artifact_paths"])),
+                colored(status, submitted_at),
                 colored(workflow_status,
                         "*" if workflow["tag_name"] == workflow["run_name"] else workflow[
                             "tag_name"] if workflow["tag_name"] else "<none>"),
@@ -91,6 +94,13 @@ def pretty_duration_and_submitted_at(submitted_at, started_at = None, finished_a
         duration_str = "<none>"
     submitted_at_str = pretty_date(round(submitted_at / 1000)) if submitted_at is not None else "<none>"
     return duration_str, submitted_at_str
+
+
+def __job_apps(apps):
+    if apps is not None and len(apps) > 0:
+        return "\n".join(map(lambda app: app["app_name"], apps))
+    else:
+        return "<none>"
 
 
 def __job_artifacts(paths):
