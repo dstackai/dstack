@@ -1,12 +1,12 @@
 # What is dstack?
 
 dstack is a platform that makes it easy to prepare data, train models, run AI apps, and collaborate.
-Define workflows as code, and run against a configured cloud account.
+It allows you to define common your tasks as workflows, and run against a configured cloud account.
 
 ### Define your workflows
 
-Define common tasks as workflows and run them in the cloud. 
-Configure output artifacts, hardware requirements, and dependencies to other workflow if any.
+Workflows allow to configure hardware requirements, output artifacts, dependencies to other workflow if any,
+and any other parameters supported by the workflow provider.
 
 === ".dstack/workflows.yaml"
     ```yaml
@@ -34,9 +34,7 @@ Configure output artifacts, hardware requirements, and dependencies to other wor
 
 ### Run anything from the CLI
 
-Run workflows, providers, and apps in the cloud with single command from your terminal.
-
-For every run, local or remote, dstack mounts your local repository with local changes, artifacts from dependencies, and track logs and output artifacts in real-time.
+You can run workflows or directly providers in the cloud from your terminal.
 
 #### Workflows
 
@@ -96,9 +94,9 @@ $ █
 
 For every run, output artifacts, e.g. with data, models, or apps, are saved in real-time.
 
-Use tags to version artifacts to reuse them from other workflows or to share them with others.
+You can use tags to version artifacts, e.g. to reuse them from other workflows or to share them with others.
 
 ### Connect your cloud accounts
 
-You can configure and use your own cloud accounts, such as AWS, GCP, or Azure, to run workflows,
-providers and applications.
+In order to run workflows or providers, you have to configure your cloud accounts 
+by adding the corresponding credentials into dstack settings.

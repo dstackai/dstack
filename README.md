@@ -6,7 +6,8 @@ ______________________________________________________________________
 
 [![pypi](https://badge.fury.io/py/dstack.svg)](https://badge.fury.io/py/dstack)
 [![stat](https://pepy.tech/badge/dstack)](https://pepy.tech/project/dstack)
-[![slack](https://img.shields.io/badge/Join%20Slack%20channel-grey.svg?logo=slack)](https://join.slack.com/t/dstackai/shared_invite/zt-xdnsytie-D4qU9BvJP8vkbkHXdi6clQ)
+[![slack](https://img.shields.io/badge/Join%20Slack%20channel-purple.svg?logo=slack)](https://join.slack.com/t/dstackai/shared_invite/zt-xdnsytie-D4qU9BvJP8vkbkHXdi6clQ)
+[![docs](https://img.shields.io/badge/Documentation-grey.svg)](https://docs.dstack.ai)
 
 [//]: # ([![twitter]&#40;https://img.shields.io/twitter/follow/dstackai.svg?style=social&label=Follow&#41;]&#40;https://twitter.com/dstackai&#41;)
 
@@ -15,12 +16,12 @@ ______________________________________________________________________
 ## Overview
 
 dstack is a platform that makes it easy to prepare data, train models, run AI apps, and collaborate.
-Define workflows as code, and run against a configured cloud account.
+It allows you to define common your tasks as workflows, and run against a configured cloud account.
 
 ### Define your workflows
 
-Define common tasks as workflows and run them in the cloud. 
-Configure output artifacts, hardware requirements, and dependencies to other workflow if any.
+Workflows allow to configure hardware requirements, output artifacts, dependencies to other workflow if any,
+and any other parameters supported by the workflow provider.
 
 ```yaml
 workflows:
@@ -47,9 +48,7 @@ workflows:
 
 ### Run anything from the CLI
 
-Run workflows, providers, and apps in the cloud with single command from your terminal.
-
-For every run, local or remote, dstack mounts your local repository with local changes, artifacts from dependencies, and track logs and output artifacts in real-time.
+You can run workflows or directly providers in the cloud from your terminal.
 
 #### Workflows
 
@@ -82,11 +81,11 @@ $ █
 
 #### Applications
 
-Some providers allow to launch interactive applications, including [JupyterLab](https://github.com/dstackai/dstack/tree/master/providers/lab/#readme),
-[VS Code](https://github.com/dstackai/dstack/tree/master/providers/code/#readme), 
-[Streamlit](https://github.com/dstackai/dstack/tree/master/providers/streamlit/#readme), 
-[Gradio](https://github.com/dstackai/dstack/tree/master/providers/gradio/#readme), 
-[FastAPI](https://github.com/dstackai/dstack/tree/master/providers/fastapi/#readme), or
+Some providers allow to launch interactive applications, including [JupyterLab](providers/lab/#readme),
+[VS Code](providers/code/#readme), 
+[Streamlit](providers/streamlit/#readme), 
+[Gradio](providers/gradio/#readme), 
+[FastAPI](providers/fastapi/#readme), or
 anything else.
 
 Here's an example of the command that launches a VS Code application:
@@ -101,20 +100,20 @@ nice-fox-1  <none>    code      SUBMITTED  code  output     now        <none>
 
 $ █
 ```
-!!! info "Supported providers"
-    You are welcome to use a variety of the [built-in providers](https://github.com/dstackai/dstack/tree/master/providers/#readme), 
-    or the providers from the community.
+    
+You are welcome to use a variety of the [built-in providers](providers/README.md), 
+or the providers from the community.
 
 ### Version and share artifacts
 
 For every run, output artifacts, e.g. with data, models, or apps, are saved in real-time.
 
-Use tags to version artifacts to reuse them from other workflows or to share them with others.
+You can use tags to version artifacts, e.g. to reuse them from other workflows or to share them with others.
 
 ### Connect your cloud accounts
 
-You can configure and use your own cloud accounts, such as AWS, GCP, or Azure, to run workflows,
-providers and applications.
+In order to run workflows or providers, you have to configure your cloud accounts 
+by adding the corresponding credentials into dstack settings.
 
 ## Repository
 
@@ -128,7 +127,6 @@ Here's the list of other packages that are expected to be included into this rep
 
 * `runner`: The source code of the program that runs dstack workflows
 * `server`: The source code of the program that orchestrates dstack runs and jobs and provides a user interface
-* `examples`: The source code of the examples of using dstack
 
 ## Contributing
 
