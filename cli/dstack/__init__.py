@@ -167,7 +167,7 @@ class Provider:
         pass
 
     def start(self):
-        print("Workflow data: " + str(self.workflow.data))
+        # print("Workflow data: " + str(self.workflow.data))
         jobs = self.create_jobs()
         # TODO: Handle previous jobs and master job
         for job in jobs:
