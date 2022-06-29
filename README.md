@@ -16,7 +16,7 @@ ______________________________________________________________________
 ## Overview
 
 dstack is a platform that makes it easy to prepare data, train models, run AI apps, and collaborate.
-It allows you to define common your tasks as workflows, and run against a configured cloud account.
+It allows you to define your common project tasks as workflows, and run them in a configured cloud account.
 
 ### Define your workflows
 
