@@ -47,7 +47,7 @@ def print_runs(profile, args):
             status = workflow["status"].upper()
             table_rows.append([
                 colored(workflow_status, workflow["run_name"]) if i == 0 else "",
-                colored(status, workflow["workflow_name"] or "<none>"),
+                colored(status, workflow.get("workflow_name") or "<none>"),
                 colored(status, workflow["provider_name"] or "<none>"),
                 # colored(status, pretty_repo_url(workflow["repo_url"])),
                 colored(status, status),

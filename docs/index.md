@@ -1,12 +1,11 @@
 # What is dstack?
 
-dstack is a platform that makes it very easy to build and share AI apps.
-It allows you to prepare data, train models, run AI apps, and collaborate within one 
-simple yet extensible platform.
+dstack is a platform that makes it easy to prepare data, train models, run AI apps, and collaborate.
+Define workflows as code, and run against a configured cloud account.
 
-### Workflows
+### Define your workflows
 
-Define common tasks as workflows and run them locally or in the cloud. 
+Define common tasks as workflows and run them in the cloud. 
 Configure output artifacts, hardware requirements, and dependencies to other workflow if any.
 
 === ".dstack/workflows.yaml"
@@ -33,9 +32,9 @@ Configure output artifacts, hardware requirements, and dependencies to other wor
         target: "app.py"
     ```
 
-### Run command
+### Run anything from the CLI
 
-Run workflows, providers, and apps locally or in the cloud with single command from your terminal.
+Run workflows, providers, and apps in the cloud with single command from your terminal.
 
 For every run, local or remote, dstack mounts your local repository with local changes, artifacts from dependencies, and track logs and output artifacts in real-time.
 
@@ -93,13 +92,13 @@ $ █
     You are welcome to use a variety of the [built-in providers](https://github.com/dstackai/dstack/tree/master/providers/#readme), 
     or the providers from the community.
 
-### Artifacts and tags
+### Version and share artifacts
 
 For every run, output artifacts, e.g. with data, models, or apps, are saved in real-time.
 
 Use tags to version artifacts to reuse them from other workflows or to share them with others.
 
-### Multi-cloud
+### Connect your cloud accounts
 
 You can configure and use your own cloud accounts, such as AWS, GCP, or Azure, to run workflows,
 providers and applications.

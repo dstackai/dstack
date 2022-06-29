@@ -1,6 +1,6 @@
 # Workflows
 
-Workflows allow you to define your common tasks and run them locally or in the cloud
+Workflows allow you to define your common tasks and run them in the cloud
 while dstack takes care of tracking code, dependencies, logs, output artifacts,
 and provisioning required infrastructure.
 

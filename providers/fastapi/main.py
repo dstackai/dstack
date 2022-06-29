@@ -23,61 +23,13 @@ class FastAPIProvider(Provider):
 
     def parse_args(self):
         parser = ArgumentParser(prog="dstack run fastapi")
-        if not self.workflow.data.get("workflow_name"):
+        self._add_base_args(parser)
+        if self.run_as_provider:
             parser.add_argument("app", metavar="APP", type=str)
-        parser.add_argument("-r", "--requirements", type=str, nargs="?")
-        parser.add_argument('-e', '--env', action='append', nargs="?")
-        parser.add_argument('-a', '--artifact', action='append', nargs="?")
-        # TODO: Support depends-on
-        parser.add_argument("--working-dir", type=str, nargs="?")
-        # parser.add_argument('--depends-on', action='append', nargs="?")
-        parser.add_argument("--cpu", type=int, nargs="?")
-        parser.add_argument("--memory", type=str, nargs="?")
-        parser.add_argument("--gpu", type=int, nargs="?")
-        parser.add_argument("--gpu-name", type=str, nargs="?")
-        parser.add_argument("--gpu-memory", type=str, nargs="?")
-        parser.add_argument("--shm-size", type=str, nargs="?")
-        args, unknown = parser.parse_known_args(self.provider_args)
-        args.unknown = unknown
-        if not self.workflow.data.get("workflow_name"):
+        args = parser.parse_args(self.provider_args)
+        self._parse_base_args(args)
+        if self.run_as_provider:
             self.workflow.data["app"] = args.app
-        if args.requirements:
-            self.workflow.data["requirements"] = args.requirements
-        if args.artifact:
-            self.workflow.data["artifacts"] = args.artifact
-        if args.working_dir:
-            self.workflow.data["working_dir"] = args.working_dir
-        if args.env:
-            environment = self.workflow.data.get("environment") or {}
-            for e in args.env:
-                if "=" in e:
-                    tokens = e.split("=", maxsplit=1)
-                    environment[tokens[0]] = tokens[1]
-                else:
-                    environment[e] = ""
-            self.workflow.data["environment"] = environment
-        if args.cpu or args.memory or args.gpu or args.gpu_name or args.gpu_memory or args.shm_size:
-            resources = self.workflow.data["resources"] or {}
-            self.workflow.data["resources"] = resources
-            if args.cpu:
-                resources["cpu"] = args.cpu
-            if args.memory:
-                resources["memory"] = args.memory
-            if args.gpu or args.gpu_name or args.gpu_memory:
-                gpu = self.workflow.data["resources"].get("gpu") or {} if self.workflow.data.get("resources") else {}
-                if type(gpu) is int:
-                    gpu = {
-                        "count": gpu
-                    }
-                resources["gpu"] = gpu
-                if args.gpu:
-                    gpu["count"] = args.gpu
-                if args.gpu_memory:
-                    gpu["memory"] = args.gpu_memory
-                if args.gpu_name:
-                    gpu["name"] = args.gpu_name
-            if args.shm_size:
-                resources["shm_size"] = args.shm_size
 
     def create_jobs(self) -> List[Job]:
         return [Job(

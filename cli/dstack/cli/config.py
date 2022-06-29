@@ -58,7 +58,7 @@ def register_parsers(main_subparsers):
                                     action="store_true")
 
     def add_force_argument(command_parser):
-        command_parser.add_argument("--force", help="Don't ask for confirmation", action="store_true")
+        command_parser.add_argument("-f", "--force", help="Don't ask for confirmation", action="store_true")
 
     def add_file_argument(command_parser):
         command_parser.add_argument("--file", help="Use specific config file")

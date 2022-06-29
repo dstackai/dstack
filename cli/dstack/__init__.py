@@ -2,6 +2,7 @@ import json
 import os
 import sys
 from abc import abstractmethod
+from argparse import ArgumentParser, Namespace
 from pathlib import Path
 from typing import Optional, List, Dict
 
@@ -92,8 +93,10 @@ class Workflow:
 class Provider:
     def __init__(self, schema: Optional[str] = None):
         self.workflow = Workflow(self._load_workflow_data())
-        self.provider_args = [str(arg) for arg in self.workflow.data["provider_args"]] if self.workflow.data.get("provider_args") else []
+        self.provider_args = [str(arg) for arg in self.workflow.data["provider_args"]] if self.workflow.data.get(
+            "provider_args") else []
         self.workflow_name = self.workflow.data.get("workflow_name")
+        self.run_as_provider = not self.workflow.data.get("workflow_name")
         self.parse_args()
         self.schema = schema
         # TODO: Move here workflow related fields, such as variables, etc
@@ -102,6 +105,63 @@ class Provider:
     @abstractmethod
     def create_jobs(self) -> List[Job]:
         pass
+
+    @staticmethod
+    def _add_base_args(parser: ArgumentParser):
+        parser.add_argument("-r", "--requirements", type=str, nargs="?")
+        parser.add_argument('-e', '--env', action='append', nargs="?")
+        parser.add_argument('-a', '--artifact', action='append', nargs="?")
+        # TODO: Support depends-on
+        parser.add_argument("--working-dir", type=str, nargs="?")
+        # parser.add_argument('--depends-on', action='append', nargs="?")
+        parser.add_argument("-i", "--interruptible", action="store_true")
+        parser.add_argument("--cpu", type=int, nargs="?")
+        parser.add_argument("--memory", type=str, nargs="?")
+        parser.add_argument("--gpu", type=int, nargs="?")
+        parser.add_argument("--gpu-name", type=str, nargs="?")
+        parser.add_argument("--gpu-memory", type=str, nargs="?")
+        parser.add_argument("--shm-size", type=str, nargs="?")
+
+    def _parse_base_args(self, args: Namespace):
+        if args.requirements:
+            self.workflow.data["requirements"] = args.requirements
+        if args.artifact:
+            self.workflow.data["artifacts"] = args.artifact
+        if args.working_dir:
+            self.workflow.data["working_dir"] = args.working_dir
+        if args.env:
+            environment = self.workflow.data.get("environment") or {}
+            for e in args.env:
+                if "=" in e:
+                    tokens = e.split("=", maxsplit=1)
+                    environment[tokens[0]] = tokens[1]
+                else:
+                    environment[e] = ""
+            self.workflow.data["environment"] = environment
+        if args.cpu or args.memory or args.gpu or args.gpu_name or args.gpu_memory or args.shm_size or args.interruptible:
+            resources = self.workflow.data.get("resources") or {}
+            self.workflow.data["resources"] = resources
+            if args.cpu:
+                resources["cpu"] = args.cpu
+            if args.memory:
+                resources["memory"] = args.memory
+            if args.gpu or args.gpu_name or args.gpu_memory:
+                gpu = self.workflow.data["resources"].get("gpu") or {} if self.workflow.data.get("resources") else {}
+                if type(gpu) is int:
+                    gpu = {
+                        "count": gpu
+                    }
+                resources["gpu"] = gpu
+                if args.gpu:
+                    gpu["count"] = args.gpu
+                if args.gpu_memory:
+                    gpu["memory"] = args.gpu_memory
+                if args.gpu_name:
+                    gpu["name"] = args.gpu_name
+            if args.shm_size:
+                resources["shm_size"] = args.shm_size
+            if args.interruptible:
+                resources["interruptible"] = True
 
     def parse_args(self):
         pass
@@ -276,14 +336,14 @@ class Provider:
         request_json_copy = dict(request_json)
         if self.workflow.data["repo_diff"]:
             request_json_copy["repo_diff"] = "<hidden, length is " + str(len(self.workflow.data["repo_diff"])) + ">"
-        print("Request: " + str(request_json_copy))
+        # print("Request: " + str(request_json_copy))
         response = requests.request(method="POST", url=f"{os.environ['DSTACK_SERVER']}/jobs/submit",
                                     data=json.dumps(request_json).encode("utf-8"),
                                     headers=headers)
         if response.status_code != 200:
             response.raise_for_status()
         response_json = response.json()
-        print("Response: " + str(response_json))
+        # print("Response: " + str(response_json))
         if response.status_code == 200:
             job.id = response_json.get("job_id")
         else:
