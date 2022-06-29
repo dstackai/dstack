@@ -22,29 +22,28 @@ Define workflows as code, and run against a configured cloud account.
 Define common tasks as workflows and run them in the cloud. 
 Configure output artifacts, hardware requirements, and dependencies to other workflow if any.
 
-=== ".dstack/workflows.yaml"
-    ```yaml
-    workflows:
-      - name: prepare
-        provider: python
-        file: "prepare.py"
-        artifacts: ["data"]
-    
-      - name: train
-        depends-on:
-          - prepare:latest
-        provider: python
-        file: "train.py"
-        artifacts: ["checkpoint"]
-        resources:
-          gpu: 4
-          
-      - name: app
-        depends-on:
-          - train:latest
-        provider: streamlit
-        target: "app.py"
-    ```
+```yaml
+workflows:
+  - name: prepare
+    provider: python
+    file: "prepare.py"
+    artifacts: ["data"]
+
+  - name: train
+    depends-on:
+      - prepare:latest
+    provider: python
+    file: "train.py"
+    artifacts: ["checkpoint"]
+    resources:
+      gpu: 4
+      
+  - name: app
+    depends-on:
+      - train:latest
+    provider: streamlit
+    target: "app.py"
+```
 
 ### Run anything from the CLI
 
