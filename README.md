@@ -6,138 +6,122 @@ ______________________________________________________________________
 
 [![pypi](https://badge.fury.io/py/dstack.svg)](https://badge.fury.io/py/dstack)
 [![stat](https://pepy.tech/badge/dstack)](https://pepy.tech/project/dstack)
-[![slack](https://img.shields.io/badge/Join%20Slack%20channel-purple.svg?logo=slack)](https://join.slack.com/t/dstackai/shared_invite/zt-xdnsytie-D4qU9BvJP8vkbkHXdi6clQ)
-[![docs](https://img.shields.io/badge/Documentation-grey.svg)](https://docs.dstack.ai)
+[![slack](https://img.shields.io/badge/Slack%20community-purple.svg?logo=slack)](https://join.slack.com/t/dstackai/shared_invite/zt-xdnsytie-D4qU9BvJP8vkbkHXdi6clQ)
 
 [//]: # ([![twitter]&#40;https://img.shields.io/twitter/follow/dstackai.svg?style=social&label=Follow&#41;]&#40;https://twitter.com/dstackai&#41;)
 
 </div>
 
-## Overview
+dstack makes it easy to build AI apps and collaborate.
 
-dstack is a platform that makes it easy to prepare data, train models, run AI apps, and collaborate.
-It allows you to define your common project tasks as workflows, and run them in a configured cloud account.
+* The platform is easily extensible through [providers](providers) that may add support for
+  various languages, training and application frameworks, dev environments, etc.
+* You can define common tasks (such as preparing data, training models, running apps, etc.), as workflows 
+  and run them in the cloud with one command. 
+* The platform automatically saves output artifacts in the cloud, and allow you to version them via tags to reuse and share with others.
+* You can configure your own cloud account (e.g. AWS, GCP, Azure, etc.)
 
-### Define your workflows
+This repository contains the open source code of the built-in [providers](providers), the [CLI](cli), and [documentation](docs). 
 
-Workflows allow to configure hardware requirements, output artifacts, dependencies to other workflow if any,
-and any other parameters supported by the workflow provider.
+## 📘 Documentation
+
+See full documentation at [docs.dstack.ai](https://docs.dstack.ai)
+
+## 🚀 Getting started
+
+To use dstack, you have to [create an account](https://dstack.ai/signup), and 
+obtain your personal token.
+
+### Install the CLI
+
+Here's how to do it:
+
+```bash
+pip install dstack
+dstack config --token <token> 
+```
+
+### Define workflows
+
+Your common project tasks can be defined as workflows:
+
+Here's an example:
 
 ```yaml
 workflows:
   - name: prepare
+    help: "Loads and prepares the training data" 
     provider: python
     file: "prepare.py"
     artifacts: ["data"]
 
   - name: train
+    help: "Trains a model and saves the checkpoints"
     depends-on:
       - prepare:latest
     provider: python
     file: "train.py"
     artifacts: ["checkpoint"]
     resources:
-      gpu: 4
+      gpu: 1
       
   - name: app
+    help: "Launches an app to play with the model"
     depends-on:
       - train:latest
     provider: streamlit
     target: "app.py"
 ```
 
-### Run anything from the CLI
-
-You can run workflows or directly providers in the cloud from your terminal.
-
-#### Workflows
-
-Here's how to run a workflow:
+Run any workflow in the cloud via a single command:
 
 ```bash
-$ dstack run train \
-  --epoch 100 --seed 2 --batch-size 128
-
-RUN         WORKFLOW  PROVIDER  STATUS     APP     ARTIFACTS  SUBMITTED  TAG                    
-nice-fox-1  train     python    SUBMITTED  <none>  <none>     now        <none>
-
-$ █
+$ dstack run train
 ```
 
-#### Providers
+### Run providers
 
-As an alternative to workflows, you can run any providers directly: 
+Workflows are optional. You can run providers directly from the CLI:
 
-```bash
-$ dstack run python train.py \
-  --epoch 100 --seed 2 --batch-size 128 \
-  --depends-on prepare:latest --artifact checkpoint --gpu 1
+``bash
+dstack run python train.py \
+  --dep prepare:latest --artifact checkpoint --gpu 1
+``
 
-RUN         WORKFLOW  PROVIDER  STATUS     APP     ARTIFACTS   SUBMITTED  TAG                    
-nice-fox-1  <none>    python    SUBMITTED  <none>  checkpoint  now        <none>
+### Run applications
 
-$ █
-```
+Here's how to run a Streamlit application:
 
-#### Applications
+``bash
+dstack run streamlit app.py --dep model:latest
+``
 
-Some providers allow to launch interactive applications, including [JupyterLab](providers/lab/#readme),
-[VS Code](providers/code/#readme), 
-[Streamlit](providers/streamlit/#readme), 
-[Gradio](providers/gradio/#readme), 
-[FastAPI](providers/fastapi/#readme), or
-anything else.
 
-Here's an example of the command that launches a VS Code application:
+### Launch dev environments
 
-```bash
-$ dstack run code \
-    --artifact output \
-    --gpu 1
+If you need an interactive dev environment, you can have it too through the corresponding provider:
 
-RUN         WORKFLOW  PROVIDER  STATUS     APP   ARTIFACTS  SUBMITTED  TAG                    
-nice-fox-1  <none>    code      SUBMITTED  code  output     now        <none>
+``bash
+dstack run code app.py --dep prepare:latest --gpu 1
+``
 
-$ █
-```
-    
-You are welcome to use a variety of the [built-in providers](providers/README.md), 
-or the providers from the community.
+This will run a VS Code with mounted artifacts and requested hardware resources.
 
-### Version and share artifacts
+## 🧩 Providers
 
-For every run, output artifacts, e.g. with data, models, or apps, are saved in real-time.
+Find the full list of built-in providers along examples and their source code [here](providers).
 
-You can use tags to version artifacts, e.g. to reuse them from other workflows or to share them with others.
+## 🙋‍♀️ Contributing
 
-### Connect your cloud accounts
+There are several ways to contribute to dstack:
 
-In order to run workflows or providers, you have to configure your cloud accounts 
-by adding the corresponding credentials into dstack settings.
+1. Fork the repository and send us pull requests with bugfixes, new providers, and improvements to the documentation.
+2. Send us links to your repositories with public workflows or custom repositories to be featured here.
+3. Report bugs to our [issue tracker](https://github.com/dstackai/dstack/issues).
+4. Share your stories and questions within our [Slack community](https://join.slack.com/t/dstackai/shared_invite/zt-xdnsytie-D4qU9BvJP8vkbkHXdi6clQ).
 
-## Repository
+Remember, it's important to respect other members of the community. In case you're not sure about the rules, check out [code of conduct](CODE_OF_CONDUCT.md).
 
-This repository contains dstack's open-source and public code, documentation, and other key resources:
+## 🛟 Troubleshooting and help
 
-* [`providers`](providers): The source code of the built-in dstack workflow providers
-* [`cli`](cli): The source code of the dstack CLI pip package
-* [`docs`](docs): A user guide to the whole dstack platform ([docs.dstack.ai](https://docs.dstack.ai))
-
-Here's the list of other packages that are expected to be included into this repository with their source code soon:
-
-* `runner`: The source code of the program that runs dstack workflows
-* `server`: The source code of the program that orchestrates dstack runs and jobs and provides a user interface
-
-## Contributing
-
-Please check [CONTRIBUTING.md](CONTRIBUTING.md) if you'd like to get involved in the development of dstack.
-
-## License
-
-Please see [LICENSE.md](LICENSE.md) for more information about the terms under which the various parts of this repository are made available.
-
-## Contact
-
-Find us on Twitter at [@dstackai](https://twitter.com/dstackai), join our [Slack community](https://join.slack.com/t/dstackai/shared_invite/zt-xdnsytie-D4qU9BvJP8vkbkHXdi6clQ) for quick help and support.
-
-Project permalink: `https://github.com/dstackai/dstack`
+Use our [Slack community](https://join.slack.com/t/dstackai/shared_invite/zt-xdnsytie-D4qU9BvJP8vkbkHXdi6clQ) to get help and support.

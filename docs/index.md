@@ -57,7 +57,7 @@ As an alternative to workflows, you can run any providers directly:
 ```bash
 $ dstack run python train.py \
   --epoch 100 --seed 2 --batch-size 128 \
-  --depends-on prepare:latest --artifact checkpoint --gpu 1
+  --dep prepare:latest --artifact checkpoint --gpu 1
 
 RUN         WORKFLOW  PROVIDER  STATUS     APP     ARTIFACTS   SUBMITTED  TAG                    
 nice-fox-1  <none>    python    SUBMITTED  <none>  checkpoint  now        <none>

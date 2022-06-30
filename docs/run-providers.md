@@ -10,7 +10,7 @@ Here's an example:
 ```bash
 dstack run python train.py \
   --epoch 100 --seed 2 --batch-size 128 \
-  --depends-on prepare:latest --artifact checkpoint --gpu 1 
+  --dep prepare:latest --artifact checkpoint --gpu 1 
 ```
 
 Every provider may have its own list of required and non-required CLI arguments.

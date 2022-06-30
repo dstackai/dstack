@@ -113,7 +113,7 @@ class Provider:
         parser.add_argument('-a', '--artifact', action='append', nargs="?")
         # TODO: Support depends-on
         parser.add_argument("--working-dir", type=str, nargs="?")
-        # parser.add_argument('--depends-on', action='append', nargs="?")
+        # parser.add_argument('--dep', action='append', nargs="?")
         parser.add_argument("-i", "--interruptible", action="store_true")
         parser.add_argument("--cpu", type=int, nargs="?")
         parser.add_argument("--memory", type=str, nargs="?")
