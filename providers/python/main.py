@@ -11,6 +11,7 @@ class PythonProvider(Provider):
         super().__init__(schema="providers/python/schema.yaml")
         # Drop the deprecated `script` property, and make `file` required in the schema
         self.file = self.workflow.data.get("script") or self.workflow.data["file"]
+        self.before_run = self.workflow.data.get("before_run")
         # TODO: Handle numbers such as 3.1 (e.g. require to use strings)
         self.version = str(self.workflow.data.get("version") or self.workflow.data.get("python") or "3.10")
         self.args = self.workflow.data.get("args")
@@ -53,6 +54,8 @@ class PythonProvider(Provider):
         commands = []
         if self.requirements:
             commands.append("pip install -r " + self.requirements)
+        if self.before_run:
+            commands.extend(self.before_run)
         args_init = ""
         if self.args:
             if isinstance(self.args, str):

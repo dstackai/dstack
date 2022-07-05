@@ -66,7 +66,8 @@ def print_runs(profile, args):
 def get_runs_v2(args, profile):
     headers, params = headers_and_params(profile, None, False)
     # del params["repo_url"]
-    params["n"] = args.last
+    if args.all:
+        params["n"] = 50
     response = request(method="GET", url=f"{profile.server}/runs/workflows/query", params=params, headers=headers,
                        verify=profile.verify)
     response.raise_for_status()
@@ -75,7 +76,7 @@ def get_runs_v2(args, profile):
     return runs
 
 
-def pretty_duration_and_submitted_at(submitted_at, started_at = None, finished_at = None):
+def pretty_duration_and_submitted_at(submitted_at, started_at=None, finished_at=None):
     if started_at is not None and finished_at is not None:
         _finished_at_milli = round(finished_at / 1000)
         duration_milli = _finished_at_milli - round(started_at / 1000)
@@ -113,8 +114,8 @@ def __job_artifacts(paths):
 def register_parsers(main_subparsers):
     parser = main_subparsers.add_parser("runs", help="Lists runs")
 
-    parser.add_argument("-n", "--last", help="Show the specified number of the most recent runs. By default, it's "
-                                             "10.",
-                        type=int, default=10)
+    parser.add_argument("-a", "--all",
+                        help="Show all recent runs. By default, it shows only active runs, or the last finished.",
+                        action="store_true")
 
     parser.set_defaults(func=runs_func)

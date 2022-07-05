@@ -9,6 +9,7 @@ from dstack import Provider, Job, App
 class LabProvider(Provider):
     def __init__(self):
         super().__init__(schema="providers/lab/schema.yaml")
+        self.before_run = self.workflow.data.get("before_run")
         # TODO: Handle numbers such as 3.1 (e.g. require to use strings)
         self.python = str(self.workflow.data.get("python") or "3.10")
         self.version = self.workflow.data.get("version")
@@ -63,6 +64,8 @@ class LabProvider(Provider):
         ]
         if self.requirements:
             commands.append("pip install -r " + self.requirements)
+        if self.before_run:
+            commands.extend(self.before_run)
         commands.append(
             f"jupyter lab"
         )

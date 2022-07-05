@@ -47,6 +47,8 @@ markdown_extensions:
       custom_checkbox: true
   - toc:
       toc_depth: 2
+  - attr_list
+  - md_in_html
 extra_css:
   - stylesheets/extra.css
 extra_javascript:

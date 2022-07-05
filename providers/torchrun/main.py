@@ -9,6 +9,7 @@ class PytorchDDPProvider(Provider):
     def __init__(self):
         super().__init__(schema="providers/torchrun/schema.yaml")
         self.script = self.workflow.data.get("script") or self.workflow.data.get("file")
+        self.before_run = self.workflow.data.get("before_run")
         self.version = str(self.workflow.data.get("version") or "3.9")
         self.requirements = self.workflow.data.get("requirements")
         self.environment = self.workflow.data.get("environment") or {}
@@ -31,6 +32,8 @@ class PytorchDDPProvider(Provider):
         commands = []
         if self.requirements:
             commands.append("pip3 install -r " + self.requirements)
+        if self.before_run:
+            commands.extend(self.before_run)
         nproc = ""
         if self.resources.gpu:
             nproc = f"--nproc_per_node={self.resources.gpu.count}"

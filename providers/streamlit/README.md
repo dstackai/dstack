@@ -34,6 +34,7 @@ workflows:
 | Parameter                 | Required | Description                                                          |
 |---------------------------|----------|----------------------------------------------------------------------|
 | `target`                  | Yes      | The path or a URL that points to the Python script                   |
+| `before_run`              | No       | The list of commands to run before launching the app                 |
 | `requirements`            | No       | The list of Python packages to pre-install                           |
 | `version`                 | No       | The Streamlit version                                                |
 | `python`                  | No       | The major Python version. By default, it's `3.10`.                   |

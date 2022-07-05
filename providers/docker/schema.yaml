@@ -3,6 +3,10 @@ additionalProperties: false
 properties:
   image:
     type: string
+  before_run:
+    type: array
+    items:
+      type: string
   commands:
     type: array
     items:

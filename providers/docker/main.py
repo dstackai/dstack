@@ -9,6 +9,7 @@ class DockerProvider(Provider):
     def __init__(self):
         super().__init__(schema="providers/docker/schema.yaml")
         self.image = self.workflow.data["image"]
+        self.before_run = self.workflow.data.get("before_run")
         self.commands = self.workflow.data.get("commands")
         self.artifacts = self.workflow.data.get("artifacts")
         self.environment = self.workflow.data.get("environment")
@@ -38,9 +39,13 @@ class DockerProvider(Provider):
             self.workflow.data["ports"] = args.ports
 
     def create_jobs(self) -> List[Job]:
+        commands = []
+        if self.before_run:
+            commands.extend(self.before_run)
+        commands.extend(self.commands)
         return [Job(
             image=self.image,
-            commands=self.commands,
+            commands=commands,
             environment=self.environment,
             working_dir=self.working_dir,
             resources=self.resources,

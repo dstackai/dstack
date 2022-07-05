@@ -1,71 +1,58 @@
 # What is dstack?
 
-dstack is a platform that makes it easy to prepare data, train models, run AI apps, and collaborate.
-It allows you to define your common project tasks as workflows, and run them in a configured cloud account.
+dstack is a platform that makes it very easy to manage data, train models, build and deploy AI apps.
 
-### Define your workflows
+### Organize your workflows
 
-Workflows allow to configure hardware requirements, output artifacts, dependencies to other workflow if any,
+dstack allows you to define your common tasks as workflows, and run them in a configured cloud account.
+
+You can configure hardware requirements, output artifacts, dependencies to other workflow if any,
 and any other parameters supported by the workflow provider.
 
-=== ".dstack/workflows.yaml"
-    ```yaml
-    workflows:
-      - name: prepare
-        provider: python
-        file: "prepare.py"
-        artifacts: ["data"]
-    
-      - name: train
-        depends-on:
-          - prepare:latest
-        provider: python
-        file: "train.py"
-        artifacts: ["checkpoint"]
-        resources:
-          gpu: 4
-          
-      - name: app
-        depends-on:
-          - train:latest
-        provider: streamlit
-        target: "app.py"
-    ```
+???- info "Click to see an example"
 
-### Run anything from the CLI
+    === ".dstack/workflows.yaml"
+        ```yaml
+        workflows:
+          - name: prepare
+            provider: python
+            file: "prepare.py"
+            artifacts: ["data"]
+        
+          - name: train
+            depends-on:
+              - prepare:latest
+            provider: python
+            file: "train.py"
+            artifacts: ["checkpoint"]
+            resources:
+              gpu: 4
+              
+          - name: app
+            depends-on:
+              - train:latest
+            provider: streamlit
+            target: "app.py"
+        ```
+
+### Run workflows, providers, and apps
 
 You can run workflows or directly providers in the cloud from your terminal.
-
-#### Workflows
 
 Here's how to run a workflow:
 
 ```bash
-$ dstack run train \
+dstack run train \
   --epoch 100 --seed 2 --batch-size 128
-
-RUN         WORKFLOW  PROVIDER  STATUS     APP     ARTIFACTS  SUBMITTED  TAG                    
-nice-fox-1  train     python    SUBMITTED  <none>  <none>     now        <none>
-
-$ █
 ```
-
-#### Providers
 
 As an alternative to workflows, you can run any providers directly: 
 
 ```bash
-$ dstack run python train.py \
+dstack run python train.py \
   --epoch 100 --seed 2 --batch-size 128 \
   --dep prepare:latest --artifact checkpoint --gpu 1
-
-RUN         WORKFLOW  PROVIDER  STATUS     APP     ARTIFACTS   SUBMITTED  TAG                    
-nice-fox-1  <none>    python    SUBMITTED  <none>  checkpoint  now        <none>
-
-$ █
 ```
-
-#### Applications
 
 Some providers allow to launch interactive applications, including [JupyterLab](https://github.com/dstackai/dstack/tree/master/providers/lab/#readme),
 [VS Code](https://github.com/dstackai/dstack/tree/master/providers/code/#readme), 
@@ -77,20 +64,67 @@ anything else.
 Here's an example of the command that launches a VS Code application:
 
 ```bash
-$ dstack run code \
-    --artifact output \
-    --gpu 1
-
-RUN         WORKFLOW  PROVIDER  STATUS     APP   ARTIFACTS  SUBMITTED  TAG                    
-nice-fox-1  <none>    code      SUBMITTED  code  output     now        <none>
-
-$ █
+dstack run code \
+  --artifact output \
+  --gpu 1
 ```
-!!! info "Supported providers"
-    You are welcome to use a variety of the [built-in providers](https://github.com/dstackai/dstack/tree/master/providers/#readme), 
-    or the providers from the community.
+### Providers registry
 
-### Version and share artifacts
+You are welcome to use a variety of the [built-in providers](https://github.com/dstackai/dstack/tree/master/providers/#readme), 
+or the providers from the community.
+
+<div class="grid cards" markdown>
+
+-  __python__
+
+    Runs a Python script
+
+    [:octicons-arrow-right-24: Reference](https://github.com/dstackai/dstack/tree/master/providers/python/#readme)
+
+- __docker__
+
+    Runs a Docker image
+    [:octicons-arrow-right-24: Reference](https://github.com/dstackai/dstack/tree/master/providers/docker/#readme)
+
+- __streamlit__
+
+    Runs a Streamlit app
+
+    [:octicons-arrow-right-24: Reference](https://github.com/dstackai/dstack/tree/master/providers/streamlit/#readme)
+
+- __gradio__
+
+    Runs a Gradio app
+
+    [:octicons-arrow-right-24: Reference](https://github.com/dstackai/dstack/tree/master/providers/gradio/#readme)
+
+- __fastapi__
+
+    Runs a FastAPI app
+
+    [:octicons-arrow-right-24: Reference](https://github.com/dstackai/dstack/tree/master/providers/fastapi/#readme)
+
+- __lab__
+
+    Runs a JupyterLab app
+
+    [:octicons-arrow-right-24: Reference](https://github.com/dstackai/dstack/tree/master/providers/lab/#readme)
+
+- __code__
+
+    Runs a VS Code app
+
+    [:octicons-arrow-right-24: Reference](https://github.com/dstackai/dstack/tree/master/providers/code/#readme)
+
+- __notebook__
+
+    Runs a Jupyter notebook
+
+    [:octicons-arrow-right-24: Reference](https://github.com/dstackai/dstack/tree/master/providers/notebook/#readme)
+
+</div>
+
+### Share data, models, and apps
 
 For every run, output artifacts, e.g. with data, models, or apps, are saved in real-time.
 

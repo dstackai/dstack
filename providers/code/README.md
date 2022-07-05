@@ -31,6 +31,7 @@ workflows:
 
 | Parameter                 | Required | Description                                                          |
 |---------------------------|----------|----------------------------------------------------------------------|
+| `before_run`              | No       | The list of commands to run before launching the app                 |
 | `requirements`            | No       | The list of Python packages to pre-install                           |
 | `version`                 | No       | The Jupyter version                                                  |
 | `python`                  | No       | The major Python version. By default, it's `3.10`.                   |

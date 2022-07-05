@@ -9,6 +9,7 @@ class FastAPIProvider(Provider):
     def __init__(self):
         super().__init__(schema="providers/fastapi/schema.yaml")
         self.app = self.workflow.data["app"]
+        self.before_run = self.workflow.data.get("before_run")
         # TODO: Handle numbers such as 3.1 (e.g. require to use strings)
         self.python = str(self.workflow.data.get("python") or "3.10")
         self.version = self.workflow.data.get("version")
@@ -55,8 +56,10 @@ class FastAPIProvider(Provider):
         commands = [
             "pip install fastapi" + (f"=={self.version}" if self.version else ""),
             "pip install \"uvicorn[standard]\"" + (f"=={self.uvicorn}" if self.uvicorn else ""),
-            f"uvicorn --port $JOB_PORT_0 --host $JOB_HOSTNAME {self.app}"
         ]
+        if self.before_run:
+            commands.extend(self.before_run)
+        commands.append(f"uvicorn --port $JOB_PORT_0 --host $JOB_HOSTNAME {self.app}")
         return commands
 
 

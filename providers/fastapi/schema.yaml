@@ -1,6 +1,10 @@
 type: object
 additionalProperties: false
 properties:
+  before_run:
+    type: array
+    items:
+      type: string
   app:
     type: string
   requirements:

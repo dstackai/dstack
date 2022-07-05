@@ -11,6 +11,7 @@ class Gradiorovider(Provider):
     def __init__(self):
         super().__init__(schema="providers/gradio/schema.yaml")
         self.file = self.workflow.data["file"]
+        self.before_run = self.workflow.data.get("before_run")
         # TODO: Handle numbers such as 3.1 (e.g. require to use strings)
         self.python = str(self.workflow.data.get("python") or "3.10")
         self.version = self.workflow.data.get("version")
@@ -59,6 +60,8 @@ class Gradiorovider(Provider):
         commands = [
             "pip install gradio" + (f"=={self.version}" if self.version else ""),
         ]
+        if self.before_run:
+            commands.extend(self.before_run)
         args_init = ""
         if self.args:
             if isinstance(self.args, str):

@@ -38,6 +38,7 @@ workflows:
 | Parameter                 | Required | Description                                                          |
 |---------------------------|----------|----------------------------------------------------------------------|
 | `image`                   | Yes      | The Docker image                                                     |
+| `before_run`              | No       | The list of commands to run before the main commands                 |
 | `commands`                | No       | The list of commands to run                                          |
 | `ports`                   | No       | The number of ports to expose                                        |
 | `artifacts`               | No       | The list of output artifacts                                         |

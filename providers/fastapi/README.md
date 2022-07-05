@@ -34,6 +34,7 @@ workflows:
 | Parameter                 | Required | Description                                                          |
 |---------------------------|----------|----------------------------------------------------------------------|
 | `app`                     | Yes      | The app in the format `<module>:<attribute>`, e.g. `main:app`        |
+| `before_run`              | No       | The list of commands to run before launching the app                 |
 | `requirements`            | No       | The list of Python packages to pre-install                           |
 | `version`                 | No       | The FastAPI version                                                  |
 | `uvicorn`                 | No       | The version of Uvicorn                                               |

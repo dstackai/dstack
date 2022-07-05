@@ -37,6 +37,7 @@ workflows:
 |---------------------------|----------|----------------------------------------------------------------------|
 | `file`                    | Yes      | The Python file to run                                               |
 | `args`                    | No       | The list of arguments for the Python script                          |
+| `before_run`              | No       | The list of commands to run before running the file                  |
 | `requirements`            | No       | The list of Python packages required by the script                   |
 | `version`                 | No       | The major Python version. By default, it's `3.10`.                   |
 | `environment`             | No       | The list of environment variables and their values                   |

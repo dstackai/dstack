@@ -14,12 +14,12 @@ ______________________________________________________________________
 
 dstack makes it easy to build AI apps and collaborate.
 
-* The platform is easily extensible through [providers](providers) that may add support for
-  various languages, training and application frameworks, dev environments, etc.
 * You can define common tasks (such as preparing data, training models, running apps, etc.), as workflows 
   and run them in the cloud with one command. 
 * The platform automatically saves output artifacts in the cloud, and allow you to version them via tags to reuse and share with others.
 * You can configure your own cloud account (e.g. AWS, GCP, Azure, etc.)
+* The platform is easily extensible through [providers](providers). Provider add support for
+  various languages, training and application frameworks, dev environments, etc.
 
 This repository contains the open source code of the built-in [providers](providers), the [CLI](cli), and [documentation](docs). 
 
@@ -45,7 +45,8 @@ dstack config --token <token>
 
 Your common project tasks can be defined as workflows:
 
-Here's an example:
+<details>
+<summary>Click to see an example</summary>
 
 ```yaml
 workflows:
@@ -72,6 +73,7 @@ workflows:
     provider: streamlit
     target: "app.py"
 ```
+</details>
 
 Run any workflow in the cloud via a single command:
 
@@ -79,31 +81,33 @@ Run any workflow in the cloud via a single command:
 $ dstack run train
 ```
 
+For more examples, check out the [examples](examples) folder.
+
 ### Run providers
 
 Workflows are optional. You can run providers directly from the CLI:
 
-``bash
+```bash
 dstack run python train.py \
   --dep prepare:latest --artifact checkpoint --gpu 1
-``
+```
 
 ### Run applications
 
 Here's how to run a Streamlit application:
 
-``bash
+```bash
 dstack run streamlit app.py --dep model:latest
-``
+```
 
 
 ### Launch dev environments
 
 If you need an interactive dev environment, you can have it too through the corresponding provider:
 
-``bash
+```bash
 dstack run code app.py --dep prepare:latest --gpu 1
-``
+```
 
 This will run a VS Code with mounted artifacts and requested hardware resources.
 
@@ -115,10 +119,10 @@ Find the full list of built-in providers along examples and their source code [h
 
 There are several ways to contribute to dstack:
 
-1. Fork the repository and send us pull requests with bugfixes, new providers, and improvements to the documentation.
-2. Send us links to your repositories with public workflows or custom repositories to be featured here.
+1. Create pull requests with bugfixes, new providers and examples, and improvements to the docs.
+2. Send us links to your own projects that use dstack to be featured here.
 3. Report bugs to our [issue tracker](https://github.com/dstackai/dstack/issues).
-4. Share your stories and questions within our [Slack community](https://join.slack.com/t/dstackai/shared_invite/zt-xdnsytie-D4qU9BvJP8vkbkHXdi6clQ).
+4. Ask questions and share news within our [Slack community](https://join.slack.com/t/dstackai/shared_invite/zt-xdnsytie-D4qU9BvJP8vkbkHXdi6clQ).
 
 Remember, it's important to respect other members of the community. In case you're not sure about the rules, check out [code of conduct](CODE_OF_CONDUCT.md).
 

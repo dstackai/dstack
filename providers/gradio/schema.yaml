@@ -3,12 +3,16 @@ additionalProperties: false
 properties:
   file:
     type: string
-    args:
-      oneOf:
-        - type: string
-        - type: array
-          items:
-            type: string
+  args:
+    oneOf:
+      - type: string
+      - type: array
+        items:
+          type: string
+  before_run:
+    type: array
+    items:
+      type: string
   requirements:
     type: string
   version:
