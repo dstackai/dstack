@@ -1,136 +1,58 @@
 # What is dstack?
 
-dstack is a platform that makes it very easy to manage data, train models, build and deploy AI apps.
+dstack allows you to train models and run AI apps in your cloud account.
 
-### Organize your workflows
+Sign up for dstack, add your cloud credentials, and run workflows from the CLI.
+dstack will provision infrastructure on-demand and will help manage your data.
 
-dstack allows you to define your common tasks as workflows, and run them in a configured cloud account.
-
-You can configure hardware requirements, output artifacts, dependencies to other workflow if any,
-and any other parameters supported by the workflow provider.
-
-???- info "Click to see an example"
-
-    === ".dstack/workflows.yaml"
-        ```yaml
-        workflows:
-          - name: prepare
-            provider: python
-            file: "prepare.py"
-            artifacts: ["data"]
-        
-          - name: train
-            depends-on:
-              - prepare:latest
-            provider: python
-            file: "train.py"
-            artifacts: ["checkpoint"]
-            resources:
-              gpu: 4
-              
-          - name: app
-            depends-on:
-              - train:latest
-            provider: streamlit
-            target: "app.py"
-        ```
-
-### Run workflows, providers, and apps
-
-You can run workflows or directly providers in the cloud from your terminal.
-
-Here's how to run a workflow:
-
-```bash
-dstack run train \
-  --epoch 100 --seed 2 --batch-size 128
-```
-
-As an alternative to workflows, you can run any providers directly: 
-
-```bash
-dstack run python train.py \
-  --epoch 100 --seed 2 --batch-size 128 \
-  --dep prepare:latest --artifact checkpoint --gpu 1
-```
-
-Some providers allow to launch interactive applications, including [JupyterLab](https://github.com/dstackai/dstack/tree/master/providers/lab/#readme),
-[VS Code](https://github.com/dstackai/dstack/tree/master/providers/code/#readme), 
-[Streamlit](https://github.com/dstackai/dstack/tree/master/providers/streamlit/#readme), 
-[Gradio](https://github.com/dstackai/dstack/tree/master/providers/gradio/#readme), 
-[FastAPI](https://github.com/dstackai/dstack/tree/master/providers/fastapi/#readme), or
-anything else.
-
-Here's an example of the command that launches a VS Code application:
-
-```bash
-dstack run code \
-  --artifact output \
-  --gpu 1
-```
-### Providers registry
-
-You are welcome to use a variety of the [built-in providers](https://github.com/dstackai/dstack/tree/master/providers/#readme), 
-or the providers from the community.
+[//]: # (TODO: Add links to the cards below)
 
 <div class="grid cards" markdown>
+- **Workflows** 
 
--  __python__
+    Define your machine learning tasks as workflows, and run them via the CLI.
 
-    Runs a Python script
+- **On-demand infrastructure** 
 
-    [:octicons-arrow-right-24: Reference](https://github.com/dstackai/dstack/tree/master/providers/python/#readme)
+    Specify hardware requirements for your workflows as code.
 
-- __docker__
+- **Applications** 
 
-    Runs a Docker image
-    [:octicons-arrow-right-24: Reference](https://github.com/dstackai/dstack/tree/master/providers/docker/#readme)
+    Deploy AI applications to dstack with a single command.
 
-- __streamlit__
+- **Manage data** 
 
-    Runs a Streamlit app
+    Store, version, and reuse data the most simple way. 
 
-    [:octicons-arrow-right-24: Reference](https://github.com/dstackai/dstack/tree/master/providers/streamlit/#readme)
+- **Dev environments** 
 
-- __gradio__
+    Launch pre-configured development environments with a single command.
 
-    Runs a Gradio app
+- **Providers** 
 
-    [:octicons-arrow-right-24: Reference](https://github.com/dstackai/dstack/tree/master/providers/gradio/#readme)
-
-- __fastapi__
-
-    Runs a FastAPI app
-
-    [:octicons-arrow-right-24: Reference](https://github.com/dstackai/dstack/tree/master/providers/fastapi/#readme)
-
-- __lab__
-
-    Runs a JupyterLab app
-
-    [:octicons-arrow-right-24: Reference](https://github.com/dstackai/dstack/tree/master/providers/lab/#readme)
-
-- __code__
-
-    Runs a VS Code app
-
-    [:octicons-arrow-right-24: Reference](https://github.com/dstackai/dstack/tree/master/providers/code/#readme)
-
-- __notebook__
-
-    Runs a Jupyter notebook
-
-    [:octicons-arrow-right-24: Reference](https://github.com/dstackai/dstack/tree/master/providers/notebook/#readme)
-
+    Use a variety of built-in or community providers.
 </div>
 
-### Share data, models, and apps
+With dstack, you don't need overly-complicated MLOps platforms.
 
-For every run, output artifacts, e.g. with data, models, or apps, are saved in real-time.
+[//]: # (**Where do I start?**)
 
-You can use tags to version artifacts, e.g. to reuse them from other workflows or to share them with others.
+[//]: # (<div class="grid cards" markdown>)
 
-### Connect your cloud accounts
+[//]: # (- [**Quickstart**]&#40;quickstart.md&#41;)
 
-In order to run workflows or providers, you have to configure your cloud accounts 
-by adding the corresponding credentials into dstack settings.
+[//]: # (    Learn about the key concepts of dstack and how to get started with it through simple steps.)
+
+[//]: # (- [**Examples**]&#40;https://github.com/dstackai/dstack-examples&#41;)
+
+[//]: # (    Check out the repository with the basic dstack examples.)
+
+[//]: # (- [**Workflows**]&#40;workflows.md&#41;)
+
+[//]: # (    Learn about workflows, how to define them for your project, and how to run them va the CLI.)
+
+[//]: # (- [**Setup**]&#40;setup.md&#41;)
+
+[//]: # (    Learn how to install the CLI, add your cloud and Git credentials, and configure secret variables.)
+
+[//]: # (</div>)

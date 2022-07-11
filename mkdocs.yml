@@ -1,7 +1,7 @@
 site_name: dstack
-#repo_url: https://github.com/dstackai/dstack
-#repo_name: dstackai/dstack
-#edit_uri: edit/master/docs/
+repo_url: https://github.com/dstackai/dstack
+repo_name: dstackai/dstack
+edit_uri: edit/master/docs/
 theme:
   name: material
   logo: assets/dstack_notext.png
@@ -27,9 +27,9 @@ theme:
   #        icon: material/weather-sunny
   #        name: Switch to light mode
   features:
-    - toc.integrate
+#    - toc.integrate
     - navigation.sections
-    - navigation.expand
+#    - navigation.expand
     - navigation.top
 markdown_extensions:
   - pymdownx.emoji:
@@ -67,15 +67,20 @@ nav:
   - Get started:
       - Overview: index.md
       - Quickstart: quickstart.md
+#      - Examples: examples.md
   - Basics:
       - Setup: setup.md
       - Workflows: workflows.md
-      - Run command:
-        - Run workflows: run-workflows.md
-        - Run providers: run-providers.md
-#      - Runners: runners.md
-#      - Custom providers: custom-providers.md
-#      - Docker: docker.md
+#      - Troubleshooting: troubleshooting.md
+#  - Guides:
+#      - On-demand infrastructure: managing-data.md
+#      - Manage data: managing-data.md
+#      - Train models: training-models.md
+#      - Deploy apps: deploy-apps.md
+#      - Dev environments: dev-environments.md
+#  - Reference:
+#      - Providers: providers.md
+#      - CLI: cli.md
   - Help:
       - Slack community: https://join.slack.com/t/dstackai/shared_invite/zt-xdnsytie-D4qU9BvJP8vkbkHXdi6clQ
       - Issue tracker: https://github.com/dstackai/dstack/issues

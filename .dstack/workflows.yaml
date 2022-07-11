@@ -1,6 +1,0 @@
-workflows:
-  - name: "hello"
-    help: "Hello, world!"
-    provider: python
-    file: examples/hello/main.py
-    artifacts: [ "output" ]
