@@ -43,7 +43,7 @@ Let's walk through the syntax of this file. Here's a basic example:
 [//]: # (!!! tip "Source code")
 [//]: # (    You can find the full source code of the example in the [dstackai/dstack-examples]&#40;https://github.com/dstackai/dstack-examples&#41; GitHub repo.)
 
-### Workflow provider
+## Providers
 
 The `provider` property defines how the workflow is executed. Every provider may have its own properties.
 
@@ -53,13 +53,14 @@ and `resources` (what hardware resources are required to run the workflow, e.g. 
 
 [//]: # (TODO: Provide mode provider examples)
 
-dstack allows you to use a variety of [built-in](https://github.com/dstackai/dstack/tree/master/providers#readme) or community providers. 
+dstack offers a variety of [built-in providers](/providers) that allow you to run any machine learning task, deploy an application, 
+or launch a dev environment.
 
 [//]: # (TODO: Tell how to use custom providers)
 
 [//]: # (TODO: Add a link to the Providers Reference)
 
-### Workflow dependencies
+## Dependencies
 
 [//]: # (TODO: Mention how to upload artifacts from the CLI)
 

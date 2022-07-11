@@ -23,18 +23,13 @@ class DockerProvider(Provider):
         parser.add_argument("--ports", type=int, nargs="?")
         if self.run_as_provider:
             parser.add_argument("image", metavar="IMAGE", type=str)
-            parser.add_argument("command", metavar="COMMAND", nargs="?")
-            parser.add_argument("args", metavar="ARGS", nargs=argparse.ZERO_OR_MORE)
-        args, unknown = parser.parse_known_args(self.provider_args)
+            parser.add_argument("-c", "--command", nargs="?")
+        args = parser.parse_args(self.provider_args)
         self._parse_base_args(args)
         if self.run_as_provider:
             self.workflow.data["image"] = args.image
             if args.command:
-                _args = args.args + unknown
-                if _args:
-                    self.workflow.data["commands"] = [args.command + " " + " ".join(_args)]
-                else:
-                    self.workflow.data["commands"] = [args.command]
+                self.workflow.data["commands"] = [args.command]
         if args.ports:
             self.workflow.data["ports"] = args.ports
 

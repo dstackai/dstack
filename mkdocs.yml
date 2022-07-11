@@ -27,6 +27,7 @@ theme:
   #        icon: material/weather-sunny
   #        name: Switch to light mode
   features:
+    - navigation.indexes
 #    - toc.integrate
     - navigation.sections
 #    - navigation.expand
@@ -65,7 +66,8 @@ extra:
 #            'workflows.md': 'define-workflows.md'
 nav:
   - Get started:
-      - Overview: index.md
+      - index.md
+      - Intro to dstack: index.md
       - Quickstart: quickstart.md
 #      - Examples: examples.md
   - Basics:
@@ -78,8 +80,17 @@ nav:
 #      - Train models: training-models.md
 #      - Deploy apps: deploy-apps.md
 #      - Dev environments: dev-environments.md
-#  - Reference:
-#      - Providers: providers.md
+  - Reference:
+      - Providers:
+        - providers/index.md
+        - Python: providers/python.md
+        - Docker: providers/docker.md
+#        - VS Code: providers/code.md
+#        - JupyterLab: providers/lab.md
+#        - Jupyter Notebook: providers/notebook.md
+#        - Streamlit: providers/streamlit.md
+#        - Gradio: providers/gradio.md
+#        - FastAPI: providers/fastapi.md
 #      - CLI: cli.md
   - Help:
       - Slack community: https://join.slack.com/t/dstackai/shared_invite/zt-xdnsytie-D4qU9BvJP8vkbkHXdi6clQ
