@@ -4,14 +4,14 @@ This quickstart guide will introduce you to the key concepts and help you with t
 
 ## Install the CLI
 
-To run workflows, we'll need the dstack CLI. Here's how to install and configure it:
+First, let's install and configure the dstack CLI:
 
 ```bash
-pip install dstack -U
+pip install dstack
 dstack config --token <token> 
 ```
 
-Your token value can be found in `Settings`.
+Your token can be found on the `Settings` page in the user interface.
 
 [//]: # (![]&#40;images/dstack_quickstart_token.png&#41;{ lazy=true width="1060" })
 
@@ -64,7 +64,7 @@ in other workflows, e.g. the `train` workflow.
 ## Add your cloud credentials
 
 To let dstack provision the infrastructure required for your workflows in your cloud account, you have to add
-your cloud credentials in `Settings` | `Clouds`.
+your cloud credentials on the `Settings` page in the user interface:
 
 ![](images/dstack_on_demand_settings.png){ lazy=true width="1080" }
 
@@ -78,8 +78,8 @@ Let's go ahead and run the `download` workflow via the CLI:
 dstack run download
 ```
 
-!!! warning "Repository directory"
-    Make sure you run the CLI from the repository directory    
+!!! info "NOTE:"
+    Make sure to always use the CLI from the project repository directory.
 
 Use the `Runs` page in the user interface to watch the progress of your workflow.
 

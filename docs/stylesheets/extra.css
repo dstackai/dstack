@@ -226,8 +226,8 @@ label.md-nav__link {
 
 .md-nav__item {
     /*color: #3c4257;*/
-    font-weight: 500;
-    font-size: 17px;
+    font-weight: 400;
+    font-size: 15px;
 }
 
 .md-nav__item .md-nav__link:hover {
@@ -301,7 +301,7 @@ label.md-nav__link {
 
 .md-typeset {
     line-height: 1.3rem;
-    font-size: 17px;
+    font-size: 16px;
 }
 
 .md-typeset h1, .md-typeset h2 {
@@ -341,10 +341,10 @@ label.md-nav__link {
 }
 
 [data-md-color-scheme=slate][data-md-color-primary=black], [data-md-color-primary=white] {
-    --md-primary-fg-color: #AD58DB;
-    --md-accent-fg-color: #AD58DB;
-    --md-typeset-a-color: #AD58DB;
-    --md-code-hl-keyword-color: #AD58DB;
+    --md-primary-fg-color: #a344d7;
+    --md-accent-fg-color: #a344d7;
+    --md-typeset-a-color: #a344d7;
+    --md-code-hl-keyword-color: #a344d7;
     --md-code-hl-string-color: #50a14f;
     --md-code-hl-constant-color: var(--md-code-fg-color);
     /*--md-primary-bg-color: white;*/
@@ -357,7 +357,7 @@ label.md-nav__link {
 }
 
 body {
-    /*--md-text-font-family: -apple-system, "system-ui", "Segoe UI", Roboto, "Helvetica Neue", Ubuntu, sans-serif;*/
+    --md-text-font-family: metro-web, Metro, -apple-system, "system-ui", "Segoe UI", Roboto, Oxygen-Sans, Ubuntu, Cantarell, "Helvetica Neue", sans-serif;
 }
 
 .md-content {
@@ -380,6 +380,7 @@ body {
 .md-nav__item--section>.md-nav__link {
     text-transform: uppercase;
     font-size: 14px;
+    line-height: 1.5rem;
 }
 
 /*.md-sidebar--primary .md-nav__item .md-nav__link--active {
@@ -395,7 +396,7 @@ body {
 }*/
 
 .md-sidebar--primary .md-nav__link {
-    padding: 3px 10px 4px;
+    padding: 3px 15px 4px;
     margin: 3px 20px 3px -10px;
 }
 
@@ -405,6 +406,16 @@ body {
 
 .md-nav__item .md-nav__link--active {
     color: var(--md-typeset-a-color);
+}
+
+@media screen and (min-width: 76.1875em) {
+    .md-sidebar--primary .md-nav__link {
+        border-left: 2px solid transparent;
+    }
+
+    .md-sidebar--primary .md-nav__link--active {
+        border-left: 2px solid var(--md-typeset-a-color);
+    }
 }
 
 .md-footer, .md-footer-meta {
@@ -495,9 +506,9 @@ body {
     margin-right: 14px !important;
     padding-left: 0 !important;
     padding-right: 0 !important;
-    font-weight: 500 !important;
-    font-size: 16px !important;
-    line-height: 1.8 !important;
+    font-weight: 400 !important;
+    font-size: 15px !important;
+    line-height: 1.5 !important;
     -webkit-font-smoothing: auto !important;
     font-family: var(--font-family-sans-serif);
 }
@@ -535,5 +546,6 @@ body {
 }
 
 .md-header--shadow {
-    box-shadow: 0 0 0.2rem rgb(0 0 0 / 3%), 0 0.2rem 0.9rem rgb(0 0 0 / 3%);
+    box-shadow: none;
+    /*0 0 0.2rem rgb(0 0 0 / 3%), 0 0.2rem 0.9rem rgb(0 0 0 / 3%);*/
 }

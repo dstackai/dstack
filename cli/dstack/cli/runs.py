@@ -115,7 +115,7 @@ def register_parsers(main_subparsers):
     parser = main_subparsers.add_parser("runs", help="Lists runs")
 
     parser.add_argument("-a", "--all",
-                        help="Show all recent runs. By default, it shows only active runs, or the last finished.",
+                        help="Show recent runs. By default, it shows only active runs, or the last finished.",
                         action="store_true")
 
     parser.set_defaults(func=runs_func)

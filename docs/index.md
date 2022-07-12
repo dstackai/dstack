@@ -1,4 +1,4 @@
-# What is dstack?
+# Welcome to 🧬 dstack
 
 dstack allows you to train models and deploy AI apps in your cloud account.
 
@@ -45,7 +45,7 @@ dstack will provision infrastructure on-demand and will help manage your data.
     [:octicons-arrow-right-24: Reference](providers)
 </div>
 
-### Where do I start?
+### Getting started
 
 <div class="grid cards" markdown>
 
@@ -55,18 +55,10 @@ dstack will provision infrastructure on-demand and will help manage your data.
 
     [:octicons-arrow-right-24: Tutorial](quickstart.md)
 
-- **Examples**
+- **Slack community**
 
-    Check out the source code of the basic examples of using dstack.
+    Connect with the community in a Slack channel.
 
-    [:octicons-arrow-right-24: GitHub](https://github.com/dstackai/dstack-examples)
-
-[//]: # (- [**Workflows**]&#40;workflows.md&#41;)
-
-[//]: # (    Learn about workflows, how to define them for your project, and how to run them va the CLI.)
-
-[//]: # (- [**Setup**]&#40;setup.md&#41;)
-
-[//]: # (    Learn how to install the CLI, add your cloud and Git credentials, and configure secret variables.)
+    [:octicons-arrow-right-24: Join](https://github.com/dstackai/dstack-examples)
 
 </div>

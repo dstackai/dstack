@@ -7,11 +7,11 @@ This guide will walk you through the main steps that you have to take before you
 To run workflows, you'll need the dstack CLI. Here's how to install and configure it:
 
 ```bash
-pip install dstack -U
+pip install dstack
 dstack config --token <token> 
 ```
 
-Your token value can be found in `Settings`:
+Your token can be found on the `Settings` page in the user interface.
 
 [//]: # (![]&#40;images/dstack_quickstart_token.png&#41;{ lazy=true width="1060" })
 
@@ -33,7 +33,7 @@ There are two ways to grant dstack access to your Git repository:
 1. By granting dstack permissions to your GitHib repositories
 2. By uploading a private SSH key to dstack
 
-!!! info "SSH"
+!!! info "NOTE:"
     If you cloned your project repository via SSH, you have to upload a private SSH key to dstack.
 
     You can check how you cloned your repository via the following command:
@@ -41,6 +41,7 @@ There are two ways to grant dstack access to your Git repository:
     ```bash
     git remote -v
     ```
+    
     If you see that the URL starts with `git://`, then it's SSH. Otherwise, it's HTTP.
 
 ### Option 1: Grant dstack GitHub permissions 
@@ -71,10 +72,10 @@ dstack init --private-key <path-to-your-private-key> --passphrase <passphrase>
 
 If the private key is not correct, you'll see an authorization error. If there is no error, this means you're all set.
 
-!!! info ""
+!!! info "NOTE:"
     If your repository is cloned via SSH, you have to upload your private key even if the project is public.
 
-!!! tip ""
+!!! tip "TIP:"
     If you are not sure about how to best clone your Git repository, the easiest and most secure option
     is always cloning it via GitHub's CLI using HTTPS protocol.
 
@@ -83,7 +84,7 @@ If the private key is not correct, you'll see an authorization error. If there i
 If you plan to use third-party services from your workflows, you can use dstack's secrets 
 to securely store passwords and tokens and access them from your workflows via environment variables.
 
-Adding secrets can be done via `Settings` | `Secrets`.
+Secrets can be configured on the `Settings` page in the user interface.
 
 The configured secrets are passed to the workflows as environment variables. 
 

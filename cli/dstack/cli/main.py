@@ -1,5 +1,5 @@
 import sys
-from argparse import ArgumentParser, SUPPRESS
+from argparse import ArgumentParser, SUPPRESS, Namespace
 
 import colorama
 
@@ -8,14 +8,47 @@ from dstack.cli import app, logs, run, stop, artifacts, runs, runners, init, \
 from dstack.version import __version__ as version
 
 
+def default_func(_: Namespace):
+    print("Usage: dstack [OPTIONS ...] COMMAND [ARGS ...]\n"
+          "\n"
+          "The available commands for execution are listed below.\n"
+          "The primary commands are given first, followed by\n"
+          "less common or more advanced commands.\n"
+          "\n"
+          "Main commands:\n"
+          "  run            Run a workflow\n"
+          "  runs           Show recent runs\n"
+          "  stop           Stop a run\n"
+          "  restart        Restart a run\n"
+          "  logs           Show logs of a run\n"
+          "  artifacts      Show or download artifacts of a run\n"
+          "  app            Open a running application\n"
+          "\n"
+          "Other commands:\n"
+          "  init           Initialize the project repository\n"
+          "  config         Configure your token\n"
+          "  prune          Delete all finished untagged runs\n"
+          "  tag            Assign a tag to a run\n"
+          "  untag          Delete a tag\n"
+          "\n"
+          "Options:\n"
+          "  -h, --help     Show this help output, or the help for a specified command.\n"
+          "  -v, --version  Show the version of the CLI.\n"
+          "\n"
+          "For more information, visit https://docs.dstack.ai/cli"
+          )
+
+
 def main():
     colorama.init()
 
     parser = ArgumentParser(epilog="Please visit https://docs.dstack.ai for more information",
                             add_help=False)
     parser.add_argument("-v", "--version", action="version", version=f"{version}", help="Show program's version")
-    parser.add_argument('-h', '--help', action='help', default=SUPPRESS,
+    parser.add_argument('-h', '--help', action='store_true', default=SUPPRESS,
                         help='Show this help message and exit')
+    parser.set_defaults(func=default_func)
+
     subparsers = parser.add_subparsers()
 
     app.register_parsers(subparsers)

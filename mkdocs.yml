@@ -67,7 +67,7 @@ extra:
 nav:
   - Get started:
       - index.md
-      - Intro to dstack: index.md
+      - Welcome to dstack: index.md
       - Quickstart: quickstart.md
 #      - Examples: examples.md
   - Basics:
@@ -92,7 +92,8 @@ nav:
         - Streamlit: providers/streamlit.md
         - Gradio: providers/gradio.md
         - FastAPI: providers/fastapi.md
-#      - CLI: cli.md
+      - CLI:
+          - cli/index.md
   - Help:
       - Slack community: https://join.slack.com/t/dstackai/shared_invite/zt-xdnsytie-D4qU9BvJP8vkbkHXdi6clQ
       - Issue tracker: https://github.com/dstackai/dstack/issues

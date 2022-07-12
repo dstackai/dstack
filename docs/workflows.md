@@ -15,7 +15,7 @@ directory and run them by a name via the CLI.
 [//]: # (You don't have to worry about )
 [//]: # (tracking code, data, or infrastructure as dstack handles everything automatically.)
 
-## Workflow syntax
+## Workflows file syntax
 
 Let's walk through the syntax of this file. Here's a basic example:
 
@@ -45,16 +45,19 @@ Let's walk through the syntax of this file. Here's a basic example:
 
 ## Providers
 
-The `provider` argument defines how the workflow is executed. Every provider may have its own arguments.
+The `provider` argument defines how the workflow is executed. 
 
+dstack offers a variety of built-in providers that allow you to run any machine learning task, deploy an application, 
+or launch a dev environment.
+
+Every provider may have its own arguments. 
 For example, with the [`python`](providers/python.md) provider, we can pass `file` (the file to run),
 `requirements` (the file with requirements), `artifacts` (what folders) to save as output artifacts,
 and `resources` (what hardware resources are required to run the workflow, e.g. GPU, memory, etc).
 
 [//]: # (TODO: Provide mode provider examples)
 
-dstack offers a variety of [built-in providers](/providers) that allow you to run any machine learning task, deploy an application, 
-or launch a dev environment.
+Check the [Reference](/providers) page to see the all built-in providers and their usage examples.
 
 [//]: # (TODO: Tell how to use custom providers)
 
@@ -171,7 +174,9 @@ You can run any of the workflows defined in `.dstack/workflows.yaml` using the C
 dstack run download 
 ```
 
-!!! warning "Be sure to run the CLI from the repository directory"
+!!! warning "NOTE:"
+
+    Make sure to always use the CLI from the project repository directory.
 
     As long as your project is under Git, you don't have to commit local changes before running workflows.
     dstack tracks staged local changes automatically and allows you to see them in the user interface
@@ -202,8 +207,9 @@ dstack runs
 
 [//]: # (```)
 
-!!! tip "You can run workflows without defining them in `.dstack/workflows.yaml`"
-
+!!! tip "TIP:"
+    You can run workflows without defining them in `.dstack/workflows.yaml`
+    
     If you want, you can run a workflow solely via the CLI by using the name of the provider: 
 
     ```bash
@@ -212,7 +218,7 @@ dstack runs
       --epoch 100 --seed 2 --batch-size 128
     ```
 
-### Workflow logs
+## Workflow logs
 
 The output of running workflows is tracked in real-time and can be accessed through the user interface
 or the CLI.
@@ -229,7 +235,9 @@ If you'd like to see the output in real-time through the CLI, add the `-f` (or `
 dstack logs <run-name> -f
 ```
 
-!!! warning "Don't print experiment metrics to the logs"
+!!! warning "NOTE:"
+    Make sure you don't print experiment metrics to the output.
+
     Instead, it's recommended that you use specialized tools such as WandB, Comet, Neptune, etc.
 
 [//]: # (TODO: Add a link to more information on experiment tracking)
@@ -264,7 +272,7 @@ dstack artifacts download <run-name>
 If you plan to use third-party services from your workflows, you can use dstack's secrets 
 to securely pass passwords and tokens.
 
-Adding secrets can be done via `Settings`.
+Secrets can be configured on the `Settings` page in the user interface.
 
 The configured secrets are passed to the workflows as environment variables. 
 
