@@ -1,0 +1,3 @@
+[submodule "examples/mnist-classifier"]
+	path = examples/mnist-classifier
+	url = https://github.com/kengz/mnist-classifier.git
