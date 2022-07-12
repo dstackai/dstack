@@ -2,7 +2,7 @@
 
 This provider runs a Python file. 
 
-You can specify the file, the version of Python, a `requirements.txt` file,
+You can specify the Python file, the version of Python, a `requirements.txt` file,
 environment variables, arguments, which folders to save as output artifacts, dependencies to
 other workflows if any, and the resources the workflow needs (e.g. CPU, GPU, memory, etc).
 
@@ -37,9 +37,7 @@ dstack run python train.py -r requirements.txt -a model \
 
 [//]: # (TODO: Resources)
 
-## Argument reference
-
-### Workflows file
+## Workflows file reference
 
 The following arguments are required:
 
@@ -75,7 +73,7 @@ The number of GPUs, their name and memory
 - `memory` (Optional) The size of GPU memory, e.g. `"16GB"`
 - `name` (Optional) The name of the GPU model (e.g. `"K80"`, `"V100"`, etc)
 
-### CLI
+## CLI reference
 
 ```bash
 usage: dstack run python [-h] [-r [REQUIREMENTS]] [-e [ENV]] [-a [ARTIFACT]]
@@ -92,7 +90,6 @@ The following arguments are required:
 
 The following arguments are optional:
 
-- `ARGS` - (Optional) The list of arguments for the Python program
 - `--working-dir [WORKING_DIR]` - (Optional) The path to the working directory
 - `-r [REQUIREMENTS]`, `--requirements [REQUIREMENTS]` - (Optional) The path to the `requirements.txt` file
 - `-e [ENV]`, `--env [ENV]` - (Optional) The list of environment variables 
@@ -104,5 +101,10 @@ The following arguments are optional:
 - `--gpu-memory [GPU_MEMORY]` - (Optional) The size of GPU memory, e.g. `"16GB"`
 - `--shm-size [SHM_SIZE]` - (Optional) The size of shared memory, e.g. `"8GB"`
 - `-i`, `--interruptible` - (Optional) if the workflow can run on interruptible instances.
+- `ARGS` - (Optional) The list of arguments for the Python program
 
 [//]: # (TODO: Add --dep argument)
+
+## Source code
+
+[:octicons-arrow-right-24: GitHub](https://github.com/dstackai/dstack/tree/master/providers/python)

@@ -22,7 +22,7 @@ you to run any machine learning task, deploy an application, or launch a dev env
 
     Runs a distributed training
 
-    [:octicons-arrow-right-24: Reference](https://github.com/dstackai/dstack/tree/master/providers/docker#readme)
+    [:octicons-arrow-right-24: Reference](torchrun.md)
 
 </div>
 
@@ -34,19 +34,19 @@ you to run any machine learning task, deploy an application, or launch a dev env
 
     Launches a VS Code dev environment
 
-    [:octicons-arrow-right-24: Reference](https://github.com/dstackai/dstack/tree/master/providers/code#readme)
+    [:octicons-arrow-right-24: Reference](code.md)
 
 - **JupyterLab** 
 
     Launches a JupyterLab dev environment
 
-    [:octicons-arrow-right-24: Reference](https://github.com/dstackai/dstack/tree/master/providers/lab#readme)
+    [:octicons-arrow-right-24: Reference](lab.md)
 
 - **Jupyter Notebook** 
 
     Launches a Jupyter notebook
 
-    [:octicons-arrow-right-24: Reference](https://github.com/dstackai/dstack/tree/master/providers/notebook#readme)
+    [:octicons-arrow-right-24: Reference](notebook.md)
 
 </div>
 
@@ -58,19 +58,19 @@ you to run any machine learning task, deploy an application, or launch a dev env
 
     Runs a Streamlit application
 
-    [:octicons-arrow-right-24: Reference](https://github.com/dstackai/dstack/tree/master/providers/streamlit#readme)
+    [:octicons-arrow-right-24: Reference](streamlit.md)
 
 - **Gradio** 
 
     Runs a Gradio application
 
-    [:octicons-arrow-right-24: Reference](https://github.com/dstackai/dstack/tree/master/providers/gradio#readme)
+    [:octicons-arrow-right-24: Reference](gradio.md)
 
 - **FastAPI** 
 
     Runs a FastAPI endpoint
 
-    [:octicons-arrow-right-24: Reference](https://github.com/dstackai/dstack/tree/master/providers/fastapi#readme)
+    [:octicons-arrow-right-24: Reference](fastapi.md)
 
 </div>
 

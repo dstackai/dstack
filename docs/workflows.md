@@ -45,9 +45,9 @@ Let's walk through the syntax of this file. Here's a basic example:
 
 ## Providers
 
-The `provider` property defines how the workflow is executed. Every provider may have its own properties.
+The `provider` argument defines how the workflow is executed. Every provider may have its own arguments.
 
-For example, with the `python` provider, we can pass `file` (the file to run),
+For example, with the [`python`](providers/python.md) provider, we can pass `file` (the file to run),
 `requirements` (the file with requirements), `artifacts` (what folders) to save as output artifacts,
 and `resources` (what hardware resources are required to run the workflow, e.g. GPU, memory, etc).
 
@@ -64,8 +64,8 @@ or launch a dev environment.
 
 [//]: # (TODO: Mention how to upload artifacts from the CLI)
 
-In the example above, you can notice that the `train` workflow has a `depends-on` property.
-This property defines dependencies to other workflows.
+In the example above, you can notice that the `train` workflow has a `depends-on` argument.
+This argument defines dependencies to other workflows.
 
 For example, if you want dstack to run the `download` workflow before the `train` workflow,
 you can use the following syntax:

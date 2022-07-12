@@ -85,12 +85,13 @@ nav:
         - providers/index.md
         - Python: providers/python.md
         - Docker: providers/docker.md
-#        - VS Code: providers/code.md
-#        - JupyterLab: providers/lab.md
-#        - Jupyter Notebook: providers/notebook.md
-#        - Streamlit: providers/streamlit.md
-#        - Gradio: providers/gradio.md
-#        - FastAPI: providers/fastapi.md
+        - Torchrun: providers/torchrun.md
+        - VS Code: providers/code.md
+        - JupyterLab: providers/lab.md
+        - Notebook: providers/notebook.md
+        - Streamlit: providers/streamlit.md
+        - Gradio: providers/gradio.md
+        - FastAPI: providers/fastapi.md
 #      - CLI: cli.md
   - Help:
       - Slack community: https://join.slack.com/t/dstackai/shared_invite/zt-xdnsytie-D4qU9BvJP8vkbkHXdi6clQ

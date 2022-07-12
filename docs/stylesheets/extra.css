@@ -251,6 +251,10 @@ label.md-nav__link {
     margin: 0 4px;
 }
 
+.md-typeset :not(pre) > a code {
+    color: var(--md-primary-fg-color);
+}
+
 .md-typeset pre > code {
     border-radius: 0;
     border-top: 1px solid #dce0e6;

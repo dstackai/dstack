@@ -2,7 +2,7 @@
 
 dstack allows you to train models and deploy AI apps in your cloud account.
 
-Sign up for dstack, add your cloud credentials  (e.g. AWS, GCP, and Azure), and run workflows from the CLI.
+Sign up for dstack, add your cloud credentials, and run workflows from the CLI.
 dstack will provision infrastructure on-demand and will help manage your data.
 
 [//]: # (TODO: Add links to the cards below)
@@ -32,9 +32,10 @@ dstack will provision infrastructure on-demand and will help manage your data.
 
 - **Dev environments** 
 
-    Launch pre-configured development environments with a single command.
+    Launch VS Code, JupyterLab, and other tools with 
+    pre-configured hardware and dependencies.
 
-    Use VS Code, JupyterLab, Jupyter notebooks, Label Studio and other tools.
+    [:octicons-arrow-right-24: Reference](providers#dev-environments)
 
 - **Providers** 
 

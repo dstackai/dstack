@@ -40,9 +40,7 @@ dstack run docker \
 
 [//]: # (TODO: Resources)
 
-## Argument reference
-
-### Workflows file
+## Workflows file reference
 
 The following arguments are required:
 
@@ -78,7 +76,7 @@ The number of GPUs, their name and memory
 - `memory` (Optional) The size of GPU memory, e.g. `"16GB"`
 - `name` (Optional) The name of the GPU model (e.g. `"K80"`, `"V100"`, etc)
 
-### CLI
+## CLI reference
 
 ```bash
 usage: dstack run docker [-h] [-r [REQUIREMENTS]] [-e [ENV]] [-a [ARTIFACT]]
@@ -111,3 +109,7 @@ The following arguments are optional:
 [//]: # (TODO: Add --dep argument)
 
 [//]: # (TODO: Tell about ports)
+
+## Source code
+
+[:octicons-arrow-right-24: GitHub](https://github.com/dstackai/dstack/tree/master/providers/docker)
