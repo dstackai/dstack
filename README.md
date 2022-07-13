@@ -14,19 +14,13 @@ ______________________________________________________________________
 
 dstack allows you to train models and run AI apps in your cloud account.
 
-* **Workflows:** Define your machine learning tasks as workflows, and run them via the CLI.
+* Define your machine learning tasks as workflows, and run them via the CLI. 
+* Specify hardware requirements for your workflows as code.
+* Deploy AI applications to dstack with a single command.
+* Store, version, and reuse data the most simple way.
+* Launch pre-configured development environments with a single command.
 
-* **On-demand infrastructure:** Specify hardware requirements for your workflows as code.
-
-* **Applications:** Deploy AI applications to dstack with a single command.
-
-* **Manage data:** Store, version, and reuse data the most simple way. 
-
-* **Dev environments:** Launch pre-configured development environments with a single command.
-
-* **Providers:** Use a variety of built-in or community providers.
-
-This repository contains the open source code of the built-in [providers](providers), the [CLI](cli), and [documentation](docs). 
+This repository contains the open source code of the built-in [providers](providers), the [CLI](src), and [documentation](docs). 
 
 ## 📘 Documentation
 

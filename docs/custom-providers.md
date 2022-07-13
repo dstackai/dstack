@@ -31,8 +31,8 @@ Here's an example:
         - name: curl
           image: python:3.9
           commands:
-            - pip3 install -r providers/curl/requirements.txt
-            - PYTHONPATH=providers python3 providers/curl/main.py
+            - pip3 install -r src/dstack/providers/requirements.txt
+            - PYTHONPATH=src python3 src/dstack/providers/curl/main.py
     ```
 
 ## Build providers
@@ -41,7 +41,7 @@ dstack offers a Python API to build custom providers.
 
 Here's an example:
 
-=== "providers/curl/main.py"
+=== "src/dstack/providers/curl/main.py"
 
     ```python
     from typing import List
@@ -51,7 +51,7 @@ Here's an example:
     
     class CurlProvider(Provider):
         def __init__(self):
-            super().__init__(schema="providers/curl/schema.yaml")
+            super().__init__(schema="schema.yaml")
             self.url = self.workflow.data["url"]
             self.output = self.workflow.data["output"]
             self.artifacts = self.workflow.data["artifacts"]
@@ -81,7 +81,7 @@ when using the provider. For example, the `curl` provider from above has three p
 If you want the provider to validate whether the parameters are filled correctly, you can define a provider
 schema, e.g. the following way:
 
-=== "providers/curl/schema.yaml"
+=== "src/dstack/providers/curl/schema.yaml"
 
     ```yaml
     type: object
@@ -113,7 +113,7 @@ b. Read the parameters of your provider from the `self.workflow.data` dictionary
 
 ```python
 def __init__(self):
-    super().__init__(schema="providers/curl/schema.yaml")
+    super().__init__(schema="schema.yaml")
     self.url = self.workflow.data["url"]
     self.output = self.workflow.data["output"]
     self.artifacts = self.workflow.data["artifacts"]

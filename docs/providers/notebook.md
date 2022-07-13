@@ -94,4 +94,4 @@ The following arguments are optional:
 
 ## Source code
 
-[:octicons-arrow-right-24: GitHub](https://github.com/dstackai/dstack/tree/master/providers/notebook)
+[:octicons-arrow-right-24: GitHub](https://github.com/dstackai/dstack/tree/master/src/dstack/providers/notebook)
