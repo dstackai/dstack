@@ -64,7 +64,7 @@ def print_runs(profile, args):
 
 
 def get_runs_v2(args, profile):
-    headers, params = headers_and_params(profile, None, False)
+    headers, params = headers_and_params(profile, args.run_name, False)
     # del params["repo_url"]
     if args.all:
         params["n"] = 50
@@ -114,6 +114,7 @@ def __job_artifacts(paths):
 def register_parsers(main_subparsers):
     parser = main_subparsers.add_parser("runs", help="Lists runs")
 
+    parser.add_argument("run_name", metavar="RUN", type=str, nargs="?")
     parser.add_argument("-a", "--all",
                         help="Show recent runs. By default, it shows only active runs, or the last finished.",
                         action="store_true")

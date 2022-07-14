@@ -5,9 +5,22 @@ import argparse
 from dstack import Provider, Job, Resources, Gpu
 
 
-class PytorchDDPProvider(Provider):
+class TorchrunProvider(Provider):
     def __init__(self):
-        super().__init__(schema="schema.yaml")
+        super().__init__()
+        self.script = None
+        self.before_run = None
+        self.version = None
+        self.requirements = None
+        self.environment = None
+        self.artifacts = None
+        self.working_dir = None
+        self.nodes = None
+        self.resources = None
+        self.args = None
+
+    def load(self):
+        super()._load(schema="schema.yaml")
         self.script = self.workflow.data.get("script") or self.workflow.data.get("file")
         self.before_run = self.workflow.data.get("before_run")
         self.version = str(self.workflow.data.get("version") or "3.9")
@@ -77,13 +90,17 @@ class PytorchDDPProvider(Provider):
                 ))
         return jobs
 
-    def parse_args(self):
-        parser = ArgumentParser(prog="dstack run torchrun")
+    def _create_parser(self, workflow_name: Optional[str]) -> Optional[ArgumentParser]:
+        parser = ArgumentParser(prog="dstack run " + (workflow_name or "torchrun"))
         self._add_base_args(parser)
         parser.add_argument("--nnodes", type=int, nargs="?")
-        if self.run_as_provider:
+        if not workflow_name:
             parser.add_argument("file", metavar="FILE", type=str)
             parser.add_argument("args", metavar="ARGS", nargs=argparse.ZERO_OR_MORE)
+        return parser
+
+    def parse_args(self):
+        parser = self._create_parser(self.workflow_name)
         args, unknown = parser.parse_known_args(self.provider_args)
         self._parse_base_args(args)
         if args.nnodes:
@@ -95,11 +112,10 @@ class PytorchDDPProvider(Provider):
                 self.workflow.data["args"] = _args
 
 
-def main():
-    provider = PytorchDDPProvider()
-    provider.start()
+def __provider__():
+    return TorchrunProvider()
 
 
 if __name__ == '__main__':
-    main()
+    __provider__().run()
 

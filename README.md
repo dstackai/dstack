@@ -20,7 +20,7 @@ dstack allows you to train models and run AI apps in your cloud account.
 * Store, version, and reuse data the most simple way.
 * Launch pre-configured development environments with a single command.
 
-This repository contains the open source code of the built-in [providers](providers), the [CLI](src), and [documentation](docs). 
+This repository contains the open source code of the built-in [providers](src/dstack/providers), the [CLI](src/dstack), and [documentation](docs). 
 
 ## 📘 Documentation
 

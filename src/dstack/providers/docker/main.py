@@ -1,13 +1,24 @@
 import argparse
 from argparse import ArgumentParser
-from typing import List
+from typing import List, Optional
 
 from dstack import Provider, Job
 
 
 class DockerProvider(Provider):
     def __init__(self):
-        super().__init__(schema="schema.yaml")
+        super().__init__()
+        self.image = None
+        self.before_run = None
+        self.commands = None
+        self.artifacts = None
+        self.environment = None
+        self.working_dir = None
+        self.ports = None
+        self.resources = None
+
+    def load(self):
+        super()._load(schema="schema.yaml")
         self.image = self.workflow.data["image"]
         self.before_run = self.workflow.data.get("before_run")
         self.commands = self.workflow.data.get("commands")
@@ -17,13 +28,17 @@ class DockerProvider(Provider):
         self.ports = self.workflow.data.get("ports")
         self.resources = self._resources()
 
-    def parse_args(self):
-        parser = ArgumentParser(prog="dstack run docker")
+    def _create_parser(self, workflow_name: Optional[str]) -> Optional[ArgumentParser]:
+        parser = ArgumentParser(prog="dstack run " + (workflow_name or "docker"))
         self._add_base_args(parser)
         parser.add_argument("--ports", type=int, nargs="?")
-        if self.run_as_provider:
+        if not workflow_name:
             parser.add_argument("image", metavar="IMAGE", type=str)
             parser.add_argument("-c", "--command", nargs="?")
+        return parser
+
+    def parse_args(self):
+        parser = self._create_parser(self.workflow_name)
         args = parser.parse_args(self.provider_args)
         self._parse_base_args(args)
         if self.run_as_provider:
@@ -49,10 +64,9 @@ class DockerProvider(Provider):
         )]
 
 
-def main():
-    provider = DockerProvider()
-    provider.start()
+def __provider__():
+    return DockerProvider()
 
 
 if __name__ == '__main__':
-    main()
+    __provider__().run()

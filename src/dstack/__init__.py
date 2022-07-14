@@ -92,7 +92,16 @@ class Workflow:
 
 
 class Provider:
-    def __init__(self, schema: Optional[str] = None):
+    def __init__(self):
+        self.workflow = None
+        self.provider_args = None
+        self.workflow_name = None
+        self.run_as_provider = None
+        self.schema = None
+        self.loaded = False
+
+    # TODO: Rename to load, move _validate_schema to run
+    def _load(self, schema: Optional[str] = None):
         self.workflow = Workflow(self._load_workflow_data())
         self.provider_args = [str(arg) for arg in self.workflow.data["provider_args"]] if self.workflow.data.get(
             "provider_args") else []
@@ -102,6 +111,21 @@ class Provider:
         self.schema = pkg_resources.resource_string(self.__module__, '/'.join([schema])) if schema else None
         # TODO: Move here workflow related fields, such as variables, etc
         self._validate_schema()
+        self.loaded = True
+
+    @abstractmethod
+    def load(self):
+        pass
+
+    # TODO: Add variables
+    @abstractmethod
+    def _create_parser(self, workflow_name: Optional[str]) -> Optional[ArgumentParser]:
+        return None
+
+    def help(self, workflow_name: Optional[str]):
+        parser = self._create_parser(workflow_name)
+        if parser:
+            parser.print_help()
 
     @abstractmethod
     def create_jobs(self) -> List[Job]:
@@ -167,19 +191,21 @@ class Provider:
     def parse_args(self):
         pass
 
-    def start(self):
+    def run(self, run_name: Optional[str] = None):
+        if not self.loaded:
+            self.load()
         # print("Workflow data: " + str(self.workflow.data))
         jobs = self.create_jobs()
         # TODO: Handle previous jobs and master job
         for job in jobs:
-            self._submit(job)
+            self._submit(job, run_name)
         job_ids = list(map(lambda j: j.id, jobs))
         self._serialize_job_ids(job_ids)
         pass
 
     @staticmethod
     def _serialize_job_ids(job_ids: List[str]):
-        job_ids_file = Path("job-ids.csv")
+        job_ids_file = Path(os.environ.get("JOB_IDS_CSV") or "job-ids.csv")
         if not job_ids_file.is_file():
             sys.exit("job-ids.csv is missing")
         with open(job_ids_file, 'w') as f:
@@ -193,8 +219,10 @@ class Provider:
             # with schema_file.open() as f:
             try:
                 workflow_data = dict(self.workflow.data)
-                del workflow_data["user_name"]
-                del workflow_data["run_name"]
+                if "user_name" in workflow_data:
+                    del workflow_data["user_name"]
+                if "run_name" in workflow_data:
+                    del workflow_data["run_name"]
                 if "workflow_name" in workflow_data:
                     del workflow_data["workflow_name"]
                 del workflow_data["repo_url"]
@@ -269,13 +297,13 @@ class Provider:
         if not os.path.isdir(os.environ["REPO_PATH"]):
             sys.exit("REPO_PATH environment variable doesn't point to a valid directory: " + os.environ["REPO_PATH"])
         # TODO: [instant_run] Use WORKFLOW_YAML_PATH environment  variable
-        workflow_file = Path("workflow.yaml")
+        workflow_file = Path(os.environ.get("WORKFLOW_YAML") or "workflow.yaml")
         if not workflow_file.is_file():
             sys.exit("workflow.yaml is missing")
         with workflow_file.open() as f:
             return yaml.load(f, yaml.FullLoader)
 
-    def _submit(self, job: Job):
+    def _submit(self, job: Job, run_name: Optional[str]):
         token = os.environ["DSTACK_TOKEN"]
         headers = {
             "Content-Type": f"application/json; charset=utf-8",
@@ -310,8 +338,8 @@ class Provider:
             if job.resources.interruptible:
                 resources["interruptible"] = job.resources.interruptible
         request_json = {
-            "user_name": self.workflow.data["user_name"],
-            "run_name": self.workflow.data["run_name"],
+            "user_name": self.workflow.data.get("user_name"),
+            "run_name": run_name or self.workflow.data["run_name"],
             "workflow_name": self.workflow.data.get("workflow_name") or None,
             "previous_job_ids": previous_job_ids or None,
             "repo_url": self.workflow.data["repo_url"],

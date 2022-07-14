@@ -1,6 +1,6 @@
 import uuid
 from argparse import ArgumentParser
-from typing import List
+from typing import List, Optional
 
 from dstack import Provider, Job, App
 
@@ -8,7 +8,19 @@ from dstack import Provider, Job, App
 # TODO: Provide job.applications (incl. application name, and query)
 class CodeProvider(Provider):
     def __init__(self):
-        super().__init__(schema="schema.yaml")
+        super().__init__()
+        self.before_run = None
+        self.python = None
+        self.version = None
+        self.requirements = None
+        self.environment = None
+        self.artifacts = None
+        self.working_dir = None
+        self.resources = None
+        self.image = None
+
+    def load(self):
+        super()._load(schema="schema.yaml")
         self.before_run = self.workflow.data.get("before_run")
         # TODO: Handle numbers such as 3.1 (e.g. require to use strings)
         self.python = str(self.workflow.data.get("python") or "3.10")
@@ -20,9 +32,13 @@ class CodeProvider(Provider):
         self.resources = self._resources()
         self.image = self._image()
 
-    def parse_args(self):
-        parser = ArgumentParser(prog="dstack run code")
+    def _create_parser(self, workflow_name: Optional[str]) -> Optional[ArgumentParser]:
+        parser = ArgumentParser(prog="dstack run " + (workflow_name or "code"))
         self._add_base_args(parser)
+        return parser
+
+    def parse_args(self):
+        parser = self._create_parser(self.workflow_name)
         args = parser.parse_args(self.provider_args)
         self._parse_base_args(args)
 
@@ -71,10 +87,9 @@ class CodeProvider(Provider):
         return commands
 
 
-def main():
-    provider = CodeProvider()
-    provider.start()
+def __provider__():
+    return CodeProvider()
 
 
 if __name__ == '__main__':
-    main()
+    __provider__().run()
