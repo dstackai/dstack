@@ -20,25 +20,14 @@ def default_stop_workflow(args: Namespace):
         if profile.token is not None:
             headers["Authorization"] = f"Bearer {profile.token}"
 
-        if args.workflow_name is not None:
-            jobs = list(filter(lambda j: j["workflow_name"] == args.workflow_name, get_jobs(args.run_name, profile)))
-            # TODO: Handle not found error
-            for job in jobs:
-                # TODO: Do it in batch
-                # TODO: Do it in the right order
-                data = {"job_id": job["job_id"], "abort": args.abort is True}
-                response = requests.request(method="POST", url=f"{profile.server}/jobs/stop",
-                                            data=json.dumps(data).encode("utf-8"),
-                                            headers=headers, verify=profile.verify)
-                if response.status_code != 200:
-                    response.raise_for_status()
-        else:
-            data = {"run_name": args.run_name, "abort": args.abort is True}
-            response = requests.request(method="POST", url=f"{profile.server}/runs/stop",
-                                        data=json.dumps(data).encode("utf-8"),
-                                        headers=headers, verify=profile.verify)
-            if response.status_code != 200:
-                response.raise_for_status()
+        data = {"run_name": args.run_name, "abort": args.abort is True}
+        if args.workflow_name:
+            data["workflow_name"] = args.workflow_name
+        response = requests.request(method="POST", url=f"{profile.server}/runs/workflows/stop",
+                                    data=json.dumps(data).encode("utf-8"),
+                                    headers=headers, verify=profile.verify)
+        if response.status_code != 200:
+            response.raise_for_status()
         print(f"{colorama.Fore.LIGHTBLACK_EX}OK{colorama.Fore.RESET}")
     except ConfigurationError:
         sys.exit(f"Call 'dstack config' first")
