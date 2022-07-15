@@ -142,8 +142,8 @@ def register_parsers(main_subparsers):
 
     # TODO: Make run_name_or_job_id optional
     # TODO: Add --format (short|detailed)
-    parser.add_argument("run_name", metavar="RUN", type=str)
-    parser.add_argument("workflow_name", metavar="WORKFLOW", type=str, nargs="?")
+    parser.add_argument("run_name", metavar="RUN", type=str, help="A name of a run")
+    parser.add_argument("workflow_name", metavar="WORKFLOW", type=str, nargs="?", help="A name of a workflow")
     parser.add_argument("--follow", "-f", help="Whether to continuously poll for new logs. By default, the command "
                                                "will exit once there are no more logs to display. To exit from this "
                                                "mode, use Control-C.", action="store_true")

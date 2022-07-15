@@ -312,14 +312,14 @@ def register_parsers(main_subparsers):
     upload_parser.set_defaults(func=upload_func)
 
     list_parser = subparsers.add_parser("list", help="Download artifacts", )
-    list_parser.add_argument("run_name", metavar="RUN", type=str)
-    list_parser.add_argument("workflow_name", metavar="WORKFLOW", type=str, nargs="?")
+    list_parser.add_argument("run_name", metavar="RUN", type=str, help="A name of a run")
+    list_parser.add_argument("workflow_name", metavar="WORKFLOW", type=str, nargs="?", help="A name of a workflow")
     parser.add_argument("--total", "-t", help="Show only the total sizes of artifacts", action="store_true")
     list_parser.set_defaults(func=list_func)
 
     download_parser = subparsers.add_parser("download", help="Download artifacts", )
-    download_parser.add_argument("run_name", metavar="RUN", type=str)
-    download_parser.add_argument("workflow_name", metavar="WORKFLOW", type=str, nargs="?")
+    download_parser.add_argument("run_name", metavar="RUN", type=str, help="A name of a run")
+    download_parser.add_argument("workflow_name", metavar="WORKFLOW", type=str, nargs="?", help="A name of a workflow")
     download_parser.add_argument("--output", "-o", help="The directory to download artifacts to. "
                                                         "By default, it's the current directory.", type=str)
     download_parser.set_defaults(func=download_func)

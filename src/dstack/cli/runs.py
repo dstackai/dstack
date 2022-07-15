@@ -114,7 +114,7 @@ def __job_artifacts(paths):
 def register_parsers(main_subparsers):
     parser = main_subparsers.add_parser("runs", help="Lists runs")
 
-    parser.add_argument("run_name", metavar="RUN", type=str, nargs="?")
+    parser.add_argument("run_name", metavar="RUN", type=str, nargs="?", help="A name of a run")
     parser.add_argument("-a", "--all",
                         help="Show recent runs. By default, it shows only active runs, or the last finished.",
                         action="store_true")

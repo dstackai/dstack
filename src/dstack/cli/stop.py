@@ -36,8 +36,8 @@ def default_stop_workflow(args: Namespace):
 def register_parsers(main_subparsers):
     parser = main_subparsers.add_parser("stop", help="Stop a run")
 
-    parser.add_argument("run_name", metavar="RUN", type=str)
-    parser.add_argument("workflow_name", metavar="WORKFLOW", type=str, nargs="?")
+    parser.add_argument("run_name", metavar="RUN", type=str, help="A name of a run")
+    parser.add_argument("workflow_name", metavar="WORKFLOW", type=str, nargs="?", help="A name of a workflow")
     parser.add_argument("-a", "--abort", help="Don't wait for a graceful stop", dest="abort",
                         action="store_true")
 

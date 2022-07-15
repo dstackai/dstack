@@ -40,7 +40,7 @@ def untag_func(args: Namespace):
 def register_parsers(main_subparsers):
     parser = main_subparsers.add_parser("untag", help="Untag a run")
 
-    parser.add_argument('run_name', metavar='RUN', type=str)
+    parser.add_argument('run_name', metavar='RUN', type=str, help="A name of a run")
     parser.add_argument("--force", "-f", help="Don't ask for confirmation", action="store_true")
 
     parser.set_defaults(func=untag_func)

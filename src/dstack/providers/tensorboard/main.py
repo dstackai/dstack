@@ -28,16 +28,16 @@ class TensorboardProvider(Provider):
 
     def _create_parser(self, workflow_name: Optional[str]) -> Optional[ArgumentParser]:
         parser = ArgumentParser(prog="dstack run " + (workflow_name or "tensorboard"))
-        self._add_base_args(parser)
         if not workflow_name:
-            parser.add_argument("run_names", metavar="RUN", type=str, nargs="+")
-            parser.add_argument("--logdir", type=str)
+            parser.add_argument("run_names", metavar="RUN", type=str, nargs="+", help="A name of a run")
+            parser.add_argument("--logdir", type=str, help="The path where TensorBoard will look for "
+                                                           "event files. By default, TensorBoard will"
+                                                           "scan all run artifacts.")
         return parser
 
     def parse_args(self):
         parser = self._create_parser(self.workflow_name)
         args = parser.parse_args(self.provider_args)
-        self._parse_base_args(args)
         if self.run_as_provider:
             self.workflow.data["runs"] = args.run_names
             if args.logdir:
