@@ -27,7 +27,7 @@ class PythonProvider(Provider):
         self.file = self.workflow.data.get("script") or self.workflow.data["file"]
         self.before_run = self.workflow.data.get("before_run")
         # TODO: Handle numbers such as 3.1 (e.g. require to use strings)
-        self.version = str(self.workflow.data.get("version") or self.workflow.data.get("python") or "3.10")
+        self.version = self._save_python_version("version")
         self.args = self.workflow.data.get("args")
         self.requirements = self.workflow.data.get("requirements")
         self.environment = self.workflow.data.get("environment") or {}

@@ -188,7 +188,7 @@ def upload_func(args: Namespace):
             else:
                 exit(f"The '{local_dir}' path doesn't refer to an existing directory")
 
-        run_name, job_id = submit_run_and_job(profile, args.workflow_name,
+        run_name, job_id = submit_run_and_job(profile, None,
                                               artifacts, tag_name=args.tag_name)
 
         artifacts_s3_bucket = user_info["user_configuration"]["artifacts_s3_bucket"] if user_info.get(
@@ -307,9 +307,7 @@ def register_parsers(main_subparsers):
     subparsers = parser.add_subparsers()
     upload_parser = subparsers.add_parser("upload", help="Upload artifacts", )
     upload_parser.add_argument("local_dirs", metavar="LOCAL_DIR", type=str, nargs="+")
-    upload_parser.add_argument("--workflow", "-w", help="The name of the workflow", type=str, nargs="?",
-                               dest="workflow_name")
-    upload_parser.add_argument("--tag", "-t", help="The tag name to assign to the generated run", type=str, nargs="?",
+    upload_parser.add_argument("--tag", "-t", help="The tag name to assign to the generated run", type=str,
                                dest="tag_name")
     upload_parser.set_defaults(func=upload_func)
 
@@ -323,5 +321,5 @@ def register_parsers(main_subparsers):
     download_parser.add_argument("run_name", metavar="RUN", type=str)
     download_parser.add_argument("workflow_name", metavar="WORKFLOW", type=str, nargs="?")
     download_parser.add_argument("--output", "-o", help="The directory to download artifacts to. "
-                                                        "By default, it's the current directory.", type=str, nargs="?")
+                                                        "By default, it's the current directory.", type=str)
     download_parser.set_defaults(func=download_func)

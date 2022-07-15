@@ -12,21 +12,30 @@ from git import InvalidGitRepositoryError
 from jsonschema import validate, ValidationError
 
 from dstack import Provider
-from dstack.cli.common import load_workflows, load_variables, load_repo_data, load_providers
+from dstack.cli.common import load_workflows, load_variables, load_repo_data, load_providers, get_user_info
 from dstack.cli.logs import logs_func
 from dstack.cli.runs import runs_func
 from dstack.cli.schema import workflows_schema_yaml
 from dstack.config import get_config, ConfigurationError, Profile
 from dstack.server import __server_url__
 
-built_in_provider_names = ["python", "curl", "docker", "torchrun", "lab", "notebook", "code", "streamlit", "gradio",
-                           "fastapi"]
+built_in_provider_names = ["bash", "python", "tensorboard", "torchrun",
+                           "docker",
+                           "curl",
+                           "lab", "notebook",
+                           "code", "streamlit", "gradio", "fastapi"]
 
 
 def init_built_in_provider(provider_name: str):
     provider_module = None
+    if provider_name == "bash":
+        import dstack.providers.bash.main as m
+        provider_module = m
     if provider_name == "python":
         import dstack.providers.python.main as m
+        provider_module = m
+    if provider_name == "tensorboard":
+        import dstack.providers.tensorboard.main as m
         provider_module = m
     if provider_name == "curl":
         import dstack.providers.curl.main as m
@@ -64,11 +73,17 @@ def load_built_in_provider(provider: Provider, provider_args: List[str], workflo
     workflow_yaml_file, workflow_yaml_filename = tempfile.mkstemp()
     os.environ["DSTACK_SERVER"] = __server_url__
     os.environ["DSTACK_TOKEN"] = profile.token
+    user_info = get_user_info(profile)
+    os.environ["DSTACK_USER"] = user_info["user_name"]
+    os.environ["DSTACK_AWS_ACCESS_KEY_ID"] = user_info["default_configuration"]["aws_access_key_id"]
+    os.environ["DSTACK_AWS_SECRET_ACCESS_KEY"] = user_info["default_configuration"]["aws_secret_access_key"]
+    os.environ["DSTACK_AWS_DEFAULT_REGION"] = user_info["default_configuration"]["aws_region"]
+    os.environ["DSTACK_ARTIFACTS_S3_BUCKET"] = user_info["default_configuration"]["artifacts_s3_bucket"]
     os.environ["REPO_PATH"] = os.getcwd()
     os.environ["JOB_IDS_CSV"] = job_ids_csv_filename
     with os.fdopen(workflow_yaml_file, 'w') as tmp:
         workflow_yaml = {
-            "user_name": None,
+            "user_name": user_info['user_name'],
             "run_name": None,
             "provider_args": provider_args,
             "workflow_name": workflow_name,

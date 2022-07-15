@@ -11,6 +11,8 @@ import requests
 import yaml
 from jsonschema import validate, ValidationError
 
+from dstack.config import Profile
+
 
 class Gpu:
     def __init__(self, count: Optional[int] = None, memory: Optional[str] = None, name: Optional[str] = None):
@@ -100,6 +102,18 @@ class Provider:
         self.schema = None
         self.loaded = False
 
+    # TODO: This is a dirty hack
+    def _save_python_version(self, name: str):
+        v = self.workflow.data.get(name)
+        if isinstance(v, str):
+            return v
+        elif v == 3.1:
+            return "3.10"
+        elif v:
+            return str(v)
+        else:
+            return "3.10"
+
     # TODO: Rename to load, move _validate_schema to run
     def _load(self, schema: Optional[str] = None):
         self.workflow = Workflow(self._load_workflow_data())
@@ -133,19 +147,19 @@ class Provider:
 
     @staticmethod
     def _add_base_args(parser: ArgumentParser):
-        parser.add_argument("-r", "--requirements", type=str, nargs="?")
-        parser.add_argument('-e', '--env', action='append', nargs="?")
-        parser.add_argument('-a', '--artifact', action='append', nargs="?")
+        parser.add_argument("-r", "--requirements", type=str)
+        parser.add_argument('-e', '--env', action='append')
+        parser.add_argument('-a', '--artifact', action='append')
         # TODO: Support depends-on
-        parser.add_argument("--working-dir", type=str, nargs="?")
-        # parser.add_argument('--dep', action='append', nargs="?")
+        parser.add_argument("--working-dir", type=str)
+        # parser.add_argument('--dep', action='append')
         parser.add_argument("-i", "--interruptible", action="store_true")
-        parser.add_argument("--cpu", type=int, nargs="?")
-        parser.add_argument("--memory", type=str, nargs="?")
-        parser.add_argument("--gpu", type=int, nargs="?")
-        parser.add_argument("--gpu-name", type=str, nargs="?")
-        parser.add_argument("--gpu-memory", type=str, nargs="?")
-        parser.add_argument("--shm-size", type=str, nargs="?")
+        parser.add_argument("--cpu", type=int)
+        parser.add_argument("--memory", type=str)
+        parser.add_argument("--gpu", type=int)
+        parser.add_argument("--gpu-name", type=str)
+        parser.add_argument("--gpu-memory", type=str)
+        parser.add_argument("--shm-size", type=str)
 
     def _parse_base_args(self, args: Namespace):
         if args.requirements:
@@ -190,6 +204,13 @@ class Provider:
 
     def parse_args(self):
         pass
+
+    @staticmethod
+    def _profile() -> Profile:
+        return Profile("default",
+                       os.environ["DSTACK_TOKEN"],
+                       os.environ["DSTACK_SERVER"],
+                       True)
 
     def run(self, run_name: Optional[str] = None):
         if not self.loaded:
@@ -246,7 +267,8 @@ class Provider:
                     del workflow_data["working_dir"]
                 validate(workflow_data, yaml.load(self.schema, yaml.FullLoader))
             except ValidationError as e:
-                sys.exit(f"There a syntax error in {os.getcwd()}/.dstack/workflows.yaml:\n\n{e}")
+                workflow_file = Path(os.environ.get("WORKFLOW_YAML") or "workflow.yaml")
+                sys.exit(f"There a syntax error in {workflow_file.resolve()}:\n\n{e}")
 
     def _resources(self) -> Optional[Resources]:
         if self.workflow.data.get("resources"):

@@ -2,7 +2,7 @@ import argparse
 from argparse import ArgumentParser
 from typing import List, Optional
 
-from dstack import Provider, Job
+from dstack import Provider, Job, App
 
 
 class DockerProvider(Provider):
@@ -31,10 +31,10 @@ class DockerProvider(Provider):
     def _create_parser(self, workflow_name: Optional[str]) -> Optional[ArgumentParser]:
         parser = ArgumentParser(prog="dstack run " + (workflow_name or "docker"))
         self._add_base_args(parser)
-        parser.add_argument("--ports", type=int, nargs="?")
+        parser.add_argument("-p", "--ports", type=int)
         if not workflow_name:
             parser.add_argument("image", metavar="IMAGE", type=str)
-            parser.add_argument("-c", "--command", nargs="?")
+            parser.add_argument("-c", "--command", type=str)
         return parser
 
     def parse_args(self):
@@ -49,6 +49,16 @@ class DockerProvider(Provider):
             self.workflow.data["ports"] = args.ports
 
     def create_jobs(self) -> List[Job]:
+        apps = None
+        if self.ports:
+            apps = []
+            for i in range(self.ports):
+                apps.append(
+                    App(
+                        port_index=i,
+                        app_name="docker" + (i if self.ports > 1 else ""),
+                    )
+                )
         commands = []
         if self.before_run:
             commands.extend(self.before_run)
@@ -60,7 +70,8 @@ class DockerProvider(Provider):
             working_dir=self.working_dir,
             resources=self.resources,
             artifacts=self.artifacts,
-            port_count=self.ports
+            port_count=self.ports,
+            apps=apps
         )]
 
 

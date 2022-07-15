@@ -27,7 +27,7 @@ class StreamlitProvider(Provider):
         self.target = self.workflow.data["target"]
         self.before_run = self.workflow.data.get("before_run")
         # TODO: Handle numbers such as 3.1 (e.g. require to use strings)
-        self.python = str(self.workflow.data.get("python") or "3.10")
+        self.python = self._save_python_version("python")
         self.version = self.workflow.data.get("version")
         self.args = self.workflow.data.get("args")
         self.requirements = self.workflow.data.get("requirements")

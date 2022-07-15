@@ -23,8 +23,8 @@ class CurlProvider(Provider):
         if not workflow_name:
             parser.add_argument("url", metavar="URL", type=str)
         # TODO: Support other curl options, such as -O
-        parser.add_argument('-a', '--artifact', action='append', nargs="?", required=True)
-        parser.add_argument("-o", "--output", type=str, nargs="?", required=True)
+        parser.add_argument('-a', '--artifact', action='append', required=True)
+        parser.add_argument("-o", "--output", type=str, required=True)
         return parser
 
     def parse_args(self):
@@ -38,7 +38,7 @@ class CurlProvider(Provider):
 
     def create_jobs(self) -> List[Job]:
         return [Job(
-            image="python:3.9",
+            image="python:3.10",
             commands=[
                 f"curl {self.url} -o {self.output}"
             ],

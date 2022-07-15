@@ -151,6 +151,6 @@ def register_parsers(main_subparsers):
                         help="From what time to begin displaying logs. By default, logs will be displayed starting "
                              "from ten minutes in the past. The value provided can be an ISO 8601 timestamp or a "
                              "relative time. For example, a value of 5m would indicate to display logs starting five "
-                             "minutes in the past.", type=str, nargs="?", default="1d")
+                             "minutes in the past.", type=str, default="1d")
 
     parser.set_defaults(func=logs_func)

@@ -42,7 +42,6 @@ def register_parsers(main_subparsers):
     parser.add_argument('run_name', metavar='RUN', type=str)
     parser.add_argument("--name", "-n", type=str,
                         help="The name of the tag. It's optional. "
-                             "If not specified, the name of the tag will be the same as the name of the run.",
-                        nargs="?")
+                             "If not specified, the name of the tag will be the same as the name of the run.")
 
     parser.set_defaults(func=tag_func)

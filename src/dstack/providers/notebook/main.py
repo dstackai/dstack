@@ -23,7 +23,7 @@ class NotebookProvider(Provider):
         super()._load(schema="schema.yaml")
         self.before_run = self.workflow.data.get("before_run")
         # TODO: Handle numbers such as 3.1 (e.g. require to use strings)
-        self.python = str(self.workflow.data.get("python") or "3.10")
+        self.python = self._save_python_version("python")
         self.version = self.workflow.data.get("version")
         self.requirements = self.workflow.data.get("requirements")
         self.environment = self.workflow.data.get("environment") or {}
