@@ -2,9 +2,8 @@ import json
 import sys
 from argparse import Namespace
 
-import colorama
+from rich import print
 import requests
-from dstack.cli.common import get_jobs
 
 from dstack.config import get_config, ConfigurationError
 
@@ -28,7 +27,7 @@ def default_stop_workflow(args: Namespace):
                                     headers=headers, verify=profile.verify)
         if response.status_code != 200:
             response.raise_for_status()
-        print(f"{colorama.Fore.LIGHTBLACK_EX}OK{colorama.Fore.RESET}")
+        print(f"[grey58]OK[/]")
     except ConfigurationError:
         sys.exit(f"Call 'dstack config' first")
 

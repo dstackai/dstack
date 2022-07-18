@@ -6,11 +6,12 @@ import typing
 from argparse import Namespace
 from pathlib import Path
 
-import colorama
+from rich import print
+from rich.console import Console
+from rich.table import Table
 import requests
 from boto3.s3 import transfer
 from git import InvalidGitRepositoryError
-from tabulate import tabulate
 from tqdm import tqdm
 
 from dstack.cli.common import get_user_info, boto3_client, list_artifact, short_artifact_path, list_artifact_files, \
@@ -74,28 +75,24 @@ def list_func(args: Namespace):
             if artifact_paths is None or len(artifact_paths) == 0:
                 print("No artifacts")
             else:
+                console = Console()
                 if args.total is True:
-                    table_headers = [
-                        f"{colorama.Fore.LIGHTMAGENTA_EX}ARTIFACT{colorama.Fore.RESET}",
-                        f"{colorama.Fore.LIGHTMAGENTA_EX}SIZE{colorama.Fore.RESET}",
-                        f"{colorama.Fore.LIGHTMAGENTA_EX}FILES{colorama.Fore.RESET}"
-                    ]
-                    table_rows = []
+                    table = Table()
+                    table.add_column("Artifact")
+                    table.add_column("Size")
+                    table.add_column("Files")
+
                     for artifact_path in artifact_paths:
                         keys_total, total_size = list_artifact(boto3_client(user_info, "s3", job),
                                                                artifacts_s3_bucket, artifact_path)
-                        table_rows.append([
-                            short_artifact_path(artifact_path),
-                            sizeof_fmt(total_size),
-                            keys_total
-                        ])
-                    print(tabulate(table_rows, headers=table_headers, tablefmt="plain"))
+
+                        table.add_row(short_artifact_path(artifact_path), sizeof_fmt(total_size), keys_total)
+                    console.print(table)
                 else:
-                    table_headers = [
-                        f"{colorama.Fore.LIGHTMAGENTA_EX}ARTIFACT{colorama.Fore.RESET}",
-                        f"{colorama.Fore.LIGHTMAGENTA_EX}FILE{colorama.Fore.RESET}",
-                        f"{colorama.Fore.LIGHTMAGENTA_EX}SIZE{colorama.Fore.RESET}"
-                    ]
+                    table = Table()
+                    table.add_column("Artifact")
+                    table.add_column("File")
+                    table.add_column("Size")
                     table_rows = []
                     for artifact_path in artifact_paths:
                         files = list_artifact_files(boto3_client(user_info, "s3", job),
@@ -105,13 +102,10 @@ def list_func(args: Namespace):
                         for i in range(len(files)):
                             file, size = files[i]
                             if (len(file) > 0 and not file.endswith('/')) or size > 0:
-                                table_rows.append([
-                                    artifact_name if not header_added else "",
-                                    file,
-                                    sizeof_fmt(size)
-                                ])
+                                table.add_row(artifact_name if not header_added else "",
+                                              file, sizeof_fmt(size))
                                 header_added = True
-                    print(tabulate(table_rows, headers=table_headers, tablefmt="plain"))
+                    console.print(table)
 
     except InvalidGitRepositoryError:
         sys.exit(f"{os.getcwd()} is not a Git repo")

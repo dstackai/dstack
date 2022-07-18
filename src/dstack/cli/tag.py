@@ -2,7 +2,7 @@ import json
 import sys
 from argparse import Namespace
 
-import colorama
+from rich import print
 import requests
 
 from dstack.config import get_config, ConfigurationError
@@ -31,7 +31,7 @@ def tag_func(args: Namespace):
         elif response.status_code != 200:
             response.raise_for_status()
         else:
-            print(f"{colorama.Fore.LIGHTBLACK_EX}OK{colorama.Fore.RESET}")
+            print(f"[grey58]OK[/]")
     except ConfigurationError:
         sys.exit(f"Call 'dstack config' first")
 

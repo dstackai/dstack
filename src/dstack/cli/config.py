@@ -1,7 +1,9 @@
 from argparse import Namespace
 from pathlib import Path
 
-from dstack.cli import confirm, get_or_ask
+from rich.prompt import Confirm
+
+from dstack.cli import get_or_ask
 from dstack.server import __server_url__
 from dstack.config import from_yaml_file, _get_config_path, Profile
 from dstack.logger import hide_token
@@ -22,7 +24,7 @@ def list_profiles(args: Namespace):
 def remove_profile(args: Namespace):
     conf = from_yaml_file(_get_config_path(args.file))
 
-    if args.force or confirm(f"Do you want to delete profile '{args.profile}'"):
+    if args.yes or Confirm.ask(f"[red]Delete profile '{args.profile}'?[/]"):
         conf.remove_profile(args.profile)
 
     conf.save()
@@ -33,12 +35,12 @@ def add_or_modify_profile(args: Namespace):
     conf = from_yaml_file(_get_config_path(file))
     profile = conf.get_profile(args.profile)
 
-    token = get_or_ask(args, profile, "token", "Token: ", secure=True)
+    token = get_or_ask(args, profile, "token", "Token", secure=True)
 
     if profile is None:
         profile = Profile(args.profile, token, args.server, not args.no_verify)
-    elif args.force or (token != profile.token and confirm(
-            f"Do you want to replace the token for the profile '{args.profile}'")):
+    elif args.yes or (token != profile.token and Confirm.ask(
+            f"Replace the token for the profile '{args.profile}'")):
         profile.token = token
 
     profile.server = args.server
@@ -58,7 +60,7 @@ def register_parsers(main_subparsers):
                                     action="store_true")
 
     def add_force_argument(command_parser):
-        command_parser.add_argument("-f", "--force", help="Don't ask for confirmation", action="store_true")
+        command_parser.add_argument("-y", "--yes", help="Don't ask for confirmation", action="store_true")
 
     def add_file_argument(command_parser):
         command_parser.add_argument("--file", help="Use specific config file")

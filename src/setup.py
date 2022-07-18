@@ -37,15 +37,14 @@ setup(
         "pyyaml",
         "requests",
         "gitpython",
-        "tabulate",
         "boto3",
-        "colorama",
         "tqdm",
         "jsonschema",
         "botocore",
         "python-dateutil",
         "paramiko",
-        "git-url-parse"
+        "git-url-parse",
+        "rich",
     ],
     classifiers=[
         "Development Status :: 2 - Pre-Alpha",

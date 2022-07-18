@@ -3,7 +3,7 @@ import os
 import sys
 from argparse import Namespace
 
-import colorama
+from rich import print
 from git import InvalidGitRepositoryError
 from requests import request
 import urllib.parse
@@ -49,7 +49,7 @@ def init_func(args: Namespace):
             response = request(method="POST", url=f"{profile.server}/repos/init", data=data_bytes, headers=headers,
                                verify=profile.verify)
             if response.status_code == 200:
-                print(f"{colorama.Fore.LIGHTBLACK_EX}OK{colorama.Fore.RESET}")
+                print(f"[grey58]OK[/]")
             elif response.status_code == 400:
                 print(response.json()["message"])
             else:

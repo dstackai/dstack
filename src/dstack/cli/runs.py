@@ -3,12 +3,13 @@ import sys
 from argparse import Namespace
 from itertools import groupby
 
-import colorama
 from git import InvalidGitRepositoryError
 from requests import request
-from tabulate import tabulate
+from rich import box
+from rich.console import Console
+from rich.table import Table
 
-from dstack.cli.common import colored, headers_and_params, pretty_date, short_artifact_path
+from dstack.cli.common import colored, headers_and_params, pretty_date, short_artifact_path, pretty_print_status
 from dstack.config import get_config, ConfigurationError
 
 
@@ -27,40 +28,34 @@ def runs_func(args: Namespace):
 def print_runs(profile, args):
     runs = get_runs_v2(args, profile)
     runs_by_name = [(run_name, list(run)) for run_name, run in groupby(runs, lambda run: run["run_name"])]
-    table_headers = [
-        f"{colorama.Fore.LIGHTMAGENTA_EX}RUN{colorama.Fore.RESET}",
-        f"{colorama.Fore.LIGHTMAGENTA_EX}WORKFLOW{colorama.Fore.RESET}",
-        f"{colorama.Fore.LIGHTMAGENTA_EX}PROVIDER{colorama.Fore.RESET}",
-        # f"{colorama.Fore.LIGHTMAGENTA_EX}REPO{colorama.Fore.RESET}",
-        f"{colorama.Fore.LIGHTMAGENTA_EX}STATUS{colorama.Fore.RESET}",
-        f"{colorama.Fore.LIGHTMAGENTA_EX}APP{colorama.Fore.RESET}",
-        f"{colorama.Fore.LIGHTMAGENTA_EX}ARTIFACTS{colorama.Fore.RESET}",
-        f"{colorama.Fore.LIGHTMAGENTA_EX}SUBMITTED{colorama.Fore.RESET}",
-        f"{colorama.Fore.LIGHTMAGENTA_EX}TAG{colorama.Fore.RESET}",
-    ]
-    table_rows = []
+    console = Console()
+    table = Table(box=box.SQUARE)
+    table.add_column("Run", style="bold", no_wrap=True)
+    table.add_column("Workflow", style="grey58", width=12)
+    table.add_column("Provider", style="grey58", width=12)
+    table.add_column("Status", no_wrap=True)
+    table.add_column("App", justify="center", style="green", no_wrap=True)
+    table.add_column("Artifacts", style="grey58", width=12)
+    table.add_column("Submitted", style="grey58", no_wrap=True)
+    table.add_column("Tag", style="bold yellow", no_wrap=True)
+
     for run_name, workflows in runs_by_name:
         for i in range(len(workflows)):
             workflow = workflows[i]
-            workflow_status = workflow["status"].upper()
             _, submitted_at = pretty_duration_and_submitted_at(workflow.get("submitted_at"))
             status = workflow["status"].upper()
-            table_rows.append([
-                colored(workflow_status, workflow["run_name"]) if i == 0 else "",
-                colored(status, workflow.get("workflow_name") or "<none>"),
-                colored(status, workflow["provider_name"] or "<none>"),
-                # colored(status, pretty_repo_url(workflow["repo_url"])),
-                colored(status, status),
-                # colored(workflow_status, "<none>"),
-                colored(status, __job_apps(workflow.get("apps"))),
-                colored(status, __job_artifacts(workflow["artifact_paths"])),
-                colored(status, submitted_at),
-                colored(workflow_status,
-                        "*" if workflow["tag_name"] == workflow["run_name"] else workflow[
-                            "tag_name"] if workflow["tag_name"] else "<none>"),
-            ])
-
-    print(tabulate(table_rows, headers=table_headers, tablefmt="plain"))
+            tag_name = workflow.get("tag_name")
+            run_name = workflow['run_name']
+            # TODO: Handle availability issues
+            table.add_row(colored(status, run_name),
+                          workflow.get("workflow_name"),
+                          workflow.get("provider_name"),
+                          colored(status, pretty_print_status(status)),
+                          __job_apps(workflow.get("apps"), status),
+                          __job_artifacts(workflow["artifact_paths"]),
+                          submitted_at,
+                          f"{tag_name}" if tag_name else "")
+    console.print(table)
 
 
 def get_runs_v2(args, profile):
@@ -97,18 +92,19 @@ def pretty_duration_and_submitted_at(submitted_at, started_at=None, finished_at=
     return duration_str, submitted_at_str
 
 
-def __job_apps(apps):
-    if apps is not None and len(apps) > 0:
-        return "\n".join(map(lambda app: app["app_name"], apps))
+def __job_apps(apps, status):
+    if status == "RUNNING" and apps is not None and len(apps) > 0:
+        return "✔"
+        # return "\n".join(map(lambda app: app.get("app_name"), apps))
     else:
-        return "<none>"
+        return ""
 
 
 def __job_artifacts(paths):
     if paths is not None and len(paths) > 0:
         return "\n".join(map(lambda path: short_artifact_path(path), paths))
     else:
-        return "<none>"
+        return ""
 
 
 def register_parsers(main_subparsers):

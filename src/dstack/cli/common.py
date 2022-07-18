@@ -6,13 +6,15 @@ import typing as ty
 from pathlib import Path
 
 import boto3
-import colorama
 import giturlparse
 import yaml
 from git import Repo
 from paramiko.config import SSHConfig
 from requests import request
-from tabulate import tabulate
+from rich import box
+from rich.console import Console
+from rich.table import Table
+
 
 from dstack.config import get_config
 
@@ -222,48 +224,69 @@ def pretty_variables(variables):
 
 
 colors = {
-    "SUBMITTED": colorama.Fore.YELLOW,
-    "RUNNING": colorama.Fore.GREEN,
-    # "DONE": colorama.Fore.WHITE,
-    "FAILED": colorama.Fore.RED,
-    # "STOPPED": colorama.Fore.WHITE,
-    "STOPPING": colorama.Fore.GREEN,
-    "ABORTED": colorama.Fore.RED,
-    "ABORTING": colorama.Fore.RED
+    "SUBMITTED": "yellow",
+    "QUEUED": "yellow",
+    "RUNNING": "green",
+    "DONE": "grey58",
+    "FAILED": "red",
+    "STOPPED": "grey58",
+    "STOPPING": "yellow",
+    "ABORTING": "yellow",
+    "ABORTED": "grey58",
+    "REQUESTED": "yellow",
 }
 
 
 def colored(status: str, val: str, bright: bool = False):
     color = colors.get(status)
-    c = f"{color}{val}{colorama.Fore.RESET}" if color is not None else val
-    return f"{colorama.Style.BRIGHT}{c}{colorama.Style.RESET_ALL}" if bright else c
+    return f"[{'bold' if bright else ''}{color}]{val}[/]" if color is not None else val
+
+
+def pretty_print_status(status: str) -> str:
+    if status == "SUBMITTED":
+        return "Provisioning..."
+    if status == "QUEUED":
+        return "Provisioning..."
+    if status == "RUNNING":
+        return "Running..."
+    if status == "DONE":
+        return "Done"
+    if status == "FAILED":
+        return "Failed"
+    if status == "STOPPING":
+        return "Stopping..."
+    if status == "ABORTING":
+        return "Aborting..."
+    if status == "STOPPED":
+        return "Stopped"
+    if status == "ABORTED":
+        return "Aborted"
+    if status == "REQUESTED":
+        return "Provisioning..."
 
 
 def print_runners(profile):
     runners = get_runners(profile)
-    table_headers = [f"{colorama.Fore.LIGHTMAGENTA_EX}RUNNER{colorama.Fore.RESET}",
-                     f"{colorama.Fore.LIGHTMAGENTA_EX}HOST{colorama.Fore.RESET}",
-                     f"{colorama.Fore.LIGHTMAGENTA_EX}CPU{colorama.Fore.RESET}",
-                     f"{colorama.Fore.LIGHTMAGENTA_EX}MEMORY{colorama.Fore.RESET}",
-                     f"{colorama.Fore.LIGHTMAGENTA_EX}GPU{colorama.Fore.RESET}",
-                     f"{colorama.Fore.LIGHTMAGENTA_EX}STATUS{colorama.Fore.RESET}",
-                     f"{colorama.Fore.LIGHTMAGENTA_EX}UPDATED{colorama.Fore.RESET}"
-                     ]
-    table_rows = []
+    console = Console()
+
+    table = Table(box=box.SQUARE)
+    table.add_column("Runner", style="bold", no_wrap=True)
+    table.add_column("Host", style="grey58", width=24)
+    table.add_column("CPU", style="grey58", width=4)
+    table.add_column("Memory", style="grey58", width=4)
+    table.add_column("GPU", style="grey58", width=6)
+    table.add_column("Status", style="grey58", width=12)
+
     for runner in runners:
-        updated_at_str = pretty_date(round(runner["updated_at"] / 1000))
-        table_rows.append(
-            [
-                runner["runner_name"],
-                runner.get("host_name") or "<none>",
-                runner["resources"]["cpu"]["count"],
-                str(int(runner["resources"]["memory_mib"] / 1024)) + "GiB",
-                __pretty_print_gpu_resources(runner["resources"]),
-                runner["status"].upper(),
-                updated_at_str
-            ]
-        )
-    print(tabulate(table_rows, headers=table_headers, tablefmt="plain"))
+        status = runner["status"].upper()
+        table.add_row(colored(status, runner["runner_name"]),
+                      runner.get("host_name"),
+                      runner["resources"]["cpu"]["count"],
+                      str(int(runner["resources"]["memory_mib"] / 1024)) + "GiB",
+                      __pretty_print_gpu_resources(runner["resources"]),
+                      colored(status, status))
+
+    console.print(table)
 
 
 def __pretty_print_gpu_resources(resources):

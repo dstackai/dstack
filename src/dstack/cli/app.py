@@ -3,9 +3,8 @@ import os
 import sys
 import webbrowser
 from argparse import Namespace
-from json import JSONDecodeError
 
-import colorama
+from rich import print
 from git import InvalidGitRepositoryError
 from requests import request
 
@@ -41,7 +40,7 @@ def apps_func(args: Namespace):
                 print(f"The application url is {url}")
                 print("Opening it in the browser...")
                 webbrowser.open(apps[0]["url"])
-                print(f"{colorama.Fore.LIGHTBLACK_EX}OK{colorama.Fore.RESET}")
+                print(f"[grey58]OK[/]")
             else:
                 sys.exit("Application is not initialized yet")
         else:

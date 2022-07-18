@@ -10,8 +10,10 @@ import requests
 import yaml
 from git import InvalidGitRepositoryError
 from jsonschema import validate, ValidationError
+from rich import print
 
 from dstack import Provider
+from rich.prompt import Confirm
 from dstack.cli.common import load_workflows, load_variables, load_repo_data, load_providers, get_user_info
 from dstack.cli.logs import logs_func
 from dstack.cli.runs import runs_func
@@ -240,14 +242,26 @@ def parse_run_args(args):
            workflow_data, workflow_name, built_in_provider, instant_run
 
 
+def stop_run(run_name: str, profile: Profile):
+    headers = {
+        "Content-Type": f"application/json; charset=utf-8"
+    }
+    if profile.token is not None:
+        headers["Authorization"] = f"Bearer {profile.token}"
+
+    data = {"run_name": run_name, "abort": False}
+    response = requests.request(method="POST", url=f"{profile.server}/runs/workflows/stop",
+                                data=json.dumps(data).encode("utf-8"),
+                                headers=headers, verify=profile.verify)
+    if response.status_code != 200:
+        response.raise_for_status()
+
 # TODO: Support --dry-run
 def register_parsers(main_subparsers, main_parser):
     parser = main_subparsers.add_parser("run", help="Run a workflow", add_help=False)
     parser.add_argument("workflow_or_provider", metavar="(WORKFLOW | PROVIDER[@BRANCH])", type=str,
                         help="A name of a workflow or a provider")
-    parser.add_argument("--follow", "-f", help="Whether to continuously poll for new logs. By default, the command "
-                                               "will exit once there are no more logs to display. To exit from this "
-                                               "mode, use Control-C.", action="store_true")
+    parser.add_argument("--detach", "-d", help="Do not poll for status update and logs.", action="store_true")
     parser.add_argument("vars", metavar="VARS", nargs=argparse.ZERO_OR_MORE,
                         help="Override workflow variables")
     parser.add_argument("args", metavar="ARGS", nargs=argparse.ZERO_OR_MORE, help="Override provider arguments")
@@ -278,8 +292,24 @@ def register_parsers(main_subparsers, main_parser):
                 if instant_run:
                     built_in_provider.run(run_name)
                 runs_func(Namespace(run_name=run_name, all=False))
-                if args.follow:
-                    logs_func(Namespace(run_name=run_name, follow=True, since="1d"))
+                if not args.detach:
+                    print()
+                    print("Provisioning may take up to a minute...")
+                    print()
+                    print("[grey58]To interrupt, press Ctrl+C.[/]")
+                    print()
+                    try:
+                        logs_func(Namespace(run_name=run_name,
+                                            workflow_name=workflow_name,
+                                            follow=True,
+                                            since="1d",
+                                            from_run=True))
+                    except KeyboardInterrupt:
+                        # The only way to exit from the --follow is to Ctrl-C. So
+                        # we should exit the iterator rather than having the
+                        # KeyboardInterrupt propagate to the rest of the command.
+                        if Confirm.ask("[grey58]Exiting...[/] [red]Stop the run?[/]"):
+                            stop_run(run_name, profile)
             elif response.status_code == 404 and response.json().get("message") == "repo not found":
                 sys.exit("Call 'dstack init' first")
             else:

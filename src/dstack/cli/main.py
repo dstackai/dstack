@@ -1,8 +1,6 @@
 import sys
 from argparse import ArgumentParser, SUPPRESS, Namespace
 
-import colorama
-
 from dstack.cli import app, logs, run, stop, artifacts, runs, runners, init, \
     restart, prune, tag, untag, config
 from dstack.version import __version__ as version
@@ -40,8 +38,6 @@ def default_func(_: Namespace):
 
 
 def main():
-    colorama.init()
-
     parser = ArgumentParser(epilog="Please visit https://docs.dstack.ai for more information",
                             add_help=False)
     parser.add_argument("-v", "--version", action="version", version=f"{version}", help="Show program's version")

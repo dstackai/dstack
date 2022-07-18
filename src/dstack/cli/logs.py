@@ -3,16 +3,18 @@ import os
 import re
 import sys
 import time
+import urllib
 from argparse import Namespace
 from collections import defaultdict
 from datetime import datetime, timedelta
 from json import JSONDecodeError
+from rich import print
 
 from botocore.exceptions import ClientError, ParamValidationError
 from botocore.utils import parse_timestamp, datetime2timestamp
 from git import InvalidGitRepositoryError
 
-from dstack.cli.common import get_user_info, boto3_client, get_jobs
+from dstack.cli.common import get_user_info, boto3_client, get_jobs, get_job
 from dstack.config import get_config, ConfigurationError
 
 SLEEP_SECONDS = 1
@@ -103,8 +105,15 @@ def logs_func(args: Namespace):
 
         filter_logs_events_kwargs = {"interleaved": True, "startTime": to_epoch_millis(args.since),
                                      "logGroupName": f"{user_info['user_name']}/{args.run_name}"}
+        job_host_names = {}
+        job_ports = {}
+        job_apps = {}
         if args.workflow_name is not None:
             jobs = list(filter(lambda j: j["workflow_name"] == args.workflow_name, get_jobs(args.run_name, profile)))
+            for job in jobs:
+                job_host_names[job["job_id"]] = job["host_name"] or ("none" if job["status"] != "submitted" else None)
+                job_apps[job["job_id"]] = job["apps"]
+                job_ports[job["job_id"]] = job["ports"]
             if len(jobs) == 0:
                 # TODO: Handle not found error
                 sys.exit(0)
@@ -115,19 +124,20 @@ def logs_func(args: Namespace):
         if args.follow is True:
             try:
                 for event in _do_filter_log_events(client, filter_logs_events_kwargs):
-                    print(json.loads(event["message"].strip())["log"])
-            except KeyboardInterrupt:
+                    print_log_event(event, job_host_names, job_ports, job_apps, profile)
+            except KeyboardInterrupt as e:
                 # The only way to exit from the --follow is to Ctrl-C. So
                 # we should exit the iterator rather than having the
                 # KeyboardInterrupt propagate to the rest of the command.
-                return
+                if hasattr(args, "from_run"):
+                    raise e
 
         else:
             paginator = client.get_paginator('filter_log_events')
             for page in paginator.paginate(**filter_logs_events_kwargs):
                 for event in page['events']:
                     try:
-                        print(json.loads(event["message"].strip())["log"])
+                        print_log_event(event, job_host_names, job_ports, job_apps, profile)
                     except JSONDecodeError:
                         pass
 
@@ -135,6 +145,29 @@ def logs_func(args: Namespace):
         sys.exit(f"{os.getcwd()} is not a Git repo")
     except ConfigurationError:
         sys.exit(f"Call 'dstack config' first")
+
+
+def print_log_event(event, job_host_names, job_ports, job_apps, profile):
+    job_id = event["logStreamName"]
+    if job_id not in job_host_names:
+        job = get_job(job_id, profile)
+        job_host_names[job_id] = job["host_name"] or "none"
+        job_ports[job_id] = job.get("ports")
+        job_apps[job_id] = job.get("apps")
+    message = json.loads(event["message"].strip())["log"]
+    host_name = job_host_names[job_id]
+    ports = job_ports[job_id]
+    apps = job_apps[job_id]
+    pat = re.compile(f'http://(localhost|0.0.0.0|{host_name}):[\\S]+[^(.+)\\s\\n\\r]')
+    if re.search(pat, message):
+        if host_name != "none" and ports and apps:
+            for app in apps:
+                port = ports[app["port_index"]]
+                url_path = app.get("url_path") or ""
+                url_query_params = app.get("url_query_params")
+                url_query = ("?" + urllib.parse.urlencode(url_query_params)) if url_query_params else ""
+                message = re.sub(pat, f"http://{host_name}:{port}/{url_path}{url_query}", message)
+    print(message)
 
 
 def register_parsers(main_subparsers):

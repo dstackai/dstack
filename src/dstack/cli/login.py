@@ -1,9 +1,9 @@
 from argparse import Namespace
 
-import colorama
+from rich import print
 import requests
 
-from dstack.cli import get_or_ask, confirm
+from dstack.cli import get_or_ask
 from dstack.server import __server_url__
 from dstack.config import _get_config_path, from_yaml_file, Profile
 
@@ -19,8 +19,8 @@ def login_func(args: Namespace):
         profile.server = args.server
     profile.verify = not args.no_verify
 
-    user = get_or_ask(args, None, "user", "Username: ", secure=False)
-    password = get_or_ask(args, None, "password", "Password: ", secure=True)
+    user = get_or_ask(args, None, "user", "Username", secure=False)
+    password = get_or_ask(args, None, "password", "Password", secure=True)
 
     login_params = {
         "user": user,
@@ -38,7 +38,7 @@ def login_func(args: Namespace):
 
         dstack_config.add_or_replace_profile(profile)
         dstack_config.save()
-        print(f"{colorama.Fore.LIGHTBLACK_EX}OK{colorama.Fore.RESET}")
+        print(f"[grey58]OK[/]")
     else:
         response_json = login_response.json()
         if response_json.get("message") is not None:

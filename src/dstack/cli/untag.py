@@ -2,17 +2,16 @@ import json
 import sys
 from argparse import Namespace
 
-import colorama
+from rich import print
 import requests
 
-from dstack.cli import confirm
+from rich.prompt import Confirm
 from dstack.config import get_config, ConfigurationError
 
 
 def untag_func(args: Namespace):
     try:
-        if args.force or confirm(
-                f"Are you sure you want to remove the tag from the run?"):
+        if args.yes or Confirm.ask(f"Are you sure you want to remove the tag from the run?"):
             dstack_config = get_config()
             # TODO: Support non-default profiles
             profile = dstack_config.get_profile("default")
@@ -30,9 +29,9 @@ def untag_func(args: Namespace):
             elif response.status_code != 200:
                 response.raise_for_status()
             else:
-                print(f"{colorama.Fore.LIGHTBLACK_EX}OK{colorama.Fore.RESET}")
+                print(f"[grey58]OK[/]")
         else:
-            print(f"{colorama.Fore.RED}Cancelled{colorama.Fore.RESET}")
+            print(f"[red]Cancelled[/]")
     except ConfigurationError:
         sys.exit(f"Call 'dstack config' first")
 
@@ -41,6 +40,6 @@ def register_parsers(main_subparsers):
     parser = main_subparsers.add_parser("untag", help="Untag a run")
 
     parser.add_argument('run_name', metavar='RUN', type=str, help="A name of a run")
-    parser.add_argument("--force", "-f", help="Don't ask for confirmation", action="store_true")
+    parser.add_argument("--yes", "-y", help="Don't ask for confirmation", action="store_true")
 
     parser.set_defaults(func=untag_func)
