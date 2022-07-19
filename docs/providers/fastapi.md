@@ -75,11 +75,11 @@ The number of GPUs, their name and memory
 ## CLI reference
 
 ```bash
-usage: dstack run gradio [-h] [-r [REQUIREMENTS]] [-e [ENV]] [-a [ARTIFACT]]
-                         [--working-dir [WORKING_DIR]] [-i] [--cpu [CPU]]
-                         [--memory [MEMORY]] [--gpu [GPU]]
-                         [--gpu-name [GPU_NAME]] [--gpu-memory [GPU_MEMORY]]
-                         [--shm-size [SHM_SIZE]]
+usage: dstack run gradio [-d] [-h] [-r REQUIREMENTS] [-e ENV] [-a ARTIFACT]
+                         [--working-dir WORKING_DIR] [-i] [--cpu CPU]
+                         [--memory MEMORY] [--gpu GPU_COUNT]
+                         [--gpu-name GPU_NAME] [--gpu-memory GPU_MEMORY]
+                         [--shm-size SHM_SIZE]
                          FILE [ARGS ...]
 ```
 
@@ -89,16 +89,17 @@ The following arguments are required:
 
 The following arguments are optional:
 
-- `--working-dir [WORKING_DIR]` - (Optional) The path to the working directory
-- `-r [REQUIREMENTS]`, `--requirements [REQUIREMENTS]` - (Optional) The path to the `requirements.txt` file
-- `-e [ENV]`, `--env [ENV]` - (Optional) The list of environment variables 
-- `-a [ARTIFACT]`, `--artifact [ARTIFACT]` - (Optional) A folder that must be saved as output artifact
-- `--cpu [CPU]` - (Optional) The number of CPU cores
-- `--memory [MEMORY]` - The size of RAM memory, e.g. `"16GB"`
-- `--gpu [GPU]` - (Optional) The number of GPUs
-- `--gpu-name [GPU_NAME]` - (Optional) The name of the GPU model (e.g. `"K80"`, `"V100"`, etc)
-- `--gpu-memory [GPU_MEMORY]` - (Optional) The size of GPU memory, e.g. `"16GB"`
-- `--shm-size [SHM_SIZE]` - (Optional) The size of shared memory, e.g. `"8GB"`
+- `-d`, `--detach` - (Optional) Do not poll for status update and logs
+- `--working-dir WORKING_DIR` - (Optional) The path to the working directory
+- `-r REQUIREMENTS`, `--requirements REQUIREMENTS` - (Optional) The path to the `requirements.txt` file
+- `-e ENV`, `--env ENV` - (Optional) The list of environment variables 
+- `-a ARTIFACT`, `--artifact ARTIFACT` - (Optional) A folder that must be saved as output artifact
+- `--cpu CPU` - (Optional) The number of CPU cores
+- `--memory MEMORY` - The size of RAM memory, e.g. `"16GB"`
+- `--gpu GPU_COUNT` - (Optional) The number of GPUs
+- `--gpu-name GPU_NAME` - (Optional) The name of the GPU model (e.g. `"K80"`, `"V100"`, etc)
+- `--gpu-memory GPU_MEMORY` - (Optional) The size of GPU memory, e.g. `"16GB"`
+- `--shm-size SHM_SIZE` - (Optional) The size of shared memory, e.g. `"8GB"`
 - `-i`, `--interruptible` - (Optional) if the workflow can run on interruptible instances.
 - `ARGS` - (Optional) The list of arguments for the Python program
 

@@ -83,15 +83,17 @@ nav:
   - Reference:
       - Providers:
         - providers/index.md
+        - Bash: providers/bash.md
         - Python: providers/python.md
+        - Tensorboard: providers/tensorboard.md
         - Docker: providers/docker.md
-        - Torchrun: providers/torchrun.md
         - VS Code: providers/code.md
         - JupyterLab: providers/lab.md
         - Notebook: providers/notebook.md
         - Streamlit: providers/streamlit.md
         - Gradio: providers/gradio.md
         - FastAPI: providers/fastapi.md
+        - Torchrun: providers/torchrun.md
       - CLI:
           - cli/index.md
   - Help:

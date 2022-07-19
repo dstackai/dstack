@@ -9,15 +9,70 @@ These tasks can include preparing data, training models, and running application
 When you run a workflow, dstack automatically provisions the required infrastructure, dependencies, and tracks 
 output artifacts.
 
-You can define workflows in the `.dstack/workflows.yaml` file within your project 
-directory and run them by a name via the CLI.
+## Running workflows
 
-[//]: # (You don't have to worry about )
-[//]: # (tracking code, data, or infrastructure as dstack handles everything automatically.)
+To run a workflow, you can either pass all its arguments via the CLI directly, or define them 
+in the `.dstack/workflows.yaml` file, and run the workflow by name.
+
+### Example
+
+```bash
+dstack run python train.py -r requirements.txt -a model \
+  --gpu 4 --gpu-name K80 
+```
+
+Make sure to use the CLI from the project repository directory.
+
+!!! info "NOTE:"
+
+    As long as your project is under Git, you don't have to commit local changes before using the run command.
+    dstack tracks local changes automatically and allows you to see them in the user interface
+    for every run.
+
+Also, you can define your workflow in the `.dstack/workflows.yaml` file and run it by name:
+
+=== ".dstack/workflows.yaml"
+
+    ```yaml
+    workflows:
+      - name: train
+        provider: python
+        file: "train.py"
+        requirements: "requirements.txt"
+        artifacts: ["model"]
+        resources:
+          gpu:
+            name: "K80"
+            count: 4
+    ```
+
+```bash
+dstack run train 
+```
+
+## Providers
+
+The `provider` argument defines how the workflow is executed. 
+
+dstack offers a variety of built-in providers that allow you to run any machine learning task, deploy an application, 
+or launch a dev environment.
+
+Every provider may have its own arguments. 
+For example, with the [`python`](providers/python.md) provider, we can pass `file` (the file to run),
+`requirements` (the file with requirements), `artifacts` (what folders) to save as output artifacts,
+and `resources` (what hardware resources are required to run the workflow, e.g. GPU, memory, etc).
+
+To learn more about the `run` command, check out the [Providers Reference](providers).
+
+[//]: # (TODO: Provide mode provider examples)
+
+[//]: # (Check the [Reference]&#40;/providers&#41; page to see the all built-in providers and their usage examples.)
+
+[//]: # (TODO: Tell how to use custom providers)
 
 ## Workflows file syntax
 
-Let's walk through the syntax of this file. Here's a basic example:
+Let's walk through the syntax of the `.dstack/workflows.yaml` file:
 
 === ".dstack/workflows.yaml"
 
@@ -42,26 +97,6 @@ Let's walk through the syntax of this file. Here's a basic example:
 
 [//]: # (!!! tip "Source code")
 [//]: # (    You can find the full source code of the example in the [dstackai/dstack-examples]&#40;https://github.com/dstackai/dstack-examples&#41; GitHub repo.)
-
-## Providers
-
-The `provider` argument defines how the workflow is executed. 
-
-dstack offers a variety of built-in providers that allow you to run any machine learning task, deploy an application, 
-or launch a dev environment.
-
-Every provider may have its own arguments. 
-For example, with the [`python`](providers/python.md) provider, we can pass `file` (the file to run),
-`requirements` (the file with requirements), `artifacts` (what folders) to save as output artifacts,
-and `resources` (what hardware resources are required to run the workflow, e.g. GPU, memory, etc).
-
-[//]: # (TODO: Provide mode provider examples)
-
-Check the [Reference](/providers) page to see the all built-in providers and their usage examples.
-
-[//]: # (TODO: Tell how to use custom providers)
-
-[//]: # (TODO: Add a link to the Providers Reference)
 
 ## Dependencies
 
@@ -166,28 +201,20 @@ for later reuse.
 [//]: # ()
 [//]: # (Any variable can be overridden via the CLI when you run a workflow.)
 
-## Run workflows
+[//]: # (## Run workflows)
 
-You can run any of the workflows defined in `.dstack/workflows.yaml` using the CLI:
+[//]: # (You can run any of the workflows defined in `.dstack/workflows.yaml` using the CLI:)
 
-```bash
-dstack run download 
-```
+[//]: # (```bash)
+[//]: # (dstack run download )
+[//]: # (```)
 
-!!! warning "NOTE:"
+[//]: # (Once you've run a workflow, you'll see it in the user interface.)
+[//]: # (To see recent runs from the CLI, use the following command:)
 
-    Make sure to always use the CLI from the project repository directory.
-
-    As long as your project is under Git, you don't have to commit local changes before running workflows.
-    dstack tracks staged local changes automatically and allows you to see them in the user interface
-    for every run.
-
-Once you've run a workflow, you'll see it in the user interface.
-To see recent runs from the CLI, use the following command:
-
-```bash
-dstack runs
-```
+[//]: # (```bash)
+[//]: # (dstack runs)
+[//]: # (```)
 
 [//]: # (TODO: Show a screennshot of repo diff)
 
@@ -207,18 +234,18 @@ dstack runs
 
 [//]: # (```)
 
-!!! tip "TIP:"
-    You can run workflows without defining them in `.dstack/workflows.yaml`
+[//]: # (!!! tip "TIP:")
+[//]: # (    You can run workflows without defining them in `.dstack/workflows.yaml`)
     
-    If you want, you can run a workflow solely via the CLI by using the name of the provider: 
+[//]: # (    If you want, you can run a workflow solely via the CLI by using the name of the provider: )
 
-    ```bash
-    dstack run python train.py \
-      --dep download:latest --artifact checkpoint --gpu 1 \ 
-      --epoch 100 --seed 2 --batch-size 128
-    ```
+[//]: # (    ```bash)
+[//]: # (    dstack run python train.py \)
+[//]: # (      --dep download:latest --artifact checkpoint --gpu 1 \ )
+[//]: # (      --epoch 100 --seed 2 --batch-size 128)
+[//]: # (    ```)
 
-## Workflow logs
+## Logs
 
 The output of running workflows is tracked in real-time and can be accessed through the user interface
 or the CLI.
@@ -242,7 +269,7 @@ dstack logs <run-name> -f
 
 [//]: # (TODO: Add a link to more information on experiment tracking)
 
-## Workflow artifacts
+## Artifacts
 
 By default, the output artifacts are tracked in real-time and can be accessed either via the user interface
 or the CLI.
@@ -267,7 +294,7 @@ dstack artifacts download <run-name>
 
 [//]: # (TODO: Add a link to Providers Reference)
 
-## Secret variables
+## Secrets
 
 If you plan to use third-party services from your workflows, you can use dstack's secrets 
 to securely pass passwords and tokens.

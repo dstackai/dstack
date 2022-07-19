@@ -31,8 +31,7 @@ Alternatively, you can use this provider from the CLI (without defining your wor
 in the `.dstack/workflows.yaml` file):
 
 ```bash
-dstack run docker \
-  -c "mkdir -p output && echo 'Hello, world!' > output/hello.txt" \
+dstack run docker -c "mkdir -p output && echo 'Hello, world!' > output/hello.txt" \
   -a output --gpu-name K80
 ```
 
@@ -79,11 +78,12 @@ The number of GPUs, their name and memory
 ## CLI reference
 
 ```bash
-usage: dstack run docker [-h] [-r [REQUIREMENTS]] [-e [ENV]] [-a [ARTIFACT]]
-                         [--working-dir [WORKING_DIR]] [-i] [--cpu [CPU]]
-                         [--memory [MEMORY]] [--gpu [GPU]]
-                         [--gpu-name [GPU_NAME]] [--gpu-memory [GPU_MEMORY]]
-                         [--shm-size [SHM_SIZE]] [--ports [PORTS]]
+usage: dstack run docker [-d] [-h] [-r REQUIREMENTS] [-e ENV] [-a ARTIFACT]
+                         [--working-dir WORKING_DIR] [-i] [--cpu CPU]
+                         [--memory MEMORY] [--gpu GPU_COUNT]
+                         [--gpu-name GPU_NAME] [--gpu-memory GPU_MEMORY]
+                         [--shm-size SHM_SIZE] [--ports [PORTS]]
+                         [-p PORT_COUNT]
                          [-c [COMMAND]]
                          IMAGE
 ```
@@ -94,16 +94,18 @@ The following arguments are required:
 
 The following arguments are optional:
 
-- `-r [REQUIREMENTS]`, `--requirements [REQUIREMENTS]` - (Optional) The path to the `requirements.txt` file
-- `--working-dir [WORKING_DIR]` - (Optional) The path to the working directory
-- `-e [ENV]`, `--env [ENV]` - (Optional) The list of environment variables 
-- `-a [ARTIFACT]`, `--artifact [ARTIFACT]` - (Optional) A folder that must be saved as output artifact
-- `--cpu [CPU]` - (Optional) The number of CPU cores
-- `--memory [MEMORY]` - The size of RAM memory, e.g. `"16GB"`
-- `--gpu [GPU]` - (Optional) The number of GPUs
-- `--gpu-name [GPU_NAME]` - (Optional) The name of the GPU model (e.g. `"K80"`, `"V100"`, etc)
-- `--gpu-memory [GPU_MEMORY]` - (Optional) The size of GPU memory, e.g. `"16GB"`
-- `--shm-size [SHM_SIZE]` - (Optional) The size of shared memory, e.g. `"8GB"`
+- `-d`, `--detach` - (Optional) Do not poll for status update and logs
+- `-p`, `--ports PORT_COUNT` - (Optional) The number of ports to expose
+- `--working-dir WORKING_DIR` - (Optional) The path to the working directory
+- `-r REQUIREMENTS`, `--requirements REQUIREMENTS` - (Optional) The path to the `requirements.txt` file
+- `-e ENV`, `--env ENV` - (Optional) The list of environment variables 
+- `-a ARTIFACT`, `--artifact ARTIFACT` - (Optional) A folder that must be saved as output artifact
+- `--cpu CPU` - (Optional) The number of CPU cores
+- `--memory MEMORY` - The size of RAM memory, e.g. `"16GB"`
+- `--gpu GPU_COUNT` - (Optional) The number of GPUs
+- `--gpu-name GPU_NAME` - (Optional) The name of the GPU model (e.g. `"K80"`, `"V100"`, etc)
+- `--gpu-memory GPU_MEMORY` - (Optional) The size of GPU memory, e.g. `"16GB"`
+- `--shm-size SHM_SIZE` - (Optional) The size of shared memory, e.g. `"8GB"`
 - `-i`, `--interruptible` - (Optional) if the workflow can run on interruptible instances.
 
 [//]: # (TODO: Add --dep argument)

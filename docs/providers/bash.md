@@ -1,9 +1,10 @@
-# VS Code
+# Bash
 
-This provider launches a VS Code dev environment. 
+This provider runs shell commands. 
 
-You can specify the version of Python, a `requirements.txt` file to pre-install,
-environment variables, arguments, which folders to save as output artifacts, dependencies to
+You can specify shell commands, the version of Python (if you want it to be pre-installed), a `requirements.txt` file
+(if you want them to be pre-installed), environment variables, the number of ports to expose (if needed), 
+which folders to save as output artifacts, dependencies to
 other workflows if any, and the resources the workflow needs (e.g. CPU, GPU, memory, etc).
 
 ## Example usage 
@@ -14,9 +15,12 @@ other workflows if any, and the resources the workflow needs (e.g. CPU, GPU, mem
 
     ```yaml
     workflows:
-      - name: dev
-        provider: code
-        artifacts: ["output"]
+      - name: train
+        provider: bash
+        commands: 
+          - pip install -r requirements.txt
+          - python train.py
+        artifacts: ["model"]
         resources:
           gpu:
             name: "K80"
@@ -27,8 +31,30 @@ Alternatively, you can use this provider from the CLI (without defining your wor
 in the `.dstack/workflows.yaml` file):
 
 ```bash
-dstack run code -a output --gpu 4 --gpu-name K80 
+dstack run bash -c "pip install -r requirements.txt && python train.py" \
+  -a model --gpu 4 --gpu-name K80 
 ```
+
+### Ports
+
+If you'd like your workflow to expose ports, you have to specify the `ports` argument with the number
+of ports to expose. Actual ports will be assigned on startup and passed to the workflow via the environment
+variables `PORT_<number>`.
+
+=== ".dstack/workflows.yaml"
+
+    ```yaml
+    workflows:
+      - name: app
+        provider: bash
+        ports: 1
+        commands: 
+          - pip install -r requirements.txt
+          - gunicorn main:app --bind 0.0.0.0:$PORT_0
+    ```
+
+!!! info "NOTE:"
+    If you need, you can also refer to the actual hostname of the workflow via the environment variable `HOSTNAME`.
 
 [//]: # (TODO: Environment variables)
 
@@ -36,9 +62,13 @@ dstack run code -a output --gpu 4 --gpu-name K80
 
 ## Workflows file reference
 
+The following arguments are required:
+
+- `commands` - (Required) The shell commands to run
+
 The following arguments are optional:
 
-- `before_run` - (Optional) The list of shell commands to run before running the Python file
+- `before_run` - (Optional) The list of shell commands to run before running the main commands
 - `requirements` - (Optional) The path to the `requirements.txt` file
 - `python` - (Optional) The major version of Python. By default, it's `3.10`.
 - `environment` - (Optional) The list of environment variables 
@@ -68,15 +98,22 @@ The number of GPUs, their name and memory
 ## CLI reference
 
 ```bash
-usage: dstack run code [-d] [-h] [-r REQUIREMENTS] [-e ENV] [-a ARTIFACT]
-                       [--working-dir WORKING_DIR] [-i] [--cpu CPU]
-                       [--memory MEMORY] [--gpu GPU_COUNT]
-                       [--gpu-name GPU_NAME] [--gpu-memory GPU_MEMORY]
-                       [--shm-size SHM_SIZE]
+usage: dstack run bash [-d] [-h] [-r REQUIREMENTS] [-e ENV] [-a ARTIFACT]
+                         [--working-dir WORKING_DIR] [-i] [--cpu CPU]
+                         [--memory MEMORY] [--gpu GPU_COUNT]
+                         [--gpu-name GPU_NAME] [--gpu-memory GPU_MEMORY]
+                         [--shm-size SHM_SIZE]
+                         [-p PORT_COUNT]
+                         -c COMMAND
 ```
+
+The following arguments are required:
+
+- `COMMAND` - (Required) The shell commands to run
 
 The following arguments are optional:
 
+- `-p`, `--ports PORT_COUNT` - (Optional) The number of ports to expose
 - `-d`, `--detach` - (Optional) Do not poll for status update and logs
 - `--working-dir WORKING_DIR` - (Optional) The path to the working directory
 - `-r REQUIREMENTS`, `--requirements REQUIREMENTS` - (Optional) The path to the `requirements.txt` file
@@ -89,10 +126,9 @@ The following arguments are optional:
 - `--gpu-memory GPU_MEMORY` - (Optional) The size of GPU memory, e.g. `"16GB"`
 - `--shm-size SHM_SIZE` - (Optional) The size of shared memory, e.g. `"8GB"`
 - `-i`, `--interruptible` - (Optional) if the workflow can run on interruptible instances.
-- `ARGS` - (Optional) The list of arguments for the Python program
 
 [//]: # (TODO: Add --dep argument)
 
 ## Source code
 
-[:octicons-arrow-right-24: GitHub](https://github.com/dstackai/dstack/tree/master/src/dstack/providers/code)
+[:octicons-arrow-right-24: GitHub](https://github.com/dstackai/dstack/tree/master/src/dstack/providers/python)

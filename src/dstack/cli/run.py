@@ -290,54 +290,74 @@ def poll_run(run_name: str, workflow_name: Optional[str], profile: Profile):
         console.print()
         logs_func(Namespace(run_name=run_name, workflow_name=workflow_name, follow=True, since="1d", from_run=True))
     except KeyboardInterrupt:
-        if Confirm.ask(f"Exiting... [red]Stop {run_name}?[/]"):
+        if Confirm.ask(f" [red]Stop {run_name}?[/]"):
             stop_run(run_name, profile)
 
 
 def run_workflow_func(args):
-    try:
-        repo_url, repo_branch, repo_hash, repo_diff = load_repo_data()
-        profile = get_config().get_profile("default")
-
-        provider_args, provider_branch, provider_name, \
-            provider_repo, variables, workflow_data, \
-            workflow_name, built_in_provider, instant_run = parse_run_args(args)
-
-        if hasattr(args, "help") and args.help and built_in_provider:
-            built_in_provider.help(workflow_name)
-            sys.exit()
-
-        if instant_run:
-            load_built_in_provider(built_in_provider, provider_args, workflow_name, workflow_data,
-                                   profile, repo_url, repo_branch, repo_hash, repo_diff)
-
-        response = submit_run(workflow_name, provider_name, provider_branch, provider_repo, provider_args, repo_url,
-                              repo_branch, repo_hash, repo_diff, variables, instant_run, profile)
-        if response.status_code == 200:
-            run_name = response.json().get("run_name")
-            if instant_run:
-                built_in_provider.run(run_name)
-            runs_func(Namespace(run_name=run_name, all=False))
-            if not args.detach:
-                poll_run(run_name, workflow_name, profile)
-        elif response.status_code == 404 and response.json().get("message") == "repo not found":
-            sys.exit("Call 'dstack init' first")
+    if not args.workflow_or_provider:
+        print("Usage: dstack run [-d] [-h] (WORKFLOW | PROVIDER) [ARGS ...]\n")
+        workflows_yaml = load_workflows()
+        workflows = (workflows_yaml or {}).get("workflows") or []
+        if workflows:
+            print("Workflows:")
+            for w in workflows:
+                if w.get("name"):
+                    print(f"  {w['name']}")
         else:
-            response.raise_for_status()
+            print("No workflows found in .dstack/workflows.yaml.")
+        print()
+        print("Providers:")
+        for p in built_in_provider_names:
+            print(f"  {p}")
+        print("\n"
+              "Options:\n"
+              "  -d, --detach   Do not poll for status update and logs"
+              "  -h, --help     Show this help output, or the help for a specified workflow or provider.")
+    else:
+        try:
+            repo_url, repo_branch, repo_hash, repo_diff = load_repo_data()
+            profile = get_config().get_profile("default")
 
-    except ConfigurationError:
-        sys.exit(f"Call 'dstack config' first")
-    except InvalidGitRepositoryError:
-        sys.exit(f"{os.getcwd()} is not a Git repo")
-    except ValidationError as e:
-        sys.exit(f"There a syntax error in {os.getcwd()}/.dstack/workflows.yaml:\n\n{e}")
+            provider_args, provider_branch, provider_name, \
+                provider_repo, variables, workflow_data, \
+                workflow_name, built_in_provider, instant_run = parse_run_args(args)
+
+            if hasattr(args, "help") and args.help and built_in_provider:
+                built_in_provider.help(workflow_name)
+                sys.exit()
+
+            if instant_run:
+                load_built_in_provider(built_in_provider, provider_args, workflow_name, workflow_data,
+                                       profile, repo_url, repo_branch, repo_hash, repo_diff)
+
+            response = submit_run(workflow_name, provider_name, provider_branch, provider_repo, provider_args, repo_url,
+                                  repo_branch, repo_hash, repo_diff, variables, instant_run, profile)
+            if response.status_code == 200:
+                run_name = response.json().get("run_name")
+                if instant_run:
+                    built_in_provider.run(run_name)
+                runs_func(Namespace(run_name=run_name, all=False))
+                if not args.detach:
+                    poll_run(run_name, workflow_name, profile)
+            elif response.status_code == 404 and response.json().get("message") == "repo not found":
+                sys.exit("Call 'dstack init' first")
+            else:
+                response.raise_for_status()
+
+        except ConfigurationError:
+            sys.exit(f"Call 'dstack config' first")
+        except InvalidGitRepositoryError:
+            sys.exit(f"{os.getcwd()} is not a Git repo")
+        except ValidationError as e:
+            sys.exit(f"There a syntax error in {os.getcwd()}/.dstack/workflows.yaml:\n\n{e}")
 
 
 def register_parsers(main_subparsers):
     parser = main_subparsers.add_parser("run", help="Run a workflow", add_help=False)
-    parser.add_argument("workflow_or_provider", metavar="(WORKFLOW | PROVIDER[@BRANCH])", type=str,
-                        help="A name of a workflow or a provider")
-    parser.add_argument("--detach", "-d", help="Do not poll for status update and logs.", action="store_true")
+    parser.add_argument("workflow_or_provider", metavar="(WORKFLOW | PROVIDER)", type=str,
+                        help="A name of a workflow or a provider", nargs="?")
+    parser.add_argument("-d", "--detach", help="Do not poll for status update and logs", action="store_true")
     parser.add_argument("vars", metavar="VARS", nargs=argparse.ZERO_OR_MORE,
                         help="Override workflow variables")
     parser.add_argument("args", metavar="ARGS", nargs=argparse.ZERO_OR_MORE, help="Override provider arguments")

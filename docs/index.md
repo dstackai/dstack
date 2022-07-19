@@ -1,18 +1,16 @@
 # Welcome to 🧬 dstack
 
-dstack allows you to train models and deploy AI apps in your cloud account.
+dstack allows to run any tasks and apps in your cloud account via the CLI.
 
-Sign up for dstack, add your cloud credentials, and run workflows from the CLI.
-dstack will provision infrastructure on-demand and will help manage your data.
+Sign up for dstack, add your cloud credentials, and run anything via the CLI.
+dstack will provision infrastructure on-demand and will help manage data.
 
 [//]: # (TODO: Add links to the cards below)
 
 <div class="grid cards" markdown>
 - **Workflows** 
 
-    Define your machine learning tasks as workflows, and run them via the CLI.
-
-    Prepare data, train models, and deploy apps.
+    Run any tasks and apps in your cloud account with a single command.
 
     [:octicons-arrow-right-24: Basics](workflows.md)
 
@@ -26,21 +24,19 @@ dstack will provision infrastructure on-demand and will help manage your data.
 
 - **Artifacts** 
 
-    Save data and models as artifacts and reuse them from your workflows.
-
-    Use tags to version artifacts and to share them with others.
+    Save any output artifacts in the central storage and reuse them from other workflows.
 
 - **Dev environments** 
 
-    Launch VS Code, JupyterLab, and other tools with 
+    Launch VS Code, JupyterLab, Tensorboard, and other tools with 
     pre-configured hardware and dependencies.
 
     [:octicons-arrow-right-24: Reference](providers#dev-environments)
 
 - **Providers** 
 
-    dstack comes with a variety of built-in providers that support
-    top frameworks, incl. Streamlit, Gradio, FastAPI and others.
+    With dstack, you can run pretty much any tools supported by the built-in
+    or community provider.
 
     [:octicons-arrow-right-24: Reference](providers)
 </div>

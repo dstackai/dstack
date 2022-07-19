@@ -35,7 +35,7 @@ class BashProvider(Provider):
     def _create_parser(self, workflow_name: Optional[str]) -> Optional[ArgumentParser]:
         parser = ArgumentParser(prog="dstack run " + (workflow_name or "bash"))
         self._add_base_args(parser)
-        parser.add_argument("-p", "--ports", type=int)
+        parser.add_argument("-p", "--ports", metavar="PORT_COUNT", type=int)
         if not workflow_name:
             parser.add_argument("-c", "--command", type=str)
         return parser

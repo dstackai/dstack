@@ -6,6 +6,12 @@ you to run any machine learning task, deploy an application, or launch a dev env
 ## Tasks
 
 <div class="grid cards" markdown>
+- **Bash** 
+
+    Runs shell commands
+
+    [:octicons-arrow-right-24: Reference](bash.md)
+
 - **Python** 
 
     Runs a Python file
@@ -41,6 +47,12 @@ you to run any machine learning task, deploy an application, or launch a dev env
     Launches a JupyterLab dev environment
 
     [:octicons-arrow-right-24: Reference](lab.md)
+
+- **Tensorboard** 
+
+    Runs a Tensorboard application
+
+    [:octicons-arrow-right-24: Reference](tensorboard.md)
 
 - **Jupyter Notebook** 
 
