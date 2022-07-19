@@ -158,7 +158,7 @@ def print_log_event(event, job_host_names, job_ports, job_apps, profile):
     host_name = job_host_names[job_id]
     ports = job_ports[job_id]
     apps = job_apps[job_id]
-    pat = re.compile(f'http://(localhost|0.0.0.0|{host_name}):[\\S]+[^(.+)\\s\\n\\r]')
+    pat = re.compile(f'http://(localhost|0.0.0.0|{host_name}):[\\S]*[^(.+)\\s\\n\\r]')
     if re.search(pat, message):
         if host_name != "none" and ports and apps:
             for app in apps:
@@ -166,7 +166,12 @@ def print_log_event(event, job_host_names, job_ports, job_apps, profile):
                 url_path = app.get("url_path") or ""
                 url_query_params = app.get("url_query_params")
                 url_query = ("?" + urllib.parse.urlencode(url_query_params)) if url_query_params else ""
-                message = re.sub(pat, f"http://{host_name}:{port}/{url_path}{url_query}", message)
+                app_url = f"http://{host_name}:{port}"
+                if url_path or url_query_params:
+                    app_url += "/"
+                    if url_query_params:
+                        app_url += url_query
+                message = re.sub(pat, app_url, message)
     print(message)
 
 

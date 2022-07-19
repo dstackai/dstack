@@ -149,6 +149,18 @@ def headers_and_params(profile, run_name, require_repo=True):
     return headers, params
 
 
+def get_runs(run_name: ty.Optional[str], workflow_name: ty.Optional[str], profile):
+    headers, params = headers_and_params(profile, run_name, False)
+    # del params["repo_url"]
+    if workflow_name:
+        params["workflow_name"] = workflow_name
+    response = request(method="GET", url=f"{profile.server}/runs/workflows/query", params=params, headers=headers,
+                       verify=profile.verify)
+    response.raise_for_status()
+    runs = list(reversed(response.json()["runs"]))
+    return runs
+
+
 # TODO: Add a parameter repo_url
 def get_jobs(run_name: ty.Optional[str], profile):
     headers, params = headers_and_params(profile, run_name, True)
@@ -242,7 +254,11 @@ def colored(status: str, val: str, bright: bool = False):
     return f"[{'bold' if bright else ''}{color}]{val}[/]" if color is not None else val
 
 
-def pretty_print_status(status: str) -> str:
+def pretty_print_status(workflow: dict) -> str:
+    status = workflow["status"].upper()
+    availability_issues = workflow.get("availability_issues")
+    if availability_issues:
+        return "No capacity"
     if status == "SUBMITTED":
         return "Provisioning..."
     if status == "QUEUED":
@@ -273,7 +289,7 @@ def print_runners(profile):
     table.add_column("Runner", style="bold", no_wrap=True)
     table.add_column("Host", style="grey58", width=24)
     table.add_column("CPU", style="grey58", width=4)
-    table.add_column("Memory", style="grey58", width=4)
+    table.add_column("Memory", style="grey58", width=8)
     table.add_column("GPU", style="grey58", width=6)
     table.add_column("Status", style="grey58", width=12)
 

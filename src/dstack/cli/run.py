@@ -3,23 +3,27 @@ import json
 import os
 import sys
 import tempfile
+import time
 from argparse import Namespace
-from typing import List
+from typing import List, Optional
 
 import requests
 import yaml
 from git import InvalidGitRepositoryError
 from jsonschema import validate, ValidationError
-from rich import print
+from rich.console import Console
+from rich.progress import SpinnerColumn, Progress, TextColumn
+from rich.prompt import Confirm
 
 from dstack import Provider
-from rich.prompt import Confirm
-from dstack.cli.common import load_workflows, load_variables, load_repo_data, load_providers, get_user_info
+from dstack.cli.common import load_workflows, load_variables, load_repo_data, load_providers, get_user_info, get_runs
 from dstack.cli.logs import logs_func
 from dstack.cli.runs import runs_func
 from dstack.cli.schema import workflows_schema_yaml
 from dstack.config import get_config, ConfigurationError, Profile
 from dstack.server import __server_url__
+
+SLEEP_SECONDS = 3
 
 built_in_provider_names = ["bash", "python", "tensorboard", "torchrun",
                            "docker",
@@ -256,8 +260,80 @@ def stop_run(run_name: str, profile: Profile):
     if response.status_code != 200:
         response.raise_for_status()
 
-# TODO: Support --dry-run
-def register_parsers(main_subparsers, main_parser):
+
+# TODO: Stop the run on SIGTERM, SIGHUP, etc
+def poll_run(run_name: str, workflow_name: Optional[str], profile: Profile):
+    try:
+        console = Console()
+        console.print()
+        availability_issues_printed = False
+        with Progress(TextColumn("[progress.description]{task.description}"), SpinnerColumn(), transient=True,) as progress:
+            task = progress.add_task("Provisioning... It may take up to a minute.", total=None)
+            while True:
+                run = get_runs(run_name, workflow_name, profile)[0]
+                if run["status"] not in ["submitted", "queued"]:
+                    progress.update(task, total=100)
+                    break
+                availability_issues = run.get("availability_issues")
+                if availability_issues:
+                    if not availability_issues_printed:
+                        issue = availability_issues[0]
+                        progress.update(task, description=f"[yellow]⛔️ {issue['message']}")
+                        availability_issues_printed = True
+                elif availability_issues_printed:
+                    progress.update(task, description="Provisioning... It may take up to a minute.")
+                    availability_issues_printed = False
+                time.sleep(SLEEP_SECONDS)
+        console.print("Provisioning... It may take up to a minute. [green]✓[/]")
+        console.print()
+        console.print("[grey58]To interrupt, press Ctrl+C.[/]")
+        console.print()
+        logs_func(Namespace(run_name=run_name, workflow_name=workflow_name, follow=True, since="1d", from_run=True))
+    except KeyboardInterrupt:
+        if Confirm.ask(f"Exiting... [red]Stop {run_name}?[/]"):
+            stop_run(run_name, profile)
+
+
+def run_workflow_func(args):
+    try:
+        repo_url, repo_branch, repo_hash, repo_diff = load_repo_data()
+        profile = get_config().get_profile("default")
+
+        provider_args, provider_branch, provider_name, \
+            provider_repo, variables, workflow_data, \
+            workflow_name, built_in_provider, instant_run = parse_run_args(args)
+
+        if hasattr(args, "help") and args.help and built_in_provider:
+            built_in_provider.help(workflow_name)
+            sys.exit()
+
+        if instant_run:
+            load_built_in_provider(built_in_provider, provider_args, workflow_name, workflow_data,
+                                   profile, repo_url, repo_branch, repo_hash, repo_diff)
+
+        response = submit_run(workflow_name, provider_name, provider_branch, provider_repo, provider_args, repo_url,
+                              repo_branch, repo_hash, repo_diff, variables, instant_run, profile)
+        if response.status_code == 200:
+            run_name = response.json().get("run_name")
+            if instant_run:
+                built_in_provider.run(run_name)
+            runs_func(Namespace(run_name=run_name, all=False))
+            if not args.detach:
+                poll_run(run_name, workflow_name, profile)
+        elif response.status_code == 404 and response.json().get("message") == "repo not found":
+            sys.exit("Call 'dstack init' first")
+        else:
+            response.raise_for_status()
+
+    except ConfigurationError:
+        sys.exit(f"Call 'dstack config' first")
+    except InvalidGitRepositoryError:
+        sys.exit(f"{os.getcwd()} is not a Git repo")
+    except ValidationError as e:
+        sys.exit(f"There a syntax error in {os.getcwd()}/.dstack/workflows.yaml:\n\n{e}")
+
+
+def register_parsers(main_subparsers):
     parser = main_subparsers.add_parser("run", help="Run a workflow", add_help=False)
     parser.add_argument("workflow_or_provider", metavar="(WORKFLOW | PROVIDER[@BRANCH])", type=str,
                         help="A name of a workflow or a provider")
@@ -268,58 +344,4 @@ def register_parsers(main_subparsers, main_parser):
     parser.add_argument('-h', '--help', action='store_true', default=argparse.SUPPRESS,
                         help='Show this help message and exit')
 
-    def default_run_func(args):
-        try:
-            repo_url, repo_branch, repo_hash, repo_diff = load_repo_data()
-            profile = get_config().get_profile("default")
-
-            provider_args, provider_branch, provider_name, \
-            provider_repo, variables, workflow_data, \
-            workflow_name, built_in_provider, instant_run = parse_run_args(args)
-
-            if hasattr(args, "help") and args.help and built_in_provider:
-                built_in_provider.help(workflow_name)
-                sys.exit()
-
-            if instant_run:
-                load_built_in_provider(built_in_provider, provider_args, workflow_name, workflow_data,
-                                       profile, repo_url, repo_branch, repo_hash, repo_diff)
-
-            response = submit_run(workflow_name, provider_name, provider_branch, provider_repo, provider_args, repo_url,
-                                  repo_branch, repo_hash, repo_diff, variables, instant_run, profile)
-            if response.status_code == 200:
-                run_name = response.json().get("run_name")
-                if instant_run:
-                    built_in_provider.run(run_name)
-                runs_func(Namespace(run_name=run_name, all=False))
-                if not args.detach:
-                    print()
-                    print("Provisioning may take up to a minute...")
-                    print()
-                    print("[grey58]To interrupt, press Ctrl+C.[/]")
-                    print()
-                    try:
-                        logs_func(Namespace(run_name=run_name,
-                                            workflow_name=workflow_name,
-                                            follow=True,
-                                            since="1d",
-                                            from_run=True))
-                    except KeyboardInterrupt:
-                        # The only way to exit from the --follow is to Ctrl-C. So
-                        # we should exit the iterator rather than having the
-                        # KeyboardInterrupt propagate to the rest of the command.
-                        if Confirm.ask("[grey58]Exiting...[/] [red]Stop the run?[/]"):
-                            stop_run(run_name, profile)
-            elif response.status_code == 404 and response.json().get("message") == "repo not found":
-                sys.exit("Call 'dstack init' first")
-            else:
-                response.raise_for_status()
-
-        except ConfigurationError:
-            sys.exit(f"Call 'dstack config' first")
-        except InvalidGitRepositoryError:
-            sys.exit(f"{os.getcwd()} is not a Git repo")
-        except ValidationError as e:
-            sys.exit(f"There a syntax error in {os.getcwd()}/.dstack/workflows.yaml:\n\n{e}")
-
-    parser.set_defaults(func=default_run_func)
+    parser.set_defaults(func=run_workflow_func)

@@ -1,34 +1,20 @@
-import json
 import os
 import sys
 import webbrowser
 from argparse import Namespace
 
-from rich import print
 from git import InvalidGitRepositoryError
-from requests import request
+from rich import print
 
-from dstack.cli.common import get_user_info, get_jobs, headers_and_params
+from dstack.cli.common import get_runs
 from dstack.config import get_config, ConfigurationError
-
-
-def get_runs_v2(args, profile):
-    headers, params = headers_and_params(profile, args.run_name, False)
-    # del params["repo_url"]
-    response = request(method="GET", url=f"{profile.server}/runs/workflows/query", params=params, headers=headers,
-                       verify=profile.verify)
-    response.raise_for_status()
-    # runs = sorted(response.json()["runs"], key=lambda job: job["updated_at"])
-    runs = reversed(response.json()["runs"])
-    return runs
 
 
 def apps_func(args: Namespace):
     try:
         dstack_config = get_config()
-        # TODO: Support non-default profiles
         profile = dstack_config.get_profile("default")
-        workflows = get_runs_v2(args, profile)
+        workflows = get_runs(args.run_name, args.workflow_name, profile=profile)
 
         apps = []
         for workflow in filter(lambda w: not args.workflow_name or w.workflow_name == args.workflow_name, workflows):

@@ -50,7 +50,7 @@ def print_runs(profile, args):
             table.add_row(colored(status, run_name),
                           workflow.get("workflow_name"),
                           workflow.get("provider_name"),
-                          colored(status, pretty_print_status(status)),
+                          colored(status, pretty_print_status(workflow)),
                           __job_apps(workflow.get("apps"), status),
                           __job_artifacts(workflow["artifact_paths"]),
                           submitted_at,

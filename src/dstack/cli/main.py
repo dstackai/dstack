@@ -59,7 +59,7 @@ def main():
     prune.register_parsers(subparsers)
     # TODO: Rename to restart
     restart.register_parsers(subparsers)
-    run.register_parsers(subparsers, parser)
+    run.register_parsers(subparsers)
     # TODO: Hide
     runners.register_parsers(subparsers)
     runs.register_parsers(subparsers)
