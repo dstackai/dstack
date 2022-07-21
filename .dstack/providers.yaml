@@ -4,6 +4,16 @@ providers:
     commands:
       - pip3 install -r src/dstack/providers/requirements.txt
       - PYTHONPATH=src python3 src/dstack/providers/python/main.py
+  - name: bash
+    image: python:3.9
+    commands:
+      - pip3 install -r src/dstack/providers/requirements.txt
+      - PYTHONPATH=src python3 src/dstack/providers/bash/main.py
+  - name: tensorboard
+    image: python:3.9
+    commands:
+      - pip3 install -r src/dstack/providers/requirements.txt
+      - PYTHONPATH=src python3 src/dstack/providers/tensorboard/main.py
   - name: curl
     image: python:3.9
     commands:
