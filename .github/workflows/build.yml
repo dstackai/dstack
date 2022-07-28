@@ -17,7 +17,7 @@ jobs:
         python-version: [ 3.6, 3.7, 3.8, 3.9 ]
     defaults:
       run:
-        working-directory: ./cli
+        working-directory: ./src
     steps:
       - uses: actions/checkout@v2
       - name: Set up Python ${{ matrix.python-version }}
@@ -37,7 +37,7 @@ jobs:
     needs: cli-test-master
     defaults:
       run:
-        working-directory: ./cli
+        working-directory: ./src
     steps:
       - uses: actions/checkout@v2
       - name: Set up Python 3.9

@@ -1,7 +1,7 @@
 <div align="center">
 <img src="https://raw.githubusercontent.com/dstackai/dstack/master/docs/assets/logo.svg" width="200px"/>    
 
-Your new home for building AI apps
+The easiest way to build AI apps
 ______________________________________________________________________
 
 [![pypi](https://badge.fury.io/py/dstack.svg)](https://badge.fury.io/py/dstack)
@@ -12,16 +12,15 @@ ______________________________________________________________________
 
 </div>
 
-dstack makes it easy to build AI apps and collaborate.
+dstack allows you to train models and run AI apps in your cloud account.
 
-* You can define common tasks (such as preparing data, training models, running apps, etc.), as workflows 
-  and run them in the cloud with one command. 
-* The platform automatically saves output artifacts in the cloud, and allow you to version them via tags to reuse and share with others.
-* You can configure your own cloud account (e.g. AWS, GCP, Azure, etc.)
-* The platform is easily extensible through [providers](providers). Provider add support for
-  various languages, training and application frameworks, dev environments, etc.
+* Define your machine learning tasks as workflows, and run them via the CLI. 
+* Specify hardware requirements for your workflows as code.
+* Deploy AI applications to dstack with a single command.
+* Store, version, and reuse data the most simple way.
+* Launch pre-configured development environments with a single command.
 
-This repository contains the open source code of the built-in [providers](providers), the [CLI](cli), and [documentation](docs). 
+This repository contains the open source code of the built-in [providers](src/dstack/providers), the [CLI](src/dstack), and [documentation](docs). 
 
 ## 📘 Documentation
 
@@ -64,14 +63,7 @@ workflows:
     file: "train.py"
     artifacts: ["checkpoint"]
     resources:
-      gpu: 1
-      
-  - name: app
-    help: "Launches an app to play with the model"
-    depends-on:
-      - train:latest
-    provider: streamlit
-    target: "app.py"
+      gpu: 1    
 ```
 </details>
 
@@ -80,10 +72,6 @@ Run any workflow in the cloud via a single command:
 ```bash
 $ dstack run train
 ```
-
-For more examples, check out the [examples](examples) folder.
-
-### Run providers
 
 Workflows are optional. You can run providers directly from the CLI:
 
@@ -94,12 +82,11 @@ dstack run python train.py \
 
 ### Run applications
 
-Here's how to run a Streamlit application:
+Here's how to run applications:
 
 ```bash
 dstack run streamlit app.py --dep model:latest
 ```
-
 
 ### Launch dev environments
 

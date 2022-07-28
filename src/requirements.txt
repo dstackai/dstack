@@ -1,0 +1,11 @@
+requests
+pyyaml
+gitpython
+boto3
+tqdm
+jsonschema
+botocore
+python-dateutil
+paramiko
+git-url-parse
+rich

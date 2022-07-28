@@ -1,0 +1,15 @@
+type: object
+additionalProperties: false
+properties:
+  before_run:
+    type: array
+    items:
+      type: string
+  logdir:
+    type: string
+  runs:
+    type: array
+    items:
+      type: string
+required:
+  - runs

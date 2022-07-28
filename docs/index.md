@@ -1,136 +1,60 @@
-# What is dstack?
+# Welcome to 🧬 dstack
 
-dstack is a platform that makes it very easy to manage data, train models, build and deploy AI apps.
+dstack allows to run any tasks and apps in your cloud account via the CLI.
 
-### Organize your workflows
+Sign up for dstack, add your cloud credentials, and run anything via the CLI.
+dstack will provision infrastructure on-demand and will help manage data.
 
-dstack allows you to define your common tasks as workflows, and run them in a configured cloud account.
+[//]: # (TODO: Add links to the cards below)
 
-You can configure hardware requirements, output artifacts, dependencies to other workflow if any,
-and any other parameters supported by the workflow provider.
+<div class="grid cards" markdown>
+- **Workflows** 
 
-???- info "Click to see an example"
+    Run any tasks and apps in your cloud account with a single command.
 
-    === ".dstack/workflows.yaml"
-        ```yaml
-        workflows:
-          - name: prepare
-            provider: python
-            file: "prepare.py"
-            artifacts: ["data"]
-        
-          - name: train
-            depends-on:
-              - prepare:latest
-            provider: python
-            file: "train.py"
-            artifacts: ["checkpoint"]
-            resources:
-              gpu: 4
-              
-          - name: app
-            depends-on:
-              - train:latest
-            provider: streamlit
-            target: "app.py"
-        ```
+    [:octicons-arrow-right-24: Basics](workflows.md)
 
-### Run workflows, providers, and apps
+[//]: # (- **On-demand infrastructure** )
 
-You can run workflows or directly providers in the cloud from your terminal.
+[//]: # (    Specify hardware requirements for your workflows as code.)
 
-Here's how to run a workflow:
+[//]: # (- **Applications** )
 
-```bash
-dstack run train \
-  --epoch 100 --seed 2 --batch-size 128
-```
+[//]: # (    Deploy AI applications to dstack with a single command.)
 
-As an alternative to workflows, you can run any providers directly: 
+- **Artifacts** 
 
-```bash
-dstack run python train.py \
-  --epoch 100 --seed 2 --batch-size 128 \
-  --dep prepare:latest --artifact checkpoint --gpu 1
-```
+    Save any output artifacts in the central storage and reuse them from other workflows.
 
-Some providers allow to launch interactive applications, including [JupyterLab](https://github.com/dstackai/dstack/tree/master/providers/lab/#readme),
-[VS Code](https://github.com/dstackai/dstack/tree/master/providers/code/#readme), 
-[Streamlit](https://github.com/dstackai/dstack/tree/master/providers/streamlit/#readme), 
-[Gradio](https://github.com/dstackai/dstack/tree/master/providers/gradio/#readme), 
-[FastAPI](https://github.com/dstackai/dstack/tree/master/providers/fastapi/#readme), or
-anything else.
+- **Dev environments** 
 
-Here's an example of the command that launches a VS Code application:
+    Launch VS Code, JupyterLab, Tensorboard, and other tools with 
+    pre-configured hardware and dependencies.
 
-```bash
-dstack run code \
-  --artifact output \
-  --gpu 1
-```
-### Providers registry
+    [:octicons-arrow-right-24: Reference](providers#dev-environments)
 
-You are welcome to use a variety of the [built-in providers](https://github.com/dstackai/dstack/tree/master/providers/#readme), 
-or the providers from the community.
+- **Providers** 
+
+    With dstack, you can run pretty much any tools supported by the built-in
+    or community provider.
+
+    [:octicons-arrow-right-24: Reference](providers)
+</div>
+
+### Getting started
 
 <div class="grid cards" markdown>
 
--  __python__
+- **Quickstart**
 
-    Runs a Python script
+    Follow our simple step-by-step tutorial to get started with dstack in minutes.
 
-    [:octicons-arrow-right-24: Reference](https://github.com/dstackai/dstack/tree/master/providers/python/#readme)
+    [:octicons-arrow-right-24: Tutorial](quickstart.md)
 
-- __docker__
+- **Slack community**
 
-    Runs a Docker image
-    [:octicons-arrow-right-24: Reference](https://github.com/dstackai/dstack/tree/master/providers/docker/#readme)
+    Connect with the community in a Slack channel.
 
-- __streamlit__
-
-    Runs a Streamlit app
-
-    [:octicons-arrow-right-24: Reference](https://github.com/dstackai/dstack/tree/master/providers/streamlit/#readme)
-
-- __gradio__
-
-    Runs a Gradio app
-
-    [:octicons-arrow-right-24: Reference](https://github.com/dstackai/dstack/tree/master/providers/gradio/#readme)
-
-- __fastapi__
-
-    Runs a FastAPI app
-
-    [:octicons-arrow-right-24: Reference](https://github.com/dstackai/dstack/tree/master/providers/fastapi/#readme)
-
-- __lab__
-
-    Runs a JupyterLab app
-
-    [:octicons-arrow-right-24: Reference](https://github.com/dstackai/dstack/tree/master/providers/lab/#readme)
-
-- __code__
-
-    Runs a VS Code app
-
-    [:octicons-arrow-right-24: Reference](https://github.com/dstackai/dstack/tree/master/providers/code/#readme)
-
-- __notebook__
-
-    Runs a Jupyter notebook
-
-    [:octicons-arrow-right-24: Reference](https://github.com/dstackai/dstack/tree/master/providers/notebook/#readme)
+    [:octicons-arrow-right-24: Join](https://github.com/dstackai/dstack-examples)
 
 </div>
-
-### Share data, models, and apps
-
-For every run, output artifacts, e.g. with data, models, or apps, are saved in real-time.
-
-You can use tags to version artifacts, e.g. to reuse them from other workflows or to share them with others.
-
-### Connect your cloud accounts
-
-In order to run workflows or providers, you have to configure your cloud accounts 
-by adding the corresponding credentials into dstack settings.

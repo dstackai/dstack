@@ -1,0 +1,56 @@
+type: object
+additionalProperties: false
+properties:
+  before_run:
+    type: array
+    items:
+      type: string
+  requirements:
+    type: string
+  commands:
+    type: array
+    items:
+      type: string
+  python:
+    oneOf:
+    - type: string
+      enum: [ "3.10", "3.9", "3.8", "3.7" ]
+    - type: number
+      enum: [ 3.10, 3.9, 3.8, 3.7 ]
+  working_dir:
+    type: string
+  resources:
+    type: object
+    properties:
+      cpu:
+        type: integer
+      memory:
+        type: string
+      gpu:
+        oneOf:
+          - type: integer
+          - type: object
+            additionalProperties: false
+            properties:
+              count:
+                type: integer
+              name:
+                type: string
+              memory:
+                type: string
+      shm_size:
+        type: string
+      interruptible:
+        type: boolean
+    additionalProperties: false
+  environment:
+    type: object
+    additionalProperties: true
+  artifacts:
+    type: array
+    items:
+      type: string
+  ports:
+    type: integer
+required:
+  - commands
