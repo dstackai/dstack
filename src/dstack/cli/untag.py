@@ -6,7 +6,6 @@ from rich import print
 import requests
 
 from rich.prompt import Confirm
-from dstack.config import get_config, ConfigurationError
 
 
 def untag_func(args: Namespace):

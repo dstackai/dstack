@@ -9,7 +9,6 @@ from requests import request
 
 from rich.prompt import Confirm
 from dstack.cli.common import load_repo_data
-from dstack.config import get_config, ConfigurationError
 
 
 def prune_func(args: Namespace):

@@ -7,7 +7,6 @@ from git import InvalidGitRepositoryError
 from rich import print
 
 from dstack.cli.common import get_runs
-from dstack.config import get_config, ConfigurationError
 
 
 def apps_func(args: Namespace):

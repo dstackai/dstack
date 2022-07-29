@@ -1,13 +1,14 @@
 from argparse import ArgumentParser
 from typing import List, Optional
 
-from dstack import Provider, Job
+from dstack import Job, JobSpec
+
+from dstack.providers import Provider
 
 
-# TODO: Merge output and artifact
 class CurlProvider(Provider):
     def __init__(self):
-        super().__init__()
+        super().__init__("curl")
         self.url = None
         self.output = None
         self.artifacts = None
@@ -19,7 +20,7 @@ class CurlProvider(Provider):
         self.artifacts = self.workflow.data["artifacts"]
 
     def _create_parser(self, workflow_name: Optional[str]) -> Optional[ArgumentParser]:
-        parser = ArgumentParser(prog="dstack run " + (workflow_name or "curl"))
+        parser = ArgumentParser(prog="dstack run " + (workflow_name or self.provider_name))
         if not workflow_name:
             parser.add_argument("url", metavar="URL", type=str)
         # TODO: Support other curl options, such as -O
@@ -36,9 +37,9 @@ class CurlProvider(Provider):
             self.workflow.data["output"] = args.output
             self.workflow.data["artifacts"] = args.artifact
 
-    def create_jobs(self) -> List[Job]:
-        return [Job(
-            image="python:3.10",
+    def create_job_specs(self) -> List[JobSpec]:
+        return [JobSpec(
+            image_name="python:3.10",
             commands=[
                 f"curl {self.url} -o {self.output}"
             ],

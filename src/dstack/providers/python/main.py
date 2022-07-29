@@ -2,24 +2,24 @@ import argparse
 from argparse import ArgumentParser
 from typing import List, Optional
 
-from dstack import Provider, Job
+from dstack import Job, JobSpec
+from dstack.providers import Provider
 
 
-# TODO: Make environment a list of VAR=VAL
 class PythonProvider(Provider):
     def __init__(self):
-        super().__init__()
+        super().__init__("python")
         self.file = None
         self.before_run = None
         # TODO: Handle numbers such as 3.1 (e.g. require to use strings)
         self.version = None
         self.args = None
         self.requirements = None
-        self.environment = None
+        self.env = None
         self.artifacts = None
         self.working_dir = None
         self.resources = None
-        self.image = None
+        self.image_name = None
 
     def load(self):
         super()._load(schema="schema.yaml")
@@ -30,11 +30,11 @@ class PythonProvider(Provider):
         self.version = self._save_python_version("version")
         self.args = self.workflow.data.get("args")
         self.requirements = self.workflow.data.get("requirements")
-        self.environment = self.workflow.data.get("environment") or {}
+        self.env = self.workflow.data.get("environment") or {}
         self.artifacts = self.workflow.data.get("artifacts")
         self.working_dir = self.workflow.data.get("working_dir")
         self.resources = self._resources()
-        self.image = self._image()
+        self.image_name = self._image_name()
 
     def _create_parser(self, workflow_name: Optional[str]) -> Optional[ArgumentParser]:
         parser = ArgumentParser(prog="dstack run " + (workflow_name or "python"))
@@ -54,18 +54,18 @@ class PythonProvider(Provider):
             if _args:
                 self.workflow.data["args"] = _args
 
-    def create_jobs(self) -> List[Job]:
-        return [Job(
-            image=self.image,
+    def create_job_specs(self) -> List[JobSpec]:
+        return [JobSpec(
+            image_name=self.image_name,
             commands=self._commands(),
-            environment=self.environment,
+            env=self.env,
             working_dir=self.working_dir,
-            resources=self.resources,
-            artifacts=self.artifacts
+            artifacts=self.artifacts,
+            requirements=self.resources,
         )]
 
-    def _image(self) -> str:
-        cuda_is_required = self.resources and self.resources.gpu
+    def _image_name(self) -> str:
+        cuda_is_required = self.resources and self.resources.gpus
         return f"dstackai/python:{self.version}-cuda-11.1" if cuda_is_required else f"python:{self.version}"
 
     def _commands(self):

@@ -16,7 +16,6 @@ from tqdm import tqdm
 
 from dstack.cli.common import get_user_info, boto3_client, list_artifact, short_artifact_path, list_artifact_files, \
     get_jobs, load_repo_data
-from dstack.config import get_config, ConfigurationError
 
 
 def download_func(args: Namespace):

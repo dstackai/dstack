@@ -6,8 +6,6 @@ from rich import print
 import requests
 from rich.prompt import Confirm
 
-from dstack.config import get_config, ConfigurationError
-
 
 def default_stop_workflow(args: Namespace):
     if (args.run_name and (args.yes or Confirm.ask(f"[red]Stop {args.run_name}?[/]"))) \

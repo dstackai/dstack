@@ -1,15 +1,17 @@
 import os
 from argparse import ArgumentParser
-from typing import List, Optional
+from typing import List, Optional, Dict
 
-from dstack import Provider, Job, App
-# TODO: Provide job.applications (incl. application name, and query)
+from dstack import App, JobSpec, Job, JobHead
+from dstack.backend import get_backend
 from dstack.cli.common import get_jobs
+from dstack.config import load_config
+from dstack.providers import Provider
 
 
 class TensorboardProvider(Provider):
     def __init__(self):
-        super().__init__()
+        super().__init__("tensorboard")
         self.app = None
         self.before_run = None
         self.python = None
@@ -27,7 +29,7 @@ class TensorboardProvider(Provider):
         self.logdir = self.workflow.data.get("logdir")
 
     def _create_parser(self, workflow_name: Optional[str]) -> Optional[ArgumentParser]:
-        parser = ArgumentParser(prog="dstack run " + (workflow_name or "tensorboard"))
+        parser = ArgumentParser(prog="dstack run " + (workflow_name or self.provider_name))
         if not workflow_name:
             parser.add_argument("run_names", metavar="RUN", type=str, nargs="+", help="A name of a run")
             parser.add_argument("--logdir", type=str, help="The path where TensorBoard will look for "
@@ -43,9 +45,9 @@ class TensorboardProvider(Provider):
             if args.logdir:
                 self.workflow.data["logdir"] = args.logdir
 
-    def create_jobs(self) -> List[Job]:
-        return [Job(
-            image="python:3.10",
+    def create_job_specs(self) -> List[JobSpec]:
+        return [JobSpec(
+            image_name="python:3.10",
             commands=self._commands(),
             port_count=1,
             apps=[App(
@@ -54,13 +56,14 @@ class TensorboardProvider(Provider):
             )]
         )]
 
-    def __get_jobs(self, run_names: List[str]):
-        profile = self._profile()
-        jobs_by_run = {}
+    def __get_job_heads_by_run_name(self, run_names: Dict[str, List[JobHead]]):
+        backend = get_backend()
+        job_heads_by_run_name = {}
         for run_name in run_names:
-            jobs = get_jobs(run_name, profile)
-            jobs_by_run[run_name] = jobs
-        return jobs_by_run
+            job_heads = backend.get_job_heads(self.workflow.data["repo_user_name"], self.workflow.data["repo_name"],
+                                              run_name)
+            job_heads_by_run_name[run_name] = job_heads
+        return job_heads_by_run_name
 
     def _commands(self):
         commands = [
@@ -71,34 +74,20 @@ class TensorboardProvider(Provider):
             commands.extend(self.before_run)
 
         logdir = []
-        jobs_by_runs = self.__get_jobs(self.run_names)
+        config = load_config()
+        job_heads_by_run_name = self.__get_job_heads_by_run_name(self.run_names)
+        repo_user_name = self.workflow.data["repo_user_name"]
+        repo_name = self.workflow.data["repo_name"]
 
-        user_name = os.environ["DSTACK_USER"]
-
-        dstack_aws_access_key_id = os.environ["DSTACK_AWS_ACCESS_KEY_ID"]
-        dstack_aws_secret_access_key = os.environ["DSTACK_AWS_SECRET_ACCESS_KEY"]
-        dstack_aws_default_region = os.environ["DSTACK_AWS_DEFAULT_REGION"]
-        dstack_artifacts_s3_bucket = os.environ["DSTACK_ARTIFACTS_S3_BUCKET"]
-
-        # TODO: Use user credentials and the user's or the job's artifact bucket if set
-
-        # user_aws_access_key_id = os.environ["USER_AWS_ACCESS_KEY_ID"]
-        # user_aws_secret_access_key = os.environ["USER_AWS_SECRET_ACCESS_KEY"]
-        # user_aws_default_region = os.environ["USER_AWS_DEFAULT_REGION"]
-        # user_artifacts_s3_bucket = os.environ["USER_ARTIFACTS_S3_BUCKET"]
-
-        for run_name in jobs_by_runs:
-            jobs = jobs_by_runs[run_name]
-            for job in jobs:
-                ld = f"s3://{dstack_artifacts_s3_bucket}/{user_name}/{run_name}/{job['job_id']}"
+        for run_name in job_heads_by_run_name:
+            job_heads = job_heads_by_run_name[run_name]
+            for job_head in job_heads:
+                ld = f"s3://{config.backend.bucket}/artifacts/{repo_user_name}/{repo_name}/{job_head.get_id()}"
                 if self.logdir:
                     ld += "/" + self.logdir
                 logdir.append(ld)
 
-        commands.append(f"AWS_ACCESS_KEY_ID={dstack_aws_access_key_id} "
-                        f"AWS_SECRET_ACCESS_KEY={dstack_aws_secret_access_key} "
-                        f"AWS_DEFAULT_REGION={dstack_aws_default_region} "
-                        f"tensorboard --port $JOB_PORT_0 --host $JOB_HOSTNAME --logdir {','.join(logdir)}")
+        commands.append(f"tensorboard --port $PORT_0 --host 0.0.0.0 --logdir {','.join(logdir)}")
         return commands
 
 

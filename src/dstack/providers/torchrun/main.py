@@ -1,18 +1,19 @@
-from typing import List, Optional
-from argparse import ArgumentParser
 import argparse
+from argparse import ArgumentParser
+from typing import List, Optional
 
-from dstack import Provider, Job, Resources, Gpu
+from dstack import Requirements, GpusRequirements, JobSpec
+from dstack.providers import Provider
 
 
 class TorchrunProvider(Provider):
     def __init__(self):
-        super().__init__()
+        super().__init__("torchrun")
         self.script = None
         self.before_run = None
         self.version = None
         self.requirements = None
-        self.environment = None
+        self.env = None
         self.artifacts = None
         self.working_dir = None
         self.nodes = None
@@ -25,20 +26,20 @@ class TorchrunProvider(Provider):
         self.before_run = self.workflow.data.get("before_run")
         self.version = str(self.workflow.data.get("version") or "3.9")
         self.requirements = self.workflow.data.get("requirements")
-        self.environment = self.workflow.data.get("environment") or {}
+        self.env = self.workflow.data.get("environment") or {}
         self.artifacts = self.workflow.data.get("artifacts")
         self.working_dir = self.workflow.data.get("working_dir")
         self.nodes = self.workflow.data.get("nodes") or 1
         self.resources = self._resources()
         self.args = self.workflow.data.get("args")
 
-    def _resources(self) -> Optional[Resources]:
+    def _resources(self) -> Optional[Requirements]:
         resources = super()._resources()
         if resources.gpu is None:
-            resources.gpu = Gpu(1)
+            resources.gpu = GpusRequirements(1)
         return resources
 
-    def _image(self):
+    def _image_name(self):
         return f"dstackai/python:{self.version}-cuda-11.1"
 
     def _commands(self, node_rank):
@@ -67,31 +68,31 @@ class TorchrunProvider(Provider):
             )
         return commands
 
-    def create_jobs(self) -> List[Job]:
-        master_job = Job(
-            image=self._image(),
+    def create_job_specs(self) -> List[JobSpec]:
+        master_job = JobSpec(
+            image_name=self._image_name(),
             commands=self._commands(0),
+            env=self.env,
             working_dir=self.working_dir,
-            resources=self.resources,
             artifacts=self.artifacts,
-            environment=self.environment,
+            requirements=self.resources,
             port_count=1,
         )
-        jobs = [master_job]
+        job_specs = [master_job]
         if self.nodes > 1:
             for i in range(self.nodes - 1):
-                jobs.append(Job(
-                    image=self._image(),
-                    commands=self._commands(i+1),
+                job_specs.append(JobSpec(
+                    image_name=self._image_name(),
+                    commands=self._commands(i + 1),
                     working_dir=self.working_dir,
-                    resources=self.resources,
-                    environment=self.environment,
-                    master=master_job
+                    env=self.env,
+                    requirements=self.resources,
+                    master_job=master_job
                 ))
-        return jobs
+        return job_specs
 
     def _create_parser(self, workflow_name: Optional[str]) -> Optional[ArgumentParser]:
-        parser = ArgumentParser(prog="dstack run " + (workflow_name or "torchrun"))
+        parser = ArgumentParser(prog="dstack run " + (workflow_name or self.provider_name))
         self._add_base_args(parser)
         parser.add_argument("--nnodes", type=int, nargs="?")
         if not workflow_name:
@@ -118,4 +119,3 @@ def __provider__():
 
 if __name__ == '__main__':
     __provider__().run()
-

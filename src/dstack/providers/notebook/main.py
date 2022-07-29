@@ -2,10 +2,10 @@ import uuid
 from argparse import ArgumentParser
 from typing import List, Optional
 
-from dstack import Provider, Job, App
+from dstack import Job, App
+from dstack.providers import Provider
 
 
-# TODO: Provide job.applications (incl. application name, and query)
 class NotebookProvider(Provider):
     def __init__(self):
         super().__init__()

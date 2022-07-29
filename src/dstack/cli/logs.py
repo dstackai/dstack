@@ -15,7 +15,6 @@ from botocore.utils import parse_timestamp, datetime2timestamp
 from git import InvalidGitRepositoryError
 
 from dstack.cli.common import get_user_info, boto3_client, get_jobs, get_job
-from dstack.config import get_config, ConfigurationError
 
 SLEEP_SECONDS = 1
 

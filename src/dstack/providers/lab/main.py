@@ -2,13 +2,13 @@ import uuid
 from argparse import ArgumentParser
 from typing import List, Optional
 
-from dstack import Provider, Job, App
+from dstack import Job, App, JobSpec
+from dstack.providers import Provider
 
 
-# TODO: Provide job.applications (incl. application name, and query)
 class LabProvider(Provider):
     def __init__(self):
-        super().__init__()
+        super().__init__("lab")
         self.before_run = None
         self.python = None
         self.version = None
@@ -17,7 +17,7 @@ class LabProvider(Provider):
         self.artifacts = None
         self.working_dir = None
         self.resources = None
-        self.image = None
+        self.image_name = None
 
     def load(self):
         super()._load(schema="schema.yaml")
@@ -30,10 +30,10 @@ class LabProvider(Provider):
         self.artifacts = self.workflow.data.get("artifacts")
         self.working_dir = self.workflow.data.get("working_dir")
         self.resources = self._resources()
-        self.image = self._image()
+        self.image_name = self._image()
 
     def _create_parser(self, workflow_name: Optional[str]) -> Optional[ArgumentParser]:
-        parser = ArgumentParser(prog="dstack run " + (workflow_name or "lab"))
+        parser = ArgumentParser(prog="dstack run " + (workflow_name or self.provider_name))
         self._add_base_args(parser)
         return parser
 
@@ -42,18 +42,18 @@ class LabProvider(Provider):
         args = parser.parse_args(self.provider_args)
         self._parse_base_args(args)
 
-    def create_jobs(self) -> List[Job]:
-        environment = dict(self.environment)
+    def create_job_specs(self) -> List[JobSpec]:
+        env = dict(self.environment)
         token = uuid.uuid4().hex
-        environment["TOKEN"] = token
-        return [Job(
-            image=self.image,
+        env["TOKEN"] = token
+        return [JobSpec(
+            image_name=self.image_name,
             commands=self._commands(),
-            environment=environment,
+            env=env,
             working_dir=self.working_dir,
-            resources=self.resources,
             artifacts=self.artifacts,
             port_count=1,
+            requirements=self.resources,
             apps=[App(
                 port_index=0,
                 app_name="lab",

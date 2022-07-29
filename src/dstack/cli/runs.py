@@ -9,25 +9,26 @@ from rich import box
 from rich.console import Console
 from rich.table import Table
 
-from dstack.cli.common import colored, headers_and_params, pretty_date, short_artifact_path, pretty_print_status
-from dstack.config import get_config, ConfigurationError
+from dstack.backend import get_backend, Backend
+from dstack.cli.common import colored, pretty_date, short_artifact_path, pretty_print_status, \
+    load_repo_data
+from dstack.config import ConfigError
 
 
 def runs_func(args: Namespace):
     try:
-        dstack_config = get_config()
-        # TODO: Support non-default profiles
-        profile = dstack_config.get_profile("default")
-        print_runs(profile, args)
-    except ConfigurationError:
+        backend = get_backend()
+        print_runs(args, backend)
+    except ConfigError:
         sys.exit(f"Call 'dstack config' first")
     except InvalidGitRepositoryError:
         sys.exit(f"{os.getcwd()} is not a Git repo")
 
 
-def print_runs(profile, args):
-    runs = get_runs_v2(args, profile)
-    runs_by_name = [(run_name, list(run)) for run_name, run in groupby(runs, lambda run: run["run_name"])]
+def print_runs(args: Namespace, backend: Backend):
+    workflow_runs = get_workflow_runs(args, backend)
+    workflow_runs_by_name = [(run_name, list(run)) for run_name, run in
+                             groupby(workflow_runs, lambda run: run["run_name"])]
     console = Console()
     table = Table(box=box.SQUARE)
     table.add_column("Run", style="bold", no_wrap=True)
@@ -39,7 +40,7 @@ def print_runs(profile, args):
     table.add_column("Submitted", style="grey58", no_wrap=True)
     table.add_column("Tag", style="bold yellow", no_wrap=True)
 
-    for run_name, workflows in runs_by_name:
+    for run_name, workflows in workflow_runs_by_name:
         for i in range(len(workflows)):
             workflow = workflows[i]
             _, submitted_at = pretty_duration_and_submitted_at(workflow.get("submitted_at"))
@@ -52,23 +53,49 @@ def print_runs(profile, args):
                           workflow.get("provider_name"),
                           colored(status, pretty_print_status(workflow)),
                           __job_apps(workflow.get("apps"), status),
-                          __job_artifacts(workflow["artifact_paths"]),
+                          '\n'.join(workflow.get("artifacts") or []),
                           submitted_at,
                           f"{tag_name}" if tag_name else "")
     console.print(table)
 
 
-def get_runs_v2(args, profile):
-    headers, params = headers_and_params(profile, args.run_name, False)
-    # del params["repo_url"]
-    if args.all:
-        params["n"] = 50
-    response = request(method="GET", url=f"{profile.server}/runs/workflows/query", params=params, headers=headers,
-                       verify=profile.verify)
-    response.raise_for_status()
-    # runs = sorted(response.json()["runs"], key=lambda job: job["updated_at"])
-    runs = reversed(response.json()["runs"])
-    return runs
+def get_workflow_runs(args: Namespace, backend: Backend):
+    workflows_by_id = {}
+    repo_user_name, repo_name, _, _, _ = load_repo_data()
+    job_heads = backend.get_job_heads(repo_user_name, repo_name, args.run_name)
+    unfinished = False
+    for job_head in job_heads:
+        if job_head.status.is_unfinished:
+            unfinished = True
+        workflow_id = ','.join([job_head.run_name, job_head.workflow_name or ''])
+        if workflow_id not in workflows_by_id:
+            workflow = {
+                "run_name": job_head.run_name,
+                "workflow_name": job_head.workflow_name,
+                "provider_name": job_head.provider_name,
+                "artifacts": job_head.artifacts or [],
+                "status": job_head.status,
+                "submitted_at": job_head.submitted_at,
+                "tag_name": job_head.tag_name
+            }
+            workflows_by_id[workflow_id] = workflow
+        else:
+            workflow = workflows_by_id[workflow_id]
+            workflow["submitted_at"] = min(workflow["submitted_at"], job_head.submitted_at)
+            if job_head.artifacts:
+                workflow["artifacts"].extend(job_head.artifacts)
+            if job_head.status.is_unfinished():
+                # TODO: implement max(status1, status2)
+                workflow["status"] = job_head.status
+
+    workflows = list(workflows_by_id.values())
+    workflows = sorted(workflows, key=lambda j: j["submitted_at"], reverse=True)
+    if not args.all:
+        if unfinished:
+            workflows = list(filter(lambda w: w["status"].is_unfinished(), workflows))
+    for workflow in workflows:
+        workflow["status"] = workflow["status"].value
+    return reversed(workflows)
 
 
 def pretty_duration_and_submitted_at(submitted_at, started_at=None, finished_at=None):

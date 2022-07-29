@@ -1,5 +1,4 @@
 import argparse
-import json
 import os
 import sys
 import tempfile
@@ -7,7 +6,6 @@ import time
 from argparse import Namespace
 from typing import List, Optional
 
-import requests
 import yaml
 from git import InvalidGitRepositoryError
 from jsonschema import validate, ValidationError
@@ -15,13 +13,13 @@ from rich.console import Console
 from rich.progress import SpinnerColumn, Progress, TextColumn
 from rich.prompt import Confirm
 
-from dstack import Provider
-from dstack.cli.common import load_workflows, load_variables, load_repo_data, load_providers, get_user_info, get_runs
+from dstack.backend import get_backend, Backend
+from dstack.cli.common import load_workflows, load_variables, load_repo_data, load_providers
 from dstack.cli.logs import logs_func
 from dstack.cli.runs import runs_func
 from dstack.cli.schema import workflows_schema_yaml
-from dstack.config import get_config, ConfigurationError, Profile
-from dstack.server import __server_url__
+from dstack.config import ConfigError
+from dstack.providers import Provider
 
 SLEEP_SECONDS = 3
 
@@ -74,26 +72,19 @@ def init_built_in_provider(provider_name: str):
 
 
 def load_built_in_provider(provider: Provider, provider_args: List[str], workflow_name: str, workflow_data: dict,
-                           profile: Profile, repo_url, repo_branch, repo_hash, repo_diff):
+                           repo_user_name, repo_name, repo_branch, repo_hash, repo_diff):
     job_ids_csv_file, job_ids_csv_filename = tempfile.mkstemp()
     workflow_yaml_file, workflow_yaml_filename = tempfile.mkstemp()
-    os.environ["DSTACK_SERVER"] = __server_url__
-    os.environ["DSTACK_TOKEN"] = profile.token
-    user_info = get_user_info(profile)
-    os.environ["DSTACK_USER"] = user_info["user_name"]
-    os.environ["DSTACK_AWS_ACCESS_KEY_ID"] = user_info["default_configuration"]["aws_access_key_id"]
-    os.environ["DSTACK_AWS_SECRET_ACCESS_KEY"] = user_info["default_configuration"]["aws_secret_access_key"]
-    os.environ["DSTACK_AWS_DEFAULT_REGION"] = user_info["default_configuration"]["aws_region"]
-    os.environ["DSTACK_ARTIFACTS_S3_BUCKET"] = user_info["default_configuration"]["artifacts_s3_bucket"]
     os.environ["REPO_PATH"] = os.getcwd()
     os.environ["JOB_IDS_CSV"] = job_ids_csv_filename
     with os.fdopen(workflow_yaml_file, 'w') as tmp:
         workflow_yaml = {
-            "user_name": user_info['user_name'],
             "run_name": None,
             "provider_args": provider_args,
             "workflow_name": workflow_name,
-            "repo_url": repo_url,
+            "provider_name": provider.provider_name,
+            "repo_user_name": repo_user_name,
+            "repo_name": repo_name,
             "repo_branch": repo_branch,
             "repo_hash": repo_hash,
             "repo_diff": repo_diff,
@@ -114,53 +105,6 @@ def load_built_in_provider(provider: Provider, provider_args: List[str], workflo
     os.environ["WORKFLOW_YAML"] = workflow_yaml_filename
     provider.load()
     # TODO: Cleanup tmp files after provider.run
-
-
-def submit_run(workflow_name, provider_name, provider_branch, provider_repo, provider_args, repo_url, repo_branch,
-               repo_hash, repo_diff, variables, instant_run, profile):
-    headers = {
-        "Content-Type": f"application/json; charset=utf-8"
-    }
-    if profile.token is not None:
-        headers["Authorization"] = f"Bearer {profile.token}"
-    data = {
-        "workflow_name": workflow_name,
-        "provider_name": provider_name,
-        "provider_repo": provider_repo,
-        "provider_branch": provider_branch,
-        "provider_args": provider_args,
-        "repo_url": repo_url,
-        "repo_branch": repo_branch,
-        "repo_hash": repo_hash,
-        "variables": variables
-    }
-    if repo_diff:
-        data["repo_diff"] = repo_diff
-    if instant_run:
-        data["status"] = "running"
-    data_bytes = json.dumps(data).encode("utf-8")
-    response = requests.request(method="POST", url=f"{profile.server}/runs/submit",
-                                data=data_bytes,
-                                headers=headers, verify=profile.verify)
-    return response
-
-
-def update_run(run_name: str, status: str, profile: Profile):
-    headers = {
-        "Content-Type": f"application/json; charset=utf-8"
-    }
-    if profile.token is not None:
-        headers["Authorization"] = f"Bearer {profile.token}"
-    data = {
-        "run_name": run_name,
-        "status": status,
-    }
-    data_bytes = json.dumps(data).encode("utf-8")
-    response = requests.request(method="POST", url=f"{profile.server}/runs/update",
-                                data=data_bytes,
-                                headers=headers, verify=profile.verify)
-    if response.status_code != 200:
-        response.raise_for_status()
 
 
 def parse_run_args(args):
@@ -246,31 +190,22 @@ def parse_run_args(args):
            workflow_data, workflow_name, built_in_provider, instant_run
 
 
-def stop_run(run_name: str, profile: Profile):
-    headers = {
-        "Content-Type": f"application/json; charset=utf-8"
-    }
-    if profile.token is not None:
-        headers["Authorization"] = f"Bearer {profile.token}"
-
-    data = {"run_name": run_name, "abort": False}
-    response = requests.request(method="POST", url=f"{profile.server}/runs/workflows/stop",
-                                data=json.dumps(data).encode("utf-8"),
-                                headers=headers, verify=profile.verify)
-    if response.status_code != 200:
-        response.raise_for_status()
+def stop_run(run_name: str, console: Console):
+    console.log("[TODO] Stopping a run...")
 
 
 # TODO: Stop the run on SIGTERM, SIGHUP, etc
-def poll_run(run_name: str, workflow_name: Optional[str], profile: Profile):
+def poll_run(run_name: str, workflow_name: Optional[str], backend: Backend):
+    console = Console()
     try:
-        console = Console()
         console.print()
         availability_issues_printed = False
-        with Progress(TextColumn("[progress.description]{task.description}"), SpinnerColumn(), transient=True,) as progress:
+        with Progress(TextColumn("[progress.description]{task.description}"), SpinnerColumn(),
+                      transient=True, ) as progress:
             task = progress.add_task("Provisioning... It may take up to a minute.", total=None)
             while True:
-                run = get_runs(run_name, workflow_name, profile)[0]
+                progress.log("[TODO] Polling run status...")
+                run = {"status": "running"}  # get_runs(run_name, workflow_name, profile)[0]
                 if run["status"] not in ["submitted", "queued"]:
                     progress.update(task, total=100)
                     break
@@ -291,7 +226,7 @@ def poll_run(run_name: str, workflow_name: Optional[str], profile: Profile):
         logs_func(Namespace(run_name=run_name, workflow_name=workflow_name, follow=True, since="1d", from_run=True))
     except KeyboardInterrupt:
         if Confirm.ask(f" [red]Stop {run_name}?[/]"):
-            stop_run(run_name, profile)
+            stop_run(run_name, console)
 
 
 def run_workflow_func(args):
@@ -316,8 +251,8 @@ def run_workflow_func(args):
               "  -h, --help     Show this help output, or the help for a specified workflow or provider.")
     else:
         try:
-            repo_url, repo_branch, repo_hash, repo_diff = load_repo_data()
-            profile = get_config().get_profile("default")
+            repo_user_name, repo_name, repo_branch, repo_hash, repo_diff = load_repo_data()
+            backend = get_backend()
 
             provider_args, provider_branch, provider_name, \
                 provider_repo, variables, workflow_data, \
@@ -329,23 +264,16 @@ def run_workflow_func(args):
 
             if instant_run:
                 load_built_in_provider(built_in_provider, provider_args, workflow_name, workflow_data,
-                                       profile, repo_url, repo_branch, repo_hash, repo_diff)
+                                       repo_user_name, repo_name, repo_branch, repo_hash, repo_diff)
 
-            response = submit_run(workflow_name, provider_name, provider_branch, provider_repo, provider_args, repo_url,
-                                  repo_branch, repo_hash, repo_diff, variables, instant_run, profile)
-            if response.status_code == 200:
-                run_name = response.json().get("run_name")
-                if instant_run:
-                    built_in_provider.run(run_name)
-                runs_func(Namespace(run_name=run_name, all=False))
-                if not args.detach:
-                    poll_run(run_name, workflow_name, profile)
-            elif response.status_code == 404 and response.json().get("message") == "repo not found":
-                sys.exit("Call 'dstack init' first")
-            else:
-                response.raise_for_status()
+            run_name = backend.next_run_name()
+            if instant_run:
+                built_in_provider.run(run_name)
+            runs_func(Namespace(run_name=run_name, all=False))
+            if not args.detach:
+                poll_run(run_name, workflow_name, backend)
 
-        except ConfigurationError:
+        except ConfigError:
             sys.exit(f"Call 'dstack config' first")
         except InvalidGitRepositoryError:
             sys.exit(f"{os.getcwd()} is not a Git repo")

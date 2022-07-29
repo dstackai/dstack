@@ -2,7 +2,6 @@ import sys
 from argparse import Namespace
 
 from dstack.cli.common import print_runners
-from dstack.config import get_config, ConfigurationError
 
 
 def runners_func(_: Namespace):

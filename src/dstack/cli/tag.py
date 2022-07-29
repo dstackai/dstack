@@ -5,8 +5,6 @@ from argparse import Namespace
 from rich import print
 import requests
 
-from dstack.config import get_config, ConfigurationError
-
 
 def tag_func(args: Namespace):
     try:

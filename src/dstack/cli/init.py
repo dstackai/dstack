@@ -10,7 +10,6 @@ import urllib.parse
 import webbrowser
 
 from dstack.cli.common import load_repo_data
-from dstack.config import get_config, ConfigurationError
 
 
 def init_func(args: Namespace):

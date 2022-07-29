@@ -1,6 +1,7 @@
 import collections
 import json
 import os
+import re
 import sys
 import typing as ty
 from pathlib import Path
@@ -14,9 +15,6 @@ from requests import request
 from rich import box
 from rich.console import Console
 from rich.table import Table
-
-
-from dstack.config import get_config
 
 
 def load_variables():
@@ -59,7 +57,13 @@ def load_repo_data():
 
         # TODO: Doesn't support unstaged changes
         repo_diff = repo.git.diff(repo_hash)
-        return repo_url, repo_branch, repo_hash, repo_diff
+        result = re.compile("^(https://|git@)github.com/([^/]+)/([^.]+)(\\.git)?$").match(repo_url)
+        if result:
+            repo_user_name = result.group(2)
+            repo_name = result.group(3)
+            return repo_user_name, repo_name, repo_branch, repo_hash, repo_diff
+        else:
+            sys.exit(f"{os.getcwd()} is not a GitHub repo")
     else:
         sys.exit(f"No tracked branch configured for branch {repo.active_branch.name}")
 
@@ -130,23 +134,6 @@ def pretty_date(time: ty.Any = False):
     if day_diff < 365:
         return str(round(day_diff / 30)) + " months ago"
     return str(round(day_diff / 365)) + " years ago"
-
-
-def headers_and_params(profile, run_name, require_repo=True):
-    headers = {}
-    if profile.token is not None:
-        headers["Authorization"] = f"Bearer {profile.token}"
-    params = {
-    }
-    try:
-        repo_url, _, _, _ = load_repo_data()
-        params["repo_url"] = repo_url
-    except Exception as e:
-        if require_repo:
-            raise e
-    if run_name is not None:
-        params["run_name"] = run_name
-    return headers, params
 
 
 def get_runs(run_name: ty.Optional[str], workflow_name: ty.Optional[str], profile):
