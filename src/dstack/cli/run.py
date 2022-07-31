@@ -205,7 +205,7 @@ def poll_run(run_name: str, workflow_name: Optional[str], backend: Backend):
             task = progress.add_task("Provisioning... It may take up to a minute.", total=None)
             while True:
                 progress.log("[TODO] Polling run status...")
-                run = {"status": "running"}  # get_runs(run_name, workflow_name, profile)[0]
+                run = {"status": "submitted"}  # get_runs(run_name, workflow_name, profile)[0]
                 if run["status"] not in ["submitted", "queued"]:
                     progress.update(task, total=100)
                     break
@@ -268,7 +268,7 @@ def run_workflow_func(args):
 
             run_name = backend.next_run_name()
             if instant_run:
-                built_in_provider.run(run_name)
+                built_in_provider.submit_jobs(run_name)
             runs_func(Namespace(run_name=run_name, all=False))
             if not args.detach:
                 poll_run(run_name, workflow_name, backend)

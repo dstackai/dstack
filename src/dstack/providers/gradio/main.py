@@ -96,4 +96,4 @@ def __provider__():
 
 
 if __name__ == '__main__':
-    __provider__().run()
+    __provider__().submit_jobs()

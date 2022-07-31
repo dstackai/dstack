@@ -155,7 +155,7 @@ class Provider:
     def parse_args(self):
         pass
 
-    def run(self, run_name: Optional[str] = None):
+    def submit_jobs(self, run_name: Optional[str] = None) -> List[Job]:
         if not self.loaded:
             self.load()
         job_specs = self.create_job_specs()

@@ -3,6 +3,13 @@ from enum import Enum
 from typing import Optional, List, Dict, Any
 
 
+def _quoted(s: Optional[str]) -> str:
+    if s:
+        return f"\"{s}\""
+    else:
+        return "None"
+
+
 class GpusRequirements:
     def __init__(self, count: Optional[int] = None, memory_mib: Optional[int] = None, name: Optional[str] = None):
         self.count = count
@@ -19,6 +26,12 @@ class Requirements:
         self.gpus = gpus
         self.shm_size = shm_size
         self.interruptible = interruptible
+
+    def __str__(self) -> str:
+        return f'Requirements(cpus={self.cpus}, memory_mib={self.memory_mib}, ' \
+               f'gpus={self.gpus}, ' \
+               f'shm_size={self.shm_size}, ' \
+               f'interruptible={self.interruptible})'
 
 
 class JobRef:
@@ -41,6 +54,9 @@ class JobRefId(JobRef):
     def __init__(self, id: str):
         self.id = id
 
+    def __str__(self) -> str:
+        return f'JobRefId(id="{self.id}")'
+
 
 class App:
     def __init__(self, port_index: int, app_name: str, url_path: Optional[str] = None,
@@ -50,6 +66,10 @@ class App:
         self.url_path = url_path
         self.url_query_params = url_query_params
 
+    def __str__(self) -> str:
+        return f'App(app_name={self.app_name}, port_index={self.port_index}, ' \
+               f'url_path={_quoted(self.url_path)}, url_query_params={self.url_query_params})'
+
 
 class Repo:
     def __init__(self, repo_user_name: str, repo_name: str, repo_branch: str, repo_hash: str, repo_diff: Optional[str]):
@@ -58,6 +78,13 @@ class Repo:
         self.repo_branch = repo_branch
         self.repo_hash = repo_hash
         self.repo_diff = repo_diff
+
+    def __str__(self) -> str:
+        return f'Repo(repo_user_name="{self.repo_user_name}", ' \
+               f'repo_name="{self.repo_name}", ' \
+               f'repo_branch="{self.repo_branch}", ' \
+               f'repo_hash="{self.repo_hash}", ' \
+               f'repo_diff_length={len(self.repo_diff) if self.repo_diff else None})'
 
 
 class JobStatus(Enum):
@@ -82,9 +109,9 @@ class JobHead(JobRef):
     def __init__(self, repo_user_name: str, repo_name: str, job_id: str, run_name: str, workflow_name: Optional[str],
                  provider_name: str, status: JobStatus, submitted_at: int, runner_id: Optional[str],
                  artifacts: Optional[List[str]], tag_name: Optional[str]):
+        self.id = job_id
         self.repo_user_name = repo_user_name
         self.repo_name = repo_name
-        self.id = job_id
         self.run_name = run_name
         self.workflow_name = workflow_name
         self.provider_name = provider_name
@@ -99,6 +126,16 @@ class JobHead(JobRef):
 
     def set_id(self, id: Optional[str]):
         self.id = id
+
+    def __str__(self) -> str:
+        return f'JobHead(id="{self.id}", repo_user_name="{self.repo_user_name}", ' \
+               f'repo_name="{self.repo_name}", ' \
+               f'run_name="{self.run_name}", workflow_name={_quoted(self.workflow_name)}, ' \
+               f'provider_name="{self.provider_name}", status={self.status.name}, ' \
+               f'submitted_at={self.submitted_at}, ' \
+               f'runner_id={_quoted(self.runner_id)}, ' \
+               f'artifacts={self.artifacts}, ' \
+               f'tag_name={_quoted(self.tag_name)})'
 
 
 class Job(JobRef):
@@ -142,6 +179,26 @@ class Job(JobRef):
     def set_id(self, id: Optional[str]):
         self.id = id
 
+    def __str__(self) -> str:
+        return f'Job(id="{self.id}", repo={self.repo}, ' \
+               f'run_name="{self.run_name}", workflow_name={_quoted(self.workflow_name)}, ' \
+               f'provider_name="{self.provider_name}", status={self.status.name}, ' \
+               f'submitted_at={self.submitted_at}, ' \
+               f'image_name="{self.image_name}", ' \
+               f'commands={self.commands}, ' \
+               f'variables={self.variables}, ' \
+               f'env={self.env}, working_dir={_quoted(self.working_dir)}, ' \
+               f'port_count={self.port_count}, ' \
+               f'ports={self.ports}, ' \
+               f'host_name={_quoted(self.host_name)}, ' \
+               f'artifacts={self.artifacts}, ' \
+               f'requirements={self.requirements}, ' \
+               f'previous_jobs=[{", ".join(map(lambda p: str(p), self.previous_jobs or []))}], ' \
+               f'master_job={self.master_job}, ' \
+               f'apps=[{", ".join(map(lambda a: str(a), self.apps or []))}], ' \
+               f'runner_id={_quoted(self.runner_id)}, ' \
+               f'tag_name={_quoted(self.artifacts)})'
+
 
 class JobSpec(JobRef):
     def __init__(self, image_name: str, commands: Optional[List[str]] = None,
@@ -168,11 +225,23 @@ class JobSpec(JobRef):
     def set_id(self, id: Optional[str]):
         self.id = id
 
+    def __str__(self) -> str:
+        return f'JobSpec(id="{self.id}", image_name="{self.image_name}", ' \
+               f'commands={self.commands}, env={self.env}, working_dir={_quoted(self.working_dir)}, ' \
+               f'port_count={self.port_count}, artifacts={self.artifacts}, ' \
+               f'requirements={self.requirements}, ' \
+               f'previous_jobs=[{", ".join(map(lambda p: str(p), self.previous_jobs or []))}], ' \
+               f'master_job={self.master_job}, ' \
+               f'apps=[{", ".join(map(lambda a: str(a), self.apps or []))}])'
+
 
 class Gpu:
     def __init__(self, name: str, memory_mib: int):
         self.memory_mib = memory_mib
         self.name = name
+
+    def __str__(self) -> str:
+        return f'Gpu(name="{self.name}", memory_mib={self.memory_mib})'
 
 
 class Resources:
@@ -181,6 +250,11 @@ class Resources:
         self.memory_mib = memory_mib
         self.gpus = gpus
         self.interruptible = interruptible
+
+    def __str__(self) -> str:
+        return f'Resources(cpus={self.cpus}, memory_mib={self.memory_mib}, ' \
+               f'gpus=[{", ".join(map(lambda g: str(g), self.gpus))}], ' \
+               f'interruptible={self.interruptible})'
 
 
 class Runner:

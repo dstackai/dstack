@@ -1,6 +1,5 @@
-import time
-import uuid
 from abc import ABC, abstractmethod
+from functools import reduce, cmp_to_key
 from typing import List, Optional
 
 import boto3
@@ -8,9 +7,18 @@ import yaml
 from botocore.client import BaseClient
 from yaml import dump
 
-from dstack import random_name, Job, Repo, JobStatus, JobRef, JobRefId, App, Requirements, GpusRequirements, JobHead, \
-    Runner, Resources
+from dstack import random_name, Job, Repo, JobStatus, JobRefId, App, Requirements, GpusRequirements, JobHead, \
+    Runner, Resources, Gpu
 from dstack.config import load_config, AwsBackendConfig
+
+
+class InstanceType:
+    def __init__(self, name: str, resources: Resources):
+        self.name = name
+        self.resources = resources
+
+    def __str__(self) -> str:
+        return f'InstanceType(name="{self.name}", resources={self.resources})'.__str__()
 
 
 class Backend(ABC):
@@ -32,12 +40,51 @@ class Backend(ABC):
         pass
 
     @abstractmethod
-    def get_job_heads(self, repo_user_name: str, repo_name: str, run_name: Optional[str] = None):
+    def get_job_heads(self, repo_user_name: str, repo_name: str, run_name: Optional[str] = None) -> List[JobHead]:
         pass
 
     @abstractmethod
     def create_runner(self, runner_state: Runner):
         pass
+
+    @abstractmethod
+    def _get_instance_types(self) -> List[InstanceType]:
+        pass
+
+    def _pick_instance_type(self, requirements: Requirements) -> Optional[InstanceType]:
+        instance_types = self._get_instance_types()
+
+        def matches(resources: Resources):
+            if requirements.cpus and requirements.cpus > resources.cpus:
+                return False
+            if requirements.memory_mib and requirements.memory_mib > resources.memory_mib:
+                return False
+            if requirements.gpus:
+                gpu_count = requirements.gpus.count or 1
+                if gpu_count > len(resources.gpus or []):
+                    return False
+                if requirements.gpus.name and gpu_count > len(
+                        list(filter(lambda gpu: gpu.name == requirements.gpus.name,
+                                    resources.gpus or []))):
+                    return False
+                if requirements.gpus.memory_mib and gpu_count > len(
+                        list(filter(lambda gpu: gpu.memory_mib >= requirements.gpus.memory_mib,
+                                    resources.gpus or []))):
+                    return False
+                if requirements.interruptible and not resources.interruptible:
+                    return False
+            return True
+
+        return next(instance_type for instance_type in instance_types if matches(instance_type.resources))
+
+
+class AwsAmi:
+    def __init__(self, ami_id: str, ami_name: str):
+        self.ami_id = ami_id
+        self.ami_name = ami_name
+
+    def __str__(self) -> str:
+        return f'Ami(ami_id="{self.ami_id}", ami_name="{self.ami_name}")'
 
 
 class AwsBackend(Backend):
@@ -47,6 +94,10 @@ class AwsBackend(Backend):
     def __s3_client(self) -> BaseClient:
         session = boto3.Session(profile_name=self.config.profile_name, region_name=self.config.region_name)
         return session.client("s3")
+
+    def __ec2_client(self) -> BaseClient:
+        session = boto3.Session(profile_name=self.config.profile_name, region_name=self.config.region_name)
+        return session.client("ec2")
 
     def next_run_name(self):
         name = random_name.next_name()
@@ -219,7 +270,7 @@ class AwsBackend(Backend):
             job_heads.append(JobHead(repo_user_name, repo_name,
                                      job_id, run_name, workflow_name or None, provider_name,
                                      JobStatus(status), int(submitted_at), runner_id or None,
-                                     artifacts.split(',') or None, tag_name or None))
+                                     artifacts.split(',') if artifacts else None, tag_name or None))
         return job_heads
 
     @staticmethod
@@ -237,7 +288,7 @@ class AwsBackend(Backend):
             "runner_id": runner.runner_id,
             "request_id": runner.request_id,
             "resources": resources,
-            "job": AwsBackend._serialize_job(job),
+            "job": AwsBackend._serialize_job(runner.job),
         }
         return runner_data
 
@@ -246,6 +297,73 @@ class AwsBackend(Backend):
         key = f"runners/{runner.runner_id}.yaml"
         client.put_object(Body=dump(self._serialize_runner(runner)), Bucket=self.config.bucket_name, Key=key)
 
+    def _get_instance_types(self) -> List[InstanceType]:
+        client = self.__ec2_client()
+        response = None
+        instance_types = []
+        while not response or response.get("NextToken"):
+            kwargs = {}
+            if response and "NextToken" in response:
+                kwargs["NextToken"] = response["NextToken"]
+            response = client.describe_instance_types(
+                Filters=[
+                    {
+                        'Name': 'instance-type',
+                        'Values': ["c5.*", "m5.*", "p2.*", "p3.*", "p4.*", "p5.*"]
+                    },
+                ],
+                **kwargs
+            )
+            for instance_type in response["InstanceTypes"]:
+                gpus = [[Gpu(gpu['Name'], gpu['MemoryInfo']['SizeInMiB'])] * gpu['Count'] for gpu in
+                        instance_type["GpuInfo"]["Gpus"]] if instance_type.get("GpuInfo") and instance_type[
+                    "GpuInfo"].get("Gpus") else []
+                instance_types.append(InstanceType(
+                    instance_type["InstanceType"],
+                    Resources(
+                        instance_type["VCpuInfo"]["DefaultVCpus"],
+                        instance_type["MemoryInfo"]["SizeInMiB"],
+                        reduce(list.__add__, gpus) if gpus else [],
+                        "spot" in instance_type["SupportedUsageClasses"],
+                    )
+                ))
+
+        def compare(i1, i2):
+            r1_gpu_total_memory_mib = sum(map(lambda g: g.memory_mib, i1.resources.gpus or []))
+            r2_gpu_total_memory_mib = sum(map(lambda g: g.memory_mib, i2.resources.gpus or []))
+            if r1_gpu_total_memory_mib < r2_gpu_total_memory_mib:
+                return -1
+            elif r1_gpu_total_memory_mib > r2_gpu_total_memory_mib:
+                return 1
+            if i1.resources.cpus < i2.resources.cpus:
+                return -1
+            elif i1.resources.cpus > i2.resources.cpus:
+                return 1
+            if i1.resources.memory_mib < i2.resources.memory_mib:
+                return -1
+            elif i1.resources.memory_mib > i2.resources.memory_mib:
+                return 1
+            return 0
+
+        return sorted(instance_types, key=cmp_to_key(compare))
+
+    def _get_ami_image_id(self, cuda: bool) -> Optional[AwsAmi]:
+        client = self.__ec2_client()
+        response = client.describe_images(Filters=[
+            {
+                'Name': 'name',
+                'Values': [
+                    'dstack-*'
+                ]
+            },
+        ], )
+        images = filter(lambda i: "cuda" in i["Name"], response["Images"])
+        if images:
+            ami = next(iter(sorted(images, key=lambda i: i["CreationDate"], reverse=True)))
+            return AwsAmi(ami["ImageId"], ami["Name"])
+        else:
+            return None
+
 
 def get_backend() -> Backend:
     config = load_config()
@@ -253,53 +371,3 @@ def get_backend() -> Backend:
         return AwsBackend(config.backend)
     else:
         raise Exception(f"Unsupported backend: {config.backend}")
-
-
-if __name__ == '__main__':
-    backend = get_backend()
-    run_name = backend.next_run_name()
-    job = Job(
-        repo=Repo(repo_user_name="dstackai",
-                  repo_name="dstack-examples",
-                  repo_branch="main",
-                  repo_hash="cc74bc6839db9232191f45f5e4704e763a1d47db", repo_diff=None),
-        run_name=run_name,
-        runner_id=None,
-        submitted_at=int(round(time.time() * 1000)),
-        provider_name="docker",
-        image_name="ubuntu",
-        status=JobStatus.SUBMITTED,
-        workflow_name="train",
-        variables=None,
-        artifacts=["output"],
-        requirements=Requirements(
-            gpus=GpusRequirements(
-                name="K80",
-                count=1,
-            )
-        ),
-        commands=[
-            "mkdir -p output",
-            "echo 'Hello, world!' > output/hello.txt",
-        ],
-        port_count=None
-    )
-    backend.create_job(job)
-    print(job.get_id())
-    runner_id = uuid.uuid4().hex
-
-    # job = backend.get_job(repo_user_name="dstackai", repo_name="dstack-examples",
-    #                     job_id="swift-eel-2,train,0")
-    # job.runner_id = runner_id
-    backend.update_job(job)
-
-    print(job)
-
-    runner = Runner(
-        runner_id,
-        request_id=uuid.uuid4().hex,
-        resources=Resources(cpus=4, memory_mib=15258, gpus=[], interruptible=False),
-        job=job
-    )
-    backend.create_runner(runner)
-    # print(backend.get_job_heads(repo_user_name="dstackai", repo_name="dstack-examples"))

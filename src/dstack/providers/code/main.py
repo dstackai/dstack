@@ -47,7 +47,7 @@ class CodeProvider(Provider):
         connection_token = uuid.uuid4().hex
         env["CONNECTION_TOKEN"] = connection_token
         return [JobSpec(
-            image_name=self.image,
+            image_name=self.image_name,
             commands=self._commands(),
             env=env,
             working_dir=self.working_dir,
@@ -92,4 +92,4 @@ def __provider__():
 
 
 if __name__ == '__main__':
-    __provider__().run()
+    __provider__().submit_jobs()

@@ -23,9 +23,8 @@ class TestConfig(TestCase):
 
     def test_config_2(self):
         self.config_path.write_text(dump({
-            "aws": {
-                "bucket": "test-bucket"
-            }
+            "backend": "aws",
+            "bucket": "test-bucket",
         }), encoding="utf-8")
         config = load_config(self.config_path)
         self.assertTrue(isinstance(config.backend, AwsBackendConfig))
