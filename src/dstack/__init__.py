@@ -287,10 +287,17 @@ class Provider:
                     gpu = int(self.workflow.data["resources"]["gpu"])
                     if gpu > 0:
                         resources.gpu = Gpu(gpu)
-                elif str(gpu.get("count")).isnumeric():
-                    gpu = int(gpu.get("count"))
-                    if gpu > 0:
-                        resources.gpu = Gpu(gpu)
+                else:
+                    gpus = 0
+                    gpu_name = None
+                    if str(gpu.get("count")).isnumeric():
+                        gpus = int(gpu.get("count"))
+                    if gpu.get("name"):
+                        gpu_name = gpu.get("name")
+                        if not gpus:
+                            gpus = 1
+                    if gpus:
+                        resources.gpu = Gpu(gpus, name=gpu_name)
             for resource_name in self.workflow.data["resources"]:
                 if resource_name.endswith("/gpu") and len(resource_name) > 4:
                     if not str(self.workflow.data["resources"][resource_name]).isnumeric():
