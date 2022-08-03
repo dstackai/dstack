@@ -11,7 +11,7 @@ import yaml
 from jsonschema import validate, ValidationError
 
 from dstack import Job, Requirements, GpusRequirements, JobSpec, Repo, JobStatus, JobRef
-from dstack.backend import get_backend
+from dstack.backend import load_backend
 
 
 class Workflow:
@@ -159,7 +159,7 @@ class Provider:
         if not self.loaded:
             self.load()
         job_specs = self.create_job_specs()
-        backend = get_backend()
+        backend = load_backend()
         # [TODO] Handle previous jobs and master job
         jobs = []
         counter = []
@@ -179,7 +179,7 @@ class Provider:
                 job_spec.image_name, job_spec.commands, self.workflow.data.get("variables") or None, job_spec.env,
                 job_spec.working_dir, job_spec.artifacts, job_spec.port_count, None, None, job_spec.requirements,
                 previous_jobs, job_spec.master_job, job_spec.apps, None, None)
-            backend.create_job(job, counter)
+            backend.submit_job(job, counter)
             jobs.append(job)
         job_ids = list(map(lambda j: j.id, jobs))
         self._serialize_job_ids(job_ids)
@@ -245,10 +245,17 @@ class Provider:
                     gpu = int(self.workflow.data["resources"]["gpu"])
                     if gpu > 0:
                         resources.gpus = GpusRequirements(gpu)
-                elif str(gpu.get("count")).isnumeric():
-                    gpu = int(gpu.get("count"))
-                    if gpu > 0:
-                        resources.gpus = GpusRequirements(gpu)
+                else:
+                    gpu_count = 0
+                    gpu_name = None
+                    if str(gpu.get("count")).isnumeric():
+                        gpu_count = int(gpu.get("count"))
+                    if gpu.get("name"):
+                        gpu_name = gpu.get("name")
+                        if not gpu_count:
+                            gpu_count = 1
+                    if gpu_count:
+                        resources.gpus = GpusRequirements(gpu_count, name=gpu_name)
             for resource_name in self.workflow.data["resources"]:
                 if resource_name.endswith("/gpu") and len(resource_name) > 4:
                     if not str(self.workflow.data["resources"][resource_name]).isnumeric():

@@ -13,7 +13,7 @@ from rich.console import Console
 from rich.progress import SpinnerColumn, Progress, TextColumn
 from rich.prompt import Confirm
 
-from dstack.backend import get_backend, Backend
+from dstack.backend import load_backend, Backend
 from dstack.cli.common import load_workflows, load_variables, load_repo_data, load_providers
 from dstack.cli.logs import logs_func
 from dstack.cli.runs import runs_func
@@ -190,12 +190,8 @@ def parse_run_args(args):
            workflow_data, workflow_name, built_in_provider, instant_run
 
 
-def stop_run(run_name: str, console: Console):
-    console.log("[TODO] Stopping a run...")
-
-
 # TODO: Stop the run on SIGTERM, SIGHUP, etc
-def poll_run(run_name: str, workflow_name: Optional[str], backend: Backend):
+def poll_run(repo_user_name: str, repo_name: str, run_name: str, workflow_name: Optional[str], backend: Backend):
     console = Console()
     try:
         console.print()
@@ -225,8 +221,9 @@ def poll_run(run_name: str, workflow_name: Optional[str], backend: Backend):
         console.print()
         logs_func(Namespace(run_name=run_name, workflow_name=workflow_name, follow=True, since="1d", from_run=True))
     except KeyboardInterrupt:
-        if Confirm.ask(f" [red]Stop {run_name}?[/]"):
-            stop_run(run_name, console)
+        if Confirm.ask(f" [red]Stop the run `{run_name}`?[/]"):
+            backend.stop_jobs(repo_user_name, repo_name, run_name, workflow_name=None, abort=True)
+            print(f"[grey58]OK[/]")
 
 
 def run_workflow_func(args):
@@ -252,7 +249,7 @@ def run_workflow_func(args):
     else:
         try:
             repo_user_name, repo_name, repo_branch, repo_hash, repo_diff = load_repo_data()
-            backend = get_backend()
+            backend = load_backend()
 
             provider_args, provider_branch, provider_name, \
                 provider_repo, variables, workflow_data, \
@@ -271,7 +268,7 @@ def run_workflow_func(args):
                 built_in_provider.submit_jobs(run_name)
             runs_func(Namespace(run_name=run_name, all=False))
             if not args.detach:
-                poll_run(run_name, workflow_name, backend)
+                poll_run(repo_user_name, repo_name, run_name, workflow_name, backend)
 
         except ConfigError:
             sys.exit(f"Call 'dstack config' first")

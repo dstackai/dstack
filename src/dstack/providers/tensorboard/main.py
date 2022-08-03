@@ -3,7 +3,7 @@ from argparse import ArgumentParser
 from typing import List, Optional, Dict
 
 from dstack import App, JobSpec, Job, JobHead
-from dstack.backend import get_backend
+from dstack.backend import load_backend
 from dstack.cli.common import get_jobs
 from dstack.config import load_config
 from dstack.providers import Provider
@@ -57,7 +57,7 @@ class TensorboardProvider(Provider):
         )]
 
     def __get_job_heads_by_run_name(self, run_names: Dict[str, List[JobHead]]):
-        backend = get_backend()
+        backend = load_backend()
         job_heads_by_run_name = {}
         for run_name in run_names:
             job_heads = backend.get_job_heads(self.workflow.data["repo_user_name"], self.workflow.data["repo_name"],
@@ -82,7 +82,7 @@ class TensorboardProvider(Provider):
         for run_name in job_heads_by_run_name:
             job_heads = job_heads_by_run_name[run_name]
             for job_head in job_heads:
-                ld = f"s3://{config.backend.bucket}/artifacts/{repo_user_name}/{repo_name}/{job_head.get_id()}"
+                ld = f"s3://{config.backend_config.bucket}/artifacts/{repo_user_name}/{repo_name}/{job_head.get_id()}"
                 if self.logdir:
                     ld += "/" + self.logdir
                 logdir.append(ld)

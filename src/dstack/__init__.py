@@ -16,6 +16,10 @@ class GpusRequirements:
         self.memory_mib = memory_mib
         self.name = name
 
+    def __str__(self) -> str:
+        return f'GpusRequirements(count={self.count}, memory_mib={self.memory_mib}, ' \
+               f'name={_quoted(self.name)})'
+
 
 class Requirements:
     def __init__(self, cpus: Optional[int] = None, memory_mib: Optional[int] = None,
@@ -258,7 +262,7 @@ class Resources:
 
 
 class Runner:
-    def __init__(self, runner_id: str, request_id: str, resources: Resources, job: Job):
+    def __init__(self, runner_id: str, request_id: Optional[str], resources: Resources, job: Job):
         self.runner_id = runner_id
         self.request_id = request_id
         self.job = job

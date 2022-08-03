@@ -1,38 +1,27 @@
-import json
+import os
 import sys
 from argparse import Namespace
 
+from git import InvalidGitRepositoryError
 from rich import print
-import requests
 from rich.prompt import Confirm
+
+from dstack.backend import load_backend
+from dstack.cli.common import load_repo_data
+from dstack.config import ConfigError, load_config
 
 
 def default_stop_workflow(args: Namespace):
-    if (args.run_name and (args.yes or Confirm.ask(f"[red]Stop {args.run_name}?[/]"))) \
+    if (args.run_name and (args.yes or Confirm.ask(f"[red]Stop the run `{args.run_name}`?[/]"))) \
             or (args.all and (args.yes or Confirm.ask("[red]Stop all runs?[/]"))):
         try:
-            dstack_config = get_config()
-            # TODO: Support non-default profiles
-            profile = dstack_config.get_profile("default")
-            headers = {
-                "Content-Type": f"application/json; charset=utf-8"
-            }
-            if profile.token is not None:
-                headers["Authorization"] = f"Bearer {profile.token}"
-
-            data = {"run_name": args.run_name,
-                    "abort": args.abort is True}
-            if args.workflow_name:
-                data["workflow_name"] = args.workflow_name
-            else:
-                data["all"] = True
-            response = requests.request(method="POST", url=f"{profile.server}/runs/workflows/stop",
-                                        data=json.dumps(data).encode("utf-8"),
-                                        headers=headers, verify=profile.verify)
-            if response.status_code != 200:
-                response.raise_for_status()
+            repo_user_name, repo_name, _, _, _ = load_repo_data()
+            backend = load_backend()
+            backend.stop_jobs(repo_user_name, repo_name, args.run_name, args.workflow_name, args.abort)
             print(f"[grey58]OK[/]")
-        except ConfigurationError:
+        except InvalidGitRepositoryError:
+            sys.exit(f"{os.getcwd()} is not a Git repo")
+        except ConfigError:
             sys.exit(f"Call 'dstack config' first")
     else:
         if not args.run_name and not args.all:

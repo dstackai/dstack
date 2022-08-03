@@ -19,8 +19,8 @@ class AwsBackendConfig(BackendConfig):
 
 
 class Config:
-    def __init__(self, backend: BackendConfig):
-        self.backend = backend
+    def __init__(self, backend_config: BackendConfig):
+        self.backend_config = backend_config
 
 
 def get_config_path():
@@ -50,17 +50,17 @@ def load_config(path: Path = get_config_path()) -> Config:
 
 
 def save_config(config: Config, path: Path = get_config_path()):
-    if isinstance(config.backend, AwsBackendConfig):
+    if isinstance(config.backend_config, AwsBackendConfig):
         with path.open('w') as f:
             config_data = {
                 "backend": "aws",
-                "bucket": config.backend.bucket_name
+                "bucket": config.backend_config.bucket_name
             }
-            if config.backend.region_name:
-                config_data["region"] = config.backend.region_name
-            if config.backend.profile_name:
-                config_data["profile"] = config.backend.profile_name
+            if config.backend_config.region_name:
+                config_data["region"] = config.backend_config.region_name
+            if config.backend_config.profile_name:
+                config_data["profile"] = config.backend_config.profile_name
             yaml.dump(config_data, f)
     else:
-        raise Exception(f"Unsupported backend: {config.backend}")
+        raise Exception(f"Unsupported backend: {config.backend_config}")
 

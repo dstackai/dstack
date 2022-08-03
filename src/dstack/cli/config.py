@@ -13,9 +13,9 @@ def config_func(_: Namespace):
     profile_name = None
     try:
         config = load_config()
-        bucket_name = config.backend.bucket_name
-        profile_name = config.backend.profile_name
-        region_name = config.backend.region_name
+        bucket_name = config.backend_config.bucket_name
+        profile_name = config.backend_config.profile_name
+        region_name = config.backend_config.region_name
     except ConfigError:
         pass
     print("Configure AWS backend:\n")

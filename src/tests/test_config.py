@@ -27,5 +27,5 @@ class TestConfig(TestCase):
             "bucket": "test-bucket",
         }), encoding="utf-8")
         config = load_config(self.config_path)
-        self.assertTrue(isinstance(config.backend, AwsBackendConfig))
-        self.assertEqual("test-bucket", config.backend.bucket_name)
+        self.assertTrue(isinstance(config.backend_config, AwsBackendConfig))
+        self.assertEqual("test-bucket", config.backend_config.bucket_name)

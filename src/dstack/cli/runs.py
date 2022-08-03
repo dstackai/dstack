@@ -9,7 +9,7 @@ from rich import box
 from rich.console import Console
 from rich.table import Table
 
-from dstack.backend import get_backend, Backend
+from dstack.backend import load_backend, Backend
 from dstack.cli.common import colored, pretty_date, short_artifact_path, pretty_print_status, \
     load_repo_data
 from dstack.config import ConfigError
@@ -17,7 +17,7 @@ from dstack.config import ConfigError
 
 def runs_func(args: Namespace):
     try:
-        backend = get_backend()
+        backend = load_backend()
         print_runs(args, backend)
     except ConfigError:
         sys.exit(f"Call 'dstack config' first")
@@ -65,7 +65,7 @@ def get_workflow_runs(args: Namespace, backend: Backend):
     job_heads = backend.get_job_heads(repo_user_name, repo_name, args.run_name)
     unfinished = False
     for job_head in job_heads:
-        if job_head.status.is_unfinished:
+        if job_head.status.is_unfinished():
             unfinished = True
         workflow_id = ','.join([job_head.run_name, job_head.workflow_name or ''])
         if workflow_id not in workflows_by_id:
