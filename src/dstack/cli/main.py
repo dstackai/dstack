@@ -38,8 +38,7 @@ def default_func(_: Namespace):
 
 
 def main():
-    parser = ArgumentParser(epilog="Please visit https://docs.dstack.ai for more information",
-                            add_help=False)
+    parser = ArgumentParser(add_help=False)
     parser.add_argument("-v", "--version", action="version", version=f"{version}", help="Show program's version")
     parser.add_argument('-h', '--help', action='store_true', default=SUPPRESS,
                         help='Show this help message and exit')

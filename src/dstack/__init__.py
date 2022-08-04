@@ -135,10 +135,11 @@ class JobHead(JobRef):
         return f'JobHead(id="{self.id}", repo_user_name="{self.repo_user_name}", ' \
                f'repo_name="{self.repo_name}", ' \
                f'run_name="{self.run_name}", workflow_name={_quoted(self.workflow_name)}, ' \
-               f'provider_name="{self.provider_name}", status={self.status.name}, ' \
+               f'provider_name="{self.provider_name}", ' \
+               f'status=JobStatus.{self.status.name}, ' \
                f'submitted_at={self.submitted_at}, ' \
                f'runner_id={_quoted(self.runner_id)}, ' \
-               f'artifacts={self.artifacts}, ' \
+               f'artifacts={("[" + ", ".join(map(lambda a: _quoted(str(a)), self.artifacts)) + "]") if self.artifacts else None}, ' \
                f'tag_name={_quoted(self.tag_name)})'
 
 
@@ -186,20 +187,22 @@ class Job(JobRef):
     def __str__(self) -> str:
         return f'Job(id="{self.id}", repo={self.repo}, ' \
                f'run_name="{self.run_name}", workflow_name={_quoted(self.workflow_name)}, ' \
-               f'provider_name="{self.provider_name}", status={self.status.name}, ' \
+               f'provider_name="{self.provider_name}", ' \
+               f'status=JobStatus.{self.status.name}, ' \
                f'submitted_at={self.submitted_at}, ' \
                f'image_name="{self.image_name}", ' \
-               f'commands={self.commands}, ' \
+               f'commands={("[" + ", ".join(map(lambda a: _quoted(str(a)), self.commands)) + "]") if self.commands else None}, ' \
                f'variables={self.variables}, ' \
-               f'env={self.env}, working_dir={_quoted(self.working_dir)}, ' \
+               f'env={self.env}, ' \
+               f'working_dir={_quoted(self.working_dir)}, ' \
                f'port_count={self.port_count}, ' \
                f'ports={self.ports}, ' \
                f'host_name={_quoted(self.host_name)}, ' \
-               f'artifacts={self.artifacts}, ' \
+               f'artifacts={("[" + ", ".join(map(lambda a: _quoted(str(a)), self.artifacts)) + "]") if self.artifacts else None}, ' \
                f'requirements={self.requirements}, ' \
-               f'previous_jobs=[{", ".join(map(lambda p: str(p), self.previous_jobs or []))}], ' \
+               f'previous_jobs={("[" + ", ".join(map(lambda a: _quoted(str(a)), self.previous_jobs)) + "]") if self.previous_jobs else None}, ' \
                f'master_job={self.master_job}, ' \
-               f'apps=[{", ".join(map(lambda a: str(a), self.apps or []))}], ' \
+               f'apps={("[" + ", ".join(map(lambda a: str(a), self.apps)) + "]") if self.apps else None}, ' \
                f'runner_id={_quoted(self.runner_id)}, ' \
                f'tag_name={_quoted(self.artifacts)})'
 
@@ -231,12 +234,15 @@ class JobSpec(JobRef):
 
     def __str__(self) -> str:
         return f'JobSpec(id="{self.id}", image_name="{self.image_name}", ' \
-               f'commands={self.commands}, env={self.env}, working_dir={_quoted(self.working_dir)}, ' \
-               f'port_count={self.port_count}, artifacts={self.artifacts}, ' \
+               f'commands={("[" + ", ".join(map(lambda a: _quoted(str(a)), self.commands)) + "]") if self.commands else None}, ' \
+               f'env={self.env}, ' \
+               f'working_dir={_quoted(self.working_dir)}, ' \
+               f'port_count={self.port_count}, ' \
+               f'artifacts={("[" + ", ".join(map(lambda a: _quoted(str(a)), self.artifacts)) + "]") if self.artifacts else None}, ' \
                f'requirements={self.requirements}, ' \
-               f'previous_jobs=[{", ".join(map(lambda p: str(p), self.previous_jobs or []))}], ' \
+               f'previous_jobs={("[" + ", ".join(map(lambda a: _quoted(str(a)), self.previous_jobs)) + "]") if self.previous_jobs else None}, ' \
                f'master_job={self.master_job}, ' \
-               f'apps=[{", ".join(map(lambda a: str(a), self.apps or []))}])'
+               f'apps={("[" + ", ".join(map(lambda a: str(a), self.apps)) + "]") if self.apps else None})'
 
 
 class Gpu:

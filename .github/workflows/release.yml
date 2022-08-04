@@ -50,6 +50,6 @@ jobs:
         run: |
           VERSION=${GITHUB_REF#refs/tags/}
           echo "__version__ = \"$VERSION\"" > dstack/version.py
-          echo "__server_url__ = \"https://api.dstack.ai\"" > dstack/server.py
+          echo "__is_release__ = True" >> dstack/version.py
           python setup.py bdist_wheel
           python -m twine upload --repository pypi --username ${{ secrets.PYPI_USERNAME }} --password ${{ secrets.PYPI_PASSWORD }} dist/*

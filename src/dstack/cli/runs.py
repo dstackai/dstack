@@ -4,14 +4,12 @@ from argparse import Namespace
 from itertools import groupby
 
 from git import InvalidGitRepositoryError
-from requests import request
 from rich import box
 from rich.console import Console
 from rich.table import Table
 
-from dstack.backend import load_backend, Backend
-from dstack.cli.common import colored, pretty_date, short_artifact_path, pretty_print_status, \
-    load_repo_data
+from dstack.backend import load_backend, Backend, Run
+from dstack.cli.common import colored, pretty_date, short_artifact_path, load_repo_data
 from dstack.config import ConfigError
 
 
@@ -25,10 +23,44 @@ def runs_func(args: Namespace):
         sys.exit(f"{os.getcwd()} is not a Git repo")
 
 
+def pretty_print_status(run: Run) -> str:
+    status = run.status.name.upper()
+    availability_issues = run.availability_issues
+    if availability_issues:
+        return "No capacity"
+    if status == "SUBMITTED":
+        return "Provisioning..."
+    if status == "QUEUED":
+        return "Provisioning..."
+    if status == "RUNNING":
+        return "Running..."
+    if status == "DONE":
+        return "Done"
+    if status == "FAILED":
+        return "Failed"
+    if status == "STOPPING":
+        return "Stopping..."
+    if status == "ABORTING":
+        return "Aborting..."
+    if status == "STOPPED":
+        return "Stopped"
+    if status == "ABORTED":
+        return "Aborted"
+    if status == "REQUESTED":
+        return "Provisioning..."
+
+
 def print_runs(args: Namespace, backend: Backend):
-    workflow_runs = get_workflow_runs(args, backend)
-    workflow_runs_by_name = [(run_name, list(run)) for run_name, run in
-                             groupby(workflow_runs, lambda run: run["run_name"])]
+    repo_user_name, repo_name, _, _, _ = load_repo_data()
+    runs = backend.get_runs(repo_user_name, repo_name, args.run_name)
+    if not args.all:
+        unfinished = any(run.status.is_unfinished() for run in runs)
+        if unfinished:
+            runs = list(filter(lambda r: r.status.is_unfinished(), runs))
+    runs = reversed(runs)
+
+    runs_by_name = [(run_name, list(run)) for run_name, run in
+                    groupby(runs, lambda run: run.run_name)]
     console = Console()
     table = Table(box=box.SQUARE)
     table.add_column("Run", style="bold", no_wrap=True)
@@ -40,20 +72,20 @@ def print_runs(args: Namespace, backend: Backend):
     table.add_column("Submitted", style="grey58", no_wrap=True)
     table.add_column("Tag", style="bold yellow", no_wrap=True)
 
-    for run_name, workflows in workflow_runs_by_name:
-        for i in range(len(workflows)):
-            workflow = workflows[i]
-            _, submitted_at = pretty_duration_and_submitted_at(workflow.get("submitted_at"))
-            status = workflow["status"].upper()
-            tag_name = workflow.get("tag_name")
-            run_name = workflow['run_name']
+    for run_name, runs in runs_by_name:
+        for i in range(len(runs)):
+            run = runs[i]
+            _, submitted_at = pretty_duration_and_submitted_at(run.submitted_at)
+            status = run.status.name
+            tag_name = run.tag_name
+            run_name = run.run_name
             # TODO: Handle availability issues
             table.add_row(colored(status, run_name),
-                          workflow.get("workflow_name"),
-                          workflow.get("provider_name"),
-                          colored(status, pretty_print_status(workflow)),
-                          __job_apps(workflow.get("apps"), status),
-                          '\n'.join(workflow.get("artifacts") or []),
+                          run.workflow_name,
+                          run.provider_name,
+                          colored(status, pretty_print_status(run)),
+                          __job_apps(run.apps, status),
+                          '\n'.join(run.artifacts or []),
                           submitted_at,
                           f"{tag_name}" if tag_name else "")
     console.print(table)

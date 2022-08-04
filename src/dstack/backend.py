@@ -11,7 +11,7 @@ from botocore.client import BaseClient
 from yaml import dump
 
 from dstack import random_name, Job, Repo, JobStatus, JobRefId, App, Requirements, GpusRequirements, JobHead, \
-    Resources, Gpu, Runner
+    Resources, Gpu, Runner, _quoted, version
 from dstack.config import load_config, AwsBackendConfig
 
 
@@ -22,6 +22,36 @@ class InstanceType:
 
     def __str__(self) -> str:
         return f'InstanceType(instance_name="{self.instance_name}", resources={self.resources})'.__str__()
+
+
+class Run:
+    def __init__(self, repo_user_name: str, repo_name: str, run_name: str, workflow_name: Optional[str],
+                 provider_name: str, artifacts: Optional[List[str]], status: JobStatus, submitted_at: int,
+                 tag_name: Optional[str]):
+        self.repo_user_name = repo_user_name
+        self.repo_name = repo_name
+        self.run_name = run_name
+        self.workflow_name = workflow_name
+        self.provider_name = provider_name
+        self.artifacts = artifacts
+        self.status = status
+        self.submitted_at = submitted_at
+        self.tag_name = tag_name
+        self.apps = None
+        self.availability_issues = None
+
+    def __str__(self) -> str:
+        return f'Run(repo_user_name="{self.repo_user_name}", ' \
+               f'repo_name="{self.repo_name}", ' \
+               f'run_name="{self.run_name}", ' \
+               f'workflow_name={_quoted(self.workflow_name)}, ' \
+               f'provider_name="{self.provider_name}", ' \
+               f'status=JobStatus.{self.status.name}, ' \
+               f'submitted_at={self.submitted_at}, ' \
+               f'artifacts={("[" + ", ".join(map(lambda a: _quoted(str(a)), self.artifacts)) + "]") if self.artifacts else None}, ' \
+               f'tag_name={_quoted(self.tag_name)}, ' \
+               f'apps={("[" + ", ".join(map(lambda a: _quoted(str(a)), self.apps)) + "]") if self.apps else None}, ' \
+               f'availability_issues={("[" + ", ".join(map(lambda i: _quoted(str(i)), self.availability_issues)) + "]") if self.availability_issues else None})'
 
 
 class Backend(ABC):
@@ -105,6 +135,36 @@ class Backend(ABC):
         for job_head in job_heads:
             if job_head.status.is_unfinished():
                 self.stop_job(repo_user_name, repo_name, job_head.get_id(), abort)
+
+    def get_runs(self, repo_user_name: str, repo_name: str, run_name: Optional[str] = None) -> List[Run]:
+        runs_by_id = {}
+        job_heads = self.get_job_heads(repo_user_name, repo_name, run_name)
+        for job_head in job_heads:
+            run_id = ','.join([job_head.run_name, job_head.workflow_name or ''])
+            if run_id not in runs_by_id:
+                run = Run(
+                    repo_user_name,
+                    repo_name,
+                    job_head.run_name,
+                    job_head.workflow_name,
+                    job_head.provider_name,
+                    job_head.artifacts or [],
+                    job_head.status,
+                    job_head.submitted_at,
+                    job_head.tag_name,
+                )
+                runs_by_id[run_id] = run
+            else:
+                run = runs_by_id[run_id]
+                run.submitted_at = min(run.submitted_at, job_head.submitted_at)
+                if job_head.artifacts:
+                    run.artifacts.extend(job_head.artifacts)
+                if job_head.status.is_unfinished():
+                    # TODO: implement max(status1, status2)
+                    run.status = job_head.status
+
+        runs = list(runs_by_id.values())
+        return sorted(runs, key=lambda r: r.submitted_at, reverse=True)
 
 
 class AwsAmi:
@@ -301,7 +361,7 @@ class AwsBackend(Backend):
         prefix = f"jobs/{repo_user_name}/{repo_name}"
         lKeyPrefix = f"{prefix}/l;"
         lKeyRunPrefix = lKeyPrefix + run_name if run_name else lKeyPrefix
-        response = client.list_objects_v2(Bucket=self.backend_config.bucket_name, Prefix=lKeyRunPrefix, MaxKeys=1)
+        response = client.list_objects_v2(Bucket=self.backend_config.bucket_name, Prefix=lKeyRunPrefix)
         job_heads = []
         if "Contents" in response:
             for obj in response["Contents"]:
@@ -701,11 +761,17 @@ HOME=/root nohup dstack-runner start &
         key = f"runners/{runner.runner_id}.yaml"
         client.delete_object(Bucket=self.backend_config.bucket_name, Key=key)
 
-    def _get_runner(self, runner_id: str) -> Runner:
+    def _get_runner(self, runner_id: str) -> Optional[Runner]:
         client = self.__s3_client()
         key = f"runners/{runner_id}.yaml"
-        obj = client.get_object(Bucket=self.backend_config.bucket_name, Key=key)
-        return self._unserialize_runner(yaml.load(obj['Body'].read().decode('utf-8'), yaml.FullLoader))
+        try:
+            obj = client.get_object(Bucket=self.backend_config.bucket_name, Key=key)
+            return self._unserialize_runner(yaml.load(obj['Body'].read().decode('utf-8'), yaml.FullLoader))
+        except Exception as e:
+            if hasattr(e, "response") and e.response.get("Error") and e.response["Error"].get("Code") == "NoSuchKey":
+                return None
+            else:
+                raise e
 
     def _get_instance_types(self) -> List[InstanceType]:
         client = self.__ec2_client()
@@ -763,7 +829,7 @@ HOME=/root nohup dstack-runner start &
             {
                 'Name': 'name',
                 'Values': [
-                    'dstack-*'
+                    'dstack-*' if version.__is_release__ else '[stgn] dstack-*'
                 ]
             },
         ], )

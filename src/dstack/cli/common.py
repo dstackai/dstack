@@ -241,33 +241,6 @@ def colored(status: str, val: str, bright: bool = False):
     return f"[{'bold' if bright else ''}{color}]{val}[/]" if color is not None else val
 
 
-def pretty_print_status(workflow: dict) -> str:
-    status = workflow["status"].upper()
-    availability_issues = workflow.get("availability_issues")
-    if availability_issues:
-        return "No capacity"
-    if status == "SUBMITTED":
-        return "Provisioning..."
-    if status == "QUEUED":
-        return "Provisioning..."
-    if status == "RUNNING":
-        return "Running..."
-    if status == "DONE":
-        return "Done"
-    if status == "FAILED":
-        return "Failed"
-    if status == "STOPPING":
-        return "Stopping..."
-    if status == "ABORTING":
-        return "Aborting..."
-    if status == "STOPPED":
-        return "Stopped"
-    if status == "ABORTED":
-        return "Aborted"
-    if status == "REQUESTED":
-        return "Provisioning..."
-
-
 def print_runners(profile):
     runners = get_runners(profile)
     console = Console()

@@ -13,6 +13,7 @@ from rich.console import Console
 from rich.progress import SpinnerColumn, Progress, TextColumn
 from rich.prompt import Confirm
 
+from dstack import JobStatus
 from dstack.backend import load_backend, Backend
 from dstack.cli.common import load_workflows, load_variables, load_repo_data, load_providers
 from dstack.cli.logs import logs_func
@@ -191,7 +192,7 @@ def parse_run_args(args):
 
 
 # TODO: Stop the run on SIGTERM, SIGHUP, etc
-def poll_run(repo_user_name: str, repo_name: str, run_name: str, workflow_name: Optional[str], backend: Backend):
+def poll_run(repo_user_name: str, repo_name: str, run_name: str, backend: Backend):
     console = Console()
     try:
         console.print()
@@ -200,16 +201,15 @@ def poll_run(repo_user_name: str, repo_name: str, run_name: str, workflow_name: 
                       transient=True, ) as progress:
             task = progress.add_task("Provisioning... It may take up to a minute.", total=None)
             while True:
-                progress.log("[TODO] Polling run status...")
-                run = {"status": "submitted"}  # get_runs(run_name, workflow_name, profile)[0]
-                if run["status"] not in ["submitted", "queued"]:
+                run = backend.get_runs(repo_user_name, repo_name, run_name)[0]
+                if run.status not in [JobStatus.SUBMITTED]:
                     progress.update(task, total=100)
                     break
-                availability_issues = run.get("availability_issues")
+                availability_issues = run.availability_issues
                 if availability_issues:
                     if not availability_issues_printed:
                         issue = availability_issues[0]
-                        progress.update(task, description=f"[yellow]⛔️ {issue['message']}")
+                        progress.update(task, description=f"[yellow]⛔️ {issue.message}")
                         availability_issues_printed = True
                 elif availability_issues_printed:
                     progress.update(task, description="Provisioning... It may take up to a minute.")
@@ -219,11 +219,11 @@ def poll_run(repo_user_name: str, repo_name: str, run_name: str, workflow_name: 
         console.print()
         console.print("[grey58]To interrupt, press Ctrl+C.[/]")
         console.print()
-        logs_func(Namespace(run_name=run_name, workflow_name=workflow_name, follow=True, since="1d", from_run=True))
+        logs_func(Namespace(run_name=run_name, follow=True, since="1d", from_run=True))
     except KeyboardInterrupt:
         if Confirm.ask(f" [red]Stop the run `{run_name}`?[/]"):
             backend.stop_jobs(repo_user_name, repo_name, run_name, workflow_name=None, abort=True)
-            print(f"[grey58]OK[/]")
+            console.print(f"[grey58]OK[/]")
 
 
 def run_workflow_func(args):
@@ -268,7 +268,7 @@ def run_workflow_func(args):
                 built_in_provider.submit_jobs(run_name)
             runs_func(Namespace(run_name=run_name, all=False))
             if not args.detach:
-                poll_run(repo_user_name, repo_name, run_name, workflow_name, backend)
+                poll_run(repo_user_name, repo_name, run_name, backend)
 
         except ConfigError:
             sys.exit(f"Call 'dstack config' first")
