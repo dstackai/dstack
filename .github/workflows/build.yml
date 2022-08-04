@@ -4,6 +4,7 @@ on:
   push:
     branches:
       - 'master'
+      - 'oss'
   pull_request:
     branches:
       - 'master'
