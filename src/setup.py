@@ -1,5 +1,7 @@
 import os
+import re
 import shutil
+import sys
 from pathlib import Path
 
 from setuptools import setup, find_packages
@@ -7,7 +9,11 @@ from setuptools import setup, find_packages
 
 def get_version():
     text = (Path("dstack") / "version.py").read_text()
-    return text.split("=")[1].strip()[1:-1]
+    match = re.compile(r"__version__\s*=\s*\"?([^\n\"]+)\"?.*").match(text)
+    if match and match.group(1) != "None":
+        return match.group(1)
+    else:
+        sys.exit("Can't parse version.py")
 
 
 parent_path = Path(os.path.dirname(os.getcwd()))
