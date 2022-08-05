@@ -80,7 +80,7 @@ workflows:
       - prepare:latest
     provider: bash
     commands: 
-      - "pip install"
+      - "pip install -r requirements"
       - "python train.py"
     artifacts: 
       - "checkpoint"

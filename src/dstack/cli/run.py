@@ -263,7 +263,7 @@ def run_workflow_func(args):
                 load_built_in_provider(built_in_provider, provider_args, workflow_name, workflow_data,
                                        repo_user_name, repo_name, repo_branch, repo_hash, repo_diff)
 
-            run_name = backend.next_run_name()
+            run_name = backend.create_run(repo_user_name, repo_name)
             if instant_run:
                 built_in_provider.submit_jobs(run_name)
             runs_func(Namespace(run_name=run_name, all=False))
