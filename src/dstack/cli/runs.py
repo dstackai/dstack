@@ -57,6 +57,8 @@ def print_runs(args: Namespace, backend: Backend):
         unfinished = any(run.status.is_unfinished() for run in runs)
         if unfinished:
             runs = list(filter(lambda r: r.status.is_unfinished(), runs))
+        else:
+            runs = runs[:1]
     runs = reversed(runs)
 
     runs_by_name = [(run_name, list(run)) for run_name, run in
