@@ -95,6 +95,7 @@ class AwsBackend(Backend):
             if job.requirements.interruptible:
                 requirements["interruptible"] = job.requirements.interruptible
         job_data = {
+            "job_id": job.get_id(),
             "repo_user_name": job.repo.repo_user_name,
             "repo_name": job.repo.repo_name,
             "repo_branch": job.repo.repo_branch,
@@ -151,16 +152,17 @@ class AwsBackend(Backend):
         master_job = JobRefId(job_data["master_job_id"]) if job_data.get("master_job_id") else None
         apps = ([App(a["port_index"], a["app_name"], a.get("url_path") or None, a.get("url_query_params") or None) for a
                  in (job_data["apps"] or [])]) or None
-        return Job(Repo(job_data["repo_user_name"], job_data["repo_name"],
-                        job_data["repo_branch"], job_data["repo_hash"], job_data["repo_diff"] or None),
-                   job_data["run_name"], job_data.get("workflow_name") or None,
-                   job_data["provider_name"], JobStatus(job_data["status"]),
-                   job_data["submitted_at"], job_data["image_name"],
-                   job_data.get("commands") or None, job_data.get("variables") or None, job_data["env"] or None,
-                   job_data.get("working_dir") or None, job_data.get("artifacts") or None,
-                   job_data.get("port_count") or None,
-                   job_data.get("ports") or None, job_data.get("host_name") or None, requirements, previous_jobs,
-                   master_job, apps, job_data.get("runner_id") or None, job_data.get("tag_name"))
+        job = Job(
+            Repo(job_data["repo_user_name"], job_data["repo_name"], job_data["repo_branch"], job_data["repo_hash"],
+                 job_data["repo_diff"] or None), job_data["run_name"], job_data.get("workflow_name") or None,
+            job_data["provider_name"], JobStatus(job_data["status"]), job_data["submitted_at"], job_data["image_name"],
+            job_data.get("commands") or None, job_data.get("variables") or None, job_data["env"] or None,
+            job_data.get("working_dir") or None, job_data.get("artifacts") or None, job_data.get("port_count") or None,
+            job_data.get("ports") or None, job_data.get("host_name") or None, requirements, previous_jobs, master_job,
+            apps, job_data.get("runner_id") or None, job_data.get("tag_name"))
+        if "job_id" in job_data:
+            job.set_id(job_data["job_id"])
+        return job
 
     # noinspection PyDefaultArgument
     def submit_job(self, job: Job, counter: List[int] = []):
