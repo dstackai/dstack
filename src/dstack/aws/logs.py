@@ -8,20 +8,20 @@ from typing import Optional, Dict, List, Generator
 from botocore.client import BaseClient
 
 from dstack import App
-from dstack.backend import LogEvent, LogEventSource, Backend
+from dstack.aws import jobs
+from dstack.backend import LogEvent, LogEventSource
 
 SLEEP_SECONDS = 1
 
 
-def __log_message(backend: Backend,
-                  log_message: str,
-                  repo_user_name: str, repo_name: str,
-                  job_id: Optional[str],
-                  job_host_names: Dict[str, Optional[str]],
-                  job_ports: Dict[str, Optional[List[int]]],
-                  job_apps: Dict[str, Optional[List[App]]]) -> str:
+def _render_log_message(s3_client: BaseClient, bucket_name: str, log_message: str,
+                        repo_user_name: str, repo_name: str,
+                        job_id: Optional[str],
+                        job_host_names: Dict[str, Optional[str]],
+                        job_ports: Dict[str, Optional[List[int]]],
+                        job_apps: Dict[str, Optional[List[App]]]) -> str:
     if job_id and job_id not in job_host_names:
-        job = backend.get_job(job_id, repo_user_name, repo_name)
+        job = jobs.get_job(s3_client, bucket_name, repo_user_name, repo_name, job_id)
         job_host_names[job_id] = job.host_name or "none"
         job_ports[job_id] = job.ports
         job_apps[job_id] = job.apps
@@ -63,10 +63,10 @@ def _reset_filter_log_events_params(fle_kwargs, event_ids_per_timestamp):
     fle_kwargs.pop('nextToken', None)
 
 
-def _do_filter_log_events(client: BaseClient, filter_logs_events_kwargs: dict):
+def _do_filter_log_events(logs_client: BaseClient, filter_logs_events_kwargs: dict):
     event_ids_per_timestamp = defaultdict(set)
     while True:
-        response = client.filter_log_events(**filter_logs_events_kwargs)
+        response = logs_client.filter_log_events(**filter_logs_events_kwargs)
 
         for event in response["events"]:
             if event["eventId"] not in event_ids_per_timestamp[event["timestamp"]]:
@@ -85,10 +85,10 @@ def _do_filter_log_events(client: BaseClient, filter_logs_events_kwargs: dict):
             time.sleep(SLEEP_SECONDS)
 
 
-def create_log_group_if_not_exists(client: BaseClient, bucket_name: str, log_group_name: str):
-    response = client.describe_log_groups(logGroupNamePrefix=log_group_name, limit=1)
+def create_log_group_if_not_exists(logs_client: BaseClient, bucket_name: str, log_group_name: str):
+    response = logs_client.describe_log_groups(logGroupNamePrefix=log_group_name, limit=1)
     if not response["logGroups"]:
-        client.create_log_group(
+        logs_client.create_log_group(
             logGroupName=log_group_name,
             tags={
                 'owner': 'dstack',
@@ -97,11 +97,11 @@ def create_log_group_if_not_exists(client: BaseClient, bucket_name: str, log_gro
         )
 
 
-def create_log_stream(client: BaseClient, log_group_name: str, run_name: str):
-    client.create_log_stream(logGroupName=log_group_name, logStreamName=run_name)
+def create_log_stream(logs_client: BaseClient, log_group_name: str, run_name: str):
+    logs_client.create_log_stream(logGroupName=log_group_name, logStreamName=run_name)
 
 
-def poll_logs(backend: Backend, client: BaseClient, bucket_name: str, repo_user_name: str, repo_name: str,
+def poll_logs(s3_client: BaseClient, logs_client: BaseClient, bucket_name: str, repo_user_name: str, repo_name: str,
               run_name: str, start_time: int, attached: bool) -> Generator[LogEvent, None, None]:
     filter_logs_events_kwargs = {
         "logGroupName": f"/dstack/jobs/{bucket_name}/{repo_user_name}/{repo_name}",
@@ -115,18 +115,18 @@ def poll_logs(backend: Backend, client: BaseClient, bucket_name: str, repo_user_
 
     try:
         if attached:
-            for event in _do_filter_log_events(client, filter_logs_events_kwargs):
-                log_message = __log_message(backend, event["message"], repo_user_name, repo_name, event.get("job_id"),
-                                            job_host_names, job_ports, job_apps)
+            for event in _do_filter_log_events(logs_client, filter_logs_events_kwargs):
+                log_message = _render_log_message(s3_client, bucket_name, event["message"], repo_user_name, repo_name,
+                                                  event.get("job_id"), job_host_names, job_ports, job_apps)
                 yield LogEvent(event["timestamp"], event.get("job_id"), log_message,
                                LogEventSource.STDOUT if event["source"] == "stdout" else LogEventSource.STDERR)
         else:
-            paginator = client.get_paginator("filter_log_events")
+            paginator = logs_client.get_paginator("filter_log_events")
             for page in paginator.paginate(**filter_logs_events_kwargs):
                 for event in page["events"]:
-                    log_message = __log_message(backend, event["message"], repo_user_name, repo_name,
-                                                event.get("job_id"),
-                                                job_host_names, job_ports, job_apps)
+                    log_message = _render_log_message(s3_client, bucket_name, event["message"], repo_user_name,
+                                                      repo_name, event.get("job_id"), job_host_names, job_ports,
+                                                      job_apps)
                     yield LogEvent(event["timestamp"], event.get("job_id"), log_message,
                                    LogEventSource.STDOUT if event["source"] == "stdout" else LogEventSource.STDERR)
     except Exception as e:

@@ -9,7 +9,7 @@ from rich.console import Console
 from rich.table import Table
 
 from dstack.backend import load_backend, Backend, Run
-from dstack.cli.common import colored, pretty_date, short_artifact_path, load_repo_data
+from dstack.cli.common import colored, pretty_date, load_repo_data
 from dstack.config import ConfigError
 
 
@@ -157,13 +157,6 @@ def __job_apps(apps, status):
     if status == "RUNNING" and apps is not None and len(apps) > 0:
         return "✔"
         # return "\n".join(map(lambda app: app.get("app_name"), apps))
-    else:
-        return ""
-
-
-def __job_artifacts(paths):
-    if paths is not None and len(paths) > 0:
-        return "\n".join(map(lambda path: short_artifact_path(path), paths))
     else:
         return ""
 

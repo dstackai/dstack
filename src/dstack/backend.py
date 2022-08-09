@@ -3,7 +3,7 @@ from abc import ABC, abstractmethod
 from enum import Enum
 from typing import List, Optional, Generator, Tuple
 
-from dstack import Job, JobStatus, Requirements, JobHead, Resources, Runner, _quoted
+from dstack import Job, JobStatus, JobHead, Resources, Runner, _quoted
 from dstack.config import load_config, AwsBackendConfig
 
 
@@ -60,75 +60,22 @@ class LogEvent:
 
 
 class Backend(ABC):
-    @abstractmethod
-    def create_run(self, repo_user_name: str, repo_name: str):
+    def create_run(self, repo_user_name: str, repo_name: str) -> str:
         pass
 
     # noinspection PyDefaultArgument
     def submit_job(self, job: Job, counter: List[int] = []):
         pass
 
-    # noinspection PyDefaultArgument
-    @abstractmethod
-    def _create_job(self, job: Job, counter: List[int] = []):
-        pass
-
-    @abstractmethod
-    def _update_job(self, job: Job):
-        pass
-
-    @abstractmethod
     def get_job(self, repo_user_name: str, repo_name: str, job_id: str) -> Job:
         pass
 
-    @abstractmethod
     def get_job_heads(self, repo_user_name: str, repo_name: str, run_name: Optional[str] = None) -> List[JobHead]:
         pass
 
-    @abstractmethod
     def run_job(self, job: Job) -> Runner:
         pass
 
-    @abstractmethod
-    def _get_instance_types(self) -> List[InstanceType]:
-        pass
-
-    def _get_instance_type(self, requirements: Optional[Requirements]) -> Optional[InstanceType]:
-        instance_types = self._get_instance_types()
-
-        def matches(resources: Resources):
-            if not requirements:
-                return True
-            if requirements.cpus and requirements.cpus > resources.cpus:
-                return False
-            if requirements.memory_mib and requirements.memory_mib > resources.memory_mib:
-                return False
-            if requirements.gpus:
-                gpu_count = requirements.gpus.count or 1
-                if gpu_count > len(resources.gpus or []):
-                    return False
-                if requirements.gpus.name and gpu_count > len(
-                        list(filter(lambda gpu: gpu.name == requirements.gpus.name,
-                                    resources.gpus or []))):
-                    return False
-                if requirements.gpus.memory_mib and gpu_count > len(
-                        list(filter(lambda gpu: gpu.memory_mib >= requirements.gpus.memory_mib,
-                                    resources.gpus or []))):
-                    return False
-                if requirements.interruptible and not resources.interruptible:
-                    return False
-            return True
-
-        instance_type = next(instance_type for instance_type in instance_types if matches(instance_type.resources))
-        return InstanceType(instance_type.instance_name,
-                            Resources(instance_type.resources.cpus, instance_type.resources.memory_mib,
-                                      instance_type.resources.gpus, requirements and requirements.interruptible))
-
-    @abstractmethod
-    def _stop_runner(self, runner: Runner):
-        pass
-
-    @abstractmethod
     def stop_job(self, repo_user_name: str, repo_name: str, job_id: str, abort: bool):
         pass
 

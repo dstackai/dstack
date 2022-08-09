@@ -6,8 +6,6 @@ from argparse import Namespace
 from git import InvalidGitRepositoryError
 from rich import print
 
-from dstack.cli.common import get_runs
-
 
 def apps_func(args: Namespace):
     try:

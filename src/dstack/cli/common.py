@@ -1,17 +1,14 @@
 import collections
-import json
 import os
 import re
 import sys
 import typing as ty
 from pathlib import Path
 
-import boto3
 import giturlparse
 import yaml
 from git import Repo
 from paramiko.config import SSHConfig
-from requests import request
 from rich import box
 from rich.console import Console
 from rich.table import Table
@@ -136,69 +133,6 @@ def pretty_date(time: ty.Any = False):
     return str(round(day_diff / 365)) + " years ago"
 
 
-def get_runs(run_name: ty.Optional[str], workflow_name: ty.Optional[str], profile):
-    headers, params = headers_and_params(profile, run_name, False)
-    # del params["repo_url"]
-    if workflow_name:
-        params["workflow_name"] = workflow_name
-    response = request(method="GET", url=f"{profile.server}/runs/workflows/query", params=params, headers=headers,
-                       verify=profile.verify)
-    response.raise_for_status()
-    runs = list(reversed(response.json()["runs"]))
-    return runs
-
-
-# TODO: Add a parameter repo_url
-def get_jobs(run_name: ty.Optional[str], profile):
-    headers, params = headers_and_params(profile, run_name, True)
-    response = request(method="GET", url=f"{profile.server}/jobs/query", params=params, headers=headers,
-                       verify=profile.verify)
-    response.raise_for_status()
-    jobs = sorted(response.json()["jobs"], key=lambda job: (job["updated_at"]))
-    return jobs
-
-
-def get_runners(profile):
-    headers, params = headers_and_params(profile, None, require_repo=False)
-    response = request(method="GET", url=f"{profile.server}/runners/query", params=params, headers=headers,
-                       verify=profile.verify)
-    response.raise_for_status()
-    runs = sorted(response.json()["runners"], key=lambda job: (job["updated_at"]))
-    return runs
-
-
-def get_job(job_id, profile):
-    headers, params = headers_and_params(profile, None)
-    response = request(method="GET", url=f"{profile.server}/jobs/{job_id}", params=params, headers=headers,
-                       verify=profile.verify)
-    if response.status_code == 200:
-        return response.json()["job"]
-    elif response.status_code == 404:
-        return None
-    else:
-        response.raise_for_status()
-
-
-def pretty_repo_url(repo_url):
-    r = repo_url
-    if r.endswith(".git"):
-        r = r[:-4]
-    if r.startswith("https://github.com"):
-        r = r[19:]
-    return r
-
-
-def get_runner_name(run_or_job):
-    if run_or_job["runner_name"]:
-        if run_or_job.get("runner_user_name") and run_or_job["runner_user_name"] != run_or_job["user_name"]:
-            runner_name = run_or_job["runner_name"] + "@" + run_or_job["runner_user_name"]
-        else:
-            runner_name = run_or_job["runner_name"]
-    else:
-        runner_name = "<none>"
-    return runner_name
-
-
 def __flatten(d, parent_key='', sep='.'):
     items = []
     for k, v in d.items():
@@ -282,96 +216,3 @@ def __pretty_print_gpu_resources(resources):
         gb = str(int(gpus[g]["memory_mib"] / 1024)) + "GiB"
         _str = _str + g + " " + gb + " x " + str(gpus[g]["count"])
     return _str if len(_str) > 0 else "<none>"
-
-
-def __job_ids(ids):
-    if ids is not None:
-        return ", ".join(ids)
-    else:
-        return ""
-
-
-def short_artifact_path(path):
-    # The format of the path is <user_name>/<run_name>/<job_id>/<internal_artifact_path>
-    return '/'.join(path.split('/')[3:])
-
-
-def list_artifact(client, artifacts_s3_bucket, artifact_path):
-    response = client.list_objects(Bucket=artifacts_s3_bucket, Prefix=artifact_path)
-
-    keys_count = 0
-    total_size = 0
-    for obj in response.get("Contents") or []:
-        keys_count += 1
-        total_size += obj["Size"]
-    return keys_count, total_size
-
-
-def list_artifact_files(client, artifacts_s3_bucket, artifact_path):
-    response = client.list_objects(Bucket=artifacts_s3_bucket, Prefix=artifact_path)
-
-    return [(obj["Key"][len(artifact_path):].lstrip("/"), obj["Size"]) for obj in
-            (response.get("Contents") or [])]
-
-
-def get_user_info(profile):
-    headers = {}
-    if profile.token is not None:
-        headers["Authorization"] = f"Bearer {profile.token}"
-    params = {}
-    response = request(method="POST", url=f"{profile.server}/users/info", params=params, headers=headers,
-                       verify=profile.verify)
-    response.raise_for_status()
-    return response.json()
-
-
-def boto3_client(user_info: dict, service_name: str, job: ty.Optional[dict] = None):
-    configuration = user_info["user_configuration"] if service_name == "s3" and user_info.get(
-        "user_configuration") is not None and job is not None and job["user_artifacts_s3_bucket"] is not None else \
-        user_info["default_configuration"]
-    # if configuration.get("aws_session_token") is not None:
-    #     client = boto3.client(service_name, aws_access_key_id=configuration["aws_access_key_id"],
-    #                           aws_secret_access_key=configuration["aws_secret_access_key"],
-    #                           aws_session_token=configuration["aws_session_token"],
-    #                           region_name=configuration["aws_region"])
-    # else:
-    return boto3.client(service_name, aws_access_key_id=configuration["aws_access_key_id"],
-                        aws_secret_access_key=configuration["aws_secret_access_key"],
-                        region_name=configuration["aws_region"])
-
-
-def sensitive(value: ty.Optional[str]):
-    if value:
-        return value[:4] + ((len(value) - 8) * "*") + value[-4:]
-    else:
-        return None
-
-
-def do_post(api, data=None):
-    dstack_config = get_config()
-    profile = dstack_config.get_profile("default")
-    headers = {}
-    if profile.token is not None:
-        headers["Authorization"] = f"Bearer {profile.token}"
-    if data is not None:
-        data_bytes = json.dumps(data).encode("utf-8")
-        headers["Content-Type"] = f"application/json; charset=utf-8"
-        response = request(method="POST", url=f"{profile.server}/{api}", data=data_bytes, headers=headers,
-                           verify=profile.verify)
-    else:
-        response = request(method="POST", url=f"{profile.server}/{api}", headers=headers,
-                           verify=profile.verify)
-    return response
-
-
-def do_get(api, params=None):
-    if params is None:
-        params = {}
-    dstack_config = get_config()
-    profile = dstack_config.get_profile("default")
-    headers = {}
-    if profile.token is not None:
-        headers["Authorization"] = f"Bearer {profile.token}"
-    response = request(method="GET", url=f"{profile.server}/{api}", params=params, headers=headers,
-                       verify=profile.verify)
-    return response

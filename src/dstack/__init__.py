@@ -204,7 +204,7 @@ class Job(JobRef):
                f'master_job={self.master_job}, ' \
                f'apps={("[" + ", ".join(map(lambda a: str(a), self.apps)) + "]") if self.apps else None}, ' \
                f'runner_id={_quoted(self.runner_id)}, ' \
-               f'tag_name={_quoted(self.artifacts)})'
+               f'tag_name={_quoted(self.tag_name)})'
 
 
 class JobSpec(JobRef):
