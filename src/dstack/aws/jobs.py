@@ -113,21 +113,20 @@ def _l_key(job: Job):
     return lKey
 
 
-# noinspection PyDefaultArgument
-def create_job(s3_client: BaseClient, bucket_name: str, job: Job, counter: List[int] = []):
+def create_job(s3_client: BaseClient, bucket_name: str, job: Job, counter: List[int] = [], listed: bool = True):
     if len(counter) == 0:
         counter.append(0)
     job_id = f"{job.run_name},{job.workflow_name or ''},{counter[0]}"
     job.set_id(job_id)
-    lKey = _l_key(job)
-    s3_client.put_object(Body="", Bucket=bucket_name, Key=lKey)
+    if listed:
+        lKey = _l_key(job)
+        s3_client.put_object(Body="", Bucket=bucket_name, Key=lKey)
     prefix = f"jobs/{job.repo.repo_user_name}/{job.repo.repo_name}"
     key = f"{prefix}/{job_id}.yaml"
     s3_client.put_object(Body=yaml.dump(serialize_job(job)), Bucket=bucket_name, Key=key)
     counter[0] += 1
 
 
-# noinspection PyDefaultArgument
 def get_job(s3_client: BaseClient, bucket_name: str, repo_user_name: str, repo_name: str, job_id: str) -> Job:
     prefix = f"jobs/{repo_user_name}/{repo_name}"
     key = f"{prefix}/{job_id}.yaml"

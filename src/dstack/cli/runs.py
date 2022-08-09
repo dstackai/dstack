@@ -77,7 +77,7 @@ def print_runs(args: Namespace, backend: Backend):
     for run_name, runs in runs_by_name:
         for i in range(len(runs)):
             run = runs[i]
-            _, submitted_at = pretty_duration_and_submitted_at(run.submitted_at)
+            submitted_at = pretty_date(round(run.submitted_at / 1000))
             status = run.status.name
             tag_name = run.tag_name
             run_name = run.run_name
@@ -149,7 +149,7 @@ def pretty_duration_and_submitted_at(submitted_at, started_at=None, finished_at=
             duration_str = "{} secs".format(int(seconds))
     else:
         duration_str = "<none>"
-    submitted_at_str = pretty_date(round(submitted_at / 1000)) if submitted_at is not None else "<none>"
+    submitted_at_str = pretty_date(round(submitted_at / 1000)) if submitted_at is not None else ""
     return duration_str, submitted_at_str
 
 

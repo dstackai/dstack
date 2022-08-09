@@ -1,9 +1,9 @@
 import os
-from abc import ABC, abstractmethod
+from abc import ABC
 from enum import Enum
 from typing import List, Optional, Generator, Tuple
 
-from dstack import Job, JobStatus, JobHead, Resources, Runner, _quoted
+from dstack import Job, JobStatus, JobHead, Resources, Runner, _quoted, Repo
 from dstack.config import load_config, AwsBackendConfig
 
 
@@ -59,12 +59,40 @@ class LogEvent:
         self.log_source = log_source
 
 
+class BackendError(Exception):
+    def __init__(self, message: str):
+        self.message = message
+
+
+class TagHead:
+    def __init__(self, repo_user_name: str, repo_name: str, tag_name: str, run_name: str,
+                 workflow_name: Optional[str], provider_name: Optional[str], created_at: int,
+                 artifacts: Optional[List[str]]):
+        self.repo_user_name = repo_user_name
+        self.repo_name = repo_name
+        self.tag_name = tag_name
+        self.run_name = run_name
+        self.workflow_name = workflow_name
+        self.provider_name = provider_name
+        self.created_at = created_at
+        self.artifacts = artifacts
+
+    def __str__(self) -> str:
+        return f'TagHead(repo_user_name="{self.repo_user_name}", ' \
+               f'repo_name="{self.repo_name}", ' \
+               f'tag_name="{self.tag_name}", ' \
+               f'run_name="{self.run_name}", ' \
+               f'workflow_name={_quoted(self.workflow_name)}, ' \
+               f'provider_name="{_quoted(self.provider_name)}", ' \
+               f'created_at={self.created_at}, ' \
+               f'artifacts={("[" + ", ".join(map(lambda a: _quoted(str(a)), self.artifacts)) + "]") if self.artifacts else None})'
+
+
 class Backend(ABC):
     def create_run(self, repo_user_name: str, repo_name: str) -> str:
         pass
 
-    # noinspection PyDefaultArgument
-    def submit_job(self, job: Job, counter: List[int] = []):
+    def submit_job(self, job: Job, counter: List[int]):
         pass
 
     def get_job(self, repo_user_name: str, repo_name: str, job_id: str) -> Job:
@@ -94,17 +122,8 @@ class Backend(ABC):
         for job_head in job_heads:
             run_id = ','.join([job_head.run_name, job_head.workflow_name or ''])
             if run_id not in runs_by_id:
-                run = Run(
-                    repo_user_name,
-                    repo_name,
-                    job_head.run_name,
-                    job_head.workflow_name,
-                    job_head.provider_name,
-                    job_head.artifacts or [],
-                    job_head.status,
-                    job_head.submitted_at,
-                    job_head.tag_name,
-                )
+                run = Run(repo_user_name, repo_name, job_head.run_name, job_head.workflow_name, job_head.provider_name,
+                          job_head.artifacts or [], job_head.status, job_head.submitted_at, job_head.tag_name)
                 runs_by_id[run_id] = run
             else:
                 run = runs_by_id[run_id]
@@ -139,15 +158,22 @@ class Backend(ABC):
                                                   output_dir or os.getcwd())
 
     def list_run_artifact_files(self, repo_user_name: str, repo_name: str, run_name: str) -> List[Tuple[str, str, int]]:
-        run_files = []
-        job_heads = self.get_job_heads(repo_user_name, repo_name, run_name)
-        for job_head in job_heads:
-            for artifact_name in job_head.artifacts:
-                artifact_files = self._list_job_artifact_files(repo_user_name, repo_name, job_head.get_id(),
-                                                               artifact_name)
-                for (file, size) in artifact_files:
-                    run_files.append((artifact_name, file, size))
-        return run_files
+        pass
+
+    def get_tag_heads(self, repo_user_name: str, repo_name: str) -> List[TagHead]:
+        pass
+
+    def get_tag_head(self, repo_user_name: str, repo_name: str, tag_name: str) -> Optional[TagHead]:
+        pass
+
+    def create_tag_from_run(self, repo_user_name: str, repo_name: str, tag_name: str, run_name: str):
+        pass
+
+    def create_tag_from_local_dirs(self, repo: Repo, tag_name: str, local_dirs: List[str]):
+        pass
+
+    def delete_tag(self, repo_user_name: str, repo_name: str, tag_head: TagHead):
+        pass
 
 
 def load_backend() -> Backend:
