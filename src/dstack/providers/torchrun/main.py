@@ -1,8 +1,8 @@
 import argparse
 from argparse import ArgumentParser
-from typing import List, Optional
+from typing import List, Optional, Dict, Any
 
-from dstack import Requirements, GpusRequirements, JobSpec
+from dstack.jobs import Requirements, GpusRequirements, JobSpec
 from dstack.providers import Provider
 
 
@@ -20,18 +20,18 @@ class TorchrunProvider(Provider):
         self.resources = None
         self.args = None
 
-    def load(self):
-        super()._load(schema="schema.yaml")
-        self.script = self.workflow.data.get("script") or self.workflow.data.get("file")
-        self.before_run = self.workflow.data.get("before_run")
-        self.version = str(self.workflow.data.get("version") or "3.9")
-        self.requirements = self.workflow.data.get("requirements")
-        self.env = self.workflow.data.get("environment") or {}
-        self.artifacts = self.workflow.data.get("artifacts")
-        self.working_dir = self.workflow.data.get("working_dir")
-        self.nodes = self.workflow.data.get("nodes") or 1
+    def load(self, provider_args: List[str], workflow_name: Optional[str], provider_data: Dict[str, Any]):
+        super().load(provider_args, workflow_name, provider_data)
+        self.script = self.provider_data.get("script") or self.provider_data.get("file")
+        self.before_run = self.provider_data.get("before_run")
+        self.version = str(self.provider_data.get("version") or "3.9")
+        self.requirements = self.provider_data.get("requirements")
+        self.env = self.provider_data.get("environment") or {}
+        self.artifacts = self.provider_data.get("artifacts")
+        self.working_dir = self.provider_data.get("working_dir")
+        self.nodes = self.provider_data.get("nodes") or 1
         self.resources = self._resources()
-        self.args = self.workflow.data.get("args")
+        self.args = self.provider_data.get("args")
 
     def _resources(self) -> Optional[Requirements]:
         resources = super()._resources()
@@ -105,17 +105,13 @@ class TorchrunProvider(Provider):
         args, unknown = parser.parse_known_args(self.provider_args)
         self._parse_base_args(args)
         if args.nnodes:
-            self.workflow.data["nodes"] = args.nnodes
+            self.provider_data["nodes"] = args.nnodes
         if self.run_as_provider:
-            self.workflow.data["file"] = args.file
+            self.provider_data["file"] = args.file
             _args = args.args + unknown
             if _args:
-                self.workflow.data["args"] = _args
+                self.provider_data["args"] = _args
 
 
 def __provider__():
     return TorchrunProvider()
-
-
-if __name__ == '__main__':
-    __provider__().submit_jobs()

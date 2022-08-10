@@ -4,12 +4,12 @@ from argparse import Namespace
 from itertools import groupby
 
 from git import InvalidGitRepositoryError
-from rich import box
 from rich.console import Console
 from rich.table import Table
 
+from dstack.repo import load_repo
 from dstack.backend import load_backend, Backend, Run
-from dstack.cli.common import colored, pretty_date, load_repo_data
+from dstack.cli.common import colored, pretty_date
 from dstack.config import ConfigError
 
 
@@ -27,7 +27,7 @@ def pretty_print_status(run: Run) -> str:
     status = run.status.name.upper()
     availability_issues = run.availability_issues
     if availability_issues:
-        return "No capacity"
+        return "Waiting for capacity..."
     if status == "SUBMITTED":
         return "Provisioning..."
     if status == "QUEUED":
@@ -51,8 +51,8 @@ def pretty_print_status(run: Run) -> str:
 
 
 def print_runs(args: Namespace, backend: Backend):
-    repo_user_name, repo_name, _, _, _ = load_repo_data()
-    runs = backend.get_runs(repo_user_name, repo_name, args.run_name)
+    repo = load_repo()
+    runs = backend.get_runs(repo.repo_user_name, repo.repo_name, args.run_name)
     if not args.all:
         unfinished = any(run.status.is_unfinished() for run in runs)
         if unfinished:
@@ -64,14 +64,14 @@ def print_runs(args: Namespace, backend: Backend):
     runs_by_name = [(run_name, list(run)) for run_name, run in
                     groupby(runs, lambda run: run.run_name)]
     console = Console()
-    table = Table(box=box.SQUARE)
+    table = Table()
     table.add_column("Run", style="bold", no_wrap=True)
-    table.add_column("Workflow", style="grey58", width=12)
-    table.add_column("Provider", style="grey58", width=12)
+    table.add_column("Workflow", width=12)
+    table.add_column("Provider", width=12)
     table.add_column("Status", no_wrap=True)
     table.add_column("App", justify="center", style="green", no_wrap=True)
     table.add_column("Artifacts", style="grey58", width=12)
-    table.add_column("Submitted", style="grey58", no_wrap=True)
+    table.add_column("Submitted", style="dark_sea_green4", no_wrap=True)
     table.add_column("Tag", style="bold yellow", no_wrap=True)
 
     for run_name, runs in runs_by_name:
@@ -95,8 +95,8 @@ def print_runs(args: Namespace, backend: Backend):
 
 def get_workflow_runs(args: Namespace, backend: Backend):
     workflows_by_id = {}
-    repo_user_name, repo_name, _, _, _ = load_repo_data()
-    job_heads = backend.get_job_heads(repo_user_name, repo_name, args.run_name)
+    repo = load_repo()
+    job_heads = backend.get_job_heads(repo.repo_user_name, repo.repo_name, args.run_name)
     unfinished = False
     for job_head in job_heads:
         if job_head.status.is_unfinished():

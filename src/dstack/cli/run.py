@@ -1,10 +1,10 @@
 import argparse
 import os
 import sys
-import tempfile
 import time
 from argparse import Namespace
-from typing import List, Optional
+from pathlib import Path
+from typing import List, Optional, Dict, Tuple, Any
 
 import yaml
 from git import InvalidGitRepositoryError
@@ -13,182 +13,51 @@ from rich.console import Console
 from rich.progress import SpinnerColumn, Progress, TextColumn
 from rich.prompt import Confirm
 
-from dstack import JobStatus
+from dstack import providers
 from dstack.backend import load_backend, Backend
-from dstack.cli.common import load_workflows, load_variables, load_repo_data, load_providers
 from dstack.cli.logs import logs_func
 from dstack.cli.runs import runs_func
 from dstack.cli.schema import workflows_schema_yaml
 from dstack.config import ConfigError
-from dstack.providers import Provider
-
-SLEEP_SECONDS = 3
-
-built_in_provider_names = ["bash", "python", "tensorboard", "torchrun",
-                           "docker",
-                           "curl",
-                           "lab", "notebook",
-                           "code", "streamlit", "gradio", "fastapi"]
+from dstack.jobs import JobStatus
+from dstack.repo import load_repo
 
 
-def init_built_in_provider(provider_name: str):
-    provider_module = None
-    if provider_name == "bash":
-        import dstack.providers.bash.main as m
-        provider_module = m
-    if provider_name == "python":
-        import dstack.providers.python.main as m
-        provider_module = m
-    if provider_name == "tensorboard":
-        import dstack.providers.tensorboard.main as m
-        provider_module = m
-    if provider_name == "curl":
-        import dstack.providers.curl.main as m
-        provider_module = m
-    if provider_name == "docker":
-        import dstack.providers.docker.main as m
-        provider_module = m
-    if provider_name == "torchrun":
-        import dstack.providers.torchrun.main as m
-        provider_module = m
-    if provider_name == "lab":
-        import dstack.providers.lab.main as m
-        provider_module = m
-    if provider_name == "notebook":
-        import dstack.providers.notebook.main as m
-        provider_module = m
-    if provider_name == "code":
-        import dstack.providers.code.main as m
-        provider_module = m
-    if provider_name == "streamlit":
-        import dstack.providers.streamlit.main as m
-        provider_module = m
-    if provider_name == "gradio":
-        import dstack.providers.gradio.main as m
-        provider_module = m
-    if provider_name == "fastapi":
-        import dstack.providers.fastapi.main as m
-        provider_module = m
-    return provider_module.__provider__() if provider_module else None
+def _load_workflows():
+    root_folder = Path(os.getcwd()) / ".dstack"
+    if root_folder.exists():
+        workflows_file = root_folder / "workflows.yaml"
+        if workflows_file.exists():
+            return yaml.load(workflows_file.open(), Loader=yaml.FullLoader)
+        else:
+            return None
+    else:
+        return None
 
 
-def load_built_in_provider(provider: Provider, provider_args: List[str], workflow_name: str, workflow_data: dict,
-                           repo_user_name, repo_name, repo_branch, repo_hash, repo_diff):
-    job_ids_csv_file, job_ids_csv_filename = tempfile.mkstemp()
-    workflow_yaml_file, workflow_yaml_filename = tempfile.mkstemp()
-    os.environ["REPO_PATH"] = os.getcwd()
-    os.environ["JOB_IDS_CSV"] = job_ids_csv_filename
-    with os.fdopen(workflow_yaml_file, 'w') as tmp:
-        workflow_yaml = {
-            "run_name": None,
-            "provider_args": provider_args,
-            "workflow_name": workflow_name,
-            "provider_name": provider.provider_name,
-            "repo_user_name": repo_user_name,
-            "repo_name": repo_name,
-            "repo_branch": repo_branch,
-            "repo_hash": repo_hash,
-            "repo_diff": repo_diff,
-            "variables": [],
-            "previous_job_ids": [],
-        }
-        if workflow_name and workflow_data:
-            del workflow_data["name"]
-            del workflow_data["provider"]
-            if workflow_data.get("help"):
-                del workflow_data["help"]
-            if workflow_data.get("depends-on"):
-                del workflow_data["depends-on"]
-            workflow_yaml.update(workflow_data)
-        # TODO: Handle previous_job_ids
-        # TODO: Handle variables
-        yaml.dump(workflow_yaml, tmp)
-    os.environ["WORKFLOW_YAML"] = workflow_yaml_filename
-    provider.load()
-    # TODO: Cleanup tmp files after provider.run
-
-
-def parse_run_args(args):
-    provider_args = args.vars + args.args + args.unknown
+def parse_run_args(args: Namespace) -> Tuple[str, List[str], Optional[str], Dict[str, Any]]:
+    provider_args = args.args + args.unknown
     workflow_name = None
-    workflow_data = None
-    provider_name = None
-    provider = None
-    provider_repo = None
-    provider_branch = None
-    variables = {}
+    workflow_data = {}
 
-    workflows_yaml = load_workflows()
+    workflows_yaml = _load_workflows()
     workflows = (workflows_yaml.get("workflows") or []) if workflows_yaml is not None else []
     if workflows:
         validate(workflows_yaml, yaml.load(workflows_schema_yaml, Loader=yaml.FullLoader))
     workflow_names = [w.get("name") for w in workflows]
     workflow_providers = {w.get("name"): w.get("provider") for w in workflows}
 
-    workflow_variables = load_variables()
-
-    providers_yaml = load_providers()
-    providers = (providers_yaml.get("providers") or []) if providers_yaml is not None else []
-    provider_names = [p.get("name") for p in providers]
-
     if args.workflow_or_provider in workflow_names:
         workflow_name = args.workflow_or_provider
         workflow_data = next(w for w in workflows if w.get("name") == workflow_name)
-        if isinstance(workflow_providers[workflow_name], str):
-            provider_name = workflow_providers[workflow_name]
-        else:
-            provider_name = workflow_providers[workflow_name]["name"]
-            provider_repo = workflow_providers[workflow_name]["repo"]
-        if "@" in provider_name:
-            tokens = provider_name.split('@', maxsplit=1)
-            provider_name = tokens[0]
-            provider_branch = tokens[1]
-
-        for idx, arg in enumerate(provider_args[:]):
-            if arg.startswith('--'):
-                arg_name = arg[2:]
-                if workflow_variables.get(workflow_name) and arg_name in workflow_variables[workflow_name] \
-                        and idx < len(provider_args) - 1:
-                    variables[arg_name] = provider_args[idx + 1]
-                    del provider_args[idx]
-                    del provider_args[idx]
-                if workflow_variables.get("global") and arg_name in workflow_variables["global"] \
-                        and idx < len(provider_args) - 1:
-                    variables[arg_name] = provider_args[idx + 1]
-                    del provider_args[idx]
-                    del provider_args[idx]
+        provider_name = workflow_providers[workflow_name]
     else:
-        if "@" in args.workflow_or_provider:
-            tokens = args.workflow_or_provider.split('@', maxsplit=1)
-            provider_name = tokens[0]
-            provider_branch = tokens[1]
-        else:
-            provider_name = args.workflow_or_provider
+        if args.workflow_or_provider not in providers.get_providers_names():
+            sys.exit(f"No workflow or provider `{args.workflow_or_provider}` is found")
 
-        # TODO: Support --repo to enable providers from other repos
-        if not provider_branch:
-            if provider_name not in (provider_names + built_in_provider_names):
-                sys.exit(f"No workflow or provider with the name `{provider_name}` is found.\n"
-                         f"If you're referring to a workflow, make sure it is defined in .dstack/workflows.yaml.\n"
-                         f"If you're referring to a provider, make sure it is defined in .dstack/providers.yaml.")
+        provider_name = args.workflow_or_provider
 
-        if workflow_variables.get("global"):
-            for idx, arg in enumerate(provider_args[:]):
-                if arg.startswith('--'):
-                    arg_name = arg[2:]
-                    if arg_name in workflow_variables["global"] \
-                            and idx < len(provider_args) - 1:
-                        variables[arg_name] = provider_args[idx + 1]
-                        del provider_args[idx]
-                        del provider_args[idx]
-
-    is_built_in_provider = provider_name in built_in_provider_names and not provider_branch
-    built_in_provider = init_built_in_provider(provider_name) if is_built_in_provider else None
-    # TODO: Support depends-on
-    instant_run = is_built_in_provider and (not workflow_data or not workflow_data.get("depends-on"))
-
-    return provider_args, provider_branch, provider_name, provider_repo, variables, \
-           workflow_data, workflow_name, built_in_provider, instant_run
+    return provider_name, provider_args, workflow_name, workflow_data
 
 
 # TODO: Stop the run on SIGTERM, SIGHUP, etc
@@ -214,7 +83,7 @@ def poll_run(repo_user_name: str, repo_name: str, run_name: str, backend: Backen
                 elif availability_issues_printed:
                     progress.update(task, description="Provisioning... It may take up to a minute.")
                     availability_issues_printed = False
-                time.sleep(SLEEP_SECONDS)
+                time.sleep(3)
         console.print("Provisioning... It may take up to a minute. [green]✓[/]")
         console.print()
         console.print("[grey58]To interrupt, press Ctrl+C.[/]")
@@ -222,14 +91,14 @@ def poll_run(repo_user_name: str, repo_name: str, run_name: str, backend: Backen
         logs_func(Namespace(run_name=run_name, follow=True, since="1d", from_run=True))
     except KeyboardInterrupt:
         if Confirm.ask(f" [red]Stop the run `{run_name}`?[/]"):
-            backend.stop_jobs(repo_user_name, repo_name, run_name, workflow_name=None, abort=True)
+            backend.stop_jobs(repo_user_name, repo_name, run_name, abort=True)
             console.print(f"[grey58]OK[/]")
 
 
-def run_workflow_func(args):
+def run_workflow_func(args: Namespace):
     if not args.workflow_or_provider:
-        print("Usage: dstack run [-d] [-h] (WORKFLOW | PROVIDER) [ARGS ...]\n")
-        workflows_yaml = load_workflows()
+        print("Usage: dstack run [-d] [-h] WORKFLOW | PROVIDER [ARGS ...]\n")
+        workflows_yaml = _load_workflows()
         workflows = (workflows_yaml or {}).get("workflows") or []
         if workflows:
             print("Workflows:")
@@ -240,7 +109,7 @@ def run_workflow_func(args):
             print("No workflows found in .dstack/workflows.yaml.")
         print()
         print("Providers:")
-        for p in built_in_provider_names:
+        for p in providers.get_providers_names():
             print(f"  {p}")
         print("\n"
               "Options:\n"
@@ -248,27 +117,23 @@ def run_workflow_func(args):
               "  -h, --help     Show this help output, or the help for a specified workflow or provider.")
     else:
         try:
-            repo_user_name, repo_name, repo_branch, repo_hash, repo_diff = load_repo_data()
+            repo = load_repo()
             backend = load_backend()
 
-            provider_args, provider_branch, provider_name, \
-                provider_repo, variables, workflow_data, \
-                workflow_name, built_in_provider, instant_run = parse_run_args(args)
+            provider_name, provider_args, workflow_name, workflow_data = parse_run_args(args)
 
-            if hasattr(args, "help") and args.help and built_in_provider:
-                built_in_provider.help(workflow_name)
+            provider = providers.load_provider(provider_name)
+
+            if hasattr(args, "help") and args.help:
+                provider.help(workflow_name)
                 sys.exit()
 
-            if instant_run:
-                load_built_in_provider(built_in_provider, provider_args, workflow_name, workflow_data,
-                                       repo_user_name, repo_name, repo_branch, repo_hash, repo_diff)
-
-            run_name = backend.create_run(repo_user_name, repo_name)
-            if instant_run:
-                built_in_provider.submit_jobs(run_name)
+            provider.load(provider_args, workflow_name, workflow_data)
+            run_name = backend.create_run(repo.repo_user_name, repo.repo_name)
+            provider.submit_jobs(run_name)
             runs_func(Namespace(run_name=run_name, all=False))
             if not args.detach:
-                poll_run(repo_user_name, repo_name, run_name, backend)
+                poll_run(repo.repo_user_name, repo.repo_name, run_name, backend)
 
         except ConfigError:
             sys.exit(f"Call 'dstack config' first")
@@ -280,11 +145,9 @@ def run_workflow_func(args):
 
 def register_parsers(main_subparsers):
     parser = main_subparsers.add_parser("run", help="Run a workflow", add_help=False)
-    parser.add_argument("workflow_or_provider", metavar="(WORKFLOW | PROVIDER)", type=str,
+    parser.add_argument("workflow_or_provider", metavar="WORKFLOW | PROVIDER", type=str,
                         help="A name of a workflow or a provider", nargs="?")
     parser.add_argument("-d", "--detach", help="Do not poll for status update and logs", action="store_true")
-    parser.add_argument("vars", metavar="VARS", nargs=argparse.ZERO_OR_MORE,
-                        help="Override workflow variables")
     parser.add_argument("args", metavar="ARGS", nargs=argparse.ZERO_OR_MORE, help="Override provider arguments")
     parser.add_argument('-h', '--help', action='store_true', default=argparse.SUPPRESS,
                         help='Show this help message and exit')

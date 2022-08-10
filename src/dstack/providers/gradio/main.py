@@ -1,8 +1,8 @@
 import argparse
 from argparse import ArgumentParser
-from typing import List, Optional
+from typing import List, Optional, Dict, Any
 
-from dstack import App, JobSpec
+from dstack.jobs import JobSpec, JobApp
 from dstack.providers import Provider
 
 
@@ -21,18 +21,18 @@ class GradioProvider(Provider):
         self.resources = None
         self.image_name = None
 
-    def load(self):
-        super()._load(schema="schema.yaml")
-        self.file = self.workflow.data["file"]
-        self.before_run = self.workflow.data.get("before_run")
+    def load(self, provider_args: List[str], workflow_name: Optional[str], provider_data: Dict[str, Any]):
+        super().load(provider_args, workflow_name, provider_data)
+        self.file = self.provider_data["file"]
+        self.before_run = self.provider_data.get("before_run")
         # TODO: Handle numbers such as 3.1 (e.g. require to use strings)
         self.python = self._save_python_version("python")
-        self.version = self.workflow.data.get("version")
-        self.args = self.workflow.data.get("args")
-        self.requirements = self.workflow.data.get("requirements")
-        self.env = self.workflow.data.get("environment") or {}
-        self.artifacts = self.workflow.data.get("artifacts")
-        self.working_dir = self.workflow.data.get("working_dir")
+        self.version = self.provider_data.get("version")
+        self.args = self.provider_data.get("args")
+        self.requirements = self.provider_data.get("requirements")
+        self.env = self.provider_data.get("environment") or {}
+        self.artifacts = self.provider_data.get("artifacts")
+        self.working_dir = self.provider_data.get("working_dir")
         self.resources = self._resources()
         self.image_name = self._image()
 
@@ -49,10 +49,10 @@ class GradioProvider(Provider):
         args, unknown = parser.parse_known_args(self.provider_args)
         self._parse_base_args(args)
         if self.run_as_provider:
-            self.workflow.data["file"] = args.file
+            self.provider_data["file"] = args.file
             _args = args.args + unknown
             if _args:
-                self.workflow.data["args"] = _args
+                self.provider_data["args"] = _args
 
     def create_job_specs(self) -> List[JobSpec]:
         return [JobSpec(
@@ -63,7 +63,7 @@ class GradioProvider(Provider):
             artifacts=self.artifacts,
             port_count=1,
             requirements=self.resources,
-            apps=[App(
+            apps=[JobApp(
                 port_index=0,
                 app_name="gradio",
             )]
@@ -93,7 +93,3 @@ class GradioProvider(Provider):
 
 def __provider__():
     return GradioProvider()
-
-
-if __name__ == '__main__':
-    __provider__().submit_jobs()

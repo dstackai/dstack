@@ -7,9 +7,11 @@ from typing import List, Optional, Tuple
 import yaml
 from botocore.client import BaseClient
 
-from dstack import Runner, Job, JobStatus, Gpu, Resources, Requirements, version
+from dstack import version
 from dstack.aws import jobs
 from dstack.backend import InstanceType
+from dstack.jobs import Job, JobStatus, Requirements
+from dstack.runners import Resources, Runner, Gpu
 
 
 def _serialize_runner(runner: Runner) -> dict:

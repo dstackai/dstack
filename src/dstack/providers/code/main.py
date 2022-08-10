@@ -1,8 +1,8 @@
 import uuid
 from argparse import ArgumentParser
-from typing import List, Optional
+from typing import List, Optional, Dict, Any
 
-from dstack import App, JobSpec
+from dstack.jobs import JobSpec, JobApp
 from dstack.providers import Provider
 
 
@@ -19,16 +19,16 @@ class CodeProvider(Provider):
         self.resources = None
         self.image_name = None
 
-    def load(self):
-        super()._load(schema="schema.yaml")
-        self.before_run = self.workflow.data.get("before_run")
+    def load(self, provider_args: List[str], workflow_name: Optional[str], provider_data: Dict[str, Any]):
+        super().load(provider_args, workflow_name, provider_data)
+        self.before_run = self.provider_data.get("before_run")
         # TODO: Handle numbers such as 3.1 (e.g. require to use strings)
         self.python = self._save_python_version("python")
-        self.version = self.workflow.data.get("version") or "1.67.2"
-        self.requirements = self.workflow.data.get("requirements")
-        self.env = self.workflow.data.get("environment") or {}
-        self.artifacts = self.workflow.data.get("artifacts")
-        self.working_dir = self.workflow.data.get("working_dir")
+        self.version = self.provider_data.get("version") or "1.67.2"
+        self.requirements = self.provider_data.get("requirements")
+        self.env = self.provider_data.get("environment") or {}
+        self.artifacts = self.provider_data.get("artifacts")
+        self.working_dir = self.provider_data.get("working_dir")
         self.resources = self._resources()
         self.image_name = self._image_name()
 
@@ -54,7 +54,7 @@ class CodeProvider(Provider):
             artifacts=self.artifacts,
             port_count=1,
             requirements=self.resources,
-            apps=[App(
+            apps=[JobApp(
                 port_index=0,
                 app_name="code",
                 url_query_params={
@@ -89,7 +89,3 @@ class CodeProvider(Provider):
 
 def __provider__():
     return CodeProvider()
-
-
-if __name__ == '__main__':
-    __provider__().submit_jobs()

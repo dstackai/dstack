@@ -1,11 +1,10 @@
 import os
 from argparse import ArgumentParser
-from typing import List, Optional, Dict
+from typing import List, Optional, Dict, Any
 
-from dstack import App, JobSpec, Job, JobHead
 from dstack.backend import load_backend
-from dstack.cli.common import get_jobs
 from dstack.config import load_config
+from dstack.jobs import JobSpec, JobHead, JobApp
 from dstack.providers import Provider
 
 
@@ -19,14 +18,14 @@ class TensorboardProvider(Provider):
         self.run_names = None
         self.logdir = None
 
-    def load(self):
-        super()._load(schema="schema.yaml")
-        self.before_run = self.workflow.data.get("before_run")
+    def load(self, provider_args: List[str], workflow_name: Optional[str], provider_data: Dict[str, Any]):
+        super().load(provider_args, workflow_name, provider_data)
+        self.before_run = self.provider_data.get("before_run")
         # TODO: Handle numbers such as 3.1 (e.g. require to use strings)
         self.python = self._save_python_version("python")
-        self.version = self.workflow.data.get("version")
-        self.run_names = self.workflow.data["runs"]
-        self.logdir = self.workflow.data.get("logdir")
+        self.version = self.provider_data.get("version")
+        self.run_names = self.provider_data["runs"]
+        self.logdir = self.provider_data.get("logdir")
 
     def _create_parser(self, workflow_name: Optional[str]) -> Optional[ArgumentParser]:
         parser = ArgumentParser(prog="dstack run " + (workflow_name or self.provider_name))
@@ -41,16 +40,16 @@ class TensorboardProvider(Provider):
         parser = self._create_parser(self.workflow_name)
         args = parser.parse_args(self.provider_args)
         if self.run_as_provider:
-            self.workflow.data["runs"] = args.run_names
+            self.provider_data["runs"] = args.run_names
             if args.logdir:
-                self.workflow.data["logdir"] = args.logdir
+                self.provider_data["logdir"] = args.logdir
 
     def create_job_specs(self) -> List[JobSpec]:
         return [JobSpec(
             image_name="python:3.10",
             commands=self._commands(),
             port_count=1,
-            apps=[App(
+            apps=[JobApp(
                 port_index=0,
                 app_name="tensorboard",
             )]
@@ -60,7 +59,7 @@ class TensorboardProvider(Provider):
         backend = load_backend()
         job_heads_by_run_name = {}
         for run_name in run_names:
-            job_heads = backend.get_job_heads(self.workflow.data["repo_user_name"], self.workflow.data["repo_name"],
+            job_heads = backend.get_job_heads(self.provider_data["repo_user_name"], self.provider_data["repo_name"],
                                               run_name)
             job_heads_by_run_name[run_name] = job_heads
         return job_heads_by_run_name
@@ -76,13 +75,13 @@ class TensorboardProvider(Provider):
         logdir = []
         config = load_config()
         job_heads_by_run_name = self.__get_job_heads_by_run_name(self.run_names)
-        repo_user_name = self.workflow.data["repo_user_name"]
-        repo_name = self.workflow.data["repo_name"]
+        repo_user_name = self.provider_data["repo_user_name"]
+        repo_name = self.provider_data["repo_name"]
 
         for run_name in job_heads_by_run_name:
             job_heads = job_heads_by_run_name[run_name]
             for job_head in job_heads:
-                ld = f"s3://{config.backend_config.bucket}/artifacts/{repo_user_name}/{repo_name}/{job_head.get_id()}"
+                ld = f"s3://{config.backend_config.bucket_name}/artifacts/{repo_user_name}/{repo_name}/{job_head.get_id()}"
                 if self.logdir:
                     ld += "/" + self.logdir
                 logdir.append(ld)
@@ -93,7 +92,3 @@ class TensorboardProvider(Provider):
 
 def __provider__():
     return TensorboardProvider()
-
-
-if __name__ == '__main__':
-    __provider__().submit_jobs()

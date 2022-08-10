@@ -8,13 +8,13 @@ from git import InvalidGitRepositoryError
 from requests import request
 
 from rich.prompt import Confirm
-from dstack.cli.common import load_repo_data
+from dstack.repo import load_repo
 
 
 def prune_func(args: Namespace):
     try:
         dstack_config = get_config()
-        repo_url, _, _, _ = load_repo_data()
+        repo_url, _, _, _ = load_repo()
         # TODO: Support non-default profiles
         profile = dstack_config.get_profile("default")
         if args.yes or Confirm.ask(

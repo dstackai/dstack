@@ -3,7 +3,8 @@ from typing import List, Optional
 import yaml
 from botocore.client import BaseClient
 
-from dstack import Job, Requirements, GpusRequirements, JobRefId, App, Repo, JobStatus, JobHead
+from dstack.jobs import Job, JobStatus, JobHead, Requirements, GpusRequirements, JobRefId, JobApp
+from dstack.repo import Repo
 
 
 def serialize_job(job: Job) -> dict:
@@ -46,7 +47,6 @@ def serialize_job(job: Job) -> dict:
         "submitted_at": job.submitted_at,
         "image_name": job.image_name,
         "commands": job.commands or [],
-        "variables": job.variables or {},
         "env": job.env or {},
         "working_dir": job.working_dir or '',
         "artifacts": job.artifacts or [],
@@ -88,13 +88,13 @@ def unserialize_job(job_data: dict) -> Job:
             requirements = None
     previous_jobs = ([JobRefId(p) for p in (job_data["previous_job_ids"] or [])]) or None
     master_job = JobRefId(job_data["master_job_id"]) if job_data.get("master_job_id") else None
-    apps = ([App(a["port_index"], a["app_name"], a.get("url_path") or None, a.get("url_query_params") or None) for a
+    apps = ([JobApp(a["port_index"], a["app_name"], a.get("url_path") or None, a.get("url_query_params") or None) for a
              in (job_data["apps"] or [])]) or None
     job = Job(Repo(job_data["repo_user_name"], job_data["repo_name"], job_data["repo_branch"], job_data["repo_hash"],
                    job_data["repo_diff"] or None),
               job_data["run_name"], job_data.get("workflow_name") or None, job_data["provider_name"],
               JobStatus(job_data["status"]), job_data["submitted_at"], job_data["image_name"],
-              job_data.get("commands") or None, job_data.get("variables") or None,
+              job_data.get("commands") or None,
               job_data["env"] or None, job_data.get("working_dir") or None, job_data.get("artifacts") or None,
               job_data.get("port_count") or None, job_data.get("ports") or None, job_data.get("host_name") or None,
               requirements, previous_jobs, master_job, apps, job_data.get("runner_id") or None,

@@ -3,7 +3,10 @@ from abc import ABC
 from enum import Enum
 from typing import List, Optional, Generator, Tuple
 
-from dstack import Job, JobStatus, JobHead, Resources, Runner, _quoted, Repo
+from dstack.jobs import Job, JobStatus, JobHead
+from dstack.repo import Repo
+from dstack.runners import Resources, Runner
+from dstack.util import _quoted
 from dstack.config import load_config, AwsBackendConfig
 
 
@@ -107,11 +110,8 @@ class Backend(ABC):
     def stop_job(self, repo_user_name: str, repo_name: str, job_id: str, abort: bool):
         pass
 
-    def stop_jobs(self, repo_user_name: str, repo_name: str, run_name: Optional[str],
-                  workflow_name: Optional[str], abort: bool):
+    def stop_jobs(self, repo_user_name: str, repo_name: str, run_name: Optional[str], abort: bool):
         job_heads = self.get_job_heads(repo_user_name, repo_name, run_name)
-        if workflow_name:
-            job_heads = filter(lambda j: j.workflow_name == workflow_name, job_heads)
         for job_head in job_heads:
             if job_head.status.is_unfinished():
                 self.stop_job(repo_user_name, repo_name, job_head.get_id(), abort)
@@ -141,21 +141,9 @@ class Backend(ABC):
                   attached: bool) -> Generator[LogEvent, None, None]:
         pass
 
-    def _download_job_artifact_files(self, repo_user_name: str, repo_name: str, job_id: str, artifact_name: str,
-                                     output_dir: Optional[str]):
-        pass
-
-    def _list_job_artifact_files(self, repo_user_name: str, repo_name: str,
-                                 job_id: str, artifact_name: str) -> List[Tuple[str, int]]:
-        pass
-
     def download_run_artifact_files(self, repo_user_name: str, repo_name: str, run_name: str,
                                     output_dir: Optional[str]):
-        job_heads = self.get_job_heads(repo_user_name, repo_name, run_name)
-        for job_head in job_heads:
-            for artifact_name in job_head.artifacts:
-                self._download_job_artifact_files(repo_user_name, repo_name, job_head.get_id(), artifact_name,
-                                                  output_dir or os.getcwd())
+        pass
 
     def list_run_artifact_files(self, repo_user_name: str, repo_name: str, run_name: str) -> List[Tuple[str, str, int]]:
         pass

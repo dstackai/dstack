@@ -1,6 +1,4 @@
-import os
 import re
-import shutil
 import sys
 from pathlib import Path
 
@@ -16,17 +14,14 @@ def get_version():
         sys.exit("Can't parse version.py")
 
 
-parent_path = Path(os.path.dirname(os.getcwd()))
-shutil.copyfile(parent_path / ".dstack" / "providers.yaml", Path("dstack") / "cli" / "providers.yaml")
-
 setup(
     name="dstack",
     version=get_version(),
-    author="peterschmidt85",
+    author="Andrey Cheptsov",
     author_email="andrey@dstack.ai",
     packages=find_packages(),
-    package_data={'': ['providers.yaml', 'schema.yaml']},
-    include_package_data=True,
+    # package_data={'': []},
+    # include_package_data=True,
     scripts=[],
     entry_points={
         "console_scripts": ["dstack=dstack.cli.main:main"],

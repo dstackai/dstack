@@ -12,7 +12,7 @@ properties:
         help:
           type: string
           minLength: 1
-        depends-on:
+        deps:
           type: array
           items:
             type: string

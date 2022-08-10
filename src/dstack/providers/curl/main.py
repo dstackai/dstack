@@ -1,8 +1,7 @@
 from argparse import ArgumentParser
-from typing import List, Optional
+from typing import List, Optional, Dict, Any
 
-from dstack import Job, JobSpec
-
+from dstack.jobs import JobSpec
 from dstack.providers import Provider
 
 
@@ -13,11 +12,11 @@ class CurlProvider(Provider):
         self.output = None
         self.artifacts = None
 
-    def load(self):
-        super()._load(schema="schema.yaml")
-        self.url = self.workflow.data["url"]
-        self.output = self.workflow.data["output"]
-        self.artifacts = self.workflow.data["artifacts"]
+    def load(self, provider_args: List[str], workflow_name: Optional[str], provider_data: Dict[str, Any]):
+        super().load(provider_args, workflow_name, provider_data)
+        self.url = self.provider_data["url"]
+        self.output = self.provider_data["output"]
+        self.artifacts = self.provider_data["artifacts"]
 
     def _create_parser(self, workflow_name: Optional[str]) -> Optional[ArgumentParser]:
         parser = ArgumentParser(prog="dstack run " + (workflow_name or self.provider_name))
@@ -33,9 +32,9 @@ class CurlProvider(Provider):
         args, unknown = parser.parse_known_args(self.provider_args)
         args.unknown = unknown
         if self.run_as_provider:
-            self.workflow.data["url"] = args.url
-            self.workflow.data["output"] = args.output
-            self.workflow.data["artifacts"] = args.artifact
+            self.provider_data["url"] = args.url
+            self.provider_data["output"] = args.output
+            self.provider_data["artifacts"] = args.artifact
 
     def create_job_specs(self) -> List[JobSpec]:
         return [JobSpec(
@@ -49,7 +48,3 @@ class CurlProvider(Provider):
 
 def __provider__():
     return CurlProvider()
-
-
-if __name__ == '__main__':
-    __provider__().submit_jobs()

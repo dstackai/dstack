@@ -9,7 +9,7 @@ from git import InvalidGitRepositoryError
 from rich import print
 
 from dstack.backend import load_backend
-from dstack.cli.common import load_repo_data
+from dstack.repo import load_repo
 from dstack.config import ConfigError
 
 
@@ -42,11 +42,11 @@ def logs_func(args: Namespace):
     try:
         backend = load_backend()
 
-        repo_user_name, repo_name, _, _, _ = load_repo_data()
+        repo = load_repo()
         start_time = to_epoch_millis(args.since)
 
         try:
-            for event in backend.poll_logs(repo_user_name, repo_name, args.run_name, start_time, args.follow):
+            for event in backend.poll_logs(repo.repo_user_name, repo.repo_name, args.run_name, start_time, args.follow):
                 print(event.log_message)
         except KeyboardInterrupt as e:
             if args.follow is True:
@@ -67,7 +67,6 @@ def register_parsers(main_subparsers):
 
     # TODO: Add --format (short|detailed)
     parser.add_argument("run_name", metavar="RUN", type=str, help="A name of a run")
-    # parser.add_argument("workflow_name", metavar="WORKFLOW", type=str, nargs="?", help="A name of a workflow")
     parser.add_argument("--follow", "-f", help="Whether to continuously poll for new logs. By default, the command "
                                                "will exit once there are no more logs to display. To exit from this "
                                                "mode, use Control-C.", action="store_true")

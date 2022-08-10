@@ -59,19 +59,14 @@ class AwsBackend(Backend):
         return logs.poll_logs(self._s3_client(), self._logs_client(), self.backend_config.bucket_name, repo_user_name,
                               repo_name, run_name, start_time, attached)
 
-    def _download_job_artifact_files(self, repo_user_name: str, repo_name: str, job_id: str, artifact_name: str,
-                                     output_dir: Optional[str]):
-        return artifacts.download_job_artifact_files(self._s3_client(), self.backend_config.bucket_name,
-                                                     repo_user_name, repo_name, job_id, artifact_name, output_dir)
-
-    def _list_job_artifact_files(self, repo_user_name: str, repo_name: str,
-                                 job_id: str, artifact_name: str) -> List[Tuple[str, int]]:
-        return artifacts.list_job_artifact_files(self._s3_client(), self.backend_config.bucket_name,
-                                                 repo_user_name, repo_name, job_id, artifact_name)
-
     def list_run_artifact_files(self, repo_user_name: str, repo_name: str, run_name: str) -> List[Tuple[str, str, int]]:
         return artifacts.list_run_artifact_files(self._s3_client(), self.backend_config.bucket_name,
                                                  repo_user_name, repo_name, run_name)
+
+    def download_run_artifact_files(self, repo_user_name: str, repo_name: str, run_name: str,
+                                    output_dir: Optional[str]):
+        artifacts.download_run_artifact_files(self._s3_client(), self.backend_config.bucket_name,
+                                              repo_user_name, repo_name, run_name, output_dir)
 
     def get_tag_heads(self, repo_user_name: str, repo_name: str) -> List[TagHead]:
         return tags.get_tag_heads(self._s3_client(), self.backend_config.bucket_name, repo_user_name, repo_name)

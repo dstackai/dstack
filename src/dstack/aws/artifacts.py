@@ -1,7 +1,7 @@
 import hashlib
 import os
 from pathlib import Path
-from typing import Optional, List, Tuple
+from typing import List, Tuple, Optional
 
 from boto3.s3 import transfer
 from botocore.client import BaseClient
@@ -21,12 +21,12 @@ def dest_file_path(key: str, output_path: Path) -> Path:
     return output_path / "/".join(key.split("/")[4:])
 
 
-def download_job_artifact_files(s3_client: BaseClient, bucket_name: str, repo_user_name: str, repo_name: str,
-                                job_id: str, artifact_name: str, output_dir: str):
-    output_path = Path(output_dir)
-
-    artifact_prefix = f"artifacts/{repo_user_name}/{repo_name}/{job_id}/{artifact_name}"
+def download_run_artifact_files(s3_client: BaseClient, bucket_name: str, repo_user_name: str, repo_name: str,
+                                run_name: str, output_dir: Optional[str]):
+    artifact_prefix = f"artifacts/{repo_user_name}/{repo_name}/{run_name},"
     response = s3_client.list_objects(Bucket=bucket_name, Prefix=artifact_prefix)
+
+    output_path = Path(output_dir or os.getcwd())
 
     total_size = 0
     keys = []
@@ -46,7 +46,6 @@ def download_job_artifact_files(s3_client: BaseClient, bucket_name: str, repo_us
 
         total_size += obj["Size"]
         if obj["Size"] > 0 and not key.endswith("/"):
-            # Skip empty files that designate folders (required by FUSE)
             keys.append(key)
             etags.append(etag)
 
@@ -54,7 +53,7 @@ def download_job_artifact_files(s3_client: BaseClient, bucket_name: str, repo_us
 
     # TODO: Make download files in parallel
     with tqdm(total=total_size, unit='B', unit_scale=True, unit_divisor=1024,
-              desc=f"Downloading '{artifact_name}'") as pbar:
+              desc=f"Downloading artifacts") as pbar:
         for i in range(len(keys)):
             key = keys[i]
             etag = etags[i]
@@ -70,15 +69,6 @@ def download_job_artifact_files(s3_client: BaseClient, bucket_name: str, repo_us
             etag_path = Path(etag_file_path(key, output_path))
             etag_path.parent.mkdir(parents=True, exist_ok=True)
             etag_path.write_text(etag)
-
-
-def list_job_artifact_files(s3_client: BaseClient, bucket_name: str, repo_user_name: str, repo_name: str, job_id: str,
-                            artifact_name: str, ) -> List[Tuple[str, int]]:
-    artifact_prefix = f"artifacts/{repo_user_name}/{repo_name}/{job_id}/{artifact_name}"
-    response = s3_client.list_objects(Bucket=bucket_name, Prefix=artifact_prefix)
-
-    return [("/".join(obj["Key"].split("/")[4:]), obj["Size"]) for obj in
-            (response.get("Contents") or []) if obj["Size"] > 0]
 
 
 def list_run_artifact_files(s3_client: BaseClient, bucket_name: str, repo_user_name: str, repo_name: str,

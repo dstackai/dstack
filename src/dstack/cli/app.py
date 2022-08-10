@@ -38,5 +38,4 @@ def register_parsers(main_subparsers):
     parser = main_subparsers.add_parser("app", help="Open an app")
 
     parser.add_argument("run_name", metavar="RUN", type=str, help="A name of a run")
-    parser.add_argument("workflow_name", metavar="WORKFLOW", type=str, nargs="?", help="A name of a workflow")
     parser.set_defaults(func=apps_func)

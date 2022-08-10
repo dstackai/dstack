@@ -7,7 +7,7 @@ from typing import Optional, Dict, List, Generator
 
 from botocore.client import BaseClient
 
-from dstack import App
+from dstack.jobs import JobApp
 from dstack.aws import jobs
 from dstack.backend import LogEvent, LogEventSource
 
@@ -19,7 +19,7 @@ def _render_log_message(s3_client: BaseClient, bucket_name: str, log_message: st
                         job_id: Optional[str],
                         job_host_names: Dict[str, Optional[str]],
                         job_ports: Dict[str, Optional[List[int]]],
-                        job_apps: Dict[str, Optional[List[App]]]) -> str:
+                        job_apps: Dict[str, Optional[List[JobApp]]]) -> str:
     if job_id and job_id not in job_host_names:
         job = jobs.get_job(s3_client, bucket_name, repo_user_name, repo_name, job_id)
         job_host_names[job_id] = job.host_name or "none"

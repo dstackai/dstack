@@ -5,9 +5,10 @@ from typing import Optional, List
 
 from botocore.client import BaseClient
 
-from dstack import Job, Repo, JobStatus
 from dstack.aws import jobs, runs, artifacts
 from dstack.backend import TagHead, BackendError
+from dstack.jobs import Job, JobStatus
+from dstack.repo import Repo
 
 
 def get_tag_heads(s3_client: BaseClient, bucket_name: str, repo_user_name: str, repo_name: str):
@@ -104,7 +105,7 @@ def create_tag_from_local_dirs(s3_client: BaseClient, logs_client: BaseClient, b
 
     run_name = runs.create_run(s3_client, logs_client, bucket_name, repo.repo_user_name, repo.repo_name)
     job = Job(repo, run_name, None, "bash", JobStatus.DONE, int(round(time.time() * 1000)), "scratch",
-              None, None, None, None, tag_artifacts, None, None, None, None, None, None, None, None, tag_name)
+              None, None, None, tag_artifacts, None, None, None, None, None, None, None, None, tag_name)
     jobs.create_job(s3_client, bucket_name, job, listed=False)
     for index, local_path in enumerate(local_paths):
         artifacts.upload_job_artifact_files(s3_client, bucket_name, repo.repo_user_name, repo.repo_name,

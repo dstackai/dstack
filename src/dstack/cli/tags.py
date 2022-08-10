@@ -1,21 +1,21 @@
 import sys
 from argparse import Namespace
 
+from rich import print
 from rich.console import Console
 from rich.table import Table
-from rich import print
 
-from dstack import Repo
 from dstack.backend import load_backend
-from dstack.cli.common import load_repo_data, pretty_date
+from dstack.cli.common import pretty_date
 from dstack.config import ConfigError
+from dstack.repo import load_repo
 
 
 def list_tags_func(_: Namespace):
     try:
         backend = load_backend()
-        repo_user_name, repo_name, _, _, _ = load_repo_data()
-        tag_heads = backend.get_tag_heads(repo_user_name, repo_name)
+        repo = load_repo()
+        tag_heads = backend.get_tag_heads(repo.repo_user_name, repo.repo_name)
         console = Console()
         table = Table()
         table.add_column("Tag", style="bold", no_wrap=True)
@@ -23,7 +23,7 @@ def list_tags_func(_: Namespace):
         # table.add_column("Workflow", style="grey58", width=12)
         # table.add_column("Provider", style="grey58", width=12)
         table.add_column("Artifacts", style="grey58", width=12)
-        table.add_column("Created", style="grey58", no_wrap=True)
+        table.add_column("Created", style="dark_sea_green4", no_wrap=True)
         for tag_head in tag_heads:
             created_at = pretty_date(round(tag_head.created_at / 1000))
             table.add_row(
@@ -42,15 +42,14 @@ def list_tags_func(_: Namespace):
 def create_tag_func(args: Namespace):
     try:
         backend = load_backend()
-        repo_user_name, repo_name, repo_branch, repo_hash, repo_diff = load_repo_data()
-        if backend.get_tag_head(repo_user_name, repo_name, args.tag_name):
+        repo = load_repo()
+        if backend.get_tag_head(repo.repo_user_name, repo.repo_name, args.tag_name):
             sys.exit(f"The tag '{args.tag_name}' already exists")
         else:
             if args.run_name:
-                backend.create_tag_from_run(repo_user_name, repo_name, args.tag_name, args.run_name)
+                backend.create_tag_from_run(repo.repo_user_name, repo.repo_name, args.tag_name, args.run_name)
             else:
-                backend.create_tag_from_local_dirs(Repo(repo_user_name, repo_name, repo_branch, repo_hash, repo_diff),
-                                                   args.tag_name, args.local_dirs)
+                backend.create_tag_from_local_dirs(repo, args.tag_name, args.local_dirs)
         print(f"[grey58]OK[/]")
     except ConfigError:
         sys.exit(f"Call 'dstack config' first")
@@ -59,12 +58,12 @@ def create_tag_func(args: Namespace):
 def delete_tag_func(args: Namespace):
     try:
         backend = load_backend()
-        repo_user_name, repo_name, _, _, _ = load_repo_data()
-        tag_head = backend.get_tag_head(repo_user_name, repo_name, args.tag_name)
+        repo = load_repo()
+        tag_head = backend.get_tag_head(repo.repo_user_name, repo.repo_name, args.tag_name)
         if not tag_head:
             sys.exit(f"The tag '{args.tag_name}' doesn't exist")
         else:
-            backend.delete_tag(repo_user_name, repo_name, tag_head)
+            backend.delete_tag(repo.repo_user_name, repo.repo_name, tag_head)
         print(f"[grey58]OK[/]")
     except ConfigError:
         sys.exit(f"Call 'dstack config' first")

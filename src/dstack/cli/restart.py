@@ -36,7 +36,6 @@ def register_parsers(main_subparsers):
     parser = main_subparsers.add_parser("restart", help="Restart a run")
 
     parser.add_argument("run_name", metavar="RUN", type=str, help="A name of a run")
-    parser.add_argument("workflow_name", metavar="WORKFLOW", type=str, nargs="?", help="A name of a workflow")
     parser.add_argument("--clear", "-c",
                         help="Clear logs and artifacts. By default, is false",
                         action="store_true")
