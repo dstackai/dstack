@@ -86,8 +86,9 @@ def _do_filter_log_events(logs_client: BaseClient, filter_logs_events_kwargs: di
 
 
 def create_log_group_if_not_exists(logs_client: BaseClient, bucket_name: str, log_group_name: str):
-    response = logs_client.describe_log_groups(logGroupNamePrefix=log_group_name, limit=1)
-    if not response["logGroups"]:
+    response = logs_client.describe_log_groups(logGroupNamePrefix=log_group_name)
+    if not response["logGroups"] or not any(
+            filter(lambda g: g["logGroupName"] == log_group_name, response["logGroups"])):
         logs_client.create_log_group(
             logGroupName=log_group_name,
             tags={
