@@ -26,7 +26,7 @@ class TorchrunProvider(Provider):
         self.before_run = self.provider_data.get("before_run")
         self.version = str(self.provider_data.get("version") or "3.9")
         self.requirements = self.provider_data.get("requirements")
-        self.env = self.provider_data.get("environment") or {}
+        self.env = self.provider_data.get("env") or {}
         self.artifacts = self.provider_data.get("artifacts")
         self.working_dir = self.provider_data.get("working_dir")
         self.nodes = self.provider_data.get("nodes") or 1

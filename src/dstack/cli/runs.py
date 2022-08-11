@@ -71,7 +71,7 @@ def print_runs(args: Namespace, backend: Backend):
     table.add_column("Status", no_wrap=True)
     table.add_column("App", justify="center", style="green", no_wrap=True)
     table.add_column("Artifacts", style="grey58", width=12)
-    table.add_column("Submitted", style="dark_sea_green4", no_wrap=True)
+    table.add_column("Submitted", style="grey58", no_wrap=True)
     table.add_column("Tag", style="bold yellow", no_wrap=True)
 
     for run_name, runs in runs_by_name:

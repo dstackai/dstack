@@ -123,6 +123,18 @@ class JobHead(JobRef):
                f'tag_name={_quoted(self.tag_name)})'
 
 
+class Dep:
+    def __init__(self, repo_user_name: str, repo_name: str, run_name: str):
+        self.repo_user_name = repo_user_name
+        self.repo_name = repo_name
+        self.run_name = run_name
+
+    def __str__(self) -> str:
+        return f'JobHead(repo_user_name="{self.repo_user_name}", ' \
+               f'repo_name="{self.repo_name}", ' \
+               f'run_name="{self.run_name}")'
+
+
 class Job(JobRef):
     def __init__(self, repo: Repo, run_name: str, workflow_name: Optional[str], provider_name: str,
                  status: JobStatus, submitted_at: int,
@@ -131,7 +143,7 @@ class Job(JobRef):
                  artifacts: Optional[List[str]] = None,
                  port_count: Optional[int] = None, ports: Optional[List[int]] = None,
                  host_name: Optional[str] = None,
-                 requirements: Optional[Requirements] = None, previous_jobs: Optional[List[JobRef]] = None,
+                 requirements: Optional[Requirements] = None, deps: Optional[List[Dep]] = None,
                  master_job: Optional[JobRef] = None, apps: Optional[List[JobApp]] = None,
                  runner_id: Optional[str] = None,
                  tag_name: Optional[str] = None):
@@ -151,7 +163,7 @@ class Job(JobRef):
         self.host_name = host_name
         self.artifacts = artifacts
         self.requirements = requirements
-        self.previous_jobs = previous_jobs
+        self.deps = deps
         self.master_job = master_job
         self.apps = apps
         self.runner_id = runner_id
@@ -178,7 +190,7 @@ class Job(JobRef):
                f'host_name={_quoted(self.host_name)}, ' \
                f'artifacts={("[" + ", ".join(map(lambda a: _quoted(str(a)), self.artifacts)) + "]") if self.artifacts else None}, ' \
                f'requirements={self.requirements}, ' \
-               f'previous_jobs={("[" + ", ".join(map(lambda a: _quoted(str(a)), self.previous_jobs)) + "]") if self.previous_jobs else None}, ' \
+               f'deps={("[" + ", ".join(map(lambda a: _quoted(str(a)), self.deps)) + "]") if self.deps else None}, ' \
                f'master_job={self.master_job}, ' \
                f'apps={("[" + ", ".join(map(lambda a: str(a), self.apps)) + "]") if self.apps else None}, ' \
                f'runner_id={_quoted(self.runner_id)}, ' \
@@ -190,7 +202,7 @@ class JobSpec(JobRef):
                  env: Dict[str, str] = None, working_dir: Optional[str] = None,
                  artifacts: Optional[List[str]] = None,
                  port_count: Optional[int] = None,
-                 requirements: Optional[Requirements] = None, previous_jobs: Optional[List[JobRef]] = None,
+                 requirements: Optional[Requirements] = None,
                  master_job: Optional[JobRef] = None, apps: Optional[List[JobApp]] = None):
         self.id = None
         self.image_name = image_name
@@ -200,7 +212,6 @@ class JobSpec(JobRef):
         self.port_count = port_count
         self.artifacts = artifacts
         self.requirements = requirements
-        self.previous_jobs = previous_jobs
         self.master_job = master_job
         self.apps = apps
 
@@ -218,6 +229,5 @@ class JobSpec(JobRef):
                f'port_count={self.port_count}, ' \
                f'artifacts={("[" + ", ".join(map(lambda a: _quoted(str(a)), self.artifacts)) + "]") if self.artifacts else None}, ' \
                f'requirements={self.requirements}, ' \
-               f'previous_jobs={("[" + ", ".join(map(lambda a: _quoted(str(a)), self.previous_jobs)) + "]") if self.previous_jobs else None}, ' \
                f'master_job={self.master_job}, ' \
                f'apps={("[" + ", ".join(map(lambda a: str(a), self.apps)) + "]") if self.apps else None})'

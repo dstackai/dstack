@@ -2,9 +2,7 @@ import uuid
 from argparse import ArgumentParser
 from typing import List, Optional, Dict, Any
 
-import env
-
-from dstack.jobs import Job, JobApp, JobSpec
+from dstack.jobs import JobApp, JobSpec
 from dstack.providers import Provider
 
 
@@ -15,7 +13,7 @@ class NotebookProvider(Provider):
         self.python = None
         self.version = None
         self.requirements = None
-        self.environment = None
+        self.env = None
         self.artifacts = None
         self.working_dir = None
         self.resources = None
@@ -28,7 +26,7 @@ class NotebookProvider(Provider):
         self.python = self._save_python_version("python")
         self.version = self.provider_data.get("version")
         self.requirements = self.provider_data.get("requirements")
-        self.environment = self.provider_data.get("environment") or {}
+        self.env = self.provider_data.get("env") or {}
         self.artifacts = self.provider_data.get("artifacts")
         self.working_dir = self.provider_data.get("working_dir")
         self.resources = self._resources()
@@ -45,7 +43,7 @@ class NotebookProvider(Provider):
         self._parse_base_args(args)
 
     def create_jobs(self) -> List[JobSpec]:
-        env = dict(self.environment)
+        env = dict(self.env)
         token = uuid.uuid4().hex
         env["TOKEN"] = token
         return [JobSpec(

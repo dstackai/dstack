@@ -3,15 +3,15 @@ from typing import List, Optional
 import yaml
 from botocore.client import BaseClient
 
-from dstack.jobs import Job, JobStatus, JobHead, Requirements, GpusRequirements, JobRefId, JobApp
+from dstack.jobs import Job, JobStatus, JobHead, Requirements, GpusRequirements, JobRefId, JobApp, Dep
 from dstack.repo import Repo
 
 
 def serialize_job(job: Job) -> dict:
-    previous_job_ids = []
-    if job.previous_jobs:
-        for j in job.previous_jobs:
-            previous_job_ids.append(j.get_id())
+    deps = []
+    if job.deps:
+        for dep in job.deps:
+            deps.append(f"{dep.repo_user_name},{dep.repo_name},{dep.run_name}")
     requirements = None
     if job.requirements:
         requirements = {}
@@ -54,7 +54,7 @@ def serialize_job(job: Job) -> dict:
         "ports": [str(port) for port in job.ports] if job.ports else [],
         "host_name": job.host_name or '',
         "requirements": requirements or {},
-        "previous_job_ids": previous_job_ids or [],
+        "deps": deps,
         "master_job_id": job.master_job.get_id() if job.master_job else '',
         "apps": [{
             "port_index": app.port_index,
@@ -86,7 +86,11 @@ def unserialize_job(job_data: dict) -> Job:
                       and not requirements.gpus.name)) \
                 and not requirements.interruptible and not not requirements.shm_size:
             requirements = None
-    previous_jobs = ([JobRefId(p) for p in (job_data["previous_job_ids"] or [])]) or None
+    deps = []
+    if job_data.get("deps"):
+        for dep in job_data["deps"]:
+            dep_repo_user_name, dep_repo_name, dep_run_name = tuple(dep.split(","))
+            deps.append(Dep(dep_repo_user_name, dep_repo_name, dep_run_name))
     master_job = JobRefId(job_data["master_job_id"]) if job_data.get("master_job_id") else None
     apps = ([JobApp(a["port_index"], a["app_name"], a.get("url_path") or None, a.get("url_query_params") or None) for a
              in (job_data["apps"] or [])]) or None
@@ -97,7 +101,7 @@ def unserialize_job(job_data: dict) -> Job:
               job_data.get("commands") or None,
               job_data["env"] or None, job_data.get("working_dir") or None, job_data.get("artifacts") or None,
               job_data.get("port_count") or None, job_data.get("ports") or None, job_data.get("host_name") or None,
-              requirements, previous_jobs, master_job, apps, job_data.get("runner_id") or None,
+              requirements, deps or None, master_job, apps, job_data.get("runner_id") or None,
               job_data.get("tag_name"))
     if "job_id" in job_data:
         job.set_id(job_data["job_id"])

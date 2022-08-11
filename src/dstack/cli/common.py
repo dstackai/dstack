@@ -60,7 +60,7 @@ def __flatten(d, parent_key='', sep='.'):
 colors = {
     "SUBMITTED": "yellow",
     "QUEUED": "yellow",
-    "RUNNING": "green",
+    "RUNNING": "dark_sea_green4",
     "DONE": "grey58",
     "FAILED": "red",
     "STOPPED": "grey58",

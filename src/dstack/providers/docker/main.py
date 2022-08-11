@@ -23,7 +23,7 @@ class DockerProvider(Provider):
         self.before_run = self.provider_data.get("before_run")
         self.commands = self.provider_data.get("commands")
         self.artifacts = self.provider_data.get("artifacts")
-        self.env = self.provider_data.get("environment")
+        self.env = self.provider_data.get("env")
         self.working_dir = self.provider_data.get("working_dir")
         self.ports = self.provider_data.get("ports")
         self.resources = self._resources()

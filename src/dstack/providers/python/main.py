@@ -2,7 +2,7 @@ import argparse
 from argparse import ArgumentParser
 from typing import List, Optional, Dict, Any
 
-from dstack import Job, JobSpec
+from dstack.jobs import JobSpec
 from dstack.providers import Provider
 
 
@@ -30,7 +30,7 @@ class PythonProvider(Provider):
         self.version = self._save_python_version("version")
         self.args = self.provider_data.get("args")
         self.requirements = self.provider_data.get("requirements")
-        self.env = self.provider_data.get("environment") or {}
+        self.env = self.provider_data.get("env") or {}
         self.artifacts = self.provider_data.get("artifacts")
         self.working_dir = self.provider_data.get("working_dir")
         self.resources = self._resources()

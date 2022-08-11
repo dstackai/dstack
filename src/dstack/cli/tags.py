@@ -23,7 +23,7 @@ def list_tags_func(_: Namespace):
         # table.add_column("Workflow", style="grey58", width=12)
         # table.add_column("Provider", style="grey58", width=12)
         table.add_column("Artifacts", style="grey58", width=12)
-        table.add_column("Created", style="dark_sea_green4", no_wrap=True)
+        table.add_column("Created", style="grey58", no_wrap=True)
         for tag_head in tag_heads:
             created_at = pretty_date(round(tag_head.created_at / 1000))
             table.add_row(

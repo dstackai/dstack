@@ -6,9 +6,9 @@ from argparse import ArgumentParser, Namespace
 from pkgutil import iter_modules
 from typing import Optional, List, Dict, Any
 
-from dstack.backend import load_backend
-from dstack.jobs import Job, JobStatus, JobSpec, JobRef, Requirements, GpusRequirements
-from dstack.repo import load_repo
+from dstack.backend import load_backend, Backend
+from dstack.jobs import Job, JobStatus, JobSpec, Requirements, GpusRequirements, Dep
+from dstack.repo import load_repo, Repo
 from dstack.util import _quoted
 
 
@@ -36,11 +36,12 @@ def _str_to_mib(s: str) -> int:
 
 class Provider:
     def __init__(self, provider_name: str):
-        self.provider_name = provider_name
-        self.provider_data = None
-        self.provider_args = None
-        self.workflow_name = None
-        self.run_as_provider = None
+        self.provider_name: str = provider_name
+        self.provider_data: Optional[Dict[str, Any]] = None
+        self.provider_args: Optional[List[str]] = None
+        self.workflow_name: Optional[str] = None
+        self.run_as_provider: Optional[bool] = None
+        self.deps: Optional[List[Dep]] = None
         self.loaded = False
 
     def __str__(self) -> str:
@@ -68,6 +69,7 @@ class Provider:
         self.provider_data = provider_data
         self.run_as_provider = not workflow_name
         self.parse_args()
+        self.deps = self._deps()
         self.loaded = True
 
     @abstractmethod
@@ -88,7 +90,7 @@ class Provider:
         parser.add_argument("-r", "--requirements", type=str)
         parser.add_argument("-e", "--env", action='append')
         parser.add_argument("-a", "--artifact", metavar="ARTIFACT", dest="artifacts", action='append')
-        # parser.add_argument("-d", "--dep", metavar="TAG | WORKFLOW", dest="deps", action='append')
+        parser.add_argument("-d", "--dep", metavar="TAG | WORKFLOW", dest="deps", action='append')
         parser.add_argument("-w", "--working-dir", type=str)
         parser.add_argument("-i", "--interruptible", action="store_true")
         parser.add_argument("--cpu", type=int)
@@ -103,19 +105,19 @@ class Provider:
             self.provider_data["requirements"] = args.requirements
         if args.artifacts:
             self.provider_data["artifacts"] = args.artifacts
-        # if args.deps:
-        #     self.provider_data["deps"] = args.deps
+        if args.deps:
+            self.provider_data["deps"] = args.deps
         if args.working_dir:
             self.provider_data["working_dir"] = args.working_dir
         if args.env:
-            environment = self.provider_data.get("environment") or {}
+            env = self.provider_data.get("env") or {}
             for e in args.env:
                 if "=" in e:
                     tokens = e.split("=", maxsplit=1)
-                    environment[tokens[0]] = tokens[1]
+                    env[tokens[0]] = tokens[1]
                 else:
-                    environment[e] = ""
-            self.provider_data["environment"] = environment
+                    env[e] = ""
+            self.provider_data["env"] = env
         if args.cpu or args.memory or args.gpu or args.gpu_name or args.gpu_memory or args.shm_size or args.interruptible:
             resources = self.provider_data.get("resources") or {}
             self.provider_data["resources"] = resources
@@ -144,31 +146,79 @@ class Provider:
     def parse_args(self):
         pass
 
-    def submit_jobs(self, run_name: Optional[str] = None) -> List[Job]:
+    def submit_jobs(self, run_name: str) -> List[Job]:
         if not self.loaded:
             raise Exception("The provider is not loaded")
         job_specs = self.create_job_specs()
         repo = load_repo()
         backend = load_backend()
-        # [TODO] Handle previous jobs and master job
+        # [TODO] Handle master job
         jobs = []
         counter = []
         for job_spec in job_specs:
-            previous_jobs = []
-            if self.provider_data.get("previous_job_ids"):
-                for jid in self.provider_data.get("previous_job_ids"):
-                    previous_jobs.append(JobRef(str(jid)))
-            if job_spec.previous_jobs:
-                previous_jobs.extend(job_spec.previous_jobs)
             submitted_at = int(round(time.time() * 1000))
-            job = Job(repo, run_name or self.provider_data["run_name"], self.provider_data.get("workflow_name") or None,
+            job = Job(repo, run_name, self.provider_data.get("workflow_name") or None,
                       self.provider_data.get("provider_name") or None, JobStatus.SUBMITTED, submitted_at,
                       job_spec.image_name, job_spec.commands, job_spec.env,
                       job_spec.working_dir, job_spec.artifacts, job_spec.port_count, None, None,
-                      job_spec.requirements, previous_jobs, job_spec.master_job, job_spec.apps, None, None)
+                      job_spec.requirements, self.deps, job_spec.master_job, job_spec.apps, None, None)
             backend.submit_job(job, counter)
             jobs.append(job)
         return jobs
+
+    def _deps(self) -> Optional[List[Dep]]:
+        if self.provider_data["deps"]:
+            repo = load_repo()
+            backend = load_backend()
+            deps = []
+            if self.provider_data.get("deps"):
+                for dep in self.provider_data.get("deps"):
+                    deps.append(self._parse_dep(dep, backend, repo))
+            return deps
+        else:
+            return None
+
+    @staticmethod
+    def _parse_dep(dep: str, backend: Backend, repo: Repo) -> Dep:
+        if dep.startswith(":"):
+            tag_dep = True
+            dep = dep[1:]
+        else:
+            tag_dep = False
+        t = dep.split("/")
+        if len(t) == 1:
+            if tag_dep:
+                return Provider._tag_dep(backend, repo.repo_user_name, repo.repo_name, t[0])
+            else:
+                return Provider._workflow_dep(backend, repo.repo_user_name, repo.repo_name, t[0])
+        elif len(t) == 3:
+            if tag_dep:
+                return Provider._tag_dep(backend, t[0], t[1], t[2])
+            else:
+                return Provider._workflow_dep(backend, t[0], t[1], t[2])
+        else:
+            sys.exit(f"Invalid dep format: {dep}")
+
+    @staticmethod
+    def _tag_dep(backend: Backend, repo_user_name: str, repo_name: str, tag_name: str) -> Dep:
+        tag_head = backend.get_tag_head(repo_user_name, repo_name, tag_name)
+        if tag_head:
+            return Dep(repo_user_name, repo_name, tag_head.run_name)
+        else:
+            sys.exit(f"Cannot find the tag '{tag_name}' in the '{repo_user_name}/{repo_name}' repo")
+
+    @staticmethod
+    def _workflow_dep(backend: Backend, repo_user_name: str, repo_name: str, workflow_name: str) -> Dep:
+        job_heads = sorted(backend.get_job_heads(repo_user_name, repo_name),
+                           key=lambda j: j.submitted_at, reverse=True)
+        run_name = next(iter([job_head.run_name for job_head in job_heads if
+                              job_head.workflow_name == workflow_name and job_head.status == JobStatus.DONE]),
+                        None)
+        if run_name:
+            return Dep(repo_user_name, repo_name, run_name)
+        else:
+            sys.exit(f"Cannot find any successful workflow with the name '{workflow_name}' "
+                     f"in the '{repo_user_name}/{repo_name}' repo")
 
     def _resources(self) -> Optional[Requirements]:
         if self.provider_data.get("resources"):
