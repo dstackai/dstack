@@ -54,6 +54,9 @@ class AwsBackend(Backend):
         job = self.get_job(repo_user_name, repo_name, job_id)
         runners.stop_job(self._ec2_client(), self._s3_client(), self.backend_config.bucket_name, job, abort)
 
+    def delete_job_head(self, repo_user_name: str, repo_name: str, job_id: str):
+        jobs.delete_job_head(self._s3_client(), self.backend_config.bucket_name, repo_user_name, repo_name, job_id)
+
     def poll_logs(self, repo_user_name: str, repo_name: str, run_name: str, start_time: int, attached: bool) -> \
             Generator[LogEvent, None, None]:
         return logs.poll_logs(self._s3_client(), self._logs_client(), self.backend_config.bucket_name, repo_user_name,

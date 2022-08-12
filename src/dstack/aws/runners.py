@@ -1,5 +1,6 @@
 import base64
 import json
+import sys
 import uuid
 from functools import reduce, cmp_to_key
 from typing import List, Optional, Tuple
@@ -123,10 +124,11 @@ def _get_instance_type(ec2_client: BaseClient, requirements: Optional[Requiremen
                 return False
         return True
 
-    instance_type = next(instance_type for instance_type in instance_types if matches(instance_type.resources))
+    instance_type = next((instance_type for instance_type in instance_types if matches(instance_type.resources)), None)
     return InstanceType(instance_type.instance_name,
                         Resources(instance_type.resources.cpus, instance_type.resources.memory_mib,
-                                  instance_type.resources.gpus, requirements and requirements.interruptible))
+                                  instance_type.resources.gpus,
+                                  requirements and requirements.interruptible)) if instance_type else None
 
 
 def _create_or_update_runner(s3_client: BaseClient, bucket_name: str, runner: Runner):
@@ -476,19 +478,24 @@ def run_job(ec2_client: BaseClient, iam_client: BaseClient, s3_client: BaseClien
             region_name, job: Job) -> Runner:
     if job.status == JobStatus.SUBMITTED:
         instance_type = _get_instance_type(ec2_client, job.requirements)
-        runner_id = uuid.uuid4().hex
-        job.runner_id = runner_id
-        jobs.update_job(s3_client, bucket_name, job)
-        runner = Runner(runner_id, None, instance_type.resources, job)
-        _create_or_update_runner(s3_client, bucket_name, runner)
-        if instance_type.resources.interruptible:
-            request_id = _create_spot_request(ec2_client, iam_client, bucket_name, region_name, runner_id,
-                                              instance_type)
+        if instance_type:
+            runner_id = uuid.uuid4().hex
+            job.runner_id = runner_id
+            jobs.update_job(s3_client, bucket_name, job)
+            runner = Runner(runner_id, None, instance_type.resources, job)
+            _create_or_update_runner(s3_client, bucket_name, runner)
+            if instance_type.resources.interruptible:
+                request_id = _create_spot_request(ec2_client, iam_client, bucket_name, region_name, runner_id,
+                                                  instance_type)
+            else:
+                request_id = _run_instance(ec2_client, iam_client, bucket_name, region_name, runner_id, instance_type)
+            runner.request_id = request_id
+            _create_or_update_runner(s3_client, bucket_name, runner)
+            return runner
         else:
-            request_id = _run_instance(ec2_client, iam_client, bucket_name, region_name, runner_id, instance_type)
-        runner.request_id = request_id
-        _create_or_update_runner(s3_client, bucket_name, runner)
-        return runner
+            job.status = JobStatus.FAILED
+            jobs.update_job(s3_client, bucket_name, job)
+            sys.exit(f"No instance type matches the requirements")
     else:
         raise Exception("Can't create a request for a job which status is not SUBMITTED")
 

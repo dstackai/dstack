@@ -92,7 +92,7 @@ class JobStatus(Enum):
 class JobHead(JobRef):
     def __init__(self, repo_user_name: str, repo_name: str, job_id: str, run_name: str, workflow_name: Optional[str],
                  provider_name: str, status: JobStatus, submitted_at: int, runner_id: Optional[str],
-                 artifacts: Optional[List[str]], tag_name: Optional[str]):
+                 artifacts: Optional[List[str]], tag_name: Optional[str], apps: Optional[List[str]]):
         self.id = job_id
         self.repo_user_name = repo_user_name
         self.repo_name = repo_name
@@ -104,6 +104,7 @@ class JobHead(JobRef):
         self.runner_id = runner_id
         self.artifacts = artifacts
         self.tag_name = tag_name
+        self.apps = apps
 
     def get_id(self) -> Optional[str]:
         return self.id
@@ -112,6 +113,8 @@ class JobHead(JobRef):
         self.id = id
 
     def __str__(self) -> str:
+        artifacts = ("[" + ", ".join(map(lambda a: _quoted(str(a)), self.artifacts)) + "]") if self.artifacts else None
+        apps = ("[" + ", ".join(map(lambda a: _quoted(a), self.apps)) + "]") if self.apps else None
         return f'JobHead(id="{self.id}", repo_user_name="{self.repo_user_name}", ' \
                f'repo_name="{self.repo_name}", ' \
                f'run_name="{self.run_name}", workflow_name={_quoted(self.workflow_name)}, ' \
@@ -119,8 +122,9 @@ class JobHead(JobRef):
                f'status=JobStatus.{self.status.name}, ' \
                f'submitted_at={self.submitted_at}, ' \
                f'runner_id={_quoted(self.runner_id)}, ' \
-               f'artifacts={("[" + ", ".join(map(lambda a: _quoted(str(a)), self.artifacts)) + "]") if self.artifacts else None}, ' \
-               f'tag_name={_quoted(self.tag_name)})'
+               f'artifacts={artifacts}, ' \
+               f'tag_name={_quoted(self.tag_name)}, ' \
+               f'apps={apps})'
 
 
 class Dep:
@@ -138,15 +142,15 @@ class Dep:
 class Job(JobRef):
     def __init__(self, repo: Repo, run_name: str, workflow_name: Optional[str], provider_name: str,
                  status: JobStatus, submitted_at: int,
-                 image_name: str, commands: Optional[List[str]] = None,
-                 env: Dict[str, str] = None, working_dir: Optional[str] = None,
-                 artifacts: Optional[List[str]] = None,
-                 port_count: Optional[int] = None, ports: Optional[List[int]] = None,
-                 host_name: Optional[str] = None,
-                 requirements: Optional[Requirements] = None, deps: Optional[List[Dep]] = None,
-                 master_job: Optional[JobRef] = None, apps: Optional[List[JobApp]] = None,
-                 runner_id: Optional[str] = None,
-                 tag_name: Optional[str] = None):
+                 image_name: str, commands: Optional[List[str]],
+                 env: Dict[str, str], working_dir: Optional[str],
+                 artifacts: Optional[List[str]],
+                 port_count: Optional[int], ports: Optional[List[int]],
+                 host_name: Optional[str],
+                 requirements: Optional[Requirements], deps: Optional[List[Dep]],
+                 master_job: Optional[JobRef], apps: Optional[List[JobApp]],
+                 runner_id: Optional[str],
+                 tag_name: Optional[str]):
         self.id = None
         self.repo = repo
         self.run_name = run_name

@@ -167,14 +167,10 @@ class Provider:
         return jobs
 
     def _deps(self) -> Optional[List[Dep]]:
-        if self.provider_data["deps"]:
+        if self.provider_data.get("deps"):
             repo = load_repo()
             backend = load_backend()
-            deps = []
-            if self.provider_data.get("deps"):
-                for dep in self.provider_data.get("deps"):
-                    deps.append(self._parse_dep(dep, backend, repo))
-            return deps
+            return [self._parse_dep(dep, backend, repo) for dep in self.provider_data["deps"]]
         else:
             return None
 

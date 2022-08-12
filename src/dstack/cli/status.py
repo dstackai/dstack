@@ -13,7 +13,7 @@ from dstack.cli.common import colored, pretty_date
 from dstack.config import ConfigError
 
 
-def runs_func(args: Namespace):
+def status_func(args: Namespace):
     try:
         backend = load_backend()
         print_runs(args, backend)
@@ -25,8 +25,8 @@ def runs_func(args: Namespace):
 
 def pretty_print_status(run: Run) -> str:
     status = run.status.name.upper()
-    availability_issues = run.availability_issues
-    if availability_issues:
+    request_errors = run.request_errors
+    if request_errors:
         return "Waiting for capacity..."
     if status == "SUBMITTED":
         return "Provisioning..."
@@ -162,11 +162,12 @@ def __job_apps(apps, status):
 
 
 def register_parsers(main_subparsers):
-    parser = main_subparsers.add_parser("runs", help="Lists runs")
+    parser = main_subparsers.add_parser("status", help="Show status of runs")
 
     parser.add_argument("run_name", metavar="RUN", type=str, nargs="?", help="A name of a run")
     parser.add_argument("-a", "--all",
-                        help="Show recent runs. By default, it shows only active runs, or the last finished.",
+                        help="Show status for all runs. "
+                             "By default, it shows only status for unfinished runs, or the last finished.",
                         action="store_true")
 
-    parser.set_defaults(func=runs_func)
+    parser.set_defaults(func=status_func)

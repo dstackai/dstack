@@ -1,7 +1,7 @@
 import sys
 from argparse import ArgumentParser, SUPPRESS, Namespace
 
-from dstack.cli import app, logs, run, stop, artifacts, runs, runners, init, \
+from dstack.cli import app, logs, run, stop, artifacts, status, init, \
     restart, prune, tags, config
 from dstack.version import __version__ as version
 
@@ -14,8 +14,8 @@ def default_func(_: Namespace):
           "less common or more advanced commands.\n"
           "\n"
           "Main commands:\n"
-          "  run            Run a workflow\n"
-          "  runs           Show recent runs\n"
+          "  run            Run a workflow or a provider\n"
+          "  status         Show status of runs\n"
           "  stop           Stop a run\n"
           "  logs           Show logs of a run\n"
           "  artifacts      List or download artifacts of a run\n"
@@ -23,10 +23,10 @@ def default_func(_: Namespace):
           "  app            Open a running application\n"
           "\n"
           "Other commands:\n"
-          "  init           Initialize the project repository\n"
-          "  config          Configure your token\n"
+          "  init           Initialize the repository\n"
+          "  config          Configure the backend\n"
           "  restart        Restart a run\n"
-          "  prune          Delete all finished untagged runs\n"
+          "  delete         Delete runs\n"
           "\n"
           "Options:\n"
           "  -h, --help     Show this help output, or the help for a specified command.\n"
@@ -53,8 +53,7 @@ def main():
     prune.register_parsers(subparsers)
     restart.register_parsers(subparsers)
     run.register_parsers(subparsers)
-    # runners.register_parsers(subparsers)
-    runs.register_parsers(subparsers)
+    status.register_parsers(subparsers)
     stop.register_parsers(subparsers)
     tags.register_parsers(subparsers)
 

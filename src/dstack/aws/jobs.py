@@ -1,4 +1,4 @@
-from typing import List, Optional
+from typing import List, Optional, Dict, Any
 
 import yaml
 from botocore.client import BaseClient
@@ -12,27 +12,6 @@ def serialize_job(job: Job) -> dict:
     if job.deps:
         for dep in job.deps:
             deps.append(f"{dep.repo_user_name},{dep.repo_name},{dep.run_name}")
-    requirements = None
-    if job.requirements:
-        requirements = {}
-        if job.requirements.cpus:
-            requirements["cpus"] = {
-                "count": job.requirements.cpus
-            }
-        if job.requirements.memory_mib:
-            requirements["memory_mib"] = job.requirements.memory_mib
-        if job.requirements.gpus:
-            requirements["gpus"] = {
-                "count": job.requirements.gpus.count
-            }
-            if job.requirements.gpus.memory_mib:
-                requirements["gpus"]["memory_mib"] = job.requirements.gpus.memory_mib
-            if job.requirements.gpus.name:
-                requirements["gpus"]["name"] = job.requirements.gpus.name
-        if job.requirements.shm_size:
-            requirements["shm_size"] = job.requirements.shm_size
-        if job.requirements.interruptible:
-            requirements["interruptible"] = job.requirements.interruptible
     job_data = {
         "job_id": job.get_id(),
         "repo_user_name": job.repo.repo_user_name,
@@ -53,7 +32,7 @@ def serialize_job(job: Job) -> dict:
         "port_count": job.port_count if job.port_count else 0,
         "ports": [str(port) for port in job.ports] if job.ports else [],
         "host_name": job.host_name or '',
-        "requirements": requirements or {},
+        "requirements": _serialize_requirements(job.requirements),
         "deps": deps,
         "master_job_id": job.master_job.get_id() if job.master_job else '',
         "apps": [{
@@ -66,6 +45,30 @@ def serialize_job(job: Job) -> dict:
         "tag_name": job.tag_name or '',
     }
     return job_data
+
+
+def _serialize_requirements(requirements) -> Dict[str, Any]:
+    req_data = {}
+    if requirements:
+        if requirements.cpus:
+            req_data["cpus"] = {
+                "count": requirements.cpus
+            }
+        if requirements.memory_mib:
+            req_data["memory_mib"] = requirements.memory_mib
+        if requirements.gpus:
+            req_data["gpus"] = {
+                "count": requirements.gpus.count
+            }
+            if requirements.gpus.memory_mib:
+                req_data["gpus"]["memory_mib"] = requirements.gpus.memory_mib
+            if requirements.gpus.name:
+                req_data["gpus"]["name"] = requirements.gpus.name
+        if requirements.shm_size:
+            req_data["shm_size"] = requirements.shm_size
+        if requirements.interruptible:
+            req_data["interruptible"] = requirements.interruptible
+    return req_data
 
 
 def unserialize_job(job_data: dict) -> Job:
@@ -108,7 +111,7 @@ def unserialize_job(job_data: dict) -> Job:
     return job
 
 
-def _l_key(job: Job):
+def _job_head_key(job: Job):
     prefix = f"jobs/{job.repo.repo_user_name}/{job.repo.repo_name}"
     lKey = f"{prefix}/l;{job.get_id()};" \
            f"{job.provider_name};{job.submitted_at};{job.status.value};" \
@@ -117,13 +120,13 @@ def _l_key(job: Job):
     return lKey
 
 
-def create_job(s3_client: BaseClient, bucket_name: str, job: Job, counter: List[int] = [], listed: bool = True):
+def create_job(s3_client: BaseClient, bucket_name: str, job: Job, counter: List[int] = [], create_head: bool = True):
     if len(counter) == 0:
         counter.append(0)
     job_id = f"{job.run_name},{job.workflow_name or ''},{counter[0]}"
     job.set_id(job_id)
-    if listed:
-        lKey = _l_key(job)
+    if create_head:
+        lKey = _job_head_key(job)
         s3_client.put_object(Body="", Bucket=bucket_name, Key=lKey)
     prefix = f"jobs/{job.repo.repo_user_name}/{job.repo.repo_name}"
     key = f"{prefix}/{job_id}.yaml"
@@ -142,12 +145,12 @@ def get_job(s3_client: BaseClient, bucket_name: str, repo_user_name: str, repo_n
 
 def update_job(s3_client: BaseClient, bucket_name: str, job: Job):
     prefix = f"jobs/{job.repo.repo_user_name}/{job.repo.repo_name}"
-    lKeyPrefix = f"{prefix}/l;{job.get_id()};"
-    response = s3_client.list_objects_v2(Bucket=bucket_name, Prefix=lKeyPrefix, MaxKeys=1)
+    job_head_key_prefix = f"{prefix}/l;{job.get_id()};"
+    response = s3_client.list_objects_v2(Bucket=bucket_name, Prefix=job_head_key_prefix, MaxKeys=1)
     for obj in response["Contents"]:
         s3_client.delete_object(Bucket=bucket_name, Key=obj["Key"])
-    lKey = _l_key(job)
-    s3_client.put_object(Body="", Bucket=bucket_name, Key=lKey)
+    job_head_key = _job_head_key(job)
+    s3_client.put_object(Body="", Bucket=bucket_name, Key=job_head_key)
     key = f"{prefix}/{job.get_id()}.yaml"
     s3_client.put_object(Body=yaml.dump(serialize_job(job)), Bucket=bucket_name, Key=key)
 
@@ -167,5 +170,14 @@ def get_job_heads(s3_client: BaseClient, bucket_name: str, repo_user_name: str, 
             job_heads.append(JobHead(repo_user_name, repo_name,
                                      job_id, run_name, workflow_name or None, provider_name,
                                      JobStatus(status), int(submitted_at), runner_id or None,
-                                     artifacts.split(',') if artifacts else None, tag_name or None))
+                                     artifacts.split(',') if artifacts else None, tag_name or None,
+                                     apps or None))
     return job_heads
+
+
+def delete_job_head(s3_client: BaseClient, bucket_name: str, repo_user_name: str, repo_name: str, job_id: str):
+    prefix = f"jobs/{repo_user_name}/{repo_name}"
+    job_head_key_prefix = f"{prefix}/l;{job_id};"
+    response = s3_client.list_objects_v2(Bucket=bucket_name, Prefix=job_head_key_prefix, MaxKeys=1)
+    for obj in response["Contents"]:
+        s3_client.delete_object(Bucket=bucket_name, Key=obj["Key"])

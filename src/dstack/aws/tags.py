@@ -106,7 +106,7 @@ def create_tag_from_local_dirs(s3_client: BaseClient, logs_client: BaseClient, b
     run_name = runs.create_run(s3_client, logs_client, bucket_name, repo.repo_user_name, repo.repo_name)
     job = Job(repo, run_name, None, "bash", JobStatus.DONE, int(round(time.time() * 1000)), "scratch",
               None, None, None, tag_artifacts, None, None, None, None, None, None, None, None, tag_name)
-    jobs.create_job(s3_client, bucket_name, job, listed=False)
+    jobs.create_job(s3_client, bucket_name, job, create_head=False)
     for index, local_path in enumerate(local_paths):
         artifacts.upload_job_artifact_files(s3_client, bucket_name, repo.repo_user_name, repo.repo_name,
                                             job.get_id(), tag_artifacts[index], local_path)

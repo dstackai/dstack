@@ -16,7 +16,7 @@ from rich.prompt import Confirm
 from dstack import providers
 from dstack.backend import load_backend, Backend
 from dstack.cli.logs import logs_func
-from dstack.cli.runs import runs_func
+from dstack.cli.status import status_func
 from dstack.cli.schema import workflows_schema_yaml
 from dstack.config import ConfigError
 from dstack.jobs import JobStatus
@@ -74,15 +74,15 @@ def poll_run(repo_user_name: str, repo_name: str, run_name: str, backend: Backen
                 if run.status not in [JobStatus.SUBMITTED]:
                     progress.update(task, total=100)
                     break
-                availability_issues = run.availability_issues
-                if availability_issues:
-                    if not availability_issues_printed:
-                        issue = availability_issues[0]
+                request_errors = run.request_errors
+                if request_errors:
+                    if not request_errors_printed:
+                        issue = request_errors[0]
                         progress.update(task, description=f"[yellow]⛔️ {issue.message}")
-                        availability_issues_printed = True
-                elif availability_issues_printed:
+                        request_errors_printed = True
+                elif request_errors_printed:
                     progress.update(task, description="Provisioning... It may take up to a minute.")
-                    availability_issues_printed = False
+                    request_errors_printed = False
                 time.sleep(3)
         console.print("Provisioning... It may take up to a minute. [green]✓[/]")
         console.print()
@@ -131,7 +131,7 @@ def run_workflow_func(args: Namespace):
             provider.load(provider_args, workflow_name, workflow_data)
             run_name = backend.create_run(repo.repo_user_name, repo.repo_name)
             provider.submit_jobs(run_name)
-            runs_func(Namespace(run_name=run_name, all=False))
+            status_func(Namespace(run_name=run_name, all=False))
             if not args.detach:
                 poll_run(repo.repo_user_name, repo.repo_name, run_name, backend)
 
@@ -144,7 +144,7 @@ def run_workflow_func(args: Namespace):
 
 
 def register_parsers(main_subparsers):
-    parser = main_subparsers.add_parser("run", help="Run a workflow", add_help=False)
+    parser = main_subparsers.add_parser("run", help="Run a workflow or a provider", add_help=False)
     parser.add_argument("workflow_or_provider", metavar="WORKFLOW | PROVIDER", type=str,
                         help="A name of a workflow or a provider", nargs="?")
     parser.add_argument("-d", "--detach", help="Do not poll for status update and logs", action="store_true")
