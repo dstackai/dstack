@@ -22,6 +22,8 @@ from dstack.config import ConfigError
 from dstack.jobs import JobStatus
 from dstack.repo import load_repo_data
 
+POLL_PROVISION_RATE_SECS = 3
+
 
 def _load_workflows():
     root_folder = Path(os.getcwd()) / ".dstack"
@@ -60,18 +62,19 @@ def parse_run_args(args: Namespace) -> Tuple[str, List[str], Optional[str], Dict
     return provider_name, provider_args, workflow_name, workflow_data
 
 
-# TODO: Stop the run on SIGTERM, SIGHUP, etc
 def poll_run(repo_user_name: str, repo_name: str, run_name: str, backend: Backend):
     console = Console()
     try:
         console.print()
-        availability_issues_printed = False
+        request_errors_printed = False
         with Progress(TextColumn("[progress.description]{task.description}"), SpinnerColumn(),
                       transient=True, ) as progress:
             task = progress.add_task("Provisioning... It may take up to a minute.", total=None)
             while True:
                 run = backend.get_runs(repo_user_name, repo_name, run_name)[0]
-                if run.status not in [JobStatus.SUBMITTED]:
+                if run.status.is_finished():
+                    sys.exit(0)
+                elif run.status not in [JobStatus.SUBMITTED]:
                     progress.update(task, total=100)
                     break
                 request_errors = run.request_errors
@@ -83,7 +86,7 @@ def poll_run(repo_user_name: str, repo_name: str, run_name: str, backend: Backen
                 elif request_errors_printed:
                     progress.update(task, description="Provisioning... It may take up to a minute.")
                     request_errors_printed = False
-                time.sleep(3)
+                time.sleep(POLL_PROVISION_RATE_SECS)
         console.print("Provisioning... It may take up to a minute. [green]✓[/]")
         console.print()
         console.print("[grey58]To interrupt, press Ctrl+C.[/]")

@@ -7,11 +7,11 @@ from typing import Optional, Dict, List, Generator
 
 from botocore.client import BaseClient
 
-from dstack.jobs import JobApp
-from dstack.aws import jobs
+from dstack.aws import jobs, runs
 from dstack.backend import LogEvent, LogEventSource
+from dstack.jobs import JobApp
 
-SLEEP_SECONDS = 1
+POLL_LOGS_RATE_SECS = 1
 
 
 def _render_log_message(s3_client: BaseClient, bucket_name: str, log_message: str,
@@ -63,8 +63,11 @@ def _reset_filter_log_events_params(fle_kwargs, event_ids_per_timestamp):
     fle_kwargs.pop('nextToken', None)
 
 
-def _do_filter_log_events(logs_client: BaseClient, filter_logs_events_kwargs: dict):
+def _do_filter_log_events(s3_client: BaseClient, logs_client: BaseClient, bucket_name: str,
+                          repo_user_name: str, repo_name: str, run_name: str,
+                          filter_logs_events_kwargs: dict):
     event_ids_per_timestamp = defaultdict(set)
+    counter = 0
     while True:
         response = logs_client.filter_log_events(**filter_logs_events_kwargs)
 
@@ -82,7 +85,12 @@ def _do_filter_log_events(logs_client: BaseClient, filter_logs_events_kwargs: di
                 filter_logs_events_kwargs,
                 event_ids_per_timestamp
             )
-            time.sleep(SLEEP_SECONDS)
+            time.sleep(POLL_LOGS_RATE_SECS)
+            counter = counter + 1
+            if counter % 3 == 0:
+                run = runs.get_runs(s3_client, bucket_name, repo_user_name, repo_name, run_name)[0]
+                if run.status.is_finished():
+                    break
 
 
 def create_log_group_if_not_exists(logs_client: BaseClient, bucket_name: str, log_group_name: str):
@@ -102,7 +110,8 @@ def create_log_stream(logs_client: BaseClient, log_group_name: str, run_name: st
     logs_client.create_log_stream(logGroupName=log_group_name, logStreamName=run_name)
 
 
-def poll_logs(s3_client: BaseClient, logs_client: BaseClient, bucket_name: str, repo_user_name: str, repo_name: str,
+def poll_logs(s3_client: BaseClient, logs_client: BaseClient, bucket_name: str,
+              repo_user_name: str, repo_name: str,
               run_name: str, start_time: int, attached: bool) -> Generator[LogEvent, None, None]:
     filter_logs_events_kwargs = {
         "logGroupName": f"/dstack/jobs/{bucket_name}/{repo_user_name}/{repo_name}",
@@ -116,7 +125,8 @@ def poll_logs(s3_client: BaseClient, logs_client: BaseClient, bucket_name: str, 
 
     try:
         if attached:
-            for event in _do_filter_log_events(logs_client, filter_logs_events_kwargs):
+            for event in _do_filter_log_events(s3_client, logs_client, bucket_name, repo_user_name, repo_name, run_name,
+                                               filter_logs_events_kwargs):
                 log_message = _render_log_message(s3_client, bucket_name, event["message"], repo_user_name, repo_name,
                                                   event.get("job_id"), job_host_names, job_ports, job_apps)
                 yield LogEvent(event["timestamp"], event.get("job_id"), log_message,

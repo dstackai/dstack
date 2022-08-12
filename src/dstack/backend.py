@@ -155,33 +155,7 @@ class Backend(ABC):
             self.delete_job_head(repo_user_name, repo_name, job_head.get_id())
 
     def get_runs(self, repo_user_name: str, repo_name: str, run_name: Optional[str] = None) -> List[Run]:
-        runs_by_id = {}
-        job_heads = self.get_job_heads(repo_user_name, repo_name, run_name)
-        for job_head in job_heads:
-            run_id = ','.join([job_head.run_name, job_head.workflow_name or ''])
-            if run_id not in runs_by_id:
-                run_apps = list(map(lambda a: RunApp(job_head.get_id(), a), job_head.apps)) if job_head.apps else None
-                run = Run(repo_user_name, repo_name, job_head.run_name, job_head.workflow_name, job_head.provider_name,
-                          job_head.artifacts or None, job_head.status, job_head.submitted_at, job_head.tag_name,
-                          run_apps, None)
-                runs_by_id[run_id] = run
-            else:
-                run = runs_by_id[run_id]
-                run.submitted_at = min(run.submitted_at, job_head.submitted_at)
-                if job_head.artifacts:
-                    if run.artifacts is None:
-                        run.artifacts = []
-                    run.artifacts.extend(job_head.artifacts)
-                if job_head.apps:
-                    if run.apps is None:
-                        run.apps = []
-                    run.apps.extend(list(map(lambda a: RunApp(job_head.get_id(), a), job_head.apps)))
-                if job_head.status.is_unfinished():
-                    # TODO: implement max(status1, status2)
-                    run.status = job_head.status
-
-        runs = list(runs_by_id.values())
-        return sorted(runs, key=lambda r: r.submitted_at, reverse=True)
+        pass
 
     def poll_logs(self, repo_user_name: str, repo_name: str, run_name: str, start_time: int,
                   attached: bool) -> Generator[LogEvent, None, None]:
