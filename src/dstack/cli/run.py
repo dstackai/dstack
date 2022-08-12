@@ -20,7 +20,7 @@ from dstack.cli.status import status_func
 from dstack.cli.schema import workflows_schema_yaml
 from dstack.config import ConfigError
 from dstack.jobs import JobStatus
-from dstack.repo import load_repo
+from dstack.repo import load_repo_data
 
 
 def _load_workflows():
@@ -117,7 +117,7 @@ def run_workflow_func(args: Namespace):
               "  -h, --help     Show this help output, or the help for a specified workflow or provider.")
     else:
         try:
-            repo = load_repo()
+            repo_data = load_repo_data()
             backend = load_backend()
 
             provider_name, provider_args, workflow_name, workflow_data = parse_run_args(args)
@@ -129,11 +129,11 @@ def run_workflow_func(args: Namespace):
                 sys.exit()
 
             provider.load(provider_args, workflow_name, workflow_data)
-            run_name = backend.create_run(repo.repo_user_name, repo.repo_name)
+            run_name = backend.create_run(repo_data.repo_user_name, repo_data.repo_name)
             provider.submit_jobs(run_name)
             status_func(Namespace(run_name=run_name, all=False))
             if not args.detach:
-                poll_run(repo.repo_user_name, repo.repo_name, run_name, backend)
+                poll_run(repo_data.repo_user_name, repo_data.repo_name, run_name, backend)
 
         except ConfigError:
             sys.exit(f"Call 'dstack config' first")

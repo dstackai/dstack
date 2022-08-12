@@ -8,7 +8,7 @@ from typing import Optional, List, Dict, Any
 
 from dstack.backend import load_backend, Backend
 from dstack.jobs import Job, JobStatus, JobSpec, Requirements, GpusRequirements, Dep
-from dstack.repo import load_repo, Repo
+from dstack.repo import load_repo_data, RepoData
 from dstack.util import _quoted
 
 
@@ -150,14 +150,14 @@ class Provider:
         if not self.loaded:
             raise Exception("The provider is not loaded")
         job_specs = self.create_job_specs()
-        repo = load_repo()
+        repo_data = load_repo_data()
         backend = load_backend()
         # [TODO] Handle master job
         jobs = []
         counter = []
         for job_spec in job_specs:
             submitted_at = int(round(time.time() * 1000))
-            job = Job(repo, run_name, self.provider_data.get("workflow_name") or None,
+            job = Job(repo_data, run_name, self.provider_data.get("workflow_name") or None,
                       self.provider_data.get("provider_name") or None, JobStatus.SUBMITTED, submitted_at,
                       job_spec.image_name, job_spec.commands, job_spec.env,
                       job_spec.working_dir, job_spec.artifacts, job_spec.port_count, None, None,
@@ -168,14 +168,14 @@ class Provider:
 
     def _deps(self) -> Optional[List[Dep]]:
         if self.provider_data.get("deps"):
-            repo = load_repo()
+            repo_data = load_repo_data()
             backend = load_backend()
-            return [self._parse_dep(dep, backend, repo) for dep in self.provider_data["deps"]]
+            return [self._parse_dep(dep, backend, repo_data) for dep in self.provider_data["deps"]]
         else:
             return None
 
     @staticmethod
-    def _parse_dep(dep: str, backend: Backend, repo: Repo) -> Dep:
+    def _parse_dep(dep: str, backend: Backend, repo_data: RepoData) -> Dep:
         if dep.startswith(":"):
             tag_dep = True
             dep = dep[1:]
@@ -184,9 +184,9 @@ class Provider:
         t = dep.split("/")
         if len(t) == 1:
             if tag_dep:
-                return Provider._tag_dep(backend, repo.repo_user_name, repo.repo_name, t[0])
+                return Provider._tag_dep(backend, repo_data.repo_user_name, repo_data.repo_name, t[0])
             else:
-                return Provider._workflow_dep(backend, repo.repo_user_name, repo.repo_name, t[0])
+                return Provider._workflow_dep(backend, repo_data.repo_user_name, repo_data.repo_name, t[0])
         elif len(t) == 3:
             if tag_dep:
                 return Provider._tag_dep(backend, t[0], t[1], t[2])

@@ -7,15 +7,15 @@ from rich.console import Console
 from rich.table import Table
 
 from dstack.backend import load_backend
-from dstack.repo import load_repo
+from dstack.repo import load_repo_data
 from dstack.config import ConfigError
 
 
 def download_func(args: Namespace):
     try:
         backend = load_backend()
-        repo = load_repo()
-        backend.download_run_artifact_files(repo.repo_user_name, repo.repo_name, args.run_name, args.output)
+        repo_data = load_repo_data()
+        backend.download_run_artifact_files(repo_data.repo_user_name, repo_data.repo_name, args.run_name, args.output)
     except InvalidGitRepositoryError:
         sys.exit(f"{os.getcwd()} is not a Git repo")
     except ConfigError:
@@ -33,8 +33,9 @@ def sizeof_fmt(num, suffix='B'):
 def list_func(args: Namespace):
     try:
         backend = load_backend()
-        repo = load_repo()
-        run_artifact_files = backend.list_run_artifact_files(repo.repo_user_name, repo.repo_name, args.run_name)
+        repo_data = load_repo_data()
+        run_artifact_files = backend.list_run_artifact_files(repo_data.repo_user_name, repo_data.repo_name,
+                                                             args.run_name)
         console = Console()
         table = Table()
         table.add_column("Artifact", style="bold", no_wrap=True)

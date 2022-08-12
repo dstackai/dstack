@@ -9,7 +9,7 @@ from git import InvalidGitRepositoryError
 from rich import print
 
 from dstack.backend import load_backend
-from dstack.repo import load_repo
+from dstack.repo import load_repo_data
 from dstack.config import ConfigError
 
 
@@ -42,11 +42,12 @@ def logs_func(args: Namespace):
     try:
         backend = load_backend()
 
-        repo = load_repo()
+        repo_data = load_repo_data()
         start_time = to_epoch_millis(args.since)
 
         try:
-            for event in backend.poll_logs(repo.repo_user_name, repo.repo_name, args.run_name, start_time, args.follow):
+            for event in backend.poll_logs(repo_data.repo_user_name, repo_data.repo_name, args.run_name, start_time,
+                                           args.follow):
                 print(event.log_message)
         except KeyboardInterrupt as e:
             if args.follow is True:

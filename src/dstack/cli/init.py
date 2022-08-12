@@ -9,13 +9,13 @@ from requests import request
 import urllib.parse
 import webbrowser
 
-from dstack.repo import load_repo
+from dstack.repo import load_repo_data
 
 
 def init_func(args: Namespace):
     try:
         dstack_config = get_config()
-        repo_url, _, _, _ = load_repo()
+        repo_url, _, _, _ = load_repo_data()
         # TODO: Support non-default profiles
         profile = dstack_config.get_profile("default")
         if repo_url.startswith("https://github.com/") and args.github_token is None:

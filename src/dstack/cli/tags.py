@@ -8,14 +8,14 @@ from rich.table import Table
 from dstack.backend import load_backend
 from dstack.cli.common import pretty_date
 from dstack.config import ConfigError
-from dstack.repo import load_repo
+from dstack.repo import load_repo_data
 
 
 def list_tags_func(_: Namespace):
     try:
         backend = load_backend()
-        repo = load_repo()
-        tag_heads = backend.get_tag_heads(repo.repo_user_name, repo.repo_name)
+        repo_data = load_repo_data()
+        tag_heads = backend.get_tag_heads(repo_data.repo_user_name, repo_data.repo_name)
         console = Console()
         table = Table()
         table.add_column("Tag", style="bold", no_wrap=True)
@@ -42,14 +42,14 @@ def list_tags_func(_: Namespace):
 def create_tag_func(args: Namespace):
     try:
         backend = load_backend()
-        repo = load_repo()
-        if backend.get_tag_head(repo.repo_user_name, repo.repo_name, args.tag_name):
+        repo_data = load_repo_data()
+        if backend.get_tag_head(repo_data.repo_user_name, repo_data.repo_name, args.tag_name):
             sys.exit(f"The tag '{args.tag_name}' already exists")
         else:
             if args.run_name:
-                backend.create_tag_from_run(repo.repo_user_name, repo.repo_name, args.tag_name, args.run_name)
+                backend.create_tag_from_run(repo_data.repo_user_name, repo_data.repo_name, args.tag_name, args.run_name)
             else:
-                backend.create_tag_from_local_dirs(repo, args.tag_name, args.local_dirs)
+                backend.create_tag_from_local_dirs(repo_data, args.tag_name, args.local_dirs)
         print(f"[grey58]OK[/]")
     except ConfigError:
         sys.exit(f"Call 'dstack config' first")
@@ -58,12 +58,12 @@ def create_tag_func(args: Namespace):
 def delete_tag_func(args: Namespace):
     try:
         backend = load_backend()
-        repo = load_repo()
-        tag_head = backend.get_tag_head(repo.repo_user_name, repo.repo_name, args.tag_name)
+        repo_data = load_repo_data()
+        tag_head = backend.get_tag_head(repo_data.repo_user_name, repo_data.repo_name, args.tag_name)
         if not tag_head:
             sys.exit(f"The tag '{args.tag_name}' doesn't exist")
         else:
-            backend.delete_tag(repo.repo_user_name, repo.repo_name, tag_head)
+            backend.delete_tag(repo_data.repo_user_name, repo_data.repo_name, tag_head)
         print(f"[grey58]OK[/]")
     except ConfigError:
         sys.exit(f"Call 'dstack config' first")

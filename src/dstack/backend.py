@@ -4,7 +4,7 @@ from enum import Enum
 from typing import List, Optional, Generator, Tuple
 
 from dstack.jobs import Job, JobStatus, JobHead
-from dstack.repo import Repo
+from dstack.repo import RepoData
 from dstack.runners import Resources, Runner
 from dstack.util import _quoted
 from dstack.config import load_config, AwsBackendConfig
@@ -203,7 +203,7 @@ class Backend(ABC):
     def create_tag_from_run(self, repo_user_name: str, repo_name: str, tag_name: str, run_name: str):
         pass
 
-    def create_tag_from_local_dirs(self, repo: Repo, tag_name: str, local_dirs: List[str]):
+    def create_tag_from_local_dirs(self, repo_data: RepoData, tag_name: str, local_dirs: List[str]):
         pass
 
     def delete_tag(self, repo_user_name: str, repo_name: str, tag_head: TagHead):

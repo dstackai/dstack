@@ -2,7 +2,7 @@ import sys
 from argparse import ArgumentParser, SUPPRESS, Namespace
 
 from dstack.cli import app, logs, run, stop, artifacts, status, init, \
-    restart, prune, tags, config
+    restart, delete, tags, config
 from dstack.version import __version__ as version
 
 
@@ -50,7 +50,7 @@ def main():
     config.register_parsers(subparsers)
     init.register_parsers(subparsers)
     logs.register_parsers(subparsers)
-    prune.register_parsers(subparsers)
+    delete.register_parsers(subparsers)
     restart.register_parsers(subparsers)
     run.register_parsers(subparsers)
     status.register_parsers(subparsers)

@@ -3,7 +3,7 @@ from enum import Enum
 from typing import Optional, List, Dict, Any
 
 from dstack.util import _quoted
-from dstack.repo import Repo
+from dstack.repo import RepoData
 
 
 class GpusRequirements:
@@ -140,7 +140,7 @@ class Dep:
 
 
 class Job(JobRef):
-    def __init__(self, repo: Repo, run_name: str, workflow_name: Optional[str], provider_name: str,
+    def __init__(self, repo_data: RepoData, run_name: str, workflow_name: Optional[str], provider_name: str,
                  status: JobStatus, submitted_at: int,
                  image_name: str, commands: Optional[List[str]],
                  env: Dict[str, str], working_dir: Optional[str],
@@ -152,7 +152,7 @@ class Job(JobRef):
                  runner_id: Optional[str],
                  tag_name: Optional[str]):
         self.id = None
-        self.repo = repo
+        self.repo_data = repo_data
         self.run_name = run_name
         self.workflow_name = workflow_name
         self.provider_name = provider_name
@@ -180,7 +180,7 @@ class Job(JobRef):
         self.id = id
 
     def __str__(self) -> str:
-        return f'Job(id="{self.id}", repo={self.repo}, ' \
+        return f'Job(id="{self.id}", repo_data={self.repo_data}, ' \
                f'run_name="{self.run_name}", workflow_name={_quoted(self.workflow_name)}, ' \
                f'provider_name="{self.provider_name}", ' \
                f'status=JobStatus.{self.status.name}, ' \

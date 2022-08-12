@@ -495,7 +495,7 @@ def run_job(ec2_client: BaseClient, iam_client: BaseClient, s3_client: BaseClien
         else:
             job.status = JobStatus.FAILED
             jobs.update_job(s3_client, bucket_name, job)
-            sys.exit(f"No instance type matches the requirements")
+            sys.exit(f"No instance type matching requirements")
     else:
         raise Exception("Can't create a request for a job which status is not SUBMITTED")
 

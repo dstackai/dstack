@@ -8,16 +8,16 @@ from rich.prompt import Confirm
 
 from dstack.backend import load_backend
 from dstack.config import ConfigError
-from dstack.repo import load_repo
+from dstack.repo import load_repo_data
 
 
 def delete_func(args: Namespace):
     if (args.run_name and (args.yes or Confirm.ask(f"[red]Delete the run `{args.run_name}`?[/]"))) \
             or (args.all and (args.yes or Confirm.ask("[red]Delete all runs?[/]"))):
         try:
-            repo = load_repo()
+            repo_data = load_repo_data()
             backend = load_backend()
-            backend.delete_job_heads(repo.repo_user_name, repo.repo_name, args.run_name)
+            backend.delete_job_heads(repo_data.repo_user_name, repo_data.repo_name, args.run_name)
             print(f"[grey58]OK[/]")
         except InvalidGitRepositoryError:
             sys.exit(f"{os.getcwd()} is not a Git repo")

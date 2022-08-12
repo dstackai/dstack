@@ -7,7 +7,7 @@ from git import InvalidGitRepositoryError
 from rich.console import Console
 from rich.table import Table
 
-from dstack.repo import load_repo
+from dstack.repo import load_repo_data
 from dstack.backend import load_backend, Backend, Run
 from dstack.cli.common import colored, pretty_date
 from dstack.config import ConfigError
@@ -51,8 +51,8 @@ def pretty_print_status(run: Run) -> str:
 
 
 def print_runs(args: Namespace, backend: Backend):
-    repo = load_repo()
-    runs = backend.get_runs(repo.repo_user_name, repo.repo_name, args.run_name)
+    repo_data = load_repo_data()
+    runs = backend.get_runs(repo_data.repo_user_name, repo_data.repo_name, args.run_name)
     if not args.all:
         unfinished = any(run.status.is_unfinished() for run in runs)
         if unfinished:
@@ -95,8 +95,8 @@ def print_runs(args: Namespace, backend: Backend):
 
 def get_workflow_runs(args: Namespace, backend: Backend):
     workflows_by_id = {}
-    repo = load_repo()
-    job_heads = backend.get_job_heads(repo.repo_user_name, repo.repo_name, args.run_name)
+    repo_data = load_repo_data()
+    job_heads = backend.get_job_heads(repo_data.repo_user_name, repo_data.repo_name, args.run_name)
     unfinished = False
     for job_head in job_heads:
         if job_head.status.is_unfinished():

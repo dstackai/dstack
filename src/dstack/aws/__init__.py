@@ -85,6 +85,6 @@ class AwsBackend(Backend):
     def delete_tag(self, repo_user_name: str, repo_name: str, tag_head: TagHead):
         tags.delete_tag(self._s3_client(), self.backend_config.bucket_name, repo_user_name, repo_name, tag_head)
 
-    def create_tag_from_local_dirs(self, repo: Repo, tag_name: str, local_dirs: List[str]):
+    def create_tag_from_local_dirs(self, repo_data: RepoData, tag_name: str, local_dirs: List[str]):
         tags.create_tag_from_local_dirs(self._s3_client(), self._logs_client(), self.backend_config.bucket_name,
-                                        repo, tag_name, local_dirs)
+                                        repo_data, tag_name, local_dirs)

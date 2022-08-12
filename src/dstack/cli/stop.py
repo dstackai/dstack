@@ -8,16 +8,16 @@ from rich.prompt import Confirm
 
 from dstack.backend import load_backend
 from dstack.config import ConfigError
-from dstack.repo import load_repo
+from dstack.repo import load_repo_data
 
 
 def stop_func(args: Namespace):
     if (args.run_name and (args.yes or Confirm.ask(f"[red]Stop the run `{args.run_name}`?[/]"))) \
             or (args.all and (args.yes or Confirm.ask("[red]Stop all runs?[/]"))):
         try:
-            repo = load_repo()
+            repo_data = load_repo_data()
             backend = load_backend()
-            backend.stop_jobs(repo.repo_user_name, repo.repo_name, args.run_name, args.abort)
+            backend.stop_jobs(repo_data.repo_user_name, repo_data.repo_name, args.run_name, args.abort)
             print(f"[grey58]OK[/]")
         except InvalidGitRepositoryError:
             sys.exit(f"{os.getcwd()} is not a Git repo")

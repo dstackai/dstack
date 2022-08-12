@@ -4,7 +4,7 @@ import yaml
 from botocore.client import BaseClient
 
 from dstack.jobs import Job, JobStatus, JobHead, Requirements, GpusRequirements, JobRefId, JobApp, Dep
-from dstack.repo import Repo
+from dstack.repo import RepoData
 
 
 def serialize_job(job: Job) -> dict:
@@ -14,11 +14,11 @@ def serialize_job(job: Job) -> dict:
             deps.append(f"{dep.repo_user_name},{dep.repo_name},{dep.run_name}")
     job_data = {
         "job_id": job.get_id(),
-        "repo_user_name": job.repo.repo_user_name,
-        "repo_name": job.repo.repo_name,
-        "repo_branch": job.repo.repo_branch,
-        "repo_hash": job.repo.repo_hash,
-        "repo_diff": job.repo.repo_diff or '',
+        "repo_user_name": job.repo_data.repo_user_name,
+        "repo_name": job.repo_data.repo_name,
+        "repo_branch": job.repo_data.repo_branch,
+        "repo_hash": job.repo_data.repo_hash,
+        "repo_diff": job.repo_data.repo_diff or '',
         "run_name": job.run_name,
         "workflow_name": job.workflow_name or '',
         "provider_name": job.provider_name,
@@ -97,8 +97,8 @@ def unserialize_job(job_data: dict) -> Job:
     master_job = JobRefId(job_data["master_job_id"]) if job_data.get("master_job_id") else None
     apps = ([JobApp(a["port_index"], a["app_name"], a.get("url_path") or None, a.get("url_query_params") or None) for a
              in (job_data["apps"] or [])]) or None
-    job = Job(Repo(job_data["repo_user_name"], job_data["repo_name"], job_data["repo_branch"], job_data["repo_hash"],
-                   job_data["repo_diff"] or None),
+    job = Job(RepoData(job_data["repo_user_name"], job_data["repo_name"], job_data["repo_branch"], job_data["repo_hash"],
+                       job_data["repo_diff"] or None),
               job_data["run_name"], job_data.get("workflow_name") or None, job_data["provider_name"],
               JobStatus(job_data["status"]), job_data["submitted_at"], job_data["image_name"],
               job_data.get("commands") or None,
@@ -112,7 +112,7 @@ def unserialize_job(job_data: dict) -> Job:
 
 
 def _job_head_key(job: Job):
-    prefix = f"jobs/{job.repo.repo_user_name}/{job.repo.repo_name}"
+    prefix = f"jobs/{job.repo_data.repo_user_name}/{job.repo_data.repo_name}"
     lKey = f"{prefix}/l;{job.get_id()};" \
            f"{job.provider_name};{job.submitted_at};{job.status.value};" \
            f"{job.runner_id or ''};{','.join(job.artifacts or [])};" \
@@ -128,7 +128,7 @@ def create_job(s3_client: BaseClient, bucket_name: str, job: Job, counter: List[
     if create_head:
         lKey = _job_head_key(job)
         s3_client.put_object(Body="", Bucket=bucket_name, Key=lKey)
-    prefix = f"jobs/{job.repo.repo_user_name}/{job.repo.repo_name}"
+    prefix = f"jobs/{job.repo_data.repo_user_name}/{job.repo_data.repo_name}"
     key = f"{prefix}/{job_id}.yaml"
     s3_client.put_object(Body=yaml.dump(serialize_job(job)), Bucket=bucket_name, Key=key)
     counter[0] += 1
@@ -144,7 +144,7 @@ def get_job(s3_client: BaseClient, bucket_name: str, repo_user_name: str, repo_n
 
 
 def update_job(s3_client: BaseClient, bucket_name: str, job: Job):
-    prefix = f"jobs/{job.repo.repo_user_name}/{job.repo.repo_name}"
+    prefix = f"jobs/{job.repo_data.repo_user_name}/{job.repo_data.repo_name}"
     job_head_key_prefix = f"{prefix}/l;{job.get_id()};"
     response = s3_client.list_objects_v2(Bucket=bucket_name, Prefix=job_head_key_prefix, MaxKeys=1)
     for obj in response["Contents"]:

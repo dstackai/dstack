@@ -8,7 +8,7 @@ from git import Repo as GitRepo
 from paramiko.config import SSHConfig
 
 
-class Repo:
+class RepoData:
     def __init__(self, repo_user_name: str, repo_name: str, repo_branch: str, repo_hash: str, repo_diff: Optional[str]):
         self.repo_user_name = repo_user_name
         self.repo_name = repo_name
@@ -17,14 +17,14 @@ class Repo:
         self.repo_diff = repo_diff
 
     def __str__(self) -> str:
-        return f'Repo(repo_user_name="{self.repo_user_name}", ' \
+        return f'RepoData(repo_user_name="{self.repo_user_name}", ' \
                f'repo_name="{self.repo_name}", ' \
                f'repo_branch="{self.repo_branch}", ' \
                f'repo_hash="{self.repo_hash}", ' \
                f'repo_diff_length={len(self.repo_diff) if self.repo_diff else None})'
 
 
-def load_repo() -> Repo:
+def load_repo_data() -> RepoData:
     # TODO: Allow to override the current working directory, e.g. via --dir
     cwd = os.getcwd()
     repo = GitRepo(cwd)
@@ -54,7 +54,7 @@ def load_repo() -> Repo:
         if result:
             repo_user_name = result.group(2)
             repo_name = result.group(3)
-            return Repo(repo_user_name, repo_name, repo_branch, repo_hash, repo_diff)
+            return RepoData(repo_user_name, repo_name, repo_branch, repo_hash, repo_diff)
         else:
             sys.exit(f"{os.getcwd()} is not a GitHub repo")
     else:
