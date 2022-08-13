@@ -92,7 +92,8 @@ class JobStatus(Enum):
 class JobHead(JobRef):
     def __init__(self, repo_user_name: str, repo_name: str, job_id: str, run_name: str, workflow_name: Optional[str],
                  provider_name: str, status: JobStatus, submitted_at: int, runner_id: Optional[str],
-                 artifacts: Optional[List[str]], tag_name: Optional[str], apps: Optional[List[str]]):
+                 request_id: Optional[str], artifacts: Optional[List[str]], tag_name: Optional[str],
+                 apps: Optional[List[str]]):
         self.id = job_id
         self.repo_user_name = repo_user_name
         self.repo_name = repo_name
@@ -102,6 +103,7 @@ class JobHead(JobRef):
         self.status = status
         self.submitted_at = submitted_at
         self.runner_id = runner_id
+        self.request_id = request_id
         self.artifacts = artifacts
         self.tag_name = tag_name
         self.apps = apps
@@ -122,6 +124,7 @@ class JobHead(JobRef):
                f'status=JobStatus.{self.status.name}, ' \
                f'submitted_at={self.submitted_at}, ' \
                f'runner_id={_quoted(self.runner_id)}, ' \
+               f'request_id={_quoted(self.request_id)}, ' \
                f'artifacts={artifacts}, ' \
                f'tag_name={_quoted(self.tag_name)}, ' \
                f'apps={apps})'
@@ -141,15 +144,11 @@ class Dep:
 
 class Job(JobRef):
     def __init__(self, repo_data: RepoData, run_name: str, workflow_name: Optional[str], provider_name: str,
-                 status: JobStatus, submitted_at: int,
-                 image_name: str, commands: Optional[List[str]],
-                 env: Dict[str, str], working_dir: Optional[str],
-                 artifacts: Optional[List[str]],
-                 port_count: Optional[int], ports: Optional[List[int]],
-                 host_name: Optional[str],
-                 requirements: Optional[Requirements], deps: Optional[List[Dep]],
-                 master_job: Optional[JobRef], apps: Optional[List[JobApp]],
-                 runner_id: Optional[str],
+                 status: JobStatus, submitted_at: int, image_name: str, commands: Optional[List[str]],
+                 env: Optional[Dict[str, str]], working_dir: Optional[str], artifacts: Optional[List[str]],
+                 port_count: Optional[int], ports: Optional[List[int]], host_name: Optional[str],
+                 requirements: Optional[Requirements], deps: Optional[List[Dep]], master_job: Optional[JobRef],
+                 apps: Optional[List[JobApp]], runner_id: Optional[str], request_id: Optional[str],
                  tag_name: Optional[str]):
         self.id = None
         self.repo_data = repo_data
@@ -171,6 +170,7 @@ class Job(JobRef):
         self.master_job = master_job
         self.apps = apps
         self.runner_id = runner_id
+        self.request_id = request_id
         self.tag_name = tag_name
 
     def get_id(self) -> Optional[str]:
@@ -198,7 +198,14 @@ class Job(JobRef):
                f'master_job={self.master_job}, ' \
                f'apps={("[" + ", ".join(map(lambda a: str(a), self.apps)) + "]") if self.apps else None}, ' \
                f'runner_id={_quoted(self.runner_id)}, ' \
+               f'request_id={_quoted(self.request_id)}, ' \
                f'tag_name={_quoted(self.tag_name)})'
+
+    def head(self) -> JobHead:
+        return JobHead(self.repo_data.repo_user_name, self.repo_data.repo_name, self.id, self.run_name,
+                       self.workflow_name, self.provider_name, self.status, self.submitted_at, self.runner_id,
+                       self.request_id, self.artifacts, self.tag_name,
+                       list(map(lambda a: a.app_name, self.apps)) if self.apps else None)
 
 
 class JobSpec(JobRef):

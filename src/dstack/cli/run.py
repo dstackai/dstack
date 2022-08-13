@@ -15,11 +15,11 @@ from rich.prompt import Confirm
 
 from dstack import providers
 from dstack.backend import load_backend, Backend
-from dstack.cli.logs import logs_func
+from dstack.cli.logs import logs_func, poll_logs, since
 from dstack.cli.status import status_func
 from dstack.cli.schema import workflows_schema_yaml
 from dstack.config import ConfigError
-from dstack.jobs import JobStatus
+from dstack.jobs import JobStatus, JobHead
 from dstack.repo import load_repo_data
 
 POLL_PROVISION_RATE_SECS = 3
@@ -62,7 +62,7 @@ def parse_run_args(args: Namespace) -> Tuple[str, List[str], Optional[str], Dict
     return provider_name, provider_args, workflow_name, workflow_data
 
 
-def poll_run(repo_user_name: str, repo_name: str, run_name: str, backend: Backend):
+def poll_run(repo_user_name: str, repo_name: str, job_heads: List[JobHead], backend: Backend):
     console = Console()
     try:
         console.print()
@@ -71,7 +71,7 @@ def poll_run(repo_user_name: str, repo_name: str, run_name: str, backend: Backen
                       transient=True, ) as progress:
             task = progress.add_task("Provisioning... It may take up to a minute.", total=None)
             while True:
-                run = backend.get_runs(repo_user_name, repo_name, run_name)[0]
+                run = next(iter(backend.get_runs(repo_user_name, repo_name, job_heads)))
                 if run.status.is_finished():
                     sys.exit(0)
                 elif run.status not in [JobStatus.SUBMITTED]:
@@ -91,8 +91,9 @@ def poll_run(repo_user_name: str, repo_name: str, run_name: str, backend: Backen
         console.print()
         console.print("[grey58]To interrupt, press Ctrl+C.[/]")
         console.print()
-        logs_func(Namespace(run_name=run_name, follow=True, since="1d", from_run=True))
+        poll_logs(backend, repo_user_name, repo_name, job_heads, since("1d"), from_run=True)
     except KeyboardInterrupt:
+        run_name = job_heads[0].run_name
         if Confirm.ask(f" [red]Stop the run `{run_name}`?[/]"):
             backend.stop_jobs(repo_user_name, repo_name, run_name, abort=True)
             console.print(f"[grey58]OK[/]")
@@ -133,10 +134,11 @@ def run_workflow_func(args: Namespace):
 
             provider.load(provider_args, workflow_name, workflow_data)
             run_name = backend.create_run(repo_data.repo_user_name, repo_data.repo_name)
-            provider.submit_jobs(run_name)
+            jobs = provider.submit_jobs(run_name)
+            job_heads = [j.head() for j in jobs]
             status_func(Namespace(run_name=run_name, all=False))
             if not args.detach:
-                poll_run(repo_data.repo_user_name, repo_data.repo_name, run_name, backend)
+                poll_run(repo_data.repo_user_name, repo_data.repo_name, job_heads, backend)
 
         except ConfigError:
             sys.exit(f"Call 'dstack config' first")

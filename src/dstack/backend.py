@@ -3,11 +3,11 @@ from abc import ABC
 from enum import Enum
 from typing import List, Optional, Generator, Tuple
 
+from dstack.config import load_config, AwsBackendConfig
 from dstack.jobs import Job, JobStatus, JobHead
 from dstack.repo import RepoData
 from dstack.runners import Resources, Runner
 from dstack.util import _quoted
-from dstack.config import load_config, AwsBackendConfig
 
 
 class InstanceType:
@@ -124,7 +124,7 @@ class Backend(ABC):
     def get_job(self, repo_user_name: str, repo_name: str, job_id: str) -> Job:
         pass
 
-    def get_job_heads(self, repo_user_name: str, repo_name: str, run_name: Optional[str] = None) -> List[JobHead]:
+    def list_job_heads(self, repo_user_name: str, repo_name: str, run_name: Optional[str] = None) -> List[JobHead]:
         pass
 
     def run_job(self, job: Job) -> Runner:
@@ -137,14 +137,14 @@ class Backend(ABC):
         pass
 
     def stop_jobs(self, repo_user_name: str, repo_name: str, run_name: Optional[str], abort: bool):
-        job_heads = self.get_job_heads(repo_user_name, repo_name, run_name)
+        job_heads = self.list_job_heads(repo_user_name, repo_name, run_name)
         for job_head in job_heads:
             if job_head.status.is_unfinished():
-                self.stop_job(repo_user_name, repo_name, job_head.get_id(), abort)
+                self.stop_job(repo_user_name, repo_name, job_head.id, abort)
 
     def delete_job_heads(self, repo_user_name: str, repo_name: str, run_name: Optional[str]):
         job_heads = []
-        for job_head in self.get_job_heads(repo_user_name, repo_name, run_name):
+        for job_head in self.list_job_heads(repo_user_name, repo_name, run_name):
             if job_head.status.is_finished():
                 job_heads.append(job_head)
             else:
@@ -152,9 +152,12 @@ class Backend(ABC):
                     sys.exit("The run is not finished yet. Stop the run first.")
 
         for job_head in job_heads:
-            self.delete_job_head(repo_user_name, repo_name, job_head.get_id())
+            self.delete_job_head(repo_user_name, repo_name, job_head.id)
 
-    def get_runs(self, repo_user_name: str, repo_name: str, run_name: Optional[str] = None) -> List[Run]:
+    def list_runs(self, repo_user_name: str, repo_name: str, run_name: Optional[str] = None) -> List[Run]:
+        pass
+
+    def get_runs(self, repo_user_name: str, repo_name: str, job_heads: List[JobHead]) -> List[Run]:
         pass
 
     def poll_logs(self, repo_user_name: str, repo_name: str, run_name: str, start_time: int,
@@ -168,7 +171,7 @@ class Backend(ABC):
     def list_run_artifact_files(self, repo_user_name: str, repo_name: str, run_name: str) -> List[Tuple[str, str, int]]:
         pass
 
-    def get_tag_heads(self, repo_user_name: str, repo_name: str) -> List[TagHead]:
+    def list_tag_heads(self, repo_user_name: str, repo_name: str) -> List[TagHead]:
         pass
 
     def get_tag_head(self, repo_user_name: str, repo_name: str, tag_name: str) -> Optional[TagHead]:

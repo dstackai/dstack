@@ -3,12 +3,14 @@ import re
 import sys
 from argparse import Namespace
 from datetime import datetime, timedelta
+from typing import List
 
 from botocore.utils import parse_timestamp, datetime2timestamp
 from git import InvalidGitRepositoryError
 from rich import print
 
 from dstack.backend import load_backend
+from dstack.jobs import JobHead
 from dstack.repo import load_repo_data
 from dstack.config import ConfigError
 
@@ -24,7 +26,7 @@ def _relative_timestamp_to_datetime(amount, unit):
     return datetime.utcnow() + timedelta(seconds=amount * multiplier * -1)
 
 
-def to_epoch_millis(timestamp):
+def since(timestamp):
     regex = re.compile(
         r"(?P<amount>\d+)(?P<unit>s|m|h|d|w)$"
     )
@@ -41,26 +43,28 @@ def to_epoch_millis(timestamp):
 def logs_func(args: Namespace):
     try:
         backend = load_backend()
-
         repo_data = load_repo_data()
-        start_time = to_epoch_millis(args.since)
-
-        try:
-            for event in backend.poll_logs(repo_data.repo_user_name, repo_data.repo_name, args.run_name, start_time,
-                                           args.follow):
-                print(event.log_message)
-        except KeyboardInterrupt as e:
-            if args.follow is True:
-                # The only way to exit from the --follow is to Ctrl-C. So
-                # we should exit the iterator rather than having the
-                # KeyboardInterrupt propagate to the rest of the command.
-                if hasattr(args, "from_run"):
-                    raise e
-
+        start_time = since(args.since)
+        job_heads = backend.list_job_heads(repo_data.repo_user_name, repo_data.repo_name, args.run_name)
+        poll_logs(backend, repo_data.repo_user_name, repo_data.repo_name, job_heads, start_time, args.follow)
     except InvalidGitRepositoryError:
         sys.exit(f"{os.getcwd()} is not a Git repo")
     except ConfigError:
         sys.exit(f"Call 'dstack config' first")
+
+
+def poll_logs(backend, repo_user_name: str, repo_name: str, job_heads: List[JobHead], start_time: int, follow: bool,
+              from_run: bool = False):
+    try:
+        for event in backend.poll_logs(repo_user_name, repo_name, job_heads, start_time, follow):
+            print(event.log_message)
+    except KeyboardInterrupt as e:
+        if follow is True:
+            # The only way to exit from the --follow is to Ctrl-C. So
+            # we should exit the iterator rather than having the
+            # KeyboardInterrupt propagate to the rest of the command.
+            if from_run:
+                raise e
 
 
 def register_parsers(main_subparsers):

@@ -13,7 +13,7 @@ def serialize_job(job: Job) -> dict:
         for dep in job.deps:
             deps.append(f"{dep.repo_user_name},{dep.repo_name},{dep.run_name}")
     job_data = {
-        "job_id": job.get_id(),
+        "job_id": job.id,
         "repo_user_name": job.repo_data.repo_user_name,
         "repo_name": job.repo_data.repo_name,
         "repo_branch": job.repo_data.repo_branch,
@@ -97,15 +97,15 @@ def unserialize_job(job_data: dict) -> Job:
     master_job = JobRefId(job_data["master_job_id"]) if job_data.get("master_job_id") else None
     apps = ([JobApp(a["port_index"], a["app_name"], a.get("url_path") or None, a.get("url_query_params") or None) for a
              in (job_data["apps"] or [])]) or None
-    job = Job(RepoData(job_data["repo_user_name"], job_data["repo_name"], job_data["repo_branch"], job_data["repo_hash"],
-                       job_data["repo_diff"] or None),
-              job_data["run_name"], job_data.get("workflow_name") or None, job_data["provider_name"],
+    job = Job(RepoData(job_data["repo_user_name"], job_data["repo_name"], job_data["repo_branch"],
+                       job_data["repo_hash"], job_data["repo_diff"] or None), job_data["run_name"],
+              job_data.get("workflow_name") or None, job_data["provider_name"],
               JobStatus(job_data["status"]), job_data["submitted_at"], job_data["image_name"],
               job_data.get("commands") or None,
               job_data["env"] or None, job_data.get("working_dir") or None, job_data.get("artifacts") or None,
               job_data.get("port_count") or None, job_data.get("ports") or None, job_data.get("host_name") or None,
               requirements, deps or None, master_job, apps, job_data.get("runner_id") or None,
-              job_data.get("tag_name"))
+              job_data.get("request_id") or None, job_data.get("tag_name"))
     if "job_id" in job_data:
         job.set_id(job_data["job_id"])
     return job
@@ -113,11 +113,16 @@ def unserialize_job(job_data: dict) -> Job:
 
 def _job_head_key(job: Job):
     prefix = f"jobs/{job.repo_data.repo_user_name}/{job.repo_data.repo_name}"
-    lKey = f"{prefix}/l;{job.get_id()};" \
-           f"{job.provider_name};{job.submitted_at};{job.status.value};" \
-           f"{job.runner_id or ''};{','.join(job.artifacts or [])};" \
-           f"{','.join(map(lambda a: a.app_name, job.apps or []))};{job.tag_name or ''}"
-    return lKey
+    key = f"{prefix}/l;" \
+          f"{job.id};" \
+          f"{job.provider_name};" \
+          f"{job.submitted_at};" \
+          f"{job.status.value};" \
+          f"{job.runner_id or ''};" \
+          f"{job.request_id or ''};" \
+          f"{','.join(job.artifacts or [])};" \
+          f"{','.join(map(lambda a: a.app_name, job.apps or []))};{job.tag_name or ''}"
+    return key
 
 
 def create_job(s3_client: BaseClient, bucket_name: str, job: Job, counter: List[int] = [], create_head: bool = True):
@@ -126,8 +131,7 @@ def create_job(s3_client: BaseClient, bucket_name: str, job: Job, counter: List[
     job_id = f"{job.run_name},{job.workflow_name or ''},{counter[0]}"
     job.set_id(job_id)
     if create_head:
-        lKey = _job_head_key(job)
-        s3_client.put_object(Body="", Bucket=bucket_name, Key=lKey)
+        s3_client.put_object(Body="", Bucket=bucket_name, Key=_job_head_key(job))
     prefix = f"jobs/{job.repo_data.repo_user_name}/{job.repo_data.repo_name}"
     key = f"{prefix}/{job_id}.yaml"
     s3_client.put_object(Body=yaml.dump(serialize_job(job)), Bucket=bucket_name, Key=key)
@@ -145,18 +149,18 @@ def get_job(s3_client: BaseClient, bucket_name: str, repo_user_name: str, repo_n
 
 def update_job(s3_client: BaseClient, bucket_name: str, job: Job):
     prefix = f"jobs/{job.repo_data.repo_user_name}/{job.repo_data.repo_name}"
-    job_head_key_prefix = f"{prefix}/l;{job.get_id()};"
+    job_head_key_prefix = f"{prefix}/l;{job.id};"
     response = s3_client.list_objects_v2(Bucket=bucket_name, Prefix=job_head_key_prefix, MaxKeys=1)
     for obj in response["Contents"]:
         s3_client.delete_object(Bucket=bucket_name, Key=obj["Key"])
     job_head_key = _job_head_key(job)
     s3_client.put_object(Body="", Bucket=bucket_name, Key=job_head_key)
-    key = f"{prefix}/{job.get_id()}.yaml"
+    key = f"{prefix}/{job.id}.yaml"
     s3_client.put_object(Body=yaml.dump(serialize_job(job)), Bucket=bucket_name, Key=key)
 
 
-def get_job_heads(s3_client: BaseClient, bucket_name: str, repo_user_name: str, repo_name: str,
-                  run_name: Optional[str] = None):
+def list_job_heads(s3_client: BaseClient, bucket_name: str, repo_user_name: str, repo_name: str,
+                   run_name: Optional[str] = None):
     prefix = f"jobs/{repo_user_name}/{repo_name}"
     lKeyPrefix = f"{prefix}/l;"
     lKeyRunPrefix = lKeyPrefix + run_name if run_name else lKeyPrefix
@@ -164,12 +168,11 @@ def get_job_heads(s3_client: BaseClient, bucket_name: str, repo_user_name: str, 
     job_heads = []
     if "Contents" in response:
         for obj in response["Contents"]:
-            job_id, provider_name, submitted_at, status, runner_id, artifacts, apps, tag_name = tuple(
+            job_id, provider_name, submitted_at, status, runner_id, request_id, artifacts, apps, tag_name = tuple(
                 obj["Key"][len(lKeyPrefix):].split(';'))
             run_name, workflow_name, job_index = tuple(job_id.split(','))
-            job_heads.append(JobHead(repo_user_name, repo_name,
-                                     job_id, run_name, workflow_name or None, provider_name,
-                                     JobStatus(status), int(submitted_at), runner_id or None,
+            job_heads.append(JobHead(repo_user_name, repo_name, job_id, run_name, workflow_name or None, provider_name,
+                                     JobStatus(status), int(submitted_at), runner_id or None, request_id or None,
                                      artifacts.split(',') if artifacts else None, tag_name or None,
                                      apps or None))
     return job_heads

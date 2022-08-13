@@ -158,10 +158,10 @@ class Provider:
         for job_spec in job_specs:
             submitted_at = int(round(time.time() * 1000))
             job = Job(repo_data, run_name, self.provider_data.get("workflow_name") or None,
-                      self.provider_data.get("provider_name") or None, JobStatus.SUBMITTED, submitted_at,
+                      self.provider_name, JobStatus.SUBMITTED, submitted_at,
                       job_spec.image_name, job_spec.commands, job_spec.env,
                       job_spec.working_dir, job_spec.artifacts, job_spec.port_count, None, None,
-                      job_spec.requirements, self.deps, job_spec.master_job, job_spec.apps, None, None)
+                      job_spec.requirements, self.deps, job_spec.master_job, job_spec.apps, None, None, None)
             backend.submit_job(job, counter)
             jobs.append(job)
         return jobs
@@ -205,7 +205,7 @@ class Provider:
 
     @staticmethod
     def _workflow_dep(backend: Backend, repo_user_name: str, repo_name: str, workflow_name: str) -> Dep:
-        job_heads = sorted(backend.get_job_heads(repo_user_name, repo_name),
+        job_heads = sorted(backend.list_job_heads(repo_user_name, repo_name),
                            key=lambda j: j.submitted_at, reverse=True)
         run_name = next(iter([job_head.run_name for job_head in job_heads if
                               job_head.workflow_name == workflow_name and job_head.status == JobStatus.DONE]),

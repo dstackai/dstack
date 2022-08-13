@@ -15,7 +15,7 @@ def list_tags_func(_: Namespace):
     try:
         backend = load_backend()
         repo_data = load_repo_data()
-        tag_heads = backend.get_tag_heads(repo_data.repo_user_name, repo_data.repo_name)
+        tag_heads = backend.list_tag_heads(repo_data.repo_user_name, repo_data.repo_name)
         console = Console()
         table = Table()
         table.add_column("Tag", style="bold", no_wrap=True)

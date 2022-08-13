@@ -490,6 +490,8 @@ def run_job(ec2_client: BaseClient, iam_client: BaseClient, s3_client: BaseClien
             else:
                 request_id = _run_instance(ec2_client, iam_client, bucket_name, region_name, runner_id, instance_type)
             runner.request_id = request_id
+            job.request_id = request_id
+            jobs.update_job(s3_client, bucket_name, job)
             _create_or_update_runner(s3_client, bucket_name, runner)
             return runner
         else:

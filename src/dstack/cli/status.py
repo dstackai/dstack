@@ -52,7 +52,8 @@ def pretty_print_status(run: Run) -> str:
 
 def print_runs(args: Namespace, backend: Backend):
     repo_data = load_repo_data()
-    runs = backend.get_runs(repo_data.repo_user_name, repo_data.repo_name, args.run_name)
+    job_heads = backend.list_job_heads(repo_data.repo_user_name, repo_data.repo_name, args.run_name)
+    runs = backend.get_runs(repo_data.repo_user_name, repo_data.repo_name, job_heads)
     if not args.all:
         unfinished = any(run.status.is_unfinished() for run in runs)
         if unfinished:
@@ -96,7 +97,7 @@ def print_runs(args: Namespace, backend: Backend):
 def get_workflow_runs(args: Namespace, backend: Backend):
     workflows_by_id = {}
     repo_data = load_repo_data()
-    job_heads = backend.get_job_heads(repo_data.repo_user_name, repo_data.repo_name, args.run_name)
+    job_heads = backend.list_job_heads(repo_data.repo_user_name, repo_data.repo_name, args.run_name)
     unfinished = False
     for job_head in job_heads:
         if job_head.status.is_unfinished():

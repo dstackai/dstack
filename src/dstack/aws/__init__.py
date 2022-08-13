@@ -42,9 +42,9 @@ class AwsBackend(Backend):
     def get_job(self, repo_user_name: str, repo_name: str, job_id: str) -> Job:
         return jobs.get_job(self._s3_client(), self.backend_config.bucket_name, repo_user_name, repo_name, job_id)
 
-    def get_job_heads(self, repo_user_name: str, repo_name: str, run_name: Optional[str] = None):
-        return jobs.get_job_heads(self._s3_client(), self.backend_config.bucket_name, repo_user_name, repo_name,
-                                  run_name)
+    def list_job_heads(self, repo_user_name: str, repo_name: str, run_name: Optional[str] = None):
+        return jobs.list_job_heads(self._s3_client(), self.backend_config.bucket_name, repo_user_name, repo_name,
+                                   run_name)
 
     def run_job(self, job: Job) -> Runner:
         return runners.run_job(self._ec2_client(), self._iam_client(), self._s3_client(),
@@ -57,8 +57,13 @@ class AwsBackend(Backend):
     def delete_job_head(self, repo_user_name: str, repo_name: str, job_id: str):
         jobs.delete_job_head(self._s3_client(), self.backend_config.bucket_name, repo_user_name, repo_name, job_id)
 
-    def get_runs(self, repo_user_name: str, repo_name: str, run_name: Optional[str] = None) -> List[Run]:
-        return runs.get_runs(self._s3_client(), self.backend_config.bucket_name, repo_user_name, repo_name, run_name)
+    def list_runs(self, repo_user_name: str, repo_name: str, run_name: Optional[str] = None) -> List[Run]:
+        return runs.list_runs(self._s3_client(), self.backend_config.bucket_name, repo_user_name, repo_name,
+                              run_name)
+
+    def get_runs(self, repo_user_name: str, repo_name: str, job_heads: List[JobHead]) -> List[Run]:
+        return runs.get_runs(self._s3_client(), self.backend_config.bucket_name, repo_user_name, repo_name,
+                             job_heads)
 
     def poll_logs(self, repo_user_name: str, repo_name: str, run_name: str, start_time: int, attached: bool) -> \
             Generator[LogEvent, None, None]:
@@ -74,8 +79,8 @@ class AwsBackend(Backend):
         artifacts.download_run_artifact_files(self._s3_client(), self.backend_config.bucket_name,
                                               repo_user_name, repo_name, run_name, output_dir)
 
-    def get_tag_heads(self, repo_user_name: str, repo_name: str) -> List[TagHead]:
-        return tags.get_tag_heads(self._s3_client(), self.backend_config.bucket_name, repo_user_name, repo_name)
+    def list_tag_heads(self, repo_user_name: str, repo_name: str) -> List[TagHead]:
+        return tags.list_tag_heads(self._s3_client(), self.backend_config.bucket_name, repo_user_name, repo_name)
 
     def get_tag_head(self, repo_user_name: str, repo_name: str, tag_name: str) -> Optional[TagHead]:
         return tags.get_tag_head(self._s3_client(), self.backend_config.bucket_name, repo_user_name, repo_name,

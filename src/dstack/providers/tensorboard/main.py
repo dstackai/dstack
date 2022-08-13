@@ -59,8 +59,8 @@ class TensorboardProvider(Provider):
         backend = load_backend()
         job_heads_by_run_name = {}
         for run_name in run_names:
-            job_heads = backend.get_job_heads(self.provider_data["repo_user_name"], self.provider_data["repo_name"],
-                                              run_name)
+            job_heads = backend.list_job_heads(self.provider_data["repo_user_name"], self.provider_data["repo_name"],
+                                               run_name)
             job_heads_by_run_name[run_name] = job_heads
         return job_heads_by_run_name
 
@@ -81,7 +81,7 @@ class TensorboardProvider(Provider):
         for run_name in job_heads_by_run_name:
             job_heads = job_heads_by_run_name[run_name]
             for job_head in job_heads:
-                ld = f"s3://{config.backend_config.bucket_name}/artifacts/{repo_user_name}/{repo_name}/{job_head.get_id()}"
+                ld = f"s3://{config.backend_config.bucket_name}/artifacts/{repo_user_name}/{repo_name}/{job_head.id}"
                 if self.logdir:
                     ld += "/" + self.logdir
                 logdir.append(ld)
