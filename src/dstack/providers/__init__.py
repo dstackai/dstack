@@ -118,7 +118,8 @@ class Provider:
                 else:
                     env[e] = ""
             self.provider_data["env"] = env
-        if args.cpu or args.memory or args.gpu or args.gpu_name or args.gpu_memory or args.shm_size or args.interruptible:
+        if args.cpu or args.memory or args.gpu or args.gpu_name or args.gpu_memory or args.shm_size \
+                or args.interruptible:
             resources = self.provider_data.get("resources") or {}
             self.provider_data["resources"] = resources
             if args.cpu:
@@ -157,11 +158,11 @@ class Provider:
         counter = []
         for job_spec in job_specs:
             submitted_at = int(round(time.time() * 1000))
-            job = Job(repo_data, run_name, self.provider_data.get("workflow_name") or None,
+            job = Job(None, repo_data, run_name, self.workflow_name or None,
                       self.provider_name, JobStatus.SUBMITTED, submitted_at,
                       job_spec.image_name, job_spec.commands, job_spec.env,
                       job_spec.working_dir, job_spec.artifacts, job_spec.port_count, None, None,
-                      job_spec.requirements, self.deps, job_spec.master_job, job_spec.apps, None, None, None)
+                      job_spec.requirements, self.deps, job_spec.master_job, job_spec.app_specs, None, None, None)
             backend.submit_job(job, counter)
             jobs.append(job)
         return jobs
@@ -255,7 +256,8 @@ class Provider:
                 resources.shm_size = self.provider_data["resources"]["shm_size"]
             if self.provider_data["resources"].get("interruptible"):
                 resources.interruptible = self.provider_data["resources"]["interruptible"]
-            if resources.cpus or resources.memory_mib or resources.gpus or resources.shm_size or resources.interruptible:
+            if resources.cpus or resources.memory_mib or resources.gpus or resources.shm_size \
+                    or resources.interruptible:
                 return resources
             else:
                 return None

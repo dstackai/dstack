@@ -65,10 +65,10 @@ class AwsBackend(Backend):
         return runs.get_runs(self._s3_client(), self.backend_config.bucket_name, repo_user_name, repo_name,
                              job_heads)
 
-    def poll_logs(self, repo_user_name: str, repo_name: str, run_name: str, start_time: int, attached: bool) -> \
-            Generator[LogEvent, None, None]:
+    def poll_logs(self, repo_user_name: str, repo_name: str, job_heads: List[JobHead], start_time: int,
+                  attached: bool) -> Generator[LogEvent, None, None]:
         return logs.poll_logs(self._s3_client(), self._logs_client(), self.backend_config.bucket_name, repo_user_name,
-                              repo_name, run_name, start_time, attached)
+                              repo_name, job_heads, start_time, attached)
 
     def list_run_artifact_files(self, repo_user_name: str, repo_name: str, run_name: str) -> List[Tuple[str, str, int]]:
         return artifacts.list_run_artifact_files(self._s3_client(), self.backend_config.bucket_name,

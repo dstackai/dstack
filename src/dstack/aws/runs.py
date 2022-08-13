@@ -4,7 +4,7 @@ from botocore.client import BaseClient
 
 from dstack import random_name
 from dstack.aws import run_names, logs, jobs
-from dstack.backend import Run, RunApp, RequestError
+from dstack.backend import Run, AppHead, RequestHead, RequestStatus
 from dstack.jobs import JobHead, Job
 
 
@@ -19,15 +19,20 @@ def create_run(s3_client: BaseClient, logs_client: BaseClient, bucket_name: str,
     return run_name
 
 
-def _request_error(request_id: str) -> Optional[RequestError]:
-    pass
+def _request_head(job) -> RequestHead:
+    return RequestHead(job.job_id, RequestStatus.TERMINATED, None)
 
 
 def _create_run(repo_user_name, repo_name, job: Job) -> Run:
-    run_apps = list(map(lambda a: RunApp(job.id, a), job.apps)) if job.apps else None
+    app_heads = list(map(lambda a: AppHead(job.job_id, a), job.app_specs)) if job.app_specs else None
+    request_heads = None
+    if job.status.is_unfinished() and job.request_id:
+        if request_heads is None:
+            request_heads = []
+        request_heads.append(_request_head(job))
     run = Run(repo_user_name, repo_name, job.run_name, job.workflow_name, job.provider_name,
               job.artifacts or None, job.status, job.submitted_at, job.tag_name,
-              run_apps, None)
+              app_heads, request_heads)
     return run
 
 
@@ -37,20 +42,24 @@ def _update_run(run: Run, job: Job):
         if run.artifacts is None:
             run.artifacts = []
         run.artifacts.extend(job.artifacts)
-    if job.apps:
-        if run.apps is None:
-            run.apps = []
-        run.apps.extend(list(map(lambda a: RunApp(job.id, a), job.apps)))
+    if job.app_specs:
+        if run.app_heads is None:
+            run.app_heads = []
+        run.app_heads.extend(list(map(lambda a: AppHead(job.job_id, a), job.app_specs)))
     if job.status.is_unfinished():
         # TODO: implement max(status1, status2)
         run.status = job.status
+        if job.request_id:
+            if run.request_heads is None:
+                run.request_heads = []
+            run.request_heads.append(_request_head(job))
 
 
 def get_runs(s3_client: BaseClient, bucket_name: str, repo_user_name, repo_name,
              job_heads: List[JobHead]) -> List[Run]:
     runs_by_id = {}
     for job_head in job_heads:
-        job = jobs.get_job(s3_client, bucket_name, repo_user_name, repo_name, job_head.id)
+        job = jobs.get_job(s3_client, bucket_name, repo_user_name, repo_name, job_head.job_id)
         run_id = ','.join([job.run_name, job.workflow_name or ''])
         if run_id not in runs_by_id:
             runs_by_id[run_id] = _create_run(repo_user_name, repo_name, job)

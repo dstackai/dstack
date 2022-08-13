@@ -2,7 +2,7 @@ import uuid
 from argparse import ArgumentParser
 from typing import List, Optional, Dict, Any
 
-from dstack import Job, App, JobSpec
+from dstack.jobs import JobSpec, AppSpec
 from dstack.providers import Provider
 
 
@@ -22,7 +22,6 @@ class LabProvider(Provider):
     def load(self, provider_args: List[str], workflow_name: Optional[str], provider_data: Dict[str, Any]):
         super().load(provider_args, workflow_name, provider_data)
         self.before_run = self.provider_data.get("before_run")
-        # TODO: Handle numbers such as 3.1 (e.g. require to use strings)
         self.python = self._save_python_version("python")
         self.version = self.provider_data.get("version")
         self.requirements = self.provider_data.get("requirements")
@@ -54,7 +53,7 @@ class LabProvider(Provider):
             artifacts=self.artifacts,
             port_count=1,
             requirements=self.resources,
-            apps=[App(
+            app_specs=[AppSpec(
                 port_index=0,
                 app_name="lab",
                 url_path="lab",

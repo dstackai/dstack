@@ -55,22 +55,3 @@ def __flatten(d, parent_key='', sep='.'):
         else:
             items.append((new_key, v))
     return dict(items)
-
-
-colors = {
-    "SUBMITTED": "yellow",
-    "QUEUED": "yellow",
-    "RUNNING": "dark_sea_green4",
-    "DONE": "grey58",
-    "FAILED": "red",
-    "STOPPED": "grey58",
-    "STOPPING": "yellow",
-    "ABORTING": "yellow",
-    "ABORTED": "grey58",
-    "REQUESTED": "yellow",
-}
-
-
-def colored(status: str, val: str, bright: bool = False):
-    color = colors.get(status)
-    return f"[{'bold' if bright else ''}{color}]{val}[/]" if color is not None else val

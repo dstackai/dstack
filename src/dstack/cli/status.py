@@ -2,15 +2,40 @@ import os
 import sys
 from argparse import Namespace
 from itertools import groupby
+from typing import List
 
 from git import InvalidGitRepositoryError
 from rich.console import Console
 from rich.table import Table
 
+from dstack.jobs import JobStatus
 from dstack.repo import load_repo_data
-from dstack.backend import load_backend, Backend, Run
-from dstack.cli.common import colored, pretty_date
+from dstack.backend import load_backend, Backend, Run, RequestStatus
+from dstack.cli.common import pretty_date
 from dstack.config import ConfigError
+
+_status_colors = {
+    JobStatus.SUBMITTED: "yellow",
+    JobStatus.RUNNING: "dark_sea_green4",
+    JobStatus.DONE: "grey58",
+    JobStatus.FAILED: "red",
+    JobStatus.STOPPED: "grey58",
+    JobStatus.STOPPING: "yellow",
+    JobStatus.ABORTING: "yellow",
+    JobStatus.ABORTED: "grey58",
+}
+
+
+def _status_color(run: Run, val: str, run_column: bool, status_column: bool):
+    if status_column and _has_request_status(run, [RequestStatus.TERMINATED, RequestStatus.NO_CAPACITY]):
+        color = "orange_red1"
+    else:
+        color = _status_colors.get(run.status)
+    return f"[{'bold ' if run_column else ''}{color}]{val}[/]" if color is not None else val
+
+
+def _has_request_status(run, statuses: List[RequestStatus]):
+    return run.status.is_unfinished() and any(filter(lambda s: s.status in statuses, run.request_heads or []))
 
 
 def status_func(args: Namespace):
@@ -24,30 +49,26 @@ def status_func(args: Namespace):
 
 
 def pretty_print_status(run: Run) -> str:
-    status = run.status.name.upper()
-    request_errors = run.request_errors
-    if request_errors:
-        return "Waiting for capacity..."
-    if status == "SUBMITTED":
+    if _has_request_status(run, [RequestStatus.TERMINATED]):
+        return "Terminated..."
+    elif _has_request_status(run, [RequestStatus.NO_CAPACITY]):
+        return "No capacity..."
+    elif run.status == JobStatus.SUBMITTED:
         return "Provisioning..."
-    if status == "QUEUED":
-        return "Provisioning..."
-    if status == "RUNNING":
+    elif run.status == JobStatus.RUNNING:
         return "Running..."
-    if status == "DONE":
+    elif run.status == JobStatus.DONE:
         return "Done"
-    if status == "FAILED":
+    elif run.status == JobStatus.FAILED:
         return "Failed"
-    if status == "STOPPING":
+    elif run.status == JobStatus.STOPPING:
         return "Stopping..."
-    if status == "ABORTING":
+    elif run.status == JobStatus.ABORTING:
         return "Aborting..."
-    if status == "STOPPED":
+    elif run.status == JobStatus.STOPPED:
         return "Stopped"
-    if status == "ABORTED":
+    elif run.status == JobStatus.ABORTED:
         return "Aborted"
-    if status == "REQUESTED":
-        return "Provisioning..."
 
 
 def print_runs(args: Namespace, backend: Backend):
@@ -70,7 +91,7 @@ def print_runs(args: Namespace, backend: Backend):
     table.add_column("Workflow", width=12)
     table.add_column("Provider", width=12)
     table.add_column("Status", no_wrap=True)
-    table.add_column("App", justify="center", style="green", no_wrap=True)
+    table.add_column("Applications", justify="center", style="green", no_wrap=True)
     table.add_column("Artifacts", style="grey58", width=12)
     table.add_column("Submitted", style="grey58", no_wrap=True)
     table.add_column("Tag", style="bold yellow", no_wrap=True)
@@ -79,18 +100,15 @@ def print_runs(args: Namespace, backend: Backend):
         for i in range(len(runs)):
             run = runs[i]
             submitted_at = pretty_date(round(run.submitted_at / 1000))
-            status = run.status.name
-            tag_name = run.tag_name
-            run_name = run.run_name
-            # TODO: Handle availability issues
-            table.add_row(colored(status, run_name),
-                          run.workflow_name,
-                          run.provider_name,
-                          colored(status, pretty_print_status(run)),
-                          __job_apps(run.apps, status),
-                          '\n'.join(run.artifacts or []),
-                          submitted_at,
-                          f"{tag_name}" if tag_name else "")
+            table.add_row(
+                _status_color(run, run_name, True, False),
+                run.workflow_name,
+                run.provider_name,
+                _status_color(run, pretty_print_status(run), False, True),
+                _app_heads(run.app_heads, run.status.name),
+                '\n'.join(run.artifacts or []),
+                submitted_at,
+                f"{run.tag_name}" if run.tag_name else "")
     console.print(table)
 
 
@@ -154,10 +172,10 @@ def pretty_duration_and_submitted_at(submitted_at, started_at=None, finished_at=
     return duration_str, submitted_at_str
 
 
-def __job_apps(apps, status):
+def _app_heads(apps, status):
     if status == "RUNNING" and apps is not None and len(apps) > 0:
-        return "✔"
-        # return "\n".join(map(lambda app: app.get("app_name"), apps))
+        # return "✔"
+        return "\n".join(map(lambda app: app.get("app_name"), apps))
     else:
         return ""
 

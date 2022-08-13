@@ -2,7 +2,7 @@ import uuid
 from argparse import ArgumentParser
 from typing import List, Optional, Dict, Any
 
-from dstack.jobs import JobApp, JobSpec
+from dstack.jobs import AppSpec, JobSpec
 from dstack.providers import Provider
 
 
@@ -22,7 +22,6 @@ class NotebookProvider(Provider):
     def load(self, provider_args: List[str], workflow_name: Optional[str], provider_data: Dict[str, Any]):
         super().load(provider_args, workflow_name, provider_data)
         self.before_run = self.provider_data.get("before_run")
-        # TODO: Handle numbers such as 3.1 (e.g. require to use strings)
         self.python = self._save_python_version("python")
         self.version = self.provider_data.get("version")
         self.requirements = self.provider_data.get("requirements")
@@ -42,7 +41,7 @@ class NotebookProvider(Provider):
         args = parser.parse_args(self.provider_args)
         self._parse_base_args(args)
 
-    def create_jobs(self) -> List[JobSpec]:
+    def create_job_specs(self) -> List[JobSpec]:
         env = dict(self.env)
         token = uuid.uuid4().hex
         env["TOKEN"] = token
@@ -54,7 +53,7 @@ class NotebookProvider(Provider):
             requirements=self.resources,
             artifacts=self.artifacts,
             port_count=1,
-            apps=[JobApp(
+            app_specs=[AppSpec(
                 port_index=0,
                 app_name="notebook",
                 url_query_params={

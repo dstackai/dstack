@@ -1,15 +1,15 @@
 import json
 import re
 import time
-import urllib
 from collections import defaultdict
 from typing import Optional, Dict, List, Generator
+from urllib import parse
 
 from botocore.client import BaseClient
 
 from dstack.aws import jobs, runs
 from dstack.backend import LogEvent, LogEventSource
-from dstack.jobs import JobApp, JobHead
+from dstack.jobs import AppSpec, JobHead
 
 POLL_LOGS_RATE_SECS = 1
 
@@ -19,24 +19,24 @@ def _render_log_message(s3_client: BaseClient, bucket_name: str, log_message: st
                         job_id: Optional[str],
                         job_host_names: Dict[str, Optional[str]],
                         job_ports: Dict[str, Optional[List[int]]],
-                        job_apps: Dict[str, Optional[List[JobApp]]]) -> str:
+                        job_app_specs: Dict[str, Optional[List[AppSpec]]]) -> str:
     if job_id and job_id not in job_host_names:
         job = jobs.get_job(s3_client, bucket_name, repo_user_name, repo_name, job_id)
         job_host_names[job_id] = job.host_name or "none"
         job_ports[job_id] = job.ports
-        job_apps[job_id] = job.apps
+        job_app_specs[job_id] = job.app_specs
     message = json.loads(log_message.strip())["log"]
     host_name = job_host_names[job_id]
     ports = job_ports[job_id]
-    apps = job_apps[job_id]
+    app_specs = job_app_specs[job_id]
     pat = re.compile(f'http://(localhost|0.0.0.0|{host_name}):[\\S]*[^(.+)\\s\\n\\r]')
     if re.search(pat, message):
-        if host_name != "none" and ports and apps:
-            for app in apps:
-                port = ports[app["port_index"]]
-                url_path = app.get("url_path") or ""
-                url_query_params = app.get("url_query_params")
-                url_query = ("?" + urllib.parse.urlencode(url_query_params)) if url_query_params else ""
+        if host_name != "none" and ports and app_specs:
+            for app_spec in app_specs:
+                port = ports[app_spec["port_index"]]
+                url_path = app_spec.get("url_path") or ""
+                url_query_params = app_spec.get("url_query_params")
+                url_query = ("?" + parse.urlencode(url_query_params)) if url_query_params else ""
                 app_url = f"http://{host_name}:{port}"
                 if url_path or url_query_params:
                     app_url += "/"
@@ -122,14 +122,14 @@ def poll_logs(s3_client: BaseClient, logs_client: BaseClient, bucket_name: str,
     }
     job_host_names = {}
     job_ports = {}
-    job_apps = {}
+    job_app_specs = {}
 
     try:
         if attached:
             for event in _do_filter_log_events(s3_client, logs_client, bucket_name, repo_user_name, repo_name,
                                                job_heads, filter_logs_events_kwargs):
                 log_message = _render_log_message(s3_client, bucket_name, event["message"], repo_user_name, repo_name,
-                                                  event.get("job_id"), job_host_names, job_ports, job_apps)
+                                                  event.get("job_id"), job_host_names, job_ports, job_app_specs)
                 yield LogEvent(event["timestamp"], event.get("job_id"), log_message,
                                LogEventSource.STDOUT if event["source"] == "stdout" else LogEventSource.STDERR)
         else:
@@ -138,7 +138,7 @@ def poll_logs(s3_client: BaseClient, logs_client: BaseClient, bucket_name: str,
                 for event in page["events"]:
                     log_message = _render_log_message(s3_client, bucket_name, event["message"], repo_user_name,
                                                       repo_name, event.get("job_id"), job_host_names, job_ports,
-                                                      job_apps)
+                                                      job_app_specs)
                     yield LogEvent(event["timestamp"], event.get("job_id"), log_message,
                                    LogEventSource.STDOUT if event["source"] == "stdout" else LogEventSource.STDERR)
     except Exception as e:

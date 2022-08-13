@@ -64,7 +64,8 @@ class TorchrunProvider(Provider):
             )
         else:
             commands.append(
-                f"{torchrun_command} --master_addr $MASTER_JOB_HOSTNAME --master_port $MASTER_JOB_PORT_0 {self.script} {args_init}"
+                f"{torchrun_command} --master_addr $MASTER_JOB_HOSTNAME --master_port $MASTER_JOB_PORT_0 "
+                f"{self.script} {args_init}"
             )
         return commands
 

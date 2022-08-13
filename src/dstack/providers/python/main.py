@@ -23,10 +23,8 @@ class PythonProvider(Provider):
 
     def load(self, provider_args: List[str], workflow_name: Optional[str], provider_data: Dict[str, Any]):
         super().load(provider_args, workflow_name, provider_data)
-        # Drop the deprecated `script` property, and make `file` required in the schema
-        self.file = self.provider_data.get("script") or self.provider_data["file"]
+        self.file = self.provider_data["file"]
         self.before_run = self.provider_data.get("before_run")
-        # TODO: Handle numbers such as 3.1 (e.g. require to use strings)
         self.version = self._save_python_version("version")
         self.args = self.provider_data.get("args")
         self.requirements = self.provider_data.get("requirements")

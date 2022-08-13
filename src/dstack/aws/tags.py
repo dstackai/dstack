@@ -58,7 +58,7 @@ def create_tag_from_run(s3_client: BaseClient, bucket_name: str, repo_user_name:
     job_with_anther_tag = None
     job_heads = jobs.list_job_heads(s3_client, bucket_name, repo_user_name, repo_name, run_name)
     for job_head in job_heads:
-        job = jobs.get_job(s3_client, bucket_name, repo_user_name, repo_name, job_head.id)
+        job = jobs.get_job(s3_client, bucket_name, repo_user_name, repo_name, job_head.job_id)
         tag_jobs.append(job)
         if job.tag_name and job.tag_name != tag_name:
             job_with_anther_tag = job
@@ -81,7 +81,7 @@ def delete_tag(s3_client: BaseClient, bucket_name: str, repo_user_name: str, rep
     tag_jobs = []
     job_heads = jobs.list_job_heads(s3_client, bucket_name, repo_user_name, repo_name, tag_head.run_name)
     for job_head in job_heads:
-        job = jobs.get_job(s3_client, bucket_name, repo_user_name, repo_name, job_head.id)
+        job = jobs.get_job(s3_client, bucket_name, repo_user_name, repo_name, job_head.job_id)
         tag_jobs.append(job)
     s3_client.delete_object(Bucket=bucket_name, Key=_tag_head_key(tag_head))
     for job in tag_jobs:
@@ -102,12 +102,12 @@ def create_tag_from_local_dirs(s3_client: BaseClient, logs_client: BaseClient, b
             sys.exit(f"The '{local_dir}' path doesn't refer to an existing directory")
 
     run_name = runs.create_run(s3_client, logs_client, bucket_name, repo_data.repo_user_name, repo_data.repo_name)
-    job = Job(repo_data, run_name, None, "bash", JobStatus.DONE, int(round(time.time() * 1000)), "scratch",
+    job = Job(None, repo_data, run_name, None, "bash", JobStatus.DONE, int(round(time.time() * 1000)), "scratch",
               None, None, None, tag_artifacts, None, None, None, None, None, None, None, None, None, tag_name)
     jobs.create_job(s3_client, bucket_name, job, create_head=False)
     for index, local_path in enumerate(local_paths):
         artifacts.upload_job_artifact_files(s3_client, bucket_name, repo_data.repo_user_name, repo_data.repo_name,
-                                            job.id, tag_artifacts[index], local_path)
+                                            job.job_id, tag_artifacts[index], local_path)
     tag_head = TagHead(repo_data.repo_user_name, repo_data.repo_name, tag_name, run_name, job.workflow_name,
                        job.provider_name, job.submitted_at, job.artifacts)
     lKey = _tag_head_key(tag_head)

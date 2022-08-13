@@ -2,7 +2,7 @@ import uuid
 from argparse import ArgumentParser
 from typing import List, Optional, Dict, Any
 
-from dstack.jobs import JobSpec, JobApp
+from dstack.jobs import JobSpec, AppSpec
 from dstack.providers import Provider
 
 
@@ -22,7 +22,6 @@ class CodeProvider(Provider):
     def load(self, provider_args: List[str], workflow_name: Optional[str], provider_data: Dict[str, Any]):
         super().load(provider_args, workflow_name, provider_data)
         self.before_run = self.provider_data.get("before_run")
-        # TODO: Handle numbers such as 3.1 (e.g. require to use strings)
         self.python = self._save_python_version("python")
         self.version = self.provider_data.get("version") or "1.67.2"
         self.requirements = self.provider_data.get("requirements")
@@ -54,7 +53,7 @@ class CodeProvider(Provider):
             artifacts=self.artifacts,
             port_count=1,
             requirements=self.resources,
-            apps=[JobApp(
+            app_specs=[AppSpec(
                 port_index=0,
                 app_name="code",
                 url_query_params={
@@ -72,7 +71,8 @@ class CodeProvider(Provider):
         commands = [
             "mkdir -p /tmp",
             "cd /tmp",
-            f"curl -L https://github.com/gitpod-io/openvscode-server/releases/download/openvscode-server-v{self.version}/openvscode-server-v{self.version}-linux-x64.tar.gz -O",
+            f"curl -L https://github.com/gitpod-io/openvscode-server/releases/download/"
+            f"openvscode-server-v{self.version}/openvscode-server-v{self.version}-linux-x64.tar.gz -O",
             f"tar -xzf openvscode-server-v{self.version}-linux-x64.tar.gz",
             f"cd openvscode-server-v{self.version}-linux-x64",
             "./bin/openvscode-server --install-extension ms-python.python"

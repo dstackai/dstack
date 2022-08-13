@@ -4,7 +4,7 @@ from typing import List, Optional, Dict, Any
 
 from dstack.backend import load_backend
 from dstack.config import load_config
-from dstack.jobs import JobSpec, JobHead, JobApp
+from dstack.jobs import JobSpec, JobHead, AppSpec
 from dstack.providers import Provider
 
 
@@ -21,7 +21,6 @@ class TensorboardProvider(Provider):
     def load(self, provider_args: List[str], workflow_name: Optional[str], provider_data: Dict[str, Any]):
         super().load(provider_args, workflow_name, provider_data)
         self.before_run = self.provider_data.get("before_run")
-        # TODO: Handle numbers such as 3.1 (e.g. require to use strings)
         self.python = self._save_python_version("python")
         self.version = self.provider_data.get("version")
         self.run_names = self.provider_data["runs"]
@@ -49,7 +48,7 @@ class TensorboardProvider(Provider):
             image_name="python:3.10",
             commands=self._commands(),
             port_count=1,
-            apps=[JobApp(
+            app_specs=[AppSpec(
                 port_index=0,
                 app_name="tensorboard",
             )]
@@ -81,7 +80,8 @@ class TensorboardProvider(Provider):
         for run_name in job_heads_by_run_name:
             job_heads = job_heads_by_run_name[run_name]
             for job_head in job_heads:
-                ld = f"s3://{config.backend_config.bucket_name}/artifacts/{repo_user_name}/{repo_name}/{job_head.id}"
+                ld = f"s3://{config.backend_config.bucket_name}/artifacts/{repo_user_name}/{repo_name}/" \
+                     f"{job_head.job_id}"
                 if self.logdir:
                     ld += "/" + self.logdir
                 logdir.append(ld)

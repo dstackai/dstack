@@ -1,7 +1,7 @@
 from argparse import ArgumentParser
 from typing import List, Optional, Dict, Any
 
-from dstack.jobs import JobApp, JobSpec
+from dstack.jobs import AppSpec, JobSpec
 from dstack.providers import Provider
 
 
@@ -54,7 +54,7 @@ class DockerProvider(Provider):
             apps = []
             for i in range(self.ports):
                 apps.append(
-                    JobApp(
+                    AppSpec(
                         port_index=i,
                         app_name="docker" + (i if self.ports > 1 else ""),
                     )
@@ -71,7 +71,7 @@ class DockerProvider(Provider):
             artifacts=self.artifacts,
             port_count=self.ports,
             requirements=self.resources,
-            apps=apps
+            app_specs=apps
         )]
 
 

@@ -2,8 +2,7 @@ import argparse
 from argparse import ArgumentParser
 from typing import List, Optional, Dict, Any
 
-from dstack.jobs import JobSpec, JobApp
-# TODO: Provide job.applications (incl. application name, and query)
+from dstack.jobs import JobSpec, AppSpec
 from dstack.providers import Provider
 
 
@@ -64,7 +63,7 @@ class StreamlitProvider(Provider):
             artifacts=self.artifacts,
             port_count=2,
             requirements=self.resources,
-            apps=[JobApp(
+            app_specs=[AppSpec(
                 port_index=1,
                 app_name="streamlit",
             )]

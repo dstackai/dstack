@@ -19,16 +19,25 @@ class InstanceType:
         return f'InstanceType(instance_name="{self.instance_name}", resources={self.resources})'.__str__()
 
 
-class RequestError:
-    def __init__(self, job_id: str, message: str):
+class RequestStatus(Enum):
+    FULLFILLED = "fullfilled"
+    PROVISIONING = "provisioning"
+    TERMINATED = "terminated"
+    NO_CAPACITY = "no_capacity"
+
+
+class RequestHead:
+    def __init__(self, job_id: str, status: RequestStatus, message: Optional[str]):
         self.job_id = job_id
+        self.status = status
         self.message = message
 
     def __str__(self) -> str:
-        return f'RequestError(job_id="{self.job_id}", message="{self.message})'
+        return f'RequestStatus(job_id="{self.job_id}", status="{self.status.value}", ' \
+               f'message="{self.message})'
 
 
-class RunApp:
+class AppHead:
     def __init__(self, job_id: str, app_name: str):
         self.job_id = job_id
         self.app_name = app_name
@@ -40,8 +49,8 @@ class RunApp:
 class Run:
     def __init__(self, repo_user_name: str, repo_name: str, run_name: str, workflow_name: Optional[str],
                  provider_name: str, artifacts: Optional[List[str]], status: JobStatus, submitted_at: int,
-                 tag_name: Optional[str], apps: Optional[List[RunApp]],
-                 request_errors: Optional[List[RequestError]]):
+                 tag_name: Optional[str], app_heads: Optional[List[AppHead]],
+                 request_heads: Optional[List[RequestHead]]):
         self.repo_user_name = repo_user_name
         self.repo_name = repo_name
         self.run_name = run_name
@@ -51,14 +60,14 @@ class Run:
         self.status = status
         self.submitted_at = submitted_at
         self.tag_name = tag_name
-        self.apps = apps
-        self.request_errors = request_errors
+        self.app_heads = app_heads
+        self.request_heads = request_heads
 
     def __str__(self) -> str:
         artifacts = ("[" + ", ".join(map(lambda a: _quoted(str(a)), self.artifacts)) + "]") if self.artifacts else None
-        apps = ("[" + ", ".join(map(lambda a: str(a), self.apps)) + "]") if self.apps else None
-        request_errors = "[" + ", ".join(
-            map(lambda e: _quoted(str(e)), self.request_errors)) + "]" if self.request_errors else None
+        app_heads = ("[" + ", ".join(map(lambda a: str(a), self.app_heads)) + "]") if self.app_heads else None
+        request_heads = "[" + ", ".join(
+            map(lambda e: _quoted(str(e)), self.request_heads)) + "]" if self.request_heads else None
         return f'Run(repo_user_name="{self.repo_user_name}", ' \
                f'repo_name="{self.repo_name}", ' \
                f'run_name="{self.run_name}", ' \
@@ -68,8 +77,8 @@ class Run:
                f'submitted_at={self.submitted_at}, ' \
                f'artifacts={artifacts}, ' \
                f'tag_name={_quoted(self.tag_name)}, ' \
-               f'apps={apps}, ' \
-               f'request_errors={request_errors})'
+               f'app_heads={app_heads}, ' \
+               f'request_heads={request_heads})'
 
 
 class LogEventSource(Enum):
@@ -104,6 +113,7 @@ class TagHead:
         self.artifacts = artifacts
 
     def __str__(self) -> str:
+        artifacts = ("[" + ", ".join(map(lambda a: _quoted(str(a)), self.artifacts)) + "]") if self.artifacts else None
         return f'TagHead(repo_user_name="{self.repo_user_name}", ' \
                f'repo_name="{self.repo_name}", ' \
                f'tag_name="{self.tag_name}", ' \
@@ -111,7 +121,7 @@ class TagHead:
                f'workflow_name={_quoted(self.workflow_name)}, ' \
                f'provider_name="{_quoted(self.provider_name)}", ' \
                f'created_at={self.created_at}, ' \
-               f'artifacts={("[" + ", ".join(map(lambda a: _quoted(str(a)), self.artifacts)) + "]") if self.artifacts else None})'
+               f'artifacts={artifacts})'
 
 
 class Backend(ABC):
@@ -140,7 +150,7 @@ class Backend(ABC):
         job_heads = self.list_job_heads(repo_user_name, repo_name, run_name)
         for job_head in job_heads:
             if job_head.status.is_unfinished():
-                self.stop_job(repo_user_name, repo_name, job_head.id, abort)
+                self.stop_job(repo_user_name, repo_name, job_head.job_id, abort)
 
     def delete_job_heads(self, repo_user_name: str, repo_name: str, run_name: Optional[str]):
         job_heads = []
@@ -152,7 +162,7 @@ class Backend(ABC):
                     sys.exit("The run is not finished yet. Stop the run first.")
 
         for job_head in job_heads:
-            self.delete_job_head(repo_user_name, repo_name, job_head.id)
+            self.delete_job_head(repo_user_name, repo_name, job_head.job_id)
 
     def list_runs(self, repo_user_name: str, repo_name: str, run_name: Optional[str] = None) -> List[Run]:
         pass

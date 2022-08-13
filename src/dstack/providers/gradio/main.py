@@ -2,7 +2,7 @@ import argparse
 from argparse import ArgumentParser
 from typing import List, Optional, Dict, Any
 
-from dstack.jobs import JobSpec, JobApp
+from dstack.jobs import JobSpec, AppSpec
 from dstack.providers import Provider
 
 
@@ -25,7 +25,6 @@ class GradioProvider(Provider):
         super().load(provider_args, workflow_name, provider_data)
         self.file = self.provider_data["file"]
         self.before_run = self.provider_data.get("before_run")
-        # TODO: Handle numbers such as 3.1 (e.g. require to use strings)
         self.python = self._save_python_version("python")
         self.version = self.provider_data.get("version")
         self.args = self.provider_data.get("args")
@@ -63,7 +62,7 @@ class GradioProvider(Provider):
             artifacts=self.artifacts,
             port_count=1,
             requirements=self.resources,
-            apps=[JobApp(
+            app_specs=[AppSpec(
                 port_index=0,
                 app_name="gradio",
             )]
