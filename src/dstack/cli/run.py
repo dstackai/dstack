@@ -78,12 +78,11 @@ def poll_run(repo_user_name: str, repo_name: str, job_heads: List[JobHead], back
                     progress.update(task, total=100)
                     break
                 if _has_request_status(run, [RequestStatus.TERMINATED, RequestStatus.NO_CAPACITY]):
-                    if not request_errors_printed:
-                        if _has_request_status(run, [RequestStatus.TERMINATED]):
-                            error_message = "Instance is terminated"
-                        elif _has_request_status(run, [RequestStatus.NO_CAPACITY]):
-                            error_message = "No capacity"
-                        progress.update(task, description=f"[yellow]⛔️ {error_message}")
+                    if _has_request_status(run, [RequestStatus.TERMINATED]):
+                        progress.update(task, description=f"[red]Request is terminated[/]", total=100)
+                        break
+                    elif not request_errors_printed and _has_request_status(run, [RequestStatus.NO_CAPACITY]):
+                        progress.update(task, description=f"[dark_orange]No capacity")
                         request_errors_printed = True
                 elif request_errors_printed:
                     progress.update(task, description="Provisioning... It may take up to a minute.")

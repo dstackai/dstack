@@ -20,8 +20,8 @@ class InstanceType:
 
 
 class RequestStatus(Enum):
-    FULLFILLED = "fullfilled"
-    PROVISIONING = "provisioning"
+    RUNNING = "fullfilled"
+    PENDING = "provisioning"
     TERMINATED = "terminated"
     NO_CAPACITY = "no_capacity"
 
@@ -164,10 +164,12 @@ class Backend(ABC):
         for job_head in job_heads:
             self.delete_job_head(repo_user_name, repo_name, job_head.job_id)
 
-    def list_runs(self, repo_user_name: str, repo_name: str, run_name: Optional[str] = None) -> List[Run]:
+    def list_runs(self, repo_user_name: str, repo_name: str, run_name: Optional[str] = None,
+                  include_request_heads: bool = True) -> List[Run]:
         pass
 
-    def get_runs(self, repo_user_name: str, repo_name: str, job_heads: List[JobHead]) -> List[Run]:
+    def get_runs(self, repo_user_name: str, repo_name: str, job_heads: List[JobHead],
+                 include_request_heads: bool = True) -> List[Run]:
         pass
 
     def poll_logs(self, repo_user_name: str, repo_name: str, run_name: str, start_time: int,

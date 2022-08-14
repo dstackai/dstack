@@ -37,10 +37,10 @@ def list_func(args: Namespace):
         run_artifact_files = backend.list_run_artifact_files(repo_data.repo_user_name, repo_data.repo_name,
                                                              args.run_name)
         console = Console()
-        table = Table()
-        table.add_column("Artifact", style="bold", no_wrap=True)
-        table.add_column("File")
-        table.add_column("Size", style="dark_sea_green4")
+        table = Table(box=None)
+        table.add_column("ARTIFACT", style="bold", no_wrap=True)
+        table.add_column("FILE")
+        table.add_column("SIZE", style="dark_sea_green4")
         previous_artifact_name = None
         for (artifact_name, file_name, file_size) in run_artifact_files:
             table.add_row(artifact_name if previous_artifact_name != artifact_name else "",

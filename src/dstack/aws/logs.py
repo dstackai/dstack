@@ -63,9 +63,9 @@ def _reset_filter_log_events_params(fle_kwargs, event_ids_per_timestamp):
     fle_kwargs.pop('nextToken', None)
 
 
-def _do_filter_log_events(s3_client: BaseClient, logs_client: BaseClient, bucket_name: str,
-                          repo_user_name: str, repo_name: str, job_heads: List[JobHead],
-                          filter_logs_events_kwargs: dict):
+def _filter_log_events_loop(ec2_client: BaseClient, s3_client: BaseClient, logs_client: BaseClient, bucket_name: str,
+                            repo_user_name: str, repo_name: str, job_heads: List[JobHead],
+                            filter_logs_events_kwargs: dict):
     event_ids_per_timestamp = defaultdict(set)
     counter = 0
     while True:
@@ -88,7 +88,8 @@ def _do_filter_log_events(s3_client: BaseClient, logs_client: BaseClient, bucket
             time.sleep(POLL_LOGS_RATE_SECS)
             counter = counter + 1
             if counter % 3 == 0:
-                run = next(iter(runs.get_runs(s3_client, bucket_name, repo_user_name, repo_name, job_heads)))
+                run = next(iter(runs.get_runs(ec2_client, s3_client, bucket_name, repo_user_name, repo_name,
+                                              job_heads, include_request_heads=False)))
                 if run.status.is_finished():
                     break
 
@@ -110,7 +111,7 @@ def create_log_stream(logs_client: BaseClient, log_group_name: str, run_name: st
     logs_client.create_log_stream(logGroupName=log_group_name, logStreamName=run_name)
 
 
-def poll_logs(s3_client: BaseClient, logs_client: BaseClient, bucket_name: str,
+def poll_logs(ec2_client: BaseClient, s3_client: BaseClient, logs_client: BaseClient, bucket_name: str,
               repo_user_name: str, repo_name: str,
               job_heads: List[JobHead], start_time: int, attached: bool) -> Generator[LogEvent, None, None]:
     run_name = job_heads[0].run_name
@@ -126,8 +127,8 @@ def poll_logs(s3_client: BaseClient, logs_client: BaseClient, bucket_name: str,
 
     try:
         if attached:
-            for event in _do_filter_log_events(s3_client, logs_client, bucket_name, repo_user_name, repo_name,
-                                               job_heads, filter_logs_events_kwargs):
+            for event in _filter_log_events_loop(ec2_client, s3_client, logs_client, bucket_name, repo_user_name,
+                                                 repo_name, job_heads, filter_logs_events_kwargs):
                 log_message = _render_log_message(s3_client, bucket_name, event["message"], repo_user_name, repo_name,
                                                   event.get("job_id"), job_host_names, job_ports, job_app_specs)
                 yield LogEvent(event["timestamp"], event.get("job_id"), log_message,

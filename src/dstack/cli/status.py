@@ -8,11 +8,11 @@ from git import InvalidGitRepositoryError
 from rich.console import Console
 from rich.table import Table
 
-from dstack.jobs import JobStatus
-from dstack.repo import load_repo_data
 from dstack.backend import load_backend, Backend, Run, RequestStatus
 from dstack.cli.common import pretty_date
 from dstack.config import ConfigError
+from dstack.jobs import JobStatus
+from dstack.repo import load_repo_data
 
 _status_colors = {
     JobStatus.SUBMITTED: "yellow",
@@ -28,7 +28,7 @@ _status_colors = {
 
 def _status_color(run: Run, val: str, run_column: bool, status_column: bool):
     if status_column and _has_request_status(run, [RequestStatus.TERMINATED, RequestStatus.NO_CAPACITY]):
-        color = "orange_red1"
+        color = "dark_orange"
     else:
         color = _status_colors.get(run.status)
     return f"[{'bold ' if run_column else ''}{color}]{val}[/]" if color is not None else val
@@ -49,26 +49,15 @@ def status_func(args: Namespace):
 
 
 def pretty_print_status(run: Run) -> str:
+    status_color = _status_colors.get(run.status)
+    status = run.status.value
+    status = status[:1].upper() + status[1:]
+    s = f"[{status_color}]{status}[/]"
     if _has_request_status(run, [RequestStatus.TERMINATED]):
-        return "Terminated..."
+        s += "\n[red]Request is terminated[/]"
     elif _has_request_status(run, [RequestStatus.NO_CAPACITY]):
-        return "No capacity..."
-    elif run.status == JobStatus.SUBMITTED:
-        return "Provisioning..."
-    elif run.status == JobStatus.RUNNING:
-        return "Running..."
-    elif run.status == JobStatus.DONE:
-        return "Done"
-    elif run.status == JobStatus.FAILED:
-        return "Failed"
-    elif run.status == JobStatus.STOPPING:
-        return "Stopping..."
-    elif run.status == JobStatus.ABORTING:
-        return "Aborting..."
-    elif run.status == JobStatus.STOPPED:
-        return "Stopped"
-    elif run.status == JobStatus.ABORTED:
-        return "Aborted"
+        s += " \n[dark_orange]No capacity[/]"
+    return s
 
 
 def print_runs(args: Namespace, backend: Backend):
@@ -83,18 +72,16 @@ def print_runs(args: Namespace, backend: Backend):
             runs = runs[:1]
     runs = reversed(runs)
 
-    runs_by_name = [(run_name, list(run)) for run_name, run in
-                    groupby(runs, lambda run: run.run_name)]
+    runs_by_name = [(run_name, list(run)) for run_name, run in groupby(runs, lambda run: run.run_name)]
     console = Console()
-    table = Table()
-    table.add_column("Run", style="bold", no_wrap=True)
-    table.add_column("Workflow", width=12)
-    table.add_column("Provider", width=12)
-    table.add_column("Status", no_wrap=True)
-    table.add_column("Applications", justify="center", style="green", no_wrap=True)
-    table.add_column("Artifacts", style="grey58", width=12)
-    table.add_column("Submitted", style="grey58", no_wrap=True)
-    table.add_column("Tag", style="bold yellow", no_wrap=True)
+    table = Table(box=None)
+    table.add_column("RUN", style="bold", no_wrap=True)
+    table.add_column("TARGET", width=12)
+    table.add_column("STATUS", no_wrap=True)
+    table.add_column("APPS", justify="center", style="green", no_wrap=True)
+    table.add_column("ARTIFACTS", style="grey58", width=12)
+    table.add_column("SUBMITTED", style="grey58", no_wrap=True)
+    table.add_column("TAG", style="bold yellow", no_wrap=True)
 
     for run_name, runs in runs_by_name:
         for i in range(len(runs)):
@@ -102,9 +89,8 @@ def print_runs(args: Namespace, backend: Backend):
             submitted_at = pretty_date(round(run.submitted_at / 1000))
             table.add_row(
                 _status_color(run, run_name, True, False),
-                run.workflow_name,
-                run.provider_name,
-                _status_color(run, pretty_print_status(run), False, True),
+                run.workflow_name or run.provider_name,
+                pretty_print_status(run),
                 _app_heads(run.app_heads, run.status.name),
                 '\n'.join(run.artifacts or []),
                 submitted_at,

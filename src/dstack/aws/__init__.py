@@ -57,18 +57,21 @@ class AwsBackend(Backend):
     def delete_job_head(self, repo_user_name: str, repo_name: str, job_id: str):
         jobs.delete_job_head(self._s3_client(), self.backend_config.bucket_name, repo_user_name, repo_name, job_id)
 
-    def list_runs(self, repo_user_name: str, repo_name: str, run_name: Optional[str] = None) -> List[Run]:
-        return runs.list_runs(self._s3_client(), self.backend_config.bucket_name, repo_user_name, repo_name,
-                              run_name)
+    def list_runs(self, repo_user_name: str, repo_name: str, run_name: Optional[str] = None,
+                  include_request_heads: bool = True) -> List[Run]:
+        return runs.list_runs(self._ec2_client(), self._s3_client(), self.backend_config.bucket_name, repo_user_name,
+                              repo_name, run_name, include_request_heads)
 
-    def get_runs(self, repo_user_name: str, repo_name: str, job_heads: List[JobHead]) -> List[Run]:
-        return runs.get_runs(self._s3_client(), self.backend_config.bucket_name, repo_user_name, repo_name,
-                             job_heads)
+    def get_runs(self, repo_user_name: str, repo_name: str, job_heads: List[JobHead],
+                 include_request_heads: bool = True) -> List[Run]:
+        return runs.get_runs(self._ec2_client(), self._s3_client(), self.backend_config.bucket_name, repo_user_name,
+                             repo_name, job_heads, include_request_heads)
 
     def poll_logs(self, repo_user_name: str, repo_name: str, job_heads: List[JobHead], start_time: int,
                   attached: bool) -> Generator[LogEvent, None, None]:
-        return logs.poll_logs(self._s3_client(), self._logs_client(), self.backend_config.bucket_name, repo_user_name,
-                              repo_name, job_heads, start_time, attached)
+        return logs.poll_logs(self._ec2_client(), self._s3_client(), self._logs_client(),
+                              self.backend_config.bucket_name, repo_user_name, repo_name, job_heads, start_time,
+                              attached)
 
     def list_run_artifact_files(self, repo_user_name: str, repo_name: str, run_name: str) -> List[Tuple[str, str, int]]:
         return artifacts.list_run_artifact_files(self._s3_client(), self.backend_config.bucket_name,

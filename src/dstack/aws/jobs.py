@@ -42,6 +42,7 @@ def serialize_job(job: Job) -> dict:
             "url_query_params": a.url_query_params or '',
         } for a in job.app_specs] if job.app_specs else [],
         "runner_id": job.runner_id or '',
+        "request_id": job.request_id or '',
         "tag_name": job.tag_name or '',
     }
     return job_data
