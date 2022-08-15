@@ -131,6 +131,8 @@ def run_workflow_func(args: Namespace):
             provider.load(provider_args, workflow_name, workflow_data)
             run_name = backend.create_run(repo_data.repo_user_name, repo_data.repo_name)
             jobs = provider.submit_jobs(run_name)
+            backend.update_repo_last_run_at(repo_data.repo_user_name, repo_data.repo_name,
+                                            last_run_at=int(round(time.time() * 1000)))
             status_func(Namespace(run_name=run_name, all=False))
             if not args.detach:
                 poll_run(repo_data.repo_user_name, repo_data.repo_name, jobs, backend)

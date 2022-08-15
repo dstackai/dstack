@@ -5,7 +5,7 @@ from typing import Optional, List
 
 from botocore.client import BaseClient
 
-from dstack.aws import jobs, runs, artifacts
+from dstack.aws import jobs, runs, artifacts, repos
 from dstack.backend import TagHead, BackendError
 from dstack.jobs import Job, JobStatus
 from dstack.repo import RepoData
@@ -31,7 +31,7 @@ def get_tag_head(s3_client: BaseClient, bucket_name: str, repo_user_name: str, r
     prefix = f"tags/{repo_user_name}/{repo_name}"
     tag_head_prefix = f"{prefix}/l;{tag_name};"
     response = s3_client.list_objects_v2(Bucket=bucket_name, Prefix=tag_head_prefix)
-    if "Contents" in response:
+    if response.get("Contents"):
         run_name, workflow_name, provider_name, created_at, artifacts = tuple(
             response["Contents"][0]["Key"][len(tag_head_prefix):].split(';'))
         return TagHead(repo_user_name, repo_name,
@@ -75,6 +75,7 @@ def create_tag_from_run(s3_client: BaseClient, bucket_name: str, repo_user_name:
     for job in tag_jobs:
         job.tag_name = tag_name
         jobs.update_job(s3_client, bucket_name, job)
+    repos.increment_repo_tags_count(s3_client, bucket_name, repo_user_name, repo_name)
 
 
 def delete_tag(s3_client: BaseClient, bucket_name: str, repo_user_name: str, repo_name: str, tag_head: TagHead):
@@ -87,6 +88,7 @@ def delete_tag(s3_client: BaseClient, bucket_name: str, repo_user_name: str, rep
     for job in tag_jobs:
         job.tag_name = None
         jobs.update_job(s3_client, bucket_name, job)
+    repos.decrement_repo_tags_count(s3_client, bucket_name, repo_user_name, repo_name)
 
 
 def create_tag_from_local_dirs(s3_client: BaseClient, logs_client: BaseClient, bucket_name: str, repo_data: RepoData,
@@ -110,5 +112,6 @@ def create_tag_from_local_dirs(s3_client: BaseClient, logs_client: BaseClient, b
                                             job.job_id, tag_artifacts[index], local_path)
     tag_head = TagHead(repo_data.repo_user_name, repo_data.repo_name, tag_name, run_name, job.workflow_name,
                        job.provider_name, job.submitted_at, job.artifacts)
-    lKey = _tag_head_key(tag_head)
-    s3_client.put_object(Body="", Bucket=bucket_name, Key=lKey)
+    tag_head_key = _tag_head_key(tag_head)
+    s3_client.put_object(Body="", Bucket=bucket_name, Key=tag_head_key)
+    repos.increment_repo_tags_count(s3_client, bucket_name, repo_data.repo_user_name, repo_data.repo_name)

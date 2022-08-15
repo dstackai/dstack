@@ -124,6 +124,20 @@ class TagHead:
                f'artifacts={artifacts})'
 
 
+class RepoHead:
+    def __init__(self, repo_user_name: str, repo_name: str, last_run_at: Optional[int], tags_count: int):
+        self.repo_user_name = repo_user_name
+        self.repo_name = repo_name
+        self.last_run_at = last_run_at
+        self.tags_count = tags_count
+
+    def __str__(self) -> str:
+        return f'RepoHead(repo_user_name="{self.repo_user_name}", ' \
+               f'repo_name="{self.repo_name}", ' \
+               f'last_run_at="{self.last_run_at}", ' \
+               f'tags_count="{self.tags_count}")'
+
+
 class Backend(ABC):
     def create_run(self, repo_user_name: str, repo_name: str) -> str:
         pass
@@ -196,6 +210,18 @@ class Backend(ABC):
         pass
 
     def delete_tag(self, repo_user_name: str, repo_name: str, tag_head: TagHead):
+        pass
+
+    def list_repo_heads(self) -> List[RepoHead]:
+        pass
+
+    def update_repo_last_run_at(self, repo_user_name: str, repo_name: str, last_run_at: int):
+        pass
+
+    def increment_repo_tags_count(self, repo_user_name: str, repo_name: str):
+        pass
+
+    def decrement_repo_tags_count(self, repo_user_name: str, repo_name: str):
         pass
 
 

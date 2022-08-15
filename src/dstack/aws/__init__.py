@@ -1,7 +1,7 @@
 import boto3
 from botocore.client import BaseClient
 
-from dstack.aws import logs, artifacts, jobs, run_names, runs, runners, tags
+from dstack.aws import logs, artifacts, jobs, run_names, runs, runners, tags, repos
 from dstack.backend import *
 from dstack.config import AwsBackendConfig
 
@@ -99,3 +99,18 @@ class AwsBackend(Backend):
     def create_tag_from_local_dirs(self, repo_data: RepoData, tag_name: str, local_dirs: List[str]):
         tags.create_tag_from_local_dirs(self._s3_client(), self._logs_client(), self.backend_config.bucket_name,
                                         repo_data, tag_name, local_dirs)
+
+    def list_repo_heads(self) -> List[RepoHead]:
+        return repos.list_repo_heads(self._s3_client(), self.backend_config.bucket_name)
+
+    def update_repo_last_run_at(self, repo_user_name: str, repo_name: str, last_run_at: int):
+        repos.update_repo_last_run_at(self._s3_client(), self.backend_config.bucket_name, repo_user_name, repo_name,
+                                      last_run_at)
+
+    def increment_repo_tags_count(self, repo_user_name: str, repo_name: str):
+        repos.increment_repo_tags_count(self._s3_client(), self.backend_config.bucket_name, repo_user_name,
+                                        repo_name)
+
+    def decrement_repo_tags_count(self, repo_user_name: str, repo_name: str):
+        repos.decrement_repo_tags_count(self._s3_client(), self.backend_config.bucket_name, repo_user_name,
+                                        repo_name)

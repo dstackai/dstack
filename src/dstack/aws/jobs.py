@@ -159,14 +159,14 @@ def update_job(s3_client: BaseClient, bucket_name: str, job: Job):
 def list_job_heads(s3_client: BaseClient, bucket_name: str, repo_user_name: str, repo_name: str,
                    run_name: Optional[str] = None):
     prefix = f"jobs/{repo_user_name}/{repo_name}"
-    lKeyPrefix = f"{prefix}/l;"
-    lKeyRunPrefix = lKeyPrefix + run_name if run_name else lKeyPrefix
-    response = s3_client.list_objects_v2(Bucket=bucket_name, Prefix=lKeyRunPrefix)
+    job_head_key_prefix = f"{prefix}/l;"
+    job_head_key_run_prefix = job_head_key_prefix + run_name if run_name else job_head_key_prefix
+    response = s3_client.list_objects_v2(Bucket=bucket_name, Prefix=job_head_key_run_prefix)
     job_heads = []
     if "Contents" in response:
         for obj in response["Contents"]:
             job_id, provider_name, submitted_at, status, artifacts, app_names, tag_name = tuple(
-                obj["Key"][len(lKeyPrefix):].split(';'))
+                obj["Key"][len(job_head_key_prefix):].split(';'))
             run_name, workflow_name, job_index = tuple(job_id.split(','))
             job_heads.append(JobHead(job_id, repo_user_name, repo_name, run_name, workflow_name or None, provider_name,
                                      JobStatus(status), int(submitted_at),
