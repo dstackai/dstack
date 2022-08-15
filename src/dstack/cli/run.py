@@ -105,21 +105,16 @@ def run_workflow_func(args: Namespace):
         print("Usage: dstack run [-d] [-h] WORKFLOW | PROVIDER [ARGS ...]\n")
         workflows_yaml = _load_workflows()
         workflows = (workflows_yaml or {}).get("workflows") or []
-        if workflows:
-            print("Workflows:")
-            for w in workflows:
-                if w.get("name"):
-                    print(f"  {w['name']}")
-        else:
-            print("No workflows found in .dstack/workflows.yaml.")
-        print()
-        print("Providers:")
-        for p in providers.get_providers_names():
-            print(f"  {p}")
-        print("\n"
-              "Options:\n"
-              "  -d, --detach   Do not poll for status update and logs"
-              "  -h, --help     Show this help output, or the help for a specified workflow or provider.")
+        workflow_names = [w["name"] for w in workflows if w.get("name")]
+        providers_names = providers.get_providers_names()
+        print(f'Positional arguments:\n'
+              f'  WORKFLOW      {{{",".join(workflow_names)}}}\n'
+              f'  PROVIDER      {{{",".join(providers_names)}}}\n')
+        print("Options:\n"
+              "  -d, --detach   Do not poll for status update and logs\n"
+              "  -h, --help     Show this help output, or the help for a specified workflow or provider.\n")
+        print("To see the help output for a particular workflow or provider, use the following command:\n"
+              "  dstack run WORKFLOW | PROVIDER --help")
     else:
         try:
             repo_data = load_repo_data()
@@ -150,7 +145,7 @@ def run_workflow_func(args: Namespace):
 
 def register_parsers(main_subparsers):
     parser = main_subparsers.add_parser("run", help="Run a workflow or a provider", add_help=False)
-    parser.add_argument("workflow_or_provider", metavar="WORKFLOW | PROVIDER", type=str,
+    parser.add_argument("workflow_or_provider", metavar="TARGET", type=str,
                         help="A name of a workflow or a provider", nargs="?")
     parser.add_argument("-d", "--detach", help="Do not poll for status update and logs", action="store_true")
     parser.add_argument("args", metavar="ARGS", nargs=argparse.ZERO_OR_MORE, help="Override provider arguments")
