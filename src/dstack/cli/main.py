@@ -2,7 +2,7 @@ import sys
 from argparse import ArgumentParser, SUPPRESS, Namespace
 
 from dstack.cli import app, logs, run, stop, artifacts, status, init, \
-    restart, delete, tags, config
+    restart, delete, tags, config, dashboard
 from dstack.version import __version__ as version
 
 
@@ -16,6 +16,7 @@ def default_func(_: Namespace):
           "  logs           Show logs of a run\n"
           "  artifacts      List or download artifacts of a run\n"
           "  tags           List, create or delete tags\n"
+          # "  dashboard      Launch a dashboard\n"
           # "  app            Open a running application\n"
           "\n"
           "Other commands:\n"
@@ -54,6 +55,7 @@ def main():
     status.register_parsers(subparsers)
     stop.register_parsers(subparsers)
     tags.register_parsers(subparsers)
+    dashboard.register_parsers(subparsers)
 
     if len(sys.argv) < 2:
         parser.print_help()

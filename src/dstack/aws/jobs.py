@@ -106,7 +106,7 @@ def unserialize_job(job_data: dict) -> Job:
               job_data.get("commands") or None, job_data["env"] or None, job_data.get("working_dir") or None,
               job_data.get("artifacts") or None, job_data.get("port_count") or None, job_data.get("ports") or None,
               job_data.get("host_name") or None, requirements, deps or None, master_job, app_specs,
-              job_data.get("runner_id") or None, job_data.get("request_id") or None, job_data.get("tag_name"))
+              job_data.get("runner_id") or None, job_data.get("request_id") or None, job_data.get("tag_name") or None)
     return job
 
 

@@ -20,8 +20,8 @@ setup(
     author="Andrey Cheptsov",
     author_email="andrey@dstack.ai",
     packages=find_packages(),
-    # package_data={'': []},
-    # include_package_data=True,
+    package_data={'dstack.dashboard': ['statics/**/*']},
+    include_package_data=True,
     scripts=[],
     entry_points={
         "console_scripts": ["dstack=dstack.cli.main:main"],
@@ -30,7 +30,7 @@ setup(
     project_urls={
         "Source": "https://github.com/dstackai/dstack",
     },
-    description="A Command Line Interface for https://dstack.ai",
+    description="An open-source tool for running data and ML workflows in the cloud",
     long_description=open("../README.md").read(),
     long_description_content_type="text/markdown",
     python_requires=">=3.6",
@@ -46,6 +46,10 @@ setup(
         "paramiko",
         "git-url-parse",
         "rich",
+        "fastapi",
+        "starlette",
+        "uvicorn",
+        "pydantic",
     ],
     classifiers=[
         "Development Status :: 2 - Pre-Alpha",

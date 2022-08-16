@@ -1,19 +1,16 @@
 <div align="center">
 <img src="https://raw.githubusercontent.com/dstackai/dstack/master/docs/assets/logo.svg" width="300px"/>    
 
-Run tasks in your AWS account from terminal
+An open-source tool for running data and ML workflows in the cloud
 ______________________________________________________________________
 
-[![slack](https://img.shields.io/badge/chat-on%20slack-e01563)](https://join.slack.com/t/dstackai/shared_invite/zt-xdnsytie-D4qU9BvJP8vkbkHXdi6clQ)
 [![pypi](https://badge.fury.io/py/dstack.svg)](https://badge.fury.io/py/dstack)
 [![License](https://img.shields.io/badge/licence-MPL%202.0-blue)](LICENSE)
+[![slack](https://img.shields.io/badge/chat-on%20slack-e01563)](https://join.slack.com/t/dstackai/shared_invite/zt-xdnsytie-D4qU9BvJP8vkbkHXdi6clQ)
 
 [//]: # ([![twitter]&#40;https://img.shields.io/twitter/follow/dstackai.svg?style=social&label=Follow&#41;]&#40;https://twitter.com/dstackai&#41;)
 
 </div>
-
-dstack is an open-source tool that allows you to run tasks 
-in your AWS account from your terminal as if you did it locally.
 
 ## Getting started
 
