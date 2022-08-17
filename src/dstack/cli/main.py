@@ -2,7 +2,7 @@ import sys
 from argparse import ArgumentParser, SUPPRESS, Namespace
 
 from dstack.cli import app, logs, run, stop, artifacts, status, init, \
-    restart, delete, tags, config, dashboard
+    restart, delete, tags, config, dashboard, secrets
 from dstack.version import __version__ as version
 
 
@@ -22,6 +22,7 @@ def default_func(_: Namespace):
           "Other commands:\n"
           "  init           Authorize dstack to access the current GitHub repo\n"
           "  config          Configure the backend\n"
+          "  secrets        Manage secrets\n"
           # "  restart        Restart a run\n"
           "  delete         Delete runs\n"
           "\n"
@@ -52,6 +53,7 @@ def main():
     delete.register_parsers(subparsers)
     # restart.register_parsers(subparsers)
     run.register_parsers(subparsers)
+    secrets.register_parsers(subparsers)
     status.register_parsers(subparsers)
     stop.register_parsers(subparsers)
     tags.register_parsers(subparsers)

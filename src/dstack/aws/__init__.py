@@ -1,7 +1,7 @@
 import boto3
 from botocore.client import BaseClient
 
-from dstack.aws import logs, artifacts, jobs, run_names, runs, runners, tags, repos
+from dstack.aws import logs, artifacts, jobs, run_names, runs, runners, tags, repos, secrets
 from dstack.backend import *
 from dstack.config import AwsBackendConfig
 
@@ -133,3 +133,16 @@ class AwsBackend(Backend):
                                   path: str) -> List[Tuple[str, bool]]:
         return artifacts.list_run_artifact_objects(self._s3_client(), self.backend_config.bucket_name, repo_user_name,
                                                    repo_name, job_id, path)
+
+    def list_secret_names(self) -> List[str]:
+        return secrets.list_secret_names(self._secretsmanager_client(), self.backend_config.bucket_name)
+
+    def get_secret(self, secret_name: str) -> Optional[Secret]:
+        return secrets.get_secret(self._secretsmanager_client(), self.backend_config.bucket_name, secret_name)
+
+    def add_secret(self, secret: Secret):
+        return secrets.add_secret(self._sts_client(), self._iam_client(), self._secretsmanager_client(),
+                                  self.backend_config.bucket_name, secret)
+
+    def delete_secret(self, secret_name: str):
+        return secrets.delete_secret(self._secretsmanager_client(), self.backend_config.bucket_name, secret_name)

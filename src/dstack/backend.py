@@ -124,7 +124,7 @@ class TagHead:
 
     def __str__(self) -> str:
         artifact_heads = (
-                    "[" + ", ".join(map(lambda a: str(a), self.artifact_heads)) + "]") if self.artifact_heads else None
+                "[" + ", ".join(map(lambda a: str(a), self.artifact_heads)) + "]") if self.artifact_heads else None
         return f'TagHead(repo_user_name="{self.repo_user_name}", ' \
                f'repo_name="{self.repo_name}", ' \
                f'tag_name="{self.tag_name}", ' \
@@ -147,6 +147,16 @@ class RepoHead:
                f'repo_name="{self.repo_name}", ' \
                f'last_run_at="{self.last_run_at}", ' \
                f'tags_count="{self.tags_count}")'
+
+
+class Secret:
+    def __init__(self, secret_name: str, secret_value: str):
+        self.secret_name = secret_name
+        self.secret_value = secret_value
+
+    def __str__(self) -> str:
+        return f'RepoHead(secret_name="{self.secret_name}", ' \
+               f'secret_value_length={len(self.secret_value)})'
 
 
 class Backend(ABC):
@@ -240,6 +250,18 @@ class Backend(ABC):
 
     def list_run_artifact_objects(self, repo_user_name: str, repo_name: str, job_id: str,
                                   path: str) -> List[Tuple[str, bool]]:
+        pass
+
+    def list_secret_names(self) -> List[str]:
+        pass
+
+    def get_secret(self, secret_name: str) -> Optional[Secret]:
+        pass
+
+    def add_secret(self, secret: Secret):
+        pass
+
+    def delete_secret(self, secret_name: str):
         pass
 
 

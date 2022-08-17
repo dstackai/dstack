@@ -40,7 +40,7 @@ def list_tags_func(_: Namespace):
         sys.exit(f"Call 'dstack config' first")
 
 
-def create_tag_func(args: Namespace):
+def add_tag_func(args: Namespace):
     try:
         backend = load_backend()
         repo_data = load_repo_data()
@@ -63,7 +63,7 @@ def delete_tag_func(args: Namespace):
         tag_head = backend.get_tag_head(repo_data.repo_user_name, repo_data.repo_name, args.tag_name)
         if not tag_head:
             sys.exit(f"The tag '{args.tag_name}' doesn't exist")
-        elif Confirm.ask(f" [red]Delete the tag '{tag_head}'?[/]"):
+        elif Confirm.ask(f" [red]Delete the tag '{tag_head.tag_name}'?[/]"):
             backend.delete_tag(repo_data.repo_user_name, repo_data.repo_name, tag_head)
             print(f"[grey58]OK[/]")
     except ConfigError:
@@ -78,14 +78,14 @@ def register_parsers(main_subparsers):
 
     subparsers.add_parser("list", help="List tags")
 
-    create_tags_parser = subparsers.add_parser("create", help="Create a tag")
-    create_tags_parser.add_argument("tag_name", metavar="TAG_NAME", type=str, help="The name of the tag")
-    group = create_tags_parser.add_mutually_exclusive_group(required=True)
+    add_tags_parser = subparsers.add_parser("add", help="Add a tag")
+    add_tags_parser.add_argument("tag_name", metavar="TAG", type=str, help="The name of the tag")
+    group = add_tags_parser.add_mutually_exclusive_group(required=True)
     group.add_argument("--run-name", "-r", type=str, help="A name of a run")
     group.add_argument("--local-dir", metavar="LOCAL_DIR", type=str,
                        help="A local directory to upload as an artifact", action="append",
                        dest="local_dirs")
-    create_tags_parser.set_defaults(func=create_tag_func)
+    add_tags_parser.set_defaults(func=add_tag_func)
 
     delete_tags_parser = subparsers.add_parser("delete", help="Delete a tag")
     delete_tags_parser.add_argument("tag_name", metavar="TAG_NAME", type=str, help="The name of the tag")

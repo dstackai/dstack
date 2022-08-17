@@ -100,7 +100,7 @@ def save_repo_credentials(sts_client: BaseClient, iam_client: BaseClient, secret
                     },
                     {
                         'Key': 'dstack_bucket',
-                        'Value': 'bucket_name'
+                        'Value': bucket_name
                     }
                 ],
             )
