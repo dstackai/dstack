@@ -20,7 +20,7 @@ def default_func(_: Namespace):
           # "  app            Open a running application\n"
           "\n"
           "Other commands:\n"
-          # "  init           Initialize the repository\n"
+          "  init           Authorize dstack to access the current GitHub repo\n"
           "  config          Configure the backend\n"
           # "  restart        Restart a run\n"
           "  delete         Delete runs\n"
@@ -47,7 +47,7 @@ def main():
     # app.register_parsers(subparsers)
     artifacts.register_parsers(subparsers)
     config.register_parsers(subparsers)
-    # init.register_parsers(subparsers)
+    init.register_parsers(subparsers)
     logs.register_parsers(subparsers)
     delete.register_parsers(subparsers)
     # restart.register_parsers(subparsers)

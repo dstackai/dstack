@@ -14,7 +14,7 @@ app.include_router(runs.router)
 
 @app.on_event("startup")
 async def startup_event():
-    print(f"The dashboard API is available at http://{os.getenv('DSTACK_HOST')}:{os.getenv('DSTACK_PORT')}/api")
+    print(f"The dashboard API is available at http://{os.getenv('DSTACK_HOST')}:{os.getenv('DSTACK_PORT')}/api/docs")
 
 
 app.mount("/", StaticFiles(packages=["dstack.dashboard"], html=True), name="static")

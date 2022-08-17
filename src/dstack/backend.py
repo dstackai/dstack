@@ -5,7 +5,7 @@ from typing import List, Optional, Generator, Tuple
 
 from dstack.config import load_config, AwsBackendConfig
 from dstack.jobs import Job, JobStatus, JobHead
-from dstack.repo import RepoData
+from dstack.repo import RepoData, RepoCredentials
 from dstack.runners import Resources, Runner
 from dstack.util import _quoted
 
@@ -222,6 +222,9 @@ class Backend(ABC):
         pass
 
     def decrement_repo_tags_count(self, repo_user_name: str, repo_name: str):
+        pass
+
+    def save_repo_credentials(self, repo_user_name: str, repo_name: str, repo_credentials: RepoCredentials):
         pass
 
 
