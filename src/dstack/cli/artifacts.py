@@ -7,15 +7,29 @@ from rich.console import Console
 from rich.table import Table
 
 from dstack.backend import load_backend
-from dstack.repo import load_repo_data
 from dstack.config import ConfigError
+from dstack.repo import load_repo_data
+
+
+def _run_name(repo_data, backend, args):
+    if args.run_name_or_tag_name.startswith(":"):
+        tag_name = args.run_name_or_tag_name[1:]
+        tag_head = backend.get_tag_head(repo_data.repo_user_name, repo_data.repo_name, tag_name)
+        if tag_head:
+            run_name = tag_head.run_name
+        else:
+            sys.exit(f"Cannot find the tag '{tag_name}'")
+    else:
+        run_name = args.run_name_or_tag_name
+    return run_name
 
 
 def download_func(args: Namespace):
     try:
         backend = load_backend()
         repo_data = load_repo_data()
-        backend.download_run_artifact_files(repo_data.repo_user_name, repo_data.repo_name, args.run_name, args.output)
+        run_name = _run_name(repo_data, backend, args)
+        backend.download_run_artifact_files(repo_data.repo_user_name, repo_data.repo_name, run_name, args.output)
     except InvalidGitRepositoryError:
         sys.exit(f"{os.getcwd()} is not a Git repo")
     except ConfigError:
@@ -34,8 +48,8 @@ def list_func(args: Namespace):
     try:
         backend = load_backend()
         repo_data = load_repo_data()
-        run_artifact_files = backend.list_run_artifact_files(repo_data.repo_user_name, repo_data.repo_name,
-                                                             args.run_name)
+        run_name = _run_name(repo_data, backend, args)
+        run_artifact_files = backend.list_run_artifact_files(repo_data.repo_user_name, repo_data.repo_name, run_name)
         console = Console()
         table = Table(box=None)
         table.add_column("ARTIFACT", style="bold", no_wrap=True)
@@ -54,15 +68,15 @@ def list_func(args: Namespace):
 
 
 def register_parsers(main_subparsers):
-    parser = main_subparsers.add_parser("artifacts", help="List, download, or upload artifacts")
+    parser = main_subparsers.add_parser("artifacts", help="List or download artifacts")
     subparsers = parser.add_subparsers()
 
-    list_parser = subparsers.add_parser("list", help="Download artifacts", )
-    list_parser.add_argument("run_name", metavar="RUN", type=str, help="A name of a run")
+    list_parser = subparsers.add_parser("list", help="List artifacts", )
+    list_parser.add_argument("run_name_or_tag_name", metavar="RUN | :TAG", type=str, help="A name of a run or a tag")
     list_parser.set_defaults(func=list_func)
 
     download_parser = subparsers.add_parser("download", help="Download artifacts", )
-    download_parser.add_argument("run_name", metavar="RUN", type=str, help="A name of a run")
+    download_parser.add_argument("run_name_or_tag_name", metavar="RUN | :TAG", type=str, help="A name of a run or a tag")
     download_parser.add_argument("--output", "-o", help="The directory to download artifacts to. "
                                                         "By default, it's the current directory.", type=str)
     download_parser.set_defaults(func=download_func)

@@ -3,6 +3,7 @@ from argparse import Namespace
 
 from rich import print
 from rich.console import Console
+from rich.prompt import Confirm
 from rich.table import Table
 
 from dstack.backend import load_backend
@@ -31,7 +32,7 @@ def list_tags_func(_: Namespace):
                 tag_head.run_name,
                 # tag_head.workflow_name,
                 # tag_head.provider_name,
-                '\n'.join(tag_head.artifacts or []),
+                '\n'.join([a.artifact_name for a in tag_head.artifact_heads or []]),
                 created_at
             )
         console.print(table)
@@ -62,9 +63,9 @@ def delete_tag_func(args: Namespace):
         tag_head = backend.get_tag_head(repo_data.repo_user_name, repo_data.repo_name, args.tag_name)
         if not tag_head:
             sys.exit(f"The tag '{args.tag_name}' doesn't exist")
-        else:
+        elif Confirm.ask(f" [red]Delete the tag '{tag_head}'?[/]"):
             backend.delete_tag(repo_data.repo_user_name, repo_data.repo_name, tag_head)
-        print(f"[grey58]OK[/]")
+            print(f"[grey58]OK[/]")
     except ConfigError:
         sys.exit(f"Call 'dstack config' first")
 

@@ -112,7 +112,7 @@ class BackendError(Exception):
 class TagHead:
     def __init__(self, repo_user_name: str, repo_name: str, tag_name: str, run_name: str,
                  workflow_name: Optional[str], provider_name: Optional[str], created_at: int,
-                 artifacts: Optional[List[str]]):
+                 artifact_heads: Optional[List[ArtifactHead]]):
         self.repo_user_name = repo_user_name
         self.repo_name = repo_name
         self.tag_name = tag_name
@@ -120,10 +120,11 @@ class TagHead:
         self.workflow_name = workflow_name
         self.provider_name = provider_name
         self.created_at = created_at
-        self.artifacts = artifacts
+        self.artifact_heads = artifact_heads
 
     def __str__(self) -> str:
-        artifacts = ("[" + ", ".join(map(lambda a: _quoted(str(a)), self.artifacts)) + "]") if self.artifacts else None
+        artifact_heads = (
+                    "[" + ", ".join(map(lambda a: str(a), self.artifact_heads)) + "]") if self.artifact_heads else None
         return f'TagHead(repo_user_name="{self.repo_user_name}", ' \
                f'repo_name="{self.repo_name}", ' \
                f'tag_name="{self.tag_name}", ' \
@@ -131,7 +132,7 @@ class TagHead:
                f'workflow_name={_quoted(self.workflow_name)}, ' \
                f'provider_name="{_quoted(self.provider_name)}", ' \
                f'created_at={self.created_at}, ' \
-               f'artifacts={artifacts})'
+               f'artifact_heads={artifact_heads})'
 
 
 class RepoHead:
