@@ -249,12 +249,11 @@ HOME=/root nohup dstack-runner start &
     return user_data
 
 
-def _role_arn(iam_client: BaseClient, bucket_name: str) -> str:
+def role_name(iam_client: BaseClient, bucket_name: str) -> str:
     policy_name = "dstack_policy_" + bucket_name.replace("-", "_").lower()
-    role_name = "dstack_role_" + bucket_name.replace("-", "_").lower()
+    _role_name = "dstack_role_" + bucket_name.replace("-", "_").lower()
     try:
-        response = iam_client.get_role(RoleName=role_name)
-        role_id = response["Role"]["RoleId"]
+        iam_client.get_role(RoleName=_role_name)
     except Exception as e:
         if hasattr(e, "response") and e.response.get("Error") and e.response["Error"].get("Code") == "NoSuchEntity":
             response = iam_client.create_policy(
@@ -267,20 +266,23 @@ def _role_arn(iam_client: BaseClient, bucket_name: str) -> str:
                             {
                                 "Effect": "Allow",
                                 "Action": "s3:*",
-                                "Resource": [f"arn:aws:s3:::{bucket_name}",
-                                             f"arn:aws:s3:::{bucket_name}/*"]
+                                "Resource": [
+                                    f"arn:aws:s3:::{bucket_name}",
+                                    f"arn:aws:s3:::{bucket_name}/*"
+                                ]
                             },
                             {
                                 "Effect": "Allow",
                                 "Action": "logs:*",
                                 "Resource": [
                                     f"arn:aws:logs:::log-group:/dstack/jobs/{bucket_name}*",
-                                    f"arn:aws:logs:::log-group:/dstack/runners/{bucket_name}*"]
+                                    f"arn:aws:logs:::log-group:/dstack/runners/{bucket_name}*"
+                                ]
                             },
                             {
                                 "Effect": "Allow",
                                 "Action": "ec2:*",
-                                "Resource": ["*"],
+                                "Resource": "*",
                                 "Condition": {
                                     "StringEquals": {
                                         "aws:ResourceTag/dstack_bucket": bucket_name,
@@ -301,8 +303,8 @@ def _role_arn(iam_client: BaseClient, bucket_name: str) -> str:
                 ]
             )
             policy_arn = response['Policy']['Arn']
-            response = iam_client.create_role(
-                RoleName=role_name,
+            iam_client.create_role(
+                RoleName=_role_name,
                 AssumeRolePolicyDocument=json.dumps(
                     {
                         "Version": "2012-10-17",
@@ -330,26 +332,24 @@ def _role_arn(iam_client: BaseClient, bucket_name: str) -> str:
                     },
                 ],
             )
-            role_id = response["Role"]["RoleId"]
             iam_client.attach_role_policy(
-                RoleName=role_name,
+                RoleName=_role_name,
                 PolicyArn=policy_arn
             )
         else:
             raise e
-    return role_id
+    return _role_name
 
 
 def _instance_profile_arn(iam_client: BaseClient, bucket_name: str) -> str:
-    role_name = "dstack_role_" + bucket_name.replace("-", "_").lower()
+    _role_name = role_name(iam_client, bucket_name)
     try:
-        response = iam_client.get_instance_profile(InstanceProfileName=role_name)
+        response = iam_client.get_instance_profile(InstanceProfileName=_role_name)
         return response["InstanceProfile"]["Arn"]
     except Exception as e:
         if hasattr(e, "response") and e.response.get("Error") and e.response["Error"].get("Code") == "NoSuchEntity":
-            _role_arn(iam_client, bucket_name)
             response = iam_client.create_instance_profile(
-                InstanceProfileName=role_name,
+                InstanceProfileName=_role_name,
                 Tags=[
                     {
                         "Key": "owner",
@@ -363,8 +363,8 @@ def _instance_profile_arn(iam_client: BaseClient, bucket_name: str) -> str:
             )
             instance_profile_arn = response["InstanceProfile"]["Arn"]
             iam_client.add_role_to_instance_profile(
-                InstanceProfileName=role_name,
-                RoleName=role_name,
+                InstanceProfileName=_role_name,
+                RoleName=_role_name,
             )
             return instance_profile_arn
         else:

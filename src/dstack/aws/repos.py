@@ -3,6 +3,7 @@ from typing import List, Optional
 
 from botocore.client import BaseClient
 
+from dstack.aws import runners
 from dstack.backend import RepoHead
 from dstack.repo import RepoCredentials, RepoProtocol
 
@@ -65,7 +66,8 @@ def decrement_repo_tags_count(s3_client: BaseClient, bucket_name: str, repo_user
         raise Exception(f"No repo head is found: {repo_user_name}/{repo_name}")
 
 
-def save_repo_credentials(secretsmanager_client: BaseClient, bucket_name: str, repo_user_name: str, repo_name: str,
+def save_repo_credentials(sts_client: BaseClient, iam_client: BaseClient, secretsmanager_client: BaseClient,
+                          bucket_name: str, repo_user_name: str, repo_name: str,
                           repo_credentials: RepoCredentials):
     secret_name = f"/dstack/{bucket_name}/credentials/{repo_user_name}/{repo_name}"
     credentials_data = {
@@ -104,3 +106,24 @@ def save_repo_credentials(secretsmanager_client: BaseClient, bucket_name: str, r
             )
         else:
             raise e
+    role_name = runners.role_name(iam_client, bucket_name)
+    account_id = sts_client.get_caller_identity()["Account"]
+    secretsmanager_client.put_resource_policy(
+        SecretId=secret_name,
+        ResourcePolicy=json.dumps(
+            {
+                "Version": "2012-10-17",
+                "Statement": [
+                    {
+                        "Effect": "Allow",
+                        "Principal": {"AWS": f"arn:aws:iam::{account_id}:role/{role_name}"},
+                        "Action": [
+                            "secretsmanager:GetSecretValue",
+                            "secretsmanager:ListSecrets",
+                        ],
+                        "Resource": "*"
+                    }
+                ]
+            }
+        )
+    )

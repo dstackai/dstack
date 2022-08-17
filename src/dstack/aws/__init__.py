@@ -35,6 +35,11 @@ class AwsBackend(Backend):
                                 region_name=self.backend_config.region_name)
         return session.client("secretsmanager")
 
+    def _sts_client(self) -> BaseClient:
+        session = boto3.Session(profile_name=self.backend_config.profile_name,
+                                region_name=self.backend_config.region_name)
+        return session.client("sts")
+
     def create_run(self, repo_user_name: str, repo_name: str) -> str:
         return runs.create_run(self._s3_client(), self._logs_client(), self.backend_config.bucket_name,
                                repo_user_name, repo_name)
@@ -121,5 +126,5 @@ class AwsBackend(Backend):
                                         repo_name)
 
     def save_repo_credentials(self, repo_user_name: str, repo_name: str, repo_credentials: RepoCredentials):
-        repos.save_repo_credentials(self._secretsmanager_client(), self.backend_config.bucket_name, repo_user_name,
-                                    repo_name, repo_credentials)
+        repos.save_repo_credentials(self._sts_client(), self._iam_client(), self._secretsmanager_client(),
+                                    self.backend_config.bucket_name, repo_user_name, repo_name, repo_credentials)
