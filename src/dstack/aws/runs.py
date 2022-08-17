@@ -4,7 +4,7 @@ from botocore.client import BaseClient
 
 from dstack import random_name
 from dstack.aws import run_names, logs, jobs
-from dstack.backend import Run, AppHead, RequestHead, RequestStatus
+from dstack.backend import Run, AppHead, RequestHead, RequestStatus, ArtifactHead
 from dstack.jobs import JobHead, Job
 
 
@@ -65,14 +65,15 @@ def _request_head(ec2_client: BaseClient, job: Job) -> RequestHead:
 
 
 def _create_run(ec2_client: BaseClient, repo_user_name, repo_name, job: Job, include_request_heads: bool) -> Run:
-    app_heads = list(map(lambda a: AppHead(job.job_id, a), job.app_specs)) if job.app_specs else None
+    app_heads = list(map(lambda a: AppHead(job.job_id, a.app_name), job.app_specs)) if job.app_specs else None
+    artifact_heads = list(map(lambda a: ArtifactHead(job.job_id, a), job.artifacts)) if job.artifacts else None
     request_heads = None
     if include_request_heads and job.status.is_unfinished():
         if request_heads is None:
             request_heads = []
         request_heads.append(_request_head(ec2_client, job))
     run = Run(repo_user_name, repo_name, job.run_name, job.workflow_name, job.provider_name,
-              job.artifacts or None, job.status, job.submitted_at, job.tag_name,
+              artifact_heads or None, job.status, job.submitted_at, job.tag_name,
               app_heads, request_heads)
     return run
 
@@ -80,13 +81,13 @@ def _create_run(ec2_client: BaseClient, repo_user_name, repo_name, job: Job, inc
 def _update_run(ec2_client: BaseClient, run: Run, job: Job, include_request_heads: bool):
     run.submitted_at = min(run.submitted_at, job.submitted_at)
     if job.artifacts:
-        if run.artifacts is None:
-            run.artifacts = []
-        run.artifacts.extend(job.artifacts)
+        if run.artifact_heads is None:
+            run.artifact_heads = []
+        run.artifact_heads.extend(list(map(lambda a: ArtifactHead(job.job_id, a), job.artifacts)))
     if job.app_specs:
         if run.app_heads is None:
             run.app_heads = []
-        run.app_heads.extend(list(map(lambda a: AppHead(job.job_id, a), job.app_specs)))
+        run.app_heads.extend(list(map(lambda a: AppHead(job.job_id, a.app_name), job.app_specs)))
     if job.status.is_unfinished():
         run.status = job.status
         if include_request_heads:

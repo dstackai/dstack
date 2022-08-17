@@ -128,3 +128,8 @@ class AwsBackend(Backend):
     def save_repo_credentials(self, repo_user_name: str, repo_name: str, repo_credentials: RepoCredentials):
         repos.save_repo_credentials(self._sts_client(), self._iam_client(), self._secretsmanager_client(),
                                     self.backend_config.bucket_name, repo_user_name, repo_name, repo_credentials)
+
+    def list_run_artifact_objects(self, repo_user_name: str, repo_name: str, job_id: str,
+                                  path: str) -> List[Tuple[str, bool]]:
+        return artifacts.list_run_artifact_objects(self._s3_client(), self.backend_config.bucket_name, repo_user_name,
+                                                   repo_name, job_id, path)

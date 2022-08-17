@@ -5,11 +5,12 @@ from fastapi import FastAPI
 from starlette.responses import HTMLResponse
 from starlette.staticfiles import StaticFiles
 
-from dstack.dashboard import repos, runs
+from dstack.dashboard import repos, runs, artifacts
 
 app = FastAPI(docs_url="/api/docs")
 app.include_router(repos.router)
 app.include_router(runs.router)
+app.include_router(artifacts.router)
 
 
 @app.on_event("startup")

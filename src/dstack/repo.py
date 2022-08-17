@@ -25,25 +25,37 @@ class RepoCredentials:
 
     def __str__(self) -> str:
         return f'RepoCredentials(protocol=RepoProtocol.{self.protocol.name}, ' \
-               f'private_key_len={len(self.private_key) if self.private_key else None}, ' \
+               f'private_key_length={len(self.private_key) if self.private_key else None}, ' \
                f'oauth_token={_quoted_masked(self.oauth_token)})'
 
 
 class RepoData:
-    def __init__(self, repo_user_name: str, repo_name: str, repo_branch: str, repo_hash: str, repo_diff: Optional[str],
-                 protocol: RepoProtocol, identity_file: Optional[str],
-                 oauth_token: Optional[str]):
+    def __init__(self, repo_user_name: str, repo_name: str, repo_branch: str, repo_hash: str, repo_diff: Optional[str]):
         self.repo_user_name = repo_user_name
         self.repo_name = repo_name
         self.repo_branch = repo_branch
         self.repo_hash = repo_hash
         self.repo_diff = repo_diff
+
+    def __str__(self) -> str:
+        return f'RepoData(repo_user_name="{self.repo_user_name}", ' \
+               f'repo_name="{self.repo_name}", ' \
+               f'repo_branch="{self.repo_branch}", ' \
+               f'repo_hash="{self.repo_hash}", ' \
+               f'repo_diff_length={len(self.repo_diff) if self.repo_diff else None})'
+
+
+class LocalRepoData(RepoData):
+    def __init__(self, repo_user_name: str, repo_name: str, repo_branch: str, repo_hash: str, repo_diff: Optional[str],
+                 protocol: RepoProtocol, identity_file: Optional[str],
+                 oauth_token: Optional[str]):
+        super().__init__(repo_user_name, repo_name, repo_branch, repo_hash, repo_diff)
         self.protocol = protocol
         self.identity_file = identity_file
         self.oauth_token = oauth_token
 
     def __str__(self) -> str:
-        return f'RepoData(repo_user_name="{self.repo_user_name}", ' \
+        return f'LocalRepoData(repo_user_name="{self.repo_user_name}", ' \
                f'repo_name="{self.repo_name}", ' \
                f'repo_branch="{self.repo_branch}", ' \
                f'repo_hash="{self.repo_hash}", ' \
@@ -77,7 +89,7 @@ class RepoData:
             raise Exception("No identity file is specified")
 
 
-def load_repo_data(oauth_token: Optional[str] = None, identity_file: Optional[str] = None) -> RepoData:
+def load_repo_data(oauth_token: Optional[str] = None, identity_file: Optional[str] = None) -> LocalRepoData:
     # TODO: Allow to override the current working directory, e.g. via --dir
     cwd = os.getcwd()
     repo = GitRepo(cwd)
@@ -114,9 +126,9 @@ def load_repo_data(oauth_token: Optional[str] = None, identity_file: Optional[st
         # TODO: Doesn't support unstaged changes
         repo_diff = repo.git.diff(repo_hash)
         if repo_resource == "github.com":
-            return RepoData(repo_url_parsed.owner, repo_url_parsed.name, repo_branch, repo_hash, repo_diff,
-                            RepoProtocol.HTTPS if repo_url_parsed.protocol == "https" else RepoProtocol.SSH,
-                            repo_identity_file or os.path.expanduser('~/.ssh/id_rsa'), repo_oauth_token)
+            return LocalRepoData(repo_url_parsed.owner, repo_url_parsed.name, repo_branch, repo_hash, repo_diff,
+                                 RepoProtocol.HTTPS if repo_url_parsed.protocol == "https" else RepoProtocol.SSH,
+                                 repo_identity_file or os.path.expanduser('~/.ssh/id_rsa'), repo_oauth_token)
         else:
             sys.exit(f"{os.getcwd()} is not a GitHub repo")
     else:

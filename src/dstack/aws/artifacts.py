@@ -114,3 +114,21 @@ def upload_job_artifact_files(s3_client: BaseClient, bucket_name: str, repo_user
                     key,
                     callback=callback,
                 )
+
+
+def list_run_artifact_objects(s3_client: BaseClient, bucket_name: str, repo_user_name: str, repo_name: str,
+                              job_id: str, path: str) -> List[Tuple[str, bool]]:
+    prefix = f"artifacts/{repo_user_name}/{repo_name}/{job_id}/" + path + ("" if path.endswith("/") else "/")
+    response = s3_client.list_objects(Bucket=bucket_name, Prefix=prefix, Delimiter="/")
+    folders = []
+    files = []
+    if "CommonPrefixes" in response:
+        for f in response["CommonPrefixes"]:
+            folder_name = f["Prefix"][len(prefix):]
+            if folder_name.endswith("/"):
+                folder_name = folder_name[:-1]
+            folders.append(folder_name)
+    if "Contents" in response:
+        for f in response["Contents"]:
+            files.append(f["Key"][len(prefix):])
+    return [(folder, True) for folder in folders] + [(file, False) for file in files]

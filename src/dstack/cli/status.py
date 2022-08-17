@@ -92,7 +92,7 @@ def print_runs(args: Namespace, backend: Backend):
                 run.workflow_name or run.provider_name,
                 pretty_print_status(run),
                 _app_heads(run.app_heads, run.status.name),
-                '\n'.join(run.artifacts or []),
+                '\n'.join([a.artifact_name for a in run.artifact_heads or []]),
                 submitted_at,
                 f"{run.tag_name}" if run.tag_name else "")
     console.print(table)

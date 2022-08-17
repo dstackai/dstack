@@ -43,12 +43,21 @@ class AppHead:
         self.app_name = app_name
 
     def __str__(self) -> str:
-        return f'RunApp(job_id="{self.job_id}", app_name="{self.app_name})'
+        return f'AppHead(job_id="{self.job_id}", app_name="{self.app_name})'
+
+
+class ArtifactHead:
+    def __init__(self, job_id: str, artifact_name: str):
+        self.job_id = job_id
+        self.artifact_name = artifact_name
+
+    def __str__(self) -> str:
+        return f'ArtifactHead(job_id="{self.job_id}", artifact_name="{self.artifact_name})'
 
 
 class Run:
     def __init__(self, repo_user_name: str, repo_name: str, run_name: str, workflow_name: Optional[str],
-                 provider_name: str, artifacts: Optional[List[str]], status: JobStatus, submitted_at: int,
+                 provider_name: str, artifact_heads: Optional[List[ArtifactHead]], status: JobStatus, submitted_at: int,
                  tag_name: Optional[str], app_heads: Optional[List[AppHead]],
                  request_heads: Optional[List[RequestHead]]):
         self.repo_user_name = repo_user_name
@@ -56,7 +65,7 @@ class Run:
         self.run_name = run_name
         self.workflow_name = workflow_name
         self.provider_name = provider_name
-        self.artifacts = artifacts
+        self.artifact_heads = artifact_heads
         self.status = status
         self.submitted_at = submitted_at
         self.tag_name = tag_name
@@ -64,7 +73,8 @@ class Run:
         self.request_heads = request_heads
 
     def __str__(self) -> str:
-        artifacts = ("[" + ", ".join(map(lambda a: _quoted(str(a)), self.artifacts)) + "]") if self.artifacts else None
+        artifact_heads = (
+                "[" + ", ".join(map(lambda a: str(a), self.artifact_heads)) + "]") if self.artifact_heads else None
         app_heads = ("[" + ", ".join(map(lambda a: str(a), self.app_heads)) + "]") if self.app_heads else None
         request_heads = "[" + ", ".join(
             map(lambda e: _quoted(str(e)), self.request_heads)) + "]" if self.request_heads else None
@@ -75,7 +85,7 @@ class Run:
                f'provider_name="{self.provider_name}", ' \
                f'status=JobStatus.{self.status.name}, ' \
                f'submitted_at={self.submitted_at}, ' \
-               f'artifacts={artifacts}, ' \
+               f'artifact_heads={artifact_heads}, ' \
                f'tag_name={_quoted(self.tag_name)}, ' \
                f'app_heads={app_heads}, ' \
                f'request_heads={request_heads})'
@@ -225,6 +235,10 @@ class Backend(ABC):
         pass
 
     def save_repo_credentials(self, repo_user_name: str, repo_name: str, repo_credentials: RepoCredentials):
+        pass
+
+    def list_run_artifact_objects(self, repo_user_name: str, repo_name: str, job_id: str,
+                                  path: str) -> List[Tuple[str, bool]]:
         pass
 
 
