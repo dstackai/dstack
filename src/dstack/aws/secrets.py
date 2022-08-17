@@ -83,6 +83,15 @@ def add_secret(sts_client: BaseClient, iam_client: BaseClient, secretsmanager_cl
     )
 
 
+def update_secret(secretsmanager_client: BaseClient, bucket_name: str,
+                  secret: Secret):
+    secret_id = f"/dstack/{bucket_name}/secrets/{secret.secret_name}"
+    secretsmanager_client.put_secret_value(
+        SecretId=secret_id,
+        SecretString=secret.secret_value,
+    )
+
+
 def delete_secret(secretsmanager_client: BaseClient, bucket_name: str, secret_name: str):
     secretsmanager_client.delete_secret(
         SecretId=f"/dstack/{bucket_name}/secrets/{secret_name}",

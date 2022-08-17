@@ -261,6 +261,9 @@ class Backend(ABC):
     def add_secret(self, secret: Secret):
         pass
 
+    def update_secret(self, secret: Secret):
+        pass
+
     def delete_secret(self, secret_name: str):
         pass
 

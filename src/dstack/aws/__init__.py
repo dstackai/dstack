@@ -144,5 +144,8 @@ class AwsBackend(Backend):
         return secrets.add_secret(self._sts_client(), self._iam_client(), self._secretsmanager_client(),
                                   self.backend_config.bucket_name, secret)
 
+    def update_secret(self, secret: Secret):
+        return secrets.update_secret(self._secretsmanager_client(), self.backend_config.bucket_name, secret)
+
     def delete_secret(self, secret_name: str):
         return secrets.delete_secret(self._secretsmanager_client(), self.backend_config.bucket_name, secret_name)
