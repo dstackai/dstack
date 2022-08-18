@@ -344,7 +344,7 @@ def role_name(iam_client: BaseClient, bucket_name: str) -> str:
     return _role_name
 
 
-def _instance_profile_arn(iam_client: BaseClient, bucket_name: str) -> str:
+def instance_profile_arn(iam_client: BaseClient, bucket_name: str) -> str:
     _role_name = role_name(iam_client, bucket_name)
     try:
         response = iam_client.get_instance_profile(InstanceProfileName=_role_name)
@@ -410,7 +410,7 @@ def _create_spot_request(ec2_client: BaseClient, iam_client: BaseClient, bucket_
                 }
             ],
             "IamInstanceProfile": {
-                "Arn": _instance_profile_arn(iam_client, bucket_name),
+                "Arn": instance_profile_arn(iam_client, bucket_name),
             },
             "UserData": base64.b64encode(
                 _user_data(bucket_name, region_name, runner_id, instance_type.resources).encode("ascii")
@@ -472,7 +472,7 @@ def _run_instance(ec2_client: BaseClient, iam_client: BaseClient, bucket_name: s
         MaxCount=1,
         SecurityGroupIds=[_get_security_group_id(ec2_client, bucket_name)],
         IamInstanceProfile={
-            "Arn": _instance_profile_arn(iam_client, bucket_name),
+            "Arn": instance_profile_arn(iam_client, bucket_name),
         },
         UserData=_user_data(bucket_name, region_name, runner_id, instance_type.resources),
         TagSpecifications=[

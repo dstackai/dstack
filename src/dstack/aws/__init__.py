@@ -1,7 +1,7 @@
 import boto3
 from botocore.client import BaseClient
 
-from dstack.aws import logs, artifacts, jobs, run_names, runs, runners, tags, repos, secrets
+from dstack.aws import logs, artifacts, jobs, run_names, runs, runners, tags, repos, secrets, config
 from dstack.backend import *
 from dstack.config import AwsBackendConfig
 
@@ -39,6 +39,10 @@ class AwsBackend(Backend):
         session = boto3.Session(profile_name=self.backend_config.profile_name,
                                 region_name=self.backend_config.region_name)
         return session.client("sts")
+
+    def configure(self, silent: bool):
+        config.configure(self._iam_client(), self._s3_client(), self.backend_config.bucket_name,
+                         self.backend_config.region_name, silent)
 
     def create_run(self, repo_user_name: str, repo_name: str) -> str:
         return runs.create_run(self._s3_client(), self._logs_client(), self.backend_config.bucket_name,

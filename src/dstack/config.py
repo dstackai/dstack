@@ -49,7 +49,7 @@ def load_config(path: Path = get_config_path()) -> Config:
         raise ConfigError(f"{path.resolve()} doesn't exist")
 
 
-def save_config(config: Config, path: Path = get_config_path()):
+def write_config(config: Config, path: Path = get_config_path()):
     if isinstance(config.backend_config, AwsBackendConfig):
         with path.open('w') as f:
             config_data = {
