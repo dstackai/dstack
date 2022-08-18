@@ -1,6 +1,7 @@
 import base64
 import json
 import sys
+import time
 import uuid
 from functools import reduce, cmp_to_key
 from typing import List, Optional, Tuple
@@ -13,6 +14,8 @@ from dstack.aws import jobs
 from dstack.backend import InstanceType
 from dstack.jobs import Job, JobStatus, Requirements
 from dstack.runners import Resources, Runner, Gpu
+
+CREATE_INSTANCE_RETRY_RATE_SECS = 3
 
 
 def _serialize_runner(runner: Runner) -> dict:
@@ -433,6 +436,24 @@ def _create_spot_request(ec2_client: BaseClient, iam_client: BaseClient, bucket_
     return request_id
 
 
+def _create_spot_request_retry(ec2_client: BaseClient, iam_client: BaseClient, bucket_name: str, region_name: str,
+                               runner_id: str, instance_type: InstanceType, attempts: int = 3) -> str:
+    try:
+        return _create_spot_request(ec2_client, iam_client, bucket_name, region_name, runner_id,
+                                    instance_type)
+    except Exception as e:
+        if hasattr(e, "response") and e.response.get("Error") and e.response["Error"].get(
+                "Code") == "InvalidParameterValue":
+            if attempts > 0:
+                time.sleep(CREATE_INSTANCE_RETRY_RATE_SECS)
+                return _create_spot_request_retry(ec2_client, iam_client, bucket_name, region_name, runner_id,
+                                                  instance_type, attempts - 1)
+            else:
+                raise Exception("Failed to retry", e)
+        else:
+            raise e
+
+
 def _run_instance(ec2_client: BaseClient, iam_client: BaseClient, bucket_name: str, region_name: str,
                   runner_id: str, instance_type: InstanceType) -> str:
     response = ec2_client.run_instances(
@@ -474,6 +495,24 @@ def _run_instance(ec2_client: BaseClient, iam_client: BaseClient, bucket_name: s
     return instance_id
 
 
+def _run_instance_retry(ec2_client: BaseClient, iam_client: BaseClient, bucket_name: str, region_name: str,
+                        runner_id: str, instance_type: InstanceType, attempts: int = 3) -> str:
+    try:
+        return _run_instance(ec2_client, iam_client, bucket_name, region_name, runner_id,
+                             instance_type)
+    except Exception as e:
+        if hasattr(e, "response") and e.response.get("Error") and e.response["Error"].get(
+                "Code") == "InvalidParameterValue":
+            if attempts > 0:
+                time.sleep(CREATE_INSTANCE_RETRY_RATE_SECS)
+                return _run_instance_retry(ec2_client, iam_client, bucket_name, region_name, runner_id,
+                                           instance_type, attempts - 1)
+            else:
+                raise Exception("Failed to retry", e)
+        else:
+            raise e
+
+
 def run_job(ec2_client: BaseClient, iam_client: BaseClient, s3_client: BaseClient, bucket_name: str,
             region_name, job: Job) -> Runner:
     if job.status == JobStatus.SUBMITTED:
@@ -485,10 +524,11 @@ def run_job(ec2_client: BaseClient, iam_client: BaseClient, s3_client: BaseClien
             runner = Runner(runner_id, None, instance_type.resources, job)
             _create_or_update_runner(s3_client, bucket_name, runner)
             if instance_type.resources.interruptible:
-                request_id = _create_spot_request(ec2_client, iam_client, bucket_name, region_name, runner_id,
-                                                  instance_type)
+                request_id = _create_spot_request_retry(ec2_client, iam_client, bucket_name, region_name, runner_id,
+                                                        instance_type)
             else:
-                request_id = _run_instance(ec2_client, iam_client, bucket_name, region_name, runner_id, instance_type)
+                request_id = _run_instance_retry(ec2_client, iam_client, bucket_name, region_name, runner_id,
+                                                 instance_type)
             runner.request_id = request_id
             job.request_id = request_id
             jobs.update_job(s3_client, bucket_name, job)
