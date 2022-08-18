@@ -1,35 +1,60 @@
 <div align="center">
 <img src="https://raw.githubusercontent.com/dstackai/dstack/master/docs/assets/logo.svg" width="300px"/>    
 
-An open-source tool for running data and ML workflows in the cloud
+A command-line interface to run workflows in the cloud.
 ______________________________________________________________________
 
-[![pypi](https://badge.fury.io/py/dstack.svg)](https://badge.fury.io/py/dstack)
-[![License](https://img.shields.io/badge/licence-MPL%202.0-blue)](LICENSE)
-[![slack](https://img.shields.io/badge/chat-on%20slack-e01563)](https://join.slack.com/t/dstackai/shared_invite/zt-xdnsytie-D4qU9BvJP8vkbkHXdi6clQ)
+![PyPI](https://img.shields.io/github/workflow/status/dstackai/dstack/Build?logo=github&style=for-the-badge)
+![PyPI](https://img.shields.io/pypi/v/dstack?style=for-the-badge)
+![PyPI - License](https://img.shields.io/pypi/l/dstack?style=for-the-badge)
+[![Slack](https://img.shields.io/badge/slack-join-e01563?style=for-the-badge)](https://join.slack.com/t/dstackai/shared_invite/zt-xdnsytie-D4qU9BvJP8vkbkHXdi6clQ)
 
 [//]: # ([![twitter]&#40;https://img.shields.io/twitter/follow/dstackai.svg?style=social&label=Follow&#41;]&#40;https://twitter.com/dstackai&#41;)
 
 </div>
 
-## Getting started
+## 👋 Intro
 
-### Install the CLI
+Often, to run data or ML workflows, your local machine is not enough, so you need to use 
+cloud instances (e.g. AWS, GCP, Azure, etc).
 
-The CLI can be installed on your local machine via pip:
+Instead of configuring instances manually and using SSH,
+(or even writing custom Ansible, Terraform, or K8S scripts), 
+now you can run workflows via dstack.
 
-```bash
+Within a moment, dstack, sets up instances, fetches your current
+Git repo (incl. not-committed changes) on it, downloads the input artifacts,
+runs the commands, uploads the output artifacts, 
+and tears down the instances.
+
+You can tell what dependencies need to be installed without having to use Docker yourself.
+The instances are automatically configured with the correct CUDA driver to use NVIDIA GPUs.
+
+The output artifacts are automatically stored in S3 and can be easily reused.
+
+## 📦 Installation
+
+To use dstack, you'll only need the dstack CLI. No other software needs to be installed or deployed.
+
+The CLI will use your local cloud credentials (e.g. the default AWS environment variables 
+or the credentials from `~/.aws/credentials`.)
+
+In order to install the CLI, you need to use pip:
+
+```shell
 pip install dstack
 ```
 
-Once you install it, configure it by running the following command:
+Before you can use dstack, you have to configure the dstack backend:
 
-```bash
+ * In which S3 bucket to store the state and the artifacts
+ * In what region, create cloud instances.
+
+To configure this, run the following command:
+
+```shell
 dstack config
 ```
-
-It will ask you the AWS profile (if not specified, the `default` will be used), the S3 bucket 
-where to store the state and artifacts, and the region where to create EC2 instances.
 
 The configuration will be stored in `~/.dstack/config.yaml`:
 
@@ -39,96 +64,131 @@ bucket: "my-dstack-workspace"
 region: "eu-west-1"
 ```
 
-### Run commands
+That's it. Now you can use dstack in your machine.
 
-Pass your commands to the CLI along with output artifacts and hardware requirements (e.g. number of CPUs, GPUs, memory size, etc.):
+## 🪄 Usage
 
-```bash
-$ dstack run bash -c "pip install -r requirements.txt && python train.py" \
-        --artifact "checkpoint" --gpu 1
-```
+### Run command
 
-Within a minute, dstack, will set up EC2 instances, fetch your current
-Git repo (incl. not-committed changes), download the input artifacts,
-run the commands, upload the output artifacts, and tear down the instances.
+Workflows can be defined in the `.dstack/workflows.yaml` file within your 
+project.
 
-You'll see the output in realtime as if you ran it locally.
-
-The artifacts are automatically stored in S3.
-
-**Note**: The EC2 instances are automatically configured with the correct CUDA driver to use NVIDIA GPUs.
-
-### Define workflows
-
-You can pass commands directly to the CLI, or define them in the
-`.dstack/workflows.yaml` file:
+For every workflow, you can specify dependencies, commands, what output folders to store
+as artifacts, and what resources the instance would need (e.g. whether it should be a 
+spot/preemptive instance, how much memory, GPU, etc).
 
 ```yaml
 workflows:
-  - name: prepare
+  - name: "train"
     provider: bash
-    commands: 
-      - "python prepare.py"
-    artifacts: 
-      - "data"
-
-  - name: train
     deps:
-      - prepare:latest
-    provider: bash
-    commands: 
-      - "pip install -r requirements"
-      - "python train.py"
-    artifacts: 
-      - "checkpoint"
+      - :some_tag
+    python: 3.10
+    commands:
+      - pip install requirements.txt
+      - python src/train.py
+    artifacts: [ "checkpoint" ]
     resources:
-      memory: 64GB
-      gpu: 4
+      interruptible: true
+      gpu: 1
 ```
 
-And then, run any of the defined workflows by name:
+Once you run the workflow, dstack will create the required cloud instance within a minute,
+and will run your workflow. You'll see the output in real-time as your 
+workflow is running.
 
-```bash
+```shell
 $ dstack run train
+
+Provisioning... It may take up to a minute. ✓
+
+To interrupt, press Ctrl+C.
+
+...
 ```
 
-### Providers
+If you want, you can run a workflow without defining it in `.dstack/workfows.yaml`:
 
-dstack allows to run not only run commands or applications but also other tools
-or even dev environments. 
+```shell
+$ dstack run bash -c "pip install requirements.txt && python src/train.py" \
+  -d :some_tag -a checkpoint -i --gpu 1
 
-See the [Providers](https://docs.dstack.ai/providers/) page 
-for more details.
+Provisioning... It may take up to a minute. ✓
 
-## Use cases
+To interrupt, press Ctrl+C.
 
-### Infrastructure on-demand
+...
+```
 
-Instead of configuring EC2 instances manually, and logging into them via SSH, run commands from your terminal, and dstack will set up and tear down cloud machines automatically.
- 
-### Version and reuse artifacts 
+### Tags command
 
-Assign tags to these artifacts to reuse the artifacts from other runs. 
+Tags help managing data. You can assign tags to 
+finished workflows to reuse their output artifacts 
+from other workflows, or you can upload data and assign an artifact to it,
+to also use from workflows.
 
-### Developer experience
+Here's how to assign a tag to a finished workflow:
 
-Use dstack from your IDE or terminal. 
-dstack is fully-integrated with Git, and tracks your code (incl. not-committed changes).
+```shell
+dstack tags add TAG --run-name RUN
+```
 
-## Documentation
+Here, `TAG` is the name of the tag and `RUN` is the name of the finished workflow run.
 
-- [Overview](https://docs.dstack.ai)
-- [Quickstart](https://docs.dstack.ai/quickstart)
-- [Providers](https://docs.dstack.ai/providers)
-- [CLI](https://docs.dstack.ai/cli)
+If you want to data from your local machine and save it as a tag to use it from other workflows,
+here's how to do it:
 
-## Help
+```shell
+dstack tags add TAG --local-dir LOCAL_DIR
+```
 
-If you encounter bugs or would like to suggest features, please report them directly 
+Once a tag is created, you can refer to it from workflows, e.g. from `.dstack/workflows.yaml`:
+
+```yaml
+deps:
+  - :some_tag
+```
+
+### Artifacts command
+
+The artifacts command allows you to browse or download the contents of artifacts.
+
+Here's how to browse artifacts:
+
+```shell
+dstack artifacts list (RUN | :TAG)
+```
+
+Here's how to download artifacts:
+
+```shell
+dstack artifacts download (RUN | :TAG) [OUTPUT_DIR]
+```
+
+### Other commands
+
+The other commands include:
+
+ * `dstack init` – Authorizes dstack to access the current Git repo
+ * `dstack status [RUN]` – Shows the status of recent runs
+ * `dstack logs RUN` – Shows the logs of a given run
+ * `dstack stop (RUN | -a)` – Stops a given run or all runs
+ * `dstack restart RUN` – Restarts a run
+ * `dstack delete (RUN | -a)` – Deletes a given run or all runs
+ * `dstack tags` – Show all tags
+ * `dstack tags delete TAG` – Deletes a given tag
+
+## 📘 Docs
+
+More tutorials, examples, and the full CLI reference can be found at https://docs.dstack.ai.
+
+## 🛟 Help
+
+If you encounter bugs, please report them directly 
 to the [issue tracker](https://github.com/dstackai/dstack/issues).
 
 For questions and support, join the [Slack channel](https://join.slack.com/t/dstackai/shared_invite/zt-xdnsytie-D4qU9BvJP8vkbkHXdi6clQ).
 
-## Licence
+##  Licence
 
 [Mozilla Public License 2.0](LICENSE.md)
