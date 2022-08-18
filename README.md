@@ -1,7 +1,7 @@
 <div align="center">
 <img src="https://raw.githubusercontent.com/dstackai/dstack/master/docs/assets/logo.svg" width="300px"/>    
 
-A command-line interface to run workflows in the cloud.
+A command-line interface to run ML workflows in the cloud.
 ______________________________________________________________________
 
 ![PyPI](https://img.shields.io/github/workflow/status/dstackai/dstack/Build?logo=github&style=for-the-badge)
@@ -31,6 +31,9 @@ You can tell what dependencies need to be installed without having to use Docker
 The instances are automatically configured with the correct CUDA driver to use NVIDIA GPUs.
 
 The output artifacts are automatically stored in S3 and can be easily reused.
+
+🪄 dstack is an alternative to SSH, SageMaker, KubeFlow and other tools used 
+for running ML workflows.
 
 ## 📦 Installation
 
@@ -66,7 +69,7 @@ region: "eu-west-1"
 
 That's it. Now you can use dstack in your machine.
 
-## 🪄 Usage
+## ✨ Usage
 
 ### Run command
 
@@ -165,22 +168,15 @@ Here's how to download artifacts:
 dstack artifacts download (RUN | :TAG) [OUTPUT_DIR]
 ```
 
-### Other commands
+## Providers
 
-The other commands include:
+dstack offers [multiple providers](https://docs.dstack.ai/providers) that allow running various tasks, applications, 
+and even dev environments.
 
- * `dstack init` – Authorizes dstack to access the current Git repo
- * `dstack status [RUN]` – Shows the status of recent runs
- * `dstack logs RUN` – Shows the logs of a given run
- * `dstack stop (RUN | -a)` – Stops a given run or all runs
- * `dstack restart RUN` – Restarts a run
- * `dstack delete (RUN | -a)` – Deletes a given run or all runs
- * `dstack tags` – Show all tags
- * `dstack tags delete TAG` – Deletes a given tag
 
 ## 📘 Docs
 
-More tutorials, examples, and the full CLI reference can be found at https://docs.dstack.ai.
+More tutorials, examples, and the full CLI reference can be found at [docs.dstack.ai](https://docs.dstack.ai).
 
 ## 🛟 Help
 

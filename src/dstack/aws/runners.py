@@ -144,6 +144,8 @@ def _create_or_update_runner(s3_client: BaseClient, bucket_name: str, runner: Ru
 
 def _get_security_group_id(ec2_client: BaseClient, bucket_name: str):
     security_group_name = "dstack_security_group_" + bucket_name.replace("-", "_").lower()
+    if not version.__is_release__:
+        security_group_name += "_stgn"
     response = ec2_client.describe_security_groups(
         Filters=[
             {
@@ -177,20 +179,32 @@ def _get_security_group_id(ec2_client: BaseClient, bucket_name: str):
             ]
         )
         security_group_id = security_group["GroupId"]
+        ip_permissions = [
+            {
+                "FromPort": 3000,
+                "ToPort": 4000,
+                "IpProtocol": "tcp",
+                "IpRanges": [
+                    {
+                        "CidrIp": "0.0.0.0/0"
+                    }
+                ],
+            }
+        ]
+        if not version.__is_release__:
+            ip_permissions.append({
+                "FromPort": 22,
+                "ToPort": 22,
+                "IpProtocol": "tcp",
+                "IpRanges": [
+                    {
+                        "CidrIp": "0.0.0.0/0"
+                    }
+                ],
+            })
         ec2_client.authorize_security_group_ingress(
             GroupId=security_group_id,
-            IpPermissions=[
-                {
-                    "FromPort": 3000,
-                    "ToPort": 4000,
-                    "IpProtocol": "tcp",
-                    "IpRanges": [
-                        {
-                            "CidrIp": "0.0.0.0/0"
-                        }
-                    ],
-                }
-            ]
+            IpPermissions=ip_permissions
         )
         ec2_client.authorize_security_group_egress(
             GroupId=security_group_id,
@@ -206,7 +220,7 @@ def _get_security_group_id(ec2_client: BaseClient, bucket_name: str):
 def _serialize_config_yaml(bucket_name: str, region_name: str):
     return f"backend: aws\\n" \
            f"bucket: {bucket_name}\\n" \
-           f"region: {region_name}\\n"
+           f"region: {region_name}"
 
 
 def _serialize_runner_yaml(runner_id: str,
@@ -216,14 +230,14 @@ def _serialize_runner_yaml(runner_id: str,
     s = f"id: {runner_id}\\n" \
         f"expose_ports: {runner_port_range_from}-{runner_port_range_to}\\n" \
         f"resources:\\n"
-    s += f"  cpus:{resources.cpus}\\n"
+    s += f"  cpus: {resources.cpus}\\n"
     if resources.gpus:
         s += "  gpus:\\n"
         for gpu in resources.gpus:
             s += f"    - name: {gpu.name}\\n      memory_mib: {gpu.memory_mib}\\n"
     if resources.interruptible:
         s += "  interruptible: true\\n"
-    return s
+    return s[:-2]
 
 
 def _user_data(bucket_name, region_name, runner_id: str, resources: Resources,
@@ -393,29 +407,32 @@ def _get_ami_image(ec2_client: BaseClient, cuda: bool) -> Tuple[str, str]:
 
 def _create_spot_request(ec2_client: BaseClient, iam_client: BaseClient, bucket_name: str, region_name: str,
                          runner_id: str, instance_type: InstanceType) -> str:
-    response = ec2_client.request_terminate_instances(
+    launch_specification = {
+        "ImageId": _get_ami_image(ec2_client, len(instance_type.resources.gpus) > 0)[0],
+        "InstanceType": instance_type.instance_name,
+        "SecurityGroupIds": [_get_security_group_id(ec2_client, bucket_name)],
+        "BlockDeviceMappings": [
+            {
+                "DeviceName": "/dev/sda1",
+                "Ebs": {
+                    "VolumeSize": 100,
+                    "VolumeType": "gp2",
+                },
+            }
+        ],
+        "IamInstanceProfile": {
+            "Arn": instance_profile_arn(iam_client, bucket_name),
+        },
+        "UserData": base64.b64encode(
+            _user_data(bucket_name, region_name, runner_id, instance_type.resources).encode("ascii")
+        ).decode('ascii')
+    }
+    if not version.__is_release__:
+        launch_specification["KeyName"] = "stgn_dstack"
+    response = ec2_client.request_spot_instances(
         InstanceCount=1,
         Type="persistent",
-        LaunchSpecification={
-            "ImageId": _get_ami_image(ec2_client, len(instance_type.resources.gpus) > 0)[0],
-            "InstanceType": instance_type.instance_name,
-            "SecurityGroupIds": [_get_security_group_id(ec2_client, bucket_name)],
-            "BlockDeviceMappings": [
-                {
-                    "DeviceName": "/dev/sda1",
-                    "Ebs": {
-                        "VolumeSize": 100,
-                        "VolumeType": "gp2",
-                    },
-                }
-            ],
-            "IamInstanceProfile": {
-                "Arn": instance_profile_arn(iam_client, bucket_name),
-            },
-            "UserData": base64.b64encode(
-                _user_data(bucket_name, region_name, runner_id, instance_type.resources).encode("ascii")
-            ).decode('ascii')
-        },
+        LaunchSpecification=launch_specification,
         TagSpecifications=[
             {
                 "ResourceType": "spot-instances-request",
@@ -456,6 +473,9 @@ def _create_spot_request_retry(ec2_client: BaseClient, iam_client: BaseClient, b
 
 def _run_instance(ec2_client: BaseClient, iam_client: BaseClient, bucket_name: str, region_name: str,
                   runner_id: str, instance_type: InstanceType) -> str:
+    launch_specification = {}
+    if not version.__is_release__:
+        launch_specification["KeyName"] = "stgn_dstack"
     response = ec2_client.run_instances(
         BlockDeviceMappings=[
             {
@@ -489,7 +509,8 @@ def _run_instance(ec2_client: BaseClient, iam_client: BaseClient, bucket_name: s
                     },
                 ],
             },
-        ]
+        ],
+        **launch_specification
     )
     instance_id = response["Instances"][0]["InstanceId"]
     return instance_id
