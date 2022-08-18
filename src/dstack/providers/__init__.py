@@ -263,8 +263,8 @@ class Provider:
                 return None
 
 
-def get_providers_names() -> List[str]:
-    return list(map(lambda m: m[1], filter(lambda m: m.ispkg, iter_modules(sys.modules[__name__].__path__))))
+def get_provider_names() -> List[str]:
+    return list(map(lambda m: m[1], filter(lambda m: m.ispkg and not m[1].startswith("_"), iter_modules(sys.modules[__name__].__path__))))
 
 
 def load_provider(provider_name) -> Provider:

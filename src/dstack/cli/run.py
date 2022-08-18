@@ -54,7 +54,7 @@ def parse_run_args(args: Namespace) -> Tuple[str, List[str], Optional[str], Dict
         workflow_data = next(w for w in workflows if w.get("name") == workflow_name)
         provider_name = workflow_providers[workflow_name]
     else:
-        if args.workflow_or_provider not in providers.get_providers_names():
+        if args.workflow_or_provider not in providers.get_provider_names():
             sys.exit(f"No workflow or provider `{args.workflow_or_provider}` is found")
 
         provider_name = args.workflow_or_provider
@@ -102,11 +102,11 @@ def poll_run(repo_user_name: str, repo_name: str, job_heads: List[JobHead], back
 
 def run_workflow_func(args: Namespace):
     if not args.workflow_or_provider:
-        print("Usage: dstack run [-d] [-h] WORKFLOW | PROVIDER [ARGS ...]\n")
+        print("Usage: dstack run [-d] [-h] (WORKFLOW | PROVIDER) [ARGS ...]\n")
         workflows_yaml = _load_workflows()
         workflows = (workflows_yaml or {}).get("workflows") or []
         workflow_names = [w["name"] for w in workflows if w.get("name")]
-        providers_names = providers.get_providers_names()
+        providers_names = providers.get_provider_names()
         print(f'Positional arguments:\n'
               f'  WORKFLOW      {{{",".join(workflow_names)}}}\n'
               f'  PROVIDER      {{{",".join(providers_names)}}}\n')
@@ -114,7 +114,7 @@ def run_workflow_func(args: Namespace):
               "  -d, --detach   Do not poll for status update and logs\n"
               "  -h, --help     Show this help output, or the help for a specified workflow or provider.\n")
         print("To see the help output for a particular workflow or provider, use the following command:\n"
-              "  dstack run WORKFLOW | PROVIDER --help")
+              "  dstack run (WORKFLOW | PROVIDER) --help")
     else:
         try:
             repo_data = load_repo_data()
