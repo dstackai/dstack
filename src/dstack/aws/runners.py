@@ -292,8 +292,8 @@ def role_name(iam_client: BaseClient, bucket_name: str) -> str:
                                 "Effect": "Allow",
                                 "Action": "logs:*",
                                 "Resource": [
-                                    f"arn:aws:logs:::log-group:/dstack/jobs/{bucket_name}*",
-                                    f"arn:aws:logs:::log-group:/dstack/runners/{bucket_name}*"
+                                    f"arn:aws:logs:*:*:log-group:/dstack/jobs/{bucket_name}:*",
+                                    f"arn:aws:logs:*:*:log-group:/dstack/runners/{bucket_name}:*"
                                 ]
                             },
                             {
