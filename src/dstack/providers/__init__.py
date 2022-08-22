@@ -110,13 +110,8 @@ class Provider:
         if args.working_dir:
             self.provider_data["working_dir"] = args.working_dir
         if args.env:
-            env = self.provider_data.get("env") or {}
-            for e in args.env:
-                if "=" in e:
-                    tokens = e.split("=", maxsplit=1)
-                    env[tokens[0]] = tokens[1]
-                else:
-                    env[e] = ""
+            env = self.provider_data.get("env") or []
+            env.extend(args.env)
             self.provider_data["env"] = env
         if args.cpu or args.memory or args.gpu or args.gpu_name or args.gpu_memory or args.shm_size \
                 or args.interruptible:
@@ -216,6 +211,19 @@ class Provider:
         else:
             sys.exit(f"Cannot find any successful workflow with the name '{workflow_name}' "
                      f"in the '{repo_user_name}/{repo_name}' repo")
+
+    def _env(self) -> Optional[Dict[str, str]]:
+        if self.provider_data.get("env"):
+            env = {}
+            for e in self.provider_data.get("env"):
+                if "=" in e:
+                    tokens = e.split("=", maxsplit=1)
+                    env[tokens[0]] = tokens[1]
+                else:
+                    env[e] = ""
+            return env
+        else:
+            return None
 
     def _resources(self) -> Optional[Requirements]:
         if self.provider_data.get("resources"):

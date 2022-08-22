@@ -28,7 +28,7 @@ class PythonProvider(Provider):
         self.version = self._save_python_version("version")
         self.args = self.provider_data.get("args")
         self.requirements = self.provider_data.get("requirements")
-        self.env = self.provider_data.get("env") or {}
+        self.env = self._env()
         self.artifacts = self.provider_data.get("artifacts")
         self.working_dir = self.provider_data.get("working_dir")
         self.resources = self._resources()

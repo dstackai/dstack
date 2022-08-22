@@ -26,7 +26,7 @@ class BashProvider(Provider):
         self.python = self._save_python_version("python")
         self.commands = self.provider_data.get("commands")
         self.requirements = self.provider_data.get("requirements")
-        self.env = self.provider_data.get("env") or {}
+        self.env = self._env()
         self.artifacts = self.provider_data.get("artifacts")
         self.working_dir = self.provider_data.get("working_dir")
         self.ports = self.provider_data.get("ports")

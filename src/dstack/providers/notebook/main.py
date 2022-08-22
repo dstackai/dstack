@@ -25,7 +25,7 @@ class NotebookProvider(Provider):
         self.python = self._save_python_version("python")
         self.version = self.provider_data.get("version")
         self.requirements = self.provider_data.get("requirements")
-        self.env = self.provider_data.get("env") or {}
+        self.env = self._env()
         self.artifacts = self.provider_data.get("artifacts")
         self.working_dir = self.provider_data.get("working_dir")
         self.resources = self._resources()

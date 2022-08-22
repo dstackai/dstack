@@ -91,7 +91,8 @@ class JobStatus(Enum):
 
 class JobHead(JobRef):
     def __init__(self, job_id: str, repo_user_name: str, repo_name: str, run_name: str, workflow_name: Optional[str],
-                 provider_name: str, status: JobStatus, submitted_at: int, artifacts: Optional[List[str]], tag_name: Optional[str],
+                 provider_name: str, status: JobStatus, submitted_at: int, artifacts: Optional[List[str]],
+                 tag_name: Optional[str],
                  apps: Optional[List[str]]):
         self.job_id = job_id
         self.repo_user_name = repo_user_name
@@ -197,7 +198,7 @@ class Job(JobHead):
 
 class JobSpec(JobRef):
     def __init__(self, image_name: str, commands: Optional[List[str]] = None,
-                 env: Dict[str, str] = None, working_dir: Optional[str] = None,
+                 env: Optional[Dict[str, str]] = None, working_dir: Optional[str] = None,
                  artifacts: Optional[List[str]] = None,
                  port_count: Optional[int] = None,
                  requirements: Optional[Requirements] = None,
