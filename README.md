@@ -1,12 +1,12 @@
 <div align="center">
 <img src="https://raw.githubusercontent.com/dstackai/dstack/master/docs/assets/logo.svg" width="300px"/>    
 
-A command-line interface to run ML workflows in the cloud.
+A command-line interface to run ML workflows in the cloud
 ______________________________________________________________________
 
 ![PyPI](https://img.shields.io/github/workflow/status/dstackai/dstack/Build?logo=github&style=for-the-badge)
-![PyPI](https://img.shields.io/pypi/v/dstack?style=for-the-badge)
-![PyPI - License](https://img.shields.io/pypi/l/dstack?style=for-the-badge)
+[![PyPI](https://img.shields.io/pypi/v/dstack?style=for-the-badge)](https://pypi.org/project/dstack/)
+[![PyPI - License](https://img.shields.io/pypi/l/dstack?style=for-the-badge)](https://github.com/dstackai/dstack/blob/master/LICENSE.md)
 [![Slack](https://img.shields.io/badge/slack-join-e01563?style=for-the-badge)](https://join.slack.com/t/dstackai/shared_invite/zt-xdnsytie-D4qU9BvJP8vkbkHXdi6clQ)
 
 [//]: # ([![twitter]&#40;https://img.shields.io/twitter/follow/dstackai.svg?style=social&label=Follow&#41;]&#40;https://twitter.com/dstackai&#41;)
@@ -15,25 +15,26 @@ ______________________________________________________________________
 
 ## 👋 Intro
 
-Often, to run data or ML workflows, your local machine is not enough, so you need to use 
-cloud instances (e.g. AWS, GCP, Azure, etc).
+To run ML workflows, your local machine is often not enough, so you need a way 
+to automate running these workflows using the cloud infrastructure.
 
-Instead of configuring instances manually and using SSH,
-(or even writing custom Ansible, Terraform, or K8S scripts), 
-now you can run workflows via dstack.
+Instead of configuring cloud instances manually, writing custom scripts, or even using complicated MLOps platforms, 
+now you can run workflows with a single dstack command.
 
-Within a moment, dstack, sets up instances, fetches your current
-Git repo (incl. not-committed changes) on it, downloads the input artifacts,
-runs the commands, uploads the output artifacts, 
-and tears down the instances.
-
-You can tell what dependencies need to be installed without having to use Docker yourself.
-The instances are automatically configured with the correct CUDA driver to use NVIDIA GPUs.
-
-The output artifacts are automatically stored in S3 and can be easily reused.
-
-🪄 dstack is an alternative to SSH, SageMaker, KubeFlow and other tools used 
+dstack is an alternative to SSH, custom scripts, Docker, KubeFlow, SageMaker, and other tools used 
 for running ML workflows.
+
+### Primary features of dstack:
+
+1. **Declarative workflows:** You define workflows within `./dstack/workflows.yaml` file 
+  and run them via the CLI.
+2. **Agnostic to tools and APIs:** No need to use specific APIs in your code. Anything that works locally, can run via dstack.
+3. **Artifacts are the first-class citizens:** Once you've run a workflow, assign a tag to
+  it and reuse its artifacts in other workflows.
+4. **Very easy setup:** No need to set up any complicated software. Just install the dstack CLI and run workflows
+  in your cloud using your local credentials. The state is stored in your cloud storage. Work alone or collaborate within a team.
+5. **GitOps approach:** dstack is fully integrated with Git. Run workflows from the CLI. dstack tracks code automatically.
+  No need to push your changes before running a workflow.
 
 ## 📦 Installation
 
@@ -71,14 +72,14 @@ That's it. Now you can use dstack in your machine.
 
 ## ✨ Usage
 
-### Run command
+### Define workflows
 
 Workflows can be defined in the `.dstack/workflows.yaml` file within your 
 project.
 
-For every workflow, you can specify dependencies, commands, what output folders to store
-as artifacts, and what resources the instance would need (e.g. whether it should be a 
-spot/preemptive instance, how much memory, GPU, etc).
+For every workflow, you can specify the provider, dependencies, commands, what output 
+folders to store as artifacts, and what resources the instance would need (e.g. whether it should be a 
+spot/preemptive instance, how much memory, GPU, etc.)
 
 ```yaml
 workflows:
@@ -95,6 +96,8 @@ workflows:
       interruptible: true
       gpu: 1
 ```
+
+### Run workflows
 
 Once you run the workflow, dstack will create the required cloud instance within a minute,
 and will run your workflow. You'll see the output in real-time as your 
@@ -123,12 +126,11 @@ To interrupt, press Ctrl+C.
 ...
 ```
 
-### Tags command
+### Manage tags
 
-Tags help managing data. You can assign tags to 
-finished workflows to reuse their output artifacts 
-from other workflows, or you can upload data and assign an artifact to it,
-to also use from workflows.
+Tags help managing data. You can assign tags to finished workflows to reuse their output artifacts 
+in other workflows. Another way to use tags is to upload data to dstack from your local machine
+and assign n tag to it to use this data in workflows.
 
 Here's how to assign a tag to a finished workflow:
 
@@ -152,7 +154,7 @@ deps:
   - :some_tag
 ```
 
-### Artifacts command
+### Manage artifacts
 
 The artifacts command allows you to browse or download the contents of artifacts.
 
@@ -172,7 +174,6 @@ dstack artifacts download (RUN | :TAG) [OUTPUT_DIR]
 
 dstack offers [multiple providers](https://docs.dstack.ai/providers) that allow running various tasks, applications, 
 and even dev environments.
-
 
 ## 📘 Docs
 

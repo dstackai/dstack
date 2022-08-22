@@ -16,21 +16,21 @@ theme:
       scheme: default
       primary: white
       accent: lilac
-  #      toggle:
-  #        icon: material/weather-night
-  #        name: Switch to dark mode
-  #    - media: "(prefers-color-scheme: dark)"
-  #      scheme: slate
-  #      primary: black
-  #      accent: light blue
-  #      toggle:
-  #        icon: material/weather-sunny
-  #        name: Switch to light mode
+  #        toggle:
+  #          icon: material/weather-night
+  #          name: Switch to dark mode
+  #      - media: "(prefers-color-scheme: dark)"
+  #        scheme: slate
+  #        primary: black
+  #        accent: light blue
+  #        toggle:
+  #          icon: material/weather-sunny
+  #          name: Switch to light mode
   features:
     - navigation.indexes
-#    - toc.integrate
+    #    - toc.integrate
     - navigation.sections
-#    - navigation.expand
+    #    - navigation.expand
     - navigation.top
 markdown_extensions:
   - pymdownx.emoji:
@@ -60,42 +60,23 @@ extra:
   analytics:
     provider: google
     property: UA-4493451-5
-#plugins:
-#    - redirects:
-#        redirect_maps:
-#            'workflows.md': 'define-workflows.md'
 nav:
   - Get started:
       - index.md
-      - Welcome to dstack: index.md
-      - Quickstart: quickstart.md
-#      - Examples: examples.md
-  - Basics:
-      - Setup: setup.md
-      - Workflows: workflows.md
-#      - Troubleshooting: troubleshooting.md
-#  - Guides:
-#      - On-demand infrastructure: managing-data.md
-#      - Manage data: managing-data.md
-#      - Train models: training-models.md
-#      - Deploy apps: deploy-apps.md
-#      - Dev environments: dev-environments.md
+      - Welcome: index.md
+      - Installation: installation.md
+      - Usage: usage.md
   - Reference:
-      - Providers:
-        - providers/index.md
-        - Bash: providers/bash.md
-        - Python: providers/python.md
-        - Tensorboard: providers/tensorboard.md
-        - Docker: providers/docker.md
-        - VS Code: providers/code.md
-        - JupyterLab: providers/lab.md
-        - Notebook: providers/notebook.md
-        - Streamlit: providers/streamlit.md
-        - Gradio: providers/gradio.md
-        - FastAPI: providers/fastapi.md
-        - Torchrun: providers/torchrun.md
-      - CLI:
-          - cli/index.md
+      - Workflows:
+        - workflows/index.md
+        - Bash: workflows/bash.md
+        - Code: workflows/code.md
+        - Lab: workflows/lab.md
+        - Notebook: workflows/notebook.md
+        - Docker: workflows/docker.md
+        - Torchrun: workflows/torchrun.md
+      - dstack CLI:
+        - cli/index.md
   - Help:
-      - Slack community: https://join.slack.com/t/dstackai/shared_invite/zt-xdnsytie-D4qU9BvJP8vkbkHXdi6clQ
-      - Issue tracker: https://github.com/dstackai/dstack/issues
+      - GitHub issues: https://github.com/dstackai/dstack/issues
+      - Join Slack: https://join.slack.com/t/dstackai/shared_invite/zt-xdnsytie-D4qU9BvJP8vkbkHXdi6clQ

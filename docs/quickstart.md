@@ -79,7 +79,7 @@ dstack run download
 ```
 
 !!! info "NOTE:"
-    Make sure to always use the CLI from the project repository directory.
+    Make sure to always run the CLI from the project repository directory.
 
 Use the `Runs` page in the user interface to watch the progress of your workflow.
 

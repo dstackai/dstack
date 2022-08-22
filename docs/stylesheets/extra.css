@@ -524,7 +524,7 @@ body {
 .md-typeset .grid {
     grid-gap: 0.8rem;
     display: grid;
-    grid-template-columns: repeat(auto-fit,minmax(15rem,1fr));
+    grid-template-columns: repeat(auto-fill,minmax(15rem,1fr));
     margin: 1em 0;
 }
 

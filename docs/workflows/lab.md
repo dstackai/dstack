@@ -1,10 +1,11 @@
-# VS Code
+# JupyterLab
 
-This provider launches a VS Code dev environment. 
+The `code` launches a JupyterLab application.
 
-You can specify the version of Python, a `requirements.txt` file to pre-install,
-environment variables, arguments, which folders to save as output artifacts, dependencies to
-other workflows if any, and the resources the workflow needs (e.g. CPU, GPU, memory, etc).
+The provider allows you to specify the version of Python, a `requirements.txt` file to pre-install,
+environment variables, properties, which folders to save as output artifacts, dependencies to
+other workflows if any, and the resources the workflow needs 
+(e.g. whether it should be a spot/preemptive instance, how much memory, GPU, etc.) 
 
 ## Example usage 
 
@@ -12,22 +13,23 @@ other workflows if any, and the resources the workflow needs (e.g. CPU, GPU, mem
 
 === ".dstack/workflows.yaml"
 
-    ```yaml
-    workflows:
-      - name: dev
-        provider: code
-        artifacts: ["output"]
-        resources:
-          gpu:
-            name: "K80"
-            count: 4
-    ```
+```yaml
+workflows:
+  - name: dev
+    provider: lab
+    artifacts: ["output"]
+    resources:
+      interruptible: true
+      gpu:
+        name: "K80"
+        count: 4
+```
 
 Alternatively, you can use this provider from the CLI (without defining your workflow
 in the `.dstack/workflows.yaml` file):
 
 ```bash
-dstack run code -a output --gpu 4 --gpu-name K80 
+dstack run lab -a output --gpu 4 --gpu-name K80 
 ```
 
 [//]: # (TODO: Environment variables)
@@ -68,11 +70,11 @@ The number of GPUs, their name and memory
 ## CLI reference
 
 ```bash
-usage: dstack run code [-d] [-h] [-r REQUIREMENTS] [-e ENV] [-a ARTIFACT]
-                       [--working-dir WORKING_DIR] [-i] [--cpu CPU]
-                       [--memory MEMORY] [--gpu GPU_COUNT]
-                       [--gpu-name GPU_NAME] [--gpu-memory GPU_MEMORY]
-                       [--shm-size SHM_SIZE]
+usage: dstack run lab [-d] [-h] [-r REQUIREMENTS] [-e ENV] [-a ARTIFACT]
+                      [--working-dir WORKING_DIR] [-i] [--cpu CPU]
+                      [--memory MEMORY] [--gpu GPU_COUNT]
+                      [--gpu-name GPU_NAME] [--gpu-memory GPU_MEMORY]
+                      [--shm-size SHM_SIZE]
 ```
 
 The following arguments are optional:
@@ -95,4 +97,4 @@ The following arguments are optional:
 
 ## Source code
 
-[:octicons-arrow-right-24: GitHub](https://github.com/dstackai/dstack/tree/master/src/dstack/providers/code)
+[:octicons-arrow-right-24: GitHub](https://github.com/dstackai/dstack/tree/master/src/dstack/providers/lab)

@@ -1,60 +1,22 @@
-# Welcome to 🧬 dstack
+# Welcome to dstack
 
-dstack allows to run any tasks and apps in your cloud account via the CLI.
+To run ML workflows, your local machine is often not enough, so you need a way 
+to automate running these workflows using the cloud infrastructure.
 
-Sign up for dstack, add your cloud credentials, and run anything via the CLI.
-dstack will provision infrastructure on-demand and will help manage data.
+Instead of configuring cloud instances manually, writing custom scripts, or even using complicated MLOps platforms, 
+now you can run workflows with a single dstack command.
 
-[//]: # (TODO: Add links to the cards below)
+dstack is an alternative to SSH, custom scripts, Docker, KubeFlow, SageMaker, and other tools used 
+for running ML workflows.
 
-<div class="grid cards" markdown>
-- **Workflows** 
+### Primary features of dstack:
 
-    Run any tasks and apps in your cloud account with a single command.
-
-    [:octicons-arrow-right-24: Basics](workflows.md)
-
-[//]: # (- **On-demand infrastructure** )
-
-[//]: # (    Specify hardware requirements for your workflows as code.)
-
-[//]: # (- **Applications** )
-
-[//]: # (    Deploy AI applications to dstack with a single command.)
-
-- **Artifacts** 
-
-    Save any output artifacts in the central storage and reuse them from other workflows.
-
-- **Dev environments** 
-
-    Launch VS Code, JupyterLab, Tensorboard, and other tools with 
-    pre-configured hardware and dependencies.
-
-    [:octicons-arrow-right-24: Reference](providers#dev-environments)
-
-- **Providers** 
-
-    With dstack, you can run pretty much any tools supported by the built-in
-    or community provider.
-
-    [:octicons-arrow-right-24: Reference](providers)
-</div>
-
-### Getting started
-
-<div class="grid cards" markdown>
-
-- **Quickstart**
-
-    Follow our simple step-by-step tutorial to get started with dstack in minutes.
-
-    [:octicons-arrow-right-24: Tutorial](quickstart.md)
-
-- **Slack community**
-
-    Connect with the community in a Slack channel.
-
-    [:octicons-arrow-right-24: Join](https://github.com/dstackai/dstack-examples)
-
-</div>
+1. **Declarative workflows:** You define workflows within `./dstack/workflows.yaml` file 
+  and run them via the CLI.
+2. **Agnostic to tools and APIs:** No need to use specific APIs in your code. Anything that works locally, can run via dstack.
+3. **Artifacts are the first-class citizens:** Once you've run a workflow, assign a tag to
+  it and reuse its artifacts in other workflows.
+4. **Very easy setup:** No need to set up any complicated software. Just install the dstack CLI and run workflows
+  in your cloud using your local credentials. The state is stored in your cloud storage. Work alone or collaborate within a team.
+5. **GitOps approach:** dstack is fully integrated with Git. Run workflows from the CLI. dstack tracks code automatically.
+  No need to push your changes before running a workflow.
