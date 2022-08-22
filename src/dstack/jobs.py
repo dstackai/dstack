@@ -73,8 +73,9 @@ class AppSpec:
 
 class JobStatus(Enum):
     SUBMITTED = "submitted"
-    PREPARING = "preparing"
+    DOWNLOADING = "downloading"
     RUNNING = "running"
+    UPLOADING = "uploading"
     STOPPING = "stopping"
     STOPPED = "stopped"
     ABORTING = "aborting"

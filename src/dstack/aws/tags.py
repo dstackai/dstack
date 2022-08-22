@@ -69,9 +69,10 @@ def create_tag_from_run(s3_client: BaseClient, bucket_name: str, repo_user_name:
     job_heads = jobs.list_job_heads(s3_client, bucket_name, repo_user_name, repo_name, run_name)
     for job_head in job_heads:
         job = jobs.get_job(s3_client, bucket_name, repo_user_name, repo_name, job_head.job_id)
-        tag_jobs.append(job)
-        if job.tag_name and job.tag_name != tag_name:
-            job_with_anther_tag = job
+        if job:
+            tag_jobs.append(job)
+            if job.tag_name and job.tag_name != tag_name:
+                job_with_anther_tag = job
     if job_with_anther_tag:
         raise BackendError(f"The run '{job_with_anther_tag.run_name} refers to another tag: "
                            f"{job_with_anther_tag.tag_name}'")
@@ -94,7 +95,8 @@ def delete_tag(s3_client: BaseClient, bucket_name: str, repo_user_name: str, rep
     job_heads = jobs.list_job_heads(s3_client, bucket_name, repo_user_name, repo_name, tag_head.run_name)
     for job_head in job_heads:
         job = jobs.get_job(s3_client, bucket_name, repo_user_name, repo_name, job_head.job_id)
-        tag_jobs.append(job)
+        if job:
+            tag_jobs.append(job)
     s3_client.delete_object(Bucket=bucket_name, Key=_tag_head_key(tag_head))
     for job in tag_jobs:
         job.tag_name = None

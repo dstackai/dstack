@@ -16,7 +16,9 @@ from dstack.repo import load_repo_data
 
 _status_colors = {
     JobStatus.SUBMITTED: "yellow",
+    JobStatus.DOWNLOADING: "yellow",
     JobStatus.RUNNING: "dark_sea_green4",
+    JobStatus.UPLOADING: "dark_sea_green4",
     JobStatus.DONE: "grey58",
     JobStatus.FAILED: "red",
     JobStatus.STOPPED: "grey58",

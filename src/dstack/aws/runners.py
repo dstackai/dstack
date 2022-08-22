@@ -599,10 +599,11 @@ def _terminate_instance(ec2_client: BaseClient, request_id: str):
 
 
 def _stop_runner(ec2_client: BaseClient, s3_client: BaseClient, bucket_name: str, runner: Runner):
-    if runner.resources.interruptible:
-        _cancel_spot_request(ec2_client, runner.request_id)
-    else:
-        _terminate_instance(ec2_client, runner.request_id)
+    if runner.request_id:
+        if runner.resources.interruptible:
+            _cancel_spot_request(ec2_client, runner.request_id)
+        else:
+            _terminate_instance(ec2_client, runner.request_id)
     _delete_runner(s3_client, bucket_name, runner)
 
 

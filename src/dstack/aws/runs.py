@@ -101,12 +101,13 @@ def get_runs(ec2_client: BaseClient, s3_client: BaseClient, bucket_name: str, re
     runs_by_id = {}
     for job_head in job_heads:
         job = jobs.get_job(s3_client, bucket_name, repo_user_name, repo_name, job_head.job_id)
-        run_id = ','.join([job.run_name, job.workflow_name or ''])
-        if run_id not in runs_by_id:
-            runs_by_id[run_id] = _create_run(ec2_client, repo_user_name, repo_name, job, include_request_heads)
-        else:
-            run = runs_by_id[run_id]
-            _update_run(ec2_client, run, job, include_request_heads)
+        if job:
+            run_id = ','.join([job.run_name, job.workflow_name or ''])
+            if run_id not in runs_by_id:
+                runs_by_id[run_id] = _create_run(ec2_client, repo_user_name, repo_name, job, include_request_heads)
+            else:
+                run = runs_by_id[run_id]
+                _update_run(ec2_client, run, job, include_request_heads)
     return sorted(list(runs_by_id.values()), key=lambda r: r.submitted_at, reverse=True)
 
 

@@ -169,7 +169,7 @@ class Backend(ABC):
     def submit_job(self, job: Job, counter: List[int]):
         pass
 
-    def get_job(self, repo_user_name: str, repo_name: str, job_id: str) -> Job:
+    def get_job(self, repo_user_name: str, repo_name: str, job_id: str) -> Optional[Job]:
         pass
 
     def list_job_heads(self, repo_user_name: str, repo_name: str, run_name: Optional[str] = None) -> List[JobHead]:

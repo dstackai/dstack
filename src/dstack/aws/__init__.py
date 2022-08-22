@@ -53,7 +53,7 @@ class AwsBackend(Backend):
         runners.run_job(self._ec2_client(), self._iam_client(), self._s3_client(), self.backend_config.bucket_name,
                         self.backend_config.region_name, job)
 
-    def get_job(self, repo_user_name: str, repo_name: str, job_id: str) -> Job:
+    def get_job(self, repo_user_name: str, repo_name: str, job_id: str) -> Optional[Job]:
         return jobs.get_job(self._s3_client(), self.backend_config.bucket_name, repo_user_name, repo_name, job_id)
 
     def list_job_heads(self, repo_user_name: str, repo_name: str, run_name: Optional[str] = None):

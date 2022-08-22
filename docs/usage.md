@@ -14,6 +14,8 @@ workflows:
     deps:
       - :some_tag
     python: 3.10
+    env:
+      - PYTHONPATH=mnist
     commands:
       - pip install requirements.txt
       - python src/train.py

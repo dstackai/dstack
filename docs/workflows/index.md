@@ -103,7 +103,7 @@ Providers may help run tasks, applications, dev environments and even distribute
 
     Runs shell commands
 
-    [:octicons-arrow-right-24: Reference](../providers/bash.md)
+    [:octicons-arrow-right-24: Reference](bash.md)
 
 </div>
 

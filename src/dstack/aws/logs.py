@@ -2,7 +2,7 @@ import json
 import re
 import time
 from collections import defaultdict
-from typing import Optional, Dict, List, Generator
+from typing import Optional, Dict, List, Generator, Any
 from urllib import parse
 
 from botocore.client import BaseClient
@@ -14,23 +14,24 @@ from dstack.jobs import AppSpec, JobHead
 POLL_LOGS_RATE_SECS = 1
 
 
-def _render_log_message(s3_client: BaseClient, bucket_name: str, log_message: str,
+def _render_log_message(s3_client: BaseClient, bucket_name: str, event: dict[str, Any],
                         repo_user_name: str, repo_name: str,
-                        job_id: Optional[str],
                         job_host_names: Dict[str, Optional[str]],
                         job_ports: Dict[str, Optional[List[int]]],
-                        job_app_specs: Dict[str, Optional[List[AppSpec]]]) -> str:
+                        job_app_specs: Dict[str, Optional[List[AppSpec]]]) -> LogEvent:
+    message = json.loads(event["message"].strip())
+    job_id = message["job_id"]
+    log = message["log"]
     if job_id and job_id not in job_host_names:
         job = jobs.get_job(s3_client, bucket_name, repo_user_name, repo_name, job_id)
-        job_host_names[job_id] = job.host_name or "none"
-        job_ports[job_id] = job.ports
-        job_app_specs[job_id] = job.app_specs
-    message = json.loads(log_message.strip())["log"]
+        job_host_names[job_id] = job.host_name or "none" if job else "none"
+        job_ports[job_id] = job.ports if job else None
+        job_app_specs[job_id] = job.app_specs if job else None
     host_name = job_host_names[job_id]
     ports = job_ports[job_id]
     app_specs = job_app_specs[job_id]
     pat = re.compile(f'http://(localhost|0.0.0.0|{host_name}):[\\S]*[^(.+)\\s\\n\\r]')
-    if re.search(pat, message):
+    if re.search(pat, log):
         if host_name != "none" and ports and app_specs:
             for app_spec in app_specs:
                 port = ports[app_spec["port_index"]]
@@ -42,8 +43,9 @@ def _render_log_message(s3_client: BaseClient, bucket_name: str, log_message: st
                     app_url += "/"
                     if url_query_params:
                         app_url += url_query
-                message = re.sub(pat, app_url, message)
-    return message
+                log = re.sub(pat, app_url, log)
+    return LogEvent(event["timestamp"], job_id, log,
+                    LogEventSource.STDOUT if message["source"] == "stdout" else LogEventSource.STDERR)
 
 
 def _get_latest_events_and_timestamp(event_ids_per_timestamp):
@@ -129,19 +131,14 @@ def poll_logs(ec2_client: BaseClient, s3_client: BaseClient, logs_client: BaseCl
         if attached:
             for event in _filter_log_events_loop(ec2_client, s3_client, logs_client, bucket_name, repo_user_name,
                                                  repo_name, job_heads, filter_logs_events_kwargs):
-                log_message = _render_log_message(s3_client, bucket_name, event["message"], repo_user_name, repo_name,
-                                                  event.get("job_id"), job_host_names, job_ports, job_app_specs)
-                yield LogEvent(event["timestamp"], event.get("job_id"), log_message,
-                               LogEventSource.STDOUT if event["source"] == "stdout" else LogEventSource.STDERR)
+                yield _render_log_message(s3_client, bucket_name, event, repo_user_name, repo_name,
+                                          job_host_names, job_ports, job_app_specs)
         else:
             paginator = logs_client.get_paginator("filter_log_events")
             for page in paginator.paginate(**filter_logs_events_kwargs):
                 for event in page["events"]:
-                    log_message = _render_log_message(s3_client, bucket_name, event["message"], repo_user_name,
-                                                      repo_name, event.get("job_id"), job_host_names, job_ports,
-                                                      job_app_specs)
-                    yield LogEvent(event["timestamp"], event.get("job_id"), log_message,
-                                   LogEventSource.STDOUT if event["source"] == "stdout" else LogEventSource.STDERR)
+                    yield _render_log_message(s3_client, bucket_name, event, repo_user_name,
+                                              repo_name, job_host_names, job_ports, job_app_specs)
     except Exception as e:
         if hasattr(e, "response") and e.response.get("Error") and e.response["Error"].get(
                 "Code") == "ResourceNotFoundException":

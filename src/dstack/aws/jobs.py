@@ -135,14 +135,19 @@ def create_job(s3_client: BaseClient, bucket_name: str, job: Job, counter: List[
     counter[0] += 1
 
 
-def get_job(s3_client: BaseClient, bucket_name: str, repo_user_name: str, repo_name: str, job_id: str) -> Job:
+def get_job(s3_client: BaseClient, bucket_name: str, repo_user_name: str, repo_name: str, job_id: str) -> Optional[Job]:
     prefix = f"jobs/{repo_user_name}/{repo_name}"
     key = f"{prefix}/{job_id}.yaml"
-    obj = s3_client.get_object(Bucket=bucket_name, Key=key)
-    job = unserialize_job(yaml.load(obj['Body'].read().decode('utf-8'), yaml.FullLoader))
-    job.set_id(job_id)
-    return job
-
+    try:
+        obj = s3_client.get_object(Bucket=bucket_name, Key=key)
+        job = unserialize_job(yaml.load(obj['Body'].read().decode('utf-8'), yaml.FullLoader))
+        job.set_id(job_id)
+        return job
+    except Exception as e:
+        if hasattr(e, "response") and e.response.get("Error") and e.response["Error"].get("Code") == "NoSuchKey":
+            return None
+        else:
+            raise e
 
 def update_job(s3_client: BaseClient, bucket_name: str, job: Job):
     prefix = f"jobs/{job.repo_data.repo_user_name}/{job.repo_data.repo_name}"

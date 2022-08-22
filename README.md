@@ -89,6 +89,8 @@ workflows:
     deps:
       - :some_tag
     python: 3.10
+    env:
+      - PYTHONPATH=src
     commands:
       - pip install requirements.txt
       - python src/train.py
