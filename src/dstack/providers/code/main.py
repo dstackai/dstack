@@ -42,7 +42,7 @@ class CodeProvider(Provider):
         self._parse_base_args(args)
 
     def create_job_specs(self) -> List[JobSpec]:
-        env = dict(self.env)
+        env = dict(self.env or {})
         connection_token = uuid.uuid4().hex
         env["CONNECTION_TOKEN"] = connection_token
         return [JobSpec(

@@ -66,6 +66,8 @@ nav:
       - Welcome: index.md
       - Installation: installation.md
       - Usage: usage.md
+  - Tutorials:
+      - Quickstart: quickstart.md
   - Reference:
       - Workflows:
         - workflows/index.md

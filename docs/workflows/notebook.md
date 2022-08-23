@@ -13,17 +13,17 @@ other workflows if any, and the resources the workflow needs
 
 === ".dstack/workflows.yaml"
 
-```yaml
-workflows:
-  - name: dev
-    provider: lab
-    artifacts: ["output"]
-    resources:
-      interruptible: true
-      gpu:
-        name: "K80"
-        count: 4
-```
+    ```yaml
+    workflows:
+      - name: dev
+        provider: lab
+        artifacts: ["output"]
+        resources:
+          interruptible: true
+          gpu:
+            name: "K80"
+            count: 4
+    ```
 
 Alternatively, you can use this provider from the CLI (without defining your workflow
 in the `.dstack/workflows.yaml` file):

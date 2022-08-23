@@ -11,21 +11,21 @@ spot/preemptive instance, how much memory, GPU, etc.)
 
 === ".dstack/workflows.yaml"
 
-```yaml
-workflows:
-  - name: "train"
-    provider: bash
-    deps:
-      - :some_tag
-    python: 3.10
-    commands:
-      - pip install requirements.txt
-      - python src/train.py
-    artifacts: [ "checkpoint" ]
-    resources:
-      interruptible: true
-      gpu: 1
-```
+    ```yaml
+    workflows:
+      - name: "train"
+        provider: bash
+        deps:
+          - :some_tag
+        python: 3.10
+        commands:
+          - pip install requirements.txt
+          - python src/train.py
+        artifacts: [ "checkpoint" ]
+        resources:
+          interruptible: true
+          gpu: 1
+    ```
 
 ## Workflows syntax
 

@@ -1,6 +1,6 @@
 To use dstack, you'll only need the dstack CLI. No other software needs to be installed or deployed.
 
-The CLI will use your local cloud credentials (e.g. the default AWS environment variables 
+The dstack CLI will use your local cloud credentials (e.g. the default AWS environment variables 
 or the credentials from `~/.aws/credentials`.)
 
 ## Install the CLI
@@ -31,3 +31,6 @@ backend: aws
 bucket: "my-dstack-workspace"
 region: "eu-west-1"
 ```
+
+!!! info "NOTE:"
+    AWS requires all S3 buckets to be unique across all users. Please make sure to choose a unique name.

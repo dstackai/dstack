@@ -13,17 +13,17 @@ other workflows if any, and the resources the workflow needs
 
 === ".dstack/workflows.yaml"
 
-```yaml
-workflows:
-  - name: dev
-    provider: code
-    artifacts: ["output"]
-    resources:
-      interruptible: true
-      gpu:
-        name: "K80"
-        count: 4
-```
+    ```yaml
+    workflows:
+      - name: dev
+        provider: code
+        artifacts: ["output"]
+        resources:
+          interruptible: true
+          gpu:
+            name: "K80"
+            count: 4
+    ```
 
 ## Workflows syntax
 

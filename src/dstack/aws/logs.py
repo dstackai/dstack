@@ -34,9 +34,9 @@ def _render_log_message(s3_client: BaseClient, bucket_name: str, event: dict[str
     if re.search(pat, log):
         if host_name != "none" and ports and app_specs:
             for app_spec in app_specs:
-                port = ports[app_spec["port_index"]]
-                url_path = app_spec.get("url_path") or ""
-                url_query_params = app_spec.get("url_query_params")
+                port = ports[app_spec.port_index]
+                url_path = app_spec.url_path or ""
+                url_query_params = app_spec.url_query_params
                 url_query = ("?" + parse.urlencode(url_query_params)) if url_query_params else ""
                 app_url = f"http://{host_name}:{port}"
                 if url_path or url_query_params:

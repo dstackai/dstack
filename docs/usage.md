@@ -7,23 +7,25 @@ For every workflow, you can specify the provider, dependencies, commands, what o
 as artifacts, and what resources the instance would need (e.g. whether it should be a 
 spot/preemptive instance, how much memory, GPU, etc).
 
-```yaml
-workflows:
-  - name: "train"
-    provider: bash
-    deps:
-      - :some_tag
-    python: 3.10
-    env:
-      - PYTHONPATH=mnist
-    commands:
-      - pip install requirements.txt
-      - python src/train.py
-    artifacts: [ "checkpoint" ]
-    resources:
-      interruptible: true
-      gpu: 1
-```
+=== ".dstack/workflows.yaml"
+
+    ```yaml
+    workflows:
+      - name: "train"
+        provider: bash
+        deps:
+          - :some_tag
+        python: 3.10
+        env:
+          - PYTHONPATH=mnist
+        commands:
+          - pip install requirements.txt
+          - python src/train.py
+        artifacts: [ "checkpoint" ]
+        resources:
+          interruptible: true
+          gpu: 1
+    ```
 
 Find more details and examples on how to define workflows [here](workflows/index.md).
 

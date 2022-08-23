@@ -66,7 +66,10 @@ class AwsBackend(Backend):
 
     def stop_job(self, repo_user_name: str, repo_name: str, job_id: str, abort: bool):
         job = self.get_job(repo_user_name, repo_name, job_id)
-        runners.stop_job(self._ec2_client(), self._s3_client(), self.backend_config.bucket_name, job, abort)
+        if job:
+            runners.stop_job(self._ec2_client(), self._s3_client(), self.backend_config.bucket_name, job, abort)
+        else:
+            jobs.delete_job_head(self._s3_client(), self.backend_config.bucket_name, repo_user_name, repo_name, job_id)
 
     def delete_job_head(self, repo_user_name: str, repo_name: str, job_id: str):
         jobs.delete_job_head(self._s3_client(), self.backend_config.bucket_name, repo_user_name, repo_name, job_id)

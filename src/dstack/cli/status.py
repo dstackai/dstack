@@ -19,7 +19,7 @@ _status_colors = {
     JobStatus.DOWNLOADING: "yellow",
     JobStatus.RUNNING: "dark_sea_green4",
     JobStatus.UPLOADING: "dark_sea_green4",
-    JobStatus.DONE: "grey58",
+    JobStatus.DONE: "gray74",
     JobStatus.FAILED: "red",
     JobStatus.STOPPED: "grey58",
     JobStatus.STOPPING: "yellow",
@@ -56,7 +56,7 @@ def pretty_print_status(run: Run) -> str:
     status = status[:1].upper() + status[1:]
     s = f"[{status_color}]{status}[/]"
     if _has_request_status(run, [RequestStatus.TERMINATED]):
-        s += "\n[red]Request is terminated[/]"
+        s += "\n[red]Request(s) terminated[/]"
     elif _has_request_status(run, [RequestStatus.NO_CAPACITY]):
         s += " \n[dark_orange]No capacity[/]"
     return s
@@ -78,7 +78,7 @@ def print_runs(args: Namespace, backend: Backend):
     console = Console()
     table = Table(box=None)
     table.add_column("RUN", style="bold", no_wrap=True)
-    table.add_column("TARGET", width=12)
+    table.add_column("TARGET", style="grey58", width=12)
     table.add_column("STATUS", no_wrap=True)
     table.add_column("APPS", justify="center", style="green", no_wrap=True)
     table.add_column("ARTIFACTS", style="grey58", width=12)
@@ -91,12 +91,12 @@ def print_runs(args: Namespace, backend: Backend):
             submitted_at = pretty_date(round(run.submitted_at / 1000))
             table.add_row(
                 _status_color(run, run_name, True, False),
-                run.workflow_name or run.provider_name,
+                _status_color(run, run.workflow_name or run.provider_name, False, False),
                 pretty_print_status(run),
-                _app_heads(run.app_heads, run.status.name),
-                '\n'.join([a.artifact_name for a in run.artifact_heads or []]),
-                submitted_at,
-                f"{run.tag_name}" if run.tag_name else "")
+                _status_color(run, _app_heads(run.app_heads, run.status.name), False, False),
+                _status_color(run, '\n'.join([a.artifact_name for a in run.artifact_heads or []]), False, False),
+                _status_color(run, submitted_at, False, False),
+                _status_color(run, f"{run.tag_name}" if run.tag_name else "", False, False))
     console.print(table)
 
 

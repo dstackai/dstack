@@ -11,7 +11,7 @@ from botocore.client import BaseClient
 
 from dstack import version
 from dstack.aws import jobs
-from dstack.backend import InstanceType
+from dstack.backend import InstanceType, RequestStatus, RequestHead
 from dstack.jobs import Job, JobStatus, Requirements
 from dstack.runners import Resources, Runner, Gpu
 
@@ -138,7 +138,7 @@ def _create_or_update_runner(s3_client: BaseClient, bucket_name: str, runner: Ru
     key = f"runners/{runner.runner_id}.yaml"
     metadata = {}
     if runner.job.status == JobStatus.STOPPING:
-        metadata["x-amz-meta-status"] = "stopping"
+        metadata["status"] = "stopping"
     s3_client.put_object(Body=yaml.dump(_serialize_runner(runner)), Bucket=bucket_name, Key=key, Metadata=metadata)
 
 
@@ -595,7 +595,59 @@ def _cancel_spot_request(ec2_client: BaseClient, request_id: str):
 
 
 def _terminate_instance(ec2_client: BaseClient, request_id: str):
-    ec2_client.terminate_instances(InstanceIds=[request_id])
+    try:
+        ec2_client.terminate_instances(InstanceIds=[request_id])
+    except Exception as e:
+        if hasattr(e, "response") and e.response.get("Error") and e.response["Error"].get(
+                "Code") == "InvalidInstanceID.NotFound":
+            pass
+        else:
+            raise e
+
+
+def request_head(ec2_client: BaseClient, job: Job) -> RequestHead:
+    interrupted = job.requirements and job.requirements.interruptible
+    if job.request_id:
+        if interrupted:
+            response = ec2_client.describe_spot_instance_requests(SpotInstanceRequestIds=[job.request_id])
+            if response.get("SpotInstanceRequests"):
+                status = response["SpotInstanceRequests"][0]["Status"]
+                if status["Code"] in ["fulfilled"]:
+                    request_status = RequestStatus.RUNNING
+                elif status["Code"] in ["not-scheduled-yet", "pending-evaluation", "pending-fulfillment"]:
+                    request_status = RequestStatus.PENDING
+                elif status["Code"] in ["not-capacity-not-available", "instance-stopped-no-capacity",
+                                        "instance-terminated-by-price", "instance-stopped-by-price",
+                                        "instance-terminated-no-capacity", "limit-exceeded", "price-too-low"]:
+                    request_status = RequestStatus.NO_CAPACITY
+                elif status["Code"] in ["instance-terminated-by-user", "instance-stopped-by-user",
+                                        "canceled-before-fulfillment", "instance-terminated-by-schedule",
+                                        "instance-terminated-by-service", "spot-instance-terminated-by-user",
+                                        "marked-for-stop", "marked-for-termination"]:
+                    request_status = RequestStatus.TERMINATED
+                else:
+                    raise Exception(f"Unsupported EC2 spot instance request status code: {status['Code']}")
+                return RequestHead(job.job_id, request_status, status.get("Message"))
+            else:
+                return RequestHead(job.job_id, RequestStatus.TERMINATED, None)
+        else:
+            response = ec2_client.describe_instances(InstanceIds=[job.request_id])
+            if response.get("Reservations") and response["Reservations"][0].get("Instances"):
+                state = response["Reservations"][0]["Instances"][0]["State"]
+                if state["Name"] in ["running"]:
+                    request_status = RequestStatus.RUNNING
+                elif state["Name"] in ["pending"]:
+                    request_status = RequestStatus.PENDING
+                elif state["Name"] in ["shutting-down", "terminated", "stopping", "stopped"]:
+                    request_status = RequestStatus.TERMINATED
+                else:
+                    raise Exception(f"Unsupported EC2 instance state name: {state['Name']}")
+                return RequestHead(job.job_id, request_status, None)
+            else:
+                return RequestHead(job.job_id, RequestStatus.TERMINATED, None)
+    else:
+        message = "The spot instance request ID is not specified" if interrupted else "The instance ID is not specified"
+        return RequestHead(job.job_id, RequestStatus.TERMINATED, message)
 
 
 def _stop_runner(ec2_client: BaseClient, s3_client: BaseClient, bucket_name: str, runner: Runner):
@@ -609,18 +661,23 @@ def _stop_runner(ec2_client: BaseClient, s3_client: BaseClient, bucket_name: str
 
 def stop_job(ec2_client: BaseClient, s3_client: BaseClient, bucket_name: str, job: Job, abort: bool):
     if job.status.is_unfinished():
-        if abort:
+        _request_head = request_head(ec2_client, job)
+        terminated = _request_head.status == RequestStatus.TERMINATED
+        if abort or terminated:
             new_status = JobStatus.ABORTED
         elif job.status == JobStatus.SUBMITTED:
             new_status = JobStatus.STOPPED
-        else:
+        elif job.status != JobStatus.UPLOADING:
             new_status = JobStatus.STOPPING
-        runner = _get_runner(s3_client, bucket_name, job.runner_id)
-        if runner:
-            if new_status.is_finished():
-                _stop_runner(ec2_client, s3_client, bucket_name, runner)
-            else:
-                runner.job.status = new_status
-                _create_or_update_runner(s3_client, bucket_name, runner)
-        job.status = new_status
-        jobs.update_job(s3_client, bucket_name, job)
+        else:
+            new_status = job.status
+        if job.status != new_status:
+            runner = _get_runner(s3_client, bucket_name, job.runner_id)
+            if runner:
+                if new_status.is_finished():
+                    _stop_runner(ec2_client, s3_client, bucket_name, runner)
+                else:
+                    runner.job.status = new_status
+                    _create_or_update_runner(s3_client, bucket_name, runner)
+            job.status = new_status
+            jobs.update_job(s3_client, bucket_name, job)

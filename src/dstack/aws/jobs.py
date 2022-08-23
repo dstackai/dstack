@@ -35,7 +35,7 @@ def serialize_job(job: Job) -> dict:
         "requirements": _serialize_requirements(job.requirements),
         "deps": deps,
         "master_job_id": job.master_job.get_id() if job.master_job else '',
-        "app_specs": [{
+        "apps": [{
             "port_index": a.port_index,
             "app_name": a.app_name,
             "url_path": a.url_path or '',
@@ -97,7 +97,7 @@ def unserialize_job(job_data: dict) -> Job:
             deps.append(Dep(dep_repo_user_name, dep_repo_name, dep_run_name))
     master_job = JobRefId(job_data["master_job_id"]) if job_data.get("master_job_id") else None
     app_specs = ([AppSpec(a["port_index"], a["app_name"], a.get("url_path") or None, a.get("url_query_params") or None)
-                  for a in (job_data.get("app_specs") or [])]) or None
+                  for a in (job_data.get("apps") or [])]) or None
     job = Job(job_data.get("job_id"), RepoData(job_data["repo_user_name"], job_data["repo_name"],
                                                job_data["repo_branch"], job_data["repo_hash"],
                                                job_data["repo_diff"] or None),
@@ -148,6 +148,7 @@ def get_job(s3_client: BaseClient, bucket_name: str, repo_user_name: str, repo_n
             return None
         else:
             raise e
+
 
 def update_job(s3_client: BaseClient, bucket_name: str, job: Job):
     prefix = f"jobs/{job.repo_data.repo_user_name}/{job.repo_data.repo_name}"

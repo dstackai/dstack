@@ -3,8 +3,8 @@ from typing import Optional, List
 from botocore.client import BaseClient
 
 from dstack import random_name
-from dstack.aws import run_names, logs, jobs
-from dstack.backend import Run, AppHead, RequestHead, RequestStatus, ArtifactHead
+from dstack.aws import run_names, logs, jobs, runners
+from dstack.backend import Run, AppHead, ArtifactHead
 from dstack.jobs import JobHead, Job
 
 
@@ -19,51 +19,6 @@ def create_run(s3_client: BaseClient, logs_client: BaseClient, bucket_name: str,
     return run_name
 
 
-def _request_head(ec2_client: BaseClient, job: Job) -> RequestHead:
-    interrupted = job.requirements and job.requirements.interruptible
-    if job.request_id:
-        if interrupted:
-            response = ec2_client.describe_spot_instance_requests(SpotInstanceRequestIds=[job.request_id])
-            if response.get("SpotInstanceRequests"):
-                status = response["SpotInstanceRequests"][0]["Status"]
-                if status["Code"] in ["fulfilled"]:
-                    request_status = RequestStatus.RUNNING
-                elif status["Code"] in ["not-scheduled-yet", "pending-evaluation", "pending-fulfillment"]:
-                    request_status = RequestStatus.PENDING
-                elif status["Code"] in ["not-capacity-not-available", "instance-stopped-no-capacity",
-                                        "instance-terminated-by-price", "instance-stopped-by-price",
-                                        "instance-terminated-no-capacity", "limit-exceeded", "price-too-low"]:
-                    request_status = RequestStatus.NO_CAPACITY
-                elif status["Code"] in ["instance-terminated-by-user", "instance-stopped-by-user",
-                                        "canceled-before-fulfillment", "instance-terminated-by-schedule",
-                                        "instance-terminated-by-service", "spot-instance-terminated-by-user",
-                                        "marked-for-stop", "marked-for-termination"]:
-                    request_status = RequestStatus.TERMINATED
-                else:
-                    raise Exception(f"Unsupported EC2 spot instance request status code: {status['Code']}")
-                return RequestHead(job.job_id, request_status, status.get("Message"))
-            else:
-                return RequestHead(job.job_id, RequestStatus.TERMINATED, None)
-        else:
-            response = ec2_client.describe_instances(InstanceIds=[job.request_id])
-            if response.get("Reservations") and response["Reservations"][0].get("Instances"):
-                state = response["Reservations"][0]["Instances"][0]["State"]
-                if state["Name"] in ["running"]:
-                    request_status = RequestStatus.RUNNING
-                elif state["Name"] in ["pending"]:
-                    request_status = RequestStatus.PENDING
-                elif state["Name"] in ["shutting-down", "terminated", "stopping", "stopped"]:
-                    request_status = RequestStatus.TERMINATED
-                else:
-                    raise Exception(f"Unsupported EC2 instance state name: {state['Name']}")
-                return RequestHead(job.job_id, request_status, None)
-            else:
-                return RequestHead(job.job_id, RequestStatus.TERMINATED, None)
-    else:
-        message = "The spot instance request ID is not specified" if interrupted else "The instance ID is not specified"
-        return RequestHead(job.job_id, RequestStatus.TERMINATED, message)
-
-
 def _create_run(ec2_client: BaseClient, repo_user_name, repo_name, job: Job, include_request_heads: bool) -> Run:
     app_heads = list(map(lambda a: AppHead(job.job_id, a.app_name), job.app_specs)) if job.app_specs else None
     artifact_heads = list(map(lambda a: ArtifactHead(job.job_id, a), job.artifacts)) if job.artifacts else None
@@ -71,7 +26,7 @@ def _create_run(ec2_client: BaseClient, repo_user_name, repo_name, job: Job, inc
     if include_request_heads and job.status.is_unfinished():
         if request_heads is None:
             request_heads = []
-        request_heads.append(_request_head(ec2_client, job))
+        request_heads.append(runners.request_head(ec2_client, job))
     run = Run(repo_user_name, repo_name, job.run_name, job.workflow_name, job.provider_name,
               artifact_heads or None, job.status, job.submitted_at, job.tag_name,
               app_heads, request_heads)
@@ -93,7 +48,7 @@ def _update_run(ec2_client: BaseClient, run: Run, job: Job, include_request_head
         if include_request_heads:
             if run.request_heads is None:
                 run.request_heads = []
-            run.request_heads.append(_request_head(ec2_client, job))
+            run.request_heads.append(runners.request_head(ec2_client, job))
 
 
 def get_runs(ec2_client: BaseClient, s3_client: BaseClient, bucket_name: str, repo_user_name, repo_name,

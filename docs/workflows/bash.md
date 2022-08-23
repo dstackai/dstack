@@ -11,23 +11,23 @@ which folders to save as output artifacts, dependencies to other workflows if an
 
 === ".dstack/workflows.yaml"
 
-```yaml
-workflows:
-  - name: "train"
-    provider: bash
-    deps:
-      - :some_tag
-    python: 3.10
-    env: 
-      - PYTHONPATH=src
-    commands:
-      - pip install requirements.txt
-      - python src/train.py
-    artifacts: [ "checkpoint" ]
-    resources:
-      interruptible: true
-      gpu: 1
-```
+    ```yaml
+    workflows:
+      - name: "train"
+        provider: bash
+        deps:
+          - :some_tag
+        python: 3.10
+        env: 
+          - PYTHONPATH=src
+        commands:
+          - pip install requirements.txt
+          - python src/train.py
+        artifacts: [ "checkpoint" ]
+        resources:
+          interruptible: true
+          gpu: 1
+    ```
 
 ## Workflow syntax
 

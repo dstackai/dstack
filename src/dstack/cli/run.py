@@ -79,7 +79,7 @@ def poll_run(repo_user_name: str, repo_name: str, job_heads: List[JobHead], back
                     break
                 if _has_request_status(run, [RequestStatus.TERMINATED, RequestStatus.NO_CAPACITY]):
                     if _has_request_status(run, [RequestStatus.TERMINATED]):
-                        progress.update(task, description=f"[red]Request is terminated[/]", total=100)
+                        progress.update(task, description=f"[red]Request(s) terminated[/]", total=100)
                         break
                     elif not request_errors_printed and _has_request_status(run, [RequestStatus.NO_CAPACITY]):
                         progress.update(task, description=f"[dark_orange]No capacity")
