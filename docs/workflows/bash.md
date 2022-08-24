@@ -1,4 +1,4 @@
-# Bash
+# bash
 
 The `bash` provider runs given shell commands. 
 

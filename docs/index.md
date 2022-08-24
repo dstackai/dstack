@@ -1,4 +1,4 @@
-# Welcome to dstack
+# Introduction to dstack
 
 To run ML workflows, your local machine is often not enough, so you need a way 
 to automate running these workflows using the cloud infrastructure.

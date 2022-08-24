@@ -1,6 +1,6 @@
-# JupyterLab
+# lab
 
-The `code` launches a JupyterLab application.
+The `lab` launches a JupyterLab application.
 
 The provider allows you to specify the version of Python, a `requirements.txt` file to pre-install,
 environment variables, properties, which folders to save as output artifacts, dependencies to

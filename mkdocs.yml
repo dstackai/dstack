@@ -63,22 +63,21 @@ extra:
 nav:
   - Get started:
       - index.md
-      - Welcome: index.md
+      - Intro: index.md
+      - Concepts: concepts.md
       - Installation: installation.md
-      - Usage: usage.md
-  - Tutorials:
       - Quickstart: quickstart.md
-  - Reference:
+  - Guides:
       - Workflows:
-        - workflows/index.md
-        - Bash: workflows/bash.md
-        - Code: workflows/code.md
-        - Lab: workflows/lab.md
-        - Notebook: workflows/notebook.md
-        - Docker: workflows/docker.md
-        - Torchrun: workflows/torchrun.md
-      - dstack CLI:
-        - cli/index.md
+        - Overview: workflows/overview.md
+        - bash: workflows/bash.md
+        - code: workflows/code.md
+        - lab: workflows/lab.md
+        - notebook: workflows/notebook.md
+        - docker: workflows/docker.md
+        - torchrun: workflows/torchrun.md
+      - Commands (CLI):
+        - Overview: cli/overview.md
   - Help:
       - GitHub issues: https://github.com/dstackai/dstack/issues
-      - Join Slack: https://join.slack.com/t/dstackai/shared_invite/zt-xdnsytie-D4qU9BvJP8vkbkHXdi6clQ
+      - Slack chat: https://join.slack.com/t/dstackai/shared_invite/zt-xdnsytie-D4qU9BvJP8vkbkHXdi6clQ

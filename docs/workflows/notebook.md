@@ -1,6 +1,6 @@
-# Notebook
+# notebook
 
-The `code` launches a Jupyter notebook application.
+The `notebook` launches a Jupyter notebook application.
 
 The provider allows you to specify the version of Python, a `requirements.txt` file to pre-install,
 environment variables, properties, which folders to save as output artifacts, dependencies to

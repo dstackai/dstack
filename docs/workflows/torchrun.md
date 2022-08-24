@@ -1,4 +1,4 @@
-# Torchrun
+# torchrun
 
 The `torchrun` provider runs a distributed PyTorch training on multiple nodes. 
 

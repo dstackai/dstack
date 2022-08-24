@@ -1,4 +1,4 @@
-# Docker
+# docker
 
 The `docker` provider runs a Docker image. 
 

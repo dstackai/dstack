@@ -1,4 +1,4 @@
-# VS Code
+# code
 
 The `code` launches a VS Code application.
 

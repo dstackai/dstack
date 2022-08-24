@@ -1,4 +1,4 @@
-# CLI
+# Command-Line Interface
 
 The command line interface to dstack is provided through the `dstack` program (that is installed with the 
 [`dstack`](https://pypi.org/project/dstack/) pip package).
