@@ -40,7 +40,7 @@ class TorchrunProvider(Provider):
         return resources
 
     def _image_name(self):
-        return f"dstackai/python:{self.version}-cuda-11.1"
+        return f"dstackai/miniconda:{self.version}-cuda-11.1"
 
     def _commands(self, node_rank):
         commands = []

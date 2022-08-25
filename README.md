@@ -18,11 +18,11 @@ ______________________________________________________________________
 To run ML workflows, your local machine is often not enough, so you need a way 
 to automate running these workflows using the cloud infrastructure.
 
-Instead of configuring cloud instances manually, writing custom scripts, or even using complicated MLOps platforms, 
-now you can run workflows with a single dstack command.
+Instead of managing infrastructure yourself, writing custom scripts, or using cumbersome MLOps platforms, 
+define your workflows in code and run from command-line.
 
-dstack is an alternative to SSH, custom scripts, Docker, KubeFlow, SageMaker, and other tools used 
-for running ML workflows.
+dstack is an alternative to KubeFlow, SageMaker, Docker, SSH, custom scripts, and many other tools used often for
+running ML workflows.
 
 ### Primary features of dstack:
 

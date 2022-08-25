@@ -74,7 +74,7 @@ class BashProvider(Provider):
 
     def _image_name(self) -> str:
         cuda_is_required = self.resources and self.resources.gpus
-        return f"dstackai/python:{self.python}-cuda-11.1" if cuda_is_required else f"python:{self.python}"
+        return f"dstackai/miniconda:{self.python}-cuda-11.1" if cuda_is_required else f"dstackai/miniconda:{self.python}"
 
     def _commands(self):
         commands = []

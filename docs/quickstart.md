@@ -73,7 +73,6 @@ If you open the `.dstack/workflows.yaml` file, you'll see the following content:
         deps:
           - :mnist_data
         provider: bash
-        requirements: "requirements.txt"
         env:
           - PYTHONPATH=mnist
         commands:
@@ -119,8 +118,8 @@ To interrupt, press Ctrl+C.
 !!! info "NOTE:"
     Make sure to always run the CLI from the project repository directory.
 
-Once you run the workflow, dstack will create the required cloud instance within a minute,
-and will run your workflow. You'll see the output in real-time as your 
+Once you run the workflow, dstack will create the required cloud instance(s) within a minute,
+download the dependencies, and run your workflow. You'll see the output in real-time as your 
 workflow is running.
 
 !!! tip "NOTE:"
@@ -238,7 +237,6 @@ file, this way:
         deps:
           - :mnist_data
         provider: bash
-        requirements: "requirements.txt"
         env:
           - PYTHONPATH=mnist
         commands:

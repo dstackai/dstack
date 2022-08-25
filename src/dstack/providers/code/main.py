@@ -65,14 +65,15 @@ class CodeProvider(Provider):
 
     def _image_name(self) -> str:
         cuda_is_required = self.resources and self.resources.gpus
-        return f"dstackai/python:{self.python}-cuda-11.1" if cuda_is_required else f"python:{self.python}"
+        return f"dstackai/miniconda:{self.python}-cuda-11.1" if cuda_is_required else f"dstackai/miniconda:{self.python}"
 
     def _commands(self):
         commands = [
             "mkdir -p /tmp",
             "cd /tmp",
-            f"curl -L https://github.com/gitpod-io/openvscode-server/releases/download/"
-            f"openvscode-server-v{self.version}/openvscode-server-v{self.version}-linux-x64.tar.gz -O",
+            f"wget -q https://github.com/gitpod-io/openvscode-server/releases/download/"
+            f"openvscode-server-v{self.version}/openvscode-server-v{self.version}-linux-x64.tar.gz -O "
+            f"openvscode-server-v{self.version}-linux-x64.tar.gz",
             f"tar -xzf openvscode-server-v{self.version}-linux-x64.tar.gz",
             f"cd openvscode-server-v{self.version}-linux-x64",
             "./bin/openvscode-server --install-extension ms-python.python"
