@@ -1,5 +1,5 @@
-import os
-import shutil
+import re
+import sys
 from pathlib import Path
 
 from setuptools import setup, find_packages
@@ -7,19 +7,20 @@ from setuptools import setup, find_packages
 
 def get_version():
     text = (Path("dstack") / "version.py").read_text()
-    return text.split("=")[1].strip()[1:-1]
+    match = re.compile(r"__version__\s*=\s*\"?([^\n\"]+)\"?.*").match(text)
+    if match and match.group(1) != "None":
+        return match.group(1)
+    else:
+        sys.exit("Can't parse version.py")
 
-
-parent_path = Path(os.path.dirname(os.getcwd()))
-shutil.copyfile(parent_path / ".dstack" / "providers.yaml", Path("dstack") / "cli" / "providers.yaml")
 
 setup(
     name="dstack",
     version=get_version(),
-    author="peterschmidt85",
+    author="Andrey Cheptsov",
     author_email="andrey@dstack.ai",
     packages=find_packages(),
-    package_data={'': ['providers.yaml', 'schema.yaml']},
+    package_data={'dstack.dashboard': ['statics/*', 'statics/**/*']},
     include_package_data=True,
     scripts=[],
     entry_points={
@@ -29,7 +30,7 @@ setup(
     project_urls={
         "Source": "https://github.com/dstackai/dstack",
     },
-    description="A Command Line Interface for https://dstack.ai",
+    description="An open-source tool for running data and ML workflows in the cloud",
     long_description=open("../README.md").read(),
     long_description_content_type="text/markdown",
     python_requires=">=3.6",
@@ -45,11 +46,15 @@ setup(
         "paramiko",
         "git-url-parse",
         "rich",
+        "fastapi",
+        "starlette",
+        "uvicorn",
+        "pydantic",
     ],
     classifiers=[
         "Development Status :: 2 - Pre-Alpha",
         "Topic :: Scientific/Engineering :: Artificial Intelligence",
-        "License :: Other/Proprietary License",
+        "License :: OSI Approved :: Mozilla Public License 2.0 (MPL 2.0)",
         "Programming Language :: Python :: 3"
     ]
 )

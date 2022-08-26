@@ -1,39 +1,38 @@
 import uuid
 from argparse import ArgumentParser
-from typing import List, Optional
+from typing import List, Optional, Dict, Any
 
-from dstack import Provider, Job, App
+from dstack.jobs import JobSpec, AppSpec
+from dstack.providers import Provider
 
 
-# TODO: Provide job.applications (incl. application name, and query)
 class LabProvider(Provider):
     def __init__(self):
-        super().__init__()
+        super().__init__("lab")
         self.before_run = None
         self.python = None
         self.version = None
         self.requirements = None
-        self.environment = None
+        self.env = None
         self.artifacts = None
         self.working_dir = None
         self.resources = None
-        self.image = None
+        self.image_name = None
 
-    def load(self):
-        super()._load(schema="schema.yaml")
-        self.before_run = self.workflow.data.get("before_run")
-        # TODO: Handle numbers such as 3.1 (e.g. require to use strings)
+    def load(self, provider_args: List[str], workflow_name: Optional[str], provider_data: Dict[str, Any]):
+        super().load(provider_args, workflow_name, provider_data)
+        self.before_run = self.provider_data.get("before_run")
         self.python = self._save_python_version("python")
-        self.version = self.workflow.data.get("version")
-        self.requirements = self.workflow.data.get("requirements")
-        self.environment = self.workflow.data.get("environment") or {}
-        self.artifacts = self.workflow.data.get("artifacts")
-        self.working_dir = self.workflow.data.get("working_dir")
+        self.version = self.provider_data.get("version")
+        self.requirements = self.provider_data.get("requirements")
+        self.env = self._env()
+        self.artifacts = self.provider_data.get("artifacts")
+        self.working_dir = self.provider_data.get("working_dir")
         self.resources = self._resources()
-        self.image = self._image()
+        self.image_name = self._image()
 
     def _create_parser(self, workflow_name: Optional[str]) -> Optional[ArgumentParser]:
-        parser = ArgumentParser(prog="dstack run " + (workflow_name or "lab"))
+        parser = ArgumentParser(prog="dstack run " + (workflow_name or self.provider_name))
         self._add_base_args(parser)
         return parser
 
@@ -42,19 +41,19 @@ class LabProvider(Provider):
         args = parser.parse_args(self.provider_args)
         self._parse_base_args(args)
 
-    def create_jobs(self) -> List[Job]:
-        environment = dict(self.environment)
+    def create_job_specs(self) -> List[JobSpec]:
+        env = dict(self.env or {})
         token = uuid.uuid4().hex
-        environment["TOKEN"] = token
-        return [Job(
-            image=self.image,
+        env["TOKEN"] = token
+        return [JobSpec(
+            image_name=self.image_name,
             commands=self._commands(),
-            environment=environment,
+            env=env,
             working_dir=self.working_dir,
-            resources=self.resources,
             artifacts=self.artifacts,
             port_count=1,
-            apps=[App(
+            requirements=self.resources,
+            app_specs=[AppSpec(
                 port_index=0,
                 app_name="lab",
                 url_path="lab",
@@ -66,7 +65,7 @@ class LabProvider(Provider):
 
     def _image(self) -> str:
         cuda_is_required = self.resources and self.resources.gpu
-        return f"dstackai/python:{self.python}-cuda-11.1" if cuda_is_required else f"python:{self.python}"
+        return f"dstackai/miniconda:{self.python}-cuda-11.1" if cuda_is_required else f"dstackai/miniconda:{self.python}"
 
     def _commands(self):
         commands = [
@@ -90,7 +89,3 @@ class LabProvider(Provider):
 
 def __provider__():
     return LabProvider()
-
-
-if __name__ == '__main__':
-    __provider__().run()

@@ -1,4 +1,4 @@
-name: Build
+name: Release
 
 on:
   create:
@@ -50,6 +50,26 @@ jobs:
         run: |
           VERSION=${GITHUB_REF#refs/tags/}
           echo "__version__ = \"$VERSION\"" > dstack/version.py
-          echo "__server_url__ = \"https://api.dstack.ai\"" > dstack/server.py
+          echo "__is_release__ = True" >> dstack/version.py
           python setup.py bdist_wheel
           python -m twine upload --repository pypi --username ${{ secrets.PYPI_USERNAME }} --password ${{ secrets.PYPI_PASSWORD }} dist/*
+
+  docs-deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v2
+        with:
+          path: dstack
+      - uses: actions/checkout@v2
+        with:
+          repository: dstackai/dstackai.github.io
+          path: ./dstackai.github.io
+          token: ${{ secrets.GH_TOKEN }}
+      - uses: actions/setup-python@v2
+        with:
+          python-version: 3.x
+      - run: |
+          pip install mkdocs-redirects
+          pip install mkdocs-material
+          mkdocs gh-deploy --config-file ../dstack/mkdocs.yml --force
+        working-directory: ./dstackai.github.io

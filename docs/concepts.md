@@ -1,45 +1,84 @@
-# Concepts
+## Workflows
 
-### 🧬 Workflow
+Workflows are defined declaratively in the `.dstack/workflows.yaml` file within the 
+project. Every workflow may specify the provider, dependencies, commands, artifacts, 
+infrastructure resources, environment variables, and more.
 
-Typical data and training pipelines consist of multiple steps. These steps may include loading data,
-preparing data, training, validating, testing a model, etc. In dstack, each of these steps is called a `Workflow`.
-Learn more on how to [define workflows](workflows.md).
+=== ".dstack/workflows.yaml"
 
-### 🏃‍♀️ Run
+    ```yaml
+    workflows:
+      - name: "train"
+        provider: bash
+        deps:
+          - :some_tag
+        python: 3.10
+        env:
+          - PYTHONPATH=mnist
+        commands:
+          - pip install requirements.txt
+          - python src/train.py
+        artifacts: [ "checkpoint" ]
+        resources:
+          interruptible: true
+          gpu: 1
+    ```
 
-Once you run a `Workflow`, the running instance of this workflow is called a `Run`. All `Jobs` created by the
-`Provider` are linked to this `Run`.
+Providers define how the workflow is executed and what properties can be specified for the workflow.
 
-### 🧩 Provider
+### Run command
 
-A `Provider` is a program that materializes a `Workflow` into actual `Jobs` that 
-process and output data according to the `Workflow` parameters.
+When you run the workflow via the `dstack run` CLI command, dstack create the cloud instance(s) within a minute,
+and runs the workflow. You can see the output of your workflow in real-time.
 
-### ⚙️ Job
+```shell
+$ dstack run train
 
-When you run a `Workflow`, the `Provider` creates the actual `Jobs` that run this `Workflow`.
+Provisioning... It may take up to a minute. ✓
 
-Every `Job` is associated with a repo with the sources, a Docker image, commands, exposed ports, an ID of the primary `Job` (in
-case there should be communication between `Jobs`), the input `Artifacts` (e.g. from other runs), 
-the hardware requirements (e.g. the number or a name of GPU, memory, etc.), and finally the output `Artifacts`.
+To interrupt, press Ctrl+C.
 
-### 📦 Artifact
+...
+```
 
-Every `Job` may produce output `Artifacts`. When a `Job` is running, dstack stores the output `Artifacts` for 
-every `Job` in real-time.
+!!! info "NOTE:"
+    As long as your project is under Git, you don't have to commit local changes before using the `dstack run` CLI command.
+    dstack tracks local changes automatically.
 
-If your `Job` depends on some another `Job`, all output `Artifacts` of that other `Job` will be
-mounted as input `Artifacts` to your `Job`.
+## Artifacts
 
-### 🏷 Tags
+Every workflow may have its output artifacts. By default, dstack saves them in real-time as the workflow is running.
 
-It's possible to assign a `Tag` to any successful `Run` to reuse its `Artifacts` in other `Workflows`. 
-By using `Tags`, it's possible to version data and models, and reuse it within the team or across.
+Artifacts can be accessed via the `dstack artifacts` CLI command.
 
-### 🤖 Runner
+## Tags
 
-A `Runner` is a machine that runs `Jobs`. `Runners` are provisioned by dstack on-demand from the configured
-`Computing Vendors` (such as AWS, GCP, Azure, and others.) As an alternative to on-demand `Runners`, it's also possible 
-to use your own hardware as `Runners` (this is called self-hosted `Runners`). 
-Learn more on how to [set up runners](runners.md).
+Tags help manage data.
+
+For example, you can assign a tag to a finished workflow to use its output artifacts from other workflows.
+
+Also, you can create a tag by uploading data from your local machine.
+
+To make a workflow use the data via a tag, one has to use the `deps` property in `.dstack/workflows.yaml`.
+
+Example:
+
+```yaml
+deps:
+  - :some_tag
+```
+
+You can refer to tags from other projects as well. 
+
+Tags can be managed via the `dstack tags` CLI command.
+
+## Backend
+
+The dstack CLI uses your local credentials (e.g. the default AWS environment variables 
+or the credentials from `~/.aws/credentials`.) to provision infrastructure and store data.
+
+All the state and artifacts are stored in an S3 bucket that can be configured via
+the `dstack config` CLI command.
+
+Multiple users may work with multiple projects within the same S3 bucket (e.g. for collaboration and
+reuse of tags across projects).

@@ -9,3 +9,7 @@ python-dateutil
 paramiko
 git-url-parse
 rich
+fastapi
+starlette
+uvicorn
+pydantic

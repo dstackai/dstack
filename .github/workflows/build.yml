@@ -4,6 +4,7 @@ on:
   push:
     branches:
       - 'master'
+      - 'oss'
   pull_request:
     branches:
       - 'master'
@@ -53,25 +54,6 @@ jobs:
         run: |
           VERSION=$((${{ github.run_number }} + 150))
           echo "__version__ = \"$VERSION\"" > dstack/version.py
+          echo "__is_release__ = False" >> dstack/version.py
           python setup.py bdist_wheel
           python -m twine upload --repository testpypi --username ${{ secrets.TESTPYPI_USERNAME }} --password ${{ secrets.TESTPYPI_PASSWORD }} dist/*
-
-  docs-deploy:
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v2
-        with:
-          path: dstack
-      - uses: actions/checkout@v2
-        with:
-          repository: dstackai/dstackai.github.io
-          path: ./dstackai.github.io
-          token: ${{ secrets.GH_TOKEN }}
-      - uses: actions/setup-python@v2
-        with:
-          python-version: 3.x
-      - run: |
-          pip install mkdocs-redirects
-          pip install mkdocs-material
-          mkdocs gh-deploy --config-file ../dstack/mkdocs.yml --force
-        working-directory: ./dstackai.github.io
