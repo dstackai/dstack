@@ -53,7 +53,7 @@ async def query(repo_user_name: str, repo_name: str) -> RunListModel:
             run_name=r.run_name,
             workflow_name=r.workflow_name,
             provider_name=r.provider_name,
-            artifacts=[ArtifactModel(job_id=a.job_id, artifact_name=a.artifact_name)
+            artifacts=[ArtifactModel(job_id=a.job_id, artifact_name=a.artifact_path)
                        for a in r.artifact_heads] if r.artifact_heads else None,
             status=r.status.value,
             submitted_at=r.submitted_at,

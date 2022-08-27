@@ -47,12 +47,12 @@ class AppHead:
 
 
 class ArtifactHead:
-    def __init__(self, job_id: str, artifact_name: str):
+    def __init__(self, job_id: str, artifact_path: str):
         self.job_id = job_id
-        self.artifact_name = artifact_name
+        self.artifact_path = artifact_path
 
     def __str__(self) -> str:
-        return f'ArtifactHead(job_id="{self.job_id}", artifact_name="{self.artifact_name})'
+        return f'ArtifactHead(job_id="{self.job_id}", artifact_name="{self.artifact_path})'
 
 
 class Run:

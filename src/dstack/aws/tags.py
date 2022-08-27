@@ -48,7 +48,7 @@ def get_tag_head(s3_client: BaseClient, bucket_name: str, repo_user_name: str, r
 
 def _serialize_artifact_heads(tag_head):
     return ':'.join(
-        [a.job_id + '=' + a.artifact_name for a in tag_head.artifact_heads]) if tag_head.artifact_heads else ''
+        [a.job_id + '=' + a.artifact_path for a in tag_head.artifact_heads]) if tag_head.artifact_heads else ''
 
 
 def _tag_head_key(tag_head: TagHead) -> str:

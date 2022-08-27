@@ -25,7 +25,7 @@ class PythonProvider(Provider):
         super().load(provider_args, workflow_name, provider_data)
         self.file = self.provider_data["file"]
         self.before_run = self.provider_data.get("before_run")
-        self.version = self._save_python_version("version")
+        self.version = self._safe_python_version("version")
         self.args = self.provider_data.get("args")
         self.requirements = self.provider_data.get("requirements")
         self.env = self._env()

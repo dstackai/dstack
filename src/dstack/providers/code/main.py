@@ -14,7 +14,7 @@ class CodeProvider(Provider):
         self.version = None
         self.requirements = None
         self.env = None
-        self.artifacts = None
+        self.artifact_specs = None
         self.working_dir = None
         self.resources = None
         self.image_name = None
@@ -22,11 +22,11 @@ class CodeProvider(Provider):
     def load(self, provider_args: List[str], workflow_name: Optional[str], provider_data: Dict[str, Any]):
         super().load(provider_args, workflow_name, provider_data)
         self.before_run = self.provider_data.get("before_run")
-        self.python = self._save_python_version("python")
+        self.python = self._safe_python_version("python")
         self.version = self.provider_data.get("version") or "1.67.2"
         self.requirements = self.provider_data.get("requirements")
         self.env = self._env()
-        self.artifacts = self.provider_data.get("artifacts")
+        self.artifact_specs = self._artifact_specs()
         self.working_dir = self.provider_data.get("working_dir")
         self.resources = self._resources()
         self.image_name = self._image_name()
@@ -50,7 +50,7 @@ class CodeProvider(Provider):
             commands=self._commands(),
             env=env,
             working_dir=self.working_dir,
-            artifacts=self.artifacts,
+            artifact_specs=self.artifact_specs,
             port_count=1,
             requirements=self.resources,
             app_specs=[AppSpec(
@@ -65,7 +65,9 @@ class CodeProvider(Provider):
 
     def _image_name(self) -> str:
         cuda_is_required = self.resources and self.resources.gpus
-        return f"dstackai/miniconda:{self.python}-cuda-11.1" if cuda_is_required else f"dstackai/miniconda:{self.python}"
+        cuda_image_name = f"dstackai/miniconda:{self.python}-cuda-11.1"
+        cpu_image_name = f"dstackai/miniconda:{self.python}"
+        return cuda_image_name if cuda_is_required else cpu_image_name
 
     def _commands(self):
         commands = [

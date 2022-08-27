@@ -92,9 +92,9 @@ class JobStatus(Enum):
 
 class JobHead(JobRef):
     def __init__(self, job_id: str, repo_user_name: str, repo_name: str, run_name: str, workflow_name: Optional[str],
-                 provider_name: str, status: JobStatus, submitted_at: int, artifacts: Optional[List[str]],
+                 provider_name: str, status: JobStatus, submitted_at: int, artifact_paths: Optional[List[str]],
                  tag_name: Optional[str],
-                 apps: Optional[List[str]]):
+                 app_names: Optional[List[str]]):
         self.job_id = job_id
         self.repo_user_name = repo_user_name
         self.repo_name = repo_name
@@ -103,9 +103,9 @@ class JobHead(JobRef):
         self.provider_name = provider_name
         self.status = status
         self.submitted_at = submitted_at
-        self.artifacts = artifacts
+        self.artifact_paths = artifact_paths
         self.tag_name = tag_name
-        self.app_names = apps
+        self.app_names = app_names
 
     def get_id(self) -> Optional[str]:
         return self.job_id
@@ -114,41 +114,56 @@ class JobHead(JobRef):
         self.job_id = job_id
 
     def __str__(self) -> str:
-        artifacts = ("[" + ", ".join(map(lambda a: _quoted(str(a)), self.artifacts)) + "]") if self.artifacts else None
-        apps = ("[" + ", ".join(map(lambda a: _quoted(a), self.app_names)) + "]") if self.app_names else None
+        artifact_paths = ("[" + ", ".join(
+            map(lambda a: _quoted(str(a)), self.artifact_paths)) + "]") if self.artifact_paths else None
+        app_names = ("[" + ", ".join(map(lambda a: _quoted(a), self.app_names)) + "]") if self.app_names else None
         return f'JobHead(job_id="{self.job_id}", repo_user_name="{self.repo_user_name}", ' \
                f'repo_name="{self.repo_name}", ' \
                f'run_name="{self.run_name}", workflow_name={_quoted(self.workflow_name)}, ' \
                f'provider_name="{self.provider_name}", ' \
                f'status=JobStatus.{self.status.name}, ' \
                f'submitted_at={self.submitted_at}, ' \
-               f'artifacts={artifacts}, ' \
+               f'artifact_paths={artifact_paths}, ' \
                f'tag_name={_quoted(self.tag_name)}, ' \
-               f'apps={apps})'
+               f'app_names={app_names})'
 
 
-class Dep:
-    def __init__(self, repo_user_name: str, repo_name: str, run_name: str):
+class DepSpec:
+    def __init__(self, repo_user_name: str, repo_name: str, run_name: str, mount: bool):
         self.repo_user_name = repo_user_name
         self.repo_name = repo_name
         self.run_name = run_name
+        self.mount = mount
 
     def __str__(self) -> str:
-        return f'JobHead(repo_user_name="{self.repo_user_name}", ' \
+        return f'DepSpec(repo_user_name="{self.repo_user_name}", ' \
                f'repo_name="{self.repo_name}", ' \
-               f'run_name="{self.run_name}")'
+               f'run_name="{self.run_name}",' \
+               f'mount={self.mount})'
+
+
+class ArtifactSpec:
+    def __init__(self, path: str, mount: bool):
+        self.artifact_path = path
+        self.mount = mount
+
+    def __str__(self) -> str:
+        return f'ArtifactSpec(artifact_path="{self.artifact_path}", ' \
+               f'mount={self.mount})'
 
 
 class Job(JobHead):
     def __init__(self, job_id: Optional[str], repo_data: RepoData, run_name: str, workflow_name: Optional[str],
                  provider_name: str, status: JobStatus, submitted_at: int, image_name: str,
                  commands: Optional[List[str]], env: Optional[Dict[str, str]], working_dir: Optional[str],
-                 artifacts: Optional[List[str]], port_count: Optional[int], ports: Optional[List[int]],
-                 host_name: Optional[str], requirements: Optional[Requirements], deps: Optional[List[Dep]],
+                 artifact_specs: Optional[List[ArtifactSpec]], port_count: Optional[int], ports: Optional[List[int]],
+                 host_name: Optional[str], requirements: Optional[Requirements], dep_specs: Optional[List[DepSpec]],
                  master_job: Optional[JobRef], app_specs: Optional[List[AppSpec]], runner_id: Optional[str],
                  request_id: Optional[str], tag_name: Optional[str]):
         super().__init__(job_id, repo_data.repo_user_name, repo_data.repo_name, run_name, workflow_name, provider_name,
-                         status, submitted_at, artifacts, tag_name,
+                         status, submitted_at,
+                         [a.artifact_path for a in artifact_specs] if artifact_specs else None,
+                         tag_name,
                          [a.app_name for a in app_specs] if app_specs else None)
         self.repo_data = repo_data
         self.runner_id = runner_id
@@ -157,11 +172,12 @@ class Job(JobHead):
         self.commands = commands
         self.env = env
         self.working_dir = working_dir
+        self.artifact_specs = artifact_specs
         self.port_count = port_count
         self.ports = ports
         self.host_name = host_name
         self.requirements = requirements
-        self.deps = deps
+        self.dep_specs = dep_specs
         self.master_job = master_job
         self.app_specs = app_specs
 
@@ -173,8 +189,10 @@ class Job(JobHead):
 
     def __str__(self) -> str:
         commands = ("[" + ", ".join(map(lambda a: _quoted(str(a)), self.commands)) + "]") if self.commands else None
-        artifacts = ("[" + ", ".join(map(lambda a: _quoted(str(a)), self.artifacts)) + "]") if self.artifacts else None
+        artifact_specs = ("[" + ", ".join(
+            map(lambda a: _quoted(str(a)), self.artifact_specs)) + "]") if self.artifact_specs else None
         app_specs = ("[" + ", ".join(map(lambda a: str(a), self.app_specs)) + "]") if self.app_specs else None
+        dep_specs = ("[" + ", ".join(map(lambda d: str(d), self.dep_specs)) + "]") if self.dep_specs else None
         return f'Job(job_id="{self.job_id}", repo_data={self.repo_data}, ' \
                f'run_name="{self.run_name}", workflow_name={_quoted(self.workflow_name)}, ' \
                f'provider_name="{self.provider_name}", ' \
@@ -187,9 +205,9 @@ class Job(JobHead):
                f'port_count={self.port_count}, ' \
                f'ports={self.ports}, ' \
                f'host_name={_quoted(self.host_name)}, ' \
-               f'artifacts={artifacts}, ' \
+               f'artifact_specs={artifact_specs}, ' \
                f'requirements={self.requirements}, ' \
-               f'deps={("[" + ", ".join(map(lambda a: _quoted(str(a)), self.deps)) + "]") if self.deps else None}, ' \
+               f'dep_specs={dep_specs}, ' \
                f'master_job={self.master_job}, ' \
                f'app_specs={app_specs}, ' \
                f'runner_id={_quoted(self.runner_id)}, ' \
@@ -200,7 +218,7 @@ class Job(JobHead):
 class JobSpec(JobRef):
     def __init__(self, image_name: str, commands: Optional[List[str]] = None,
                  env: Optional[Dict[str, str]] = None, working_dir: Optional[str] = None,
-                 artifacts: Optional[List[str]] = None,
+                 artifact_specs: Optional[List[ArtifactSpec]] = None,
                  port_count: Optional[int] = None,
                  requirements: Optional[Requirements] = None,
                  master_job: Optional[JobRef] = None, app_specs: Optional[List[AppSpec]] = None):
@@ -210,7 +228,7 @@ class JobSpec(JobRef):
         self.env = env
         self.working_dir = working_dir
         self.port_count = port_count
-        self.artifacts = artifacts
+        self.artifact_specs = artifact_specs
         self.requirements = requirements
         self.master_job = master_job
         self.app_specs = app_specs
@@ -223,13 +241,15 @@ class JobSpec(JobRef):
 
     def __str__(self) -> str:
         commands = ("[" + ", ".join(map(lambda a: _quoted(str(a)), self.commands)) + "]") if self.commands else None
-        artifacts = ("[" + ", ".join(map(lambda a: _quoted(str(a)), self.artifacts)) + "]") if self.artifacts else None
+        artifact_specs = ("[" + ", ".join(
+            map(lambda a: str(a), self.artifact_specs)) + "]") if self.artifact_specs else None
+        app_specs = ("[" + ", ".join(map(lambda a: str(a), self.app_specs)) + "]") if self.app_specs else None
         return f'JobSpec(job_id="{self.job_id}", image_name="{self.image_name}", ' \
                f'commands={commands}, ' \
                f'env={self.env}, ' \
                f'working_dir={_quoted(self.working_dir)}, ' \
                f'port_count={self.port_count}, ' \
-               f'artifacts={artifacts}, ' \
+               f'artifact_specs={artifact_specs}, ' \
                f'requirements={self.requirements}, ' \
                f'master_job={self.master_job}, ' \
-               f'app_specs={("[" + ", ".join(map(lambda a: str(a), self.app_specs)) + "]") if self.app_specs else None})'
+               f'app_specs={app_specs})'

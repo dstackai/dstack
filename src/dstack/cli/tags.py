@@ -32,7 +32,7 @@ def list_tags_func(_: Namespace):
                 tag_head.run_name,
                 # tag_head.workflow_name,
                 # tag_head.provider_name,
-                '\n'.join([a.artifact_name for a in tag_head.artifact_heads or []]),
+                '\n'.join([a.artifact_path for a in tag_head.artifact_heads or []]),
                 created_at
             )
         console.print(table)

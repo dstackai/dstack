@@ -25,7 +25,7 @@ class GradioProvider(Provider):
         super().load(provider_args, workflow_name, provider_data)
         self.file = self.provider_data["file"]
         self.before_run = self.provider_data.get("before_run")
-        self.python = self._save_python_version("python")
+        self.python = self._safe_python_version("python")
         self.version = self.provider_data.get("version")
         self.args = self.provider_data.get("args")
         self.requirements = self.provider_data.get("requirements")

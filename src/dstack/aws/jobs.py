@@ -3,15 +3,28 @@ from typing import List, Optional, Dict, Any
 import yaml
 from botocore.client import BaseClient
 
-from dstack.jobs import Job, JobStatus, JobHead, Requirements, GpusRequirements, JobRefId, AppSpec, Dep
+from dstack.jobs import Job, JobStatus, JobHead, Requirements, GpusRequirements, JobRefId, AppSpec, DepSpec, \
+    ArtifactSpec
 from dstack.repo import RepoData
 
 
 def serialize_job(job: Job) -> dict:
     deps = []
-    if job.deps:
-        for dep in job.deps:
-            deps.append(f"{dep.repo_user_name},{dep.repo_name},{dep.run_name}")
+    if job.dep_specs:
+        for dep in job.dep_specs:
+            deps.append({
+                "repo_user_name": dep.repo_user_name,
+                "repo_name": dep.repo_name,
+                "run_name": dep.run_name,
+                "mount": dep.mount,
+            })
+    artifacts = []
+    if job.artifact_specs:
+        for artifact_spec in job.artifact_specs:
+            artifacts.append({
+                "path": artifact_spec.artifact_path,
+                "mount": artifact_spec.mount
+            })
     job_data = {
         "job_id": job.job_id,
         "repo_user_name": job.repo_data.repo_user_name,
@@ -28,7 +41,7 @@ def serialize_job(job: Job) -> dict:
         "commands": job.commands or [],
         "env": job.env or {},
         "working_dir": job.working_dir or '',
-        "artifacts": job.artifacts or [],
+        "artifacts": artifacts,
         "port_count": job.port_count if job.port_count else 0,
         "ports": [str(port) for port in job.ports] if job.ports else [],
         "host_name": job.host_name or '',
@@ -90,11 +103,23 @@ def unserialize_job(job_data: dict) -> Job:
                       and not requirements.gpus.name)) \
                 and not requirements.interruptible and not not requirements.shm_size:
             requirements = None
-    deps = []
+    dep_specs = []
     if job_data.get("deps"):
         for dep in job_data["deps"]:
-            dep_repo_user_name, dep_repo_name, dep_run_name = tuple(dep.split(","))
-            deps.append(Dep(dep_repo_user_name, dep_repo_name, dep_run_name))
+            if isinstance(dep, str):
+                dep_repo_user_name, dep_repo_name, dep_run_name = tuple(dep.split(","))
+                dep_spec = DepSpec(dep_repo_user_name, dep_repo_name, dep_run_name, False)
+            else:
+                dep_spec = DepSpec(dep["repo_user_name"], dep["repo_name"], dep["run_name"], dep["mount"])
+            dep_specs.append(dep_spec)
+    artifact_specs = []
+    if job_data.get("artifacts"):
+        for artifact in job_data["artifacts"]:
+            if isinstance(artifact, str):
+                artifact_spec = ArtifactSpec(artifact, False)
+            else:
+                artifact_spec = ArtifactSpec(artifact["path"], artifact["mount"])
+            artifact_specs.append(artifact_spec)
     master_job = JobRefId(job_data["master_job_id"]) if job_data.get("master_job_id") else None
     app_specs = ([AppSpec(a["port_index"], a["app_name"], a.get("url_path") or None, a.get("url_query_params") or None)
                   for a in (job_data.get("apps") or [])]) or None
@@ -104,8 +129,8 @@ def unserialize_job(job_data: dict) -> Job:
               job_data["run_name"], job_data.get("workflow_name") or None, job_data["provider_name"],
               JobStatus(job_data["status"]), job_data["submitted_at"], job_data["image_name"],
               job_data.get("commands") or None, job_data["env"] or None, job_data.get("working_dir") or None,
-              job_data.get("artifacts") or None, job_data.get("port_count") or None, job_data.get("ports") or None,
-              job_data.get("host_name") or None, requirements, deps or None, master_job, app_specs,
+              artifact_specs, job_data.get("port_count") or None, job_data.get("ports") or None,
+              job_data.get("host_name") or None, requirements, dep_specs or None, master_job, app_specs,
               job_data.get("runner_id") or None, job_data.get("request_id") or None, job_data.get("tag_name") or None)
     return job
 
@@ -117,8 +142,9 @@ def _job_head_key(job: Job):
           f"{job.provider_name};" \
           f"{job.submitted_at};" \
           f"{job.status.value};" \
-          f"{','.join(job.artifacts or [])};" \
-          f"{','.join(map(lambda a: a.app_name, job.app_specs or []))};{job.tag_name or ''}"
+          f"{','.join([a.artifact_path for a in (job.artifact_specs or [])])};" \
+          f"{','.join([a.app_name for a in (job.app_specs or [])])};" \
+          f"{job.tag_name or ''}"
     return key
 
 

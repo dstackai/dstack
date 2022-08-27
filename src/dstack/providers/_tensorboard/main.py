@@ -20,7 +20,7 @@ class TensorboardProvider(Provider):
     def load(self, provider_args: List[str], workflow_name: Optional[str], provider_data: Dict[str, Any]):
         super().load(provider_args, workflow_name, provider_data)
         self.before_run = self.provider_data.get("before_run")
-        self.python = self._save_python_version("python")
+        self.python = self._safe_python_version("python")
         self.version = self.provider_data.get("version")
         self.run_names = self.provider_data["runs"]
         self.logdir = self.provider_data.get("logdir")

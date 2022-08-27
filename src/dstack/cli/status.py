@@ -94,7 +94,7 @@ def print_runs(args: Namespace, backend: Backend):
                 _status_color(run, run.workflow_name or run.provider_name, False, False),
                 pretty_print_status(run),
                 _status_color(run, _app_heads(run.app_heads, run.status.name), False, False),
-                _status_color(run, '\n'.join([a.artifact_name for a in run.artifact_heads or []]), False, False),
+                _status_color(run, '\n'.join([a.artifact_path for a in run.artifact_heads or []]), False, False),
                 _status_color(run, submitted_at, False, False),
                 _status_color(run, f"{run.tag_name}" if run.tag_name else "", False, False))
     console.print(table)

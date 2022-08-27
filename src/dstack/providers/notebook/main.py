@@ -22,7 +22,7 @@ class NotebookProvider(Provider):
     def load(self, provider_args: List[str], workflow_name: Optional[str], provider_data: Dict[str, Any]):
         super().load(provider_args, workflow_name, provider_data)
         self.before_run = self.provider_data.get("before_run")
-        self.python = self._save_python_version("python")
+        self.python = self._safe_python_version("python")
         self.version = self.provider_data.get("version")
         self.requirements = self.provider_data.get("requirements")
         self.env = self._env()

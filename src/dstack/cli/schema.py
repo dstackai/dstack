@@ -15,8 +15,27 @@ properties:
         deps:
           type: array
           items:
-            type: string
-            minLength: 1
+            oneOf:
+              - type: string
+                minLength: 1
+              - type: object
+                properties:
+                  tag: 
+                    type: string
+                    minLength: 1
+                  mount:
+                    type: boolean
+                required:
+                  - tag                  
+              - type: object
+                properties:
+                  workflow: 
+                    type: string
+                    minLength: 1
+                  mount:
+                    type: boolean
+                required:
+                  - workflow                  
           minItems: 1
       additionalProperties: true
       required:

@@ -21,7 +21,8 @@ def create_run(s3_client: BaseClient, logs_client: BaseClient, bucket_name: str,
 
 def _create_run(ec2_client: BaseClient, repo_user_name, repo_name, job: Job, include_request_heads: bool) -> Run:
     app_heads = list(map(lambda a: AppHead(job.job_id, a.app_name), job.app_specs)) if job.app_specs else None
-    artifact_heads = list(map(lambda a: ArtifactHead(job.job_id, a), job.artifacts)) if job.artifacts else None
+    artifact_heads = list(
+        map(lambda a: ArtifactHead(job.job_id, a.artifact_path), job.artifact_specs)) if job.artifact_specs else None
     request_heads = None
     if include_request_heads and job.status.is_unfinished():
         if request_heads is None:
@@ -35,10 +36,10 @@ def _create_run(ec2_client: BaseClient, repo_user_name, repo_name, job: Job, inc
 
 def _update_run(ec2_client: BaseClient, run: Run, job: Job, include_request_heads: bool):
     run.submitted_at = min(run.submitted_at, job.submitted_at)
-    if job.artifacts:
+    if job.artifact_specs:
         if run.artifact_heads is None:
             run.artifact_heads = []
-        run.artifact_heads.extend(list(map(lambda a: ArtifactHead(job.job_id, a), job.artifacts)))
+        run.artifact_heads.extend(list(map(lambda a: ArtifactHead(job.job_id, a.artifact_path), job.artifact_specs)))
     if job.app_specs:
         if run.app_heads is None:
             run.app_heads = []

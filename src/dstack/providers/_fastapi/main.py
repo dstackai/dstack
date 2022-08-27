@@ -25,7 +25,7 @@ class FastAPIProvider(Provider):
         super().load(provider_args, workflow_name, provider_data)
         self.app = self.provider_data["app"]
         self.before_run = self.provider_data.get("before_run")
-        self.python = self._save_python_version("python")
+        self.python = self._safe_python_version("python")
         self.version = self.provider_data.get("version")
         self.uvicorn = self.provider_data.get("uvicorn")
         self.args = self.provider_data.get("args")

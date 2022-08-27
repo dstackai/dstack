@@ -4,10 +4,10 @@ import time
 from abc import abstractmethod
 from argparse import ArgumentParser, Namespace
 from pkgutil import iter_modules
-from typing import Optional, List, Dict, Any
+from typing import Optional, List, Dict, Any, Union
 
 from dstack.backend import load_backend, Backend
-from dstack.jobs import Job, JobStatus, JobSpec, Requirements, GpusRequirements, Dep
+from dstack.jobs import Job, JobStatus, JobSpec, Requirements, GpusRequirements, DepSpec, ArtifactSpec
 from dstack.repo import load_repo_data, RepoData
 from dstack.util import _quoted
 
@@ -41,7 +41,7 @@ class Provider:
         self.provider_args: Optional[List[str]] = None
         self.workflow_name: Optional[str] = None
         self.run_as_provider: Optional[bool] = None
-        self.deps: Optional[List[Dep]] = None
+        self.dep_specs: Optional[List[DepSpec]] = None
         self.loaded = False
 
     def __str__(self) -> str:
@@ -52,7 +52,7 @@ class Provider:
                f'run_as_provider={self.run_as_provider})'
 
     # TODO: This is a dirty hack
-    def _save_python_version(self, name: str):
+    def _safe_python_version(self, name: str):
         v = self.provider_data.get(name)
         if isinstance(v, str):
             return v
@@ -69,7 +69,7 @@ class Provider:
         self.provider_data = provider_data
         self.run_as_provider = not workflow_name
         self.parse_args()
-        self.deps = self._deps()
+        self.dep_specs = self._dep_specs()
         self.loaded = True
 
     @abstractmethod
@@ -156,58 +156,83 @@ class Provider:
             job = Job(None, repo_data, run_name, self.workflow_name or None,
                       self.provider_name, JobStatus.SUBMITTED, submitted_at,
                       job_spec.image_name, job_spec.commands, job_spec.env,
-                      job_spec.working_dir, job_spec.artifacts, job_spec.port_count, None, None,
-                      job_spec.requirements, self.deps, job_spec.master_job, job_spec.app_specs, None, None, None)
+                      job_spec.working_dir, job_spec.artifact_specs, job_spec.port_count, None, None,
+                      job_spec.requirements, self.dep_specs, job_spec.master_job, job_spec.app_specs, None, None, None)
             backend.submit_job(job, counter)
             jobs.append(job)
         return jobs
 
-    def _deps(self) -> Optional[List[Dep]]:
+    def _dep_specs(self) -> Optional[List[DepSpec]]:
         if self.provider_data.get("deps"):
             repo_data = load_repo_data()
             backend = load_backend()
-            return [self._parse_dep(dep, backend, repo_data) for dep in self.provider_data["deps"]]
+            return [self._parse_dep_spec(dep, backend, repo_data) for dep in self.provider_data["deps"]]
+        else:
+            return None
+
+    def _artifact_specs(self) -> Optional[List[ArtifactSpec]]:
+        if self.provider_data.get("artifacts"):
+            return [self._parse_artifact_spec(a) for a in self.provider_data["artifacts"]]
         else:
             return None
 
     @staticmethod
-    def _parse_dep(dep: str, backend: Backend, repo_data: RepoData) -> Dep:
-        if dep.startswith(":"):
-            tag_dep = True
-            dep = dep[1:]
+    def _parse_artifact_spec(artifact: Union[dict, str]) -> ArtifactSpec:
+        def remove_prefix(text: str, prefix: str) -> str:
+            if text.startswith(prefix):
+                return text[len(prefix):]
+            return text
+
+        if isinstance(artifact, str):
+            return ArtifactSpec(remove_prefix(artifact, "./"), False)
         else:
-            tag_dep = False
+            return ArtifactSpec(remove_prefix(artifact["path"], "./"), artifact.get("mount") is True)
+
+    @staticmethod
+    def _parse_dep_spec(dep: Union[dict, str], backend: Backend, repo_data: RepoData) -> DepSpec:
+        if isinstance(dep, str):
+            mount = False
+            if dep.startswith(":"):
+                tag_dep = True
+                dep = dep[1:]
+            else:
+                tag_dep = False
+        else:
+            mount = dep.get("mount") is True
+            tag_dep = dep.get("tag") is not None
+            dep = dep.get("tag") or dep.get("workflow")
         t = dep.split("/")
         if len(t) == 1:
             if tag_dep:
-                return Provider._tag_dep(backend, repo_data.repo_user_name, repo_data.repo_name, t[0])
+                return Provider._tag_dep(backend, repo_data.repo_user_name, repo_data.repo_name, t[0], mount)
             else:
-                return Provider._workflow_dep(backend, repo_data.repo_user_name, repo_data.repo_name, t[0])
+                return Provider._workflow_dep(backend, repo_data.repo_user_name, repo_data.repo_name, t[0], mount)
         elif len(t) == 3:
             if tag_dep:
-                return Provider._tag_dep(backend, t[0], t[1], t[2])
+                return Provider._tag_dep(backend, t[0], t[1], t[2], mount)
             else:
-                return Provider._workflow_dep(backend, t[0], t[1], t[2])
+                return Provider._workflow_dep(backend, t[0], t[1], t[2], mount)
         else:
             sys.exit(f"Invalid dep format: {dep}")
 
     @staticmethod
-    def _tag_dep(backend: Backend, repo_user_name: str, repo_name: str, tag_name: str) -> Dep:
+    def _tag_dep(backend: Backend, repo_user_name: str, repo_name: str, tag_name: str, mount: bool) -> DepSpec:
         tag_head = backend.get_tag_head(repo_user_name, repo_name, tag_name)
         if tag_head:
-            return Dep(repo_user_name, repo_name, tag_head.run_name)
+            return DepSpec(repo_user_name, repo_name, tag_head.run_name, mount)
         else:
             sys.exit(f"Cannot find the tag '{tag_name}' in the '{repo_user_name}/{repo_name}' repo")
 
     @staticmethod
-    def _workflow_dep(backend: Backend, repo_user_name: str, repo_name: str, workflow_name: str) -> Dep:
+    def _workflow_dep(backend: Backend, repo_user_name: str, repo_name: str, workflow_name: str,
+                      mount: bool) -> DepSpec:
         job_heads = sorted(backend.list_job_heads(repo_user_name, repo_name),
                            key=lambda j: j.submitted_at, reverse=True)
         run_name = next(iter([job_head.run_name for job_head in job_heads if
                               job_head.workflow_name == workflow_name and job_head.status == JobStatus.DONE]),
                         None)
         if run_name:
-            return Dep(repo_user_name, repo_name, run_name)
+            return DepSpec(repo_user_name, repo_name, run_name, mount)
         else:
             sys.exit(f"Cannot find any successful workflow with the name '{workflow_name}' "
                      f"in the '{repo_user_name}/{repo_name}' repo")
@@ -272,7 +297,8 @@ class Provider:
 
 
 def get_provider_names() -> List[str]:
-    return list(map(lambda m: m[1], filter(lambda m: m.ispkg and not m[1].startswith("_"), iter_modules(sys.modules[__name__].__path__))))
+    return list(map(lambda m: m[1], filter(lambda m: m.ispkg and not m[1].startswith("_"),
+                                           iter_modules(sys.modules[__name__].__path__))))
 
 
 def load_provider(provider_name) -> Provider:

@@ -11,7 +11,7 @@ class DockerProvider(Provider):
         self.image_name = None
         self.before_run = None
         self.commands = None
-        self.artifacts = None
+        self.artifact_specs = None
         self.env = None
         self.working_dir = None
         self.ports = None
@@ -22,7 +22,7 @@ class DockerProvider(Provider):
         self.image_name = self.provider_data["image"]
         self.before_run = self.provider_data.get("before_run")
         self.commands = self.provider_data.get("commands")
-        self.artifacts = self.provider_data.get("artifacts")
+        self.artifact_specs = self._artifact_specs()
         self.env = self.provider_data.get("env")
         self.working_dir = self.provider_data.get("working_dir")
         self.ports = self.provider_data.get("ports")
@@ -68,7 +68,7 @@ class DockerProvider(Provider):
             commands=commands,
             env=self.env,
             working_dir=self.working_dir,
-            artifacts=self.artifacts,
+            artifact_specs=self.artifact_specs,
             port_count=self.ports,
             requirements=self.resources,
             app_specs=apps

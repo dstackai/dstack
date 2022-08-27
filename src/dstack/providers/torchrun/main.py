@@ -11,10 +11,10 @@ class TorchrunProvider(Provider):
         super().__init__("torchrun")
         self.script = None
         self.before_run = None
-        self.version = None
+        self.python = None
         self.requirements = None
         self.env = None
-        self.artifacts = None
+        self.artifact_specs = None
         self.working_dir = None
         self.nodes = None
         self.resources = None
@@ -24,10 +24,10 @@ class TorchrunProvider(Provider):
         super().load(provider_args, workflow_name, provider_data)
         self.script = self.provider_data.get("script") or self.provider_data.get("file")
         self.before_run = self.provider_data.get("before_run")
-        self.version = str(self.provider_data.get("version") or "3.9")
+        self.python = self._safe_python_version("python")
         self.requirements = self.provider_data.get("requirements")
         self.env = self._env()
-        self.artifacts = self.provider_data.get("artifacts")
+        self.artifact_specs = self._artifact_specs()
         self.working_dir = self.provider_data.get("working_dir")
         self.nodes = self.provider_data.get("nodes") or 1
         self.resources = self._resources()
@@ -39,8 +39,11 @@ class TorchrunProvider(Provider):
             resources.gpu = GpusRequirements(1)
         return resources
 
-    def _image_name(self):
-        return f"dstackai/miniconda:{self.version}-cuda-11.1"
+    def _image_name(self) -> str:
+        cuda_is_required = self.resources and self.resources.gpus
+        cuda_image_name = f"dstackai/miniconda:{self.python}-cuda-11.1"
+        cpu_image_name = f"dstackai/miniconda:{self.python}"
+        return cuda_image_name if cuda_is_required else cpu_image_name
 
     def _commands(self, node_rank):
         commands = []
@@ -75,7 +78,7 @@ class TorchrunProvider(Provider):
             commands=self._commands(0),
             env=self.env,
             working_dir=self.working_dir,
-            artifacts=self.artifacts,
+            artifact_specs=self.artifact_specs,
             requirements=self.resources,
             port_count=1,
         )
