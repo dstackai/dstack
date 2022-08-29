@@ -48,9 +48,9 @@ def add_tag_func(args: Namespace):
             sys.exit(f"The tag '{args.tag_name}' already exists")
         else:
             if args.run_name:
-                backend.create_tag_from_run(repo_data.repo_user_name, repo_data.repo_name, args.tag_name, args.run_name)
+                backend.add_tag_from_run(repo_data.repo_user_name, repo_data.repo_name, args.tag_name, args.run_name)
             else:
-                backend.create_tag_from_local_dirs(repo_data, args.tag_name, args.local_dirs)
+                backend.add_tag_from_local_dirs(repo_data, args.tag_name, args.local_dirs)
         print(f"[grey58]OK[/]")
     except ConfigError:
         sys.exit(f"Call 'dstack config' first")
@@ -64,7 +64,7 @@ def delete_tag_func(args: Namespace):
         if not tag_head:
             sys.exit(f"The tag '{args.tag_name}' doesn't exist")
         elif Confirm.ask(f" [red]Delete the tag '{tag_head.tag_name}'?[/]"):
-            backend.delete_tag(repo_data.repo_user_name, repo_data.repo_name, tag_head)
+            backend.delete_tag_head(repo_data.repo_user_name, repo_data.repo_name, tag_head)
             print(f"[grey58]OK[/]")
     except ConfigError:
         sys.exit(f"Call 'dstack config' first")

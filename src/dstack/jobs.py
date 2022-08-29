@@ -143,8 +143,8 @@ class DepSpec:
 
 
 class ArtifactSpec:
-    def __init__(self, path: str, mount: bool):
-        self.artifact_path = path
+    def __init__(self, artifact_path: str, mount: bool):
+        self.artifact_path = artifact_path
         self.mount = mount
 
     def __str__(self) -> str:

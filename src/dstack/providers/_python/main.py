@@ -16,7 +16,7 @@ class PythonProvider(Provider):
         self.args = None
         self.requirements = None
         self.env = None
-        self.artifacts = None
+        self.artifact_specs = None
         self.working_dir = None
         self.resources = None
         self.image_name = None
@@ -29,7 +29,7 @@ class PythonProvider(Provider):
         self.args = self.provider_data.get("args")
         self.requirements = self.provider_data.get("requirements")
         self.env = self._env()
-        self.artifacts = self.provider_data.get("artifacts")
+        self.artifact_specs = self._artifact_specs()
         self.working_dir = self.provider_data.get("working_dir")
         self.resources = self._resources()
         self.image_name = self._image_name()
@@ -58,7 +58,7 @@ class PythonProvider(Provider):
             commands=self._commands(),
             env=self.env,
             working_dir=self.working_dir,
-            artifacts=self.artifacts,
+            artifact_specs=self.artifact_specs,
             requirements=self.resources,
         )]
 

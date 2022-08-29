@@ -7,7 +7,7 @@ from botocore.client import BaseClient
 
 from dstack.aws import jobs, runs, artifacts, repos
 from dstack.backend import TagHead, BackendError, ArtifactHead
-from dstack.jobs import Job, JobStatus
+from dstack.jobs import Job, JobStatus, ArtifactSpec
 from dstack.repo import RepoData
 
 
@@ -80,8 +80,8 @@ def create_tag_from_run(s3_client: BaseClient, bucket_name: str, repo_user_name:
         sys.exit(f"Cannot find the run '{run_name}'")
     tag_head = TagHead(repo_user_name, repo_name, tag_name, run_name, tag_jobs[0].workflow_name,
                        tag_jobs[0].provider_name, int(round(time.time() * 1000)),
-                       [ArtifactHead(run_job.job_id, artifact) for run_job in tag_jobs for artifact in
-                        run_job.artifacts or []] or None)
+                       [ArtifactHead(run_job.job_id, artifact_spec.artifact_path) for run_job in tag_jobs for
+                        artifact_spec in run_job.artifact_specs or []] or None)
     s3_client.put_object(Body="", Bucket=bucket_name, Key=_tag_head_key(tag_head))
 
     for job in tag_jobs:
@@ -118,14 +118,16 @@ def create_tag_from_local_dirs(s3_client: BaseClient, logs_client: BaseClient, b
 
     run_name = runs.create_run(s3_client, logs_client, bucket_name, repo_data.repo_user_name, repo_data.repo_name)
     job = Job(None, repo_data, run_name, None, "bash", JobStatus.DONE, int(round(time.time() * 1000)), "scratch",
-              None, None, None, tag_artifacts, None, None, None, None, None, None, None, None, None, tag_name)
+              None, None, None, [ArtifactSpec(a, False) for a in tag_artifacts], None, None, None, None, None, None,
+              None, None, None, tag_name)
     jobs.create_job(s3_client, bucket_name, job, create_head=False)
     for index, local_path in enumerate(local_paths):
         artifacts.upload_job_artifact_files(s3_client, bucket_name, repo_data.repo_user_name, repo_data.repo_name,
                                             job.job_id, tag_artifacts[index], local_path)
     tag_head = TagHead(repo_data.repo_user_name, repo_data.repo_name, tag_name, run_name, job.workflow_name,
                        job.provider_name, job.submitted_at,
-                       [ArtifactHead(job.job_id, a) for a in job.artifacts] if job.artifacts else None)
+                       [ArtifactHead(job.job_id, a.artifact_path) for a in
+                        job.artifact_specs] if job.artifact_specs else None)
     tag_head_key = _tag_head_key(tag_head)
     s3_client.put_object(Body="", Bucket=bucket_name, Key=tag_head_key)
     repos.increment_repo_tags_count(s3_client, bucket_name, repo_data.repo_user_name, repo_data.repo_name)

@@ -5,12 +5,14 @@ from fastapi import FastAPI
 from starlette.responses import HTMLResponse
 from starlette.staticfiles import StaticFiles
 
-from dstack.dashboard import repos, runs, artifacts
+from dstack.dashboard import repos, runs, artifacts, secrets, tags
 
 app = FastAPI(docs_url="/api/docs")
 app.include_router(repos.router)
 app.include_router(runs.router)
 app.include_router(artifacts.router)
+app.include_router(secrets.router)
+app.include_router(tags.router)
 
 
 @app.on_event("startup")
@@ -21,6 +23,7 @@ async def startup_event():
 app.mount("/", StaticFiles(packages=["dstack.dashboard"], html=True), name="static")
 
 
+# noinspection PyUnusedLocal
 @app.exception_handler(404)
 async def custom_http_exception_handler(request, exc):
     return HTMLResponse(pkg_resources.resource_string(__name__, 'statics/index.html'))

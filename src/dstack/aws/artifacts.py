@@ -116,8 +116,8 @@ def upload_job_artifact_files(s3_client: BaseClient, bucket_name: str, repo_user
                 )
 
 
-def list_run_artifact_objects(s3_client: BaseClient, bucket_name: str, repo_user_name: str, repo_name: str,
-                              job_id: str, path: str) -> List[Tuple[str, bool]]:
+def list_run_artifact_files_and_folders(s3_client: BaseClient, bucket_name: str, repo_user_name: str, repo_name: str,
+                                        job_id: str, path: str) -> List[Tuple[str, bool]]:
     prefix = f"artifacts/{repo_user_name}/{repo_name}/{job_id}/" + path + ("" if path.endswith("/") else "/")
     response = s3_client.list_objects(Bucket=bucket_name, Prefix=prefix, Delimiter="/")
     folders = []

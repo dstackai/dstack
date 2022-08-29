@@ -14,7 +14,7 @@ class NotebookProvider(Provider):
         self.version = None
         self.requirements = None
         self.env = None
-        self.artifacts = None
+        self.artifact_specs = None
         self.working_dir = None
         self.resources = None
         self.image_name = None
@@ -26,7 +26,7 @@ class NotebookProvider(Provider):
         self.version = self.provider_data.get("version")
         self.requirements = self.provider_data.get("requirements")
         self.env = self._env()
-        self.artifacts = self.provider_data.get("artifacts")
+        self.artifact_specs = self._artifact_specs()
         self.working_dir = self.provider_data.get("working_dir")
         self.resources = self._resources()
         self.image_name = self._image()
@@ -51,7 +51,7 @@ class NotebookProvider(Provider):
             env=env,
             working_dir=self.working_dir,
             requirements=self.resources,
-            artifacts=self.artifacts,
+            artifact_specs=self.artifact_specs,
             port_count=1,
             app_specs=[AppSpec(
                 port_index=0,

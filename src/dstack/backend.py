@@ -227,13 +227,13 @@ class Backend(ABC):
     def get_tag_head(self, repo_user_name: str, repo_name: str, tag_name: str) -> Optional[TagHead]:
         pass
 
-    def create_tag_from_run(self, repo_user_name: str, repo_name: str, tag_name: str, run_name: str):
+    def add_tag_from_run(self, repo_user_name: str, repo_name: str, tag_name: str, run_name: str):
         pass
 
-    def create_tag_from_local_dirs(self, repo_data: RepoData, tag_name: str, local_dirs: List[str]):
+    def add_tag_from_local_dirs(self, repo_data: RepoData, tag_name: str, local_dirs: List[str]):
         pass
 
-    def delete_tag(self, repo_user_name: str, repo_name: str, tag_head: TagHead):
+    def delete_tag_head(self, repo_user_name: str, repo_name: str, tag_head: TagHead):
         pass
 
     def list_repo_heads(self) -> List[RepoHead]:
@@ -248,11 +248,14 @@ class Backend(ABC):
     def decrement_repo_tags_count(self, repo_user_name: str, repo_name: str):
         pass
 
+    def delete_repo(self, repo_user_name: str, repo_name):
+        pass
+
     def save_repo_credentials(self, repo_user_name: str, repo_name: str, repo_credentials: RepoCredentials):
         pass
 
-    def list_run_artifact_objects(self, repo_user_name: str, repo_name: str, job_id: str,
-                                  path: str) -> List[Tuple[str, bool]]:
+    def list_run_artifact_files_and_folders(self, repo_user_name: str, repo_name: str, job_id: str,
+                                            path: str) -> List[Tuple[str, bool]]:
         pass
 
     def list_secret_names(self) -> List[str]:

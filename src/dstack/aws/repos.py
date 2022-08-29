@@ -66,6 +66,14 @@ def decrement_repo_tags_count(s3_client: BaseClient, bucket_name: str, repo_user
         raise Exception(f"No repo head is found: {repo_user_name}/{repo_name}")
 
 
+def delete_repo(s3_client: BaseClient, bucket_name: str, repo_user_name: str, repo_name: str):
+    repo_head_prefix = f"repos/l;{repo_user_name};{repo_name};"
+    response = s3_client.list_objects_v2(Bucket=bucket_name, Prefix=repo_head_prefix)
+    if "Contents" in response:
+        for obj in response["Contents"]:
+            s3_client.delete_object(Bucket=bucket_name, Key=obj["Key"])
+
+
 def save_repo_credentials(sts_client: BaseClient, iam_client: BaseClient, secretsmanager_client: BaseClient,
                           bucket_name: str, repo_user_name: str, repo_name: str,
                           repo_credentials: RepoCredentials):

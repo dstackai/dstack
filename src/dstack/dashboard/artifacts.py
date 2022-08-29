@@ -5,22 +5,22 @@ from pydantic import BaseModel
 
 from dstack.backend import load_backend
 
-router = APIRouter(prefix="/api/artifacts")
+router = APIRouter(prefix="/api/artifacts", tags=["artifacts"])
 
 
-class ArtifactObjectModel(BaseModel):
-    object_name: str
+class ArtifactFileItem(BaseModel):
+    name: str
     folder: bool
 
 
-class ArtifactObjectListModel(BaseModel):
-    objects: List[ArtifactObjectModel]
+class BrowseArtifactsRequest(BaseModel):
+    objects: List[ArtifactFileItem]
 
 
-@router.get("/objects", response_model=ArtifactObjectListModel)
-async def objects(repo_user_name: str, repo_name: str, job_id: str, path: str) -> ArtifactObjectListModel:
+@router.get("/browse", response_model=BrowseArtifactsRequest)
+async def query(repo_user_name: str, repo_name: str, job_id: str, path: str) -> BrowseArtifactsRequest:
     backend = load_backend()
-    objects = backend.list_run_artifact_objects(repo_user_name, repo_name, job_id, path)
-    return ArtifactObjectListModel(
-        objects=[ArtifactObjectModel(object_name=object_name,
-                                     folder=folder) for object_name, folder in objects])
+    files_and_folders = backend.list_run_artifact_files_and_folders(repo_user_name, repo_name, job_id, path)
+    return BrowseArtifactsRequest(
+        objects=[ArtifactFileItem(name=file_or_folder_name,
+                                  folder=folder) for file_or_folder_name, folder in files_and_folders])
