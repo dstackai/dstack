@@ -90,8 +90,8 @@ def _filter_log_events_loop(ec2_client: BaseClient, s3_client: BaseClient, logs_
             time.sleep(POLL_LOGS_RATE_SECS)
             counter = counter + 1
             if counter % 3 == 0:
-                run = next(iter(runs.get_runs(ec2_client, s3_client, bucket_name, repo_user_name, repo_name,
-                                              job_heads, include_request_heads=False)))
+                run = next(iter(runs.get_run_heads(ec2_client, s3_client, bucket_name, repo_user_name, repo_name,
+                                                   job_heads, include_request_heads=False)))
                 if run.status.is_finished():
                     break
 

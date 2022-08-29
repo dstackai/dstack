@@ -123,9 +123,9 @@ def unserialize_job(job_data: dict) -> Job:
     master_job = JobRefId(job_data["master_job_id"]) if job_data.get("master_job_id") else None
     app_specs = ([AppSpec(a["port_index"], a["app_name"], a.get("url_path") or None, a.get("url_query_params") or None)
                   for a in (job_data.get("apps") or [])]) or None
-    job = Job(job_data.get("job_id"), RepoData(job_data["repo_user_name"], job_data["repo_name"],
-                                               job_data["repo_branch"], job_data["repo_hash"],
-                                               job_data["repo_diff"] or None),
+    job = Job(job_data["job_id"], RepoData(job_data["repo_user_name"], job_data["repo_name"],
+                                           job_data["repo_branch"], job_data["repo_hash"],
+                                           job_data["repo_diff"] or None),
               job_data["run_name"], job_data.get("workflow_name") or None, job_data["provider_name"],
               JobStatus(job_data["status"]), job_data["submitted_at"], job_data["image_name"],
               job_data.get("commands") or None, job_data["env"] or None, job_data.get("working_dir") or None,
@@ -167,7 +167,6 @@ def get_job(s3_client: BaseClient, bucket_name: str, repo_user_name: str, repo_n
     try:
         obj = s3_client.get_object(Bucket=bucket_name, Key=key)
         job = unserialize_job(yaml.load(obj['Body'].read().decode('utf-8'), yaml.FullLoader))
-        job.set_id(job_id)
         return job
     except Exception as e:
         if hasattr(e, "response") and e.response.get("Error") and e.response["Error"].get("Code") == "NoSuchKey":
@@ -189,7 +188,7 @@ def update_job(s3_client: BaseClient, bucket_name: str, job: Job):
 
 
 def list_job_heads(s3_client: BaseClient, bucket_name: str, repo_user_name: str, repo_name: str,
-                   run_name: Optional[str] = None):
+                   run_name: Optional[str] = None) -> List[JobHead]:
     prefix = f"jobs/{repo_user_name}/{repo_name}"
     job_head_key_prefix = f"{prefix}/l;"
     job_head_key_run_prefix = job_head_key_prefix + run_name if run_name else job_head_key_prefix
@@ -205,6 +204,19 @@ def list_job_heads(s3_client: BaseClient, bucket_name: str, repo_user_name: str,
                                      artifacts.split(',') if artifacts else None, tag_name or None,
                                      app_names or None))
     return job_heads
+
+
+def list_jobs(s3_client: BaseClient, bucket_name: str, repo_user_name: str, repo_name: str,
+              run_name: Optional[str] = None) -> List[Job]:
+    job_key_run_prefix = f"jobs/{repo_user_name}/{repo_name}/{run_name},"
+    response = s3_client.list_objects_v2(Bucket=bucket_name, Prefix=job_key_run_prefix)
+    jobs = []
+    if "Contents" in response:
+        for obj in response["Contents"]:
+            job_obj = s3_client.get_object(Bucket=bucket_name, Key=obj["Key"])
+            job = unserialize_job(yaml.load(job_obj['Body'].read().decode('utf-8'), yaml.FullLoader))
+            jobs.append(job)
+    return jobs
 
 
 def delete_job_head(s3_client: BaseClient, bucket_name: str, repo_user_name: str, repo_name: str, job_id: str):

@@ -1,6 +1,6 @@
 from typing import Optional, List
 
-from fastapi import APIRouter
+from fastapi import APIRouter, HTTPException
 from pydantic import BaseModel
 
 from dstack.backend import load_backend
@@ -24,7 +24,7 @@ class RequestHeadItem(BaseModel):
     message: Optional[str]
 
 
-class RunItem(BaseModel):
+class RunHeadItem(BaseModel):
     repo_user_name: str
     repo_name: str
     run_name: str
@@ -38,16 +38,37 @@ class RunItem(BaseModel):
     requests: Optional[List[RequestHeadItem]]
 
 
+class RunItem(BaseModel):
+    repo_user_name: str
+    repo_name: str
+    repo_branch: str
+    repo_hash: str
+    repo_diff: str
+    run_name: str
+    workflow_name: Optional[str]
+    provider_name: str
+    artifacts: Optional[List[ArtifactHeadItem]]
+    status: str
+    submitted_at: int
+    tag_name: Optional[str]
+    apps: Optional[List[AppHeadItem]]
+    requests: Optional[List[RequestHeadItem]]
+
+
 class QueryRunsResponse(BaseModel):
-    runs: List[RunItem]
+    runs: List[RunHeadItem]
+
+
+class GetRunResponse(BaseModel):
+    run: RunItem
 
 
 @router.get("/query", response_model=QueryRunsResponse)
 async def query(repo_user_name: str, repo_name: str) -> QueryRunsResponse:
     backend = load_backend()
-    runs = backend.list_runs(repo_user_name, repo_name, include_request_heads=True)
+    runs = backend.list_run_heads(repo_user_name, repo_name, include_request_heads=True)
     return QueryRunsResponse(
-        runs=[RunItem(
+        runs=[RunHeadItem(
             repo_user_name=r.repo_user_name,
             repo_name=r.repo_name,
             run_name=r.run_name,
@@ -62,6 +83,36 @@ async def query(repo_user_name: str, repo_name: str) -> QueryRunsResponse:
                   for a in r.app_heads] if r.app_heads else None,
             requests=[RequestHeadItem(job_id=r.job_id, status=r.status.value, message=r.message)
                       for r in r.request_heads] if r.request_heads else None) for r in runs])
+
+
+@router.get("/get", response_model=GetRunResponse)
+async def get(repo_user_name: str, repo_name: str, run_name: str) -> GetRunResponse:
+    backend = load_backend()
+    job_heads = backend.list_job_heads(repo_user_name, repo_name, run_name)
+    if job_heads:
+        r = backend.get_run_heads(repo_user_name, repo_name, job_heads)[0]
+        j = backend.get_job(repo_user_name, repo_name, job_heads[0].job_id)
+        return GetRunResponse(
+            run=RunItem(
+                repo_user_name=r.repo_user_name,
+                repo_name=r.repo_name,
+                repo_branch=j.repo_data.repo_branch,
+                repo_hash=j.repo_data.repo_hash,
+                repo_diff=j.repo_data.repo_diff,
+                run_name=r.run_name,
+                workflow_name=r.workflow_name,
+                provider_name=r.provider_name,
+                artifacts=[ArtifactHeadItem(job_id=a.job_id, artifact_name=a.artifact_path)
+                           for a in r.artifact_heads] if r.artifact_heads else None,
+                status=r.status.value,
+                submitted_at=r.submitted_at,
+                tag_name=r.tag_name,
+                apps=[AppHeadItem(job_id=a.job_id, app_name=a.app_name)
+                      for a in r.app_heads] if r.app_heads else None,
+                requests=[RequestHeadItem(job_id=r.job_id, status=r.status.value, message=r.message)
+                          for r in r.request_heads] if r.request_heads else None))
+    else:
+        raise HTTPException(status_code=404, detail="Run not found")
 
 
 class StopRunRequest(BaseModel):

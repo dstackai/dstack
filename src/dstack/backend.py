@@ -55,7 +55,7 @@ class ArtifactHead:
         return f'ArtifactHead(job_id="{self.job_id}", artifact_name="{self.artifact_path})'
 
 
-class Run:
+class RunHead:
     def __init__(self, repo_user_name: str, repo_name: str, run_name: str, workflow_name: Optional[str],
                  provider_name: str, artifact_heads: Optional[List[ArtifactHead]], status: JobStatus, submitted_at: int,
                  tag_name: Optional[str], app_heads: Optional[List[AppHead]],
@@ -175,6 +175,9 @@ class Backend(ABC):
     def list_job_heads(self, repo_user_name: str, repo_name: str, run_name: Optional[str] = None) -> List[JobHead]:
         pass
 
+    def list_jobs(self, repo_user_name: str, repo_name: str, run_name: str) -> List[Job]:
+        pass
+
     def run_job(self, job: Job) -> Runner:
         pass
 
@@ -202,12 +205,12 @@ class Backend(ABC):
         for job_head in job_heads:
             self.delete_job_head(repo_user_name, repo_name, job_head.job_id)
 
-    def list_runs(self, repo_user_name: str, repo_name: str, run_name: Optional[str] = None,
-                  include_request_heads: bool = True) -> List[Run]:
+    def list_run_heads(self, repo_user_name: str, repo_name: str, run_name: Optional[str] = None,
+                       include_request_heads: bool = True) -> List[RunHead]:
         pass
 
-    def get_runs(self, repo_user_name: str, repo_name: str, job_heads: List[JobHead],
-                 include_request_heads: bool = True) -> List[Run]:
+    def get_run_heads(self, repo_user_name: str, repo_name: str, job_heads: List[JobHead],
+                      include_request_heads: bool = True) -> List[RunHead]:
         pass
 
     def poll_logs(self, repo_user_name: str, repo_name: str, run_name: str, start_time: int,

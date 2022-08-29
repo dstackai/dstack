@@ -13,7 +13,7 @@ class ArtifactHeadItem(BaseModel):
     artifact_path: str
 
 
-class TagItem(BaseModel):
+class TagHeadItem(BaseModel):
     repo_user_name: str
     repo_name: str
     tag_name: str
@@ -24,8 +24,22 @@ class TagItem(BaseModel):
     artifact_heads: Optional[List[ArtifactHeadItem]]
 
 
+class TagItem(BaseModel):
+    repo_user_name: str
+    repo_name: str
+    repo_branch: str
+    repo_hash: str
+    repo_diff: str
+    tag_name: str
+    run_name: str
+    workflow_name: Optional[str]
+    provider_name: Optional[str]
+    created_at: int
+    artifact_heads: Optional[List[ArtifactHeadItem]]
+
+
 class QueryTagsResponse(BaseModel):
-    tags: List[TagItem]
+    tags: List[TagHeadItem]
 
 
 class DeleteTagRequest(BaseModel):
@@ -41,22 +55,51 @@ class AddTagRequest(BaseModel):
     tag_name: str
 
 
+class GetTagResponse(BaseModel):
+    tag: TagItem
+
+
 @router.get("/query", response_model=QueryTagsResponse)
 async def query(repo_user_name: str, repo_name: str) -> QueryTagsResponse:
     backend = load_backend()
     tag_heads = backend.list_tag_heads(repo_user_name, repo_name)
     return QueryTagsResponse(
-        tags=[TagItem(repo_user_name=t.repo_user_name,
-                      repo_name=t.repo_name,
-                      tag_name=t.tag_name,
-                      run_name=t.run_name,
-                      workflow_name=t.workflow_name,
-                      provider_name=t.provider_name,
-                      created_at=t.created_at,
-                      artifact_heads=[
-                          ArtifactHeadItem(job_id=a.job_id, artifact_path=a.artifact_path)
-                          for a in t.artifact_heads
-                      ] if t.artifact_heads else None) for t in tag_heads])
+        tags=[TagHeadItem(repo_user_name=t.repo_user_name,
+                          repo_name=t.repo_name,
+                          tag_name=t.tag_name,
+                          run_name=t.run_name,
+                          workflow_name=t.workflow_name,
+                          provider_name=t.provider_name,
+                          created_at=t.created_at,
+                          artifact_heads=[
+                              ArtifactHeadItem(job_id=a.job_id, artifact_path=a.artifact_path)
+                              for a in t.artifact_heads
+                          ] if t.artifact_heads else None) for t in tag_heads])
+
+
+@router.get("/get", response_model=GetTagResponse)
+async def query(repo_user_name: str, repo_name: str, tag_name: str) -> GetTagResponse:
+    backend = load_backend()
+    t = backend.get_tag_head(repo_user_name, repo_name, tag_name)
+    if t:
+        j = backend.list_jobs(repo_user_name, repo_name, t.run_name)[0]
+        return GetTagResponse(
+            tag=TagItem(repo_user_name=t.repo_user_name,
+                        repo_name=t.repo_name,
+                        repo_branch=j.repo_data.repo_branch,
+                        repo_hash=j.repo_data.repo_hash,
+                        repo_diff=j.repo_data.repo_diff,
+                        tag_name=t.tag_name,
+                        run_name=t.run_name,
+                        workflow_name=t.workflow_name,
+                        provider_name=t.provider_name,
+                        created_at=t.created_at,
+                        artifact_heads=[
+                            ArtifactHeadItem(job_id=a.job_id, artifact_path=a.artifact_path)
+                            for a in t.artifact_heads
+                        ] if t.artifact_heads else None))
+    else:
+        raise HTTPException(status_code=404, detail="Tag not found")
 
 
 @router.post("/delete")

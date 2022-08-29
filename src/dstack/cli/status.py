@@ -8,7 +8,7 @@ from git import InvalidGitRepositoryError
 from rich.console import Console
 from rich.table import Table
 
-from dstack.backend import load_backend, Backend, Run, RequestStatus
+from dstack.backend import load_backend, Backend, RunHead, RequestStatus
 from dstack.cli.common import pretty_date
 from dstack.config import ConfigError
 from dstack.jobs import JobStatus
@@ -28,7 +28,7 @@ _status_colors = {
 }
 
 
-def _status_color(run: Run, val: str, run_column: bool, status_column: bool):
+def _status_color(run: RunHead, val: str, run_column: bool, status_column: bool):
     if status_column and _has_request_status(run, [RequestStatus.TERMINATED, RequestStatus.NO_CAPACITY]):
         color = "dark_orange"
     else:
@@ -50,7 +50,7 @@ def status_func(args: Namespace):
         sys.exit(f"{os.getcwd()} is not a Git repo")
 
 
-def pretty_print_status(run: Run) -> str:
+def pretty_print_status(run: RunHead) -> str:
     status_color = _status_colors.get(run.status)
     status = run.status.value
     status = status[:1].upper() + status[1:]
@@ -65,7 +65,7 @@ def pretty_print_status(run: Run) -> str:
 def print_runs(args: Namespace, backend: Backend):
     repo_data = load_repo_data()
     job_heads = backend.list_job_heads(repo_data.repo_user_name, repo_data.repo_name, args.run_name)
-    runs = backend.get_runs(repo_data.repo_user_name, repo_data.repo_name, job_heads)
+    runs = backend.get_run_heads(repo_data.repo_user_name, repo_data.repo_name, job_heads)
     if not args.all:
         unfinished = any(run.status.is_unfinished() for run in runs)
         if unfinished:

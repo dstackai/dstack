@@ -60,6 +60,10 @@ class AwsBackend(Backend):
         return jobs.list_job_heads(self._s3_client(), self.backend_config.bucket_name, repo_user_name, repo_name,
                                    run_name)
 
+    def list_jobs(self, repo_user_name: str, repo_name: str, run_name: str) -> List[Job]:
+        return jobs.list_jobs(self._s3_client(), self.backend_config.bucket_name, repo_user_name, repo_name,
+                              run_name)
+
     def run_job(self, job: Job) -> Runner:
         return runners.run_job(self._ec2_client(), self._iam_client(), self._s3_client(),
                                self.backend_config.bucket_name, self.backend_config.region_name, job)
@@ -74,15 +78,15 @@ class AwsBackend(Backend):
     def delete_job_head(self, repo_user_name: str, repo_name: str, job_id: str):
         jobs.delete_job_head(self._s3_client(), self.backend_config.bucket_name, repo_user_name, repo_name, job_id)
 
-    def list_runs(self, repo_user_name: str, repo_name: str, run_name: Optional[str] = None,
-                  include_request_heads: bool = True) -> List[Run]:
-        return runs.list_runs(self._ec2_client(), self._s3_client(), self.backend_config.bucket_name, repo_user_name,
-                              repo_name, run_name, include_request_heads)
+    def list_run_heads(self, repo_user_name: str, repo_name: str, run_name: Optional[str] = None,
+                       include_request_heads: bool = True) -> List[RunHead]:
+        return runs.list_run_heads(self._ec2_client(), self._s3_client(), self.backend_config.bucket_name,
+                                   repo_user_name, repo_name, run_name, include_request_heads)
 
-    def get_runs(self, repo_user_name: str, repo_name: str, job_heads: List[JobHead],
-                 include_request_heads: bool = True) -> List[Run]:
-        return runs.get_runs(self._ec2_client(), self._s3_client(), self.backend_config.bucket_name, repo_user_name,
-                             repo_name, job_heads, include_request_heads)
+    def get_run_heads(self, repo_user_name: str, repo_name: str, job_heads: List[JobHead],
+                      include_request_heads: bool = True) -> List[RunHead]:
+        return runs.get_run_heads(self._ec2_client(), self._s3_client(), self.backend_config.bucket_name,
+                                  repo_user_name, repo_name, job_heads, include_request_heads)
 
     def poll_logs(self, repo_user_name: str, repo_name: str, job_heads: List[JobHead], start_time: int,
                   attached: bool) -> Generator[LogEvent, None, None]:

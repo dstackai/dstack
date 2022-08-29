@@ -4,7 +4,7 @@ from botocore.client import BaseClient
 
 from dstack import random_name
 from dstack.aws import run_names, logs, jobs, runners
-from dstack.backend import Run, AppHead, ArtifactHead
+from dstack.backend import RunHead, AppHead, ArtifactHead
 from dstack.jobs import JobHead, Job
 
 
@@ -19,7 +19,7 @@ def create_run(s3_client: BaseClient, logs_client: BaseClient, bucket_name: str,
     return run_name
 
 
-def _create_run(ec2_client: BaseClient, repo_user_name, repo_name, job: Job, include_request_heads: bool) -> Run:
+def _create_run(ec2_client: BaseClient, repo_user_name, repo_name, job: Job, include_request_heads: bool) -> RunHead:
     app_heads = list(map(lambda a: AppHead(job.job_id, a.app_name), job.app_specs)) if job.app_specs else None
     artifact_heads = list(
         map(lambda a: ArtifactHead(job.job_id, a.artifact_path), job.artifact_specs)) if job.artifact_specs else None
@@ -28,13 +28,13 @@ def _create_run(ec2_client: BaseClient, repo_user_name, repo_name, job: Job, inc
         if request_heads is None:
             request_heads = []
         request_heads.append(runners.request_head(ec2_client, job))
-    run = Run(repo_user_name, repo_name, job.run_name, job.workflow_name, job.provider_name,
-              artifact_heads or None, job.status, job.submitted_at, job.tag_name,
-              app_heads, request_heads)
-    return run
+    run_head = RunHead(repo_user_name, repo_name, job.run_name, job.workflow_name, job.provider_name,
+                       artifact_heads or None, job.status, job.submitted_at, job.tag_name,
+                       app_heads, request_heads)
+    return run_head
 
 
-def _update_run(ec2_client: BaseClient, run: Run, job: Job, include_request_heads: bool):
+def _update_run(ec2_client: BaseClient, run: RunHead, job: Job, include_request_heads: bool):
     run.submitted_at = min(run.submitted_at, job.submitted_at)
     if job.artifact_specs:
         if run.artifact_heads is None:
@@ -52,8 +52,8 @@ def _update_run(ec2_client: BaseClient, run: Run, job: Job, include_request_head
             run.request_heads.append(runners.request_head(ec2_client, job))
 
 
-def get_runs(ec2_client: BaseClient, s3_client: BaseClient, bucket_name: str, repo_user_name, repo_name,
-             job_heads: List[JobHead], include_request_heads: bool) -> List[Run]:
+def get_run_heads(ec2_client: BaseClient, s3_client: BaseClient, bucket_name: str, repo_user_name, repo_name,
+                  job_heads: List[JobHead], include_request_heads: bool) -> List[RunHead]:
     runs_by_id = {}
     for job_head in job_heads:
         job = jobs.get_job(s3_client, bucket_name, repo_user_name, repo_name, job_head.job_id)
@@ -67,7 +67,8 @@ def get_runs(ec2_client: BaseClient, s3_client: BaseClient, bucket_name: str, re
     return sorted(list(runs_by_id.values()), key=lambda r: r.submitted_at, reverse=True)
 
 
-def list_runs(ec2_client: BaseClient, s3_client: BaseClient, bucket_name: str, repo_user_name, repo_name,
-              run_name: Optional[str], include_request_heads: bool) -> List[Run]:
+def list_run_heads(ec2_client: BaseClient, s3_client: BaseClient, bucket_name: str, repo_user_name, repo_name,
+                   run_name: Optional[str], include_request_heads: bool) -> List[RunHead]:
     job_heads = jobs.list_job_heads(s3_client, bucket_name, repo_user_name, repo_name, run_name)
-    return get_runs(ec2_client, s3_client, bucket_name, repo_user_name, repo_name, job_heads, include_request_heads)
+    return get_run_heads(ec2_client, s3_client, bucket_name, repo_user_name, repo_name, job_heads,
+                         include_request_heads)
