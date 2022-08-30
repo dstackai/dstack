@@ -14,7 +14,7 @@ To view a list of the commands available in your current dstack version, run `ds
 Usage: dstack [OPTIONS ...] COMMAND [ARGS ...]
 
 Main commands:
-  run            Run a workflow or a provider
+  run            Run a workflow
   status         Show status of runs
   stop           Stop a run
   logs           Show logs of a run

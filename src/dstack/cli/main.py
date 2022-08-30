@@ -10,7 +10,7 @@ def default_func(_: Namespace):
     print("Usage: dstack [OPTIONS ...] COMMAND [ARGS ...]\n"
           "\n"
           "Main commands:\n"
-          "  run            Run a workflow or a provider\n"
+          "  run            Run a workflow\n"
           "  status         Show status of runs\n"
           "  stop           Stop a run\n"
           "  logs           Show logs of a run\n"

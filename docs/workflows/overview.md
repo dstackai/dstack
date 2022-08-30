@@ -16,7 +16,7 @@ spot/preemptive instance, how much memory, GPU, etc.)
       - name: "train"
         provider: bash
         deps:
-          - :some_tag
+          - tag: some_tag
         python: 3.10
         commands:
           - pip install requirements.txt
@@ -50,15 +50,15 @@ The following properties are optional:
 The `deps` property defienes the workflow's dependencies. The output artifacts of these dependencies are 
 mounted as local folders before the workflow starts to run.
 
-There are two ways to define dependencies: via _Tags_ and via _Workflows_.
+There are two ways to define dependencies: via tags and via workflows.
 
 ### Tags
 
-The first way to specify a dependency is to use a _colon_ followed by a name of a tag:
+The first way to specify a dependency is to use the `tag` property with a name of a tag:
 
 ```yaml
 deps:
-  - :some_tag
+  - tag: some_tag
 ```
 
 Here, `some_tag` is a name of a tag.
@@ -70,26 +70,35 @@ Here's an example:
 
 ```yaml
 deps:
-  - :dstackai/dstack/some_tag
+  - tag: dstackai/dstack/some_tag
 ```
 
 ### Workflows
 
-The second way to specify a dependency is to use a workflow name:
+The second way to specify a dependency is to use the `workflow` property with a name of a workflow:
 
 ```yaml
 deps:
-  - some_workflow
+  - workflow: some_workflow
 ```
 
 Similar to tags, you can refer to workflows from other projects:
 
 ```yaml
 deps:
-  - dstackai/dstack/some_workflow
+  - workflow: dstackai/dstack/some_workflow
 ```
 
 In that case, dstack will use the output artifacts of the most last run of the specified workflow.
+
+## Secrets
+
+Secrets allow to use sensitive data within workflows (such as passwords or security tokens) without 
+hard-coding them inside the code.
+
+A secret has a name and a value. All secrets are passed to the running workflows via environment variables.
+
+Secrets can be managed via the `dstack secrets` CLI command.
 
 ## Providers
 

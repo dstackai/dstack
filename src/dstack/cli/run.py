@@ -146,7 +146,7 @@ def run_workflow_func(args: Namespace):
 
 
 def register_parsers(main_subparsers):
-    parser = main_subparsers.add_parser("run", help="Run a workflow or a provider", add_help=False)
+    parser = main_subparsers.add_parser("run", help="Run a workflow", add_help=False)
     parser.add_argument("workflow_or_provider", metavar="TARGET", type=str,
                         help="A name of a workflow or a provider", nargs="?")
     parser.add_argument("-d", "--detach", help="Do not poll for status update and logs", action="store_true")

@@ -15,29 +15,42 @@ The easiest way to install the dstack CLI is through pip:
 pip install dstack
 ```
 
-## Configure the backend
+## Configure AWS credentials
 
-Before you can use dstack, you have to configure the dstack backend:
+The dstack CLI uses your local AWS credentials to provision infrastructure and store data.
+Make sure, you've [configured](https://docs.aws.amazon.com/cli/latest/userguide/cli-configure-files.html) them
+locally before using the dstack CLI. 
 
- * In which S3 bucket to store the state and the artifacts
- * In what region, create cloud instances.
+The credentials should allow actions on the EC2, IAM, SecretsManager, 
+S3, and CloudWatch Logs resources.
+
+## Configure the dstack backend
+
+Before you can use the dstack CLI, you have to configure the dstack backend.
+
+It includes configuring the following:
+
+ * In which S3 bucket to store the state and artifacts
+ * In what AWS region, to create EC2 instances
 
 To configure this, run the following command:
 
 ```shell
 dstack config
+
+Configure AWS backend:
+
+AWS profile name (default):
+S3 bucket name:
+Region name:
 ```
 
-The configuration will be stored in `~/.dstack/config.yaml`:
+Make sure to choose a unique S3 bucket name. If the bucket doesn't exist, dstack will prompt you
+to create it. 
 
-```yaml
-backend: aws
-bucket: "my-dstack-workspace"
-region: "eu-west-1"
-```
+The command will also create the necessary IAM instance profile role to be used when provisioning EC2 instances.
 
-!!! info "NOTE:"
-    AWS requires all S3 buckets to be unique across all users. Please make sure to choose a unique name.
+The final configuration will be stored in `~/.dstack/config.yaml`.
 
 ## Clone the repo
 
@@ -71,7 +84,7 @@ If you open the `.dstack/workflows.yaml` file, you'll see the following content:
       - name: train
         help: "Train a MNIST model"
         deps:
-          - :mnist_data
+          - tag: mnist_data
         provider: bash
         env:
           - PYTHONPATH=mnist
@@ -235,7 +248,7 @@ file, this way:
       - name: train
         help: "Train a MNIST model"
         deps:
-          - :mnist_data
+          - tag: mnist_data
         provider: bash
         env:
           - PYTHONPATH=mnist
@@ -264,4 +277,4 @@ The other useful CLI commands include:
  - `dstack delete` – Deletes runs within the current project. To delete all runs, use the `dstack delete -a` 
   command. Deleting runs doesn't affect tags. Feel free to delete the run after you've assigned a tag to it.
 
-For more details on the CLI commands, check out the CLI [documentation](cli/index.md).
+For more details on the CLI commands, check out the CLI [documentation](cli/overview.md).

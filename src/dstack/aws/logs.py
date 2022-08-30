@@ -14,7 +14,7 @@ from dstack.jobs import AppSpec, JobHead
 POLL_LOGS_RATE_SECS = 1
 
 
-def _render_log_message(s3_client: BaseClient, bucket_name: str, event: dict[str, Any],
+def _render_log_message(s3_client: BaseClient, bucket_name: str, event: Dict[str, Any],
                         repo_user_name: str, repo_name: str,
                         job_host_names: Dict[str, Optional[str]],
                         job_ports: Dict[str, Optional[List[int]]],

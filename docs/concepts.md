@@ -1,7 +1,7 @@
 ## Workflows
 
-Workflows are defined declaratively in the `.dstack/workflows.yaml` file within the 
-project. Every workflow may specify the provider, dependencies, commands, artifacts, 
+Workflows are defined declaratively in the `.dstack/workflows.yaml` file within the
+project. Every workflow may specify the provider, dependencies, commands, artifacts,
 infrastructure resources, environment variables, and more.
 
 === ".dstack/workflows.yaml"
@@ -11,7 +11,7 @@ infrastructure resources, environment variables, and more.
       - name: "train"
         provider: bash
         deps:
-          - :some_tag
+          - tag: some_tag
         python: 3.10
         env:
           - PYTHONPATH=mnist
@@ -65,16 +65,16 @@ Example:
 
 ```yaml
 deps:
-  - :some_tag
+  - tag: some_tag
 ```
 
-You can refer to tags from other projects as well. 
+You can refer to tags from other projects as well.
 
 Tags can be managed via the `dstack tags` CLI command.
 
 ## Backend
 
-The dstack CLI uses your local credentials (e.g. the default AWS environment variables 
+The dstack CLI uses your local credentials (e.g. the default AWS environment variables
 or the credentials from `~/.aws/credentials`.) to provision infrastructure and store data.
 
 All the state and artifacts are stored in an S3 bucket that can be configured via
