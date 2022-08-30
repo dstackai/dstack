@@ -286,10 +286,10 @@ class Provider:
                     if gpu > 0:
                         resources.gpus = GpusRequirements(gpu, name=resource_name[:-4])
             if self.provider_data["resources"].get("shm_size"):
-                resources.shm_size = self.provider_data["resources"]["shm_size"]
+                resources.shm_size_mib = _str_to_mib(self.provider_data["resources"]["shm_size"])
             if self.provider_data["resources"].get("interruptible"):
                 resources.interruptible = self.provider_data["resources"]["interruptible"]
-            if resources.cpus or resources.memory_mib or resources.gpus or resources.shm_size \
+            if resources.cpus or resources.memory_mib or resources.gpus or resources.shm_size_mib \
                     or resources.interruptible:
                 return resources
             else:

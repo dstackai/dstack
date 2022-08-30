@@ -78,8 +78,8 @@ def _serialize_requirements(requirements) -> Dict[str, Any]:
                 req_data["gpus"]["memory_mib"] = requirements.gpus.memory_mib
             if requirements.gpus.name:
                 req_data["gpus"]["name"] = requirements.gpus.name
-        if requirements.shm_size:
-            req_data["shm_size"] = requirements.shm_size
+        if requirements.shm_size_mib:
+            req_data["shm_size_mib"] = requirements.shm_size_mib
         if requirements.interruptible:
             req_data["interruptible"] = requirements.interruptible
     return req_data
@@ -87,13 +87,13 @@ def _serialize_requirements(requirements) -> Dict[str, Any]:
 
 def unserialize_job(job_data: dict) -> Job:
     requirements = Requirements(
-        job_data["requirements"].get("cpu") or None,
-        job_data["requirements"].get("memory") or None,
-        GpusRequirements(job_data["requirements"]["gpu"].get("count") or None,
-                         job_data["requirements"]["gpu"].get("memory") or None,
-                         job_data["requirements"]["gpu"].get("name") or None
-                         ) if job_data["requirements"].get("gpu") else None,
-        job_data.get("shm_size") or None, job_data.get("interruptible") or None
+        job_data["requirements"].get("cpus") or None,
+        job_data["requirements"].get("memory_mib") or None,
+        GpusRequirements(job_data["requirements"]["gpus"].get("count") or None,
+                         job_data["requirements"]["gpus"].get("memory") or None,
+                         job_data["requirements"]["gpus"].get("name") or None
+                         ) if job_data["requirements"].get("gpus") else None,
+        job_data.get("shm_size_mib") or None, job_data.get("interruptible") or None
     ) if job_data.get("requirements") else None
     if requirements:
         if not requirements.cpus \
@@ -101,7 +101,7 @@ def unserialize_job(job_data: dict) -> Job:
                      (not requirements.gpus.count
                       and not requirements.gpus.memory_mib
                       and not requirements.gpus.name)) \
-                and not requirements.interruptible and not not requirements.shm_size:
+                and not requirements.interruptible and not not requirements.shm_size_mib:
             requirements = None
     dep_specs = []
     if job_data.get("deps"):

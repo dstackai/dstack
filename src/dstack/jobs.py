@@ -19,18 +19,18 @@ class GpusRequirements:
 
 class Requirements:
     def __init__(self, cpus: Optional[int] = None, memory_mib: Optional[int] = None,
-                 gpus: Optional[GpusRequirements] = None, shm_size: Optional[str] = None,
+                 gpus: Optional[GpusRequirements] = None, shm_size_mib: Optional[int] = None,
                  interruptible: Optional[bool] = None):
         self.cpus = cpus
         self.memory_mib = memory_mib
         self.gpus = gpus
-        self.shm_size = shm_size
+        self.shm_size_mib = shm_size_mib
         self.interruptible = interruptible
 
     def __str__(self) -> str:
         return f'Requirements(cpus={self.cpus}, memory_mib={self.memory_mib}, ' \
                f'gpus={self.gpus}, ' \
-               f'shm_size={self.shm_size}, ' \
+               f'shm_size_mib={self.shm_size_mib}, ' \
                f'interruptible={self.interruptible})'
 
 

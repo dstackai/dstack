@@ -397,7 +397,7 @@ def _get_ami_image(ec2_client: BaseClient, cuda: bool) -> Tuple[str, str]:
             ]
         },
     ], )
-    images = filter(lambda i: cuda == ("cuda" in i["Name"]), response["Images"])
+    images = list(filter(lambda i: cuda == ("cuda" in i["Name"]), response["Images"]))
     if images:
         ami = next(iter(sorted(images, key=lambda i: i["CreationDate"], reverse=True)))
         return ami["ImageId"], ami["Name"]
@@ -544,17 +544,22 @@ def run_job(ec2_client: BaseClient, iam_client: BaseClient, s3_client: BaseClien
             jobs.update_job(s3_client, bucket_name, job)
             runner = Runner(runner_id, None, instance_type.resources, job)
             _create_or_update_runner(s3_client, bucket_name, runner)
-            if instance_type.resources.interruptible:
-                request_id = _create_spot_request_retry(ec2_client, iam_client, bucket_name, region_name, runner_id,
-                                                        instance_type)
-            else:
-                request_id = _run_instance_retry(ec2_client, iam_client, bucket_name, region_name, runner_id,
-                                                 instance_type)
-            runner.request_id = request_id
-            job.request_id = request_id
-            jobs.update_job(s3_client, bucket_name, job)
-            _create_or_update_runner(s3_client, bucket_name, runner)
-            return runner
+            try:
+                if instance_type.resources.interruptible:
+                    request_id = _create_spot_request_retry(ec2_client, iam_client, bucket_name, region_name, runner_id,
+                                                            instance_type)
+                else:
+                    request_id = _run_instance_retry(ec2_client, iam_client, bucket_name, region_name, runner_id,
+                                                     instance_type)
+                runner.request_id = request_id
+                job.request_id = request_id
+                jobs.update_job(s3_client, bucket_name, job)
+                _create_or_update_runner(s3_client, bucket_name, runner)
+                return runner
+            except Exception as e:
+                job.status = JobStatus.FAILED
+                jobs.update_job(s3_client, bucket_name, job)
+                raise e
         else:
             job.status = JobStatus.FAILED
             jobs.update_job(s3_client, bucket_name, job)
@@ -606,9 +611,9 @@ def _terminate_instance(ec2_client: BaseClient, request_id: str):
 
 
 def request_head(ec2_client: BaseClient, job: Job) -> RequestHead:
-    interrupted = job.requirements and job.requirements.interruptible
+    interruptible = job.requirements and job.requirements.interruptible
     if job.request_id:
-        if interrupted:
+        if interruptible:
             response = ec2_client.describe_spot_instance_requests(SpotInstanceRequestIds=[job.request_id])
             if response.get("SpotInstanceRequests"):
                 status = response["SpotInstanceRequests"][0]["Status"]
@@ -646,7 +651,7 @@ def request_head(ec2_client: BaseClient, job: Job) -> RequestHead:
             else:
                 return RequestHead(job.job_id, RequestStatus.TERMINATED, None)
     else:
-        message = "The spot instance request ID is not specified" if interrupted else "The instance ID is not specified"
+        message = "The spot instance request ID is not specified" if interruptible else "The instance ID is not specified"
         return RequestHead(job.job_id, RequestStatus.TERMINATED, message)
 
 
