@@ -30,7 +30,7 @@ setup(
     project_urls={
         "Source": "https://github.com/dstackai/dstack",
     },
-    description="An open-source tool for running data and ML workflows in the cloud",
+    description="A command-line interface to run ML workflows in the cloud",
     long_description=open("../README.md").read(),
     long_description_content_type="text/markdown",
     python_requires=">=3.6",

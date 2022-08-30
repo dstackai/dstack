@@ -51,7 +51,7 @@ jobs:
           VERSION=${GITHUB_REF#refs/tags/}
           echo "__version__ = \"$VERSION\"" > dstack/version.py
           echo "__is_release__ = True" >> dstack/version.py
-          python setup.py bdist_wheel
+          python setup.py sdist bdist_wheel
           python -m twine upload --repository pypi --username ${{ secrets.PYPI_USERNAME }} --password ${{ secrets.PYPI_PASSWORD }} dist/*
 
   docs-deploy:
