@@ -27,7 +27,7 @@ running ML workflows.
 ### Primary features of dstack:
 
 1. **Infrastructure as code:** Define workflows and infrastructure requirements declaratively as code.
-   dstack sets up and tears down infrastructure on-automatically.
+   dstack sets up and tears down infrastructure automatically.
 2. **GitOps approach:** dstack is integrated with Git and tracks code automatically.
    No need to push local changes before running a workflow.
 3. **Artifacts and tags:** Artifacts are the first-class citizens.
