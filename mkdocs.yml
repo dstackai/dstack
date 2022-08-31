@@ -75,7 +75,7 @@ nav:
         - lab: workflows/lab.md
         - notebook: workflows/notebook.md
         - docker: workflows/docker.md
-        - torchrun: workflows/torchrun.md
+#        - torchrun: workflows/torchrun.md
       - Commands (CLI):
         - Overview: cli/overview.md
   - Help:

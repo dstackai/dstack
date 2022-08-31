@@ -18,7 +18,8 @@ infrastructure resources, environment variables, and more.
         commands:
           - pip install requirements.txt
           - python src/train.py
-        artifacts: [ "checkpoint" ]
+        artifacts:
+          - path: checkpoint
         resources:
           interruptible: true
           gpu: 1

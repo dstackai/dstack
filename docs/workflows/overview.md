@@ -21,7 +21,8 @@ spot/preemptive instance, how much memory, GPU, etc.)
         commands:
           - pip install requirements.txt
           - python src/train.py
-        artifacts: [ "checkpoint" ]
+        artifacts: 
+          - path: checkpoint
         resources:
           interruptible: true
           gpu: 1
@@ -138,11 +139,11 @@ Providers may help run tasks, applications, dev environments and even distribute
 
     [:octicons-arrow-right-24: Reference](notebook.md)
 
-- **Torchrun** 
+[//]: # (- **Torchrun** )
 
-    Runs a distributed training
+[//]: # (    Runs a distributed training)
 
-    [:octicons-arrow-right-24: Reference](torchrun.md)
+[//]: # (    [:octicons-arrow-right-24: Reference]&#40;torchrun.md&#41;)
 
 - **Docker** 
 

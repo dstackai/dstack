@@ -23,7 +23,8 @@ which folders to save as output artifacts, dependencies to other workflows if an
         commands:
           - pip install requirements.txt
           - python src/train.py
-        artifacts: [ "checkpoint" ]
+        artifacts: 
+          - path: checkpoint
         resources:
           interruptible: true
           gpu: 1

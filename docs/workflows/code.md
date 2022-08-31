@@ -17,7 +17,8 @@ other workflows if any, and the resources the workflow needs
     workflows:
       - name: dev
         provider: code
-        artifacts: ["output"]
+        artifacts:
+          - path: output
         resources:
           interruptible: true
           gpu:

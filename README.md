@@ -73,7 +73,7 @@ Region name:
 
 The configuration will be stored in `~/.dstack/config.yaml`.
 
-That's it. Now you can use dstack in your machine.
+That's it. Now you can use dstack on your machine.
 
 ## ✨ Usage
 
@@ -98,7 +98,8 @@ workflows:
     commands:
       - pip install requirements.txt
       - python src/train.py
-    artifacts: [ "checkpoint" ]
+    artifacts: 
+      - path: checkpoint
     resources:
       interruptible: true
       gpu: 1

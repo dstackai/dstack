@@ -21,7 +21,8 @@ other workflows if any, and the resources the workflow needs
         commands:
           - mkdir -p output
           - echo 'Hello, world!' > output/hello.txt
-        artifacts: ["output"]
+        artifacts:
+          - path: output
         resources:
           gpu:
             name: "K80"

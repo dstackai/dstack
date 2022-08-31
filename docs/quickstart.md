@@ -79,7 +79,7 @@ If you open the `.dstack/workflows.yaml` file, you'll see the following content:
           - pip install -r requirements.txt
           - python mnist/download.py
         artifacts:
-          - data
+          - path: data
     
       - name: train
         help: "Train a MNIST model"
@@ -92,7 +92,7 @@ If you open the `.dstack/workflows.yaml` file, you'll see the following content:
           - pip install -r requirements.txt
           - python mnist/train.py
         artifacts:
-          - lightning_logs
+          - path: lightning_logs
     ```
 
 The `download` workflow downloads the [MNIST](http://yann.lecun.com/exdb/mnist/) dataset
@@ -243,7 +243,7 @@ file, this way:
           - pip install -r requirements.txt
           - python mnist/download.py
         artifacts:
-          - data
+          - path: data
     
       - name: train
         help: "Train a MNIST model"
@@ -256,7 +256,7 @@ file, this way:
           - pip install -r requirements.txt
           - python mnist/train.py
         artifacts:
-          - lightning_logs
+          - path: lightning_logs
         resources:
             gpu: 1
     ```

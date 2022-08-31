@@ -19,7 +19,8 @@ a `requirements.txt` file, environment variables, arguments, which folders to sa
         provider: torchrun
         file: "train.py"
         requirements: "requirements.txt"
-        artifacts: ["model"]
+        artifacts: 
+          - path: model
         nodes: 4
         resources:
           gpu:
