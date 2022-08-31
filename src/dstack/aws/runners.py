@@ -621,7 +621,7 @@ def request_head(ec2_client: BaseClient, job: Job) -> RequestHead:
                     request_status = RequestStatus.RUNNING
                 elif status["Code"] in ["not-scheduled-yet", "pending-evaluation", "pending-fulfillment"]:
                     request_status = RequestStatus.PENDING
-                elif status["Code"] in ["not-capacity-not-available", "instance-stopped-no-capacity",
+                elif status["Code"] in ["capacity-not-available", "instance-stopped-no-capacity",
                                         "instance-terminated-by-price", "instance-stopped-by-price",
                                         "instance-terminated-no-capacity", "limit-exceeded", "price-too-low"]:
                     request_status = RequestStatus.NO_CAPACITY
