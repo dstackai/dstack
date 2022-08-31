@@ -16,12 +16,16 @@ def _run_name(repo_data, backend, args):
         tag_name = args.run_name_or_tag_name[1:]
         tag_head = backend.get_tag_head(repo_data.repo_user_name, repo_data.repo_name, tag_name)
         if tag_head:
-            run_name = tag_head.run_name
+            return tag_head.run_name
         else:
             sys.exit(f"Cannot find the tag '{tag_name}'")
     else:
         run_name = args.run_name_or_tag_name
-    return run_name
+        job_heads = backend.list_job_heads(repo_data.repo_user_name, repo_data.repo_name, run_name)
+        if job_heads:
+            return run_name
+        else:
+            sys.exit(f"Cannot find the run '{run_name}'")
 
 
 def download_func(args: Namespace):

@@ -46,7 +46,10 @@ def logs_func(args: Namespace):
         repo_data = load_repo_data()
         start_time = since(args.since)
         job_heads = backend.list_job_heads(repo_data.repo_user_name, repo_data.repo_name, args.run_name)
-        poll_logs(backend, repo_data.repo_user_name, repo_data.repo_name, job_heads, start_time, args.follow)
+        if job_heads:
+            poll_logs(backend, repo_data.repo_user_name, repo_data.repo_name, job_heads, start_time, args.follow)
+        else:
+            sys.exit(f"Cannot find the run '{args.run_name}'")
     except InvalidGitRepositoryError:
         sys.exit(f"{os.getcwd()} is not a Git repo")
     except ConfigError:

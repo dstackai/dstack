@@ -86,15 +86,16 @@ def _serialize_requirements(requirements) -> Dict[str, Any]:
 
 
 def unserialize_job(job_data: dict) -> Job:
+    _requirements = job_data.get("requirements")
     requirements = Requirements(
-        job_data["requirements"].get("cpus") or None,
-        job_data["requirements"].get("memory_mib") or None,
-        GpusRequirements(job_data["requirements"]["gpus"].get("count") or None,
-                         job_data["requirements"]["gpus"].get("memory") or None,
-                         job_data["requirements"]["gpus"].get("name") or None
-                         ) if job_data["requirements"].get("gpus") else None,
-        job_data.get("shm_size_mib") or None, job_data.get("interruptible") or None
-    ) if job_data.get("requirements") else None
+        _requirements.get("cpus") or None,
+        _requirements.get("memory_mib") or None,
+        GpusRequirements(_requirements["gpus"].get("count") or None,
+                         _requirements["gpus"].get("memory") or None,
+                         _requirements["gpus"].get("name") or None
+                         ) if _requirements.get("gpus") else None,
+        _requirements.get("shm_size_mib") or None, _requirements.get("interruptible") or None
+    ) if _requirements else None
     if requirements:
         if not requirements.cpus \
                 and (not requirements.gpus or
@@ -110,7 +111,7 @@ def unserialize_job(job_data: dict) -> Job:
                 dep_repo_user_name, dep_repo_name, dep_run_name = tuple(dep.split(","))
                 dep_spec = DepSpec(dep_repo_user_name, dep_repo_name, dep_run_name, False)
             else:
-                dep_spec = DepSpec(dep["repo_user_name"], dep["repo_name"], dep["run_name"], dep["mount"])
+                dep_spec = DepSpec(dep["repo_user_name"], dep["repo_name"], dep["run_name"], dep.get("mount") is True)
             dep_specs.append(dep_spec)
     artifact_specs = []
     if job_data.get("artifacts"):
@@ -118,7 +119,7 @@ def unserialize_job(job_data: dict) -> Job:
             if isinstance(artifact, str):
                 artifact_spec = ArtifactSpec(artifact, False)
             else:
-                artifact_spec = ArtifactSpec(artifact["path"], artifact["mount"])
+                artifact_spec = ArtifactSpec(artifact["path"], artifact.get("mount") is True)
             artifact_specs.append(artifact_spec)
     master_job = JobRefId(job_data["master_job_id"]) if job_data.get("master_job_id") else None
     app_specs = ([AppSpec(a["port_index"], a["app_name"], a.get("url_path") or None, a.get("url_query_params") or None)
