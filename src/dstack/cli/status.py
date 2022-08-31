@@ -161,9 +161,8 @@ def pretty_duration_and_submitted_at(submitted_at, started_at=None, finished_at=
 
 
 def _app_heads(apps, status):
-    if status == "RUNNING" and apps is not None and len(apps) > 0:
-        # return "✔"
-        return "\n".join(map(lambda app: app.get("app_name"), apps))
+    if status == "RUNNING" and apps:
+        return "\n".join(map(lambda app: app.app_name, apps))
     else:
         return ""
 

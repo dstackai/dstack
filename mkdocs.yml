@@ -67,7 +67,7 @@ nav:
       - Concepts: concepts.md
       - Installation: installation.md
       - Quickstart: quickstart.md
-  - Guides:
+  - Reference:
       - Workflows:
         - Overview: workflows/overview.md
         - bash: workflows/bash.md
