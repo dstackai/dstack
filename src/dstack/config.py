@@ -51,6 +51,8 @@ def load_config(path: Path = get_config_path()) -> Config:
 
 def write_config(config: Config, path: Path = get_config_path()):
     if isinstance(config.backend_config, AwsBackendConfig):
+        if not path.parent.exists():
+            path.parent.mkdir(parents=True)
         with path.open('w') as f:
             config_data = {
                 "backend": "aws",

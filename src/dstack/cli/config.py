@@ -15,12 +15,12 @@ def config_func(_: Namespace):
     try:
         config = load_config()
         bucket_name = config.backend_config.bucket_name
-        profile_name = config.backend_config.profile_name or "default"
+        profile_name = config.backend_config.profile_name
         region_name = config.backend_config.region_name
     except ConfigError:
         pass
     print("Configure AWS backend:\n")
-    profile_name = Prompt.ask("AWS profile name", default=profile_name)
+    profile_name = Prompt.ask("AWS profile name", default=profile_name or "default")
     if profile_name == "default":
         profile_name = None
     bucket_name = Prompt.ask("S3 bucket name", default=bucket_name)
