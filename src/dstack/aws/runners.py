@@ -586,17 +586,17 @@ def _get_runner(s3_client: BaseClient, bucket_name: str, runner_id: str) -> Opti
 
 
 def _cancel_spot_request(ec2_client: BaseClient, request_id: str):
-    ec2_client.cancel_terminate_instance_requests(SpotInstanceRequestIds=[request_id])
+    ec2_client.cancel_spot_instance_requests(SpotInstanceRequestIds=[request_id])
     response = ec2_client.describe_instances(
         Filters=[
             {
                 'Name': 'spot-instance-request-id',
-                'Values': ['request_id']
+                'Values': [request_id]
             },
         ],
     )
-    if response.get("Reservations"):
-        ec2_client.terminate_instances(InstanceIds=[response["Reservations"][0]["InstanceId"]])
+    if response.get("Reservations") and response["Reservations"][0].get("Instances"):
+        ec2_client.terminate_instances(InstanceIds=[response["Reservations"][0]["Instances"][0]["InstanceId"]])
 
 
 def _terminate_instance(ec2_client: BaseClient, request_id: str):
@@ -617,7 +617,7 @@ def request_head(ec2_client: BaseClient, job: Job) -> RequestHead:
             response = ec2_client.describe_spot_instance_requests(SpotInstanceRequestIds=[job.request_id])
             if response.get("SpotInstanceRequests"):
                 status = response["SpotInstanceRequests"][0]["Status"]
-                if status["Code"] in ["fulfilled"]:
+                if status["Code"] in ["fulfilled", "request-canceled-and-instance-running"]:
                     request_status = RequestStatus.RUNNING
                 elif status["Code"] in ["not-scheduled-yet", "pending-evaluation", "pending-fulfillment"]:
                     request_status = RequestStatus.PENDING
