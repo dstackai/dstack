@@ -129,15 +129,15 @@ To interrupt, press Ctrl+C.
 ```
 
 !!! info "NOTE:"
-    Make sure to always run the CLI from the project repository directory.
+    Make sure to always run the CLI from the Git repository.
 
-Once you run the workflow, dstack will create the required cloud instance(s) within a minute,
+Once you run the workflow, dstack creates the required cloud instance(s) within a minute,
 download the dependencies, and run your workflow. You'll see the output in real-time as your 
 workflow is running.
 
 !!! tip "NOTE:"
     As long as your project is under Git, you don't have to commit local changes before using the run command.
-    dstack will take the local changes into account automatically.
+    dstack takes the local changes into account automatically.
     Just make sure that these changes are staged (using the `git add` command).
 
 ## Access the run artifacts

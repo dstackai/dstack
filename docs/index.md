@@ -1,28 +1,28 @@
 # Introduction to dstack
 
-To run ML workflows, your local machine is often not enough, so you need a way 
-to automate running these workflows using the cloud infrastructure.
+To run ML workflows, your local machine is often not enough. 
+That’s why you often have to automate running ML workflows withing the cloud infrastructure.
 
-Instead of managing infrastructure yourself, writing custom scripts, or using cumbersome MLOps platforms, 
-define your workflows in code and run from command-line.
+Instead of managing infrastructure yourself, writing own scripts, or using cumbersome MLOps platforms, with dstack, 
+you can focus on code while dstack does management of dependencies, infrastructure, and data for you.
 
-dstack is an alternative to SSH, custom scripts, Docker, KubeFlow, SageMaker, and other tools used 
-for running ML workflows.
+dstack is an alternative to KubeFlow, SageMaker, Docker, SSH, custom scripts, and other tools used often to
+run ML workflows.
 
 ### Primary features of dstack:
 
-1. **Infrastructure as code:** Define workflows and infrastructure requirements declaratively as code.
-   dstack sets up and tears down infrastructure automatically.
-2. **GitOps approach:** dstack is integrated with Git and tracks code automatically.
-   No need to push local changes before running a workflow.
-3. **Artifacts and tags:** Artifacts are the first-class citizens.
-   Once the workflow is finished, assign a tag to it and reuse artifacts in other workflows.
-4. **Environment setup:** No need to build own Docker images or setup CUDA yourself. Just specify Conda 
+1. **Git-focused:** Define workflows and their hardware requirements declaratively in your code.
+   When you run a workflow, dstack detects the current branch, commit hash, and local changes.
+2. **Data management:** Workflow artifacts are the 1st-class citizens.
+   Assign tags to finished workflows to reuse their artifacts from other workflows. 
+   Version data using tags.
+3. **Environment setup:** No need to build custom Docker images or setup CUDA yourself. Just specify Conda 
    requirements and they will be pre-configured.
-5. **Interrupted workflows:** Artifacts can be stored in real-time, so you can fully-leverage spot/preemptive instances.
-   Resume workflows from where they were interrupted.
-6. **Technology-agnostic:** No need to use specific APIs in your code. Anything that works locally, can run via dstack.
-7. **Dev environments:** Workflows may be not only tasks or applications but also dev environments, such as VS Code, JupyterLab, and Jupyter notebooks.
-8. **Very easy setup:** Just install the dstack CLI and run workflows
-   in your cloud using your local credentials. The state is stored in your cloud storage. 
-   No need to set up any complicated software.
+4. **Interruption-friendly:** Because artifacts can be stored in real-time, you can leverage interruptible 
+   (spot/preemptive) instances. Workflows can be resumed from where they were interrupted.
+5. **Technology-agnostic:** No need to use specific APIs in your code. Anything that works locally, can run via dstack.
+6. **Dev environments:** Workflows may be not only tasks and applications but also dev environments, incl. 
+   IDEs and notebooks.
+7. **Very easy setup:** Install the dstack CLI and run workflows
+   in the cloud using your local credentials. The state is stored in an S3 bucket. 
+   No need to set up anything else.

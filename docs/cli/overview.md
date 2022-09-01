@@ -4,7 +4,7 @@ The command line interface to dstack is provided through the `dstack` program (t
 [`dstack`](https://pypi.org/project/dstack/) pip package).
 
 !!! info "NOTE:"
-    Make sure to always run the CLI from the project repository directory.
+    Make sure to always run the CLI from the Git repository.
 
 ## Example usage
 

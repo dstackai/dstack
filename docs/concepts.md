@@ -11,13 +11,13 @@ infrastructure resources, environment variables, and more.
       - name: "train"
         provider: bash
         deps:
-          - tag: some_tag
+          - tag: mnist_data
         python: 3.10
         env:
           - PYTHONPATH=mnist
         commands:
           - pip install requirements.txt
-          - python src/train.py
+          - python mnist/train.py
         artifacts:
           - path: checkpoint
         resources:
@@ -26,8 +26,6 @@ infrastructure resources, environment variables, and more.
     ```
 
 Providers define how the workflow is executed and what properties can be specified for the workflow.
-
-### Run command
 
 When you run the workflow via the `dstack run` CLI command, dstack create the cloud instance(s) within a minute,
 and runs the workflow. You can see the output of your workflow in real-time.
@@ -42,9 +40,14 @@ To interrupt, press Ctrl+C.
 ...
 ```
 
-!!! info "NOTE:"
-    As long as your project is under Git, you don't have to commit local changes before using the `dstack run` CLI command.
-    dstack tracks local changes automatically.
+!!! tip "Environment setup"
+    dstack automatically sets up environment for the workflow. It pre-installs the right CUDA driver 
+    and Conda.
+
+## Git
+
+When you run a workflow withing a Git repository, dstack detects the current branch, commit hash, 
+and local changes, and uses it on the cloud instance(s) to run the workflow.
 
 ## Artifacts
 
@@ -66,7 +69,7 @@ Example:
 
 ```yaml
 deps:
-  - tag: some_tag
+  - tag: mnist_data
 ```
 
 You can refer to tags from other projects as well.

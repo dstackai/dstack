@@ -1,7 +1,7 @@
 <div align="center">
 <img src="https://raw.githubusercontent.com/dstackai/dstack/master/docs/assets/logo.svg" width="300px"/>    
 
-A command-line interface to run ML workflows in the cloud
+Git-based CLI to run ML workflows on cloud
 ______________________________________________________________________
 
 ![PyPI](https://img.shields.io/github/workflow/status/dstackai/dstack/Build?logo=github&style=for-the-badge)
@@ -15,32 +15,32 @@ ______________________________________________________________________
 
 ## 👋 Intro
 
-To run ML workflows, your local machine is often not enough, so you need a way 
-to automate running these workflows using the cloud infrastructure.
+To run ML workflows, your local machine is often not enough. 
+That’s why you often have to automate running ML workflows withing the cloud infrastructure.
 
-Instead of managing infrastructure yourself, writing custom scripts, or using cumbersome MLOps platforms, 
-define your workflows in code and run from command-line.
+Instead of managing infrastructure yourself, writing own scripts, or using cumbersome MLOps platforms, with dstack, 
+you can focus on code while dstack does management of dependencies, infrastructure, and data for you.
 
-dstack is an alternative to KubeFlow, SageMaker, Docker, SSH, custom scripts, and many other tools used often for
-running ML workflows.
+dstack is an alternative to KubeFlow, SageMaker, Docker, SSH, custom scripts, and other tools used often to
+run ML workflows.
 
 ### Primary features of dstack:
 
-1. **Infrastructure as code:** Define workflows and infrastructure requirements declaratively as code.
-   dstack sets up and tears down infrastructure automatically.
-2. **GitOps approach:** dstack is integrated with Git and tracks code automatically.
-   No need to push local changes before running a workflow.
-3. **Artifacts and tags:** Artifacts are the first-class citizens.
-   Once the workflow is finished, assign a tag to it and reuse artifacts in other workflows.
-4. **Environment setup:** No need to build own Docker images or setup CUDA yourself. Just specify Conda 
+1. **Git-focused:** Define workflows and their hardware requirements as code.
+   When you run a workflow, dstack detects the current branch, commit hash, and local changes.
+2. **Data management:** Workflow artifacts are the 1st-class citizens.
+   Assign tags to finished workflows to reuse their artifacts from other workflows. 
+   Version data using tags.
+3. **Environment setup:** No need to build custom Docker images or setup CUDA yourself. Just specify Conda 
    requirements and they will be pre-configured.
-5. **Interrupted workflows:** Artifacts can be stored in real-time, so you can fully-leverage spot/preemptive instances.
-   Resume workflows from where they were interrupted.
-6. **Technology-agnostic:** No need to use specific APIs in your code. Anything that works locally, can run via dstack.
-7. **Dev environments:** Workflows may be not only tasks or applications but also dev environments, such as VS Code, JupyterLab, and Jupyter notebooks.
-8. **Very easy setup:** Just install the dstack CLI and run workflows
-   in your cloud using your local credentials. The state is stored in your cloud storage. 
-   No need to set up any complicated software.
+4. **Interruption-friendly:** Because artifacts can be stored in real-time, you can leverage interruptible 
+   (spot/preemptive) instances. Workflows can be resumed from where they were interrupted.
+5. **Technology-agnostic:** No need to use specific APIs in your code. Anything that works locally, can run via dstack.
+6. **Dev environments:** Workflows may be not only tasks and applications but also dev environments, incl. 
+   IDEs and notebooks.
+7. **Very easy setup:** Install the dstack CLI and run workflows
+   in the cloud using your local credentials. The state is stored in an S3 bucket. 
+   No need to set up anything else.
 
 ## 📦 Installation
 
@@ -91,7 +91,7 @@ workflows:
   - name: "train"
     provider: bash
     deps:
-      - tag: some_tag
+      - tag: mnist_data
     python: 3.10
     env:
       - PYTHONPATH=src
@@ -121,67 +121,47 @@ To interrupt, press Ctrl+C.
 ...
 ```
 
-[//]: # (If you want, you can run a workflow without defining it in `.dstack/workfows.yaml`:)
+#### Environment setup
+    
+dstack automatically sets up environment for the workflow. It pre-installs the right CUDA driver 
+and Conda.
 
-[//]: # (```shell)
-[//]: # ($ dstack run bash -c "pip install requirements.txt && python src/train.py" \)
-[//]: # (  -d :some_tag -a checkpoint -i --gpu 1)
+#### Git
 
-[//]: # (Provisioning... It may take up to a minute. ✓)
+When you run a workflow withing a Git repository, dstack detects the current branch, commit hash, 
+and local changes, and uses it on the cloud instance(s) to run the workflow.
 
-[//]: # (To interrupt, press Ctrl+C.)
+## Manage artifacts
 
-[//]: # (...)
-[//]: # (```)
+Every workflow may have its output artifacts. If needed, artifacts can be read/written in real-time.
 
-### Manage tags
+Artifacts can be accessed via the `dstack artifacts` CLI command.
 
-Tags help managing data. You can assign tags to finished workflows to reuse their output artifacts 
-in other workflows. Another way to use tags is to upload data to dstack from your local machine
-and assign n tag to it to use this data in workflows.
+## Manage tags
 
-Here's how to assign a tag to a finished workflow:
+Tags help manage data.
 
-```shell
-dstack tags add TAG --run-name RUN
-```
+For example, you can assign a tag to a finished workflow to use its output artifacts from other workflows.
 
-Here, `TAG` is the name of the tag and `RUN` is the name of the finished workflow run.
+Also, you can create a tag by uploading data from your local machine.
 
-If you want to data from your local machine and save it as a tag to use it from other workflows,
-here's how to do it:
+To make a workflow use the data via a tag, one has to use the `deps` property in `.dstack/workflows.yaml`.
 
-```shell
-dstack tags add TAG --local-dir LOCAL_DIR
-```
-
-Once a tag is created, you can refer to it from workflows, e.g. from `.dstack/workflows.yaml`:
+Example:
 
 ```yaml
 deps:
-  - tag: some_tag
+  - tag: mnist_data
 ```
 
-### Manage artifacts
+You can refer to tags from other projects as well.
 
-The artifacts command allows you to browse or download the contents of artifacts.
-
-Here's how to browse artifacts:
-
-```shell
-dstack artifacts list (RUN | :TAG)
-```
-
-Here's how to download artifacts:
-
-```shell
-dstack artifacts download (RUN | :TAG) [OUTPUT_DIR]
-```
+Tags can be managed via the `dstack tags` CLI command.
 
 ## Providers
 
-dstack offers [multiple providers](https://docs.dstack.ai/providers) that allow running various tasks, applications, 
-and even dev environments.
+dstack offers [multiple providers](https://docs.dstack.ai/providers) that allow running tasks, applications, 
+and dev environments.
 
 ## 📘 Docs
 
@@ -192,7 +172,7 @@ More tutorials, examples, and the full CLI reference can be found at [docs.dstac
 If you encounter bugs, please report them directly 
 to the [issue tracker](https://github.com/dstackai/dstack/issues).
 
-For questions and support, join the [Slack channel](https://join.slack.com/t/dstackai/shared_invite/zt-xdnsytie-D4qU9BvJP8vkbkHXdi6clQ).
+For questions and support, join the [Slack chat](https://join.slack.com/t/dstackai/shared_invite/zt-xdnsytie-D4qU9BvJP8vkbkHXdi6clQ).
 
 ##  Licence
 
