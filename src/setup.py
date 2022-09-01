@@ -31,7 +31,7 @@ setup(
         "Source": "https://github.com/dstackai/dstack",
     },
     description="A command-line interface to run ML workflows in the cloud",
-    long_description=open("../README.md").read(),
+    long_description=open("README.md").read(),
     long_description_content_type="text/markdown",
     python_requires=">=3.6",
     install_requires=[
