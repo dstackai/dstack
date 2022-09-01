@@ -614,42 +614,56 @@ def request_head(ec2_client: BaseClient, job: Job) -> RequestHead:
     interruptible = job.requirements and job.requirements.interruptible
     if job.request_id:
         if interruptible:
-            response = ec2_client.describe_spot_instance_requests(SpotInstanceRequestIds=[job.request_id])
-            if response.get("SpotInstanceRequests"):
-                status = response["SpotInstanceRequests"][0]["Status"]
-                if status["Code"] in ["fulfilled", "request-canceled-and-instance-running"]:
-                    request_status = RequestStatus.RUNNING
-                elif status["Code"] in ["not-scheduled-yet", "pending-evaluation", "pending-fulfillment"]:
-                    request_status = RequestStatus.PENDING
-                elif status["Code"] in ["capacity-not-available", "instance-stopped-no-capacity",
-                                        "instance-terminated-by-price", "instance-stopped-by-price",
-                                        "instance-terminated-no-capacity", "limit-exceeded", "price-too-low"]:
-                    request_status = RequestStatus.NO_CAPACITY
-                elif status["Code"] in ["instance-terminated-by-user", "instance-stopped-by-user",
-                                        "canceled-before-fulfillment", "instance-terminated-by-schedule",
-                                        "instance-terminated-by-service", "spot-instance-terminated-by-user",
-                                        "marked-for-stop", "marked-for-termination"]:
-                    request_status = RequestStatus.TERMINATED
+            try:
+                response = ec2_client.describe_spot_instance_requests(SpotInstanceRequestIds=[job.request_id])
+                if response.get("SpotInstanceRequests"):
+                    status = response["SpotInstanceRequests"][0]["Status"]
+                    if status["Code"] in ["fulfilled", "request-canceled-and-instance-running"]:
+                        request_status = RequestStatus.RUNNING
+                    elif status["Code"] in ["not-scheduled-yet", "pending-evaluation", "pending-fulfillment"]:
+                        request_status = RequestStatus.PENDING
+                    elif status["Code"] in ["capacity-not-available", "instance-stopped-no-capacity",
+                                            "instance-terminated-by-price", "instance-stopped-by-price",
+                                            "instance-terminated-no-capacity", "limit-exceeded", "price-too-low"]:
+                        request_status = RequestStatus.NO_CAPACITY
+                    elif status["Code"] in ["instance-terminated-by-user", "instance-stopped-by-user",
+                                            "canceled-before-fulfillment", "instance-terminated-by-schedule",
+                                            "instance-terminated-by-service", "spot-instance-terminated-by-user",
+                                            "marked-for-stop", "marked-for-termination"]:
+                        request_status = RequestStatus.TERMINATED
+                    else:
+                        raise Exception(f"Unsupported EC2 spot instance request status code: {status['Code']}")
+                    return RequestHead(job.job_id, request_status, status.get("Message"))
                 else:
-                    raise Exception(f"Unsupported EC2 spot instance request status code: {status['Code']}")
-                return RequestHead(job.job_id, request_status, status.get("Message"))
-            else:
-                return RequestHead(job.job_id, RequestStatus.TERMINATED, None)
+                    return RequestHead(job.job_id, RequestStatus.TERMINATED, None)
+            except Exception as e:
+                if hasattr(e, "response") and e.response.get("Error") and e.response["Error"].get(
+                        "Code") == "InvalidSpotInstanceRequestID.NotFound":
+                    return RequestHead(job.job_id, RequestStatus.TERMINATED, e.response["Error"].get("Message"))
+                else:
+                    raise e
         else:
-            response = ec2_client.describe_instances(InstanceIds=[job.request_id])
-            if response.get("Reservations") and response["Reservations"][0].get("Instances"):
-                state = response["Reservations"][0]["Instances"][0]["State"]
-                if state["Name"] in ["running"]:
-                    request_status = RequestStatus.RUNNING
-                elif state["Name"] in ["pending"]:
-                    request_status = RequestStatus.PENDING
-                elif state["Name"] in ["shutting-down", "terminated", "stopping", "stopped"]:
-                    request_status = RequestStatus.TERMINATED
+            try:
+                response = ec2_client.describe_instances(InstanceIds=[job.request_id])
+                if response.get("Reservations") and response["Reservations"][0].get("Instances"):
+                    state = response["Reservations"][0]["Instances"][0]["State"]
+                    if state["Name"] in ["running"]:
+                        request_status = RequestStatus.RUNNING
+                    elif state["Name"] in ["pending"]:
+                        request_status = RequestStatus.PENDING
+                    elif state["Name"] in ["shutting-down", "terminated", "stopping", "stopped"]:
+                        request_status = RequestStatus.TERMINATED
+                    else:
+                        raise Exception(f"Unsupported EC2 instance state name: {state['Name']}")
+                    return RequestHead(job.job_id, request_status, None)
                 else:
-                    raise Exception(f"Unsupported EC2 instance state name: {state['Name']}")
-                return RequestHead(job.job_id, request_status, None)
-            else:
-                return RequestHead(job.job_id, RequestStatus.TERMINATED, None)
+                    return RequestHead(job.job_id, RequestStatus.TERMINATED, None)
+            except Exception as e:
+                if hasattr(e, "response") and e.response.get("Error") and e.response["Error"].get(
+                        "Code") == "InvalidInstanceID.NotFound":
+                    return RequestHead(job.job_id, RequestStatus.TERMINATED, e.response["Error"].get("Message"))
+                else:
+                    raise e
     else:
         message = "The spot instance request ID is not specified" if interruptible else "The instance ID is not specified"
         return RequestHead(job.job_id, RequestStatus.TERMINATED, message)
