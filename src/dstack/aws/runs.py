@@ -27,8 +27,8 @@ def _create_run(ec2_client: BaseClient, repo_user_name, repo_name, job: Job, inc
     if include_request_heads and job.status.is_unfinished():
         if request_heads is None:
             request_heads = []
-        _request_head = runners.request_head(ec2_client, job)
-        request_heads.append(_request_head)
+        request_head = runners.get_request_head(ec2_client, job)
+        request_heads.append(request_head)
     run_head = RunHead(repo_user_name, repo_name, job.run_name, job.workflow_name, job.provider_name,
                        artifact_heads or None, job.status, job.submitted_at, job.tag_name,
                        app_heads, request_heads)
@@ -50,8 +50,8 @@ def _update_run(ec2_client: BaseClient, run: RunHead, job: Job, include_request_
         if include_request_heads:
             if run.request_heads is None:
                 run.request_heads = []
-            _request_head = runners.request_head(ec2_client, job)
-            run.request_heads.append(_request_head)
+            request_head = runners.get_request_head(ec2_client, job)
+            run.request_heads.append(request_head)
 
 
 def get_run_heads(ec2_client: BaseClient, s3_client: BaseClient, bucket_name: str, repo_user_name, repo_name,

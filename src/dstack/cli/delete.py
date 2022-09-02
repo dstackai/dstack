@@ -12,13 +12,24 @@ from dstack.repo import load_repo_data
 
 
 def delete_func(args: Namespace):
-    if (args.run_name and (args.yes or Confirm.ask(f"[red]Delete the run `{args.run_name}`?[/]"))) \
+    if (args.run_name and (args.yes or Confirm.ask(f"[red]Delete the run '{args.run_name}'?[/]"))) \
             or (args.all and (args.yes or Confirm.ask("[red]Delete all runs?[/]"))):
         try:
             repo_data = load_repo_data()
             backend = load_backend()
-            backend.delete_job_heads(repo_data.repo_user_name, repo_data.repo_name, args.run_name)
-            print(f"[grey58]OK[/]")
+            job_heads = backend.list_job_heads(repo_data.repo_user_name, repo_data.repo_name, args.run_name)
+            if job_heads:
+                finished_job_heads = []
+                for job_head in job_heads:
+                    if job_head.status.is_finished():
+                        finished_job_heads.append(job_head)
+                    elif args.run_name:
+                        sys.exit("The run is not finished yet. Stop the run first.")
+                for job_head in finished_job_heads:
+                    backend.delete_job_head(repo_data.repo_user_name, repo_data.repo_name, job_head.job_id)
+                print(f"[grey58]OK[/]")
+            elif args.run_name:
+                sys.exit(f"Cannot find the run '{args.run_name}'")
         except InvalidGitRepositoryError:
             sys.exit(f"{os.getcwd()} is not a Git repo")
         except ConfigError:

@@ -55,7 +55,7 @@ def parse_run_args(args: Namespace) -> Tuple[str, List[str], Optional[str], Dict
         provider_name = workflow_providers[workflow_name]
     else:
         if args.workflow_or_provider not in providers.get_provider_names():
-            sys.exit(f"No workflow or provider `{args.workflow_or_provider}` is found")
+            sys.exit(f"No workflow or provider '{args.workflow_or_provider}' is found")
 
         provider_name = args.workflow_or_provider
 

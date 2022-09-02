@@ -610,7 +610,7 @@ def _terminate_instance(ec2_client: BaseClient, request_id: str):
             raise e
 
 
-def request_head(ec2_client: BaseClient, job: Job) -> RequestHead:
+def get_request_head(ec2_client: BaseClient, job: Job) -> RequestHead:
     interruptible = job.requirements and job.requirements.interruptible
     if job.request_id:
         if interruptible:
@@ -678,25 +678,37 @@ def _stop_runner(ec2_client: BaseClient, s3_client: BaseClient, bucket_name: str
     _delete_runner(s3_client, bucket_name, runner)
 
 
-def stop_job(ec2_client: BaseClient, s3_client: BaseClient, bucket_name: str, job: Job, abort: bool):
-    if job.status.is_unfinished():
-        _request_head = request_head(ec2_client, job)
-        terminated = _request_head.status == RequestStatus.TERMINATED
-        if abort or terminated:
+def stop_job(ec2_client: BaseClient, s3_client: BaseClient, bucket_name: str, repo_user_name: str, repo_name: str,
+             job_id: str, abort: bool):
+    job_head = jobs.list_job_head(s3_client, bucket_name, repo_user_name, repo_name, job_id)
+    job = jobs.get_job(s3_client, bucket_name, repo_user_name, repo_name, job_id)
+    request_status = get_request_head(ec2_client, job).status if job else RequestStatus.TERMINATED
+    runner = _get_runner(s3_client, bucket_name, job.runner_id) if job else None
+    if job_head and job_head.status.is_unfinished() or job and job.status.is_unfinished() \
+            or runner and runner.job.status.is_unfinished() \
+            or request_status != RequestStatus.TERMINATED:
+        if abort:
             new_status = JobStatus.ABORTED
-        elif job.status == JobStatus.SUBMITTED:
+        elif not job_head \
+                or job_head.status in [JobStatus.SUBMITTED, JobStatus.DOWNLOADING] \
+                or not job \
+                or job.status in [JobStatus.SUBMITTED, JobStatus.DOWNLOADING] \
+                or request_status == RequestStatus.TERMINATED\
+                or not runner:
             new_status = JobStatus.STOPPED
-        elif job.status != JobStatus.UPLOADING:
+        elif job_head and job_head.status != JobStatus.UPLOADING \
+                or job and job.status != JobStatus.UPLOADING:
             new_status = JobStatus.STOPPING
         else:
-            new_status = job.status
-        if job.status != new_status:
-            runner = _get_runner(s3_client, bucket_name, job.runner_id)
-            if runner:
+            new_status = None
+        if new_status:
+            if runner and runner.job.status.is_unfinished() and runner.job.status != new_status:
                 if new_status.is_finished():
                     _stop_runner(ec2_client, s3_client, bucket_name, runner)
                 else:
                     runner.job.status = new_status
                     _create_or_update_runner(s3_client, bucket_name, runner)
-            job.status = new_status
-            jobs.update_job(s3_client, bucket_name, job)
+            if job_head and job_head.status.is_unfinished() and job_head.status != new_status or \
+                    job and job.status.is_unfinished() and job.status != new_status:
+                job.status = new_status
+                jobs.update_job(s3_client, bucket_name, job)

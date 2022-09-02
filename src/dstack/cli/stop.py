@@ -12,12 +12,18 @@ from dstack.repo import load_repo_data
 
 
 def stop_func(args: Namespace):
-    if (args.run_name and (args.yes or Confirm.ask(f"[red]Stop the run `{args.run_name}`?[/]"))) \
+    if (args.run_name and (args.yes or Confirm.ask(f"[red]Stop the run '{args.run_name}'?[/]"))) \
             or (args.all and (args.yes or Confirm.ask("[red]Stop all runs?[/]"))):
         try:
             repo_data = load_repo_data()
             backend = load_backend()
-            backend.stop_jobs(repo_data.repo_user_name, repo_data.repo_name, args.run_name, args.abort)
+            job_heads = backend.list_job_heads(repo_data.repo_user_name, repo_data.repo_name, args.run_name)
+            if job_heads:
+                for job_head in job_heads:
+                    if job_head.status.is_unfinished():
+                        backend.stop_job(repo_data.repo_user_name, repo_data.repo_name, job_head.job_id, args.abort)
+            else:
+                sys.exit(f"Cannot find the run '{args.run_name}'")
             print(f"[grey58]OK[/]")
         except InvalidGitRepositoryError:
             sys.exit(f"{os.getcwd()} is not a Git repo")
