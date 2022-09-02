@@ -2,7 +2,7 @@
 
 Workflows are defined declaratively in the `.dstack/workflows.yaml` file within the
 project. Every workflow may specify the provider, dependencies, commands, artifacts,
-infrastructure resources, environment variables, and more.
+hardware requirements, environment variables, and more.
 
 === ".dstack/workflows.yaml"
 
@@ -25,7 +25,7 @@ infrastructure resources, environment variables, and more.
           gpu: 1
     ```
 
-Providers define how the workflow is executed and what properties can be specified for the workflow.
+The provider defines how the workflow is executed and what properties can be specified for the workflow.
 
 When you run the workflow via the `dstack run` CLI command, dstack create the cloud instance(s) within a minute,
 and runs the workflow. You can see the output of your workflow in real-time.
@@ -40,39 +40,43 @@ To interrupt, press Ctrl+C.
 ...
 ```
 
-!!! tip "Environment setup"
-    dstack automatically sets up environment for the workflow. It pre-installs the right CUDA driver 
-    and Conda.
+## Environment
+    
+dstack automatically sets up environment for the workflow. It pre-installs the right CUDA driver, 
+the right version of Python, and Conda.
 
 ## Git
+
+dstack is fully integrated with Git.
 
 When you run a workflow withing a Git repository, dstack detects the current branch, commit hash, 
 and local changes, and uses it on the cloud instance(s) to run the workflow.
 
-## Artifacts
+## Artifacts and tags
 
-Every workflow may have its output artifacts. By default, dstack saves them in real-time as the workflow is running.
+Every workflow may have its output artifacts. They can be accessed via the `dstack artifacts` CLI command.
 
-Artifacts can be accessed via the `dstack artifacts` CLI command.
+You can assign tags to finished workflows to reuse their output artifacts from other workflows.
 
-## Tags
+You can also use tags to upload local data and reuse it from other workflows.
 
-Tags help manage data.
-
-For example, you can assign a tag to a finished workflow to use its output artifacts from other workflows.
-
-Also, you can create a tag by uploading data from your local machine.
-
-To make a workflow use the data via a tag, one has to use the `deps` property in `.dstack/workflows.yaml`.
-
-Example:
+If you've added a tag, you can refer to it as to a dependency via the `deps` property of your workflow 
+in `.dstack/workflows.yaml`:
 
 ```yaml
 deps:
   - tag: mnist_data
 ```
 
-You can refer to tags from other projects as well.
+You can refer not only to tags within your current Git repository but to the tags from your other 
+repositories.
+
+Here's an example how the workflow refers to a tag from the `dstackai/dstack-examples` repository:
+
+```yaml
+deps:
+  - tag: dstackai/dstack-examples/mnist_data
+```
 
 Tags can be managed via the `dstack tags` CLI command.
 

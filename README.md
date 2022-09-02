@@ -121,40 +121,37 @@ To interrupt, press Ctrl+C.
 ...
 ```
 
-#### Environment setup
-    
-dstack automatically sets up environment for the workflow. It pre-installs the right CUDA driver 
-and Conda.
+**Environment setup:** dstack automatically sets up environment for the workflow. It pre-installs the right CUDA driver, 
+the right version of Python, and Conda.
 
-#### Git
-
-When you run a workflow withing a Git repository, dstack detects the current branch, commit hash, 
+**Git:** When you run a workflow withing a Git repository, dstack detects the current branch, commit hash, 
 and local changes, and uses it on the cloud instance(s) to run the workflow.
 
-## Manage artifacts
+## Artifacts and tags
 
-Every workflow may have its output artifacts. If needed, artifacts can be read/written in real-time.
+Every workflow may have its output artifacts. They can be accessed via the `dstack artifacts` CLI command.
 
-Artifacts can be accessed via the `dstack artifacts` CLI command.
+You can assign tags to finished workflows to reuse their output artifacts from other workflows.
 
-## Manage tags
+You can also use tags to upload local data and reuse it from other workflows.
 
-Tags help manage data.
-
-For example, you can assign a tag to a finished workflow to use its output artifacts from other workflows.
-
-Also, you can create a tag by uploading data from your local machine.
-
-To make a workflow use the data via a tag, one has to use the `deps` property in `.dstack/workflows.yaml`.
-
-Example:
+If you've added a tag, you can refer to it as to a dependency via the `deps` property of your workflow 
+in `.dstack/workflows.yaml`:
 
 ```yaml
 deps:
   - tag: mnist_data
 ```
 
-You can refer to tags from other projects as well.
+You can refer not only to tags within your current Git repository but to the tags from your other 
+repositories.
+
+Here's an example how the workflow refers to a tag from the `dstackai/dstack-examples` repository:
+
+```yaml
+deps:
+  - tag: dstackai/dstack-examples/mnist_data
+```
 
 Tags can be managed via the `dstack tags` CLI command.
 
