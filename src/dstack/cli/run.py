@@ -95,7 +95,7 @@ def poll_run(repo_user_name: str, repo_name: str, job_heads: List[JobHead], back
         poll_logs(backend, repo_user_name, repo_name, job_heads, since("1d"), follow=True, from_run=True)
     except KeyboardInterrupt:
         run_name = job_heads[0].run_name
-        if Confirm.ask(f" [red]Stop the run '{run_name}'?[/]"):
+        if Confirm.ask(f" [red]Abort the run '{run_name}'?[/]"):
             backend.stop_jobs(repo_user_name, repo_name, run_name, abort=True)
             console.print(f"[grey58]OK[/]")
 
