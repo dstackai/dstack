@@ -1,4 +1,3 @@
-import base64
 import json
 import sys
 import time
@@ -406,77 +405,19 @@ def _get_ami_image(ec2_client: BaseClient, cuda: bool) -> Tuple[str, str]:
         raise Exception(f"Can't find an AMI image 'dstack-*' (cuda={cuda})")
 
 
-def _create_spot_request(ec2_client: BaseClient, iam_client: BaseClient, bucket_name: str, region_name: str,
-                         runner_id: str, instance_type: InstanceType) -> str:
-    launch_specification = {
-        "ImageId": _get_ami_image(ec2_client, len(instance_type.resources.gpus) > 0)[0],
-        "InstanceType": instance_type.instance_name,
-        "SecurityGroupIds": [_get_security_group_id(ec2_client, bucket_name)],
-        "BlockDeviceMappings": [
-            {
-                "DeviceName": "/dev/sda1",
-                "Ebs": {
-                    "VolumeSize": 100,
-                    "VolumeType": "gp2",
-                },
-            }
-        ],
-        "IamInstanceProfile": {
-            "Arn": instance_profile_arn(iam_client, bucket_name),
-        },
-        "UserData": base64.b64encode(
-            _user_data(bucket_name, region_name, runner_id, instance_type.resources).encode("ascii")
-        ).decode('ascii')
-    }
-    if not version.__is_release__:
-        launch_specification["KeyName"] = "stgn_dstack"
-    response = ec2_client.request_spot_instances(
-        InstanceCount=1,
-        Type="persistent",
-        LaunchSpecification=launch_specification,
-        TagSpecifications=[
-            {
-                "ResourceType": "spot-instances-request",
-                "Tags": [
-                    {
-                        "Key": "owner",
-                        "Value": "dstack"
-                    },
-                    {
-                        "Key": "dstack_bucket",
-                        "Value": bucket_name
-                    },
-                ],
-            },
-        ]
-    )
-    request_id = response["SpotInstanceRequests"][0]["SpotInstanceRequestId"]
-    return request_id
-
-
-def _create_spot_request_retry(ec2_client: BaseClient, iam_client: BaseClient, bucket_name: str, region_name: str,
-                               runner_id: str, instance_type: InstanceType, attempts: int = 3) -> str:
-    try:
-        return _create_spot_request(ec2_client, iam_client, bucket_name, region_name, runner_id,
-                                    instance_type)
-    except Exception as e:
-        if hasattr(e, "response") and e.response.get("Error") and e.response["Error"].get(
-                "Code") == "InvalidParameterValue":
-            if attempts > 0:
-                time.sleep(CREATE_INSTANCE_RETRY_RATE_SECS)
-                return _create_spot_request_retry(ec2_client, iam_client, bucket_name, region_name, runner_id,
-                                                  instance_type, attempts - 1)
-            else:
-                raise Exception("Failed to retry", e)
-        else:
-            raise e
-
-
 def _run_instance(ec2_client: BaseClient, iam_client: BaseClient, bucket_name: str, region_name: str,
                   runner_id: str, instance_type: InstanceType) -> str:
     launch_specification = {}
     if not version.__is_release__:
         launch_specification["KeyName"] = "stgn_dstack"
+    if instance_type.resources.interruptible:
+        launch_specification["InstanceMarketOptions"] = {
+            "MarketType": "spot",
+            "SpotOptions": {
+                "SpotInstanceType": "persistent",
+                "InstanceInterruptionBehavior": "stop",
+            }
+        }
     response = ec2_client.run_instances(
         BlockDeviceMappings=[
             {
@@ -513,8 +454,21 @@ def _run_instance(ec2_client: BaseClient, iam_client: BaseClient, bucket_name: s
         ],
         **launch_specification
     )
-    instance_id = response["Instances"][0]["InstanceId"]
-    return instance_id
+    if instance_type.resources.interruptible:
+        request_id = response["Instances"][0]["SpotInstanceRequestId"]
+        ec2_client.create_tags(Resources=[request_id], Tags=[
+            {
+                "Key": "owner",
+                "Value": "dstack"
+            },
+            {
+                "Key": "dstack_bucket",
+                "Value": bucket_name
+            },
+        ])
+    else:
+        request_id = response["Instances"][0]["InstanceId"]
+    return request_id
 
 
 def _run_instance_retry(ec2_client: BaseClient, iam_client: BaseClient, bucket_name: str, region_name: str,
@@ -547,12 +501,8 @@ def run_job(secretsmanager_client: BaseClient, ec2_client: BaseClient, iam_clien
                             secrets.list_secret_names(secretsmanager_client, bucket_name))
             _create_or_update_runner(s3_client, bucket_name, runner)
             try:
-                if instance_type.resources.interruptible:
-                    request_id = _create_spot_request_retry(ec2_client, iam_client, bucket_name, region_name, runner_id,
-                                                            instance_type)
-                else:
-                    request_id = _run_instance_retry(ec2_client, iam_client, bucket_name, region_name, runner_id,
-                                                     instance_type)
+                request_id = _run_instance_retry(ec2_client, iam_client, bucket_name, region_name, runner_id,
+                                                 instance_type)
                 runner.request_id = request_id
                 job.request_id = request_id
                 jobs.update_job(s3_client, bucket_name, job)
@@ -695,7 +645,7 @@ def stop_job(ec2_client: BaseClient, s3_client: BaseClient, bucket_name: str, re
                 or job_head.status in [JobStatus.SUBMITTED, JobStatus.DOWNLOADING] \
                 or not job \
                 or job.status in [JobStatus.SUBMITTED, JobStatus.DOWNLOADING] \
-                or request_status == RequestStatus.TERMINATED\
+                or request_status == RequestStatus.TERMINATED \
                 or not runner:
             new_status = JobStatus.STOPPED
         elif job_head and job_head.status != JobStatus.UPLOADING \
