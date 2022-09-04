@@ -52,7 +52,7 @@ class ArtifactHead:
         self.artifact_path = artifact_path
 
     def __str__(self) -> str:
-        return f'ArtifactHead(job_id="{self.job_id}", artifact_name="{self.artifact_path})'
+        return f'ArtifactHead(job_id="{self.job_id}", artifact_path="{self.artifact_path})'
 
 
 class RunHead:
