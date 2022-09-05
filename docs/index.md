@@ -64,8 +64,7 @@ run ML workflows.
 
 !!! info "NOTE:"
     dstack is still under development.
-    If you encounter bugs, please report them directly to the [issue tracker](https://github.com/dstackai/dstack/issues).
-
+    If you encounter bugs, please report them directly to [GitHub issues](https://github.com/dstackai/dstack/issues).
     For bugs, be sure to specify the detailed steps to reproduce the issue.
 
 Below is the list of existing limitations:

@@ -164,8 +164,8 @@ More tutorials, examples, and the full CLI reference can be found at [docs.dstac
 
 ## Help
 
-dstack is still under development.  If you encounter bugs, please report them directly 
-to the [issue tracker](https://github.com/dstackai/dstack/issues).
+dstack is still under development. If you encounter bugs, please report them directly 
+to [GitHub issues](https://github.com/dstackai/dstack/issues).
 For bugs, be sure to specify the detailed steps to reproduce the issue.
 
 For questions and support, join the [Slack chat](https://join.slack.com/t/dstackai/shared_invite/zt-xdnsytie-D4qU9BvJP8vkbkHXdi6clQ).

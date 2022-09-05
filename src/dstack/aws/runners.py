@@ -9,7 +9,7 @@ import yaml
 from botocore.client import BaseClient
 
 from dstack import version
-from dstack.aws import jobs, secrets
+from dstack.aws import jobs, secrets, logs
 from dstack.backend import InstanceType, RequestStatus, RequestHead
 from dstack.jobs import Job, JobStatus, Requirements
 from dstack.runners import Resources, Runner, Gpu
@@ -135,7 +135,17 @@ def _get_instance_type(ec2_client: BaseClient, requirements: Optional[Requiremen
                                   requirements and requirements.interruptible)) if instance_type else None
 
 
-def _create_or_update_runner(s3_client: BaseClient, bucket_name: str, runner: Runner):
+def _create_runner(logs_client: BaseClient, s3_client: BaseClient, bucket_name: str, runner: Runner):
+    key = f"runners/{runner.runner_id}.yaml"
+    metadata = {}
+    if runner.job.status == JobStatus.STOPPING:
+        metadata["status"] = "stopping"
+    s3_client.put_object(Body=yaml.dump(_serialize_runner(runner)), Bucket=bucket_name, Key=key, Metadata=metadata)
+    log_group_name = f"/dstack/runners/{bucket_name}"
+    logs.create_log_group_if_not_exists(logs_client, bucket_name, log_group_name)
+
+
+def _update_runner(s3_client: BaseClient, bucket_name: str, runner: Runner):
     key = f"runners/{runner.runner_id}.yaml"
     metadata = {}
     if runner.job.status == JobStatus.STOPPING:
@@ -489,7 +499,8 @@ def _run_instance_retry(ec2_client: BaseClient, iam_client: BaseClient, bucket_n
             raise e
 
 
-def run_job(secretsmanager_client: BaseClient, ec2_client: BaseClient, iam_client: BaseClient, s3_client: BaseClient,
+def run_job(secretsmanager_client: BaseClient, logs_client: BaseClient, ec2_client: BaseClient, iam_client: BaseClient,
+            s3_client: BaseClient,
             bucket_name: str, region_name, job: Job) -> Runner:
     if job.status == JobStatus.SUBMITTED:
         instance_type = _get_instance_type(ec2_client, job.requirements)
@@ -499,14 +510,14 @@ def run_job(secretsmanager_client: BaseClient, ec2_client: BaseClient, iam_clien
             jobs.update_job(s3_client, bucket_name, job)
             secret_names = secrets.list_secret_names(secretsmanager_client, bucket_name)
             runner = Runner(runner_id, None, instance_type.resources, job, secret_names)
-            _create_or_update_runner(s3_client, bucket_name, runner)
+            _create_runner(logs_client, s3_client, bucket_name, runner)
             try:
                 request_id = _run_instance_retry(ec2_client, iam_client, bucket_name, region_name, runner_id,
                                                  instance_type)
                 runner.request_id = request_id
                 job.request_id = request_id
                 jobs.update_job(s3_client, bucket_name, job)
-                _create_or_update_runner(s3_client, bucket_name, runner)
+                _update_runner(s3_client, bucket_name, runner)
                 return runner
             except Exception as e:
                 job.status = JobStatus.FAILED
@@ -659,7 +670,7 @@ def stop_job(ec2_client: BaseClient, s3_client: BaseClient, bucket_name: str, re
                     _stop_runner(ec2_client, s3_client, bucket_name, runner)
                 else:
                     runner.job.status = new_status
-                    _create_or_update_runner(s3_client, bucket_name, runner)
+                    _update_runner(s3_client, bucket_name, runner)
             if job_head and job_head.status.is_unfinished() and job_head.status != new_status or \
                     job and job.status.is_unfinished() and job.status != new_status:
                 job.status = new_status

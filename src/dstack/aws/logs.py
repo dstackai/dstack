@@ -11,6 +11,10 @@ from dstack.aws import jobs, runs
 from dstack.backend import LogEvent, LogEventSource
 from dstack.jobs import AppSpec, JobHead
 
+WAIT_N_ONCE_FINISHED = 1
+
+CHECK_STATUS_EVERY_N = 3
+
 POLL_LOGS_RATE_SECS = 1
 
 
@@ -70,6 +74,7 @@ def _filter_log_events_loop(ec2_client: BaseClient, s3_client: BaseClient, logs_
                             filter_logs_events_kwargs: dict):
     event_ids_per_timestamp = defaultdict(set)
     counter = 0
+    finished_counter = 0
     while True:
         response = logs_client.filter_log_events(**filter_logs_events_kwargs)
 
@@ -89,11 +94,13 @@ def _filter_log_events_loop(ec2_client: BaseClient, s3_client: BaseClient, logs_
             )
             time.sleep(POLL_LOGS_RATE_SECS)
             counter = counter + 1
-            if counter % 3 == 0:
+            if counter % CHECK_STATUS_EVERY_N == 0:
                 run = next(iter(runs.get_run_heads(ec2_client, s3_client, bucket_name, repo_user_name, repo_name,
                                                    job_heads, include_request_heads=False)))
                 if run.status.is_finished():
-                    break
+                    if finished_counter == WAIT_N_ONCE_FINISHED:
+                        break
+                    finished_counter += 1
 
 
 def create_log_group_if_not_exists(logs_client: BaseClient, bucket_name: str, log_group_name: str):

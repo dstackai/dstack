@@ -42,9 +42,20 @@ The following properties are optional:
 - `requirements` - (Optional) The path to the `requirements.txt` file
 - `version` - (Optional) The major version of Python. By default, it's `3.10`.
 - `environment` - (Optional) The list of environment variables 
-- `artifacts` - (Optional) The list of folders that must be saved as output artifacts
+- [`artifacts`](#artifacts) - (Optional) The list of output artifacts
 - [`resources`](#resources) - (Optional) The hardware resources required by the workflow
 - `working_dir` - (Optional) The path to the working directory
+
+#### artifacts
+
+The list of output artifacts
+
+- `path` – (Required) The relative path of the folder that must be saved as an output artifact
+- `mount` – (Optional) `true` if the artifact files must be saved in real-time.
+    Must be used only when real-time access to the artifacts is important: 
+    for storing checkpoints (e.g. if interruptible instances are used) and event files
+    (e.g. TensorBoard event files, etc.)
+    By default, it's `false`.
 
 #### resources
 
