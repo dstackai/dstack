@@ -67,6 +67,7 @@ def poll_run(repo_user_name: str, repo_name: str, job_heads: List[JobHead], back
     try:
         console.print()
         request_errors_printed = False
+        downloading = False
         with Progress(TextColumn("[progress.description]{task.description}"), SpinnerColumn(),
                       transient=True, ) as progress:
             task = progress.add_task("Provisioning... It may take up to a minute.", total=None)
@@ -74,7 +75,10 @@ def poll_run(repo_user_name: str, repo_name: str, job_heads: List[JobHead], back
                 run = next(iter(backend.get_run_heads(repo_user_name, repo_name, job_heads)))
                 if run.status.is_finished():
                     sys.exit(0)
-                elif run.status not in [JobStatus.SUBMITTED]:
+                elif run.status == JobStatus.DOWNLOADING and not downloading:
+                    progress.update(task, description="Downloading dependencies... It may take a while.")
+                    downloading = True
+                elif run.status not in [JobStatus.SUBMITTED, JobStatus.DOWNLOADING]:
                     progress.update(task, total=100)
                     break
                 if _has_request_status(run, [RequestStatus.TERMINATED, RequestStatus.NO_CAPACITY]):
@@ -82,7 +86,7 @@ def poll_run(repo_user_name: str, repo_name: str, job_heads: List[JobHead], back
                         progress.update(task, description=f"[red]Request(s) terminated[/]", total=100)
                         break
                     elif not request_errors_printed and _has_request_status(run, [RequestStatus.NO_CAPACITY]):
-                        progress.update(task, description=f"[dark_orange]No capacity")
+                        progress.update(task, description=f"[dark_orange]No capacity[/]")
                         request_errors_printed = True
                 elif request_errors_printed:
                     progress.update(task, description="Provisioning... It may take up to a minute.")

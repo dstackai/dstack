@@ -100,45 +100,6 @@ def print_runs(args: Namespace, backend: Backend):
     console.print(table)
 
 
-def get_workflow_runs(args: Namespace, backend: Backend):
-    workflows_by_id = {}
-    repo_data = load_repo_data()
-    job_heads = backend.list_job_heads(repo_data.repo_user_name, repo_data.repo_name, args.run_name)
-    unfinished = False
-    for job_head in job_heads:
-        if job_head.status.is_unfinished():
-            unfinished = True
-        workflow_id = ','.join([job_head.run_name, job_head.workflow_name or ''])
-        if workflow_id not in workflows_by_id:
-            workflow = {
-                "run_name": job_head.run_name,
-                "workflow_name": job_head.workflow_name,
-                "provider_name": job_head.provider_name,
-                "artifacts": job_head.artifacts or [],
-                "status": job_head.status,
-                "submitted_at": job_head.submitted_at,
-                "tag_name": job_head.tag_name
-            }
-            workflows_by_id[workflow_id] = workflow
-        else:
-            workflow = workflows_by_id[workflow_id]
-            workflow["submitted_at"] = min(workflow["submitted_at"], job_head.submitted_at)
-            if job_head.artifacts:
-                workflow["artifacts"].extend(job_head.artifacts)
-            if job_head.status.is_unfinished():
-                # TODO: implement max(status1, status2)
-                workflow["status"] = job_head.status
-
-    workflows = list(workflows_by_id.values())
-    workflows = sorted(workflows, key=lambda j: j["submitted_at"], reverse=True)
-    if not args.all:
-        if unfinished:
-            workflows = list(filter(lambda w: w["status"].is_unfinished(), workflows))
-    for workflow in workflows:
-        workflow["status"] = workflow["status"].value
-    return reversed(workflows)
-
-
 def pretty_duration_and_submitted_at(submitted_at, started_at=None, finished_at=None):
     if started_at is not None and finished_at is not None:
         _finished_at_milli = round(finished_at / 1000)
@@ -168,7 +129,7 @@ def _app_heads(apps, status):
 
 
 def register_parsers(main_subparsers):
-    parser = main_subparsers.add_parser("status", help="Show status of runs")
+    parser = main_subparsers.add_parser("ps", help="List runs")
 
     parser.add_argument("run_name", metavar="RUN", type=str, nargs="?", help="A name of a run")
     parser.add_argument("-a", "--all",

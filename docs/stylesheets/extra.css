@@ -502,6 +502,15 @@ body {
     border: 1px solid #E4E4E7;
 }
 
+.md-typeset figure p img {
+    border: none;
+    display: inline-block;
+}
+
+.md-typeset .grid.fit {
+    grid-template-columns: repeat(auto-fit,minmax(15rem,1fr));
+}
+
 .md-typeset .tabbed-labels>label {
     margin-right: 14px !important;
     padding-left: 0 !important;

@@ -397,7 +397,7 @@ def _get_ami_image(ec2_client: BaseClient, cuda: bool) -> Tuple[str, str]:
             ]
         },
     ], )
-    images = list(filter(lambda i: cuda == ("cuda" in i["Name"]), response["Images"]))
+    images = list(filter(lambda i: cuda == ("cuda" in i["Name"]) and i["State"] == "available", response["Images"]))
     if images:
         ami = next(iter(sorted(images, key=lambda i: i["CreationDate"], reverse=True)))
         return ami["ImageId"], ami["Name"]
@@ -497,8 +497,8 @@ def run_job(secretsmanager_client: BaseClient, ec2_client: BaseClient, iam_clien
             runner_id = uuid.uuid4().hex
             job.runner_id = runner_id
             jobs.update_job(s3_client, bucket_name, job)
-            runner = Runner(runner_id, None, instance_type.resources, job,
-                            secrets.list_secret_names(secretsmanager_client, bucket_name))
+            secret_names = secrets.list_secret_names(secretsmanager_client, bucket_name)
+            runner = Runner(runner_id, None, instance_type.resources, job, secret_names)
             _create_or_update_runner(s3_client, bucket_name, runner)
             try:
                 request_id = _run_instance_retry(ec2_client, iam_client, bucket_name, region_name, runner_id,

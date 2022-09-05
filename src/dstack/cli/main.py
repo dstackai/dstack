@@ -11,8 +11,8 @@ def default_func(_: Namespace):
           "\n"
           "Main commands:\n"
           "  run            Run a workflow\n"
-          "  status         Show status of runs\n"
-          "  stop           Stop a run\n"
+          "  ps             List runs\n"
+          "  stop           Stop runs\n"
           "  logs           Show logs of a run\n"
           "  artifacts      List or download artifacts of a run\n"
           "  tags           List, create or delete tags\n"
@@ -30,9 +30,7 @@ def default_func(_: Namespace):
           "  -h, --help     Show this help output, or the help for a specified command.\n"
           "  -v, --version  Show the version of the CLI.\n"
           "\n"
-          "For documentation, visit https://docs.dstack.ai/cli\n"
-          "\n"
-          "✨ Support us by giving us as star on GitHub: https://github.com/dstackai/dstack"
+          "For documentation, visit https://docs.dstack.ai/cli"
           )
 
 
@@ -60,7 +58,7 @@ def main():
     dashboard.register_parsers(subparsers)
 
     if len(sys.argv) < 2:
-        parser.print_help()
+        default_func(Namespace())
         exit(1)
 
     args, unknown = parser.parse_known_args()

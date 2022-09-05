@@ -4,19 +4,18 @@
 Git-based CLI to run ML workflows on cloud
 ______________________________________________________________________
 
-![PyPI](https://img.shields.io/github/workflow/status/dstackai/dstack/Build?logo=github&style=for-the-badge)
-[![PyPI](https://img.shields.io/pypi/v/dstack?style=for-the-badge)](https://pypi.org/project/dstack/)
-[![PyPI - License](https://img.shields.io/pypi/l/dstack?style=for-the-badge)](https://github.com/dstackai/dstack/blob/master/LICENSE.md)
-[![Slack](https://img.shields.io/badge/slack-join-e01563?style=for-the-badge)](https://join.slack.com/t/dstackai/shared_invite/zt-xdnsytie-D4qU9BvJP8vkbkHXdi6clQ)
+[![PyPI](https://img.shields.io/pypi/v/dstack?style=for-the-badge&color=brightgreen)](https://pypi.org/project/dstack/)
+[![PyPI - License](https://img.shields.io/pypi/l/dstack?style=for-the-badge&color=blue)](https://github.com/dstackai/dstack/blob/master/LICENSE.md)
+[![Slack](https://img.shields.io/badge/slack-chat-e01563?style=for-the-badge)](https://join.slack.com/t/dstackai/shared_invite/zt-xdnsytie-D4qU9BvJP8vkbkHXdi6clQ)
 
 [//]: # ([![twitter]&#40;https://img.shields.io/twitter/follow/dstackai.svg?style=social&label=Follow&#41;]&#40;https://twitter.com/dstackai&#41;)
 
 </div>
 
-## 👋 Intro
+## Intro
 
-To run ML workflows, your local machine is often not enough. 
-That’s why you often have to automate running ML workflows withing the cloud infrastructure.
+To run ML workflows, often your local machine is not enough. 
+That’s why it's necessary to automate the process of running ML workflows within the cloud infrastructure.
 
 Instead of managing infrastructure yourself, writing own scripts, or using cumbersome MLOps platforms, with dstack, 
 you can focus on code while dstack does management of dependencies, infrastructure, and data for you.
@@ -35,14 +34,13 @@ run ML workflows.
    requirements and they will be pre-configured.
 4. **Interruption-friendly:** Because artifacts can be stored in real-time, you can leverage interruptible 
    (spot/preemptive) instances. Workflows can be resumed from where they were interrupted.
-5. **Technology-agnostic:** No need to use specific APIs in your code. Anything that works locally, can run via dstack.
-6. **Dev environments:** Workflows may be not only tasks and applications but also dev environments, incl. 
-   IDEs and notebooks.
-7. **Very easy setup:** Install the dstack CLI and run workflows
+5. **Dev environments:** Workflows may be not only tasks and applications but also dev environments, such as 
+   IDEs and Jupyter notebooks.
+6. **Very easy setup:** Install the dstack CLI and run workflows
    in the cloud using your local credentials. The state is stored in an S3 bucket. 
    No need to set up anything else.
 
-## 📦 Installation
+## Installation
 
 To use dstack, you'll only need the dstack CLI. No other software needs to be installed or deployed.
 
@@ -75,7 +73,7 @@ The configuration will be stored in `~/.dstack/config.yaml`.
 
 That's it. Now you can use dstack on your machine.
 
-## ✨ Usage
+## Usage
 
 ### Define workflows
 
@@ -157,19 +155,38 @@ Tags can be managed via the `dstack tags` CLI command.
 
 ## Providers
 
-dstack offers [multiple providers](https://docs.dstack.ai/providers) that allow running tasks, applications, 
+dstack supports [multiple providers](https://docs.dstack.ai/providers) that allow running tasks, applications, 
 and dev environments.
 
-## 📘 Docs
+## Docs
 
 More tutorials, examples, and the full CLI reference can be found at [docs.dstack.ai](https://docs.dstack.ai).
 
-## 🛟 Help
+## Help
 
-If you encounter bugs, please report them directly 
+dstack is still under development.  If you encounter bugs, please report them directly 
 to the [issue tracker](https://github.com/dstackai/dstack/issues).
+For bugs, be sure to specify the detailed steps to reproduce the issue.
 
 For questions and support, join the [Slack chat](https://join.slack.com/t/dstackai/shared_invite/zt-xdnsytie-D4qU9BvJP8vkbkHXdi6clQ).
+
+## Limitations and roadmap
+
+Below is the list of existing limitations:
+
+- **Visual dashboard:** There's no visual dashboard to manage repos, runs, tags, and secrets. 
+  It's already in work and is going to be released shortly (Q3, 2022).
+- **Interactive logs:** Currently, output logs of workflows are not interactive. Means, you can't 
+  use output to display progress (e.g. via `tqdm`, etc.) Until it's supported, it's recommended that 
+  you report progress via TensorBoard event files or hosted experiment trackers (e.g. WanB, Comet, 
+  Neptune, etc.) 
+- **Git:** Currently, dstack can be used only with GitHub repositories. If you'd like to use
+  dstack with other Git hosting providers or without using Git at all, add or upvote the 
+  corresponding issue.
+- **Cloud :** dstack currently works only with AWS. If you'd like to use dstack with GCP, 
+  Azure, or Kubernetes, add or upvote the corresponding issue.
+- **Integrations:** Currently, dstack supports only basic providers. Advanced providers (e.g. for 
+  distributed training and data processing) are going to be added later.
 
 ##  Licence
 

@@ -15,7 +15,7 @@ Usage: dstack [OPTIONS ...] COMMAND [ARGS ...]
 
 Main commands:
   run            Run a workflow
-  status         Show status of runs
+  ps             List runs
   stop           Stop a run
   logs           Show logs of a run
   artifacts      List or download artifacts of a run or a tag

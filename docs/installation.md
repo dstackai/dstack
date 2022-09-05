@@ -1,9 +1,5 @@
 To use dstack, you'll only need the dstack CLI. No other software needs to be installed or deployed.
 
-!!! info "NOTE:"
-    dstack currently works only with **AWS**. If you'd like to use dstack with **GCP**, **Azure**, or **Kubernetes**,
-    please [upvote](https://github.com/dstackai/dstack/labels/cloud-provider) the corresponding issue.
-
 ## Install the CLI
 
 In order to install the dstack CLI, you need to use **pip**:

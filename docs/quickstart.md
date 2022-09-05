@@ -130,15 +130,13 @@ To interrupt, press Ctrl+C.
 
 !!! info "NOTE:"
     Make sure to always run the CLI from the Git repository.
+    When you run a workflow, dstack detects the current branch, commit hash, and local changes.
+
+    As long as your project is under Git, you don't have to commit local changes before using the run command.
 
 Once you run the workflow, dstack creates the required cloud instance(s) within a minute,
 download the dependencies, and run your workflow. You'll see the output in real-time as your 
 workflow is running.
-
-!!! tip "NOTE:"
-    As long as your project is under Git, you don't have to commit local changes before using the run command.
-    dstack takes the local changes into account automatically.
-    Just make sure that these changes are staged (using the `git add` command).
 
 ## Access the run artifacts
 
@@ -264,17 +262,3 @@ file, this way:
 The `resources` property allows you to specify the number of CPUs, GPUs, the name of the GPU (e.g. `V80` or `V100`),
 the amount of memory, and even whether you want to use spot/preemptive instances or regular ones.
 Find more details on how to specify resources in the `bash` provider [documentation](workflows/bash.md#resources).
-
-## More CLI commands
-
-The other useful CLI commands include:
-
- - `dstack status` – Show status of runs within the current project. By default, shows the unfinished runs only, or the 
-  last finished run. Use `dstack status -a` to see all recent runs.
- - `dstack tags` – List existing tags within the current project.
- - `dstack secrets` – Manages secrets. Secrets can be used to access sensitive data (passwords, tokens, etc)
-  from workflows without hard-coding it within the code.
- - `dstack delete` – Deletes runs within the current project. To delete all runs, use the `dstack delete -a` 
-  command. Deleting runs doesn't affect tags. Feel free to delete the run after you've assigned a tag to it.
-
-For more details on the CLI commands, check out the CLI [documentation](cli/overview.md).
