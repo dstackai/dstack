@@ -43,7 +43,7 @@ def register_parsers(main_subparsers):
     parser = main_subparsers.add_parser("delete", help="Delete runs")
 
     parser.add_argument("run_name", metavar="RUN", type=str, nargs="?", help="A name of a run")
-    parser.add_argument("-a", "--all", help="All runs", dest="all", action="store_true")
-    parser.add_argument("--yes", "-y", help="Don't ask for confirmation", action="store_true")
+    parser.add_argument("-a", "--all", help="Delete all finished runs", dest="all", action="store_true")
+    parser.add_argument("-y", "--yes", help="Don't ask for confirmation", action="store_true")
 
     parser.set_defaults(func=delete_func)

@@ -89,7 +89,7 @@ class Provider:
     def _add_base_args(parser: ArgumentParser):
         parser.add_argument("-r", "--requirements", type=str)
         parser.add_argument("-e", "--env", action='append')
-        parser.add_argument("-a", "--artifact", metavar="ARTIFACT", dest="artifacts", action='append')
+        parser.add_argument("-a", "--artifact", metavar="PATH", dest="artifacts", action='append')
         parser.add_argument("-d", "--dep", metavar="TAG | WORKFLOW", dest="deps", action='append')
         parser.add_argument("-w", "--working-dir", type=str)
         parser.add_argument("-i", "--interruptible", action="store_true")

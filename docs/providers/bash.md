@@ -16,7 +16,7 @@ which folders to save as output artifacts, dependencies to other workflows if an
       - name: "train"
         provider: bash
         deps:
-          - :some_tag
+          - tag: some_tag
         python: 3.10
         env: 
           - PYTHONPATH=src

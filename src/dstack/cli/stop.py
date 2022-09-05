@@ -45,8 +45,9 @@ def register_parsers(main_subparsers):
     parser = main_subparsers.add_parser("stop", help="Stop runs")
 
     parser.add_argument("run_name", metavar="RUN", type=str, nargs="?", help="A name of a run")
-    parser.add_argument("-a", "--all", help="All runs", dest="all", action="store_true")
-    parser.add_argument("-x", "--abort", help="Don't wait for a graceful stop", dest="abort", action="store_true")
-    parser.add_argument("--yes", "-y", help="Don't ask for confirmation", action="store_true")
+    parser.add_argument("-a", "--all", help="Stop all unfinished runs", dest="all", action="store_true")
+    parser.add_argument("-x", "--abort", help="Don't wait for a graceful stop and abort the run immediately",
+                        dest="abort", action="store_true")
+    parser.add_argument("-y", "--yes", help="Don't ask for confirmation", action="store_true")
 
     parser.set_defaults(func=stop_func)

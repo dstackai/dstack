@@ -14,7 +14,7 @@ def default_func(_: Namespace):
           "  ps             List runs\n"
           "  stop           Stop runs\n"
           "  logs           Show logs of a run\n"
-          "  artifacts      List or download artifacts of a run\n"
+          "  artifacts      List or download artifacts of a run or tag\n"
           "  tags           List, create or delete tags\n"
           # "  dashboard      Launch a dashboard\n"
           # "  app            Open a running application\n"

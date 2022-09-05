@@ -68,16 +68,26 @@ nav:
       - Installation: installation.md
       - Quickstart: quickstart.md
   - Reference:
-      - Workflows:
-        - Overview: workflows/overview.md
-        - bash: workflows/bash.md
-        - code: workflows/code.md
-        - lab: workflows/lab.md
-        - notebook: workflows/notebook.md
-        - docker: workflows/docker.md
-#        - torchrun: workflows/torchrun.md
-      - Commands (CLI):
-        - Overview: cli/overview.md
+      - Workflows: workflows/overview.md
+      - Providers:
+        - bash: providers/bash.md
+        - code: providers/code.md
+        - lab: providers/lab.md
+        - notebook: providers/notebook.md
+        - docker: providers/docker.md
+#        - torchrun: providers/torchrun.md
+      - CLI:
+        - cli/index.md
+        - run: cli/run.md
+        - ps: cli/ps.md
+        - stop: cli/stop.md
+        - logs: cli/logs.md
+        - artifacts: cli/artifacts.md
+        - tags: cli/tags.md
+        - init: cli/init.md
+        - config: cli/config.md
+        - secrets: cli/secrets.md
+        - delete: cli/delete.md
   - Help:
       - Slack chat: https://join.slack.com/t/dstackai/shared_invite/zt-xdnsytie-D4qU9BvJP8vkbkHXdi6clQ
       - GitHub issues: https://github.com/dstackai/dstack/issues

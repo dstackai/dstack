@@ -12,7 +12,7 @@ from dstack.repo import load_repo_data
 
 def init_func(args: Namespace):
     try:
-        local_repo_data = load_repo_data(args.gh_token, args.private_key)
+        local_repo_data = load_repo_data(args.gh_token, args.identity_file)
         local_repo_data.ls_remote()
         backend = load_backend()
         backend.save_repo_credentials(local_repo_data.repo_user_name, local_repo_data.repo_name,
@@ -26,8 +26,8 @@ def init_func(args: Namespace):
 
 def register_parsers(main_subparsers):
     parser = main_subparsers.add_parser("init", help="Authorize dstack to access the current GitHub repo")
-    parser.add_argument("--gh-token", help="A GitHub personal access token", type=str, nargs="?",
+    parser.add_argument("-t", "--token", metavar="GH_TOKEN", help="An authentication token for GitHub", type=str,
                         dest="gh_token")
-    parser.add_argument("--private-key", help="A path to the private SSH key file", type=str, nargs="?",
-                        dest="private_key")
+    parser.add_argument("-i", "--identity", metavar="FILE", help="A path to the private SSH key file", type=str,
+                        dest="identity_file")
     parser.set_defaults(func=init_func)

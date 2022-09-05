@@ -80,7 +80,8 @@ def register_parsers(main_subparsers):
     list_parser.set_defaults(func=list_func)
 
     download_parser = subparsers.add_parser("download", help="Download artifacts", )
-    download_parser.add_argument("run_name_or_tag_name", metavar="RUN | :TAG", type=str, help="A name of a run or a tag")
-    download_parser.add_argument("--output", "-o", help="The directory to download artifacts to. "
+    download_parser.add_argument("run_name_or_tag_name", metavar="(RUN | :TAG)", type=str,
+                                 help="A name of a run or a tag")
+    download_parser.add_argument("-o", "--output", help="The directory to download artifacts to. "
                                                         "By default, it's the current directory.", type=str)
     download_parser.set_defaults(func=download_func)

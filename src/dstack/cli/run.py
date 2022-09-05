@@ -94,7 +94,7 @@ def poll_run(repo_user_name: str, repo_name: str, job_heads: List[JobHead], back
         console.print()
         console.print("[grey58]To interrupt, press Ctrl+C.[/]")
         console.print()
-        poll_logs(backend, repo_user_name, repo_name, job_heads, since("1d"), follow=True, from_run=True)
+        poll_logs(backend, repo_user_name, repo_name, job_heads, since("1d"), attach=True, from_run=True)
     except KeyboardInterrupt:
         run_name = job_heads[0].run_name
         if Confirm.ask(f" [red]Abort the run '{run_name}'?[/]"):
@@ -149,7 +149,7 @@ def run_workflow_func(args: Namespace):
 
 def register_parsers(main_subparsers):
     parser = main_subparsers.add_parser("run", help="Run a workflow", add_help=False)
-    parser.add_argument("workflow_or_provider", metavar="TARGET", type=str,
+    parser.add_argument("workflow_or_provider", metavar="(WORKFLOW | PROVIDER)", type=str,
                         help="A name of a workflow or a provider", nargs="?")
     parser.add_argument("-d", "--detach", help="Do not poll for status update and logs", action="store_true")
     parser.add_argument("args", metavar="ARGS", nargs=argparse.ZERO_OR_MORE, help="Override provider arguments")

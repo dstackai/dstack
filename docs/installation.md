@@ -1,14 +1,18 @@
 To use dstack, you'll only need the dstack CLI. No other software needs to be installed or deployed.
 
+!!! info "NOTE:"
+    dstack currently works only with AWS. If you'd like to use dstack with GCP, Azure, or Kubernetes,
+    [upvote](https://github.com/dstackai/dstack/labels/cloud-provider) the corresponding issue.
+
 ## Install the CLI
 
-In order to install the dstack CLI, you need to use **pip**:
+In order to install the dstack CLI, you need to use `pip`:
 
 ```shell
 pip install dstack
 ```
 
-## Configure AWS credentials
+## Configure cloud credentials
 
 The dstack CLI uses your local AWS credentials to provision infrastructure and store data.
 Make sure, you've [configured](https://docs.aws.amazon.com/cli/latest/userguide/cli-configure-files.html) them
@@ -43,6 +47,6 @@ to create it.
 
 The command will also create the necessary IAM instance profile role to be used when provisioning EC2 instances.
 
-The final configuration will be stored in `~/.dstack/config.yaml`.
+The configuration is stored in `~/.dstack/config.yaml`.
 
 Once the command is successful, you are good to go to run workflows with the CLI.

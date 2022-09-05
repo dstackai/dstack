@@ -82,7 +82,7 @@ def register_parsers(main_subparsers):
     add_secrets_parser.add_argument("secret_name", metavar="NAME", type=str, help="The name of the secret")
     add_secrets_parser.add_argument("secret_value", metavar="VALUE", type=str, help="The value of the secret",
                                     nargs="?")
-    add_secrets_parser.add_argument("--override", "-o", help="Override the existing secret", action="store_true")
+    add_secrets_parser.add_argument("-o", "--override", help="Override the secret if it exists", action="store_true")
     add_secrets_parser.set_defaults(func=add_secret_func)
 
     update_secrets_parser = subparsers.add_parser("update", help="Update a secret")

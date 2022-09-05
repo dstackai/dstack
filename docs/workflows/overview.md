@@ -113,7 +113,7 @@ Providers may help run tasks, applications, dev environments and even distribute
 
     Runs shell commands
 
-    [:octicons-arrow-right-24: Reference](bash.md)
+    [:octicons-arrow-right-24: Reference](../providers/bash.md)
 
 </div>
 
@@ -125,19 +125,19 @@ Providers may help run tasks, applications, dev environments and even distribute
 
     Launches a VS Code dev environment
 
-    [:octicons-arrow-right-24: Reference](code.md)
+    [:octicons-arrow-right-24: Reference](../providers/code.md)
 
 - **JupyterLab** 
 
     Launches a JupyterLab dev environment
 
-    [:octicons-arrow-right-24: Reference](lab.md)
+    [:octicons-arrow-right-24: Reference](../providers/lab.md)
 
 - **Jupyter Notebook** 
 
     Launches a Jupyter notebook
 
-    [:octicons-arrow-right-24: Reference](notebook.md)
+    [:octicons-arrow-right-24: Reference](../providers/notebook.md)
 
 [//]: # (- **Torchrun** )
 
@@ -149,6 +149,6 @@ Providers may help run tasks, applications, dev environments and even distribute
 
     Runs a Docker image
 
-    [:octicons-arrow-right-24: Reference](docker.md)
+    [:octicons-arrow-right-24: Reference](../providers/docker.md)
 
 </div>

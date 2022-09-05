@@ -47,7 +47,7 @@ def logs_func(args: Namespace):
         start_time = since(args.since)
         job_heads = backend.list_job_heads(repo_data.repo_user_name, repo_data.repo_name, args.run_name)
         if job_heads:
-            poll_logs(backend, repo_data.repo_user_name, repo_data.repo_name, job_heads, start_time, args.follow)
+            poll_logs(backend, repo_data.repo_user_name, repo_data.repo_name, job_heads, start_time, args.attach)
         else:
             sys.exit(f"Cannot find the run '{args.run_name}'")
     except InvalidGitRepositoryError:
@@ -56,14 +56,14 @@ def logs_func(args: Namespace):
         sys.exit(f"Call 'dstack config' first")
 
 
-def poll_logs(backend, repo_user_name: str, repo_name: str, job_heads: List[JobHead], start_time: int, follow: bool,
+def poll_logs(backend, repo_user_name: str, repo_name: str, job_heads: List[JobHead], start_time: int, attach: bool,
               from_run: bool = False):
     try:
-        for event in backend.poll_logs(repo_user_name, repo_name, job_heads, start_time, follow):
+        for event in backend.poll_logs(repo_user_name, repo_name, job_heads, start_time, attach):
             print(event.log_message)
     except KeyboardInterrupt as e:
-        if follow is True:
-            # The only way to exit from the --follow is to Ctrl-C. So
+        if attach is True:
+            # The only way to exit from the --attach is to Ctrl-C. So
             # we should exit the iterator rather than having the
             # KeyboardInterrupt propagate to the rest of the command.
             if from_run:
@@ -75,12 +75,12 @@ def register_parsers(main_subparsers):
 
     # TODO: Add --format (short|detailed)
     parser.add_argument("run_name", metavar="RUN", type=str, help="A name of a run")
-    parser.add_argument("--follow", "-f", help="Whether to continuously poll for new logs. By default, the command "
+    parser.add_argument("-a", "--attach", help="Whether to continuously poll for new logs. By default, the command "
                                                "will exit once there are no more logs to display. To exit from this "
                                                "mode, use Control-C.", action="store_true")
-    parser.add_argument("--since", "-s",
+    parser.add_argument("-s", "--since",
                         help="From what time to begin displaying logs. By default, logs will be displayed starting "
-                             "from ten minutes in the past. The value provided can be an ISO 8601 timestamp or a "
+                             "from 24 hours in the past. The value provided can be an ISO 8601 timestamp or a "
                              "relative time. For example, a value of 5m would indicate to display logs starting five "
                              "minutes in the past.", type=str, default="1d")
 

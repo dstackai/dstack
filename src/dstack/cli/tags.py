@@ -49,8 +49,10 @@ def add_tag_func(args: Namespace):
         else:
             if args.run_name:
                 backend.add_tag_from_run(repo_data.repo_user_name, repo_data.repo_name, args.tag_name, args.run_name)
+            elif args.artifact_paths:
+                backend.add_tag_from_local_dirs(repo_data, args.tag_name, args.artifact_paths)
             else:
-                backend.add_tag_from_local_dirs(repo_data, args.tag_name, args.local_dirs)
+                sys.exit("Specify -r RUN or -a PATH to create a tag")
         print(f"[grey58]OK[/]")
     except ConfigError:
         sys.exit(f"Call 'dstack config' first")
@@ -80,11 +82,10 @@ def register_parsers(main_subparsers):
 
     add_tags_parser = subparsers.add_parser("add", help="Add a tag")
     add_tags_parser.add_argument("tag_name", metavar="TAG", type=str, help="The name of the tag")
-    group = add_tags_parser.add_mutually_exclusive_group(required=True)
-    group.add_argument("--run-name", "-r", type=str, help="A name of a run")
-    group.add_argument("--local-dir", metavar="LOCAL_DIR", type=str,
-                       help="A local directory to upload as an artifact", action="append",
-                       dest="local_dirs")
+    add_tags_parser.add_argument("run_name", metavar="RUN", type=str, help="A name of a run", nargs="?")
+    add_tags_parser.add_argument("-a", "--artifact", metavar="PATH", type=str,
+                                 help="A path to local directory to upload as an artifact", action="append",
+                                 dest="artifact_paths")
     add_tags_parser.set_defaults(func=add_tag_func)
 
     delete_tags_parser = subparsers.add_parser("delete", help="Delete a tag")

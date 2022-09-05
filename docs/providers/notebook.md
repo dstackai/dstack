@@ -82,7 +82,7 @@ The number of GPUs, their name and memory
 ## CLI reference
 
 ```bash
-usage: dstack run notebook [-d] [-h] [-r REQUIREMENTS] [-e ENV] [-a ARTIFACT]
+usage: dstack run notebook [-d] [-h] [-r REQUIREMENTS] [-e ENV] [-a PATH]
                            [--working-dir WORKING_DIR] [-i] [--cpu CPU]
                            [--memory MEMORY] [--gpu GPU_COUNT]
                            [--gpu-name GPU_NAME] [--gpu-memory GPU_MEMORY]
@@ -95,7 +95,7 @@ The following arguments are optional:
 - `--working-dir WORKING_DIR` - (Optional) The path to the working directory
 - `-r REQUIREMENTS`, `--requirements REQUIREMENTS` - (Optional) The path to the `requirements.txt` file
 - `-e ENV`, `--env ENV` - (Optional) The list of environment variables 
-- `-a ARTIFACT`, `--artifact ARTIFACT` - (Optional) A folder that must be saved as output artifact
+- `-a PATH`, `--artifact PATH` - (Optional) A folder that must be saved as output artifact
 - `--cpu CPU` - (Optional) The number of CPU cores
 - `--memory MEMORY` - The size of RAM memory, e.g. `"16GB"`
 - `--gpu GPU_COUNT` - (Optional) The number of GPUs

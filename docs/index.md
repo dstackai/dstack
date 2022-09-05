@@ -75,10 +75,9 @@ Below is the list of existing limitations:
   use output to display progress (e.g. via `tqdm`, etc.) Until it's supported, it's recommended that 
   you report progress via TensorBoard event files or hosted experiment trackers (e.g. WanB, Comet, 
   Neptune, etc.) 
-- **Git:** Currently, dstack can be used only with GitHub repositories. If you'd like to use
-  dstack with other Git hosting providers or without using Git at all, add or upvote the 
+- **Git hosting providers:** Currently, dstack works only with the GitHub.com repositories. If you'd like to use
+  dstack with other Git hosting providers (or without using Git at all), add or upvote the 
   corresponding issue.
-- **Cloud :** dstack currently works only with AWS. If you'd like to use dstack with GCP, 
+- **Cloud providers:** dstack currently works only with AWS. If you'd like to use dstack with GCP, 
   Azure, or Kubernetes, add or upvote the corresponding issue.
-- **Integrations:** Currently, dstack supports only basic providers. Advanced providers (e.g. for 
-  distributed training and data processing) are going to be added later.
+- **Providers:** Advanced providers, e.g. for distributed training and data processing, are in plan.
