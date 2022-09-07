@@ -78,10 +78,10 @@ def print_runs(args: Namespace, backend: Backend):
     console = Console()
     table = Table(box=None)
     table.add_column("RUN", style="bold", no_wrap=True)
-    table.add_column("TARGET", style="grey58", width=12)
+    table.add_column("TARGET", style="grey58", width=14)
     table.add_column("STATUS", no_wrap=True)
-    table.add_column("APPS", justify="center", style="green", no_wrap=True)
-    table.add_column("ARTIFACTS", style="grey58", width=12)
+    table.add_column("APPS", no_wrap=True)
+    table.add_column("ARTIFACTS", style="grey58", width=18)
     table.add_column("SUBMITTED", style="grey58", no_wrap=True)
     table.add_column("TAG", style="bold yellow", no_wrap=True)
 

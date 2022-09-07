@@ -78,7 +78,7 @@ That's it. Now you can use dstack on your machine.
 ### Define workflows
 
 Workflows can be defined in the `.dstack/workflows.yaml` file within your 
-project.
+project directory.
 
 For every workflow, you can specify the provider, dependencies, commands, what output 
 folders to store as artifacts, and what resources the instance would need (e.g. whether it should be a 

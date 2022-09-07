@@ -67,9 +67,11 @@ nav:
       - Concepts: concepts.md
       - Installation: installation.md
       - Quickstart: quickstart.md
+      - Examples: examples/index.md
   - Reference:
       - Workflows: workflows/overview.md
       - Providers:
+        - providers/index.md
         - bash: providers/bash.md
         - code: providers/code.md
         - lab: providers/lab.md

@@ -29,6 +29,13 @@ other workflows if any, and the resources the workflow needs
             count: 1
     ```
 
+!!! info "NOTE:"
+    Unlike the `bash`, `code`, `lab`, and `notebook` providers, the `docker` provider doesn't have 
+    the CUDA driver and Conda pre-installed.
+
+    If you want, you can use the [`dstackai/miniconda`](https://hub.docker.com/repository/docker/dstackai/miniconda) 
+    base Docker image that has the CUDA driver and Conda pre-installed.
+
 ## Workflow syntax
 
 The following properties are required:

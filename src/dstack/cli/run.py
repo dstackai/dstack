@@ -74,7 +74,7 @@ def poll_run(repo_user_name: str, repo_name: str, job_heads: List[JobHead], back
             while True:
                 run = next(iter(backend.get_run_heads(repo_user_name, repo_name, job_heads)))
                 if run.status == JobStatus.DOWNLOADING and not downloading:
-                    progress.update(task, description="Downloading dependencies... It may take a while.")
+                    progress.update(task, description="Downloading deps... It may take a while.")
                     downloading = True
                 elif run.status not in [JobStatus.SUBMITTED, JobStatus.DOWNLOADING]:
                     progress.update(task, total=100)

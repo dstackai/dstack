@@ -1,7 +1,7 @@
 # Workflows
 
 Workflows can be defined in the `.dstack/workflows.yaml` file within your 
-project.
+project directory.
 
 For every workflow, you can specify the provider, dependencies, commands, what output 
 folders to store as artifacts, and what resources the instance would need (e.g. whether it should be a 
@@ -28,7 +28,7 @@ spot/preemptive instance, how much memory, GPU, etc.)
           gpu: 1
     ```
 
-## Workflows syntax
+## Workflow syntax
 
 Let's walk through the syntax of the `.dstack/workflows.yaml` file.
 
@@ -46,6 +46,10 @@ The following properties are optional:
   are mounted as local folders before the workflow starts to run.
 - `help` - (Optional) A description with what the workflow does (for documentation purposes).
 
+!!! info "NOTE:"
+    Other workflow properties depend on the selected `provider`. Check out the [Providers](../providers/index.md) page 
+    to see what providers are supported and how to use them.
+
 ## Deps
 
 The `deps` property defienes the workflow's dependencies. The output artifacts of these dependencies are 
@@ -53,7 +57,7 @@ mounted as local folders before the workflow starts to run.
 
 There are two ways to define dependencies: via tags and via workflows.
 
-### Tags
+#### Tags
 
 The first way to specify a dependency is to use the `tag` property with a name of a tag:
 
@@ -74,7 +78,7 @@ deps:
   - tag: dstackai/dstack/some_tag
 ```
 
-### Workflows
+#### Workflows
 
 The second way to specify a dependency is to use the `workflow` property with a name of a workflow:
 
@@ -100,55 +104,3 @@ hard-coding them inside the code.
 A secret has a name and a value. All secrets are passed to the running workflows via environment variables.
 
 Secrets can be managed via the `dstack secrets` CLI command.
-
-## Providers
-
-Providers define how the workflow is executed and what properties can be specified for the workflow.
-Providers may help run tasks, applications, dev environments and even distributed workflows.
-
-### Main provider
-
-<div class="grid cards" markdown>
-- **Bash** 
-
-    Runs shell commands
-
-    [:octicons-arrow-right-24: Reference](../providers/bash.md)
-
-</div>
-
-### Other providers
-
-<div class="grid cards" markdown>
-
-- **VS Code** 
-
-    Launches a VS Code dev environment
-
-    [:octicons-arrow-right-24: Reference](../providers/code.md)
-
-- **JupyterLab** 
-
-    Launches a JupyterLab dev environment
-
-    [:octicons-arrow-right-24: Reference](../providers/lab.md)
-
-- **Jupyter Notebook** 
-
-    Launches a Jupyter notebook
-
-    [:octicons-arrow-right-24: Reference](../providers/notebook.md)
-
-[//]: # (- **Torchrun** )
-
-[//]: # (    Runs a distributed training)
-
-[//]: # (    [:octicons-arrow-right-24: Reference]&#40;torchrun.md&#41;)
-
-- **Docker** 
-
-    Runs a Docker image
-
-    [:octicons-arrow-right-24: Reference](../providers/docker.md)
-
-</div>

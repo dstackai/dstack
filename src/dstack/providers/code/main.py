@@ -23,7 +23,7 @@ class CodeProvider(Provider):
         super().load(provider_args, workflow_name, provider_data)
         self.before_run = self.provider_data.get("before_run")
         self.python = self._safe_python_version("python")
-        self.version = self.provider_data.get("version") or "1.67.2"
+        self.version = self.provider_data.get("version") or "1.71.0"
         self.requirements = self.provider_data.get("requirements")
         self.env = self._env()
         self.artifact_specs = self._artifact_specs()
@@ -85,7 +85,7 @@ class CodeProvider(Provider):
         if self.before_run:
             commands.extend(self.before_run)
         commands.append(
-            "./bin/openvscode-server --port $PORT_0 --host --host 0.0.0.0 --connection-token $CONNECTION_TOKEN"
+            "./bin/openvscode-server --port $PORT_0 --host 0.0.0.0 --connection-token $CONNECTION_TOKEN"
         )
         return commands
 

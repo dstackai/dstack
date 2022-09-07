@@ -52,9 +52,9 @@ The list of output artifacts
 
 - `path` – (Required) The relative path of the folder that must be saved as an output artifact
 - `mount` – (Optional) `true` if the artifact files must be saved in real-time.
-    Must be used only when real-time access to the artifacts is important: 
-    for storing checkpoints (e.g. if interruptible instances are used) and event files
-    (e.g. TensorBoard event files, etc.)
+    Must be used only when real-time access to the artifacts is important. 
+    For example, for storing checkpoints when interruptible instances are used, or for storing
+    event files in real-time (e.g. TensorBoard event files.)
     By default, it's `false`.
 
 #### resources

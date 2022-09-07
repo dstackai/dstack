@@ -1,3 +1,4 @@
+import re
 from argparse import Namespace
 
 import boto3
@@ -23,7 +24,7 @@ def config_func(_: Namespace):
     profile_name = Prompt.ask("AWS profile name", default=profile_name or "default")
     if profile_name == "default":
         profile_name = None
-    bucket_name = Prompt.ask("S3 bucket name", default=bucket_name)
+    bucket_name = ask_bucket_name(bucket_name)
     if not region_name:
         try:
             my_session = boto3.session.Session(profile_name=profile_name)
@@ -35,6 +36,18 @@ def config_func(_: Namespace):
     backend = load_backend()
     backend.configure(silent=False)
     print(f"[grey58]OK[/]")
+
+
+def ask_bucket_name(default_bucket_name):
+    bucket_name = Prompt.ask("S3 bucket name", default=default_bucket_name)
+    match = re.compile(r"(?!(^xn--|-s3alias$))^[a-z0-9][a-z0-9-]{1,61}[a-z0-9]$").match(bucket_name)
+    if match:
+        return bucket_name
+    else:
+        print("[red]Bucket name contains invalid characters.[/red] "
+              "See rules for bucket naming: "
+              "https://docs.aws.amazon.com/AmazonS3/latest/userguide/bucketnamingrules.html")
+        return ask_bucket_name(default_bucket_name)
 
 
 def register_parsers(main_subparsers):

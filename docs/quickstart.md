@@ -63,7 +63,7 @@ git clone https://github.com/dstackai/dstack-examples.git
 cd dstack-examples
 ```
 
-If you open the `.dstack/workflows.yaml` file, you'll see the following content:
+If you open the `.dstack/workflows.yaml` file inside the project directory, you'll see the following content:
 
 === ".dstack/workflows.yaml"
 
@@ -72,7 +72,6 @@ If you open the `.dstack/workflows.yaml` file, you'll see the following content:
       - name: download
         help: "Download the MNIST dataset"
         provider: bash
-        python: 3.10
         env:
           - PYTHONPATH=mnist
         commands:
@@ -112,7 +111,7 @@ Before you can use dstack with the new repo, you have to initialize it using the
 dstack init
 ```
 
-This command will ensure that dstack has the access to the repo.
+This command will ensure that dstack has the access to the Git repository.
 
 ## Run the download workflow
 
