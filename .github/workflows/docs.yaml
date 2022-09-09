@@ -1,0 +1,28 @@
+name: Deploy Docs
+
+on:
+  workflow_dispatch:
+  create:
+    tags:
+      - '*'
+
+jobs:
+  docs-deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v2
+        with:
+          path: dstack
+      - uses: actions/checkout@v2
+        with:
+          repository: dstackai/dstackai.github.io
+          path: ./dstackai.github.io
+          token: ${{ secrets.GH_TOKEN }}
+      - uses: actions/setup-python@v2
+        with:
+          python-version: 3.x
+      - run: |
+          pip install mkdocs-redirects
+          pip install mkdocs-material
+          mkdocs gh-deploy --config-file ../dstack/mkdocs.yml --force
+        working-directory: ./dstackai.github.io
