@@ -25,20 +25,19 @@ run ML workflows.
 
 ### Primary features of dstack:
 
-1. **Git-focused:** Define workflows and their hardware requirements as code.
-   When you run a workflow, dstack detects the current branch, commit hash, and local changes.
-2. **Data management:** Workflow artifacts are the 1st-class citizens.
-   Assign tags to finished workflows to reuse their artifacts from other workflows. 
-   Version data using tags.
-3. **Environment setup:** No need to build custom Docker images or setup CUDA yourself. Just specify Conda 
-   requirements and they will be pre-configured.
-4. **Interruption-friendly:** Because artifacts can be stored in real-time, you can leverage interruptible 
-   (spot/preemptive) instances. Workflows can be resumed from where they were interrupted.
-5. **Dev environments:** Workflows may be not only tasks and applications but also dev environments, such as 
-   IDEs and Jupyter notebooks.
-6. **Very easy setup:** Install the dstack CLI and run workflows
-   in the cloud using your local credentials. The state is stored in an S3 bucket. 
-   No need to set up anything else.
+1. **Environment setup:** No need to use Docker, configure CUDA yourself, etc. Just specify workflow 
+    requirements in your code, and it will be pre-configured.
+2. **Data management:** Use tags to manage data and reuse it from workflows.
+    Assign tags to finished workflows to reuse their artifacts from other workflows.
+3. **Dev environments:** Workflows may include tasks, applications, also dev environments, such as 
+    IDEs and Jupyter notebooks.
+4. **Easy installation:** Just install the dstack CLI locally, and that's it.
+    The CLI will use your local cloud credentials to run workflows. 
+    The state is stored in an S3 bucket.
+5. **Git-focused:** When you run a workflow, dstack detects your local branch, commit hash, and local changes, 
+    and uses it to run the workflow in the cloud.
+6. **Interruption-friendly:** Fully-leverage cloud spot/preemptive instances.
+    If needed, store artifacts in real-time to resume workflows, e.g. if there were interrupted.
 
 ## Installation
 
@@ -105,8 +104,8 @@ workflows:
 
 ### Run workflows
 
-Once you run the workflow, dstack will create the required cloud instance(s) within a minute,
-and will run your workflow. You'll see the output in real-time as your 
+Once you run the workflow, dstack within a minute will create the required cloud instance(s), pre-configure
+the environment, and run your workflow. You'll see the output in real-time as your 
 workflow is running.
 
 ```shell
@@ -118,12 +117,6 @@ To interrupt, press Ctrl+C.
 
 ...
 ```
-
-**Environment setup:** dstack automatically sets up environment for the workflow. It pre-installs the right CUDA driver, 
-the right version of Python, and Conda.
-
-**Git:** When you run a workflow withing a Git repository, dstack detects the current branch, commit hash, 
-and local changes, and uses it on the cloud instance(s) to run the workflow.
 
 ## Artifacts and tags
 

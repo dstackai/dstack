@@ -44,8 +44,7 @@ The following properties are required:
 
 The following properties are optional:
 
-- `args` - (Optional) The list of properties for the Python program
-- `before_run` - (Optional) The list of shell commands to run before running the Python file
+- `before_run` - (Optional) The list of shell commands to run before running the Docker image
 - `requirements` - (Optional) The path to the `requirements.txt` file
 - `version` - (Optional) The major version of Python. By default, it's `3.10`.
 - `environment` - (Optional) The list of environment variables 
@@ -74,6 +73,11 @@ The hardware resources required by the workflow
 - `shm_size` - (Optional) The size of shared memory, e.g. `"8GB"`
 - `interruptible` - (Optional) `true` if the workflow can run on interruptible instances.
     By default, it's `false`.
+
+!!! info "NOTE:"
+    If your workflow is training a model using multiple parallel processes (e.g. via PyTorch DDP),
+    make sure to use the `shm_size` to configure enough shared memory (e.g. `"8GB"` or more) so the processes 
+    can communicate. Otherwise, you might get an error.
 
 #### gpu
 

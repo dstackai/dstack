@@ -72,6 +72,8 @@ class LabProvider(Provider):
     def _commands(self):
         commands = [
             "pip install jupyterlab" + (f"=={self.version}" if self.version else ""),
+            "pip install ipywidgets",
+            "jupyter nbextension enable --py widgetsnbextension",
             "mkdir -p /root/.jupyter",
             "echo \"c.ServerApp.allow_root = True\" > /root/.jupyter/jupyter_server_config.py",
             "echo \"c.ServerApp.open_browser = False\" >> /root/.jupyter/jupyter_server_config.py",

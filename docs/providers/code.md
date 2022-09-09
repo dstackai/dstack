@@ -60,6 +60,11 @@ The hardware resources required by the workflow
 - `interruptible` - (Optional) `true` if the workflow can run on interruptible instances.
     By default, it's `false`.
 
+!!! info "NOTE:"
+    If your workflow is training a model using multiple parallel processes (e.g. via PyTorch DDP),
+    make sure to use the `shm_size` to configure enough shared memory (e.g. `"8GB"` or more) so the processes 
+    can communicate. Otherwise, you might get an error.
+
 #### gpu
 
 The number of GPUs, their name and memory

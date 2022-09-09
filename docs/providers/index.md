@@ -3,7 +3,8 @@
 Providers define how the workflow is executed and what properties can be specified for the workflow in the 
 `.dstack/workflows.yaml` file.
 
-Providers allow to run data and ML tasks, applications, and dev environments.
+Providers allow to run tasks, applications, and even dev environments, such as 
+IDEs and Jupyter notebooks.
 
 ## Main provider
 

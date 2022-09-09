@@ -26,22 +26,11 @@ other workflows if any, and the resources the workflow needs
             count: 4
     ```
 
-Alternatively, you can use this provider from the CLI (without defining your workflow
-in the `.dstack/workflows.yaml` file):
+## Workflow syntax
 
-```bash
-dstack run notebook -a output --gpu 4 --gpu-name K80 
-```
+The following properties are optional:
 
-[//]: # (TODO: Environment variables)
-
-[//]: # (TODO: Resources)
-
-## Workflows file reference
-
-The following arguments are optional:
-
-- `before_run` - (Optional) The list of shell commands to run before running the Python file
+- `before_run` - (Optional) The list of shell commands to run before running the Notebook application
 - `requirements` - (Optional) The path to the `requirements.txt` file
 - `python` - (Optional) The major version of Python. By default, it's `3.10`.
 - `environment` - (Optional) The list of environment variables 
@@ -71,6 +60,12 @@ The hardware resources required by the workflow
 - `interruptible` - (Optional) `true` if the workflow can run on interruptible instances.
     By default, it's `false`.
 
+
+!!! info "NOTE:"
+    If your workflow is training a model using multiple parallel processes (e.g. via PyTorch DDP),
+    make sure to use the `shm_size` to configure enough shared memory (e.g. `"8GB"` or more) so the processes 
+    can communicate. Otherwise, you might get an error.
+
 #### gpu
 
 The number of GPUs, their name and memory
@@ -78,35 +73,3 @@ The number of GPUs, their name and memory
 - `count` - (Optional) The number of GPUs
 - `memory` (Optional) The size of GPU memory, e.g. `"16GB"`
 - `name` (Optional) The name of the GPU model (e.g. `"K80"`, `"V100"`, etc)
-
-## CLI reference
-
-```bash
-usage: dstack run notebook [-d] [-h] [-r REQUIREMENTS] [-e ENV] [-a PATH]
-                           [--working-dir WORKING_DIR] [-i] [--cpu CPU]
-                           [--memory MEMORY] [--gpu GPU_COUNT]
-                           [--gpu-name GPU_NAME] [--gpu-memory GPU_MEMORY]
-                           [--shm-size SHM_SIZE]
-```
-
-The following arguments are optional:
-
-- `-d`, `--detach` - (Optional) Do not poll for status update and logs
-- `--working-dir WORKING_DIR` - (Optional) The path to the working directory
-- `-r REQUIREMENTS`, `--requirements REQUIREMENTS` - (Optional) The path to the `requirements.txt` file
-- `-e ENV`, `--env ENV` - (Optional) The list of environment variables 
-- `-a PATH`, `--artifact PATH` - (Optional) A folder that must be saved as output artifact
-- `--cpu CPU` - (Optional) The number of CPU cores
-- `--memory MEMORY` - The size of RAM memory, e.g. `"16GB"`
-- `--gpu GPU_COUNT` - (Optional) The number of GPUs
-- `--gpu-name GPU_NAME` - (Optional) The name of the GPU model (e.g. `"K80"`, `"V100"`, etc)
-- `--gpu-memory GPU_MEMORY` - (Optional) The size of GPU memory, e.g. `"16GB"`
-- `--shm-size SHM_SIZE` - (Optional) The size of shared memory, e.g. `"8GB"`
-- `-i`, `--interruptible` - (Optional) if the workflow can run on interruptible instances.
-- `ARGS` - (Optional) The list of arguments for the Python program
-
-[//]: # (TODO: Add --dep argument)
-
-## Source code
-
-[:octicons-arrow-right-24: GitHub](https://github.com/dstackai/dstack/tree/master/src/dstack/providers/notebook)

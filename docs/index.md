@@ -27,36 +27,36 @@ run ML workflows.
 
 <div class="grid cards" markdown>
 
-- **Git-focused** 
+- **Environment setup** 
 
-    Define workflows and their hardware requirements as code. 
-    When you run a workflow, dstack detects the current branch, commit hash, and local changes.
+    No need to use Docker, configure CUDA yourself, etc. Just specify workflow 
+    requirements in your code, and it will be pre-configured.
 
 - **Data management** 
 
-    Workflow artifacts are the 1st-class citizens.
-    Assign tags to finished workflows to reuse their artifacts from other workflows. 
-    Version data using tags.
-
-- **Environment setup** 
-
-    No need to build custom Docker images or setup CUDA yourself. Just specify Conda 
-    requirements and they will be pre-configured.
-
-- **Interruption-friendly** 
-
-    Because artifacts can be stored in real-time, you can leverage interruptible 
-    (spot/preemptive) instances.
+    Use tags to manage data and reuse it from workflows.
+    Assign tags to finished workflows to reuse their artifacts from other workflows.
 
 - **Dev environments** 
 
-    Workflows may be not only tasks and applications but also dev environments, such as 
+    Workflows may include tasks, applications, also dev environments, such as 
     IDEs and Jupyter notebooks.
 
-- **Very easy setup** 
+- **Easy installation** 
 
-    Install the dstack CLI and run workflows
-    in the cloud using your local credentials. The state is stored in an S3 bucket.
+    Just install the dstack CLI locally, and that's it.
+    The CLI will use your local cloud credentials to run workflows. 
+    The state is stored in an S3 bucket.
+
+- **Git-focused** 
+
+    When you run a workflow, dstack detects your local branch, commit hash, and local changes, 
+    and uses it to run the workflow in the cloud.
+
+- **Interruption-friendly** 
+
+    Fully-leverage cloud spot/preemptive instances.
+    If needed, store artifacts in real-time to resume workflows, e.g. if there were interrupted.
 
 </div>
 

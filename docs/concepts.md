@@ -25,9 +25,7 @@ hardware requirements, environment variables, and more.
           gpu: 1
     ```
 
-The provider defines how the workflow is executed and what properties can be specified for the workflow.
-
-When you run the workflow via the `dstack run` CLI command, dstack create the cloud instance(s) within a minute,
+When you run the workflow via the `dstack run` CLI command, dstack creates the cloud instance(s) within a minute,
 and runs the workflow. You can see the output of your workflow in real-time.
 
 ```shell
@@ -40,6 +38,14 @@ To interrupt, press Ctrl+C.
 ...
 ```
 
+## Providers
+
+The provider defines how the workflow is executed and what properties can be 
+specified for the workflow.
+
+Providers allow to run tasks, applications, and even dev environments, such as 
+IDEs and Jupyter notebooks.
+
 ## Environment
     
 dstack automatically sets up environment for the workflow. It pre-installs the right CUDA driver, 
@@ -47,14 +53,14 @@ the right version of Python, and Conda.
 
 ## Git
 
-dstack is fully integrated with Git.
+You can run the dstack CLI only from inside a Git repository directory.
 
-When you run a workflow withing a Git repository, dstack detects the current branch, commit hash, 
+When you run a workflow, dstack detects the current branch, commit hash, 
 and local changes, and uses it on the cloud instance(s) to run the workflow.
 
 ## Artifacts and tags
 
-Every workflow may have its output artifacts. They can be accessed via the `dstack artifacts` CLI command.
+Every workflow may have output artifacts. They can be accessed via the `dstack artifacts` CLI command.
 
 You can assign tags to finished workflows to reuse their output artifacts from other workflows.
 
