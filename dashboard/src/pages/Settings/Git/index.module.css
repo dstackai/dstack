@@ -1,0 +1,26 @@
+.git {}
+.configurePermissions {
+    max-width: 820px;
+    margin-top: 20px;
+    & .button {
+        margin-top: 8px;
+    }
+}
+.text {
+    max-width: 600px;
+    margin-top: 12px;
+    @mixin textStyle 14, 20;
+    color: var(--color-black);
+    &.strong {
+        font-weight: 500;
+        & button {
+            font-weight: normal;
+        }
+    }
+}
+.table {
+    margin-top: 16px;
+}
+.addButton {
+    margin-top: 30px;
+}

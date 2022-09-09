@@ -1,0 +1,31 @@
+.repo {
+    display: flex;
+    align-items: center;
+    flex-wrap: wrap;
+    gap: 8px;
+}
+.url, .branch, .hash {
+    display: flex;
+    align-items: center;
+    @mixin textStyle 14, 20;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    &:not(a) {
+        color: var(--color-medium-gray);
+    }
+    & svg {
+        flex-shrink: 0;
+        margin-right: 4px;
+        color: var(--color-gray);
+    }
+    & span {
+        overflow: hidden;
+        text-overflow: ellipsis;
+        white-space: nowrap;
+    }
+}
+.name {
+    @mixin textStyle 14, 20;
+}
+

@@ -1,0 +1,63 @@
+.mailchimpSubscribeForm {
+    margin-top: 18px;
+
+    & form {
+        display: flex;
+
+        & .input {
+            flex-shrink: 0;
+            width: 200px;
+        }
+
+        & .inputElement {
+            display: inline-block;
+            padding: 10px;
+            border: 1px solid var(--color-black);
+            border-right-width: 0;
+            border-radius: 4px 0 0 4px;
+            font-size: 16px;
+            line-height: 19px;
+            -webkit-appearance: none;
+            border-color: var(--color-medium-gray);
+
+            &::placeholder {
+                color: var(--color-medium-gray);
+            }
+            &:focus {
+                border-color: var(--color-black);
+            }
+        }
+
+        & .button {
+            flex-shrink: 0;
+            @mixin textStyle 16, 20;
+            font-weight: 500;
+
+            & button {
+                padding-right: 22px !important;
+                padding-left: 22px !important;
+                white-space: nowrap;
+                border-top-left-radius: 0;
+                border-bottom-left-radius: 0;
+            }
+        }
+    }
+}
+
+.label {
+    margin-top: 10px;
+    @mixin textStyle 13, 20;
+    font-weight: 600;
+    text-align: center;
+    color: var(--color-medium-gray);
+    opacity: 0.9;
+
+    &:global(.success) {
+        color: var(--color-green);
+    }
+
+    &:global(.error) {
+        color: var(--color-alert-text);
+    }
+}
+

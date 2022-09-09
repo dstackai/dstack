@@ -1,0 +1,65 @@
+:root {
+    --repo-card-width: 331px;
+    --repo-card-height: 114px;
+}
+
+.list {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, var(--repo-card-width));
+    gap: 20px;
+    & > :global(.skeleton-element) {
+        height: var(--repo-card-height);
+    }
+}
+
+.card {
+    display: flex;
+    flex-direction: column;
+    height: var(--repo-card-height);
+    padding: 14px 16px 12px;
+    background: var(--color-white);
+    border: 1px solid var(--color-light-gray);
+    border-radius: 6px;
+    & .name {
+        @mixin textStyle 14, 20;
+        font-weight: 500;
+        color: var(--color-black);
+    }
+}
+.privacy {
+    display: flex;
+    align-items: center;
+    margin-top: 6px;
+    max-width: fit-content;
+    padding: 3px 10px;
+    border-radius: 4px;
+    background-color: #F1F3F6;
+    color: #7D8288;
+    @mixin textStyle 14, 20;
+    & svg {
+        flex-shrink: 0;
+        margin-right: 4px;
+    }
+}
+.additions {
+    margin-top: auto;
+    flex-shrink: 0;
+    display: flex;
+    flex-wrap: wrap;
+    gap: 12px;
+    & svg {
+        flex-shrink: 0;
+        margin-right: 4px;
+    }
+}
+.addition {
+    display: flex;
+    align-items: center;
+    @mixin textStyle 13, 18;
+    color: var(--color-medium-gray);
+    & svg {
+        flex-shrink: 0;
+        margin-right: 4px;
+        color: var(--color-gray);
+    }
+}

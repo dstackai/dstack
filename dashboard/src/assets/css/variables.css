@@ -1,0 +1,51 @@
+@custom-media --mobile (width <= 640px);
+@custom-media --no-mobile (width > 640px);
+@custom-media --no-desktop (width < 980px);
+@custom-media --desktop (width >= 980px);
+
+:root {
+    --app-header-height: 47px;
+    --app-content-width: 1040px;
+    --app-header-z-index: 2;
+    --app-sidebar-z-index: 1;
+    --app-modal-z-index: 10;
+    --dropdown-z-index: 9;
+    --main-content-vertical-padding: 0;
+    --main-content-horizontal-padding: 30px;
+    --details-sidebar-width: 320px;
+    --tag-height: 24px;
+    --table-context-menu-size: 80px;
+    --cell-height: 20px;
+    --cell-vertical-padding: 8px;
+    --cell-horizontal-padding: 8px;
+}
+
+:root {
+    --color-black: #303440;
+    --color-black-hover: #1C1D23;
+    --color-white: #fff;
+    --color-medium-gray: #696F86;
+    --color-light-gray: #E4E4E7;
+    --color-lightest-grey: #ECECEE;
+    --color-gray: #BABFD3;
+    --color-lilac: #AD58DB;
+    --color-lilac-hover: #9A39CD;
+    --color-lilac-disabled: rgba(173, 88, 219, 0.8);
+    --color-violet-light: #A89EE6;
+    --color-blue: #437CEC;
+    --color-blue-hover: #2C65D5;
+    --color-blue-disabled: #86A6DD;
+    --color-light-blue: #86A6DD;
+    --color-lightest-blue: #E6EEFB;
+    --color-green: #199561;
+    --color-green-hover: #126944;
+    --color-alert-text: #AF4545;
+    --color-red-hover: #C20E0E;
+    --color-red-disabled: #E0A3A3;
+    --color-orange: #FD7E51;
+
+    --color-tag-background: rgba(67, 124, 236, 0.1);
+    --color-tag-background-hover: #D2E3FF;
+
+    --logo-landing-background: #F7F8FA;
+}

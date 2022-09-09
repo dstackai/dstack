@@ -1,0 +1,16 @@
+.row {
+    &:not(.with-border) {
+        border-bottom: none;
+    }
+}
+.animationCell {
+    width: calc(100% - 14px);
+    height: 16px;
+    margin-top: 4px;
+    margin-bottom: 4px;
+    background: linear-gradient(90deg, #E9ECF0 5.56%, #F2F2F2 62.89%, #E9ECF0 97.01%);
+    border-radius: 2px;
+    &:global {
+        animation: loader-pulse 1.5s infinite;
+    }
+}

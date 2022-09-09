@@ -1,0 +1,25 @@
+.or {
+    display: flex;
+    align-items: center;
+    margin-top: 20px;
+    margin-bottom: 4px;
+    &::before,
+    &::after {
+        display: block;
+        content: "";
+        flex-grow: 1;
+        width: 400px;
+        height: 1px;
+        background-color: var(--color-light-gray);
+    }
+    &::before {
+        margin-right: 10px;
+    }
+    &::after {
+        margin-left: 10px;
+    }
+    & span {
+        white-space: nowrap;
+        flex-shrink: 0;
+    }
+}

@@ -1,0 +1,19 @@
+.tabs {
+    display: flex;
+    align-items: center;
+    margin-top: 20px;
+    border-bottom: 1px solid var(--color-light-gray);
+    gap: 16px;
+}
+.tab {
+    flex-shrink: 0;
+    @mixin textStyle 14, 19;
+    color: var(--color-black);
+    border-bottom: 2px solid transparent;
+    margin-bottom: -1px;
+    transition: border-color .2s ease-out;
+    cursor: pointer;
+    &:global(.active) {
+        border-color: var(--color-blue);
+    }
+}

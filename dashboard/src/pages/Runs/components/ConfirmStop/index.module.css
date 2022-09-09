@@ -1,0 +1,18 @@
+.abort {
+    margin-top: 12px;
+    & .label {
+        display: flex;
+        align-items: center;
+        color: var(--color-black);
+        @mixin textStyle 14, 20;
+    }
+    & .checkbox {
+        margin-right: 6px;
+    }
+    & .description {
+        padding-left: 20px;
+        color: var(--color-medium-gray);
+        @mixin textStyle 12, 16;
+    }
+}
+

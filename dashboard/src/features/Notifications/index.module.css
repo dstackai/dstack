@@ -1,0 +1,25 @@
+.notifications {
+
+}
+.notification {
+    display: flex;
+    align-items: flex-start;
+    padding: 10px 30px;
+    @mixin textStyle 14, 20;
+    color: var(--color-black);
+    &.type-success {
+        background-color: #DEF5DE;
+    }
+    & .body {
+
+    }
+    & .title {
+        font-weight: 600;
+    }
+    & .text {
+
+    }
+    & .close {
+        margin: -4px -4px -4px auto;
+    }
+}

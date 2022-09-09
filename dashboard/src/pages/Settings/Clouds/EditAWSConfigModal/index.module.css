@@ -1,0 +1,45 @@
+.modal {
+
+}
+.modalButtons {
+    margin-top: 40px;
+}
+.form {
+}
+.controlsField {
+
+}
+.buttons {
+    display: flex;
+}
+.applyButton {
+    &:global(.color-gray.type-transparent) {
+        color: var(--color-green);
+        &:hover {
+            color: var(--color-green-hover);
+        }
+    }
+}
+.field {
+    margin-top: 12px;
+    &.notChanged {
+        & input {
+            color: var(--color-gray);
+        }
+    }
+}
+.toggleButton {
+    margin-left: auto;
+    width: 80px;
+    justify-content: center;
+}
+.message {
+    @mixin textStyle 12, 16;
+    color: var(--color-gray);
+    &:global(.success) {
+        color: var(--color-green);
+    }
+    &:global(.fail) {
+        color: var(--color-alert-text);
+    }
+}

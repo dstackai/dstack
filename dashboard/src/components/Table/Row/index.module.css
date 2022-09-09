@@ -1,0 +1,57 @@
+.row {
+    position: relative;
+    display: flex;
+    border-radius: 6px;
+    transition: background-color .2s ease;;
+    &:hover {
+        background: rgba(134, 166, 221, 0.05);
+    }
+    &:not(:hover) > .contextMenu.autoHidden,
+    &:not(:hover) > .checkboxContainer.autoHidden {
+        opacity: 0;
+    }
+    &:not(.stretch) {
+        max-width: fit-content;
+    }
+    &.disabled {
+        color: var(--color-gray)
+    }
+}
+.contextMenu {
+    flex-shrink: 0;
+    align-self: center;
+    display: flex;
+    align-items: center;
+    justify-content: flex-end;
+    gap: 8px;
+    width: var(--table-context-menu-size);
+    margin-left: auto;
+    padding-left: 8px;
+    padding-right: 8px;
+    &.autoHidden {
+        transition: opacity .2s ease;
+    }
+}
+.checkboxContainer {
+    position: absolute;
+    top: 0;
+    height: calc(var(--cell-height) + var(--cell-vertical-padding) * 2);
+    left: -20px;
+    display: flex;
+    align-items: center;
+    &.autoHidden {
+        transition: opacity .2s ease;
+    }
+}
+.rowEditButton {
+    background-color: rgba(67, 124, 236, .1) !important;
+    &:hover {
+        background-color: rgba(67, 124, 236, .2) !important;
+    }
+}
+.rowDeleteButton {
+    background-color: rgba(175, 69, 69, .1) !important;
+    &:hover {
+        background-color: rgba(175, 69, 69, .2) !important;
+    }
+}

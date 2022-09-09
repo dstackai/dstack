@@ -1,0 +1,74 @@
+.requestInvite {
+    @media (--no-mobile) {
+        margin-left: auto;
+        margin-right: auto;
+        width: 550px;
+    }
+    & form {
+        display: flex;
+        @media (--no-mobile) {
+            margin-left: 30px;
+        }
+        & .input {
+            flex-grow: 1;
+            flex-basis: 0;
+            min-width: 0;
+            @media (--no-mobile) {
+                flex-shrink: 0;
+                flex-grow: initial;
+                flex-basis: initial;
+                min-width: initial;
+                width: 340px;
+            }
+        }
+        & .inputElement {
+            @mixin textStyle 16, 26;
+            padding: 8px 18px;
+            height: 42px;
+            border-color: var(--color-gray);
+            @media (--no-mobile) {
+                @mixin textStyle 16, 24;
+                padding: 12px 28px;
+                height: 50px;
+            }
+        }
+        & .button {
+            flex-shrink: 0;
+            width: 168px;
+            margin-left: 8px;
+            @media (--mobile) {
+                height: 42px;
+            }
+            @media (--no-mobile) {
+                width: 198px;
+                margin-left: 16px;
+            }
+            & button {
+                @mixin textStyle 16, 24;
+                white-space: nowrap;
+                @media (--mobile) {
+                    @mixin textStyle 16, 26;
+                    min-height: 42px !important;
+                    height: 42px;
+                }
+            }
+        }
+    }
+}
+.label {
+    margin-top: 6px;
+    @mixin textStyle 12, 16;
+    text-align: center;
+    color: var(--color-medium-gray);
+    opacity: 0.9;
+    @media (--no-mobile) {
+        margin-top: 10px;
+        @mixin textStyle 16, 24;
+    }
+    &:global(.success) {
+        color: var(--color-green);
+    }
+    &:global(.error) {
+        color: var(--color-alert-text);
+    }
+}

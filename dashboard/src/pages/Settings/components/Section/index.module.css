@@ -1,0 +1,27 @@
+.section {
+    &:nth-child(n+2) {
+        margin-top: 30px;
+    }
+    & a:global(.disabled) {
+        pointer-events: none;
+        opacity: .5;
+    }
+}
+.title {
+    @mixin textStyle 12, 20;
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+    color: var(--color-medium-gray);
+}
+.text {
+    max-width: 600px;
+    margin-top: 12px;
+    @mixin textStyle 14, 20;
+    color: var(--color-black);
+    &.strong {
+        font-weight: 500;
+        & button {
+            font-weight: normal;
+        }
+    }
+}

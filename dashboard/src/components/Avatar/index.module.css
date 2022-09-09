@@ -1,0 +1,19 @@
+
+.avatar {
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    box-sizing: border-box;
+    &:global(.appearance-round) {
+        border-radius: 50%;
+    }
+    &:global(.appearance-square) {
+        border-radius: 10px;
+    }
+    &:global(.size-xl) {
+        @mixin textStyle 32, 32;
+    }
+    &:global(.size-s) {
+        @mixin textStyle 16, 16;
+    }
+}

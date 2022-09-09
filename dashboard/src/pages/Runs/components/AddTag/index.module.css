@@ -1,0 +1,5 @@
+.label {
+    @mixin textStyle 14, 20;
+    color: var(--color-black);
+    margin-bottom: 12px;
+}

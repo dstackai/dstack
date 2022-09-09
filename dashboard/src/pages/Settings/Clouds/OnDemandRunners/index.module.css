@@ -1,0 +1,16 @@
+.enablingSwitcher {
+    display: flex;
+    & .label {
+        @mixin textStyle 14, 20;
+        font-weight: 500;
+    }
+    & .switcher {
+        margin-left: 8px;
+    }
+}
+.table {
+    margin-top: 16px;
+}
+.addLimit {
+    margin-top: 4px;
+}

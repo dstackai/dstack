@@ -1,0 +1,66 @@
+.sidebar {
+    overflow-y: auto;
+}
+.section {
+    & + & {
+        margin-top: 30px;
+    }
+}
+.sectionTitle {
+    margin: 0 0 12px;
+    @mixin textStyle 12, 20;
+    font-weight: normal;
+    text-transform: uppercase;
+    letter-spacing: 0.1em;
+    color: var(--color-black);
+}
+.prop {
+    display: flex;
+    @mixin textStyle 14, 20;
+    &.align-start {
+        align-items: flex-start;
+    }
+    &.align-center {
+        align-items: center;
+    }
+    &.align-end {
+        align-items: flex-end;
+    }
+    & + & {
+        margin-top: 12px;
+    }
+}
+.propName {
+    flex-shrink: 0;
+    width: 80px;
+    margin-right: 8px;
+    white-space: nowrap;
+    text-overflow: ellipsis;
+    overflow: hidden;
+    color: var(--color-medium-gray);
+}
+.propValue {
+    flex-grow: 1;
+    min-width: 0;
+    flex-basis: 0;
+    color: var(--color-black);
+    white-space: nowrap;
+    text-overflow: ellipsis;
+    overflow: hidden;
+    & .repoAttrs {
+        margin-top: 2px;
+        margin-bottom: 4px;
+    }
+}
+.repoAttrs {
+    display: flex;
+    font-weight: normal;
+    & .name,
+    & .hash,
+    & .branch {
+        @mixin textStyle 12, 18;
+    }
+    & .branch {
+        flex-shrink: 0;
+    }
+}

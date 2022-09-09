@@ -1,0 +1,24 @@
+.apps {
+    display: flex;
+    align-items: center;
+    max-width: 100%;
+}
+.icon {
+    margin-right: 4px;
+    color: var(--color-gray);
+}
+.app {
+    overflow: hidden;
+    white-space: nowrap;
+    text-overflow: ellipsis;
+    max-width: 115px;
+}
+.gray {
+    color: var(--color-gray);
+}
+.otherCount {
+    flex-shrink: 0;
+    margin-left: 2px;
+    width: auto !important;
+    padding: 0 !important;
+}

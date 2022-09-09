@@ -1,0 +1,13 @@
+.header {
+    display: flex;
+    align-items: center;
+    & .backButton {
+        margin-left: -24px;
+        margin-right: 4px;
+        margin-top: 2px;
+    }
+    & .title {
+        @mixin textStyle 24, 28;
+        font-weight: 600;
+    }
+}

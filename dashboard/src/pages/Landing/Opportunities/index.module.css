@@ -1,0 +1,97 @@
+.opportunities {
+
+}
+.item {
+    &:nth-child(n+2) {
+        margin-top: 80px;
+    }
+    @media (--desktop) {
+        display: flex;
+        &:nth-child(n+2) {
+            margin-top: 140px;
+        }
+        &.left {
+            flex-direction: row-reverse;
+            & .details {
+               padding-right: 50px;
+            }
+        }
+        &.right {
+            & .details {
+               padding-left: 50px;
+            }
+        }
+    }
+}
+.asset {
+    @media (--desktop) {
+        flex-grow: 1;
+        min-width: 0;
+        flex-basis: 0;
+    }
+}
+.details {
+    padding-top: 30px;
+    @media (--desktop) {
+        padding-top: 60px;
+        width: 400px;
+    }
+}
+.title {
+    @mixin textStyle 26, 34;
+    font-weight: 600;
+    margin-bottom: 24px;
+}
+.point {
+    margin-top: 20px;
+}
+.pointTitle {
+    margin-bottom: 8px;
+    @mixin textStyle 18, 26;
+    font-weight: 600;
+}
+.pointText {
+    @mixin textStyle 18, 26;
+    opacity: .9;
+}
+:root {
+    --code-view-height: 480px;
+}
+.window {
+    &.codeView {
+        border: none;
+        background: #252935;
+        overflow: hidden;
+    }
+    & .code {
+        border-radius: 0;
+        border: none;
+        & > pre {
+            height: calc(var(--code-view-height) / 2);
+            @media (--desktop) {
+                height: var(--code-view-height);
+            }
+            padding: 0;
+        }
+        & code {
+            white-space: pre;
+            padding-left: 14px;
+            padding-right: 14px;
+        }
+    }
+    & .tabs {
+        position: sticky;
+        top: -14px;
+        margin-top: -14px;
+        padding-bottom: 4px;
+        margin-bottom: 8px;
+        z-index: 1;
+    }
+    & .image {
+        & img {
+            max-width: 100%;
+            height: auto;
+            object-fit: contain;
+        }
+    }
+}

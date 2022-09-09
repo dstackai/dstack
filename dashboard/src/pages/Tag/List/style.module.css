@@ -1,0 +1,13 @@
+.section {
+
+}
+
+.grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(332px, 1fr));
+    gap: 20px;
+    & :global(.skeleton-element) {
+        height: 100px;
+        border-radius: 6px;
+    }
+}

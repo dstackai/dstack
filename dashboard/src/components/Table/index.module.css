@@ -1,0 +1,28 @@
+.table {
+    overflow: auto;
+    &.withCheckbox {
+        padding-left: 20px;
+        margin-left: -20px;
+    }
+}
+.head {
+    display: flex;
+    margin-bottom: 4px;
+}
+.headCell {
+    padding: 0 var(--cell-horizontal-padding) 2px;
+    border-bottom: 1px solid var(--color-light-gray);
+    color: var(--color-medium-gray);
+    @mixin textStyle 13, 20;
+    font-weight: 500;
+    &:not(.stretch) {
+        flex-shrink: 0;
+    }
+    &.stretch {
+        flex-grow: 1;
+        flex-basis: 0;
+    }
+}
+.contextMenuCell {
+    width: var(--table-context-menu-size);
+}

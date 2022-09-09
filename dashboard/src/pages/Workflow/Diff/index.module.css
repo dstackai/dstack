@@ -1,0 +1,19 @@
+.diff {
+    min-height: 400px;
+    overflow-y: auto;
+    margin: calc(var(--main-content-vertical-padding) * -1) calc(var(--main-content-horizontal-padding) * -1);
+    padding: var(--main-content-vertical-padding) var(--main-content-horizontal-padding);
+}
+.header {
+
+}
+.repoAttrs {
+    margin-top: 8px;
+}
+.content {
+    margin-top: 20px;
+}
+.empty {
+    @mixin textStyle 14, 20;
+    color: var(--color-gray);
+}
