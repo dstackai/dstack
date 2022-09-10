@@ -1,4 +1,5 @@
 import os
+import webbrowser
 
 import pkg_resources
 from fastapi import FastAPI
@@ -6,6 +7,7 @@ from starlette.responses import HTMLResponse, JSONResponse
 from starlette.staticfiles import StaticFiles
 
 from dstack.dashboard import repos, runs, artifacts, secrets, tags
+from dstack.repo import load_repo_data
 
 app = FastAPI(docs_url="/api/docs")
 app.include_router(repos.router)
@@ -17,7 +19,15 @@ app.include_router(tags.router)
 
 @app.on_event("startup")
 async def startup_event():
-    print(f"The dashboard API is available at http://{os.getenv('DSTACK_HOST')}:{os.getenv('DSTACK_PORT')}/api/docs")
+    url = f"http://{os.getenv('DSTACK_DASHBOARD_HOST')}:{os.getenv('DSTACK_DASHBOARD_PORT')}"
+    try:
+        repo_data = load_repo_data()
+        url += f"/{repo_data.repo_user_name}/{repo_data.repo_name}"
+    except Exception:
+        pass
+    print(f"The dashboard is available at {url}")
+    if os.getenv('DSTACK_DASHBOARD_HEADLESS').strip().lower() != "true":
+        webbrowser.open(url)
 
 
 app.mount("/", StaticFiles(packages=["dstack.dashboard"], html=True), name="static")
