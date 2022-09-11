@@ -8,6 +8,7 @@
 
       [![PyPI](https://img.shields.io/pypi/v/dstack?style=for-the-badge&color=brightgreen)](https://pypi.org/project/dstack/)
       [![PyPI - License](https://img.shields.io/pypi/l/dstack?style=for-the-badge&color=blue)](https://github.com/dstackai/dstack/blob/master/LICENSE.md)
+      [![GitHub](https://img.shields.io/github/stars/dstackai/dstack?label=GitHub&style=for-the-badge&color=darkviolet)](https://github.com/dstackai/dstack)
       [![Slack](https://img.shields.io/badge/slack-chat-e01563?style=for-the-badge)](https://join.slack.com/t/dstackai/shared_invite/zt-xdnsytie-D4qU9BvJP8vkbkHXdi6clQ)
     </figure>
 </div>
