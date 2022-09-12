@@ -2,7 +2,7 @@ import json
 import re
 import time
 from collections import defaultdict
-from typing import Optional, Dict, List, Generator, Any
+from typing import Optional, Dict, List, Generator, Any, Tuple
 from urllib import parse
 
 from botocore.client import BaseClient
@@ -48,7 +48,7 @@ def _render_log_message(s3_client: BaseClient, bucket_name: str, event: Dict[str
                     if url_query_params:
                         app_url += url_query
                 log = re.sub(pat, app_url, log)
-    return LogEvent(event["timestamp"], job_id, log,
+    return LogEvent(event["eventId"], event["timestamp"], job_id, log,
                     LogEventSource.STDOUT if message["source"] == "stdout" else LogEventSource.STDERR)
 
 
@@ -120,16 +120,27 @@ def create_log_stream(logs_client: BaseClient, log_group_name: str, run_name: st
     logs_client.create_log_stream(logGroupName=log_group_name, logStreamName=run_name)
 
 
-def poll_logs(ec2_client: BaseClient, s3_client: BaseClient, logs_client: BaseClient, bucket_name: str,
-              repo_user_name: str, repo_name: str,
-              job_heads: List[JobHead], start_time: int, attached: bool) -> Generator[LogEvent, None, None]:
-    run_name = job_heads[0].run_name
+def _filter_logs_events_kwargs(bucket_name: str, repo_user_name: str, repo_name: str, run_name: str, start_time: int,
+                               end_time: Optional[int], next_token: Optional[str]):
     filter_logs_events_kwargs = {
         "logGroupName": f"/dstack/jobs/{bucket_name}/{repo_user_name}/{repo_name}",
         "logStreamNames": [run_name],
         "startTime": start_time,
         "interleaved": True,
     }
+    if end_time:
+        filter_logs_events_kwargs["endTime"] = end_time
+    if next_token:
+        filter_logs_events_kwargs["nextToken"] = next_token
+    return filter_logs_events_kwargs
+
+
+def poll_logs(ec2_client: BaseClient, s3_client: BaseClient, logs_client: BaseClient, bucket_name: str,
+              repo_user_name: str, repo_name: str,
+              job_heads: List[JobHead], start_time: int, attached: bool) -> Generator[LogEvent, None, None]:
+    run_name = job_heads[0].run_name
+    filter_logs_events_kwargs = _filter_logs_events_kwargs(bucket_name, repo_user_name, repo_name, run_name, start_time,
+                                                           end_time=None, next_token=None)
     job_host_names = {}
     job_ports = {}
     job_app_specs = {}
@@ -152,3 +163,22 @@ def poll_logs(ec2_client: BaseClient, s3_client: BaseClient, logs_client: BaseCl
             return
         else:
             raise e
+
+
+def query_logs(s3_client: BaseClient, logs_client: BaseClient, bucket_name: str,
+               repo_user_name: str, repo_name: str, run_name: str, start_time: int, end_time: Optional[int],
+               next_token: Optional[str],
+               job_host_names: Dict[str, Optional[str]], job_ports: Dict[str, Optional[List[int]]],
+               job_app_specs: Dict[str, Optional[List[AppSpec]]]) -> Tuple[List[LogEvent], Optional[str],
+                                                                           Dict[str, Optional[str]],
+                                                                           Dict[str, Optional[List[int]]],
+                                                                           Dict[str, Optional[List[AppSpec]]]]:
+    job_host_names = dict(job_host_names)
+    job_ports = dict(job_ports)
+    job_app_specs = dict(job_app_specs)
+    filter_logs_events_kwargs = _filter_logs_events_kwargs(bucket_name, repo_user_name, repo_name, run_name, start_time,
+                                                           end_time, next_token)
+    response = logs_client.filter_log_events(**filter_logs_events_kwargs)
+    return [_render_log_message(s3_client, bucket_name, event, repo_user_name, repo_name, job_host_names, job_ports,
+                                job_app_specs)
+            for event in response["events"]], response.get("nextToken"), job_host_names, job_ports, job_app_specs

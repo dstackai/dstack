@@ -6,7 +6,7 @@ from fastapi import FastAPI
 from starlette.responses import HTMLResponse, JSONResponse
 from starlette.staticfiles import StaticFiles
 
-from dstack.dashboard import repos, runs, artifacts, secrets, tags
+from dstack.dashboard import repos, runs, artifacts, secrets, tags, logs
 from dstack.repo import load_repo_data
 
 app = FastAPI(docs_url="/api/docs")
@@ -15,6 +15,7 @@ app.include_router(runs.router)
 app.include_router(artifacts.router)
 app.include_router(secrets.router)
 app.include_router(tags.router)
+app.include_router(logs.router)
 
 
 @app.on_event("startup")
