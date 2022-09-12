@@ -1,9 +1,14 @@
 site_name: dstack
 repo_url: https://github.com/dstackai/dstack
 repo_name: dstackai/dstack
+site_description: >-
+  dstack is an open-source CLI that allow to define ML workflows as code and run them on cloud. 
+  It provisions infrastructure and manages data automatically.
 edit_uri: edit/master/docs/
+copyright: © 2022 dstack GmbH
 theme:
   name: material
+  custom_dir: docs/overrides
   logo: assets/dstack_notext.png
   favicon: images/dstack_fav_32.ico
   icon:
@@ -60,6 +65,15 @@ extra:
   analytics:
     provider: google
     property: UA-4493451-5
+  social:
+    - icon: fontawesome/brands/github
+      link: https://github.com/dstackai/dstack
+    - icon: fontawesome/brands/twitter
+      link: https://twitter.com/dstackai
+    - icon: fontawesome/brands/slack
+      link: https://join.slack.com/t/dstackai/shared_invite/zt-xdnsytie-D4qU9BvJP8vkbkHXdi6clQ
+    - icon: fontawesome/brands/linkedin
+      link: https://linkedin.com/company/dstackai
 nav:
   - Get started:
       - index.md

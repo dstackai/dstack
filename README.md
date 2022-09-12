@@ -4,15 +4,19 @@
 Git-based CLI to run ML workflows on cloud
 ______________________________________________________________________
 
-[![PyPI](https://img.shields.io/pypi/v/dstack?style=for-the-badge&color=brightgreen)](https://pypi.org/project/dstack/)
-[![PyPI - License](https://img.shields.io/pypi/l/dstack?style=for-the-badge&color=blue)](https://github.com/dstackai/dstack/blob/master/LICENSE.md)
-[![Slack](https://img.shields.io/badge/slack-chat-e01563?style=for-the-badge)](https://join.slack.com/t/dstackai/shared_invite/zt-xdnsytie-D4qU9BvJP8vkbkHXdi6clQ)
 
-[//]: # ([![twitter]&#40;https://img.shields.io/twitter/follow/dstackai.svg?style=social&label=Follow&#41;]&#40;https://twitter.com/dstackai&#41;)
+[![PyPI](https://img.shields.io/github/workflow/status/dstackai/dstack/Build?style=for-the-badge)](https://pypi.org/project/dstack/)
+[![PyPI](https://img.shields.io/pypi/v/dstack?style=for-the-badge)](https://pypi.org/project/dstack/)
+[![PyPI - License](https://img.shields.io/pypi/l/dstack?style=for-the-badge&color=blue)](https://github.com/dstackai/dstack/blob/master/LICENSE.md)
+
+[Docs](https://docs.dstack.ai) | [Issues](https://github.com/dstackai/dstack/issues) | [Twitter](https://twitter.com/dstackai) | [Slack](https://join.slack.com/t/dstackai/shared_invite/zt-xdnsytie-D4qU9BvJP8vkbkHXdi6clQ)
 
 </div>
 
 ## Intro
+
+**dstack is an open-source CLI that allows to define ML workflows as code and run them on cloud. 
+  It provisions infrastructure and manages data automatically.**
 
 To run ML workflows, often your local machine is not enough. 
 That’s why it's necessary to automate the process of running ML workflows within the cloud infrastructure.

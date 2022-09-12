@@ -1,8 +1,8 @@
 .md-header {
-    border-bottom: 1px solid #E4E4E7;
+    border-bottom: 1px solid rgba(172, 191, 229, 0.45);
 }
 .md-footer {
-    border-top: 1px solid #E4E4E7;
+    /*border-top: 1px solid #E4E4E7;*/
 }
 .md-footer__link {
     padding-top: 1.2rem;
@@ -349,7 +349,8 @@ label.md-nav__link {
     --md-code-hl-constant-color: var(--md-code-fg-color);
     /*--md-primary-bg-color: white;*/
     --md-default-fg-color--lighter: rgb(159, 172, 190);
-    --md-default-fg-color--lightest: rgb(245, 246, 251);
+    --md-default-fg-color--lightest: #f6f9fc;
+    --md-footer-fg-color--light: var(--md-default-fg-color);
 }
 
 .highlight :where(.l) {
@@ -361,7 +362,7 @@ body {
 }
 
 .md-content {
-    border-left: 1px solid #E4E4E7;
+    /*border-left: 1px solid #E4E4E7;*/
 }
 
 .md-content__inner {
@@ -418,13 +419,19 @@ body {
     }
 }
 
-.md-footer, .md-footer-meta {
-    background-color: inherit;
+.md-footer {
+    background-color: var(--md-default-bg-color);
     color: inherit;
 }
 
 .md-footer-meta {
-     display: none;
+    border-top: 1px solid rgba(172, 191, 229, 0.45);
+     /*display: none;*/
+    background-color: var(--md-default-fg-color--lightest);
+}
+
+html .md-footer-meta.md-typeset a:is(:focus,:hover) {
+    color: var(--md-primary-fg-color) !important;
 }
 
 @media screen and (max-width: 76.1875em) {
@@ -546,7 +553,7 @@ body {
     /*border-radius: 0.2rem;*/
     display: block;
     margin: 0;
-    background-color: rgba(247, 248, 250, 0.7);
+    background-color: var(--md-default-fg-color--lightest);
     padding: 0.6rem 1.25rem;
 }
 
