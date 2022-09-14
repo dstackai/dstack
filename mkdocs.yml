@@ -81,29 +81,30 @@ nav:
       - Concepts: concepts.md
       - Installation: installation.md
       - Quickstart: quickstart.md
-      - Examples: examples/index.md
   - Reference:
-      - Workflows: workflows/overview.md
-      - Providers:
-        - providers/index.md
-        - bash: providers/bash.md
-        - code: providers/code.md
-        - lab: providers/lab.md
-        - notebook: providers/notebook.md
-        - docker: providers/docker.md
-#        - torchrun: providers/torchrun.md
+      - reference/index.md
+      - Examples: reference/examples/index.md
       - CLI:
-        - cli/index.md
-        - run: cli/run.md
-        - ps: cli/ps.md
-        - stop: cli/stop.md
-        - logs: cli/logs.md
-        - artifacts: cli/artifacts.md
-        - tags: cli/tags.md
-        - init: cli/init.md
-        - config: cli/config.md
-        - secrets: cli/secrets.md
-        - delete: cli/delete.md
+        - reference/cli/index.md
+        - run: reference/cli/run.md
+        - ps: reference/cli/ps.md
+        - stop: reference/cli/stop.md
+        - logs: reference/cli/logs.md
+        - artifacts: reference/cli/artifacts.md
+        - tags: reference/cli/tags.md
+        - init: reference/cli/init.md
+        - config: reference/cli/config.md
+        - secrets: reference/cli/secrets.md
+        - delete: reference/cli/delete.md
+      - Workflows: reference/workflows/index.md
+      - Providers:
+        - reference/providers/index.md
+        - bash: reference/providers/bash.md
+        - code: reference/providers/code.md
+        - lab: reference/providers/lab.md
+        - notebook: reference/providers/notebook.md
+        - docker: reference/providers/docker.md
+#        - torchrun: reference/providers/torchrun.md
   - Help:
       - Slack chat: https://join.slack.com/t/dstackai/shared_invite/zt-xdnsytie-D4qU9BvJP8vkbkHXdi6clQ
       - GitHub issues: https://github.com/dstackai/dstack/issues

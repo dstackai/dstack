@@ -13,8 +13,6 @@ hardware requirements, environment variables, and more.
         deps:
           - tag: mnist_data
         python: 3.10
-        env:
-          - PYTHONPATH=mnist
         commands:
           - pip install requirements.txt
           - python mnist/train.py

@@ -273,6 +273,10 @@ label.md-nav__link {
     }
 }
 
+.md-search__input {
+    font-size: .7rem;
+}
+
 .md-clipboard:after {
     color: var(--md-default-fg-color--lighter)
 }

@@ -1,4 +1,12 @@
 {% extends "base.html" %}
 {% block extrahead %}
-<meta name="og:image" content="/assets/splash_thumbnail.png">
+{% if page and page.url == '' %}
+    <meta property="og:title" content="{{ config.site_name }} - An open-source CLI to run ML workflows on cloud">
+{% elif page and page.title %}
+<meta property="og:title" content="{{ config.site_name }} - {{ page.title }}">
+{% else %}
+<meta property="og:title" content="{{ config.site_name }}">
+{% endif %}
+<meta property="og:description" content="{{ config.site_description }}">
+<meta name="og:image" content="https://docs.dstack.ai/assets/splash_thumbnail.png">
 {% endblock %}

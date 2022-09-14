@@ -2,55 +2,8 @@
 
 This tutorial will walk you through the first steps of using dstack.
 
-## Install the CLI
-
-To use dstack, you'll only need the dstack CLI. No other software needs to be installed or deployed.
-
-The dstack CLI will use your local cloud credentials (e.g. the default AWS environment variables 
-or the credentials from `~/.aws/credentials`.)
-
-The easiest way to install the dstack CLI is through pip:
-
-```shell
-pip install dstack
-```
-
-## Configure AWS credentials
-
-The dstack CLI uses your local AWS credentials to provision infrastructure and store data.
-Make sure, you've [configured](https://docs.aws.amazon.com/cli/latest/userguide/cli-configure-files.html) them
-locally before using the dstack CLI. 
-
-The credentials should allow actions on the EC2, IAM, SecretsManager, 
-S3, and CloudWatch Logs resources.
-
-## Configure the dstack backend
-
-Before you can use the dstack CLI, you have to configure the dstack backend.
-
-It includes configuring the following:
-
- * In which S3 bucket, to store the state and artifacts
- * In what AWS region, to create EC2 instances
-
-To configure this, run the following command:
-
-```shell
-dstack config
-
-Configure AWS backend:
-
-AWS profile name (default):
-S3 bucket name:
-Region name:
-```
-
-Make sure to choose a unique S3 bucket name. If the bucket doesn't exist, dstack will prompt you
-to create it. 
-
-The command will also create the necessary IAM instance profile role to be used when provisioning EC2 instances.
-
-The configuration is stored in `~/.dstack/config.yaml`.
+!!! info "NOTE:"
+    Make sure you've [installed and configured the dstack CLI](installation.md) before following this tutorial.
 
 ## Clone the repo
 
@@ -72,8 +25,6 @@ If you open the `.dstack/workflows.yaml` file inside the project directory, you'
       - name: download
         help: "Download the MNIST dataset"
         provider: bash
-        env:
-          - PYTHONPATH=mnist
         commands:
           - pip install -r requirements.txt
           - python mnist/download.py
@@ -85,8 +36,6 @@ If you open the `.dstack/workflows.yaml` file inside the project directory, you'
         deps:
           - tag: mnist_data
         provider: bash
-        env:
-          - PYTHONPATH=mnist
         commands:
           - pip install -r requirements.txt
           - python mnist/train.py
@@ -115,7 +64,7 @@ This command will ensure that dstack has the access to the Git repository.
 
 ## Run the download workflow
 
-Let's go ahead and run the `download` workflow via the CLI:
+Let's go ahead and run the `download` workflow via the [`dstack run`](reference/cli/run.md) CLI command:
 
 ```shell
 dstack run download
@@ -135,10 +84,14 @@ Once you run the workflow, dstack creates the required cloud instance(s) within 
 download the dependencies, and run your workflow. You'll see the output in real-time as your 
 workflow is running.
 
+!!! info "NOTE:"
+    To see the list of currently running or recently finished workflows, use the [`dstack ps`](reference/cli/ps.md) command.
+
 ## Access the run artifacts
 
 If the run has finished successfully, you can see its output artifacts using 
-the `dstack artifacts list command and the name of the run:
+the [`dstack artifacts list`](reference/cli/artifacts.md#artifacts-list) CLI command with the
+name of the run:
 
 ```shell
 dstack artifacts list <run-name>
@@ -154,7 +107,8 @@ dstack artifacts list <run-name>
            MNIST/raw/train-labels-idx1-ubyte.gz  28.2KiB
 ```
 
-To download artifacts, use a similar command followed by the path, where to download the artifacts:
+To download artifacts, use the [`dstack artifacts download`](reference/cli/artifacts.md#artifacts-download) CLI command 
+also with the name of the run and a path to the directory, where to download the artifacts:
 
 ```shell
 dstack artifacts download <run-name> .
@@ -164,7 +118,7 @@ dstack artifacts download <run-name> .
 
 Now, to use the artifacts from other workflows, we need to assign a tag to it, e.g. `mnist_data`.
 
-It can be done the following way:
+It can be done via the [`dstack tags add`](reference/cli/tags.md#tags-add) CLI command:
 
 ```shell
 dstack tags add mnist_data <run-name>
@@ -173,7 +127,7 @@ dstack tags add mnist_data <run-name>
 !!! info "NOTE:"
     All tags within the same project repository must be unique.
 
-You can access the artifacts of a tag the same way as for a run, except that you have to prepend the name of the tag
+You can access the artifacts of a tag the same way as for a run. Just prepend the name of the tag
 with a colon:  
 
 ```shell
@@ -206,56 +160,6 @@ To interrupt, press Ctrl+C.
 
 The `train` workflow will use the data from the tag to train a model and will save the checkpoint to the output artifacts.
 
-## Stop and restart the workflow
-
-You can stop the `train` workflow using the `dstack stop` command followed by the name of the run.
-
-By default, output artifacts are stored in real-time. This means, if the workflow saves the checkpoints while it's 
-running, you'll be able to restart the workflow using the `dstack restart` command and the workflow will
-start from where it was interrupted.
-
-## Change resource requirements
-
-If you don't specify resource requirements for your workflow, by default, when you run it, dstack uses the 
-minimal instance type.
-
-To specify resource requirements for your workflow, add the `resources` property to it in `.dstack/workflows.yaml`.
-
-For example, if you want to use one GPU for the `train` workflows, you'll have to modify the `.dstack/workflows.yaml`
-file, this way:
-
-=== ".dstack/workflows.yaml"
-
-    ```yaml
-    workflows:
-      - name: download
-        help: "Download the MNIST dataset"
-        provider: bash
-        python: 3.10
-        env:
-          - PYTHONPATH=mnist
-        commands:
-          - pip install -r requirements.txt
-          - python mnist/download.py
-        artifacts:
-          - path: data
-    
-      - name: train
-        help: "Train a MNIST model"
-        deps:
-          - tag: mnist_data
-        provider: bash
-        env:
-          - PYTHONPATH=mnist
-        commands:
-          - pip install -r requirements.txt
-          - python mnist/train.py
-        artifacts:
-          - path: lightning_logs
-        resources:
-            gpu: 1
-    ```
-
-The `resources` property allows you to specify the number of CPUs, GPUs, the name of the GPU (e.g. `V80` or `V100`),
-the amount of memory, and even whether you want to use spot/preemptive instances or regular ones.
-Find more details on how to specify resources in the `bash` provider [documentation](providers/bash.md#resources).
+!!! info "NOTE:"
+    What's next? Make sure to check out the [Examples](reference/examples/index.md), the [CLI](reference/cli/index.md), 
+    [Workflows](reference/workflows/index.md), and [Providers](reference/providers/index.md) reference pages.  

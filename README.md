@@ -5,7 +5,7 @@ Git-based CLI to run ML workflows on cloud
 ______________________________________________________________________
 
 
-[![PyPI](https://img.shields.io/github/workflow/status/dstackai/dstack/Build?style=for-the-badge)](https://pypi.org/project/dstack/)
+[![PyPI](https://img.shields.io/github/workflow/status/dstackai/dstack/Build?style=for-the-badge)](https://github.com/dstackai/dstack/actions/workflows/build.yml)
 [![PyPI](https://img.shields.io/pypi/v/dstack?style=for-the-badge)](https://pypi.org/project/dstack/)
 [![PyPI - License](https://img.shields.io/pypi/l/dstack?style=for-the-badge&color=blue)](https://github.com/dstackai/dstack/blob/master/LICENSE.md)
 
@@ -14,9 +14,6 @@ ______________________________________________________________________
 </div>
 
 ## Intro
-
-**dstack is an open-source CLI that allows to define ML workflows as code and run them on cloud. 
-  It provisions infrastructure and manages data automatically.**
 
 To run ML workflows, often your local machine is not enough. 
 That’s why it's necessary to automate the process of running ML workflows within the cloud infrastructure.
@@ -94,8 +91,6 @@ workflows:
     deps:
       - tag: mnist_data
     python: 3.10
-    env:
-      - PYTHONPATH=src
     commands:
       - pip install requirements.txt
       - python src/train.py

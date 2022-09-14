@@ -14,8 +14,7 @@
 
 # Intro
 
-**dstack is an open-source CLI that allows to define ML workflows as code and run them on cloud. 
-It provisions infrastructure and manages data automatically.**
+**dstack is an open-source CLI that allows to define ML workflows as code and run them on cloud. It provisions infrastructure and manages data for you.**
 
 To run ML workflows, often your local machine is not enough. 
 That’s why it's necessary to automate the process of running ML workflows within the cloud infrastructure.
