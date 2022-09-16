@@ -9,7 +9,7 @@ To use dstack, you'll only need the dstack CLI. No other software needs to be in
 In order to install the dstack CLI, you need to use `pip`:
 
 ```shell
-pip install dstack
+$ pip install dstack
 ```
 
 ## Configure cloud credentials
@@ -33,7 +33,7 @@ It includes configuring the following:
 To configure this, run the following command:
 
 ```shell
-dstack config
+$ dstack config
 
 Configure AWS backend:
 

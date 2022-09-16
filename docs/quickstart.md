@@ -162,4 +162,4 @@ The `train` workflow will use the data from the tag to train a model and will sa
 
 !!! info "NOTE:"
     What's next? Make sure to check out the [Examples](reference/examples/index.md), the [CLI](reference/cli/index.md), 
-    [Workflows](reference/workflows/index.md), and [Providers](reference/providers/index.md) reference pages.  
+    [Workflows](reference/workflows/index.md) reference pages.  

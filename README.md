@@ -147,7 +147,7 @@ Tags can be managed via the `dstack tags` CLI command.
 
 ## Providers
 
-dstack supports [multiple providers](https://docs.dstack.ai/providers) that allow running tasks, applications, 
+dstack supports [multiple providers](https://docs.dstack.ai/reference/workflows/#providers) that allow running tasks, applications, 
 and dev environments.
 
 ## Docs

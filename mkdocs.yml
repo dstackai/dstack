@@ -9,7 +9,7 @@ copyright: © 2022 dstack GmbH
 theme:
   name: material
   custom_dir: docs/overrides
-  logo: assets/dstack_notext.png
+  logo: assets/logo.svg
   favicon: images/dstack_fav_32.ico
   icon:
     repo: fontawesome/brands/github
@@ -32,10 +32,12 @@ theme:
   #          icon: material/weather-sunny
   #          name: Switch to light mode
   features:
-    - navigation.indexes
+#    - navigation.indexes
+    - navigation.tabs
+    - navigation.instant
     #    - toc.integrate
     - navigation.sections
-    #    - navigation.expand
+    - navigation.expand
     - navigation.top
 markdown_extensions:
   - pymdownx.emoji:
@@ -60,7 +62,7 @@ extra_css:
 extra_javascript:
   - javascripts/extra.js
 extra:
-  homepage: https://dstack.ai
+  homepage: /
   generator: false
   analytics:
     provider: google
@@ -75,17 +77,16 @@ extra:
     - icon: fontawesome/brands/linkedin
       link: https://linkedin.com/company/dstackai
 nav:
-  - Get started:
-      - index.md
-      - Intro: index.md
-      - Concepts: concepts.md
-      - Installation: installation.md
-      - Quickstart: quickstart.md
+  - Guide:
+    - Getting started:
+        - Introduction: index.md
+        - Concepts: concepts.md
+        - Installation: installation.md
+        - Quickstart: quickstart.md
   - Reference:
-      - reference/index.md
-      - Examples: reference/examples/index.md
+#      - Examples: reference/examples/index.md
       - CLI:
-        - reference/cli/index.md
+        - Introduction: reference/cli/index.md
         - run: reference/cli/run.md
         - ps: reference/cli/ps.md
         - stop: reference/cli/stop.md
@@ -96,15 +97,11 @@ nav:
         - config: reference/cli/config.md
         - secrets: reference/cli/secrets.md
         - delete: reference/cli/delete.md
-      - Workflows: reference/workflows/index.md
-      - Providers:
-        - reference/providers/index.md
-        - bash: reference/providers/bash.md
-        - code: reference/providers/code.md
-        - lab: reference/providers/lab.md
-        - notebook: reference/providers/notebook.md
-        - docker: reference/providers/docker.md
-#        - torchrun: reference/providers/torchrun.md
-  - Help:
-      - Slack chat: https://join.slack.com/t/dstackai/shared_invite/zt-xdnsytie-D4qU9BvJP8vkbkHXdi6clQ
-      - GitHub issues: https://github.com/dstackai/dstack/issues
+      - Workflows:
+          - Introduction: reference/workflows/index.md
+          - bash: reference/workflows/bash.md
+          - code: reference/workflows/code.md
+          - lab: reference/workflows/lab.md
+          - notebook: reference/workflows/notebook.md
+          - docker: reference/workflows/docker.md
+  #        - torchrun: reference/workflows/torchrun.md

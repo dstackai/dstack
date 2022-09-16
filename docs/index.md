@@ -1,20 +1,6 @@
-<div class="grid cards fit" markdown>
-  - 
-     <figure markdown> 
+# Introduction to dstack
 
-     ![](https://raw.githubusercontent.com/dstackai/dstack/master/docs/assets/logo.svg){ width="300" align="center"}
-
-      **Git-based CLI to run ML workflows on cloud**
-
-      [![PyPI](https://img.shields.io/pypi/v/dstack?style=for-the-badge)](https://pypi.org/project/dstack/)
-      [![PyPI - License](https://img.shields.io/pypi/l/dstack?style=for-the-badge&color=blue)](https://github.com/dstackai/dstack/blob/master/LICENSE.md)
-      [![Slack](https://img.shields.io/badge/slack-chat-e01563?style=for-the-badge)](https://join.slack.com/t/dstackai/shared_invite/zt-xdnsytie-D4qU9BvJP8vkbkHXdi6clQ)
-    </figure>
-</div>
-
-# Intro
-
-**dstack is an open-source CLI that allows to define ML workflows as code and run them on cloud. It provisions infrastructure and manages data for you.**
+dstack is an open-source CLI that allows to define ML workflows as code and run them on cloud. It provisions infrastructure and manages data for you.
 
 To run ML workflows, often your local machine is not enough. 
 That’s why it's necessary to automate the process of running ML workflows within the cloud infrastructure.
