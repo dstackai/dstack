@@ -4,11 +4,12 @@
 Git-based CLI to run ML workflows on cloud
 ______________________________________________________________________
 
-[![PyPI](https://img.shields.io/pypi/v/dstack?style=for-the-badge&color=brightgreen)](https://pypi.org/project/dstack/)
-[![PyPI - License](https://img.shields.io/pypi/l/dstack?style=for-the-badge&color=blue)](https://github.com/dstackai/dstack/blob/master/LICENSE.md)
-[![Slack](https://img.shields.io/badge/slack-chat-e01563?style=for-the-badge)](https://join.slack.com/t/dstackai/shared_invite/zt-xdnsytie-D4qU9BvJP8vkbkHXdi6clQ)
 
-[//]: # ([![twitter]&#40;https://img.shields.io/twitter/follow/dstackai.svg?style=social&label=Follow&#41;]&#40;https://twitter.com/dstackai&#41;)
+[![PyPI](https://img.shields.io/github/workflow/status/dstackai/dstack/Build?style=for-the-badge)](https://github.com/dstackai/dstack/actions/workflows/build.yml)
+[![PyPI](https://img.shields.io/pypi/v/dstack?style=for-the-badge)](https://pypi.org/project/dstack/)
+[![PyPI - License](https://img.shields.io/pypi/l/dstack?style=for-the-badge&color=blue)](https://github.com/dstackai/dstack/blob/master/LICENSE.md)
+
+[Docs](https://docs.dstack.ai) | [Issues](https://github.com/dstackai/dstack/issues) | [Twitter](https://twitter.com/dstackai) | [Slack](https://join.slack.com/t/dstackai/shared_invite/zt-xdnsytie-D4qU9BvJP8vkbkHXdi6clQ)
 
 </div>
 
@@ -90,8 +91,6 @@ workflows:
     deps:
       - tag: mnist_data
     python: 3.10
-    env:
-      - PYTHONPATH=src
     commands:
       - pip install requirements.txt
       - python src/train.py
@@ -148,7 +147,7 @@ Tags can be managed via the `dstack tags` CLI command.
 
 ## Providers
 
-dstack supports [multiple providers](https://docs.dstack.ai/providers) that allow running tasks, applications, 
+dstack supports [multiple providers](https://docs.dstack.ai/reference/workflows/#providers) that allow running tasks, applications, 
 and dev environments.
 
 ## Docs

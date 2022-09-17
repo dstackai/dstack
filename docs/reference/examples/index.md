@@ -218,7 +218,7 @@ a code editor and a terminal.
 
 Once you don't need the dev environment, you can stop the workflow.
 
-Just like with other providers, you can configure [resources](../providers/code.md#resources) for your dev environment, 
+Just like with other providers, you can configure [resources](../workflows/code.md#resources) for your dev environment, 
 use the `resources` property:
 
 === ".dstack/workflows.yaml"

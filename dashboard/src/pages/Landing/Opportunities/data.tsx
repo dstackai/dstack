@@ -29,8 +29,6 @@ const DefineWorkflowsSnippet: FC = () => {
     - name: download
       provider: bash
       python: 3.10
-      env:
-        - PYTHONPATH=mnist
       commands:
         - pip install -r requirements.txt
         - python mnist/download.py
@@ -41,8 +39,7 @@ const DefineWorkflowsSnippet: FC = () => {
       deps:
         - tag: mnist_data
       provider: bash
-      env:
-        - PYTHONPATH=mnist
+      python: 3.10
       commands:
         - pip install -r requirements.txt
         - python mnist/train.py

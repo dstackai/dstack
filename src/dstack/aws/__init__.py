@@ -4,6 +4,7 @@ from botocore.client import BaseClient
 from dstack.aws import logs, artifacts, jobs, run_names, runs, runners, tags, repos, secrets, config
 from dstack.backend import *
 from dstack.config import AwsBackendConfig
+from dstack.jobs import AppSpec
 
 
 class AwsBackend(Backend):
@@ -91,6 +92,15 @@ class AwsBackend(Backend):
         return logs.poll_logs(self._ec2_client(), self._s3_client(), self._logs_client(),
                               self.backend_config.bucket_name, repo_user_name, repo_name, job_heads, start_time,
                               attached)
+
+    def query_logs(self, repo_user_name: str, repo_name: str, run_name: str, start_time: int, end_time: Optional[int],
+                   next_token: Optional[str], job_host_names: Dict[str, Optional[str]],
+                   job_ports: Dict[str, Optional[List[int]]], job_app_specs: Dict[str, Optional[List[AppSpec]]]) \
+            -> Tuple[List[LogEvent], Optional[str], Dict[str, Optional[str]], Dict[str, Optional[List[int]]],
+                     Dict[str, Optional[List[AppSpec]]]]:
+        return logs.query_logs(self._s3_client(), self._logs_client(),
+                               self.backend_config.bucket_name, repo_user_name, repo_name, run_name, start_time,
+                               end_time, next_token, job_host_names, job_ports, job_app_specs)
 
     def list_run_artifact_files(self, repo_user_name: str, repo_name: str, run_name: str) -> List[Tuple[str, str, int]]:
         return artifacts.list_run_artifact_files(self._s3_client(), self.backend_config.bucket_name,

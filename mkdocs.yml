@@ -1,10 +1,15 @@
 site_name: dstack
 repo_url: https://github.com/dstackai/dstack
 repo_name: dstackai/dstack
+site_description: >-
+  dstack is an open-source CLI that allow to define ML workflows as code and run them on cloud. 
+  It provisions infrastructure and manages data automatically.
 edit_uri: edit/master/docs/
+copyright: © 2022 dstack GmbH
 theme:
   name: material
-  logo: assets/dstack_notext.png
+  custom_dir: docs/overrides
+  logo: assets/logo.svg
   favicon: images/dstack_fav_32.ico
   icon:
     repo: fontawesome/brands/github
@@ -27,10 +32,12 @@ theme:
   #          icon: material/weather-sunny
   #          name: Switch to light mode
   features:
-    - navigation.indexes
+#    - navigation.indexes
+    - navigation.tabs
+    - navigation.instant
     #    - toc.integrate
     - navigation.sections
-    #    - navigation.expand
+    - navigation.expand
     - navigation.top
 markdown_extensions:
   - pymdownx.emoji:
@@ -55,41 +62,46 @@ extra_css:
 extra_javascript:
   - javascripts/extra.js
 extra:
-  homepage: https://dstack.ai
+  homepage: /
   generator: false
   analytics:
     provider: google
     property: UA-4493451-5
+  social:
+    - icon: fontawesome/brands/github
+      link: https://github.com/dstackai/dstack
+    - icon: fontawesome/brands/twitter
+      link: https://twitter.com/dstackai
+    - icon: fontawesome/brands/slack
+      link: https://join.slack.com/t/dstackai/shared_invite/zt-xdnsytie-D4qU9BvJP8vkbkHXdi6clQ
+    - icon: fontawesome/brands/linkedin
+      link: https://linkedin.com/company/dstackai
 nav:
-  - Get started:
-      - index.md
-      - Intro: index.md
-      - Concepts: concepts.md
-      - Installation: installation.md
-      - Quickstart: quickstart.md
-      - Examples: examples/index.md
+  - Guide:
+    - Getting started:
+        - Introduction: index.md
+        - Concepts: concepts.md
+        - Installation: installation.md
+        - Quickstart: quickstart.md
   - Reference:
-      - Workflows: workflows/overview.md
-      - Providers:
-        - providers/index.md
-        - bash: providers/bash.md
-        - code: providers/code.md
-        - lab: providers/lab.md
-        - notebook: providers/notebook.md
-        - docker: providers/docker.md
-#        - torchrun: providers/torchrun.md
+#      - Examples: reference/examples/index.md
       - CLI:
-        - cli/index.md
-        - run: cli/run.md
-        - ps: cli/ps.md
-        - stop: cli/stop.md
-        - logs: cli/logs.md
-        - artifacts: cli/artifacts.md
-        - tags: cli/tags.md
-        - init: cli/init.md
-        - config: cli/config.md
-        - secrets: cli/secrets.md
-        - delete: cli/delete.md
-  - Help:
-      - Slack chat: https://join.slack.com/t/dstackai/shared_invite/zt-xdnsytie-D4qU9BvJP8vkbkHXdi6clQ
-      - GitHub issues: https://github.com/dstackai/dstack/issues
+        - Introduction: reference/cli/index.md
+        - run: reference/cli/run.md
+        - ps: reference/cli/ps.md
+        - stop: reference/cli/stop.md
+        - logs: reference/cli/logs.md
+        - artifacts: reference/cli/artifacts.md
+        - tags: reference/cli/tags.md
+        - init: reference/cli/init.md
+        - config: reference/cli/config.md
+        - secrets: reference/cli/secrets.md
+        - delete: reference/cli/delete.md
+      - Workflows:
+          - Introduction: reference/workflows/index.md
+          - bash: reference/workflows/bash.md
+          - code: reference/workflows/code.md
+          - lab: reference/workflows/lab.md
+          - notebook: reference/workflows/notebook.md
+          - docker: reference/workflows/docker.md
+  #        - torchrun: reference/workflows/torchrun.md

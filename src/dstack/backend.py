@@ -1,10 +1,10 @@
 import sys
 from abc import ABC
 from enum import Enum
-from typing import List, Optional, Generator, Tuple
+from typing import List, Optional, Generator, Tuple, Dict
 
 from dstack.config import load_config, AwsBackendConfig
-from dstack.jobs import Job, JobStatus, JobHead
+from dstack.jobs import Job, JobStatus, JobHead, AppSpec
 from dstack.repo import RepoData, RepoCredentials
 from dstack.runners import Resources, Runner
 from dstack.util import _quoted
@@ -97,7 +97,9 @@ class LogEventSource(Enum):
 
 
 class LogEvent:
-    def __init__(self, timestamp: int, job_id: Optional[str], log_message: str, log_source: LogEventSource):
+    def __init__(self, event_id: str, timestamp: int, job_id: Optional[str], log_message: str,
+                 log_source: LogEventSource):
+        self.event_id = event_id
         self.timestamp = timestamp
         self.job_id = job_id
         self.log_message = log_message
@@ -213,8 +215,15 @@ class Backend(ABC):
                       include_request_heads: bool = True) -> List[RunHead]:
         pass
 
-    def poll_logs(self, repo_user_name: str, repo_name: str, run_name: str, start_time: int,
+    def poll_logs(self, repo_user_name: str, repo_name: str, job_heads: List[JobHead], start_time: int,
                   attached: bool) -> Generator[LogEvent, None, None]:
+        pass
+
+    def query_logs(self, repo_user_name: str, repo_name: str, run_name: str, start_time: int, end_time: Optional[int],
+                   next_token: Optional[str], job_host_names: Dict[str, Optional[str]],
+                   job_ports: Dict[str, Optional[List[int]]], job_app_specs: Dict[str, Optional[List[AppSpec]]]) \
+            -> Tuple[List[LogEvent], Optional[str], Dict[str, Optional[str]], Dict[str, Optional[List[int]]],
+                     Dict[str, Optional[List[AppSpec]]]]:
         pass
 
     def download_run_artifact_files(self, repo_user_name: str, repo_name: str, run_name: str,

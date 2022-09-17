@@ -21,7 +21,7 @@ class TagHeadItem(BaseModel):
     workflow_name: Optional[str]
     provider_name: Optional[str]
     created_at: int
-    artifact_heads: Optional[List[ArtifactHeadItem]]
+    artifacts: Optional[List[ArtifactHeadItem]]
 
 
 class TagItem(BaseModel):
@@ -35,7 +35,7 @@ class TagItem(BaseModel):
     workflow_name: Optional[str]
     provider_name: Optional[str]
     created_at: int
-    artifact_heads: Optional[List[ArtifactHeadItem]]
+    artifacts: Optional[List[ArtifactHeadItem]]
 
 
 class QueryTagsResponse(BaseModel):
@@ -71,7 +71,7 @@ async def query(repo_user_name: str, repo_name: str) -> QueryTagsResponse:
                           workflow_name=t.workflow_name,
                           provider_name=t.provider_name,
                           created_at=t.created_at,
-                          artifact_heads=[
+                          artifacts=[
                               ArtifactHeadItem(job_id=a.job_id, artifact_path=a.artifact_path)
                               for a in t.artifact_heads
                           ] if t.artifact_heads else None) for t in tag_heads])
@@ -94,7 +94,7 @@ async def query(repo_user_name: str, repo_name: str, tag_name: str) -> GetTagRes
                         workflow_name=t.workflow_name,
                         provider_name=t.provider_name,
                         created_at=t.created_at,
-                        artifact_heads=[
+                        artifacts=[
                             ArtifactHeadItem(job_id=a.job_id, artifact_path=a.artifact_path)
                             for a in t.artifact_heads
                         ] if t.artifact_heads else None))
