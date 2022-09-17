@@ -11,7 +11,7 @@ const Switcher = forwardRef<HTMLInputElement, Props>(({ className, ...rest }, re
     const inputRef = React.useRef<HTMLInputElement>(null);
 
     return (
-        <div className={cn(css.switcherWrapper, className, { withAnimation: isMounted() })}>
+        <div className={cn(css.switcherWrapper, className, { withAnimation: isMounted(), [css.disabled]: rest.disabled })}>
             <input className={cn(css.checkbox)} {...rest} ref={refSetter(ref, inputRef)} type="checkbox" />
             <div className={css.switcher} />
         </div>

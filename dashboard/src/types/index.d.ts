@@ -1,9 +1,16 @@
+
+
 declare type TStatus = 'submitted' | 'running' | 'stopping' | 'aborting' | 'stopped' | 'aborted' | 'failed' | 'done' | 'queued'
 
 declare type TVariables = {[key: string]: any};
 declare type IVariable = {key: string, value: string};
 declare type TApps = IApp[];
-declare type IApp = {app_name: string, url: string};
+
+declare interface IApp {
+    app_name: string;
+    job_id: string;
+    url: string
+}
 
 declare interface SelectOption {
     value: string;

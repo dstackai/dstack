@@ -223,7 +223,7 @@
   "delete_repository": "Delete repository",
   "completed_runs_with_any_status": "Completed runs with any status",
   "only_failed_runs": "Only failed runs",
-  "all_runs": "All Runs",
+  "show_active_runs": "Show active runs",
   "clear": "Clear",
   "no_runs_here": "No runs here.",
   "to_start_your_first_run": "To start your first run...",
@@ -234,6 +234,10 @@
   "it_is_pretty_empty": "\uD83E\uDD14 Hmmm, it’s pretty empty",
   "you_do_not_have_any_artifacts_and_logs_yet": "You don’t have any Artifacts and Logs yet",
   "you_do_not_have_any_tags_yet": "You don’t have any Tags yet",
+  "delete_all": "Delete all",
+  "delete_all_runs": "Delete all runs",
+  "delete_failed_runs": "Delete failed runs",
+  "actions": "Actions",
 
   "statuses": {
     "queued": "Queued",

@@ -1,5 +1,5 @@
 import React, { useMemo } from 'react';
-import { Link, Outlet, useParams } from 'react-router-dom';
+import { Link, Outlet, useParams, Route, Routes } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import { ReactComponent as GithubIcon } from 'assets/icons/github-circle.svg';
 import { ReactComponent as RefreshIcon } from 'assets/icons/refresh.svg';
@@ -12,12 +12,15 @@ import { useRefetchWorkflowsMutation } from 'services/workflows';
 import { URL_PARAMS } from 'route/url-params';
 import { getRouterModule, RouterModules } from 'route';
 import css from './index.module.css';
+import { goToUrl } from 'libs';
 
 const RepoDetails: React.FC = () => {
     const { t } = useTranslation();
-    const { userName, repoName } = useParams();
+    const urlParams = useParams();
+    const { userName, repoUserName, repoName } = urlParams;
     const newRouter = getRouterModule(RouterModules.NEW_ROUTER);
     const [refetchWorkflows] = useRefetchWorkflowsMutation();
+
     const refreshList = () => refetchWorkflows();
 
     const userLink = useMemo<string>(() => {
@@ -25,6 +28,16 @@ const RepoDetails: React.FC = () => {
             [URL_PARAMS.USER_NAME]: userName,
         });
     }, [userName]);
+
+    const runsRoute = useMemo<string>(() => {
+        const pathName = ['app', urlParams[URL_PARAMS.REPO_USER_NAME] ? 'user-repouser-repo' : 'user-repo', 'repo', 'runs']
+            .filter(Boolean)
+            .join('.');
+
+        return newRouter.buildUrl(pathName);
+    }, [urlParams]);
+
+    console.log(runsRoute);
 
     return (
         <div className={css.details}>
@@ -59,14 +72,8 @@ const RepoDetails: React.FC = () => {
                             },
                         ]}
                     >
-                        <Button
-                            className={css.button}
-                            appearance="gray-stroke"
-                            direction="right"
-                            icon={<ChevronDownIcon />}
-                            onClick={() => console.log('clear')}
-                        >
-                            {t('clear')}
+                        <Button className={css.button} appearance="gray-stroke" direction="right" icon={<ChevronDownIcon />}>
+                            {t('delete_all')}
                         </Button>
                     </Dropdown>
 
@@ -74,7 +81,7 @@ const RepoDetails: React.FC = () => {
                         className={css.button}
                         appearance="gray-stroke"
                         direction="right"
-                        onClick={() => console.log('open_in')}
+                        onClick={() => goToUrl(`https://github.com/${repoUserName}/${repoName}`, true)}
                         icon={<GithubIcon width={12} height={12} />}
                     >
                         {t('open_in')}
@@ -88,7 +95,9 @@ const RepoDetails: React.FC = () => {
                             },
                         ]}
                     >
-                        <Button appearance="gray-transparent" displayAsRound icon={<DotsICon />} />
+                        <Button className={css.button} appearance="gray-stroke" direction="right" icon={<ChevronDownIcon />}>
+                            {t('actions')}
+                        </Button>
                     </Dropdown>
                 </div>
             </div>

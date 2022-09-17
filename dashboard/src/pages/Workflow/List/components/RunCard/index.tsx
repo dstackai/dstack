@@ -21,7 +21,7 @@ import { showArtifacts } from 'features/ArtifactsModal/slice';
 import { useAppDispatch } from 'hooks';
 import { getDateAgoSting, goToUrl, stopPropagation } from 'libs';
 import { artifactsToArtifactPaths } from 'libs/artifacts';
-import { isFailed, isFinished } from 'libs/run';
+import { isFailed, isFinished, isRunning } from 'libs/run';
 import { useDeleteMutation, useRestartMutation, useStopMutation } from 'services/workflows';
 import css from './index.module.css';
 
@@ -86,7 +86,10 @@ const RunCard: React.FC<Props> = ({ className, item, ...props }) => {
         if (!item.apps?.length) return;
 
         if (item.apps.length === 1) {
-            goToUrl(item.apps[0].url, true);
+            goToUrl(
+                `/api/apps/?repo_user_name=${item.repo_user_name}&repo_name=${item.repo_name}&run_name=${item.run_name}&job_id=${item.apps[0].job_id}&app_name=${item.apps[0].app_name}`,
+                true,
+            );
             return;
         }
 
@@ -104,6 +107,7 @@ const RunCard: React.FC<Props> = ({ className, item, ...props }) => {
             }),
         );
     };
+
     return (
         <>
             <Link
@@ -163,7 +167,7 @@ const RunCard: React.FC<Props> = ({ className, item, ...props }) => {
                     <ul className={css.points}>
                         <li className={css.point}>
                             <ClockIcon width={12} height={12} />
-                            {getDateAgoSting(item.updated_at)}
+                            {getDateAgoSting(item.submitted_at)}
                         </li>
 
                         {!!item.artifacts?.length && (
@@ -174,7 +178,7 @@ const RunCard: React.FC<Props> = ({ className, item, ...props }) => {
                         )}
                     </ul>
 
-                    {item.apps?.length ? (
+                    {item.apps?.length && isRunning(item) ? (
                         <Button
                             className={css.openApp}
                             appearance="gray-stroke"

@@ -1,4 +1,4 @@
-import { isFinishedStatus, isAvailableResumeByStatus, isFailedStatus } from './status';
+import { isFinishedStatus, isAvailableResumeByStatus, isFailedStatus, isRunningStatus } from './status';
 
 export const filterRunByQuery = (run: IRun, queryString: string): boolean => {
     const query = queryString.toLowerCase();
@@ -48,6 +48,10 @@ export const isFinished = (run: IRun | IRunWorkflow): boolean => {
 
 export const isFailed = (item: IRun | IRunWorkflow): boolean => {
     return isFailedStatus(item.status);
+};
+
+export const isRunning = (item: IRun | IRunWorkflow): boolean => {
+    return isRunningStatus(item.status);
 };
 
 export const isAvailableResumeFor = (run: IRun | IRunWorkflow): boolean => {

@@ -36,4 +36,5 @@ declare interface ITag {
     provider_name: string,
     created_at: number,
     artifact_heads: TTagArtifactHead[]
+    artifacts: IArtifact[]
 }

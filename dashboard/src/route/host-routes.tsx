@@ -2,6 +2,7 @@ import React from 'react';
 import { Navigate } from 'react-router-dom';
 
 import AppLayout from 'layouts/AppLayout';
+
 import WorkflowList from 'pages/Workflow/List';
 import WorkflowDetails from 'pages/Workflow/Details';
 
@@ -12,10 +13,10 @@ import RepoDetails from 'pages/Repositories/Details';
 import TagList from 'pages/Tag/List';
 
 import Settings from 'pages/Settings';
+import SecretsSettings from 'pages/Settings/Secrets';
 
 import { getPathParamForRouter } from './url-params';
 import { Route } from './types';
-import SecretsSettings from 'pages/Settings/Secrets';
 
 const runsRoutes: Route[] = [
     {
@@ -31,11 +32,13 @@ const runsRoutes: Route[] = [
             },
         ],
     },
+
     {
         name: 'run',
         path: `runs/${getPathParamForRouter('RUN_NAME')}`,
         element: <WorkflowDetails />,
     },
+
     {
         name: 'workflow',
         path: `runs/${getPathParamForRouter('RUN_NAME')}/${getPathParamForRouter('WORKFLOW_NAME')}`,

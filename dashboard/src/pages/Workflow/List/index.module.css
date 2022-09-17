@@ -17,6 +17,11 @@
         margin-right: 8px;
         @mixin textStyle 14, 20;
     }
+    & > span {
+        &.disabled {
+            opacity: .5;
+        }
+    }
 }
 .grid {
     display: grid;

@@ -6,11 +6,21 @@
     border: 1px solid var(--color-light-gray);
     border-radius: 6px;
     padding: 12px 12px 10px;
+    transition: background-color .2s ease;
     &.failed {
         background-color: #FFF9F9;
     }
     &.warning {
         background-color: #FFFAF0;
+    }
+    &:hover {
+        background-color: #f5f5f5;
+        &.failed {
+            background-color: #fcecec;
+        }
+        &.warning {
+            background-color: #fcf0d8;
+        }
     }
 }
 .topSection {

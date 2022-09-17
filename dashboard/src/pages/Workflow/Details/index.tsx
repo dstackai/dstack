@@ -36,6 +36,7 @@ import EmptyMessage from 'components/EmptyMessage';
 import { URL_PARAMS } from 'route/url-params';
 import { getRouterModule, RouterModules } from 'route';
 import css from './index.module.css';
+import { isRunning } from '../../../libs/run';
 
 const WorkflowDetails: React.FC = () => {
     const { t } = useTranslation();
@@ -171,15 +172,15 @@ const WorkflowDetails: React.FC = () => {
                         {workflow.tag_name && <Tag className={css.tag} title={workflow.tag_name} withIcon />}
 
                         <div className={css.buttons}>
-                            {finished && (
-                                <Button
-                                    appearance="gray-stroke"
-                                    disabled={isRestarting}
-                                    displayAsRound
-                                    icon={<RefreshIcon />}
-                                    onClick={() => setShowConfirmRestart(true)}
-                                />
-                            )}
+                            {/*{finished && (*/}
+                            {/*    <Button*/}
+                            {/*        appearance="gray-stroke"*/}
+                            {/*        disabled={isRestarting}*/}
+                            {/*        displayAsRound*/}
+                            {/*        icon={<RefreshIcon />}*/}
+                            {/*        onClick={() => setShowConfirmRestart(true)}*/}
+                            {/*    />*/}
+                            {/*)}*/}
 
                             {!finished && (
                                 <Button
@@ -198,7 +199,7 @@ const WorkflowDetails: React.FC = () => {
                                     disabled={isRemovingTag}
                                     onClick={removeTagHandle}
                                     icon={<TagMinusIcon />}
-                                ></Button>
+                                />
                             )}
 
                             {finished && (
@@ -210,14 +211,14 @@ const WorkflowDetails: React.FC = () => {
                                 />
                             )}
 
-                            {finished && !!workflow.apps?.length && (
+                            {isRunning(workflow) && !!workflow.apps?.length && (
                                 <Button
                                     className={css.openApp}
                                     appearance="gray-stroke"
                                     icon={<ShapePlusIcon />}
                                     onClick={showAppsHandle}
                                 >
-                                    {t('open_application', { count: workflow.apps.length })}
+                                    {t('open_app', { count: workflow.apps.length })}
                                 </Button>
                             )}
                         </div>
@@ -255,30 +256,37 @@ const WorkflowDetails: React.FC = () => {
                     <Sidebar className={css.sidebar}>
                         {workflow && (
                             <>
-                                {/*<Sidebar.Property name={t('repository')}>*/}
-                                {/*    <Sidebar.RepoAttrs*/}
-                                {/*        repoName={workflow.repo_name}*/}
-                                {/*        hash={workflow.repo_hash}*/}
-                                {/*        branch={workflow.repo_branch}*/}
-                                {/*    />*/}
+                                <Sidebar.Property name={t('repository')}>
+                                    <Sidebar.RepoAttrs
+                                        repoUrl={`https://github.com/${repoUserName}/${repoName}`}
+                                        hash={workflow.repo_hash}
+                                        branch={workflow.repo_branch}
+                                    />
 
-                                {/*    /!*<Link*!/*/}
-                                {/*    /!*    to={*!/*/}
-                                {/*    /!*        workflow.workflow_name*!/*/}
-                                {/*    /!*            ? routes.userRunWorkflowDetailsDiff({*!/*/}
-                                {/*    /!*                  userName: workflow.user_name,*!/*/}
-                                {/*    /!*                  runName: workflow.run_name,*!/*/}
-                                {/*    /!*                  workflowName: workflow.workflow_name,*!/*/}
-                                {/*    /!*              })*!/*/}
-                                {/*    /!*            : routes.userRunDetailsDiff({*!/*/}
-                                {/*    /!*                  userName: workflow.user_name,*!/*/}
-                                {/*    /!*                  runName: workflow.run_name,*!/*/}
-                                {/*    /!*              })*!/*/}
-                                {/*    /!*    }*!/*/}
-                                {/*    /!*>*!/*/}
-                                {/*    /!*    {t('local_changes')}*!/*/}
-                                {/*    /!*</Link>*!/*/}
-                                {/*</Sidebar.Property>*/}
+                                    <a
+                                        href={`https://github.com/${repoUserName}/${repoName}/commit/${workflow.repo_hash}`}
+                                        target="_blank"
+                                    >
+                                        {t('local_changes')}
+                                    </a>
+
+                                    {/*<Link*/}
+                                    {/*    to={*/}
+                                    {/*        workflow.workflow_name*/}
+                                    {/*            ? routes.userRunWorkflowDetailsDiff({*/}
+                                    {/*                  userName: workflow.user_name,*/}
+                                    {/*                  runName: workflow.run_name,*/}
+                                    {/*                  workflowName: workflow.workflow_name,*/}
+                                    {/*              })*/}
+                                    {/*            : routes.userRunDetailsDiff({*/}
+                                    {/*                  userName: workflow.user_name,*/}
+                                    {/*                  runName: workflow.run_name,*/}
+                                    {/*              })*/}
+                                    {/*    }*/}
+                                    {/*>*/}
+                                    {/*    {t('local_changes')}*/}
+                                    {/*</Link>*/}
+                                </Sidebar.Property>
 
                                 <Sidebar.Property name={t('workflow')}>
                                     <span className={cn({ [css.gray]: !workflow.workflow_name })}>
@@ -289,11 +297,12 @@ const WorkflowDetails: React.FC = () => {
                                 <Sidebar.Property name={t('submitted')}>
                                     {getDateAgoSting(workflow.submitted_at)}
                                 </Sidebar.Property>
-                                <Sidebar.Property name={t('updated')}>{getDateAgoSting(workflow.updated_at)}</Sidebar.Property>
 
-                                <Sidebar.Property name={t('variable_other')} align="center">
-                                    {/*<VariablesCell data={workflow.variables} />*/}
-                                </Sidebar.Property>
+                                {/*<Sidebar.Property name={t('updated')}>{getDateAgoSting(workflow.updated_at)}</Sidebar.Property>*/}
+
+                                {/*<Sidebar.Property name={t('variable_other')} align="center">*/}
+                                {/*<VariablesCell data={workflow.variables} />*/}
+                                {/*</Sidebar.Property>*/}
                             </>
                         )}
                     </Sidebar>

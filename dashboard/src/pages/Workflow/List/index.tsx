@@ -1,10 +1,11 @@
-import React, { useCallback, useMemo } from 'react';
+import React, { useCallback, useEffect, useMemo } from 'react';
+import cn from 'classnames';
 import { useTranslation } from 'react-i18next';
 import { useParams } from 'react-router-dom';
 
 import Switcher from 'components/Switcher';
 import EmptyMessage from 'components/EmptyMessage';
-import { isFinished } from 'libs/run';
+import { isFinished, isRunning } from 'libs/run';
 import { useGetWorkflowsQuery } from 'services/workflows';
 import { POLLING_INTERVAL, STORAGE_KEYS } from 'consts';
 import { URL_PARAMS } from 'route/url-params';
@@ -17,7 +18,7 @@ const LAST_RUNS_COUNT = 50;
 
 const RunsList: React.FC = () => {
     const { t } = useTranslation();
-    const [isShowAllRuns, setIsShowAllRuns] = useLocalStorageState<boolean>(false, STORAGE_KEYS.ALL_RUNS_LIST_FILTER);
+    const [isShowActiveRuns, setIsShowActiveRuns] = useLocalStorageState<boolean>(false, STORAGE_KEYS.ACTIVE_RUNS_LIST_FILTER);
     const urlParams = useParams();
     const newRouter = getRouterModule(RouterModules.NEW_ROUTER);
 
@@ -33,19 +34,23 @@ const RunsList: React.FC = () => {
 
     useAppProgress(isFetching);
 
+    useEffect(() => {
+        if (data?.length && isShowActiveRuns && !data?.some((w) => isRunning(w))) setIsShowActiveRuns(false);
+    }, [data]);
+
     const filteredData = useMemo<typeof data>(() => {
         if (!Array.isArray(data)) return data;
 
-        if (isShowAllRuns) return data;
+        if (!isShowActiveRuns) return data;
 
         return data.filter((workflow) => {
             let result = true;
 
-            if (!isShowAllRuns) result = result && !isFinished(workflow);
+            if (!isShowActiveRuns) result = result && !isFinished(workflow);
 
             return result;
         });
-    }, [isShowAllRuns, data]);
+    }, [isShowActiveRuns, data]);
 
     const getWorkflowLink = useCallback(
         (w: IRunWorkflow): string => {
@@ -68,20 +73,26 @@ const RunsList: React.FC = () => {
         [urlParams],
     );
 
+    const disabledShowActive = useMemo(() => {
+        if (isLoading) return true;
+        if (!data?.length) return true;
+
+        return !data?.some((w) => isRunning(w));
+    }, [isLoading, data]);
+
     return (
         <section className={css.section}>
             <div className={css.filter}>
-                {!isLoading && !!data?.length && (
-                    <label className={css.switcherLabel}>
-                        <Switcher
-                            className={css.switcher}
-                            checked={isShowAllRuns}
-                            onChange={(event) => setIsShowAllRuns(event.currentTarget.checked)}
-                        />
+                <label className={css.switcherLabel}>
+                    <Switcher
+                        className={css.switcher}
+                        checked={isShowActiveRuns}
+                        disabled={disabledShowActive}
+                        onChange={(event) => setIsShowActiveRuns(event.currentTarget.checked)}
+                    />
 
-                        <span>{t('all_runs')}</span>
-                    </label>
-                )}
+                    <span className={cn({ [css.disabled]: disabledShowActive })}>{t('show_active_runs')}</span>
+                </label>
             </div>
 
             {isLoading && (
