@@ -1,5 +1,5 @@
 import React, { useMemo } from 'react';
-import { Link, Outlet, useParams, Route, Routes } from 'react-router-dom';
+import { Link, Outlet, useParams, Route, Routes, useLocation } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import { ReactComponent as GithubIcon } from 'assets/icons/github-circle.svg';
 import { ReactComponent as RefreshIcon } from 'assets/icons/refresh.svg';
@@ -17,6 +17,7 @@ import { goToUrl } from 'libs';
 const RepoDetails: React.FC = () => {
     const { t } = useTranslation();
     const urlParams = useParams();
+    const { pathname } = useLocation();
     const { userName, repoUserName, repoName } = urlParams;
     const newRouter = getRouterModule(RouterModules.NEW_ROUTER);
     const [refetchWorkflows] = useRefetchWorkflowsMutation();
@@ -34,10 +35,12 @@ const RepoDetails: React.FC = () => {
             .filter(Boolean)
             .join('.');
 
-        return newRouter.buildUrl(pathName);
+        return newRouter.buildUrl(pathName, {
+            [URL_PARAMS.USER_NAME]: urlParams[URL_PARAMS.USER_NAME],
+            [URL_PARAMS.REPO_USER_NAME]: urlParams[URL_PARAMS.REPO_USER_NAME],
+            [URL_PARAMS.REPO_NAME]: urlParams[URL_PARAMS.REPO_NAME],
+        });
     }, [urlParams]);
-
-    console.log(runsRoute);
 
     return (
         <div className={css.details}>
@@ -56,26 +59,33 @@ const RepoDetails: React.FC = () => {
                         {t('refresh')}
                     </Button>
 
-                    <Dropdown
-                        items={[
-                            {
-                                children: t('completed_runs_with_any_status'),
-                                onClick: () => console.log('completed_runs_with_any_status'),
-                            },
-                            {
-                                children: t('only_failed_runs'),
-                                onClick: () => console.log('only_failed_runs'),
-                            },
-                            {
-                                children: t('all_runs'),
-                                onClick: () => console.log('all_runs'),
-                            },
-                        ]}
-                    >
-                        <Button className={css.button} appearance="gray-stroke" direction="right" icon={<ChevronDownIcon />}>
-                            {t('delete_all')}
-                        </Button>
-                    </Dropdown>
+                    {pathname === runsRoute && (
+                        <Dropdown
+                            items={[
+                                {
+                                    children: t('completed_runs_with_any_status'),
+                                    onClick: () => console.log('completed_runs_with_any_status'),
+                                },
+                                {
+                                    children: t('only_failed_runs'),
+                                    onClick: () => console.log('only_failed_runs'),
+                                },
+                                {
+                                    children: t('all_runs'),
+                                    onClick: () => console.log('all_runs'),
+                                },
+                            ]}
+                        >
+                            <Button
+                                className={css.button}
+                                appearance="gray-stroke"
+                                direction="right"
+                                icon={<ChevronDownIcon />}
+                            >
+                                {t('delete_all')}
+                            </Button>
+                        </Dropdown>
+                    )}
 
                     <Button
                         className={css.button}
