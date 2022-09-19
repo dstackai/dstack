@@ -1,52 +1,33 @@
-# docker
+# lab
 
-The `docker` provider runs a Docker image. 
+The `lab` provider launches a JupyterLab dev environment.
 
-The provider allows you to specify an image, a list of shell commands to run inside the container, 
-environment variables, properties, which folders to save as output artifacts, dependencies to
-other workflows if any, and the resources the workflow needs 
-(e.g. whether it should be a spot/preemptive instance, how much memory, GPU, etc.) 
+It comes with Python and Conda pre-installed, and allows to expose ports.
+
+If GPU is requested, the provider pre-installs the CUDA driver too. 
 
 ## Example usage 
-
-### Basic example
 
 === ".dstack/workflows.yaml"
 
     ```yaml
     workflows:
-      - name: train
-        provider: docker
-        image: ubuntu
-        commands:
-          - mkdir -p output
-          - echo 'Hello, world!' > output/hello.txt
-        artifacts:
+      - name: ide-lab
+        provider: lab
+        artifacts: 
           - path: output
         resources:
-          gpu:
-            name: "K80"
-            count: 1
+          interruptible: true
+          gpu: 1
     ```
 
-!!! info "NOTE:"
-    Unlike the `bash`, `code`, `lab`, and `notebook` providers, the `docker` provider doesn't have 
-    the CUDA driver and Conda pre-installed.
-
-    If you want, you can use the [`dstackai/miniconda`](https://hub.docker.com/repository/docker/dstackai/miniconda) 
-    base Docker image that has the CUDA driver and Conda pre-installed.
-
-## Workflow syntax
-
-The following properties are required:
-
-- `file` - (Required) The Python file to run
+## Properties reference
 
 The following properties are optional:
 
-- `before_run` - (Optional) The list of shell commands to run before running the Docker image
+- `before_run` - (Optional) The list of shell commands to run before running the JupyterLab application
 - `requirements` - (Optional) The path to the `requirements.txt` file
-- `version` - (Optional) The major version of Python. By default, it's `3.10`.
+- `python` - (Optional) The major version of Python. By default, it's `3.10`.
 - `environment` - (Optional) The list of environment variables 
 - [`artifacts`](#artifacts) - (Optional) The list of output artifacts
 - [`resources`](#resources) - (Optional) The hardware resources required by the workflow
@@ -74,10 +55,8 @@ The hardware resources required by the workflow
 - `interruptible` - (Optional) `true` if the workflow can run on interruptible instances.
     By default, it's `false`.
 
-!!! info "NOTE:"
-    If your workflow is training a model using multiple parallel processes (e.g. via PyTorch DDP),
-    make sure to use the `shm_size` to configure enough shared memory (e.g. `"8GB"` or more) so the processes 
-    can communicate. Otherwise, you might get an error.
+If your workflow is using parallel communicating processes (e.g. dataloaders in PyTorch), 
+you may need to configure the size of the shared memory (`/dev/shm` filesystem) via the `shm_size` property.
 
 #### gpu
 

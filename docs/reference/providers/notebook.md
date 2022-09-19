@@ -1,46 +1,33 @@
-# torchrun
+# notebook
 
-The `torchrun` provider runs a distributed PyTorch training on multiple nodes. 
+The `notebook` provider launches a Jupyter notebook dev environment.
 
-The provider allows you to specify the Python file with the training script, the number of nodes, the version of Python, 
-a `requirements.txt` file, environment variables, arguments, which folders to save as output artifacts 
-(on the master node), dependencies to other workflows if any, and the resources the workflow needs on each node
-(e.g. CPU, GPU, memory, etc).
+It comes with Python and Conda pre-installed, and allows to expose ports.
+
+If GPU is requested, the provider pre-installs the CUDA driver too.
 
 ## Example usage 
-
-### Basic example
 
 === ".dstack/workflows.yaml"
 
     ```yaml
     workflows:
-      - name: train
-        provider: torchrun
-        file: "train.py"
-        requirements: "requirements.txt"
+      - name: ide-notebook
+        provider: notebook
         artifacts: 
-          - path: model
-        nodes: 4
+          - path: output
         resources:
-          gpu:
-            name: "K80"
-            count: 4
+          interruptible: true
+          gpu: 1
     ```
 
-## Workflow syntax
-
-The following properties are required:
-
-- `file` - (Required) The Python file with the training script, e.g. `"train.py"`
+## Properties reference
 
 The following properties are optional:
 
-- `nodes` - (Required) The number of nodes. By default, it's `1`.
-- `args` - (Optional) The list of arguments for the Python program
-- `before_run` - (Optional) The list of shell commands to run before running the Python file
+- `before_run` - (Optional) The list of shell commands to run before running the Notebook application
 - `requirements` - (Optional) The path to the `requirements.txt` file
-- `version` - (Optional) The major version of Python. By default, it's `3.10`.
+- `python` - (Optional) The major version of Python. By default, it's `3.10`.
 - `environment` - (Optional) The list of environment variables 
 - [`artifacts`](#artifacts) - (Optional) The list of output artifacts
 - [`resources`](#resources) - (Optional) The hardware resources required by the workflow
@@ -67,6 +54,9 @@ The hardware resources required by the workflow
 - `shm_size` - (Optional) The size of shared memory, e.g. `"8GB"`
 - `interruptible` - (Optional) `true` if the workflow can run on interruptible instances.
     By default, it's `false`.
+
+If your workflow is using parallel communicating processes (e.g. dataloaders in PyTorch), 
+you may need to configure the size of the shared memory (`/dev/shm` filesystem) via the `shm_size` property.
 
 #### gpu
 

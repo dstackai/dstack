@@ -34,11 +34,16 @@ theme:
   features:
 #    - navigation.indexes
     - navigation.tabs
-    - navigation.instant
+#    - navigation.instant
     #    - toc.integrate
     - navigation.sections
     - navigation.expand
     - navigation.top
+#plugins:
+#  - search
+#  - redirects:
+#      redirect_maps:
+#        'index.md': 'quickstart/index.md'
 markdown_extensions:
   - pymdownx.emoji:
       emoji_index: !!python/name:materialx.emoji.twemoji
@@ -77,31 +82,46 @@ extra:
     - icon: fontawesome/brands/linkedin
       link: https://linkedin.com/company/dstackai
 nav:
-  - Guide:
+  - Quickstart:
     - Getting started:
-        - Introduction: index.md
-        - Concepts: concepts.md
+        - What is dstack?: index.md
         - Installation: installation.md
-        - Quickstart: quickstart.md
+#        - Concepts: concepts.md
+        - "Tutorial: First steps": tutorials/first-steps.md
+    - Examples:
+        - Hello, world: examples/hello.md
+        - Python: examples/python.md
+        - Resources: examples/resources.md
+        - Artifacts: examples/artifacts.md
+        - Deps: examples/deps.md
+        - Environment variables: examples/env.md
+        - Apps: examples/apps.md
+        - Secrets: examples/secrets.md
+        - Dev environments: examples/devs.md
+#    - Other docs:
+#        - Cheat sheet: other/cheat_sheet.md
+    - Help:
+      - Issue tracker: https://github.com/dstackai/dstack/issues
+      - Slack chat: https://join.slack.com/t/dstackai/shared_invite/zt-xdnsytie-D4qU9BvJP8vkbkHXdi6clQ
   - Reference:
 #      - Examples: reference/examples/index.md
       - CLI:
-        - Introduction: reference/cli/index.md
-        - run: reference/cli/run.md
-        - ps: reference/cli/ps.md
-        - stop: reference/cli/stop.md
-        - logs: reference/cli/logs.md
-        - artifacts: reference/cli/artifacts.md
-        - tags: reference/cli/tags.md
-        - init: reference/cli/init.md
-        - config: reference/cli/config.md
-        - secrets: reference/cli/secrets.md
-        - delete: reference/cli/delete.md
-      - Workflows:
-          - Introduction: reference/workflows/index.md
-          - bash: reference/workflows/bash.md
-          - code: reference/workflows/code.md
-          - lab: reference/workflows/lab.md
-          - notebook: reference/workflows/notebook.md
-          - docker: reference/workflows/docker.md
+        - dstack: reference/cli/index.md
+        - dstack run: reference/cli/run.md
+        - dstack ps: reference/cli/ps.md
+        - dstack stop: reference/cli/stop.md
+        - dstack logs: reference/cli/logs.md
+        - dstack artifacts: reference/cli/artifacts.md
+        - dstack tags: reference/cli/tags.md
+        - dstack init: reference/cli/init.md
+        - dstack config: reference/cli/config.md
+        - dstack secrets: reference/cli/secrets.md
+        - dstack delete: reference/cli/delete.md
+      - Providers:
+#          - Introduction: reference/workflows/index.md
+          - bash: reference/providers/bash.md
+          - code: reference/providers/code.md
+          - lab: reference/providers/lab.md
+          - notebook: reference/providers/notebook.md
+          - docker: reference/providers/docker.md
   #        - torchrun: reference/workflows/torchrun.md

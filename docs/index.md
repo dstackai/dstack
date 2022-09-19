@@ -1,71 +1,63 @@
-# Introduction to dstack
+# What is dstack?
 
-dstack is an open-source CLI that allows to define ML workflows as code and run them on cloud. It provisions infrastructure and manages data for you.
+`dstack` is a lightweight command-line tool for running reproducible ML workflows in the cloud.
 
-To run ML workflows, often your local machine is not enough. 
-That’s why it's necessary to automate the process of running ML workflows within the cloud infrastructure.
+## Features
 
-Instead of managing infrastructure yourself, writing own scripts, or using cumbersome MLOps platforms, with dstack, 
-you can focus on code while dstack does management of dependencies, infrastructure, and data for you.
+ * Define workflows (incl. their dependencies, environment and hardware requirements) as code.
+ * Run workflows in the cloud using the `dstack` CLI. dstack provisions infrastructure and environment for you in the cloud.
+ * Save output artifacts of workflows and reuse them in other workflows.
 
-dstack is an alternative to KubeFlow, SageMaker, Docker, SSH, custom scripts, and other tools used often to
-run ML workflows.
+## Getting started
 
-## Primary features
+ * Install `dstack` CLI locally (e.g. via pip)
+ * Make sure the cloud account credentials are configured locally
+ * Configue the `dstack` CLI with the cloud region name and a storage bucket name (to use to provision infrastructure and save data)
+ * Define workflows as code (within your Git project directory)
+ * Use the `dstack` CLI to run workflows, manage their state and artifacts
 
-<div class="grid cards" markdown>
+## How does it work?
 
-- **Environment setup** 
+ * You define workflows in `.dstack/workflows.yaml` within your project: environment and hardware requirements, dependencies, artifacts, etc.
+ * You use the `dstack run` CLI command to run workflows
+ * When you run a workflow, the CLI provisions infrastructure, prepares environment, fetches your code,
+   downloads dependencies, runs the workflow, saves artifacts, and tears down infrastructure.
+ * You assign tags to finished run, e.g. to reuse their output artifacts in other workflows.
+ * Use workflows to process data, train models, host apps, and launch dev environments. 
 
-    No need to use Docker, configure CUDA yourself, etc. Just specify workflow 
-    requirements in your code, and it will be pre-configured.
+[//]: # (## Roadmap)
 
-- **Data management** 
+[//]: # ()
+[//]: # (dstack is available as a beta.)
 
-    Use tags to manage data and reuse it from workflows.
-    Assign tags to finished workflows to reuse their artifacts from other workflows.
+[//]: # (If you encounter bugs, please report them directly to [GitHub issues]&#40;https://github.com/dstackai/dstack/issues&#41;.)
 
-- **Dev environments** 
+[//]: # (For bugs, be sure to specify the detailed steps to reproduce the issue.)
 
-    Workflows may include tasks, applications, also dev environments, such as 
-    IDEs and Jupyter notebooks.
+[//]: # ()
+[//]: # (Below is the list of existing limitations:)
 
-- **Easy installation** 
+[//]: # ()
+[//]: # (- **Visual dashboard:** There's no visual dashboard to manage repos, runs, tags, and secrets. )
 
-    Just install the dstack CLI locally, and that's it.
-    The CLI will use your local cloud credentials to run workflows. 
-    The state is stored in an S3 bucket.
+[//]: # (  It's already in work and is going to be released shortly &#40;Q3, 2022&#41;.)
 
-- **Git-focused** 
+[//]: # (- **Interactive logs:** Currently, output logs of workflows are not interactive. Means, you can't )
 
-    When you run a workflow, dstack detects your local branch, commit hash, and local changes, 
-    and uses it to run the workflow in the cloud.
+[//]: # (  use output to display progress &#40;e.g. via `tqdm`, etc.&#41; Until it's supported, it's recommended that )
 
-- **Interruption-friendly** 
+[//]: # (  you report progress via TensorBoard event files or hosted experiment trackers &#40;e.g. WanB, Comet, )
 
-    Fully-leverage cloud spot/preemptive instances.
-    If needed, store artifacts in real-time to resume workflows, e.g. if there were interrupted.
+[//]: # (  Neptune, etc.&#41; )
 
-</div>
+[//]: # (- **Git hosting providers:** Currently, dstack works only with the GitHub.com repositories. If you'd like to use)
 
-## Limitations and roadmap
+[//]: # (  dstack with other Git hosting providers &#40;or without using Git at all&#41;, add or upvote the )
 
-!!! info "NOTE:"
-    dstack is still under development.
-    If you encounter bugs, please report them directly to [GitHub issues](https://github.com/dstackai/dstack/issues).
-    For bugs, be sure to specify the detailed steps to reproduce the issue.
+[//]: # (  corresponding issue.)
 
-Below is the list of existing limitations:
+[//]: # (- **Cloud providers:** dstack currently works only with AWS. If you'd like to use dstack with GCP, )
 
-- **Visual dashboard:** There's no visual dashboard to manage repos, runs, tags, and secrets. 
-  It's already in work and is going to be released shortly (Q3, 2022).
-- **Interactive logs:** Currently, output logs of workflows are not interactive. Means, you can't 
-  use output to display progress (e.g. via `tqdm`, etc.) Until it's supported, it's recommended that 
-  you report progress via TensorBoard event files or hosted experiment trackers (e.g. WanB, Comet, 
-  Neptune, etc.) 
-- **Git hosting providers:** Currently, dstack works only with the GitHub.com repositories. If you'd like to use
-  dstack with other Git hosting providers (or without using Git at all), add or upvote the 
-  corresponding issue.
-- **Cloud providers:** dstack currently works only with AWS. If you'd like to use dstack with GCP, 
-  Azure, or Kubernetes, add or upvote the corresponding issue.
-- **Providers:** Advanced providers, e.g. for distributed training and data processing, are in plan.
+[//]: # (  Azure, or Kubernetes, add or upvote the corresponding issue.)
+
+[//]: # (- **Providers:** Advanced providers, e.g. for distributed training and data processing, are in plan.)

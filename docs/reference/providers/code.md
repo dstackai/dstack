@@ -1,36 +1,31 @@
-# lab
+# code
 
-The `lab` launches a JupyterLab application.
+The `code` provider launches a VS Code dev environment.
 
-The provider allows you to specify the version of Python, a `requirements.txt` file to pre-install,
-environment variables, properties, which folders to save as output artifacts, dependencies to
-other workflows if any, and the resources the workflow needs 
-(e.g. whether it should be a spot/preemptive instance, how much memory, GPU, etc.) 
+It comes with Python and Conda pre-installed. 
+
+If GPU is requested, the provider pre-installs the CUDA driver too.
 
 ## Example usage 
-
-### Basic example
 
 === ".dstack/workflows.yaml"
 
     ```yaml
     workflows:
-      - name: dev
-        provider: lab
-        artifacts: 
+      - name: ide
+        provider: code
+        artifacts:
           - path: output
         resources:
           interruptible: true
-          gpu:
-            name: "K80"
-            count: 4
+          gpu: 1
     ```
 
-## Workflow syntax
+## Properties reference
 
 The following properties are optional:
 
-- `before_run` - (Optional) The list of shell commands to run before running the JupyterLab application
+- `before_run` - (Optional) The list of shell commands to run before running the Python file
 - `requirements` - (Optional) The path to the `requirements.txt` file
 - `python` - (Optional) The major version of Python. By default, it's `3.10`.
 - `environment` - (Optional) The list of environment variables 
@@ -60,10 +55,8 @@ The hardware resources required by the workflow
 - `interruptible` - (Optional) `true` if the workflow can run on interruptible instances.
     By default, it's `false`.
 
-!!! info "NOTE:"
-    If your workflow is training a model using multiple parallel processes (e.g. via PyTorch DDP),
-    make sure to use the `shm_size` to configure enough shared memory (e.g. `"8GB"` or more) so the processes 
-    can communicate. Otherwise, you might get an error.
+If your workflow is using parallel communicating processes (e.g. dataloaders in PyTorch), 
+you may need to configure the size of the shared memory (`/dev/shm` filesystem) via the `shm_size` property.
 
 #### gpu
 

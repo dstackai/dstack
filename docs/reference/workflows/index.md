@@ -132,19 +132,19 @@ IDEs and Jupyter notebooks.
 
     Launches a VS Code dev environment
 
-    [:octicons-arrow-right-24: Reference](code.md)
+    [:octicons-arrow-right-24: Reference](../providers/code.md)
 
 - **JupyterLab** 
 
     Launches a JupyterLab dev environment
 
-    [:octicons-arrow-right-24: Reference](lab.md)
+    [:octicons-arrow-right-24: Reference](../providers/lab.md)
 
 - **Jupyter Notebook** 
 
     Launches a Jupyter notebook
 
-    [:octicons-arrow-right-24: Reference](notebook.md)
+    [:octicons-arrow-right-24: Reference](../providers/notebook.md)
 
 [//]: # (- **Torchrun** )
 
@@ -156,6 +156,6 @@ IDEs and Jupyter notebooks.
 
     Runs a Docker image
 
-    [:octicons-arrow-right-24: Reference](docker.md)
+    [:octicons-arrow-right-24: Reference](../providers/docker.md)
 
 </div>

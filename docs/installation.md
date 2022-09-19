@@ -1,52 +1,45 @@
-To use dstack, you'll only need the dstack CLI. No other software needs to be installed or deployed.
-
-!!! info "NOTE:"
-    dstack currently works only with AWS. If you'd like to use dstack with GCP, Azure, or Kubernetes,
-    [upvote](https://github.com/dstackai/dstack/labels/cloud-provider) the corresponding issue.
-
-## Install the CLI
-
-In order to install the dstack CLI, you need to use `pip`:
+Use pip to install the `dstack` CLI:
 
 ```shell
-$ pip install dstack
+pip install dstack
 ```
 
-## Configure cloud credentials
+## AWS credentials
 
-The dstack CLI uses your local AWS credentials to provision infrastructure and store data.
-Make sure, you've [configured](https://docs.aws.amazon.com/cli/latest/userguide/cli-configure-files.html) them
-locally before using the dstack CLI. 
+Make sure the AWS account credentials are configured locally 
+(e.g. in `~/.aws/credentials` or `AWS_ACCESS_KEY_ID` and `AWS_SECRET_ACCESS_KEY` environment variables.)
 
-The credentials should allow actions on the EC2, IAM, SecretsManager, 
-S3, and CloudWatch Logs resources.
+These credentials are needed by the `dstack` CLI to provision infrastructure and manage state in the cloud. 
 
-## Configure the dstack backend
+[//]: # (To use the CLI with AWS, dstack requires the following permissions: `ec2:*`, `iam:*`, `secretsmanager:*`, `s3:*`, and `logs:*`.)
 
-Before you can use the dstack CLI, you have to configure the dstack backend.
+If you don't have an AWS account, you can quickly [create](https://aws.amazon.com/resources/create-account/) one,
+and get [credentials](https://docs.aws.amazon.com/sdk-for-javascript/v2/developer-guide/getting-your-credentials.html). 
 
-It includes configuring the following:
+## Configure AWS region and S3 bucket
 
- * In which S3 bucket to store the state and artifacts
- * In what AWS region, to create EC2 instances
+Before you can use the `dstack` CLI, you need to configure the AWS region where dstack will provision 
+infrastructure and the S3 bucket where it will save data.
 
-To configure this, run the following command:
+To do that, use the `dstack config` command.
 
 ```shell
-$ dstack config
+dstack config
+```
 
-Configure AWS backend:
+It will prompt you to enter an AWS profile name, a region name, and an S3 bucket name.
 
+```shell
 AWS profile name (default):
 S3 bucket name:
 Region name:
 ```
 
-Make sure to choose a unique S3 bucket name. If the bucket doesn't exist, dstack will prompt you
-to create it. 
+Make sure to use a name of the S3 bucket that isn't used by other AWS accounts.
 
-The command will also create the necessary IAM instance profile role to be used when provisioning EC2 instances.
+The configuration will be saved in the `~/.dstack/config.yaml` file.
 
-The configuration is stored in `~/.dstack/config.yaml`.
-
-Once the command is successful, you are good to go to run workflows with the CLI.
+[//]: # (## Environment variables)
+[//]: # ()
+[//]: # (Instead of using the `dstack config` command, you can specify the )
+[//]: # (`DSTACK_AWS_REGION` and `DSTACK_AWS_S3_BUCKET` environment variables directly.)
