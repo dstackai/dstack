@@ -32,6 +32,15 @@
 .md-sidebar__scrollwrap {
     margin-top: -25px;
     overflow-y: hidden;
+
+    -webkit-mask-image: -webkit-gradient(
+            linear,
+            left 92%,
+            left bottom,
+            from(rgba(0,0,0,1)),
+            to(rgba(0,0,0,0)));
+
+    padding-bottom: 30px
 }
 
 .md-sidebar__scrollwrap:hover {
@@ -406,7 +415,7 @@ body {
 }
 
 .md-header__button.md-logo :where(img,svg) {
-    height: 1.3rem !important;
+    height: 1.4rem !important;
 }
 
 .md-header__button.md-logo {
@@ -440,13 +449,13 @@ body {
 
     .md-search__form::before {
         content: "⌘";
-        color: #28292a;
+        color: white;
         font-weight: 500;
         position: absolute;
         padding: 6px;
         margin: 5px;
         font-size: .65rem;
-        background-color: #e4e4e8;
+        background-color: rgba(0,0,0,.87);
         border-radius: 5px;
         right: 44px;
         z-index: 1;
@@ -456,13 +465,13 @@ body {
 
     .md-search__form::after {
         content: "K";
-        color: #28292a;
+        color: white;
         font-weight: 500;
         position: absolute;
         padding: 6px;
         margin: 5px;
         font-size: .65rem;
-        background-color: #e4e4e8;
+        background-color: rgba(0,0,0,.87);
         border-radius: 5px;
         right: 11px;
         /*z-index: 1;*/
