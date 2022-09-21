@@ -4,26 +4,23 @@
 
 ## Features
 
- * Define workflows (incl. their dependencies, environment and hardware requirements) as code.
- * Run workflows in the cloud using the `dstack` CLI. dstack provisions infrastructure and environment for you in the cloud.
+ * Define workflows, incl. dependencies, environment, and required compute resources, via declarative configuration files
+ * Run workflows in the cloud via the `dstack` CLI.
  * Save output artifacts of workflows and reuse them in other workflows.
-
-## Getting started
-
- * Install `dstack` CLI locally (e.g. via pip)
- * Make sure the cloud account credentials are configured locally
- * Configue the `dstack` CLI with the cloud region name and a storage bucket name (to use to provision infrastructure and save data)
- * Define workflows as code (within your Git project directory)
- * Use the `dstack` CLI to run workflows, manage their state and artifacts
+ * Use workflows to process data, train models, host apps, and launch dev environments.
 
 ## How does it work?
 
- * You define workflows in `.dstack/workflows.yaml` within your project: environment and hardware requirements, dependencies, artifacts, etc.
- * You use the `dstack run` CLI command to run workflows
- * When you run a workflow, the CLI provisions infrastructure, prepares environment, fetches your code,
-   downloads dependencies, runs the workflow, saves artifacts, and tears down infrastructure.
- * You assign tags to finished run, e.g. to reuse their output artifacts in other workflows.
- * Use workflows to process data, train models, host apps, and launch dev environments. 
+ * Install `dstack` CLI locally
+ * Make sure the AWS account credentials are configured locally
+ * Configure the AWS region (where to provision infrastructure) and an S3 storage bucket name (where to save data)
+ * Define define workflows in `.dstack/workflows.yaml` within your project directory
+ * Use the `dstack` CLI to run workflows, manage their state and artifacts 
+ * When you run a workflow, the `dstack` CLI  provisions the required cloud resources, 
+   fetches your code, prepares environment, downloads dependencies, runs the workflow,
+   saves artifacts, and tears down cloud resources.
+
+
 
 [//]: # (## Roadmap)
 

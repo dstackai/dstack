@@ -1,6 +1,6 @@
-# logs
+# dstack logs
 
-The `logs` command shows logs of a run within the current Git repository.
+Use this command to see logs of a given run within the current Git repository.
 
 ### Usage
 

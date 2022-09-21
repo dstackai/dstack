@@ -1,6 +1,6 @@
-# run
+# dstack run
 
-The `run` command runs a workflow within the current Git repository. 
+Use this command to run a workflow within the current Git repository. 
 
 Once you run the workflow, dstack creates the required cloud instance(s) within a minute,
 and runs your workflow. If you run it in the attached mode, you'll see the output in real-time as your 

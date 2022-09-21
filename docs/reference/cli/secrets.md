@@ -1,6 +1,6 @@
-# secrets
+# dstack secrets
 
-The `secrets` command manages global secrets.
+Use this command to manage global secrets.
 
 Secrets allow to use sensitive data within workflows (such as passwords or security tokens) without 
 hard-coding them inside the code.

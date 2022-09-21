@@ -1,26 +1,26 @@
-# config
+# dstack config
 
-The `config` command configures the backend of the dstack CLI:
-
- * In which S3 bucket, to store the state and the artifacts
- * In what region, to create cloud instances.
-
-Use this command before running any other commands. 
+Use this command before running any other `dstack` commands to configure 
+the AWS region, where dstack will provision compute resources, and
+the S3 bucket, where dstack will save data.
 
 ### Usage
 
 ```shell
-dstack config
-Configure AWS backend:
-
-AWS profile name (default):
-S3 bucket name:
-Region name:
+dstack config [-p NAME]
 ```
 
-Make sure to choose a unique S3 bucket name. If the bucket doesn't exist, dstack will prompt you
-to create it. 
+Make sure to use an S3 bucket name that isn't used by other AWS accounts.
 
-The command will also create the necessary IAM instance profile role to be used when provisioning EC2 instances.
+```shell
+Region name (eu-west-1):
+S3 bucket name (dstack-142421590066-eu-west-1):
+```
 
 The configuration is stored in `~/.dstack/config.yaml`.
+
+#### Arguments reference
+
+The following arguments are optional:
+
+- `-p NAME`, `--profile NAME` - (Optional) A name of the AWS profile. Default is `default`.

@@ -1,6 +1,6 @@
 # First steps
 
-Before following the tutorial, make sure the `dstack` CLI is [installed and configured](../installation.md).
+Before following the tutorial, make sure you've [installed and configured](../installation.md) the `dstack` CLI.
 
 ## Clone repo
 
@@ -85,14 +85,28 @@ Extracting /workflow/data/MNIST/raw/train-images-idx2-ubyte.gz
 
 Once the workflow is finished, its artifacts are saved and infrastructure is torn down.
 
-You can see currently running or recently finished workflows, 
-use the [`dstack ps`](../reference/cli/ps.md) command.
+Use the [`dstack ps`](../reference/cli/ps.md) command to see the status of recent workflows.
+
+```shell
+dstack ps
+```
+
+It shows currently running workflows or the last finished one. 
+
+```shell
+RUN             TARGET    STATUS  APPS  ARTIFACTS  SUBMITTED  TAG 
+grumpy-zebra-1  download  Done          data       a min ago
+```
+
+To see all workflows, use the `dstack ps -a` command. 
+
+The value in the `RUN` column is the name of the corresponding run. It serves as a unique identifier of the run.
 
 ## Access artifacts
 
 To see artifacts of a run, use the
 [`dstack artifacts list`](../reference/cli/artifacts.md#artifacts-list) command followed
-by its name:
+by the name of the run.
 
 ```shell
 dstack artifacts list grumpy-zebra-1
@@ -112,23 +126,18 @@ data  MNIST/raw/t10k-images-idx3-ubyte      7.5MiB
       MNIST/raw/train-labels-idx1-ubyte.gz  28.2KiB
 ```
 
-To download artifacts, use the [`dstack artifacts download`](../reference/cli/artifacts.md#artifacts-download)
-command:
-
-```shell
-dstack artifacts download grumpy-zebra-1
-```
-
 ## Add tag
 
-To use the artifacts of one workflow from another workflow, you have to add a tag to
-the corresponding run:
+If you want to use the artifacts of a particular run from other workflows, you
+can add a tag to this run.
 
 Let's assign the `mnist_data` tag to our finished run `grumpy-zebra-1`.
 
 ```shell
 dstack tags add mnist_data grumpy-zebra-1
 ```
+
+You can see all tags of the current repo via the `dstack tags` command.
 
 [//]: # (Note, tag names within on Git repo must be unique.)
 
@@ -141,16 +150,18 @@ dstack artifacts list :mnist_data
 
 ## Run train workflow
 
-Now that the `mnist_data` tag is created, we can run the `train` workflow.
+Now that the `mnist_data` tag is added, we can run the `train` workflow.
 
 ```shell
 dstack run train
 ```
 
-When you run the `train` workflow, before starting the workflow, `dstack` will download the artifacts of the tag `mnist_data`).
-Then, you'll see the output in real-time.
+On the start of the `train` workflow, dstack will download the artifacts of the tag `mnist_data` to the working directory.
 
 ```shell
+RUN            TARGET    STATUS     APPS  ARTIFACTS       SUBMITTED  TAG 
+wet-mangust-2  train     Submitted        lightning_logs  now 
+
 Povisioning... It may take up to a minute. ✓
 
 To interrupt, press Ctrl+C.
@@ -164,4 +175,13 @@ val_acc       0.965399980545044
 val_loss      0.10975822806358337
 ```
 
-Once the `train` workflow is finished, you'll be able to access its artifacts.
+## Download artifacts
+
+Once the `train` workflow is finished, if you want, you can download its artifacts using 
+the [`dstack artifacts download`](../reference/cli/artifacts.md#artifacts-download) command.
+
+```shell
+dstack artifacts download wet-mangust-2 .
+```
+
+It will download the `lightning_logs` folder to the current directory.

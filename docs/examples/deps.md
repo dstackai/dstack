@@ -60,3 +60,5 @@ This workflow uses the artifacts of the last run of the `hello-txt` workflow.
 
 Note, there should be at least one run of the specified workflow with the status `Done`.
 Use the `dstack ps -a` command to see all the recent runs.
+
+[//]: # (External tags and workflows)

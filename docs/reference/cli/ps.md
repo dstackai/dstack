@@ -1,6 +1,6 @@
-# ps
+# dstack ps
 
-The `ps` command shows status of runs within the current Git repository.
+Use this command to show status of runs within the current Git repository.
 
 ### Usage
 

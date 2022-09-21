@@ -1,10 +1,9 @@
-# init
+# dstack init
 
-The `init` command authorizes dstack to access the current Git repository. 
-Use this command on a Git repository before running any workflows in it.
+Use this command before you run any workflows within the current Git repository.
 
-This commands uploads the Git credentials to the cloud storage of credentials within the configured backend 
-(for AWS, it's Secrets Manager). 
+This command uploads the current Git credentials to the encrypted cloud storage of secrets. 
+dstack uses the these credentials to access the current Git repository when running workflows.
 
 ### Usage
 

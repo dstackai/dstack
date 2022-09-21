@@ -1,6 +1,6 @@
-# tags
+# dstack tags
 
-The `tags` command manages tags within the current Git repository. 
+Use this command to manage tags within the current Git repository. 
 
 It supports the following subcommands: `list`, `add`, and `delete`.
 

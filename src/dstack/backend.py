@@ -3,7 +3,7 @@ from abc import ABC
 from enum import Enum
 from typing import List, Optional, Generator, Tuple, Dict
 
-from dstack.config import load_config, AwsBackendConfig
+from dstack.config import load_config, AwsBackendConfig, Config, BackendConfig
 from dstack.jobs import Job, JobStatus, JobHead, AppSpec
 from dstack.repo import RepoData, RepoCredentials
 from dstack.runners import Resources, Runner
@@ -162,7 +162,7 @@ class Secret:
 
 
 class Backend(ABC):
-    def configure(self, silent: bool):
+    def configure(self, silent: bool) -> bool:
         pass
 
     def create_run(self, repo_user_name: str, repo_name: str) -> str:
@@ -286,8 +286,7 @@ class Backend(ABC):
         pass
 
 
-def load_backend() -> Backend:
-    config = load_config()
+def load_backend(config: Config = load_config()) -> Backend:
     if isinstance(config.backend_config, AwsBackendConfig):
         from dstack.aws import AwsBackend
 
