@@ -1,4 +1,4 @@
-# FAQ
+# FAQs
 
 #### What kind of ML workflows can I use dstack for?
 

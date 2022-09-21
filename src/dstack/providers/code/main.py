@@ -78,7 +78,8 @@ class CodeProvider(Provider):
             f"openvscode-server-v{self.version}-linux-x64.tar.gz",
             f"tar -xzf openvscode-server-v{self.version}-linux-x64.tar.gz",
             f"cd openvscode-server-v{self.version}-linux-x64",
-            "./bin/openvscode-server --install-extension ms-python.python"
+            "./bin/openvscode-server --install-extension ms-python.python",
+            "rm /usr/bin/python2*",
         ]
         if self.requirements:
             commands.append("pip install -r " + self.requirements)
