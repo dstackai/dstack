@@ -79,8 +79,8 @@ extra:
       link: https://join.slack.com/t/dstackai/shared_invite/zt-xdnsytie-D4qU9BvJP8vkbkHXdi6clQ
     - icon: fontawesome/brands/twitter
       link: https://twitter.com/dstackai
-    - icon: fontawesome/brands/linkedin
-      link: https://linkedin.com/company/dstackai
+    - icon: fontawesome/solid/rss
+      link: https://dstack.curated.co
 nav:
   - Quickstart:
     - Getting started:
@@ -99,11 +99,8 @@ nav:
         - Secrets: examples/secrets.md
         - Dev environments: examples/devs.md
     - Other docs:
-      - FAQ: faq.md
+      - FAQs: faq.md
 #        - Cheat sheet: other/cheatsheet.md
-    - Help:
-      - Issue tracker: https://github.com/dstackai/dstack/issues
-      - Slack chat: https://join.slack.com/t/dstackai/shared_invite/zt-xdnsytie-D4qU9BvJP8vkbkHXdi6clQ
   - Reference:
 #      - Examples: reference/examples/index.md
       - CLI:
@@ -126,3 +123,4 @@ nav:
           - notebook: reference/providers/notebook.md
           - docker: reference/providers/docker.md
   #        - torchrun: reference/workflows/torchrun.md
+  - Community: community.md
