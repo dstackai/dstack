@@ -17,9 +17,10 @@ ______________________________________________________________________
 
 ## Features
 
- * Define workflows (incl. their dependencies, environment and hardware requirements) as code.
- * Run workflows in the cloud using the `dstack` CLI. dstack provisions infrastructure and environment for you in the cloud.
+ * Define workflows, incl. dependencies, environment, and required compute resources, via declarative configuration files.
+ * Run workflows in the cloud via the `dstack` CLI.
  * Save output artifacts of workflows and reuse them in other workflows.
+ * Use workflows to process data, train models, host apps, and launch dev environments.
 
 ## Installation
 
@@ -29,40 +30,39 @@ Use pip to install the `dstack` CLI:
 pip install dstack
 ```
 
-Make sure the AWS account credentials are configured locally 
-(e.g. in `~/.aws/credentials` or `AWS_ACCESS_KEY_ID` and `AWS_SECRET_ACCESS_KEY` environment variables.)
+When you run workflows via the `dstack` CLI, dstack provisions compute resources
+and saves data in your AWS account.
 
-Before you can use the `dstack` CLI, you need to configure the AWS region where dstack will provision 
-infrastructure and the S3 bucket where it will save data.
-
-To do that, use the `dstack config` command.
+The `dstack` CLI needs your AWS account credentials to be configured locally 
+(e.g. in `~/.aws/credentials` or `AWS_ACCESS_KEY_ID` and `AWS_SECRET_ACCESS_KEY` environment variables).
 
 ```shell
 dstack config
 ```
 
-It will prompt you to enter an AWS profile name, a region name, and an S3 bucket name.
+This command will help you configure the AWS region, where dstack will provision compute resources, and
+the S3 bucket, where dstack will save data.
 
 ```shell
-AWS profile name (default):
-S3 bucket name:
-Region name:
+Region name (eu-west-1):
+S3 bucket name (dstack-142421590066-eu-west-1):
 ```
 
 ## How does it work?
 
- * You define workflows in `.dstack/workflows.yaml` within your project: environment and hardware requirements, dependencies, artifacts, etc.
- * You use the `dstack run` CLI command to run workflows
- * When you run a workflow, the CLI provisions infrastructure, prepares environment, fetches your code,
-   downloads dependencies, runs the workflow, saves artifacts, and tears down infrastructure.
- * You assign tags to finished run, e.g. to reuse their output artifacts in other workflows.
- * Use workflows to process data, train models, host apps, and launch dev environments.
+ * Install `dstack` CLI locally
+ * Define workflows in `.dstack/workflows.yaml` within your project directory
+ * Use the `dstack` CLI to run workflows, manage their state and artifacts 
+ * When you run a workflow, the `dstack` CLI  provisions the required cloud resources, 
+   fetches your code, prepares environment, downloads dependencies, runs the workflow,
+   saves artifacts, and tears down cloud resources.
 
 ## More information
 
  * [Documentation](https://docs.dstack.ai)
  * [Issue tracker](https://github.com/dstackai/dstack/issues)
- * [Slack chat](https://join.slack.com/t/dstackai/shared_invite/zt-xdnsytie-D4qU9BvJP8vkbkHXdi6clQ)
+ * [Slack](https://join.slack.com/t/dstackai/shared_invite/zt-xdnsytie-D4qU9BvJP8vkbkHXdi6clQ)
+ * [Newsletter](https://dstack.curated.co/)
  * [Twitter](https://twitter.com/dstackai)
  
 ##  Licence

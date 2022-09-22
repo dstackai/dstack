@@ -14,7 +14,7 @@
  * Install `dstack` CLI locally
  * Make sure the AWS account credentials are configured locally
  * Configure the AWS region (where to provision infrastructure) and an S3 storage bucket name (where to save data)
- * Define define workflows in `.dstack/workflows.yaml` within your project directory
+ * Define workflows in `.dstack/workflows.yaml` within your project directory
  * Use the `dstack` CLI to run workflows, manage their state and artifacts 
  * When you run a workflow, the `dstack` CLI  provisions the required cloud resources, 
    fetches your code, prepares environment, downloads dependencies, runs the workflow,
