@@ -100,7 +100,8 @@ grumpy-zebra-1  download  Done          data       a min ago
 
 To see all workflows, use the `dstack ps -a` command. 
 
-The value in the `RUN` column is the name of the corresponding run. It serves as a unique identifier of the run.
+!!! tip "NOTE:"
+    The value in the `RUN` column is the name of the corresponding run. It serves as a unique identifier of the run.
 
 ## Access artifacts
 

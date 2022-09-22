@@ -1,10 +1,10 @@
 # Artifacts
 
-If you use the [`bash`](../reference/providers/bash.md), [`code`](../reference/providers/code.md), 
-[`lab`](../reference/providers/lab.md), and [`notebook`](../reference/providers/notebook.md) providers, 
-you can use the `artifacts` property to specify what folders must be saved as artifacts. 
+The [`bash`](../reference/providers/bash.md), [`code`](../reference/providers/code.md), 
+[`lab`](../reference/providers/lab.md), and [`notebook`](../reference/providers/notebook.md) providers 
+allow workflows to save output files as artifacts. 
 
-This workflow creates a `output/hello.txt` and saves it as an artifact.
+Here's a workflow that creates the `output/hello.txt` file and saves it as an artifact.
 
 === ".dstack/workflows.yaml"
 
@@ -18,14 +18,13 @@ This workflow creates a `output/hello.txt` and saves it as an artifact.
           - path: output 
     ```
 
-By default, artifacts are saved when the workflow is finished.
-Artifacts are not saved if you abort the workflow abruptly using the `dstack stop -x` command.
+!!! info "NOTE:"
+    By default, artifacts are saved when the workflow is finished.
+    Artifacts are not saved if you abort the workflow abruptly using the `dstack stop -x` command.
 
-## Mounting artifacts
+## Mount artifacts
 
-If you want, artifact can be mounted directly into filesystem.
-In this case all read and write operations will be real-time requests to the cloud storage. 
-To use this feature, you have to set the `mount` property of the artifact to `true`.
+If you want to save artifacts in real time (as you write files to the disk), you can use the `mount` option:
 
 === ".dstack/workflows.yaml"
 
@@ -51,5 +50,9 @@ To use this feature, you have to set the `mount` property of the artifact to `tr
     done
     ```
 
-Mounting artifacts may significantly affect performance and thus must be used 
-with care.
+!!! info "NOTE:"
+    Every read or write operation within the mounted artifact directory will create
+    an HTTP request to the cloud storage.
+
+    For example, the `mount` option can be used to save and restore checkpoint files
+    if the workflow uses interruptible instances.

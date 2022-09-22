@@ -55,8 +55,9 @@ The hardware resources required by the workflow
 - `interruptible` - (Optional) `true` if the workflow can run on interruptible instances.
     By default, it's `false`.
 
-If your workflow is using parallel communicating processes (e.g. dataloaders in PyTorch), 
-you may need to configure the size of the shared memory (`/dev/shm` filesystem) via the `shm_size` property.
+!!! info "NOTE:"
+    If your workflow is using parallel communicating processes (e.g. dataloaders in PyTorch), 
+    you may need to configure the size of the shared memory (`/dev/shm` filesystem) via the `shm_size` property.
 
 #### gpu
 

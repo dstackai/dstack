@@ -1,6 +1,6 @@
 # dstack run
 
-Use this command to run a workflow within the current Git repository. 
+Use this command to run a workflow within the current Git repo. 
 
 Once you run the workflow, dstack creates the required cloud instance(s) within a minute,
 and runs your workflow. If you run it in the attached mode, you'll see the output in real-time as your 
@@ -10,7 +10,7 @@ You can either pass a name of one of the workflows defined in
 the `./dstack/workflows.yaml` file, or pass all the parameters right in the command line.
 
 !!! info "NOTE:"
-    Make sure to use the CLI from within a Git repository directory.
+    Make sure to use the CLI from within a Git repo directory.
     When you run a workflow, dstack detects the current branch, commit hash, and local changes.
 
 ### Usage

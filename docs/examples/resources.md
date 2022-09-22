@@ -1,14 +1,12 @@
-If you use the [`bash`](../reference/providers/bash.md), [`code`](../reference/providers/code.md), 
-[`lab`](../reference/providers/lab.md), and [`notebook`](../reference/providers/notebook.md) providers, 
-you can specify the hardware requirements for the workflow using the `resources` property.
+The [`bash`](../reference/providers/bash.md), [`code`](../reference/providers/code.md), 
+[`lab`](../reference/providers/lab.md), and [`notebook`](../reference/providers/notebook.md) providers 
+allow workflows to specify required compute resources.
 
 ## GPU acceleration
 
 If you request GPU, the provider pre-installs the CUDA driver for you.
 
-This workflow is using 1 Tesla V100 GPU.
-
-It uses the `nvidia-smi` utility to show GPU information.
+Let's create a workflow that uses a Tesla V100 GPU.
 
 === ".dstack/workflows.yaml"
 
@@ -24,7 +22,7 @@ It uses the `nvidia-smi` utility to show GPU information.
             count: 1
     ```
 
-If you don't specify the name of GPU, dstack will use the cheapest available (e.g. Tesla K80). 
+If you don't specify the name of GPU, dstack will use the cheapest available GPU (e.g. Tesla K80). 
 
 === ".dstack/workflows.yaml"
 
@@ -38,15 +36,13 @@ If you don't specify the name of GPU, dstack will use the cheapest available (e.
           gpu: 1
     ```
 
-Before you can use GPU with your AWS account, the 
-corresponding [service quota](https://docs.aws.amazon.com/AWSEC2/latest/UserGuide/ec2-resource-limits.html) has to 
-be approved.
+!!! info "NOTE:"
+    If you want to use GPU with your AWS account, make sure the 
+    corresponding [service quota](https://docs.aws.amazon.com/AWSEC2/latest/UserGuide/ec2-resource-limits.html) is approved.
 
 ## Memory
 
-This workflow is using 64GB of memory.
-
-It uses the standard `free` bash command to show memory information.
+Here's an example of a workflow that requires 64GB of RAM.
 
 === ".dstack/workflows.yaml"
 
@@ -62,12 +58,11 @@ It uses the standard `free` bash command to show memory information.
 
 ## Shared memory
 
-If your workflow is using parallel communicating processes (e.g. dataloaders in PyTorch), 
-you may need to configure the size of the shared memory (`/dev/shm` filesystem) via the `shm_size` property.
+!!! info "NOTE:"
+    If your workflow is using parallel communicating processes (e.g. dataloaders in PyTorch), 
+    you may need to configure the size of the shared memory (`/dev/shm` filesystem) via the `shm_size` property.
 
-This workflow is using `16GB` of shared memory.
-
-It uses the standard `df` bash command to show disk space information.
+Here's a workflow that uses `16GB` of shared memory.
 
 === ".dstack/workflows.yaml"
 
@@ -83,7 +78,13 @@ It uses the standard `df` bash command to show disk space information.
 
 ## Interruptible instances
 
-This workflow is using an interruptible instance:
+Interruptible instances (also known as spot instances or preemptive instances) are 
+not guaranteed and may be interrupted by the cloud provider at any time.
+Because of that, they are typically several times cheaper.
+
+Interruptible instances can be a great way to use expensive GPU at affordable prices.
+
+Here's an example of a workflow that uses an interruptible instance:
 
 === ".dstack/workflows.yaml"
 
@@ -97,6 +98,6 @@ This workflow is using an interruptible instance:
           interruptible: true
     ```
 
-Before you can use interruptible instances with your AWS account, the 
-corresponding [service quota](https://docs.aws.amazon.com/AWSEC2/latest/UserGuide/ec2-resource-limits.html) has to 
-be approved. 
+!!! info "NOTE:"
+    If you want to use interruptible instances with your AWS account, make sure the 
+    corresponding [service quota](https://docs.aws.amazon.com/AWSEC2/latest/UserGuide/ec2-resource-limits.html) is approved.

@@ -1,13 +1,13 @@
 # Dev environments
 
 The [`code`](../reference/providers/bash.md), [`lab`](../reference/providers/bash.md), and [`notebook`](../reference/providers/bash.md)
-providers allow to run code interactively. 
+providers allow to launch dev environments, such as VS Code, JupyterLab, and Jupyter notebooks.
+
+This is a great way to run code interactively using an IDE, a notebook, or a terminal.
 
 ## VS Code
 
 This workflow launches a VS Code dev environment.
-
-It uses the `code` provider.
 
 === ".dstack/workflows.yaml"
 
@@ -17,7 +17,7 @@ It uses the `code` provider.
         provider: code
     ```
 
-This workflow launches a VS Code dev environment with 1 GPU and 64GB of memory:
+Here's an example if you need 1 GPU and 64GB of RAM.
 
 === ".dstack/workflows.yaml"
 
@@ -32,5 +32,5 @@ This workflow launches a VS Code dev environment with 1 GPU and 64GB of memory:
 
 ## JupyterLab and Jupyter
 
-The `lab` and `notebook` providers work very similarly. Use the same
-examples from above and replace the `code` with `lab` or `notebook`.
+You can launch JupyterLab and Jupyter dev environments the very same way – just 
+replace `code` with `lab` or `notebook`.

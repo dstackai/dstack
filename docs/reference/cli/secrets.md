@@ -36,7 +36,7 @@ dstack secrets add [-o] [-y] NAME VALUE
 
 The following arguments are required:
 
-- `NAME` – (Required) A name of the secret. Must be unique within the current Git repository.
+- `NAME` – (Required) A name of the secret. Must be unique within the current Git repo.
 - `VALUE` – (Required) The value of the secret.
 - 
 The following arguments are optional:

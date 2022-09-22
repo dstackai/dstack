@@ -1,6 +1,6 @@
 # dstack stop
 
-Use this command stops runs within the current Git repository.
+Use this command stops runs within the current Git repo.
 
 ### Usage
 

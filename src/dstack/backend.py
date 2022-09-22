@@ -287,7 +287,9 @@ class Backend(ABC):
         pass
 
 
-def load_backend(config: Config = load_config()) -> Backend:
+def load_backend(config: Optional[Config] = None) -> Backend:
+    if not config:
+        config = load_config()
     if isinstance(config.backend_config, AwsBackendConfig):
         from dstack.aws import AwsBackend
 

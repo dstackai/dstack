@@ -4,7 +4,7 @@
 
 ## Features
 
- * Define workflows, incl. dependencies, environment, and required compute resources, via declarative configuration files
+ * Define workflows, incl. dependencies, environment, and required compute resources, via declarative configuration files.
  * Run workflows in the cloud via the `dstack` CLI.
  * Save output artifacts of workflows and reuse them in other workflows.
  * Use workflows to process data, train models, host apps, and launch dev environments.

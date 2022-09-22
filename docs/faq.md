@@ -2,10 +2,11 @@
 
 #### What kind of ML workflows can I use dstack for?
 
-dstack allows you to describe workflows as code and quickly run them anywhere (e.g. in a configured cloud) from the CLI.
-You don't have to worry about infrastructure or data management.
+dstack allows you to describe workflows and their requirements as code and quickly run them anywhere 
+(e.g. in a configured cloud).
+You don't need to worry about managing infrastructure or data.
 
-Workflows can be pretty much anything: scripts, long-running jobs, and even applications.
+Workflows can be data processing scripts, long-running training jobs, and web applications.
 
 #### Can dstack run workflows locally on my machine? 
 
@@ -29,7 +30,7 @@ the corresponding [GitHub issue](https://github.com/dstackai/dstack/issues?q=is%
 
 Indeed, currently the `dstack` CLI works only within directories that 
 are GitHub repositories. If you'd like dstack to work within any directories, 
-or if your repository is not on GitHub (e.g. you use BitBucket or GitLab), please
+or if your repo is not on GitHub (e.g. you use BitBucket or GitLab), please
 file a corresponding [GitHub issue](https://github.com/dstackai/dstack/issues/new/choose).
 
 #### I want to contribute to dstack? Where do I start?

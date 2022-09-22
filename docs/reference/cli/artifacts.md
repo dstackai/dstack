@@ -1,6 +1,6 @@
 # dstack artifacts
 
-Use this command to access artifacts of runs and tags within the current Git repository.
+Use this command to access artifacts of runs and tags within the current Git repo.
 
 It supports the following subcommands: `list`, and `download`.
 

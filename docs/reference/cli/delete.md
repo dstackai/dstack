@@ -1,6 +1,6 @@
 # dstack delete
 
-Use this command to delete finished runs within the current Git repository.
+Use this command to delete finished runs within the current Git repo.
 
 ### Usage
 

@@ -1,16 +1,11 @@
 # Apps
 
-Both the [`bash`](../reference/providers/bash.md) and [`docker`](../reference/providers/docker.md) providers 
-allow to host applications.
+The [`bash`](../reference/providers/bash.md) and [`docker`](../reference/providers/docker.md) providers 
+allow workflows to host applications.
 
-To do that, you have to use the `ports` property to specify the number of ports to expose.
+To do that, you have to pass the number of ports (that you want to expose) to the `ports` property.
 
-The exact port numbers will be passes to the workflow via environment variables `PORT_0`, `PORT_1`, 
-etc.
-
-Note, make sure to use the `0.0.0.0` as the hostname.
-
-This workflow launches a FastAPI application.
+Here's a workflow that launches a FastAPI application.
 
 === ".dstack/workflows.yaml"
 
@@ -36,3 +31,9 @@ This workflow launches a FastAPI application.
        async def root():
            return {"message": "Hello World"}
     ```
+
+!!! info "NOTE:"
+    The actual port numbers will be passes to the workflow via environment variables `PORT_0`, `PORT_1`, 
+    etc.
+    
+    Don't forget to use `0.0.0.0` as the hostname.

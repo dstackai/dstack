@@ -65,8 +65,9 @@ The hardware resources required by the workflow
 - `interruptible` - (Optional) `true` if the instance must be spot/preemptive.
     By default, it's `false`.
 
-If your workflow is using parallel communicating processes (e.g. dataloaders in PyTorch), 
-you may need to configure the size of the shared memory (`/dev/shm` filesystem) via the `shm_size` property.
+!!! info "NOTE:"
+    If your workflow is using parallel communicating processes (e.g. dataloaders in PyTorch), 
+    you may need to configure the size of the shared memory (`/dev/shm` filesystem) via the `shm_size` property.
 
 #### gpu
 
@@ -96,5 +97,5 @@ variables `PORT_<number>`.
           - gunicorn main:app --bind 0.0.0.0:$PORT_0
     ```
 
-!!! info "NOTE:"
-    If you need, you can also refer to the actual hostname of the workflow via the environment variable `HOSTNAME`.
+[//]: # (!!! info "NOTE:")
+[//]: # (    If you need, you can also refer to the actual hostname of the workflow via the environment variable `HOSTNAME`.)

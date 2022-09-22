@@ -57,51 +57,25 @@
     background-color: var(--md-default-fg-color--lighter)
 }
 
-.md-typeset :is(.admonition,details):is(.warning) {
-    background-color: #fffdf6;
-    border-color: #fdeeba;
+.md-typeset :is(.admonition,details):is(.info,.tip,.warning) {
+    background-color: rgba(0,0,0,0.005);
+    border-color: rgba(0,0,0,0.6);
 }
 
-.md-typeset :is(.warning)>:is(.admonition-title) {
-    color: #897e6d;
+.md-typeset :is(.info,.tip,.warning)>:is(.admonition-title) {
+    color: var(--md-default-fg-color);
 }
 
-.md-typeset :is(.warning)>:is(.admonition-title):before {
-    background-color: #ffbf58;
-}
-
-.md-typeset :is(.admonition,details):is(.info) {
-    background-color: #fbfcff;
-    border-color: #dfe8ff;
-}
-
-.md-typeset :is(.info)>:is(.admonition-title) {
-    color: #395ba4;
-}
-
-.md-typeset :is(.info)>:is(.admonition-title):before {
-    background-color: #4d7cdc;
-}
-
-.md-typeset :is(.admonition,details):is(.tip) {
-    background-color: #fbfffc;
-    border-color: #bfffd4;
-}
-
-.md-typeset :is(.tip)>:is(.admonition-title) {
-    color: #469a62;
-}
-
-.md-typeset :is(.tip)>:is(.admonition-title):before {
-    background-color: #51c677;
+.md-typeset :is(.info,.tip,.warning)>:is(.admonition-title):before {
+    background-color: var(--md-default-fg-color);
 }
 
 [dir=ltr] .md-typeset :is(.admonition,details) {
     border-style: solid;
-    border-width: 1px;
+    border-width: 0.5px;
     border-radius: 8px;
     box-shadow: none;
-    padding: .6rem .8rem
+    padding: .6rem .8rem;
 }
 
 [dir=ltr] .md-typeset :is(.admonition,details) :is(p,div):not([class*="admonition-title"]) {
@@ -120,7 +94,7 @@
 [dir=ltr] .md-typeset :is(.admonition-title,summary) {
     font-size: 1em;
     letter-spacing: -0.5px;
-    font-weight: 600;
+    font-weight: 800;
     /*padding-left: 18px;*/
     padding-bottom: 0;
     border: none;

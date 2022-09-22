@@ -51,7 +51,7 @@ the right version of Python, and Conda.
 
 ## Git
 
-You can run the dstack CLI only from inside a Git repository directory.
+You can run the dstack CLI only from inside a Git repo directory.
 
 When you run a workflow, dstack detects the current branch, commit hash, 
 and local changes, and uses it on the cloud instance(s) to run the workflow.
@@ -72,10 +72,10 @@ deps:
   - tag: mnist_data
 ```
 
-You can refer not only to tags within your current Git repository but to the tags from your other 
+You can refer not only to tags within your current Git repo but to the tags from your other 
 repositories.
 
-Here's an example how the workflow refers to a tag from the `dstackai/dstack-examples` repository:
+Here's an example how the workflow refers to a tag from the `dstackai/dstack-examples` repo:
 
 ```yaml
 deps:

@@ -1,8 +1,8 @@
 # Environment variables
 
-This workflow defines environment variables and prints them to the output. 
+You can configure environment variables for workflows using the `env` property. 
 
-It uses the standard `env` bash command to print environment variables. 
+Here's a workflow that sets `DSTACK_ENV_1`, `DSTACK_ENV_2`, and `DSTACK_ENV_3` environment variables:
 
 === ".dstack/workflows.yaml"
 

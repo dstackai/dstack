@@ -1,21 +1,21 @@
 # Secrets
 
-Secrets are stored in the encrypted cloud storage (e.g. for AWS, it's Secrets Manager) 
-and can be accessed from running workflows via environment variable.
+Secrets can be used to access passwords and tokens securely from workflows (without hard-coding them in the code).
 
-Secrets can be managed via the [`dstack secrets`](../reference/cli/secrets.md) command.
+#### Weights & Biases
 
-## Weights & Biases
+Here's an example of how to use your Weight & Biases API token in your workflows. 
 
-This example shows how to use secrets to authenticate workflows with Weights & Biases.
+Go to the settings of your Weight & Biases user and copy your API token. 
 
-First, add the corresponding secret:
+Use the `dstack secrets add` command to add it as a secret:
 
 ```shell
 dstack secrets add WANDB_API_KEY acd0a9e1ebe7a4e4854d2f6a7cef85b5257f8183
 ```
 
-Now, you can run the workflow.
+Now, when you run any workflow, your API token will be passed to the workflow 
+via the `WANDB_API_KEY` environment variable:
 
 === ".dstack/workflows.yaml"
 
@@ -28,5 +28,4 @@ Now, you can run the workflow.
           - wandb login
     ```
 
-When you run the workflow, dstack will pass to the `WANDB_API_KEY` environment
-variable with the configured API token.
+Secrets can be managed via the [`dstack secrets`](../reference/cli/secrets.md) command.

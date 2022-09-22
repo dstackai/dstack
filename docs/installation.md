@@ -17,7 +17,8 @@ The `dstack` CLI needs your AWS account credentials to be configured locally
 If you don't have an AWS account, you can quickly [create](https://aws.amazon.com/resources/create-account/) one,
 and get [credentials](https://docs.aws.amazon.com/sdk-for-javascript/v2/developer-guide/getting-your-credentials.html).
 
-Support for other cloud providers, such as GCP and Azure is in the roadmap.
+!!! info "NOTE:"
+    Support for other cloud providers, such as GCP and Azure is in the roadmap.
 
 ## Configure AWS region and S3 bucket
 
@@ -35,7 +36,8 @@ Region name (eu-west-1):
 S3 bucket name (dstack-142421590066-eu-west-1):
 ```
 
-Make sure to use an S3 bucket name that isn't used by other AWS accounts.
+!!! warning "NOTE:"
+    Make sure to use an S3 bucket name that isn't used by other AWS accounts.
 
 The configuration will be saved in the `~/.dstack/config.yaml` file.
 
