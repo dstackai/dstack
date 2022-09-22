@@ -63,30 +63,35 @@ def _tag_head_key(tag_head: TagHead) -> str:
 
 
 def create_tag_from_run(s3_client: BaseClient, bucket_name: str, repo_user_name: str, repo_name: str,
-                        tag_name: str, run_name: str):
-    tag_jobs = []
-    job_with_anther_tag = None
-    job_heads = jobs.list_job_heads(s3_client, bucket_name, repo_user_name, repo_name, run_name)
-    for job_head in job_heads:
-        job = jobs.get_job(s3_client, bucket_name, repo_user_name, repo_name, job_head.job_id)
-        if job:
-            tag_jobs.append(job)
-            if job.tag_name and job.tag_name != tag_name:
-                job_with_anther_tag = job
-    if job_with_anther_tag:
-        raise BackendError(f"The run '{job_with_anther_tag.run_name} refers to another tag: "
-                           f"{job_with_anther_tag.tag_name}'")
-    if not tag_jobs:
-        sys.exit(f"Cannot find the run '{run_name}'")
+                        tag_name: str, run_name: str, run_jobs: Optional[List[Job]]):
+    if run_jobs:
+        tag_jobs = run_jobs
+    else:
+        tag_jobs = []
+        job_with_anther_tag = None
+        job_heads = jobs.list_job_heads(s3_client, bucket_name, repo_user_name, repo_name, run_name)
+        for job_head in job_heads:
+            job = jobs.get_job(s3_client, bucket_name, repo_user_name, repo_name, job_head.job_id)
+            if job:
+                tag_jobs.append(job)
+                if job.tag_name and job.tag_name != tag_name:
+                    job_with_anther_tag = job
+        if job_with_anther_tag:
+            raise BackendError(f"The run '{job_with_anther_tag.run_name} refers to another tag: "
+                               f"{job_with_anther_tag.tag_name}'")
+        if not tag_jobs:
+            sys.exit(f"Cannot find the run '{run_name}'")
+
     tag_head = TagHead(repo_user_name, repo_name, tag_name, run_name, tag_jobs[0].workflow_name,
                        tag_jobs[0].provider_name, int(round(time.time() * 1000)),
                        [ArtifactHead(run_job.job_id, artifact_spec.artifact_path) for run_job in tag_jobs for
                         artifact_spec in run_job.artifact_specs or []] or None)
     s3_client.put_object(Body="", Bucket=bucket_name, Key=_tag_head_key(tag_head))
 
-    for job in tag_jobs:
-        job.tag_name = tag_name
-        jobs.update_job(s3_client, bucket_name, job)
+    if not run_jobs:
+        for job in tag_jobs:
+            job.tag_name = tag_name
+            jobs.update_job(s3_client, bucket_name, job)
     repos.increment_repo_tags_count(s3_client, bucket_name, repo_user_name, repo_name)
 
 

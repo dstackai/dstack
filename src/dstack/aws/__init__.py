@@ -118,9 +118,10 @@ class AwsBackend(Backend):
         return tags.get_tag_head(self._s3_client(), self.backend_config.bucket_name, repo_user_name, repo_name,
                                  tag_name)
 
-    def add_tag_from_run(self, repo_user_name: str, repo_name: str, tag_name: str, run_name: str):
+    def add_tag_from_run(self, repo_user_name: str, repo_name: str, tag_name: str, run_name: str,
+                         run_jobs: Optional[List[Job]]):
         tags.create_tag_from_run(self._s3_client(), self.backend_config.bucket_name, repo_user_name, repo_name,
-                                 tag_name, run_name)
+                                 tag_name, run_name, run_jobs)
 
     def delete_tag_head(self, repo_user_name: str, repo_name: str, tag_head: TagHead):
         tags.delete_tag(self._s3_client(), self.backend_config.bucket_name, repo_user_name, repo_name, tag_head)

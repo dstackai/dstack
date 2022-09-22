@@ -239,7 +239,8 @@ class Backend(ABC):
     def get_tag_head(self, repo_user_name: str, repo_name: str, tag_name: str) -> Optional[TagHead]:
         pass
 
-    def add_tag_from_run(self, repo_user_name: str, repo_name: str, tag_name: str, run_name: str):
+    def add_tag_from_run(self, repo_user_name: str, repo_name: str, tag_name: str, run_name: str,
+                         run_jobs: Optional[List[Job]]):
         pass
 
     def add_tag_from_local_dirs(self, repo_data: RepoData, tag_name: str, local_dirs: List[str]):

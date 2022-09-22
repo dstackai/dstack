@@ -115,4 +115,5 @@ async def delete(request: DeleteTagRequest):
 @router.post("/add")
 async def delete(request: AddTagRequest):
     backend = load_backend()
-    backend.add_tag_from_run(request.repo_user_name, request.repo_name, request.tag_name, request.run_name)
+    backend.add_tag_from_run(request.repo_user_name, request.repo_name, request.tag_name, request.run_name,
+                             run_jobs=None)

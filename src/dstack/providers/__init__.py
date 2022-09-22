@@ -53,15 +53,22 @@ class Provider:
 
     # TODO: This is a dirty hack
     def _safe_python_version(self, name: str):
+        python_version: str
         v = self.provider_data.get(name)
         if isinstance(v, str):
-            return v
+            python_version = v
         elif v == 3.1:
-            return "3.10"
+            python_version = "3.10"
         elif v:
-            return str(v)
+            python_version = str(v)
         else:
-            return "3.10"
+            version_info = sys.version_info
+            python_version = f"{version_info.major}.{version_info.minor}"
+        supported_python_versions = ["3.7", "3.8", "3.9", "3.10"]
+        if python_version not in supported_python_versions:
+            sys.exit(f"Python version `{python_version}` is not supported. "
+                     f"Supported versions: {str(supported_python_versions)}.")
+        return python_version
 
     def load(self, provider_args: List[str], workflow_name: Optional[str], provider_data: Dict[str, Any]):
         self.provider_args = provider_args
@@ -87,18 +94,18 @@ class Provider:
 
     @staticmethod
     def _add_base_args(parser: ArgumentParser):
-        parser.add_argument("-r", "--requirements", type=str)
+        parser.add_argument("-r", "--requirements", metavar="PATH", type=str)
         parser.add_argument("-e", "--env", action='append')
         parser.add_argument("-a", "--artifact", metavar="PATH", dest="artifacts", action='append')
-        parser.add_argument("-d", "--dep", metavar="TAG | WORKFLOW", dest="deps", action='append')
-        parser.add_argument("-w", "--working-dir", type=str)
+        parser.add_argument("--dep", metavar="(:TAG | WORKFLOW)", dest="deps", action='append')
+        parser.add_argument("-w", "--working-dir", metavar="PATH", type=str)
         parser.add_argument("-i", "--interruptible", action="store_true")
-        parser.add_argument("--cpu", type=int)
-        parser.add_argument("--memory", type=str)
-        parser.add_argument("--gpu", type=int)
-        parser.add_argument("--gpu-name", type=str)
-        parser.add_argument("--gpu-memory", type=str)
-        parser.add_argument("--shm-size", type=str)
+        parser.add_argument("--cpu", metavar="NUM", type=int)
+        parser.add_argument("--memory", metavar="SIZE", type=str)
+        parser.add_argument("--gpu", metavar="NUM", type=int)
+        parser.add_argument("--gpu-name", metavar="NAME", type=str)
+        parser.add_argument("--gpu-memory", metavar="SIZE", type=str)
+        parser.add_argument("--shm-size", metavar="SIZE", type=str)
 
     def _parse_base_args(self, args: Namespace):
         if args.requirements:
@@ -142,7 +149,7 @@ class Provider:
     def parse_args(self):
         pass
 
-    def submit_jobs(self, run_name: str) -> List[Job]:
+    def submit_jobs(self, run_name: str, tag_name: str) -> List[Job]:
         if not self.loaded:
             raise Exception("The provider is not loaded")
         job_specs = self.create_job_specs()
@@ -157,9 +164,13 @@ class Provider:
                       self.provider_name, JobStatus.SUBMITTED, submitted_at,
                       job_spec.image_name, job_spec.commands, job_spec.env,
                       job_spec.working_dir, job_spec.artifact_specs, job_spec.port_count, None, None,
-                      job_spec.requirements, self.dep_specs, job_spec.master_job, job_spec.app_specs, None, None, None)
+                      job_spec.requirements, self.dep_specs, job_spec.master_job, job_spec.app_specs, None, None,
+                      tag_name)
             backend.submit_job(job, counter)
             jobs.append(job)
+        if tag_name:
+            backend.add_tag_from_run(repo_data.repo_user_name, repo_data.repo_name, tag_name,
+                                     run_name, run_jobs=jobs)
         return jobs
 
     def _dep_specs(self) -> Optional[List[DepSpec]]:

@@ -104,19 +104,18 @@ def poll_run(repo_user_name: str, repo_name: str, job_heads: List[JobHead], back
 
 def run_workflow_func(args: Namespace):
     if not args.workflow_or_provider:
-        print("Usage: dstack run [-d] [-h] (WORKFLOW | PROVIDER) [ARGS ...]\n")
+        print("Usage: dstack run [-h] WORKFLOW [-d] [-t TAG] [ARGS ...]\n")
         workflows_yaml = _load_workflows()
         workflows = (workflows_yaml or {}).get("workflows") or []
         workflow_names = [w["name"] for w in workflows if w.get("name")]
-        providers_names = providers.get_provider_names()
         print(f'Positional arguments:\n'
-              f'  WORKFLOW      {{{",".join(workflow_names)}}}\n'
-              f'  PROVIDER      {{{",".join(providers_names)}}}\n')
+              f'  WORKFLOW              {{{",".join(workflow_names)}}}\n')
         print("Options:\n"
-              "  -d, --detach   Do not poll for status update and logs\n"
-              "  -h, --help     Show this help output, or the help for a specified workflow or provider.\n")
-        print("To see the help output for a particular workflow or provider, use the following command:\n"
-              "  dstack run (WORKFLOW | PROVIDER) --help")
+              "  -t TAG, --tag TAG      A tag name. Warning, if the tag already exists, it will be overridden.\n"
+              "  -d, --detach           Do not poll for status update and logs\n"
+              "  -h, --help             Show this help output, or the help for a specified workflow or provider.\n")
+        print("To see the help output for a particular workflow, use the following command:\n"
+              "  dstack run WORKFLOW --help")
     else:
         try:
             repo_data = load_repo_data()
@@ -131,8 +130,16 @@ def run_workflow_func(args: Namespace):
                 sys.exit()
 
             provider.load(provider_args, workflow_name, workflow_data)
+            if args.tag_name:
+                tag_head = backend.get_tag_head(repo_data.repo_user_name, repo_data.repo_name, args.tag_name)
+                if tag_head:
+                    # if args.yes or Confirm.ask(f"[red]The tag '{args.tag_name}' already exists. "
+                    #                            f"Do you want to override it?[/]"):
+                    backend.delete_tag_head(repo_data.repo_user_name, repo_data.repo_name, tag_head)
+                    # else:
+                    #     return
             run_name = backend.create_run(repo_data.repo_user_name, repo_data.repo_name)
-            jobs = provider.submit_jobs(run_name)
+            jobs = provider.submit_jobs(run_name, args.tag_name)
             backend.update_repo_last_run_at(repo_data.repo_user_name, repo_data.repo_name,
                                             last_run_at=int(round(time.time() * 1000)))
             status_func(Namespace(run_name=run_name, all=False))
@@ -149,9 +156,12 @@ def run_workflow_func(args: Namespace):
 
 def register_parsers(main_subparsers):
     parser = main_subparsers.add_parser("run", help="Run a workflow", add_help=False)
-    parser.add_argument("workflow_or_provider", metavar="(WORKFLOW | PROVIDER)", type=str,
-                        help="A name of a workflow or a provider", nargs="?")
+    parser.add_argument("workflow_or_provider", metavar="WORKFLOW", type=str,
+                        help="A name of a workflow", nargs="?")
+    parser.add_argument("-t", "--tag", metavar="TAG", help="A tag name. Warning, if the tag exists, "
+                                                           "it will be overridden.", type=str, dest="tag_name")
     parser.add_argument("-d", "--detach", help="Do not poll for status update and logs", action="store_true")
+    # parser.add_argument("-y", "--yes", help="Don't ask for confirmation", action="store_true")
     parser.add_argument("args", metavar="ARGS", nargs=argparse.ZERO_OR_MORE, help="Override provider arguments")
     parser.add_argument('-h', '--help', action='store_true', default=argparse.SUPPRESS,
                         help='Show this help message and exit')

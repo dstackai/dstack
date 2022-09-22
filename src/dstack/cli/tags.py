@@ -41,21 +41,27 @@ def list_tags_func(_: Namespace):
 
 
 def add_tag_func(args: Namespace):
-    try:
-        backend = load_backend()
-        repo_data = load_repo_data()
-        if backend.get_tag_head(repo_data.repo_user_name, repo_data.repo_name, args.tag_name):
-            sys.exit(f"The tag '{args.tag_name}' already exists")
-        else:
+    if args.run_name or args.artifact_paths:
+        try:
+            backend = load_backend()
+            repo_data = load_repo_data()
+            tag_head = backend.get_tag_head(repo_data.repo_user_name, repo_data.repo_name, args.tag_name)
+            if tag_head:
+                if args.yes or Confirm.ask(f"[red]The tag '{args.tag_name}' already exists. "
+                                           f"Do you want to override it?[/]"):
+                    backend.delete_tag_head(repo_data.repo_user_name, repo_data.repo_name, tag_head)
+                else:
+                    return
             if args.run_name:
-                backend.add_tag_from_run(repo_data.repo_user_name, repo_data.repo_name, args.tag_name, args.run_name)
-            elif args.artifact_paths:
-                backend.add_tag_from_local_dirs(repo_data, args.tag_name, args.artifact_paths)
+                backend.add_tag_from_run(repo_data.repo_user_name, repo_data.repo_name, args.tag_name, args.run_name,
+                                         run_jobs=None)
             else:
-                sys.exit("Specify -r RUN or -a PATH to create a tag")
-        print(f"[grey58]OK[/]")
-    except ConfigError:
-        sys.exit(f"Call 'dstack config' first")
+                backend.add_tag_from_local_dirs(repo_data, args.tag_name, args.artifact_paths)
+            print(f"[grey58]OK[/]")
+        except ConfigError:
+            sys.exit(f"Call 'dstack config' first")
+    else:
+        sys.exit("Specify -r RUN or -a PATH to create a tag")
 
 
 def delete_tag_func(args: Namespace):
@@ -86,6 +92,7 @@ def register_parsers(main_subparsers):
     add_tags_parser.add_argument("-a", "--artifact", metavar="PATH", type=str,
                                  help="A path to local directory to upload as an artifact", action="append",
                                  dest="artifact_paths")
+    parser.add_argument("-y", "--yes", help="Don't ask for confirmation", action="store_true")
     add_tags_parser.set_defaults(func=add_tag_func)
 
     delete_tags_parser = subparsers.add_parser("delete", help="Delete a tag")

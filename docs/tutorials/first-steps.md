@@ -66,7 +66,7 @@ etc.
 You'll see the output in real-time as your workflow is running.
 
 ```
-RUN             TARGET    STATUS     APPS  ARTIFACTS  SUBMITTED  TAG 
+RUN             WORKFLOW  STATUS     APPS  ARTIFACTS  SUBMITTED  TAG 
 grumpy-zebra-1  download  Submitted        data       now 
  
 Provisioning... It may take up to a minute. ✓
@@ -94,7 +94,7 @@ dstack ps
 It shows currently running workflows or the last finished one. 
 
 ```shell
-RUN             TARGET    STATUS  APPS  ARTIFACTS  SUBMITTED  TAG 
+RUN             WORKFLOW  STATUS  APPS  ARTIFACTS  SUBMITTED  TAG 
 grumpy-zebra-1  download  Done          data       a min ago
 ```
 
@@ -159,7 +159,7 @@ dstack run train
 On the start of the `train` workflow, dstack will download the artifacts of the tag `mnist_data` to the working directory.
 
 ```shell
-RUN            TARGET    STATUS     APPS  ARTIFACTS       SUBMITTED  TAG 
+RUN            WORKFLOW  STATUS     APPS  ARTIFACTS       SUBMITTED  TAG 
 wet-mangust-2  train     Submitted        lightning_logs  now 
 
 Povisioning... It may take up to a minute. ✓

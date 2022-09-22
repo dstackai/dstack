@@ -8,7 +8,7 @@ dstack uses the these credentials to access the current Git repository when runn
 ### Usage
 
 ```shell
-dstack init [-t TOKEN] [-i FILE]
+dstack init [-t GH_TOKEN | -i FILE]
 ```
 
 #### Arguments reference

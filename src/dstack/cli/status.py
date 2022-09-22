@@ -78,7 +78,7 @@ def print_runs(args: Namespace, backend: Backend):
     console = Console()
     table = Table(box=None)
     table.add_column("RUN", style="bold", no_wrap=True)
-    table.add_column("TARGET", style="grey58", width=14)
+    table.add_column("WORKFLOW", style="grey58", width=14)
     table.add_column("STATUS", no_wrap=True)
     table.add_column("APPS", no_wrap=True)
     table.add_column("ARTIFACTS", style="grey58", width=18)
