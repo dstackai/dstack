@@ -59,7 +59,7 @@ def ask_bucket_name(default_bucket_name):
 
 def register_parsers(main_subparsers):
     parser = main_subparsers.add_parser("config", help="Configure the backend")
-    parser.add_argument("--profile", metavar="NAME",
+    parser.add_argument("--aws-profile", metavar="NAME",
                         help="A name of the AWS profile. Default is \"default\".", type=str,
                         dest="profile_name", default="default")
     parser.set_defaults(func=config_func)

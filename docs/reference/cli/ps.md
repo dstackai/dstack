@@ -16,5 +16,5 @@ The following arguments are optional and mutually exclusive:
 - `RUN` - (Optional) A name of a run
 
 !!! info "NOTE:"
-    If no arguments are specified, the command shows status of unfinished runs if any or otherwise the 
-    last finished run.
+    If no arguments are specified, the command shows status of active runs only. If there are no active runs,
+    it shows the status of the last finished run.

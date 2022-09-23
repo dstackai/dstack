@@ -1,13 +1,11 @@
 # dstack config
 
-Use this command before running any other `dstack` commands to configure 
-the AWS region, where dstack will provision compute resources, and
-the S3 bucket, where dstack will save data.
+This command configures the AWS region and S3 bucket, where dstack will provision compute resources and save data.
 
 ### Usage
 
 ```shell
-dstack config [-p NAME]
+dstack config [--aws-profile NAME]
 ```
 
 Make sure to use an S3 bucket name that isn't used by other AWS accounts.
@@ -23,4 +21,4 @@ The configuration is stored in `~/.dstack/config.yaml`.
 
 The following arguments are optional:
 
-- `-p NAME`, `--profile NAME` - (Optional) A name of the AWS profile. Default is `default`.
+- `--aws-profile NAME` - (Optional) A name of the AWS profile. Default is `default`.

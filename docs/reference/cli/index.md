@@ -2,34 +2,41 @@
 
 The base command for the `dstack` CLI.
 
-## Usage
+### Usage
 
-To view a list of the commands available in your current dstack version, run `dstack` with no additional arguments:
+To view the list of supported CLI commands, run `dstack` with no additional arguments:
 
 ```bash
-Usage: dstack [OPTIONS ...] COMMAND [ARGS ...]
+Usage: dstack [-h] [-v] [OPTIONS ...] COMMAND [ARGS ...]
 
 Main commands:
-  run            Run a workflow
-  ps             List runs
-  stop           Stop a run
-  logs           Show logs of a run
-  artifacts      List or download artifacts of a run or a tag
-  tags           List, create or delete tags
+  dstack run WORKFLOW [-d] [-t TAG] [ARGS ...]        Run a workflow
+  dstack ps [-a | RUN]                                Show run(s) status
+  dstack stop [-x] [-y] (RUN | -a)                    Stop run(s)
+  dstack logs [-a] [-s SINCE] RUN                     Show logs
+  dstack artifacts list (RUN | :TAG)                  List artifacts
+  dstack artifacts download (RUN | :TAG)              Download artifacts
 
 Other commands:
-  init           Authorize dstack to access the current GitHub repo
-  config         Configure the backend
-  secrets        Manage secrets
-  delete         Delete runs
+  dstack init [-t GH_TOKEN | -i SSH_PRIVATE_KEY]      Initialize the repo
+  dstack config [--aws-profile NAME]                  Configure the backend
+  dstack tags add TAG (-r RUN | -a PATH ...)          Add a tag
+  dstack tags delete [-y] TAG                         Delete a tag
+  dstack tags list                                    List tags
+  dstack secrets add [-y] NAME [VALUE]                Add a secret
+  dstack secrets list                                 List secrets
+  dstack secrets delete NAME                          Delete a secret
+  dstack delete [-y] (RUN | -a)                       Delete run(s)
 
-Options:
-  -h, --help     Show this help output, or the help for a specified command.
-  -v, --version  Show the version of the CLI.
+Global options:
+  -h, --help                                          Show this help output
+  -v, --version                                       Show dstack version
 ```
 
-To get specific help for any specific command, use the `--help` option with the relevant command. 
-For example, to see help about the "init" command you can run `dstack init --help`.
+Use `--help` to see the usage of the specific command, e.g. `run`:
 
-For more detailed information, refer to each command's section of this documentation, available in the navigation 
-section of this page.
+```shell
+ dstack run --help
+```
+
+For more details and examples on a specific command, check out its dedicate reference page using the navigation section.
