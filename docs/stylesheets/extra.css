@@ -788,3 +788,21 @@ html .md-footer-meta.md-typeset a:is(:focus,:hover) {
         padding-left: 0;
     }
 }
+
+.md-banner {
+    background-color: #f5f4f7;
+    color: var(--md-default-fg-color);
+    border-top: 1px solid #f4f3e6;
+    border-bottom: 1px solid #f4f3e6;
+    margin-bottom: 1px;
+}
+
+.md-typeset.md-banner__inner {
+    margin: 0.23rem auto;
+    text-align: center;
+    font-size: 0.7rem;
+}
+
+.md-typeset.md-banner__inner .md-banner__button {
+    color: var(--md-default-fg-color--light);
+}

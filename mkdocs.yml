@@ -39,6 +39,7 @@ theme:
     - navigation.sections
     - navigation.expand
     - navigation.top
+    - announce.dismiss
 #plugins:
 #  - search
 #  - redirects:
@@ -75,6 +76,8 @@ extra:
   social:
     - icon: fontawesome/brands/github
       link: https://github.com/dstackai/dstack
+    - icon: fontawesome/brands/python
+      link: https://pypi.org/project/dstack/
     - icon: fontawesome/brands/slack
       link: https://join.slack.com/t/dstackai/shared_invite/zt-xdnsytie-D4qU9BvJP8vkbkHXdi6clQ
     - icon: fontawesome/brands/twitter
