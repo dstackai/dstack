@@ -1,7 +1,7 @@
 import React, { useMemo, useState } from 'react';
 import cn from 'classnames';
 import { useTranslation } from 'react-i18next';
-import { Link, useNavigate, useParams } from 'react-router-dom';
+import { useNavigate, useParams } from 'react-router-dom';
 import ConfirmStop from 'pages/Runs/components/ConfirmStop';
 import Sidebar from 'components/details/DetailsSidebar';
 import { isFinishedStatus } from 'libs/status';
@@ -22,7 +22,6 @@ import { showAppsModal } from 'features/Run/AppsModal/slice';
 import Artifacts from 'features/Artifacts';
 import { useAppDispatch, useAppProgress, useAppSelector } from 'hooks';
 import { getDateAgoSting, goToUrl, stopPropagation } from 'libs';
-import { artifactsToArtifactPaths } from 'libs/artifacts';
 import { POLLING_INTERVAL } from 'consts';
 import { ReactComponent as RefreshIcon } from 'assets/icons/refresh.svg';
 import { ReactComponent as ShapePlusIcon } from 'assets/icons/shape-plus.svg';
@@ -246,10 +245,10 @@ const WorkflowDetails: React.FC = () => {
                             <div className={css.title}>{t('artifact_other')}</div>
 
                             <Artifacts
-                                workflow_name={workflow.workflow_name}
-                                run_name={workflow.run_name}
-                                artifacts={artifactsToArtifactPaths(workflow.artifacts)}
+                                artifacts={workflow.artifacts}
                                 className={css.artifacts}
+                                repo_user_name={workflow.repo_user_name}
+                                repo_name={workflow.repo_name}
                             />
                         </div>
                     )}

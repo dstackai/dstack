@@ -8,7 +8,6 @@ import { ReactComponent as ChevronUpIcon } from 'assets/icons/chevron-up.svg';
 import { ReactComponent as ChevronDownIcon } from 'assets/icons/chevron-down.svg';
 import { ReactComponent as FolderOutlineIcon } from 'assets/icons/folder-outline.svg';
 import { ReactComponent as FileDownloadOutlineIcon } from 'assets/icons/file-download-outline.svg';
-import { isJobArtifactParams, artifactPathGetFolderName } from 'libs/artifacts';
 import css from './index.module.css';
 
 export interface FileProps {
@@ -28,7 +27,7 @@ const File: React.FC<FileProps> = ({ name, nestingLevel, noBorder }) => {
     );
 };
 
-type TArtifactFolderProps = TArtifactsFetchParams & {
+type TArtifactFolderProps = IArtifactsFetchParams & {
     open?: boolean;
     nestingLevel?: number;
     noBorder?: boolean;
@@ -97,22 +96,18 @@ const Folder: React.FC<TArtifactFolderProps> = ({
     );
 };
 
-export type Props = IArtifactsTableCellData & { className?: string };
+export interface Props extends Omit<IArtifactsFetchParams, 'path' | 'job_id'> {
+    artifacts?: TArtifacts;
+    className?: string;
+}
 
 const Artifacts: React.FC<Props> = ({ artifacts, className, ...params }) => {
     if (!artifacts) return null;
 
-    const folders = artifacts.map(artifactPathGetFolderName);
-
-    const apiUrl = useMemo<string>(() => {
-        if (isJobArtifactParams(params)) return '/jobs/artifacts/objects';
-        else return '/runs/workflows/artifacts/objects';
-    }, [params]);
-
     return (
         <div className={cn(css.artifacts, className)}>
-            {folders.map((f, index) => (
-                <Folder path={f} key={index} apiUrl={apiUrl} open {...params} />
+            {artifacts.map((f, index) => (
+                <Folder path={f.artifact_path} key={index} job_id={f.job_id} open {...params} />
             ))}
         </div>
     );

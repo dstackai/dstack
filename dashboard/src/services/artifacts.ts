@@ -11,7 +11,7 @@ export const artifactsApi = createApi({
     tagTypes: ['Artifacts'],
 
     endpoints: (builder) => ({
-        getArtifactObjects: builder.query<IArtifactObject[], TArtifactsFetchParams>({
+        getArtifactObjects: builder.query<IArtifactObject[], IArtifactsFetchParams>({
             query: (params) => {
                 const { ...searchParams } = params;
 
@@ -23,6 +23,8 @@ export const artifactsApi = createApi({
                     ).toString()}`,
                 };
             },
+
+            transformResponse: (response: { objects: IArtifactObject[] }) => response.objects,
         }),
     }),
 });

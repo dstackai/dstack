@@ -2,8 +2,8 @@ import { createSlice, PayloadAction } from '@reduxjs/toolkit';
 import type { RootState } from 'store';
 
 interface ArtifactsModal {
-    artifacts: TArtifactPaths;
-    params: Omit<IArtifactsTableCellData, 'artifacts'> | null;
+    artifacts: TArtifacts | null;
+    params: Omit<IArtifactsFetchParams, 'path' | 'job_id'> | null;
 }
 
 const initialState: ArtifactsModal = {
@@ -16,7 +16,7 @@ export const artifactsModalSlice = createSlice({
     initialState,
 
     reducers: {
-        showArtifacts: (state, action: PayloadAction<IArtifactsTableCellData>) => {
+        showArtifacts: (state, action: PayloadAction<ArtifactsModal['params'] & { artifacts: TArtifacts }>) => {
             const { artifacts, ...params } = action.payload;
             state.artifacts = artifacts;
             state.params = params;

@@ -20,7 +20,6 @@ import { showAppsModal } from 'features/Run/AppsModal/slice';
 import { showArtifacts } from 'features/ArtifactsModal/slice';
 import { useAppDispatch } from 'hooks';
 import { getDateAgoSting, goToUrl, stopPropagation } from 'libs';
-import { artifactsToArtifactPaths } from 'libs/artifacts';
 import { isFailed, isFinished, isRunning } from 'libs/run';
 import { useDeleteMutation, useRestartMutation, useStopMutation } from 'services/workflows';
 import css from './index.module.css';
@@ -101,9 +100,9 @@ const RunCard: React.FC<Props> = ({ className, item, ...props }) => {
 
         dispatch(
             showArtifacts({
-                artifacts: artifactsToArtifactPaths(item.artifacts),
-                run_name: item.run_name,
-                workflow_name: item.workflow_name,
+                artifacts: item.artifacts,
+                repo_user_name: item.repo_user_name,
+                repo_name: item.repo_name,
             }),
         );
     };

@@ -1,7 +1,3 @@
-export const isJobArtifactParams = (params: { [key: string]: any }): params is IJobArtifactsFetchParams => {
-    return typeof params.job_id === 'string';
-};
-
 export const artifactPathGetFolderName = (path: TArtifactPath): string => {
     return path.split('/')[3] ?? '';
 };
@@ -13,6 +9,6 @@ export const artifactPathsToString = (paths: IJob['artifact_paths']): string => 
 };
 
 // TODO add test
-export const artifactsToArtifactPaths = (artifacts: IArtifact[]): TArtifactPaths => {
+export const artifactsToArtifactPaths = (artifacts: TArtifacts): TArtifactPath[] => {
     return artifacts.map((a) => a.artifact_path);
 };
