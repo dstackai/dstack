@@ -47,7 +47,8 @@ Region name (eu-west-1):
 S3 bucket name (dstack-142421590066-eu-west-1):
 ```
 
-Support for GCP and Azure is in the roadmap.
+> **Note**
+> Support for GCP and Azure is in the roadmap.
 
 ## How does it work?
 
@@ -57,6 +58,7 @@ Support for GCP and Azure is in the roadmap.
 4. Use other `dstack` CLI commands to manage runs, artifacts, etc.
 
 
+> **Note**
 >  When you run an ML workflow via the `dstack` CLI, it provisions the required compute resources (in a configured cloud
    account), sets up environment (such as Python, Conda, CUDA, etc), fetches your code, downloads deps,
    saves artifacts, and tears down compute resources.
