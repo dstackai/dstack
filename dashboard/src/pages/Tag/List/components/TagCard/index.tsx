@@ -1,5 +1,6 @@
-import React from 'react';
+import React, { useMemo } from 'react';
 import cn from 'classnames';
+import { Link, LinkProps, useParams } from 'react-router-dom';
 import Button from 'components/Button';
 import Dropdown from 'components/Dropdown';
 import { ReactComponent as DotsIcon } from 'assets/icons/dots-vertical.svg';
@@ -9,18 +10,21 @@ import { useTranslation } from 'react-i18next';
 import { useDeleteMutation } from 'services/tags';
 import { ReactComponent as LayersIcon } from 'assets/icons/layers.svg';
 import { showArtifacts } from 'features/ArtifactsModal/slice';
-import { artifactsToArtifactPaths } from 'libs/artifacts';
 import { useAppDispatch } from 'hooks';
+import { URL_PARAMS } from 'route/url-params';
+import { getRouterModule, RouterModules } from 'route';
 import css from './style.module.css';
 
-export interface Props extends ITag {
-    className?: string;
+export interface Props extends Omit<LinkProps, 'to'> {
+    tag: ITag;
 }
 
-const TagCard: React.FC<Props> = ({ className, ...tag }) => {
+const TagCard: React.FC<Props> = ({ className, tag, ...props }) => {
     const { t } = useTranslation();
     const [deleteTag, { isLoading: isDeleting }] = useDeleteMutation();
     const dispatch = useAppDispatch();
+    const newRouter = getRouterModule(RouterModules.NEW_ROUTER);
+    const urlParams = useParams();
 
     const deleteHandle = () => {
         deleteTag({
@@ -35,15 +39,27 @@ const TagCard: React.FC<Props> = ({ className, ...tag }) => {
 
         dispatch(
             showArtifacts({
-                artifacts: artifactsToArtifactPaths(tag.artifacts),
-                run_name: tag.run_name,
-                workflow_name: tag.workflow_name,
+                artifacts: tag.artifacts,
+                repo_user_name: tag.repo_user_name,
+                repo_name: tag.repo_name,
             }),
         );
     };
 
+    const tagDetailsLink = useMemo<string>(() => {
+        const pathName = ['app', urlParams[URL_PARAMS.REPO_USER_NAME] ? 'user-repouser-repo' : 'user-repo', 'tag']
+            .filter(Boolean)
+            .join('.');
+
+        return newRouter.buildUrl(pathName, {
+            [URL_PARAMS.TAG_NAME]: tag.tag_name,
+            [URL_PARAMS.REPO_USER_NAME]: urlParams[URL_PARAMS.REPO_USER_NAME],
+            [URL_PARAMS.REPO_NAME]: urlParams[URL_PARAMS.REPO_NAME],
+        });
+    }, [urlParams]);
+
     return (
-        <div className={cn(css.card, className)}>
+        <Link className={cn(css.card, className)} {...props} to={tagDetailsLink}>
             <div className={css.topSection}>
                 <div className={cn(css.name, 'mono-font')}>{tag.tag_name}</div>
 
@@ -83,7 +99,7 @@ const TagCard: React.FC<Props> = ({ className, ...tag }) => {
                     )}
                 </ul>
             </div>
-        </div>
+        </Link>
     );
 };
 

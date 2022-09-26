@@ -21,7 +21,7 @@ declare interface IAvailabilityIssues {
     message: null | string
 }
 
-declare interface IRunWorkflow extends Pick<IRun, 'run_name' | 'status' | 'submitted_at' | 'tag_name' | 'updated_at' | 'user_name' | 'workflow_name' | 'repo_hash' | 'repo_branch' | 'repo_name' | 'repo_user_name' | 'repo_diff' | 'variables'> {
+declare interface IRunWorkflow extends Pick<IRun, 'run_name' | 'status' | 'submitted_at' | 'tag_name' | 'updated_at' | 'user_name' | 'workflow_name' | 'repo_hash' | 'repo_branch' | 'repo_name' | 'repo_user_name' | 'repo_diff' | 'variables' | 'provider_name'> {
     artifacts: IArtifact[]
     availability_issues?: IAvailabilityIssues[]
     ports: IWorkflowPort[]

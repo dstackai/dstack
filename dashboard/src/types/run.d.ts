@@ -7,6 +7,7 @@ declare interface IRun {
     repo_diff: null | string,
     repo_name: string,
     repo_user_name: string,
+    provider_name: string | null
     variables: TVariables,
     submitted_at: number,
     started_at: null | number,

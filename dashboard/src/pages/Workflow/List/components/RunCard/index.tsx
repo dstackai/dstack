@@ -40,7 +40,7 @@ const RunCard: React.FC<Props> = ({ className, item, ...props }) => {
     const [showConfirmRestart, setShowConfirmRestart] = useState<boolean>(false);
     const [showAddTag, setShowAddTag] = useState<boolean>(false);
 
-    const [restartWorkflow, { isLoading: isRestarting }] = useRestartMutation();
+    const [restartWorkflow] = useRestartMutation();
     const [stopWorkflow, { isLoading: isStopping }] = useStopMutation();
     const [deleteWorkflow, { isLoading: isDeleting }] = useDeleteMutation();
 
@@ -160,7 +160,7 @@ const RunCard: React.FC<Props> = ({ className, item, ...props }) => {
                     </Dropdown>
                 </div>
 
-                <div className={css.run}>{item.run_name}</div>
+                <div className={css.run}>{item.workflow_name || item.provider_name || t('no_name')}</div>
 
                 <div className={css.bottomSection}>
                     <ul className={css.points}>

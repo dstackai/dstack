@@ -30,11 +30,14 @@ declare type TTagArtifactHead = {
 declare interface ITag {
     repo_user_name: string,
     repo_name: string,
+    repo_branch: string,
+    repo_diff: string,
+    repo_hash: string,
     tag_name: string,
     run_name: string,
     workflow_name: string,
     provider_name: string,
     created_at: number,
-    artifact_heads: TTagArtifactHead[]
-    artifacts: IArtifact[]
+    artifact_heads: TTagArtifactHead[],
+    artifacts: IArtifact[],
 }

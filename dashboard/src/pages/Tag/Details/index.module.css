@@ -1,0 +1,75 @@
+.details {
+    display: flex;
+    flex-direction: column;
+    height: calc(100vh - var(--app-header-height));
+    padding-top: 12px;
+}
+.topSection {
+    flex-shrink: 0;
+    display: flex;
+    align-items: center;
+    & .breadcrumbs {
+        margin-right: auto;
+    }
+}
+.tabs {
+    flex-shrink: 0;
+}
+.content {
+    flex-grow: 1;
+    min-height: 600px;
+    margin-top: 16px;
+    display: grid;
+    grid-template-columns: 1fr var(--details-sidebar-width);
+    grid-template-rows: auto 1fr;
+    grid-template-areas:
+        "header header"
+        "artifacts sidebar"
+;
+    column-gap: 34px;
+    row-gap: 20px;
+    padding-bottom: 12px;
+}
+.header {
+    grid-area: header;
+    display: flex;
+    align-items: center;
+    padding-bottom: 8px;
+    & .title {
+        overflow: hidden;
+        white-space: nowrap;
+        text-overflow: ellipsis;
+        margin: 0;
+        @mixin textStyle 28, 30;
+    }
+    & .buttons {
+        flex-shrink: 0;
+        margin-left: auto;
+        padding-left: 20px;
+        display: flex;
+        align-items: center;
+        gap: 8px;
+    }
+}
+.runName {
+    margin-top: 4px;
+    flex-shrink: 0;
+    color: var(--color-medium-gray);
+    @mixin textStyle 14, 20;
+}
+.artifactsWrapper {
+    grid-area: artifacts;
+    padding: 12px 20px;
+    border: 1px solid var(--color-light-gray);
+    border-radius: 6px;
+    & .title {
+        padding-bottom: 8px;
+        font-weight: 500;
+        @mixin textStyle 12, 20;
+        letter-spacing: 0.1em;
+        text-transform: uppercase;
+    }
+    & .artifacts {
+
+    }
+}

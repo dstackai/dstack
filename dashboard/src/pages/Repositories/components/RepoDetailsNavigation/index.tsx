@@ -1,5 +1,5 @@
 import React, { useMemo } from 'react';
-import { useParams } from 'react-router-dom';
+import { useLocation, useParams } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import Tabs, { Props as TabsProps } from 'components/Tabs';
 import { getRouterModule, RouterModules } from 'route';
@@ -11,6 +11,7 @@ const RepoDetailsNavigation: React.FC<Props> = (props) => {
     const { t } = useTranslation();
     const newRouter = getRouterModule(RouterModules.NEW_ROUTER);
     const urlParams = useParams();
+    const { pathname } = useLocation();
 
     const repoLink = useMemo<string>(() => {
         const pathName = ['app', urlParams[URL_PARAMS.REPO_USER_NAME] ? 'user-repouser-repo' : 'user-repo', 'repo']
@@ -36,9 +37,11 @@ const RepoDetailsNavigation: React.FC<Props> = (props) => {
         });
     }, [urlParams]);
 
+    const hasRuns = /\/runs\//.test(pathname);
+
     return (
         <Tabs {...props}>
-            <Tabs.TabItemNavLink end to={repoLink}>
+            <Tabs.TabItemNavLink end={!hasRuns} to={repoLink}>
                 {t('run_other')}
             </Tabs.TabItemNavLink>
             <Tabs.TabItemNavLink to={tagsLink}>{t('tag_other')}</Tabs.TabItemNavLink>

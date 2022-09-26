@@ -4,6 +4,7 @@ export enum URL_PARAMS {
     REPO_NAME = 'repoName',
     RUN_NAME = 'runName',
     WORKFLOW_NAME = 'workflowName',
+    TAG_NAME = 'tagName',
 }
 
 export const getPathParamForRouter = (key: keyof typeof URL_PARAMS): string => {

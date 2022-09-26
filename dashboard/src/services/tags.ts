@@ -8,7 +8,7 @@ export const tagsApi = createApi({
         prepareHeaders: fetchBaseQueryHeaders,
     }),
 
-    tagTypes: ['Tags'],
+    tagTypes: ['Tag'],
 
     endpoints: (builder) => ({
         getTags: builder.query<ITag[], TFetchTagsRequestParams>({
@@ -25,8 +25,8 @@ export const tagsApi = createApi({
 
             providesTags: (result) =>
                 result
-                    ? [...result.map(({ tag_name }) => ({ type: 'Tags', id: tag_name } as const)), { type: 'Tags', id: 'LIST' }]
-                    : [{ type: 'Tags', id: 'LIST' }],
+                    ? [...result.map(({ tag_name }) => ({ type: 'Tag', id: tag_name } as const)), { type: 'Tag', id: 'LIST' }]
+                    : [{ type: 'Tag', id: 'LIST' }],
         }),
 
         getTag: builder.query<ITag, TFetchTagRequestParams>({
@@ -41,7 +41,7 @@ export const tagsApi = createApi({
             },
 
             transformResponse: (response: { tag: ITag }) => response.tag,
-            providesTags: (result, error, { tagName }) => [{ type: 'Tags', id: tagName }],
+            providesTags: (result, error, { tagName }) => [{ type: 'Tag', id: tagName }],
         }),
 
         add: builder.mutation<void, TAddTagRequestParams>({
@@ -53,7 +53,7 @@ export const tagsApi = createApi({
                 };
             },
 
-            invalidatesTags: () => [{ type: 'Tags', id: 'LIST' }],
+            invalidatesTags: () => [{ type: 'Tag', id: 'LIST' }],
         }),
 
         delete: builder.mutation<void, TDeleteTagRequestParams>({
@@ -65,12 +65,17 @@ export const tagsApi = createApi({
                 };
             },
 
-            invalidatesTags: (result, error, { tagName }) => [
-                { type: 'Tags', id: tagName },
-                { type: 'Tags', id: 'LIST' },
+            invalidatesTags: (result, error, { tag_name }) => [
+                { type: 'Tag', id: tag_name },
+                { type: 'Tag', id: 'LIST' },
             ],
+        }),
+
+        refetchTag: builder.mutation<null, Pick<TFetchTagRequestParams, 'tagName'>>({
+            queryFn: () => ({ data: null }),
+            invalidatesTags: (result, error, { tagName }) => [{ type: 'Tag', id: tagName }],
         }),
     }),
 });
 
-export const { useGetTagsQuery, useDeleteMutation, useAddMutation } = tagsApi;
+export const { useGetTagsQuery, useGetTagQuery, useDeleteMutation, useAddMutation, useRefetchTagMutation } = tagsApi;

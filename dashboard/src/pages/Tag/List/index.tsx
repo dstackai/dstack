@@ -45,7 +45,7 @@ const TagList: React.FC = () => {
             {!isLoading && !!tags?.length && (
                 <div className={css.grid}>
                     {tags.map((row, index) => (
-                        <TagCard key={index} {...row} />
+                        <TagCard key={index} tag={row} />
                     ))}
                 </div>
             )}

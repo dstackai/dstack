@@ -11,6 +11,7 @@ import UserDetails from 'pages/Users/Details';
 import RepoDetails from 'pages/Repositories/Details';
 
 import TagList from 'pages/Tag/List';
+import TagDetails from 'pages/Tag/Details';
 
 import Settings from 'pages/Settings';
 import SecretsSettings from 'pages/Settings/Secrets';
@@ -26,7 +27,7 @@ const runsRoutes: Route[] = [
             { name: 'runs', index: true, element: <WorkflowList /> },
 
             {
-                name: 'tag',
+                name: 'tags',
                 path: `tags`,
                 element: <TagList />,
             },
@@ -37,6 +38,12 @@ const runsRoutes: Route[] = [
         name: 'run',
         path: `runs/${getPathParamForRouter('RUN_NAME')}`,
         element: <WorkflowDetails />,
+    },
+
+    {
+        name: 'tag',
+        path: `tags/${getPathParamForRouter('TAG_NAME')}`,
+        element: <TagDetails />,
     },
 
     {
