@@ -4,8 +4,7 @@ Get involved with the community of dstack using the links below.
 
 ##  :material-github: GitHub
 
-Let more people know about dstack by giving our [GitHub repo](https://github.com/dstackai/dstack) a star.
-Join the project as a contributor.
+Check the source code of the project on [GitHub](https://github.com/dstackai/dstack). Pull requests are very welcome.
 
 ## :material-bug: Issue tracker
 

@@ -1,12 +1,9 @@
 # dstack run
 
-This command runs a workflow within the current Git repo. 
+This command runs a workflow defined in the current Git repo. 
 
-It provisions the required compute resources, fetches the same version of code (as you have locally),
-pre-downloads the data the workflow depends on, and runs the workflow.
-
-If you run it in the attached mode, you'll see the output in real-time as your 
-workflow is running.
+The command provisions the required compute resources (in a configured cloud), fetches the same version of code 
+(as you have locally), downloads the deps, and runs the workflow, saves artifacts, and tears down compute resources.
 
 [//]: # (!!! info "NOTE:")
 [//]: # (    Make sure to use the CLI from within a Git repo directory.)
@@ -36,16 +33,6 @@ The following arguments are optional:
 
 Use `ARGS` to override any of the workflow parameters defined in the `./dstack/workflows.yaml` file.
 
-[//]: # (### Examples)
-
-[//]: # (Here's how to run the `train` workflow defined in the `.dstack/workflows.yaml` file:)
-
-[//]: # (```shell)
-[//]: # ($ dstack run train)
-
-[//]: # (Provisioning... It may take up to a minute. ✓)
-
-[//]: # (To interrupt, press Ctrl+C.)
-
-[//]: # (...)
-[//]: # (```)
+!!! info "NOTE:"
+    By default, it runs it in the attached mode, so you'll see the output in real-time as your 
+    workflow is running.

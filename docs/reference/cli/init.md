@@ -1,7 +1,7 @@
 # dstack init
 
-This command shares the current Git credentials with dstack. 
-This is required to let dstack fetch the code when running workflows within private Git repos.
+This command authorizes dstack to use the current Git credentials (to fetch your code when running workflows).
+Not needed for public repos.
 
 ### Usage
 
@@ -21,3 +21,6 @@ The following arguments are optional:
 
 If no arguments are provided, dstack takes the credentials configured in
     `~/.config/gh/hosts.yml` or `./.ssh/config` for the current Git repo.
+
+!!! info "NOTE:"
+    Currently `dstack` supports only Git repos that are hosted on GitHub.

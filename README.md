@@ -1,7 +1,7 @@
 <div align="center">
 <img src="https://raw.githubusercontent.com/dstackai/dstack/master/docs/assets/logo.svg" width="300px"/>    
 
-A lightweight command-line tool to run reproducible ML workflows in the cloud
+A command-line tool to provision infrastructure for ML workflows
 ______________________________________________________________________
 
 
@@ -13,50 +13,54 @@ ______________________________________________________________________
 
 </div>
 
-`dstack` is a lightweight command-line tool for running reproducible ML workflows in the cloud.
+`dstack` is a lightweight command-line tool to provision infrastructure for ML workflows.
 
 ## Features
 
- * Define workflows, incl. dependencies, environment, and required compute resources, via declarative configuration files.
- * Run workflows in the cloud via the `dstack` CLI.
- * Save output artifacts of workflows and reuse them in other workflows.
- * Use workflows to process data, train models, host apps, and launch dev environments.
+ * Define your ML workflows declaratively, incl. their dependencies, environment, and required compute resources 
+ * Run workflows via the `dstack` CLI. Have infrastructure provisioned automatically in a configured cloud account. 
+ * Save output artifacts, such as data and models, and reuse them in other ML workflows
+ * Use `dstack` to process data, train models, host apps, and launch dev environments
 
 ## Installation
 
-Use pip to install the `dstack` CLI:
+Use pip to install `dstack` locally:
 
 ```shell
 pip install dstack
 ```
 
-When you run workflows via the `dstack` CLI, dstack provisions compute resources
-and saves data in your AWS account.
-
 The `dstack` CLI needs your AWS account credentials to be configured locally 
 (e.g. in `~/.aws/credentials` or `AWS_ACCESS_KEY_ID` and `AWS_SECRET_ACCESS_KEY` environment variables).
+
+Before you can use the `dstack` CLI, you need to configure it:
 
 ```shell
 dstack config
 ```
 
-This command will help you configure the AWS region, where dstack will provision compute resources, and
-the S3 bucket, where dstack will save data.
+It will prompt you to select the AWS region 
+where dstack will provision compute resources, and the S3 bucket, where dstack will save data.
 
 ```shell
 Region name (eu-west-1):
 S3 bucket name (dstack-142421590066-eu-west-1):
 ```
 
+Support for GCP and Azure is in the roadmap.
+
 ## How does it work?
 
- * Install `dstack` CLI locally
- * Define workflows in `.dstack/workflows.yaml` within your project directory
- * Use the `dstack` CLI to run workflows, manage their state and artifacts 
- * When you run a workflow, the `dstack` CLI  provisions the required cloud resources, 
-   fetches your code, prepares environment, downloads dependencies, runs the workflow,
-   saves artifacts, and tears down cloud resources.
+1. Install `dstack` locally 
+2. Define ML workflows in `.dstack/workflows.yaml` (within your existing Git repository)
+3. Run ML workflows via the `dstack run` CLI command
+4. Use other `dstack` CLI commands to manage runs, artifacts, etc.
 
+
+>  When you run an ML workflow via the `dstack` CLI, it provisions the required compute resources (in a configured cloud
+   account), sets up environment (such as Python, Conda, CUDA, etc), fetches your code, downloads deps,
+   saves artifacts, and tears down compute resources.
+ 
 ## More information
 
  * [Documentation](https://docs.dstack.ai)

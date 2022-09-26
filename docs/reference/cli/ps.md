@@ -1,6 +1,6 @@
 # dstack ps
 
-Use this command to show status of runs within the current Git repo.
+This command shows status of runs within the current Git repo.
 
 ### Usage
 
@@ -16,5 +16,4 @@ The following arguments are optional and mutually exclusive:
 - `RUN` - (Optional) A name of a run
 
 !!! info "NOTE:"
-    If no arguments are specified, the command shows status of active runs only. If there are no active runs,
-    it shows the status of the last finished run.
+    If `-a` is not used, the command shows only the status of active runs, the last finished one.

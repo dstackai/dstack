@@ -9,16 +9,19 @@ To view the list of supported CLI commands, run `dstack` with no additional argu
 ```bash
 Usage: dstack [-h] [-v] [OPTIONS ...] COMMAND [ARGS ...]
 
+Not sure where to start? Call `dstack config`, followed by `dstack init`.
+Define workflows in `.dstack/workflows.yaml` and run them via `dstack run`.
+
 Main commands:
   dstack run WORKFLOW [-d] [-t TAG] [ARGS ...]        Run a workflow
   dstack ps [-a | RUN]                                Show run(s) status
   dstack stop [-x] [-y] (RUN | -a)                    Stop run(s)
-  dstack logs [-a] [-s SINCE] RUN                     Show logs
+  dstack logs [-a] [-s SINCE] RUN                     Show logs of a run
   dstack artifacts list (RUN | :TAG)                  List artifacts
   dstack artifacts download (RUN | :TAG)              Download artifacts
 
 Other commands:
-  dstack init [-t GH_TOKEN | -i SSH_PRIVATE_KEY]      Initialize the repo
+  dstack init [-t GITHUB_TOKEN | -i SSH_PRIVATE_KEY]  Initialize the repo
   dstack config [--aws-profile NAME]                  Configure the backend
   dstack tags add TAG (-r RUN | -a PATH ...)          Add a tag
   dstack tags delete [-y] TAG                         Delete a tag
@@ -33,10 +36,11 @@ Global options:
   -v, --version                                       Show dstack version
 ```
 
-Use `--help` to see the usage of the specific command, e.g. `run`:
-
-```shell
- dstack run --help
-```
+!!! tip "NOTE:"
+    To quickly see the usage of a particular command, use the command name and  `--help` together:
+    
+    ```shell
+     dstack run --help
+    ```
 
 For more details and examples on a specific command, check out its dedicate reference page using the navigation section.
