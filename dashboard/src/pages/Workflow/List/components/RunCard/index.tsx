@@ -117,7 +117,7 @@ const RunCard: React.FC<Props> = ({ className, item, ...props }) => {
                 <div className={css.topSection}>
                     <Status className={css.icon} type={item.status} availabilityIssues={item.availability_issues} />
 
-                    <div className={cn(css.name, 'mono-font')}>{item.workflow_name || t('no_name')}</div>
+                    <div className={cn(css.name, 'mono-font')}>{item.run_name || t('no_name')}</div>
 
                     {item.tag_name && (
                         <Tooltip overlayContent={<div>{item.tag_name}</div>} mouseEnterDelay={1}>

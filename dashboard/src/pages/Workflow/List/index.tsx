@@ -54,16 +54,11 @@ const RunsList: React.FC = () => {
 
     const getWorkflowLink = useCallback(
         (w: IRunWorkflow): string => {
-            const pathName = [
-                'app',
-                urlParams[URL_PARAMS.REPO_USER_NAME] ? 'user-repouser-repo' : 'user-repo',
-                w.workflow_name ? 'workflow' : 'run',
-            ]
+            const pathName = ['app', urlParams[URL_PARAMS.REPO_USER_NAME] ? 'user-repouser-repo' : 'user-repo', 'run']
                 .filter(Boolean)
                 .join('.');
 
             return newRouter.buildUrl(pathName, {
-                [URL_PARAMS.WORKFLOW_NAME]: w.workflow_name,
                 [URL_PARAMS.RUN_NAME]: w.run_name,
                 [URL_PARAMS.USER_NAME]: urlParams[URL_PARAMS.USER_NAME],
                 [URL_PARAMS.REPO_USER_NAME]: urlParams[URL_PARAMS.REPO_USER_NAME],

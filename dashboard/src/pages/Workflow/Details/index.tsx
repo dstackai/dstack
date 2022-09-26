@@ -35,8 +35,9 @@ import ConfirmRestartRun from 'pages/Runs/components/ConfirmRestartRun';
 import EmptyMessage from 'components/EmptyMessage';
 import { URL_PARAMS } from 'route/url-params';
 import { getRouterModule, RouterModules } from 'route';
+import { isRunning } from 'libs/run';
+import BreadCrumbs from 'components/BreadCrumbs';
 import css from './index.module.css';
-import { isRunning } from '../../../libs/run';
 
 const WorkflowDetails: React.FC = () => {
     const { t } = useTranslation();
@@ -44,10 +45,10 @@ const WorkflowDetails: React.FC = () => {
     const [showConfirmStop, setShowConfirmStop] = useState<boolean>(false);
     const [showConfirmDelete, setShowConfirmDelete] = useState<boolean>(false);
     const [showConfirmRestart, setShowConfirmRestart] = useState<boolean>(false);
-    const { userName, repoUserName, repoName, runName, workflowName } = useParams();
+    const urlParams = useParams();
+    const { userName, repoUserName, repoName, runName, workflowName } = urlParams;
     const hasLogs = useAppSelector(selectHasLogs);
     const newRouter = getRouterModule(RouterModules.NEW_ROUTER);
-    const urlParams = useParams();
     const navigate = useNavigate();
 
     const {
@@ -143,19 +144,27 @@ const WorkflowDetails: React.FC = () => {
         dispatch(showAppsModal(workflow.apps));
     };
 
+    const repoDetailsUrl = useMemo<string>(() => {
+        const pathName = ['app', urlParams[URL_PARAMS.REPO_USER_NAME] ? 'user-repouser-repo' : 'user-repo', 'repo', 'runs']
+            .filter(Boolean)
+            .join('.');
+
+        return newRouter.buildUrl(pathName, {
+            [URL_PARAMS.USER_NAME]: urlParams[URL_PARAMS.USER_NAME],
+            [URL_PARAMS.REPO_USER_NAME]: urlParams[URL_PARAMS.REPO_USER_NAME],
+            [URL_PARAMS.REPO_NAME]: urlParams[URL_PARAMS.REPO_NAME],
+        });
+    }, [urlParams]);
+
     if (isLoadingWorkflow) return null;
 
     return (
         <section className={css.details}>
             <div className={css.topSection}>
-                <h2 className={css.repoName}>
-                    {userName && (
-                        <>
-                            <Link to={userLink}>{userName}</Link> /
-                        </>
-                    )}{' '}
-                    <Link to={repoLink}>{repoName}</Link>
-                </h2>
+                <BreadCrumbs className={css.breadcrumbs}>
+                    <BreadCrumbs.Item to={newRouter.buildUrl('app')}>{t('repository_other')}</BreadCrumbs.Item>
+                    <BreadCrumbs.Item to={repoDetailsUrl}>{`${repoUserName}/${repoName}`}</BreadCrumbs.Item>
+                </BreadCrumbs>
 
                 <Button className={css.button} appearance="gray-stroke" icon={<RefreshIcon />} onClick={refreshHandle}>
                     {t('refresh')}
@@ -168,7 +177,7 @@ const WorkflowDetails: React.FC = () => {
                 <div className={css.content}>
                     <div className={css.header}>
                         <Status className={css.status} type={workflow.status} />
-                        <h1 className={css.title}>{workflow.workflow_name || t('no_name')}</h1>
+                        <h1 className={css.title}>{workflow.run_name || t('no_name')}</h1>
                         {workflow.tag_name && <Tag className={css.tag} title={workflow.tag_name} withIcon />}
 
                         <div className={css.buttons}>

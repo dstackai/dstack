@@ -7,21 +7,7 @@
     align-items: center;
 }
 .title {
-    font-weight: 400;
-    @mixin textStyle 24, 30;
     margin-right: auto;
-    margin-top: 0;
-    margin-bottom: 0;
-    & strong {
-        font-weight: 600;
-    }
-    & a {
-        color: var(--color-black);
-        transition: color .2s ease-out;
-        &:hover {
-            color: var(--color-gray)
-        }
-    }
 }
 .rightSide {
     display: flex;

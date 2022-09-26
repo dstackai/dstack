@@ -7,6 +7,7 @@ import { ReactComponent as ChevronDownIcon } from 'assets/icons/chevron-down.svg
 import { ReactComponent as DotsICon } from 'assets/icons/dots-vertical.svg';
 import Button from 'components/Button';
 import Dropdown from 'components/Dropdown';
+import BreadCrumbs from 'components/BreadCrumbs';
 import RepoDetailsNavigation from '../components/RepoDetailsNavigation';
 import { useRefetchWorkflowsMutation } from 'services/workflows';
 import { URL_PARAMS } from 'route/url-params';
@@ -45,14 +46,12 @@ const RepoDetails: React.FC = () => {
     return (
         <div className={css.details}>
             <div className={css.header}>
-                <h1 className={css.title}>
-                    {userName && (
-                        <>
-                            <Link to={userLink}>{userName}</Link> /
-                        </>
-                    )}{' '}
-                    <strong>{repoName}</strong>
-                </h1>
+                <div className={css.title}>
+                    <BreadCrumbs>
+                        <BreadCrumbs.Item to={newRouter.buildUrl('app')}>{t('repository_other')}</BreadCrumbs.Item>
+                        <BreadCrumbs.Item>{`${repoUserName}/${repoName}`}</BreadCrumbs.Item>
+                    </BreadCrumbs>
+                </div>
 
                 <div className={css.rightSide}>
                     <Button className={css.button} appearance="gray-stroke" icon={<RefreshIcon />} onClick={refreshList}>
