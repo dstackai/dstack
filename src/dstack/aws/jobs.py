@@ -203,7 +203,7 @@ def list_job_heads(s3_client: BaseClient, bucket_name: str, repo_user_name: str,
             job_heads.append(JobHead(job_id, repo_user_name, repo_name, run_name, workflow_name or None, provider_name,
                                      JobStatus(status), int(submitted_at),
                                      artifacts.split(',') if artifacts else None, tag_name or None,
-                                     app_names or None))
+                                     app_names.split(',') or None))
     return job_heads
 
 
@@ -220,7 +220,7 @@ def list_job_head(s3_client: BaseClient, bucket_name: str, repo_user_name: str, 
             return JobHead(job_id, repo_user_name, repo_name, run_name, workflow_name or None, provider_name,
                            JobStatus(status), int(submitted_at),
                            artifacts.split(',') if artifacts else None, tag_name or None,
-                           app_names or None)
+                           app_names.split(',') or None)
     return None
 
 
