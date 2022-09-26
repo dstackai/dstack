@@ -230,7 +230,8 @@ class Backend(ABC):
                                     output_dir: Optional[str]):
         pass
 
-    def list_run_artifact_files(self, repo_user_name: str, repo_name: str, run_name: str) -> List[Tuple[str, str, int]]:
+    def list_run_artifact_files(self, repo_user_name: str, repo_name: str, run_name: str) -> \
+            Generator[Tuple[str, str, int], None, None]:
         pass
 
     def list_tag_heads(self, repo_user_name: str, repo_name: str) -> List[TagHead]:

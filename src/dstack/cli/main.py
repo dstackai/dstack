@@ -11,6 +11,9 @@ def default_func(_: Namespace):
     print("Usage: [bold]dstack [grey53][-h] [-v] [OPTIONS ...][/grey53] " +
           "COMMAND [grey53][ARGS ...][/grey53][/bold]\n"
           "\n"
+          "Not sure where to start? Call [yellow bold]dstack config[/yellow bold], followed by [yellow bold]dstack init[/yellow bold].\n"
+          "Define workflows in [bold].dstack/workflows.yaml[/bold] and run them via [bold]dstack run[/bold].\n"
+          "\n"
           "Main commands:\n"
           "  [bold]dstack run WORKFLOW [grey53][-d] [-t TAG] [ARGS ...][/grey53][/bold]           Run a workflow\n"
           "  [bold]dstack ps [grey53][-a | RUN][/grey53][/bold]                                   Show [reset]run(s)[/reset] status\n"
@@ -38,7 +41,7 @@ def default_func(_: Namespace):
           "  [bold]-h[/bold], [bold]--help[/bold]                                             Show this help output\n"
           "  [bold]-v[/bold], [bold]--version[/bold]                                          Show dstack version\n"
           "\n"
-          "For more details, visit https://docs.dstack.ai/reference/cli"
+          "For more details, check https://docs.dstack.ai/reference/cli\n"
           )
 
 

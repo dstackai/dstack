@@ -102,7 +102,8 @@ class AwsBackend(Backend):
                                self.backend_config.bucket_name, repo_user_name, repo_name, run_name, start_time,
                                end_time, next_token, job_host_names, job_ports, job_app_specs)
 
-    def list_run_artifact_files(self, repo_user_name: str, repo_name: str, run_name: str) -> List[Tuple[str, str, int]]:
+    def list_run_artifact_files(self, repo_user_name: str, repo_name: str, run_name: str) -> \
+            Generator[Tuple[str, str, int], None, None]:
         return artifacts.list_run_artifact_files(self._s3_client(), self.backend_config.bucket_name,
                                                  repo_user_name, repo_name, run_name)
 
