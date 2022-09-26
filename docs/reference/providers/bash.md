@@ -2,12 +2,11 @@
 
 The `bash` provider runs given shell commands. 
 
-The provider allows you to specify commands, a version of Python (if you want it to be pre-installed), 
-a `requirements.txt` file (if you want them to be pre-installed), environment variables, the number of ports to expose (if needed), 
-which folders to save as output artifacts, dependencies to other workflows if any, and the resources the workflow needs 
-(e.g. whether it should be a spot/preemptive instance, how much memory, GPU, etc.) 
+It comes with Python and Conda pre-installed, and allows to expose ports. 
 
-## Basic example
+If GPU is requested, the provider pre-installs the CUDA driver too.
+
+## Usage example
 
 === ".dstack/workflows.yaml"
 
@@ -28,7 +27,7 @@ which folders to save as output artifacts, dependencies to other workflows if an
           gpu: 1
     ```
 
-## Workflow syntax
+## Properties reference
 
 The following properties are required:
 
@@ -67,9 +66,8 @@ The hardware resources required by the workflow
     By default, it's `false`.
 
 !!! info "NOTE:"
-    If your workflow is training a model using multiple parallel processes (e.g. via PyTorch DDP),
-    make sure to use the `shm_size` to configure enough shared memory (e.g. `"8GB"` or more) so the processes 
-    can communicate. Otherwise, you might get an error.
+    If your workflow is using parallel communicating processes (e.g. dataloaders in PyTorch), 
+    you may need to configure the size of the shared memory (`/dev/shm` filesystem) via the `shm_size` property.
 
 #### gpu
 
@@ -79,10 +77,9 @@ The number of GPUs, their name and memory
 - `memory` (Optional) The size of GPU memory, e.g. `"16GB"`
 - `name` (Optional) The name of the GPU model (e.g. `"K80"`, `"V100"`, etc)
 
-!!! info "NOTE:"
-    The instances are automatically configured with the correct CUDA driver to use NVIDIA GPUs.
+## More examples
 
-## Ports example
+#### Ports
 
 If you'd like your workflow to expose ports, you have to specify the `ports` property with the number
 of ports to expose. Actual ports will be assigned on startup and passed to the workflow via the environment
@@ -100,5 +97,5 @@ variables `PORT_<number>`.
           - gunicorn main:app --bind 0.0.0.0:$PORT_0
     ```
 
-!!! info "NOTE:"
-    If you need, you can also refer to the actual hostname of the workflow via the environment variable `HOSTNAME`.
+[//]: # (!!! info "NOTE:")
+[//]: # (    If you need, you can also refer to the actual hostname of the workflow via the environment variable `HOSTNAME`.)

@@ -7,7 +7,7 @@ from rich import print
 from dstack.aws import runners
 
 
-def configure(iam_client: BaseClient, s3_client: BaseClient, bucket_name: str, region_name: str, silent: bool):
+def configure(iam_client: BaseClient, s3_client: BaseClient, bucket_name: str, region_name: str, silent: bool) -> bool:
     try:
         response = s3_client.head_bucket(Bucket=bucket_name)
         bucket_region = response["ResponseMetadata"]["HTTPHeaders"]["x-amz-bucket-region"]
@@ -15,10 +15,12 @@ def configure(iam_client: BaseClient, s3_client: BaseClient, bucket_name: str, r
             print(f"[red]Warning! The bucket '{bucket_name}' is in the '{bucket_region}' region "
                   f"while you've configured the '{region_name}' region for dstack.\n"
                   f"The region of the bucket and the region configured for dstack must be the same.")
+            return False
     except Exception as e:
         if hasattr(e, "response") and e.response.get("Error") and e.response["Error"].get("Code") == "403":
-            sys.exit(f"You don't have access the '{bucket_name}' bucket. "
-                     "The bucket may belong to another account.")
+            print(f"[red]You don't have access the '{bucket_name}' bucket. "
+                  "The bucket may belong to another account.")
+            return False
         else:
             if hasattr(e, "response") and e.response.get("Error") and e.response["Error"].get("Code") == "404":
                 if silent or Confirm.ask(f"[red]The bucket '{bucket_name}' doesn't exist. Create it?[/]"):
@@ -28,8 +30,9 @@ def configure(iam_client: BaseClient, s3_client: BaseClient, bucket_name: str, r
                     else:
                         s3_client.create_bucket(Bucket=bucket_name)
                 else:
-                    return
+                    return False
             else:
                 raise e
     runners.instance_profile_arn(iam_client, bucket_name)
+    return True
 

@@ -1,26 +1,26 @@
-# init
+# dstack init
 
-The `init` command authorizes dstack to access the current Git repository. 
-Use this command on a Git repository before running any workflows in it.
-
-This commands uploads the Git credentials to the cloud storage of credentials within the configured backend 
-(for AWS, it's Secrets Manager). 
+This command authorizes dstack to use the current Git credentials (to fetch your code when running workflows).
+Not needed for public repos.
 
 ### Usage
 
 ```shell
-dstack init [-t TOKEN] [-i FILE]
+dstack init [-t GITHUB_TOKEN | -i SSH_PRIVATE_KEY]
 ```
+
+!!! info "NOTE:"
+    The credentials are stored in the encrypted cloud storage (e.g. for AWS, it's Secrets Manager).
 
 #### Arguments reference
 
 The following arguments are optional:
 
-- `-t GH_TOKEN`, `--token GH_TOKEN` - (Optional) An authentication token for GitHub
-- `-i FILE`, `--identity FILE` – A path to the private SSH key file 
+- `-t GITHUB_TOKEN`, `--token GITHUB_TOKEN` - (Optional) An authentication token for GitHub
+- `-i SSH_PRIVATE_KEY`, `--identity SSH_PRIVATE_KEY` – A path to the private SSH key file 
 
-!!! warning "NOTE:"
-    If no arguments are provided, the command will try to the credentials configured in
-    `~/.config/gh/hosts.yml`, `./.ssh/config` for the hostname of the current GitHub repository.
+If no arguments are provided, dstack takes the credentials configured in
+    `~/.config/gh/hosts.yml` or `./.ssh/config` for the current Git repo.
 
-    For public repositories, credentials are not needed.
+!!! info "NOTE:"
+    Currently `dstack` supports only Git repos that are hosted on GitHub.

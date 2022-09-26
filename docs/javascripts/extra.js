@@ -25,3 +25,11 @@ controller = (function () {
 })();
 
 controller.init();
+
+window.addEventListener("DOMContentLoaded", function() {
+    tabs = document.querySelector(".md-tabs")
+    header = document.querySelector(".md-header")
+    search = document.querySelector(".md-search")
+    search.parentNode.insertBefore(tabs, search)
+    header.classList.add("ready")
+});

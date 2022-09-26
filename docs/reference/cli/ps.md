@@ -1,6 +1,6 @@
-# ps
+# dstack ps
 
-The `ps` command shows status of runs within the current Git repository.
+This command shows status of runs within the current Git repo.
 
 ### Usage
 
@@ -16,5 +16,4 @@ The following arguments are optional and mutually exclusive:
 - `RUN` - (Optional) A name of a run
 
 !!! info "NOTE:"
-    If no arguments are specified, the command shows status of unfinished runs if any or otherwise the 
-    last finished run.
+    If `-a` is not used, the command shows only the status of active runs, the last finished one.

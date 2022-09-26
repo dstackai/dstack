@@ -26,8 +26,8 @@ def init_func(args: Namespace):
 
 def register_parsers(main_subparsers):
     parser = main_subparsers.add_parser("init", help="Authorize dstack to access the current GitHub repo")
-    parser.add_argument("-t", "--token", metavar="GH_TOKEN", help="An authentication token for GitHub", type=str,
+    parser.add_argument("-t", "--token", metavar="GITHUB_TOKEN", help="An authentication token for GitHub", type=str,
                         dest="gh_token")
-    parser.add_argument("-i", "--identity", metavar="FILE", help="A path to the private SSH key file", type=str,
-                        dest="identity_file")
+    parser.add_argument("-i", "--identity", metavar="SSH_PRIVATE_KEY", help="A path to the private SSH key file",
+                        type=str, dest="identity_file")
     parser.set_defaults(func=init_func)

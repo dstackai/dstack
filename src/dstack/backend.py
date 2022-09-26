@@ -3,7 +3,7 @@ from abc import ABC
 from enum import Enum
 from typing import List, Optional, Generator, Tuple, Dict
 
-from dstack.config import load_config, AwsBackendConfig
+from dstack.config import load_config, AwsBackendConfig, Config, BackendConfig
 from dstack.jobs import Job, JobStatus, JobHead, AppSpec
 from dstack.repo import RepoData, RepoCredentials
 from dstack.runners import Resources, Runner
@@ -162,7 +162,7 @@ class Secret:
 
 
 class Backend(ABC):
-    def configure(self, silent: bool):
+    def configure(self, silent: bool) -> bool:
         pass
 
     def create_run(self, repo_user_name: str, repo_name: str) -> str:
@@ -230,7 +230,8 @@ class Backend(ABC):
                                     output_dir: Optional[str]):
         pass
 
-    def list_run_artifact_files(self, repo_user_name: str, repo_name: str, run_name: str) -> List[Tuple[str, str, int]]:
+    def list_run_artifact_files(self, repo_user_name: str, repo_name: str, run_name: str) -> \
+            Generator[Tuple[str, str, int], None, None]:
         pass
 
     def list_tag_heads(self, repo_user_name: str, repo_name: str) -> List[TagHead]:
@@ -239,7 +240,8 @@ class Backend(ABC):
     def get_tag_head(self, repo_user_name: str, repo_name: str, tag_name: str) -> Optional[TagHead]:
         pass
 
-    def add_tag_from_run(self, repo_user_name: str, repo_name: str, tag_name: str, run_name: str):
+    def add_tag_from_run(self, repo_user_name: str, repo_name: str, tag_name: str, run_name: str,
+                         run_jobs: Optional[List[Job]]):
         pass
 
     def add_tag_from_local_dirs(self, repo_data: RepoData, tag_name: str, local_dirs: List[str]):
@@ -286,8 +288,9 @@ class Backend(ABC):
         pass
 
 
-def load_backend() -> Backend:
-    config = load_config()
+def load_backend(config: Optional[Config] = None) -> Backend:
+    if not config:
+        config = load_config()
     if isinstance(config.backend_config, AwsBackendConfig):
         from dstack.aws import AwsBackend
 

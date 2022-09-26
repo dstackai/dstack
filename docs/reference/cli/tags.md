@@ -1,6 +1,6 @@
-# tags
+# dstack tags
 
-The `tags` command manages tags within the current Git repository. 
+Use this command to manage tags within the current Git repo. 
 
 It supports the following subcommands: `list`, `add`, and `delete`.
 
@@ -33,7 +33,7 @@ dstack tags add TAG (-r RUN | -a PATH ...)
 
 The following argument is required:
 
-- `TAG` – (Required) A name of the tag. Must be unique within the current Git repository.
+- `TAG` – (Required) A name of the tag. Must be unique within the current Git repo.
 
 One of the following arguments is also required:
 

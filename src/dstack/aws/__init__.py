@@ -41,9 +41,9 @@ class AwsBackend(Backend):
                                 region_name=self.backend_config.region_name)
         return session.client("sts")
 
-    def configure(self, silent: bool):
-        config.configure(self._iam_client(), self._s3_client(), self.backend_config.bucket_name,
-                         self.backend_config.region_name, silent)
+    def configure(self, silent: bool) -> bool:
+        return config.configure(self._iam_client(), self._s3_client(), self.backend_config.bucket_name,
+                                self.backend_config.region_name, silent)
 
     def create_run(self, repo_user_name: str, repo_name: str) -> str:
         return runs.create_run(self._s3_client(), self._logs_client(), self.backend_config.bucket_name,
@@ -102,7 +102,8 @@ class AwsBackend(Backend):
                                self.backend_config.bucket_name, repo_user_name, repo_name, run_name, start_time,
                                end_time, next_token, job_host_names, job_ports, job_app_specs)
 
-    def list_run_artifact_files(self, repo_user_name: str, repo_name: str, run_name: str) -> List[Tuple[str, str, int]]:
+    def list_run_artifact_files(self, repo_user_name: str, repo_name: str, run_name: str) -> \
+            Generator[Tuple[str, str, int], None, None]:
         return artifacts.list_run_artifact_files(self._s3_client(), self.backend_config.bucket_name,
                                                  repo_user_name, repo_name, run_name)
 
@@ -118,9 +119,10 @@ class AwsBackend(Backend):
         return tags.get_tag_head(self._s3_client(), self.backend_config.bucket_name, repo_user_name, repo_name,
                                  tag_name)
 
-    def add_tag_from_run(self, repo_user_name: str, repo_name: str, tag_name: str, run_name: str):
+    def add_tag_from_run(self, repo_user_name: str, repo_name: str, tag_name: str, run_name: str,
+                         run_jobs: Optional[List[Job]]):
         tags.create_tag_from_run(self._s3_client(), self.backend_config.bucket_name, repo_user_name, repo_name,
-                                 tag_name, run_name)
+                                 tag_name, run_name, run_jobs)
 
     def delete_tag_head(self, repo_user_name: str, repo_name: str, tag_head: TagHead):
         tags.delete_tag(self._s3_client(), self.backend_config.bucket_name, repo_user_name, repo_name, tag_head)
