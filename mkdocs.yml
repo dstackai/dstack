@@ -39,6 +39,7 @@ theme:
     - navigation.sections
     - navigation.expand
     - navigation.top
+    - announce.dismiss
 #plugins:
 #  - search
 #  - redirects:
