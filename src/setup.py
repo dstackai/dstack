@@ -30,7 +30,7 @@ setup(
     project_urls={
         "Source": "https://github.com/dstackai/dstack",
     },
-    description="A command-line tool to provision infrastructure for ML workflows",
+    description="A command-line utility to provision infrastructure for ML workflows",
     long_description=open("README.md").read(),
     long_description_content_type="text/markdown",
     python_requires=">=3.6",
@@ -52,7 +52,7 @@ setup(
         "pydantic",
     ],
     classifiers=[
-        "Development Status :: 4 - Beta",
+        "Development Status :: 2 - Pre-Alpha",
         "Topic :: Scientific/Engineering :: Artificial Intelligence",
         "License :: OSI Approved :: Mozilla Public License 2.0 (MPL 2.0)",
         "Programming Language :: Python :: 3"

@@ -1,7 +1,7 @@
 <div align="center">
 <img src="https://raw.githubusercontent.com/dstackai/dstack/master/docs/assets/logo.svg" width="300px"/>    
 
-A command-line tool to provision infrastructure for ML workflows
+A command-line utility to provision infrastructure for ML workflows
 ______________________________________________________________________
 
 
@@ -13,7 +13,7 @@ ______________________________________________________________________
 
 </div>
 
-`dstack` is a lightweight command-line tool to provision infrastructure for ML workflows.
+`dstack` is a lightweight command-line utility to provision infrastructure for ML workflows.
 
 ## Features
 
