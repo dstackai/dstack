@@ -74,8 +74,9 @@ const RunCard: React.FC<Props> = ({ className, item, ...props }) => {
         setShowConfirmDelete(false);
 
         deleteWorkflow({
+            repo_user_name: item.repo_user_name,
+            repo_name: item.repo_name,
             run_name: item.run_name,
-            workflow_name: item.workflow_name,
         });
     };
 

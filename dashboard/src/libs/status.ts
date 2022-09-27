@@ -1,7 +1,7 @@
 export const finishedStatuses = new Set<TStatus>(['stopped', 'aborted', 'failed', 'done']);
 export const availableResumeStatuses = new Set<TStatus>(['stopped', 'aborted']);
 export const failedStatuses = new Set<TStatus>(['failed', 'aborted']);
-export const runningStatuses = new Set<TStatus>(['submitted', 'running', 'queued']);
+export const runningStatuses = new Set<TStatus>(['submitted', 'uploading', 'downloading', 'running', 'queued']);
 
 export const isFinishedStatus = (status: TStatus): boolean => {
     return finishedStatuses.has(status);

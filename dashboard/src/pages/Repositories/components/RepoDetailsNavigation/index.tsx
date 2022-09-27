@@ -26,7 +26,7 @@ const RepoDetailsNavigation: React.FC<Props> = (props) => {
     }, [urlParams]);
 
     const tagsLink = useMemo<string>(() => {
-        const pathName = ['app', urlParams[URL_PARAMS.REPO_USER_NAME] ? 'user-repouser-repo' : 'user-repo', 'repo', 'tag']
+        const pathName = ['app', urlParams[URL_PARAMS.REPO_USER_NAME] ? 'user-repouser-repo' : 'user-repo', 'repo', 'tags']
             .filter(Boolean)
             .join('.');
 

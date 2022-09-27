@@ -3,6 +3,14 @@ import fetchBaseQueryHeaders from 'libs/fetchBaseQueryHeaders';
 
 type GenericRequestParams = Partial<Pick<IRunWorkflow, 'run_name' | 'workflow_name'>>;
 
+type DeleteRequestParams = {
+    repo_user_name: string;
+    repo_name: string;
+    run_name?: string;
+    all_run?: boolean;
+    failed_runs?: boolean;
+};
+
 const getWorkflowId = ({ run_name, workflow_name }: GenericRequestParams): string => {
     return `${run_name}/${workflow_name}`;
 };
@@ -115,7 +123,7 @@ export const workflowApi = createApi({
             ],
         }),
 
-        delete: builder.mutation<void, GenericRequestParams>({
+        delete: builder.mutation<void, DeleteRequestParams>({
             query: (body) => {
                 return {
                     url: `/runs/delete`,
@@ -124,10 +132,7 @@ export const workflowApi = createApi({
                 };
             },
 
-            invalidatesTags: (result, error, { run_name, workflow_name }) => [
-                { type: 'Workflows', id: getWorkflowId({ run_name, workflow_name }) },
-                { type: 'Workflows', id: 'LIST' },
-            ],
+            invalidatesTags: () => [{ type: 'Workflows', id: 'LIST' }],
         }),
 
         refetchWorkflows: builder.mutation<null, void>({

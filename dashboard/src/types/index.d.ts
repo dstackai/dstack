@@ -1,6 +1,6 @@
 
 
-declare type TStatus = 'submitted' | 'running' | 'stopping' | 'aborting' | 'stopped' | 'aborted' | 'failed' | 'done' | 'queued'
+declare type TStatus = 'submitted' | 'running' | 'uploading' | 'downloading' | 'stopping' | 'aborting' | 'stopped' | 'aborted' | 'failed' | 'done' | 'queued'
 
 declare type TVariables = {[key: string]: any};
 declare type IVariable = {key: string, value: string};
