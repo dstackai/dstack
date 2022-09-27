@@ -95,8 +95,10 @@ def _filter_log_events_loop(ec2_client: BaseClient, s3_client: BaseClient, logs_
             time.sleep(POLL_LOGS_RATE_SECS)
             counter = counter + 1
             if counter % CHECK_STATUS_EVERY_N == 0:
+                _job_heads = [jobs.get_job(s3_client, bucket_name, repo_user_name, repo_name, job_head.job_id)
+                              for job_head in job_heads]
                 run = next(iter(runs.get_run_heads(ec2_client, s3_client, bucket_name, repo_user_name, repo_name,
-                                                   job_heads, include_request_heads=False)))
+                                                   _job_heads, include_request_heads=False)))
                 if run.status.is_finished():
                     if finished_counter == WAIT_N_ONCE_FINISHED:
                         break
@@ -136,8 +138,8 @@ def _filter_logs_events_kwargs(bucket_name: str, repo_user_name: str, repo_name:
 
 
 def poll_logs(ec2_client: BaseClient, s3_client: BaseClient, logs_client: BaseClient, bucket_name: str,
-              repo_user_name: str, repo_name: str,
-              job_heads: List[JobHead], start_time: int, attached: bool) -> Generator[LogEvent, None, None]:
+              repo_user_name: str, repo_name: str, job_heads: List[JobHead], start_time: int, attached: bool) \
+        -> Generator[LogEvent, None, None]:
     run_name = job_heads[0].run_name
     filter_logs_events_kwargs = _filter_logs_events_kwargs(bucket_name, repo_user_name, repo_name, run_name, start_time,
                                                            end_time=None, next_token=None)
