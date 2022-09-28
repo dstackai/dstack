@@ -595,7 +595,7 @@ html .md-footer-meta.md-typeset a:is(:focus,:hover) {
     border: 1px solid #E4E4E7;
 }
 
-.md-typeset /*figure*/ p img {
+.md-typeset figure p img {
     border: none;
     display: inline-block;
 }
@@ -792,8 +792,8 @@ html .md-footer-meta.md-typeset a:is(:focus,:hover) {
 .md-banner {
     background-color: #f5f4f7;
     color: var(--md-default-fg-color);
-    border-top: 1px solid #f3f2e5;
-    border-bottom: 1px solid #f3f2e5;
+    border-top: 1px solid #f4f3e6;
+    border-bottom: 1px solid #f4f3e6;
     margin-bottom: 1px;
 }
 
