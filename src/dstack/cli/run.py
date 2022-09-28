@@ -72,7 +72,9 @@ def poll_run(repo_user_name: str, repo_name: str, job_heads: List[JobHead], back
                       transient=True, ) as progress:
             task = progress.add_task("Provisioning... It may take up to a minute.", total=None)
             while True:
-                run = next(iter(backend.get_run_heads(repo_user_name, repo_name, job_heads)))
+                time.sleep(POLL_PROVISION_RATE_SECS)
+                _job_heads = [backend.get_job(repo_user_name, repo_name, job_head.job_id) for job_head in job_heads]
+                run = next(iter(backend.get_run_heads(repo_user_name, repo_name, _job_heads)))
                 if run.status == JobStatus.DOWNLOADING and not downloading:
                     progress.update(task, description="Downloading deps... It may take a while.")
                     downloading = True
@@ -89,7 +91,6 @@ def poll_run(repo_user_name: str, repo_name: str, job_heads: List[JobHead], back
                 elif request_errors_printed:
                     progress.update(task, description="Provisioning... It may take up to a minute.")
                     request_errors_printed = False
-                time.sleep(POLL_PROVISION_RATE_SECS)
         console.print("Provisioning... It may take up to a minute. [green]✓[/]")
         console.print()
         console.print("[grey58]To interrupt, press Ctrl+C.[/]")
