@@ -15,7 +15,10 @@ ______________________________________________________________________
 
 `dstack` is a lightweight command-line utility to provision infrastructure for ML workflows.
 
-## Features
+[//]: # (An illustration courtesy of Storyset: https://storyset.com/people)
+<img src="https://raw.githubusercontent.com/dstackai/dstack/master/docs/assets/Ninja-amico.svg" width="450px"/>
+
+## Highlights
 
  * Define your ML workflows declaratively, incl. their dependencies, environment, and required compute resources 
  * Run workflows via the `dstack` CLI. Have infrastructure provisioned automatically in a configured cloud account. 
