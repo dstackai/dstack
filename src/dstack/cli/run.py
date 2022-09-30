@@ -6,12 +6,15 @@ from argparse import Namespace
 from pathlib import Path
 from typing import List, Optional, Dict, Tuple, Any
 
+import websocket
 import yaml
+from cursor import cursor
 from git import InvalidGitRepositoryError
 from jsonschema import validate, ValidationError
 from rich.console import Console
 from rich.progress import SpinnerColumn, Progress, TextColumn
 from rich.prompt import Confirm
+from websocket import WebSocketApp
 
 from dstack import providers
 from dstack.backend import load_backend, Backend, RequestStatus
@@ -68,6 +71,7 @@ def poll_run(repo_user_name: str, repo_name: str, job_heads: List[JobHead], back
         console.print()
         request_errors_printed = False
         downloading = False
+        run = None
         with Progress(TextColumn("[progress.description]{task.description}"), SpinnerColumn(),
                       transient=True, ) as progress:
             task = progress.add_task("Provisioning... It may take up to a minute.", total=None)
@@ -95,12 +99,44 @@ def poll_run(repo_user_name: str, repo_name: str, job_heads: List[JobHead], back
         console.print()
         console.print("[grey58]To interrupt, press Ctrl+C.[/]")
         console.print()
-        poll_logs(backend, repo_user_name, repo_name, job_heads, since("1d"), attach=True, from_run=True)
+        if len(job_heads) == 1 and run and run.status == JobStatus.RUNNING:
+            poll_logs_ws(backend, repo_user_name, repo_name, job_heads[0], console)
+        else:
+            poll_logs(backend, repo_user_name, repo_name, job_heads, since("1d"), attach=True, from_run=True)
     except KeyboardInterrupt:
         run_name = job_heads[0].run_name
         if Confirm.ask(f" [red]Abort the run '{run_name}'?[/]"):
             backend.stop_jobs(repo_user_name, repo_name, run_name, abort=True)
             console.print(f"[grey58]OK[/]")
+
+
+def poll_logs_ws(backend: Backend, repo_user_name: str, repo_name: str,
+                 job_head: JobHead, console):
+    def on_message(ws: WebSocketApp, message):
+        sys.stdout.write(message)
+
+    def on_error(ws: WebSocketApp, err: Exception):
+        if isinstance(err, KeyboardInterrupt):
+            run_name = job_head.run_name
+            if Confirm.ask(f"\n [red]Abort the run '{run_name}'?[/]"):
+                backend.stop_jobs(repo_user_name, repo_name, run_name, abort=True)
+                console.print(f"[grey58]OK[/]")
+        else:
+            pass
+
+    def on_open(ws: WebSocketApp):
+        pass
+
+    def on_close(ws: WebSocketApp, close_status_code, close_msg):
+        pass
+
+    cursor.hide()
+    job = backend.get_job(repo_user_name, repo_name, job_head.job_id)
+    url = f"ws://{job.host_name}:4000/logsws"
+    ws = websocket.WebSocketApp(url, on_message=on_message, on_error=on_error, on_open=on_open,
+                                on_close=on_close)
+    ws.run_forever()
+    cursor.show()
 
 
 def run_workflow_func(args: Namespace):

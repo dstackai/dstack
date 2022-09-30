@@ -272,7 +272,7 @@ echo $'{_serialize_runner_yaml(runner_id, resources, runner_port_range_from, run
 die() {{ status=$1; shift; echo "FATAL: $*"; exit $status; }}
 EC2_PUBLIC_HOSTNAME="`wget -q -O - http://169.254.169.254/latest/meta-data/public-hostname || die \"wget public-hostname has failed: $?\"`"
 echo "hostname: $EC2_PUBLIC_HOSTNAME" >> /root/.dstack/runner.yaml
-HOME=/root nohup dstack-runner start &
+HOME=/root nohup dstack-runner start --http-port 4000 &
 """
     return user_data
 

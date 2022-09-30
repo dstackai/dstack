@@ -50,6 +50,8 @@ setup(
         "starlette",
         "uvicorn",
         "pydantic",
+        "websocket-client",
+        "cursor",
     ],
     classifiers=[
         "Development Status :: 2 - Pre-Alpha",

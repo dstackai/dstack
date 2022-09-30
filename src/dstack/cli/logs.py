@@ -9,7 +9,7 @@ from botocore.utils import parse_timestamp, datetime2timestamp
 from git import InvalidGitRepositoryError
 from rich import print
 
-from dstack.backend import load_backend
+from dstack.backend import load_backend, Backend
 from dstack.jobs import JobHead
 from dstack.repo import load_repo_data
 from dstack.config import ConfigError
@@ -56,8 +56,8 @@ def logs_func(args: Namespace):
         sys.exit(f"Call 'dstack config' first")
 
 
-def poll_logs(backend, repo_user_name: str, repo_name: str, job_heads: List[JobHead], start_time: int, attach: bool,
-              from_run: bool = False):
+def poll_logs(backend: Backend, repo_user_name: str, repo_name: str, job_heads: List[JobHead], start_time: int,
+              attach: bool, from_run: bool = False):
     try:
         for event in backend.poll_logs(repo_user_name, repo_name, job_heads, start_time, attach):
             print(event.log_message)
