@@ -1,10 +1,12 @@
 import argparse
 import os
+import re
 import sys
 import time
 from argparse import Namespace
 from pathlib import Path
 from typing import List, Optional, Dict, Tuple, Any
+from urllib import parse
 
 import websocket
 import yaml
@@ -112,7 +114,23 @@ def poll_run(repo_user_name: str, repo_name: str, job_heads: List[JobHead], back
 
 def poll_logs_ws(backend: Backend, repo_user_name: str, repo_name: str,
                  job_head: JobHead, console):
+    job = backend.get_job(repo_user_name, repo_name, job_head.job_id)
+
     def on_message(ws: WebSocketApp, message):
+        pat = re.compile(f'http://(localhost|0.0.0.0|{job.host_name}):[\\S]*[^(.+)\\s\\n\\r]')
+        if re.search(pat, message):
+            if job.host_name and job.ports and job.app_specs:
+                for app_spec in job.app_specs:
+                    port = job.ports[app_spec.port_index]
+                    url_path = app_spec.url_path or ""
+                    url_query_params = app_spec.url_query_params
+                    url_query = ("?" + parse.urlencode(url_query_params)) if url_query_params else ""
+                    app_url = f"http://{job.host_name}:{port}"
+                    if url_path or url_query_params:
+                        app_url += "/"
+                        if url_query_params:
+                            app_url += url_query
+                    message = re.sub(pat, app_url, message)
         sys.stdout.write(message)
 
     def on_error(ws: WebSocketApp, err: Exception):
@@ -130,9 +148,8 @@ def poll_logs_ws(backend: Backend, repo_user_name: str, repo_name: str,
     def on_close(ws: WebSocketApp, close_status_code, close_msg):
         pass
 
-    cursor.hide()
-    job = backend.get_job(repo_user_name, repo_name, job_head.job_id)
     url = f"ws://{job.host_name}:4000/logsws"
+    cursor.hide()
     ws = websocket.WebSocketApp(url, on_message=on_message, on_error=on_error, on_open=on_open,
                                 on_close=on_close)
     ws.run_forever()
