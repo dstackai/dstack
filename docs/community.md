@@ -16,7 +16,7 @@ File a [GitHub issue](https://github.com/dstackai/dstack/issues).
 Need help with using dstack or want to chat with other users? 
 Join our [Slack chat](https://join.slack.com/t/dstackai/shared_invite/zt-xdnsytie-D4qU9BvJP8vkbkHXdi6clQ).
 
-## :material-rss: Newsletter
+## :material-rss: Substack
 
 Stay up to date with the latest news about dstack through our 
-[newsletter](https://dstack.curated.co/). No spam.
+[newsletter](https://mlopsfluff.dstack.ai/). No spam.

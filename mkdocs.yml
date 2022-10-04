@@ -80,10 +80,10 @@ extra:
       link: https://pypi.org/project/dstack/
     - icon: fontawesome/brands/slack
       link: https://join.slack.com/t/dstackai/shared_invite/zt-xdnsytie-D4qU9BvJP8vkbkHXdi6clQ
+    - icon: simple/substack
+      link: https://mlopsfluff.dstack.ai
     - icon: fontawesome/brands/twitter
       link: https://twitter.com/dstackai
-    - icon: fontawesome/solid/rss
-      link: https://dstack.curated.co
 nav:
   - Quickstart:
     - Getting started:
