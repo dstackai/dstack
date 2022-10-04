@@ -66,7 +66,7 @@ S3 bucket name (dstack-142421590066-eu-west-1):
  * [Documentation](https://docs.dstack.ai)
  * [Issue tracker](https://github.com/dstackai/dstack/issues)
  * [Slack](https://join.slack.com/t/dstackai/shared_invite/zt-xdnsytie-D4qU9BvJP8vkbkHXdi6clQ)
- * [Newsletter](https://dstack.curated.co/)
+ * [Substack](https://mlopsfluff.dstack.ai/)
  * [Twitter](https://twitter.com/dstackai)
  
 ##  Licence
