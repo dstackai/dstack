@@ -1,5 +1,5 @@
 <div align="center">
-<img src="https://raw.githubusercontent.com/dstackai/dstack/master/docs/assets/dstack_dark_bannner.png" width="800px"/>    
+<img src="https://raw.githubusercontent.com/dstackai/dstack/master/docs/assets/dstack_dark_banner.png" width="800px"/>    
 
 ______________________________________________________________________
 
