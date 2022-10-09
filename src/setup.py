@@ -52,6 +52,7 @@ setup(
         "pydantic",
         "websocket-client",
         "cursor",
+        "simple-term-menu",
     ],
     classifiers=[
         "Development Status :: 2 - Pre-Alpha",

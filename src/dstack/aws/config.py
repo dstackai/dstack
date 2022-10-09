@@ -18,8 +18,8 @@ def configure(iam_client: BaseClient, s3_client: BaseClient, bucket_name: str, r
             return False
     except Exception as e:
         if hasattr(e, "response") and e.response.get("Error") and e.response["Error"].get("Code") == "403":
-            print(f"[red]You don't have access the '{bucket_name}' bucket. "
-                  "The bucket may belong to another account.")
+            print(f"[red bold]✗[/red bold] [red]You don't have access to this bucket. "
+                  "It may belong to another AWS account.[/red]")
             return False
         else:
             if hasattr(e, "response") and e.response.get("Error") and e.response["Error"].get("Code") == "404":
