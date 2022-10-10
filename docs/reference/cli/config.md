@@ -11,8 +11,12 @@ dstack config [--aws-profile NAME]
 Make sure to use an S3 bucket name that isn't used by other AWS accounts.
 
 ```shell
-Region name (eu-west-1):
-S3 bucket name (dstack-142421590066-eu-west-1):
+? Choose AWS region
+✓ Europe, Ireland [eu-west-1]
+? Choose S3 bucke
+✓ Default [dstack-142421590066-eu-west-1]
+? Choose EC2 subnet
+✓ Default [no preference]
 ```
 
 The configuration is stored in `~/.dstack/config.yaml`.

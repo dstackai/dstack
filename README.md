@@ -53,8 +53,12 @@ It will prompt you to select the AWS region
 where dstack will provision compute resources, and the S3 bucket, where dstack will save data.
 
 ```shell
-Region name (eu-west-1):
-S3 bucket name (dstack-142421590066-eu-west-1):
+? Choose AWS region
+✓ Europe, Ireland [eu-west-1]
+? Choose S3 bucke
+✓ Default [dstack-142421590066-eu-west-1]
+? Choose EC2 subnet
+✓ Default [no preference]
 ```
 
 > Support for GCP and Azure is in the roadmap.
