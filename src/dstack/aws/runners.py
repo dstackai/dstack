@@ -416,7 +416,7 @@ def _get_ami_image(ec2_client: BaseClient, cuda: bool) -> Tuple[str, str]:
 
 
 def _run_instance(ec2_client: BaseClient, iam_client: BaseClient, bucket_name: str, region_name: str,
-                  runner_id: str, instance_type: InstanceType) -> str:
+                  subnet_id: Optional[str], runner_id: str, instance_type: InstanceType) -> str:
     launch_specification = {}
     if not version.__is_release__:
         launch_specification["KeyName"] = "stgn_dstack"
@@ -428,6 +428,17 @@ def _run_instance(ec2_client: BaseClient, iam_client: BaseClient, bucket_name: s
                 "InstanceInterruptionBehavior": "stop",
             }
         }
+    if subnet_id:
+        launch_specification["NetworkInterfaces"] = [
+            {
+                "AssociatePublicIpAddress": True,
+                "DeviceIndex": 0,
+                "SubnetId": subnet_id,
+                "Groups": [_get_security_group_id(ec2_client, bucket_name)],
+            },
+        ]
+    else:
+        launch_specification["SecurityGroupIds"] = [_get_security_group_id(ec2_client, bucket_name)]
     response = ec2_client.run_instances(
         BlockDeviceMappings=[
             {
@@ -442,7 +453,6 @@ def _run_instance(ec2_client: BaseClient, iam_client: BaseClient, bucket_name: s
         InstanceType=instance_type.instance_name,
         MinCount=1,
         MaxCount=1,
-        SecurityGroupIds=[_get_security_group_id(ec2_client, bucket_name)],
         IamInstanceProfile={
             "Arn": instance_profile_arn(iam_client, bucket_name),
         },
@@ -482,16 +492,17 @@ def _run_instance(ec2_client: BaseClient, iam_client: BaseClient, bucket_name: s
 
 
 def _run_instance_retry(ec2_client: BaseClient, iam_client: BaseClient, bucket_name: str, region_name: str,
-                        runner_id: str, instance_type: InstanceType, attempts: int = 3) -> str:
+                        subnet_id: Optional[str], runner_id: str, instance_type: InstanceType, attempts: int = 3) \
+        -> str:
     try:
-        return _run_instance(ec2_client, iam_client, bucket_name, region_name, runner_id,
+        return _run_instance(ec2_client, iam_client, bucket_name, region_name, subnet_id, runner_id,
                              instance_type)
     except Exception as e:
         if hasattr(e, "response") and e.response.get("Error") and e.response["Error"].get(
                 "Code") == "InvalidParameterValue":
             if attempts > 0:
                 time.sleep(CREATE_INSTANCE_RETRY_RATE_SECS)
-                return _run_instance_retry(ec2_client, iam_client, bucket_name, region_name, runner_id,
+                return _run_instance_retry(ec2_client, iam_client, bucket_name, region_name, subnet_id, runner_id,
                                            instance_type, attempts - 1)
             else:
                 raise Exception("Failed to retry", e)
@@ -500,8 +511,7 @@ def _run_instance_retry(ec2_client: BaseClient, iam_client: BaseClient, bucket_n
 
 
 def run_job(secretsmanager_client: BaseClient, logs_client: BaseClient, ec2_client: BaseClient, iam_client: BaseClient,
-            s3_client: BaseClient,
-            bucket_name: str, region_name, job: Job) -> Runner:
+            s3_client: BaseClient, bucket_name: str, region_name, subnet_id: Optional[str], job: Job) -> Runner:
     if job.status == JobStatus.SUBMITTED:
         instance_type = _get_instance_type(ec2_client, job.requirements)
         if instance_type:
@@ -512,7 +522,7 @@ def run_job(secretsmanager_client: BaseClient, logs_client: BaseClient, ec2_clie
             runner = Runner(runner_id, None, instance_type.resources, job, secret_names)
             _create_runner(logs_client, s3_client, bucket_name, runner)
             try:
-                request_id = _run_instance_retry(ec2_client, iam_client, bucket_name, region_name, runner_id,
+                request_id = _run_instance_retry(ec2_client, iam_client, bucket_name, region_name, subnet_id, runner_id,
                                                  instance_type)
                 runner.request_id = request_id
                 job.request_id = request_id

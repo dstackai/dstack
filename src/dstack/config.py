@@ -12,11 +12,13 @@ class BackendConfig(ABC):
 
 
 class AwsBackendConfig(BackendConfig):
-    def __init__(self, profile_name: Optional[str], region_name: Optional[str], bucket_name: str):
+    def __init__(self, profile_name: Optional[str], region_name: Optional[str], bucket_name: str,
+                 subnet_id: Optional[str]):
         super().__init__()
         self.bucket_name = bucket_name
         self.region_name = region_name
         self.profile_name = profile_name
+        self.subnet_id = subnet_id
 
 
 class Config:
@@ -37,7 +39,8 @@ def load_config(path: Path = get_config_path()) -> Config:
     bucket_name = os.getenv("DSTACK_AWS_S3_BUCKET")
     if bucket_name:
         return Config(AwsBackendConfig(os.getenv("DSTACK_AWS_PROFILE") or os.getenv("AWS_PROFILE"),
-                                       os.getenv("DSTACK_AWS_REGION") or os.getenv("AWS_DEFAULT_REGION"), bucket_name))
+                                       os.getenv("DSTACK_AWS_REGION") or os.getenv("AWS_DEFAULT_REGION"), bucket_name,
+                                       os.getenv("DSTACK_AWS_EC2_SUBNET")))
     else:
         if path.exists():
             with path.open() as f:
@@ -50,7 +53,8 @@ def load_config(path: Path = get_config_path()) -> Config:
                 else:
                     return Config(AwsBackendConfig(config_data.get("profile") or os.getenv("AWS_PROFILE"),
                                                    config_data.get("region") or os.getenv("AWS_DEFAULT_REGION"),
-                                                   config_data["bucket"]))
+                                                   config_data["bucket"],
+                                                   config_data.get("subnet")))
         else:
             raise ConfigError(f"{path.resolve()} doesn't exist")
 
@@ -68,6 +72,8 @@ def write_config(config: Config, path: Path = get_config_path()):
                 config_data["region"] = config.backend_config.region_name
             if config.backend_config.profile_name:
                 config_data["profile"] = config.backend_config.profile_name
+            if config.backend_config.subnet_id:
+                config_data["subnet"] = config.backend_config.subnet_id
             yaml.dump(config_data, f)
     else:
         raise Exception(f"Unsupported backend: {config.backend_config}")
