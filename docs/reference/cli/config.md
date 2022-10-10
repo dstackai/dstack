@@ -13,7 +13,7 @@ Make sure to use an S3 bucket name that isn't used by other AWS accounts.
 ```shell
 ? Choose AWS region
 ✓ Europe, Ireland [eu-west-1]
-? Choose S3 bucke
+? Choose S3 bucket
 ✓ Default [dstack-142421590066-eu-west-1]
 ? Choose EC2 subnet
 ✓ Default [no preference]

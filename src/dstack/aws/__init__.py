@@ -46,7 +46,8 @@ class AwsBackend(Backend):
                                       self.backend_config.region_name)
 
     def configure(self):
-        config.configure(self._iam_client(), self.backend_config.bucket_name)
+        config.configure(self._ec2_client(), self._iam_client(), self.backend_config.bucket_name,
+                         self.backend_config.subnet_id)
 
     def create_run(self, repo_user_name: str, repo_name: str) -> str:
         return runs.create_run(self._s3_client(), self._logs_client(), self.backend_config.bucket_name,

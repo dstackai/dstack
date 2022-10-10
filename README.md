@@ -55,7 +55,7 @@ where dstack will provision compute resources, and the S3 bucket, where dstack w
 ```shell
 ? Choose AWS region
 ✓ Europe, Ireland [eu-west-1]
-? Choose S3 bucke
+? Choose S3 bucket
 ✓ Default [dstack-142421590066-eu-west-1]
 ? Choose EC2 subnet
 ✓ Default [no preference]

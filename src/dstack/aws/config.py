@@ -1,3 +1,5 @@
+from typing import Optional
+
 from botocore.client import BaseClient
 from rich import print
 from rich.prompt import Confirm
@@ -33,5 +35,6 @@ def validate_bucket(s3_client: BaseClient, bucket_name: str, region_name: str) -
     return True
 
 
-def configure(iam_client: BaseClient, bucket_name: str):
+def configure(ec2_client: BaseClient, iam_client: BaseClient, bucket_name: str, subnet_id: Optional[str]):
     runners.instance_profile_arn(iam_client, bucket_name)
+    runners.get_security_group_id(ec2_client, bucket_name, subnet_id)
