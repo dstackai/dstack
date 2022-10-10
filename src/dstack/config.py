@@ -12,7 +12,7 @@ class BackendConfig(ABC):
 
 
 class AwsBackendConfig(BackendConfig):
-    def __init__(self, bucket_name: str, region_name: Optional[str], profile_name: Optional[str]):
+    def __init__(self, profile_name: Optional[str], region_name: Optional[str], bucket_name: str):
         super().__init__()
         self.bucket_name = bucket_name
         self.region_name = region_name
@@ -36,9 +36,8 @@ class ConfigError(Exception):
 def load_config(path: Path = get_config_path()) -> Config:
     bucket_name = os.getenv("DSTACK_AWS_S3_BUCKET")
     if bucket_name:
-        return Config(AwsBackendConfig(bucket_name,
-                                       os.getenv("DSTACK_AWS_REGION") or os.getenv("AWS_DEFAULT_REGION"),
-                                       os.getenv("DSTACK_AWS_PROFILE") or os.getenv("AWS_PROFILE")))
+        return Config(AwsBackendConfig(os.getenv("DSTACK_AWS_PROFILE") or os.getenv("AWS_PROFILE"),
+                                       os.getenv("DSTACK_AWS_REGION") or os.getenv("AWS_DEFAULT_REGION"), bucket_name))
     else:
         if path.exists():
             with path.open() as f:
@@ -49,9 +48,9 @@ def load_config(path: Path = get_config_path()) -> Config:
                 elif backend_name != "aws":
                     raise ConfigError(f"Unknown backend: {backend_name}")
                 else:
-                    return Config(AwsBackendConfig(config_data["bucket"],
+                    return Config(AwsBackendConfig(config_data.get("profile") or os.getenv("AWS_PROFILE"),
                                                    config_data.get("region") or os.getenv("AWS_DEFAULT_REGION"),
-                                                   config_data.get("profile") or os.getenv("AWS_PROFILE")))
+                                                   config_data["bucket"]))
         else:
             raise ConfigError(f"{path.resolve()} doesn't exist")
 

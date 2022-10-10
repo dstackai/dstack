@@ -162,7 +162,7 @@ class Secret:
 
 
 class Backend(ABC):
-    def configure(self, silent: bool) -> bool:
+    def configure(self):
         pass
 
     def create_run(self, repo_user_name: str, repo_name: str) -> str:

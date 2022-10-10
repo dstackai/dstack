@@ -1,5 +1,6 @@
 import re
 from argparse import Namespace
+from typing import Optional
 
 import boto3
 from rich import print
@@ -10,25 +11,25 @@ from dstack.backend import load_backend
 from dstack.config import load_config, ConfigError, write_config, Config, AwsBackendConfig
 
 regions = [
-    ("US East, Ohio", "us-east-2"),
     ("US East, N. Virginia", "us-east-1"),
+    ("US East, Ohio", "us-east-2"),
     ("US West, N. California", "us-west-1"),
     ("US West, Oregon", "us-west-2"),
+    ("Asia Pacific, Singapore", "ap-southeast-1"),
     ("Canada, Central", "ca-central-1"),
     ("Europe, Frankfurt", "eu-central-1"),
     ("Europe, Ireland", "eu-west-1"),
     ("Europe, London", "eu-west-2"),
     ("Europe, Paris", "eu-west-3"),
     ("Europe, Stockholm", "eu-north-1"),
-    ("Asia Pacific, Singapore", "ap-southeast-1"),
 ]
 
 
 def ask_region(default_region_name):
-    print("[sea_green3 bold]?[/sea_green3 bold] [bold]AWS region[/bold] "
+    print("[sea_green3 bold]?[/sea_green3 bold] [bold]Choose AWS region[/bold] "
           "[gray46]Use arrows to move, type to filter[/gray46]")
     region_options = [(r[0] + " [" + r[1] + "]") for r in regions]
-    default_region_index = [r[1] for r in regions].index(default_region_name)
+    default_region_index = [r[1] for r in regions].index(default_region_name) if default_region_name else None
     region_menu = TerminalMenu(region_options, menu_cursor_style=["fg_red", "bold"],
                                menu_highlight_style=["fg_red", "bold"],
                                search_key=None,
@@ -60,7 +61,18 @@ def config_func(args: Namespace):
         except Exception:
             default_region_name = "us-east-1"
     region_name = ask_region(default_region_name)
-    print("[sea_green3 bold]?[/sea_green3 bold] [bold]S3 bucket[/bold] "
+    if default_bucket_name and region_name != default_region_name:
+        default_bucket_name = None
+    bucket_name = ask_bucket(profile_name, region_name, default_bucket_name)
+    config = Config(AwsBackendConfig(profile_name, region_name, bucket_name))
+    backend = load_backend(config)
+    backend.configure()
+    write_config(config)
+    print(f"[grey58]OK[/]")
+
+
+def ask_bucket(profile_name: Optional[str], region_name: str, default_bucket_name: Optional[str]):
+    print("[sea_green3 bold]?[/sea_green3 bold] [bold]Choose S3 bucket[/bold] "
           "[gray46]Use arrows to move, type to filter[/gray46]")
     bucket_options = []
     if not default_bucket_name:
@@ -83,26 +95,31 @@ def config_func(args: Namespace):
     print(f"[sea_green3 bold]✓[/sea_green3 bold] [grey74]{bucket_title}[/grey74]")
     if bucket_index == 0 and default_bucket_name:
         bucket_name = default_bucket_name
+        config = Config(AwsBackendConfig(profile_name, region_name, bucket_name))
+        backend = load_backend(config)
+        if backend.validate_bucket():
+            return bucket_name
+        else:
+            return ask_bucket(profile_name, region_name, default_bucket_name)
     else:
-        bucket_name = ask_bucket_name(None)
-    config = Config(AwsBackendConfig(bucket_name, region_name, profile_name))
-    backend = load_backend(config)
-    if backend.configure(silent=False):
-        write_config(config)
-        print(f"[grey58]OK[/]")
+        return ask_bucket_name(profile_name, region_name, None)
 
 
-def ask_bucket_name(default_bucket_name):
-    bucket_name = Prompt.ask("[sea_green3 bold]?[/sea_green3 bold] [bold]S3 bucket name[/bold] "
-                             "[gray46](must not belong to another AWS account)[/gray46]")
+def ask_bucket_name(profile_name: Optional[str], region_name: str, default_bucket_name: Optional[str]):
+    bucket_name = Prompt.ask("[sea_green3 bold]?[/sea_green3 bold] [bold]Enter S3 bucket name[/bold]")
     match = re.compile(r"(?!(^xn--|-s3alias$))^[a-z0-9][a-z0-9-]{1,61}[a-z0-9]$").match(bucket_name)
     if match:
-        return bucket_name
+        config = Config(AwsBackendConfig(profile_name, region_name, bucket_name))
+        backend = load_backend(config)
+        if backend.validate_bucket():
+            return bucket_name
+        else:
+            return ask_bucket(profile_name, region_name, default_bucket_name)
     else:
         print("[red bold]✗[/red bold] [red]Bucket name is not valid. "
               "Check naming rules: "
               "https://docs.aws.amazon.com/AmazonS3/latest/userguide/bucketnamingrules.html[/red]")
-        return ask_bucket_name(default_bucket_name)
+        return ask_bucket_name(profile_name, region_name, default_bucket_name)
 
 
 def register_parsers(main_subparsers):
