@@ -1,11 +1,11 @@
 import re
 from argparse import Namespace
-from typing import Optional
+from importlib.util import find_spec
+from typing import Optional, List
 
 import boto3
 from rich import print
 from rich.prompt import Prompt
-from simple_term_menu import TerminalMenu
 
 from dstack.backend import load_backend
 from dstack.config import load_config, ConfigError, write_config, Config, AwsBackendConfig
@@ -24,47 +24,57 @@ regions = [
     ("Europe, Stockholm", "eu-north-1"),
 ]
 
+_is_termios_available = find_spec("termios") is not None
 
-def ask_region(default_region_name):
-    print("[sea_green3 bold]?[/sea_green3 bold] [bold]Choose AWS region[/bold] "
-          "[gray46]Use arrows to move, type to filter[/gray46]")
-    region_options = [(r[0] + " [" + r[1] + "]") for r in regions]
-    default_region_index = [r[1] for r in regions].index(default_region_name) if default_region_name else None
-    region_menu = TerminalMenu(region_options, menu_cursor_style=["fg_red", "bold"],
-                               menu_highlight_style=["fg_red", "bold"],
-                               search_key=None,
-                               search_highlight_style=["fg_purple"],
-                               cursor_index=default_region_index)
-    region_index = region_menu.show()
-    region_title = regions[region_index][0]
-    region_name = regions[region_index][1]
-    print(f"[sea_green3 bold]✓[/sea_green3 bold] [grey74]{region_title} \\[{region_name}][/grey74]")
-    return region_name
+
+def ask_choice(title: str, labels: List[str], values: List[str], selected_value: Optional[str],
+               show_choices: Optional[bool] = None) -> str:
+    if selected_value not in values:
+        selected_value = None
+    if _is_termios_available:
+        from simple_term_menu import TerminalMenu
+        print(f"[sea_green3 bold]?[/sea_green3 bold] [bold]{title}[/bold] "
+              "[gray46]Use arrows to move, type to filter[/gray46]")
+        try:
+            cursor_index = values.index(selected_value) if selected_value else None
+        except ValueError:
+            cursor_index = None
+        terminal_menu = TerminalMenu(menu_entries=labels, menu_cursor_style=["fg_red", "bold"],
+                                     menu_highlight_style=["fg_red", "bold"],
+                                     search_key=None,
+                                     search_highlight_style=["fg_purple"],
+                                     cursor_index=cursor_index)
+        chosen_menu_index = terminal_menu.show()
+        chosen_menu_label = labels[chosen_menu_index].replace("[", "\\[")
+        print(f"[sea_green3 bold]✓[/sea_green3 bold] [grey74]{chosen_menu_label}][/grey74]")
+        return values[chosen_menu_index]
+    else:
+        if len(values) < 6 and show_choices is None or show_choices is True:
+            return Prompt.ask(prompt=f"[sea_green3 bold]?[/sea_green3 bold] [bold]{title}[/bold]",
+                              choices=values, default=selected_value)
+        else:
+            value = Prompt.ask(prompt=f"[sea_green3 bold]?[/sea_green3 bold] [bold]{title}[/bold]",
+                               default=selected_value)
+            if value in values:
+                return value
+            else:
+                print(
+                    f"[red]Please select one of the available options: \\[{', '.join(values)}][/red]")
+                return ask_choice(title, labels, values, selected_value, show_choices)
 
 
 def ask_subnet(profile_name: Optional[str], region_name: str, default_subnet_id: Optional[str]) -> Optional[str]:
     my_session = boto3.session.Session(profile_name=profile_name, region_name=region_name)
     ec2_client = my_session.client("ec2")
-    print("[sea_green3 bold]?[/sea_green3 bold] [bold]Choose EC2 subnet[/bold] "
-          "[gray46]Use arrows to move, type to filter[/gray46]")
     subnets_response = ec2_client.describe_subnets()
     existing_subnets = [s["SubnetId"] for s in subnets_response["Subnets"]]
-    default_subnet_index = existing_subnets.index(
-        default_subnet_id) + 1 if default_subnet_id in existing_subnets else 0
     subnet_options = ["Default [no preference]"]
     subnet_options.extend([(s["SubnetId"] + " [" + s["VpcId"] + "]") for s in subnets_response["Subnets"]])
-    subnet_menu = TerminalMenu(subnet_options, menu_cursor_style=["fg_red", "bold"],
-                               menu_highlight_style=["fg_red", "bold"],
-                               search_key=None,
-                               search_highlight_style=["fg_purple"],
-                               cursor_index=default_subnet_index)
-    subnet_index = subnet_menu.show()
-    subnet_title = subnet_options[subnet_index].replace("[", "\\[")
-    print(f"[sea_green3 bold]✓[/sea_green3 bold] [grey74]{subnet_title}[/grey74]")
-    if subnet_index > 0:
-        return existing_subnets[subnet_index - 1]
-    else:
-        return None
+    choice = ask_choice("Choose EC2 subnet", subnet_options, ["none"] + existing_subnets, default_subnet_id or "none",
+                        show_choices=True)
+    if choice == "none":
+        choice = None
+    return choice
 
 
 def config_func(args: Namespace):
@@ -87,7 +97,8 @@ def config_func(args: Namespace):
             default_region_name = my_session.region_name
         except Exception:
             default_region_name = "us-east-1"
-    region_name = ask_region(default_region_name)
+    region_name = ask_choice("Choose AWS region", [(r[0] + " [" + r[1] + "]") for r in regions],
+                             [r[1] for r in regions], default_region_name)
     if region_name != default_region_name:
         default_bucket_name = None
         default_subnet_id = None
@@ -102,8 +113,6 @@ def config_func(args: Namespace):
 
 def ask_bucket(profile_name: Optional[str], region_name: str, default_bucket_name: Optional[str],
                default_subnet_id: Optional[str]):
-    print("[sea_green3 bold]?[/sea_green3 bold] [bold]Choose S3 bucket[/bold] "
-          "[gray46]Use arrows to move, type to filter[/gray46]")
     bucket_options = []
     if not default_bucket_name:
         try:
@@ -117,12 +126,18 @@ def ask_bucket(profile_name: Optional[str], region_name: str, default_bucket_nam
     else:
         bucket_options.append(f"Default [{default_bucket_name}]")
     bucket_options.append("Custom...")
-    bucket_menu = TerminalMenu(bucket_options, menu_cursor_style=["fg_red", "bold"],
-                               menu_highlight_style=["fg_red", "bold"],
-                               search_highlight_style=["fg_purple"])
-    bucket_index = bucket_menu.show()
-    bucket_title = bucket_options[bucket_index].replace("[", "\\[")
-    print(f"[sea_green3 bold]✓[/sea_green3 bold] [grey74]{bucket_title}[/grey74]")
+    if _is_termios_available and len(bucket_options) == 2:
+        from simple_term_menu import TerminalMenu
+        print("[sea_green3 bold]?[/sea_green3 bold] [bold]Choose S3 bucket[/bold] "
+              "[gray46]Use arrows to move, type to filter[/gray46]")
+        bucket_menu = TerminalMenu(bucket_options, menu_cursor_style=["fg_red", "bold"],
+                                   menu_highlight_style=["fg_red", "bold"],
+                                   search_highlight_style=["fg_purple"])
+        bucket_index = bucket_menu.show()
+        bucket_title = bucket_options[bucket_index].replace("[", "\\[")
+        print(f"[sea_green3 bold]✓[/sea_green3 bold] [grey74]{bucket_title}[/grey74]")
+    else:
+        bucket_index = 1
     if bucket_index == 0 and default_bucket_name:
         bucket_name = default_bucket_name
         config = Config(AwsBackendConfig(profile_name, region_name, bucket_name, default_subnet_id))
@@ -132,12 +147,13 @@ def ask_bucket(profile_name: Optional[str], region_name: str, default_bucket_nam
         else:
             return ask_bucket(profile_name, region_name, default_bucket_name, default_subnet_id)
     else:
-        return ask_bucket_name(profile_name, region_name, None, default_subnet_id)
+        return ask_bucket_name(profile_name, region_name, default_bucket_name, default_subnet_id)
 
 
 def ask_bucket_name(profile_name: Optional[str], region_name: str, default_bucket_name: Optional[str],
                     default_subnet_id: Optional[str]):
-    bucket_name = Prompt.ask("[sea_green3 bold]?[/sea_green3 bold] [bold]Enter S3 bucket name[/bold]")
+    bucket_name = Prompt.ask("[sea_green3 bold]?[/sea_green3 bold] [bold]Enter S3 bucket name[/bold]",
+                             default=default_bucket_name)
     match = re.compile(r"(?!(^xn--|-s3alias$))^[a-z0-9][a-z0-9-]{1,61}[a-z0-9]$").match(bucket_name)
     if match:
         config = Config(AwsBackendConfig(profile_name, region_name, bucket_name, default_subnet_id))
