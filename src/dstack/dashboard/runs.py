@@ -43,7 +43,7 @@ class RunItem(BaseModel):
     repo_name: str
     repo_branch: str
     repo_hash: str
-    repo_diff: str
+    repo_diff: Optional[str]
     run_name: str
     workflow_name: Optional[str]
     provider_name: str
