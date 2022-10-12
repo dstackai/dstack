@@ -46,7 +46,7 @@ def ask_choice(title: str, labels: List[str], values: List[str], selected_value:
                                      cursor_index=cursor_index)
         chosen_menu_index = terminal_menu.show()
         chosen_menu_label = labels[chosen_menu_index].replace("[", "\\[")
-        print(f"[sea_green3 bold]✓[/sea_green3 bold] [grey74]{chosen_menu_label}][/grey74]")
+        print(f"[sea_green3 bold]✓[/sea_green3 bold] [grey74]{chosen_menu_label}[/grey74]")
         return values[chosen_menu_index]
     else:
         if len(values) < 6 and show_choices is None or show_choices is True:
