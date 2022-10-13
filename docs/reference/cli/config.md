@@ -5,24 +5,16 @@ This command configures the AWS region and S3 bucket, where dstack will provisio
 ### Usage
 
 ```shell
-dstack config [--aws-profile NAME]
+dstack config
 ```
 
 Make sure to use an S3 bucket name that isn't used by other AWS accounts.
 
 ```shell
-? Choose AWS region
-✓ Europe, Ireland [eu-west-1]
-? Choose S3 bucket
-✓ Default [dstack-142421590066-eu-west-1]
-? Choose EC2 subnet
-✓ Default [no preference]
+AWS profile: default
+AWS region: eu-west-1
+S3 bucket: dstack-142421590066-eu-west-1
+EC2 subnet: none
 ```
 
 The configuration is stored in `~/.dstack/config.yaml`.
-
-#### Arguments reference
-
-The following arguments are optional:
-
-- `--aws-profile NAME` - (Optional) A name of the AWS profile. Default is `default`.

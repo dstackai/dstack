@@ -27,7 +27,7 @@ def default_func(_: Namespace):
           # "app            Open a running application\n"
           "  [bold]dstack init [grey53][-t GITHUB_TOKEN | -i SSH_PRIVATE_KEY][/grey53][/bold]     " +
           "Initialize the repo\n"
-          "  [bold]dstack config [grey53][--aws-profile NAME][/grey53][/bold]                     Configure the backend\n"
+          "  [bold]dstack config[/bold]                                          Configure the backend\n"
           "  [bold]dstack tags add TAG [grey53]([/grey53]-r RUN [grey53]|[/grey53] -a PATH [grey53]...)[/grey53][/bold]             Add a tag\n"
           "  [bold]dstack tags delete [grey53][-y][/grey53] TAG[/bold]                            Delete a tag\n"
           "  [bold]dstack tags list[/bold]                                       List tags\n"

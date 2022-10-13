@@ -22,7 +22,7 @@ Main commands:
 
 Other commands:
   dstack init [-t GITHUB_TOKEN | -i SSH_PRIVATE_KEY]  Initialize the repo
-  dstack config [--aws-profile NAME]                  Configure the backend
+  dstack config                                       Configure the backend
   dstack tags add TAG (-r RUN | -a PATH ...)          Add a tag
   dstack tags delete [-y] TAG                         Delete a tag
   dstack tags list                                    List tags

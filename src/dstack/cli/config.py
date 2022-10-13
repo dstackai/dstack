@@ -77,20 +77,20 @@ def ask_subnet(profile_name: Optional[str], region_name: str, default_subnet_id:
     return choice
 
 
-def config_func(args: Namespace):
+def config_func(_: Namespace):
+    default_profile_name = None
     default_bucket_name = None
     default_region_name = None
     default_subnet_id = None
     try:
         config = load_config()
+        default_profile_name = config.backend_config.profile_name
         default_region_name = config.backend_config.region_name
         default_bucket_name = config.backend_config.bucket_name
         default_subnet_id = config.backend_config.subnet_id
     except ConfigError:
         pass
-    profile_name = args.profile_name
-    if profile_name == "default":
-        profile_name = None
+    profile_name = ask_profile_name(default_profile_name)
     if not default_region_name:
         try:
             my_session = boto3.session.Session(profile_name=profile_name)
@@ -109,6 +109,26 @@ def config_func(args: Namespace):
     backend.configure()
     write_config(config)
     print(f"[grey58]OK[/]")
+
+
+def ask_profile_name(default_profile_name):
+    profiles = []
+    try:
+        my_session = boto3.session.Session()
+        profiles.extend(my_session.available_profiles)
+    except Exception:
+        pass
+    if len(profiles) > 1:
+        profile_name = ask_choice("Choose AWS profile", profiles, profiles, default_profile_name)
+    elif len(profiles) == 1:
+        profile_name = profiles[0]
+        print(f"[sea_green3 bold]✓[/sea_green3 bold] [gray46]AWS profile: {profile_name}[/gray46]")
+    else:
+        profile_name = "default"
+        print(f"[sea_green3 bold]✓[/sea_green3 bold] [gray46]AWS profile: {profile_name}[/gray46]")
+    if profile_name == "default":
+        profile_name = None
+    return profile_name
 
 
 def ask_bucket(profile_name: Optional[str], region_name: str, default_bucket_name: Optional[str],
@@ -171,7 +191,4 @@ def ask_bucket_name(profile_name: Optional[str], region_name: str, default_bucke
 
 def register_parsers(main_subparsers):
     parser = main_subparsers.add_parser("config", help="Configure the backend")
-    parser.add_argument("--aws-profile", metavar="NAME",
-                        help="A name of the AWS profile. Default is \"default\".", type=str,
-                        dest="profile_name", default="default")
     parser.set_defaults(func=config_func)
