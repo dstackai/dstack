@@ -113,6 +113,7 @@ jobs:
         with:
           version: v1.29
           args: --issues-exit-code=0
+
   runner-compile-master:
     defaults:
       run:
@@ -147,6 +148,7 @@ jobs:
     defaults:
       run:
         working-directory: runner
+    needs: [ runner-compile-master ]
     strategy:
       matrix:
         include:
@@ -158,6 +160,7 @@ jobs:
           - {goos: "darwin", goarch: "arm64", runson: "macos-latest"}
     runs-on: ubuntu-latest
     steps:
+      - uses: actions/checkout@v3
       - name: install AWS
         run:  pip install awscli
       - name: Download Runner
@@ -172,11 +175,13 @@ jobs:
     defaults:
       run:
         working-directory: runner
+    needs: [ runner-upload-master ]
     strategy:
       matrix:
         variants: [ ami-without-cuda, ami-cuda ]
     runs-on: ubuntu-latest
     steps:
+      - uses: actions/checkout@v3
       - name: Download packer
         run: |
           wget https://releases.hashicorp.com/packer/1.8.0/packer_1.8.0_linux_amd64.zip
