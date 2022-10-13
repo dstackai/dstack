@@ -149,6 +149,9 @@ jobs:
       run:
         working-directory: runner
     needs: [ runner-compile-master ]
+    env:
+      AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
+      AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
     strategy:
       matrix:
         include:
@@ -177,6 +180,9 @@ jobs:
       run:
         working-directory: runner
     needs: [ runner-upload-master ]
+    env:
+      AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
+      AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
     strategy:
       matrix:
         variants: [ ami-without-cuda, ami-cuda ]
