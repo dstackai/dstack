@@ -1,0 +1,28 @@
+apps: []
+artifacts:
+  - output
+commands:
+  - mkdir -p output
+  - echo 'Hello, world!' > output/hello.txt
+env: {}
+host_name: ''
+image_name: ubuntu
+master_job_id: ''
+port_count: 0
+ports: []
+previous_job_ids: []
+provider_name: docker
+repo_branch: main
+repo_diff: ''
+repo_hash: cc74bc6839db9232191f45f5e4704e763a1d47db
+repo_name: dstack-examples
+repo_user_name: dstackai
+requirements: {}
+run_name: swift-eel-2
+runner_id: e0af2518bfaa45598a24faa36c7b31be
+status: submitted
+submitted_at: 1658934214
+tag_name: ''
+variables: {}
+workflow_name: train
+working_dir: ''

@@ -1,0 +1,99 @@
+job:
+  apps: []
+  artifacts:
+    - data
+  commands:
+    - python train.py
+  env: {}
+  host_name: ''
+  image_name: python:3.10
+  job_id: tidy-firefox-1,,0
+  master_job_id: ''
+  port_count: 0
+  ports: []
+  previous_job_ids: []
+  provider_name: python
+  repo_branch: main
+  repo_diff: "diff --git a/.dstack/variables.yaml b/.dstack/variables.yaml\ndeleted\
+    \ file mode 100644\nindex fe230b6..0000000\n--- a/.dstack/variables.yaml\n+++\
+    \ /dev/null\n@@ -1,9 +0,0 @@\n-variables:\n-  train:\n-    batch-size: 64\n- \
+    \   test-batch-size: 1000\n-    epochs: 1\n-    lr: 1.0\n-    gamma: 0.7\n-  \
+    \  seed: 1\n-    log-interval: 10\n\\ No newline at end of file\ndiff --git a/.dstack/workflows.yaml\
+    \ b/.dstack/workflows.yaml\nindex 5bc5386..a668f48 100644\n--- a/.dstack/workflows.yaml\n\
+    +++ b/.dstack/workflows.yaml\n@@ -1,18 +1,8 @@\n workflows:\n-  - name: download\n\
+    -    provider: python\n-    requirements: requirements.txt\n-    script: download.py\n\
+    -    artifacts:\n-      - data\n-\n   - name: train\n+    help: \"Trains a MNIST\
+    \ model\"\n     provider: python\n-    requirements: requirements.txt\n-    script:\
+    \ train.py\n-    depends-on:\n-      - download:latest\n+    requirements: \"\
+    requirements.txt\"\n+    file: \"train.py\"\n     artifacts:\n-      - model\n\
+    -    resources:\n-      gpu: 1\n\\ No newline at end of file\n+      - model\n\
+    \\ No newline at end of file\ndiff --git a/fastapi_app/main.py b/fastapi_app/main.py\n\
+    new file mode 100644\nindex 0000000..ee60be1\n--- /dev/null\n+++ b/fastapi_app/main.py\n\
+    @@ -0,0 +1,8 @@\n+from fastapi import FastAPI\n+\n+app = FastAPI()\n+\n+\n+@app.get(\"\
+    /\")\n+async def root():\n+    return {\"message\": \"Hello World\"}\ndiff --git\
+    \ a/fastapi_app/requirements.txt b/fastapi_app/requirements.txt\nnew file mode\
+    \ 100644\nindex 0000000..b9c3e9d\n--- /dev/null\n+++ b/fastapi_app/requirements.txt\n\
+    @@ -0,0 +1,3 @@\n+fastapi\n+gunicorn\n+uvicorn[standard]\n\\ No newline at end\
+    \ of file\ndiff --git a/train.py b/train.py\nindex ff09108..da71ad1 100644\n---\
+    \ a/train.py\n+++ b/train.py\n@@ -10,6 +10,7 @@ import torch.optim as optim\n\
+    \ from torchvision import datasets, transforms\n from torch.optim.lr_scheduler\
+    \ import StepLR\n \n+# import wandb\n \n class Net(nn.Module):\n     def __init__(self):\n\
+    @@ -50,6 +51,7 @@ def train(args, model, device, train_loader, optimizer, epoch):\n\
+    \             print('Train Epoch: {} [{}/{} ({:.0f}%)]\\tLoss: {:.6f}'.format(\n\
+    \                 epoch, batch_idx * len(data), len(train_loader.dataset),\n \
+    \                100. * batch_idx / len(train_loader), loss.item()))\n+      \
+    \      # wandb.log({\"loss\": loss.item()})\n             if args.dry_run:\n \
+    \                break\n \n@@ -74,25 +76,27 @@ def test(model, device, test_loader):\n\
+    \ \n \n def main():\n+    # wandb.init(project=\"dstack-examples\", entity=\"\
+    peterschmidt85\", name=os.environ[\"RUN_NAME\"])\n+\n     # Training settings\n\
+    \     parser = argparse.ArgumentParser(description='PyTorch MNIST Example')\n\
+    -    parser.add_argument('--batch-size', type=int, default=os.environ.get(\"BATCH_SIZE\"\
+    ), metavar='N',\n+    parser.add_argument('--batch-size', type=int, default=64,\
+    \ metavar='N',\n                         help='input batch size for training (default:\
+    \ 64)')\n     parser.add_argument('--test-batch-size', type=int, default=1000,\
+    \ metavar='N',\n                         help='input batch size for testing (default:\
+    \ 1000)')\n-    parser.add_argument('--epochs', type=int, default=os.environ.get(\"\
+    EPOCHS\"), metavar='N',\n+    parser.add_argument('--epochs', type=int, default=14,\
+    \ metavar='N',\n                         help='number of epochs to train (default:\
+    \ 14)')\n-    parser.add_argument('--lr', type=float, default=float(os.environ.get(\"\
+    LR\")), metavar='LR',\n+    parser.add_argument('--lr', type=float, default=1.0,\
+    \ metavar='LR',\n                         help='learning rate (default: 1.0)')\n\
+    -    parser.add_argument('--gamma', type=float, default=float(os.environ.get(\"\
+    GAMMA\")), metavar='M',\n+    parser.add_argument('--gamma', type=float, default=0.7,\
+    \ metavar='M',\n                         help='Learning rate step gamma (default:\
+    \ 0.7)')\n     parser.add_argument('--no-cuda', action='store_true', default=False,\n\
+    \                         help='disables CUDA training')\n     parser.add_argument('--dry-run',\
+    \ action='store_true', default=False,\n                         help='quickly\
+    \ check a single pass')\n-    parser.add_argument('--seed', type=int, default=int(os.environ.get(\"\
+    SEED\")), metavar='S',\n+    parser.add_argument('--seed', type=int, default=1,\
+    \ metavar='S',\n                         help='random seed (default: 1)')\n- \
+    \   parser.add_argument('--log-interval', type=int, default=int(os.environ.get(\"\
+    LOG_INTERVAL\")), metavar='N',\n+    parser.add_argument('--log-interval', type=int,\
+    \ default=10, metavar='N',\n                         help='how many batches to\
+    \ wait before logging training status')\n     parser.add_argument('--save-model',\
+    \ action='store_true', default=True,\n                         help='For Saving\
+    \ the current Model')\n@@ -116,8 +120,7 @@ def main():\n         transforms.ToTensor(),\n\
+    \         transforms.Normalize((0.1307,), (0.3081,))\n         ])\n-    dataset1\
+    \ = datasets.MNIST('data', train=True,\n-                       transform=transform)\n\
+    +    dataset1 = datasets.MNIST('data', train=True, transform=transform, download=True)\n\
+    \     dataset2 = datasets.MNIST('data', train=False,\n                       \
+    \ transform=transform)\n     train_loader = torch.utils.data.DataLoader(dataset1,**train_kwargs)"
+  repo_hash: cc74bc6839db9232191f45f5e4704e763a1d47db
+  repo_name: dstack-examples
+  repo_user_name: dstackai
+  requirements: {}
+  run_name: tidy-firefox-1
+  runner_id: e0af2518bfaa45598a24faa36c7b31be
+  status: submitted
+  submitted_at: 1659976832392
+  tag_name: ''
+  variables: {}
+  workflow_name: ''
+  working_dir: ''
+request_id: i-0eaa2ef677a8b2210
+resources:
+  cpus: 2
+  gpus: []
+  interruptible: false
+  memory_mib: 4096
+runner_id: e0af2518bfaa45598a24faa36c7b31be

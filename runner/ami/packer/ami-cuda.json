@@ -1,0 +1,92 @@
+{
+  "variables": {
+    "aws_access_key": "{{env `AWS_ACCESS_KEY_ID`}}",
+    "aws_secret_key": "{{env `AWS_SECRET_ACCESS_KEY`}}",
+    "region": "eu-west-1",
+    "ssh_username": "ubuntu",
+    "base_ami": "ami-0be0bfd2eb8b14c30",
+    "instance_type": "t2.micro",
+    "subnet_id": "subnet-c39cb6a5",
+    "docker_version": "20.10.17",
+    "build_id": "{{timestamp}}",
+    "build_prefix": "[stgn] ",
+    "ami_regions": "",
+    "dstack_stage": "STGN",
+    "ami_groups": ""
+  },
+  "builders": [
+    {
+      "type": "amazon-ebs",
+      "access_key": "{{user `aws_access_key`}}",
+      "secret_key": "{{user `aws_secret_key` }}",
+      "region": "{{user `region` }}",
+      "subnet_id": "{{user `subnet_id` }}",
+      "source_ami": "{{user `base_ami`}}",
+      "instance_type": "{{user `instance_type` }}",
+      "ssh_username": "{{user `ssh_username`}}",
+      "ami_name": "{{user `build_prefix`}}dstack-cuda-11.1-{{user `build_id`}}",
+      "associate_public_ip_address": true,
+      "ami_regions": "{{user `ami_regions`}}",
+      "ami_groups": "{{user `ami_groups`}}",
+      "tags": {
+        "Name": "DSTACK-CUDA"
+      }
+    }
+  ],
+  "provisioners": [
+    {
+      "type": "shell",
+      "inline": ["cloud-init status --long --wait"]
+    },
+    {
+      "type": "shell",
+      "scripts": [
+        "provisioners/kernel/apt-mirrors.sh",
+        "provisioners/kernel/apt-kernel.sh",
+        "provisioners/kernel/apt-upgrade.sh",
+        "provisioners/kernel/apt-daily.sh",
+        "provisioners/kernel/apt-packages.sh",
+        "provisioners/kernel/apt-mirrors.sh",
+        "provisioners/kernel/kernel-tuning.sh"]
+    },
+    {
+      "type": "shell",
+      "environment_vars": ["DSTACK_STAGE={{user `dstack_stage`}}"],
+      "script": "provisioners/get-dstack-runner.sh"
+    },
+    {
+      "type": "file",
+      "source": "provisioners/install-docker.sh",
+      "destination": "/tmp/install-docker.sh"
+    },
+    {
+      "type": "file",
+      "source": "provisioners/run-docker",
+      "destination": "/tmp/run-docker"
+    },
+    {
+      "type": "shell",
+      "inline": [
+        "cd /tmp",
+        "chmod +x install-docker.sh",
+        "./install-docker.sh --version {{user `docker_version`}}"]
+    },
+    {
+      "type": "shell",
+      "environment_vars": ["CUDA_DRIVERS_VERSION=455.45.01-1"],
+      "script": "provisioners/cuda.sh"
+    },
+    {
+      "type": "shell",
+      "script": "provisioners/pip-cache.sh"
+    },
+    {
+      "type": "shell",
+      "script": "provisioners/docker-image-with-cuda.sh"
+    },
+    {
+      "type": "shell",
+      "inline": ["/usr/local/bin/dstack-runner --version"]
+    }
+  ]
+}

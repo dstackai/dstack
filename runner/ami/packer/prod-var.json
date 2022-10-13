@@ -1,0 +1,5 @@
+{
+   "ami_regions": "us-east-2,us-east-1,us-west-1,us-west-2,ca-central-1,eu-central-1,eu-west-1,eu-west-2,eu-west-3,eu-north-1,ap-southeast-1",
+   "ami_groups": "all",
+   "dstack_stage": "PROD"
+}
