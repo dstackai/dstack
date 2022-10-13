@@ -113,6 +113,7 @@ jobs:
         with:
           version: v1.29
           args: --issues-exit-code=0
+          working-directory: runner
 
   runner-compile-master:
     defaults:
