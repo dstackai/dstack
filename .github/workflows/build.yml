@@ -167,6 +167,7 @@ jobs:
         uses: actions/download-artifact@v1
         with:
           name: dstack-runner-${{ matrix.goos }}-${{ matrix.goarch }}
+          path: runner/dstack-runner-${{ matrix.goos }}-${{ matrix.goarch }}
       - name: Upload to S3
         run: |
           aws s3 cp dstack-runner-${{ matrix.goos }}-${{ matrix.goarch }} "s3://dstack-runner-downloads-stgn/${{ github.run_number }}/binaries/dstack-runner-${{ matrix.goos }}-${{ matrix.goarch }}" --acl public-read
