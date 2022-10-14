@@ -1,4 +1,4 @@
-name: Build
+name: Manual AMI build for STGN
 
 on: [workflow_dispatch]
 
