@@ -101,6 +101,13 @@ jobs:
         with:
           go-version: 1.17
 
+      - name: golangci-lint
+        uses: golangci/golangci-lint-action@v3
+        with:
+          version: v1.29
+          args: --issues-exit-code=0
+          working-directory: runner
+
       - name: Test
         run: |
           go version
@@ -108,12 +115,6 @@ jobs:
           go vet $(go list ./... | grep -v /vendor/)
           go test -race $(go list ./... | grep -v /vendor/)
 
-      - name: golangci-lint
-        uses: golangci/golangci-lint-action@v3
-        with:
-          version: v1.29
-          args: --issues-exit-code=0
-          working-directory: runner
 
   runner-compile-master:
     defaults:
@@ -176,25 +177,3 @@ jobs:
         run: |
           aws s3 cp dstack-runner-${{ matrix.goos }}-${{ matrix.goarch }} "s3://dstack-runner-downloads-stgn/${{ github.run_number }}/binaries/dstack-runner-${{ matrix.goos }}-${{ matrix.goarch }}" --acl public-read
           aws s3 cp dstack-runner-${{ matrix.goos }}-${{ matrix.goarch }} "s3://dstack-runner-downloads-stgn/latest/binaries/dstack-runner-${{ matrix.goos }}-${{ matrix.goarch }}" --acl public-read
-  ami-build:
-    defaults:
-      run:
-        working-directory: runner
-    needs: [ runner-upload-master ]
-    env:
-      AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
-      AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
-    strategy:
-      matrix:
-        variants: [ ami-without-cuda, ami-cuda ]
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v3
-      - name: Download packer
-        run: |
-          wget https://releases.hashicorp.com/packer/1.8.0/packer_1.8.0_linux_amd64.zip
-          unzip packer_1.8.0_linux_amd64.zip
-          chmod +x packer
-          cp -R ami/packer/* .
-      - name: Run packer
-        run: ./packer build -var build_id=${{ github.run_number }} ${{ matrix.variants }}.json
