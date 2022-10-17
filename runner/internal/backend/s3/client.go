@@ -10,7 +10,7 @@ import (
 	"github.com/aws/aws-sdk-go-v2/aws"
 	"github.com/aws/aws-sdk-go-v2/config"
 	"github.com/aws/aws-sdk-go-v2/service/s3"
-	"gitlab.com/dstackai/dstackai-runner/internal/gerrors"
+	"github.com/dstackai/dstackai/runner/internal/gerrors"
 )
 
 var ErrTagNotFound error = errors.New("tag not found")

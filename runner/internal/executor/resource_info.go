@@ -8,12 +8,12 @@ import (
 	"strconv"
 	"strings"
 
+	"github.com/dstackai/dstackai/runner/consts"
+	"github.com/dstackai/dstackai/runner/internal/container"
+	"github.com/dstackai/dstackai/runner/internal/gerrors"
+	"github.com/dstackai/dstackai/runner/internal/log"
+	"github.com/dstackai/dstackai/runner/internal/models"
 	"github.com/sirupsen/logrus"
-	"gitlab.com/dstackai/dstackai-runner/consts"
-	"gitlab.com/dstackai/dstackai-runner/internal/container"
-	"gitlab.com/dstackai/dstackai-runner/internal/gerrors"
-	"gitlab.com/dstackai/dstackai-runner/internal/log"
-	"gitlab.com/dstackai/dstackai-runner/internal/models"
 )
 
 func updateResourceInfo() (*models.Resource, error) {

@@ -1,25 +1,28 @@
 package main
 
 import (
+	"bytes"
 	"context"
 	"fmt"
 	_ "net/http/pprof"
 	"os"
 	"os/signal"
 	"path/filepath"
+	"strings"
 	"sync"
 	"syscall"
 	"time"
 
+	"github.com/dstackai/dstackai/runner/consts"
+	"github.com/dstackai/dstackai/runner/internal/backend"
+	_ "github.com/dstackai/dstackai/runner/internal/backend/local"
+	_ "github.com/dstackai/dstackai/runner/internal/backend/s3"
+	"github.com/dstackai/dstackai/runner/internal/common"
+	"github.com/dstackai/dstackai/runner/internal/container"
+	"github.com/dstackai/dstackai/runner/internal/executor"
+	"github.com/dstackai/dstackai/runner/internal/log"
+	"github.com/dstackai/dstackai/runner/internal/stream"
 	"github.com/sirupsen/logrus"
-	"gitlab.com/dstackai/dstackai-runner/consts"
-	"gitlab.com/dstackai/dstackai-runner/internal/backend"
-	_ "gitlab.com/dstackai/dstackai-runner/internal/backend/local"
-	_ "gitlab.com/dstackai/dstackai-runner/internal/backend/s3"
-	"gitlab.com/dstackai/dstackai-runner/internal/common"
-	"gitlab.com/dstackai/dstackai-runner/internal/executor"
-	"gitlab.com/dstackai/dstackai-runner/internal/log"
-	"gitlab.com/dstackai/dstackai-runner/internal/stream"
 )
 
 func main() {
@@ -81,4 +84,45 @@ func start(logLevel int, httpPort int) {
 
 	cancel()
 	time.Sleep(1 * time.Second) // TODO: ugly hack. Need wait for buf cloudwatch
+}
+
+func check() {
+	ctx := context.Background()
+	engine := container.NewEngine()
+	if engine == nil {
+		printErrorAndExit("Docker is not installed")
+	}
+	if engine.DockerRuntime() != consts.NVIDIA_RUNTIME {
+		printErrorAndExit("NVIDIA docker is not installed")
+	}
+	var logger bytes.Buffer
+	docker, err := engine.Create(ctx,
+		&container.Spec{
+			Image:    consts.NVIDIA_CUDA_IMAGE,
+			Commands: strings.Split(consts.NVIDIA_SMI_CMD, " "),
+		},
+		&logger)
+	if err != nil {
+		printErrorAndExit("Failed to create docker container: " + err.Error())
+	}
+	err = docker.Run(ctx)
+	if err != nil {
+		if strings.Contains(err.Error(), consts.NVIDIA_DRIVER_INIT_ERROR) {
+			printErrorAndExit("NVIDIA driver error:" + err.Error())
+		}
+		printErrorAndExit(err.Error())
+	}
+	if err = docker.Wait(ctx); err != nil {
+		printErrorAndExit("Failed to create docker container: " + err.Error())
+	}
+
+	output := strings.Split(strings.TrimRight(logger.String(), "\n"), "\n")
+	if len(output) == 0 {
+		printErrorAndExit("GPU not found")
+	}
+}
+
+func printErrorAndExit(msg string) {
+	_, _ = os.Stderr.WriteString(msg + "\n")
+	os.Exit(1)
 }

@@ -15,9 +15,9 @@ import (
 	docker "github.com/docker/docker/client"
 	"github.com/docker/docker/pkg/stdcopy"
 	"github.com/docker/go-connections/nat"
+	"github.com/dstackai/dstackai/runner/consts"
+	"github.com/dstackai/dstackai/runner/internal/log"
 	"github.com/sirupsen/logrus"
-	"gitlab.com/dstackai/dstackai-runner/consts"
-	"gitlab.com/dstackai/dstackai-runner/internal/log"
 )
 
 // todo check copy-pasted code against modern docker API

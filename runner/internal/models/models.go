@@ -1,7 +1,7 @@
 package models
 
 import (
-	"gitlab.com/dstackai/dstackai-runner/internal/states"
+	"github.com/dstackai/dstackai/runner/internal/states"
 )
 
 type Run struct {

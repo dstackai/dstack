@@ -6,8 +6,8 @@ import (
 	"sync"
 
 	"github.com/docker/go-connections/nat"
+	"github.com/dstackai/dstackai/runner/internal/ports/queue"
 	"github.com/google/uuid"
-	"gitlab.com/dstackai/dstackai-runner/internal/ports/queue"
 )
 
 type single struct {

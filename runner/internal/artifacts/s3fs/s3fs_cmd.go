@@ -9,11 +9,11 @@ import (
 	"strings"
 
 	"github.com/docker/docker/api/types/mount"
+	"github.com/dstackai/dstackai/runner/internal/artifacts"
+	"github.com/dstackai/dstackai/runner/internal/artifacts/client"
+	"github.com/dstackai/dstackai/runner/internal/gerrors"
+	"github.com/dstackai/dstackai/runner/internal/log"
 	"github.com/sirupsen/logrus"
-	"gitlab.com/dstackai/dstackai-runner/internal/artifacts"
-	"gitlab.com/dstackai/dstackai-runner/internal/artifacts/client"
-	"gitlab.com/dstackai/dstackai-runner/internal/gerrors"
-	"gitlab.com/dstackai/dstackai-runner/internal/log"
 )
 
 var _ artifacts.Artifacter = (*S3FSCmd)(nil)

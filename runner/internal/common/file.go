@@ -5,9 +5,9 @@ import (
 	"os"
 	"path/filepath"
 
+	"github.com/dstackai/dstackai/runner/consts"
+	"github.com/dstackai/dstackai/runner/internal/log"
 	"github.com/sirupsen/logrus"
-	"gitlab.com/dstackai/dstackai-runner/consts"
-	"gitlab.com/dstackai/dstackai-runner/internal/log"
 )
 
 func HomeDir() string {

@@ -5,10 +5,10 @@ import (
 	"log"
 	"os"
 
+	"github.com/dstackai/dstackai/runner/consts"
 	"github.com/urfave/cli/v2"
-	"gitlab.com/dstackai/dstackai-runner/consts"
 
-	"gitlab.com/dstackai/dstackai-runner/version"
+	"github.com/dstackai/dstackai/runner/version"
 )
 
 func App() {
@@ -66,6 +66,14 @@ func App() {
 				Action: func(c *cli.Context) error {
 					start(c.Int("log-level"), c.Int("http-port"))
 
+					return nil
+				},
+			},
+			{
+				Name:  "check",
+				Usage: "Checking the system for the possibility to run the runner",
+				Action: func(context *cli.Context) error {
+					check()
 					return nil
 				},
 			},

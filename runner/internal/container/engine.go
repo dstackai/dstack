@@ -12,9 +12,9 @@ import (
 	"github.com/docker/docker/api/types/filters"
 	docker "github.com/docker/docker/client"
 	"github.com/docker/docker/pkg/stdcopy"
-	"gitlab.com/dstackai/dstackai-runner/consts"
-	"gitlab.com/dstackai/dstackai-runner/internal/gerrors"
-	"gitlab.com/dstackai/dstackai-runner/internal/log"
+	"github.com/dstackai/dstackai/runner/consts"
+	"github.com/dstackai/dstackai/runner/internal/gerrors"
+	"github.com/dstackai/dstackai/runner/internal/log"
 )
 
 type Engine struct {

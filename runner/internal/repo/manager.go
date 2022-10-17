@@ -5,11 +5,11 @@ import (
 	"fmt"
 	"os"
 
+	"github.com/dstackai/dstackai/runner/internal/log"
 	"github.com/go-git/go-git/v5"
 	"github.com/go-git/go-git/v5/plumbing"
 	"github.com/go-git/go-git/v5/plumbing/transport/http"
 	gitssh "github.com/go-git/go-git/v5/plumbing/transport/ssh"
-	"gitlab.com/dstackai/dstackai-runner/internal/log"
 	"golang.org/x/crypto/ssh"
 )
 

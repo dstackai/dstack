@@ -14,8 +14,8 @@ import (
 	"github.com/aws/aws-sdk-go-v2/config"
 	"github.com/aws/aws-sdk-go-v2/service/cloudwatchlogs"
 	"github.com/aws/aws-sdk-go-v2/service/cloudwatchlogs/types"
-	"gitlab.com/dstackai/dstackai-runner/internal/gerrors"
-	"gitlab.com/dstackai/dstackai-runner/internal/log"
+	"github.com/dstackai/dstackai/runner/internal/gerrors"
+	"github.com/dstackai/dstackai/runner/internal/log"
 )
 
 var defaultFlushInterval = 250 * time.Millisecond

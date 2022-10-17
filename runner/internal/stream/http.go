@@ -6,9 +6,9 @@ import (
 	"net/http"
 	"sync"
 
+	"github.com/dstackai/dstackai/runner/internal/gerrors"
+	"github.com/dstackai/dstackai/runner/internal/log"
 	"github.com/gorilla/websocket"
-	"gitlab.com/dstackai/dstackai-runner/internal/gerrors"
-	"gitlab.com/dstackai/dstackai-runner/internal/log"
 )
 
 const (

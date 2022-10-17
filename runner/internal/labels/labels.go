@@ -1,7 +1,7 @@
 package labels
 
 import (
-	"gitlab.com/dstackai/dstackai-runner/internal/models"
+	"github.com/dstackai/dstackai/runner/internal/models"
 )
 
 func Combine(l ...map[string]string) map[string]string {

@@ -8,8 +8,8 @@ import (
 	"github.com/aws/aws-sdk-go-v2/config"
 	"github.com/aws/aws-sdk-go-v2/service/secretsmanager"
 	"github.com/aws/aws-sdk-go/aws"
-	"gitlab.com/dstackai/dstackai-runner/internal/log"
-	"gitlab.com/dstackai/dstackai-runner/internal/models"
+	"github.com/dstackai/dstackai/runner/internal/log"
+	"github.com/dstackai/dstackai/runner/internal/models"
 )
 
 type ClientSecret struct {

@@ -11,7 +11,7 @@ import (
 	"strings"
 
 	"github.com/bluekeyes/go-gitdiff/gitdiff"
-	"gitlab.com/dstackai/dstackai-runner/internal/log"
+	"github.com/dstackai/dstackai/runner/internal/log"
 )
 
 func ApplyDiff(ctx context.Context, dir, patch string) error {

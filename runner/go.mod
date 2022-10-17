@@ -1,4 +1,4 @@
-module gitlab.com/dstackai/dstackai-runner
+module github.com/dstackai/dstackai/runner
 
 go 1.16
 

@@ -6,9 +6,9 @@ import (
 	"io"
 	"io/ioutil"
 
-	"gitlab.com/dstackai/dstackai-runner/internal/artifacts"
-	"gitlab.com/dstackai/dstackai-runner/internal/backend"
-	"gitlab.com/dstackai/dstackai-runner/internal/models"
+	"github.com/dstackai/dstackai/runner/internal/artifacts"
+	"github.com/dstackai/dstackai/runner/internal/backend"
+	"github.com/dstackai/dstackai/runner/internal/models"
 	"gopkg.in/yaml.v3"
 )
 
