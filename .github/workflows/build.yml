@@ -157,12 +157,12 @@ jobs:
     strategy:
       matrix:
         include:
-          - {goos: "linux", goarch: "386", runson: "ubuntu-latest"}
-          - {goos: "linux", goarch: "amd64", runson: "ubuntu-latest"}
-          - {goos: "windows", goarch: "386", runson: "ubuntu-latest"}
-          - {goos: "windows", goarch: "amd64", runson: "ubuntu-latest"}
-          - {goos: "darwin", goarch: "amd64", runson: "macos-latest"}
-          - {goos: "darwin", goarch: "arm64", runson: "macos-latest"}
+          - {goos: "linux", goarch: "386", runson: "ubuntu-latest", platform: "x86", extension: ""}
+          - {goos: "linux", goarch: "amd64", runson: "ubuntu-latest", platform: "amd64", extension: ""}
+          - {goos: "windows", goarch: "386", runson: "ubuntu-latest", platform: "x86", extension: ".exe"}
+          - {goos: "windows", goarch: "amd64", runson: "ubuntu-latest", platform: "amd64", extension: ".exe"}
+          - {goos: "darwin", goarch: "amd64", runson: "macos-latest", platform: "amd64", extension: ""}
+          - {goos: "darwin", goarch: "arm64", runson: "macos-latest", platform: "arm64", extension: ""}
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v3
@@ -175,5 +175,5 @@ jobs:
           path: runner
       - name: Upload to S3
         run: |
-          aws s3 cp dstack-runner-${{ matrix.goos }}-${{ matrix.goarch }} "s3://dstack-runner-downloads-stgn/${{ github.run_number }}/binaries/dstack-runner-${{ matrix.goos }}-${{ matrix.goarch }}" --acl public-read
-          aws s3 cp dstack-runner-${{ matrix.goos }}-${{ matrix.goarch }} "s3://dstack-runner-downloads-stgn/latest/binaries/dstack-runner-${{ matrix.goos }}-${{ matrix.goarch }}" --acl public-read
+          aws s3 cp dstack-runner-${{ matrix.goos }}-${{ matrix.goarch }} "s3://dstack-runner-downloads-stgn/${{ github.run_number }}/binaries/dstack-runner-${{ matrix.goos }}-${{ matrix.platform }}${{ matrix.extension }}" --acl public-read
+          aws s3 cp dstack-runner-${{ matrix.goos }}-${{ matrix.goarch }} "s3://dstack-runner-downloads-stgn/latest/binaries/dstack-runner-${{ matrix.goos }}-${{ matrix.platform }}${{ matrix.extension }}" --acl public-read
