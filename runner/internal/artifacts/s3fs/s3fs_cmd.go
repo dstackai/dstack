@@ -13,7 +13,6 @@ import (
 	"github.com/dstackai/dstackai/runner/internal/artifacts/client"
 	"github.com/dstackai/dstackai/runner/internal/gerrors"
 	"github.com/dstackai/dstackai/runner/internal/log"
-	"github.com/sirupsen/logrus"
 )
 
 var _ artifacts.Artifacter = (*S3FSCmd)(nil)
@@ -76,6 +75,8 @@ func (s *S3FSCmd) DockerBindings(workDir string) []mount.Mount {
 		},
 	}
 }
+
+/*
 func mapLogrusS3FS(level logrus.Level) string {
 	switch level {
 	case logrus.ErrorLevel:
@@ -90,6 +91,7 @@ func mapLogrusS3FS(level logrus.Level) string {
 	}
 	return "crit"
 }
+*/
 
 func New(ctx context.Context, bucket, region, IAMRole, workDir, localPath, remotePath string) (*S3FSCmd, error) {
 	log.Trace(ctx, "Build FUSE engine")

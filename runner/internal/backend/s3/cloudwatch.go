@@ -233,19 +233,28 @@ func (l *Logger) WriteLogs(ctx context.Context) {
 	for {
 		select {
 		case <-ctx.Done():
-			l.publishButch(context.Background())
+			err := l.publishButch(context.Background())
+			if err != nil {
+				fmt.Println(err.Error())
+			}
 			l.mu.Lock()
 			l.logEvents = l.logEvents[:0]
 			l.mu.Unlock()
 			return
 		case <-ticker.C:
-			l.publishButch(ctx)
+			err := l.publishButch(ctx)
+			if err != nil {
+				fmt.Println(err.Error())
+			}
 			l.mu.Lock()
 			l.logEvents = l.logEvents[:0]
 			l.mu.Unlock()
 		case event, ok := <-l.logCh:
 			if !ok {
-				l.publishButch(ctx)
+				err := l.publishButch(ctx)
+				if err != nil {
+					fmt.Println(err.Error())
+				}
 				l.mu.Lock()
 				l.logEvents = l.logEvents[:0]
 				l.mu.Unlock()

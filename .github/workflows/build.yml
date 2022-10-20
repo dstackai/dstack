@@ -105,7 +105,7 @@ jobs:
         uses: golangci/golangci-lint-action@v3
         with:
           version: v1.29
-          args: --issues-exit-code=0
+          args: --config=/runner/.golangci-lint.yml
           working-directory: runner
 
       - name: Test
