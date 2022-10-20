@@ -4,10 +4,14 @@ import (
 	"bytes"
 	"context"
 	"fmt"
+	"io/ioutil"
+	"math/bits"
 	_ "net/http/pprof"
 	"os"
 	"os/signal"
 	"path/filepath"
+	"regexp"
+	"strconv"
 	"strings"
 	"sync"
 	"syscall"
@@ -21,15 +25,18 @@ import (
 	"github.com/dstackai/dstackai/runner/internal/container"
 	"github.com/dstackai/dstackai/runner/internal/executor"
 	"github.com/dstackai/dstackai/runner/internal/log"
+	"github.com/dstackai/dstackai/runner/internal/models"
 	"github.com/dstackai/dstackai/runner/internal/stream"
 	"github.com/sirupsen/logrus"
+	"github.com/urfave/cli/v2"
+	"gopkg.in/yaml.v3"
 )
 
 func main() {
 	App()
 }
 
-func start(logLevel int, httpPort int) {
+func start(logLevel int, httpPort int, configDir string) {
 	ctx := context.Background()
 	log.L.Logger.SetLevel(logrus.Level(logLevel))
 	fileLog, err := os.OpenFile("/var/log/dstack/output.log", os.O_RDWR|os.O_CREATE|os.O_APPEND, 0o777)
@@ -42,7 +49,7 @@ func start(logLevel int, httpPort int) {
 
 	common.CreateTMPDir()
 
-	pathConfig := filepath.Join(common.HomeDir(), consts.DSTACK_DIR_PATH, consts.CONFIG_FILE_NAME)
+	pathConfig := filepath.Join(configDir, consts.CONFIG_FILE_NAME)
 
 	b, err := backend.New(logCtx, pathConfig)
 	if err != nil {
@@ -64,7 +71,7 @@ func start(logLevel int, httpPort int) {
 
 	defer ex.Shutdown(context.Background())
 
-	err = ex.Init(ctxSig)
+	err = ex.Init(ctxSig, configDir)
 	if err != nil {
 		log.Error(logCtx, "Failed to init executor", "err", err)
 		cancel()
@@ -86,15 +93,30 @@ func start(logLevel int, httpPort int) {
 	time.Sleep(1 * time.Second) // TODO: ugly hack. Need wait for buf cloudwatch
 }
 
-func check() {
+func check(configDir string) error {
 	ctx := context.Background()
+	config := new(executor.Config)
+	thePathConfig := filepath.Join(configDir, consts.RUNNER_FILE_NAME)
+	if _, err := os.Stat(thePathConfig); os.IsNotExist(err) {
+		return cli.Exit("Failed to load config", 1)
+	}
+	theConfigFile, err := ioutil.ReadFile(thePathConfig)
+	if err != nil {
+		return cli.Exit("Unexpected error, please try to rerun", 1)
+	}
+	if err = yaml.Unmarshal(theConfigFile, config); err != nil {
+		return cli.Exit("Config file is corrupted or does not exists", 1)
+	}
+
+	config.Resources = new(models.Resource)
 	engine := container.NewEngine()
 	if engine == nil {
-		printErrorAndExit("Docker is not installed")
+		return cli.Exit("Docker is not installed", 1)
 	}
 	if engine.DockerRuntime() != consts.NVIDIA_RUNTIME {
-		printErrorAndExit("NVIDIA docker is not installed")
+		return cli.Exit("NVIDIA docker is not installed", 1)
 	}
+	config.Resources.Cpus, config.Resources.MemoryMiB = engine.CPU(), engine.MemMiB()
 	var logger bytes.Buffer
 	docker, err := engine.Create(ctx,
 		&container.Spec{
@@ -103,26 +125,47 @@ func check() {
 		},
 		&logger)
 	if err != nil {
-		printErrorAndExit("Failed to create docker container: " + err.Error())
+		return cli.Exit("Failed to create docker container: "+err.Error(), 1)
 	}
 	err = docker.Run(ctx)
 	if err != nil {
 		if strings.Contains(err.Error(), consts.NVIDIA_DRIVER_INIT_ERROR) {
-			printErrorAndExit("NVIDIA driver error:" + err.Error())
+			return cli.Exit("NVIDIA driver error:"+err.Error(), 1)
 		}
-		printErrorAndExit(err.Error())
+		return cli.Exit(err.Error(), 1)
 	}
 	if err = docker.Wait(ctx); err != nil {
-		printErrorAndExit("Failed to create docker container: " + err.Error())
+		return cli.Exit("Failed to create docker container: "+err.Error(), 1)
 	}
 
 	output := strings.Split(strings.TrimRight(logger.String(), "\n"), "\n")
 	if len(output) == 0 {
-		printErrorAndExit("GPU not found")
+		return cli.Exit("GPU not found", 1)
 	}
-}
+	var gpus []models.Gpu
+	for _, x := range output {
+		regex := regexp.MustCompile(` *, *`)
+		gpu := regex.Split(x, -1)
+		memoryTotal := strings.Trim(strings.Split(gpu[1], "MiB")[0], " ")
+		memoryMiB, err := strconv.ParseInt(memoryTotal, 10, bits.UintSize)
+		if err != nil {
+			return cli.Exit("GPU memory conversion to integer failed: "+err.Error(), 1)
+		}
+		gpus = append(gpus, models.Gpu{
+			Name:      gpu[0],
+			MemoryMiB: uint64(memoryMiB),
+		})
+	}
+	config.Resources.Gpus = gpus
 
-func printErrorAndExit(msg string) {
-	_, _ = os.Stderr.WriteString(msg + "\n")
-	os.Exit(1)
+	theConfigFile, err = yaml.Marshal(config)
+	if err != nil {
+		return cli.Exit("Unexpected error, please try to rerun", 1)
+	}
+	err = ioutil.WriteFile(thePathConfig, theConfigFile, 0o644)
+	if err != nil {
+		return cli.Exit("Unexpected error, please try to rerun", 1)
+	}
+
+	return nil
 }

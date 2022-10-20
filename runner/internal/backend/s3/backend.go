@@ -269,8 +269,8 @@ func (s S3) ListSubDir(ctx context.Context, dir string) ([]string, error) {
 		return nil, gerrors.Wrap(err)
 	}
 	artifact := make(map[string]struct{})
-	for _, path := range listDir {
-		pathSlice := strings.Split(path, "/")
+	for _, pathDir := range listDir {
+		pathSlice := strings.Split(pathDir, "/")
 		if len(pathSlice) > 4 && pathSlice[4] != "" {
 			artifact[filepath.Join(pathSlice[:5]...)] = struct{}{}
 		}

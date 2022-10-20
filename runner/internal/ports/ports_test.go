@@ -99,3 +99,11 @@ func TestMgr_BindPorts(t *testing.T) {
 	}})
 
 }
+
+func TestSystem(t *testing.T) {
+	m := NewSystem()
+	taskID, err := m.Register(3, nil)
+	assert.Equal(t, err, nil)
+	listPost := m.Ports(taskID)
+	assert.Equal(t, 3, len(listPost))
+}

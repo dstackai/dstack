@@ -4,8 +4,10 @@ import (
 	"fmt"
 	"log"
 	"os"
+	"path/filepath"
 
 	"github.com/dstackai/dstackai/runner/consts"
+	"github.com/dstackai/dstackai/runner/internal/common"
 	"github.com/urfave/cli/v2"
 
 	"github.com/dstackai/dstackai/runner/version"
@@ -22,6 +24,11 @@ func App() {
 				Value:       2,
 				DefaultText: "4 (Info)",
 				Usage:       "log verbosity level: 2 (Error), 3 (Warning), 4 (Info), 5 (Debug), 6 (Trace)",
+			},
+			&cli.StringFlag{
+				Name:  "config-dir",
+				Usage: "Set custom config dir",
+				Value: filepath.Join(common.HomeDir(), ".dstack"),
 			},
 		},
 		Commands: []*cli.Command{
@@ -64,17 +71,15 @@ func App() {
 					},
 				},
 				Action: func(c *cli.Context) error {
-					start(c.Int("log-level"), c.Int("http-port"))
-
+					start(c.Int("log-level"), c.Int("http-port"), c.String("config-dir"))
 					return nil
 				},
 			},
 			{
 				Name:  "check",
 				Usage: "Checking the system for the possibility to run the runner",
-				Action: func(context *cli.Context) error {
-					check()
-					return nil
+				Action: func(c *cli.Context) error {
+					return check(c.String("config-dir"))
 				},
 			},
 		},

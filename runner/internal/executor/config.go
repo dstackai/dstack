@@ -9,7 +9,6 @@ import (
 	"strings"
 
 	"github.com/dstackai/dstackai/runner/consts"
-	"github.com/dstackai/dstackai/runner/internal/common"
 	"github.com/dstackai/dstackai/runner/internal/gerrors"
 	"github.com/dstackai/dstackai/runner/internal/log"
 	"github.com/dstackai/dstackai/runner/internal/models"
@@ -24,8 +23,8 @@ type Config struct {
 	ExposePort *string          `yaml:"expose_ports,omitempty"`
 }
 
-func (ex *Executor) loadConfig() error {
-	thePathConfig := filepath.Join(common.HomeDir(), consts.DSTACK_DIR_PATH, consts.RUNNER_FILE_NAME)
+func (ex *Executor) loadConfig(configDir string) error {
+	thePathConfig := filepath.Join(configDir, consts.RUNNER_FILE_NAME)
 	if _, err := os.Stat(thePathConfig); os.IsNotExist(err) {
 		log.Error(context.Background(), "Failed to load config", "err", gerrors.Wrap(err))
 		return err
@@ -39,21 +38,23 @@ func (ex *Executor) loadConfig() error {
 		log.Error(context.Background(), "Config file is corrupted or does not exists", "err", gerrors.Wrap(err))
 		return err
 	}
-	if ex.config.Resources == nil {
-		ex.config.Resources, err = updateResourceInfo()
-		if err != nil {
-			return gerrors.Wrap(err)
+	/*
+		if ex.config.Resources == nil {
+			ex.config.Resources, err = updateResourceInfo()
+			if err != nil {
+				return gerrors.Wrap(err)
+			}
+			err = ex.saveConfig(configDir)
+			if err != nil {
+				return gerrors.Wrap(err)
+			}
 		}
-		err = ex.saveConfig()
-		if err != nil {
-			return gerrors.Wrap(err)
-		}
-	}
+	*/
 	return nil
 }
-func (ex *Executor) saveConfig() error {
+func (ex *Executor) saveConfig(configDir string) error {
 	log.Info(context.Background(), "Save runner's config")
-	thePathConfig := filepath.Join(common.HomeDir(), consts.DSTACK_DIR_PATH, consts.RUNNER_FILE_NAME)
+	thePathConfig := filepath.Join(configDir, consts.RUNNER_FILE_NAME)
 	theConfigFile, err := yaml.Marshal(ex.config)
 	if err != nil {
 		log.Error(context.Background(), "Unexpected error, please try to rerun", "err", gerrors.Wrap(err))

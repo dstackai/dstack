@@ -48,7 +48,7 @@ func (ex *Executor) SetStreamLogs(w *stream.Server) {
 	ex.streamLogs = w
 }
 
-func (ex *Executor) Init(ctx context.Context) error {
+func (ex *Executor) Init(ctx context.Context, configDir string) error {
 	defer func() {
 		if r := recover(); r != nil {
 			log.Error(ctx, "[PANIC]", "", r)
@@ -56,7 +56,7 @@ func (ex *Executor) Init(ctx context.Context) error {
 			panic(r)
 		}
 	}()
-	err := ex.loadConfig()
+	err := ex.loadConfig(configDir)
 	if err != nil {
 		return err
 	}
@@ -76,7 +76,8 @@ func (ex *Executor) Init(ctx context.Context) error {
 		return err
 	}
 
-	ex.pm = ports.NewSingle(ex.config.ExposePorts())
+	//ex.pm = ports.NewSingle(ex.config.ExposePorts())
+	ex.pm = ports.NewSystem()
 	job := ex.backend.Job(ctx)
 
 	for _, artifact := range job.Artifacts {
