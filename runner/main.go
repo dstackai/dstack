@@ -114,7 +114,7 @@ func check(configDir string) error {
 		return cli.Exit("Docker is not installed", 1)
 	}
 	config.Resources.Cpus, config.Resources.MemoryMiB = engine.CPU(), engine.MemMiB()
-	if engine.DockerRuntime() != consts.NVIDIA_RUNTIME {
+	if engine.DockerRuntime() == consts.NVIDIA_RUNTIME {
 		var logger bytes.Buffer
 		docker, err := engine.Create(ctx,
 			&container.Spec{
