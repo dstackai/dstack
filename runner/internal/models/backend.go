@@ -6,6 +6,7 @@ type Resoures struct {
 	GPUs          []GPU `yaml:"gpus,omitempty"`
 	Interruptible bool  `yaml:"interruptible,omitempty"`
 	ShmSize       int64 `yaml:"shm_size_mib,omitempty"`
+	Local         bool  `json:"local"`
 }
 
 type Job struct {
@@ -63,6 +64,7 @@ type Requirements struct {
 	Memory        int   `yaml:"memory_mib,omitempty"`
 	Interruptible bool  `yaml:"interruptible,omitempty"`
 	ShmSize       int64 `yaml:"shm_size_mib,omitempty"`
+	Local         bool  `json:"local"`
 }
 
 type GPU struct {

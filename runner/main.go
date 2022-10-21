@@ -93,7 +93,7 @@ func start(logLevel int, httpPort int, configDir string) {
 	time.Sleep(1 * time.Second) // TODO: ugly hack. Need wait for buf cloudwatch
 }
 
-func check(configDir string) error {
+func check(configDir string, needGPU bool) error {
 	ctx := context.Background()
 	config := new(executor.Config)
 	thePathConfig := filepath.Join(configDir, consts.RUNNER_FILE_NAME)
@@ -113,51 +113,52 @@ func check(configDir string) error {
 	if engine == nil {
 		return cli.Exit("Docker is not installed", 1)
 	}
-	if engine.DockerRuntime() != consts.NVIDIA_RUNTIME {
-		return cli.Exit("NVIDIA docker is not installed", 1)
-	}
 	config.Resources.Cpus, config.Resources.MemoryMiB = engine.CPU(), engine.MemMiB()
-	var logger bytes.Buffer
-	docker, err := engine.Create(ctx,
-		&container.Spec{
-			Image:    consts.NVIDIA_CUDA_IMAGE,
-			Commands: strings.Split(consts.NVIDIA_SMI_CMD, " "),
-		},
-		&logger)
-	if err != nil {
-		return cli.Exit("Failed to create docker container: "+err.Error(), 1)
-	}
-	err = docker.Run(ctx)
-	if err != nil {
-		if strings.Contains(err.Error(), consts.NVIDIA_DRIVER_INIT_ERROR) {
-			return cli.Exit("NVIDIA driver error:"+err.Error(), 1)
+	if needGPU {
+		if engine.DockerRuntime() != consts.NVIDIA_RUNTIME {
+			return cli.Exit("NVIDIA docker is not installed", 1)
 		}
-		return cli.Exit(err.Error(), 1)
-	}
-	if err = docker.Wait(ctx); err != nil {
-		return cli.Exit("Failed to create docker container: "+err.Error(), 1)
-	}
-
-	output := strings.Split(strings.TrimRight(logger.String(), "\n"), "\n")
-	if len(output) == 0 {
-		return cli.Exit("GPU not found", 1)
-	}
-	var gpus []models.Gpu
-	for _, x := range output {
-		regex := regexp.MustCompile(` *, *`)
-		gpu := regex.Split(x, -1)
-		memoryTotal := strings.Trim(strings.Split(gpu[1], "MiB")[0], " ")
-		memoryMiB, err := strconv.ParseInt(memoryTotal, 10, bits.UintSize)
+		var logger bytes.Buffer
+		docker, err := engine.Create(ctx,
+			&container.Spec{
+				Image:    consts.NVIDIA_CUDA_IMAGE,
+				Commands: strings.Split(consts.NVIDIA_SMI_CMD, " "),
+			},
+			&logger)
 		if err != nil {
-			return cli.Exit("GPU memory conversion to integer failed: "+err.Error(), 1)
+			return cli.Exit("Failed to create docker container: "+err.Error(), 1)
 		}
-		gpus = append(gpus, models.Gpu{
-			Name:      gpu[0],
-			MemoryMiB: uint64(memoryMiB),
-		})
-	}
-	config.Resources.Gpus = gpus
+		err = docker.Run(ctx)
+		if err != nil {
+			if strings.Contains(err.Error(), consts.NVIDIA_DRIVER_INIT_ERROR) {
+				return cli.Exit("NVIDIA driver error:"+err.Error(), 1)
+			}
+			return cli.Exit(err.Error(), 1)
+		}
+		if err = docker.Wait(ctx); err != nil {
+			return cli.Exit("Failed to create docker container: "+err.Error(), 1)
+		}
 
+		output := strings.Split(strings.TrimRight(logger.String(), "\n"), "\n")
+		if len(output) == 0 {
+			return cli.Exit("GPU not found", 1)
+		}
+		var gpus []models.Gpu
+		for _, x := range output {
+			regex := regexp.MustCompile(` *, *`)
+			gpu := regex.Split(x, -1)
+			memoryTotal := strings.Trim(strings.Split(gpu[1], "MiB")[0], " ")
+			memoryMiB, err := strconv.ParseInt(memoryTotal, 10, bits.UintSize)
+			if err != nil {
+				return cli.Exit("GPU memory conversion to integer failed: "+err.Error(), 1)
+			}
+			gpus = append(gpus, models.Gpu{
+				Name:      gpu[0],
+				MemoryMiB: uint64(memoryMiB),
+			})
+		}
+		config.Resources.Gpus = gpus
+	}
 	theConfigFile, err = yaml.Marshal(config)
 	if err != nil {
 		return cli.Exit("Unexpected error, please try to rerun", 1)

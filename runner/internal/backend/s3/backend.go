@@ -180,6 +180,9 @@ func (s *S3) Shutdown(ctx context.Context) error {
 	if s == nil {
 		return gerrors.New("Backend is nil")
 	}
+	if s.state.Resources.Local {
+		return nil
+	}
 	if s.state.Resources.Interruptible {
 		log.Trace(ctx, "Instance interruptible")
 		if err := s.cliEC2.CancelSpot(ctx, s.state.RequestID); err != nil {
