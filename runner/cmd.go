@@ -69,12 +69,6 @@ func App() {
 						Usage:   "Set a http port",
 						Value:   "80",
 					},
-					&cli.BoolFlag{
-						Name:    "gpu",
-						Aliases: []string{"GPU"},
-						Usage:   "Check support GPU",
-						Value:   false,
-					},
 				},
 				Action: func(c *cli.Context) error {
 					start(c.Int("log-level"), c.Int("http-port"), c.String("config-dir"))
@@ -85,7 +79,7 @@ func App() {
 				Name:  "check",
 				Usage: "Checking the system for the possibility to run the runner",
 				Action: func(c *cli.Context) error {
-					return check(c.String("config-dir"), c.Bool("gpu"))
+					return check(c.String("config-dir"))
 				},
 			},
 		},

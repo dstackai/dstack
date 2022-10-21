@@ -93,7 +93,7 @@ func start(logLevel int, httpPort int, configDir string) {
 	time.Sleep(1 * time.Second) // TODO: ugly hack. Need wait for buf cloudwatch
 }
 
-func check(configDir string, needGPU bool) error {
+func check(configDir string) error {
 	ctx := context.Background()
 	config := new(executor.Config)
 	thePathConfig := filepath.Join(configDir, consts.RUNNER_FILE_NAME)
@@ -114,10 +114,7 @@ func check(configDir string, needGPU bool) error {
 		return cli.Exit("Docker is not installed", 1)
 	}
 	config.Resources.Cpus, config.Resources.MemoryMiB = engine.CPU(), engine.MemMiB()
-	if needGPU {
-		if engine.DockerRuntime() != consts.NVIDIA_RUNTIME {
-			return cli.Exit("NVIDIA docker is not installed", 1)
-		}
+	if engine.DockerRuntime() != consts.NVIDIA_RUNTIME {
 		var logger bytes.Buffer
 		docker, err := engine.Create(ctx,
 			&container.Spec{
@@ -140,9 +137,6 @@ func check(configDir string, needGPU bool) error {
 		}
 
 		output := strings.Split(strings.TrimRight(logger.String(), "\n"), "\n")
-		if len(output) == 0 {
-			return cli.Exit("GPU not found", 1)
-		}
 		var gpus []models.Gpu
 		for _, x := range output {
 			regex := regexp.MustCompile(` *, *`)
