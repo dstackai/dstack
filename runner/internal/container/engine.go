@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"io"
 	"io/ioutil"
+	"runtime"
 	"strings"
 
 	"github.com/docker/docker/api/types"
@@ -108,8 +109,12 @@ func (r *Engine) Create(ctx context.Context, spec *Spec, logs io.Writer) (*Docke
 		ExposedPorts: spec.ExposedPorts,
 		Labels:       spec.Labels,
 	}
+	var networkMode container.NetworkMode = "default"
+	if supportNetworkModeHost() {
+		networkMode = "host"
+	}
 	hostConfig := &container.HostConfig{
-		NetworkMode:     "host",
+		NetworkMode:     networkMode,
 		PortBindings:    spec.BindingPorts,
 		PublishAllPorts: true,
 		ShmSize:         spec.ShmSize * 1024 * 1024,
@@ -285,4 +290,13 @@ func ShellCommands(commands []string) []string {
 func BytesToMiB(bytesCount int64) uint64 {
 	var mib int64 = 1024 * 1024
 	return uint64(bytesCount / mib)
+}
+
+func supportNetworkModeHost() bool {
+	switch runtime.GOOS {
+	case "linux":
+		return true
+	default:
+		return false
+	}
 }
