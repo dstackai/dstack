@@ -3,7 +3,7 @@
 `dstack` lets you run any scripts in your cloud account from the command line. 
 You don't have to worry about provisioning compute resources, setting up the environment, or managing data.
 
-`dstack` is easy to use with Python scripts, Git, and your IDE.
+It is easy to use with Python scripts, Git, and your IDE.
 
 ## Processing data
 
@@ -66,10 +66,10 @@ use `conda env create --prefix` to create it, and mark the corresponding folder 
 
 ## When to use dstack?
 
-`dstack` comes handy if you want to be able to quickly run scripts in the cloud while
+The utility comes handy if you want to be able to quickly run scripts in the cloud while
 keeping them highly reproducible.
+
+It is especially great if you prefer to use Git and your IDE.
 
 `dstack` is an alternative to creating cloud machines manually
 or to using the MLOps platforms (such as AWS SageMaker, KubeFlow, etc).
-
-`dstack` is especially great if you prefer to use Git and your IDE.

@@ -1,10 +1,20 @@
+# Project information
 site_name: dstack
+site_url: https://docs.dstack.ai
+site_author: Andrey Cheptsov
+site_description: >-
+  dstack is a command-line utility to run ML workflows in the cloud,
+  while keeping your workflows highly reproducible.
+
+# Repository
 repo_url: https://github.com/dstackai/dstack
 repo_name: dstackai/dstack
-site_description: >-
-  dstack is a command-line utility to run ML workflows in the cloud.
 edit_uri: edit/master/docs/
+
+#Copyright
 copyright: © 2022 dstack GmbH
+
+# Configuration
 theme:
   name: material
   custom_dir: docs/overrides
@@ -39,12 +49,16 @@ theme:
     - navigation.expand
     - navigation.top
     - announce.dismiss
+
+# Plugins
 plugins:
   - social
   - search
 #  - redirects:
 #      redirect_maps:
 #        'index.md': 'quickstart/index.md'
+
+# Extensions
 markdown_extensions:
   - pymdownx.emoji:
       emoji_index: !!python/name:materialx.emoji.twemoji
@@ -63,6 +77,8 @@ markdown_extensions:
       toc_depth: 2
   - attr_list
   - md_in_html
+
+# Customization
 extra_css:
   - stylesheets/extra.css
 extra_javascript:
@@ -84,6 +100,8 @@ extra:
       link: https://mlopsfluff.dstack.ai
     - icon: fontawesome/brands/twitter
       link: https://twitter.com/dstackai
+
+# Page tree
 nav:
   - Guide:
     - Introduction:
@@ -92,7 +110,7 @@ nav:
         - Use cases: use-cases.md
     - Getting started:
         - Installation: installation.md
-        - "Tutorial: Quickstart": tutorials/first-steps.md
+        - "Tutorial: Quickstart": tutorials/quickstart.md
     - Examples:
         - Hello, world: examples/hello.md
         - Python: examples/python.md

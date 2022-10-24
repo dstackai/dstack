@@ -1,6 +1,7 @@
 # What is dstack?
 
-dstack is a ultra-light-weight utility to run ML workflows in the cloud and manage data.
+dstack is a command-line utility to run ML workflows in the cloud,
+while keeping your workflows highly reproducible.
 
 ## Features
 

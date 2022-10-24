@@ -4,7 +4,8 @@ title: Introduction to dstack
 
 # Introduction to dstack
 
-`dstack` is an ultra-light-weight command-line utility to run ML workflows in the cloud.
+`dstack` is a command-line utility to run ML workflows in the cloud,
+while keeping your workflows highly reproducible.
 
 ## Introduction
 
