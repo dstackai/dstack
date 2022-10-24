@@ -4,22 +4,22 @@
 ______________________________________________________________________
 
 
-[![PyPI](https://img.shields.io/github/workflow/status/dstackai/dstack/Build?style=for-the-badge)](https://github.com/dstackai/dstack/actions/workflows/build.yml)
-[![PyPI](https://img.shields.io/pypi/v/dstack?style=for-the-badge)](https://pypi.org/project/dstack/)
-[![PyPI - License](https://img.shields.io/pypi/l/dstack?style=for-the-badge&color=blue)](https://github.com/dstackai/dstack/blob/master/LICENSE.md)
+[![PyPI](https://img.shields.io/github/workflow/status/dstackai/dstack/Build?style=flat-square)](https://github.com/dstackai/dstack/actions/workflows/build.yml)
+[![PyPI](https://img.shields.io/pypi/v/dstack?style=flat-square)](https://pypi.org/project/dstack/)
+[![PyPI - License](https://img.shields.io/pypi/l/dstack?style=flat-square&color=blue)](https://github.com/dstackai/dstack/blob/master/LICENSE.md)
 
-[Documentation](https://docs.dstack.ai) | [Issue tracker](https://github.com/dstackai/dstack/issues) | [Slack chat](https://join.slack.com/t/dstackai/shared_invite/zt-xdnsytie-D4qU9BvJP8vkbkHXdi6clQ)
+[Documentation](https://docs.dstack.ai) | [Community chat](https://join.slack.com/t/dstackai/shared_invite/zt-xdnsytie-D4qU9BvJP8vkbkHXdi6clQ) | [Newsletter](https://mlopsfluff.dstack.ai) | [Twitter](https://twitter.com/dstackai)
 
 </div>
 
-`dstack` is a lightweight command-line utility to provision infrastructure for ML workflows.
+`dstack` is an ultra-light-weight command-line utility to run ML workflows in the cloud.
+
 
 ## Features
 
  * Define your ML workflows declaratively, incl. their dependencies, environment, and required compute resources 
  * Run workflows via the `dstack` CLI. Have infrastructure provisioned automatically in a configured cloud account. 
- * Save output artifacts, such as data and models, and reuse them in other ML workflows
- * Use `dstack` to process data, train models, host apps, and launch dev environments
+ * Save output artifacts, such as data and models, to reuse them in other ML workflows
 
 ## How does it work?
 
@@ -130,9 +130,9 @@ and dev environments.
 ## More information
 
  * [Documentation](https://docs.dstack.ai)
- * [Issue tracker](https://github.com/dstackai/dstack/issues)
- * [Slack chat](https://join.slack.com/t/dstackai/shared_invite/zt-xdnsytie-D4qU9BvJP8vkbkHXdi6clQ)
- * [Substack](https://mlopsfluff.dstack.ai/)
+ * [GitHub Issues](https://github.com/dstackai/dstack/issues)
+ * [Community chat](https://join.slack.com/t/dstackai/shared_invite/zt-xdnsytie-D4qU9BvJP8vkbkHXdi6clQ)
+ * [Newsletter](https://mlopsfluff.dstack.ai/)
  * [Twitter](https://twitter.com/dstackai)
  
 ##  Licence

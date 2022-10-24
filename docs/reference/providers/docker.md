@@ -10,23 +10,21 @@ Docker image that has Conda and the CUDA driver pre-installed.
 
 ## Example usage 
 
-=== ".dstack/workflows.yaml"
-
-    ```yaml
-    workflows:
-      - name: train
-        provider: docker
-        image: ubuntu
-        commands:
-          - mkdir -p output
-          - echo 'Hello, world!' > output/hello.txt
-        artifacts:
-          - path: output
-        resources:
-          gpu:
-            name: "K80"
-            count: 1
-    ```
+```yaml
+workflows:
+  - name: train
+    provider: docker
+    image: ubuntu
+    commands:
+      - mkdir -p output
+      - echo 'Hello, world!' > output/hello.txt
+    artifacts:
+      - path: output
+    resources:
+      gpu:
+        name: "K80"
+        count: 1
+```
 
 ## Properties reference
 

@@ -2,21 +2,22 @@
 
 Get involved with the community of dstack using the links below.
 
-##  :material-github: GitHub
+<div class="grid cards" markdown>
+- [**:material-github: GitHub repo** 
+   Check the source code of dstack. Pull requests are very welcome.
+  ](https://github.com/dstackai/dstack)
+- [**:material-slack: Community chat**
+   Join our Slack to get help or chat with other users.
+  ](https://join.slack.com/t/dstackai/shared_invite/zt-xdnsytie-D4qU9BvJP8vkbkHXdi6clQ)
+- [**:material-bug: Issue tracker**
+   Experience a bug or miss a feature?
+   File an issue to the tracker. 
+  ](https://github.com/dstackai/dstack/issues)
+- [**:material-rss: Newsletter**
+   Subscribe for our newsletter to receive major news and updates.
+  ](https://mlopsfluff.dstack.ai)
+- [**:fontawesome-brands-twitter: Twitter**
+   Follow our Twitter for news and tips about dstack.
+  ](https://twitter.com/dstackai)
+</div>
 
-Check the source code of the project on [GitHub](https://github.com/dstackai/dstack). Pull requests are very welcome.
-
-## :material-bug: Issue tracker
-
-Experience a bug in dstack or find something inconvenient?
-File a [GitHub issue](https://github.com/dstackai/dstack/issues). 
-
-## :material-slack: Slack chat
-
-Need help with using dstack or want to chat with other users? 
-Join our [Slack chat](https://join.slack.com/t/dstackai/shared_invite/zt-xdnsytie-D4qU9BvJP8vkbkHXdi6clQ).
-
-## :material-rss: Substack
-
-Stay up to date with the latest news about dstack through our 
-[newsletter](https://mlopsfluff.dstack.ai/). No spam.

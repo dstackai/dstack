@@ -6,21 +6,13 @@ come with Python and Conda pre-installed.
 
 Create the `.dstack/workflows.yaml` and `hello.py` files in your project directory:
 
-=== ".dstack/workflows.yaml"
-
-    ```yaml
-    workflows:
-      - name: hello-py
-        provider: bash
-        commands:
-          - python hello.py
-    ```
-
-=== "hello.py"
-
-    ```python
-    print("Hello world")
-    ```
+```yaml
+workflows:
+  - name: hello-py
+    provider: bash
+    commands:
+      - python hello.py
+```
 
 Now, use the `dstack run` command to run it:
 
@@ -45,32 +37,14 @@ Hello, world
 
 You can use the `pip` or the `conda` executables to install Python packages:
 
-=== ".dstack/workflows.yaml"
-
-    ```yaml
-    workflows:
-      - name: hello-pandas
-        provider: bash
-        commands:
-          - conda install pandas -y
-          - python hello_pandas.py
-    ```
-
-=== "hello_pandas.py"
-
-    ```python
-    import pandas as pd
-
-    data = {
-      "calories": [420, 380, 390],
-      "duration": [50, 40, 45]
-    }
-    
-    #load data into a DataFrame object:
-    df = pd.DataFrame(data)
-    
-    print(df) 
-    ```
+```yaml
+workflows:
+  - name: hello-pandas
+    provider: bash
+    commands:
+      - conda install pandas -y
+      - python hello_pandas.py
+```
 
 !!! tip "NOTE:"
     You can create custom Conda environments using `conda env create --prefix` 
@@ -81,19 +55,11 @@ You can use the `pip` or the `conda` executables to install Python packages:
 By default, the workflow uses the same Python version that you use locally. 
 You can override the major Python version using the `python` property.
 
-=== ".dstack/workflows.yaml"
-
-    ```yaml
-    workflows:
-      - name: hello-py-39
-        provider: bash
-        python: 3.9
-        commands:
-          - python hello.py
-    ```
-
-=== "hello.py"
-
-    ```python
-    print("Hello world")
-    ```
+```yaml
+workflows:
+  - name: hello-py-39
+    provider: bash
+    python: 3.9
+    commands:
+      - python hello.py
+```

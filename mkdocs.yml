@@ -2,14 +2,13 @@ site_name: dstack
 repo_url: https://github.com/dstackai/dstack
 repo_name: dstackai/dstack
 site_description: >-
-  dstack is an open-source CLI that allow to define ML workflows as code and run them on cloud. 
-  It provisions infrastructure and manages data automatically.
+  dstack is a command-line utility to run ML workflows in the cloud.
 edit_uri: edit/master/docs/
 copyright: © 2022 dstack GmbH
 theme:
   name: material
   custom_dir: docs/overrides
-  logo: assets/logo.svg
+  logo: assets/dstack_notext.svg
   favicon: images/dstack_fav_32.ico
   icon:
     repo: fontawesome/brands/github
@@ -40,8 +39,9 @@ theme:
     - navigation.expand
     - navigation.top
     - announce.dismiss
-#plugins:
-#  - search
+plugins:
+  - social
+  - search
 #  - redirects:
 #      redirect_maps:
 #        'index.md': 'quickstart/index.md'
@@ -80,17 +80,19 @@ extra:
       link: https://pypi.org/project/dstack/
     - icon: fontawesome/brands/slack
       link: https://join.slack.com/t/dstackai/shared_invite/zt-xdnsytie-D4qU9BvJP8vkbkHXdi6clQ
-    - icon: simple/substack
+    - icon: material/rss
       link: https://mlopsfluff.dstack.ai
     - icon: fontawesome/brands/twitter
       link: https://twitter.com/dstackai
 nav:
-  - Quickstart:
+  - Guide:
+    - Introduction:
+        - Overview: index.md
+        - What is dstack?: what-is-dstack.md
+        - Use cases: use-cases.md
     - Getting started:
-        - What is dstack?: index.md
         - Installation: installation.md
-#        - Concepts: concepts.md
-        - "Tutorial: First steps": tutorials/first-steps.md
+        - "Tutorial: Quickstart": tutorials/first-steps.md
     - Examples:
         - Hello, world: examples/hello.md
         - Python: examples/python.md
@@ -103,9 +105,7 @@ nav:
         - Dev environments: examples/devs.md
     - Other docs:
       - FAQs: faq.md
-#        - Cheat sheet: other/cheatsheet.md
   - Reference:
-#      - Examples: reference/examples/index.md
       - CLI:
         - dstack: reference/cli/index.md
         - dstack run: reference/cli/run.md

@@ -6,17 +6,15 @@ allow workflows to save output files as artifacts.
 
 Here's a workflow that creates the `output/hello.txt` file and saves it as an artifact.
 
-=== ".dstack/workflows.yaml"
-
-    ```yaml
-    workflows:
-      - name: hello-txt
-        provider: bash
-        commands:
-          - echo "Hello world" > output/hello.txt
-        artifacts:
-          - path: output 
-    ```
+```yaml
+workflows:
+  - name: hello-txt
+    provider: bash
+    commands:
+      - echo "Hello world" > output/hello.txt
+    artifacts:
+      - path: output 
+```
 
 !!! info "NOTE:"
     Artifacts are saved at the end of the workflow.
@@ -57,29 +55,16 @@ dstack artifacts download grumpy-zebra-1 .
 If you want your workflow to save artifacts as you write files to the disk (in real time), 
 you can use the `mount` option:
 
-=== ".dstack/workflows.yaml"
-
-    ```yaml
-    workflows:
-      - name: hello-sh
-        provider: bash
-        commands:
-          - bash hello.sh
-        artifacts:
-          - path: output
-            mount: true
-    ```
-
-=== "hello.sh"
-
-    ```bash
-    for i in {000..100}
-    do
-        sleep 1
-        echo $i > "output/${i}.txt"
-        echo "Wrote output/${i}.txt"
-    done
-    ```
+```yaml
+workflows:
+  - name: hello-sh
+    provider: bash
+    commands:
+      - bash hello.sh
+    artifacts:
+      - path: output
+        mount: true
+```
 
 !!! info "NOTE:"
     Every read or write operation within the mounted artifact directory will create

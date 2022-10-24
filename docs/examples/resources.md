@@ -8,33 +8,29 @@ If you request GPU, the provider pre-installs the CUDA driver for you.
 
 Let's create a workflow that uses a Tesla V100 GPU.
 
-=== ".dstack/workflows.yaml"
-
-    ```yaml
-    workflows:
-      - name: gpu-v100
-        provider: bash
-        commands:
-          - nvidia-smi
-        resources:
-          gpu: 
-            name: V100
-            count: 1
-    ```
+```yaml
+workflows:
+  - name: gpu-v100
+    provider: bash
+    commands:
+      - nvidia-smi
+    resources:
+      gpu: 
+        name: V100
+        count: 1
+```
 
 If you don't specify the name of GPU, dstack will use the cheapest available GPU (e.g. Tesla K80). 
 
-=== ".dstack/workflows.yaml"
-
-    ```yaml
-    workflows:
-      - name: gpu-1
-        provider: bash
-        commands:
-          - nvidia-smi
-        resources:
-          gpu: 1
-    ```
+```yaml
+workflows:
+  - name: gpu-1
+    provider: bash
+    commands:
+      - nvidia-smi
+    resources:
+      gpu: 1
+```
 
 !!! info "NOTE:"
     If you want to use GPU with your AWS account, make sure the 
@@ -44,17 +40,15 @@ If you don't specify the name of GPU, dstack will use the cheapest available GPU
 
 Here's an example of a workflow that requires 64GB of RAM.
 
-=== ".dstack/workflows.yaml"
-
-    ```yaml
-    workflows:
-      - name: gpu-v100
-        provider: bash
-        commands:
-          - free -m
-        resources:
-          memory: 64GB
-    ```
+```yaml
+workflows:
+  - name: gpu-v100
+    provider: bash
+    commands:
+      - free -m
+    resources:
+      memory: 64GB
+```
 
 ## Shared memory
 
@@ -64,17 +58,15 @@ Here's an example of a workflow that requires 64GB of RAM.
 
 Here's a workflow that uses `16GB` of shared memory.
 
-=== ".dstack/workflows.yaml"
-
-    ```yaml
-    workflows:
-      - name: shm-size
-        provider: bash
-        commands:
-          - df /dev/shm
-        resources:
-          shm_size: 16GB 
-    ```
+```yaml
+workflows:
+  - name: shm-size
+    provider: bash
+    commands:
+      - df /dev/shm
+    resources:
+      shm_size: 16GB 
+```
 
 ## Interruptible instances
 
@@ -86,17 +78,15 @@ Interruptible instances can be a great way to use expensive GPU at affordable pr
 
 Here's an example of a workflow that uses an interruptible instance:
 
-=== ".dstack/workflows.yaml"
-
-    ```yaml
-    workflows:
-      - name: hello-i
-        provider: bash
-        commands:
-          - echo "Hello world"
-        resources:
-          interruptible: true
-    ```
+```yaml
+workflows:
+  - name: hello-i
+    provider: bash
+    commands:
+      - echo "Hello world"
+    resources:
+      interruptible: true
+```
 
 !!! info "NOTE:"
     If you want to use interruptible instances with your AWS account, make sure the 

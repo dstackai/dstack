@@ -4,15 +4,13 @@ Let's start from the very beginning: a workflow that prints `"Hello, world"`.
 
 Go ahead, and create the `.dstack/workflows.yaml` file in your project directory:
 
-=== ".dstack/workflows.yaml"
-
-    ```yaml
-    workflows:
-      - name: hello
-        provider: bash
-        commands:
-          - echo "Hello, world"
-    ```
+```yaml
+workflows:
+  - name: hello
+    provider: bash
+    commands:
+      - echo "Hello, world"
+```
 
 Now, use the `dstack run` command to run it:
 

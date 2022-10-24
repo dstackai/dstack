@@ -8,18 +8,16 @@ If GPU is requested, the provider pre-installs the CUDA driver too.
 
 ## Example usage 
 
-=== ".dstack/workflows.yaml"
-
-    ```yaml
-    workflows:
-      - name: ide-notebook
-        provider: notebook
-        artifacts: 
-          - path: output
-        resources:
-          interruptible: true
-          gpu: 1
-    ```
+```yaml
+workflows:
+  - name: ide-notebook
+    provider: notebook
+    artifacts: 
+      - path: output
+    resources:
+      interruptible: true
+      gpu: 1
+```
 
 ## Properties reference
 

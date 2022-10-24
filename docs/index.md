@@ -1,23 +1,40 @@
-# What is dstack?
+---
+title: Introduction to dstack 
+---
 
-`dstack` is a lightweight and open-source command-line tool to provision infrastructure for ML workflows.
+# Introduction to dstack
 
-## Features
+`dstack` is an ultra-light-weight command-line utility to run ML workflows in the cloud.
 
- * Define your ML workflows declaratively, incl. their dependencies, environment, and required compute resources 
- * Run workflows via the `dstack` CLI. Have infrastructure provisioned automatically in a configured cloud account. 
- * Save output artifacts, such as data and models, and reuse them in other ML workflows
- * Use `dstack` to process data, train models, host apps, and launch dev environments
+## Introduction
 
-## How does it work?
+<div class="grid cards" markdown>
+- [**What is dstack?** 
+   Learn what dstack is, how it works, and what features it provides.](what-is-dstack.md)
+- [**Use cases**
+   Read about the most popular use cases to use dstack.](use-cases.md)
+[//]: # (- [**dstack vs. alternatives**)
+[//]: # (   Learn how dstack compares to other tools and services.]&#40;&#41;)
+</div>
 
- * Install `dstack` locally (a simple `pip install` will do)
- * Configure the cloud credentials locally (e.g. via `~/.aws/credentials`)
- * Run `dstack config` to configure the cloud region (to provision infrastructure) and the S3 bucket (to store data)
- * Define ML workflows in `.dstack/workflows.yaml` (within your existing Git repository)
- * Run ML workflows via the `dstack run` CLI command. Use other CLI commands to show status, manage state, artifacts, etc. 
+## Getting started
 
-!!! tip "NOTE:"
-    When you run an ML workflow via the `dstack` CLI, it provisions the required compute resources (in a configured cloud
-    account), sets up environment (such as Python, Conda, CUDA, etc), fetches your code, downloads deps,
-    saves artifacts, and tears down compute resources.
+<div class="grid cards" markdown>
+- [**Installation** 
+   See how to install and configure dstack locally.](installation.md)
+- [**Tutorial: Quickstart**
+   Try dstack yourself by following a step-by-step tutorial.](tutorials/quickstart.md)
+- [**Examples**
+   Check the basic examples of using dstack.](examples/hello)
+</div>
+
+## Reference
+
+<div class="grid cards" markdown>
+- [**dstack CLI** 
+   Use the dstack CLI to run workflows, and manage artifacts, tags, secrets, etc.
+  ](reference/cli/index.md)
+- [**Providers**
+   Define workflows declaratively using the built-in providers.
+  ](reference/providers/bash.md)
+</div>

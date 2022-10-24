@@ -8,24 +8,22 @@ If GPU is requested, the provider pre-installs the CUDA driver too.
 
 ## Usage example
 
-=== ".dstack/workflows.yaml"
-
-    ```yaml
-    workflows:
-      - name: "train"
-        provider: bash
-        deps:
-          - tag: some_tag
-        python: 3.10
-        commands:
-          - pip install requirements.txt
-          - python src/train.py
-        artifacts: 
-          - path: checkpoint
-        resources:
-          interruptible: true
-          gpu: 1
-    ```
+```yaml
+workflows:
+  - name: "train"
+    provider: bash
+    deps:
+      - tag: some_tag
+    python: 3.10
+    commands:
+      - pip install requirements.txt
+      - python src/train.py
+    artifacts: 
+      - path: checkpoint
+    resources:
+      interruptible: true
+      gpu: 1
+```
 
 ## Properties reference
 
@@ -85,17 +83,15 @@ If you'd like your workflow to expose ports, you have to specify the `ports` pro
 of ports to expose. Actual ports will be assigned on startup and passed to the workflow via the environment
 variables `PORT_<number>`.
 
-=== ".dstack/workflows.yaml"
-
-    ```yaml
-    workflows:
-      - name: app
-        provider: bash
-        ports: 1
-        commands: 
-          - pip install -r requirements.txt
-          - gunicorn main:app --bind 0.0.0.0:$PORT_0
-    ```
+```yaml
+workflows:
+  - name: app
+    provider: bash
+    ports: 1
+    commands: 
+      - pip install -r requirements.txt
+      - gunicorn main:app --bind 0.0.0.0:$PORT_0
+```
 
 [//]: # (!!! info "NOTE:")
 [//]: # (    If you need, you can also refer to the actual hostname of the workflow via the environment variable `HOSTNAME`.)

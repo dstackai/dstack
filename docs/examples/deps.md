@@ -18,17 +18,15 @@ The `txt-file` here is the name of the tag, and `grumpy-zebra-2` is the run name
 
 Now you can use this tag from another workflow:
 
-=== ".dstack/workflows.yaml"
-
-    ```yaml
-    workflows:
-      - name: cat-txt
-        provider: bash
-        deps:
-          - tag: txt-file
-        commands:
-          - cat output/hello.txt
-    ```
+```yaml
+workflows:
+  - name: cat-txt
+    provider: bash
+    deps:
+      - tag: txt-file
+    commands:
+      - cat output/hello.txt
+```
 
 !!! tip "NOTE:"
     One more way to create a tag is by uploading local files as tag artifacts. 
@@ -41,17 +39,15 @@ This way, dstack will use artifacts of the last run with that name.
 
 Here's a a workflow that uses artifacts of the last run of the `hello-txt` workflow.
 
-=== ".dstack/workflows.yaml"
-
-    ```yaml
-    workflows:
-      - name: cat-txt
-        provider: bash
-        deps:
-          - workflow: hello-txt
-        commands:
-          - cat output/hello.txt
-    ```
+```yaml
+workflows:
+  - name: cat-txt
+    provider: bash
+    deps:
+      - workflow: hello-txt
+    commands:
+      - cat output/hello.txt
+```
 
 !!! info "NOTE:"
     There should be at least one run of the `hello-txt` workflow in the `DONE` status.
@@ -65,14 +61,12 @@ you have to prepend the name (of the tag or the workflow) with the repo name.
 
 Here's a workflow that refers to a tag from the `dstackai/dstack` Git repo.
 
-=== ".dstack/workflows.yaml"
-
-    ```yaml
-    workflows:
-      - name: cat-txt
-        provider: bash
-        deps:
-          - tag: dstackai/dstack/txt-file
-        commands:
-          - cat output/hello.txt
-    ```
+```yaml
+workflows:
+  - name: cat-txt
+    provider: bash
+    deps:
+      - tag: dstackai/dstack/txt-file
+    commands:
+      - cat output/hello.txt
+```
