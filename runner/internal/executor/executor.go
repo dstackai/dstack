@@ -35,12 +35,14 @@ type Executor struct {
 	pm            ports.Manager
 	portID        string
 	streamLogs    *stream.Server
+	stoppedCh     chan struct{}
 }
 
 func New(b backend.Backend) *Executor {
 	return &Executor{
-		backend: b,
-		engine:  container.NewEngine(),
+		backend:   b,
+		engine:    container.NewEngine(),
+		stoppedCh: make(chan struct{}),
 	}
 }
 
@@ -98,52 +100,70 @@ func (ex *Executor) Init(ctx context.Context, configDir string) error {
 }
 
 func (ex *Executor) Run(ctx context.Context) error {
+	runCtx := context.Background()
 	defer func() {
 		if r := recover(); r != nil {
-			log.Error(ctx, "[PANIC]", "", r)
-			job := ex.backend.Job(ctx)
+			log.Error(runCtx, "[PANIC]", "", r)
+			job := ex.backend.Job(runCtx)
 			job.Status = states.Failed
-			_ = ex.backend.UpdateState(ctx)
+			_ = ex.backend.UpdateState(runCtx)
 			time.Sleep(1 * time.Second)
 			panic(r)
 		}
 	}()
 	erCh := make(chan error)
-	stoppedCh := make(chan struct{})
-	go ex.runJob(ctx, erCh, stoppedCh)
+	go ex.runJob(runCtx, erCh, ex.stoppedCh)
 	timer := time.NewTicker(consts.DELAY_READ_STATUS)
 	for {
 		select {
 		case <-timer.C:
-			stopped, err := ex.backend.CheckStop(ctx)
+			stopped, err := ex.backend.CheckStop(runCtx)
 			if err != nil {
 				return err
 			}
 			if stopped {
-				log.Info(ctx, "Stopped")
-				close(stoppedCh)
-				log.Info(ctx, "Waiting job end")
+				log.Info(runCtx, "Stopped")
+				ex.Stop()
+				log.Info(runCtx, "Waiting job end")
 				err = <-erCh
-				job := ex.backend.Job(ctx)
+				job := ex.backend.Job(runCtx)
 				job.Status = states.Stopped
-				_ = ex.backend.UpdateState(ctx)
-
+				_ = ex.backend.UpdateState(runCtx)
 				return err
 			}
 		case <-ctx.Done():
+			log.Info(runCtx, "Stopped")
+			ex.Stop()
+			log.Info(runCtx, "Waiting job end")
+			err := <-erCh
+			job := ex.backend.Job(runCtx)
+			job.Status = states.Stopped
+			_ = ex.backend.UpdateState(runCtx)
+			if err != nil {
+				return gerrors.Wrap(err)
+			}
 			return nil
 		case errRun := <-erCh:
-			job := ex.backend.Job(ctx)
+			job := ex.backend.Job(runCtx)
 			if errRun == nil {
 				job.Status = states.Done
 			} else {
-				log.Error(ctx, "Failed run", "err", errRun)
+				log.Error(runCtx, "Failed run", "err", errRun)
 				job.Status = states.Failed
 			}
-			_ = ex.backend.UpdateState(ctx)
+			_ = ex.backend.UpdateState(runCtx)
 			return errRun
 		}
 	}
+}
+
+func (ex *Executor) Stop() {
+	select {
+	case <-ex.stoppedCh:
+		return
+	default:
+	}
+	close(ex.stoppedCh)
 }
 
 func (ex *Executor) runJob(ctx context.Context, erCh chan error, stoppedCh chan struct{}) {

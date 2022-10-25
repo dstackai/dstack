@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"io"
 	"io/ioutil"
+	"os"
 	"path"
 	"path/filepath"
 	"strings"
@@ -87,6 +88,24 @@ func (s *S3) Init(ctx context.Context, ID string) error {
 	err = yaml.Unmarshal(theFile, &s.state)
 	if err != nil {
 		return gerrors.Wrap(err)
+	}
+	if s.state == nil {
+		return gerrors.New("State is empty. Data not loading")
+	}
+	//Update job
+	s.state.Job.RunnerID = ID
+	if s.state.Resources.Local {
+		s.state.Job.RequestID = fmt.Sprintf("l-%d", os.Getpid())
+	} else {
+		if s.state.Resources.Interruptible {
+
+		} else {
+			id, err := s.cliEC2.getInstanceID(ctx)
+			if err != nil {
+				return gerrors.Wrap(err)
+			}
+			s.state.Job.RequestID = id
+		}
 	}
 	return nil
 }

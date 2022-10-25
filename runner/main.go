@@ -67,7 +67,7 @@ func start(logLevel int, httpPort int, configDir string) {
 	ex := executor.New(b)
 	ex.SetStreamLogs(streamLogs)
 
-	ctxSig, cancel := signal.NotifyContext(logCtx, os.Interrupt, syscall.SIGTERM, syscall.SIGKILL)
+	ctxSig, cancel := signal.NotifyContext(logCtx, os.Interrupt, syscall.SIGTERM, syscall.SIGKILL, syscall.SIGQUIT)
 
 	defer ex.Shutdown(context.Background())
 
