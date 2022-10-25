@@ -11,7 +11,7 @@ from dstack.config import ConfigError
 from dstack.repo import load_repo_data
 
 
-def delete_func(args: Namespace):
+def rm_func(args: Namespace):
     if (args.run_name and (args.yes or Confirm.ask(f"[red]Delete the run '{args.run_name}'?[/]"))) \
             or (args.all and (args.yes or Confirm.ask("[red]Delete all runs?[/]"))):
         try:
@@ -40,10 +40,10 @@ def delete_func(args: Namespace):
 
 
 def register_parsers(main_subparsers):
-    parser = main_subparsers.add_parser("delete", help="Delete runs")
+    parser = main_subparsers.add_parser("rm", help="Remove runs")
 
     parser.add_argument("run_name", metavar="RUN", type=str, nargs="?", help="A name of a run")
-    parser.add_argument("-a", "--all", help="Delete all finished runs", dest="all", action="store_true")
+    parser.add_argument("-a", "--all", help="Remove all finished runs", dest="all", action="store_true")
     parser.add_argument("-y", "--yes", help="Don't ask for confirmation", action="store_true")
 
-    parser.set_defaults(func=delete_func)
+    parser.set_defaults(func=rm_func)

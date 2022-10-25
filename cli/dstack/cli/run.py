@@ -22,7 +22,7 @@ from dstack import providers
 from dstack.backend import load_backend, Backend, RequestStatus
 from dstack.cli.logs import poll_logs, since
 from dstack.cli.schema import workflows_schema_yaml
-from dstack.cli.status import status_func, _has_request_status
+from dstack.cli.ps import ps_func, _has_request_status
 from dstack.config import ConfigError
 from dstack.jobs import JobStatus, JobHead
 from dstack.repo import load_repo_data
@@ -150,9 +150,9 @@ def poll_logs_ws(backend: Backend, repo_user_name: str, repo_name: str,
 
     url = f"ws://{job.host_name}:4000/logsws"
     cursor.hide()
-    ws = websocket.WebSocketApp(url, on_message=on_message, on_error=on_error, on_open=on_open,
-                                on_close=on_close)
-    ws.run_forever()
+    _ws = websocket.WebSocketApp(url, on_message=on_message, on_error=on_error, on_open=on_open,
+                                 on_close=on_close)
+    _ws.run_forever()
     cursor.show()
 
 
@@ -196,7 +196,7 @@ def run_workflow_func(args: Namespace):
             jobs = provider.submit_jobs(run_name, args.tag_name)
             backend.update_repo_last_run_at(repo_data.repo_user_name, repo_data.repo_name,
                                             last_run_at=int(round(time.time() * 1000)))
-            status_func(Namespace(run_name=run_name, all=False))
+            ps_func(Namespace(run_name=run_name, all=False))
             if not args.detach:
                 poll_run(repo_data.repo_user_name, repo_data.repo_name, jobs, backend)
 

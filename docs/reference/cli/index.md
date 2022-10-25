@@ -29,7 +29,7 @@ Other commands:
   dstack secrets add [-y] NAME [VALUE]                Add a secret
   dstack secrets list                                 List secrets
   dstack secrets delete NAME                          Delete a secret
-  dstack delete [-y] (RUN | -a)                       Delete run(s)
+  dstack rm [-y] (RUN | -a)                           Remove run(s)
 
 Global options:
   -h, --help                                          Show this help output

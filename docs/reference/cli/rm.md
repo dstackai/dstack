@@ -1,11 +1,11 @@
-# dstack delete
+# dstack rm
 
-Use this command to delete finished runs within the current Git repo.
+Use this command to remove finished runs within the current Git repo.
 
 ### Usage
 
 ```shell
-dstack delete [-y] (RUN | -a)
+dstack rm [-y] (RUN | -a)
 ```
 
 #### Arguments reference
@@ -13,7 +13,7 @@ dstack delete [-y] (RUN | -a)
 One of the following arguments is required:
 
 - `RUN` - A name of a particular run
--  `-a`, `--all` – Delete all finished runs 
+-  `-a`, `--all` – Remove all finished runs 
 
 The following arguments are optional:
 

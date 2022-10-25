@@ -135,7 +135,7 @@ nav:
         - dstack init: reference/cli/init.md
         - dstack config: reference/cli/config.md
         - dstack secrets: reference/cli/secrets.md
-        - dstack delete: reference/cli/delete.md
+        - dstack rm: reference/cli/rm.md
       - Providers:
 #          - Introduction: reference/workflows/index.md
           - bash: reference/providers/bash.md

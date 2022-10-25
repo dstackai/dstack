@@ -40,7 +40,7 @@ def _has_request_status(run, statuses: List[RequestStatus]):
     return run.status.is_unfinished() and any(filter(lambda s: s.status in statuses, run.request_heads or []))
 
 
-def status_func(args: Namespace):
+def ps_func(args: Namespace):
     try:
         backend = load_backend()
         print_runs(args, backend)
@@ -137,4 +137,4 @@ def register_parsers(main_subparsers):
                              "By default, it shows only status for unfinished runs, or the last finished.",
                         action="store_true")
 
-    parser.set_defaults(func=status_func)
+    parser.set_defaults(func=ps_func)

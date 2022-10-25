@@ -3,7 +3,7 @@ from abc import ABC
 from enum import Enum
 from typing import List, Optional, Generator, Tuple, Dict
 
-from dstack.config import load_config, AwsBackendConfig, Config, BackendConfig
+from dstack.config import load_config, AwsBackendConfig, Config
 from dstack.jobs import Job, JobStatus, JobHead, AppSpec
 from dstack.repo import RepoData, RepoCredentials
 from dstack.runners import Resources, Runner
