@@ -98,7 +98,11 @@ func (s *S3) Init(ctx context.Context, ID string) error {
 		s.state.Job.RequestID = fmt.Sprintf("l-%d", os.Getpid())
 	} else {
 		if s.state.Resources.Interruptible {
-
+			id, err := s.cliEC2.getRequestID(ctx)
+			if err != nil {
+				return gerrors.Wrap(err)
+			}
+			s.state.Job.RequestID = id
 		} else {
 			id, err := s.cliEC2.getInstanceID(ctx)
 			if err != nil {

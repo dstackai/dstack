@@ -7,6 +7,7 @@ import (
 	"github.com/aws/aws-sdk-go-v2/config"
 	"github.com/aws/aws-sdk-go-v2/feature/ec2/imds"
 	"github.com/aws/aws-sdk-go-v2/service/ec2"
+	"github.com/aws/aws-sdk-go/aws"
 	"github.com/dstackai/dstackai/runner/internal/gerrors"
 	"github.com/dstackai/dstackai/runner/internal/log"
 )
@@ -72,4 +73,24 @@ func (ec *ClientEC2) getInstanceID(ctx context.Context) (string, error) {
 		return "", gerrors.Wrap(err)
 	}
 	return string(id), nil
+}
+func (ec *ClientEC2) getRequestID(ctx context.Context) (string, error) {
+	id, err := ec.getInstanceID(ctx)
+	if err != nil {
+		return "", gerrors.Wrap(err)
+	}
+	resp, err := ec.cli.DescribeInstances(ctx, &ec2.DescribeInstancesInput{
+		InstanceIds: []string{id},
+	})
+	if err != nil {
+		return "", gerrors.Wrap(err)
+	}
+	for _, reserve := range resp.Reservations {
+		for _, instance := range reserve.Instances {
+			if aws.StringValue(instance.InstanceId) == id {
+				return aws.StringValue(instance.SpotInstanceRequestId), nil
+			}
+		}
+	}
+	return "", nil
 }
