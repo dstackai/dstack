@@ -50,6 +50,10 @@ func (s *Server) Run(ctx context.Context) error {
 	return nil
 }
 
+func (s *Server) Port() int {
+	return s.port
+}
+
 func (s *Server) Close() {
 	select {
 	case <-s.closed:

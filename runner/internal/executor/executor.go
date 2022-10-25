@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"io"
 	"path"
+	"strconv"
 	"strings"
 	"time"
 
@@ -81,6 +82,15 @@ func (ex *Executor) Init(ctx context.Context, configDir string) error {
 	//ex.pm = ports.NewSingle(ex.config.ExposePorts())
 	ex.pm = ports.NewSystem()
 	job := ex.backend.Job(ctx)
+
+	//Update port logs
+	if ex.streamLogs != nil {
+		job.Environment["WS_LOGS_PORT"] = strconv.Itoa(ex.streamLogs.Port())
+		err = ex.backend.UpdateState(ctx)
+		if err != nil {
+			return gerrors.Wrap(err)
+		}
+	}
 
 	for _, artifact := range job.Artifacts {
 		artOut := ex.backend.GetArtifact(ctx, job.RunName, artifact.Path, path.Join("artifacts", job.RepoUserName, job.RepoName, job.JobID, artifact.Path), artifact.Mount)

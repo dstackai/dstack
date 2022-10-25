@@ -67,7 +67,6 @@ func App() {
 						Name:    "http-port",
 						Aliases: []string{"http"},
 						Usage:   "Set a http port",
-						Value:   "80",
 					},
 				},
 				Action: func(c *cli.Context) error {
