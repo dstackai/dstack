@@ -9,7 +9,7 @@ import yaml
 from botocore.client import BaseClient
 
 from dstack import version
-from dstack.aws import jobs, secrets, logs
+from dstack.aws import jobs, secrets, logs, local
 from dstack.backend import InstanceType, RequestStatus, RequestHead
 from dstack.jobs import Job, JobStatus, Requirements
 from dstack.runners import Resources, Runner, Gpu
@@ -24,8 +24,9 @@ def _serialize_runner(runner: Runner) -> dict:
         "gpus": [{
             "name": gpu.name,
             "memory_mib": gpu.memory_mib,
-        } for gpu in runner.resources.gpus],
+        } for gpu in (runner.resources.gpus or [])],
         "interruptible": runner.resources.interruptible is True,
+        "local": runner.resources.local is True,
     }
     data = {
         "runner_id": runner.runner_id,
@@ -40,12 +41,13 @@ def _serialize_runner(runner: Runner) -> dict:
 def _unserialize_runner(data: dict) -> Runner:
     return Runner(
         data["runner_id"],
-        data["request_id"],
+        data.get("request_id"),
         Resources(
             data["resources"]["cpus"],
             data["resources"]["memory_mib"],
             [Gpu(g["name"], g["memory_mib"]) for g in data["resources"]["gpus"]],
             data["resources"]["interruptible"] is True,
+            data["resources"].get("local") is True,
         ),
         jobs.unserialize_job(data["job"]),
         data.get("secret_names") or [],
@@ -79,6 +81,7 @@ def _get_instance_types(ec2_client: BaseClient) -> List[InstanceType]:
                     instance_type["MemoryInfo"]["SizeInMiB"],
                     reduce(list.__add__, gpus) if gpus else [],
                     "spot" in instance_type["SupportedUsageClasses"],
+                    False,
                 )
             ))
 
@@ -102,37 +105,39 @@ def _get_instance_types(ec2_client: BaseClient) -> List[InstanceType]:
     return sorted(instance_types, key=cmp_to_key(compare))
 
 
+def _matches(resources: Resources, requirements: Optional[Requirements]) -> bool:
+    if not requirements:
+        return True
+    if requirements.cpus and requirements.cpus > resources.cpus:
+        return False
+    if requirements.memory_mib and requirements.memory_mib > resources.memory_mib:
+        return False
+    if requirements.gpus:
+        gpu_count = requirements.gpus.count or 1
+        if gpu_count > len(resources.gpus or []):
+            return False
+        if requirements.gpus.name and gpu_count > len(
+                list(filter(lambda gpu: gpu.name == requirements.gpus.name,
+                            resources.gpus or []))):
+            return False
+        if requirements.gpus.memory_mib and gpu_count > len(
+                list(filter(lambda gpu: gpu.memory_mib >= requirements.gpus.memory_mib,
+                            resources.gpus or []))):
+            return False
+        if requirements.interruptible and not resources.interruptible:
+            return False
+    return True
+
+
 def _get_instance_type(ec2_client: BaseClient, requirements: Optional[Requirements]) -> Optional[InstanceType]:
     instance_types = _get_instance_types(ec2_client)
 
-    def matches(resources: Resources):
-        if not requirements:
-            return True
-        if requirements.cpus and requirements.cpus > resources.cpus:
-            return False
-        if requirements.memory_mib and requirements.memory_mib > resources.memory_mib:
-            return False
-        if requirements.gpus:
-            gpu_count = requirements.gpus.count or 1
-            if gpu_count > len(resources.gpus or []):
-                return False
-            if requirements.gpus.name and gpu_count > len(
-                    list(filter(lambda gpu: gpu.name == requirements.gpus.name,
-                                resources.gpus or []))):
-                return False
-            if requirements.gpus.memory_mib and gpu_count > len(
-                    list(filter(lambda gpu: gpu.memory_mib >= requirements.gpus.memory_mib,
-                                resources.gpus or []))):
-                return False
-            if requirements.interruptible and not resources.interruptible:
-                return False
-        return True
-
-    instance_type = next((instance_type for instance_type in instance_types if matches(instance_type.resources)), None)
+    instance_type = next(
+        (instance_type for instance_type in instance_types if _matches(instance_type.resources, requirements)), None)
     return InstanceType(instance_type.instance_name,
                         Resources(instance_type.resources.cpus, instance_type.resources.memory_mib,
                                   instance_type.resources.gpus,
-                                  requirements and requirements.interruptible)) if instance_type else None
+                                  requirements and requirements.interruptible, False)) if instance_type else None
 
 
 def _create_runner(logs_client: BaseClient, s3_client: BaseClient, bucket_name: str, runner: Runner):
@@ -254,6 +259,8 @@ def _serialize_runner_yaml(runner_id: str,
             s += f"    - name: {gpu.name}\\n      memory_mib: {gpu.memory_mib}\\n"
     if resources.interruptible:
         s += "  interruptible: true\\n"
+    if resources.local:
+        s += "  local: true\\n"
     return s[:-2]
 
 
@@ -394,12 +401,12 @@ def instance_profile_arn(iam_client: BaseClient, bucket_name: str) -> str:
                     },
                 ],
             )
-            instance_profile_arn = response["InstanceProfile"]["Arn"]
+            _instance_profile_arn = response["InstanceProfile"]["Arn"]
             iam_client.add_role_to_instance_profile(
                 InstanceProfileName=_role_name,
                 RoleName=_role_name,
             )
-            return instance_profile_arn
+            return _instance_profile_arn
         else:
             raise e
 
@@ -517,32 +524,41 @@ def _run_instance_retry(ec2_client: BaseClient, iam_client: BaseClient, bucket_n
 
 
 def run_job(secretsmanager_client: BaseClient, logs_client: BaseClient, ec2_client: BaseClient, iam_client: BaseClient,
-            s3_client: BaseClient, bucket_name: str, region_name, subnet_id: Optional[str], job: Job) -> Runner:
+            s3_client: BaseClient, bucket_name: str, region_name, subnet_id: Optional[str], job: Job):
     if job.status == JobStatus.SUBMITTED:
-        instance_type = _get_instance_type(ec2_client, job.requirements)
-        if instance_type:
-            runner_id = uuid.uuid4().hex
-            job.runner_id = runner_id
+        runner = None
+        try:
+            job.runner_id = uuid.uuid4().hex
             jobs.update_job(s3_client, bucket_name, job)
             secret_names = secrets.list_secret_names(secretsmanager_client, bucket_name)
-            runner = Runner(runner_id, None, instance_type.resources, job, secret_names)
-            _create_runner(logs_client, s3_client, bucket_name, runner)
-            try:
-                request_id = _run_instance_retry(ec2_client, iam_client, bucket_name, region_name, subnet_id, runner_id,
-                                                 instance_type)
-                runner.request_id = request_id
-                job.request_id = request_id
-                jobs.update_job(s3_client, bucket_name, job)
-                _update_runner(s3_client, bucket_name, runner)
-                return runner
-            except Exception as e:
-                job.status = JobStatus.FAILED
-                jobs.update_job(s3_client, bucket_name, job)
-                raise e
-        else:
+            if job.requirements and job.requirements.local:
+                resources = local.check_runner_resources(job.runner_id)
+                if _matches(resources, job.requirements):
+                    runner = Runner(job.runner_id, None, resources, job, secret_names)
+                    _create_runner(logs_client, s3_client, bucket_name, runner)
+                    runner.request_id = local.start_runner_process(job.runner_id)
+                else:
+                    job.status = JobStatus.FAILED
+                    jobs.update_job(s3_client, bucket_name, job)
+                    sys.exit(f"Local resources do not match requirements")
+            else:
+                instance_type = _get_instance_type(ec2_client, job.requirements)
+                runner = Runner(job.runner_id, None, instance_type.resources, job, secret_names)
+                _create_runner(logs_client, s3_client, bucket_name, runner)
+                if instance_type:
+                    runner.request_id = _run_instance_retry(ec2_client, iam_client, bucket_name, region_name, subnet_id,
+                                                            job.runner_id, instance_type)
+                else:
+                    job.status = JobStatus.FAILED
+                    job.request_id = runner.request_id
+                    jobs.update_job(s3_client, bucket_name, job)
+                    sys.exit(f"No instance type matching requirements")
+            _update_runner(s3_client, bucket_name, runner)
+        except Exception as e:
             job.status = JobStatus.FAILED
+            job.request_id = runner.request_id if runner else None
             jobs.update_job(s3_client, bucket_name, job)
-            sys.exit(f"No instance type matching requirements")
+            raise e
     else:
         raise Exception("Can't create a request for a job which status is not SUBMITTED")
 
@@ -589,12 +605,26 @@ def _terminate_instance(ec2_client: BaseClient, request_id: str):
             raise e
 
 
-def get_request_head(ec2_client: BaseClient, job: Job) -> RequestHead:
+def get_request_head(ec2_client: BaseClient, s3_client: BaseClient, bucket_name: str,
+                     job: Job, runner: Optional[Runner] = None) -> RequestHead:
+    _local = job.requirements and job.requirements.local
     interruptible = job.requirements and job.requirements.interruptible
+    request_id = None
     if job.request_id:
-        if interruptible:
+        request_id = job.request_id
+    elif runner and runner.request_id:
+        request_id = runner.request_id
+    elif not runner:
+        runner = _get_runner(s3_client, bucket_name, job.runner_id)
+        if runner:
+            request_id = runner.request_id
+    if request_id:
+        if _local:
+            _running = local.is_running(request_id)
+            return RequestHead(job.job_id, RequestStatus.RUNNING if _running else RequestStatus.TERMINATED, None)
+        elif interruptible:
             try:
-                response = ec2_client.describe_spot_instance_requests(SpotInstanceRequestIds=[job.request_id])
+                response = ec2_client.describe_spot_instance_requests(SpotInstanceRequestIds=[request_id])
                 if response.get("SpotInstanceRequests"):
                     status = response["SpotInstanceRequests"][0]["Status"]
                     if status["Code"] in ["fulfilled", "request-canceled-and-instance-running"]:
@@ -623,7 +653,7 @@ def get_request_head(ec2_client: BaseClient, job: Job) -> RequestHead:
                     raise e
         else:
             try:
-                response = ec2_client.describe_instances(InstanceIds=[job.request_id])
+                response = ec2_client.describe_instances(InstanceIds=[request_id])
                 if response.get("Reservations") and response["Reservations"][0].get("Instances"):
                     state = response["Reservations"][0]["Instances"][0]["State"]
                     if state["Name"] in ["running"]:
@@ -644,13 +674,16 @@ def get_request_head(ec2_client: BaseClient, job: Job) -> RequestHead:
                 else:
                     raise e
     else:
-        message = "The spot instance request ID is not specified" if interruptible else "The instance ID is not specified"
+        message = "The spot instance request ID is not specified" if interruptible \
+            else "The instance ID is not specified"
         return RequestHead(job.job_id, RequestStatus.TERMINATED, message)
 
 
 def _stop_runner(ec2_client: BaseClient, s3_client: BaseClient, bucket_name: str, runner: Runner):
     if runner.request_id:
-        if runner.resources.interruptible:
+        if runner.resources.local:
+            local.stop_process(runner.request_id)
+        elif runner.resources.interruptible:
             _cancel_spot_request(ec2_client, runner.request_id)
         else:
             _terminate_instance(ec2_client, runner.request_id)
@@ -661,8 +694,9 @@ def stop_job(ec2_client: BaseClient, s3_client: BaseClient, bucket_name: str, re
              job_id: str, abort: bool):
     job_head = jobs.list_job_head(s3_client, bucket_name, repo_user_name, repo_name, job_id)
     job = jobs.get_job(s3_client, bucket_name, repo_user_name, repo_name, job_id)
-    request_status = get_request_head(ec2_client, job).status if job else RequestStatus.TERMINATED
     runner = _get_runner(s3_client, bucket_name, job.runner_id) if job else None
+    request_status = get_request_head(ec2_client, s3_client, bucket_name, job,
+                                      runner).status if job else RequestStatus.TERMINATED
     if job_head and job_head.status.is_unfinished() or job and job.status.is_unfinished() \
             or runner and runner.job.status.is_unfinished() \
             or request_status != RequestStatus.TERMINATED:

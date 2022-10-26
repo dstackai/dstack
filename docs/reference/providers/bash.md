@@ -60,8 +60,11 @@ The hardware resources required by the workflow
 - `memory` (Optional) The size of RAM memory, e.g. `"16GB"`
 - [`gpu`](#gpu) - (Optional) The number of GPUs, their model name and memory
 - `shm_size` - (Optional) The size of shared memory, e.g. `"8GB"`
-- `interruptible` - (Optional) `true` if the instance must be spot/preemptive.
+- `interruptible` - (Optional) `true` if you want the workflow to use interruptible instances.
     By default, it's `false`.
+- `local` - (Optional) `true` if you want the workflow to run locally. Requires Docker
+  or [NVIDIA Docker](https://github.com/NVIDIA/nvidia-docker) to be installed locally.
+   By default, it's `false`.
 
 !!! info "NOTE:"
     If your workflow is using parallel communicating processes (e.g. dataloaders in PyTorch), 
@@ -92,6 +95,3 @@ workflows:
       - pip install -r requirements.txt
       - gunicorn main:app --bind 0.0.0.0:$PORT_0
 ```
-
-[//]: # (!!! info "NOTE:")
-[//]: # (    If you need, you can also refer to the actual hostname of the workflow via the environment variable `HOSTNAME`.)

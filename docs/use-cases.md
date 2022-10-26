@@ -3,19 +3,8 @@
 `dstack` lets you run any scripts in your cloud account from the command line. 
 You don't have to worry about provisioning compute resources, setting up the environment, or managing data.
 
-It is easy to use with Python scripts, Git, and your IDE.
-
-## Processing data
-
-If your script processes large data, you can specify the amount of memory to use
-(via `.dstack/workflows.yaml`), and run it via `dstack run`. `dstack` will automatically
-create a machine in your cloud account with required resources and run your script.
-
-If your script produces data, you can mark those folders as artifacts
-(via `.dstack/workflows.yaml`). `dstack` will automatically save them in your storage, 
-so you can use them later (e.g. from other scripts).
-
-If you want to reduce costs, you can explicitly tell `dstack` (via `.dstack/workflows.yaml`) to use spot instances.
+The utility is easy to use with Git, Python scripts, and your IDE.
+`dstack` is a lightweight alternative to the MLOps platforms, such as AWS SageMaker, KubeFlow, etc.
 
 ## Training models
 
@@ -30,19 +19,17 @@ so you can use them later (e.g. from other scripts).
 
 If you want to reduce costs, you can explicitly tell `dstack` (via `.dstack/workflows.yaml`) to use spot instances.
 
-## Dev environments
+## Processing data
 
-If you want to quickly create a dev environment such as VS Code or JupyterLab with required
-resources (such as GPU or memory), you can specify the requirements (via `.dstack/workflows.yaml`) 
-and run it via `dstack run`. `dstack` will automatically
-create a machine in your cloud account with required resources and provide you a link to open the dev environment.
-The dev environment will have your Git repo checked out and the required environment (Conda, CUDA, etc) configured.
+If your script processes large data, you can specify the amount of memory to use
+(via `.dstack/workflows.yaml`), and run it via `dstack run`. `dstack` will automatically
+create a machine in your cloud account with required resources and run your script.
 
-## Running apps
+If your script produces data, you can mark those folders as artifacts
+(via `.dstack/workflows.yaml`). `dstack` will automatically save them in your storage, 
+so you can use them later (e.g. from other scripts).
 
-If your script runs an application, you can tell `dstack` to expose the corresponding port (via `.dstack/workflows.yaml`), 
-and run it via `dstack run`. `dstack` will automatically
-create a machine in your cloud account with required resources and deploy your application.
+If you want to reduce costs, you can explicitly tell `dstack` (via `.dstack/workflows.yaml`) to use spot instances.
 
 ## Managing data
 
@@ -64,12 +51,16 @@ use `conda env create --prefix` to create it, and mark the corresponding folder 
 
 `dstack` will automatically save it in your storage, so you can use it later (e.g. from other scripts).
 
-## When to use dstack?
+## Dev environments
 
-The utility comes handy if you want to be able to quickly run scripts in the cloud while
-keeping them highly reproducible.
+If you want to quickly create a dev environment such as VS Code or JupyterLab with required
+resources (such as GPU or memory), you can specify the requirements (via `.dstack/workflows.yaml`) 
+and run it via `dstack run`. `dstack` will automatically
+create a machine in your cloud account with required resources and provide you a link to open the dev environment.
+The dev environment will have your Git repo checked out and the required environment (Conda, CUDA, etc) configured.
 
-It is especially great if you prefer to use Git and your IDE.
+## Running apps
 
-`dstack` is an alternative to creating cloud machines manually
-or to using the MLOps platforms (such as AWS SageMaker, KubeFlow, etc).
+If your script runs an application, you can tell `dstack` to expose the corresponding port (via `.dstack/workflows.yaml`), 
+and run it via `dstack run`. `dstack` will automatically
+create a machine in your cloud account with required resources and deploy your application.

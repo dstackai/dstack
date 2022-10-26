@@ -9,11 +9,8 @@ To view the list of supported CLI commands, run `dstack` with no additional argu
 ```bash
 Usage: dstack [-h] [-v] [OPTIONS ...] COMMAND [ARGS ...]
 
-Not sure where to start? Call `dstack config`, followed by `dstack init`.
-Define workflows in `.dstack/workflows.yaml` and run them via `dstack run`.
-
 Main commands:
-  dstack run WORKFLOW [-d] [-t TAG] [ARGS ...]        Run a workflow
+  dstack run WORKFLOW [-d] [-l] [-t TAG] [ARGS ...]   Run a workflow
   dstack ps [-a | RUN]                                Show run(s) status
   dstack stop [-x] [-y] (RUN | -a)                    Stop run(s)
   dstack logs [-a] [-s SINCE] RUN                     Show logs of a run

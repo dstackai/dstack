@@ -70,10 +70,10 @@ class AwsBackend(Backend):
         return jobs.list_jobs(self._s3_client(), self.backend_config.bucket_name, repo_user_name, repo_name,
                               run_name)
 
-    def run_job(self, job: Job) -> Runner:
-        return runners.run_job(self._secretsmanager_client(), self._logs_client(), self._ec2_client(),
-                               self._iam_client(), self._s3_client(), self.backend_config.bucket_name,
-                               self.backend_config.region_name, self.backend_config.subnet_id, job)
+    def run_job(self, job: Job):
+        runners.run_job(self._secretsmanager_client(), self._logs_client(), self._ec2_client(),
+                        self._iam_client(), self._s3_client(), self.backend_config.bucket_name,
+                        self.backend_config.region_name, self.backend_config.subnet_id, job)
 
     def stop_job(self, repo_user_name: str, repo_name: str, job_id: str, abort: bool):
         runners.stop_job(self._ec2_client(), self._s3_client(), self.backend_config.bucket_name, repo_user_name,

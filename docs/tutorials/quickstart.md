@@ -85,6 +85,17 @@ Extracting /workflow/data/MNIST/raw/train-images-idx2-ubyte.gz
 
 Once the workflow is finished, its artifacts are saved and infrastructure is torn down.
 
+!!! info "NOTE:"
+    If you want `dstack` to run your workflow locally (instead of provisioning infrastructure in the cloud),
+    use the `--local` argument (or `-l` for shorter).
+
+    ```bash
+    dstack run download -l
+    ```
+
+    Running workflows locally requires Docker or [NVIDIA Docker](https://github.com/NVIDIA/nvidia-docker) 
+    to be installed locally.
+
 Use the [`dstack ps`](../reference/cli/ps.md) command to see the status of recent workflows.
 
 ```shell

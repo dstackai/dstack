@@ -82,6 +82,8 @@ def _serialize_requirements(requirements) -> Dict[str, Any]:
             req_data["shm_size_mib"] = requirements.shm_size_mib
         if requirements.interruptible:
             req_data["interruptible"] = requirements.interruptible
+        if requirements.local:
+            req_data["local"] = requirements.local
     return req_data
 
 
@@ -94,7 +96,9 @@ def unserialize_job(job_data: dict) -> Job:
                          _requirements["gpus"].get("memory") or None,
                          _requirements["gpus"].get("name") or None
                          ) if _requirements.get("gpus") else None,
-        _requirements.get("shm_size_mib") or None, _requirements.get("interruptible") or None
+        _requirements.get("shm_size_mib") or None,
+        _requirements.get("interruptible") or None,
+        _requirements.get("local") or None
     ) if _requirements else None
     if requirements:
         if not requirements.cpus \
@@ -102,7 +106,9 @@ def unserialize_job(job_data: dict) -> Job:
                      (not requirements.gpus.count
                       and not requirements.gpus.memory_mib
                       and not requirements.gpus.name)) \
-                and not requirements.interruptible and not not requirements.shm_size_mib:
+                and not requirements.interruptible \
+                and not requirements.local \
+                and not not requirements.shm_size_mib:
             requirements = None
     dep_specs = []
     if job_data.get("deps"):

@@ -99,7 +99,9 @@ class Provider:
         parser.add_argument("-a", "--artifact", metavar="PATH", dest="artifacts", action='append')
         parser.add_argument("--dep", metavar="(:TAG | WORKFLOW)", dest="deps", action='append')
         parser.add_argument("-w", "--working-dir", metavar="PATH", type=str)
-        parser.add_argument("-i", "--interruptible", action="store_true")
+        group = parser.add_mutually_exclusive_group()
+        group.add_argument("-i", "--interruptible", action="store_true")
+        group.add_argument("-l", "--local", action="store_true")
         parser.add_argument("--cpu", metavar="NUM", type=int)
         parser.add_argument("--memory", metavar="SIZE", type=str)
         parser.add_argument("--gpu", metavar="NUM", type=int)
@@ -121,7 +123,7 @@ class Provider:
             env.extend(args.env)
             self.provider_data["env"] = env
         if args.cpu or args.memory or args.gpu or args.gpu_name or args.gpu_memory or args.shm_size \
-                or args.interruptible:
+                or args.interruptible or args.local:
             resources = self.provider_data.get("resources") or {}
             self.provider_data["resources"] = resources
             if args.cpu:
@@ -145,6 +147,8 @@ class Provider:
                 resources["shm_size"] = args.shm_size
             if args.interruptible:
                 resources["interruptible"] = True
+            if args.local:
+                resources["local"] = True
 
     def parse_args(self):
         pass
@@ -300,8 +304,10 @@ class Provider:
                 resources.shm_size_mib = _str_to_mib(self.provider_data["resources"]["shm_size"])
             if self.provider_data["resources"].get("interruptible"):
                 resources.interruptible = self.provider_data["resources"]["interruptible"]
+            if self.provider_data["resources"].get("local"):
+                resources.local = self.provider_data["resources"]["local"]
             if resources.cpus or resources.memory_mib or resources.gpus or resources.shm_size_mib \
-                    or resources.interruptible:
+                    or resources.interruptible or resources.local:
                 return resources
             else:
                 return None

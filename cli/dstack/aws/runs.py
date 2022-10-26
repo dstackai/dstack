@@ -5,7 +5,7 @@ from botocore.client import BaseClient
 from dstack import random_name
 from dstack.aws import run_names, logs, jobs, runners
 from dstack.backend import RunHead, AppHead, ArtifactHead
-from dstack.jobs import JobHead, Job
+from dstack.jobs import JobHead
 
 
 def create_run(s3_client: BaseClient, logs_client: BaseClient, bucket_name: str, repo_user_name: str,
@@ -29,7 +29,7 @@ def _create_run(ec2_client: BaseClient, s3_client: BaseClient, bucket_name: str,
         if request_heads is None:
             request_heads = []
         job = jobs.get_job(s3_client, bucket_name, job_head.repo_user_name, job_head.repo_name, job_head.job_id)
-        request_head = runners.get_request_head(ec2_client, job)
+        request_head = runners.get_request_head(ec2_client, s3_client, bucket_name, job, None)
         request_heads.append(request_head)
     run_head = RunHead(job_head.repo_user_name, job_head.repo_name, job_head.run_name, job_head.workflow_name,
                        job_head.provider_name, artifact_heads or None, job_head.status, job_head.submitted_at,
@@ -55,7 +55,7 @@ def _update_run(ec2_client: BaseClient, s3_client: BaseClient, bucket_name: str,
             if run.request_heads is None:
                 run.request_heads = []
             job = jobs.get_job(s3_client, bucket_name, job_head.repo_user_name, job_head.repo_name, job_head.job_id)
-            request_head = runners.get_request_head(ec2_client, job)
+            request_head = runners.get_request_head(ec2_client, s3_client, bucket_name, job, None)
             run.request_heads.append(request_head)
 
 

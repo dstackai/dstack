@@ -53,6 +53,8 @@ setup(
         "websocket-client",
         "cursor",
         "simple-term-menu",
+        "py-cpuinfo",
+        "psutil",
     ],
     classifiers=[
         "Development Status :: 2 - Pre-Alpha",

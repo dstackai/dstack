@@ -52,7 +52,10 @@ theme:
 
 # Plugins
 plugins:
-  - social
+  - social:
+      cards_color:
+        fill: "#fefeff"
+      cards_font: Roboto
   - search
 #  - redirects:
 #      redirect_maps:

@@ -13,3 +13,5 @@ fastapi
 starlette
 uvicorn
 pydantic
+py-cpuinfo
+psutil

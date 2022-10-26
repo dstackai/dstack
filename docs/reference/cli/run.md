@@ -12,7 +12,7 @@ The command provisions the required compute resources (in a configured cloud), f
 ### Usage
 
 ```shell
-dstack run [-h] WORKFLOW [-d] [-t TAG] [ARGS ...]
+dstack run [-h] WORKFLOW [-d] [-l] [-t TAG] [ARGS ...]
 ```
 
 #### Arguments reference
@@ -25,6 +25,8 @@ The following arguments are required:
 The following arguments are optional:
 
 - `-t TAG`, `--tag TAG` - (Optional) A tag name. Warning, if the tag exists, it will be overridden.
+- `-l`, `--local`, - (Optional) Run the workflow locally. Requires Docker
+  or [NVIDIA Docker](https://github.com/NVIDIA/nvidia-docker) to be installed locally.
 -  `-d`, `--detach` - (Optional) Run the workflow in the detached mode. Means, the `run` command doesn't
   poll for logs and workflow status, but exits immediately. 
 - `ARGS` – (Optional) Use these arguments to override workflow parameters defined in `.dstack/workflows.yaml`

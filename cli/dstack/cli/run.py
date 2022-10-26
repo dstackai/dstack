@@ -140,7 +140,7 @@ def poll_logs_ws(backend: Backend, repo_user_name: str, repo_name: str,
                 backend.stop_jobs(repo_user_name, repo_name, run_name, abort=True)
                 console.print(f"[grey58]OK[/]")
         else:
-            pass
+            print(str(err))
 
     def on_open(ws: WebSocketApp):
         pass
@@ -148,7 +148,7 @@ def poll_logs_ws(backend: Backend, repo_user_name: str, repo_name: str,
     def on_close(ws: WebSocketApp, close_status_code, close_msg):
         pass
 
-    url = f"ws://{job.host_name}:4000/logsws"
+    url = f"ws://{job.host_name}:{job.env['WS_LOGS_PORT']}/logsws"
     cursor.hide()
     _ws = websocket.WebSocketApp(url, on_message=on_message, on_error=on_error, on_open=on_open,
                                  on_close=on_close)

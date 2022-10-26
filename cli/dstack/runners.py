@@ -13,21 +13,23 @@ class Gpu:
 
 
 class Resources:
-    def __init__(self, cpus: int, memory_mib: int, gpus: Optional[List[Gpu]], interruptible: bool):
+    def __init__(self, cpus: int, memory_mib: int, gpus: Optional[List[Gpu]], interruptible: bool, local: bool):
         self.cpus = cpus
         self.memory_mib = memory_mib
         self.gpus = gpus
         self.interruptible = interruptible
+        self.local = local
 
     def __str__(self) -> str:
         return f'Resources(cpus={self.cpus}, memory_mib={self.memory_mib}, ' \
                f'gpus=[{", ".join(map(lambda g: str(g), self.gpus))}], ' \
-               f'interruptible={self.interruptible})'
+               f'interruptible={self.interruptible}, ' \
+               f'local={self.local})'
 
 
 class Runner:
-    def __init__(self, runner_id: str, request_id: Optional[str], resources: Resources,
-                 job: Job, secret_names: List[str]):
+    def __init__(self, runner_id: str, request_id: Optional[str], resources: Resources, job: Job,
+                 secret_names: List[str]):
         self.runner_id = runner_id
         self.request_id = request_id
         self.job = job

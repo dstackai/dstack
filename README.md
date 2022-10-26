@@ -1,14 +1,13 @@
 <div align="center">
-<img src="https://raw.githubusercontent.com/dstackai/dstack/master/docs/assets/dstack_dark_banner.png" width="800px"/>    
+<img src="https://raw.githubusercontent.com/dstackai/dstack/master/docs/assets/logo.svg" width="500px"/>    
 
 ______________________________________________________________________
 
-
 [![PyPI](https://img.shields.io/github/workflow/status/dstackai/dstack/Build?style=flat-square)](https://github.com/dstackai/dstack/actions/workflows/build.yml)
-[![PyPI](https://img.shields.io/pypi/v/dstack?style=flat-square)](https://pypi.org/project/dstack/)
+[![PyPI](https://img.shields.io/pypi/v/dstack?style=flat-square&color=blueviolet)](https://pypi.org/project/dstack/)
 [![PyPI - License](https://img.shields.io/pypi/l/dstack?style=flat-square&color=blue)](https://github.com/dstackai/dstack/blob/master/LICENSE.md)
 
-[Documentation](https://docs.dstack.ai) | [Community chat](https://join.slack.com/t/dstackai/shared_invite/zt-xdnsytie-D4qU9BvJP8vkbkHXdi6clQ) | [Newsletter](https://mlopsfluff.dstack.ai) | [Twitter](https://twitter.com/dstackai)
+#### [Docs](https://docs.dstack.ai) - [Quickstart](https://docs.dstack.ai/tutorials/quickstart) - [Slack](https://join.slack.com/t/dstackai/shared_invite/zt-xdnsytie-D4qU9BvJP8vkbkHXdi6clQ) - [Twitter](https://twitter.com/dstackai)
 
 </div>
 
@@ -132,8 +131,8 @@ and dev environments.
 
  * [Documentation](https://docs.dstack.ai)
  * [GitHub Issues](https://github.com/dstackai/dstack/issues)
- * [Community chat](https://join.slack.com/t/dstackai/shared_invite/zt-xdnsytie-D4qU9BvJP8vkbkHXdi6clQ)
- * [Newsletter](https://mlopsfluff.dstack.ai/)
+ * [Slack](https://join.slack.com/t/dstackai/shared_invite/zt-xdnsytie-D4qU9BvJP8vkbkHXdi6clQ)
+ * [Blog](https://mlopsfluff.dstack.ai/)
  * [Twitter](https://twitter.com/dstackai)
  
 ##  Licence

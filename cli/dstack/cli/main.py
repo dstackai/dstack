@@ -15,7 +15,7 @@ def default_func(_: Namespace):
           "Define workflows in [bold].dstack/workflows.yaml[/bold] and run them via [bold]dstack run[/bold].\n"
           "\n"
           "Main commands:\n"
-          "  [bold]dstack run WORKFLOW [grey53][-d] [-t TAG] [ARGS ...][/grey53][/bold]           Run a workflow\n"
+          "  [bold]dstack run WORKFLOW [grey53][-d] [-l] [-t TAG] [ARGS ...][/grey53][/bold]      Run a workflow\n"
           "  [bold]dstack ps [grey53][-a | RUN][/grey53][/bold]                                   Show [reset]run(s)[/reset] status\n"
           "  [bold]dstack stop [grey53][-x] [-y][/grey53] [grey53]([/grey53]RUN [grey53]|[/grey53] -a[grey53])[/grey53][/bold]                       Stop [reset]run(s)[/reset]\n"
           "  [bold]dstack logs [grey53][-a] [-s SINCE][/grey53] RUN[/bold]                        Show logs of a run\n"

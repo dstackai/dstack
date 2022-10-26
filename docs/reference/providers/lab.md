@@ -50,8 +50,11 @@ The hardware resources required by the workflow
 - `memory` (Optional) The size of RAM memory, e.g. `"16GB"`
 - [`gpu`](#gpu) - (Optional) The number of GPUs, their model name and memory
 - `shm_size` - (Optional) The size of shared memory, e.g. `"8GB"`
-- `interruptible` - (Optional) `true` if the workflow can run on interruptible instances.
+- `interruptible` - (Optional) `true` if you want the workflow to use interruptible instances.
     By default, it's `false`.
+- `local` - (Optional) `true` if you want the workflow to run locally. Requires Docker
+  or [NVIDIA Docker](https://github.com/NVIDIA/nvidia-docker) to be installed locally.
+   By default, it's `false`.
 
 !!! info "NOTE:"
     If your workflow is using parallel communicating processes (e.g. dataloaders in PyTorch), 

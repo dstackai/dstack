@@ -1,11 +1,5 @@
 # FAQs
 
-## Can dstack run workflows locally? 
-
-Currently, dstack can run workflows only in a configured cloud account. We plan to 
-allow running workflows locally too. Please upvote 
-the corresponding [GitHub issue](https://github.com/dstackai/dstack/issues/95).
-
 ## Does dstack support SSH?
 
 No, you can't use SSH to connect to a running workflow. Instead, we recommend you
