@@ -334,7 +334,7 @@ func (ex *Executor) processDeps(ctx context.Context) error {
 		}
 		for _, pathDir := range listDir {
 			dirSlice := strings.Split(pathDir, "/")
-			ex.artifactsIn = append(ex.artifactsIn, ex.backend.GetArtifact(ctx, job.RunName, dirSlice[len(dirSlice)-1], pathDir, dep.Mount))
+			ex.artifactsIn = append(ex.artifactsIn, ex.backend.GetArtifact(ctx, dep.RunName, dirSlice[len(dirSlice)-1], pathDir, dep.Mount))
 			if err != nil {
 				return gerrors.Wrap(err)
 			}
