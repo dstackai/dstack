@@ -140,7 +140,8 @@ jobs:
           GOARCH: ${{ matrix.goarch }}
           ACTIONSOS: ${{ matrix.runson }}
         run: |
-          go build -ldflags "-X '${REPO_NAME}/runner/version.Version=${{ github.run_number }}' -X '${REPO_NAME}/runner/pkg/log.CloudLog=true' -extldflags '-static'" -o dstack-runner-${{ matrix.goos }}-${{ matrix.goarch }}
+          VERSION=$((${{ github.run_number }} + 150))
+          go build -ldflags "-X '$REPO_NAME/runner/version.Version=$VERSION' -X '$REPO_NAME/runner/pkg/log.CloudLog=true' -extldflags '-static'" -o dstack-runner-${{ matrix.goos }}-${{ matrix.goarch }}
 
       - uses: actions/upload-artifact@v2
         with:

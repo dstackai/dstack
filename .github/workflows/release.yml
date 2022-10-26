@@ -137,7 +137,7 @@ jobs:
           ACTIONSOS: ${{ matrix.runson }}
         run: |
           VERSION=${GITHUB_REF#refs/tags/}
-          go build -ldflags "-X '${REPO_NAME}/runner/version.Version=$VERSION' -X '${REPO_NAME}/runner/pkg/log.CloudLog=true' -extldflags '-static'" -o dstack-runner-${{ matrix.goos }}-${{ matrix.goarch }}
+          go build -ldflags "-X '$REPO_NAME/runner/version.Version=$VERSION' -X '$REPO_NAME/runner/pkg/log.CloudLog=true' -extldflags '-static'" -o dstack-runner-${{ matrix.goos }}-${{ matrix.goarch }}
 
       - uses: actions/upload-artifact@v2
         with:
