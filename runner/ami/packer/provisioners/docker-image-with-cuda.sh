@@ -10,7 +10,7 @@ IMAGES="
 "
 echo "START pull image"
 for img in $IMAGES; do
- docker pull $img
+ docker pull --platform linux/amd64 $img
 done 
 echo "LIST installed images"
 docker image ls --all
