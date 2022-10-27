@@ -1,0 +1,26 @@
+name: Build Docker
+
+on: [workflow_dispatch]
+
+jobs:
+  build-docker:
+    defaults:
+      run:
+        working-directory: docker
+    runs-on: ubuntu-latest
+    steps:
+     - name: Checkout repository
+       uses: actions/checkout@v3
+     - name: Set up Docker Buildx
+       uses: docker/setup-buildx-action@v2
+     - name: Login to DockerHub
+       uses: docker/login-action@v2
+       with:
+         username: ${{ secrets.DOCKERHUB_USERNAME }}
+         password: ${{ secrets.DOCKERHUB_TOKEN }}
+     - name: Build and upload to DockerHub
+       run: |
+         docker buildx build --platform linux/arm64/v8 --build-arg ARCH=aarch64 --push --tag dstackai/miniconda:3.10-arm64 -f miniconda/cpu/3.10/Dockerfile .
+         docker buildx build --platform linux/amd64 --build-arg ARCH=x86_64 --push --tag dstackai/miniconda:3.10-amd64 -f miniconda/cpu/3.10/Dockerfile .
+         docker manifest create dstackai/miniconda:3.10 --amend dstackai/miniconda:3.10-arm64 --amend dstackai/miniconda:3.10-amd64
+         docker manifest push dstackai/miniconda:3.10
