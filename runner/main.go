@@ -121,7 +121,7 @@ func check(configDir string) error {
 	if engine == nil {
 		return cli.Exit("Docker is not installed", 1)
 	}
-	config.Resources.Cpus, config.Resources.MemoryMiB = engine.CPU(), engine.MemMiB()
+	config.Resources.CPUs, config.Resources.Memory = engine.CPU(), engine.MemMiB()
 	if engine.DockerRuntime() == consts.NVIDIA_RUNTIME {
 		var logger bytes.Buffer
 		docker, err := engine.Create(ctx,
@@ -145,7 +145,7 @@ func check(configDir string) error {
 		}
 
 		output := strings.Split(strings.TrimRight(logger.String(), "\n"), "\n")
-		var gpus []models.Gpu
+		var gpus []models.GPU
 		for _, x := range output {
 			regex := regexp.MustCompile(` *, *`)
 			gpu := regex.Split(x, -1)
@@ -154,12 +154,12 @@ func check(configDir string) error {
 			if err != nil {
 				return cli.Exit("GPU memory conversion to integer failed: "+err.Error(), 1)
 			}
-			gpus = append(gpus, models.Gpu{
+			gpus = append(gpus, models.GPU{
 				Name:      gpu[0],
-				MemoryMiB: uint64(memoryMiB),
+				MemoryMiB: int(memoryMiB),
 			})
 		}
-		config.Resources.Gpus = gpus
+		config.Resources.GPUs = gpus
 	}
 	theConfigFile, err = yaml.Marshal(config)
 	if err != nil {
