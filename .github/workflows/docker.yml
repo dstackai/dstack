@@ -4,6 +4,10 @@ on: [workflow_dispatch]
 
 jobs:
   build-docker:
+    strategy:
+      matrix:
+        device: [ "cpu", "cuda" ]
+        python: [ "3.7", "3.8", "3.9", "3.10" ]
     defaults:
       run:
         working-directory: docker
@@ -22,7 +26,7 @@ jobs:
        uses: docker/setup-qemu-action@v2
      - name: Build and upload to DockerHub
        run: |
-         docker buildx build --platform linux/arm64/v8 --build-arg ARCH=aarch64 --push --tag dstackai/miniconda:3.10-arm64 -f miniconda/cpu/3.10/Dockerfile .
-         docker buildx build --platform linux/amd64 --build-arg ARCH=x86_64 --push --tag dstackai/miniconda:3.10-amd64 -f miniconda/cpu/3.10/Dockerfile .
-         docker manifest create dstackai/miniconda:3.10 --amend dstackai/miniconda:3.10-arm64 --amend dstackai/miniconda:3.10-amd64
-         docker manifest push dstackai/miniconda:3.10
+         docker buildx build --platform linux/arm64/v8 --build-arg ARCH=aarch64 --push --tag dstackai/miniconda:${{ matrix.python }}-arm64 -f miniconda/${{ matrix.device }}/${{ matrix.python }}/Dockerfile .
+         docker buildx build --platform linux/amd64 --build-arg ARCH=x86_64 --push --tag dstackai/miniconda:${{ matrix.python }}-amd64 -f miniconda/${{ matrix.device }}/${{ matrix.python }}/Dockerfile .
+         docker manifest create dstackai/miniconda:${{ matrix.python }} --amend dstackai/miniconda:${{ matrix.python }}-arm64 --amend dstackai/miniconda:${{ matrix.python }}-amd64
+         docker manifest push dstackai/miniconda:${{ matrix.python }}
