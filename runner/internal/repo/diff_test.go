@@ -310,7 +310,9 @@ Last line.`
 			dir, err := ioutil.TempDir("", "dstack-unit-")
 			assert.NoError(t, err, "create tmp directory for test")
 			if err != nil {
-				defer os.RemoveAll(dir)
+				defer func() {
+					_ = os.RemoveAll(dir)
+				}()
 			}
 			if t.Failed() {
 				return

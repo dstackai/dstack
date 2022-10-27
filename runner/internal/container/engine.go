@@ -35,6 +35,7 @@ func (f funcEngineOpt) apply(engine *Engine) {
 	f(engine)
 }
 
+//nolint:all
 func WithCustomClient(client docker.APIClient) Option {
 	return funcEngineOpt(func(engine *Engine) {
 		engine.client = client
@@ -54,7 +55,7 @@ func NewEngine(opts ...Option) *Engine {
 		return nil
 	}
 	var defaultRuntime = info.DefaultRuntime
-	for name, _ := range info.Runtimes {
+	for name := range info.Runtimes {
 		if name == consts.NVIDIA_RUNTIME {
 			defaultRuntime = name
 		}
@@ -245,7 +246,7 @@ func (r *DockerRuntime) Stop(ctx context.Context) error {
 	return nil
 }
 
-func (r Engine) pullImageIfAbsent(ctx context.Context, image string) error {
+func (r *Engine) pullImageIfAbsent(ctx context.Context, image string) error {
 	if image == "" {
 		return gerrors.New("given image value is empty")
 	}

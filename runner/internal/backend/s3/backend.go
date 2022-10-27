@@ -74,6 +74,9 @@ func New(region, bucket string) *S3 {
 
 func (s *S3) Init(ctx context.Context, ID string) error {
 	log.Trace(ctx, "Initialize backend with ID runner", "runner ID", ID)
+	if s == nil {
+		return gerrors.New("Backend is nil")
+	}
 	s.runnerID = ID
 	pathS3 := fmt.Sprintf("runners/%s.yaml", ID)
 	log.Trace(ctx, "Fetch runner state from S3",
@@ -100,8 +103,11 @@ func (s *S3) Init(ctx context.Context, ID string) error {
 	return nil
 }
 
-func (s S3) Job(ctx context.Context) *models.Job {
+func (s *S3) Job(ctx context.Context) *models.Job {
 	log.Trace(ctx, "Getting job from state")
+	if s == nil {
+		return new(models.Job)
+	}
 	if s.state == nil {
 		log.Trace(ctx, "State not exist")
 		return new(models.Job)
@@ -110,8 +116,11 @@ func (s S3) Job(ctx context.Context) *models.Job {
 	return s.state.Job
 }
 
-func (s S3) UpdateState(ctx context.Context) error {
+func (s *S3) UpdateState(ctx context.Context) error {
 	log.Trace(ctx, "Start update state")
+	if s == nil {
+		return gerrors.New("Backend is nil")
+	}
 	if s.state == nil {
 		log.Trace(ctx, "State not exist")
 		return gerrors.Wrap(backend.ErrLoadStateFile)
@@ -166,7 +175,10 @@ func (s S3) UpdateState(ctx context.Context) error {
 	}
 	return nil
 }
-func (s S3) CheckStop(ctx context.Context) (bool, error) {
+func (s *S3) CheckStop(ctx context.Context) (bool, error) {
+	if s == nil {
+		return false, gerrors.New("Backend is nil")
+	}
 	if s.state == nil {
 		log.Trace(ctx, "State not exist")
 		return false, gerrors.Wrap(backend.ErrLoadStateFile)
@@ -204,7 +216,10 @@ func (s *S3) Shutdown(ctx context.Context) error {
 
 }
 
-func (s S3) GetArtifact(ctx context.Context, runName, localPath, remotePath string, mount bool) artifacts.Artifacter {
+func (s *S3) GetArtifact(ctx context.Context, runName, localPath, remotePath string, mount bool) artifacts.Artifacter {
+	if s == nil {
+		return nil
+	}
 	if mount {
 		rootPath := path.Join(common.HomeDir(), consts.FUSE_PATH, runName)
 		iamRole := fmt.Sprintf("dstack_role_%s", strings.ReplaceAll(s.bucket, "-", "_"))
@@ -226,7 +241,10 @@ func (s S3) GetArtifact(ctx context.Context, runName, localPath, remotePath stri
 	return art
 }
 
-func (s S3) Requirements(ctx context.Context) models.Requirements {
+func (s *S3) Requirements(ctx context.Context) models.Requirements {
+	if s == nil {
+		return models.Requirements{}
+	}
 	if s.state == nil {
 		log.Trace(ctx, "State not exist")
 		return models.Requirements{}
@@ -235,7 +253,10 @@ func (s S3) Requirements(ctx context.Context) models.Requirements {
 	return s.state.Job.Requirements
 }
 
-func (s S3) MasterJob(ctx context.Context) *models.Job {
+func (s *S3) MasterJob(ctx context.Context) *models.Job {
+	if s == nil {
+		return new(models.Job)
+	}
 	if s.state == nil {
 		log.Trace(ctx, "State not exist")
 		return nil
@@ -252,7 +273,10 @@ func (s S3) MasterJob(ctx context.Context) *models.Job {
 	return masterJob
 }
 
-func (s S3) CreateLogger(ctx context.Context, logGroup, logName string) io.Writer {
+func (s *S3) CreateLogger(ctx context.Context, logGroup, logName string) io.Writer {
+	if s == nil {
+		return nil
+	}
 	if s.state == nil {
 		log.Trace(ctx, "State not exist")
 		return nil
@@ -274,8 +298,11 @@ func (s S3) CreateLogger(ctx context.Context, logGroup, logName string) io.Write
 	return s.logger.Build(ctx, logGroup, logName)
 }
 
-func (s S3) ListSubDir(ctx context.Context, dir string) ([]string, error) {
+func (s *S3) ListSubDir(ctx context.Context, dir string) ([]string, error) {
 	log.Trace(ctx, "Fetching list sub dir")
+	if s == nil {
+		return nil, gerrors.New("Backend is nil")
+	}
 	listDir, err := s.cliS3.ListDir(ctx, s.bucket, dir)
 	if err != nil {
 		return nil, gerrors.Wrap(err)
@@ -293,20 +320,30 @@ func (s S3) ListSubDir(ctx context.Context, dir string) ([]string, error) {
 	}
 	return listDir, nil
 }
-func (s S3) Bucket(ctx context.Context) string {
+func (s *S3) Bucket(ctx context.Context) string {
 	log.Trace(ctx, "Getting bucket")
+	if s == nil {
+		return ""
+	}
 	return s.bucket
 }
-func (s S3) Secrets(ctx context.Context) map[string]string {
+func (s *S3) Secrets(ctx context.Context) map[string]string {
 	log.Trace(ctx, "Getting secrets")
+	if s == nil {
+		return make(map[string]string)
+	}
 	if s.state == nil {
 		log.Error(ctx, "State is empty")
-		return nil
+		return make(map[string]string)
 	}
 	return s.cliSecret.fetchSecret(ctx, s.bucket, s.state.Secrets)
 }
-func (s S3) GitCredentials(ctx context.Context) *models.GitCredentials {
+func (s *S3) GitCredentials(ctx context.Context) *models.GitCredentials {
 	log.Trace(ctx, "Getting credentials")
+	if s == nil {
+		log.Error(ctx, "Backend is empty")
+		return nil
+	}
 	if s.state == nil {
 		log.Error(ctx, "State is empty")
 		return nil

@@ -93,66 +93,6 @@ func (l *Logger) checkStreamExists(ctx context.Context) error {
 	return nil
 }
 
-func (l *Logger) checkStreamExistsDeprecated(ctx context.Context) error {
-	resp, err := l.cwl.DescribeLogStreams(ctx, &cloudwatchlogs.DescribeLogStreamsInput{
-		LogGroupName: aws.String(l.logGroup),
-	})
-	if err != nil {
-		return gerrors.Wrap(err)
-	}
-	for _, logStream := range resp.LogStreams {
-		if *logStream.LogStreamName == l.logStream {
-			l.seqToken = logStream.UploadSequenceToken
-			return nil
-		}
-	}
-	_, err = l.cwl.CreateLogStream(ctx, &cloudwatchlogs.CreateLogStreamInput{
-		LogGroupName:  aws.String(l.logGroup),
-		LogStreamName: aws.String(l.logStream),
-	})
-
-	return nil
-}
-func (l *Logger) checkGroupExists(_ context.Context) error {
-	/*	log.Trace(ctx, "check group exist", "group", l.logGroup)
-		_, err := l.cwl.CreateLogGroup(ctx, &cloudwatchlogs.CreateLogGroupInput{
-			LogGroupName: aws.String(l.logGroup),
-		})
-		if err != nil {
-			var awsErr *types.ResourceAlreadyExistsException
-			if errors.As(err, &awsErr) {
-				return nil
-			}
-			return gerrors.Wrap(err)
-		}
-
-	*/
-
-	return nil
-}
-func (l *Logger) checkGroupExistsDeprecated(ctx context.Context) error {
-	log.Trace(ctx, "check group exist", "group", l.logGroup)
-	resp, err := l.cwl.DescribeLogGroups(ctx, &cloudwatchlogs.DescribeLogGroupsInput{
-		LogGroupNamePrefix: aws.String(l.logGroup),
-	})
-	if err != nil {
-		return gerrors.Wrap(err)
-	}
-
-	for _, logGroup := range resp.LogGroups {
-		if *logGroup.LogGroupName == l.logGroup {
-			return nil
-		}
-	}
-
-	_, err = l.cwl.CreateLogGroup(ctx, &cloudwatchlogs.CreateLogGroupInput{
-		LogGroupName: aws.String(l.logGroup),
-	})
-	if err != nil {
-		return gerrors.Wrap(err)
-	}
-	return nil
-}
 func (l *Logger) publishButch(ctx context.Context) error {
 	if len(l.logEvents) == 0 {
 		return nil
@@ -210,10 +150,6 @@ func (l *Logger) Build(ctx context.Context, logGroup, logStream string) io.Write
 		mu:            sync.Mutex{},
 		logCh:         make(chan LogMesage, 100),
 		jobID:         l.jobID,
-	}
-	if err := newLogger.checkGroupExists(ctx); err != nil {
-		log.Error(ctx, "unable to check group", "err", err)
-		return nil
 	}
 	if err := newLogger.checkStreamExists(ctx); err != nil {
 		log.Error(ctx, "unable to check stream", "err", err)

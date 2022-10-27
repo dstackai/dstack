@@ -61,15 +61,14 @@ type Object struct {
 }
 
 type fileJob struct {
-	path  string
-	info  os.FileInfo
-	isDir bool
+	path string
+	info os.FileInfo
 }
 
 type ProgressBar struct {
 	totalSize   atomic.Int64
 	currentSize atomic.Int64
-	totatFile   atomic.Int64
+	totalFile   atomic.Int64
 	currentFile atomic.Int64
 	averageSize atomic.Int64
 }
@@ -100,7 +99,7 @@ func New(region string) *Copier {
 	c.pb = &ProgressBar{
 		totalSize:   atomic.Int64{},
 		currentSize: atomic.Int64{},
-		totatFile:   atomic.Int64{},
+		totalFile:   atomic.Int64{},
 		currentFile: atomic.Int64{},
 		averageSize: atomic.Int64{},
 	}
@@ -110,12 +109,12 @@ func New(region string) *Copier {
 func (pb *ProgressBar) reset() {
 	pb.totalSize = atomic.Int64{}
 	pb.currentSize = atomic.Int64{}
-	pb.totatFile = atomic.Int64{}
+	pb.totalFile = atomic.Int64{}
 	pb.currentFile = atomic.Int64{}
 	pb.averageSize = atomic.Int64{}
 }
 func (pb *ProgressBar) average() {
-	r := pb.totatFile.Load()
+	r := pb.totalFile.Load()
 	if r != 0 {
 		pb.averageSize.Store(pb.totalSize.Load() / r)
 	}
@@ -129,7 +128,7 @@ func (pb *ProgressBar) size() int64 {
 
 func (c *Copier) incTotalSize(fileSize int64) {
 	c.pb.totalSize.Add(fileSize)
-	c.pb.totatFile.Inc()
+	c.pb.totalFile.Inc()
 }
 
 func (c *Copier) updateBars(downloadSize int64) {
@@ -180,15 +179,15 @@ func (c *Copier) listObjects(bucket, remote string) <-chan *Object {
 				key := aws.StringValue(file.Key)
 				etag := aws.StringValue(file.ETag)
 				mod := aws.TimeValue(file.LastModified).UTC()
-				var objtype os.FileMode
+				var objType os.FileMode
 				if strings.HasSuffix(key, "/") {
-					objtype = os.ModeDir
+					objType = os.ModeDir
 				}
 				objCh <- &Object{
 					Key:     key,
 					Etag:    strings.Trim(etag, `"`),
 					ModTime: &mod,
-					Type:    ObjectType{objtype},
+					Type:    ObjectType{objType},
 					Size:    file.Size,
 				}
 			}

@@ -20,66 +20,66 @@ type Local struct {
 	artifacts []artifacts.Artifacter
 }
 
-func (l Local) GitCredentials(ctx context.Context) *models.GitCredentials {
+func (l Local) GitCredentials(_ context.Context) *models.GitCredentials {
 	//TODO implement me
 	panic("implement me")
 }
 
-func (l Local) Secrets(ctx context.Context) map[string]string {
+func (l Local) Secrets(_ context.Context) map[string]string {
 	//TODO implement me
 	panic("implement me")
 }
 
-func (l Local) Bucket(ctx context.Context) string {
+func (l Local) Bucket(_ context.Context) string {
 	panic("implement me")
 }
 
-func (l Local) ListSubDir(ctx context.Context, dir string) ([]string, error) {
+func (l Local) ListSubDir(_ context.Context, _ string) ([]string, error) {
 	//TODO implement me
 	panic("implement me")
 }
 
-func (l Local) Init(ctx context.Context, ID string) error {
+func (l Local) Init(_ context.Context, _ string) error {
 	//TODO implement me
 	panic("implement me")
 }
 
-func (l Local) Job(ctx context.Context) *models.Job {
+func (l Local) Job(_ context.Context) *models.Job {
 	//TODO implement me
 	panic("implement me")
 }
 
-func (l Local) MasterJob(ctx context.Context) *models.Job {
+func (l Local) MasterJob(_ context.Context) *models.Job {
 	//TODO implement me
 	panic("implement me")
 }
 
-func (l Local) Requirements(ctx context.Context) models.Requirements {
+func (l Local) Requirements(_ context.Context) models.Requirements {
 	//TODO implement me
 	panic("implement me")
 }
 
-func (l Local) UpdateState(ctx context.Context) error {
+func (l Local) UpdateState(_ context.Context) error {
 	//TODO implement me
 	panic("implement me")
 }
 
-func (l Local) CheckStop(ctx context.Context) (bool, error) {
+func (l Local) CheckStop(_ context.Context) (bool, error) {
 	//TODO implement me
 	panic("implement me")
 }
 
-func (l Local) Shutdown(ctx context.Context) error {
+func (l Local) Shutdown(_ context.Context) error {
 	//TODO implement me
 	panic("implement me")
 }
 
-func (l Local) GetArtifact(ctx context.Context, rootPath, localPath, remotePath string, fs bool) artifacts.Artifacter {
+func (l Local) GetArtifact(_ context.Context, _, _, _ string, _ bool) artifacts.Artifacter {
 	//TODO implement me
 	panic("implement me")
 }
 
-func (l Local) CreateLogger(ctx context.Context, logGroup, logName string) io.Writer {
+func (l Local) CreateLogger(_ context.Context, _, _ string) io.Writer {
 	//TODO implement me
 	panic("implement me")
 }

@@ -14,7 +14,7 @@ import (
 	"gopkg.in/yaml.v2"
 )
 
-var ErrLoadStateFile error = errors.New("not load state file")
+var ErrLoadStateFile = errors.New("not load state file")
 
 type Backend interface {
 	Init(ctx context.Context, ID string) error

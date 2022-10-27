@@ -7,7 +7,6 @@ import (
 )
 
 type Artifacter interface {
-	//Register(pathLocal, pathRemote string) error
 	BeforeRun(ctx context.Context) error
 	AfterRun(ctx context.Context) error
 	DockerBindings(workDir string) []mount.Mount

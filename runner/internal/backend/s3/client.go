@@ -11,9 +11,10 @@ import (
 	"github.com/aws/aws-sdk-go-v2/config"
 	"github.com/aws/aws-sdk-go-v2/service/s3"
 	"github.com/dstackai/dstackai/runner/internal/gerrors"
+	"github.com/dstackai/dstackai/runner/internal/log"
 )
 
-var ErrTagNotFound error = errors.New("tag not found")
+var ErrTagNotFound = errors.New("tag not found")
 
 type ClientS3 struct {
 	cli *s3.Client
@@ -41,7 +42,13 @@ func (c *ClientS3) GetFile(ctx context.Context, bucket, key string) ([]byte, err
 	if err != nil {
 		return nil, gerrors.Wrap(err)
 	}
-	defer out.Body.Close()
+	defer func() {
+		err = out.Body.Close()
+		if err != nil {
+			log.Error(ctx, "Fail close body", "err", err)
+		}
+	}()
+
 	buffer := new(bytes.Buffer)
 	size, err := io.Copy(buffer, out.Body)
 	if size != out.ContentLength {

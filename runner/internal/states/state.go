@@ -7,10 +7,7 @@ const (
 	Running           = "running"
 	Done              = "done"
 	Failed            = "failed"
-	Stopping          = "stopping"
 	Stopped           = "stopped"
-	Aborting          = "aborting"
-	Aborted           = "aborted"
 	Downloading       = "downloading"
 	Uploading         = "uploading"
 )

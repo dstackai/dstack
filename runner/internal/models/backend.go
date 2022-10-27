@@ -1,6 +1,6 @@
 package models
 
-type Resoures struct {
+type Resource struct {
 	CPUs          int   `yaml:"cpus,omitempty"`
 	Memory        int   `yaml:"memory_mib,omitempty"`
 	GPUs          []GPU `yaml:"gpus,omitempty"`
@@ -75,7 +75,7 @@ type GPU struct {
 type State struct {
 	Job       *Job     `yaml:"job"`
 	RequestID string   `yaml:"request_id"`
-	Resources Resoures `yaml:"resources"`
+	Resources Resource `yaml:"resources"`
 	RunnerID  string   `yaml:"runner_id"`
 	Secrets   []string `yaml:"secret_names"`
 }

@@ -38,33 +38,6 @@ func (ex *Executor) loadConfig(configDir string) error {
 		log.Error(context.Background(), "Config file is corrupted or does not exists", "err", gerrors.Wrap(err))
 		return err
 	}
-	/*
-		if ex.config.Resources == nil {
-			ex.config.Resources, err = updateResourceInfo()
-			if err != nil {
-				return gerrors.Wrap(err)
-			}
-			err = ex.saveConfig(configDir)
-			if err != nil {
-				return gerrors.Wrap(err)
-			}
-		}
-	*/
-	return nil
-}
-func (ex *Executor) saveConfig(configDir string) error {
-	log.Info(context.Background(), "Save runner's config")
-	thePathConfig := filepath.Join(configDir, consts.RUNNER_FILE_NAME)
-	theConfigFile, err := yaml.Marshal(ex.config)
-	if err != nil {
-		log.Error(context.Background(), "Unexpected error, please try to rerun", "err", gerrors.Wrap(err))
-		return err
-	}
-	err = ioutil.WriteFile(thePathConfig, theConfigFile, 0o644)
-	if err != nil {
-		log.Error(context.Background(), "Unexpected error, please try to rerun", "err", gerrors.Wrap(err))
-		return err
-	}
 	return nil
 }
 func (c *Config) ExposePorts() (defaultStart int, defaultEnd int) {

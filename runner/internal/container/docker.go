@@ -15,7 +15,6 @@ import (
 	docker "github.com/docker/docker/client"
 	"github.com/docker/docker/pkg/stdcopy"
 	"github.com/docker/go-connections/nat"
-	"github.com/dstackai/dstackai/runner/consts"
 	"github.com/dstackai/dstackai/runner/internal/log"
 	"github.com/sirupsen/logrus"
 )
@@ -40,32 +39,6 @@ type Docker struct {
 	runtime     string
 	nCpu        int
 	memTotalMiB uint64
-}
-
-func NewDocker(ctx context.Context) (*Docker, error) {
-	client, err := docker.NewClientWithOpts(docker.FromEnv, docker.WithAPIVersionNegotiation())
-	if err != nil {
-		return nil, err
-	}
-	// Checking if Docker demon is actually running
-	info, err := client.Info(ctx)
-	if err != nil {
-		return nil, err
-	}
-	var defaultRuntime = info.DefaultRuntime
-	for name, _ := range info.Runtimes {
-		if name == consts.NVIDIA_RUNTIME {
-			defaultRuntime = name
-		}
-	}
-	d := &Docker{
-		ctx:         ctx,
-		client:      client,
-		runtime:     defaultRuntime,
-		nCpu:        info.NCPU,
-		memTotalMiB: BytesToMiB(info.MemTotal),
-	}
-	return d, nil
 }
 
 type Spec struct {
