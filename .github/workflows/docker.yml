@@ -18,6 +18,8 @@ jobs:
        with:
          username: ${{ secrets.DOCKERHUB_USERNAME }}
          password: ${{ secrets.DOCKERHUB_TOKEN }}
+     - name: Set up QEMU
+       uses: docker/setup-qemu-action@v2
      - name: Build and upload to DockerHub
        run: |
          docker buildx build --platform linux/arm64/v8 --build-arg ARCH=aarch64 --push --tag dstackai/miniconda:3.10-arm64 -f miniconda/cpu/3.10/Dockerfile .
