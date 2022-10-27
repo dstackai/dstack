@@ -18,6 +18,7 @@ import (
 	"github.com/aws/aws-sdk-go-v2/service/s3"
 	"github.com/aws/aws-sdk-go/aws"
 	"github.com/aws/smithy-go"
+	"github.com/dstackai/dstackai/runner/consts"
 	"github.com/dstackai/dstackai/runner/internal/gerrors"
 	"github.com/dstackai/dstackai/runner/internal/log"
 	"go.uber.org/atomic"
@@ -222,10 +223,16 @@ func (c *Copier) CreateDirObject(ctx context.Context, bucket, path string) error
 }
 
 func (c *Copier) Download(ctx context.Context, bucket, remote, local string) {
+	//Check local file cache
+	if _, err := os.Stat(filepath.Join(local, consts.FILE_LOCK_FULL_DOWNLOAD)); os.IsExist(err) {
+		return
+	}
 	c.statDownload(bucket, remote)
+	errorFound := atomic.NewBool(false)
 	for file := range c.listObjects(bucket, remote) {
 		if file.Err != nil {
 			log.Error(ctx, "List files", "err", file.Err)
+			errorFound.Store(true)
 			continue
 		}
 		c.threads.acquire(1)
@@ -237,6 +244,7 @@ func (c *Copier) Download(ctx context.Context, bucket, remote, local string) {
 				log.Trace(ctx, "Make dir", "dir", theFilePath)
 				if err := os.MkdirAll(theFilePath, 0755); err != nil {
 					log.Error(ctx, "Create dir", "err", err)
+					errorFound.Store(true)
 				}
 				return
 			}
@@ -250,12 +258,14 @@ func (c *Copier) Download(ctx context.Context, bucket, remote, local string) {
 			theFile, err := os.Create(theFilePath)
 			if err != nil {
 				log.Error(ctx, "Create file", "err", err)
+				errorFound.Store(true)
 				return
 			}
 			defer func() {
 				err = theFile.Close()
 				if err != nil {
 					log.Error(ctx, "Close file", "err", err)
+					errorFound.Store(true)
 				}
 			}()
 
@@ -271,6 +281,7 @@ func (c *Copier) Download(ctx context.Context, bucket, remote, local string) {
 			}
 			if err != nil {
 				log.Error(ctx, "Download file", "err", err)
+				errorFound.Store(true)
 				return
 			}
 			c.updateBars(file.Size)
@@ -278,6 +289,20 @@ func (c *Copier) Download(ctx context.Context, bucket, remote, local string) {
 		}(file)
 	}
 	c.threads.acquire(MAX_THREADS)
+	if !errorFound.Load() {
+		log.Info(ctx, "Lock directory")
+		theFile, err := os.Create(filepath.Join(local, consts.FILE_LOCK_FULL_DOWNLOAD))
+		if err != nil {
+			log.Error(ctx, "Create lock file", "err", err)
+			return
+		}
+		defer func() {
+			err = theFile.Close()
+			if err != nil {
+				log.Error(ctx, "Close lock file", "err", err)
+			}
+		}()
+	}
 }
 func (c *Copier) Upload(ctx context.Context, bucket, remote, local string) {
 	c.statUpload(local)

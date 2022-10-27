@@ -13,6 +13,8 @@ const VARIABLES_FILE_NAME string = "variables.yaml"
 const WORKFLOWS_FILE_NAME string = "workflows.yaml"
 const CONFIG_ARGS string = "$variables_as_args"
 
+const FILE_LOCK_FULL_DOWNLOAD = ".lock.full"
+
 // ServerUrl A default build-time variable. The value is overridden via ldflags.
 var ServerUrl = "https://api.stgn.dstack.ai"
 
