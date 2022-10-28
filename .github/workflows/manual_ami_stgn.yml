@@ -24,5 +24,4 @@ jobs:
           cp -R ami/packer/* .
       - name: Run packer
         run: |
-          VERSION=$((${{ github.run_number }} + 150))
-          ./packer build -var build_id=$VERSION ${{ matrix.variants }}.json
+          ./packer build ${{ matrix.variants }}.json
