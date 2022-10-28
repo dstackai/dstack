@@ -4,8 +4,8 @@ title: Introduction to dstack
 
 # Introduction to dstack
 
-`dstack` is a command-line utility to run ML workflows in the cloud,
-while keeping your workflows highly reproducible.
+`dstack` is a lightweight command-line utility that lets you run ML workflows in the cloud,
+while keeping them highly reproducible.
 
 ## Introduction
 
@@ -29,13 +29,13 @@ while keeping your workflows highly reproducible.
    Check the basic examples of using dstack.](examples/hello)
 </div>
 
-## Reference
+## Support
 
 <div class="grid cards" markdown>
-- [**dstack CLI** 
-   Use the dstack CLI to run workflows, and manage artifacts, tags, secrets, etc.
-  ](reference/cli/index.md)
-- [**Providers**
-   Define workflows declaratively using the built-in providers.
-  ](reference/providers/bash.md)
+- [**:material-slack: Slack chat**
+   Join our chat to get help and to chat with other users of dstack.
+  ](https://join.slack.com/t/dstackai/shared_invite/zt-xdnsytie-D4qU9BvJP8vkbkHXdi6clQ)
+- [**:material-bug: GitHub Issues**
+    File bugs and feature requests to our issue tracker.   
+  ](https://github.com/dstackai/dstack/issues)
 </div>

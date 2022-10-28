@@ -15,3 +15,6 @@ uvicorn
 pydantic
 py-cpuinfo
 psutil
+websocket-client
+cursor
+simple-term-menu

@@ -412,12 +412,17 @@ def instance_profile_arn(iam_client: BaseClient, bucket_name: str) -> str:
 
 
 def _get_ami_image(ec2_client: BaseClient, cuda: bool) -> Tuple[str, str]:
+    ami_name = "dstack"
+    if cuda:
+        ami_name = ami_name + "-cuda-11.1"
+    if version.__is_release__:
+        ami_name = ami_name + f"-{version.__version__}"
+    else:
+        ami_name = "[stgn] " + ami_name + "-*"
     response = ec2_client.describe_images(Filters=[
         {
             'Name': 'name',
-            'Values': [
-                'dstack-*' if version.__is_release__ else '[stgn] dstack-*'
-            ]
+            'Values': [ami_name]
         },
     ], )
     images = list(filter(lambda i: cuda == ("cuda" in i["Name"]) and i["State"] == "available", response["Images"]))
@@ -425,7 +430,7 @@ def _get_ami_image(ec2_client: BaseClient, cuda: bool) -> Tuple[str, str]:
         ami = next(iter(sorted(images, key=lambda i: i["CreationDate"], reverse=True)))
         return ami["ImageId"], ami["Name"]
     else:
-        raise Exception(f"Can't find an AMI image 'dstack-*' (cuda={cuda})")
+        raise Exception(f"Can't find an AMI image '{ami_name}")
 
 
 def _run_instance(ec2_client: BaseClient, iam_client: BaseClient, bucket_name: str, region_name: str,

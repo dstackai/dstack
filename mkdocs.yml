@@ -124,8 +124,8 @@ nav:
         - Apps: examples/apps.md
         - Secrets: examples/secrets.md
         - Dev environments: examples/devs.md
-    - Other docs:
-      - FAQs: faq.md
+#    - Other docs:
+#      - FAQs: faq.md
   - Reference:
       - CLI:
         - dstack: reference/cli/index.md

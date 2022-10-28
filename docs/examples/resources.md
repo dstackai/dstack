@@ -91,3 +91,39 @@ workflows:
 !!! info "NOTE:"
     If you want to use interruptible instances with your AWS account, make sure the 
     corresponding [service quota](https://docs.aws.amazon.com/AWSEC2/latest/UserGuide/ec2-resource-limits.html) is approved.
+
+## Run locally
+
+If you want, you can run workflows on your local machine instead of the cloud.
+This is helpful if you want to quickly test something locally before spinning resources in the cloud.
+
+Here's an example of how to define such a workflow:
+
+```bash
+workflows:
+  - name: hello-i
+    provider: bash
+    commands:
+      - echo "Hello world"
+    resources:
+      local: true
+```
+
+!!! warning "NOTE:"
+    Running workflows locally requires Docker or [NVIDIA Docker](https://github.com/NVIDIA/nvidia-docker) 
+    to be installed locally.
+
+## Override resources via CLI
+
+Resources can be configured not only through `.dstack/workflows.yaml` but
+also via the `dstack run` command.
+
+The following command that runs the `hello` workflow using interruptible instances with 4 GPUs:
+
+```shell
+dstack run hello --gpu 4 -i
+```
+
+!!! info "NOTE:"
+    To see all supported arguments (that can be used to override resources), 
+    use the `dstack run WORKFLOW --help` command.
