@@ -23,7 +23,7 @@ class CodeProvider(Provider):
         super().load(provider_args, workflow_name, provider_data)
         self.before_run = self.provider_data.get("before_run")
         self.python = self._safe_python_version("python")
-        self.version = self.provider_data.get("version") or "1.71.0"
+        self.version = self.provider_data.get("version") or "1.72.3"
         self.requirements = self.provider_data.get("requirements")
         self.env = self._env()
         self.artifact_specs = self._artifact_specs()
@@ -73,11 +73,12 @@ class CodeProvider(Provider):
         commands = [
             "mkdir -p /tmp",
             "cd /tmp",
+            "if [ $(uname -m) = \"aarch64\" ]; then arch=\"arm64\"; else arch=\"x64\"; fi",
             f"wget -q https://github.com/gitpod-io/openvscode-server/releases/download/"
-            f"openvscode-server-v{self.version}/openvscode-server-v{self.version}-linux-x64.tar.gz -O "
-            f"openvscode-server-v{self.version}-linux-x64.tar.gz",
-            f"tar -xzf openvscode-server-v{self.version}-linux-x64.tar.gz",
-            f"cd openvscode-server-v{self.version}-linux-x64",
+            f"openvscode-server-v{self.version}/openvscode-server-v{self.version}-linux-$arch.tar.gz -O "
+            f"openvscode-server-v{self.version}-linux-$arch.tar.gz",
+            f"tar -xzf openvscode-server-v{self.version}-linux-$arch.tar.gz",
+            f"cd openvscode-server-v{self.version}-linux-$arch",
             "./bin/openvscode-server --install-extension ms-python.python",
             "rm /usr/bin/python2*",
         ]
