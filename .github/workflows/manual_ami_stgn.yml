@@ -23,4 +23,6 @@ jobs:
           chmod +x packer
           cp -R ami/packer/* .
       - name: Run packer
-        run: ./packer build -var build_id=${{ github.run_number }} ${{ matrix.variants }}.json
+        run: |
+          VERSION=$((${{ github.run_number }} + 150))
+          ./packer build -var build_id=$VERSION ${{ matrix.variants }}.json
