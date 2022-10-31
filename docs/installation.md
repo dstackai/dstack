@@ -12,13 +12,13 @@ and saves data in a configured AWS account.
 The `dstack` CLI needs your AWS account credentials to be configured locally 
 (e.g. in `~/.aws/credentials` or `AWS_ACCESS_KEY_ID` and `AWS_SECRET_ACCESS_KEY` environment variables).
 
-[//]: # (To use the CLI with AWS, dstack requires the following permissions: `ec2:*`, `iam:*`, `secretsmanager:*`, `s3:*`, and `logs:*`.)
-
-If you don't have an AWS account, you can quickly [create](https://aws.amazon.com/resources/create-account/) one,
-and get [credentials](https://docs.aws.amazon.com/sdk-for-javascript/v2/developer-guide/getting-your-credentials.html).
+For more details on what AWS permissions the `dstack` CLI requires, check the [reference](reference/aws/permissions.md) .
 
 !!! info "NOTE:"
     Support for GCP and Azure is in the roadmap.
+
+If you don't have an AWS account, you can quickly [create](https://aws.amazon.com/resources/create-account/) one,
+and get [credentials](https://docs.aws.amazon.com/sdk-for-javascript/v2/developer-guide/getting-your-credentials.html).
 
 ## Configure AWS region and S3 bucket
 

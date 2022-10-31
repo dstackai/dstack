@@ -852,6 +852,7 @@ html .md-footer-meta.md-typeset a:is(:focus,:hover) {
     border-top: 1px solid #f4f3e6;
     border-bottom: 1px solid #f4f3e6;
     margin-bottom: 1px;
+    font-weight: 500;
 }
 
 .md-typeset.md-banner__inner {

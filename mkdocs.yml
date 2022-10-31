@@ -147,4 +147,6 @@ nav:
           - notebook: reference/providers/notebook.md
           - docker: reference/providers/docker.md
   #        - torchrun: reference/workflows/torchrun.md
+      - AWS:
+        - Permissions: reference/aws/permissions.md
   - Community: community.md
