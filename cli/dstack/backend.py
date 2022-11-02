@@ -272,19 +272,19 @@ class Backend(ABC):
                                             path: str) -> List[Tuple[str, bool]]:
         pass
 
-    def list_secret_names(self) -> List[str]:
+    def list_secret_names(self, repo_user_name: str, repo_name: str) -> List[str]:
         pass
 
     def get_secret(self, secret_name: str) -> Optional[Secret]:
         pass
 
-    def add_secret(self, secret: Secret):
+    def add_secret(self, repo_user_name: str, repo_name: str, secret: Secret):
         pass
 
-    def update_secret(self, secret: Secret):
+    def update_secret(self, repo_user_name: str, repo_name: str, secret: Secret):
         pass
 
-    def delete_secret(self, secret_name: str):
+    def delete_secret(self, repo_user_name: str, repo_name: str, secret_name: str):
         pass
 
 

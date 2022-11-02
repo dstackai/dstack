@@ -7,26 +7,16 @@ from dstack.aws import runners
 from dstack.backend import Secret
 
 
-def list_secret_names(secretsmanager_client: BaseClient, bucket_name: str) -> List[str]:
-    prefix = f"/dstack/{bucket_name}/secrets/"
-    response = secretsmanager_client.list_secrets(
-        MaxResults=50,
-        Filters=[
-            {
-                "Key": "name",
-                "Values": [prefix]
-            },
-            {
-                "Key": "tag-key",
-                "Values": ["dstack_bucket"]
-            },
-            {
-                "Key": "tag-value",
-                "Values": [bucket_name]
-            },
-        ]
-    )
-    return [s["Name"][len(prefix):] for s in response["SecretList"]]
+def list_secret_names(s3_client: BaseClient, bucket_name: str, repo_user_name: str, repo_name: str) -> List[str]:
+    prefix = f"secrets/{repo_user_name}/{repo_name}"
+    secret_head_prefix = f"{prefix}/l;"
+    response = s3_client.list_objects_v2(Bucket=bucket_name, Prefix=secret_head_prefix)
+    secret_names = []
+    if "Contents" in response:
+        for obj in response["Contents"]:
+            secret_name = obj["Key"][len(secret_head_prefix):]
+            secret_names.append(secret_name)
+    return secret_names
 
 
 def get_secret(secretsmanager_client: BaseClient, bucket_name: str, secret_name: str) -> Optional[Secret]:
@@ -42,8 +32,14 @@ def get_secret(secretsmanager_client: BaseClient, bucket_name: str, secret_name:
             raise e
 
 
-def add_secret(sts_client: BaseClient, iam_client: BaseClient, secretsmanager_client: BaseClient, bucket_name: str,
-               secret: Secret):
+def _secret_head_key(repo_user_name: str, repo_name: str, secret_name: str) -> str:
+    prefix = f"secrets/{repo_user_name}/{repo_name}"
+    key = f"{prefix}/l;{secret_name}"
+    return key
+
+
+def add_secret(sts_client: BaseClient, iam_client: BaseClient, secretsmanager_client: BaseClient, s3_client: BaseClient,
+               bucket_name: str, repo_user_name: str, repo_name: str, secret: Secret):
     secret_id = f"/dstack/{bucket_name}/secrets/{secret.secret_name}"
     secretsmanager_client.create_secret(
         Name=secret_id,
@@ -81,19 +77,26 @@ def add_secret(sts_client: BaseClient, iam_client: BaseClient, secretsmanager_cl
             }
         )
     )
+    secret_head_key = _secret_head_key(repo_user_name, repo_name, secret.secret_name)
+    s3_client.put_object(Body="", Bucket=bucket_name, Key=secret_head_key)
 
 
-def update_secret(secretsmanager_client: BaseClient, bucket_name: str,
-                  secret: Secret):
+def update_secret(secretsmanager_client: BaseClient, s3_client: BaseClient, bucket_name: str, repo_user_name: str,
+                  repo_name: str, secret: Secret):
     secret_id = f"/dstack/{bucket_name}/secrets/{secret.secret_name}"
     secretsmanager_client.put_secret_value(
         SecretId=secret_id,
         SecretString=secret.secret_value,
     )
+    secret_head_key = _secret_head_key(repo_user_name, repo_name, secret.secret_name)
+    s3_client.put_object(Body="", Bucket=bucket_name, Key=secret_head_key)
 
 
-def delete_secret(secretsmanager_client: BaseClient, bucket_name: str, secret_name: str):
+def delete_secret(secretsmanager_client: BaseClient, s3_client: BaseClient, bucket_name: str, repo_user_name: str,
+                  repo_name: str, secret_name: str):
     secretsmanager_client.delete_secret(
         SecretId=f"/dstack/{bucket_name}/secrets/{secret_name}",
         ForceDeleteWithoutRecovery=True
     )
+    secret_head_key = _secret_head_key(repo_user_name, repo_name, secret_name)
+    s3_client.delete_object(Bucket=bucket_name, Key=secret_head_key)

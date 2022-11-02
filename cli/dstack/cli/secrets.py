@@ -8,12 +8,14 @@ from rich.table import Table
 
 from dstack.backend import load_backend, Secret
 from dstack.config import ConfigError
+from dstack.repo import load_repo_data
 
 
 def list_secrets_func(_: Namespace):
     try:
         backend = load_backend()
-        secret_names = backend.list_secret_names()
+        repo_data = load_repo_data()
+        secret_names = backend.list_secret_names(repo_data.repo_user_name, repo_data.repo_name)
         console = Console()
         table = Table(box=None)
         table.add_column("NAME", style="bold", no_wrap=True)
@@ -29,17 +31,19 @@ def list_secrets_func(_: Namespace):
 def add_secret_func(args: Namespace):
     try:
         backend = load_backend()
+        repo_data = load_repo_data()
         if backend.get_secret(args.secret_name):
             if args.yes or Confirm.ask(f"[red]The secret '{args.secret_name}' already exists. "
                                        f"Do you want to override it?[/]"):
                 secret_value = args.secret_value or Prompt.ask("Value", password=True)
-                backend.update_secret(Secret(args.secret_name, secret_value))
+                backend.update_secret(repo_data.repo_user_name, repo_data.repo_name,
+                                      Secret(args.secret_name, secret_value))
                 print(f"[grey58]OK[/]")
             else:
                 return
         else:
             secret_value = args.secret_value or Prompt.ask("Value", password=True)
-            backend.add_secret(Secret(args.secret_name, secret_value))
+            backend.add_secret(repo_data.repo_user_name, repo_data.repo_name, Secret(args.secret_name, secret_value))
             print(f"[grey58]OK[/]")
     except ConfigError:
         sys.exit(f"Call 'dstack config' first")
@@ -48,11 +52,12 @@ def add_secret_func(args: Namespace):
 def update_secret_func(args: Namespace):
     try:
         backend = load_backend()
+        repo_data = load_repo_data()
         if not backend.get_secret(args.secret_name):
             sys.exit(f"The secret '{args.secret_name}' doesn't exist")
         else:
             secret_value = args.secret_value or Prompt.ask("Value", password=True)
-            backend.update_secret(Secret(args.secret_name, secret_value))
+            backend.update_secret(repo_data.repo_user_name, repo_data.repo_name, Secret(args.secret_name, secret_value))
             print(f"[grey58]OK[/]")
     except ConfigError:
         sys.exit(f"Call 'dstack config' first")
@@ -61,11 +66,12 @@ def update_secret_func(args: Namespace):
 def delete_secret_func(args: Namespace):
     try:
         backend = load_backend()
+        repo_data = load_repo_data()
         secret = backend.get_secret(args.secret_name)
         if not secret:
             sys.exit(f"The secret '{args.secret_name}' doesn't exist")
         elif Confirm.ask(f" [red]Delete the secret '{secret.secret_name}'?[/]"):
-            backend.delete_secret(secret.secret_name)
+            backend.delete_secret(repo_data.repo_user_name, repo_data.repo_name, secret.secret_name)
             print(f"[grey58]OK[/]")
     except ConfigError:
         sys.exit(f"Call 'dstack config' first")

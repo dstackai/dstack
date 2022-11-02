@@ -102,7 +102,7 @@ class AwsBackend(Backend):
                    next_token: Optional[str], job_host_names: Dict[str, Optional[str]],
                    job_ports: Dict[str, Optional[List[int]]], job_app_specs: Dict[str, Optional[List[AppSpec]]]) \
             -> Tuple[List[LogEvent], Optional[str], Dict[str, Optional[str]], Dict[str, Optional[List[int]]],
-                     Dict[str, Optional[List[AppSpec]]]]:
+            Dict[str, Optional[List[AppSpec]]]]:
         return logs.query_logs(self._s3_client(), self._logs_client(),
                                self.backend_config.bucket_name, repo_user_name, repo_name, run_name, start_time,
                                end_time, next_token, job_host_names, job_ports, job_app_specs)
@@ -163,18 +163,20 @@ class AwsBackend(Backend):
         return artifacts.list_run_artifact_files_and_folders(self._s3_client(), self.backend_config.bucket_name,
                                                              repo_user_name, repo_name, job_id, path)
 
-    def list_secret_names(self) -> List[str]:
-        return secrets.list_secret_names(self._secretsmanager_client(), self.backend_config.bucket_name)
+    def list_secret_names(self, repo_user_name: str, repo_name: str) -> List[str]:
+        return secrets.list_secret_names(self._s3_client(), self.backend_config.bucket_name, repo_user_name, repo_name)
 
     def get_secret(self, secret_name: str) -> Optional[Secret]:
         return secrets.get_secret(self._secretsmanager_client(), self.backend_config.bucket_name, secret_name)
 
-    def add_secret(self, secret: Secret):
+    def add_secret(self, repo_user_name: str, repo_name: str, secret: Secret):
         return secrets.add_secret(self._sts_client(), self._iam_client(), self._secretsmanager_client(),
-                                  self.backend_config.bucket_name, secret)
+                                  self._s3_client(), self.backend_config.bucket_name, repo_user_name, repo_name, secret)
 
-    def update_secret(self, secret: Secret):
-        return secrets.update_secret(self._secretsmanager_client(), self.backend_config.bucket_name, secret)
+    def update_secret(self, repo_user_name: str, repo_name: str, secret: Secret):
+        return secrets.update_secret(self._secretsmanager_client(), self._s3_client(), self.backend_config.bucket_name,
+                                     repo_user_name, repo_name, secret)
 
-    def delete_secret(self, secret_name: str):
-        return secrets.delete_secret(self._secretsmanager_client(), self.backend_config.bucket_name, secret_name)
+    def delete_secret(self, repo_user_name: str, repo_name: str, secret_name: str):
+        return secrets.delete_secret(self._secretsmanager_client(), self._s3_client(), self.backend_config.bucket_name,
+                                     repo_user_name, repo_name, secret_name)

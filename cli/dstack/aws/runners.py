@@ -33,7 +33,6 @@ def _serialize_runner(runner: Runner) -> dict:
         "request_id": runner.request_id,
         "resources": resources,
         "job": jobs.serialize_job(runner.job),
-        "secret_names": runner.secret_names
     }
     return data
 
@@ -50,7 +49,6 @@ def _unserialize_runner(data: dict) -> Runner:
             data["resources"].get("local") is True,
         ),
         jobs.unserialize_job(data["job"]),
-        data.get("secret_names") or [],
     )
 
 
@@ -535,11 +533,10 @@ def run_job(secretsmanager_client: BaseClient, logs_client: BaseClient, ec2_clie
         try:
             job.runner_id = uuid.uuid4().hex
             jobs.update_job(s3_client, bucket_name, job)
-            secret_names = secrets.list_secret_names(secretsmanager_client, bucket_name)
             if job.requirements and job.requirements.local:
                 resources = local.check_runner_resources(job.runner_id)
                 if _matches(resources, job.requirements):
-                    runner = Runner(job.runner_id, None, resources, job, secret_names)
+                    runner = Runner(job.runner_id, None, resources, job)
                     _create_runner(logs_client, s3_client, bucket_name, runner)
                     runner.request_id = local.start_runner_process(job.runner_id)
                 else:
@@ -548,7 +545,7 @@ def run_job(secretsmanager_client: BaseClient, logs_client: BaseClient, ec2_clie
                     sys.exit(f"Local resources do not match requirements")
             else:
                 instance_type = _get_instance_type(ec2_client, job.requirements)
-                runner = Runner(job.runner_id, None, instance_type.resources, job, secret_names)
+                runner = Runner(job.runner_id, None, instance_type.resources, job)
                 _create_runner(logs_client, s3_client, bucket_name, runner)
                 if instance_type:
                     runner.request_id = _run_instance_retry(ec2_client, iam_client, bucket_name, region_name, subnet_id,
