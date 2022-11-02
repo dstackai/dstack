@@ -78,6 +78,10 @@
     padding: .6rem .8rem;
 }
 
+.md-typeset iframe {
+    border-radius: 6px;
+}
+
 [dir=ltr] .md-typeset :is(.admonition,details) :is(p,div):not([class*="admonition-title"]) {
     padding-left: 32px;
 }

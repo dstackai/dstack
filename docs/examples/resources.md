@@ -101,7 +101,7 @@ Here's an example of how to define such a workflow:
 
 ```bash
 workflows:
-  - name: hello-i
+  - name: hello
     provider: bash
     commands:
       - echo "Hello world"

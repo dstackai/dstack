@@ -20,6 +20,10 @@ while keeping them highly reproducible.
  * Run workflows via the `dstack` CLI. Have infrastructure provisioned automatically in a configured cloud account. 
  * Save output artifacts, such as data and models, to reuse them in other ML workflows
 
+## Demo
+
+<img src="https://s4.gifyu.com/images/dstack-run-gpu.gif" width="800px"/>
+
 ## How does it work?
 
 1. Install `dstack` locally 

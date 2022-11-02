@@ -1,3 +1,7 @@
+---
+title: AWS permissions 
+---
+
 # AWS permissions
 
 The `dstack` CLI needs AWS permissions to provision infrastructure,
