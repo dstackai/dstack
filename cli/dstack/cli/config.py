@@ -64,17 +64,28 @@ def ask_choice(title: str, labels: List[str], values: List[str], selected_value:
 
 
 def ask_subnet(profile_name: Optional[str], region_name: str, default_subnet_id: Optional[str]) -> Optional[str]:
-    my_session = boto3.session.Session(profile_name=profile_name, region_name=region_name)
-    ec2_client = my_session.client("ec2")
-    subnets_response = ec2_client.describe_subnets()
+    try:
+        my_session = boto3.session.Session(profile_name=profile_name, region_name=region_name)
+        ec2_client = my_session.client("ec2")
+        subnets_response = ec2_client.describe_subnets()
+    except Exception:
+        return ask_subnet_id(default_subnet_id)
     existing_subnets = [s["SubnetId"] for s in subnets_response["Subnets"]]
     subnet_options = ["Default [no preference]"]
     subnet_options.extend([(s["SubnetId"] + " [" + s["VpcId"] + "]") for s in subnets_response["Subnets"]])
-    choice = ask_choice("Choose EC2 subnet", subnet_options, ["none"] + existing_subnets, default_subnet_id or "none",
-                        show_choices=True)
+    choice = ask_choice("Choose EC2 subnet", subnet_options, ["none"] + existing_subnets,
+                        default_subnet_id or "none", show_choices=True)
     if choice == "none":
         choice = None
     return choice
+
+
+def ask_subnet_id(default_subnet_id: Optional[str]) -> Optional[str]:
+    subnet_id = Prompt.ask("[sea_green3 bold]?[/sea_green3 bold] [bold]Enter EC2 subnet ID[/bold]",
+                           default=default_subnet_id or "no preference")
+    if subnet_id == "no preference":
+        subnet_id = None
+    return subnet_id
 
 
 def config_func(_: Namespace):
