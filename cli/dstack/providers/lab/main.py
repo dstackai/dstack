@@ -71,20 +71,22 @@ class LabProvider(Provider):
 
     def _commands(self):
         commands = [
+            "conda install psutil",
             "pip install jupyterlab" + (f"=={self.version}" if self.version else ""),
             "pip install ipywidgets",
             "jupyter nbextension enable --py widgetsnbextension",
             "mkdir -p /root/.jupyter",
             "echo \"c.ServerApp.allow_root = True\" > /root/.jupyter/jupyter_server_config.py",
+            "echo \"c.ServerApp.allow_origin = '*'\" >> /root/.jupyter/jupyter_server_config.py",
             "echo \"c.ServerApp.open_browser = False\" >> /root/.jupyter/jupyter_server_config.py",
-            "echo \"c.ServerApp.port = $JOB_PORT_0\" >> /root/.jupyter/jupyter_server_config.py",
+            "echo \"c.ServerApp.port = $PORT_0\" >> /root/.jupyter/jupyter_server_config.py",
             "echo \"c.ServerApp.token = '$TOKEN'\" >> /root/.jupyter/jupyter_server_config.py",
-            "echo \"c.ServerApp.ip = '$JOB_HOSTNAME'\" >> /root/.jupyter/jupyter_server_config.py",
+            "echo \"c.ServerApp.ip = '0.0.0.0'\" >> /root/.jupyter/jupyter_server_config.py",
         ]
-        if self.requirements:
-            commands.append("pip install -r " + self.requirements)
         if self.before_run:
             commands.extend(self.before_run)
+        if self.requirements:
+            commands.append("pip install -r " + self.requirements)
         commands.append(
             f"jupyter lab"
         )

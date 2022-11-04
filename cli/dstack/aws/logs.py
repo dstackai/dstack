@@ -34,7 +34,7 @@ def _render_log_message(s3_client: BaseClient, bucket_name: str, event: Dict[str
     host_name = job_host_names[job_id]
     ports = job_ports[job_id]
     app_specs = job_app_specs[job_id]
-    pat = re.compile(f'http://(localhost|0.0.0.0|{host_name}):[\\S]*[^(.+)\\s\\n\\r]')
+    pat = re.compile(f'http://(localhost|0.0.0.0|127.0.0.1|{host_name}):[\\S]*[^(.+)\\s\\n\\r]')
     if re.search(pat, log):
         if host_name != "none" and ports and app_specs:
             for app_spec in app_specs:

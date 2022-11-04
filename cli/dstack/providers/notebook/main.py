@@ -29,7 +29,7 @@ class NotebookProvider(Provider):
         self.artifact_specs = self._artifact_specs()
         self.working_dir = self.provider_data.get("working_dir")
         self.resources = self._resources()
-        self.image_name = self._image()
+        self.image_name = self._image_name()
 
     def _create_parser(self, workflow_name: Optional[str]) -> Optional[ArgumentParser]:
         parser = ArgumentParser(prog="dstack run " + (workflow_name or self.provider_name))
@@ -50,9 +50,9 @@ class NotebookProvider(Provider):
             commands=self._commands(),
             env=env,
             working_dir=self.working_dir,
-            requirements=self.resources,
             artifact_specs=self.artifact_specs,
             port_count=1,
+            requirements=self.resources,
             app_specs=[AppSpec(
                 port_index=0,
                 app_name="notebook",
@@ -62,19 +62,23 @@ class NotebookProvider(Provider):
             )]
         )]
 
-    def _image(self) -> str:
-        cuda_is_required = self.resources and self.resources.gpu
-        return f"dstackai/miniconda:{self.python}-cuda-11.1" if cuda_is_required else f"dstackai/miniconda:{self.python}"
+    def _image_name(self) -> str:
+        cuda_is_required = self.resources and self.resources.gpus
+        cuda_image_name = f"dstackai/miniconda:{self.python}-cuda-11.1"
+        cpu_image_name = f"dstackai/miniconda:{self.python}"
+        return cuda_image_name if cuda_is_required else cpu_image_name
 
     def _commands(self):
         commands = [
+            "conda install psutil",
             "pip install jupyter" + (f"=={self.version}" if self.version else ""),
             "mkdir -p /root/.jupyter",
             "echo \"c.NotebookApp.allow_root = True\" > /root/.jupyter/jupyter_notebook_config.py",
+            "echo \"c.NotebookApp.allow_origin = '*'\" >> /root/.jupyter/jupyter_notebook_config.py",
             "echo \"c.NotebookApp.open_browser = False\" >> /root/.jupyter/jupyter_notebook_config.py",
-            "echo \"c.NotebookApp.port = $JOB_PORT_0\" >> /root/.jupyter/jupyter_notebook_config.py",
+            "echo \"c.NotebookApp.port = $PORT_0\" >> /root/.jupyter/jupyter_notebook_config.py",
             "echo \"c.NotebookApp.token = '$TOKEN'\" >> /root/.jupyter/jupyter_notebook_config.py",
-            "echo \"c.NotebookApp.ip = '$JOB_HOSTNAME'\" >> /root/.jupyter/jupyter_notebook_config.py",
+            "echo \"c.NotebookApp.ip = '0.0.0.0'\" >> /root/.jupyter/jupyter_notebook_config.py",
         ]
         if self.requirements:
             commands.append("pip install -r " + self.requirements)

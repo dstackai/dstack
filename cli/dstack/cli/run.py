@@ -117,7 +117,7 @@ def poll_logs_ws(backend: Backend, repo_user_name: str, repo_name: str,
     job = backend.get_job(repo_user_name, repo_name, job_head.job_id)
 
     def on_message(ws: WebSocketApp, message):
-        pat = re.compile(f'http://(localhost|0.0.0.0|{job.host_name}):[\\S]*[^(.+)\\s\\n\\r]')
+        pat = re.compile(f'http://(localhost|0.0.0.0|127.0.0.1|{job.host_name}):[\\S]*[^(.+)\\s\\n\\r]')
         if re.search(pat, message):
             if job.host_name and job.ports and job.app_specs:
                 for app_spec in job.app_specs:

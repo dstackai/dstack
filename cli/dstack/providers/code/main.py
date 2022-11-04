@@ -2,7 +2,7 @@ import uuid
 from argparse import ArgumentParser
 from typing import List, Optional, Dict, Any
 
-from dstack.jobs import JobSpec, AppSpec
+from dstack.jobs import AppSpec, JobSpec
 from dstack.providers import Provider
 
 
@@ -72,22 +72,20 @@ class CodeProvider(Provider):
     def _commands(self):
         commands = [
             "mkdir -p /tmp",
-            "cd /tmp",
             "if [ $(uname -m) = \"aarch64\" ]; then arch=\"arm64\"; else arch=\"x64\"; fi",
             f"wget -q https://github.com/gitpod-io/openvscode-server/releases/download/"
             f"openvscode-server-v{self.version}/openvscode-server-v{self.version}-linux-$arch.tar.gz -O "
-            f"openvscode-server-v{self.version}-linux-$arch.tar.gz",
-            f"tar -xzf openvscode-server-v{self.version}-linux-$arch.tar.gz",
-            f"cd openvscode-server-v{self.version}-linux-$arch",
-            "./bin/openvscode-server --install-extension ms-python.python",
+            f"/tmp/openvscode-server-v{self.version}-linux-$arch.tar.gz",
+            f"tar -xzf /tmp/openvscode-server-v{self.version}-linux-$arch.tar.gz -C /tmp",
+            f"/tmp/openvscode-server-v{self.version}-linux-$arch/bin/openvscode-server --install-extension ms-python.python",
             "rm /usr/bin/python2*",
         ]
-        if self.requirements:
-            commands.append("pip install -r " + self.requirements)
         if self.before_run:
             commands.extend(self.before_run)
+        if self.requirements:
+            commands.append("pip install -r " + self.requirements)
         commands.append(
-            "./bin/openvscode-server --port $PORT_0 --host 0.0.0.0 --connection-token $CONNECTION_TOKEN"
+            f"/tmp/openvscode-server-v{self.version}-linux-$arch/bin/openvscode-server --port $PORT_0 --host 0.0.0.0 --connection-token $CONNECTION_TOKEN"
         )
         return commands
 

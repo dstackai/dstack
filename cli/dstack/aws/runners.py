@@ -413,10 +413,9 @@ def _get_ami_image(ec2_client: BaseClient, cuda: bool) -> Tuple[str, str]:
     ami_name = "dstack"
     if cuda:
         ami_name = ami_name + "-cuda-11.1"
-    if version.__is_release__:
-        ami_name = ami_name + f"-{version.__version__}"
-    else:
-        ami_name = "[stgn] " + ami_name + "-*"
+    if not version.__is_release__:
+        ami_name = "[stgn] " + ami_name
+    ami_name = ami_name + "-*"
     response = ec2_client.describe_images(Filters=[
         {
             'Name': 'name',
