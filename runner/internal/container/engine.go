@@ -104,11 +104,13 @@ func (r *Engine) Create(ctx context.Context, spec *Spec, logs io.Writer) (*Docke
 	config := &container.Config{
 		Image:        spec.Image,
 		Cmd:          spec.Commands,
-		Tty:          false,
+		Tty:          true,
 		WorkingDir:   spec.WorkDir,
 		Env:          spec.Env,
 		ExposedPorts: spec.ExposedPorts,
 		Labels:       spec.Labels,
+		AttachStdout: true,
+		AttachStdin:  true,
 	}
 	var networkMode container.NetworkMode = "default"
 	if supportNetworkModeHost() {
@@ -176,13 +178,14 @@ func (r *DockerRuntime) LogsWS(ctx context.Context) error {
 		Stream: true,
 		Stdout: true,
 		Stderr: true,
+		Logs:   true,
 	})
 	if err != nil {
 		return gerrors.Wrap(err)
 	}
 	go func() {
-		//_, err = io.Copy(r.logs, logs)
-		_, err = stdcopy.StdCopy(r.logs, r.logs, logs.Reader)
+		_, err = io.Copy(r.logs, logs.Reader)
+		//_, err = stdcopy.StdCopy(r.logs, r.logs, logs.Reader)
 		if err != nil {
 			log.Error(ctx, "failed to stream container logs", "err", gerrors.Wrap(err))
 		}
@@ -281,7 +284,8 @@ func ShellCommands(commands []string) []string {
 	}
 	arg := strings.Join(commands, " && ")
 	shell := []string{
-		"/bin/sh",
+		"/bin/bash",
+		"-i",
 		"-c",
 		arg,
 	}
