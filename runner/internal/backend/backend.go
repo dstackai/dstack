@@ -28,7 +28,7 @@ type Backend interface {
 	CreateLogger(ctx context.Context, logGroup, logName string) io.Writer
 	ListSubDir(ctx context.Context, dir string) ([]string, error)
 	Bucket(ctx context.Context) string
-	Secrets(ctx context.Context) map[string]string
+	Secrets(ctx context.Context) (map[string]string, error)
 	GitCredentials(ctx context.Context) *models.GitCredentials
 }
 

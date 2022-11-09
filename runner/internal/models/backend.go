@@ -77,7 +77,6 @@ type State struct {
 	RequestID string   `yaml:"request_id"`
 	Resources Resource `yaml:"resources"`
 	RunnerID  string   `yaml:"runner_id"`
-	Secrets   []string `yaml:"secret_names"`
 }
 type GitCredentials struct {
 	Protocol   string  `json:"protocol"`

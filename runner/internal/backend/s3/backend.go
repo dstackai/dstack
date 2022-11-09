@@ -327,16 +327,24 @@ func (s *S3) Bucket(ctx context.Context) string {
 	}
 	return s.bucket
 }
-func (s *S3) Secrets(ctx context.Context) map[string]string {
+func (s *S3) Secrets(ctx context.Context) (map[string]string, error) {
 	log.Trace(ctx, "Getting secrets")
 	if s == nil {
-		return make(map[string]string)
+		return nil, gerrors.New("Backend is nil")
 	}
 	if s.state == nil {
-		log.Error(ctx, "State is empty")
-		return make(map[string]string)
+		return nil, gerrors.New("State is empty")
 	}
-	return s.cliSecret.fetchSecret(ctx, s.bucket, s.state.Secrets)
+	templatePath := fmt.Sprintf("secrets/%s/%s/l;", s.state.Job.RepoUserName, s.state.Job.RepoName)
+	listSecrets, err := s.cliS3.ListFile(ctx, s.bucket, templatePath)
+	if err != nil {
+		return nil, gerrors.Wrap(err)
+	}
+	secrets := make([]string, 0, len(listSecrets))
+	for _, secretPath := range listSecrets {
+		secrets = append(secrets, strings.ReplaceAll(secretPath, templatePath, ""))
+	}
+	return s.cliSecret.fetchSecret(ctx, s.bucket, secrets)
 }
 func (s *S3) GitCredentials(ctx context.Context) *models.GitCredentials {
 	log.Trace(ctx, "Getting credentials")
