@@ -6,7 +6,7 @@ jobs:
   build-docker:
     strategy:
       matrix:
-        python: [ "3.7", "3.8", "3.9", "3.10" ]
+        python: [ "3.7", "3.8", "3.9", "3.10", "3.11" ]
     defaults:
       run:
         working-directory: docker
@@ -25,8 +25,8 @@ jobs:
        uses: docker/setup-qemu-action@v2
      - name: Build and upload to DockerHub
        run: |
-         docker buildx build --platform linux/arm64/v8 --build-arg ARCH=aarch64 --push --tag dstackai/miniconda:${{ matrix.python }}-arm64 -f miniconda/cpu/${{ matrix.python }}/Dockerfile .
-         docker buildx build --platform linux/amd64 --build-arg ARCH=x86_64 --push --tag dstackai/miniconda:${{ matrix.python }}-amd64 -f miniconda/cpu/${{ matrix.python }}/Dockerfile .
-         docker manifest create dstackai/miniconda:${{ matrix.python }} --amend dstackai/miniconda:${{ matrix.python }}-arm64 --amend dstackai/miniconda:${{ matrix.python }}-amd64
-         docker manifest push dstackai/miniconda:${{ matrix.python }}
-         docker buildx build --platform linux/amd64 --build-arg ARCH=x86_64 --push --tag dstackai/miniconda:${{ matrix.python }}-cuda-11.1 -f miniconda/cuda/${{ matrix.python }}/Dockerfile .
+         docker buildx build --platform linux/arm64/v8 --build-arg PYTHON=${{ matrix.python }} --push --tag dstackai/miniforge:${{ matrix.python }}-arm64 -f cpu/Dockerfile .
+         docker buildx build --platform linux/amd64 --build-arg PYTHON=${{ matrix.python }} --push --tag dstackai/miniforge:${{ matrix.python }}-amd64 -f cpu/Dockerfile .
+         docker manifest create dstackai/miniforge:${{ matrix.python }} --amend dstackai/miniforge:${{ matrix.python }}-arm64 --amend dstackai/miniforge:${{ matrix.python }}-amd64
+         docker manifest push dstackai/miniforge:${{ matrix.python }}
+         docker buildx build --platform linux/amd64 --build-arg PYTHON=${{ matrix.python }} --push --tag dstackai/miniforge:${{ matrix.python }}-cuda-11.1 -f cuda/Dockerfile .

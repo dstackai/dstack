@@ -41,8 +41,8 @@ class TorchrunProvider(Provider):
 
     def _image_name(self) -> str:
         cuda_is_required = self.resources and self.resources.gpus
-        cuda_image_name = f"dstackai/miniconda:{self.python}-cuda-11.1"
-        cpu_image_name = f"dstackai/miniconda:{self.python}"
+        cuda_image_name = f"dstackai/miniforge:{self.python}-cuda-11.1"
+        cpu_image_name = f"dstackai/miniforge:{self.python}"
         return cuda_image_name if cuda_is_required else cpu_image_name
 
     def _commands(self, node_rank):

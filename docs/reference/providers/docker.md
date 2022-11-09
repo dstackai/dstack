@@ -5,7 +5,7 @@ The `docker` provider runs given shell commands using a given Docker image.
 Unlike the `bash`, `code`, `lab`, and `notebook` providers, the `docker` provider doesn't  
 pre-install Python, Conda, or the CUDA driver.
 
-If you plan to build your own Docker image, you can base it on the [`dstackai/miniconda`](https://hub.docker.com/repository/docker/dstackai/miniconda) 
+If you plan to build your own Docker image, you can base it on the [`dstackai/miniforge`](https://hub.docker.com/repository/docker/dstackai/miniforge) 
 Docker image that has Conda and the CUDA driver pre-installed.
 
 ## Example usage 

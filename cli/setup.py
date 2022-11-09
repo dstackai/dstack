@@ -33,7 +33,7 @@ setup(
     description="A command-line utility to provision infrastructure for ML workflows",
     long_description=open("README.md").read(),
     long_description_content_type="text/markdown",
-    python_requires=">=3.6",
+    python_requires=">=3.7",
     install_requires=[
         "pyyaml",
         "requests",
