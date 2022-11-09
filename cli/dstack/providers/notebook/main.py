@@ -70,7 +70,7 @@ class NotebookProvider(Provider):
 
     def _commands(self):
         commands = [
-            "conda install psutil",
+            "conda install psutil -y",
             "pip install jupyter" + (f"=={self.version}" if self.version else ""),
             "mkdir -p /root/.jupyter",
             "echo \"c.NotebookApp.allow_root = True\" > /root/.jupyter/jupyter_notebook_config.py",

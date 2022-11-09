@@ -71,7 +71,7 @@ class LabProvider(Provider):
 
     def _commands(self):
         commands = [
-            "conda install psutil",
+            "conda install psutil -y",
             "pip install jupyterlab" + (f"=={self.version}" if self.version else ""),
             "pip install ipywidgets",
             "jupyter nbextension enable --py widgetsnbextension",
