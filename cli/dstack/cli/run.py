@@ -29,6 +29,8 @@ from dstack.repo import load_repo_data
 
 POLL_PROVISION_RATE_SECS = 3
 
+POLL_FINISHED_STATE_RATE_SECS = 1
+
 
 def _load_workflows():
     root_folder = Path(os.getcwd()) / ".dstack"
@@ -154,6 +156,20 @@ def poll_logs_ws(backend: Backend, repo_user_name: str, repo_name: str,
                                  on_close=on_close)
     _ws.run_forever()
     cursor.show()
+
+    try:
+        while True:
+            _job_head = backend.get_job(repo_user_name, repo_name, job_head.job_id)
+            run = next(iter(backend.get_run_heads(repo_user_name, repo_name,
+                                               [_job_head], include_request_heads=False)))
+            if run.status.is_finished():
+                break
+            time.sleep(POLL_FINISHED_STATE_RATE_SECS)
+    except KeyboardInterrupt:
+        if Confirm.ask(f"\n [red]Abort the run '{job.run_name}'?[/]"):
+            backend.stop_jobs(repo_user_name, repo_name, job.run_name, abort=True)
+            console.print(f"[grey58]OK[/]")
+
 
 
 def run_workflow_func(args: Namespace):
