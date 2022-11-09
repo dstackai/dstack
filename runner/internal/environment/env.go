@@ -18,6 +18,9 @@ func New() *Env {
 }
 
 func (e *Env) AddMapString(src map[string]string) {
+	if src == nil {
+		return
+	}
 	e.mu.Lock()
 	defer e.mu.Unlock()
 	for k, v := range src {
@@ -25,6 +28,9 @@ func (e *Env) AddMapString(src map[string]string) {
 	}
 }
 func (e *Env) AddMapInterface(src map[string]interface{}) {
+	if src == nil {
+		return
+	}
 	e.mu.Lock()
 	defer e.mu.Unlock()
 	for k, v := range src {
