@@ -2,8 +2,10 @@ package simple
 
 import (
 	"context"
+	"errors"
 	"os"
 	"path"
+	"path/filepath"
 
 	"github.com/docker/docker/api/types/mount"
 	"github.com/dstackai/dstackai/runner/internal/artifacts"
@@ -34,14 +36,23 @@ func (s *Simple) AfterRun(ctx context.Context) error {
 	return nil
 }
 
-func (s *Simple) DockerBindings(workDir string) []mount.Mount {
+func (s *Simple) DockerBindings(workDir string) ([]mount.Mount, error) {
+	cleanPath := filepath.Clean(s.pathLocal)
+	if path.IsAbs(cleanPath) && path.Dir(cleanPath) == cleanPath {
+		return nil, errors.New("directory needs to be a non-root path")
+	}
+	dir := s.pathLocal
+	if !filepath.IsAbs(s.pathLocal) {
+		dir = path.Join(workDir, s.pathLocal)
+	}
+
 	return []mount.Mount{
 		{
 			Type:   mount.TypeBind,
 			Source: path.Join(s.workDir, s.pathLocal),
-			Target: path.Join(workDir, s.pathLocal),
+			Target: dir,
 		},
-	}
+	}, nil
 }
 
 func NewSimple(bucket, region, workDir, pathLocal, pathRemote string) (*Simple, error) {

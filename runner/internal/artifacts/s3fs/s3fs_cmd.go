@@ -2,10 +2,12 @@ package s3fs
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"os"
 	"os/exec"
 	"path"
+	"path/filepath"
 	"strings"
 
 	"github.com/docker/docker/api/types/mount"
@@ -66,14 +68,23 @@ func (s *S3FSCmd) AfterRun(ctx context.Context) error {
 	return oneOf
 }
 
-func (s *S3FSCmd) DockerBindings(workDir string) []mount.Mount {
+func (s *S3FSCmd) DockerBindings(workDir string) ([]mount.Mount, error) {
+	cleanPath := filepath.Clean(s.pathLocal)
+	if path.IsAbs(cleanPath) && path.Dir(cleanPath) == cleanPath {
+		return nil, errors.New("directory needs to be a non-root path")
+	}
+	dir := s.pathLocal
+	if !filepath.IsAbs(s.pathLocal) {
+		dir = path.Join(workDir, s.pathLocal)
+	}
+
 	return []mount.Mount{
 		{
 			Type:   mount.TypeBind,
 			Source: path.Join(s.workDir, s.pathLocal),
-			Target: path.Join(workDir, s.pathLocal),
+			Target: dir,
 		},
-	}
+	}, nil
 }
 
 /*

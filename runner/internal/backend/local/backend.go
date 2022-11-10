@@ -25,7 +25,7 @@ func (l Local) GitCredentials(_ context.Context) *models.GitCredentials {
 	panic("implement me")
 }
 
-func (l Local) Secrets(_ context.Context) map[string]string {
+func (l Local) Secrets(_ context.Context) (map[string]string, error) {
 	//TODO implement me
 	panic("implement me")
 }

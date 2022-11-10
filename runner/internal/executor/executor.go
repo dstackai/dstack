@@ -333,10 +333,9 @@ func (ex *Executor) processDeps(ctx context.Context) error {
 			return gerrors.Wrap(err)
 		}
 		for _, pathDir := range listDir {
-			dirSlice := strings.Split(pathDir, "/")
+			dirSlice := strings.Split(pathDir, "/") // TODO: fix, ugly code
 			ex.artifactsIn = append(ex.artifactsIn, ex.backend.GetArtifact(ctx, dep.RunName, dirSlice[len(dirSlice)-1], pathDir, dep.Mount))
 		}
-
 	}
 	return nil
 }
@@ -384,8 +383,11 @@ func (ex *Executor) environment(ctx context.Context) []string {
 	env.AddMapString(cons)
 	env.AddMapString(job.Environment)
 	env.AddMapInterface(job.Variables)
-
-	env.AddMapString(ex.backend.Secrets(ctx))
+	secrets, err := ex.backend.Secrets(ctx)
+	if err != nil {
+		log.Error(ctx, "Fail fetching secrets", "err", err)
+	}
+	env.AddMapString(secrets)
 
 	log.Trace(ctx, "Stop generate env", "slice", env.ToSlice())
 	return env.ToSlice()
@@ -402,10 +404,18 @@ func (ex *Executor) processJob(ctx context.Context, stoppedCh chan struct{}) err
 		Target: "/workflow",
 	})
 	for _, artifact := range ex.artifactsIn {
-		bindings = append(bindings, artifact.DockerBindings(path.Join("/workflow", job.WorkingDir))...)
+		art, err := artifact.DockerBindings(path.Join("/workflow", job.WorkingDir))
+		if err != nil {
+			return gerrors.Wrap(err)
+		}
+		bindings = append(bindings, art...)
 	}
 	for _, artifact := range ex.artifactsOut {
-		bindings = append(bindings, artifact.DockerBindings(path.Join("/workflow", job.WorkingDir))...)
+		art, err := artifact.DockerBindings(path.Join("/workflow", job.WorkingDir))
+		if err != nil {
+			return gerrors.Wrap(err)
+		}
+		bindings = append(bindings, art...)
 	}
 	logger := ex.backend.CreateLogger(ctx, fmt.Sprintf("/dstack/jobs/%s/%s/%s", ex.backend.Bucket(ctx), job.RepoUserName, job.RepoName), job.RunName)
 	spec := &container.Spec{
@@ -442,13 +452,13 @@ func (ex *Executor) processJob(ctx context.Context, stoppedCh chan struct{}) err
 	select {
 	case err = <-errCh:
 		if err != nil {
-			return err
+			return gerrors.Wrap(err)
 		}
 		return nil
 	case <-stoppedCh:
 		err = docker.Stop(ctx)
 		if err != nil {
-			return err
+			return gerrors.Wrap(err)
 		}
 		return nil
 	}
