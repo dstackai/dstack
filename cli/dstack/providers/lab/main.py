@@ -42,7 +42,7 @@ class LabProvider(Provider):
         self._parse_base_args(args)
 
     def create_job_specs(self) -> List[JobSpec]:
-        env = dict(self.env or {})
+        env = {}
         token = uuid.uuid4().hex
         env["TOKEN"] = token
         return [JobSpec(
@@ -70,7 +70,10 @@ class LabProvider(Provider):
         return cuda_image_name if cuda_is_required else cpu_image_name
 
     def _commands(self):
-        commands = [
+        commands = []
+        if self.env:
+            self._extend_commands_with_env(commands, self.env)
+        commands.extend([
             "conda install psutil -y",
             "pip install jupyterlab" + (f"=={self.version}" if self.version else ""),
             "pip install ipywidgets",
@@ -82,7 +85,7 @@ class LabProvider(Provider):
             "echo \"c.ServerApp.port = $PORT_0\" >> /root/.jupyter/jupyter_server_config.py",
             "echo \"c.ServerApp.token = '$TOKEN'\" >> /root/.jupyter/jupyter_server_config.py",
             "echo \"c.ServerApp.ip = '0.0.0.0'\" >> /root/.jupyter/jupyter_server_config.py",
-        ]
+        ])
         if self.before_run:
             commands.extend(self.before_run)
         if self.requirements:

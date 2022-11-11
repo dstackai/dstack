@@ -42,7 +42,7 @@ class NotebookProvider(Provider):
         self._parse_base_args(args)
 
     def create_job_specs(self) -> List[JobSpec]:
-        env = dict(self.env or {})
+        env = {}
         token = uuid.uuid4().hex
         env["TOKEN"] = token
         return [JobSpec(
@@ -69,7 +69,10 @@ class NotebookProvider(Provider):
         return cuda_image_name if cuda_is_required else cpu_image_name
 
     def _commands(self):
-        commands = [
+        commands = []
+        if self.env:
+            self._extend_commands_with_env(commands, self.env)
+        commands.extend([
             "conda install psutil -y",
             "pip install jupyter" + (f"=={self.version}" if self.version else ""),
             "mkdir -p /root/.jupyter",
@@ -79,7 +82,7 @@ class NotebookProvider(Provider):
             "echo \"c.NotebookApp.port = $PORT_0\" >> /root/.jupyter/jupyter_notebook_config.py",
             "echo \"c.NotebookApp.token = '$TOKEN'\" >> /root/.jupyter/jupyter_notebook_config.py",
             "echo \"c.NotebookApp.ip = '0.0.0.0'\" >> /root/.jupyter/jupyter_notebook_config.py",
-        ]
+        ])
         if self.requirements:
             commands.append("pip install -r " + self.requirements)
         if self.before_run:

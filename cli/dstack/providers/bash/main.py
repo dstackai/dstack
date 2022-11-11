@@ -64,7 +64,6 @@ class BashProvider(Provider):
         return [JobSpec(
             image_name=self.image_name,
             commands=self._commands(),
-            env=self.env,
             working_dir=self.working_dir,
             artifact_specs=self.artifact_specs,
             port_count=self.ports,
@@ -80,6 +79,8 @@ class BashProvider(Provider):
 
     def _commands(self):
         commands = []
+        if self.env:
+            self._extend_commands_with_env(commands, self.env)
         if self.requirements:
             commands.append("pip install -r " + self.requirements)
         if self.before_run:

@@ -311,6 +311,10 @@ class Provider:
             else:
                 return None
 
+    @staticmethod
+    def _extend_commands_with_env(commands, env):
+        commands.extend([f"export {e}={env[e] if env.get(e) else ''}" for e in env])
+
 
 def get_provider_names() -> List[str]:
     return list(map(lambda m: m[1], filter(lambda m: m.ispkg and not m[1].startswith("_"),

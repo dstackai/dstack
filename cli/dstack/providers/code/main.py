@@ -42,7 +42,7 @@ class CodeProvider(Provider):
         self._parse_base_args(args)
 
     def create_job_specs(self) -> List[JobSpec]:
-        env = dict(self.env or {})
+        env = {}
         connection_token = uuid.uuid4().hex
         env["CONNECTION_TOKEN"] = connection_token
         return [JobSpec(
@@ -70,7 +70,10 @@ class CodeProvider(Provider):
         return cuda_image_name if cuda_is_required else cpu_image_name
 
     def _commands(self):
-        commands = [
+        commands = []
+        if self.env:
+            self._extend_commands_with_env(commands, self.env)
+        commands.extend([
             "mkdir -p /tmp",
             "if [ $(uname -m) = \"aarch64\" ]; then arch=\"arm64\"; else arch=\"x64\"; fi",
             f"wget -q https://github.com/gitpod-io/openvscode-server/releases/download/"
@@ -79,7 +82,7 @@ class CodeProvider(Provider):
             f"tar -xzf /tmp/openvscode-server-v{self.version}-linux-$arch.tar.gz -C /tmp",
             f"/tmp/openvscode-server-v{self.version}-linux-$arch/bin/openvscode-server --install-extension ms-python.python",
             "rm /usr/bin/python2*",
-        ]
+        ])
         if self.before_run:
             commands.extend(self.before_run)
         if self.requirements:
