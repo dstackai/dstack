@@ -25,7 +25,7 @@ def default_func(_: Namespace):
           "Other commands:\n"
           # "dashboard      Launch a dashboard\n"
           # "app            Open a running application\n"
-          "  [bold]dstack init [grey53][-t GITHUB_TOKEN | -i SSH_PRIVATE_KEY][/grey53][/bold]     " +
+          "  [bold]dstack init [grey53][-t OAUTH_TOKEN | -i SSH_PRIVATE_KEY][/grey53][/bold]      " +
           "Initialize the repo\n"
           "  [bold]dstack config[/bold]                                          Configure the backend\n"
           "  [bold]dstack tags add TAG [grey53]([/grey53]-r RUN [grey53]|[/grey53] -a PATH [grey53]...)[/grey53][/bold]             Add a tag\n"

@@ -17,7 +17,7 @@ def rm_func(args: Namespace):
         try:
             repo_data = load_repo_data()
             backend = load_backend()
-            job_heads = backend.list_job_heads(repo_data.repo_user_name, repo_data.repo_name, args.run_name)
+            job_heads = backend.list_job_heads(repo_data, args.run_name)
             if job_heads:
                 finished_job_heads = []
                 for job_head in job_heads:
@@ -26,7 +26,7 @@ def rm_func(args: Namespace):
                     elif args.run_name:
                         sys.exit("The run is not finished yet. Stop the run first.")
                 for job_head in finished_job_heads:
-                    backend.delete_job_head(repo_data.repo_user_name, repo_data.repo_name, job_head.job_id)
+                    backend.delete_job_head(repo_data, job_head.job_id)
                 print(f"[grey58]OK[/]")
             elif args.run_name:
                 sys.exit(f"Cannot find the run '{args.run_name}'")

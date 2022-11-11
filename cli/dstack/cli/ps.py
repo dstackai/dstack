@@ -64,8 +64,8 @@ def pretty_print_status(run: RunHead) -> str:
 
 def print_runs(args: Namespace, backend: Backend):
     repo_data = load_repo_data()
-    job_heads = backend.list_job_heads(repo_data.repo_user_name, repo_data.repo_name, args.run_name)
-    runs = backend.get_run_heads(repo_data.repo_user_name, repo_data.repo_name, job_heads)
+    job_heads = backend.list_job_heads(repo_data, args.run_name)
+    runs = backend.get_run_heads(repo_data, job_heads)
     if not args.all:
         unfinished = any(run.status.is_unfinished() for run in runs)
         if unfinished:
@@ -78,11 +78,12 @@ def print_runs(args: Namespace, backend: Backend):
     console = Console()
     table = Table(box=None)
     table.add_column("RUN", style="bold", no_wrap=True)
-    table.add_column("WORKFLOW", style="grey58", width=16)
-    table.add_column("STATUS", no_wrap=True)
-    table.add_column("APPS", no_wrap=True)
-    table.add_column("ARTIFACTS", style="grey58", width=18)
+    table.add_column("WORKFLOW", style="grey58", max_width=16)
+    # table.add_column("APPS", no_wrap=True)
+    # table.add_column("ARTIFACTS", style="grey58", width=18)
     table.add_column("SUBMITTED", style="grey58", no_wrap=True)
+    table.add_column("OWNER", style="grey58", no_wrap=True, max_width=16)
+    table.add_column("STATUS", no_wrap=True)
     table.add_column("TAG", style="bold yellow", no_wrap=True)
 
     for run_name, runs in runs_by_name:
@@ -92,10 +93,11 @@ def print_runs(args: Namespace, backend: Backend):
             table.add_row(
                 _status_color(run, run_name, True, False),
                 _status_color(run, run.workflow_name or run.provider_name, False, False),
-                pretty_print_status(run),
-                _status_color(run, _app_heads(run.app_heads, run.status.name), False, False),
-                _status_color(run, '\n'.join([a.artifact_path for a in run.artifact_heads or []]), False, False),
+                # _status_color(run, _app_heads(run.app_heads, run.status.name), False, False),
+                # _status_color(run, '\n'.join([a.artifact_path for a in run.artifact_heads or []]), False, False),
                 _status_color(run, submitted_at, False, False),
+                _status_color(run, run.local_repo_user_name, False, False),
+                pretty_print_status(run),
                 _status_color(run, f"{run.tag_name}" if run.tag_name else "", False, False))
     console.print(table)
 
@@ -121,11 +123,11 @@ def pretty_duration_and_submitted_at(submitted_at, started_at=None, finished_at=
     return duration_str, submitted_at_str
 
 
-def _app_heads(apps, status):
-    if status == "RUNNING" and apps:
-        return "\n".join(map(lambda app: app.app_name, apps))
-    else:
-        return ""
+# def _app_heads(apps, status):
+#     if status == "RUNNING" and apps:
+#         return "\n".join(map(lambda app: app.app_name, apps))
+#     else:
+#         return ""
 
 
 def register_parsers(main_subparsers):

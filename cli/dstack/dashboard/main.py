@@ -7,7 +7,7 @@ from starlette.responses import HTMLResponse, JSONResponse
 from starlette.staticfiles import StaticFiles
 
 from dstack.dashboard import repos, runs, artifacts, secrets, tags, logs
-from dstack.repo import load_repo_data
+from dstack.repo import load_repo_data, _repo_address_path
 
 app = FastAPI(docs_url="/api/docs")
 app.include_router(repos.router)
@@ -23,7 +23,7 @@ async def startup_event():
     url = f"http://{os.getenv('DSTACK_DASHBOARD_HOST')}:{os.getenv('DSTACK_DASHBOARD_PORT')}"
     try:
         repo_data = load_repo_data()
-        url += f"/{repo_data.repo_user_name}/{repo_data.repo_name}"
+        url += f"/{_repo_address_path(repo_data)}"
     except Exception:
         pass
     print(f"The dashboard is available at {url}")

@@ -4,11 +4,14 @@ from fastapi import APIRouter
 from pydantic import BaseModel
 
 from dstack.backend import load_backend
+from dstack.repo import RepoAddress
 
 router = APIRouter(prefix="/api/repos", tags=["repos"])
 
 
 class RepoItem(BaseModel):
+    repo_host_name: str
+    repo_port: Optional[int]
     repo_user_name: str
     repo_name: str
     last_run_at: Optional[int]
@@ -20,6 +23,8 @@ class QueryReposRequest(BaseModel):
 
 
 class DeleteRepoRequest(BaseModel):
+    repo_host_name: str
+    repo_port: Optional[int]
     repo_user_name: str
     repo_name: str
 
@@ -29,7 +34,9 @@ async def query() -> QueryReposRequest:
     backend = load_backend()
     repo_heads = backend.list_repo_heads()
     return QueryReposRequest(
-        repos=[RepoItem(repo_user_name=r.repo_user_name,
+        repos=[RepoItem(repo_host_name=r.repo_host_name,
+                        repo_port=r.repo_port,
+                        repo_user_name=r.repo_user_name,
                         repo_name=r.repo_name,
                         last_run_at=r.last_run_at,
                         tags_count=r.tags_count) for r in repo_heads])
@@ -38,4 +45,5 @@ async def query() -> QueryReposRequest:
 @router.post("/delete")
 async def delete(request: DeleteRepoRequest):
     backend = load_backend()
-    backend.delete_repo(request.repo_user_name, request.repo_name)
+    backend.delete_repo(RepoAddress(request.repo_host_name, request.repo_port, request.repo_user_name,
+                                    request.repo_name))

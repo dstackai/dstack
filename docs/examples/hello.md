@@ -21,8 +21,8 @@ dstack run hello
 You'll see the output in real-time as your workflow is running:
 
 ```shell
-RUN           WORKFLOW  STATUS     APPS  ARTIFACTS  SUBMITTED  TAG 
-slim-shady-1  hello     Submitted                   now 
+RUN           WORKFLOW  SUBMITTED  OWNER           STATUS     TAG 
+slim-shady-1  hello     now        peterschmidt85  Submitted  
  
 Provisioning... It may take up to a minute. ✓
 

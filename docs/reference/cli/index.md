@@ -18,7 +18,7 @@ Main commands:
   dstack artifacts download (RUN | :TAG)              Download artifacts
 
 Other commands:
-  dstack init [-t GITHUB_TOKEN | -i SSH_PRIVATE_KEY]  Initialize the repo
+  dstack init [-t OAUTH_TOKEN | -i SSH_PRIVATE_KEY]   Initialize the repo
   dstack config                                       Configure the backend
   dstack tags add TAG (-r RUN | -a PATH ...)          Add a tag
   dstack tags delete [-y] TAG                         Delete a tag

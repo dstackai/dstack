@@ -12,12 +12,6 @@ or [`notebook`](reference/providers/notebook.md).
 dstack doesn't support any of that yet. Please upvote 
 the corresponding [GitHub issue](https://github.com/dstackai/dstack/issues?q=is%3Aissue+is%3Aopen+label%3Acloud-provider).
 
-## Does dstack support only GitHub repos?
-Indeed, currently the `dstack` CLI works only within directories that 
-are GitHub repositories. If you'd like dstack to work within any directories, 
-or if your repo is not on GitHub (e.g. you use BitBucket or GitLab), please
-file a corresponding [GitHub issue](https://github.com/dstackai/dstack/issues/new/choose).
-
 ## How to contribute to dstack?
 
 We're currently working on a document that describes how dstack works internally.

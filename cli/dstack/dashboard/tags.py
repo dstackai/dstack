@@ -4,6 +4,7 @@ from fastapi import APIRouter, HTTPException
 from pydantic import BaseModel
 
 from dstack.backend import load_backend
+from dstack.repo import RepoAddress
 
 router = APIRouter(prefix="/api/tags", tags=["tags"])
 
@@ -14,6 +15,8 @@ class ArtifactHeadItem(BaseModel):
 
 
 class TagHeadItem(BaseModel):
+    repo_host_name: str
+    repo_port: Optional[int]
     repo_user_name: str
     repo_name: str
     tag_name: str
@@ -25,6 +28,8 @@ class TagHeadItem(BaseModel):
 
 
 class TagItem(BaseModel):
+    repo_host_name: str
+    repo_port: Optional[int]
     repo_user_name: str
     repo_name: str
     repo_branch: str
@@ -43,12 +48,16 @@ class QueryTagsResponse(BaseModel):
 
 
 class DeleteTagRequest(BaseModel):
+    repo_host_name: str
+    repo_port: Optional[int]
     repo_user_name: str
     repo_name: str
     tag_name: str
 
 
 class AddTagRequest(BaseModel):
+    repo_host_name: str
+    repo_port: Optional[int]
     repo_user_name: str
     repo_name: str
     run_name: str
@@ -60,12 +69,16 @@ class GetTagResponse(BaseModel):
 
 
 @router.get("/query", response_model=QueryTagsResponse)
-async def query(repo_user_name: str, repo_name: str) -> QueryTagsResponse:
+async def query(repo_host_name: str, repo_port: Optional[int], repo_user_name: str,
+                repo_name: str) -> QueryTagsResponse:
     backend = load_backend()
-    tag_heads = backend.list_tag_heads(repo_user_name, repo_name)
+    repo_address = RepoAddress(repo_host_name, repo_port, repo_user_name, repo_name)
+    tag_heads = backend.list_tag_heads(repo_address)
     return QueryTagsResponse(
-        tags=[TagHeadItem(repo_user_name=t.repo_user_name,
-                          repo_name=t.repo_name,
+        tags=[TagHeadItem(repo_host_name=t.repo_address.repo_host_name,
+                          repo_port=t.repo_address.repo_port,
+                          repo_user_name=t.repo_address.repo_user_name,
+                          repo_name=t.repo_address.repo_name,
                           tag_name=t.tag_name,
                           run_name=t.run_name,
                           workflow_name=t.workflow_name,
@@ -78,14 +91,18 @@ async def query(repo_user_name: str, repo_name: str) -> QueryTagsResponse:
 
 
 @router.get("/get", response_model=GetTagResponse)
-async def query(repo_user_name: str, repo_name: str, tag_name: str) -> GetTagResponse:
+async def query(repo_host_name: str, repo_port: Optional[int], repo_user_name: str, repo_name: str,
+                tag_name: str) -> GetTagResponse:
     backend = load_backend()
-    t = backend.get_tag_head(repo_user_name, repo_name, tag_name)
+    repo_address = RepoAddress(repo_host_name, repo_port, repo_user_name, repo_name)
+    t = backend.get_tag_head(repo_address, tag_name)
     if t:
-        j = backend.list_jobs(repo_user_name, repo_name, t.run_name)[0]
+        j = backend.list_jobs(repo_address, t.run_name)[0]
         return GetTagResponse(
-            tag=TagItem(repo_user_name=t.repo_user_name,
-                        repo_name=t.repo_name,
+            tag=TagItem(repo_host_name = t.repo_address.repo_host_name,
+                        repo_port = t.repo_address.repo_port,
+                        repo_user_name=t.repo_address.repo_user_name,
+                        repo_name=t.repo_address.repo_name,
                         repo_branch=j.repo_data.repo_branch,
                         repo_hash=j.repo_data.repo_hash,
                         repo_diff=j.repo_data.repo_diff,
@@ -105,9 +122,10 @@ async def query(repo_user_name: str, repo_name: str, tag_name: str) -> GetTagRes
 @router.post("/delete")
 async def delete(request: DeleteTagRequest):
     backend = load_backend()
-    tag_head = backend.get_tag_head(request.repo_user_name, request.repo_name, request.tag_name)
+    repo_address = RepoAddress(request.repo_host_name, request.repo_port, request.repo_user_name, request.repo_name)
+    tag_head = backend.get_tag_head(repo_address, request.tag_name)
     if tag_head:
-        backend.delete_tag_head(request.repo_user_name, request.repo_name, tag_head)
+        backend.delete_tag_head(repo_address, tag_head)
     else:
         raise HTTPException(status_code=404, detail="Tag not found")
 
@@ -115,5 +133,5 @@ async def delete(request: DeleteTagRequest):
 @router.post("/add")
 async def delete(request: AddTagRequest):
     backend = load_backend()
-    backend.add_tag_from_run(request.repo_user_name, request.repo_name, request.tag_name, request.run_name,
-                             run_jobs=None)
+    repo_address = RepoAddress(request.repo_host_name, request.repo_port, request.repo_user_name, request.repo_name)
+    backend.add_tag_from_run(repo_address, request.tag_name, request.run_name, run_jobs=None)

@@ -8,7 +8,7 @@ from typing import Optional, List, Dict, Any, Union
 
 from dstack.backend import load_backend, Backend
 from dstack.jobs import Job, JobStatus, JobSpec, Requirements, GpusRequirements, DepSpec, ArtifactSpec
-from dstack.repo import load_repo_data, RepoData
+from dstack.repo import load_repo_data, RepoData, RepoAddress, _repo_address_path
 from dstack.util import _quoted
 
 
@@ -164,17 +164,15 @@ class Provider:
         counter = []
         for job_spec in job_specs:
             submitted_at = int(round(time.time() * 1000))
-            job = Job(None, repo_data, run_name, self.workflow_name or None,
-                      self.provider_name, JobStatus.SUBMITTED, submitted_at,
-                      job_spec.image_name, job_spec.commands, job_spec.env,
-                      job_spec.working_dir, job_spec.artifact_specs, job_spec.port_count, None, None,
-                      job_spec.requirements, self.dep_specs, job_spec.master_job, job_spec.app_specs, None, None,
-                      tag_name)
+            job = Job(None, repo_data, run_name, self.workflow_name or None, self.provider_name,
+                      repo_data.local_repo_user_name, repo_data.local_repo_user_email, JobStatus.SUBMITTED,
+                      submitted_at, job_spec.image_name, job_spec.commands, job_spec.env, job_spec.working_dir,
+                      job_spec.artifact_specs, job_spec.port_count, None, None, job_spec.requirements, self.dep_specs,
+                      job_spec.master_job, job_spec.app_specs, None, None, tag_name)
             backend.submit_job(job, counter)
             jobs.append(job)
         if tag_name:
-            backend.add_tag_from_run(repo_data.repo_user_name, repo_data.repo_name, tag_name,
-                                     run_name, run_jobs=jobs)
+            backend.add_tag_from_run(repo_data, tag_name, run_name, jobs)
         return jobs
 
     def _dep_specs(self) -> Optional[List[DepSpec]]:
@@ -219,38 +217,39 @@ class Provider:
         t = dep.split("/")
         if len(t) == 1:
             if tag_dep:
-                return Provider._tag_dep(backend, repo_data.repo_user_name, repo_data.repo_name, t[0], mount)
+                return Provider._tag_dep(backend, repo_data, t[0], mount)
             else:
-                return Provider._workflow_dep(backend, repo_data.repo_user_name, repo_data.repo_name, t[0], mount)
+                return Provider._workflow_dep(backend, repo_data, t[0], mount)
         elif len(t) == 3:
+            # This doesn't allow to refer to projects from other repos
+            repo_address = RepoAddress(repo_data.repo_host_name, repo_data.repo_port, t[0], t[1])
             if tag_dep:
-                return Provider._tag_dep(backend, t[0], t[1], t[2], mount)
+                return Provider._tag_dep(backend, repo_address, t[2], mount)
             else:
-                return Provider._workflow_dep(backend, t[0], t[1], t[2], mount)
+                return Provider._workflow_dep(backend, repo_address, t[2], mount)
         else:
             sys.exit(f"Invalid dep format: {dep}")
 
     @staticmethod
-    def _tag_dep(backend: Backend, repo_user_name: str, repo_name: str, tag_name: str, mount: bool) -> DepSpec:
-        tag_head = backend.get_tag_head(repo_user_name, repo_name, tag_name)
+    def _tag_dep(backend: Backend, repo_address: RepoAddress, tag_name: str, mount: bool) -> DepSpec:
+        tag_head = backend.get_tag_head(repo_address, tag_name)
         if tag_head:
-            return DepSpec(repo_user_name, repo_name, tag_head.run_name, mount)
+            return DepSpec(repo_address, tag_head.run_name, mount)
         else:
-            sys.exit(f"Cannot find the tag '{tag_name}' in the '{repo_user_name}/{repo_name}' repo")
+            sys.exit(f"Cannot find the tag '{tag_name}' in the '{_repo_address_path(repo_address)}' repo")
 
     @staticmethod
-    def _workflow_dep(backend: Backend, repo_user_name: str, repo_name: str, workflow_name: str,
+    def _workflow_dep(backend: Backend, repo_address: RepoAddress, workflow_name: str,
                       mount: bool) -> DepSpec:
-        job_heads = sorted(backend.list_job_heads(repo_user_name, repo_name),
-                           key=lambda j: j.submitted_at, reverse=True)
+        job_heads = sorted(backend.list_job_heads(repo_address), key=lambda j: j.submitted_at, reverse=True)
         run_name = next(iter([job_head.run_name for job_head in job_heads if
                               job_head.workflow_name == workflow_name and job_head.status == JobStatus.DONE]),
                         None)
         if run_name:
-            return DepSpec(repo_user_name, repo_name, run_name, mount)
+            return DepSpec(repo_address, run_name, mount)
         else:
             sys.exit(f"Cannot find any successful workflow with the name '{workflow_name}' "
-                     f"in the '{repo_user_name}/{repo_name}' repo")
+                     f"in the '{_repo_address_path(repo_address)}' repo")
 
     def _env(self) -> Optional[Dict[str, str]]:
         if self.provider_data.get("env"):

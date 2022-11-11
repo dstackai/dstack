@@ -15,7 +15,7 @@ def list_secrets_func(_: Namespace):
     try:
         backend = load_backend()
         repo_data = load_repo_data()
-        secret_names = backend.list_secret_names(repo_data.repo_user_name, repo_data.repo_name)
+        secret_names = backend.list_secret_names(repo_data)
         console = Console()
         table = Table(box=None)
         table.add_column("NAME", style="bold", no_wrap=True)
@@ -32,18 +32,17 @@ def add_secret_func(args: Namespace):
     try:
         backend = load_backend()
         repo_data = load_repo_data()
-        if backend.get_secret(args.secret_name):
+        if backend.get_secret(repo_data, args.secret_name):
             if args.yes or Confirm.ask(f"[red]The secret '{args.secret_name}' already exists. "
                                        f"Do you want to override it?[/]"):
                 secret_value = args.secret_value or Prompt.ask("Value", password=True)
-                backend.update_secret(repo_data.repo_user_name, repo_data.repo_name,
-                                      Secret(args.secret_name, secret_value))
+                backend.update_secret(repo_data, Secret(args.secret_name, secret_value))
                 print(f"[grey58]OK[/]")
             else:
                 return
         else:
             secret_value = args.secret_value or Prompt.ask("Value", password=True)
-            backend.add_secret(repo_data.repo_user_name, repo_data.repo_name, Secret(args.secret_name, secret_value))
+            backend.add_secret(repo_data, Secret(args.secret_name, secret_value))
             print(f"[grey58]OK[/]")
     except ConfigError:
         sys.exit(f"Call 'dstack config' first")
@@ -53,11 +52,11 @@ def update_secret_func(args: Namespace):
     try:
         backend = load_backend()
         repo_data = load_repo_data()
-        if not backend.get_secret(args.secret_name):
+        if not backend.get_secret(repo_data, args.secret_name):
             sys.exit(f"The secret '{args.secret_name}' doesn't exist")
         else:
             secret_value = args.secret_value or Prompt.ask("Value", password=True)
-            backend.update_secret(repo_data.repo_user_name, repo_data.repo_name, Secret(args.secret_name, secret_value))
+            backend.update_secret(repo_data, Secret(args.secret_name, secret_value))
             print(f"[grey58]OK[/]")
     except ConfigError:
         sys.exit(f"Call 'dstack config' first")
@@ -67,11 +66,11 @@ def delete_secret_func(args: Namespace):
     try:
         backend = load_backend()
         repo_data = load_repo_data()
-        secret = backend.get_secret(args.secret_name)
+        secret = backend.get_secret(repo_data, args.secret_name)
         if not secret:
             sys.exit(f"The secret '{args.secret_name}' doesn't exist")
         elif Confirm.ask(f" [red]Delete the secret '{secret.secret_name}'?[/]"):
-            backend.delete_secret(repo_data.repo_user_name, repo_data.repo_name, secret.secret_name)
+            backend.delete_secret(repo_data, secret.secret_name)
             print(f"[grey58]OK[/]")
     except ConfigError:
         sys.exit(f"Call 'dstack config' first")

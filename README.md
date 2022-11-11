@@ -118,9 +118,9 @@ Use the `dstack ps` command to see the status of recent workflows.
 ```shell
 dstack ps -a
 
-RUN               TARGET    STATUS   ARTIFACTS   APPS  SUBMITTED    TAG
-angry-elephant-1  download  Done     data              8 hours ago  mnist_data
-wet-insect-1      train     Running  checkpoint        1 weeks ago
+RUN               TARGET    SUBMITTED    OWNER           STATUS   TAG
+angry-elephant-1  download  8 hours ago  peterschmidt85  Done     mnist_data
+wet-insect-1      train     1 weeks ago  peterschmidt85  Running  
 ```
 
 Other CLI commands allow to manage runs, artifacts, tags, secrets, and more.

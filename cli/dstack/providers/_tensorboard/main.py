@@ -5,6 +5,7 @@ from dstack.backend import load_backend
 from dstack.config import load_config
 from dstack.jobs import JobSpec, JobHead, AppSpec
 from dstack.providers import Provider
+from dstack.repo import RepoAddress, _repo_address_path
 
 
 class TensorboardProvider(Provider):
@@ -73,13 +74,15 @@ class TensorboardProvider(Provider):
         logdir = []
         config = load_config()
         job_heads_by_run_name = self.__get_job_heads_by_run_name(self.run_names)
+        repo_host_name = self.provider_data["repo_host_name"]
+        repo_port = self.provider_data.get("repo_port")
         repo_user_name = self.provider_data["repo_user_name"]
         repo_name = self.provider_data["repo_name"]
-
+        repo_address = RepoAddress(repo_host_name, repo_port, repo_user_name, repo_name)
         for run_name in job_heads_by_run_name:
             job_heads = job_heads_by_run_name[run_name]
             for job_head in job_heads:
-                ld = f"s3://{config.backend_config.bucket_name}/artifacts/{repo_user_name}/{repo_name}/" \
+                ld = f"s3://{config.backend_config.bucket_name}/artifacts/{_repo_address_path(repo_address)}/" \
                      f"{job_head.job_id}"
                 if self.logdir:
                     ld += "/" + self.logdir

@@ -25,7 +25,7 @@ from dstack.cli.schema import workflows_schema_yaml
 from dstack.cli.ps import ps_func, _has_request_status
 from dstack.config import ConfigError
 from dstack.jobs import JobStatus, JobHead
-from dstack.repo import load_repo_data
+from dstack.repo import load_repo_data, RepoAddress
 
 POLL_PROVISION_RATE_SECS = 3
 
@@ -69,20 +69,19 @@ def parse_run_args(args: Namespace) -> Tuple[str, List[str], Optional[str], Dict
     return provider_name, provider_args, workflow_name, workflow_data
 
 
-def poll_run(repo_user_name: str, repo_name: str, job_heads: List[JobHead], backend: Backend):
+def poll_run(repo_address: RepoAddress, job_heads: List[JobHead], backend: Backend):
     console = Console()
     try:
         console.print()
         request_errors_printed = False
         downloading = False
-        run = None
         with Progress(TextColumn("[progress.description]{task.description}"), SpinnerColumn(),
                       transient=True, ) as progress:
             task = progress.add_task("Provisioning... It may take up to a minute.", total=None)
             while True:
                 time.sleep(POLL_PROVISION_RATE_SECS)
-                _job_heads = [backend.get_job(repo_user_name, repo_name, job_head.job_id) for job_head in job_heads]
-                run = next(iter(backend.get_run_heads(repo_user_name, repo_name, _job_heads)))
+                _job_heads = [backend.get_job(repo_address, job_head.job_id) for job_head in job_heads]
+                run = next(iter(backend.get_run_heads(repo_address, _job_heads)))
                 if run.status == JobStatus.DOWNLOADING and not downloading:
                     progress.update(task, description="Downloading deps... It may take a while.")
                     downloading = True
@@ -104,19 +103,19 @@ def poll_run(repo_user_name: str, repo_name: str, job_heads: List[JobHead], back
         console.print("[grey58]To interrupt, press Ctrl+C.[/]")
         console.print()
         if len(job_heads) == 1 and run and run.status == JobStatus.RUNNING:
-            poll_logs_ws(backend, repo_user_name, repo_name, job_heads[0], console)
+            poll_logs_ws(backend, repo_address, job_heads[0], console)
         else:
-            poll_logs(backend, repo_user_name, repo_name, job_heads, since("1d"), attach=True, from_run=True)
+            poll_logs(backend, repo_address, job_heads, since("1d"), attach=True, from_run=True)
     except KeyboardInterrupt:
         run_name = job_heads[0].run_name
         if Confirm.ask(f" [red]Abort the run '{run_name}'?[/]"):
-            backend.stop_jobs(repo_user_name, repo_name, run_name, abort=True)
+            backend.stop_jobs(repo_address, run_name, abort=True)
             console.print(f"[grey58]OK[/]")
 
 
-def poll_logs_ws(backend: Backend, repo_user_name: str, repo_name: str,
+def poll_logs_ws(backend: Backend, repo_address: RepoAddress,
                  job_head: JobHead, console):
-    job = backend.get_job(repo_user_name, repo_name, job_head.job_id)
+    job = backend.get_job(repo_address, job_head.job_id)
 
     def on_message(ws: WebSocketApp, message):
         pat = re.compile(f'http://(localhost|0.0.0.0|127.0.0.1|{job.host_name}):[\\S]*[^(.+)\\s\\n\\r]')
@@ -139,7 +138,7 @@ def poll_logs_ws(backend: Backend, repo_user_name: str, repo_name: str,
         if isinstance(err, KeyboardInterrupt):
             run_name = job_head.run_name
             if Confirm.ask(f"\n [red]Abort the run '{run_name}'?[/]"):
-                backend.stop_jobs(repo_user_name, repo_name, run_name, abort=True)
+                backend.stop_jobs(repo_address, run_name, abort=True)
                 console.print(f"[grey58]OK[/]")
         else:
             print(str(err))
@@ -159,15 +158,15 @@ def poll_logs_ws(backend: Backend, repo_user_name: str, repo_name: str,
 
     try:
         while True:
-            _job_head = backend.get_job(repo_user_name, repo_name, job_head.job_id)
-            run = next(iter(backend.get_run_heads(repo_user_name, repo_name,
+            _job_head = backend.get_job(repo_address, job_head.job_id)
+            run = next(iter(backend.get_run_heads(repo_address,
                                                [_job_head], include_request_heads=False)))
             if run.status.is_finished():
                 break
             time.sleep(POLL_FINISHED_STATE_RATE_SECS)
     except KeyboardInterrupt:
         if Confirm.ask(f"\n [red]Abort the run '{job.run_name}'?[/]"):
-            backend.stop_jobs(repo_user_name, repo_name, job.run_name, abort=True)
+            backend.stop_jobs(repo_address, job.run_name, abort=True)
             console.print(f"[grey58]OK[/]")
 
 
@@ -201,20 +200,19 @@ def run_workflow_func(args: Namespace):
 
             provider.load(provider_args, workflow_name, workflow_data)
             if args.tag_name:
-                tag_head = backend.get_tag_head(repo_data.repo_user_name, repo_data.repo_name, args.tag_name)
+                tag_head = backend.get_tag_head(repo_data, args.tag_name)
                 if tag_head:
                     # if args.yes or Confirm.ask(f"[red]The tag '{args.tag_name}' already exists. "
                     #                            f"Do you want to override it?[/]"):
-                    backend.delete_tag_head(repo_data.repo_user_name, repo_data.repo_name, tag_head)
+                    backend.delete_tag_head(repo_data, tag_head)
                     # else:
                     #     return
-            run_name = backend.create_run(repo_data.repo_user_name, repo_data.repo_name)
+            run_name = backend.create_run(repo_data)
             jobs = provider.submit_jobs(run_name, args.tag_name)
-            backend.update_repo_last_run_at(repo_data.repo_user_name, repo_data.repo_name,
-                                            last_run_at=int(round(time.time() * 1000)))
+            backend.update_repo_last_run_at(repo_data, last_run_at=int(round(time.time() * 1000)))
             ps_func(Namespace(run_name=run_name, all=False))
             if not args.detach:
-                poll_run(repo_data.repo_user_name, repo_data.repo_name, jobs, backend)
+                poll_run(repo_data, jobs, backend)
 
         except ConfigError:
             sys.exit(f"Call 'dstack config' first")

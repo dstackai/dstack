@@ -16,7 +16,7 @@ def list_tags_func(_: Namespace):
     try:
         backend = load_backend()
         repo_data = load_repo_data()
-        tag_heads = backend.list_tag_heads(repo_data.repo_user_name, repo_data.repo_name)
+        tag_heads = backend.list_tag_heads(repo_data)
         console = Console()
         table = Table(box=None)
         table.add_column("TAG", style="bold", no_wrap=True)
@@ -45,16 +45,15 @@ def add_tag_func(args: Namespace):
         try:
             backend = load_backend()
             repo_data = load_repo_data()
-            tag_head = backend.get_tag_head(repo_data.repo_user_name, repo_data.repo_name, args.tag_name)
+            tag_head = backend.get_tag_head(repo_data, args.tag_name)
             if tag_head:
                 if args.yes or Confirm.ask(f"[red]The tag '{args.tag_name}' already exists. "
                                            f"Do you want to override it?[/]"):
-                    backend.delete_tag_head(repo_data.repo_user_name, repo_data.repo_name, tag_head)
+                    backend.delete_tag_head(repo_data, tag_head)
                 else:
                     return
             if args.run_name:
-                backend.add_tag_from_run(repo_data.repo_user_name, repo_data.repo_name, args.tag_name, args.run_name,
-                                         run_jobs=None)
+                backend.add_tag_from_run(repo_data, args.tag_name, args.run_name, run_jobs=None)
             else:
                 backend.add_tag_from_local_dirs(repo_data, args.tag_name, args.artifact_paths)
             print(f"[grey58]OK[/]")
@@ -68,11 +67,11 @@ def delete_tag_func(args: Namespace):
     try:
         backend = load_backend()
         repo_data = load_repo_data()
-        tag_head = backend.get_tag_head(repo_data.repo_user_name, repo_data.repo_name, args.tag_name)
+        tag_head = backend.get_tag_head(repo_data, args.tag_name)
         if not tag_head:
             sys.exit(f"The tag '{args.tag_name}' doesn't exist")
         elif Confirm.ask(f" [red]Delete the tag '{tag_head.tag_name}'?[/]"):
-            backend.delete_tag_head(repo_data.repo_user_name, repo_data.repo_name, tag_head)
+            backend.delete_tag_head(repo_data, tag_head)
             print(f"[grey58]OK[/]")
     except ConfigError:
         sys.exit(f"Call 'dstack config' first")

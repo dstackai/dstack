@@ -4,6 +4,7 @@ from fastapi import APIRouter
 from pydantic import BaseModel
 
 from dstack.backend import load_backend
+from dstack.repo import RepoAddress
 
 DEFAULT_SINCE_DAYS = 1
 
@@ -31,6 +32,8 @@ class LogsCacheItem(BaseModel):
 
 
 class QueryLogsRequest(BaseModel):
+    repo_host_name: str
+    repo_port: Optional[int]
     repo_user_name: str
     repo_name: str
     run_name: str
@@ -49,11 +52,13 @@ class QueryLogsResponse(BaseModel):
 @router.post("/query", response_model=QueryLogsResponse)
 async def query(request: QueryLogsRequest) -> QueryLogsResponse:
     backend = load_backend()
-    logs_response = backend.query_logs(request.repo_user_name, request.repo_name, request.run_name, request.start_time,
-                                       request.end_time, request.next_token,
-                                       (request.cache.job_host_names or {}) if request.cache else {},
-                                       (request.cache.job_ports or {}) if request.cache else {},
-                                       (request.cache.job_app_specs or {}) if request.cache else {})
+    logs_response = backend.query_logs(
+        RepoAddress(request.repo_host_name, request.repo_port, request.repo_user_name, request.repo_name),
+        request.run_name, request.start_time,
+        request.end_time, request.next_token,
+        (request.cache.job_host_names or {}) if request.cache else {},
+        (request.cache.job_ports or {}) if request.cache else {},
+        (request.cache.job_app_specs or {}) if request.cache else {})
     events, next_token, job_host_names, job_ports, job_app_specs = logs_response
     return QueryLogsResponse(
         events=[

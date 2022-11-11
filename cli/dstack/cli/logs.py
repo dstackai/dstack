@@ -11,7 +11,7 @@ from rich import print
 
 from dstack.backend import load_backend, Backend
 from dstack.jobs import JobHead
-from dstack.repo import load_repo_data
+from dstack.repo import load_repo_data, RepoAddress
 from dstack.config import ConfigError
 
 
@@ -45,9 +45,9 @@ def logs_func(args: Namespace):
         backend = load_backend()
         repo_data = load_repo_data()
         start_time = since(args.since)
-        job_heads = backend.list_job_heads(repo_data.repo_user_name, repo_data.repo_name, args.run_name)
+        job_heads = backend.list_job_heads(repo_data, args.run_name)
         if job_heads:
-            poll_logs(backend, repo_data.repo_user_name, repo_data.repo_name, job_heads, start_time, args.attach)
+            poll_logs(backend, repo_data, job_heads, start_time, args.attach)
         else:
             sys.exit(f"Cannot find the run '{args.run_name}'")
     except InvalidGitRepositoryError:
@@ -56,10 +56,10 @@ def logs_func(args: Namespace):
         sys.exit(f"Call 'dstack config' first")
 
 
-def poll_logs(backend: Backend, repo_user_name: str, repo_name: str, job_heads: List[JobHead], start_time: int,
+def poll_logs(backend: Backend, repo_address: RepoAddress, job_heads: List[JobHead], start_time: int,
               attach: bool, from_run: bool = False):
     try:
-        for event in backend.poll_logs(repo_user_name, repo_name, job_heads, start_time, attach):
+        for event in backend.poll_logs(repo_address, job_heads, start_time, attach):
             print(event.log_message)
     except KeyboardInterrupt as e:
         if attach is True:

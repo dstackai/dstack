@@ -15,8 +15,7 @@ def init_func(args: Namespace):
         local_repo_data = load_repo_data(args.gh_token, args.identity_file)
         local_repo_data.ls_remote()
         backend = load_backend()
-        backend.save_repo_credentials(local_repo_data.repo_user_name, local_repo_data.repo_name,
-                                      local_repo_data.repo_credentials())
+        backend.save_repo_credentials(local_repo_data, local_repo_data.repo_credentials())
         print(f"[grey58]OK[/]")
     except InvalidGitRepositoryError:
         sys.exit(f"{os.getcwd()} is not a Git repo")
@@ -25,8 +24,8 @@ def init_func(args: Namespace):
 
 
 def register_parsers(main_subparsers):
-    parser = main_subparsers.add_parser("init", help="Authorize dstack to access the current GitHub repo")
-    parser.add_argument("-t", "--token", metavar="GITHUB_TOKEN", help="An authentication token for GitHub", type=str,
+    parser = main_subparsers.add_parser("init", help="Authorize dstack to access the current Git repo")
+    parser.add_argument("-t", "--token", metavar="OAUTH_TOKEN", help="An authentication token for Git", type=str,
                         dest="gh_token")
     parser.add_argument("-i", "--identity", metavar="SSH_PRIVATE_KEY", help="A path to the private SSH key file",
                         type=str, dest="identity_file")

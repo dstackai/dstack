@@ -2,7 +2,7 @@ from abc import abstractmethod
 from enum import Enum
 from typing import Optional, List, Dict
 
-from dstack.repo import RepoData
+from dstack.repo import RepoData, RepoAddress
 from dstack.util import _quoted
 
 
@@ -93,16 +93,15 @@ class JobStatus(Enum):
 
 
 class JobHead(JobRef):
-    def __init__(self, job_id: str, repo_user_name: str, repo_name: str, run_name: str, workflow_name: Optional[str],
-                 provider_name: str, status: JobStatus, submitted_at: int, artifact_paths: Optional[List[str]],
-                 tag_name: Optional[str],
-                 app_names: Optional[List[str]]):
+    def __init__(self, job_id: str, repo_address: RepoAddress, run_name: str, workflow_name: Optional[str],
+                 provider_name: str, local_repo_user_name: str, status: JobStatus, submitted_at: int,
+                 artifact_paths: Optional[List[str]], tag_name: Optional[str], app_names: Optional[List[str]]):
         self.job_id = job_id
-        self.repo_user_name = repo_user_name
-        self.repo_name = repo_name
+        self.repo_address = repo_address
         self.run_name = run_name
         self.workflow_name = workflow_name
         self.provider_name = provider_name
+        self.local_repo_user_name = local_repo_user_name
         self.status = status
         self.submitted_at = submitted_at
         self.artifact_paths = artifact_paths
@@ -119,10 +118,10 @@ class JobHead(JobRef):
         artifact_paths = ("[" + ", ".join(
             map(lambda a: _quoted(str(a)), self.artifact_paths)) + "]") if self.artifact_paths else None
         app_names = ("[" + ", ".join(map(lambda a: _quoted(a), self.app_names)) + "]") if self.app_names else None
-        return f'JobHead(job_id="{self.job_id}", repo_user_name="{self.repo_user_name}", ' \
-               f'repo_name="{self.repo_name}", ' \
+        return f'JobHead(job_id="{self.job_id}", repo_address={self.repo_address}, ' \
                f'run_name="{self.run_name}", workflow_name={_quoted(self.workflow_name)}, ' \
                f'provider_name="{self.provider_name}", ' \
+               f'local_repo_user_name="{self.local_repo_user_name}", ' \
                f'status=JobStatus.{self.status.name}, ' \
                f'submitted_at={self.submitted_at}, ' \
                f'artifact_paths={artifact_paths}, ' \
@@ -131,15 +130,13 @@ class JobHead(JobRef):
 
 
 class DepSpec:
-    def __init__(self, repo_user_name: str, repo_name: str, run_name: str, mount: bool):
-        self.repo_user_name = repo_user_name
-        self.repo_name = repo_name
+    def __init__(self, repo_address: RepoAddress, run_name: str, mount: bool):
+        self.repo_address = repo_address
         self.run_name = run_name
         self.mount = mount
 
     def __str__(self) -> str:
-        return f'DepSpec(repo_user_name="{self.repo_user_name}", ' \
-               f'repo_name="{self.repo_name}", ' \
+        return f'DepSpec(repo_address={self.repo_address}, ' \
                f'run_name="{self.run_name}",' \
                f'mount={self.mount})'
 
@@ -156,18 +153,17 @@ class ArtifactSpec:
 
 class Job(JobHead):
     def __init__(self, job_id: Optional[str], repo_data: RepoData, run_name: str, workflow_name: Optional[str],
-                 provider_name: str, status: JobStatus, submitted_at: int, image_name: str,
-                 commands: Optional[List[str]], env: Optional[Dict[str, str]], working_dir: Optional[str],
-                 artifact_specs: Optional[List[ArtifactSpec]], port_count: Optional[int], ports: Optional[List[int]],
-                 host_name: Optional[str], requirements: Optional[Requirements], dep_specs: Optional[List[DepSpec]],
-                 master_job: Optional[JobRef], app_specs: Optional[List[AppSpec]], runner_id: Optional[str],
-                 request_id: Optional[str], tag_name: Optional[str]):
-        super().__init__(job_id, repo_data.repo_user_name, repo_data.repo_name, run_name, workflow_name, provider_name,
-                         status, submitted_at,
-                         [a.artifact_path for a in artifact_specs] if artifact_specs else None,
-                         tag_name,
+                 provider_name: str, local_repo_user_name: str, local_repo_user_email: Optional[str], status: JobStatus,
+                 submitted_at: int, image_name: str, commands: Optional[List[str]], env: Optional[Dict[str, str]],
+                 working_dir: Optional[str], artifact_specs: Optional[List[ArtifactSpec]], port_count: Optional[int],
+                 ports: Optional[List[int]], host_name: Optional[str], requirements: Optional[Requirements],
+                 dep_specs: Optional[List[DepSpec]], master_job: Optional[JobRef], app_specs: Optional[List[AppSpec]],
+                 runner_id: Optional[str], request_id: Optional[str], tag_name: Optional[str]):
+        super().__init__(job_id, repo_data, run_name, workflow_name, provider_name, local_repo_user_name, status,
+                         submitted_at, [a.artifact_path for a in artifact_specs] if artifact_specs else None, tag_name,
                          [a.app_name for a in app_specs] if app_specs else None)
         self.repo_data = repo_data
+        self.local_repo_user_email = local_repo_user_email
         self.runner_id = runner_id
         self.request_id = request_id
         self.image_name = image_name
@@ -198,6 +194,8 @@ class Job(JobHead):
         return f'Job(job_id="{self.job_id}", repo_data={self.repo_data}, ' \
                f'run_name="{self.run_name}", workflow_name={_quoted(self.workflow_name)}, ' \
                f'provider_name="{self.provider_name}", ' \
+               f'local_repo_user_name="{self.local_repo_user_name}", ' \
+               f'local_repo_user_email={_quoted(self.local_repo_user_email)}, ' \
                f'status=JobStatus.{self.status.name}, ' \
                f'submitted_at={self.submitted_at}, ' \
                f'image_name="{self.image_name}", ' \

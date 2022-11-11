@@ -9,9 +9,10 @@ import yaml
 from botocore.client import BaseClient
 
 from dstack import version
-from dstack.aws import jobs, secrets, logs, local
+from dstack.aws import jobs, logs, local
 from dstack.backend import InstanceType, RequestStatus, RequestHead
 from dstack.jobs import Job, JobStatus, Requirements
+from dstack.repo import RepoAddress
 from dstack.runners import Resources, Runner, Gpu
 
 CREATE_INSTANCE_RETRY_RATE_SECS = 3
@@ -536,7 +537,7 @@ def _run_instance_retry(ec2_client: BaseClient, iam_client: BaseClient, bucket_n
             raise e
 
 
-def run_job(secretsmanager_client: BaseClient, logs_client: BaseClient, ec2_client: BaseClient, iam_client: BaseClient,
+def run_job(logs_client: BaseClient, ec2_client: BaseClient, iam_client: BaseClient,
             s3_client: BaseClient, bucket_name: str, region_name, subnet_id: Optional[str], job: Job):
     if job.status == JobStatus.SUBMITTED:
         runner = None
@@ -702,10 +703,10 @@ def _stop_runner(ec2_client: BaseClient, s3_client: BaseClient, bucket_name: str
     _delete_runner(s3_client, bucket_name, runner)
 
 
-def stop_job(ec2_client: BaseClient, s3_client: BaseClient, bucket_name: str, repo_user_name: str, repo_name: str,
+def stop_job(ec2_client: BaseClient, s3_client: BaseClient, bucket_name: str, repo_address: RepoAddress,
              job_id: str, abort: bool):
-    job_head = jobs.list_job_head(s3_client, bucket_name, repo_user_name, repo_name, job_id)
-    job = jobs.get_job(s3_client, bucket_name, repo_user_name, repo_name, job_id)
+    job_head = jobs.list_job_head(s3_client, bucket_name, repo_address, job_id)
+    job = jobs.get_job(s3_client, bucket_name, repo_address, job_id)
     runner = _get_runner(s3_client, bucket_name, job.runner_id) if job else None
     request_status = get_request_head(ec2_client, s3_client, bucket_name, job,
                                       runner).status if job else RequestStatus.TERMINATED

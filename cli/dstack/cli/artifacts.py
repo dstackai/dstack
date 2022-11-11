@@ -14,14 +14,14 @@ from dstack.repo import load_repo_data
 def _run_name(repo_data, backend, args):
     if args.run_name_or_tag_name.startswith(":"):
         tag_name = args.run_name_or_tag_name[1:]
-        tag_head = backend.get_tag_head(repo_data.repo_user_name, repo_data.repo_name, tag_name)
+        tag_head = backend.get_tag_head(repo_data, tag_name)
         if tag_head:
             return tag_head.run_name
         else:
             sys.exit(f"Cannot find the tag '{tag_name}'")
     else:
         run_name = args.run_name_or_tag_name
-        job_heads = backend.list_job_heads(repo_data.repo_user_name, repo_data.repo_name, run_name)
+        job_heads = backend.list_job_heads(repo_data, run_name)
         if job_heads:
             return run_name
         else:
@@ -33,7 +33,7 @@ def download_func(args: Namespace):
         backend = load_backend()
         repo_data = load_repo_data()
         run_name = _run_name(repo_data, backend, args)
-        backend.download_run_artifact_files(repo_data.repo_user_name, repo_data.repo_name, run_name, args.output)
+        backend.download_run_artifact_files(repo_data, run_name, args.output)
     except InvalidGitRepositoryError:
         sys.exit(f"{os.getcwd()} is not a Git repo")
     except ConfigError:
@@ -53,7 +53,7 @@ def list_func(args: Namespace):
         backend = load_backend()
         repo_data = load_repo_data()
         run_name = _run_name(repo_data, backend, args)
-        run_artifact_files = backend.list_run_artifact_files(repo_data.repo_user_name, repo_data.repo_name, run_name)
+        run_artifact_files = backend.list_run_artifact_files(repo_data, run_name)
         console = Console()
         table = Table(box=None)
         table.add_column("ARTIFACT", style="bold", no_wrap=True)
