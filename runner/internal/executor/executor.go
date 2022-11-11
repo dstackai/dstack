@@ -7,7 +7,6 @@ import (
 	"io"
 	"path"
 	"strconv"
-	"strings"
 	"time"
 
 	"github.com/docker/docker/api/types/mount"
@@ -328,13 +327,21 @@ func (ex *Executor) prepareGit(ctx context.Context) error {
 func (ex *Executor) processDeps(ctx context.Context) error {
 	job := ex.backend.Job(ctx)
 	for _, dep := range job.Deps {
-		listDir, err := ex.backend.ListSubDir(ctx, fmt.Sprintf("artifacts/%s/%s/%s", dep.RepoUserName, dep.RepoName, dep.RunName)+",")
+		listDir, err := ex.backend.ListSubDir(ctx, fmt.Sprintf("jobs/%s/%s/%s,", dep.RepoUserName, dep.RepoName, dep.RunName))
 		if err != nil {
 			return gerrors.Wrap(err)
 		}
-		for _, pathDir := range listDir {
-			dirSlice := strings.Split(pathDir, "/") // TODO: fix, ugly code
-			ex.artifactsIn = append(ex.artifactsIn, ex.backend.GetArtifact(ctx, dep.RunName, dirSlice[len(dirSlice)-1], pathDir, dep.Mount))
+		for _, pathJob := range listDir {
+			jobDep, err := ex.backend.GetJobByPath(ctx, pathJob)
+			if err != nil {
+				return gerrors.Wrap(err)
+			}
+			for _, artifact := range jobDep.Artifacts {
+				artIn := ex.backend.GetArtifact(ctx, jobDep.RunName, artifact.Path, path.Join("artifacts", jobDep.RepoUserName, jobDep.RepoName, jobDep.JobID, artifact.Path), artifact.Mount)
+				if artIn != nil {
+					ex.artifactsIn = append(ex.artifactsIn, artIn)
+				}
+			}
 		}
 	}
 	return nil

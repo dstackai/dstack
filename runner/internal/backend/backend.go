@@ -30,6 +30,7 @@ type Backend interface {
 	Bucket(ctx context.Context) string
 	Secrets(ctx context.Context) (map[string]string, error)
 	GitCredentials(ctx context.Context) *models.GitCredentials
+	GetJobByPath(ctx context.Context, path string) (*models.Job, error)
 }
 
 type File struct {

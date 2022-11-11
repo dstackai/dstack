@@ -2,13 +2,13 @@ package local
 
 import (
 	"context"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"io"
 	"io/ioutil"
 	"os"
 	"path"
-	"path/filepath"
 	"strings"
 	"time"
 
@@ -307,19 +307,25 @@ func (s *S3) ListSubDir(ctx context.Context, dir string) ([]string, error) {
 	if err != nil {
 		return nil, gerrors.Wrap(err)
 	}
-	artifact := make(map[string]struct{})
-	for _, pathDir := range listDir {
-		pathSlice := strings.Split(pathDir, "/")
-		if len(pathSlice) > 4 && pathSlice[4] != "" {
-			artifact[filepath.Join(pathSlice[:5]...)] = struct{}{}
-		}
-	}
-	listDir = make([]string, 0)
-	for k := range artifact {
-		listDir = append(listDir, k)
-	}
 	return listDir, nil
 }
+func (s *S3) GetJobByPath(ctx context.Context, path string) (*models.Job, error) {
+	log.Trace(ctx, "Fetching job by path")
+	if s == nil {
+		return nil, gerrors.New("Backend is nil")
+	}
+	fileJob, err := s.cliS3.GetFile(ctx, s.bucket, path)
+	if err != nil {
+		return nil, gerrors.Wrap(err)
+	}
+	var job *models.Job
+	err = json.Unmarshal(fileJob, job)
+	if err != nil {
+		return nil, gerrors.Wrap(err)
+	}
+	return job, nil
+}
+
 func (s *S3) Bucket(ctx context.Context) string {
 	log.Trace(ctx, "Getting bucket")
 	if s == nil {

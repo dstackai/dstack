@@ -20,6 +20,11 @@ type Local struct {
 	artifacts []artifacts.Artifacter
 }
 
+func (l Local) GetJobByPath(_ context.Context, _ string) (*models.Job, error) {
+	//TODO implement me
+	panic("implement me")
+}
+
 func (l Local) GitCredentials(_ context.Context) *models.GitCredentials {
 	//TODO implement me
 	panic("implement me")
