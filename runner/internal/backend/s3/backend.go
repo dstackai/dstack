@@ -158,12 +158,13 @@ func (s *S3) UpdateState(ctx context.Context) error {
 		artifactSlice = append(artifactSlice, art.Path)
 	}
 
-	pathLockJob := fmt.Sprintf("jobs/%s/%s/%s/l;%s;%s;%d;%s;%s;%s;%s",
+	pathLockJob := fmt.Sprintf("jobs/%s/%s/%s/l;%s;%s;%s;%d;%s;%s;%s;%s",
 		s.state.Job.RepoHostNameWithPort(),
 		s.state.Job.RepoUserName,
 		s.state.Job.RepoName,
 		s.state.Job.JobID,
 		s.state.Job.ProviderName,
+		s.state.Job.LocalRepoUserName,
 		s.state.Job.SubmittedAt,
 		s.state.Job.Status,
 		strings.Join(artifactSlice, ","),
