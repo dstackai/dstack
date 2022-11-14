@@ -1,5 +1,7 @@
 package models
 
+import "fmt"
+
 type Resource struct {
 	CPUs          int    `yaml:"cpus,omitempty"`
 	Memory        uint64 `yaml:"memory_mib,omitempty"`
@@ -10,23 +12,27 @@ type Resource struct {
 }
 
 type Job struct {
-	Apps         []App                  `yaml:"apps"`
-	Artifacts    []Artifact             `yaml:"artifacts"`
-	Commands     []string               `yaml:"commands"`
-	Environment  map[string]string      `yaml:"env"`
-	HostName     string                 `yaml:"host_name"`
-	Image        string                 `yaml:"image_name"`
-	JobID        string                 `yaml:"job_id"`
-	MasterJobID  string                 `yaml:"master_job_id"`
-	PortCount    int                    `yaml:"port_count"`
-	Ports        []string               `yaml:"ports"`
-	Deps         []Dep                  `yaml:"deps"`
-	ProviderName string                 `yaml:"provider_name"`
-	RepoBranch   string                 `yaml:"repo_branch"`
-	RepoDiff     string                 `yaml:"repo_diff"`
-	RepoHash     string                 `yaml:"repo_hash"`
-	RepoName     string                 `yaml:"repo_name"`
-	RepoUserName string                 `yaml:"repo_user_name"`
+	Apps         []App             `yaml:"apps"`
+	Artifacts    []Artifact        `yaml:"artifacts"`
+	Commands     []string          `yaml:"commands"`
+	Environment  map[string]string `yaml:"env"`
+	HostName     string            `yaml:"host_name"`
+	Image        string            `yaml:"image_name"`
+	JobID        string            `yaml:"job_id"`
+	MasterJobID  string            `yaml:"master_job_id"`
+	PortCount    int               `yaml:"port_count"`
+	Ports        []string          `yaml:"ports"`
+	Deps         []Dep             `yaml:"deps"`
+	ProviderName string            `yaml:"provider_name"`
+
+	RepoHostName string `yaml:"repo_host_name"`
+	RepoPort     string `yaml:"repo_port"`
+	RepoBranch   string `yaml:"repo_branch"`
+	RepoDiff     string `yaml:"repo_diff"`
+	RepoHash     string `yaml:"repo_hash"`
+	RepoName     string `yaml:"repo_name"`
+	RepoUserName string `yaml:"repo_user_name"`
+
 	RequestID    string                 `yaml:"request_id"`
 	Requirements Requirements           `yaml:"requirements"`
 	RunName      string                 `yaml:"run_name"`
@@ -40,6 +46,8 @@ type Job struct {
 }
 
 type Dep struct {
+	RepoHostName string `yaml:"repo_host_name,omitempty"`
+	RepoPort     string `yaml:"repo_port,omitempty"`
 	RepoUserName string `yaml:"repo_user_name,omitempty"`
 	RepoName     string `yaml:"repo_name,omitempty"`
 	RunName      string `yaml:"run_name,omitempty"`
@@ -83,4 +91,17 @@ type GitCredentials struct {
 	OAuthToken *string `json:"oauth_token,omitempty"`
 	PrivateKey *string `json:"private_key,omitempty"`
 	Passphrase *string `json:"passphrase,omitempty"`
+}
+
+func (j *Job) RepoHostNameWithPort() string {
+	if j.RepoPort == "" {
+		return j.RepoHostName
+	}
+	return fmt.Sprintf("%s:%s", j.RepoHostName, j.RepoPort)
+}
+func (d *Dep) RepoHostNameWithPort() string {
+	if d.RepoPort == "" {
+		return d.RepoHostName
+	}
+	return fmt.Sprintf("%s:%s", d.RepoHostName, d.RepoPort)
 }

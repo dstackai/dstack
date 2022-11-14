@@ -126,7 +126,7 @@ func (s *S3) UpdateState(ctx context.Context) error {
 		return gerrors.Wrap(backend.ErrLoadStateFile)
 	}
 	log.Trace(ctx, "Fetching list jobs", "Repo username", s.state.Job.RepoUserName, "Repo name", s.state.Job.RepoName, "Job ID", s.state.Job.JobID)
-	listForDelete, err := s.cliS3.ListFile(ctx, s.bucket, fmt.Sprintf("jobs/%s/%s/l;%s;", s.state.Job.RepoUserName, s.state.Job.RepoName, s.state.Job.JobID))
+	listForDelete, err := s.cliS3.ListFile(ctx, s.bucket, fmt.Sprintf("jobs/%s/%s/%s/l;%s;", s.state.Job.RepoHostNameWithPort(), s.state.Job.RepoUserName, s.state.Job.RepoName, s.state.Job.JobID))
 	if err != nil {
 		return gerrors.Wrap(err)
 	}
@@ -142,7 +142,7 @@ func (s *S3) UpdateState(ctx context.Context) error {
 	if err != nil {
 		return gerrors.Wrap(err)
 	}
-	pathJob := fmt.Sprintf("jobs/%s/%s/%s.yaml", s.state.Job.RepoUserName, s.state.Job.RepoName, s.state.Job.JobID)
+	pathJob := fmt.Sprintf("jobs/%s/%s/%s/%s.yaml", s.state.Job.RepoHostNameWithPort(), s.state.Job.RepoUserName, s.state.Job.RepoName, s.state.Job.JobID)
 	log.Trace(ctx, "Write to file job", "Path", pathJob)
 	err = s.cliS3.PutFile(ctx, s.bucket, pathJob, theFile)
 	if err != nil {
@@ -158,7 +158,8 @@ func (s *S3) UpdateState(ctx context.Context) error {
 		artifactSlice = append(artifactSlice, art.Path)
 	}
 
-	pathLockJob := fmt.Sprintf("jobs/%s/%s/l;%s;%s;%d;%s;%s;%s;%s",
+	pathLockJob := fmt.Sprintf("jobs/%s/%s/%s/l;%s;%s;%d;%s;%s;%s;%s",
+		s.state.Job.RepoHostNameWithPort(),
 		s.state.Job.RepoUserName,
 		s.state.Job.RepoName,
 		s.state.Job.JobID,
@@ -261,7 +262,7 @@ func (s *S3) MasterJob(ctx context.Context) *models.Job {
 		log.Trace(ctx, "State not exist")
 		return nil
 	}
-	theFile, err := s.cliS3.GetFile(ctx, s.bucket, fmt.Sprintf("jobs/%s/%s/%s.yaml", s.state.Job.RepoUserName, s.state.Job.RepoName, s.state.Job.MasterJobID))
+	theFile, err := s.cliS3.GetFile(ctx, s.bucket, fmt.Sprintf("jobs/%s/%s/%s/%s.yaml", s.state.Job.RepoHostNameWithPort(), s.state.Job.RepoUserName, s.state.Job.RepoName, s.state.Job.MasterJobID))
 	if err != nil {
 		return nil
 	}
@@ -341,7 +342,7 @@ func (s *S3) Secrets(ctx context.Context) (map[string]string, error) {
 	if s.state == nil {
 		return nil, gerrors.New("State is empty")
 	}
-	templatePath := fmt.Sprintf("secrets/%s/%s/l;", s.state.Job.RepoUserName, s.state.Job.RepoName)
+	templatePath := fmt.Sprintf("secrets/%s/%s/%s/l;", s.state.Job.RepoHostNameWithPort(), s.state.Job.RepoUserName, s.state.Job.RepoName)
 	listSecrets, err := s.cliS3.ListFile(ctx, s.bucket, templatePath)
 	if err != nil {
 		return nil, gerrors.Wrap(err)
@@ -366,5 +367,5 @@ func (s *S3) GitCredentials(ctx context.Context) *models.GitCredentials {
 		log.Error(ctx, "Job is empty")
 		return nil
 	}
-	return s.cliSecret.fetchCredentials(ctx, s.bucket, s.state.Job.RepoUserName, s.state.Job.RepoName)
+	return s.cliSecret.fetchCredentials(ctx, s.bucket, s.state.Job.RepoHostNameWithPort(), s.state.Job.RepoUserName, s.state.Job.RepoName)
 }
