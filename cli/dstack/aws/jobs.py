@@ -30,7 +30,7 @@ def serialize_job(job: Job) -> dict:
     job_data = {
         "job_id": job.job_id,
         "repo_host_name": job.repo_address.repo_host_name,
-        "repo_port": job.repo_address.repo_port or '',
+        "repo_port": job.repo_address.repo_port or 0,
         "repo_user_name": job.repo_data.repo_user_name,
         "repo_name": job.repo_data.repo_name,
         "repo_branch": job.repo_data.repo_branch,
@@ -119,7 +119,7 @@ def unserialize_job(job_data: dict) -> Job:
     dep_specs = []
     if job_data.get("deps"):
         for dep in job_data["deps"]:
-            dep_spec = DepSpec(RepoAddress(dep["repo_host_name"], dep.get("repo_port"), dep["repo_user_name"],
+            dep_spec = DepSpec(RepoAddress(dep["repo_host_name"], dep.get("repo_port") or None, dep["repo_user_name"],
                                            dep["repo_name"]), dep["run_name"], dep.get("mount") is True)
             dep_specs.append(dep_spec)
     artifact_specs = []
@@ -133,7 +133,7 @@ def unserialize_job(job_data: dict) -> Job:
     master_job = JobRefId(job_data["master_job_id"]) if job_data.get("master_job_id") else None
     app_specs = ([AppSpec(a["port_index"], a["app_name"], a.get("url_path") or None, a.get("url_query_params") or None)
                   for a in (job_data.get("apps") or [])]) or None
-    job = Job(job_data["job_id"], RepoData(job_data["repo_host_name"], job_data.get("repo_port"),
+    job = Job(job_data["job_id"], RepoData(job_data["repo_host_name"], job_data.get("repo_port") or None,
                                            job_data["repo_user_name"], job_data["repo_name"],
                                            job_data["repo_branch"], job_data["repo_hash"],
                                            job_data["repo_diff"] or None),
