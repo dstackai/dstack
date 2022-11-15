@@ -26,7 +26,7 @@ type Job struct {
 	ProviderName string            `yaml:"provider_name"`
 
 	RepoHostName       string `yaml:"repo_host_name"`
-	RepoPort           string `yaml:"repo_port"`
+	RepoPort           int    `yaml:"repo_port"`
 	RepoBranch         string `yaml:"repo_branch"`
 	RepoDiff           string `yaml:"repo_diff"`
 	RepoHash           string `yaml:"repo_hash"`
@@ -35,21 +35,21 @@ type Job struct {
 	LocalRepoUserName  string `yaml:"local_repo_user_name"`
 	LocalRepoUserEmail string `yaml:"local_repo_user_email,omitempty"`
 
-	RequestID    string                 `yaml:"request_id"`
-	Requirements Requirements           `yaml:"requirements"`
-	RunName      string                 `yaml:"run_name"`
-	RunnerID     string                 `yaml:"runner_id"`
-	Status       string                 `yaml:"status"`
-	SubmittedAt  uint64                 `yaml:"submitted_at"`
-	TagName      string                 `yaml:"tag_name"`
-	Variables    map[string]interface{} `yaml:"variables"`
-	WorkflowName string                 `yaml:"workflow_name"`
-	WorkingDir   string                 `yaml:"working_dir"`
+	RequestID    string       `yaml:"request_id"`
+	Requirements Requirements `yaml:"requirements"`
+	RunName      string       `yaml:"run_name"`
+	RunnerID     string       `yaml:"runner_id"`
+	Status       string       `yaml:"status"`
+	SubmittedAt  uint64       `yaml:"submitted_at"`
+	TagName      string       `yaml:"tag_name"`
+	//Variables    map[string]interface{} `yaml:"variables"`
+	WorkflowName string `yaml:"workflow_name"`
+	WorkingDir   string `yaml:"working_dir"`
 }
 
 type Dep struct {
 	RepoHostName string `yaml:"repo_host_name,omitempty"`
-	RepoPort     string `yaml:"repo_port,omitempty"`
+	RepoPort     int    `yaml:"repo_port,omitempty"`
 	RepoUserName string `yaml:"repo_user_name,omitempty"`
 	RepoName     string `yaml:"repo_name,omitempty"`
 	RunName      string `yaml:"run_name,omitempty"`
@@ -96,13 +96,13 @@ type GitCredentials struct {
 }
 
 func (j *Job) RepoHostNameWithPort() string {
-	if j.RepoPort == "" {
+	if j.RepoPort == 0 || j.RepoPort == 80 {
 		return j.RepoHostName
 	}
 	return fmt.Sprintf("%s:%s", j.RepoHostName, j.RepoPort)
 }
 func (d *Dep) RepoHostNameWithPort() string {
-	if d.RepoPort == "" {
+	if d.RepoPort == 0 || d.RepoPort == 80 {
 		return d.RepoHostName
 	}
 	return fmt.Sprintf("%s:%s", d.RepoHostName, d.RepoPort)
