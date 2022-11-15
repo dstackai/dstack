@@ -267,7 +267,7 @@ func (s *S3) MasterJob(ctx context.Context) *models.Job {
 		return nil
 	}
 	masterJob := new(models.Job)
-	err = yaml.Unmarshal(theFile, masterJob)
+	err = yaml.Unmarshal(theFile, &masterJob)
 	if err != nil {
 		return nil
 	}
@@ -320,7 +320,7 @@ func (s *S3) GetJobByPath(ctx context.Context, path string) (*models.Job, error)
 		return nil, gerrors.Wrap(err)
 	}
 	var job *models.Job
-	err = yaml.Unmarshal(fileJob, job)
+	err = yaml.Unmarshal(fileJob, &job)
 	if err != nil {
 		return nil, gerrors.Wrap(err)
 	}
