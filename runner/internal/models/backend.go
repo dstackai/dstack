@@ -99,11 +99,11 @@ func (j *Job) RepoHostNameWithPort() string {
 	if j.RepoPort == 0 || j.RepoPort == 80 {
 		return j.RepoHostName
 	}
-	return fmt.Sprintf("%s:%s", j.RepoHostName, j.RepoPort)
+	return fmt.Sprintf("%s:%d", j.RepoHostName, j.RepoPort)
 }
 func (d *Dep) RepoHostNameWithPort() string {
 	if d.RepoPort == 0 || d.RepoPort == 80 {
 		return d.RepoHostName
 	}
-	return fmt.Sprintf("%s:%s", d.RepoHostName, d.RepoPort)
+	return fmt.Sprintf("%s:%d", d.RepoHostName, d.RepoPort)
 }
