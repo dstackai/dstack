@@ -312,7 +312,7 @@ func (s *S3) ListSubDir(ctx context.Context, dir string) ([]string, error) {
 	return listDir, nil
 }
 func (s *S3) GetJobByPath(ctx context.Context, path string) (*models.Job, error) {
-	log.Trace(ctx, "Fetching job by path")
+	log.Trace(ctx, "Fetching job by path", "Path", path)
 	if s == nil {
 		return nil, gerrors.New("Backend is nil")
 	}
