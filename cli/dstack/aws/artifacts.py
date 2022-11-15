@@ -10,7 +10,7 @@ from dstack.repo import RepoAddress, _repo_address_path
 
 
 def dest_file_path(key: str, output_path: Path) -> Path:
-    return output_path / "/".join(key.split("/")[4:])
+    return output_path / "/".join(key.split("/")[5:])
 
 
 def download_run_artifact_files(s3_client: BaseClient, bucket_name: str, repo_address: RepoAddress,
@@ -56,7 +56,7 @@ def list_run_artifact_files(s3_client: BaseClient, bucket_name: str, repo_addres
     for page in page_iterator:
         for obj in (page.get("Contents") or []):
             if obj["Size"] > 0:
-                yield obj["Key"].split("/")[4], "/".join(obj["Key"].split("/")[5:]), obj["Size"]
+                yield obj["Key"].split("/")[5], "/".join(obj["Key"].split("/")[6:]), obj["Size"]
 
 
 def __remove_prefix(text, prefix):
