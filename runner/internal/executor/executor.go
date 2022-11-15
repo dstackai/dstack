@@ -389,7 +389,7 @@ func (ex *Executor) environment(ctx context.Context) []string {
 
 	env.AddMapString(cons)
 	env.AddMapString(job.Environment)
-	env.AddMapInterface(job.Variables)
+	//env.AddMapInterface(job.Variables)
 	secrets, err := ex.backend.Secrets(ctx)
 	if err != nil {
 		log.Error(ctx, "Fail fetching secrets", "err", err)
