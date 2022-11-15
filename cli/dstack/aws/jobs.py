@@ -14,7 +14,7 @@ def serialize_job(job: Job) -> dict:
         for dep in job.dep_specs:
             deps.append({
                 "repo_host_name": dep.repo_address.repo_host_name,
-                "repo_port": dep.repo_address.repo_port or '',
+                "repo_port": dep.repo_address.repo_port or 0,
                 "repo_user_name": dep.repo_address.repo_user_name,
                 "repo_name": dep.repo_address.repo_name,
                 "run_name": dep.run_name,
