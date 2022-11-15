@@ -2,7 +2,6 @@ package local
 
 import (
 	"context"
-	"encoding/json"
 	"errors"
 	"fmt"
 	"io"
@@ -321,7 +320,7 @@ func (s *S3) GetJobByPath(ctx context.Context, path string) (*models.Job, error)
 		return nil, gerrors.Wrap(err)
 	}
 	var job *models.Job
-	err = json.Unmarshal(fileJob, job)
+	err = yaml.Unmarshal(fileJob, job)
 	if err != nil {
 		return nil, gerrors.Wrap(err)
 	}
