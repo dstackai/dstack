@@ -26,7 +26,7 @@ type Job struct {
 	ProviderName string            `yaml:"provider_name"`
 
 	RepoHostName       string `yaml:"repo_host_name"`
-	RepoPort           int    `yaml:"repo_port"`
+	RepoPort           int    `yaml:"repo_port,omitempty"`
 	RepoBranch         string `yaml:"repo_branch"`
 	RepoDiff           string `yaml:"repo_diff"`
 	RepoHash           string `yaml:"repo_hash"`
@@ -96,13 +96,13 @@ type GitCredentials struct {
 }
 
 func (j *Job) RepoHostNameWithPort() string {
-	if j.RepoPort == 0 || j.RepoPort == 80 {
+	if j.RepoPort == 0 {
 		return j.RepoHostName
 	}
 	return fmt.Sprintf("%s:%d", j.RepoHostName, j.RepoPort)
 }
 func (d *Dep) RepoHostNameWithPort() string {
-	if d.RepoPort == 0 || d.RepoPort == 80 {
+	if d.RepoPort == 0 {
 		return d.RepoHostName
 	}
 	return fmt.Sprintf("%s:%d", d.RepoHostName, d.RepoPort)
