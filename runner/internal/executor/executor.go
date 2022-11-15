@@ -285,7 +285,7 @@ func (ex *Executor) runJob(ctx context.Context, erCh chan error, stoppedCh chan 
 func (ex *Executor) prepareGit(ctx context.Context) error {
 	job := ex.backend.Job(ctx)
 	dir := path.Join(common.HomeDir(), consts.RUNS_PATH, job.RunName, job.JobID)
-	ex.repo = repo.NewManager(ctx, fmt.Sprintf(consts.REPO_HTTPS_URL, job.RepoUserName, job.RepoName), job.RepoBranch, job.RepoHash).WithLocalPath(dir)
+	ex.repo = repo.NewManager(ctx, fmt.Sprintf(consts.REPO_HTTPS_URL, job.RepoHostNameWithPort(), job.RepoUserName, job.RepoName), job.RepoBranch, job.RepoHash).WithLocalPath(dir)
 	cred := ex.backend.GitCredentials(ctx)
 	if cred != nil {
 		log.Trace(ctx, "Credentials is not empty")
@@ -307,7 +307,7 @@ func (ex *Executor) prepareGit(ctx context.Context) error {
 			if cred.Passphrase != nil {
 				password = *cred.Passphrase
 			}
-			ex.repo = repo.NewManager(ctx, fmt.Sprintf(consts.REPO_GIT_URL, job.RepoUserName, job.RepoName), job.RepoBranch, job.RepoHash).WithLocalPath(dir)
+			ex.repo = repo.NewManager(ctx, fmt.Sprintf(consts.REPO_GIT_URL, job.RepoHostNameWithPort(), job.RepoUserName, job.RepoName), job.RepoBranch, job.RepoHash).WithLocalPath(dir)
 			ex.repo.WithSSHAuth(*cred.PrivateKey, password)
 		default:
 			log.Error(ctx, "Unsupported protocol", "protocol", cred.Protocol)

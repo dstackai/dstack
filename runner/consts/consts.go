@@ -36,5 +36,5 @@ const DELAY_TRY = 6 * time.Second
 
 const DELAY_READ_STATUS = 5 * time.Second
 
-const REPO_HTTPS_URL = "https://github.com/%s/%s.git"
-const REPO_GIT_URL = "git@github.com:%s/%s.git"
+const REPO_HTTPS_URL = "https://%s/%s/%s.git"
+const REPO_GIT_URL = "git@%s:%s/%s.git"
