@@ -66,7 +66,7 @@ def main():
     ps.register_parsers(subparsers)
     stop.register_parsers(subparsers)
     tags.register_parsers(subparsers)
-    dashboard.register_parsers(subparsers)
+    # dashboard.register_parsers(subparsers)
 
     if len(sys.argv) < 2:
         default_func(Namespace())
