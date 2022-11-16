@@ -305,6 +305,7 @@ func (c *Copier) Download(ctx context.Context, bucket, remote, local string) {
 }
 func (c *Copier) Upload(ctx context.Context, bucket, remote, local string) {
 	c.statUpload(local)
+	errorFound := atomic.NewBool(false)
 	for file := range walkFiles(local) {
 		c.threads.acquire(1)
 		go func(file *fileJob) {
@@ -321,6 +322,7 @@ func (c *Copier) Upload(ctx context.Context, bucket, remote, local string) {
 			theFile, err := os.Open(file.path)
 			if err != nil {
 				log.Error(ctx, "Open file", "err", err)
+				errorFound.Store(true)
 				return
 			}
 			log.Trace(ctx, "Upload file", "path", file.path)
@@ -335,6 +337,7 @@ func (c *Copier) Upload(ctx context.Context, bucket, remote, local string) {
 			}
 			if err != nil {
 				log.Error(ctx, "Upload file", "err", err)
+				errorFound.Store(true)
 				return
 			}
 			c.updateBars(file.info.Size())
@@ -342,6 +345,20 @@ func (c *Copier) Upload(ctx context.Context, bucket, remote, local string) {
 		}(file)
 	}
 	c.threads.acquire(MAX_THREADS)
+	if !errorFound.Load() {
+		log.Info(ctx, "Lock directory")
+		theFile, err := os.Create(filepath.Join(local, consts.FILE_LOCK_FULL_DOWNLOAD))
+		if err != nil {
+			log.Error(ctx, "Create lock file", "err", err)
+			return
+		}
+		defer func() {
+			err = theFile.Close()
+			if err != nil {
+				log.Error(ctx, "Close lock file", "err", err)
+			}
+		}()
+	}
 }
 
 func walkFiles(local string) chan *fileJob {
