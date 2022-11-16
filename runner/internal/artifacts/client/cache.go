@@ -223,7 +223,7 @@ func (c *Copier) CreateDirObject(ctx context.Context, bucket, path string) error
 
 func (c *Copier) Download(ctx context.Context, bucket, remote, local string) {
 	//Check local file cache
-	if _, err := os.Stat(filepath.Join(local, consts.FILE_LOCK_FULL_DOWNLOAD)); os.IsExist(err) {
+	if _, err := os.Stat(filepath.Join(local, consts.FILE_LOCK_FULL_DOWNLOAD)); err == nil {
 		return
 	}
 	c.statDownload(bucket, remote)
