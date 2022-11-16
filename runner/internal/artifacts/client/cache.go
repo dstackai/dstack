@@ -250,7 +250,7 @@ func (c *Copier) Download(ctx context.Context, bucket, remote, local string) {
 			if err := os.MkdirAll(path.Dir(theFilePath), 0755); err != nil {
 				return
 			}
-			if _, err := os.Stat(theFilePath); os.IsExist(err) {
+			if _, err := os.Stat(theFilePath); err == nil {
 				// file exists
 				return
 			}
