@@ -23,7 +23,7 @@ workflows:
       - pip install -r requirements.txt
       - python mnist/download.py
     artifacts:
-      - path: data
+      - path: ./data
 
   - name: train
     deps:
@@ -33,7 +33,7 @@ workflows:
       - pip install -r requirements.txt
       - python mnist/train.py
     artifacts:
-      - path: lightning_logs
+      - path: ./lightning_logs
 ```
 
 The `download` workflow downloads the dataset to the `data` folder and saves it as an artifact.

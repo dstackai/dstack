@@ -13,7 +13,7 @@ workflows:
     commands:
       - echo "Hello world" > output/hello.txt
     artifacts:
-      - path: output 
+      - path: ./output 
 ```
 
 !!! info "NOTE:"
@@ -62,7 +62,7 @@ workflows:
     commands:
       - bash hello.sh
     artifacts:
-      - path: output
+      - path: ./output
         mount: true
 ```
 

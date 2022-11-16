@@ -13,7 +13,7 @@ workflows:
   - name: ide-lab
     provider: lab
     artifacts: 
-      - path: output
+      - path: ./output
     resources:
       interruptible: true
       gpu: 1

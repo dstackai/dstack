@@ -6,7 +6,7 @@ Not needed for public repos.
 ### Usage
 
 ```shell
-dstack init [-t GITHUB_TOKEN | -i SSH_PRIVATE_KEY]
+dstack init [-t OAUTH_TOKEN | -i SSH_PRIVATE_KEY]
 ```
 
 !!! info "NOTE:"
@@ -16,11 +16,9 @@ dstack init [-t GITHUB_TOKEN | -i SSH_PRIVATE_KEY]
 
 The following arguments are optional:
 
-- `-t GITHUB_TOKEN`, `--token GITHUB_TOKEN` - (Optional) An authentication token for GitHub
+- `-t OAUTH_TOKEN`, `--token OAUTH_TOKEN` - (Optional) An authentication token for GitHub
 - `-i SSH_PRIVATE_KEY`, `--identity SSH_PRIVATE_KEY` – A path to the private SSH key file 
 
-If no arguments are provided, dstack takes the credentials configured in
-    `~/.config/gh/hosts.yml` or `./.ssh/config` for the current Git repo.
-
 !!! info "NOTE:"
-    Currently `dstack` supports only Git repos that are hosted on GitHub.
+    If no arguments are provided, `dstack` uses the credentials configured in
+    `~/.config/gh/hosts.yml` or `./.ssh/config` for the current Git repo.

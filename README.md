@@ -83,7 +83,7 @@ workflows:
       - pip install requirements.txt
       - python src/train.py
     artifacts: 
-      - path: checkpoint
+      - path: ./checkpoint
     resources:
       interruptible: true
       gpu: 1

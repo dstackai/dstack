@@ -13,7 +13,7 @@ workflows:
   - name: ide-notebook
     provider: notebook
     artifacts: 
-      - path: output
+      - path: ./output
     resources:
       interruptible: true
       gpu: 1

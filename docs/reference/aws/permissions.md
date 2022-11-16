@@ -47,16 +47,8 @@ Here's the full list of required permissions:
     {
       "Effect": "Allow",
       "Action": [
-        "secretsmanager:ListSecrets"
-      ],
-      "Resource": "*"
-    },
-    {
-      "Effect": "Allow",
-      "Action": [
         "ec2:DescribeInstanceTypes",
         "ec2:DescribeSecurityGroups",
-        "ec2:DescribeSubnets",
         "ec2:DescribeImages",
         "ec2:DescribeInstances",
         "ec2:DescribeSpotInstanceRequests"
@@ -134,10 +126,3 @@ Here's the full list of required permissions:
 
 In case you have questions about permissions, or you want to suggest a change (e.g. on how it works),
 please raise a [GitHub issue](https://github.com/dstackai/dstack/issues).
-
-!!! info "NOTE:"
-    In `v0.0.12`, we plan to drop the requirement of
-    the [`secretsmanager:ListSecrets`](https://github.com/dstackai/dstack/issues/112) and
-    [`ec2:DescribeSubnets`](Prompt the user to enter the name of the subnet manually if the user has no access to
-    DescribeSubnets #111) permissions. 
-

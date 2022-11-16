@@ -47,8 +47,8 @@ workflows:
 ```
 
 !!! tip "NOTE:"
-    You can create custom Conda environments using `conda env create --prefix` 
-    and save them as artifacts. This way you can reuse pre-built environments from other workflows.
+    If your workflow creates a custom Conda environment via `conda env create`, 
+    you can save it as an output artifact, and reuse later from other workflows.
 
 #### Python version
 
