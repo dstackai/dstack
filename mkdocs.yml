@@ -49,6 +49,7 @@ theme:
     - navigation.expand
     - navigation.top
     - announce.dismiss
+    - navigation.tracking
 
 # Plugins
 plugins:
@@ -78,6 +79,7 @@ markdown_extensions:
       custom_checkbox: true
   - toc:
       toc_depth: 2
+      permalink: true
   - attr_list
   - md_in_html
 
@@ -95,58 +97,28 @@ extra:
   social:
     - icon: fontawesome/brands/github
       link: https://github.com/dstackai/dstack
-    - icon: fontawesome/brands/python
-      link: https://pypi.org/project/dstack/
+#    - icon: fontawesome/brands/python
+#      link: https://pypi.org/project/dstack/
     - icon: fontawesome/brands/slack
       link: https://join.slack.com/t/dstackai/shared_invite/zt-xdnsytie-D4qU9BvJP8vkbkHXdi6clQ
     - icon: material/rss
-      link: https://mlopsfluff.dstack.ai
+      link: https://dstack.curated.co/
     - icon: fontawesome/brands/twitter
       link: https://twitter.com/dstackai
 
 # Page tree
 nav:
-  - Guide:
-    - Introduction:
-        - Overview: index.md
-        - What is dstack?: what-is-dstack.md
-        - Use cases: use-cases.md
+  - Docs:
     - Getting started:
+        - Overview: index.md
         - Installation: installation.md
-        - "Tutorial: Quickstart": tutorials/quickstart.md
-    - Examples:
-        - Hello, world: examples/hello.md
-        - Python: examples/python.md
-        - Resources: examples/resources.md
-        - Artifacts: examples/artifacts.md
-        - Deps: examples/deps.md
-        - Environment variables: examples/env.md
-        - Apps: examples/apps.md
-        - Secrets: examples/secrets.md
-        - Dev environments: examples/devs.md
-#    - Other docs:
-#      - FAQs: faq.md
-  - Reference:
-      - CLI:
-        - dstack: reference/cli/index.md
-        - dstack run: reference/cli/run.md
-        - dstack ps: reference/cli/ps.md
-        - dstack stop: reference/cli/stop.md
-        - dstack logs: reference/cli/logs.md
-        - dstack artifacts: reference/cli/artifacts.md
-        - dstack tags: reference/cli/tags.md
-        - dstack init: reference/cli/init.md
-        - dstack config: reference/cli/config.md
-        - dstack secrets: reference/cli/secrets.md
-        - dstack rm: reference/cli/rm.md
-      - Providers:
-#          - Introduction: reference/workflows/index.md
-          - bash: reference/providers/bash.md
-          - code: reference/providers/code.md
-          - lab: reference/providers/lab.md
-          - notebook: reference/providers/notebook.md
-          - docker: reference/providers/docker.md
-  #        - torchrun: reference/workflows/torchrun.md
-      - AWS:
-        - Permissions: reference/aws/permissions.md
-  - Community: community.md
+        - Quickstart: tutorials/quickstart.md
+        - Examples: examples/index.md
+    - Reference:
+        - CLI: reference/cli/index.md
+        - Providers: reference/providers/index.md
+    - Community:
+        - Slack chat: https://join.slack.com/t/dstackai/shared_invite/zt-xdnsytie-D4qU9BvJP8vkbkHXdi6clQ
+        - GitHub Issues: https://mlopsfluff.dstack.ai
+        - Newsletter: https://dstack.curated.co/
+  - Newsletter: https://dstack.curated.co/

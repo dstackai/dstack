@@ -132,10 +132,10 @@ and dev environments.
 
 ## More information
 
- * [Documentation](https://docs.dstack.ai)
+ * [Docs](https://docs.dstack.ai)
  * [GitHub Issues](https://github.com/dstackai/dstack/issues)
  * [Slack](https://join.slack.com/t/dstackai/shared_invite/zt-xdnsytie-D4qU9BvJP8vkbkHXdi6clQ)
- * [Blog](https://mlopsfluff.dstack.ai/)
+ * [Newsletter](https://dstack.curated.co/)
  * [Twitter](https://twitter.com/dstackai)
  
 ##  Licence

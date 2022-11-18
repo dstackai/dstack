@@ -26,9 +26,6 @@
 .md-header[data-md-state=shadow] {
     box-shadow: none;
 }
-.md-main__inner {
-    margin-top: 0;
-}
 .md-sidebar__scrollwrap {
     margin-top: -25px;
     overflow-y: hidden;
@@ -175,8 +172,13 @@
     }
 }
 
-.md-nav__title {
-    display: none;
+.md-nav--secondary .md-nav__title {
+    /*display: none;*/
+    padding: 2px 15px 3px;
+    margin: 30px 20px 22px -10px;
+    font-size: 17px;
+    font-weight: 800;
+    color: rgba(0, 0, 0, 0.87);
 }
 
 @font-face {
@@ -314,7 +316,7 @@ label.md-nav__link {
 }
 
 .md-typeset :not(pre) > a code {
-    color: var(--md-primary-fg-color);
+    color: #8752d7;
 }
 
 .md-typeset pre > code {
@@ -401,8 +403,8 @@ label.md-nav__link {
     --md-primary-fg-color: #a344d7;
     --md-accent-fg-color: #a344d7;
     --md-typeset-a-color: #a344d7;
-    --md-code-hl-function-color: #8192be;
-    --md-code-hl-keyword-color: #8192be;
+    --md-code-hl-function-color: #97ace1;
+    --md-code-hl-keyword-color: #97ace1;
     --md-code-hl-string-color: #91bd68;
     --md-code-fg-color: rgb(212, 212, 216);
     --md-code-hl-comment-color: #707880;
@@ -429,10 +431,6 @@ body {
 
 .md-content {
     /*border-left: 1px solid #E4E4E7;*/
-}
-
-.md-main__inner {
-    margin-top: 1rem;
 }
 
 .md-header__button.md-logo :where(img,svg) {
@@ -509,6 +507,8 @@ body {
 .md-sidebar--secondary .md-nav__link {
     padding-left: 15px;
     border-left: 2px solid transparent;
+    padding-top: 1px;
+    padding-bottom: 1px;
 }
 
 .md-sidebar--secondary .md-nav__item .md-nav__link--passed {
@@ -529,7 +529,7 @@ body {
     .md-nav__item--section>.md-nav>.md-nav__list>li.md-nav__item:not(.md-nav__item--nested):not(.md-nav__item--active) {
         padding-left: 1.1rem;
         margin-left: -4px;
-        color: var(--md-default-fg-color--light);
+        /*color: inherit;*/
     }
     .md-sidebar--primary a.md-nav__link--active::before {
         content: "•";
@@ -750,9 +750,9 @@ html .md-footer-meta.md-typeset a:is(:focus,:hover) {
         pointer-events: inherit;
     }
 
-    .md-nav__title {
+    /*.md-nav__title {
         display: none;
-    }
+    }*/
 
     .md-tabs__link {
         text-transform: uppercase;
