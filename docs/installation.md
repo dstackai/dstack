@@ -158,7 +158,8 @@ Here's the full list of AWS permissions the `dstack` CLI needs:
       "Action": [
         "iam:GetInstanceProfile",
         "iam:CreateInstanceProfile",
-        "iam:AddRoleToInstanceProfile"
+        "iam:AddRoleToInstanceProfile",
+        "iam:TagInstaceProfile",
       ],
       "Resource": [
         "arn:aws:iam::*:instance-profile/dstack_role_{bucket_name_under_score}*",
