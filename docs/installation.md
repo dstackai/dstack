@@ -93,6 +93,7 @@ Here's the full list of AWS permissions the `dstack` CLI needs:
       "Action": [
         "ec2:DescribeInstanceTypes",
         "ec2:DescribeSecurityGroups",
+        "ec2:DescribeSubnets",
         "ec2:DescribeImages",
         "ec2:DescribeInstances",
         "ec2:DescribeSpotInstanceRequests"
