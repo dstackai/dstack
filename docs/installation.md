@@ -122,7 +122,7 @@ Here's the full list of AWS permissions the `dstack` CLI needs:
     {
       "Effect": "Allow",
       "Action": [
-        "ec2:CancelSpotRequests",
+        "ec2:CancelSpotInstanceRequests",
         "ec2:TerminateInstances"
       ],
       "Condition": {
