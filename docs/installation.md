@@ -142,14 +142,14 @@ Here's the full list of AWS permissions the `dstack` CLI needs:
         "iam:CreateRole",
         "iam:AttachRolePolicy"
       ],
-      "Resource": "arn:aws:iam::*:role/dstack_role_{bucket_name}*"
+      "Resource": "arn:aws:iam::*:role/dstack_role_{bucket_name_under_score}*"
     },
     {
       "Effect": "Allow",
       "Action": [
         "iam:CreatePolicy"
       ],
-      "Resource": "arn:aws:iam::*:role/dstack_policy_{bucket_name}*"
+      "Resource": "arn:aws:iam::*:role/dstack_policy_{bucket_name_under_score}*"
     },
     {
       "Effect": "Allow",
@@ -158,11 +158,12 @@ Here's the full list of AWS permissions the `dstack` CLI needs:
         "iam:CreateInstanceProfile",
         "iam:AddRoleToInstanceProfile"
       ],
-      "Resource": "arn:aws:iam::*:role/dstack_role_{bucket_name}*"
+      "Resource": "arn:aws:iam::*:role/dstack_role_{bucket_name_under_score}*"
     }
   ]
 }
 ```
 
 !!! info "NOTE:"
-    Replace `{bucket_name}` substring with the name of the S3 bucket configured in `~/.dstack/config.yaml`.
+    Replace `{bucket_name}` substring with the name of the S3 bucket configured in `~/.dstack/config.yaml` and replace `{bucket_name_under_score}` with the name of the name of the bucket sanitized with underscores
+    (for instance `special-dstack-bucket` becomes `special_dstack_bucket`)
