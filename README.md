@@ -11,29 +11,34 @@ ______________________________________________________________________
 
 </div>
 
-`dstack` is a lightweight command-line utility that lets you run ML workflows in the cloud,
-while keeping them highly reproducible.
+`dstack` is an open-source tool that helps teams define ML workflow, and
+run them in a configured cloud. It takes care of 
+provisioning compute resources, handling dependencies, and versioning data.
+You can use the `dstack` CLI from both your IDE and your CI/CD pipelines.
 
 ## Features
 
- * Define your ML workflows declaratively, incl. their dependencies, environment, and required compute resources 
- * Run workflows via the `dstack` CLI. Have infrastructure provisioned automatically in a configured cloud account. 
- * Save output artifacts, such as data and models, to reuse them in other ML workflows
+* Define your ML workflows declaratively (incl. their dependencies, environment, artifacts, and compute resources).
+* Run workflows via the CLI. Have compute resources provisioned in your cloud (using your local credentials). 
+* Save data, models, and environments as artifacts and reuse them across workflows and teams. 
 
-## Demo
-
-<img src="https://s4.gifyu.com/images/dstack-run-gpu.gif" width="800px"/>
+For debugging purposes, you can spin dev environments (VS Code and JupyterLab), and also run workflow locally if needed.
 
 ## How does it work?
 
-1. Install `dstack` locally 
-2. Define ML workflows in `.dstack/workflows.yaml` (within your existing Git repository)
-3. Run ML workflows via the `dstack run` CLI command
-4. Use other `dstack` CLI commands to manage runs, artifacts, etc.
+1. Install `dstack` CLI locally 
+2. Configure the cloud credentials locally (e.g. via `~/.aws/credentials`)
+3. Define ML workflows in `.dstack/workflows.yaml` (within your existing Git repository)
+4. Run ML workflows via the `dstack run` CLI command
+5. Use other `dstack` CLI commands to manage runs, artifacts, etc.
 
->  When you run an ML workflow via the `dstack` CLI, it provisions the required compute resources (in a configured cloud
-   account), sets up environment (such as Python, Conda, CUDA, etc), fetches your code, downloads deps,
-   saves artifacts, and tears down compute resources.
+When you run a workflow via the `dstack` CLI, it provisions the required compute resources (in a configured cloud
+account), sets up environment (such as Python, Conda, CUDA, etc), fetches your code, downloads deps,
+saves artifacts, and tears down compute resources.
+
+### Demo
+
+<img src="https://s4.gifyu.com/images/dstack-run-gpu.gif" width="800px"/>
 
 ## Installation
 
@@ -52,8 +57,9 @@ Before you can use the `dstack` CLI, you need to configure it:
 dstack config
 ```
 
-It will prompt you to select the AWS region 
-where dstack will provision compute resources, and the S3 bucket, where dstack will save data.
+It will prompt you to select an AWS region 
+where `dstack` will provision compute resources, and an S3 bucket, 
+where dstack will store state and output artifacts.
 
 ```shell
 AWS profile: default
@@ -62,15 +68,10 @@ S3 bucket: dstack-142421590066-eu-west-1
 EC2 subnet: none
 ```
 
-> Support for GCP and Azure is in the roadmap.
-
 ## Usage example
 
-Say, you have a Python script that trains a model. It loads data from a local folder and saves the checkpoints
-into another folder.
-
-Now, to make it possible to run it via dstack, you have to create a `.dstack/workflows.yaml` file, and define there
-how to run the script, where to load the data, how to store output artifacts, and what compute resources are
+**Step 1:** Create a `.dstack/workflows.yaml` file, and define there how to run the script, 
+from where to load the data, how to store output artifacts, and what compute resources are
 needed to run it.
 
 ```yaml
@@ -89,13 +90,16 @@ workflows:
       gpu: 1
 ```
 
-Now you can run it via the `dstack` CLI:
+Use `deps` to add artifacts of other workflows as dependencies. You can refer to other 
+workflows via the name of the workflow, or via the name of the tag. 
+
+**Step 2:** Run the workflow via `dstack run`:
 
 ```shell
 dstack run train
 ```
 
-You'll see the output in real-time as your workflow is running.
+It will automatically provision the required compute resource, and run the workflow. You'll see the output in real-time:
 
 ```shell
 Provisioning... It may take up to a minute. ✓
@@ -113,7 +117,7 @@ val_acc       0.965399980545044
 val_loss      0.10975822806358337
 ```
 
-Use the `dstack ps` command to see the status of recent workflows.
+**Step 3:** Use the `dstack ps` command to see the status of runs.
 
 ```shell
 dstack ps -a
@@ -123,12 +127,9 @@ angry-elephant-1  download  8 hours ago  peterschmidt85  Done     mnist_data
 wet-insect-1      train     1 weeks ago  peterschmidt85  Running  
 ```
 
-Other CLI commands allow to manage runs, artifacts, tags, secrets, and more.
+**Step 4:** Use other commands to manage runs, artifacts, tags, secrets, and more.
 
-You can use dstack to not only process data or train models, but also to run applications,
-and dev environments.
-
-> All the state and output artifacts are stored in a configured S3 bucket.
+For more 
 
 ## More information
 
