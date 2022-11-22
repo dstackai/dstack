@@ -60,9 +60,9 @@ Here's the full list of AWS permissions the `dstack` CLI needs:
           "s3:DeleteObjectTagging",
           "s3:GetBucketAcl"
       ],
-      "Resources": [
-        "s3://{bucket_name}",
-        "s3://{bucket_name}*"
+      "Resource": [
+        "arn:aws:s3:::{bucket_name}",
+        "arn:aws:s3:::{bucket_name}/*"
       ]
     },
     {
@@ -125,6 +125,7 @@ Here's the full list of AWS permissions the `dstack` CLI needs:
         "ec2:CancelSpotInstanceRequests",
         "ec2:TerminateInstances"
       ],
+      "Resource": "*",
       "Condition": {
         "StringEquals": {
           "aws:ResourceTag/dstack_bucket": "{bucket_name}"
@@ -168,5 +169,6 @@ Here's the full list of AWS permissions the `dstack` CLI needs:
 ```
 
 !!! info "NOTE:"
-    Replace `{bucket_name}` substring with the name of the S3 bucket configured in `~/.dstack/config.yaml` and replace `{bucket_name_under_score}` with the name of the name of the bucket sanitized with underscores
-    (for instance `special-dstack-bucket` becomes `special_dstack_bucket`)
+    Instead of `{bucket_name}`, use the name of the S3 bucket configured in `~/.dstack/config.yaml`.
+    For `{bucket_name_under_score}`, use the same value as for `{bucket_name}` but with dash characters 
+    replaced to underscores (e.g. `dstack-142421590066-eu-west-1` becomes `dstack_142421590066_eu_west_1`).
