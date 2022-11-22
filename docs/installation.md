@@ -68,8 +68,16 @@ Here's the full list of AWS permissions the `dstack` CLI needs:
     {
       "Effect": "Allow",
       "Action": [
+        "logs:DescribeLogGroups"
+      ],
+      "Resource": [
+        "arn:aws:logs:*:*:log-group:*"
+      ]
+    },
+    {
+      "Effect": "Allow",
+      "Action": [
         "logs:FilterLogEvents",
-        "logs:DescribeLogGroups",
         "logs:CreateLogGroup",
         "logs:CreateLogStream"
       ],
