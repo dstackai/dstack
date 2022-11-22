@@ -85,7 +85,8 @@ Here's the full list of AWS permissions the `dstack` CLI needs:
         "secretsmanager:GetSecretValue",
         "secretsmanager:CreateSecret",
         "secretsmanager:PutResourcePolicy",
-        "secretsmanager:TagResource"
+        "secretsmanager:TagResource",
+        "secretsmanager:DeleteSecret"
       ],
       "Resource": "arn:*:secretsmanager:*:*:secret:/dstack/{bucket_name}/secrets/*"
     },
