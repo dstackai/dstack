@@ -90,6 +90,13 @@ Here's the full list of AWS permissions the `dstack` CLI needs:
     {
       "Effect": "Allow",
       "Action": [
+        "secretsmanager:ListSecrets"
+      ],
+      "Resource": "*"
+    },
+    {
+      "Effect": "Allow",
+      "Action": [
         "secretsmanager:UpdateSecret",
         "secretsmanager:GetSecretValue",
         "secretsmanager:CreateSecret",
