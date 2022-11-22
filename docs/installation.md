@@ -6,7 +6,7 @@ pip install dstack --upgrade
 
 ## Configure the CLI
 
-In order to use `dstack` locally, first you need to run the [`dstack config`](reference/cli/config.md) command 
+In order to use `dstack` locally, first you need to run the [`dstack config`](reference/cli/index.md#dstack-config) command 
 on your machine.
 
 ```shell

@@ -54,7 +54,7 @@ It will ensure that `dstack` has the access to the Git repo.
 
 ## Run download workflow
 
-Now, you can use the [`dstack run`](../reference/cli/run.md) command to run the `download` workflow:
+Now, you can use the [`dstack run`](../reference/cli/index.md#dstack-run) command to run the `download` workflow:
 
 ```shell
 dstack run download
@@ -96,7 +96,7 @@ Once the workflow is finished, its artifacts are saved and infrastructure is tor
     Running workflows locally requires Docker or [NVIDIA Docker](https://github.com/NVIDIA/nvidia-docker) 
     to be installed locally.
 
-Use the [`dstack ps`](../reference/cli/ps.md) command to see the status of recent workflows.
+Use the [`dstack ps`](../reference/cli/index.md#dstack-ps) command to see the status of recent workflows.
 
 ```shell
 dstack ps
@@ -117,7 +117,7 @@ To see all workflows, use the `dstack ps -a` command.
 ## Access artifacts
 
 To see artifacts of a run, use the
-[`dstack artifacts list`](../reference/cli/artifacts.md#artifacts-list) command followed
+[`dstack artifacts list`](../reference/cli/index.md#dstack-artifacts-list) command followed
 by the name of the run.
 
 ```shell
@@ -190,7 +190,7 @@ val_loss      0.10975822806358337
 ## Download artifacts
 
 Once the `train` workflow is finished, if you want, you can download its artifacts using 
-the [`dstack artifacts download`](../reference/cli/artifacts.md#artifacts-download) command.
+the [`dstack artifacts download`](../reference/cli/index.md#dstack-artifacts-download) command.
 
 ```shell
 dstack artifacts download wet-mangust-2 .

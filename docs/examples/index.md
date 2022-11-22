@@ -35,8 +35,8 @@ Hello, world!
 
 ## Python
 
-The [`bash`](../reference/providers/bash.md), [`code`](../reference/providers/code.md), 
-[`lab`](../reference/providers/lab.md), and [`notebook`](../reference/providers/notebook.md) providers
+The [`bash`](../reference/providers/index.md#bash), [`code`](../reference/providers/index.md#code), 
+[`lab`](../reference/providers/index.md#lab), and [`notebook`](../reference/providers/index.md#notebook) providers
 come with Python and Conda pre-installed.
 
 Create the `.dstack/workflows.yaml` and `hello.py` files in your project directory:
@@ -268,7 +268,7 @@ workflows:
 ### Access artifacts
 
 To see artifacts of a run, you can use the
-[`dstack artifacts list`](../reference/cli/artifacts.md#artifacts-list) command followed
+[`dstack artifacts list`](../reference/cli/index.md#dstack-artifacts-list) command followed
 by the name of the run.
 
 ```shell
@@ -289,7 +289,7 @@ data  MNIST/raw/t10k-images-idx3-ubyte      7.5MiB
       MNIST/raw/train-labels-idx1-ubyte.gz  28.2KiB
 ```
 
-To download artifacts, use the [`dstack artifacts download`](../reference/cli/artifacts.md#artifacts-download) command:
+To download artifacts, use the [`dstack artifacts download`](../reference/cli/index.md#dstack-artifacts-download) command:
 
 ```shell
 dstack artifacts download grumpy-zebra-1 .
@@ -326,15 +326,15 @@ Deps allow workflows to reuse artifacts via tags or from other workflows.
 
 The easiest way to create a tag is to add a tag to a finished run. 
 
-For example, you ran the [`hello-txt`](artifacts.md) workflow, and want to use its artifacts in another workflow.
+For example, you ran the [`hello-txt`](#artifacts) workflow, and want to use its artifacts in another workflow.
 
-Once the [`hello-txt`](artifacts.md) workflow is finished, you can add a tag to it:
+Once the [`hello-txt`](#artifacts) workflow is finished, you can add a tag to it:
 
 ```shell
 dstack tags add txt-file grumpy-zebra-2
 ```
 
-The `txt-file` here is the name of the tag, and `grumpy-zebra-2` is the run name of the [`hello-txt`](artifacts.md) workflow. 
+The `txt-file` here is the name of the tag, and `grumpy-zebra-2` is the run name of the [`hello-txt`](#artifacts) workflow. 
 
 Now you can use this tag from another workflow:
 
@@ -350,7 +350,7 @@ workflows:
 
 !!! tip "NOTE:"
     One more way to create a tag is by uploading local files as tag artifacts. 
-    See the [`dstack tags add`](../reference/cli/tags.md#tags-add) command documentation to know more.
+    See the [`dstack tags add`](../reference/cli/index.md#dstack-tags-add) command documentation to know more.
 
 ### Workflows
 
@@ -411,7 +411,7 @@ workflows:
 
 ## Apps
 
-The [`bash`](../reference/providers/bash.md) and [`docker`](../reference/providers/docker.md) providers 
+The [`bash`](../reference/providers/index.md#bash) and [`docker`](../reference/providers/index.md#docker) providers 
 allow workflows to host applications.
 
 To do that, you have to pass the number of ports (that you want to expose) to the `ports` property.
@@ -473,7 +473,7 @@ workflows:
       - wandb login
 ```
 
-Secrets can be managed via the [`dstack secrets`](../reference/cli/secrets.md) command.
+Secrets can be managed via the [`dstack secrets`](../reference/cli/index.md#dstack-secrets-add) command.
 
 ## Dev environments
 

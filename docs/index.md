@@ -41,7 +41,7 @@ saves artifacts, and tears down compute resources.
 - [**Quickstart**
    Try `dstack` yourself by following a step-by-step tutorial.](tutorials/quickstart.md)
 - [**Examples**
-   Check basic examples of how to use `dstack`.](examples/hello)
+   Check basic examples of how to use `dstack`.](examples)
 - [**Community**
    Join our Slack for support and to talk to other users of `dstack`.
   ](https://join.slack.com/t/dstackai/shared_invite/zt-xdnsytie-D4qU9BvJP8vkbkHXdi6clQ)
