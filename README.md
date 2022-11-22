@@ -129,8 +129,6 @@ wet-insect-1      train     1 weeks ago  peterschmidt85  Running
 
 **Step 4:** Use other commands to manage runs, artifacts, tags, secrets, and more.
 
-For more 
-
 ## More information
 
  * [Docs](https://docs.dstack.ai)
