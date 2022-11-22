@@ -110,30 +110,12 @@ Here's the full list of AWS permissions the `dstack` CLI needs:
         "ec2:DescribeSubnets",
         "ec2:DescribeImages",
         "ec2:DescribeInstances",
-        "ec2:DescribeSpotInstanceRequests"
-      ],
-      "Resource": "*"
-    },
-    {
-      "Effect": "Allow",
-      "Action": [
+        "ec2:DescribeSpotInstanceRequests",
+        "ec2:RunInstances",
+        "ec2:CreateTags",
         "ec2:CreateSecurityGroup",
         "ec2:AuthorizeSecurityGroupIngress",
         "ec2:AuthorizeSecurityGroupEgress"
-      ],
-      "Resource": "*"
-    },
-    {
-      "Effect": "Allow",
-      "Action": [
-        "ec2:RunInstances"
-      ],
-      "Resource": "*"
-    },
-    {
-      "Effect": "Allow",
-      "Action": [
-        "ec2:CreateTags"
       ],
       "Resource": "*"
     },
