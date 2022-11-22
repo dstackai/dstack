@@ -48,7 +48,18 @@ Here's the full list of AWS permissions the `dstack` CLI needs:
   "Statement": [
     {
       "Effect": "Allow",
-      "Action": "*",
+      "Action": [
+          "s3:PutObject",
+          "s3:GetObject",
+          "s3:DeleteObject",
+          "s3:ListBucket",
+          "s3:GetLifecycleConfiguration",
+          "s3:PutLifecycleConfiguration",
+          "s3:PutObjectTagging",
+          "s3:GetObjectTagging",
+          "s3:DeleteObjectTagging",
+          "s3:GetBucketAcl"
+      ],
       "Resources": [
         "s3://{bucket_name}",
         "s3://{bucket_name}*"
