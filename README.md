@@ -1,26 +1,41 @@
 <div align="center">
-<img src="https://raw.githubusercontent.com/dstackai/dstack/master/docs/assets/logo.svg" width="500px"/>    
+<h1 align="center">
+  <a target="_blank" href="https://dstack.ai">
+    <img align="center" src="https://raw.githubusercontent.com/dstackai/dstack/master/docs/assets/logo.svg" width="400px"/>
+  </a>
+</h1>
 
-______________________________________________________________________
+<h3 align="center">
+Reproducible ML workflows for teams
+</h3>
 
-[![PyPI](https://img.shields.io/github/workflow/status/dstackai/dstack/Build?style=flat-square)](https://github.com/dstackai/dstack/actions/workflows/build.yml)
-[![PyPI](https://img.shields.io/pypi/v/dstack?style=flat-square&color=blueviolet)](https://pypi.org/project/dstack/)
-[![PyPI - License](https://img.shields.io/pypi/l/dstack?style=flat-square&color=blue)](https://github.com/dstackai/dstack/blob/master/LICENSE.md)
+<p align="center">
+<code>dstack</code> helps teams define ML workflow, run them in a configured cloud, and collaborate around 
+artifacts. <br/>It takes care of provisioning compute resources, handling dependencies, and versioning data.
+</p>
 
-#### [Docs](https://docs.dstack.ai) - [Quickstart](https://docs.dstack.ai/tutorials/quickstart) - [Slack](https://join.slack.com/t/dstackai/shared_invite/zt-xdnsytie-D4qU9BvJP8vkbkHXdi6clQ) - [Twitter](https://twitter.com/dstackai)
+[![Slack](https://img.shields.io/badge/slack-chat%20with%20us-blueviolet?logo=slack&style=for-the-badge)](https://join.slack.com/t/dstackai/shared_invite/zt-xdnsytie-D4qU9BvJP8vkbkHXdi6clQ)
+
+<p align="center">
+<a href="https://docs.dstack.ai" target="_blank"><b>Docs</b></a> • 
+<a href="https://docs.dstack.ai/tutorials/quickstart"><b>Quickstart</b></a> • 
+<a href="https://docs.dstack.ai/examples" target="_blank"><b>Examples</b></a> • 
+<a href="https://join.slack.com/t/dstackai/shared_invite/zt-xdnsytie-D4qU9BvJP8vkbkHXdi6clQ" target="_blank"><b>Slack</b></a> • 
+<a href="https://twitter.com/dstackai" target="_blank"><b>Twitter</b></a>
+</p>
+
+[![Last commit](https://img.shields.io/github/last-commit/dstackai/dstack)](https://github.com/dstackai/dstack/commits/)
+[![PyPI - License](https://img.shields.io/pypi/l/dstack?style=flat&color=blue)](https://github.com/dstackai/dstack/blob/master/LICENSE.md)
 
 </div>
-
-`dstack` is an open-source tool that helps teams define ML workflow, and
-run them in a configured cloud. It takes care of 
-provisioning compute resources, handling dependencies, and versioning data.
-You can use the `dstack` CLI from both your IDE and your CI/CD pipelines.
 
 ## Features
 
 * Define your ML workflows declaratively (incl. their dependencies, environment, artifacts, and compute resources).
 * Run workflows via the CLI. Have compute resources provisioned in your cloud (using your local credentials). 
 * Save data, models, and environments as artifacts and reuse them across workflows and teams. 
+
+You can use the `dstack` CLI from both your IDE and your CI/CD pipelines.
 
 For debugging purposes, you can spin dev environments (VS Code and JupyterLab), and also run workflow locally if needed.
 
@@ -38,7 +53,8 @@ saves artifacts, and tears down compute resources.
 
 ### Demo
 
-<img src="https://s4.gifyu.com/images/dstack-run-gpu.gif" width="800px"/>
+<video src="https://user-images.githubusercontent.com/54148038/203490366-e32ef5bb-e134-4562-bf48-358ade41a225.mp4" controls="controls" style="max-width: 800px;"> 
+</video>
 
 ## Installation
 

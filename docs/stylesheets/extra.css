@@ -175,7 +175,7 @@
 .md-nav--secondary .md-nav__title {
     /*display: none;*/
     padding: 2px 15px 3px;
-    margin: 30px 20px 22px -10px;
+    margin: 30px 20px 11px -10px;
     font-size: 17px;
     font-weight: 800;
     color: rgba(0, 0, 0, 0.87);
@@ -459,7 +459,7 @@ body {
         display: inline-block;
         font-size: 0.8rem;
         font-weight: 800;
-        line-height: 1.5rem;
+        line-height: 1rem;
     }
 
     .md-search__form > * {
@@ -501,7 +501,7 @@ body {
 
 .md-sidebar--primary .md-nav__link {
     padding: 3px 15px 4px;
-    margin: 5px 20px 5px -10px;
+    margin: 5px 20px 0 -10px;
 }
 
 .md-sidebar--secondary .md-nav__link {

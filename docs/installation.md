@@ -33,7 +33,7 @@ The configuration will be saved in the `~/.dstack/config.yaml` file.
     and `DSTACK_AWS_EC2_SUBNET` environment variables.
     This might be convenient, if you run `dstack` from your CI/CD pipeline.
 
-## AWS credentials
+## Configure AWS credentials
 
 The use of the `dstack` CLI requires AWS credentials. They must be configured on your machine
 (e.g. in `~/.aws/credentials` or `AWS_ACCESS_KEY_ID` and `AWS_SECRET_ACCESS_KEY` environment variables).
