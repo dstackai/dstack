@@ -32,7 +32,7 @@ type Job struct {
 	RepoHash           string `yaml:"repo_hash"`
 	RepoName           string `yaml:"repo_name"`
 	RepoUserName       string `yaml:"repo_user_name"`
-	LocalRepoUserName  string `yaml:"local_repo_user_name"`
+	LocalRepoUserName  string `yaml:"local_repo_user_name,omitempty"`
 	LocalRepoUserEmail string `yaml:"local_repo_user_email,omitempty"`
 
 	RequestID    string       `yaml:"request_id"`
