@@ -39,8 +39,8 @@ def serialize_job(job: Job) -> dict:
         "run_name": job.run_name,
         "workflow_name": job.workflow_name or '',
         "provider_name": job.provider_name,
-        "local_repo_user_name": job.local_repo_user_name,
-        "local_repo_user_email": job.local_repo_user_email or None,
+        "local_repo_user_name": job.local_repo_user_name or '',
+        "local_repo_user_email": job.local_repo_user_email or '',
         "status": job.status.value,
         "submitted_at": job.submitted_at,
         "image_name": job.image_name,
@@ -152,7 +152,7 @@ def _job_head_key(job: Job):
     key = f"{prefix}/l;" \
           f"{job.job_id};" \
           f"{job.provider_name};" \
-          f"{job.local_repo_user_name};" \
+          f"{job.local_repo_user_name or ''};" \
           f"{job.submitted_at};" \
           f"{job.status.value};" \
           f"{','.join([a.artifact_path for a in (job.artifact_specs or [])])};" \
@@ -232,7 +232,7 @@ def list_job_head(s3_client: BaseClient, bucket_name: str, repo_address: RepoAdd
                 provider_name, local_repo_user_name, submitted_at, status, artifacts, app_names, tag_name = tuple(t)
                 run_name, workflow_name, job_index = tuple(job_id.split(','))
                 return JobHead(job_id, repo_address, run_name, workflow_name or None, provider_name,
-                               local_repo_user_name, JobStatus(status), int(submitted_at),
+                               local_repo_user_name or None, JobStatus(status), int(submitted_at),
                                artifacts.split(',') if artifacts else None, tag_name or None,
                                app_names.split(',') or None)
     return None

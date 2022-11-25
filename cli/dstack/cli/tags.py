@@ -20,20 +20,22 @@ def list_tags_func(_: Namespace):
         console = Console()
         table = Table(box=None)
         table.add_column("TAG", style="bold", no_wrap=True)
+        table.add_column("CREATED", style="grey58", no_wrap=True)
         table.add_column("RUN", style="grey58", no_wrap=True)
         # table.add_column("WORKFLOW", style="grey58", width=12)
         # table.add_column("PROVIDER", style="grey58", width=12)
-        table.add_column("ARTIFACTS", style="grey58", width=12)
-        table.add_column("CREATED", style="grey58", no_wrap=True)
+        # table.add_column("ARTIFACTS", style="grey58", width=12)
+        table.add_column("OWNER", style="grey58", no_wrap=True, max_width=16)
         for tag_head in tag_heads:
             created_at = pretty_date(round(tag_head.created_at / 1000))
             table.add_row(
                 tag_head.tag_name,
-                tag_head.run_name,
                 # tag_head.workflow_name,
                 # tag_head.provider_name,
-                '\n'.join([a.artifact_path for a in tag_head.artifact_heads or []]),
-                created_at
+                # '\n'.join([a.artifact_path for a in tag_head.artifact_heads or []]),
+                created_at,
+                tag_head.run_name,
+                tag_head.local_repo_user_name or "",
             )
         console.print(table)
     except ConfigError:

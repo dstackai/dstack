@@ -27,8 +27,8 @@ def list_tag_heads(s3_client: BaseClient, bucket_name: str, repo_address: RepoAd
             if len(t) == 7:
                 tag_name, run_name, workflow_name, provider_name, local_repo_user_name, created_at, artifact_heads = tuple(
                     t)
-                tag_heads.append(TagHead(repo_address, tag_name, run_name, workflow_name, provider_name,
-                                         local_repo_user_name, int(created_at),
+                tag_heads.append(TagHead(repo_address, tag_name, run_name, workflow_name or None, provider_name or None,
+                                         local_repo_user_name or None, int(created_at),
                                          _unserialize_artifact_heads(artifact_heads)))
     return tag_heads
 
@@ -42,8 +42,8 @@ def get_tag_head(s3_client: BaseClient, bucket_name: str, repo_address: RepoAddr
         t = response["Contents"][0]["Key"][len(tag_head_prefix):].split(';')
         if len(t) == 6:
             run_name, workflow_name, provider_name, local_repo_user_name, created_at, artifact_heads = tuple(t)
-            return TagHead(repo_address, tag_name, run_name, workflow_name, provider_name, local_repo_user_name,
-                           int(created_at), _unserialize_artifact_heads(artifact_heads))
+            return TagHead(repo_address, tag_name, run_name, workflow_name or None, provider_name or None,
+                           local_repo_user_name or None, int(created_at), _unserialize_artifact_heads(artifact_heads))
     else:
         return None
 
@@ -59,7 +59,7 @@ def _tag_head_key(tag_head: TagHead) -> str:
           f"{tag_head.run_name};" \
           f"{tag_head.workflow_name or ''};" \
           f"{tag_head.provider_name or ''};" \
-          f"{tag_head.local_repo_user_name};" \
+          f"{tag_head.local_repo_user_name or ''};" \
           f"{tag_head.created_at};" \
           f"{_serialize_artifact_heads(tag_head)}"
     return key

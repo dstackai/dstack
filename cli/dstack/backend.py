@@ -57,8 +57,8 @@ class ArtifactHead:
 
 class RunHead:
     def __init__(self, repo_address: RepoAddress, run_name: str, workflow_name: Optional[str], provider_name: str,
-                 local_repo_user_name: str, artifact_heads: Optional[List[ArtifactHead]], status: JobStatus, submitted_at: int,
-                 tag_name: Optional[str], app_heads: Optional[List[AppHead]],
+                 local_repo_user_name: Optional[str], artifact_heads: Optional[List[ArtifactHead]], status: JobStatus,
+                 submitted_at: int, tag_name: Optional[str], app_heads: Optional[List[AppHead]],
                  request_heads: Optional[List[RequestHead]]):
         self.repo_address = repo_address
         self.run_name = run_name
@@ -82,7 +82,7 @@ class RunHead:
                f'run_name="{self.run_name}", ' \
                f'workflow_name={_quoted(self.workflow_name)}, ' \
                f'provider_name="{self.provider_name}", ' \
-               f'local_repo_user_name="{self.local_repo_user_name}", ' \
+               f'local_repo_user_name={_quoted(self.local_repo_user_name)}, ' \
                f'status=JobStatus.{self.status.name}, ' \
                f'submitted_at={self.submitted_at}, ' \
                f'artifact_heads={artifact_heads}, ' \
@@ -112,9 +112,9 @@ class BackendError(Exception):
 
 
 class TagHead:
-    def __init__(self, repo_address: RepoAddress, tag_name: str, run_name: str,
-                 workflow_name: Optional[str], provider_name: Optional[str],
-                 local_repo_user_name: str, created_at: int, artifact_heads: Optional[List[ArtifactHead]]):
+    def __init__(self, repo_address: RepoAddress, tag_name: str, run_name: str, workflow_name: Optional[str],
+                 provider_name: Optional[str], local_repo_user_name: Optional[str], created_at: int,
+                 artifact_heads: Optional[List[ArtifactHead]]):
         self.repo_address = repo_address
         self.tag_name = tag_name
         self.run_name = run_name
@@ -132,7 +132,7 @@ class TagHead:
                f'run_name="{self.run_name}", ' \
                f'workflow_name={_quoted(self.workflow_name)}, ' \
                f'provider_name={_quoted(self.provider_name)}, ' \
-               f'local_repo_user_name="{self.local_repo_user_name}", ' \
+               f'local_repo_user_name={_quoted(self.local_repo_user_name)}, ' \
                f'created_at={self.created_at}, ' \
                f'artifact_heads={artifact_heads})'
 

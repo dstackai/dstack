@@ -96,9 +96,9 @@ def print_runs(args: Namespace, backend: Backend):
                 # _status_color(run, _app_heads(run.app_heads, run.status.name), False, False),
                 # _status_color(run, '\n'.join([a.artifact_path for a in run.artifact_heads or []]), False, False),
                 _status_color(run, submitted_at, False, False),
-                _status_color(run, run.local_repo_user_name, False, False),
+                _status_color(run, run.local_repo_user_name or "", False, False),
                 pretty_print_status(run),
-                _status_color(run, f"{run.tag_name}" if run.tag_name else "", False, False))
+                _status_color(run, run.tag_name or "", False, False))
     console.print(table)
 
 

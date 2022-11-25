@@ -69,7 +69,7 @@ class LocalRepoData(RepoData):
     def __init__(self, repo_host_name: str, repo_port: Optional[int], repo_user_name: str, repo_name: str,
                  repo_branch: str, repo_hash: str, repo_diff: Optional[str], protocol: RepoProtocol,
                  identity_file: Optional[str], oauth_token: Optional[str],
-                 local_repo_user_name: str, local_repo_user_email: Optional[str]):
+                 local_repo_user_name: Optional[str], local_repo_user_email: Optional[str]):
         super().__init__(repo_host_name, repo_port, repo_user_name, repo_name, repo_branch, repo_hash, repo_diff)
         self.protocol = protocol
         self.identity_file = identity_file
@@ -88,7 +88,7 @@ class LocalRepoData(RepoData):
                f'protocol=RepoProtocol.{self.protocol.name}, ' \
                f'identity_file={_quoted(self.identity_file)}, ' \
                f'oauth_token={_quoted_masked(self.oauth_token)},' \
-               f'local_repo_user_name="{self.local_repo_user_name}", ' \
+               f'local_repo_user_name="{_quoted(self.local_repo_user_name)}, ' \
                f'local_repo_user_email={_quoted(self.local_repo_user_email)})'
 
     def ls_remote(self) -> str:
@@ -128,7 +128,7 @@ def load_repo_data(oauth_token: Optional[str] = None, identity_file: Optional[st
         repo_hash = tracking_branch.commit.hexsha
         repo_url = repo.remote(remote_name).url
 
-        local_repo_user_name = repo.config_reader().get_value("user", "name")
+        local_repo_user_name = repo.config_reader().get_value("user", "name", "") or None
         local_repo_user_email = repo.config_reader().get_value("user", "email", "") or None
 
         repo_url_parsed = giturlparse.parse(repo_url)
