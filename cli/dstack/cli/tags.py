@@ -70,7 +70,7 @@ def delete_tag_func(args: Namespace):
         tag_head = backend.get_tag_head(repo_data, args.tag_name)
         if not tag_head:
             sys.exit(f"The tag '{args.tag_name}' doesn't exist")
-        elif Confirm.ask(f" [red]Delete the tag '{tag_head.tag_name}'?[/]"):
+        elif args.yes or Confirm.ask(f" [red]Delete the tag '{tag_head.tag_name}'?[/]"):
             backend.delete_tag_head(repo_data, tag_head)
             print(f"[grey58]OK[/]")
     except ConfigError:
@@ -91,9 +91,10 @@ def register_parsers(main_subparsers):
     add_tags_parser.add_argument("-a", "--artifact", metavar="PATH", type=str,
                                  help="A path to local directory to upload as an artifact", action="append",
                                  dest="artifact_paths")
-    parser.add_argument("-y", "--yes", help="Don't ask for confirmation", action="store_true")
+    add_tags_parser.add_argument("-y", "--yes", help="Don't ask for confirmation", action="store_true")
     add_tags_parser.set_defaults(func=add_tag_func)
 
     delete_tags_parser = subparsers.add_parser("delete", help="Delete a tag")
     delete_tags_parser.add_argument("tag_name", metavar="TAG_NAME", type=str, help="The name of the tag")
+    delete_tags_parser.add_argument("-y", "--yes", help="Don't ask for confirmation", action="store_true")
     delete_tags_parser.set_defaults(func=delete_tag_func)
