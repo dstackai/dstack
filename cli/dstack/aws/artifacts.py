@@ -86,7 +86,7 @@ def upload_job_artifact_files(s3_client: BaseClient, bucket_name: str, repo_addr
             for filename in files:
                 file_path = Path(os.path.join(root, filename)).absolute()
 
-                key = prefix + __remove_prefix(str(file_path), str(local_path.absolute()))
+                key = prefix + __remove_prefix(file_path.as_posix(), local_path.absolute().as_posix())
                 uploader.upload_file(
                     str(file_path),
                     bucket_name,
