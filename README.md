@@ -10,16 +10,15 @@ Reproducible ML workflows for teams
 </h3>
 
 <p align="center">
-<code>dstack</code> helps teams define ML workflow, run them in a configured cloud, and collaborate around 
-artifacts. <br/>It takes care of provisioning compute resources, handling dependencies, and versioning data.
+<code>dstack</code> helps teams run ML workflow in a configured cloud, manage dependencies, and version data.
 </p>
 
 [![Slack](https://img.shields.io/badge/slack-chat%20with%20us-blueviolet?logo=slack&style=for-the-badge)](https://join.slack.com/t/dstackai/shared_invite/zt-xdnsytie-D4qU9BvJP8vkbkHXdi6clQ)
 
 <p align="center">
 <a href="https://docs.dstack.ai" target="_blank"><b>Docs</b></a> • 
-<a href="https://docs.dstack.ai/tutorials/quickstart"><b>Quickstart</b></a> • 
 <a href="https://docs.dstack.ai/examples" target="_blank"><b>Examples</b></a> • 
+<a href="https://docs.dstack.ai/tutorials/quickstart"><b>Quickstart</b></a> • 
 <a href="https://join.slack.com/t/dstackai/shared_invite/zt-xdnsytie-D4qU9BvJP8vkbkHXdi6clQ" target="_blank"><b>Slack</b></a> • 
 <a href="https://twitter.com/dstackai" target="_blank"><b>Twitter</b></a>
 </p>
@@ -29,15 +28,17 @@ artifacts. <br/>It takes care of provisioning compute resources, handling depend
 
 </div>
 
-## Features
+### Features
 
-* Define your ML workflows declaratively (incl. their dependencies, environment, artifacts, and compute resources).
-* Run workflows via the CLI. Have compute resources provisioned in your cloud (using your local credentials). 
-* Save data, models, and environments as artifacts and reuse them across workflows and teams. 
+* **Workflows as code:** Define your ML workflows as code, and run them in a configured cloud via the command-line.
+* **Reusable artifacts:** Save data, models, and environment as workflows artifacts, and reuse them across projects.
+* **Built-in containers:** Workflow containers are pre-built with Conda, Python, etc. No Docker is needed.
 
-You can use the `dstack` CLI from both your IDE and your CI/CD pipelines.
-
-For debugging purposes, you can spin dev environments (VS Code and JupyterLab), and also run workflow locally if needed.
+> **Note:**
+> You can use the `dstack` CLI from both your IDE and your CI/CD pipelines.
+> 
+> For debugging purposes, you can run workflow locally, or attach to them interactive dev environments (e.g. VS Code, 
+and JupyterLab).
 
 ## How does it work?
 
@@ -147,8 +148,9 @@ wet-insect-1      train     1 weeks ago  peterschmidt85  Running
 
 ## More information
 
- * [Docs](https://docs.dstack.ai)
- * [GitHub Issues](https://github.com/dstackai/dstack/issues)
+ * [Docs](https://docs.dstack.ai/tutorials/quickstart)
+ * [Examples](https://docs.dstack.ai/examples)
+ * [Quickstart](https://docs.dstack.ai/tutorials/quickstart) 
  * [Slack](https://join.slack.com/t/dstackai/shared_invite/zt-xdnsytie-D4qU9BvJP8vkbkHXdi6clQ)
  * [Newsletter](https://dstack.curated.co/)
  * [Twitter](https://twitter.com/dstackai)

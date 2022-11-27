@@ -111,16 +111,16 @@ nav:
   - Docs:
     - Getting started:
         - Overview: index.md
+        - Examples: examples/index.md
         - Installation: installation.md
         - Quickstart: tutorials/quickstart.md
-        - Examples: examples/index.md
     - Reference:
         - CLI: reference/cli/index.md
         - Providers: reference/providers/index.md
     - Community:
         - Slack chat: https://join.slack.com/t/dstackai/shared_invite/zt-xdnsytie-D4qU9BvJP8vkbkHXdi6clQ
-        - GitHub Issues: https://mlopsfluff.dstack.ai
+        - GitHub Issues: https://github.com/dstackai/dstack/issues
     - Releases:
         - Changelog: https://github.com/dstackai/dstack/releases
         - Newsletter: https://dstack.curated.co/
-#  - Newsletter: https://dstack.curated.co/
+  - Newsletter: https://dstack.curated.co/
