@@ -14,6 +14,10 @@ def get_version():
         sys.exit("Can't parse version.py")
 
 
+def get_long_description():
+    return re.sub(r"<picture>\s*|<source[^>]*>\s*|\s*</picture>|<video[^>]*>\s*|</video>\s*|### Demo\s*", "", open("README.md").read())
+
+
 setup(
     name="dstack",
     version=get_version(),
@@ -31,7 +35,7 @@ setup(
         "Source": "https://github.com/dstackai/dstack",
     },
     description="An open-source tool for teams to build reproducible ML workflows",
-    long_description=re.sub(r"<picture>|</picture>|<source[^>]*>", "", open("README.md").read()),
+    long_description=get_long_description(),
     long_description_content_type="text/markdown",
     python_requires=">=3.7",
     install_requires=[
