@@ -1,7 +1,10 @@
 <div align="center">
 <h1 align="center">
   <a target="_blank" href="https://dstack.ai">
-    <img align="center" src="https://raw.githubusercontent.com/dstackai/dstack/master/docs/assets/logo.svg" width="400px"/>
+    <picture>
+      <source media="(prefers-color-scheme: dark)" srcset="https://raw.githubusercontent.com/dstackai/dstack/master/docs/assets/logo-dark.svg"/>
+      <img alt="dstack" src="https://raw.githubusercontent.com/dstackai/dstack/master/docs/assets/logo.svg" width="400px"/>
+    </picture>
   </a>
 </h1>
 
@@ -34,7 +37,6 @@ Reproducible ML workflows for teams
 * **Reusable artifacts:** Save data, models, and environment as workflows artifacts, and reuse them across projects.
 * **Built-in containers:** Workflow containers are pre-built with Conda, Python, etc. No Docker is needed.
 
-> **Note:**
 > You can use the `dstack` CLI from both your IDE and your CI/CD pipelines.
 > 
 > For debugging purposes, you can run workflow locally, or attach to them interactive dev environments (e.g. VS Code, 
