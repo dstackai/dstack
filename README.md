@@ -1,10 +1,7 @@
 <div align="center">
 <h1 align="center">
   <a target="_blank" href="https://dstack.ai">
-    <picture>
-      <source media="(prefers-color-scheme: dark)" srcset="https://raw.githubusercontent.com/dstackai/dstack/master/docs/assets/logo-dark.svg"/>
-      <img alt="dstack" src="https://raw.githubusercontent.com/dstackai/dstack/master/docs/assets/logo.svg" width="400px"/>
-    </picture>
+    <img alt="dstack" src="https://raw.githubusercontent.com/dstackai/dstack/master/docs/assets/logo.svg" width="400px"/>
   </a>
 </h1>
 
@@ -39,8 +36,8 @@ Reproducible ML workflows for teams
 
 > You can use the `dstack` CLI from both your IDE and your CI/CD pipelines.
 > 
-> For debugging purposes, you can run workflow locally, or attach to them interactive dev environments (e.g. VS Code, 
-and JupyterLab).
+> For debugging purposes, you can run workflow locally, or attach to them interactive dev environments (e.g. VS Code,
+> and JupyterLab).
 
 ## How does it work?
 
