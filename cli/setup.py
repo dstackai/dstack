@@ -30,8 +30,8 @@ setup(
     project_urls={
         "Source": "https://github.com/dstackai/dstack",
     },
-    description="A command-line utility to provision infrastructure for ML workflows",
-    long_description=open("README.md").read(),
+    description="An open-source tool for teams to build reproducible ML workflows",
+    long_description=re.sub(r"<picture>|</picture>|<source[^>]*>", "", open("README.md").read()),
     long_description_content_type="text/markdown",
     python_requires=">=3.7",
     install_requires=[
