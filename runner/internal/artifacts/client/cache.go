@@ -267,7 +267,11 @@ func (c *Copier) Download(ctx context.Context, bucket, remote, local string) {
 					errorFound.Store(true)
 				}
 			}()
-
+			err = theFile.Chmod(0777)
+			if err != nil {
+				log.Error(ctx, "Set file permission to execute for deps", "err", err)
+				errorFound.Store(true)
+			}
 			log.Trace(ctx, "Download file", "path", theFilePath)
 			var size int64
 			if file.Size < c.pb.size() {
