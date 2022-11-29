@@ -67,7 +67,7 @@ Use pip to install `dstack` locally:
 pip install dstack
 ```
 
-The `dstack` CLI needs your AWS account credentials to be configured locally 
+The `dstack` CLI needs your AWS account credentials to be configured locally.
 (e.g. in `~/.aws/credentials` or `AWS_ACCESS_KEY_ID` and `AWS_SECRET_ACCESS_KEY` environment variables).
 
 Before you can use the `dstack` CLI, you need to configure it:
@@ -94,30 +94,65 @@ from where to load the data, how to store output artifacts, and what compute res
 needed to run it.
 
 ```yaml
-workflows: 
-  - name: train
+workflows:
+  - name: download
+    help: "Download the MNIST dataset"
     provider: bash
+    commands:
+      - pip install -r requirements.txt
+      - python mnist/download.py
+    artifacts:
+      - path: data
+
+  - name: train
+    help: "Train a MNIST model"
     deps:
       - tag: mnist_data
+    provider: bash
     commands:
-      - pip install requirements.txt
-      - python src/train.py
-    artifacts: 
-      - path: ./checkpoint
-    resources:
-      interruptible: true
-      gpu: 1
+      - pip install -r requirements.txt
+      - python mnist/train.py
+    artifacts:
+      - path: lightning_logs
 ```
 
 Use `deps` to add artifacts of other workflows as dependencies. You can refer to other 
 workflows via the name of the workflow, or via the name of the tag. 
 
-**Step 2:** Run the workflow via `dstack run`:
+**Step 2:** Init repo
+Before you can use dstack on a new Git repo, you have to run the dstack init command:
 
+```shell
+dstack init
+```
+It will ensure that dstack has the access to the Git repo.
+
+
+**Step 3:** Run download workflow and command to see the status of runs.
+Now, you can use the dstack run command to run the download workflow:
+
+```shell
+dstack run download
+```
+- Note: Add `-l` flag to run your workflow locally (instead of provisioning infrastructure in the cloud)
+
+When you run a workflow, the CLI provisions infrastructure, prepares environment, fetches your code, etc.
+Once the workflow is finished, its artifacts are saved and infrastructure is torn down.
+
+```shell
+dstack ps
+dstack artifacts list <artifact-name>
+```
+
+**Step 4:** Add tag:
+```shell
+dstack tags add mnist_data <artifact-name>
+```
+
+**Step 5:** Run train workflow:
 ```shell
 dstack run train
 ```
-
 It will automatically provision the required compute resource, and run the workflow. You'll see the output in real-time:
 
 ```shell
@@ -136,17 +171,12 @@ val_acc       0.965399980545044
 val_loss      0.10975822806358337
 ```
 
-**Step 3:** Use the `dstack ps` command to see the status of runs.
-
+**Step 6:** Download artifacts:
 ```shell
-dstack ps -a
-
-RUN               TARGET    SUBMITTED    OWNER           STATUS   TAG
-angry-elephant-1  download  8 hours ago  peterschmidt85  Done     mnist_data
-wet-insect-1      train     1 weeks ago  peterschmidt85  Running  
+dstack artifacts download <artifact-name> .
 ```
 
-**Step 4:** Use other commands to manage runs, artifacts, tags, secrets, and more.
+**Step 7:** Use other commands to manage runs, artifacts, tags, secrets, and more.
 
 ## More information
 
