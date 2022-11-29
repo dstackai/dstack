@@ -102,7 +102,7 @@ def config_func(_: Namespace):
     except ConfigError:
         pass
     profile_name = ask_profile_name(default_profile_name)
-    if not default_region_name:
+    if not default_region_name or default_profile_name != profile_name:
         try:
             my_session = boto3.session.Session(profile_name=profile_name)
             default_region_name = my_session.region_name
@@ -130,6 +130,8 @@ def ask_profile_name(default_profile_name):
     except Exception:
         pass
     if len(profiles) > 1:
+        if not default_profile_name:
+            default_profile_name = profiles[0]
         profile_name = ask_choice("Choose AWS profile", profiles, profiles, default_profile_name)
     elif len(profiles) == 1:
         profile_name = profiles[0]
