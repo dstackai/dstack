@@ -254,7 +254,7 @@ func (c *Copier) Download(ctx context.Context, bucket, remote, local string) {
 				// file exists
 				return
 			}
-			theFile, err := os.Create(theFilePath)
+			theFile, err := os.OpenFile(theFilePath, os.O_RDWR|os.O_CREATE|os.O_TRUNC, 0777)
 			if err != nil {
 				log.Error(ctx, "Create file", "err", err)
 				errorFound.Store(true)
@@ -281,11 +281,6 @@ func (c *Copier) Download(ctx context.Context, bucket, remote, local string) {
 				log.Error(ctx, "Download file", "err", err)
 				errorFound.Store(true)
 				return
-			}
-			err = theFile.Chmod(0777)
-			if err != nil {
-				log.Error(ctx, "Set file permission to execute for deps", "err", err)
-				errorFound.Store(true)
 			}
 			c.updateBars(file.Size)
 			return
