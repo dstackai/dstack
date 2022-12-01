@@ -347,14 +347,14 @@ func (s *S3) Secrets(ctx context.Context) (map[string]string, error) {
 	if err != nil {
 		return nil, gerrors.Wrap(err)
 	}
-	secrets := make([]string, 0, len(listSecrets))
+	secrets := make(map[string]string, 0)
 	for _, secretPath := range listSecrets {
 		clearName := strings.ReplaceAll(secretPath, templatePath, "")
-		secrets = append(secrets, fmt.Sprintf("%s/%s/%s/%s",
+		secrets[clearName] = fmt.Sprintf("%s/%s/%s/%s",
 			s.state.Job.RepoHostNameWithPort(),
 			s.state.Job.RepoUserName,
 			s.state.Job.RepoName,
-			clearName))
+			clearName)
 	}
 	return s.cliSecret.fetchSecret(ctx, s.bucket, secrets)
 }

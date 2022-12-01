@@ -31,14 +31,14 @@ func NewClientSecret(region string) *ClientSecret {
 	return c
 }
 
-func (sm *ClientSecret) fetchSecret(ctx context.Context, bucket string, secrets []string) (map[string]string, error) {
+func (sm *ClientSecret) fetchSecret(ctx context.Context, bucket string, secrets map[string]string) (map[string]string, error) {
 	result := make(map[string]string)
-	for _, secret := range secrets {
+	for secret, secretPath := range secrets {
 		value, err := sm.cli.GetSecretValue(ctx, &secretsmanager.GetSecretValueInput{
-			SecretId: aws.String(fmt.Sprintf("/dstack/%s/secrets/%s", bucket, secret)),
+			SecretId: aws.String(fmt.Sprintf("/dstack/%s/secrets/%s", bucket, secretPath)),
 		})
 		if err != nil {
-			log.Error(ctx, "Fetching value secret S3", "bucket", bucket, "secret", secret, "err", err)
+			log.Error(ctx, "Fetching value secret S3", "bucket", bucket, "secret", secret, "secret_path", secretPath, "err", err)
 			return nil, gerrors.Wrap(err)
 		}
 		result[secret] = aws.StringValue(value.SecretString)
