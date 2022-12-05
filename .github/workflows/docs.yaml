@@ -2,9 +2,6 @@ name: Deploy Docs
 
 on:
   workflow_dispatch:
-  create:
-    tags:
-      - '*'
 
 jobs:
   docs-deploy:
