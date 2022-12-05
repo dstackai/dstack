@@ -12,7 +12,7 @@ from dstack import version
 from dstack.aws import jobs, logs, local
 from dstack.backend import InstanceType, RequestStatus, RequestHead
 from dstack.jobs import Job, JobStatus, Requirements
-from dstack.repo import RepoAddress
+from dstack.repo import RepoAddress, RepoData, _repo_address_path
 from dstack.runners import Resources, Runner, Gpu
 
 CREATE_INSTANCE_RETRY_RATE_SECS = 3
@@ -443,7 +443,9 @@ def _get_ami_image(ec2_client: BaseClient, cuda: bool, _version: Optional[str] =
 
 
 def _run_instance(ec2_client: BaseClient, iam_client: BaseClient, bucket_name: str, region_name: str,
-                  subnet_id: Optional[str], runner_id: str, instance_type: InstanceType) -> str:
+                  subnet_id: Optional[str], runner_id: str, instance_type: InstanceType,
+                  local_repo_user_name: Optional[str], local_repo_user_email: Optional[str],
+                  repo_address: RepoAddress) -> str:
     launch_specification = {}
     if not version.__is_release__:
         launch_specification["KeyName"] = "stgn_dstack"
@@ -466,6 +468,30 @@ def _run_instance(ec2_client: BaseClient, iam_client: BaseClient, bucket_name: s
         ]
     else:
         launch_specification["SecurityGroupIds"] = [get_security_group_id(ec2_client, bucket_name, subnet_id)]
+    tags = [
+        {
+            "Key": "owner",
+            "Value": "dstack"
+        },
+        {
+            "Key": "dstack_bucket",
+            "Value": bucket_name
+        },
+        {
+            "Key": "dstack_repo",
+            "Value": _repo_address_path(repo_address)
+        },
+    ]
+    if local_repo_user_name:
+        tags.append({
+            "Key": "dstack_user_name",
+            "Value": local_repo_user_name
+        })
+    if local_repo_user_email:
+        tags.append({
+            "Key": "dstack_user_email",
+            "Value": local_repo_user_email
+        })
     response = ec2_client.run_instances(
         BlockDeviceMappings=[
             {
@@ -487,50 +513,35 @@ def _run_instance(ec2_client: BaseClient, iam_client: BaseClient, bucket_name: s
         TagSpecifications=[
             {
                 "ResourceType": "instance",
-                "Tags": [
-                    {
-                        "Key": "owner",
-                        "Value": "dstack"
-                    },
-                    {
-                        "Key": "dstack_bucket",
-                        "Value": bucket_name
-                    },
-                ],
+                "Tags": tags,
             },
         ],
         **launch_specification
     )
     if instance_type.resources.interruptible:
         request_id = response["Instances"][0]["SpotInstanceRequestId"]
-        ec2_client.create_tags(Resources=[request_id], Tags=[
-            {
-                "Key": "owner",
-                "Value": "dstack"
-            },
-            {
-                "Key": "dstack_bucket",
-                "Value": bucket_name
-            },
-        ])
+        ec2_client.create_tags(Resources=[request_id], Tags=tags)
     else:
         request_id = response["Instances"][0]["InstanceId"]
     return request_id
 
 
 def _run_instance_retry(ec2_client: BaseClient, iam_client: BaseClient, bucket_name: str, region_name: str,
-                        subnet_id: Optional[str], runner_id: str, instance_type: InstanceType, attempts: int = 3) \
+                        subnet_id: Optional[str], runner_id: str, instance_type: InstanceType,
+                        local_repo_user_name: Optional[str], local_repo_user_email: Optional[str],
+                        repo_address: RepoAddress, attempts: int = 3) \
         -> str:
     try:
         return _run_instance(ec2_client, iam_client, bucket_name, region_name, subnet_id, runner_id,
-                             instance_type)
+                             instance_type, local_repo_user_name, local_repo_user_email, repo_address)
     except Exception as e:
         if hasattr(e, "response") and e.response.get("Error") and e.response["Error"].get(
                 "Code") == "InvalidParameterValue":
             if attempts > 0:
                 time.sleep(CREATE_INSTANCE_RETRY_RATE_SECS)
                 return _run_instance_retry(ec2_client, iam_client, bucket_name, region_name, subnet_id, runner_id,
-                                           instance_type, attempts - 1)
+                                           instance_type, local_repo_user_name, local_repo_user_email, repo_address,
+                                           attempts - 1)
             else:
                 raise Exception("Failed to retry", e)
         else:
@@ -560,7 +571,8 @@ def run_job(logs_client: BaseClient, ec2_client: BaseClient, iam_client: BaseCli
                 _create_runner(logs_client, s3_client, bucket_name, runner)
                 if instance_type:
                     runner.request_id = _run_instance_retry(ec2_client, iam_client, bucket_name, region_name, subnet_id,
-                                                            job.runner_id, instance_type)
+                                                            job.runner_id, instance_type, job.local_repo_user_name,
+                                                            job.local_repo_user_email, job.repo_address)
                 else:
                     job.status = JobStatus.FAILED
                     job.request_id = runner.request_id
