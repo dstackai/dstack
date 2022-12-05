@@ -3,6 +3,7 @@ FROM dstackai/cuda:11.1-base-ubuntu20.04
 ARG PYTHON
 ENV PYTHON=$PYTHON
 ENV LANG=C.UTF-8 LC_ALL=C.UTF-8
+ENV PIP_ROOT_USER_ACTION=ignore
 
 RUN apt-key adv --fetch-keys https://developer.download.nvidia.com/compute/cuda/repos/ubuntu2004/x86_64/3bf863cc.pub &&  \
     apt-get update --fix-missing && \

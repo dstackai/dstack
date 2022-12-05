@@ -3,6 +3,7 @@ FROM ubuntu:20.04
 ARG PYTHON
 ENV PYTHON=$PYTHON
 ENV LANG=C.UTF-8 LC_ALL=C.UTF-8
+ENV PIP_ROOT_USER_ACTION=ignore
 
 RUN apt-get update --fix-missing && \
     apt upgrade -y && \
