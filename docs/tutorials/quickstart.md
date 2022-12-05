@@ -13,11 +13,11 @@ git clone https://github.com/dstackai/dstack-examples.git
 cd dstack-examples
 ```
 
-If you open the `.dstack/workflows.yaml` file inside the project, you'll see the following:
+If you open the `.dstack/workflows/mnist.yaml` file inside the project, you'll see the following:
 
 ```yaml
 workflows:
-  - name: download
+  - name: mnist-download
     provider: bash
     commands:
       - pip install -r requirements.txt
@@ -25,7 +25,7 @@ workflows:
     artifacts:
       - path: ./data
 
-  - name: train
+  - name: mnist-train
     deps:
       - tag: mnist_data
     provider: bash
@@ -36,9 +36,9 @@ workflows:
       - path: ./lightning_logs
 ```
 
-The `download` workflow downloads the dataset to the `data` folder and saves it as an artifact.
+The `mnist-download` workflow downloads the dataset to the `data` folder and saves it as an artifact.
 
-The `train` workflow uses the data from the `mnist_data` tag to train a model. 
+The `mnist-train` workflow uses the data from the `mnist_data` tag to train a model. 
 
 It writes checkpoints and logs within the `lightning_logs` folder, and saves it as an artifact.
 
@@ -54,10 +54,10 @@ It will ensure that `dstack` has the access to the Git repo.
 
 ## Run download workflow
 
-Now, you can use the [`dstack run`](../reference/cli/index.md#dstack-run) command to run the `download` workflow:
+Now, you can use the [`dstack run`](../reference/cli/index.md#dstack-run) command to run the `mnist-download` workflow:
 
 ```shell
-dstack run download
+dstack run mnist-download
 ```
 
 When you run a workflow, the CLI provisions infrastructure, prepares environment, fetches your code,
@@ -66,8 +66,8 @@ etc.
 You'll see the output in real-time as your workflow is running.
 
 ```
-RUN             WORKFLOW  SUBMITTED  OWNER           STATUS     TAG 
-grumpy-zebra-1  download  now        peterschmidt85  Submitted  
+RUN             WORKFLOW        SUBMITTED  OWNER           STATUS     TAG 
+grumpy-zebra-1  mnist-download  now        peterschmidt85  Submitted  
  
 Provisioning... It may take up to a minute. ✓
 
@@ -90,7 +90,7 @@ Once the workflow is finished, its artifacts are saved and infrastructure is tor
     use the `--local` argument (or `-l` for shorter).
 
     ```bash
-    dstack run download -l
+    dstack run mnist-download -l
     ```
 
     Running workflows locally requires Docker or [NVIDIA Docker](https://github.com/NVIDIA/nvidia-docker) 
@@ -105,8 +105,8 @@ dstack ps
 It shows currently running workflows or the last finished one. 
 
 ```shell
-RUN             WORKFLOW  SUBMITTED  OWNER           STATUS  TAG 
-grumpy-zebra-1  download  a min ago  peterschmidt85  Done    
+RUN             WORKFLOW        SUBMITTED  OWNER           STATUS  TAG 
+grumpy-zebra-1  mnist-download  a min ago  peterschmidt85  Done    
 ```
 
 To see all workflows, use the `dstack ps -a` command. 
@@ -162,17 +162,17 @@ dstack artifacts list :mnist_data
 
 ## Run train workflow
 
-Now that the `mnist_data` tag is added, we can run the `train` workflow.
+Now that the `mnist_data` tag is added, we can run the `mnist-train` workflow.
 
 ```shell
-dstack run train
+dstack run mnist-train
 ```
 
-On the start of the `train` workflow, dstack will download the artifacts of the tag `mnist_data` to the working directory.
+On the start of the `mnist-train` workflow, dstack will download the artifacts of the tag `mnist_data` to the working directory.
 
 ```shell
-RUN            WORKFLOW  SUBMITTED  OWNER           STATUS     TAG 
-wet-mangust-2  train     now        peterschmidt85  Submitted  
+RUN            WORKFLOW     SUBMITTED  OWNER           STATUS     TAG 
+wet-mangust-2  mnist-train  now        peterschmidt85  Submitted  
 
 Povisioning... It may take up to a minute. ✓
 
@@ -189,7 +189,7 @@ val_loss      0.10975822806358337
 
 ## Download artifacts
 
-Once the `train` workflow is finished, if you want, you can download its artifacts using 
+Once the `mnist-train` workflow is finished, if you want, you can download its artifacts using 
 the [`dstack artifacts download`](../reference/cli/index.md#dstack-artifacts-download) command.
 
 ```shell

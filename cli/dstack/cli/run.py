@@ -33,15 +33,25 @@ POLL_FINISHED_STATE_RATE_SECS = 1
 
 
 def _load_workflows():
+    workflows = []
     root_folder = Path(os.getcwd()) / ".dstack"
     if root_folder.exists():
         workflows_file = root_folder / "workflows.yaml"
         if workflows_file.exists():
-            return yaml.load(workflows_file.open(), Loader=yaml.FullLoader)
-        else:
-            return None
-    else:
-        return None
+            workflows.extend(_load_workflows_from_file(workflows_file))
+        workflows_dir = root_folder / "workflows"
+        if workflows_dir.is_dir():
+            for workflows_file in os.listdir(workflows_dir):
+                workflows_file_path = workflows_dir / workflows_file
+                if workflows_file_path.name.endswith(".yaml") or workflows_file_path.name.endswith(".yml"):
+                    workflows.extend(_load_workflows_from_file(workflows_file_path))
+    return workflows
+
+
+def _load_workflows_from_file(workflows_file: Path) -> List[Any]:
+    workflows_yaml = yaml.load(workflows_file.open(), Loader=yaml.FullLoader)
+    validate(workflows_yaml, yaml.load(workflows_schema_yaml, Loader=yaml.FullLoader))
+    return workflows_yaml.get("workflows") or []
 
 
 def parse_run_args(args: Namespace) -> Tuple[str, List[str], Optional[str], Dict[str, Any]]:
@@ -49,10 +59,7 @@ def parse_run_args(args: Namespace) -> Tuple[str, List[str], Optional[str], Dict
     workflow_name = None
     workflow_data = {}
 
-    workflows_yaml = _load_workflows()
-    workflows = (workflows_yaml.get("workflows") or []) if workflows_yaml is not None else []
-    if workflows:
-        validate(workflows_yaml, yaml.load(workflows_schema_yaml, Loader=yaml.FullLoader))
+    workflows = _load_workflows()
     workflow_names = [w.get("name") for w in workflows]
     workflow_providers = {w.get("name"): w.get("provider") for w in workflows}
 
@@ -173,8 +180,7 @@ def poll_logs_ws(backend: Backend, repo_address: RepoAddress,
 def run_workflow_func(args: Namespace):
     if not args.workflow_or_provider:
         print("Usage: dstack run [-h] WORKFLOW [-d] [-l] [-t TAG] [OPTIONS ...] [ARGS ...]\n")
-        workflows_yaml = _load_workflows()
-        workflows = (workflows_yaml or {}).get("workflows") or []
+        workflows = _load_workflows()
         workflow_names = [w["name"] for w in workflows if w.get("name")]
         print(f'Positional arguments:\n'
               f'  WORKFLOW              {{{",".join(workflow_names)}}}\n')
@@ -218,7 +224,8 @@ def run_workflow_func(args: Namespace):
         except InvalidGitRepositoryError:
             sys.exit(f"{os.getcwd()} is not a Git repo")
         except ValidationError as e:
-            sys.exit(f"There a syntax error in {os.getcwd()}/.dstack/workflows.yaml:\n\n{e}")
+            sys.exit(
+                f"There a syntax error in one of the files inside the {os.getcwd()}/.dstack/workflows directory:\n\n{e}")
 
 
 def register_parsers(main_subparsers):

@@ -4,7 +4,7 @@
 
 Let's start from the very beginning: a workflow that prints `"Hello, world"`.  
 
-Go ahead, and create the `.dstack/workflows.yaml` file in your project directory:
+Go ahead, and create the `.dstack/workflows/hello.yaml` file in your project directory:
 
 ```yaml
 workflows:
@@ -39,7 +39,7 @@ The [`bash`](../reference/providers/index.md#bash), [`code`](../reference/provid
 [`lab`](../reference/providers/index.md#lab), and [`notebook`](../reference/providers/index.md#notebook) providers
 come with Python and Conda pre-installed.
 
-Create the `.dstack/workflows.yaml` and `hello.py` files in your project directory:
+Inside the `.dstack/workflows/hello.yaml` file, define the following workflow:
 
 ```yaml
 workflows:
@@ -48,6 +48,13 @@ workflows:
     commands:
       - python hello.py
 ```
+
+Then, create the `hello.py` Python script:
+
+```python
+print("Hello, world!")
+```
+
 
 Now, use the `dstack run` command to run it:
 
@@ -234,7 +241,7 @@ workflows:
 
 ### Override resources via CLI
 
-Resources can be configured not only through `.dstack/workflows.yaml` but
+Resources can be configured not only through the YAML file but
 also via the `dstack run` command.
 
 The following command that runs the `hello` workflow using interruptible instances with 4 GPUs:
@@ -413,7 +420,7 @@ workflows:
 
 Workflows can be parametrized. 
 
-When you pass any parameters to the `dstack run` command, they can be accessed from the `.dstack/workflows.yaml` file via
+When you pass any parameters to the `dstack run` command, they can be accessed from the workflow YAML file via
 the `${{ run.args }}` expression. 
 
 Here's an example:

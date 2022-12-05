@@ -4,17 +4,20 @@ title: Reproducible ML workflows for teams
 
 # Reproducible ML workflows for teams
 
-## Welcome to dstack
+## Introduction to dstack
 
-`dstack` helps teams run ML workflow in a configured cloud, manage dependencies, and version data.
+`dstack` allows you to define your ML workflows as code, and run them in a configured cloud via the CLI. 
+It takes care of managing workflow dependencies, provisioning cloud infrastructure, and versioning data.
 
 ### Features
 
-* **Workflows as code:** Define your ML workflows as code, and run them in a configured cloud via the command-line.
+* **Workflows as code:** Define your ML workflows as code, and run them in a configured cloud via a single CLI command.
 * **Reusable artifacts:** Save data, models, and environment as workflows artifacts, and reuse them across projects.
 * **Built-in containers:** Workflow containers are pre-built with Conda, Python, etc. No Docker is needed.
 
 !!! info "NOTE:"
+    The `dstack` CLI automatically tracks your current Git revision and uncommitted local changed.
+
     You can use the `dstack` CLI from both your IDE and your CI/CD pipelines.
 
     For debugging purposes, you can run workflow locally, or attach to them interactive dev environments (e.g. VS Code, 
@@ -24,7 +27,7 @@ title: Reproducible ML workflows for teams
 
 1. Install `dstack` CLI locally 
 2. Configure the cloud credentials locally (e.g. via `~/.aws/credentials`)
-3. Define ML workflows in `.dstack/workflows.yaml` (within your existing Git repository)
+3. Define ML workflows in YAML files inside the `.dstack/workflows` directory (within your project)
 4. Run ML workflows via the `dstack run` CLI command
 5. Use other `dstack` CLI commands to manage runs, artifacts, etc.
 
@@ -41,13 +44,13 @@ saves artifacts, and tears down compute resources.
 Set your first ML workflows up and running should take 30 min or less.
 
 <div class="grid cards" markdown>
-- [**1. Explore examples**
+- [**1. Examples**
    Browse the featured examples of what you can do with `dstack`.](examples)
-- [**2. Install the CLI** 
+- [**2. Installation** 
    Install and configure the `dstack` CLI in no time.](installation.md)
-- [**3. Follow quickstart**
+- [**3. Quickstart**
    Try `dstack` yourself by following a simple step-by-step tutorial.](tutorials/quickstart.md)
-- [**4. Join our community**
+- [**4. Slack**
    Join our Slack chat to get support and hear about announcements.
   ](https://join.slack.com/t/dstackai/shared_invite/zt-xdnsytie-D4qU9BvJP8vkbkHXdi6clQ)
 </div>

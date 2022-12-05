@@ -12,7 +12,7 @@ def default_func(_: Namespace):
           "COMMAND [grey53][ARGS ...][/grey53][/bold]\n"
           "\n"
           "Not sure where to start? Call [yellow bold]dstack config[/yellow bold], followed by [yellow bold]dstack init[/yellow bold].\n"
-          "Define workflows in [bold].dstack/workflows.yaml[/bold] and run them via [bold]dstack run[/bold].\n"
+          "Define workflows within [bold].dstack/workflows[/bold] and run them via [bold]dstack run[/bold].\n"
           "\n"
           "Main commands:\n"
           "  [bold]dstack run WORKFLOW [grey53][-d] [-l] [-t TAG] [ARGS ...][/grey53][/bold]      Run a workflow\n"

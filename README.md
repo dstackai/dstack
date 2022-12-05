@@ -13,7 +13,8 @@ Reproducible ML workflows for teams
 </h3>
 
 <p align="center">
-<code>dstack</code> helps teams run ML workflow in a configured cloud, manage dependencies, and version data.
+<code>dstack</code>  allows you to define your ML workflows as code, and run them in a configured cloud via the CLI. 
+It takes care of managing workflow dependencies, provisioning cloud infrastructure, and versioning data.
 </p>
 
 [![Slack](https://img.shields.io/badge/slack-chat%20with%20us-blueviolet?logo=slack&style=for-the-badge)](https://join.slack.com/t/dstackai/shared_invite/zt-xdnsytie-D4qU9BvJP8vkbkHXdi6clQ)
@@ -33,10 +34,12 @@ Reproducible ML workflows for teams
 
 ### Features
 
-* **Workflows as code:** Define your ML workflows as code, and run them in a configured cloud via the command-line.
+* **Workflows as code:** Define your ML workflows as code, and run them in a configured cloud via a single CLI command.
 * **Reusable artifacts:** Save data, models, and environment as workflows artifacts, and reuse them across projects.
 * **Built-in containers:** Workflow containers are pre-built with Conda, Python, etc. No Docker is needed.
 
+> The `dstack` CLI automatically tracks your current Git revision and uncommitted local changed.
+>
 > You can use the `dstack` CLI from both your IDE and your CI/CD pipelines.
 > 
 > For debugging purposes, you can run workflow locally, or attach to them interactive dev environments (e.g. VS Code, 
@@ -46,7 +49,7 @@ and JupyterLab).
 
 1. Install `dstack` CLI locally 
 2. Configure the cloud credentials locally (e.g. via `~/.aws/credentials`)
-3. Define ML workflows in `.dstack/workflows.yaml` (within your existing Git repository)
+3. Define ML workflows in `.dstack/workflows` (within your existing Git repository)
 4. Run ML workflows via the `dstack run` CLI command
 5. Use other `dstack` CLI commands to manage runs, artifacts, etc.
 
@@ -89,7 +92,7 @@ EC2 subnet: none
 
 ## Usage example
 
-**Step 1:** Create a `.dstack/workflows.yaml` file, and define there how to run the script, 
+**Step 1:** Create a `.dstack/mnist.yaml` file, and define there how to run the script, 
 from where to load the data, how to store output artifacts, and what compute resources are
 needed to run it.
 
@@ -141,7 +144,7 @@ val_loss      0.10975822806358337
 ```shell
 dstack ps -a
 
-RUN               TARGET    SUBMITTED    OWNER           STATUS   TAG
+RUN               WORKFLOW  SUBMITTED    OWNER           STATUS   TAG
 angry-elephant-1  download  8 hours ago  peterschmidt85  Done     mnist_data
 wet-insect-1      train     1 weeks ago  peterschmidt85  Running  
 ```

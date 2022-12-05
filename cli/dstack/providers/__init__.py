@@ -317,7 +317,7 @@ class Provider:
             resources = Requirements()
             if self.provider_data["resources"].get("cpu"):
                 if not str(self.provider_data["resources"]["cpu"]).isnumeric():
-                    sys.exit("resources.cpu in workflows.yaml should be an integer")
+                    sys.exit("resources.cpu should be an integer")
                 cpu = int(self.provider_data["resources"]["cpu"])
                 if cpu > 0:
                     resources.cpus = cpu
@@ -343,7 +343,7 @@ class Provider:
             for resource_name in self.provider_data["resources"]:
                 if resource_name.endswith("/gpu") and len(resource_name) > 4:
                     if not str(self.provider_data["resources"][resource_name]).isnumeric():
-                        sys.exit(f"resources.'{resource_name}' in workflows.yaml should be an integer")
+                        sys.exit(f"resources.'{resource_name}' should be an integer")
                     gpu = int(self.provider_data["resources"][resource_name])
                     if gpu > 0:
                         resources.gpus = GpusRequirements(gpu, name=resource_name[:-4])

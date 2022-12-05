@@ -1,7 +1,9 @@
 # Providers
 
-Workflows can be defined in the `.dstack/workflows.yaml` file within project.
-Each provider may have its own syntax. Below, you'll find the reference for each provider.
+Workflows can be defined in the `.dstack/workflows` directory within your project. Within your project,
+you may have multiple workflow files.
+
+Each workflow must specify a provider. Each provider may have its own syntax. Below, you'll find the reference for each provider.
 
 ## bash
 
@@ -12,6 +14,8 @@ It comes with Python and Conda pre-installed, and allows to expose ports.
 If GPU is requested, the provider pre-installs the CUDA driver too.
 
 ### Usage example
+
+Inside the `.dstack/workflows` directory within your project, create the following `bash-example.yaml` file:
 
 ```yaml
 workflows:
@@ -28,6 +32,12 @@ workflows:
     resources:
       interruptible: true
       gpu: 1
+```
+
+To run this workflow, use the following command:
+
+```shell
+dstack run train
 ```
 
 ### Properties reference
@@ -111,6 +121,8 @@ If GPU is requested, the provider pre-installs the CUDA driver too.
 
 ### Usage example 
 
+Inside the `.dstack/workflows` directory within your project, create the following `code-example.yaml` file:
+
 ```yaml
 workflows:
   - name: ide
@@ -120,6 +132,12 @@ workflows:
     resources:
       interruptible: true
       gpu: 1
+```
+
+To run this workflow, use the following command:
+
+```shell
+dstack run ide
 ```
 
 ### Properties reference
@@ -179,7 +197,9 @@ It comes with Python and Conda pre-installed, and allows to expose ports.
 
 If GPU is requested, the provider pre-installs the CUDA driver too. 
 
-### Usage example 
+### Usage example
+
+Inside the `.dstack/workflows` directory within your project, create the following `lab-example.yaml` file:
 
 ```yaml
 workflows:
@@ -190,6 +210,12 @@ workflows:
     resources:
       interruptible: true
       gpu: 1
+```
+
+To run this workflow, use the following command:
+
+```shell
+dstack run ide-lab
 ```
 
 ### Properties reference
@@ -251,15 +277,21 @@ If GPU is requested, the provider pre-installs the CUDA driver too.
 
 ### Usage example 
 
+Inside the `.dstack/workflows` directory within your project, create the following `notebook-example.yaml` file:
+
 ```yaml
 workflows:
   - name: ide-notebook
     provider: notebook
-    artifacts: 
-      - path: ./output
     resources:
       interruptible: true
       gpu: 1
+```
+
+To run this workflow, use the following command:
+
+```shell
+dstack run ide-notebook
 ```
 
 ### Properties reference
@@ -323,9 +355,11 @@ Docker image that has Conda and the CUDA driver pre-installed.
 
 ### Usage example 
 
+Inside the `.dstack/workflows` directory within your project, create the following `docker-example.yaml` file:
+
 ```yaml
 workflows:
-  - name: train
+  - name: hello-docker
     provider: docker
     image: ubuntu
     commands:
@@ -337,6 +371,12 @@ workflows:
       gpu:
         name: "K80"
         count: 1
+```
+
+To run this workflow, use the following command:
+
+```shell
+dstack run hello-docker
 ```
 
 ### Properties reference
