@@ -6,6 +6,8 @@ from argparse import ArgumentParser, Namespace
 from pkgutil import iter_modules
 from typing import Optional, List, Dict, Any, Union
 
+from jinja2 import Template
+
 from dstack.backend import load_backend, Backend
 from dstack.jobs import Job, JobStatus, JobSpec, Requirements, GpusRequirements, DepSpec, ArtifactSpec
 from dstack.repo import load_repo_data, RepoData, RepoAddress, _repo_address_path
@@ -41,6 +43,7 @@ class Provider:
         self.provider_args: Optional[List[str]] = None
         self.workflow_name: Optional[str] = None
         self.run_as_provider: Optional[bool] = None
+        self.run_name: Optional[str] = None
         self.dep_specs: Optional[List[DepSpec]] = None
         self.loaded = False
 
@@ -70,12 +73,55 @@ class Provider:
                      f"Supported versions: {str(supported_python_versions)}.")
         return python_version
 
-    def load(self, provider_args: List[str], workflow_name: Optional[str], provider_data: Dict[str, Any]):
+    def _inject_context(self):
+        class Args:
+            def __init__(self, args: List[str]) -> None:
+                super().__init__()
+                self.args = args
+
+            def __str__(self):
+                _str = ""
+                for arg in self.args:
+                    if _str:
+                        _str += " "
+                    if ' ' in arg:
+                        _str += '"' + arg.replace('"', '\\"') + '"'
+                    else:
+                        _str += arg
+                return _str
+
+        class Run:
+            def __init__(self, name: str, args: Args) -> None:
+                super().__init__()
+                self.name = name
+                self.args = args
+
+        run = Run(self.run_name, Args(self.provider_data.get("run_args") or []))
+        self.provider_data = self._inject_context_recursively(self.provider_data, run=run)
+
+    @staticmethod
+    def _inject_context_recursively(obj: Any, **kwargs: Any) -> Any:
+        if isinstance(obj, str):
+            return Template(obj, variable_start_string="${{").render(**kwargs)
+        elif isinstance(obj, dict):
+            d = {}
+            for k in obj:
+                d[k] = Provider._inject_context_recursively(obj[k], **kwargs)
+            return d
+        elif isinstance(obj, list):
+            return [Provider._inject_context_recursively(item, **kwargs) for item in obj]
+        else:
+            return obj
+
+    def load(self, provider_args: List[str], workflow_name: Optional[str], provider_data: Dict[str, Any],
+             run_name: str):
         self.provider_args = provider_args
         self.workflow_name = workflow_name
         self.provider_data = provider_data
         self.run_as_provider = not workflow_name
+        self.run_name = run_name
         self.parse_args()
+        self._inject_context()
         self.dep_specs = self._dep_specs()
         self.loaded = True
 
@@ -109,7 +155,7 @@ class Provider:
         parser.add_argument("--gpu-memory", metavar="SIZE", type=str)
         parser.add_argument("--shm-size", metavar="SIZE", type=str)
 
-    def _parse_base_args(self, args: Namespace):
+    def _parse_base_args(self, args: Namespace, unknown_args):
         if args.requirements:
             self.provider_data["requirements"] = args.requirements
         if args.artifacts:
@@ -149,11 +195,13 @@ class Provider:
                 resources["interruptible"] = True
             if args.local:
                 resources["local"] = True
+        if unknown_args:
+            self.provider_data["run_args"] = unknown_args
 
     def parse_args(self):
         pass
 
-    def submit_jobs(self, run_name: str, tag_name: str) -> List[Job]:
+    def submit_jobs(self, tag_name: str) -> List[Job]:
         if not self.loaded:
             raise Exception("The provider is not loaded")
         job_specs = self.create_job_specs()
@@ -164,7 +212,7 @@ class Provider:
         counter = []
         for job_spec in job_specs:
             submitted_at = int(round(time.time() * 1000))
-            job = Job(None, repo_data, run_name, self.workflow_name or None, self.provider_name,
+            job = Job(None, repo_data, self.run_name, self.workflow_name or None, self.provider_name,
                       repo_data.local_repo_user_name, repo_data.local_repo_user_email, JobStatus.SUBMITTED,
                       submitted_at, job_spec.image_name, job_spec.commands, job_spec.env, job_spec.working_dir,
                       job_spec.artifact_specs, job_spec.port_count, None, None, job_spec.requirements, self.dep_specs,
@@ -172,7 +220,7 @@ class Provider:
             backend.submit_job(job, counter)
             jobs.append(job)
         if tag_name:
-            backend.add_tag_from_run(repo_data, tag_name, run_name, jobs)
+            backend.add_tag_from_run(repo_data, tag_name, self.run_name, jobs)
         return jobs
 
     def _dep_specs(self) -> Optional[List[DepSpec]]:

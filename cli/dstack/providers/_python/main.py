@@ -21,8 +21,8 @@ class PythonProvider(Provider):
         self.resources = None
         self.image_name = None
 
-    def load(self, provider_args: List[str], workflow_name: Optional[str], provider_data: Dict[str, Any]):
-        super().load(provider_args, workflow_name, provider_data)
+    def load(self, provider_args: List[str], workflow_name: Optional[str], provider_data: Dict[str, Any], run_name: str):
+        super().load(provider_args, workflow_name, provider_data, run_name)
         self.file = self.provider_data["file"]
         self.before_run = self.provider_data.get("before_run")
         self.version = self._safe_python_version("version")
@@ -45,7 +45,7 @@ class PythonProvider(Provider):
     def parse_args(self):
         parser = self._create_parser(self.workflow_name)
         args, unknown_args = parser.parse_known_args(self.provider_args)
-        self._parse_base_args(args)
+        self._parse_base_args(args, unknown_args)
         if self.run_as_provider:
             self.provider_data["file"] = args.file
             _args = args.args + unknown_args

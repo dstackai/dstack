@@ -20,8 +20,8 @@ class TorchrunProvider(Provider):
         self.resources = None
         self.args = None
 
-    def load(self, provider_args: List[str], workflow_name: Optional[str], provider_data: Dict[str, Any]):
-        super().load(provider_args, workflow_name, provider_data)
+    def load(self, provider_args: List[str], workflow_name: Optional[str], provider_data: Dict[str, Any], run_name: str):
+        super().load(provider_args, workflow_name, provider_data, run_name)
         self.script = self.provider_data.get("script") or self.provider_data.get("file")
         self.before_run = self.provider_data.get("before_run")
         self.python = self._safe_python_version("python")
@@ -106,13 +106,13 @@ class TorchrunProvider(Provider):
 
     def parse_args(self):
         parser = self._create_parser(self.workflow_name)
-        args, unknown = parser.parse_known_args(self.provider_args)
-        self._parse_base_args(args)
+        args, unknown_args = parser.parse_known_args(self.provider_args)
+        self._parse_base_args(args, unknown_args)
         if args.nnodes:
             self.provider_data["nodes"] = args.nnodes
         if self.run_as_provider:
             self.provider_data["file"] = args.file
-            _args = args.args + unknown
+            _args = args.args + unknown_args
             if _args:
                 self.provider_data["args"] = _args
 

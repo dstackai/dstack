@@ -59,6 +59,7 @@ setup(
         "simple-term-menu",
         "py-cpuinfo",
         "psutil",
+        "jinja2",
     ],
     classifiers=[
         "Development Status :: 2 - Pre-Alpha",

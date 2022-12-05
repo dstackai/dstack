@@ -21,8 +21,8 @@ from websocket import WebSocketApp
 from dstack import providers
 from dstack.backend import load_backend, Backend, RequestStatus
 from dstack.cli.logs import poll_logs, since
-from dstack.cli.schema import workflows_schema_yaml
 from dstack.cli.ps import ps_func, _has_request_status
+from dstack.cli.schema import workflows_schema_yaml
 from dstack.config import ConfigError
 from dstack.jobs import JobStatus, JobHead
 from dstack.repo import load_repo_data, RepoAddress
@@ -160,7 +160,7 @@ def poll_logs_ws(backend: Backend, repo_address: RepoAddress,
         while True:
             _job_head = backend.get_job(repo_address, job_head.job_id)
             run = next(iter(backend.get_run_heads(repo_address,
-                                               [_job_head], include_request_heads=False)))
+                                                  [_job_head], include_request_heads=False)))
             if run.status.is_finished():
                 break
             time.sleep(POLL_FINISHED_STATE_RATE_SECS)
@@ -170,10 +170,9 @@ def poll_logs_ws(backend: Backend, repo_address: RepoAddress,
             console.print(f"[grey58]OK[/]")
 
 
-
 def run_workflow_func(args: Namespace):
     if not args.workflow_or_provider:
-        print("Usage: dstack run [-h] WORKFLOW [-d] [-t TAG] [ARGS ...]\n")
+        print("Usage: dstack run [-h] WORKFLOW [-d] [-l] [-t TAG] [OPTIONS ...] [ARGS ...]\n")
         workflows_yaml = _load_workflows()
         workflows = (workflows_yaml or {}).get("workflows") or []
         workflow_names = [w["name"] for w in workflows if w.get("name")]
@@ -198,7 +197,8 @@ def run_workflow_func(args: Namespace):
                 provider.help(workflow_name)
                 sys.exit()
 
-            provider.load(provider_args, workflow_name, workflow_data)
+            run_name = backend.create_run(repo_data)
+            provider.load(provider_args, workflow_name, workflow_data, run_name)
             if args.tag_name:
                 tag_head = backend.get_tag_head(repo_data, args.tag_name)
                 if tag_head:
@@ -207,8 +207,7 @@ def run_workflow_func(args: Namespace):
                     backend.delete_tag_head(repo_data, tag_head)
                     # else:
                     #     return
-            run_name = backend.create_run(repo_data)
-            jobs = provider.submit_jobs(run_name, args.tag_name)
+            jobs = provider.submit_jobs(args.tag_name)
             backend.update_repo_last_run_at(repo_data, last_run_at=int(round(time.time() * 1000)))
             ps_func(Namespace(run_name=run_name, all=False))
             if not args.detach:

@@ -16,7 +16,7 @@ The command provisions the required compute resources (in a configured cloud), f
 ### Usage
 
 ```shell
-dstack run [-h] WORKFLOW [-d] [-l] [-t TAG] [ARGS ...]
+dstack run [-h] WORKFLOW [-d] [-l] [-t TAG] [OPTIONS ...] [ARGS ...]
 ```
 
 #### Arguments reference
@@ -33,11 +33,11 @@ The following arguments are optional:
   or [NVIDIA Docker](https://github.com/NVIDIA/nvidia-docker) to be installed locally.
 -  `-d`, `--detach` - (Optional) Run the workflow in the detached mode. Means, the `run` command doesn't
   poll for logs and workflow status, but exits immediately. 
-- `ARGS` – (Optional) Use these arguments to override workflow parameters defined in `.dstack/workflows.yaml`
+- `OPTIONS` – (Optional) Use `OPTIONS` to override workflow parameters defined in `.dstack/workflows.yaml`
+- `ARGS` – (Optional) Use `ARGS` to [pass arguments](../../examples/index.md#args) to the workflow
+  (can be accessed via `${{ run.args }}` from `.dstack/workflows.yaml`).
 -  `-h`, `--help` - (Optional) Shows help for the `dstack run` command. Combine it with the name of the workflow
    to see how to override workflow parameters defined in `.dstack/workflows.yaml`
-
-Use `ARGS` to override any of the workflow parameters defined in the `./dstack/workflows.yaml` file.
 
 !!! info "NOTE:"
     By default, it runs it in the attached mode, so you'll see the output in real-time as your 

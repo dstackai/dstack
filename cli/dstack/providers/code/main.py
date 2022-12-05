@@ -19,8 +19,8 @@ class CodeProvider(Provider):
         self.resources = None
         self.image_name = None
 
-    def load(self, provider_args: List[str], workflow_name: Optional[str], provider_data: Dict[str, Any]):
-        super().load(provider_args, workflow_name, provider_data)
+    def load(self, provider_args: List[str], workflow_name: Optional[str], provider_data: Dict[str, Any], run_name: str):
+        super().load(provider_args, workflow_name, provider_data, run_name)
         self.before_run = self.provider_data.get("before_run")
         self.python = self._safe_python_version("python")
         self.version = self.provider_data.get("version") or "1.72.3"
@@ -38,8 +38,8 @@ class CodeProvider(Provider):
 
     def parse_args(self):
         parser = self._create_parser(self.workflow_name)
-        args = parser.parse_args(self.provider_args)
-        self._parse_base_args(args)
+        args, unknown_args = parser.parse_known_args(self.provider_args)
+        self._parse_base_args(args, unknown_args)
 
     def create_job_specs(self) -> List[JobSpec]:
         env = {}

@@ -409,6 +409,34 @@ workflows:
       - env | grep DSTACK_
 ```
 
+## Args
+
+Workflows can be parametrized. 
+
+When you pass any parameters to the `dstack run` command, they can be accessed from the `.dstack/workflows.yaml` file via
+the `${{ run.args }}` expression. 
+
+Here's an example:
+
+```yaml
+workflows:
+  - name: hello-args
+    provider: bash
+    commands:
+      - python hello-arg.py ${{ run.args }}
+```
+
+If you run the following command:
+
+```shell
+dstack run hello-arg "Hello, world!"
+```
+
+It will pass the `"Hello, world!"` argument to the `hello-arg.py` script.
+
+!!! info "NOTE:"
+    You can use any arguments except those that are reserved for the [`dstack run`](../reference/cli/index.md#dstack-run) command.
+
 ## Apps
 
 The [`bash`](../reference/providers/index.md#bash) and [`docker`](../reference/providers/index.md#docker) providers 
