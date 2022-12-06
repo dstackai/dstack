@@ -13,7 +13,7 @@ Reproducible ML workflows for teams
 </h3>
 
 <p align="center">
-<code>dstack</code>  allows you to define your ML workflows as code, and run them in a configured cloud via the CLI. 
+<code>dstack</code> allows you to define your ML workflows as code, and run them in a configured cloud via the CLI. 
 It takes care of managing workflow dependencies, provisioning cloud infrastructure, and versioning data.
 </p>
 
@@ -92,16 +92,13 @@ EC2 subnet: none
 
 ## Usage example
 
-**Step 1:** Create a `.dstack/mnist.yaml` file, and define there how to run the script, 
-from where to load the data, how to store output artifacts, and what compute resources are
-needed to run it.
+**Step 1:** Create a `.dstack/workflows/example.yaml` file, and define there how to run the workflow, 
+how to store output artifacts, and what compute resources to use.
 
 ```yaml
 workflows: 
   - name: train
     provider: bash
-    deps:
-      - tag: mnist_data
     commands:
       - pip install requirements.txt
       - python src/train.py
@@ -112,16 +109,14 @@ workflows:
       gpu: 1
 ```
 
-Use `deps` to add artifacts of other workflows as dependencies. You can refer to other 
-workflows via the name of the workflow, or via the name of the tag. 
-
 **Step 2:** Run the workflow via `dstack run`:
 
 ```shell
 dstack run train
 ```
 
-It will automatically provision the required compute resource, and run the workflow. You'll see the output in real-time:
+It will automatically provision the required compute resource in the configured AWS account, 
+and run the workflow. You'll see the output in real-time:
 
 ```shell
 Provisioning... It may take up to a minute. ✓
@@ -142,20 +137,53 @@ val_loss      0.10975822806358337
 **Step 3:** Use the `dstack ps` command to see the status of runs.
 
 ```shell
-dstack ps -a
+dstack ps
 
-RUN               WORKFLOW  SUBMITTED    OWNER           STATUS   TAG
-angry-elephant-1  download  8 hours ago  peterschmidt85  Done     mnist_data
-wet-insect-1      train     1 weeks ago  peterschmidt85  Running  
+RUN           WORKFLOW  SUBMITTED    OWNER           STATUS   TAG
+wet-insect-1  train     1 weeks ago  peterschmidt85  Running  
 ```
 
-**Step 4:** Use other commands to manage runs, artifacts, tags, secrets, and more.
+**Step 4:** Reuse artifacts
+
+Say, you want to reuse the `checkpoints` from the previous run in another workflow.
+
+You'll need to add a tag to the previous run:
+
+```shell
+dstack tag add checkpoints-v1 wet-insect-1
+```
+
+Now, you can use the `checkpoints-v1` tag from another workflow:
+
+```yaml
+workflows: 
+  - name: finetune
+    provider: bash
+    deps:
+      - tag: checkpoints-v1
+    commands:
+      - pip install requirements.txt
+      - python src/finetune.py
+    resources:
+      interruptible: true
+      gpu: 1
+```
+
+> **Note:**
+> As an alternative to `tag`, you can use `workflow` inside `deps` and pass a name of the workflow directly instead of the tag name.  
+>
+> Also, you can refer to workflows and tags from other repos.
+
+Other CLI commands can be used to manage runs, artifacts, tags, secrets, and [more](https://docs.dstack.ai/reference/cli).
 
 ## More information
 
+Be sure to check [Examples](https://docs.dstack.ai/examples) and [Quickstart](https://docs.dstack.ai/tutorials/quickstart) for more examples
+on what `dstack` can do, and how to get started with it.
+
+Other useful links:
+
  * [Docs](https://docs.dstack.ai/tutorials/quickstart)
- * [Examples](https://docs.dstack.ai/examples)
- * [Quickstart](https://docs.dstack.ai/tutorials/quickstart) 
  * [Slack](https://join.slack.com/t/dstackai/shared_invite/zt-xdnsytie-D4qU9BvJP8vkbkHXdi6clQ)
  * [Newsletter](https://dstack.curated.co/)
  * [Twitter](https://twitter.com/dstackai)

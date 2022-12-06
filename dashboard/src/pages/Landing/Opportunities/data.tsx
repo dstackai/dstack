@@ -37,7 +37,7 @@ const DefineWorkflowsSnippet: FC = () => {
     
     - name: train
       deps:
-        - tag: mnist_data
+        - tag: mnist-data
       provider: bash
       python: 3.10
       commands:

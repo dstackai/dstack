@@ -8,7 +8,7 @@ In this tutorial, we'll use the
 [`dstackai/dstack-examples`](https://github.com/dstackai/dstack-examples) GitHub repo. Go ahead and clone this 
 repo.
 
-```shell
+```shell hl_lines="1-2"
 git clone https://github.com/dstackai/dstack-examples.git
 cd dstack-examples
 ```
@@ -27,7 +27,7 @@ workflows:
 
   - name: mnist-train
     deps:
-      - tag: mnist_data
+      - tag: mnist-data
     provider: bash
     commands:
       - pip install -r requirements.txt
@@ -38,7 +38,7 @@ workflows:
 
 The `mnist-download` workflow downloads the dataset to the `data` folder and saves it as an artifact.
 
-The `mnist-train` workflow uses the data from the `mnist_data` tag to train a model. 
+The `mnist-train` workflow uses the data from the `mnist-data` tag to train a model. 
 
 It writes checkpoints and logs within the `lightning_logs` folder, and saves it as an artifact.
 
@@ -46,7 +46,7 @@ It writes checkpoints and logs within the `lightning_logs` folder, and saves it 
 
 Before you can use `dstack` on a new Git repo, you have to run the `dstack init` command:
 
-```shell
+```shell hl_lines="1"
 dstack init
 ```
 
@@ -56,7 +56,7 @@ It will ensure that `dstack` has the access to the Git repo.
 
 Now, you can use the [`dstack run`](../reference/cli/index.md#dstack-run) command to run the `mnist-download` workflow:
 
-```shell
+```shell hl_lines="1"
 dstack run mnist-download
 ```
 
@@ -65,7 +65,7 @@ etc.
 
 You'll see the output in real-time as your workflow is running.
 
-```
+```shell hl_lines="1"
 RUN             WORKFLOW        SUBMITTED  OWNER           STATUS     TAG 
 grumpy-zebra-1  mnist-download  now        peterschmidt85  Submitted  
  
@@ -89,7 +89,7 @@ Once the workflow is finished, its artifacts are saved and infrastructure is tor
     If you want `dstack` to run your workflow locally (instead of provisioning infrastructure in the cloud),
     use the `--local` argument (or `-l` for shorter).
 
-    ```bash
+    ```shell hl_lines="1" 
     dstack run mnist-download -l
     ```
 
@@ -98,13 +98,13 @@ Once the workflow is finished, its artifacts are saved and infrastructure is tor
 
 Use the [`dstack ps`](../reference/cli/index.md#dstack-ps) command to see the status of recent workflows.
 
-```shell
+```shell hl_lines="1"
 dstack ps
 ```
 
 It shows currently running workflows or the last finished one. 
 
-```shell
+```shell hl_lines="1"
 RUN             WORKFLOW        SUBMITTED  OWNER           STATUS  TAG 
 grumpy-zebra-1  mnist-download  a min ago  peterschmidt85  Done    
 ```
@@ -120,13 +120,13 @@ To see artifacts of a run, use the
 [`dstack artifacts list`](../reference/cli/index.md#dstack-artifacts-list) command followed
 by the name of the run.
 
-```shell
+```shell hl_lines="1"
 dstack artifacts list grumpy-zebra-1
 ```
 
 It will list all saved files inside artifacts along with their size:
 
-```shell
+```shell hl_lines="1"
 PATH  FILE                                  SIZE
 data  MNIST/raw/t10k-images-idx3-ubyte      7.5MiB
       MNIST/raw/t10k-images-idx3-ubyte.gz   1.6MiB
@@ -143,10 +143,10 @@ data  MNIST/raw/t10k-images-idx3-ubyte      7.5MiB
 If you want to use the artifacts of a particular run from other workflows, you
 can add a tag to this run.
 
-Let's assign the `mnist_data` tag to our finished run `grumpy-zebra-1`.
+Let's assign the `mnist-data` tag to our finished run `grumpy-zebra-1`.
 
-```shell
-dstack tags add mnist_data grumpy-zebra-1
+```shell hl_lines="1"
+dstack tags add mnist-data grumpy-zebra-1
 ```
 
 You can see all tags of the current repo via the `dstack tags` command.
@@ -157,20 +157,20 @@ You can use a tag name instead of the run name with the `dstack artifacts` comma
 Just put a colon before the tag name:
 
 ```shell
-dstack artifacts list :mnist_data
+dstack artifacts list :mnist-data
 ```
 
 ## Run train workflow
 
-Now that the `mnist_data` tag is added, we can run the `mnist-train` workflow.
+Now that the `mnist-data` tag is added, we can run the `mnist-train` workflow.
 
-```shell
+```shell hl_lines="1"
 dstack run mnist-train
 ```
 
-On the start of the `mnist-train` workflow, dstack will download the artifacts of the tag `mnist_data` to the working directory.
+On the start of the `mnist-train` workflow, dstack will download the artifacts of the tag `mnist-data` to the working directory.
 
-```shell
+```shell hl_lines="1"
 RUN            WORKFLOW     SUBMITTED  OWNER           STATUS     TAG 
 wet-mangust-2  mnist-train  now        peterschmidt85  Submitted  
 
@@ -192,7 +192,7 @@ val_loss      0.10975822806358337
 Once the `mnist-train` workflow is finished, if you want, you can download its artifacts using 
 the [`dstack artifacts download`](../reference/cli/index.md#dstack-artifacts-download) command.
 
-```shell
+```shell hl_lines="1"
 dstack artifacts download wet-mangust-2 .
 ```
 
