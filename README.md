@@ -177,12 +177,11 @@ successful run of the corresponding workflow.
 
 Also, you can refer to workflows and tags from other repos.
 
-## More information
+## More examples
 
-Be sure to check [Examples](https://docs.dstack.ai/examples) and [Quickstart](https://docs.dstack.ai/tutorials/quickstart) for more examples
-on what `dstack` can do, and how to get started with it.
+**For more examples on what dstack can do and how to get started with it, check [Examples](https://docs.dstack.ai/examples) and [Quickstart](https://docs.dstack.ai/tutorials/quickstart).**
 
-Other useful links:
+## Links
 
  * [Docs](https://docs.dstack.ai/tutorials/quickstart)
  * [Slack](https://join.slack.com/t/dstackai/shared_invite/zt-xdnsytie-D4qU9BvJP8vkbkHXdi6clQ)
