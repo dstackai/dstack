@@ -38,10 +38,9 @@ It takes care of managing workflow dependencies, provisioning cloud infrastructu
 * **Reusable artifacts:** Save data, models, and environment as workflows artifacts, and reuse them across projects.
 * **Built-in containers:** Workflow containers are pre-built with Conda, Python, etc. No Docker is needed.
 
-> The `dstack` CLI automatically tracks your current Git revision and uncommitted local changed.
->
-> You can use the `dstack` CLI from both your IDE and your CI/CD pipelines.
-> 
+You can use the `dstack` CLI from both your IDE and your CI/CD pipelines.
+The `dstack` CLI automatically tracks your current Git revision, including uncommitted local changes.
+
 > For debugging purposes, you can run workflow locally, or attach to them interactive dev environments (e.g. VS Code, 
 and JupyterLab).
 
@@ -103,7 +102,7 @@ workflows:
       - pip install requirements.txt
       - python src/train.py
     artifacts: 
-      - path: ./checkpoint
+      - path: ./checkpoints
     resources:
       interruptible: true
       gpu: 1
@@ -172,15 +171,11 @@ workflows:
 When you run the `finetune` workflow, `dstack` will automatically download 
 the `./checkpoints` artifact of the run with the `checkpoints-v1` tag.
 
-> **Note**
-> 
-> As an alternative to the `tag` property, you can use the `workflow` property inside `deps` and pass
-> there a name of the workflow directly. In that case, `dstack` will use the artifacts of the last 
-> successful run of the corresponding workflow.
->
-> Finally, you can also refer to workflows and tags from other repos.
+As an alternative to the `tag` property, you can use the `workflow` property inside `deps` and pass
+there a name of the workflow directly. In that case, `dstack` will use the artifacts of the last 
+successful run of the corresponding workflow.
 
-Other CLI commands can be used to manage runs, artifacts, tags, secrets, and [more](https://docs.dstack.ai/reference/cli).
+Also, you can refer to workflows and tags from other repos.
 
 ## More information
 

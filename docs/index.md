@@ -15,11 +15,10 @@ It takes care of managing workflow dependencies, provisioning cloud infrastructu
 * **Reusable artifacts:** Save data, models, and environment as workflows artifacts, and reuse them across projects.
 * **Built-in containers:** Workflow containers are pre-built with Conda, Python, etc. No Docker is needed.
 
-!!! info "NOTE:"
-    The `dstack` CLI automatically tracks your current Git revision and uncommitted local changed.
+You can use the `dstack` CLI from both your IDE and your CI/CD pipelines. 
+The `dstack` CLI automatically tracks your current Git revision, including uncommitted local changes.
 
-    You can use the `dstack` CLI from both your IDE and your CI/CD pipelines.
-
+!!! tip "NOTE:"
     For debugging purposes, you can run workflow locally, or attach to them interactive dev environments (e.g. VS Code, 
     and JupyterLab).
 
