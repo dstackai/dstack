@@ -169,10 +169,16 @@ workflows:
       gpu: 1
 ```
 
-> **Note:**
-> As an alternative to `tag`, you can use `workflow` inside `deps` and pass a name of the workflow directly instead of the tag name.  
+When you run the `finetune` workflow, `dstack` will automatically download 
+the `./checkpoints` artifact of the run with the `checkpoints-v1` tag.
+
+> **Note**
+> 
+> As an alternative to the `tag` property, you can use the `workflow` property inside `deps` and pass
+> there a name of the workflow directly. In that case, `dstack` will use the artifacts of the last 
+> successful run of the corresponding workflow.
 >
-> Also, you can refer to workflows and tags from other repos.
+> Finally, you can also refer to workflows and tags from other repos.
 
 Other CLI commands can be used to manage runs, artifacts, tags, secrets, and [more](https://docs.dstack.ai/reference/cli).
 
