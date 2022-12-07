@@ -148,7 +148,7 @@ Here's the full list of AWS permissions the `dstack` CLI needs:
         "iam:CreatePolicy",
         "iam:TagPolicy"
       ],
-      "Resource": "arn:aws:iam::*:role/dstack_policy_{bucket_name_under_score}*"
+      "Resource": "arn:aws:iam::*:policy/dstack_policy_{bucket_name_under_score}*"
     },
     {
       "Effect": "Allow",
