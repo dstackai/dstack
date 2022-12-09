@@ -118,9 +118,9 @@ nav:
         - CLI: reference/cli/index.md
         - Providers: reference/providers/index.md
     - Community:
-        - Slack chat: https://join.slack.com/t/dstackai/shared_invite/zt-xdnsytie-D4qU9BvJP8vkbkHXdi6clQ
-        - GitHub Issues: https://github.com/dstackai/dstack/issues
+        - Slack: https://join.slack.com/t/dstackai/shared_invite/zt-xdnsytie-D4qU9BvJP8vkbkHXdi6clQ
     - Releases:
         - Changelog: https://github.com/dstackai/dstack/releases
         - Newsletter: https://dstack.curated.co/
-  - Newsletter: https://dstack.curated.co/
+  - Slack: https://join.slack.com/t/dstackai/shared_invite/zt-xdnsytie-D4qU9BvJP8vkbkHXdi6clQ
+#  - GitHub: https://github.com/dstackai/dstack

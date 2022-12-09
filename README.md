@@ -8,13 +8,14 @@
   </a>
 </h1>
 
-<h3 align="center">
+<h4 align="center">
 Reproducible ML workflows for teams
-</h3>
+</h4>
 
 <p align="center">
-<code>dstack</code> allows you to define your ML workflows as code, and run them in a configured cloud via the CLI. 
-It takes care of managing workflow dependencies, provisioning cloud infrastructure, and versioning data.
+<code>dstack</code> allows define ML workflows as code, and run them in a configured cloud via the CLI. 
+It automatically handles workflow dependencies, provisions cloud infrastructure, and versions 
+data, models, and environments.
 </p>
 
 [![Slack](https://img.shields.io/badge/slack-chat%20with%20us-blueviolet?logo=slack&style=for-the-badge)](https://join.slack.com/t/dstackai/shared_invite/zt-xdnsytie-D4qU9BvJP8vkbkHXdi6clQ)
@@ -23,8 +24,7 @@ It takes care of managing workflow dependencies, provisioning cloud infrastructu
 <a href="https://docs.dstack.ai" target="_blank"><b>Docs</b></a> • 
 <a href="https://docs.dstack.ai/examples" target="_blank"><b>Examples</b></a> • 
 <a href="https://docs.dstack.ai/tutorials/quickstart"><b>Quickstart</b></a> • 
-<a href="https://join.slack.com/t/dstackai/shared_invite/zt-xdnsytie-D4qU9BvJP8vkbkHXdi6clQ" target="_blank"><b>Slack</b></a> • 
-<a href="https://twitter.com/dstackai" target="_blank"><b>Twitter</b></a>
+<a href="https://join.slack.com/t/dstackai/shared_invite/zt-xdnsytie-D4qU9BvJP8vkbkHXdi6clQ" target="_blank"><b>Slack</b></a> 
 </p>
 
 [![Last commit](https://img.shields.io/github/last-commit/dstackai/dstack)](https://github.com/dstackai/dstack/commits/)
@@ -34,15 +34,16 @@ It takes care of managing workflow dependencies, provisioning cloud infrastructu
 
 ### Features
 
-* **Workflows as code:** Define your ML workflows as code, and run them in a configured cloud via a single CLI command.
-* **Reusable artifacts:** Save data, models, and environment as workflows artifacts, and reuse them across projects.
-* **Built-in containers:** Workflow containers are pre-built with Conda, Python, etc. No Docker is needed.
-
-You can use the `dstack` CLI from both your IDE and your CI/CD pipelines.
-The `dstack` CLI automatically tracks your current Git revision, including uncommitted local changes.
-
-> For debugging purposes, you can run workflow locally, or attach to them interactive dev environments (e.g. VS Code, 
-and JupyterLab).
+* **GitOps-driven:** Define your ML workflows via YAML, and run them in a configured cloud using the CLI, &mdash; 
+  interactively from the IDE or from your CI/CD pipeline.
+* **Collaborative:** Version data, models, and environments, and reuse them easily in other workflows &mdash; 
+  across different projects and teams.
+* **Cloud-native:** Run workflows locally or in a configured cloud.
+  Configure the resources required by workflows (memory, GPU, etc.) as code.
+* **Vendor-agnostic:** Use any cloud provider, languages, frameworks, tools, and third-party services. No code changes
+  is required.
+* **Dev environments:** For debugging purposes, attach interactive dev environments (e.g. VS Code, JupyterLab, etc.)
+  directly to running workflows.
 
 ## How does it work?
 
@@ -89,104 +90,13 @@ S3 bucket: dstack-142421590066-eu-west-1
 EC2 subnet: none
 ```
 
-## Usage example
+## More information
 
-**Step 1:** Create a `.dstack/workflows/example.yaml` file, and define there how to run the workflow, 
-how to store output artifacts, and what compute resources to use.
-
-```yaml
-workflows: 
-  - name: train
-    provider: bash
-    commands:
-      - pip install requirements.txt
-      - python src/train.py
-    artifacts: 
-      - path: ./checkpoints
-    resources:
-      interruptible: true
-      gpu: 1
-```
-
-**Step 2:** Run the workflow via `dstack run`:
-
-```shell
-dstack run train
-```
-
-It will automatically provision the required compute resource in the configured AWS account, 
-and run the workflow. You'll see the output in real-time:
-
-```shell
-Provisioning... It may take up to a minute. ✓
-
-To interrupt, press Ctrl+C.
-
-Epoch 4: 100%|██████████████| 1876/1876 [00:17<00:00, 107.85it/s, loss=0.0944, v_num=0, val_loss=0.108, val_acc=0.968]
-
-`Trainer.fit` stopped: `max_epochs=5` reached.
-
-Testing DataLoader 0: 100%|██████████████| 313/313 [00:00<00:00, 589.34it/s]
-
-Test metric   DataLoader 0
-val_acc       0.965399980545044
-val_loss      0.10975822806358337
-```
-
-**Step 3:** Use the `dstack ps` command to see the status of runs.
-
-```shell
-dstack ps
-
-RUN           WORKFLOW  SUBMITTED    OWNER           STATUS   TAG
-wet-insect-1  train     1 weeks ago  peterschmidt85  Running  
-```
-
-**Step 4:** Reuse artifacts
-
-Say, you want to reuse the `checkpoints` from the previous run in another workflow.
-
-You'll need to add a tag to the previous run:
-
-```shell
-dstack tag add checkpoints-v1 wet-insect-1
-```
-
-Now, you can use the `checkpoints-v1` tag from another workflow:
-
-```yaml
-workflows: 
-  - name: finetune
-    provider: bash
-    deps:
-      - tag: checkpoints-v1
-    commands:
-      - pip install requirements.txt
-      - python src/finetune.py
-    resources:
-      interruptible: true
-      gpu: 1
-```
-
-When you run the `finetune` workflow, `dstack` will automatically download 
-the `./checkpoints` artifact of the run with the `checkpoints-v1` tag.
-
-As an alternative to the `tag` property, you can use the `workflow` property inside `deps` and pass
-there a name of the workflow directly. In that case, `dstack` will use the artifacts of the last 
-successful run of the corresponding workflow.
-
-Also, you can refer to workflows and tags from other repos.
-
-## More examples
-
-**For more examples on what dstack can do and how to get started with it, check [Examples](https://docs.dstack.ai/examples) and [Quickstart](https://docs.dstack.ai/tutorials/quickstart).**
-
-## Links
-
- * [Docs](https://docs.dstack.ai/tutorials/quickstart)
- * [Slack](https://join.slack.com/t/dstackai/shared_invite/zt-xdnsytie-D4qU9BvJP8vkbkHXdi6clQ)
- * [Newsletter](https://dstack.curated.co/)
- * [Twitter](https://twitter.com/dstackai)
+* [Docs](https://docs.dstack.ai/)
+* [Examples](https://docs.dstack.ai/examples)
+* [Innstallation](https://docs.dstack.ai/installation)
+* [Quickstart](https://docs.dstack.ai/tutorials/quickstart)
+* [Slack](https://join.slack.com/t/dstackai/shared_invite/zt-xdnsytie-D4qU9BvJP8vkbkHXdi6clQ)
  
 ##  Licence
 
