@@ -152,6 +152,9 @@ class AwsBackend(Backend):
     def delete_repo(self, repo_address: RepoAddress):
         repos.delete_repo(self._s3_client(), self.backend_config.bucket_name, repo_address)
 
+    def get_repo_credentials(self, repo_address: RepoAddress) -> Optional[RepoCredentials]:
+        return repos.get_repo_credentials(self._secretsmanager_client(), self.backend_config.bucket_name, repo_address)
+
     def save_repo_credentials(self, repo_address: RepoAddress, repo_credentials: RepoCredentials):
         repos.save_repo_credentials(self._sts_client(), self._iam_client(), self._secretsmanager_client(),
                                     self.backend_config.bucket_name, repo_address, repo_credentials)

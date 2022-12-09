@@ -267,6 +267,9 @@ class Backend(ABC):
     def delete_repo(self, repo_address: RepoAddress):
         pass
 
+    def get_repo_credentials(self, repo_address: RepoAddress) -> Optional[RepoCredentials]:
+        pass
+
     def save_repo_credentials(self, repo_address: RepoAddress, repo_credentials: RepoCredentials):
         pass
 

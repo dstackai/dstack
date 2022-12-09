@@ -78,6 +78,23 @@ def delete_repo(s3_client: BaseClient, bucket_name: str, repo_address: RepoAddre
             s3_client.delete_object(Bucket=bucket_name, Key=obj["Key"])
 
 
+def get_repo_credentials(secretsmanager_client: BaseClient, bucket_name: str, repo_address: RepoAddress) \
+        -> Optional[RepoCredentials]:
+    secret_name = f"/dstack/{bucket_name}/credentials/{_repo_address_path(repo_address)}"
+    try:
+        response = secretsmanager_client.get_secret_value(SecretId=secret_name)
+        credentials_data = json.loads(response["SecretString"])
+        return RepoCredentials(
+            RepoProtocol(credentials_data["protocol"]),
+            credentials_data.get("private_key"),
+            credentials_data.get("oauth_token")
+        )
+    except Exception as e:
+        if hasattr(e, "response") and e.response.get("Error") and e.response["Error"].get(
+                "Code") == "ResourceNotFoundException":
+            return None
+
+
 def save_repo_credentials(sts_client: BaseClient, iam_client: BaseClient, secretsmanager_client: BaseClient,
                           bucket_name: str, repo_address: RepoAddress, repo_credentials: RepoCredentials):
     secret_name = f"/dstack/{bucket_name}/credentials/{_repo_address_path(repo_address)}"

@@ -194,31 +194,30 @@ def run_workflow_func(args: Namespace):
         try:
             repo_data = load_repo_data()
             backend = load_backend()
-
             provider_name, provider_args, workflow_name, workflow_data = parse_run_args(args)
-
             provider = providers.load_provider(provider_name)
-
             if hasattr(args, "help") and args.help:
                 provider.help(workflow_name)
                 sys.exit()
 
-            run_name = backend.create_run(repo_data)
-            provider.load(provider_args, workflow_name, workflow_data, run_name)
-            if args.tag_name:
-                tag_head = backend.get_tag_head(repo_data, args.tag_name)
-                if tag_head:
-                    # if args.yes or Confirm.ask(f"[red]The tag '{args.tag_name}' already exists. "
-                    #                            f"Do you want to override it?[/]"):
-                    backend.delete_tag_head(repo_data, tag_head)
-                    # else:
-                    #     return
-            jobs = provider.submit_jobs(args.tag_name)
-            backend.update_repo_last_run_at(repo_data, last_run_at=int(round(time.time() * 1000)))
-            ps_func(Namespace(run_name=run_name, all=False))
-            if not args.detach:
-                poll_run(repo_data, jobs, backend)
-
+            if backend.get_repo_credentials(repo_data):
+                run_name = backend.create_run(repo_data)
+                provider.load(provider_args, workflow_name, workflow_data, run_name)
+                if args.tag_name:
+                    tag_head = backend.get_tag_head(repo_data, args.tag_name)
+                    if tag_head:
+                        # if args.yes or Confirm.ask(f"[red]The tag '{args.tag_name}' already exists. "
+                        #                            f"Do you want to override it?[/]"):
+                        backend.delete_tag_head(repo_data, tag_head)
+                        # else:
+                        #     return
+                jobs = provider.submit_jobs(args.tag_name)
+                backend.update_repo_last_run_at(repo_data, last_run_at=int(round(time.time() * 1000)))
+                ps_func(Namespace(run_name=run_name, all=False))
+                if not args.detach:
+                    poll_run(repo_data, jobs, backend)
+            else:
+                sys.exit(f"Call 'dstack init' first")
         except ConfigError:
             sys.exit(f"Call 'dstack config' first")
         except InvalidGitRepositoryError:
