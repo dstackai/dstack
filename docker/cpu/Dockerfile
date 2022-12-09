@@ -20,5 +20,5 @@ RUN wget -O Miniforge3.sh "https://github.com/conda-forge/miniforge/releases/lat
     chmod +x /opt/conda/etc/profile.d/conda.sh && \
     echo ". /opt/conda/etc/profile.d/conda.sh" >> ~/.bashrc && \
     /opt/conda/condabin/conda update conda --all -y && \
-    /opt/conda/condabin/conda create --name ${PYTHON} python=${PYTHON} -y && \
-    echo "conda activate ${PYTHON}" >> ~/.bashrc
+    /opt/conda/condabin/conda create --name workflow python=${PYTHON} -y && \
+    echo "conda activate workflow" >> ~/.bashrc
