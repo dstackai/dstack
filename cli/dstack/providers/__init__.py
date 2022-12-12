@@ -312,6 +312,13 @@ class Provider:
         else:
             return None
 
+    def _get_list_data(self, name: str) -> Optional[List[str]]:
+        v = self.provider_data.get(name)
+        if isinstance(v, str):
+            return v.split("\n")
+        else:
+            return v
+
     def _resources(self) -> Optional[Requirements]:
         if self.provider_data.get("resources"):
             resources = Requirements()

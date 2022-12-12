@@ -48,7 +48,7 @@ The following properties are required:
 
 The following properties are optional:
 
-- `before_run` - (Optional) The list of shell commands to run before running the main commands
+- `setup` - (Optional) The list of shell commands to run before running the main commands
 - `requirements` - (Optional) The path to the `requirements.txt` file
 - `python` - (Optional) The major version of Python. By default, it's `3.10`.
 - `env` - (Optional) The list of environment variables 
@@ -144,7 +144,7 @@ dstack run ide
 
 The following properties are optional:
 
-- `before_run` - (Optional) The list of shell commands to run before running the Python file
+- `setup` - (Optional) The list of shell commands to run before running the Python file
 - `requirements` - (Optional) The path to the `requirements.txt` file
 - `python` - (Optional) The major version of Python. By default, it's `3.10`.
 - `environment` - (Optional) The list of environment variables 
@@ -222,7 +222,7 @@ dstack run ide-lab
 
 The following properties are optional:
 
-- `before_run` - (Optional) The list of shell commands to run before running the JupyterLab application
+- `setup` - (Optional) The list of shell commands to run before running the JupyterLab application
 - `requirements` - (Optional) The path to the `requirements.txt` file
 - `python` - (Optional) The major version of Python. By default, it's `3.10`.
 - `environment` - (Optional) The list of environment variables 
@@ -298,7 +298,7 @@ dstack run ide-notebook
 
 The following properties are optional:
 
-- `before_run` - (Optional) The list of shell commands to run before running the Notebook application
+- `setup` - (Optional) The list of shell commands to run before running the Notebook application
 - `requirements` - (Optional) The path to the `requirements.txt` file
 - `python` - (Optional) The major version of Python. By default, it's `3.10`.
 - `environment` - (Optional) The list of environment variables 
@@ -387,7 +387,7 @@ The following properties are required:
 
 The following properties are optional:
 
-- `before_run` - (Optional) The list of shell commands to run before running the Docker image
+- `setup` - (Optional) The list of shell commands to run before running the Docker image
 - `requirements` - (Optional) The path to the `requirements.txt` file
 - `version` - (Optional) The major version of Python. By default, it's `3.10`.
 - `environment` - (Optional) The list of environment variables 

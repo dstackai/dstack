@@ -10,7 +10,7 @@ class PythonProvider(Provider):
     def __init__(self):
         super().__init__("python")
         self.file = None
-        self.before_run = None
+        self.setup = None
         # TODO: Handle numbers such as 3.1 (e.g. require to use strings)
         self.version = None
         self.args = None
@@ -24,7 +24,7 @@ class PythonProvider(Provider):
     def load(self, provider_args: List[str], workflow_name: Optional[str], provider_data: Dict[str, Any], run_name: str):
         super().load(provider_args, workflow_name, provider_data, run_name)
         self.file = self.provider_data["file"]
-        self.before_run = self.provider_data.get("before_run")
+        self.setup = self._get_list_data("setup") or self._get_list_data("before_run")
         self.version = self._safe_python_version("version")
         self.args = self.provider_data.get("args")
         self.requirements = self.provider_data.get("requirements")
@@ -72,8 +72,8 @@ class PythonProvider(Provider):
         commands = []
         if self.requirements:
             commands.append("pip install -r " + self.requirements)
-        if self.before_run:
-            commands.extend(self.before_run)
+        if self.setup:
+            commands.extend(self.setup)
         args_init = ""
         if self.args:
             if isinstance(self.args, str):

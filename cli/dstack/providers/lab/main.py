@@ -9,7 +9,7 @@ from dstack.providers import Provider
 class LabProvider(Provider):
     def __init__(self):
         super().__init__("lab")
-        self.before_run = None
+        self.setup = None
         self.python = None
         self.version = None
         self.requirements = None
@@ -21,7 +21,7 @@ class LabProvider(Provider):
 
     def load(self, provider_args: List[str], workflow_name: Optional[str], provider_data: Dict[str, Any], run_name: str):
         super().load(provider_args, workflow_name, provider_data, run_name)
-        self.before_run = self.provider_data.get("before_run")
+        self.setup = self._get_list_data("setup") or self._get_list_data("before_run")
         self.python = self._safe_python_version("python")
         self.version = self.provider_data.get("version")
         self.requirements = self.provider_data.get("requirements")
@@ -86,8 +86,8 @@ class LabProvider(Provider):
             "echo \"c.ServerApp.token = '$TOKEN'\" >> /root/.jupyter/jupyter_server_config.py",
             "echo \"c.ServerApp.ip = '0.0.0.0'\" >> /root/.jupyter/jupyter_server_config.py",
         ])
-        if self.before_run:
-            commands.extend(self.before_run)
+        if self.setup:
+            commands.extend(self.setup)
         if self.requirements:
             commands.append("pip install -r " + self.requirements)
         commands.append(

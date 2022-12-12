@@ -10,7 +10,7 @@ class TorchrunProvider(Provider):
     def __init__(self):
         super().__init__("torchrun")
         self.script = None
-        self.before_run = None
+        self.setup = None
         self.python = None
         self.requirements = None
         self.env = None
@@ -23,7 +23,7 @@ class TorchrunProvider(Provider):
     def load(self, provider_args: List[str], workflow_name: Optional[str], provider_data: Dict[str, Any], run_name: str):
         super().load(provider_args, workflow_name, provider_data, run_name)
         self.script = self.provider_data.get("script") or self.provider_data.get("file")
-        self.before_run = self.provider_data.get("before_run")
+        self.setup = self._get_list_data("setup") or self._get_list_data("before_run")
         self.python = self._safe_python_version("python")
         self.requirements = self.provider_data.get("requirements")
         self.env = self._env()
@@ -49,8 +49,8 @@ class TorchrunProvider(Provider):
         commands = []
         if self.requirements:
             commands.append("pip3 install -r " + self.requirements)
-        if self.before_run:
-            commands.extend(self.before_run)
+        if self.setup:
+            commands.extend(self.setup)
         nproc = ""
         if self.resources.gpu:
             nproc = f"--nproc_per_node={self.resources.gpu.count}"

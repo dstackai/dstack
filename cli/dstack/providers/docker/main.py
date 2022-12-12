@@ -9,7 +9,7 @@ class DockerProvider(Provider):
     def __init__(self):
         super().__init__("docker")
         self.image_name = None
-        self.before_run = None
+        self.setup = None
         self.commands = None
         self.artifact_specs = None
         self.env = None
@@ -20,8 +20,8 @@ class DockerProvider(Provider):
     def load(self, provider_args: List[str], workflow_name: Optional[str], provider_data: Dict[str, Any], run_name: str):
         super().load(provider_args, workflow_name, provider_data, run_name)
         self.image_name = self.provider_data["image"]
-        self.before_run = self.provider_data.get("before_run")
-        self.commands = self.provider_data.get("commands")
+        self.setup = self._get_list_data("setup") or self._get_list_data("before_run")
+        self.commands = self._get_list_data("commands")
         self.artifact_specs = self._artifact_specs()
         self.env = self.provider_data.get("env")
         self.working_dir = self.provider_data.get("working_dir")
@@ -60,8 +60,8 @@ class DockerProvider(Provider):
                     )
                 )
         commands = []
-        if self.before_run:
-            commands.extend(self.before_run)
+        if self.setup:
+            commands.extend(self.setup)
         commands.extend(self.commands or [])
         return [JobSpec(
             image_name=self.image_name,

@@ -9,7 +9,7 @@ class BashProvider(Provider):
     def __init__(self):
         super().__init__("bash")
         self.file = None
-        self.before_run = None
+        self.setup = None
         self.python = None
         self.requirements = None
         self.env = None
@@ -22,9 +22,9 @@ class BashProvider(Provider):
 
     def load(self, provider_args: List[str], workflow_name: Optional[str], provider_data: Dict[str, Any], run_name: str):
         super().load(provider_args, workflow_name, provider_data, run_name)
-        self.before_run = self.provider_data.get("before_run")
+        self.setup = self._get_list_data("setup") or self._get_list_data("before_run")
         self.python = self._safe_python_version("python")
-        self.commands = self.provider_data.get("commands")
+        self.commands = self._get_list_data("commands")
         self.requirements = self.provider_data.get("requirements")
         self.env = self._env()
         self.artifact_specs = self._artifact_specs()
@@ -83,8 +83,8 @@ class BashProvider(Provider):
             self._extend_commands_with_env(commands, self.env)
         if self.requirements:
             commands.append("pip install -r " + self.requirements)
-        if self.before_run:
-            commands.extend(self.before_run)
+        if self.setup:
+            commands.extend(self.setup)
         commands.extend(self.commands)
         return commands
 
