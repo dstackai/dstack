@@ -12,7 +12,6 @@ class LabProvider(Provider):
         self.setup = None
         self.python = None
         self.version = None
-        self.requirements = None
         self.env = None
         self.artifact_specs = None
         self.working_dir = None
@@ -24,7 +23,6 @@ class LabProvider(Provider):
         self.setup = self._get_list_data("setup") or self._get_list_data("before_run")
         self.python = self._safe_python_version("python")
         self.version = self.provider_data.get("version")
-        self.requirements = self.provider_data.get("requirements")
         self.env = self._env()
         self.artifact_specs = self._artifact_specs()
         self.working_dir = self.provider_data.get("working_dir")
@@ -88,8 +86,6 @@ class LabProvider(Provider):
         ])
         if self.setup:
             commands.extend(self.setup)
-        if self.requirements:
-            commands.append("pip install -r " + self.requirements)
         commands.append(
             f"jupyter lab"
         )

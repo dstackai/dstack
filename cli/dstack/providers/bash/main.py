@@ -11,7 +11,6 @@ class BashProvider(Provider):
         self.file = None
         self.setup = None
         self.python = None
-        self.requirements = None
         self.env = None
         self.artifact_specs = None
         self.working_dir = None
@@ -25,7 +24,6 @@ class BashProvider(Provider):
         self.setup = self._get_list_data("setup") or self._get_list_data("before_run")
         self.python = self._safe_python_version("python")
         self.commands = self._get_list_data("commands")
-        self.requirements = self.provider_data.get("requirements")
         self.env = self._env()
         self.artifact_specs = self._artifact_specs()
         self.working_dir = self.provider_data.get("working_dir")
@@ -81,8 +79,6 @@ class BashProvider(Provider):
         commands = []
         if self.env:
             self._extend_commands_with_env(commands, self.env)
-        if self.requirements:
-            commands.append("pip install -r " + self.requirements)
         if self.setup:
             commands.extend(self.setup)
         commands.extend(self.commands)

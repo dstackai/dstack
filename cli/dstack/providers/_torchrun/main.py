@@ -12,7 +12,6 @@ class TorchrunProvider(Provider):
         self.script = None
         self.setup = None
         self.python = None
-        self.requirements = None
         self.env = None
         self.artifact_specs = None
         self.working_dir = None
@@ -25,7 +24,6 @@ class TorchrunProvider(Provider):
         self.script = self.provider_data.get("script") or self.provider_data.get("file")
         self.setup = self._get_list_data("setup") or self._get_list_data("before_run")
         self.python = self._safe_python_version("python")
-        self.requirements = self.provider_data.get("requirements")
         self.env = self._env()
         self.artifact_specs = self._artifact_specs()
         self.working_dir = self.provider_data.get("working_dir")
@@ -47,8 +45,6 @@ class TorchrunProvider(Provider):
 
     def _commands(self, node_rank):
         commands = []
-        if self.requirements:
-            commands.append("pip3 install -r " + self.requirements)
         if self.setup:
             commands.extend(self.setup)
         nproc = ""

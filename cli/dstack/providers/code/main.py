@@ -24,7 +24,6 @@ class CodeProvider(Provider):
         self.setup = self._get_list_data("setup") or self._get_list_data("before_run")
         self.python = self._safe_python_version("python")
         self.version = self.provider_data.get("version") or "1.72.3"
-        self.requirements = self.provider_data.get("requirements")
         self.env = self._env()
         self.artifact_specs = self._artifact_specs()
         self.working_dir = self.provider_data.get("working_dir")
@@ -85,8 +84,6 @@ class CodeProvider(Provider):
         ])
         if self.setup:
             commands.extend(self.setup)
-        if self.requirements:
-            commands.append("pip install -r " + self.requirements)
         commands.append(
             f"/tmp/openvscode-server-v{self.version}-linux-$arch/bin/openvscode-server --port $PORT_0 --host 0.0.0.0 --connection-token $CONNECTION_TOKEN"
         )

@@ -49,8 +49,7 @@ The following properties are required:
 The following properties are optional:
 
 - `setup` - (Optional) The list of shell commands to run before running the main commands
-- `requirements` - (Optional) The path to the `requirements.txt` file
-- `python` - (Optional) The major version of Python. By default, it's `3.10`.
+- `python` - (Optional) The major version of Python
 - `env` - (Optional) The list of environment variables 
 - [`artifacts`](#artifacts) - (Optional) The list of output artifacts
 - [`resources`](#resources) - (Optional) The hardware resources required by the workflow
@@ -145,8 +144,7 @@ dstack run ide
 The following properties are optional:
 
 - `setup` - (Optional) The list of shell commands to run before running the Python file
-- `requirements` - (Optional) The path to the `requirements.txt` file
-- `python` - (Optional) The major version of Python. By default, it's `3.10`.
+- `python` - (Optional) The major version of Python
 - `environment` - (Optional) The list of environment variables 
 - [`artifacts`](#artifacts) - (Optional) The list of output artifacts
 - [`resources`](#resources) - (Optional) The hardware resources required by the workflow
@@ -223,8 +221,7 @@ dstack run ide-lab
 The following properties are optional:
 
 - `setup` - (Optional) The list of shell commands to run before running the JupyterLab application
-- `requirements` - (Optional) The path to the `requirements.txt` file
-- `python` - (Optional) The major version of Python. By default, it's `3.10`.
+- `python` - (Optional) The major version of Python
 - `environment` - (Optional) The list of environment variables 
 - [`artifacts`](#artifacts) - (Optional) The list of output artifacts
 - [`resources`](#resources) - (Optional) The hardware resources required by the workflow
@@ -299,8 +296,7 @@ dstack run ide-notebook
 The following properties are optional:
 
 - `setup` - (Optional) The list of shell commands to run before running the Notebook application
-- `requirements` - (Optional) The path to the `requirements.txt` file
-- `python` - (Optional) The major version of Python. By default, it's `3.10`.
+- `python` - (Optional) The major version of Python
 - `environment` - (Optional) The list of environment variables 
 - [`artifacts`](#artifacts) - (Optional) The list of output artifacts
 - [`resources`](#resources) - (Optional) The hardware resources required by the workflow
@@ -388,8 +384,7 @@ The following properties are required:
 The following properties are optional:
 
 - `setup` - (Optional) The list of shell commands to run before running the Docker image
-- `requirements` - (Optional) The path to the `requirements.txt` file
-- `version` - (Optional) The major version of Python. By default, it's `3.10`.
+- `version` - (Optional) The major version of Python
 - `environment` - (Optional) The list of environment variables 
 - [`artifacts`](#artifacts) - (Optional) The list of output artifacts
 - [`resources`](#resources) - (Optional) The hardware resources required by the workflow
