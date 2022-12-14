@@ -3,6 +3,7 @@ import os
 import re
 import sys
 import time
+import pkg_resources
 from argparse import Namespace
 from pathlib import Path
 from typing import List, Optional, Dict, Tuple, Any
@@ -22,7 +23,6 @@ from dstack import providers
 from dstack.backend import load_backend, Backend, RequestStatus
 from dstack.cli.logs import poll_logs, since
 from dstack.cli.ps import ps_func, _has_request_status
-from dstack.cli.schema import workflows_schema_yaml
 from dstack.config import ConfigError
 from dstack.jobs import JobStatus, JobHead
 from dstack.repo import load_repo_data, RepoAddress
@@ -50,6 +50,7 @@ def _load_workflows():
 
 def _load_workflows_from_file(workflows_file: Path) -> List[Any]:
     workflows_yaml = yaml.load(workflows_file.open(), Loader=yaml.FullLoader)
+    workflows_schema_yaml = pkg_resources.resource_string("dstack.schemas", "workflows.json")
     validate(workflows_yaml, yaml.load(workflows_schema_yaml, Loader=yaml.FullLoader))
     return workflows_yaml.get("workflows") or []
 

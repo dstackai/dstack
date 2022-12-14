@@ -24,7 +24,10 @@ setup(
     author="Andrey Cheptsov",
     author_email="andrey@dstack.ai",
     packages=find_packages(),
-    package_data={'dstack.dashboard': ['statics/*', 'statics/**/*', 'statics/**/**/*']},
+    package_data={
+        "dstack.schemas": ["*.json"],
+        "dstack.dashboard": ["statics/*", "statics/**/*", "statics/**/**/*"]
+    },
     include_package_data=True,
     scripts=[],
     entry_points={

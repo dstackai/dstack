@@ -1,0 +1,447 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema",
+  "additionalProperties": false,
+  "definitions": {
+    "_commands": {
+      "anyOf": [
+        {
+          "type": "array",
+          "minItems": 1,
+          "items": {
+            "type": "string",
+            "minLength": 1
+          }
+        },
+        {
+          "type": "string",
+          "minLength": 1
+        }
+      ]
+    },
+    "commands": {
+      "description": "The bash commands to run",
+      "$ref": "#/definitions/_commands"
+    },
+    "setup": {
+      "description": "The bash commands to run before running workflow",
+      "$ref": "#/definitions/_commands"
+    },
+    "env": {
+      "description": "The list of environment variables",
+      "type": "array",
+      "items": {
+        "type": "string",
+        "minLength": 1
+      },
+      "minItems": 1
+    },
+    "artifacts": {
+      "description": "The list of output artifacts",
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "path"
+        ],
+        "properties": {
+          "path": {
+            "description": "The absolute or relative path to the folder that must be stored as an output artifact",
+            "type": "string",
+            "minLength": 1
+          },
+          "mount": {
+            "description": "Must be set to `true` if the artifact files must be saved in real-time",
+            "type": "boolean",
+            "enum": [
+              true
+            ]
+          }
+        }
+      }
+    },
+    "python": {
+      "description": "The major version of Python",
+      "anyOf": [
+        {
+          "type": "string",
+          "pattern": "^\\d+(\\.\\d+)?$"
+        },
+        {
+          "type": "number"
+        }
+      ]
+    },
+    "resources": {
+      "description": "The hardware resource requirements",
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "gpu": {
+          "description": "The GPU requirements",
+          "anyOf": [
+            {
+              "type": "integer",
+              "minimum": 1
+            },
+            {
+              "type": "object",
+              "additionalProperties": false,
+              "properties": {
+                "name": {
+                  "description": "The name of the GPU, e.g. K80 or V100",
+                  "type": "string",
+                  "minLength": 1
+                },
+                "count": {
+                  "description": "The minimum number of GPUs",
+                  "type": "integer",
+                  "minimum": 1
+                },
+                "memory": {
+                  "description": "The minimum amount of GPU memory, e.g. 512MB or 16GB",
+                  "type": "string",
+                  "pattern": "^\\d+[MG]B$"
+                }
+              }
+            }
+          ]
+        },
+        "memory": {
+          "description": "The minimum amount of RAM memory, e.g. 512MB or 16GB",
+          "type": "string",
+          "pattern": "^\\d+[MG]B$"
+        },
+        "shm_size": {
+          "description": "The minimum amount of shared memory, e.g. 512MB or 16GB",
+          "type": "string",
+          "pattern": "^\\d+[MG]B$"
+        },
+        "cpu": {
+          "description": "The minimum number of virtual CPU cores",
+          "type": "integer",
+          "minimum": 1
+        },
+        "local": {
+          "description": "Must be set to `true` if the workflow must run locally",
+          "type": "boolean",
+          "enum": [
+            true
+          ]
+        },
+        "interruptible": {
+          "description": "Must be set to `true` if the workflow must use interruptible instances",
+          "type": "boolean",
+          "enum": [
+            true
+          ]
+        }
+      }
+    },
+    "ports": {
+      "description": "The number of ports to expose",
+      "type": "integer",
+      "minimum": 1
+    },
+    "working_dir": {
+      "description": "The absolute or relative path to the working directory where to run the workflow",
+      "type": "string",
+      "minLength": 1
+    },
+    "bash": {
+      "type": "object",
+      "required": [
+        "commands"
+      ],
+      "additionalProperties": false,
+      "patternProperties": {
+        "^name$": {
+        },
+        "^help$": {
+        },
+        "^deps$": {
+        }
+      },
+      "properties": {
+        "provider": {
+          "enum": [
+            "bash"
+          ]
+        },
+        "ports": {
+          "$ref": "#/definitions/ports"
+        },
+        "commands": {
+          "$ref": "#/definitions/commands"
+        },
+        "setup": {
+          "$ref": "#/definitions/setup"
+        },
+        "env": {
+          "$ref": "#/definitions/env"
+        },
+        "python": {
+          "$ref": "#/definitions/python"
+        },
+        "requirements": {
+          "$ref": "#/definitions/requirements"
+        },
+        "working_dir": {
+          "$ref": "#/definitions/working_dir"
+        },
+        "artifacts": {
+          "$ref": "#/definitions/artifacts"
+        },
+        "resources": {
+          "$ref": "#/definitions/resources"
+        }
+      }
+    },
+    "docker": {
+      "type": "object",
+      "required": [
+        "image"
+      ],
+      "additionalProperties": false,
+      "patternProperties": {
+        "^name$": {
+        },
+        "^help$": {
+        },
+        "^deps$": {
+        }
+      },
+      "properties": {
+        "provider": {
+          "enum": [
+            "docker"
+          ]
+        },
+        "ports": {
+          "$ref": "#/definitions/ports"
+        },
+        "commands": {
+          "$ref": "#/definitions/commands"
+        },
+        "setup": {
+          "$ref": "#/definitions/setup"
+        },
+        "env": {
+          "$ref": "#/definitions/env"
+        },
+        "python": {
+          "$ref": "#/definitions/python"
+        },
+        "image": {
+          "description": "The name of the Docker image to run",
+          "type": "string",
+          "minLength": 1
+        },
+        "working_dir": {
+          "$ref": "#/definitions/working_dir"
+        },
+        "artifacts": {
+          "$ref": "#/definitions/artifacts"
+        },
+        "resources": {
+          "$ref": "#/definitions/resources"
+        }
+      }
+    },
+    "code": {
+      "type": "object",
+      "additionalProperties": false,
+      "patternProperties": {
+        "^name$": {
+        },
+        "^help$": {
+        },
+        "^deps$": {
+        }
+      },
+      "properties": {
+        "provider": {
+          "enum": [
+            "code"
+          ]
+        },
+        "setup": {
+          "$ref": "#/definitions/setup"
+        },
+        "env": {
+          "$ref": "#/definitions/env"
+        },
+        "python": {
+          "$ref": "#/definitions/python"
+        },
+        "requirements": {
+          "$ref": "#/definitions/requirements"
+        },
+        "working_dir": {
+          "$ref": "#/definitions/working_dir"
+        },
+        "artifacts": {
+          "$ref": "#/definitions/artifacts"
+        },
+        "resources": {
+          "$ref": "#/definitions/resources"
+        }
+      }
+    },
+    "lab": {
+      "type": "object",
+      "additionalProperties": false,
+      "patternProperties": {
+        "^name$": {
+        },
+        "^help$": {
+        },
+        "^deps$": {
+        }
+      },
+      "properties": {
+        "provider": {
+          "enum": [
+            "lab"
+          ]
+        },
+        "setup": {
+          "$ref": "#/definitions/setup"
+        },
+        "env": {
+          "$ref": "#/definitions/env"
+        },
+        "python": {
+          "$ref": "#/definitions/python"
+        },
+        "requirements": {
+          "$ref": "#/definitions/requirements"
+        },
+        "working_dir": {
+          "$ref": "#/definitions/working_dir"
+        },
+        "artifacts": {
+          "$ref": "#/definitions/artifacts"
+        },
+        "resources": {
+          "$ref": "#/definitions/resources"
+        }
+      }
+    },
+    "notebook": {
+      "type": "object",
+      "additionalProperties": false,
+      "patternProperties": {
+        "^name$": {
+        },
+        "^help$": {
+        },
+        "^deps$": {
+        }
+      },
+      "properties": {
+        "provider": {
+          "enum": [
+            "notebook"
+          ]
+        },
+        "setup": {
+          "$ref": "#/definitions/setup"
+        },
+        "env": {
+          "$ref": "#/definitions/env"
+        },
+        "python": {
+          "$ref": "#/definitions/python"
+        },
+        "requirements": {
+          "$ref": "#/definitions/requirements"
+        },
+        "working_dir": {
+          "$ref": "#/definitions/working_dir"
+        },
+        "artifacts": {
+          "$ref": "#/definitions/artifacts"
+        },
+        "resources": {
+          "$ref": "#/definitions/resources"
+        }
+      }
+    }
+  },
+  "properties": {
+    "workflows": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "type": "object",
+        "required": [
+          "name"
+        ],
+        "properties": {
+          "name": {
+            "type": "string",
+            "minLength": 1
+          },
+          "help": {
+            "type": "string",
+            "minLength": 1
+          },
+          "deps": {
+            "description": "The dependencies on other workflows or tags",
+            "type": "array",
+            "minItems": 1,
+            "items": {
+              "oneOf": [
+                {
+                  "type": "object",
+                  "additionalProperties": false,
+                  "properties": {
+                    "workflow": {
+                      "description": "The name of the workflow",
+                      "type": "string",
+                      "minLength": 1
+                    }
+                  }
+                },
+                {
+                  "type": "object",
+                  "additionalProperties": false,
+                  "properties": {
+                    "tag": {
+                      "description": "The name of the tag",
+                      "type": "string",
+                      "minLength": 1
+                    }
+                  }
+                }
+              ]
+            }
+          }
+        },
+        "anyOf": [
+          {
+            "$ref": "#/definitions/bash"
+          },
+          {
+            "$ref": "#/definitions/docker"
+          },
+          {
+            "$ref": "#/definitions/code"
+          },
+          {
+            "$ref": "#/definitions/lab"
+          },
+          {
+            "$ref": "#/definitions/notebook"
+          }
+        ]
+      }
+    }
+  },
+  "required": [
+    "workflows"
+  ],
+  "type": "object"
+}
