@@ -1,5 +1,5 @@
 {
-  "$schema": "http://json-schema.org/draft-07/schema",
+  "$schema": "http://json-schema.org/draft-04/schema",
   "additionalProperties": false,
   "definitions": {
     "_commands": {
@@ -184,9 +184,6 @@
         "python": {
           "$ref": "#/definitions/python"
         },
-        "requirements": {
-          "$ref": "#/definitions/requirements"
-        },
         "working_dir": {
           "$ref": "#/definitions/working_dir"
         },
@@ -275,9 +272,6 @@
         "python": {
           "$ref": "#/definitions/python"
         },
-        "requirements": {
-          "$ref": "#/definitions/requirements"
-        },
         "working_dir": {
           "$ref": "#/definitions/working_dir"
         },
@@ -315,9 +309,6 @@
         "python": {
           "$ref": "#/definitions/python"
         },
-        "requirements": {
-          "$ref": "#/definitions/requirements"
-        },
         "working_dir": {
           "$ref": "#/definitions/working_dir"
         },
@@ -354,9 +345,6 @@
         },
         "python": {
           "$ref": "#/definitions/python"
-        },
-        "requirements": {
-          "$ref": "#/definitions/requirements"
         },
         "working_dir": {
           "$ref": "#/definitions/working_dir"
