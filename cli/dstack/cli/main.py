@@ -2,7 +2,7 @@ import sys
 from argparse import ArgumentParser, SUPPRESS, Namespace
 
 from dstack.cli import app, logs, run, stop, artifacts, ps, init, \
-    restart, rm, tags, config, dashboard, secrets
+    restart, rm, tags, config, secrets
 from dstack.version import __version__ as version
 from rich import print
 
@@ -23,7 +23,6 @@ def default_func(_: Namespace):
           "  [bold]dstack artifacts download [grey53]([/grey53]RUN [grey53]|[/grey53] :TAG[grey53])[/grey53][/bold]                 Download artifacts\n"
           "\n"
           "Other commands:\n"
-          # "dashboard      Launch a dashboard\n"
           # "app            Open a running application\n"
           "  [bold]dstack config[/bold]                                          Configure the backend\n"
           "  [bold]dstack init [grey53][-t OAUTH_TOKEN | -i SSH_PRIVATE_KEY][/grey53][/bold]      " +
@@ -66,7 +65,6 @@ def main():
     ps.register_parsers(subparsers)
     stop.register_parsers(subparsers)
     tags.register_parsers(subparsers)
-    # dashboard.register_parsers(subparsers)
 
     if len(sys.argv) < 2:
         default_func(Namespace())

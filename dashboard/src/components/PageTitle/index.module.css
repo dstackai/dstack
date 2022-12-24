@@ -1,8 +1,0 @@
-.title {
-  &.h1 {
-      margin-top: 0;
-      margin-bottom: 20px;
-      @mixin textStyle 24, 28;
-      font-weight: 600;
-  }
-}

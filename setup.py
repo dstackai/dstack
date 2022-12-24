@@ -4,18 +4,24 @@ from pathlib import Path
 
 from setuptools import setup, find_packages
 
+project_dir = Path(__file__).parent
+
 
 def get_version():
-    text = (Path("dstack") / "version.py").read_text()
+    text = (project_dir / "cli" / "dstack" / "version.py").read_text()
     match = re.compile(r"__version__\s*=\s*\"?([^\n\"]+)\"?.*").match(text)
-    if match and match.group(1) != "None":
-        return match.group(1)
+    if match:
+        if match.group(1) != "None":
+            return match.group(1)
+        else:
+            return None
     else:
         sys.exit("Can't parse version.py")
 
 
 def get_long_description():
-    return re.sub(r"<picture>\s*|<source[^>]*>\s*|\s*</picture>|<video[^>]*>\s*|</video>\s*|### Demo\s*", "", open("README.md").read())
+    return re.sub(r"<picture>\s*|<source[^>]*>\s*|\s*</picture>|<video[^>]*>\s*|</video>\s*|### Demo\s*", "",
+                  open(project_dir / "README.md").read())
 
 
 setup(
@@ -23,10 +29,10 @@ setup(
     version=get_version(),
     author="Andrey Cheptsov",
     author_email="andrey@dstack.ai",
-    packages=find_packages(),
+    package_dir={"": "cli"},
+    packages=find_packages("cli"),
     package_data={
-        "dstack.schemas": ["*.json"],
-        "dstack.dashboard": ["statics/*", "statics/**/*", "statics/**/**/*"]
+        "dstack.schemas": ["*.json"]
     },
     include_package_data=True,
     scripts=[],
@@ -53,10 +59,6 @@ setup(
         "paramiko",
         "git-url-parse",
         "rich",
-        "fastapi",
-        "starlette",
-        "uvicorn",
-        "pydantic",
         "websocket-client",
         "cursor",
         "simple-term-menu",

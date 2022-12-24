@@ -1,9 +1,0 @@
-.modal {
-
-}
-.field {
-    max-width: 210px;
-    &:nth-child(n+2) {
-        margin-top: 12px;
-    }
-}

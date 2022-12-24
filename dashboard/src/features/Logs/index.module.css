@@ -1,4 +1,0 @@
-.empty {
-    @mixin textStyle 14, 20;
-    color: var(--color-medium-gray);
-}
