@@ -428,8 +428,7 @@ func (ex *Executor) processJob(ctx context.Context, stoppedCh chan struct{}) err
 		}
 		bindings = append(bindings, art...)
 	}
-	logGroup := fmt.Sprintf("/dstack/jobs/%s/%s/%s/%s", ex.backend.Bucket(ctx), job.RepoHostNameWithPort(), job.RepoUserName, job.RepoName)
-	logger := ex.backend.CreateLogger(ctx, logGroup, job.RunName)
+	logger := ex.backend.CreateLogger(ctx, fmt.Sprintf("/dstack/jobs/%s/%s/%s/%s", ex.backend.Bucket(ctx), job.RepoHostNameWithPort(), job.RepoUserName, job.RepoName), job.RunName)
 	spec := &container.Spec{
 		Image:        job.Image,
 		WorkDir:      path.Join("/workflow", job.WorkingDir),
@@ -440,6 +439,7 @@ func (ex *Executor) processJob(ctx context.Context, stoppedCh chan struct{}) err
 		BindingPorts: ex.pm.BindPorts(ex.portID),
 		ShmSize:      resource.ShmSize,
 	}
+	logGroup := fmt.Sprintf("/jobs/%s/%s/%s", job.RepoHostNameWithPort(), job.RepoUserName, job.RepoName)
 	if _, err := os.Stat(filepath.Join(ex.configDir, "logs", logGroup)); err != nil {
 		if err = os.MkdirAll(filepath.Join(ex.configDir, "logs", logGroup), 0o777); err != nil {
 			return gerrors.Wrap(err)
