@@ -16,6 +16,7 @@ import (
 	"github.com/dstackai/dstackai/runner/internal/gerrors"
 	"github.com/dstackai/dstackai/runner/internal/log"
 	"github.com/dstackai/dstackai/runner/internal/models"
+	"gopkg.in/yaml.v3"
 )
 
 var _ backend.Backend = (*Local)(nil)
@@ -26,6 +27,11 @@ type Local struct {
 	state     *models.State
 	artifacts []artifacts.Artifacter
 	logger    *Logger
+}
+
+func (l Local) GetJobByPath(ctx context.Context, path string) (*models.Job, error) {
+	//TODO implement me
+	panic("implement me")
 }
 
 func (l Local) fullPath(ctx context.Context) string {
@@ -48,8 +54,8 @@ func (l Local) GitCredentials(ctx context.Context) *models.GitCredentials {
 	return git
 }
 
-func (l Local) Secrets(ctx context.Context) map[string]string {
-	return map[string]string{}
+func (l Local) Secrets(_ context.Context) (map[string]string, error) {
+	return map[string]string{}, nil
 }
 
 func (l Local) Bucket(ctx context.Context) string {
