@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"context"
 	"fmt"
+	"io"
 	"io/ioutil"
 	"math/bits"
 	_ "net/http/pprof"
@@ -39,11 +40,39 @@ func main() {
 
 func start(logLevel int, httpPort int, configDir string) {
 	ctx := context.Background()
-	log.L.Logger.SetLevel(logrus.Level(logLevel))
-	fileLog, err := os.OpenFile("/var/log/dstack/output.log", os.O_RDWR|os.O_CREATE|os.O_APPEND, 0o777)
-	if err == nil {
-		log.L.Logger.SetOutput(fileLog)
+	//Load runner config
+	config := new(executor.Config)
+	thePathConfig := filepath.Join(configDir, consts.RUNNER_FILE_NAME)
+	if _, err := os.Stat(thePathConfig); os.IsNotExist(err) {
+		fmt.Println(err)
+		return
 	}
+	theConfigFile, err := ioutil.ReadFile(thePathConfig)
+	if err != nil {
+		fmt.Println(err)
+		return
+	}
+	if err = yaml.Unmarshal(theConfigFile, config); err != nil {
+		fmt.Println(err)
+		return
+	}
+
+	if _, err = os.Stat(filepath.Join(configDir, "logs", "runners")); err != nil {
+		if err = os.MkdirAll(filepath.Join(configDir, "logs", "runners"), 0o777); err != nil {
+			fmt.Println(err)
+			return
+		}
+	}
+
+	pathLogRunner := filepath.Join(configDir, "logs", "runners", fmt.Sprintf("%s.log", config.Id))
+	log.L.Logger.SetLevel(logrus.Level(logLevel))
+	fileLog, err := os.OpenFile(pathLogRunner, os.O_RDWR|os.O_CREATE|os.O_APPEND, 0o777)
+	if err != nil {
+		return
+	}
+	defer fileLog.Close()
+	log.L.Logger.SetOutput(io.MultiWriter(os.Stdout, fileLog))
+
 	logCtx := log.WithLogger(ctx, log.L)
 	log.Info(logCtx, fmt.Sprintf("Log level: %v", log.L.Logger.GetLevel().String()))
 	log.Info(logCtx, "RUNNER START...")

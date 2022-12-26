@@ -5,7 +5,9 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"os"
 	"path"
+	"path/filepath"
 	"strconv"
 	"time"
 
@@ -26,6 +28,7 @@ import (
 
 type Executor struct {
 	backend       backend.Backend
+	configDir     string
 	config        *Config
 	engine        *container.Engine
 	artifactsIn   []artifacts.Artifacter
@@ -58,6 +61,7 @@ func (ex *Executor) Init(ctx context.Context, configDir string) error {
 			panic(r)
 		}
 	}()
+	ex.configDir = configDir
 	err := ex.loadConfig(configDir)
 	if err != nil {
 		return err
@@ -424,7 +428,8 @@ func (ex *Executor) processJob(ctx context.Context, stoppedCh chan struct{}) err
 		}
 		bindings = append(bindings, art...)
 	}
-	logger := ex.backend.CreateLogger(ctx, fmt.Sprintf("/dstack/jobs/%s/%s/%s/%s", ex.backend.Bucket(ctx), job.RepoHostNameWithPort(), job.RepoUserName, job.RepoName), job.RunName)
+	logGroup := fmt.Sprintf("/dstack/jobs/%s/%s/%s/%s", ex.backend.Bucket(ctx), job.RepoHostNameWithPort(), job.RepoUserName, job.RepoName)
+	logger := ex.backend.CreateLogger(ctx, logGroup, job.RunName)
 	spec := &container.Spec{
 		Image:        job.Image,
 		WorkDir:      path.Join("/workflow", job.WorkingDir),
@@ -435,7 +440,18 @@ func (ex *Executor) processJob(ctx context.Context, stoppedCh chan struct{}) err
 		BindingPorts: ex.pm.BindPorts(ex.portID),
 		ShmSize:      resource.ShmSize,
 	}
-	ml := io.MultiWriter(logger, ex.streamLogs)
+	if _, err := os.Stat(filepath.Join(ex.configDir, "logs", logGroup)); err != nil {
+		if err = os.MkdirAll(filepath.Join(ex.configDir, "logs", logGroup), 0o777); err != nil {
+			return gerrors.Wrap(err)
+		}
+	}
+	fileLog, err := os.OpenFile(filepath.Join(ex.configDir, "logs", logGroup, fmt.Sprintf("%s.log", job.RunName)), os.O_RDWR|os.O_CREATE|os.O_APPEND, 0o777)
+	if err != nil {
+		return gerrors.Wrap(err)
+	}
+	defer fileLog.Close()
+
+	ml := io.MultiWriter(logger, ex.streamLogs, fileLog)
 	docker, err := ex.engine.Create(ctx, spec, ml)
 	if err != nil {
 		return gerrors.Wrap(err)
