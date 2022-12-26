@@ -8,10 +8,10 @@ import (
 	"strconv"
 	"strings"
 
-	"github.com/dstackai/dstackai/runner/consts"
-	"github.com/dstackai/dstackai/runner/internal/gerrors"
-	"github.com/dstackai/dstackai/runner/internal/log"
-	"github.com/dstackai/dstackai/runner/internal/models"
+	"github.com/dstackai/dstack/runner/consts"
+	"github.com/dstackai/dstack/runner/internal/gerrors"
+	"github.com/dstackai/dstack/runner/internal/log"
+	"github.com/dstackai/dstack/runner/internal/models"
 	"github.com/sirupsen/logrus"
 	"gopkg.in/yaml.v2"
 )

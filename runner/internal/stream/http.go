@@ -6,8 +6,8 @@ import (
 	"net/http"
 	"sync"
 
-	"github.com/dstackai/dstackai/runner/internal/gerrors"
-	"github.com/dstackai/dstackai/runner/internal/log"
+	"github.com/dstackai/dstack/runner/internal/gerrors"
+	"github.com/dstackai/dstack/runner/internal/log"
 	"github.com/gorilla/websocket"
 )
 

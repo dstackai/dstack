@@ -5,9 +5,9 @@ import (
 	"os"
 	"path/filepath"
 
-	"github.com/dstackai/dstackai/runner/consts"
-	"github.com/dstackai/dstackai/runner/internal/common"
-	"github.com/dstackai/dstackai/runner/internal/gerrors"
+	"github.com/dstackai/dstack/runner/consts"
+	"github.com/dstackai/dstack/runner/internal/common"
+	"github.com/dstackai/dstack/runner/internal/gerrors"
 	"github.com/sirupsen/logrus"
 )
 

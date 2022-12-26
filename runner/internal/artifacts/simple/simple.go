@@ -8,10 +8,10 @@ import (
 	"path/filepath"
 
 	"github.com/docker/docker/api/types/mount"
-	"github.com/dstackai/dstackai/runner/internal/artifacts"
-	"github.com/dstackai/dstackai/runner/internal/artifacts/client"
-	"github.com/dstackai/dstackai/runner/internal/gerrors"
-	"github.com/dstackai/dstackai/runner/internal/log"
+	"github.com/dstackai/dstack/runner/internal/artifacts"
+	"github.com/dstackai/dstack/runner/internal/artifacts/client"
+	"github.com/dstackai/dstack/runner/internal/gerrors"
+	"github.com/dstackai/dstack/runner/internal/log"
 )
 
 var _ artifacts.Artifacter = (*Simple)(nil)

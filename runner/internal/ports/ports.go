@@ -6,7 +6,7 @@ import (
 	"sync"
 
 	"github.com/docker/go-connections/nat"
-	"github.com/dstackai/dstackai/runner/internal/ports/queue"
+	"github.com/dstackai/dstack/runner/internal/ports/queue"
 	"github.com/google/uuid"
 )
 

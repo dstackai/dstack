@@ -7,10 +7,10 @@ import (
 	"io/ioutil"
 	"sync"
 
-	"github.com/dstackai/dstackai/runner/internal/artifacts"
-	"github.com/dstackai/dstackai/runner/internal/gerrors"
-	"github.com/dstackai/dstackai/runner/internal/log"
-	"github.com/dstackai/dstackai/runner/internal/models"
+	"github.com/dstackai/dstack/runner/internal/artifacts"
+	"github.com/dstackai/dstack/runner/internal/gerrors"
+	"github.com/dstackai/dstack/runner/internal/log"
+	"github.com/dstackai/dstack/runner/internal/models"
 	"gopkg.in/yaml.v2"
 )
 

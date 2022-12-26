@@ -9,13 +9,13 @@ import (
 	"path/filepath"
 	"strings"
 
-	"github.com/dstackai/dstackai/runner/consts"
-	"github.com/dstackai/dstackai/runner/internal/artifacts"
-	"github.com/dstackai/dstackai/runner/internal/backend"
-	"github.com/dstackai/dstackai/runner/internal/common"
-	"github.com/dstackai/dstackai/runner/internal/gerrors"
-	"github.com/dstackai/dstackai/runner/internal/log"
-	"github.com/dstackai/dstackai/runner/internal/models"
+	"github.com/dstackai/dstack/runner/consts"
+	"github.com/dstackai/dstack/runner/internal/artifacts"
+	"github.com/dstackai/dstack/runner/internal/backend"
+	"github.com/dstackai/dstack/runner/internal/common"
+	"github.com/dstackai/dstack/runner/internal/gerrors"
+	"github.com/dstackai/dstack/runner/internal/log"
+	"github.com/dstackai/dstack/runner/internal/models"
 	"gopkg.in/yaml.v3"
 )
 

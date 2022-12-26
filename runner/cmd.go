@@ -6,11 +6,11 @@ import (
 	"os"
 	"path/filepath"
 
-	"github.com/dstackai/dstackai/runner/consts"
-	"github.com/dstackai/dstackai/runner/internal/common"
+	"github.com/dstackai/dstack/runner/consts"
+	"github.com/dstackai/dstack/runner/internal/common"
 	"github.com/urfave/cli/v2"
 
-	"github.com/dstackai/dstackai/runner/version"
+	"github.com/dstackai/dstack/runner/version"
 )
 
 func App() {
