@@ -1,9 +1,7 @@
 # Examples
 
-!!! tip "NOTE:"
-    All examples can be found on [GitHub](https://github.com/dstackai/dstack-examples).
-    Feel free to [install `dstack`](../installation.md), clone the [repo](https://github.com/dstackai/dstack-examples), 
-    and follow the instructions.
+This section of the documentation showcases the main capabilities of `dstack`. The source code for the examples can 
+be found on [GitHub](https://github.com/dstackai/dstack-examples).
 
 ## Hello, world!
 
@@ -19,13 +17,15 @@ The workflow below prints `"Hello, world"`.
           - echo "Hello, world!"
     ```
 
-Run it locally using the `dstack run --local` command:
+### Run locally
+
+To run a workflow locally, simply use the `dstack run` command:
 
 ```shell hl_lines="1"
-dstack run hello --local
+dstack run hello
 ```
 
-You'll see the output in real-time as your workflow is running:
+You'll see the output in real-time:
 
 ```shell hl_lines="1"
 RUN           WORKFLOW  SUBMITTED  OWNER           STATUS     TAG 
@@ -38,336 +38,37 @@ To interrupt, press Ctrl+C.
 Hello, world!
 ```
 
-## Python
+!!! warning "NOTE:"
+    To run workflows locally, it is required to have either Docker or [NVIDIA Docker](https://github.com/NVIDIA/nvidia-docker) 
+    pre-installed.
 
-!!! info "NOTE:"
-    The [`bash`](../reference/providers/index.md#bash), [`code`](../reference/providers/index.md#code), 
-    [`lab`](../reference/providers/index.md#lab), and [`notebook`](../reference/providers/index.md#notebook) providers
-    come with Python and Conda pre-installed.
+### Run remotely
 
-The workflow below runs a Python script that prints `"Hello, world!"`:
-
-=== "`.dstack/workflows/python.yaml`"
-
-    ```yaml
-    workflows:
-      - name: hello-py
-        provider: bash
-        commands:
-          - python python/hello.py
-    ```
-
-=== "`python/hello.py`"
-
-    ```python
-    if __name__ == '__main__':
-        print("Hello, world!")
-    ```
-
-Run it locally using the `dstack run --local` command:
+To run a workflow remotely, add the `--remote` flag (or `-r`) to 
+the `dstack run` command:
 
 ```shell hl_lines="1"
-dstack run hello-py --local 
+dstack run hello --remote
 ```
 
-You'll see the output in real-time as your workflow is running:
+This will automatically set up the necessary infrastructure (e.g. within a 
+configured cloud account), run the workflow, and upon completion, tear down 
+the infrastructure.
 
 ```shell hl_lines="1"
 RUN           WORKFLOW  SUBMITTED  OWNER           STATUS     TAG 
-slim-shady-1  hello-py  now        peterschmidt85  Submitted  
+slim-shady-1  hello     now        peterschmidt85  Submitted  
  
 Provisioning... It may take up to a minute. ✓
 
 To interrupt, press Ctrl+C.
 
-Hello, world
-```
-
-### Python packages
-
-You can use both `pip` and `conda` within workflows install Python packages.
-
-The workflow below installs `pandas` via `pip` and runs a Python script that uses `pandas`:
-
-=== "`.dstack/workflows/python.yaml`"
-
-    ```yaml
-    workflows:
-      - name: hello-pandas
-        provider: bash
-        commands:
-          - pip install pandas
-          - python python/hello_pandas.py
-    ```
-
-=== "`python/hello_pandas.py`"
-
-    ```python
-    import pandas as pd
-
-    if __name__ == '__main__':
-        df = pd.DataFrame(
-            {
-                "Name": [
-                    "Braund, Mr. Owen Harris",
-                    "Allen, Mr. William Henry",
-                    "Bonnell, Miss. Elizabeth",
-                ],
-                "Age": [22, 35, 58],
-                "Sex": ["male", "male", "female"],
-            }
-        )
-    
-        print(df)
-
-    ```
-
-Run it locally using the `dstack run --local` command:
-
-```shell hl_lines="1"
-dstack run hello-pandas --local
-```
-
-### Conda environments
-
-You can create your custom Conda environments using `conda env create`, 
-save them as artifact, and reuse from other workflows via `deps` and `conda activate`:
-
-=== "`.dstack/workflows/conda.yaml`"
-
-    ```yaml
-    workflows:
-      - name: setup-conda
-        provider: bash
-        commands:
-          - conda env create --file conda/environment.yaml
-        artifacts:
-          - path: /opt/conda/envs/myenv
-    
-      - name: use-conda
-        provider: bash
-        deps:
-          - workflow: setup-conda
-        commands:
-          - conda activate myenv
-          - python conda/hello_pandas.py
-    
-    ```
-
-=== "`conda/hello_pandas`"
-
-    ```python
-    import pandas as pd
-
-    if __name__ == '__main__':
-        df = pd.DataFrame(
-            {
-                "Name": [
-                    "Braund, Mr. Owen Harris",
-                    "Allen, Mr. William Henry",
-                    "Bonnell, Miss. Elizabeth",
-                ],
-                "Age": [22, 35, 58],
-                "Sex": ["male", "male", "female"],
-            }
-        )
-    
-        print(df)
-
-    ```
-
-First, run the `setup-conda` workflow locally:
-
-```shell hl_lines="1"
-dstack run setup-conda --local
-```
-
-And then, run the `use-conda` workflow locally:
-
-```shell hl_lines="1"
-dstack run use-conda --local
-```
-
-The `use-conda` workflow will reuse the `myenv` environment from the `setup-conda` workflow.
-
-!!! warning "NOTE:"
-    Conda environments are always bound to a specific architecture and cannot be reused on machines 
-    that has a different architecture (e.g. `AMD64` vs `ARM64`).
-
-### Python version
-
-By default, the workflow uses the same Python version that you use locally. 
-You can override the major Python version using the `python` property:
-
-=== "`.dstack/workflows/python-version.yaml`"
-
-    ```yaml
-    workflows:
-      - name: python-version
-        provider: bash
-        python: 3.7
-        commands:
-          - python --version
-    ```
-
-Run it locally using the `dstack run --local` command:
-
-```shell hl_lines="1"
-dstack run python-version --local
-```
-
-## Resources
-
-If you're not explicitly telling `dstack` to run the workflow locally, `dstack`
-runs it in the configured cloud account, and provisions the resources
-described in the `resources` property of the workflow YAML file. 
-
-### GPU acceleration
-
-The workflow below will automatically create a machine with one `NVIDIA Tesla V100` GPU:
-
-=== "`.dstack/workflows/resources.yaml`"
-
-    ```yaml
-    workflows:
-      - name: gpu-v100
-        provider: bash
-        commands:
-          - nvidia-smi
-        resources:
-          gpu:
-            name: V100
-            count: 1
-    ```
-
-Run it using the `dstack run` command:
-
-```shell hl_lines="1"
-dstack run gpu-v100
+Hello, world!
 ```
 
 !!! info "NOTE:"
-    If you want to use GPU with your AWS account, make sure to have the 
-    corresponding [service quota](https://docs.aws.amazon.com/AWSEC2/latest/UserGuide/ec2-resource-limits.html) approved
-    by the AWS support team beforehand.
-    The approval typically takes a few business days.
-
-### Memory
-
-The workflow below provisions a machine with 64GB memory:
-
-=== "`.dstack/workflows/resources.yaml`"
-
-    ```yaml
-    workflows:
-      - name: mem-64gb
-        provider: bash
-        commands:
-          - free --giga
-        resources:
-          memory: 64GB
-    ```
-
-Run it using the `dstack run` command:
-
-```shell hl_lines="1"
-dstack run mem-64gb
-```
-
-### Shared memory
-
-If your workflow is using parallel communicating processes (e.g. dataloaders in PyTorch), 
-you may need to configure the size of the shared memory (`/dev/shm` filesystem) via the `shm_size` property.
-
-The workflow below uses `16GB` of shared memory:
-
-=== "`.dstack/workflows/resources.yaml`"
-
-    ```yaml
-    workflows:
-      - name: shm-size
-        provider: bash
-        commands:
-          - df /dev/shm
-        resources:
-          shm_size: 16GB 
-    ```
-
-Run it using the `dstack run` command:
-
-```shell hl_lines="1"
-dstack run shm-size
-```
-
-### Interruptible instances
-
-Interruptible instances (also known as spot instances or preemptive instances) are 
-offered at a significant price discount, and allow to use expensive machines at affordable prices.
-
-The workflow below uses an interruptible instance with one default GPU (`NVIDIA Tesla K80`):
-
-=== "`.dstack/workflows/resources.yaml`"
-
-    ```yaml
-    workflows:
-      - name: gpu-i
-        provider: bash
-        commands:
-          - nvidia-smi
-        resources:
-          interruptible: true
-          gpu: 1
-    ```
-
-!!! info "NOTE:"
-    If you want to use interruptible instances with your AWS account, make sure to have the 
-    corresponding [service quota](https://docs.aws.amazon.com/AWSEC2/latest/UserGuide/ec2-resource-limits.html) approved
-    by the AWS support team beforehand.
-    The approval typically takes a few business days.
-
-### Run locally
-
-To run a workflow locally, you have to either set `local` to `true` inside the `resources` property,
-or pass `--local` directly to the `dstack run`.
-
-This workflow will run locally by default:
-
-=== "`.dstack/workflows/resources.yaml`"
-
-    ```yaml
-    workflows:
-      - name: local-hello
-        provider: bash
-        commands:
-          - echo "Hello world"
-        resources:
-          local: true
-    ```
-
-You don't have to use `--local` with `dstack run`:
-
-```shell hl_lines="1"
-dstack run local-hello
-```
-
-!!! warning "NOTE:"
-    Running workflows locally requires Docker or [NVIDIA Docker](https://github.com/NVIDIA/nvidia-docker) 
-    to be installed locally.
-
-### Override resources via CLI
-
-Resources can be configured not only through the YAML file but
-also via the `dstack run` command.
-
-The following command that runs the `hello` workflow using interruptible instances with four GPUs:
-
-```shell hl_lines="1"
-dstack run hello --gpu 4 -i
-```
-
-!!! info "NOTE:"
-    To see all supported arguments (that can be used to override resources), 
-    use the `dstack run WORKFLOW --help` command.
+    You can use `pip`, `conda`, and `python` executables from the `commands` property of your workflow.
+    See [Python](#python) for more details.
 
 ## Artifacts
 
@@ -385,7 +86,7 @@ The workflow below creates the `output/hello.txt` file and saves it as an artifa
           - path: ./output
     ```
 
-Run it locally using `dstack run --local`:
+Run it locally using `dstack run`:
 
 ```shell hl_lines="1"
 dstack run hello-txt
@@ -395,14 +96,14 @@ dstack run hello-txt
     Artifacts are saved at the end of the workflow.
     They are not saved if the workflow was aborted (e.g. via `dstack stop -x`).
 
-### Access artifacts
+### List artifacts
 
 To see artifacts of a run, you can use the
-[`dstack artifacts list`](../reference/cli/index.md#dstack-artifacts-list) command followed
+[`dstack ls`](../reference/cli/index.md#dstack-artifacts-list) command followed
 by the name of the run.
 
 ```shell hl_lines="1"
-dstack artifacts list grumpy-zebra-1
+dstack ls grumpy-zebra-1
 ```
 
 It will list all saved files inside artifacts along with their size:
@@ -419,15 +120,24 @@ data  MNIST/raw/t10k-images-idx3-ubyte      7.5MiB
       MNIST/raw/train-labels-idx1-ubyte.gz  28.2KiB
 ```
 
-To download artifacts, use the [`dstack artifacts download`](../reference/cli/index.md#dstack-artifacts-download) command:
+### Push artifacts to the cloud
+
+When you run a workflow locally, artifacts are stored in `~/.dstack/artifacts` and can be reused only from the workflows
+that run locally too.
+
+If you'd like to reuse the artifacts outside your machine, you must push these artifacts using the `dstack push` command:
 
 ```shell hl_lines="1"
-dstack artifacts download grumpy-zebra-1 .
+dstack push grumpy-zebra-1
 ```
+
+!!! info "NOTE:"
+    If you run a workflow remotely, artifacts are pushed automatically, and it's typically a lot faster
+    than pushing artifacts of a local run.
 
 ### Real-time artifacts
 
-If you want your workflow to save artifacts in real time (as you write files to the disk), 
+If you run your workflow remotely, and want to save artifacts in real time (as you write files to the disk), 
 you can set the `mount` property to `true` for a particular artifact.
 
 The workflow below creates files in `output` and save them as artifacts in real-time:
@@ -456,10 +166,10 @@ The workflow below creates files in `output` and save them as artifacts in real-
     done
     ```
 
-Run it using the `dstack run` command:
+Go ahead and run this workflow remotely:
 
 ```shell
-dstack run hello-sh
+dstack run hello-sh --remote
 ```
 
 !!! info "NOTE:"
@@ -471,14 +181,33 @@ dstack run hello-sh
 
 ## Deps
 
-Deps allow workflows to reuse artifacts from tags or from other workflows.
+Using deps, workflows can reuse artifacts from other workflows. There are two methods for doing this: by specifying a
+tag name or a workflow name
+
+### Workflows
+
+The workflow below uses the output artifacts of the most recent run of the `hello-txt` workflow:
+
+=== "`.dstack/workflows/deps.yaml`"
+
+    ```yaml
+    workflows:
+      - name: cat-txt-2
+        provider: bash
+        deps:
+          - workflow: hello-txt
+        commands:
+          - cat output/hello.txt
+    ```
+
+!!! info "NOTE:"
+    Make sure to run the `hello-txt` workflow beforehand.
 
 ### Tags
 
 Tags can be managed using the `dstack tags` command.
 
-You can create a tag either by uploading any data and specifying a tag name,
-or by assigning a tag name to a finished run.
+You can create a tag either by assigning a tag name to a finished run or by uploading any local data.
 
 Say, you ran the [`hello-txt`](#artifacts) workflow, and want to reuse its artifacts in another workflow.
 
@@ -505,40 +234,21 @@ Let's reuse the `txt-file` tag from another workflow:
           - cat output/hello.txt
     ```
 
-!!! tip "NOTE:"
-    If you want to create a tag buy uploading data from your local machine, 
-    use the [`dstack tags add`](../reference/cli/index.md#dstack-tags-add) command with `-a PATH` argument pointing to
-    the local folder with the data to upload.
-
-### Workflows
-
-Another way to reuse artifacts of a workflow is by using the name of a workflow.
-
-The workflow below uses the output artifacts from the last run of the `hello-txt` workflow:
-
-=== "`.dstack/workflows/deps.yaml`"
-
-    ```yaml
-    workflows:
-      - name: cat-txt-2
-        provider: bash
-        deps:
-          - workflow: hello-txt
-        commands:
-          - cat output/hello.txt
-    ```
-
 !!! info "NOTE:"
-    Make sure to run the `hello-txt` workflow beforehand.
+    Tags are only supported for remote runs. If you want to use a tag for a local run, you must first push the 
+    artifacts of the local run using the `dstack push` command. 
+
+    You can create also a tag by uploading arbitrary local files. To do this, use the `dstack tags add` command 
+    with the `-a PATH` argument, which should point to the local folder containing local files.
 
 ### External repos
 
-By default, dstack looks up tags and workflows within the same Git repo.
+By default, dstack looks up tags and workflows within the same repo.
 
-If you want to refer to a tag or a workflow from another Git repo, 
+If you want to refer to a tag or a workflow from another repo, 
 you have to prepend the name (of the tag or the workflow) with the repo name.
 
-The workflow below uses a tag from the `dstackai/dstack` Git repo.
+The workflow below uses a tag from the `dstackai/dstack` repo:
 
 === "`.dstack/workflows/deps.yaml`"
 
@@ -553,7 +263,159 @@ The workflow below uses a tag from the `dstackai/dstack` Git repo.
     ```
 
 !!! info "NOTE:"
-    Make sure to run the `hello-txt` workflow inside the `dstackai/dstack` repo beforehand.
+    Make sure to run the `hello-txt` workflow in the `dstackai/dstack` repo beforehand.
+
+## Resources
+
+By default, `dstack` runs workflows locally and utilizes the resources available on your machine.
+
+When you run the workflow in remotely, you can use the `resources` property in your YAML file to specify which 
+resources are required by the workflow.
+
+### GPU acceleration
+
+If you run the following workflow remotely, `dstack` will automatically provision a machine with one 
+`NVIDIA Tesla V100` GPU:
+
+=== "`.dstack/workflows/resources.yaml`"
+
+    ```yaml
+    workflows:
+      - name: gpu-v100
+        provider: bash
+        commands:
+          - nvidia-smi
+        resources:
+          gpu:
+            name: V100
+            count: 1
+    ```
+
+Go ahead, and run this workflow remotely:
+
+```shell hl_lines="1"
+dstack run gpu-v100 --remote
+```
+
+!!! info "NOTE:"
+    If you want to use GPU with your AWS account, make sure to have the 
+    corresponding [service quota](https://docs.aws.amazon.com/AWSEC2/latest/UserGuide/ec2-resource-limits.html) approved
+    by the AWS support team beforehand.
+    The approval typically takes a few business days.
+
+### Memory
+
+If you run the following workflow remotely, `dstack` will automatically provision a machine with 64GB memory:
+
+=== "`.dstack/workflows/resources.yaml`"
+
+    ```yaml
+    workflows:
+      - name: mem-64gb
+        provider: bash
+        commands:
+          - free --giga
+        resources:
+          memory: 64GB
+    ```
+
+Go ahead, and run this workflow remotely:
+
+```shell hl_lines="1"
+dstack run mem-64gb --remote
+```
+
+### Shared memory
+
+If your workflow is using parallel communicating processes (e.g. dataloaders in PyTorch), 
+you may need to configure the size of the shared memory (`/dev/shm` filesystem) via the `shm_size` property.
+
+The workflow below uses `16GB` of shared memory:
+
+=== "`.dstack/workflows/resources.yaml`"
+
+    ```yaml
+    workflows:
+      - name: shm-size
+        provider: bash
+        commands:
+          - df /dev/shm
+        resources:
+          shm_size: 16GB 
+    ```
+
+Try running this workflow either locally or remotely
+
+```shell hl_lines="1"
+dstack run shm-size
+```
+
+### Interruptible instances
+
+Interruptible instances (also known as spot instances or preemptive instances) are 
+offered at a significant price discount, and allow to use expensive machines at affordable prices.
+
+If you run the following workflow remotely, `dstack` will automatically provision a spot instance with one default GPU 
+(`NVIDIA Tesla K80`):
+
+=== "`.dstack/workflows/resources.yaml`"
+
+    ```yaml
+    workflows:
+      - name: gpu-i
+        provider: bash
+        commands:
+          - nvidia-smi
+        resources:
+          interruptible: true
+          gpu: 1
+    ```
+
+!!! info "NOTE:"
+    If you want to use interruptible instances with your AWS account, make sure to have the 
+    corresponding [service quota](https://docs.aws.amazon.com/AWSEC2/latest/UserGuide/ec2-resource-limits.html) approved
+    by the AWS support team beforehand.
+    The approval typically takes a few business days.
+
+### Run remotely by default
+
+If you plan to run a workflow remotely by default (and don't want to include the `--remote` flag to the `dstack run` command
+each time), you can set `remote` to `true` inside `resources`.
+
+This workflow will run remotely by default:
+
+=== "`.dstack/workflows/resources.yaml`"
+
+    ```yaml
+    workflows:
+      - name: local-hello
+        provider: bash
+        commands:
+          - echo "Hello world"
+        resources:
+          remote: true
+    ```
+
+Go ahead and run it with `dstack run`:
+
+```shell hl_lines="1"
+dstack run local-hello
+```
+
+### Override resources via CLI
+
+Resources can be configured not only through the YAML file but
+also via the `dstack run` command.
+
+The following command that runs the `hello` workflow remotely using a spot instance with four GPUs:
+
+```shell hl_lines="1"
+dstack run hello --remote --gpu 4 --interruptible
+```
+
+!!! info "NOTE:"
+    To see all supported arguments (that can be used to override resources), 
+    use the `dstack run WORKFLOW --help` command.
 
 ## Dev environments
 
@@ -714,7 +576,7 @@ The workflow below launches a FastAPI application:
 
 ## Secrets
 
-Secrets can be used to access passwords and tokens securely from workflows (without hard-coding them in the code).
+Secrets can be used to access passwords and tokens securely from remote workflows (without hard-coding them in the code).
 
 ### Weights & Biases
 
@@ -743,3 +605,181 @@ via the `WANDB_API_KEY` environment variable:
     ```
 
 Secrets can be managed via the [`dstack secrets`](../reference/cli/index.md#dstack-secrets-add) command.
+
+!!! info "NOTE:"
+    Secrets are currently only supported by remote workflows.
+
+[//]: # (TODO: Align secrets with local and remote workflows)
+
+## Python
+
+The workflow below runs a Python script that prints `"Hello, world!"`:
+
+=== "`.dstack/workflows/python.yaml`"
+
+    ```yaml
+    workflows:
+      - name: hello-py
+        provider: bash
+        commands:
+          - python python/hello.py
+    ```
+
+=== "`python/hello.py`"
+
+    ```python
+    if __name__ == '__main__':
+        print("Hello, world!")
+    ```
+
+Run it locally using the `dstack run` command:
+
+```shell hl_lines="1"
+dstack run hello-py
+```
+
+You'll see the output in real-time as your workflow is running:
+
+```shell hl_lines="1"
+RUN           WORKFLOW  SUBMITTED  OWNER           STATUS     TAG 
+slim-shady-1  hello-py  now        peterschmidt85  Submitted  
+ 
+Provisioning... It may take up to a minute. ✓
+
+To interrupt, press Ctrl+C.
+
+Hello, world
+```
+
+### Python packages
+
+You can use both `pip` and `conda` within workflows install Python packages.
+
+The workflow below installs `pandas` via `pip` and runs a Python script that uses `pandas`:
+
+=== "`.dstack/workflows/python.yaml`"
+
+    ```yaml
+    workflows:
+      - name: hello-pandas
+        provider: bash
+        commands:
+          - pip install pandas
+          - python python/hello_pandas.py
+    ```
+
+=== "`python/hello_pandas.py`"
+
+    ```python
+    import pandas as pd
+
+    if __name__ == '__main__':
+        df = pd.DataFrame(
+            {
+                "Name": [
+                    "Braund, Mr. Owen Harris",
+                    "Allen, Mr. William Henry",
+                    "Bonnell, Miss. Elizabeth",
+                ],
+                "Age": [22, 35, 58],
+                "Sex": ["male", "male", "female"],
+            }
+        )
+    
+        print(df)
+
+    ```
+
+Run it locally using the `dstack run` command:
+
+```shell hl_lines="1"
+dstack run hello-pandas
+```
+
+### Conda environments
+
+You can create your custom Conda environments using `conda env create`, 
+save them as artifact, and reuse from other workflows via `deps` and `conda activate`:
+
+=== "`.dstack/workflows/conda.yaml`"
+
+    ```yaml
+    workflows:
+      - name: setup-conda
+        provider: bash
+        commands:
+          - conda env create --file conda/environment.yaml
+        artifacts:
+          - path: /opt/conda/envs/myenv
+    
+      - name: use-conda
+        provider: bash
+        deps:
+          - workflow: setup-conda
+        commands:
+          - conda activate myenv
+          - python conda/hello_pandas.py
+    
+    ```
+
+=== "`conda/hello_pandas`"
+
+    ```python
+    import pandas as pd
+
+    if __name__ == '__main__':
+        df = pd.DataFrame(
+            {
+                "Name": [
+                    "Braund, Mr. Owen Harris",
+                    "Allen, Mr. William Henry",
+                    "Bonnell, Miss. Elizabeth",
+                ],
+                "Age": [22, 35, 58],
+                "Sex": ["male", "male", "female"],
+            }
+        )
+    
+        print(df)
+
+    ```
+
+First, run the `setup-conda` workflow:
+
+```shell hl_lines="1"
+dstack run setup-conda
+```
+
+And then, run the `use-conda` workflow:
+
+```shell hl_lines="1"
+dstack run use-conda
+```
+
+The `use-conda` workflow will reuse the `myenv` environment from the `setup-conda` workflow.
+
+!!! warning "NOTE:"
+    Conda environments are always bound to a specific architecture and cannot be reused on machines 
+    that has a different architecture (e.g. `AMD64` vs `ARM64`).
+
+### Python version
+
+By default, the workflow uses the same Python version that you use locally. 
+You can override the major Python version using the `python` property:
+
+=== "`.dstack/workflows/python-version.yaml`"
+
+    ```yaml
+    workflows:
+      - name: python-version
+        provider: bash
+        python: 3.7
+        commands:
+          - python --version
+    ```
+
+Run it locally using the `dstack run` command:
+
+```shell hl_lines="1"
+dstack run python-version
+```

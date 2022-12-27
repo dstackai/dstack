@@ -1,20 +1,29 @@
-Use pip to install `dstack` locally:
+## Install the CLI
 
-```shell
+Use `pip`, To install the CLI:
+
+```shell hl_lines="1"
 pip install dstack --upgrade
 ```
 
-## Configure the CLI
+!!! info "NOTE:"
+    If you only plan to run workflows locally and do not want to share artifacts with others outside your machine, you do
+    not need to configure anything else.
 
-In order to use `dstack` locally, first you need to run the [`dstack config`](reference/cli/index.md#dstack-config) command 
-on your machine.
+## (Optional) Configure the remote
 
-```shell
+To run workflows remotely (e.g. in the cloud) or share artifacts outside your machine, you must configure your remote 
+settings using the `dstack config` command:
+
+```shell hl_lines="1"
 dstack config
 ```
 
-This command configures the AWS region, where dstack will provision compute resources, and
-the S3 bucket, where `dstack` will save metadata and artifacts.
+!!! info "NOTE:"
+    Currently, the only supported remote type is AWS. 
+
+The `dstack config` command will ask you to choose an AWS profile (which will be used for AWS credentials), an AWS region (where
+workflows will be run), and an S3 bucket (to store remote artifacts and metadata).
 
 ```shell
 AWS profile: default
@@ -33,12 +42,12 @@ The configuration will be saved in the `~/.dstack/config.yaml` file.
     and `DSTACK_AWS_EC2_SUBNET` environment variables.
     This might be convenient, if you run `dstack` from your CI/CD pipeline.
 
-## Configure AWS credentials
+[//]: # (TODO: Describe `dstack config --install`)  
 
-The use of the `dstack` CLI requires AWS credentials. They must be configured on your machine
+### Required AWS credentials
+
+Running workflows remotely requires AWS credentials to be configured on your machine
 (e.g. in `~/.aws/credentials` or `AWS_ACCESS_KEY_ID` and `AWS_SECRET_ACCESS_KEY` environment variables).
-
-### AWS permissions
 
 Here's the full list of AWS permissions the `dstack` CLI needs:
 

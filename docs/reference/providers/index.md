@@ -3,7 +3,7 @@
 Workflows can be defined in the `.dstack/workflows` directory within your project. Within your project,
 you may have multiple workflow files.
 
-Each workflow must specify a provider. Each provider may have its own syntax. Below, you'll find the reference for each provider.
+Each workflow must specify a `provider`. Each provider may have its own syntax. Below, you'll find the reference for each provider.
 
 ## bash
 
@@ -76,8 +76,7 @@ The hardware resources required by the workflow
 - `shm_size` - (Optional) The size of shared memory, e.g. `"8GB"`
 - `interruptible` - (Optional) `true` if you want the workflow to use interruptible instances.
     By default, it's `false`.
-- `local` - (Optional) `true` if you want the workflow to run locally. Requires Docker
-  or [NVIDIA Docker](https://github.com/NVIDIA/nvidia-docker) to be installed locally.
+- `remote` - (Optional) `true` if you want the workflow to run in the cloud.
    By default, it's `false`.
 
 !!! info "NOTE:"
@@ -171,8 +170,7 @@ The hardware resources required by the workflow
 - `shm_size` - (Optional) The size of shared memory, e.g. `"8GB"`
 - `interruptible` - (Optional) `true` if you want the workflow to use interruptible instances.
     By default, it's `false`.
-- `local` - (Optional) `true` if you want the workflow to run locally. Requires Docker
-  or [NVIDIA Docker](https://github.com/NVIDIA/nvidia-docker) to be installed locally.
+- `remote` - (Optional) `true` if you want the workflow to run in the cloud.
    By default, it's `false`.
 
 !!! info "NOTE:"
@@ -248,8 +246,7 @@ The hardware resources required by the workflow
 - `shm_size` - (Optional) The size of shared memory, e.g. `"8GB"`
 - `interruptible` - (Optional) `true` if you want the workflow to use interruptible instances.
     By default, it's `false`.
-- `local` - (Optional) `true` if you want the workflow to run locally. Requires Docker
-  or [NVIDIA Docker](https://github.com/NVIDIA/nvidia-docker) to be installed locally.
+- `remote` - (Optional) `true` if you want the workflow to run in the cloud.
    By default, it's `false`.
 
 !!! info "NOTE:"
@@ -323,8 +320,7 @@ The hardware resources required by the workflow
 - `shm_size` - (Optional) The size of shared memory, e.g. `"8GB"`
 - `interruptible` - (Optional) `true` if you want the workflow to use interruptible instances.
     By default, it's `false`.
-- `local` - (Optional) `true` if you want the workflow to run locally. Requires Docker
-  or [NVIDIA Docker](https://github.com/NVIDIA/nvidia-docker) to be installed locally.
+- `remote` - (Optional) `true` if you want the workflow to run in the cloud.
    By default, it's `false`.
 
 !!! info "NOTE:"
@@ -411,8 +407,7 @@ The hardware resources required by the workflow
 - `shm_size` - (Optional) The size of shared memory, e.g. `"8GB"`
 - `interruptible` - (Optional) `true` if you want the workflow to use interruptible instances.
     By default, it's `false`.
-- `local` - (Optional) `true` if you want the workflow to run locally. Requires Docker
-  or [NVIDIA Docker](https://github.com/NVIDIA/nvidia-docker) to be installed locally.
+- `remote` - (Optional) `true` if you want the workflow to run in the cloud.
    By default, it's `false`.
 
 !!! info "NOTE:"
