@@ -16,7 +16,7 @@ The command provisions the required compute resources (in a configured cloud), f
 ### Usage
 
 ```shell
-dstack run [-h] WORKFLOW [-d] [-l] [-t TAG] [OPTIONS ...] [ARGS ...]
+dstack run [-h] WORKFLOW [-d] [-r] [-t TAG] [OPTIONS ...] [ARGS ...]
 ```
 
 #### Arguments reference
@@ -29,7 +29,7 @@ The following arguments are required:
 The following arguments are optional:
 
 - `-t TAG`, `--tag TAG` - (Optional) A tag name. Warning, if the tag exists, it will be overridden.
-- `-l`, `--local`, - (Optional) Run the workflow locally. Requires Docker
+- `-r`, `--remote`, - (Optional) Run the workflow in the cloud.
   or [NVIDIA Docker](https://github.com/NVIDIA/nvidia-docker) to be installed locally.
 -  `-d`, `--detach` - (Optional) Run the workflow in the detached mode. Means, the `run` command doesn't
   poll for logs and workflow status, but exits immediately. 
@@ -62,6 +62,41 @@ The following arguments are optional and mutually exclusive:
 
 !!! info "NOTE:"
     If `-a` is not used, the command shows only the status of active runs, the last finished one.
+
+## dstack push
+
+The `push` command pushes the artifacts of a local run to the configured remote (e.g. 
+to the configured cloud account).
+
+### Usage
+
+```shell
+dstack push RUN
+```
+
+### Arguments reference
+
+The following arguments are required:
+
+- `RUN` - A name of a run
+
+## dstack pull
+
+The `pull` command downloads the artifacts of a given run or tag from the configured remote (e.g. 
+to the configured cloud account) to the local cache (`~/.dstack/artifacts`).
+
+### Usage
+
+```shell
+dstack pull (RUN | :TAG)
+```
+
+### Arguments reference
+
+One of the following arguments is required:
+
+- `RUN` - A name of a run
+- `:TAG` - A name of a tag
 
 ## dstack stop
 
@@ -110,14 +145,14 @@ The following arguments are optional:
   relative time. For example, a value of `5m` would indicate to display logs starting five
   minutes in the past.
 
-## dstack artifacts list
+## dstack ls
 
-The `artifacts list` command lists the files of the artifacts of a given run or tag.
+The `ls` command lists the files of the artifacts of a given run or tag.
 
 ### Usage
 
 ```shell
-dstack artifacts list (RUN | :TAG)
+dstack ls (RUN | :TAG)
 ```
 
 ### Arguments reference
@@ -125,28 +160,7 @@ dstack artifacts list (RUN | :TAG)
 One of the following arguments is required:
 
 - `RUN` - A name of a run
-- `TAG` - A name of a tag
-
-## dstack artifacts download
-
-The `artifacts download` command downloads the files of the artifacts of a given run or tag.
-
-### Usage
-
-```shell
-dstack artifacts download [-o OUTPUT] (RUN | :TAG)
-```
-
-### Arguments reference
-
-One of the following arguments is required:
-
-- `RUN` - A name of a run
-- `TAG` - A name of a tag
-
-The following arguments are optional:
-
-- `-o`, `--output` – (Optional) The directory to download artifacts to. By default, it's the current directory.
+- `:TAG` - A name of a tag
 
 ## dstack tags list
 

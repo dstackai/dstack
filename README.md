@@ -13,17 +13,16 @@ Reproducible ML workflows for teams
 </h4>
 
 <p align="center">
-<code>dstack</code> allows define ML workflows as code, and run them in a configured cloud via the CLI. 
-It automatically handles workflow dependencies, provisions cloud infrastructure, and versions 
-data, models, and environments.
+<code>dstack</code> is a free and open-source ML workflow orchestration system designed to drive reproducibility and
+collaboration in ML projects.
 </p>
 
-[![Slack](https://img.shields.io/badge/slack-chat%20with%20us-blueviolet?logo=slack&style=for-the-badge)](https://join.slack.com/t/dstackai/shared_invite/zt-xdnsytie-D4qU9BvJP8vkbkHXdi6clQ)
+[![Slack](https://img.shields.io/badge/slack-join%20community-blueviolet?logo=slack&style=for-the-badge)](https://join.slack.com/t/dstackai/shared_invite/zt-xdnsytie-D4qU9BvJP8vkbkHXdi6clQ)
 
 <p align="center">
 <a href="https://docs.dstack.ai" target="_blank"><b>Docs</b></a> • 
-<a href="https://docs.dstack.ai/examples" target="_blank"><b>Examples</b></a> • 
 <a href="https://docs.dstack.ai/tutorials/quickstart"><b>Quickstart</b></a> • 
+<a href="https://docs.dstack.ai/examples" target="_blank"><b>Examples</b></a> • 
 <a href="https://join.slack.com/t/dstackai/shared_invite/zt-xdnsytie-D4qU9BvJP8vkbkHXdi6clQ" target="_blank"><b>Slack</b></a> 
 </p>
 
@@ -32,56 +31,33 @@ data, models, and environments.
 
 </div>
 
-### Features
+`dstack` makes it easier for teams to run ML workflows independently of environment, 
+whether it be local or in the cloud, and to easily share and reuse data and models.
 
-* **GitOps-driven:** Define your ML workflows via YAML, and run them in a configured cloud using the CLI, &mdash; 
-  interactively from the IDE or from your CI/CD pipeline.
-* **Collaborative:** Version data, models, and environments, and reuse them easily in other workflows &mdash; 
-  across different projects and teams.
-* **Cloud-native:** Run workflows locally or in a configured cloud.
-  Configure the resources required by workflows (memory, GPU, etc.) as code.
-* **Vendor-agnostic:** Use any cloud provider, languages, frameworks, tools, and third-party services. No code changes
-  is required.
-* **Dev environments:** For debugging purposes, attach interactive dev environments (e.g. VS Code, JupyterLab, etc.)
-  directly to running workflows.
+### How does it work?
 
-## How does it work?
-
-1. Install `dstack` CLI locally 
-2. Configure the cloud credentials locally (e.g. via `~/.aws/credentials`)
-3. Define ML workflows in `.dstack/workflows` (within your existing Git repository)
-4. Run ML workflows via the `dstack run` CLI command
-5. Use other `dstack` CLI commands to manage runs, artifacts, etc.
-
-When you run a workflow via the `dstack` CLI, it provisions the required compute resources (in a configured cloud
-account), sets up environment (such as Python, Conda, CUDA, etc), fetches your code, downloads deps,
-saves artifacts, and tears down compute resources.
-
-### Demo
-
-<video src="https://user-images.githubusercontent.com/54148038/203490366-e32ef5bb-e134-4562-bf48-358ade41a225.mp4" controls="controls" style="max-width: 800px;"> 
-</video>
+1. Install `dstack` CLI 
+2. Run workflows locally and reuse artifacts across workflows
+3. Configure remote settings (e.g. your cloud account)
+4. Run workflows remotely and reuse artifacts across teams
 
 ## Installation
 
 Use pip to install `dstack` locally:
 
 ```shell
-pip install dstack
+pip install dstack --upgrade
 ```
 
-The `dstack` CLI needs your AWS account credentials to be configured locally 
-(e.g. in `~/.aws/credentials` or `AWS_ACCESS_KEY_ID` and `AWS_SECRET_ACCESS_KEY` environment variables).
-
-Before you can use the `dstack` CLI, you need to configure it:
+To run workflows remotely (e.g. in the cloud) or share artifacts outside your machine, you must configure your remote
+settings using the `dstack config` command:
 
 ```shell
 dstack config
 ```
 
-It will prompt you to select an AWS region 
-where `dstack` will provision compute resources, and an S3 bucket, 
-where dstack will store state and output artifacts.
+This command will ask you to choose an AWS profile (which will be used for AWS credentials), an AWS
+region (where workflows will be run), and an S3 bucket (to store remote artifacts and metadata).
 
 ```shell
 AWS profile: default
@@ -90,13 +66,47 @@ S3 bucket: dstack-142421590066-eu-west-1
 EC2 subnet: none
 ```
 
+## Example
+
+Here's an example from [dstack-examples](https://github.com/dstackai/dstack-examples).
+
+```yaml
+workflows:
+  # Saves the MNIST dataset as reusable artifact for other workflows
+  - name: mnist-data
+    provider: bash
+    commands:
+      - pip install -r mnist/requirements.txt
+      - python mnist/download.py
+    artifacts:
+      # Saves the folder with the dataset as an artifact
+      - path: ./data
+
+  # Trains a model using the dataset from the `mnist-data` workflow
+  - name: mnist-train
+    provider: bash
+    deps:
+      # Depends on the artifacts from the `mnist-data` workflow
+      - workflow: mnist-data
+    commands:
+      - pip install -r mnist/requirements.txt
+      - python mnist/train.py
+    artifacts:
+      # Saves the `folder with logs and checkpoints as an artifact
+      - path: ./lightning_logs
+```
+
+With workflows defined in this manner, `dstack` allows for effortless execution either locally 
+or in a configured cloud account, while also enabling versioning and reuse of artifacts.
+
 ## More information
 
+For additional information and examples, see the following links:
+
 * [Docs](https://docs.dstack.ai/)
-* [Examples](https://docs.dstack.ai/examples)
-* [Innstallation](https://docs.dstack.ai/installation)
+* [Installation](https://docs.dstack.ai/installation)
 * [Quickstart](https://docs.dstack.ai/tutorials/quickstart)
-* [Slack](https://join.slack.com/t/dstackai/shared_invite/zt-xdnsytie-D4qU9BvJP8vkbkHXdi6clQ)
+* [Examples](https://docs.dstack.ai/examples)
  
 ##  Licence
 

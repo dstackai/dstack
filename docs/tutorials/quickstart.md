@@ -1,73 +1,79 @@
 # Quickstart
 
-Make sure you've [configured](../installation.md) the `dstack` CLI.
+In this tutorial, we will learn how to use `dstack` to run ML workflows 
+independently of the environment, and enable sharing of data and models within your team.
 
-## Clone repo
+## Step 1: Clone repo
 
 In this tutorial, we'll use the 
-[`dstackai/dstack-examples`](https://github.com/dstackai/dstack-examples) GitHub repo. Go ahead and clone this 
-repo.
+[`dstackai/dstack-examples`](https://github.com/dstackai/dstack-examples) GitHub repo. Go ahead and clone it:
 
 ```shell hl_lines="1-2"
 git clone https://github.com/dstackai/dstack-examples.git
 cd dstack-examples
 ```
 
-If you open the `.dstack/workflows/mnist.yaml` file inside the project, you'll see the following:
+If you open the `.dstack/workflows/mnist.yaml` file, you'll see the following:
 
 ```yaml
 workflows:
-  - name: mnist-download
+  # Saves the MNIST dataset as reusable artifact for other workflows
+  - name: mnist-data
     provider: bash
     commands:
-      - pip install -r requirements.txt
+      - pip install -r mnist/requirements.txt
       - python mnist/download.py
     artifacts:
+      # Saves the folder with the dataset as an artifact
       - path: ./data
 
+  # Trains a model using the dataset from the `mnist-data` workflow
   - name: mnist-train
-    deps:
-      - tag: mnist-data
     provider: bash
+    deps:
+      # Depends on the artifacts from the `mnist-data` workflow
+      - workflow: mnist-data
     commands:
-      - pip install -r requirements.txt
+      - pip install -r mnist/requirements.txt
       - python mnist/train.py
     artifacts:
+      # Saves the `folder with logs and checkpoints as an artifact
       - path: ./lightning_logs
 ```
 
-The `mnist-download` workflow downloads the dataset to the `data` folder and saves it as an artifact.
+!!! info "NOTE:"
+    With workflows defined in this manner, `dstack` allows for effortless execution in any environment (whether locally 
+    or remotely), while also enabling versioning and reuse of artifacts.
+    
+## Step 2: Init repo
 
-The `mnist-train` workflow uses the data from the `mnist-data` tag to train a model. 
+If you haven't yet installed `dstack`, run this command:
 
-It writes checkpoints and logs within the `lightning_logs` folder, and saves it as an artifact.
+```shell hl_lines="1"
+pip install dstack --upgrade
+```
 
-## Init repo
-
-Before you can use `dstack` on a new Git repo, you have to run the `dstack init` command:
+Before using `dstack` on a new repo, run the `dstack init` command:
 
 ```shell hl_lines="1"
 dstack init
 ```
 
-It will ensure that `dstack` has the access to the Git repo.
+## Step 3: Run mnist-data workflow locally
 
-## Run download workflow
+By default, `dstack` runs the workflow locally.
 
-Now, you can use the [`dstack run`](../reference/cli/index.md#dstack-run) command to run the `mnist-download` workflow:
+Let's go ahead and run the `mnist-data` workflow using the [`dstack run`](../reference/cli/index.md#dstack-run) command:
 
 ```shell hl_lines="1"
-dstack run mnist-download
+dstack run mnist-data
 ```
 
-When you run a workflow, the CLI provisions infrastructure, prepares environment, fetches your code,
-etc.
-
-You'll see the output in real-time as your workflow is running.
+As the workflow is running, you will see its output:
 
 ```shell hl_lines="1"
-RUN             WORKFLOW        SUBMITTED  OWNER           STATUS     TAG 
-grumpy-zebra-1  mnist-download  now        peterschmidt85  Submitted  
+RUN             WORKFLOW    SUBMITTED  OWNER           STATUS     TAG 
+grumpy-zebra-1  mnist-data  now        peterschmidt85  Submitted  
  
 Provisioning... It may take up to a minute. ✓
 
@@ -83,48 +89,43 @@ Downloading http://yann.lecun.com/exdb/mnist/train-labels-idx2-ubyte.gz
 Extracting /workflow/data/MNIST/raw/train-images-idx2-ubyte.gz
 ```
 
-Once the workflow is finished, its artifacts are saved and infrastructure is torn down.
-
 !!! info "NOTE:"
-    If you want `dstack` to run your workflow locally (instead of provisioning infrastructure in the cloud),
-    use the `--local` argument (or `-l` for shorter).
+    To run workflows locally, it is required to have either Docker or [NVIDIA Docker](https://github.com/NVIDIA/nvidia-docker) 
+    pre-installed.
 
-    ```shell hl_lines="1" 
-    dstack run mnist-download -l
-    ```
+### Check status
 
-    Running workflows locally requires Docker or [NVIDIA Docker](https://github.com/NVIDIA/nvidia-docker) 
-    to be installed locally.
-
-Use the [`dstack ps`](../reference/cli/index.md#dstack-ps) command to see the status of recent workflows.
+To check the status of recent runs, use the [`dstack ps`](../reference/cli/index.md#dstack-ps) command:
 
 ```shell hl_lines="1"
 dstack ps
 ```
 
-It shows currently running workflows or the last finished one. 
+This command displays either the current running workflows or the last completed run:
 
 ```shell hl_lines="1"
-RUN             WORKFLOW        SUBMITTED  OWNER           STATUS  TAG 
-grumpy-zebra-1  mnist-download  a min ago  peterschmidt85  Done    
+RUN             WORKFLOW    SUBMITTED  OWNER           STATUS  TAG 
+grumpy-zebra-1  mnist-data  a min ago  peterschmidt85  Done    
 ```
 
-To see all workflows, use the `dstack ps -a` command. 
+To see all runs, use the `dstack ps -a` command.
 
-!!! tip "NOTE:"
-    The value in the `RUN` column is the name of the corresponding run. It serves as a unique identifier of the run.
+!!! info "NOTE:"
+    The `RUN` column contains the name of the run. Use this value in other CLI commands (e.g.
+    [`dstack stop`](../reference/cli/index.md#dstack-stop), [`dstack artifacts`](../reference/cli/index.md#dstack-artifacts), etc.) to refer to the 
+    corresponding run.
 
-## Access artifacts
+### List artifacts
 
-To see artifacts of a run, use the
-[`dstack artifacts list`](../reference/cli/index.md#dstack-artifacts-list) command followed
-by the name of the run.
+Once a run is finished, its artifacts are saved and can be reused.
+
+You can list artifacts of any run using the [`dstack ls`](../reference/cli/index.md#dstack-ls) command:
 
 ```shell hl_lines="1"
-dstack artifacts list grumpy-zebra-1
+dstack ls grumpy-zebra-1
 ```
 
-It will list all saved files inside artifacts along with their size:
+This will display all the files and their sizes:
 
 ```shell hl_lines="1"
 PATH  FILE                                  SIZE
@@ -138,37 +139,16 @@ data  MNIST/raw/t10k-images-idx3-ubyte      7.5MiB
       MNIST/raw/train-labels-idx1-ubyte.gz  28.2KiB
 ```
 
-## Add tag
+## Step 4: Run mnist-train workflow locally
 
-If you want to use the artifacts of a particular run from other workflows, you
-can add a tag to this run.
-
-Let's assign the `mnist-data` tag to our finished run `grumpy-zebra-1`.
-
-```shell hl_lines="1"
-dstack tags add mnist-data grumpy-zebra-1
-```
-
-You can see all tags of the current repo via the `dstack tags` command.
-
-[//]: # (Note, tag names within on Git repo must be unique.)
-
-You can use a tag name instead of the run name with the `dstack artifacts` command. 
-Just put a colon before the tag name:
-
-```shell
-dstack artifacts list :mnist-data
-```
-
-## Run train workflow
-
-Now that the `mnist-data` tag is added, we can run the `mnist-train` workflow.
+Now, let's run the `mnist-train` workflow:
 
 ```shell hl_lines="1"
 dstack run mnist-train
 ```
 
-On the start of the `mnist-train` workflow, dstack will download the artifacts of the tag `mnist-data` to the working directory.
+Because the `mnist-train` workflow depends on the `mnist-data` workflow,
+it will reuse the artifacts from the most recent run of the `mnist-data` workflow.
 
 ```shell hl_lines="1"
 RUN            WORKFLOW     SUBMITTED  OWNER           STATUS     TAG 
@@ -187,13 +167,79 @@ val_acc       0.965399980545044
 val_loss      0.10975822806358337
 ```
 
-## Download artifacts
+!!! info "NOTE:"
+    If necessary, `dstack` allows you to reuse artifacts from a specific run (rather than using the most recent run) 
+    by using [tags](../examples/index.md#tags). However, this is beyond the scope of this tutorial.
 
-Once the `mnist-train` workflow is finished, if you want, you can download its artifacts using 
-the [`dstack artifacts download`](../reference/cli/index.md#dstack-artifacts-download) command.
+## Step 5: Configure the remote
+
+When you run a workflow locally, artifacts are stored in `~/.dstack/artifacts` and 
+can be reused only from the workflows that run locally too.
+
+To run workflows remotely (e.g. in the cloud) or enable reuse of the artifacts outside your machine, configure your
+remote settings using the [`dstack config`](../reference/cli/index.md#dstack-config) command:
 
 ```shell hl_lines="1"
-dstack artifacts download wet-mangust-2 .
+dstack config
 ```
 
-It will download the `lightning_logs` folder to the current directory.
+This command will ask you to choose an AWS profile (which will be used for AWS credentials), an AWS region (where
+workflows will be run), and an S3 bucket (to store remote artifacts and metadata):
+
+```shell
+AWS profile: default
+AWS region: eu-west-1
+S3 bucket: dstack-142421590066-eu-west-1
+EC2 subnet: none
+```
+
+## Step 5 (Optional): Push artifacts
+
+If you'd like to reuse the artifacts of the `mnist-data` workflow outside your machine,
+you must push these artifacts using the `dstack push` command:
+
+```shell hl_lines="1"
+dstack push grumpy-zebra-1
+```
+
+!!! info "NOTE:"
+    If you run a workflow remotely, artifacts are pushed automatically, and it's typically 
+    a lot faster than pushing artifacts of a local run.
+
+    Therefore, if you plan to reuse the artifacts of the `mnist-data` workflow remotely, it's
+    easier to run the `mnist-data` workflow remotely in the first place.
+
+## Step 6: Run mnist-train remotely
+
+!!! info "NOTE:"
+    Before we run the `mnist-train` workflow remotely, we have to ensure that the artifacts of the `mnist-data` 
+    workflow are available remotely.
+
+    For this, either follow the previous step (pushing artifacts to the cloud), or run the `mnist-data` workflow in the cloud:
+
+    ```shell hl_lines="1"
+    dstack run mnist-data --remote
+    ```
+
+Now, let's run the `mnist-train` workflow in the cloud:
+
+```shell hl_lines="1"
+dstack run mnist-train --remote
+```
+
+When you run a workflow remotely, `dstack` automatically sets up the necessary infrastructure (e.g. within a 
+configured cloud account), runs the workflow, and upon completion, saves the artifacts remotely and tears down 
+the infrastructure.
+
+!!! info "NOTE:"
+    You can specify hardware resource requirements, such as the GPU, memory, and the use of interruptible instances, 
+    for each remotely running workflow using [`resources`](../examples/index.md#resources). 
+    However, this topic will not be addressed in this tutorial.
+
+[//]: # (Consider introducing `remotes` and resources `profiles` - To be elaborated)
+
+[//]: # (## Conclusion)
+
+[//]: # (Reiterate on what is the main value of dstack)
+
+[//]: # (Mention what is not covered)
