@@ -140,7 +140,7 @@ def unserialize_job(job_data: dict) -> Job:
                                            job_data["repo_branch"], job_data["repo_hash"],
                                            job_data["repo_diff"] or None),
               job_data["run_name"], job_data.get("workflow_name") or None, job_data["provider_name"],
-              job_data["local_repo_user_name"], job_data.get("local_repo_user_email") or None,
+              job_data.get("local_repo_user_name"), job_data.get("local_repo_user_email") or None,
               JobStatus(job_data["status"]), job_data["submitted_at"], job_data["image_name"],
               job_data.get("commands") or None, job_data["env"] or None, job_data.get("working_dir") or None,
               artifact_specs, job_data.get("port_count") or None, job_data.get("ports") or None,
