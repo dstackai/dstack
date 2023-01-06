@@ -12,7 +12,7 @@ repo_name: dstackai/dstack
 edit_uri: edit/master/docs/
 
 #Copyright
-copyright: © 2022 dstack GmbH
+copyright: © 2023 dstack GmbH
 
 # Configuration
 theme:
@@ -41,6 +41,8 @@ theme:
   #          icon: material/weather-sunny
   #          name: Switch to light mode
   features:
+    - content.code.copy
+    - content.action.edit
 #    - navigation.indexes
     - navigation.tabs
 #    - navigation.instant
