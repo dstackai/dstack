@@ -41,7 +41,10 @@ from dstack.cli.ps import ps_func, _has_request_status
 from core.config import ConfigError
 from dstack.jobs import JobStatus, JobHead
 from core.repo import load_repo_data, RepoAddress
+<<<<<<<< HEAD:cli/dstack/cli/commands/run/__init__.py
 >>>>>>>> c0a4b24 (- [CLI]: New implementation CLI.):cli/dstack/cli/run.py
+========
+>>>>>>>> 7c7ba9b (- [CLI]: New implementation CLI.):cli/dstack/cli/run.py
 
 POLL_PROVISION_RATE_SECS = 3
 
