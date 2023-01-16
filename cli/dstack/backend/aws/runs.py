@@ -46,11 +46,11 @@ def _update_run(ec2_client: BaseClient, s3_client: BaseClient, bucket_name: str,
         if run.artifact_heads is None:
             run.artifact_heads = []
         run.artifact_heads.extend(
-            list(map(lambda artifact_path: ArtifactHead(job.job_id, artifact_path), job_head.artifact_paths)))
+            list(map(lambda artifact_path: ArtifactHead(job_head.job_id, artifact_path), job_head.artifact_paths)))
     if job_head.app_names:
         if run.app_heads is None:
             run.app_heads = []
-        run.app_heads.extend(list(map(lambda app_name: AppHead(job.job_id, app_name), job_head.app_names)))
+        run.app_heads.extend(list(map(lambda app_name: AppHead(job_head.job_id, app_name), job_head.app_names)))
     if job_head.status.is_unfinished():
         run.status = job_head.status
         if include_request_heads:
