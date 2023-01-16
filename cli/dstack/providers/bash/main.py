@@ -1,7 +1,7 @@
 from argparse import ArgumentParser
 from typing import List, Optional, Dict, Any
 
-from dstack.jobs import JobSpec, AppSpec
+from dstack.core.job import JobSpec, AppSpec
 from dstack.providers import Provider
 
 

@@ -9,8 +9,9 @@ from typing import Optional, List, Dict, Any, Union
 from jinja2 import Template
 
 from dstack.backend import load_backend, Backend
-from dstack.jobs import Job, JobStatus, JobSpec, Requirements, GpusRequirements, DepSpec, ArtifactSpec
-from dstack.repo import load_repo_data, RepoData, RepoAddress, _repo_address_path
+from dstack.core.job import Job, JobStatus, JobSpec, Requirements, GpusRequirements, DepSpec, ArtifactSpec
+from dstack.core.repo import RepoData, RepoAddress, _repo_address_path
+from dstack.api.repo import load_repo_data
 from dstack.util import _quoted
 
 

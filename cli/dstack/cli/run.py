@@ -23,9 +23,9 @@ from dstack import providers
 from dstack.backend import load_backend, Backend, RequestStatus
 from dstack.cli.logs import poll_logs, since
 from dstack.cli.ps import ps_func, _has_request_status
-from dstack.config import ConfigError
+from core.config import ConfigError
 from dstack.jobs import JobStatus, JobHead
-from dstack.repo import load_repo_data, RepoAddress
+from core.repo import load_repo_data, RepoAddress
 
 POLL_PROVISION_RATE_SECS = 3
 

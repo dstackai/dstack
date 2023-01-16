@@ -3,7 +3,7 @@ from unittest import TestCase
 
 from yaml import dump
 
-from dstack.config import *
+from core.config import *
 
 
 class TestConfig(TestCase):

@@ -1,6 +1,6 @@
 from typing import Optional, List
 
-from dstack.jobs import Job
+from dstack.core.job import Job
 
 
 class Gpu:
