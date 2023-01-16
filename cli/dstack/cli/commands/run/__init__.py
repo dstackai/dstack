@@ -20,6 +20,7 @@ from websocket import WebSocketApp
 
 
 from dstack import providers
+<<<<<<<< HEAD:cli/dstack/cli/commands/run/__init__.py
 from dstack.core.error import check_config, check_git, check_backend
 from dstack.core.repo import RepoAddress
 from dstack.backend import Backend
@@ -33,6 +34,14 @@ from dstack.api.logs import poll_logs
 from dstack.util import since
 
 __all__ = "RunCommand"
+========
+from dstack.backend import load_backend, Backend, RequestStatus
+from dstack.cli.logs import poll_logs, since
+from dstack.cli.ps import ps_func, _has_request_status
+from core.config import ConfigError
+from dstack.jobs import JobStatus, JobHead
+from core.repo import load_repo_data, RepoAddress
+>>>>>>>> c0a4b24 (- [CLI]: New implementation CLI.):cli/dstack/cli/run.py
 
 POLL_PROVISION_RATE_SECS = 3
 
