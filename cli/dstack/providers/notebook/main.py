@@ -2,7 +2,8 @@ import uuid
 from argparse import ArgumentParser
 from typing import List, Optional, Dict, Any
 
-from dstack.jobs import AppSpec, JobSpec
+from dstack.core.job import JobSpec
+from dstack.core.app import AppSpec
 from dstack.providers import Provider
 
 
