@@ -6,7 +6,7 @@ class LocalBackend(Backend):
     NAME = "local"
 
     def __init__(self):
-        self._loaded = True
+        self._loaded = False
         self.backend_config = LocalConfig
 
     def configure(self):

@@ -4,7 +4,7 @@ from botocore.client import BaseClient
 
 from dstack.backend import Backend, BackendType
 from dstack.backend.aws import logs, artifacts, jobs, run_names, runs, runners, tags, repos, secrets, config
-from dstack.core.config import BackendConfig
+from dstack.backend.aws.__config__ import AWSConfig
 from dstack.core.app import AppSpec
 from dstack.core.repo import LocalRepoData, RepoAddress, RepoHead, RepoCredentials
 from dstack.core.job import Job, JobHead
@@ -14,22 +14,12 @@ from dstack.core.tag import TagHead
 from dstack.core.secret import Secret
 
 
-"""
-class AwsBackendConfig(BackendConfig):
-    def __init__(self, profile_name: Optional[str], region_name: Optional[str], bucket_name: str,
-                 subnet_id: Optional[str]):
-        super().__init__()
-        self.bucket_name = bucket_name
-        self.region_name = region_name
-        self.profile_name = profile_name
-        self.subnet_id = subnet_id
-"""
-
 class AwsBackend(Backend):
     NAME = "AWS"
 
     def __init__(self):
-        self.backend_config = None #TODO Load config
+        self.backend_config = AWSConfig()
+        self._loaded = True
 
     def _s3_client(self) -> BaseClient:
         session = boto3.Session(profile_name=self.backend_config.profile_name,
@@ -60,10 +50,6 @@ class AwsBackend(Backend):
         session = boto3.Session(profile_name=self.backend_config.profile_name,
                                 region_name=self.backend_config.region_name)
         return session.client("sts")
-
-    def validate_bucket(self) -> bool:
-        return config.validate_bucket(self._s3_client(), self.backend_config.bucket_name,
-                                      self.backend_config.region_name)
 
     def configure(self):
         config.configure(self._ec2_client(), self._iam_client(), self.backend_config.bucket_name,
