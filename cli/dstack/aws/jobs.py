@@ -71,9 +71,7 @@ def _serialize_requirements(requirements) -> Dict[str, Any]:
     req_data = {}
     if requirements:
         if requirements.cpus:
-            req_data["cpus"] = {
-                "count": requirements.cpus
-            }
+            req_data["cpus"] = requirements.cpus
         if requirements.memory_mib:
             req_data["memory_mib"] = requirements.memory_mib
         if requirements.gpus:
