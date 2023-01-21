@@ -1,8 +1,10 @@
 from argparse import ArgumentParser
 from typing import List, Optional, Dict, Any
 
-from dstack.jobs import AppSpec, JobSpec
+from dstack.core.job import JobSpec
+from dstack.core.app import AppSpec
 from dstack.providers import Provider
+from dstack.backend import Backend
 
 
 class DockerProvider(Provider):
@@ -17,8 +19,8 @@ class DockerProvider(Provider):
         self.ports = None
         self.resources = None
 
-    def load(self, provider_args: List[str], workflow_name: Optional[str], provider_data: Dict[str, Any], run_name: str):
-        super().load(provider_args, workflow_name, provider_data, run_name)
+    def load(self, backend: Backend, provider_args: List[str], workflow_name: Optional[str], provider_data: Dict[str, Any], run_name: str):
+        super().load(backend, provider_args, workflow_name, provider_data, run_name)
         self.image_name = self.provider_data["image"]
         self.setup = self._get_list_data("setup") or self._get_list_data("before_run")
         self.commands = self._get_list_data("commands")
