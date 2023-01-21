@@ -155,7 +155,7 @@ class Backend(object):
         pass
 
     def delete_secret(self, repo_address: RepoAddress, secret_name: str):
-        pass
+        ...
 
     def loaded(self):
         return self._loaded
