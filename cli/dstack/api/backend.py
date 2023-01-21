@@ -26,6 +26,6 @@ def get_backend_by_name(name: str) -> Optional[Backend]:
     all_backends = [cls() for cls in Backend.__subclasses__()]  # pylint: disable=E1101
     for current_backend in all_backends:
         if current_backend.loaded():
-            if current_backend.name == name:
+            if current_backend.NAME == name:
                 return current_backend
     raise BackendError(f"Not a backend named {name}")

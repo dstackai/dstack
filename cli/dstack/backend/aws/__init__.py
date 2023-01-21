@@ -15,10 +15,11 @@ from dstack.core.secret import Secret
 
 
 class AwsBackend(Backend):
-    NAME = "AWS"
+    NAME = "aws"
 
     def __init__(self):
         self.backend_config = AWSConfig()
+        self.backend_config.load()
         self._loaded = True
 
     def _s3_client(self) -> BaseClient:

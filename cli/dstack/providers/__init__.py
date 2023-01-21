@@ -8,7 +8,7 @@ from typing import Optional, List, Dict, Any, Union
 
 from jinja2 import Template
 
-from dstack.backend import load_backend, Backend
+from dstack.backend import Backend
 from dstack.core.job import Job, JobStatus, JobSpec, Requirements, GpusRequirements, DepSpec, ArtifactSpec
 from dstack.core.repo import RepoData, RepoAddress, _repo_address_path
 from dstack.api.repo import load_repo_data
@@ -114,7 +114,7 @@ class Provider:
         else:
             return obj
 
-    def load(self, provider_args: List[str], workflow_name: Optional[str], provider_data: Dict[str, Any],
+    def load(self, backend: Backend, provider_args: List[str], workflow_name: Optional[str], provider_data: Dict[str, Any],
              run_name: str):
         self.provider_args = provider_args
         self.workflow_name = workflow_name
@@ -123,7 +123,7 @@ class Provider:
         self.run_name = run_name
         self.parse_args()
         self._inject_context()
-        self.dep_specs = self._dep_specs()
+        self.dep_specs = self._dep_specs(backend)
         self.loaded = True
 
     @abstractmethod
@@ -202,12 +202,11 @@ class Provider:
     def parse_args(self):
         pass
 
-    def submit_jobs(self, tag_name: str) -> List[Job]:
+    def submit_jobs(self, backend: Backend, tag_name: str) -> List[Job]:
         if not self.loaded:
             raise Exception("The provider is not loaded")
         job_specs = self.create_job_specs()
         repo_data = load_repo_data()
-        backend = load_backend()
         # [TODO] Handle master job
         jobs = []
         counter = []
@@ -224,10 +223,9 @@ class Provider:
             backend.add_tag_from_run(repo_data, tag_name, self.run_name, jobs)
         return jobs
 
-    def _dep_specs(self) -> Optional[List[DepSpec]]:
+    def _dep_specs(self, backend: Backend) -> Optional[List[DepSpec]]:
         if self.provider_data.get("deps"):
             repo_data = load_repo_data()
-            backend = load_backend()
             return [self._parse_dep_spec(dep, backend, repo_data) for dep in self.provider_data["deps"]]
         else:
             return None

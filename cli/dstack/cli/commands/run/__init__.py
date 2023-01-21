@@ -225,7 +225,7 @@ class RunCommand(BasicCommand):
             try:
                 repo_data = load_repo_data()
                 backend_name = DEFAULT
-                if args.remote:
+                if args.remote is not None:
                     if len(args.remote) == 0:
                         backend_name = DEFAULT_REMOTE
                     else:
@@ -240,7 +240,7 @@ class RunCommand(BasicCommand):
 
                 if backend.get_repo_credentials(repo_data):
                     run_name = backend.create_run(repo_data)
-                    provider.load(provider_args, workflow_name, workflow_data, run_name)
+                    provider.load(backend, provider_args, workflow_name, workflow_data, run_name)
                     if args.tag_name:
                         tag_head = backend.get_tag_head(repo_data, args.tag_name)
                         if tag_head:
@@ -249,9 +249,9 @@ class RunCommand(BasicCommand):
                             backend.delete_tag_head(repo_data, tag_head)
                             # else:
                             #     return
-                    jobs = provider.submit_jobs(args.tag_name)
+                    jobs = provider.submit_jobs(backend, args.tag_name)
                     backend.update_repo_last_run_at(repo_data, last_run_at=int(round(time.time() * 1000)))
-                    print_runs(Namespace(run_name=run_name, all=False))
+                    print_runs(Namespace(run_name=run_name, all=False), backend)
                     if not args.detach:
                         poll_run(repo_data, jobs, backend)
                 else:

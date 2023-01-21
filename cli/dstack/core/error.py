@@ -37,7 +37,7 @@ def check_backend(func):
     def decorator(*args, **kwargs):
         try:
             func(*args, **kwargs)
-        except BackendError:
-            sys.exit(f"{os.getcwd()} is not a Git repo")
+        except BackendError as e:
+            sys.exit(e.message)
 
     return decorator

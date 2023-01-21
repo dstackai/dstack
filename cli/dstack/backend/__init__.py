@@ -162,15 +162,3 @@ class Backend(object):
 
     def type(self) -> BackendType:
         ...
-
-
-def load_backend() -> Backend:
-    """
-    config = load_config()
-    if isinstance(config.backend_config, AwsBackendConfig):
-        from dstack.backend.aws import AwsBackend
-
-        return AwsBackend(config.backend_config)
-    else:
-        raise Exception(f"Unsupported backend: {config.backend_config}")
-    """
