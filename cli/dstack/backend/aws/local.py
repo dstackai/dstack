@@ -14,7 +14,7 @@ from psutil import NoSuchProcess
 from tqdm import tqdm
 
 from dstack import version
-#from dstack.core.config import load_config
+from dstack.core.config import BackendConfig
 from dstack.runners import Resources, Gpu
 
 
@@ -63,10 +63,11 @@ def _runner_path() -> Path:
     return _config_directory_path() / "tmp" / "runner" / "bin" / _runner_version() / _runner_filename()
 
 
-def _get_runner_config_dir(runner_id: str, config: Optional[Config] = None, create: Optional[bool] = None) -> Path:
+def _get_runner_config_dir(runner_id: str, config: Optional[BackendConfig] = None, create: Optional[bool] = None) -> Path:
     runner_config_dir_path = _config_directory_path() / "tmp" / "runner" / "configs" / runner_id
     if create:
         runner_config_dir_path.mkdir(parents=True, exist_ok=True)
+        config.save(path=runner_config_dir_path / "config.yaml")
         #write_config(config, runner_config_dir_path / "config.yaml") //Ivan
         runner_config_path = runner_config_dir_path / "runner.yaml"
         runner_config_path.write_text(yaml.dump({

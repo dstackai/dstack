@@ -1,7 +1,6 @@
 import sys
 from argparse import Namespace
 
-from dstack.backend import Backend
 from dstack.core.error import check_config, check_git
 from dstack.cli.commands import BasicCommand
 from dstack.api.repo import load_repo_data

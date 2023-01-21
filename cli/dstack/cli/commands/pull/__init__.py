@@ -1,8 +1,6 @@
 import sys
 
 from argparse import Namespace
-from rich.console import Console
-from rich.table import Table
 
 from dstack.core.error import check_config, check_git
 from dstack.cli.commands import BasicCommand
