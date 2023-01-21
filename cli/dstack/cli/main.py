@@ -54,19 +54,6 @@ def main():
     subparsers = parser.add_subparsers()
 
     cli_initialize(parser=subparsers)
-    """
-    artifacts.register_parsers(subparsers)
-    config.register_parsers(subparsers)
-    init.register_parsers(subparsers)
-    logs.register_parsers(subparsers)
-    rm.register_parsers(subparsers)
-    # restart.register_parsers(subparsers)
-    run.register_parsers(subparsers)
-    secrets.register_parsers(subparsers)
-    # ps.register_parsers(subparsers) // Ivan
-    stop.register_parsers(subparsers)
-    tags.register_parsers(subparsers)
-    """
 
     if len(sys.argv) < 2:
         default_func(Namespace())
