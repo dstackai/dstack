@@ -2,6 +2,10 @@ declare type AddedEmptyString<Type> = {
     [Property in keyof Type]: Type[Property] | '';
 };
 
+declare interface HashMap<T = any> {
+    [key: string]: T;
+}
+
 declare namespace NodeJS {
     interface ProcessEnv {
         readonly NODE_ENV: 'development' | 'production' | 'test';

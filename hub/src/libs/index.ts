@@ -95,3 +95,11 @@ export const stopPropagation = (event: MouseEvent | TouchEvent | React.MouseEven
     event.preventDefault();
     event.stopPropagation();
 };
+
+export const buildRoute = (route: string, params: HashMap): string => {
+    return Object.keys(params).reduce((acc, key) => {
+        const regExp = new RegExp(`:${key}`);
+
+        return acc.replace(regExp, params[key] as string);
+    }, route);
+};

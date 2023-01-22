@@ -1,10 +1,11 @@
 import React, { useEffect, useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { useSearchParams } from 'react-router-dom';
+import { useSearchParams, Routes, Route, Navigate } from 'react-router-dom';
 import { useCheckTokenMutation } from 'services/auth';
 import { isValidToken } from 'libs';
 import { useAppDispatch, useAppSelector } from 'hooks';
 import AppLayout from 'layouts/AppLayout';
+import { ROUTES } from 'routes';
 import { selectIsAuthenticated, setAuthData } from './slice';
 
 const App: React.FC = () => {
@@ -19,7 +20,7 @@ const App: React.FC = () => {
 
     useEffect(() => {
         if (isValidToken(token)) {
-            checkToken({ token: token! });
+            checkToken({ token: token ?? '' });
             setSearchParams();
         }
     }, []);
@@ -33,7 +34,7 @@ const App: React.FC = () => {
     }, [checkingData, checkingError, isLoading]);
 
     const renderTokenError = () => {
-        const errorKey = 'error' in checkingError! ? checkingError.error : '';
+        const errorKey = checkingError && 'error' in checkingError ? checkingError.error : '';
 
         if (errorKey) return <div>{t(`auth.${errorKey}`)}</div>;
 
@@ -46,7 +47,15 @@ const App: React.FC = () => {
 
     if (!isAuthenticated && !token) return <div>Unauthorized</div>;
 
-    return <AppLayout>Hello word</AppLayout>;
+    return (
+        <AppLayout>
+            <Routes>
+                <Route path={ROUTES.BASE} element={<Navigate replace to={ROUTES.HUB.LIST} />} />
+                <Route path={ROUTES.HUB.LIST} element={<div>Hub list</div>} />
+                <Route path={ROUTES.USER.LIST} element={<div>User list</div>} />
+            </Routes>
+        </AppLayout>
+    );
 };
 
 export default App;

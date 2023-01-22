@@ -84,9 +84,13 @@
     "webpack-nano": "^1.1.1"
   },
   "dependencies": {
+    "@cloudscape-design/collection-hooks": "^1.0.19",
+    "@cloudscape-design/components": "^3.0.174",
+    "@cloudscape-design/global-styles": "^1.0.7",
     "@hookform/resolvers": "^2.9.10",
     "@reduxjs/toolkit": "^1.9.1",
     "classnames": "^2.3.2",
+    "css-minimizer-webpack-plugin": "^4.2.2",
     "date-fns": "^2.29.3",
     "i18next": "^22.4.9",
     "prismjs": "^1.29.0",

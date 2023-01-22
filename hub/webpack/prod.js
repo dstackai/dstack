@@ -2,6 +2,7 @@
 const {join} = require('path');
 const {buildDir, publicPath, srcDir} = require('./env');
 const MiniCssExtractPlugin = require('mini-css-extract-plugin');
+const CssMinimizerPlugin = require('css-minimizer-webpack-plugin');
 
 
 module.exports = {
@@ -17,5 +18,8 @@ module.exports = {
     plugins: [
         new MiniCssExtractPlugin(),
     ],
-    optimization: {},
+    optimization: {
+        minimize: true,
+        minimizer: [new CssMinimizerPlugin()]
+    },
 };
