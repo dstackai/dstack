@@ -1,0 +1,7 @@
+{
+  "auth": {
+    "invalid_token": "Invalid token",
+    "undefined_token": "Token not found",
+    "token_error": "Token error"
+  }
+}
