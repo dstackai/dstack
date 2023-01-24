@@ -1,12 +1,17 @@
 {
+  "dstack": "Dstack",
+  "common": {
+    "loading": "Loading"
+  },
   "auth": {
     "invalid_token": "Invalid token",
     "undefined_token": "Token not found",
-    "token_error": "Token error"
+    "token_error": "Token error",
+    "you_are_not_logged_in": "You are not logged in",
+    "contact_to_administrator": "For getting the authorization token, contact to the administrator"
   },
 
   "navigation": {
-    "dstack": "Dstackai",
     "hubs": "Hubs",
     "users": "Users"
   }

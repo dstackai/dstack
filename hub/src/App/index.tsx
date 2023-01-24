@@ -5,8 +5,12 @@ import { useCheckTokenMutation } from 'services/auth';
 import { isValidToken } from 'libs';
 import { useAppDispatch, useAppSelector } from 'hooks';
 import AppLayout from 'layouts/AppLayout';
+import { Box } from 'components';
 import { ROUTES } from 'routes';
 import { selectIsAuthenticated, setAuthData } from './slice';
+import { AuthErrorMessage } from './AuthErrorMessage';
+import { Loading } from './Loading';
+import { Logout } from './Logout';
 
 const App: React.FC = () => {
     const { t } = useTranslation();
@@ -35,24 +39,27 @@ const App: React.FC = () => {
 
     const renderTokenError = () => {
         const errorKey = checkingError && 'error' in checkingError ? checkingError.error : '';
-
-        if (errorKey) return <div>{t(`auth.${errorKey}`)}</div>;
-
-        return <div>{t('auth.token_error')}</div>;
+        if (errorKey) return <AuthErrorMessage title={t(`auth.${errorKey}`)} text={t('auth.contact_to_administrator')} />;
+        return <AuthErrorMessage title={t('auth.token_error')} text={t('auth.contact_to_administrator')} />;
     };
 
-    if (isAuthorizing) return <div>Loading</div>;
+    const renderNotAuthorizedError = () => {
+        return <AuthErrorMessage title={t('auth.you_are_not_logged_in')} text={t('auth.contact_to_administrator')} />;
+    };
+
+    if (isAuthorizing) return <Loading />;
 
     if (checkingError) return renderTokenError();
 
-    if (!isAuthenticated && !token) return <div>Unauthorized</div>;
+    if (!isAuthenticated && !token) return renderNotAuthorizedError();
 
     return (
         <AppLayout>
             <Routes>
                 <Route path={ROUTES.BASE} element={<Navigate replace to={ROUTES.HUB.LIST} />} />
-                <Route path={ROUTES.HUB.LIST} element={<div>Hub list</div>} />
-                <Route path={ROUTES.USER.LIST} element={<div>User list</div>} />
+                <Route path={ROUTES.HUB.LIST} element={<Box variant="h1">Hub list</Box>} />
+                <Route path={ROUTES.USER.LIST} element={<Box variant="h1">User list</Box>} />
+                <Route path={ROUTES.LOGOUT} element={<Logout />} />
             </Routes>
         </AppLayout>
     );

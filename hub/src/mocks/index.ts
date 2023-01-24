@@ -1,6 +1,7 @@
 import auth from './auth';
 import { QueryReturnValue } from '@reduxjs/toolkit/dist/query/baseQueryTypes';
 import { FetchBaseQueryError, FetchBaseQueryMeta } from '@reduxjs/toolkit/dist/query/fetchBaseQuery';
+import { API } from 'api';
 
 type MockItem = {
     success: unknown;
@@ -14,7 +15,7 @@ type MocksMap = {
 };
 
 const MocksMap: MocksMap = {
-    '/auth/token': {
+    [API.AUTH.TOKEN()]: {
         POST: {
             success: auth.success,
             failed: auth.failed,

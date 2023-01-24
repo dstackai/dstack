@@ -18,6 +18,8 @@ const env = {
 const sourceMap = !isProd;
 const cssRegex = /\.css$/;
 const cssModuleRegex = /\.module\.css$/;
+const sassRegex = /\.(scss|sass)$/;
+const sassModuleRegex = /\.module\.(scss|sass)$/;
 
 module.exports = {
     resolve: {
@@ -67,7 +69,7 @@ module.exports = {
                     },
                     {
                         test: cssRegex,
-                        exclude: cssModuleRegex,
+                        exclude: [cssModuleRegex, '/node_modules'],
                         use: getStyleLoaders({
                             importLoaders: 1,
                             sourceMap,
@@ -84,6 +86,36 @@ module.exports = {
                                 localIdentName: isDev ? "[local]--[hash:base64:5]" : "[hash:base64:5]",
                             },
                         }),
+                    },
+
+                    {
+                        test: sassRegex,
+                        exclude: sassModuleRegex,
+                        use: getStyleLoaders(
+                            {
+                                importLoaders: 3,
+                                sourceMap,
+                                modules: {
+                                    mode: 'icss',
+                                },
+                            },
+                            'sass-loader'
+                        ),
+                        sideEffects: true,
+                    },
+                    {
+                        test: sassModuleRegex,
+                        use: getStyleLoaders(
+                            {
+                                importLoaders: 3,
+                                sourceMap,
+                                modules: {
+                                    mode: 'local',
+                                    localIdentName: isDev ? "[local]--[hash:base64:5]" : "[hash:base64:5]",
+                                },
+                            },
+                            'sass-loader'
+                        ),
                     },
                     {
                         exclude: [/^$/, /\.(js|mjs|jsx|ts|tsx)$/, /\.html$/, /\.json$/],
