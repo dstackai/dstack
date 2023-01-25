@@ -1,4 +1,4 @@
-# Quickstart
+# Quick start
 
 In this tutorial, we will learn how to use `dstack` to run ML workflows 
 independently of the environment, and enable sharing of data and models within your team.
@@ -63,7 +63,7 @@ dstack init
 
 By default, `dstack` runs the workflow locally.
 
-Let's go ahead and run the `mnist-data` workflow using the [`dstack run`](../reference/cli/index.md#dstack-run) command:
+Let's go ahead and run the `mnist-data` workflow using the [`dstack run`](reference/cli/index.md#dstack-run) command:
 
 ```shell hl_lines="1"
 dstack run mnist-data
@@ -95,7 +95,7 @@ Extracting /workflow/data/MNIST/raw/train-images-idx2-ubyte.gz
 
 ### Check status
 
-To check the status of recent runs, use the [`dstack ps`](../reference/cli/index.md#dstack-ps) command:
+To check the status of recent runs, use the [`dstack ps`](reference/cli/index.md#dstack-ps) command:
 
 ```shell hl_lines="1"
 dstack ps
@@ -112,14 +112,14 @@ To see all runs, use the `dstack ps -a` command.
 
 !!! info "NOTE:"
     The `RUN` column contains the name of the run. Use this value in other CLI commands (e.g.
-    [`dstack stop`](../reference/cli/index.md#dstack-stop), [`dstack artifacts`](../reference/cli/index.md#dstack-artifacts), etc.) to refer to the 
+    [`dstack stop`](reference/cli/index.md#dstack-stop), [`dstack artifacts`](reference/cli/index.md#dstack-artifacts), etc.) to refer to the 
     corresponding run.
 
 ### List artifacts
 
 Once a run is finished, its artifacts are saved and can be reused.
 
-You can list artifacts of any run using the [`dstack ls`](../reference/cli/index.md#dstack-ls) command:
+You can list artifacts of any run using the [`dstack ls`](reference/cli/index.md#dstack-ls) command:
 
 ```shell hl_lines="1"
 dstack ls grumpy-zebra-1
@@ -169,7 +169,7 @@ val_loss      0.10975822806358337
 
 !!! info "NOTE:"
     If necessary, `dstack` allows you to reuse artifacts from a specific run (rather than using the most recent run) 
-    by using [tags](../examples/index.md#tags). However, this is beyond the scope of this tutorial.
+    by using [tags](basics/deps.md#tags). However, this is beyond the scope of this tutorial.
 
 ## Step 5: Configure the remote
 
@@ -177,7 +177,7 @@ When you run a workflow locally, artifacts are stored in `~/.dstack/artifacts` a
 can be reused only from the workflows that run locally too.
 
 To run workflows remotely (e.g. in the cloud) or enable reuse of the artifacts outside your machine, configure your
-remote settings using the [`dstack config`](../reference/cli/index.md#dstack-config) command:
+remote settings using the [`dstack config`](reference/cli/index.md#dstack-config) command:
 
 ```shell hl_lines="1"
 dstack config
@@ -233,7 +233,7 @@ the infrastructure.
 
 !!! info "NOTE:"
     You can specify hardware resource requirements, such as the GPU, memory, and the use of interruptible instances, 
-    for each remotely running workflow using [`resources`](../examples/index.md#resources). 
+    for each remotely running workflow using [`resources`](basics/resources.md). 
     However, this topic will not be addressed in this tutorial.
 
 [//]: # (Consider introducing `remotes` and resources `profiles` - To be elaborated)

@@ -1,30 +1,44 @@
 ---
-title: Reproducible ML workflows for teams 
+title: Reproducible ML workflow
+hide:
+  - footer
 ---
 
-# Reproducible ML workflows for teams
+# Reproducible ML workflows
 
-`dstack` is a free and open-source ML workflow orchestration system designed to drive reproducibility and
-collaboration in ML projects. 
+`dstack` is an open-source tool that allows running reproducible ML workflows independently of
+infrastructure. It allows running ML workflows locally or remotely, using any configured cloud vendor. 
+Additionally, `dstack` facilitates versioning and reuse of artifacts (such as data and models), across teams.
 
-It allows teams to run ML workflows in any environment, 
-whether it be local or in the cloud, and to easily share and reuse data and models.
+In brief, `dstack` simplifies the process of establishing ML training pipelines that are independent of a
+particular vendor, and facilitates collaboration within teams on data and models.
 
-### How does it work?
+[//]: # (### How it works)
 
-1. Install `dstack` CLI 
-2. Run workflows locally and reuse artifacts across workflows
-3. Configure remote settings (e.g. your cloud account)
-4. Run workflows remotely and reuse artifacts across teams
+[//]: # (* Define workflows via YAML)
+[//]: # (* Run workflows locally via CLI)
+[//]: # (* Reuse artifacts &#40;data and models&#41; across workflows)
+[//]: # (* Run workflows remotely &#40;in any configured cloud&#41; via CLI)
+[//]: # (* Share artifacts &#40;data and models&#41; across teams)
+
+[//]: # (TODO: Later, tell something about managing teams, quotes, etc)
 
 ### Get started in 30 min
 
-Get your first ML workflows running in less than 30 minutes.
+Having your first ML workflows up and running will take less than 30 min.
 
 <div class="grid cards" markdown>
-- [**1. Quickstart**
-   Try `dstack` yourself by following a simple step-by-step tutorial.](tutorials/quickstart.md)
+- [**1. Installation**
+   See the instructions on how to install and configure the CLI.
+  ](installation.md)
+- [**2. Quick start**
+   Try it yourself by following a simple step-by-step guide.
+  ](quick-start.md)
+- [**3. Basics**
+   Browse the basic examples of how to use `dstack`.
+  ](basics/hello-world.md)
+- [**3. Slack**
+   Join our Slack chat to get support from us and the community.
+  ](https://join.slack.com/t/dstackai/shared_invite/zt-xdnsytie-D4qU9BvJP8vkbkHXdi6clQ)
 
-- [**2. Examples**
-   Browse the featured examples of what you can do with `dstack`.](examples)
 </div>
