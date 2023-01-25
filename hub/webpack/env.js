@@ -4,14 +4,6 @@ const apiURLs = '/api'
 
 const publicURLs = '/'
 
-// cross-env NODE_ENV=production AUTH_TYPE=github LANDING=on API_URL=/ PUBLIC_URL=/ webpack build --config webpack.config.js
-
-// LANDING: 'on' | 'off'
-const landing = process.env.LANDING || 'on';
-// HOST: boolean
-const host = process.env.HOST || true;
-// AUTH_TYPE: 'github' | 'password'
-const gitHubEnabled = process.env.GITHUB_ENABLED ? process.env.GITHUB_ENABLED === 'true' : true;
 const environment = process.env.NODE_ENV || 'production';
 const isProd = environment === 'production';
 const isDev = environment === 'development';
@@ -30,8 +22,6 @@ const description = "dstack is an open-source tool that allows you to define ML 
 
 module.exports = {
     environment,
-    landing,
-    gitHubEnabled,
     isProd,
     isDev,
     isStage,
@@ -44,5 +34,4 @@ module.exports = {
     publicUrl,
     title,
     description,
-    host,
 }

@@ -9,7 +9,8 @@ import { BaseQueryFn } from '@reduxjs/toolkit/dist/query/baseQueryTypes';
 import { getResponse, getResponseArgs } from 'mocks';
 import { wait } from '../';
 
-const isTest = true;
+const isMockingEnabled = process.env.ENABLE_API_MOCKING;
+// const isMockingEnabled = false;
 
 export const fetchBaseQuery = (
     params?: FetchBaseQueryArgs,
@@ -21,7 +22,7 @@ export const fetchBaseQuery = (
     { responseType?: getResponseArgs['responseType'] },
     FetchBaseQueryMeta
 > => {
-    if (isTest) {
+    if (isMockingEnabled) {
         return async ({ url, method, body, params }) => {
             await wait(Math.floor(Math.random() * 3000));
 
