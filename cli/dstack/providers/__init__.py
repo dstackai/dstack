@@ -68,7 +68,7 @@ class Provider:
         else:
             version_info = sys.version_info
             python_version = f"{version_info.major}.{version_info.minor}"
-        supported_python_versions = ["3.7", "3.8", "3.9", "3.10"]
+        supported_python_versions = ["3.7", "3.8", "3.9", "3.10", "3.11"]
         if python_version not in supported_python_versions:
             sys.exit(f"Python version `{python_version}` is not supported. "
                      f"Supported versions: {str(supported_python_versions)}.")
