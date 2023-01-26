@@ -3,6 +3,7 @@
 set -e
 
 IMAGES="
+ dstackai/miniforge:3.11
  dstackai/miniforge:3.10
  dstackai/miniforge:3.9
  dstackai/miniforge:3.8

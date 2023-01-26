@@ -9,20 +9,20 @@
 </h1>
 
 <h4 align="center">
-Reproducible ML workflows for teams
+Reproducible ML workflows
 </h4>
 
 <p align="center">
-<code>dstack</code> is a free and open-source ML workflow orchestration system designed to drive reproducibility and
-collaboration in ML projects.
+<code>dstack</code> is an open-source tool that allows running reproducible ML workflows independently of
+infrastructure, and collaborate around data and models. 
 </p>
 
 [![Slack](https://img.shields.io/badge/slack-join%20community-blueviolet?logo=slack&style=for-the-badge)](https://join.slack.com/t/dstackai/shared_invite/zt-xdnsytie-D4qU9BvJP8vkbkHXdi6clQ)
 
 <p align="center">
 <a href="https://docs.dstack.ai" target="_blank"><b>Docs</b></a> • 
-<a href="https://docs.dstack.ai/tutorials/quickstart"><b>Quickstart</b></a> • 
-<a href="https://docs.dstack.ai/examples" target="_blank"><b>Examples</b></a> • 
+<a href="https://docs.dstack.ai/quick-start"><b>Quick start</b></a> • 
+<a href="https://docs.dstack.ai/basics/hello-world" target="_blank"><b>Basics</b></a> • 
 <a href="https://join.slack.com/t/dstackai/shared_invite/zt-xdnsytie-D4qU9BvJP8vkbkHXdi6clQ" target="_blank"><b>Slack</b></a> 
 </p>
 
@@ -31,15 +31,20 @@ collaboration in ML projects.
 
 </div>
 
-`dstack` makes it easier for teams to run ML workflows independently of environment, 
-whether it be local or in the cloud, and to easily share and reuse data and models.
+`dstack` is an open-source tool that allows running reproducible ML workflows independently of
+infrastructure. It allows running ML workflows locally or remotely, using any configured cloud vendor. 
+Additionally, `dstack` facilitates versioning and reuse of artifacts (such as data and models), across teams.
+
+In brief, `dstack` simplifies the process of establishing ML training pipelines that are independent of a
+particular vendor, and facilitates collaboration within teams on data and models.
 
 ### How does it work?
 
-1. Install `dstack` CLI 
-2. Run workflows locally and reuse artifacts across workflows
-3. Configure remote settings (e.g. your cloud account)
-4. Run workflows remotely and reuse artifacts across teams
+* Define workflows via YAML
+* Run workflows locally via CLI
+* Reuse artifacts (data and models) across workflows
+* Run workflows remotely (in any configured cloud) via CLI
+* Share artifacts (data and models) across teams
 
 ## Installation
 
@@ -105,8 +110,8 @@ For additional information and examples, see the following links:
 
 * [Docs](https://docs.dstack.ai/)
 * [Installation](https://docs.dstack.ai/installation)
-* [Quickstart](https://docs.dstack.ai/tutorials/quickstart)
-* [Examples](https://docs.dstack.ai/examples)
+* [Quick start](https://docs.dstack.ai/quick-start)
+* [Basics](https://docs.dstack.ai/basics/hello-world)
  
 ##  Licence
 

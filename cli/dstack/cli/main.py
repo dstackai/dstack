@@ -1,9 +1,9 @@
 import sys
 from argparse import ArgumentParser, SUPPRESS, Namespace
 
-from dstack.cli import app, logs, run, stop, artifacts, ps, init, \
-    restart, rm, tags, config, secrets
+# from dstack.cli import logs, run, stop, artifacts, ps, init, restart, rm, tags, config, secrets
 from dstack.version import __version__ as version
+from dstack.cli.handlers import cli_initialize
 from rich import print
 
 
@@ -53,23 +53,11 @@ def main():
 
     subparsers = parser.add_subparsers()
 
-    # app.register_parsers(subparsers)
-    artifacts.register_parsers(subparsers)
-    config.register_parsers(subparsers)
-    init.register_parsers(subparsers)
-    logs.register_parsers(subparsers)
-    rm.register_parsers(subparsers)
-    # restart.register_parsers(subparsers)
-    run.register_parsers(subparsers)
-    secrets.register_parsers(subparsers)
-    ps.register_parsers(subparsers)
-    stop.register_parsers(subparsers)
-    tags.register_parsers(subparsers)
+    cli_initialize(parser=subparsers)
 
     if len(sys.argv) < 2:
         default_func(Namespace())
         exit(1)
-
     args, unknown = parser.parse_known_args()
     args.unknown = unknown
     args.func(args)
