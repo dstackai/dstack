@@ -1,13 +1,13 @@
 import React, { useEffect, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useSearchParams, Routes, Route, Navigate } from 'react-router-dom';
-import { useCheckTokenMutation } from 'services/auth';
+import { useGetUserDataQuery } from 'services/user';
 import { isValidToken } from 'libs';
 import { useAppDispatch, useAppSelector } from 'hooks';
 import AppLayout from 'layouts/AppLayout';
 import { Box } from 'components';
 import { ROUTES } from 'routes';
-import { selectIsAuthenticated, setAuthData } from './slice';
+import { removeAuthData, selectAuthToken, setAuthData, setUserData } from './slice';
 import { AuthErrorMessage } from './AuthErrorMessage';
 import { Loading } from './Loading';
 import { Logout } from './Logout';
@@ -16,33 +16,44 @@ import { Hub } from 'pages/Hub';
 const App: React.FC = () => {
     const { t } = useTranslation();
     const [searchParams, setSearchParams] = useSearchParams();
-    const token = searchParams.get('token');
-    const isAuthenticated = useAppSelector(selectIsAuthenticated);
-    const [isAuthorizing, setIsAuthorizing] = useState(isValidToken(token));
+    const urlToken = searchParams.get('token');
+    const storeToken = useAppSelector(selectAuthToken);
+    const isAuthenticated = useAppSelector(selectAuthToken);
+    const [isAuthorizing, setIsAuthorizing] = useState(isValidToken(urlToken || storeToken));
     const dispatch = useAppDispatch();
 
-    const [checkToken, { isLoading, data: checkingData, error: checkingError }] = useCheckTokenMutation();
+    const {
+        isLoading,
+        data: userData,
+        error: getUserError,
+    } = useGetUserDataQuery(
+        {
+            token: (urlToken || storeToken) as string,
+        },
+        {
+            skip: !isAuthenticated && !urlToken,
+        },
+    );
 
     useEffect(() => {
-        if (isValidToken(token)) {
-            checkToken({ token: token ?? '' });
-            setSearchParams();
-        }
-    }, []);
-
-    useEffect(() => {
-        if (checkingData?.token || checkingError) {
+        if (userData?.user_name || getUserError) {
             setIsAuthorizing(false);
 
-            if (checkingData?.token) dispatch(setAuthData(checkingData));
+            if (userData?.user_name) {
+                dispatch(setAuthData({ token: urlToken as string }));
+                dispatch(setUserData(userData));
+            } else if (getUserError) {
+                dispatch(removeAuthData());
+            }
+
+            if (urlToken) {
+                setSearchParams();
+            }
         }
-    }, [checkingData, checkingError, isLoading]);
+    }, [userData, getUserError, isLoading]);
 
     const renderTokenError = () => {
-        const errorData = checkingError && 'data' in checkingError ? (checkingError.data as { error_code: string }) : null;
-        if (errorData)
-            return <AuthErrorMessage title={t(`auth.${errorData.error_code}`)} text={t('auth.contact_to_administrator')} />;
-        return <AuthErrorMessage title={t('auth.token_error')} text={t('auth.contact_to_administrator')} />;
+        return <AuthErrorMessage title={t('auth.invalid_token')} text={t('auth.contact_to_administrator')} />;
     };
 
     const renderNotAuthorizedError = () => {
@@ -51,9 +62,9 @@ const App: React.FC = () => {
 
     if (isAuthorizing) return <Loading />;
 
-    if (checkingError) return renderTokenError();
+    if (getUserError) return renderTokenError();
 
-    if (!isAuthenticated && !token) return renderNotAuthorizedError();
+    if (!isAuthenticated && !urlToken) return renderNotAuthorizedError();
 
     return (
         <AppLayout>

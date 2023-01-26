@@ -3,23 +3,21 @@ import { fetchBaseQuery } from 'libs/fetchBaseQuery';
 import fetchBaseQueryHeaders from 'libs/fetchBaseQueryHeaders';
 import { API } from 'api';
 
-export const authApi = createApi({
-    reducerPath: 'authApi',
+export const userApi = createApi({
+    reducerPath: 'userApi',
     baseQuery: fetchBaseQuery({
         prepareHeaders: fetchBaseQueryHeaders,
     }),
 
     endpoints: (builder) => ({
-        checkToken: builder.mutation<IUserSmall, { token: string }>({
-            query: (body) => {
+        getUserData: builder.query<IUserSmall, { token: string }>({
+            query: (params) => {
                 return {
-                    url: API.AUTH.TOKEN(),
-                    method: 'POST',
-                    body,
+                    url: API.USERS.INFO() + `?token=${params.token}`,
                 };
             },
         }),
     }),
 });
 
-export const { useCheckTokenMutation } = authApi;
+export const { useGetUserDataQuery } = userApi;

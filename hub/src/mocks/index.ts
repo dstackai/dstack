@@ -2,7 +2,7 @@ import { QueryReturnValue } from '@reduxjs/toolkit/dist/query/baseQueryTypes';
 import { FetchBaseQueryError, FetchBaseQueryMeta } from '@reduxjs/toolkit/dist/query/fetchBaseQuery';
 import { API } from 'api';
 
-import auth from './auth';
+import user from './user';
 import hub from './hub';
 
 type MockItem = {
@@ -19,10 +19,10 @@ type MocksMap = {
 };
 
 const mocksMap: MocksMap = {
-    [API.AUTH.TOKEN()]: {
-        POST: {
-            success: auth.success,
-            failed: auth.failed,
+    [API.USERS.INFO()]: {
+        GET: {
+            success: user.info.success,
+            failed: user.info.failed,
         },
     },
     [API.HUB.LIST()]: {
@@ -42,14 +42,12 @@ export type getResponseArgs = {
 export type getResponseReturned = QueryReturnValue<unknown, FetchBaseQueryError, FetchBaseQueryMeta>;
 
 export const getResponse = ({ url, method = 'GET', responseType = 'success' }: getResponseArgs): getResponseReturned => {
+    const formattedUrl = url.replace(/\?.+/gi, '');
+
     if (responseType === 'failed')
         return {
-            error: {
-                status: 'CUSTOM_ERROR',
-                error: 'Forbidden',
-                data: mocksMap[url][method][responseType] as string,
-            },
+            error: mocksMap[formattedUrl][method][responseType] as FetchBaseQueryError,
         };
 
-    return { data: mocksMap[url][method][responseType] };
+    return { data: mocksMap[formattedUrl][method][responseType] };
 };
