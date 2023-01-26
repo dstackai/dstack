@@ -1,0 +1,7 @@
+**/__pycache__/
+*.py[co]
+
+
+/cli/dstack.egg-info/
+
+/runner/runner
