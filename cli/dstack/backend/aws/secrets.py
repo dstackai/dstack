@@ -5,11 +5,11 @@ from botocore.client import BaseClient
 
 from dstack.backend.aws import runners
 from dstack.backend import Secret
-from dstack.core.repo import RepoAddress, _repo_address_path
+from dstack.core.repo import RepoAddress
 
 
 def list_secret_names(s3_client: BaseClient, bucket_name: str, repo_address: RepoAddress) -> List[str]:
-    prefix = f"secrets/{_repo_address_path(repo_address)}"
+    prefix = f"secrets/{repo_address.path()}"
     secret_head_prefix = f"{prefix}/l;"
     response = s3_client.list_objects_v2(Bucket=bucket_name, Prefix=secret_head_prefix)
     secret_names = []
@@ -24,7 +24,7 @@ def get_secret(secretsmanager_client: BaseClient, bucket_name: str, repo_address
         -> Optional[Secret]:
     try:
         return Secret(secret_name, secretsmanager_client.get_secret_value(
-            SecretId=f"/dstack/{bucket_name}/secrets/{_repo_address_path(repo_address)}/{secret_name}"
+            SecretId=f"/dstack/{bucket_name}/secrets/{repo_address.path()}/{secret_name}"
         )["SecretString"])
     except Exception as e:
         if hasattr(e, "response") and e.response.get("Error") and e.response["Error"].get(
@@ -35,14 +35,14 @@ def get_secret(secretsmanager_client: BaseClient, bucket_name: str, repo_address
 
 
 def _secret_head_key(repo_address: RepoAddress, secret_name: str) -> str:
-    prefix = f"secrets/{_repo_address_path(repo_address)}"
+    prefix = f"secrets/{repo_address.path()}"
     key = f"{prefix}/l;{secret_name}"
     return key
 
 
 def add_secret(sts_client: BaseClient, iam_client: BaseClient, secretsmanager_client: BaseClient, s3_client: BaseClient,
                bucket_name: str, repo_address: RepoAddress, secret: Secret):
-    secret_id = f"/dstack/{bucket_name}/secrets/{_repo_address_path(repo_address)}/{secret.secret_name}"
+    secret_id = f"/dstack/{bucket_name}/secrets/{repo_address.path()}/{secret.secret_name}"
     secretsmanager_client.create_secret(
         Name=secret_id,
         SecretString=secret.secret_value,
@@ -85,7 +85,7 @@ def add_secret(sts_client: BaseClient, iam_client: BaseClient, secretsmanager_cl
 
 def update_secret(secretsmanager_client: BaseClient, s3_client: BaseClient, bucket_name: str, repo_address: RepoAddress,
                   secret: Secret):
-    secret_id = f"/dstack/{bucket_name}/secrets/{_repo_address_path(repo_address)}/{secret.secret_name}"
+    secret_id = f"/dstack/{bucket_name}/secrets/{repo_address.path()}/{secret.secret_name}"
     secretsmanager_client.put_secret_value(
         SecretId=secret_id,
         SecretString=secret.secret_value,
@@ -97,7 +97,7 @@ def update_secret(secretsmanager_client: BaseClient, s3_client: BaseClient, buck
 def delete_secret(secretsmanager_client: BaseClient, s3_client: BaseClient, bucket_name: str, repo_address: RepoAddress,
                   secret_name: str):
     secretsmanager_client.delete_secret(
-        SecretId=f"/dstack/{bucket_name}/secrets/{_repo_address_path(repo_address)}/{secret_name}",
+        SecretId=f"/dstack/{bucket_name}/secrets/{repo_address.path()}/{secret_name}",
         ForceDeleteWithoutRecovery=True
     )
     secret_head_key = _secret_head_key(repo_address, secret_name)

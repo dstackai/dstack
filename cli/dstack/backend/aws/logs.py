@@ -11,7 +11,7 @@ from dstack.backend.aws import jobs, runs
 from dstack.core.log_event import LogEvent, LogEventSource
 from dstack.core.job import JobHead
 from dstack.core.app import AppSpec
-from dstack.core.repo import RepoAddress, _repo_address_path
+from dstack.core.repo import RepoAddress
 
 WAIT_N_ONCE_FINISHED = 1
 
@@ -127,7 +127,7 @@ def create_log_stream(logs_client: BaseClient, log_group_name: str, run_name: st
 def _filter_logs_events_kwargs(bucket_name: str, repo_address: RepoAddress, run_name: str, start_time: int,
                                end_time: Optional[int], next_token: Optional[str]):
     filter_logs_events_kwargs = {
-        "logGroupName": f"/dstack/jobs/{bucket_name}/{_repo_address_path(repo_address)}",
+        "logGroupName": f"/dstack/jobs/{bucket_name}/{repo_address.path()}",
         "logStreamNames": [run_name],
         "startTime": start_time,
         "interleaved": True,

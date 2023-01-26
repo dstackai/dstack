@@ -10,7 +10,7 @@ from jinja2 import Template
 
 from dstack.backend import Backend
 from dstack.core.job import Job, JobStatus, JobSpec, Requirements, GpusRequirements, DepSpec, ArtifactSpec
-from dstack.core.repo import RepoData, RepoAddress, _repo_address_path
+from dstack.core.repo import RepoData, RepoAddress
 from dstack.api.repo import load_repo_data
 from dstack.util import _quoted
 
@@ -283,7 +283,7 @@ class Provider:
         if tag_head:
             return DepSpec(repo_address, tag_head.run_name, mount)
         else:
-            sys.exit(f"Cannot find the tag '{tag_name}' in the '{_repo_address_path(repo_address)}' repo")
+            sys.exit(f"Cannot find the tag '{tag_name}' in the '{repo_address.path()}' repo")
 
     @staticmethod
     def _workflow_dep(backend: Backend, repo_address: RepoAddress, workflow_name: str,
@@ -296,7 +296,7 @@ class Provider:
             return DepSpec(repo_address, run_name, mount)
         else:
             sys.exit(f"Cannot find any successful workflow with the name '{workflow_name}' "
-                     f"in the '{_repo_address_path(repo_address)}' repo")
+                     f"in the '{repo_address.path()}' repo")
 
     def _env(self) -> Optional[Dict[str, str]]:
         if self.provider_data.get("env"):

@@ -1,7 +1,7 @@
 from typing import List, Dict
 
 from dstack.core.config import BackendConfig
-from dstack.backend.aws.__config__ import AWSConfig
+from dstack.backend.aws.config import AWSConfig
 
 
 def list_config() -> List[BackendConfig]:

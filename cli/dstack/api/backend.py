@@ -1,5 +1,6 @@
 from typing import List, Dict, Optional
 from dstack.backend import Backend
+from dstack.core.run import RunHead
 from dstack.core.error import BackendError
 from dstack.backend.aws import AwsBackend
 from dstack.backend.local import LocalBackend
@@ -29,3 +30,4 @@ def get_backend_by_name(name: str) -> Optional[Backend]:
             if current_backend.NAME == name:
                 return current_backend
     raise BackendError(f"Not a backend named {name}")
+

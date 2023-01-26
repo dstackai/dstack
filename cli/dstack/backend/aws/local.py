@@ -15,7 +15,7 @@ from tqdm import tqdm
 
 from dstack import version
 from dstack.core.config import BackendConfig
-from dstack.runners import Resources, Gpu
+from core.runners import Resources, Gpu
 
 
 def _arch() -> str:
@@ -68,7 +68,6 @@ def _get_runner_config_dir(runner_id: str, config: Optional[BackendConfig] = Non
     if create:
         runner_config_dir_path.mkdir(parents=True, exist_ok=True)
         config.save(path=runner_config_dir_path / "config.yaml")
-        #write_config(config, runner_config_dir_path / "config.yaml") //Ivan
         runner_config_path = runner_config_dir_path / "runner.yaml"
         runner_config_path.write_text(yaml.dump({
             "id": runner_id,

@@ -19,6 +19,11 @@ class RepoAddress:
                f'repo_user_name="{self.repo_user_name}", ' \
                f'repo_name="{self.repo_name}")'
 
+    def path(self, delimiter: str = '/'):
+        return f"{self.repo_host_name}" \
+               f"{(':' + str(self.repo_port)) if self.repo_port else ''}{delimiter}" \
+               f"{self.repo_user_name}{delimiter}{self.repo_name}"
+
 
 class RepoHead(RepoAddress):
     def __init__(self, repo_address: RepoAddress, last_run_at: Optional[int], tags_count: int):
@@ -26,6 +31,7 @@ class RepoHead(RepoAddress):
                          repo_address.repo_name)
         self.last_run_at = last_run_at
         self.tags_count = tags_count
+        self.repo_address = repo_address
 
     def __str__(self) -> str:
         return f'RepoHead(repo_host_name="{self.repo_host_name}", ' \
@@ -105,12 +111,12 @@ class LocalRepoData(RepoData):
         if self.protocol == RepoProtocol.HTTPS:
             return git.cmd.Git().ls_remote(f"https://"
                                            f"{(self.oauth_token + '@') if self.oauth_token else ''}"
-                                           f"{_repo_address_path(self)}.git")
+                                           f"{self.path()}.git")
         else:
             if self.identity_file:
                 git_ssh_command = f"ssh -o IdentitiesOnly=yes -F /dev/null -o IdentityFile={self.identity_file}"
                 if self.repo_port:
-                    url = f"ssh@{_repo_address_path(self)}.git"
+                    url = f"ssh@{self.path()}.git"
                 else:
                     url = f"git@{self.repo_host_name}:{self.repo_user_name}/{self.repo_name}.git"
                 return git.cmd.Git().ls_remote(url, env=dict(GIT_SSH_COMMAND=git_ssh_command))
@@ -125,9 +131,3 @@ class LocalRepoData(RepoData):
                 return RepoCredentials(self.protocol, private_key=f.read(), oauth_token=None)
         else:
             raise Exception("No identity file is specified")
-
-
-def _repo_address_path(repo_address: RepoAddress, delimiter: str = '/'):
-    return f"{repo_address.repo_host_name}" \
-           f"{(':' + str(repo_address.repo_port)) if repo_address.repo_port else ''}{delimiter}" \
-           f"{repo_address.repo_user_name}{delimiter}{repo_address.repo_name}"

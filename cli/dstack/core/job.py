@@ -1,6 +1,6 @@
 from abc import abstractmethod
 from enum import Enum
-from typing import Optional, List, Dict
+from typing import Optional, List, Dict, Any
 
 from dstack.core.artifact import ArtifactSpec
 from dstack.core.app import AppSpec
@@ -37,6 +37,28 @@ class Requirements:
                f'shm_size_mib={self.shm_size_mib}, ' \
                f'interruptible={self.interruptible}, ' \
                f'local={self.local})'
+
+    def serialize(self) -> Dict[str, Any]:
+        req_data = {}
+        if self.cpus:
+            req_data["cpus"] = self.cpus
+        if self.memory_mib:
+            req_data["memory_mib"] = self.memory_mib
+        if self.gpus:
+            req_data["gpus"] = {
+                "count": self.gpus.count
+            }
+            if self.gpus.memory_mib:
+                req_data["gpus"]["memory_mib"] = self.gpus.memory_mib
+            if self.gpus.name:
+                req_data["gpus"]["name"] = self.gpus.name
+        if self.shm_size_mib:
+            req_data["shm_size_mib"] = self.shm_size_mib
+        if self.interruptible:
+            req_data["interruptible"] = self.interruptible
+        if self.local:
+            req_data["local"] = self.local
+        return req_data
 
 
 class JobRef:
@@ -182,6 +204,136 @@ class Job(JobHead):
                f'runner_id={_quoted(self.runner_id)}, ' \
                f'request_id={_quoted(self.request_id)}, ' \
                f'tag_name={_quoted(self.tag_name)})'
+
+    def job_head_key(self, add_prefix=True):
+        prefix = ''
+        if add_prefix:
+            prefix = f"jobs/{self.repo_data.path()}/"
+        key = f"{prefix}l;" \
+              f"{self.job_id};" \
+              f"{self.provider_name};" \
+              f"{self.local_repo_user_name or ''};" \
+              f"{self.submitted_at};" \
+              f"{self.status.value};" \
+              f"{','.join([a.artifact_path for a in (self.artifact_specs or [])])};" \
+              f"{','.join([a.app_name for a in (self.app_specs or [])])};" \
+              f"{self.tag_name or ''}"
+        return key
+
+    def serialize(self) -> dict:
+        deps = []
+        if self.dep_specs:
+            for dep in self.dep_specs:
+                deps.append({
+                    "repo_host_name": dep.repo_address.repo_host_name,
+                    "repo_port": dep.repo_address.repo_port or 0,
+                    "repo_user_name": dep.repo_address.repo_user_name,
+                    "repo_name": dep.repo_address.repo_name,
+                    "run_name": dep.run_name,
+                    "mount": dep.mount,
+                })
+        artifacts = []
+        if self.artifact_specs:
+            for artifact_spec in self.artifact_specs:
+                artifacts.append({
+                    "path": artifact_spec.artifact_path,
+                    "mount": artifact_spec.mount
+                })
+        job_data = {
+            "job_id": self.job_id,
+            "repo_host_name": self.repo_address.repo_host_name,
+            "repo_port": self.repo_address.repo_port or 0,
+            "repo_user_name": self.repo_data.repo_user_name,
+            "repo_name": self.repo_data.repo_name,
+            "repo_branch": self.repo_data.repo_branch,
+            "repo_hash": self.repo_data.repo_hash,
+            "repo_diff": self.repo_data.repo_diff or '',
+            "run_name": self.run_name,
+            "workflow_name": self.workflow_name or '',
+            "provider_name": self.provider_name,
+            "local_repo_user_name": self.local_repo_user_name or '',
+            "local_repo_user_email": self.local_repo_user_email or '',
+            "status": self.status.value,
+            "submitted_at": self.submitted_at,
+            "image_name": self.image_name,
+            "commands": self.commands or [],
+            "env": self.env or {},
+            "working_dir": self.working_dir or '',
+            "artifacts": artifacts,
+            "port_count": self.port_count if self.port_count else 0,
+            "ports": [str(port) for port in self.ports] if self.ports else [],
+            "host_name": self.host_name or '',
+            "requirements": self.requirements.serialize() if self.requirements else {},
+            "deps": deps,
+            "master_job_id": self.master_job.get_id() if self.master_job else '',
+            "apps": [{
+                "port_index": a.port_index,
+                "app_name": a.app_name,
+                "url_path": a.url_path or '',
+                "url_query_params": a.url_query_params or {},
+            } for a in self.app_specs] if self.app_specs else [],
+            "runner_id": self.runner_id or '',
+            "request_id": self.request_id or '',
+            "tag_name": self.tag_name or '',
+        }
+        return job_data
+
+    @staticmethod
+    def unserialize(job_data: dict):
+        _requirements = job_data.get("requirements")
+        requirements = Requirements(
+            _requirements.get("cpus") or None,
+            _requirements.get("memory_mib") or None,
+            GpusRequirements(_requirements["gpus"].get("count") or None,
+                             _requirements["gpus"].get("memory") or None,
+                             _requirements["gpus"].get("name") or None
+                             ) if _requirements.get("gpus") else None,
+            _requirements.get("shm_size_mib") or None,
+            _requirements.get("interruptible") or None,
+            _requirements.get("local") or None
+        ) if _requirements else None
+        if requirements:
+            if not requirements.cpus \
+                    and (not requirements.gpus or
+                         (not requirements.gpus.count
+                          and not requirements.gpus.memory_mib
+                          and not requirements.gpus.name)) \
+                    and not requirements.interruptible \
+                    and not requirements.local \
+                    and not not requirements.shm_size_mib:
+                requirements = None
+        dep_specs = []
+        if job_data.get("deps"):
+            for dep in job_data["deps"]:
+                dep_spec = DepSpec(
+                    RepoAddress(dep["repo_host_name"], dep.get("repo_port") or None, dep["repo_user_name"],
+                                dep["repo_name"]), dep["run_name"], dep.get("mount") is True)
+                dep_specs.append(dep_spec)
+        artifact_specs = []
+        if job_data.get("artifacts"):
+            for artifact in job_data["artifacts"]:
+                if isinstance(artifact, str):
+                    artifact_spec = ArtifactSpec(artifact, False)
+                else:
+                    artifact_spec = ArtifactSpec(artifact["path"], artifact.get("mount") is True)
+                artifact_specs.append(artifact_spec)
+        master_job = JobRefId(job_data["master_job_id"]) if job_data.get("master_job_id") else None
+        app_specs = ([
+            AppSpec(a["port_index"], a["app_name"], a.get("url_path") or None, a.get("url_query_params") or None)
+            for a in (job_data.get("apps") or [])]) or None
+        job = Job(job_data["job_id"], RepoData(job_data["repo_host_name"], job_data.get("repo_port") or None,
+                                                   job_data["repo_user_name"], job_data["repo_name"],
+                                                   job_data["repo_branch"], job_data["repo_hash"],
+                                                   job_data["repo_diff"] or None),
+                      job_data["run_name"], job_data.get("workflow_name") or None, job_data["provider_name"],
+                      job_data.get("local_repo_user_name"), job_data.get("local_repo_user_email") or None,
+                      JobStatus(job_data["status"]), job_data["submitted_at"], job_data["image_name"],
+                      job_data.get("commands") or None, job_data["env"] or None, job_data.get("working_dir") or None,
+                      artifact_specs, job_data.get("port_count") or None, job_data.get("ports") or None,
+                      job_data.get("host_name") or None, requirements, dep_specs or None, master_job, app_specs,
+                      job_data.get("runner_id") or None, job_data.get("request_id") or None,
+                      job_data.get("tag_name") or None)
+        return job
 
 
 class JobSpec(JobRef):

@@ -5,7 +5,7 @@ from botocore.client import BaseClient
 
 from dstack.backend.aws import runners
 from dstack.backend import RepoHead
-from dstack.core.repo import RepoCredentials, RepoProtocol, RepoAddress, _repo_address_path
+from dstack.core.repo import RepoCredentials, RepoProtocol, RepoAddress
 
 
 def list_repo_heads(s3_client: BaseClient, bucket_name: str) -> List[RepoHead]:
@@ -26,7 +26,7 @@ def list_repo_heads(s3_client: BaseClient, bucket_name: str) -> List[RepoHead]:
 
 
 def _get_repo_head(s3_client: BaseClient, bucket_name: str, repo_address: RepoAddress) -> Optional[RepoHead]:
-    repo_head_prefix = f"repos/l;{_repo_address_path(repo_address, delimiter=',')};"
+    repo_head_prefix = f"repos/l;{repo_address.path(delimiter=',')};"
     response = s3_client.list_objects_v2(Bucket=bucket_name, Prefix=repo_head_prefix)
     if response.get("Contents"):
         last_run_at, tags_count = tuple(response["Contents"][0]["Key"][len(repo_head_prefix):].split(';'))
@@ -37,7 +37,7 @@ def _get_repo_head(s3_client: BaseClient, bucket_name: str, repo_address: RepoAd
 
 
 def _create_or_update_repo_head(s3_client: BaseClient, bucket_name: str, repo_head: RepoHead):
-    repo_head_prefix = f"repos/l;{_repo_address_path(repo_head, delimiter=',')};"
+    repo_head_prefix = f"repos/l;{repo_head.path(delimiter=',')};"
     response = s3_client.list_objects_v2(Bucket=bucket_name, Prefix=repo_head_prefix)
     if "Contents" in response:
         for obj in response["Contents"]:
@@ -67,11 +67,11 @@ def decrement_repo_tags_count(s3_client: BaseClient, bucket_name: str, repo_addr
         repo_head.tags_count = repo_head.tags_count - 1
         _create_or_update_repo_head(s3_client, bucket_name, repo_head)
     else:
-        raise Exception(f"No repo head is found: {_repo_address_path(repo_address)}")
+        raise Exception(f"No repo head is found: {repo_address.path()}")
 
 
 def delete_repo(s3_client: BaseClient, bucket_name: str, repo_address: RepoAddress):
-    repo_head_prefix = f"repos/l;{_repo_address_path(repo_address, delimiter=',')};"
+    repo_head_prefix = f"repos/l;{repo_address.path(delimiter=',')};"
     response = s3_client.list_objects_v2(Bucket=bucket_name, Prefix=repo_head_prefix)
     if "Contents" in response:
         for obj in response["Contents"]:
@@ -80,7 +80,7 @@ def delete_repo(s3_client: BaseClient, bucket_name: str, repo_address: RepoAddre
 
 def get_repo_credentials(secretsmanager_client: BaseClient, bucket_name: str, repo_address: RepoAddress) \
         -> Optional[RepoCredentials]:
-    secret_name = f"/dstack/{bucket_name}/credentials/{_repo_address_path(repo_address)}"
+    secret_name = f"/dstack/{bucket_name}/credentials/{repo_address.path()}"
     try:
         response = secretsmanager_client.get_secret_value(SecretId=secret_name)
         credentials_data = json.loads(response["SecretString"])
@@ -97,7 +97,7 @@ def get_repo_credentials(secretsmanager_client: BaseClient, bucket_name: str, re
 
 def save_repo_credentials(sts_client: BaseClient, iam_client: BaseClient, secretsmanager_client: BaseClient,
                           bucket_name: str, repo_address: RepoAddress, repo_credentials: RepoCredentials):
-    secret_name = f"/dstack/{bucket_name}/credentials/{_repo_address_path(repo_address)}"
+    secret_name = f"/dstack/{bucket_name}/credentials/{repo_address.path()}"
     credentials_data = {
         "protocol": repo_credentials.protocol.value
     }

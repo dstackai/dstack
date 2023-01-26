@@ -10,7 +10,7 @@ from dstack.core.tag import TagHead
 from dstack.core.artifact import ArtifactHead, ArtifactSpec
 from dstack.core.error import BackendError
 from dstack.core.job import Job, JobStatus
-from dstack.core.repo import RepoAddress, _repo_address_path, LocalRepoData
+from dstack.core.repo import RepoAddress, LocalRepoData
 
 
 def _unserialize_artifact_heads(artifact_heads):
@@ -19,7 +19,7 @@ def _unserialize_artifact_heads(artifact_heads):
 
 
 def list_tag_heads(s3_client: BaseClient, bucket_name: str, repo_address: RepoAddress):
-    prefix = f"tags/{_repo_address_path(repo_address)}"
+    prefix = f"tags/{repo_address.path()}"
     tag_head_prefix = f"{prefix}/l;"
     response = s3_client.list_objects_v2(Bucket=bucket_name, Prefix=tag_head_prefix)
     tag_heads = []
@@ -37,7 +37,7 @@ def list_tag_heads(s3_client: BaseClient, bucket_name: str, repo_address: RepoAd
 
 def get_tag_head(s3_client: BaseClient, bucket_name: str, repo_address: RepoAddress, tag_name: str) \
         -> Optional[TagHead]:
-    prefix = f"tags/{_repo_address_path(repo_address)}"
+    prefix = f"tags/{repo_address.path()}"
     tag_head_prefix = f"{prefix}/l;{tag_name};"
     response = s3_client.list_objects_v2(Bucket=bucket_name, Prefix=tag_head_prefix)
     if response.get("Contents"):
@@ -56,7 +56,7 @@ def _serialize_artifact_heads(tag_head):
 
 
 def _tag_head_key(tag_head: TagHead) -> str:
-    prefix = f"tags/{_repo_address_path(tag_head.repo_address)}"
+    prefix = f"tags/{tag_head.repo_address.path()}"
     key = f"{prefix}/l;{tag_head.tag_name};" \
           f"{tag_head.run_name};" \
           f"{tag_head.workflow_name or ''};" \

@@ -2,7 +2,6 @@ import sys
 from enum import Enum
 from typing import List, Optional, Generator, Tuple, Dict
 
-# from dstack.core.config import load_config
 from dstack.core.app import AppSpec
 from dstack.core.repo import RepoData, RepoCredentials, RepoAddress, RepoHead
 from dstack.core.job import Job, JobHead
@@ -10,7 +9,7 @@ from dstack.core.secret import Secret
 from dstack.core.log_event import LogEvent
 from dstack.core.tag import TagHead
 from dstack.core.run import RunHead
-from dstack.runners import Runner
+from dstack.core.runners import Runner
 
 
 class BackendType(Enum):
@@ -27,7 +26,7 @@ class Backend(object):
 
     @property
     def name(self) -> str:
-        return self.NAME + "*" if self.type() == BackendType.REMOTE else ""
+        return self.NAME + ("*" if self.type() == BackendType.REMOTE else "")
 
     def configure(self):
         pass

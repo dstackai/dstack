@@ -1,2 +1,2 @@
-__version__ = "0.0.4-STGN"
+__version__ = "523"
 __is_release__ = False

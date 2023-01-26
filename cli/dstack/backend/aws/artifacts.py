@@ -6,7 +6,7 @@ from boto3.s3 import transfer
 from botocore.client import BaseClient
 from tqdm import tqdm
 
-from dstack.core.repo import RepoAddress, _repo_address_path
+from dstack.core.repo import RepoAddress
 
 
 def dest_file_path(key: str, output_path: Path) -> Path:
@@ -15,7 +15,7 @@ def dest_file_path(key: str, output_path: Path) -> Path:
 
 def download_run_artifact_files(s3_client: BaseClient, bucket_name: str, repo_address: RepoAddress,
                                 run_name: str, output_dir: Optional[str]):
-    artifact_prefix = f"artifacts/{_repo_address_path(repo_address)}/{run_name},"
+    artifact_prefix = f"artifacts/{repo_address.path()}/{run_name},"
 
     output_path = Path(output_dir or os.getcwd())
 
@@ -50,7 +50,7 @@ def download_run_artifact_files(s3_client: BaseClient, bucket_name: str, repo_ad
 
 def list_run_artifact_files(s3_client: BaseClient, bucket_name: str, repo_address: RepoAddress,
                             run_name: str) -> Generator[Tuple[str, str, int], None, None]:
-    artifact_prefix = f"artifacts/{_repo_address_path(repo_address)}/{run_name},"
+    artifact_prefix = f"artifacts/{repo_address.path()}/{run_name},"
     paginator = s3_client.get_paginator('list_objects')
     page_iterator = paginator.paginate(Bucket=bucket_name, Prefix=artifact_prefix)
     for page in page_iterator:
@@ -81,7 +81,7 @@ def upload_job_artifact_files(s3_client: BaseClient, bucket_name: str, repo_addr
         def callback(size):
             pbar.update(size)
 
-        prefix = f"artifacts/{_repo_address_path(repo_address)}/{job_id}/{artifact_name}"
+        prefix = f"artifacts/{repo_address.path()}/{job_id}/{artifact_name}"
         for root, sub_dirs, files in os.walk(local_path):
             for filename in files:
                 file_path = Path(os.path.join(root, filename)).absolute()
@@ -97,7 +97,7 @@ def upload_job_artifact_files(s3_client: BaseClient, bucket_name: str, repo_addr
 
 def list_run_artifact_files_and_folders(s3_client: BaseClient, bucket_name: str, repo_address: RepoAddress,
                                         job_id: str, path: str) -> List[Tuple[str, bool]]:
-    prefix = f"artifacts/{_repo_address_path(repo_address)}/{job_id}/" + path + ("" if path.endswith("/") else "/")
+    prefix = f"artifacts/{repo_address.path()}/{job_id}/" + path + ("" if path.endswith("/") else "/")
     response = s3_client.list_objects(Bucket=bucket_name, Prefix=prefix, Delimiter="/")
     folders = []
     files = []

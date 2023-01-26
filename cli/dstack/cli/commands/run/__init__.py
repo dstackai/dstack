@@ -30,6 +30,7 @@ from dstack.cli.commands.ps import print_runs, _has_request_status # TODO ugly
 from dstack.api.repo import load_repo_data
 from dstack.api.backend import get_backend_by_name, DEFAULT, DEFAULT_REMOTE
 from dstack.api.logs import poll_logs
+from dstack.api.run import list_runs
 from dstack.util import since
 
 __all__ = "RunCommand"
@@ -251,7 +252,7 @@ class RunCommand(BasicCommand):
                             #     return
                     jobs = provider.submit_jobs(backend, args.tag_name)
                     backend.update_repo_last_run_at(repo_data, last_run_at=int(round(time.time() * 1000)))
-                    print_runs(Namespace(run_name=run_name, all=False), backend)
+                    print_runs(list_runs(backend, run_name=run_name))
                     if not args.detach:
                         poll_run(repo_data, jobs, backend)
                 else:

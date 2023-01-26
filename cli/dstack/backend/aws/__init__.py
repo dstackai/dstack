@@ -4,7 +4,7 @@ from botocore.client import BaseClient
 
 from dstack.backend import Backend, BackendType
 from dstack.backend.aws import logs, artifacts, jobs, run_names, runs, runners, tags, repos, secrets, config
-from dstack.backend.aws.__config__ import AWSConfig
+from dstack.backend.aws.config import AWSConfig
 from dstack.core.app import AppSpec
 from dstack.core.repo import LocalRepoData, RepoAddress, RepoHead, RepoCredentials
 from dstack.core.job import Job, JobHead

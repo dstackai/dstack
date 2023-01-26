@@ -8,11 +8,10 @@ from itertools import groupby
 from dstack.cli.commands import BasicCommand
 from dstack.core.error import (check_config, check_git)
 from dstack.core.job import JobStatus
-from dstack.api.repo import load_repo_data
+from dstack.api.run import list_runs
 from dstack.core.request import RequestStatus
 from dstack.core.run import RunHead
 from dstack.api.backend import list_backends
-from dstack.backend import Backend
 from dstack.util import pretty_date
 
 _status_colors = {
@@ -53,18 +52,7 @@ def pretty_print_status(run: RunHead) -> str:
     return s
 
 
-def print_runs(args: Namespace, backend: Backend):
-    repo_data = load_repo_data()
-    job_heads = backend.list_job_heads(repo_data, args.run_name)
-    runs = backend.get_run_heads(repo_data, job_heads)
-    if not args.all:
-        unfinished = any(run.status.is_unfinished() for run in runs)
-        if unfinished:
-            runs = list(filter(lambda r: r.status.is_unfinished(), runs))
-        else:
-            runs = runs[:1]
-    runs = reversed(runs)
-
+def print_runs(runs: List[RunHead]):
     runs_by_name = [(run_name, list(run)) for run_name, run in groupby(runs, lambda run: run.run_name)]
     console = Console()
     table = Table(box=None)
@@ -86,7 +74,7 @@ def print_runs(args: Namespace, backend: Backend):
                 _status_color(run, run.local_repo_user_name or "", False, False),
                 pretty_print_status(run),
                 _status_color(run, run.tag_name or "", False, False),
-                _status_color(run, backend.name, False, False)
+                _status_color(run, run.backend_name or "???", False, False)
             )
     console.print(table)
 
@@ -108,6 +96,5 @@ class PSCommand(BasicCommand):
     @check_config
     @check_git
     def _command(self, args: Namespace):
-        for backend in list_backends():
-            print_runs(args, backend)
+        print_runs(list_runs(list_backends(), args.run_name, args.all))
 

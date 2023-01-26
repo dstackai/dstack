@@ -3,6 +3,8 @@ from typing import Optional, List
 from dstack.core.artifact import ArtifactHead
 from dstack.core.repo import RepoAddress
 from dstack.util import _quoted
+
+
 class TagHead:
     def __init__(self, repo_address: RepoAddress, tag_name: str, run_name: str, workflow_name: Optional[str],
                  provider_name: Optional[str], local_repo_user_name: Optional[str], created_at: int,
@@ -28,3 +30,19 @@ class TagHead:
                f'created_at={self.created_at}, ' \
                f'artifact_heads={artifact_heads})'
 
+    def serialize_artifact_heads(self):
+        return ':'.join(
+            [a.job_id + '=' + a.artifact_path for a in self.artifact_heads]) if self.artifact_heads else ''
+
+    def key(self, add_prefix=True) -> str:
+        prefix = ''
+        if add_prefix:
+            prefix = f"tags/{self.repo_address.path()}/"
+        key = f"{prefix}l;{self.tag_name};" \
+              f"{self.run_name};" \
+              f"{self.workflow_name or ''};" \
+              f"{self.provider_name or ''};" \
+              f"{self.local_repo_user_name or ''};" \
+              f"{self.created_at};" \
+              f"{self.serialize_artifact_heads()}"
+        return key

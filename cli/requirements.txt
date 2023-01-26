@@ -2,7 +2,7 @@ requests
 pyyaml
 gitpython
 boto3
-tqdm
+tqdm==4.64.1
 jsonschema
 botocore
 python-dateutil

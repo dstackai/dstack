@@ -13,8 +13,8 @@ from dstack.backend.aws import jobs, logs
 from dstack.core.instance import InstanceType
 from dstack.core.request import RequestStatus, RequestHead
 from dstack.core.job import Job, JobStatus, Requirements
-from dstack.core.repo import RepoAddress, _repo_address_path
-from dstack.runners import Resources, Runner, Gpu
+from dstack.core.repo import RepoAddress
+from core.runners import Resources, Runner, Gpu
 
 CREATE_INSTANCE_RETRY_RATE_SECS = 3
 
@@ -34,7 +34,7 @@ def _serialize_runner(runner: Runner) -> dict:
         "runner_id": runner.runner_id,
         "request_id": runner.request_id,
         "resources": resources,
-        "job": jobs.serialize_job(runner.job),
+        "job": runner.job.serialize(),
     }
     return data
 
@@ -50,7 +50,7 @@ def _unserialize_runner(data: dict) -> Runner:
             data["resources"]["interruptible"] is True,
             data["resources"].get("local") is True,
         ),
-        jobs.unserialize_job(data["job"]),
+        Job.unserialize(data["job"]),
     )
 
 
@@ -480,7 +480,7 @@ def _run_instance(ec2_client: BaseClient, iam_client: BaseClient, bucket_name: s
         },
         {
             "Key": "dstack_repo",
-            "Value": _repo_address_path(repo_address)
+            "Value": repo_address.path()
         },
     ]
     if local_repo_user_name:

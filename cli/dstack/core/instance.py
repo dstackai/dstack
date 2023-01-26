@@ -1,4 +1,4 @@
-from dstack.runners import Resources
+from core.runners import Resources
 
 
 class InstanceType:
