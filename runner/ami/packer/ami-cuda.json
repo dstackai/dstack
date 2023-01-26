@@ -5,7 +5,7 @@
     "region": "eu-west-1",
     "ssh_username": "ubuntu",
     "base_ami": "ami-0be0bfd2eb8b14c30",
-    "instance_type": "t2.micro",
+    "instance_type": "c5.large",
     "subnet_id": "subnet-c39cb6a5",
     "docker_version": "20.10.17",
     "build_id": "{{timestamp}}",
@@ -49,13 +49,11 @@
     {
       "type": "shell",
       "scripts": [
-        "provisioners/kernel/apt-mirrors.sh",
-        "provisioners/kernel/apt-kernel.sh",
         "provisioners/kernel/apt-upgrade.sh",
         "provisioners/kernel/apt-daily.sh",
         "provisioners/kernel/apt-packages.sh",
-        "provisioners/kernel/apt-mirrors.sh",
-        "provisioners/kernel/kernel-tuning.sh"]
+        "provisioners/kernel/kernel-tuning.sh"
+      ]
     },
     {
       "type": "shell",
@@ -83,10 +81,6 @@
       "type": "shell",
       "environment_vars": ["CUDA_DRIVERS_VERSION=455.45.01-1"],
       "script": "provisioners/cuda.sh"
-    },
-    {
-      "type": "shell",
-      "script": "provisioners/pip-cache.sh"
     },
     {
       "type": "shell",
