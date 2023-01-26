@@ -1,0 +1,16 @@
+{
+  "dstack": "Dstack",
+  "common": {
+    "loading": "Loading"
+  },
+  "auth": {
+    "invalid_token": "Invalid token",
+    "you_are_not_logged_in": "You are not logged in",
+    "contact_to_administrator": "For getting the authorization token, contact to the administrator"
+  },
+
+  "navigation": {
+    "hubs": "Hubs",
+    "users": "Users"
+  }
+}
