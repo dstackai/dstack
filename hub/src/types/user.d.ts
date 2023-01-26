@@ -6,4 +6,6 @@ declare interface IUser {
 
 declare interface IUserSmall extends Pick<IUser, 'token' | 'user_name'>{}
 
-declare type TTokenError = 'invalid_token' | 'undefined_token'
+declare type TTokenError = {
+    error_code: 'invalid_token' | 'undefined_token'
+}

@@ -11,6 +11,7 @@ import { selectIsAuthenticated, setAuthData } from './slice';
 import { AuthErrorMessage } from './AuthErrorMessage';
 import { Loading } from './Loading';
 import { Logout } from './Logout';
+import { Hub } from 'pages/Hub';
 
 const App: React.FC = () => {
     const { t } = useTranslation();
@@ -38,8 +39,9 @@ const App: React.FC = () => {
     }, [checkingData, checkingError, isLoading]);
 
     const renderTokenError = () => {
-        const errorKey = checkingError && 'error' in checkingError ? checkingError.error : '';
-        if (errorKey) return <AuthErrorMessage title={t(`auth.${errorKey}`)} text={t('auth.contact_to_administrator')} />;
+        const errorData = checkingError && 'data' in checkingError ? (checkingError.data as { error_code: string }) : null;
+        if (errorData)
+            return <AuthErrorMessage title={t(`auth.${errorData.error_code}`)} text={t('auth.contact_to_administrator')} />;
         return <AuthErrorMessage title={t('auth.token_error')} text={t('auth.contact_to_administrator')} />;
     };
 
@@ -57,7 +59,7 @@ const App: React.FC = () => {
         <AppLayout>
             <Routes>
                 <Route path={ROUTES.BASE} element={<Navigate replace to={ROUTES.HUB.LIST} />} />
-                <Route path={ROUTES.HUB.LIST} element={<Box variant="h1">Hub list</Box>} />
+                <Route path={ROUTES.HUB.LIST} element={<Hub />} />
                 <Route path={ROUTES.USER.LIST} element={<Box variant="h1">User list</Box>} />
                 <Route path={ROUTES.LOGOUT} element={<Logout />} />
             </Routes>

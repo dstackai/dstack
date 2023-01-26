@@ -3,7 +3,7 @@ const success: IUserSmall = {
     token: '541005acbde6d1134d02e49fd7cdba55',
 };
 
-const failed: TTokenError = 'invalid_token';
+const failed: TTokenError = { error_code: 'invalid_token' };
 
 export default {
     success,

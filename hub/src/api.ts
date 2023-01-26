@@ -6,4 +6,9 @@ export const API = {
         BASE: () => `${API.BASE()}/auth`,
         TOKEN: () => `${API.AUTH.BASE()}/token`,
     },
+
+    HUB: {
+        BASE: () => `${API.BASE()}/hub`,
+        LIST: () => `${API.HUB.BASE()}/list`,
+    },
 };
