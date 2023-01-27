@@ -40,7 +40,9 @@ const App: React.FC = () => {
             setIsAuthorizing(false);
 
             if (userData?.user_name) {
-                dispatch(setAuthData({ token: urlToken as string }));
+                if (urlToken) {
+                    dispatch(setAuthData({ token: urlToken as string }));
+                }
                 dispatch(setUserData(userData));
             } else if (getUserError) {
                 dispatch(removeAuthData());

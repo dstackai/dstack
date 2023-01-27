@@ -1,7 +1,8 @@
 {
   "dstack": "Dstack",
   "common": {
-    "loading": "Loading"
+    "loading": "Loading",
+    "edit": "Edit"
   },
   "auth": {
     "invalid_token": "Invalid token",
@@ -12,5 +13,10 @@
   "navigation": {
     "hubs": "Hubs",
     "users": "Users"
+  },
+
+  "hubs": {
+    "page_title": "Hubs",
+    "search_placeholder": "Find hubs"
   }
 }
