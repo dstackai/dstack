@@ -9,6 +9,11 @@ python-dateutil
 paramiko
 git-url-parse
 rich
+fastapi
+starlette
+uvicorn
+pydantic
+sqlalchemy
 py-cpuinfo
 psutil
 websocket-client
