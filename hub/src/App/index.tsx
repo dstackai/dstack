@@ -2,12 +2,11 @@ import React, { useEffect, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useSearchParams, Routes, Route, Navigate } from 'react-router-dom';
 import { useGetUserDataQuery } from 'services/user';
-import { isValidToken } from 'libs';
 import { useAppDispatch, useAppSelector } from 'hooks';
 import AppLayout from 'layouts/AppLayout';
 import { Box } from 'components';
 import { ROUTES } from 'routes';
-import { removeAuthData, selectAuthToken, setAuthData, setUserData } from './slice';
+import { selectAuthToken, setAuthData, setUserData } from './slice';
 import { AuthErrorMessage } from './AuthErrorMessage';
 import { Loading } from './Loading';
 import { Logout } from './Logout';
@@ -17,37 +16,35 @@ const App: React.FC = () => {
     const { t } = useTranslation();
     const [searchParams, setSearchParams] = useSearchParams();
     const urlToken = searchParams.get('token');
-    const storeToken = useAppSelector(selectAuthToken);
-    const isAuthenticated = useAppSelector(selectAuthToken);
-    const [isAuthorizing, setIsAuthorizing] = useState(isValidToken(urlToken || storeToken));
+    const isAuthenticated = Boolean(useAppSelector(selectAuthToken));
+    const [isAuthorizing, setIsAuthorizing] = useState(true);
     const dispatch = useAppDispatch();
 
     const {
         isLoading,
         data: userData,
         error: getUserError,
-    } = useGetUserDataQuery(
-        {
-            token: (urlToken || storeToken) as string,
-        },
-        {
-            skip: !isAuthenticated && !urlToken,
-        },
-    );
+    } = useGetUserDataQuery(undefined, {
+        skip: !isAuthenticated,
+    });
+
+    useEffect(() => {
+        if (!isAuthenticated && !urlToken) {
+            setIsAuthorizing(false);
+        }
+
+        if (urlToken) {
+            dispatch(setAuthData({ token: urlToken as string }));
+            setSearchParams();
+        }
+    }, []);
 
     useEffect(() => {
         if (userData?.user_name || getUserError) {
             setIsAuthorizing(false);
 
             if (userData?.user_name) {
-                dispatch(setAuthData({ token: urlToken as string }));
                 dispatch(setUserData(userData));
-            } else if (getUserError) {
-                dispatch(removeAuthData());
-            }
-
-            if (urlToken) {
-                setSearchParams();
             }
         }
     }, [userData, getUserError, isLoading]);

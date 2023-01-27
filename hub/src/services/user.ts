@@ -10,10 +10,10 @@ export const userApi = createApi({
     }),
 
     endpoints: (builder) => ({
-        getUserData: builder.query<IUserSmall, { token: string }>({
-            query: (params) => {
+        getUserData: builder.query<IUserSmall, void>({
+            query: () => {
                 return {
-                    url: API.USERS.INFO() + `?token=${params.token}`,
+                    url: API.USERS.INFO(),
                 };
             },
         }),
