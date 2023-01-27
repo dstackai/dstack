@@ -2,6 +2,7 @@
   "dstack": "Dstack",
   "common": {
     "loading": "Loading",
+    "add": "Add",
     "edit": "Edit",
     "delete": "Delete",
     "match_count_with_value_one": "{{count}} match",

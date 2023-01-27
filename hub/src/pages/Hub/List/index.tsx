@@ -111,6 +111,7 @@ export const HubList: React.FC = () => {
                     counter={renderCounter()}
                     actions={
                         <SpaceBetween size="xs" direction="horizontal">
+                            <Button>{t('common.add')}</Button>
                             <Button disabled={isDisabledEdit}>{t('common.edit')}</Button>
 
                             <Button onClick={deleteSelectedHubsHandler} disabled={isDisabledDelete}>
