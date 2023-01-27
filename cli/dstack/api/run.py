@@ -1,10 +1,10 @@
-from typing import List
+from typing import List, Union
 from dstack.backend import Backend
 from dstack.core.run import RunHead
 from dstack.api.repo import load_repo_data
 
 
-def list_runs(backends: List[Backend] | Backend, run_name: str = "", all: bool = False) -> List[RunHead]:
+def list_runs(backends: Union[List[Backend], Backend], run_name: str = "", all: bool = False) -> List[RunHead]:
     repo_data = load_repo_data()
     runs = []
     if type(backends) == list:
