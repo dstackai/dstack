@@ -1,4 +1,5 @@
 declare interface IHub {
     id: number,
-    name: string,
+    hub_name: string,
+    permission: 'read' | 'write'
 }

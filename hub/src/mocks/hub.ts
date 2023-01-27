@@ -1,6 +1,7 @@
 const listSuccess: IHub[] = new Array(50).fill({}).map((i, index) => ({
     id: index,
-    name: `hub_${index}`,
+    hub_name: `hub_${index}`,
+    permission: index < 8 ? 'write' : 'read',
 }));
 
 export default {
