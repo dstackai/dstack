@@ -4,7 +4,7 @@ export const API = {
     BASE: () => `${BASE_URL}`,
     USERS: {
         BASE: () => `${API.BASE()}/users`,
-        INFO: () => `${API.USERS.BASE()}/token`,
+        INFO: () => `${API.USERS.BASE()}/info`,
     },
 
     HUB: {
