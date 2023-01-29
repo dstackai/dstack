@@ -77,6 +77,7 @@ func App() {
 			{
 				Name:  "check",
 				Usage: "Checking the system for the possibility to run the runner",
+				Flags: []cli.Flag{},
 				Action: func(c *cli.Context) error {
 					return check(c.String("config-dir"))
 				},

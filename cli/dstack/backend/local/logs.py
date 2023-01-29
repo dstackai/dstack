@@ -1,9 +1,12 @@
 import json
+import os.path
 import re
 import time
 from collections import defaultdict
+from pathlib import Path
 from typing import Optional, Dict, List, Generator, Any, Tuple
 from urllib import parse
+from pygtail import Pygtail
 
 from botocore.client import BaseClient
 
@@ -19,13 +22,15 @@ CHECK_STATUS_EVERY_N = 3
 
 POLL_LOGS_RATE_SECS = 1
 
+_events = []
+
 
 def _render_log_message(path: str, event: Dict[str, Any],
                         repo_address: RepoAddress,
                         job_host_names: Dict[str, Optional[str]],
                         job_ports: Dict[str, Optional[List[int]]],
                         job_app_specs: Dict[str, Optional[List[AppSpec]]]) -> LogEvent:
-    message = json.loads(event["message"].strip())
+    message = event["message"]
     job_id = message["job_id"]
     log = message["log"]
     if job_id and job_id not in job_host_names:
@@ -54,69 +59,59 @@ def _render_log_message(path: str, event: Dict[str, Any],
                     LogEventSource.STDOUT if message["source"] == "stdout" else LogEventSource.STDERR)
 
 
-def _get_latest_events_and_timestamp(event_ids_per_timestamp):
-    if event_ids_per_timestamp:
-        newest_timestamp = max(event_ids_per_timestamp.keys())
-        event_ids_per_timestamp = defaultdict(
-            set, {newest_timestamp: event_ids_per_timestamp[newest_timestamp]}
-        )
-    return event_ids_per_timestamp
+def events_loop(path: str, repo_address: RepoAddress, job_heads: List[JobHead]):
+    counter = 0
+    finished_counter = 0
+    tails = {}
 
+    _jobs = [jobs.get_job(path, repo_address, job_head.job_id) for job_head in job_heads]
+    for _job in _jobs:
+        path_dir = Path.home() / ".dstack" / "tmp" / "runner" / "configs" / _job.runner_id / "logs" / "jobs" / repo_address.path()  # TODO Hardcode
+        file_log = f"{_job.run_name}.log"  # TODO Hardcode
+        if not path_dir.exists():
+            path_dir.mkdir(parents=True)
+            f = open(path_dir / file_log, "w")
+            f.close()
+        tails[_job.job_id] = Pygtail(os.path.join(path_dir, file_log), save_on_end=False, copytruncate=False)
 
-def _reset_filter_log_events_params(fle_kwargs, event_ids_per_timestamp):
-    if event_ids_per_timestamp:
-        fle_kwargs['startTime'] = max(
-            event_ids_per_timestamp.keys()
-        )
-    fle_kwargs.pop('nextToken', None)
+    while True:
+        if counter % CHECK_STATUS_EVERY_N == 0:
+            _jobs = [jobs.get_job(path, repo_address, job_head.job_id) for job_head in job_heads]
 
+            for _job in _jobs:
+                for line_log in tails[_job.job_id]:
+                    yield {
+                        "message": {
+                            "source": "stdout",
+                            "log": line_log,
+                            "job_id": _job.job_id,
+                        },
+                        "eventId": _job.runner_id,
+                        "timestamp": time.time(),
 
-def _filter_log_events_loop(path: str,
-                            repo_address: RepoAddress, job_heads: List[JobHead],
-                            filter_logs_events_kwargs: dict):
-    pass
+                    }
 
+            run = next(iter(runs.get_run_heads(path, _jobs,
+                                               include_request_heads=False)))
+            if run.status.is_finished():
+                if finished_counter == WAIT_N_ONCE_FINISHED:
+                    break
+                finished_counter += 1
+        counter = counter + 1
+        time.sleep(POLL_LOGS_RATE_SECS)
 
-def create_log_group_if_not_exists(path: str, log_group_name: str):
-    pass
-
-
-def create_log_stream(logs_client: BaseClient, log_group_name: str, run_name: str):
-    pass
-
-
-def _filter_logs_events_kwargs(bucket_name: str, repo_address: RepoAddress, run_name: str, start_time: int,
-                               end_time: Optional[int], next_token: Optional[str]):
-    pass
 
 def poll_logs(path: str,
               repo_address: RepoAddress, job_heads: List[JobHead], start_time: int, attached: bool) \
         -> Generator[LogEvent, None, None]:
+    job_host_names = {}
+    job_ports = {}
+    job_app_specs = {}
     try:
-        yield LogEvent("", "", "job_id", "log", LogEventSource.STDOUT)
+        # Read log_file
+        for event in events_loop(path, repo_address, job_heads):
+            yield _render_log_message(path, event, repo_address,
+                                      job_host_names, job_ports, job_app_specs)
     except Exception as e:
         raise e
-
-
-def query_logs(path: str,
-               repo_address: RepoAddress, run_name: str, start_time: int, end_time: Optional[int],
-               next_token: Optional[str],
-               job_host_names: Dict[str, Optional[str]], job_ports: Dict[str, Optional[List[int]]],
-               job_app_specs: Dict[str, Optional[List[AppSpec]]]) -> Tuple[List[LogEvent], Optional[str],
-Dict[str, Optional[str]],
-Dict[str, Optional[List[int]]],
-Dict[str, Optional[List[AppSpec]]]]:
-    job_host_names = dict(job_host_names)
-    job_ports = dict(job_ports)
-    job_app_specs = dict(job_app_specs)
-    filter_logs_events_kwargs = _filter_logs_events_kwargs(path, repo_address, run_name, start_time,
-                                                           end_time, next_token)
-    response = []
-    return [_render_log_message(path, event, repo_address, job_host_names, job_ports,
-                                job_app_specs)
-            for event in response], response.get("nextToken"), job_host_names, job_ports, job_app_specs
-
-
-def get_paginator():
-    return []
 

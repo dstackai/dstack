@@ -108,8 +108,7 @@ func start(logLevel int, httpPort int, configDir string) {
 
 	defer ex.Shutdown(context.Background())
 
-	err = ex.Init(ctxSig, configDir)
-	if err != nil {
+	if err = ex.Init(ctxSig, configDir); err != nil {
 		log.Error(logCtx, "Failed to init executor", "err", err)
 		cancel()
 

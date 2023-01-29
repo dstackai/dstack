@@ -5,6 +5,8 @@ import (
 	"errors"
 	"io"
 	"io/ioutil"
+	"os"
+	"path/filepath"
 	"sync"
 
 	"github.com/dstackai/dstack/runner/internal/artifacts"
@@ -37,6 +39,7 @@ type File struct {
 	Backend string `yaml:"backend"`
 }
 
+var DefaultBackend Backend
 var backends map[string]LoadFn
 var mu = sync.Mutex{}
 var ErrNotFoundTask = errors.New("not found task")
@@ -58,6 +61,9 @@ func New(ctx context.Context, path string) (Backend, error) {
 	defer mu.Unlock()
 	file := File{}
 	log.Trace(ctx, "Read config for backend", "path", path)
+	if _, err := os.Stat(filepath.Join(path)); err != nil {
+		return DefaultBackend, nil
+	}
 	theConfig, err := ioutil.ReadFile(path)
 	if err != nil {
 		return nil, gerrors.Wrap(err)

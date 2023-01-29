@@ -215,7 +215,7 @@ class Job(JobHead):
               f"{self.local_repo_user_name or ''};" \
               f"{self.submitted_at};" \
               f"{self.status.value};" \
-              f"{','.join([a.artifact_path for a in (self.artifact_specs or [])])};" \
+              f"{','.join([a.artifact_path.replace('/', '_') for a in (self.artifact_specs or [])])};" \
               f"{','.join([a.app_name for a in (self.app_specs or [])])};" \
               f"{self.tag_name or ''}"
         return key

@@ -36,10 +36,13 @@ def _create_runner(path: str, runner: Runner):
     put_object(Body=yaml.dump(runner.serialize()), Root=root, Key=key)
     # log_group_name = f"/dstack/runners/{bucket_name}"
     # logs.create_log_group_if_not_exists(logs_client, bucket_name, log_group_name)
+
+
 def _delete_runner(path: str, runner: Runner):
     root = os.path.join(path, "runners")
     key = f"{runner.runner_id}.yaml"
     delete_object(Root=root, Key=key)
+
 
 def _get_runner(path: str, runner_id: str) -> Optional[Runner]:
     root = os.path.join(path, "runners")
@@ -49,6 +52,7 @@ def _get_runner(path: str, runner_id: str) -> Optional[Runner]:
         return Runner.unserialize(yaml.load(obj, yaml.FullLoader))
     except Exception as e:
         return None
+
 
 def _update_runner(path: str, runner: Runner):
     root = os.path.join(path, "runners")
@@ -103,6 +107,7 @@ def run_job(path: str, job: Job):
     else:
         raise Exception("Can't create a request for a job which status is not SUBMITTED")
 
+
 def start_runner_process(runner_id: str) -> str:
     _install_runner_if_necessary()
     runner_config_dir = _get_runner_config_dir(runner_id)
@@ -112,6 +117,7 @@ def start_runner_process(runner_id: str) -> str:
         stderr=subprocess.STDOUT,
         start_new_session=True)
     return f"l-{proc.pid}"
+
 
 def check_runner_resources(runner_id: str) -> Resources:
     _install_runner_if_necessary()
@@ -124,10 +130,13 @@ def check_runner_resources(runner_id: str) -> Resources:
         raise Exception(result.stderr)
     _runner_yaml = yaml.load(runner_config_path.open(), yaml.FullLoader)
     return _unserialize_runner_resources(_runner_yaml["resources"])
+
+
 def _unserialize_runner_resources(data: dict) -> Resources:
     return Resources(data["cpus"], data["memory_mib"],
                      [Gpu(g["name"], g["memory_mib"]) for g in data["gpus"]] if data.get("gpus") else [],
                      False, True)
+
 
 def _runner_version() -> str:
     runner_version = str(version.__version__) if version.__version__ else "latest"
@@ -136,11 +145,13 @@ def _runner_version() -> str:
 
 runner_bucket_region = "eu-west-1"
 
+
 def _install_runner_if_necessary():
     runner_path = _runner_path()
     if not runner_path.exists():
         runner_path.parent.mkdir(parents=True, exist_ok=True)
         _download_runner(_runner_url(), runner_path)
+
 
 def _download_runner(url: str, path: str):
     with requests.get(url, stream=True) as r:
@@ -151,9 +162,12 @@ def _download_runner(url: str, path: str):
                 shutil.copyfileobj(raw, output)
         os.chmod(path, 0o755)
 
+
 def _runner_url() -> str:
     return f"https://{_runner_bucket()}.s3.{runner_bucket_region}.amazonaws.com" \
            f"/{_runner_version()}/binaries/{_runner_filename()}"
+
+
 def _runner_bucket() -> str:
     if version.__is_release__:
         return "dstack-runner-downloads"
@@ -161,7 +175,7 @@ def _runner_bucket() -> str:
         return "dstack-runner-downloads-stgn"
 
 
-def _get_runner_config_dir(runner_id: str,  create: Optional[bool] = None) -> str:
+def _get_runner_config_dir(runner_id: str, create: Optional[bool] = None) -> str:
     runner_config_dir_path = Path(os.path.join(_config_directory_path(), "tmp", "runner", "configs", runner_id))
     if create:
         runner_config_dir_path.mkdir(parents=True, exist_ok=True)
@@ -171,6 +185,7 @@ def _get_runner_config_dir(runner_id: str,  create: Optional[bool] = None) -> st
             "hostname": "127.0.0.1",
         }))
     return runner_config_dir_path
+
 
 def get_request_head(path: str, job: Job, runner: Optional[Runner] = None) -> RequestHead:
     request_id = None
@@ -188,10 +203,12 @@ def get_request_head(path: str, job: Job, runner: Optional[Runner] = None) -> Re
     else:
         return RequestHead(job.job_id, RequestStatus.TERMINATED, "PID is not specified")
 
+
 def _stop_runner(path: str, runner: Runner):
     if runner.request_id:
         stop_process(runner.request_id)
     _delete_runner(path, runner)
+
 
 def _arch() -> str:
     uname = platform.uname()
@@ -237,6 +254,7 @@ def _config_directory_path() -> Path:
 def _runner_path() -> Path:
     return _config_directory_path() / "tmp" / "runner" / "bin" / _runner_version() / _runner_filename()
 
+
 def stop_job(path: str, repo_address: RepoAddress,
              job_id: str, abort: bool):
     job_head = jobs.list_job_head(path, repo_address, job_id)
@@ -272,6 +290,7 @@ def stop_job(path: str, repo_address: RepoAddress,
                 job.status = new_status
                 jobs.update_job(path, job)
 
+
 def stop_process(request_id: str):
     t = request_id.split("-")
     pid = int(t[1])
@@ -279,6 +298,7 @@ def stop_process(request_id: str):
         os.kill(pid, signal.SIGTERM)
     except ProcessLookupError:
         pass
+
 
 def is_running(request_id: str) -> bool:
     t = request_id.split("-")

@@ -20,3 +20,4 @@ websocket-client
 cursor
 simple-term-menu
 jinja2
+pygtail

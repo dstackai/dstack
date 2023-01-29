@@ -89,8 +89,7 @@ func (ex *Executor) Init(ctx context.Context, configDir string) error {
 	//Update port logs
 	if ex.streamLogs != nil {
 		job.Environment["WS_LOGS_PORT"] = strconv.Itoa(ex.streamLogs.Port())
-		err = ex.backend.UpdateState(ctx)
-		if err != nil {
+		if err = ex.backend.UpdateState(ctx); err != nil {
 			return gerrors.Wrap(err)
 		}
 	}
@@ -212,14 +211,14 @@ func (ex *Executor) runJob(ctx context.Context, erCh chan error, stoppedCh chan 
 		}
 	}
 	log.Trace(jctx, "Fetching git repository")
-	err = ex.prepareGit(jctx)
-	if err != nil {
+
+	if err = ex.prepareGit(jctx); err != nil {
 		erCh <- gerrors.Wrap(err)
 		return
 	}
 	log.Trace(jctx, "Dependency processing")
-	err = ex.processDeps(jctx)
-	if err != nil {
+
+	if err = ex.processDeps(jctx); err != nil {
 		erCh <- gerrors.Wrap(err)
 		return
 	}
@@ -249,13 +248,13 @@ func (ex *Executor) runJob(ctx context.Context, erCh chan error, stoppedCh chan 
 		}
 		log.Trace(jctx, "Running job")
 		job.Status = states.Running
-		err = ex.backend.UpdateState(jctx)
-		if err != nil {
+
+		if err = ex.backend.UpdateState(jctx); err != nil {
 			erCh <- gerrors.Wrap(err)
 			return
 		}
-		err = ex.processJob(ctx, stoppedCh)
-		if err != nil {
+
+		if err = ex.processJob(ctx, stoppedCh); err != nil {
 			erCh <- gerrors.Wrap(err)
 			return
 		}
@@ -289,6 +288,9 @@ func (ex *Executor) runJob(ctx context.Context, erCh chan error, stoppedCh chan 
 func (ex *Executor) prepareGit(ctx context.Context) error {
 	job := ex.backend.Job(ctx)
 	dir := path.Join(common.HomeDir(), consts.RUNS_PATH, job.RunName, job.JobID)
+	if _, err := os.Stat(dir); err != nil {
+		os.MkdirAll(dir, 0777)
+	}
 	ex.repo = repo.NewManager(ctx, fmt.Sprintf(consts.REPO_HTTPS_URL, job.RepoHostNameWithPort(), job.RepoUserName, job.RepoName), job.RepoBranch, job.RepoHash).WithLocalPath(dir)
 	cred := ex.backend.GitCredentials(ctx)
 	if cred != nil {
@@ -317,13 +319,15 @@ func (ex *Executor) prepareGit(ctx context.Context) error {
 			log.Error(ctx, "Unsupported protocol", "protocol", cred.Protocol)
 		}
 	}
-	err := ex.repo.Checkout()
-	if err != nil {
+
+	if err := ex.repo.Checkout(); err != nil {
 		log.Trace(ctx, "GIT checkout error", "err", err, "GIT URL", ex.repo.URL())
 		return gerrors.Wrap(err)
 	}
 	if job.RepoDiff != "" {
-		err = repo.ApplyDiff(ctx, dir, job.RepoDiff)
+		if err := repo.ApplyDiff(ctx, dir, job.RepoDiff); err != nil {
+			return gerrors.Wrap(err)
+		}
 	}
 	return nil
 }
@@ -440,12 +444,7 @@ func (ex *Executor) processJob(ctx context.Context, stoppedCh chan struct{}) err
 		ShmSize:      resource.ShmSize,
 	}
 	logGroup := fmt.Sprintf("/jobs/%s/%s/%s", job.RepoHostNameWithPort(), job.RepoUserName, job.RepoName)
-	if _, err := os.Stat(filepath.Join(ex.configDir, "logs", logGroup)); err != nil {
-		if err = os.MkdirAll(filepath.Join(ex.configDir, "logs", logGroup), 0o777); err != nil {
-			return gerrors.Wrap(err)
-		}
-	}
-	fileLog, err := os.OpenFile(filepath.Join(ex.configDir, "logs", logGroup, fmt.Sprintf("%s.log", job.RunName)), os.O_RDWR|os.O_CREATE|os.O_APPEND, 0o777)
+	fileLog, err := createLocalLog(filepath.Join(ex.configDir, "logs", logGroup), job.RunName)
 	if err != nil {
 		return gerrors.Wrap(err)
 	}
@@ -511,4 +510,15 @@ func uniqueMount(m []mount.Mount) []mount.Mount {
 		result = append(result, item)
 	}
 	return result
+}
+
+func createLocalLog(dir, fileName string) (*os.File, error) {
+	if _, err := os.Stat(dir); err != nil {
+		os.MkdirAll(dir, 0777)
+	}
+	fileLog, err := os.OpenFile(filepath.Join(dir, fmt.Sprintf("%s.log", fileName)), os.O_RDWR|os.O_CREATE|os.O_APPEND, 0o777)
+	if err != nil {
+		return nil, gerrors.Wrap(err)
+	}
+	return fileLog, nil
 }

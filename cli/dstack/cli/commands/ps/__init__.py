@@ -29,15 +29,13 @@ _status_colors = {
 
 
 def _status_color(run: RunHead, val: str, run_column: bool, status_column: bool):
-    if status_column and _has_request_status(run, [RequestStatus.TERMINATED, RequestStatus.NO_CAPACITY]):
+    if status_column and run.has_request_status([RequestStatus.TERMINATED, RequestStatus.NO_CAPACITY]):
         color = "dark_orange"
     else:
         color = _status_colors.get(run.status)
     return f"[{'bold ' if run_column else ''}{color}]{val}[/]" if color is not None else val
 
 
-def _has_request_status(run, statuses: List[RequestStatus]):
-    return run.status.is_unfinished() and any(filter(lambda s: s.status in statuses, run.request_heads or []))
 
 
 def pretty_print_status(run: RunHead) -> str:
@@ -45,9 +43,9 @@ def pretty_print_status(run: RunHead) -> str:
     status = run.status.value
     status = status[:1].upper() + status[1:]
     s = f"[{status_color}]{status}[/]"
-    if _has_request_status(run, [RequestStatus.TERMINATED]):
+    if run.has_request_status([RequestStatus.TERMINATED]):
         s += "\n[red]Request(s) terminated[/]"
-    elif _has_request_status(run, [RequestStatus.NO_CAPACITY]):
+    elif run.has_request_status([RequestStatus.NO_CAPACITY]):
         s += " \n[dark_orange]No capacity[/]"
     return s
 

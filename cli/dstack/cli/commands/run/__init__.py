@@ -26,7 +26,7 @@ from dstack.backend import Backend
 from dstack.core.job import JobHead, JobStatus
 from dstack.core.request import RequestStatus
 from dstack.cli.commands import BasicCommand
-from dstack.cli.commands.ps import print_runs, _has_request_status # TODO ugly
+from dstack.cli.commands.ps import print_runs
 from dstack.api.repo import load_repo_data
 from dstack.api.backend import get_backend_by_name, DEFAULT, DEFAULT_REMOTE
 from dstack.api.logs import poll_logs
@@ -161,11 +161,11 @@ def poll_run(repo_address: RepoAddress, job_heads: List[JobHead], backend: Backe
                 elif run.status not in [JobStatus.SUBMITTED, JobStatus.DOWNLOADING]:
                     progress.update(task, total=100)
                     break
-                if _has_request_status(run, [RequestStatus.TERMINATED, RequestStatus.NO_CAPACITY]):
-                    if _has_request_status(run, [RequestStatus.TERMINATED]):
+                if run.has_request_status([RequestStatus.TERMINATED, RequestStatus.NO_CAPACITY]):
+                    if run.has_request_status([RequestStatus.TERMINATED]):
                         progress.update(task, description=f"[red]Request(s) terminated[/]", total=100)
                         break
-                    elif not request_errors_printed and _has_request_status(run, [RequestStatus.NO_CAPACITY]):
+                    elif not request_errors_printed and run.has_request_status([RequestStatus.NO_CAPACITY]):
                         progress.update(task, description=f"[dark_orange]No capacity[/]")
                         request_errors_printed = True
                 elif request_errors_printed:

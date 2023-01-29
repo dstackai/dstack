@@ -4,7 +4,7 @@ from dstack.util import _quoted
 from dstack.core.app import AppHead
 from dstack.core.artifact import ArtifactHead
 from dstack.core.repo import RepoAddress
-from dstack.core.request import RequestHead
+from dstack.core.request import RequestHead, RequestStatus
 from dstack.core.job import JobStatus
 
 
@@ -42,3 +42,6 @@ class RunHead:
                f'tag_name={_quoted(self.tag_name)}, ' \
                f'app_heads={app_heads}, ' \
                f'request_heads={request_heads})'
+
+    def has_request_status(self, statuses: List[RequestStatus]):
+        return self.status.is_unfinished() and any(filter(lambda s: s.status in statuses, self.request_heads or []))

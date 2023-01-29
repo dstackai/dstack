@@ -6,11 +6,13 @@ import (
 	"io"
 	"io/ioutil"
 	"os"
+	"path"
 	"path/filepath"
 	"strings"
 
 	"github.com/dstackai/dstack/runner/consts"
 	"github.com/dstackai/dstack/runner/internal/artifacts"
+	"github.com/dstackai/dstack/runner/internal/artifacts/local"
 	"github.com/dstackai/dstack/runner/internal/backend"
 	"github.com/dstackai/dstack/runner/internal/common"
 	"github.com/dstackai/dstack/runner/internal/gerrors"
@@ -21,53 +23,121 @@ import (
 
 var _ backend.Backend = (*Local)(nil)
 
+func init() {
+	backend.DefaultBackend = New()
+	backend.RegisterBackend("local", func(ctx context.Context, pathConfig string) (backend.Backend, error) {
+		file := File{}
+		theConfig, err := ioutil.ReadFile(pathConfig)
+		if err != nil {
+			fmt.Println("[ERROR]", err.Error())
+			return nil, err
+		}
+		err = yaml.Unmarshal(theConfig, &file)
+		if err != nil {
+			fmt.Println("[ERROR]", err.Error())
+			return nil, err
+		}
+		return New(), nil
+	})
+}
+
 type Local struct {
 	path      string
 	runnerID  string
 	state     *models.State
+	cliSecret *ClientSecret
 	artifacts []artifacts.Artifacter
 	logger    *Logger
 }
 
+func New() *Local {
+	path := filepath.Join(common.HomeDir(), consts.DSTACK_DIR_PATH)
+	return &Local{
+		path:      path,
+		cliSecret: NewClientSecret(path),
+	}
+}
+
 func (l Local) GetJobByPath(ctx context.Context, path string) (*models.Job, error) {
-	//TODO implement me
-	panic("implement me")
+	if l.state == nil {
+		log.Trace(ctx, "State not exist")
+		return nil, gerrors.Wrap(backend.ErrLoadStateFile)
+	}
+	theFile, err := os.Open(filepath.Join(l.path, path))
+	if err != nil {
+		log.Error(ctx, "Failed to open file", "err", err)
+		return nil, gerrors.Wrap(err)
+	}
+	bodyFile, err := io.ReadAll(theFile)
+	if err != nil {
+		log.Error(ctx, "Failed to read file", "err", err)
+		return nil, gerrors.Wrap(err)
+	}
+	job := new(models.Job)
+	if err = yaml.Unmarshal(bodyFile, job); err != nil {
+		return nil, gerrors.Wrap(err)
+	}
+	return job, nil
 }
 
-func (l Local) fullPath(ctx context.Context) string {
-	return filepath.Join(common.HomeDir(), consts.DSTACK_DIR_PATH, l.Bucket(ctx))
+func (l *Local) GitCredentials(ctx context.Context) *models.GitCredentials {
+	log.Trace(ctx, "Getting credentials")
+	if l == nil {
+		log.Error(ctx, "Backend is empty")
+		return nil
+	}
+	if l.state == nil {
+		log.Error(ctx, "State is empty")
+		return nil
+	}
+	if l.state.Job == nil {
+		log.Error(ctx, "Job is empty")
+		return nil
+	}
+	return l.cliSecret.fetchCredentials(ctx, l.state.Job.RepoHostNameWithPort(), l.state.Job.RepoUserName, l.state.Job.RepoName)
 }
 
-func (l Local) GitCredentials(ctx context.Context) *models.GitCredentials {
-	git := &models.GitCredentials{
-		Protocol: os.Getenv("REPO_PROTOCOL"),
+func (l *Local) Secrets(ctx context.Context) (map[string]string, error) {
+	log.Trace(ctx, "Getting secrets")
+	if l == nil {
+		return nil, gerrors.New("Backend is nil")
 	}
-	if os.Getenv("REPO_OAUTH_TOKEN") != "" {
-		git.OAuthToken = common.String(os.Getenv("REPO_OAUTH_TOKEN"))
+	if l.state == nil {
+		return nil, gerrors.New("State is empty")
 	}
-	if os.Getenv("REPO_PRIVATE_KEY") != "" {
-		git.PrivateKey = common.String(os.Getenv("REPO_PRIVATE_KEY"))
+	templatePath := fmt.Sprintf("secrets/%s/%s/%s", l.state.Job.RepoHostNameWithPort(), l.state.Job.RepoUserName, l.state.Job.RepoName)
+	if _, err := os.Stat(filepath.Join(l.path, templatePath)); err != nil {
+		return map[string]string{}, nil
 	}
-	if os.Getenv("REPO_PASSPHRASE") != "" {
-		git.Passphrase = common.String(os.Getenv("REPO_PASSPHRASE"))
+	listSecrets, err := os.ReadDir(filepath.Join(l.path, templatePath))
+	if err != nil {
+		return nil, gerrors.Wrap(err)
 	}
-	return git
-}
 
-func (l Local) Secrets(_ context.Context) (map[string]string, error) {
-	return map[string]string{}, nil
+	secrets := make(map[string]string, 0)
+	for _, file := range listSecrets {
+		if file.IsDir() {
+			continue
+		}
+		if strings.HasPrefix(file.Name(), "l;") {
+			clearName := strings.ReplaceAll(file.Name(), "l;", "")
+			secrets[clearName] = fmt.Sprintf("%s/%s/%s/%s",
+				l.state.Job.RepoHostNameWithPort(),
+				l.state.Job.RepoUserName,
+				l.state.Job.RepoName,
+				clearName)
+		}
+	}
+	return l.cliSecret.fetchSecret(ctx, templatePath, secrets)
 }
 
 func (l Local) Bucket(ctx context.Context) string {
-	if l.path == "" {
-		return "default"
-	}
-	return l.path
+	return ""
 }
 
 func (l Local) ListSubDir(ctx context.Context, dir string) ([]string, error) {
 	log.Trace(ctx, "Fetching list sub dir")
-	list, err := os.ReadDir(filepath.Join(l.fullPath(ctx), dir))
+	list, err := os.ReadDir(filepath.Join(l.path, dir))
 	if err != nil {
 		return nil, gerrors.Wrap(err)
 	}
@@ -83,10 +153,10 @@ func (l Local) ListSubDir(ctx context.Context, dir string) ([]string, error) {
 	return listDir, nil
 }
 
-func (l Local) Init(ctx context.Context, ID string) error {
+func (l *Local) Init(ctx context.Context, ID string) error {
 	log.Trace(ctx, "Initialize backend with ID runner", "runner ID", ID)
 	l.runnerID = ID
-	pathRunner := filepath.Join(l.fullPath(ctx), "runners", fmt.Sprintf("%s.yaml", ID))
+	pathRunner := filepath.Join(l.path, "runners", fmt.Sprintf("%s.yaml", ID))
 	log.Trace(ctx, "Fetch runner state from S3",
 		"path", pathRunner)
 	theFile, err := os.Open(pathRunner)
@@ -120,7 +190,7 @@ func (l Local) MasterJob(ctx context.Context) *models.Job {
 		log.Trace(ctx, "State not exist")
 		return nil
 	}
-	theFile, err := os.Open(filepath.Join(l.fullPath(ctx), "jobs", l.state.Job.RepoUserName, l.state.Job.RepoName, fmt.Sprintf("%s.yaml", l.state.Job.MasterJobID)))
+	theFile, err := os.Open(filepath.Join(l.path, "jobs", l.state.Job.RepoUserName, l.state.Job.RepoName, fmt.Sprintf("%s.yaml", l.state.Job.MasterJobID)))
 	if err != nil {
 		log.Error(ctx, "Failed to open file", "err", err)
 		return nil
@@ -154,7 +224,8 @@ func (l Local) UpdateState(ctx context.Context) error {
 		return gerrors.Wrap(backend.ErrLoadStateFile)
 	}
 	log.Trace(ctx, "Fetching list jobs", "Repo username", l.state.Job.RepoUserName, "Repo name", l.state.Job.RepoName, "Job ID", l.state.Job.JobID)
-	list, err := os.ReadDir(filepath.Join(l.fullPath(ctx), fmt.Sprintf("jobs/%s/%s", l.state.Job.RepoUserName, l.state.Job.RepoName)))
+	pathDir := filepath.Join(l.path, fmt.Sprintf("jobs/%s/%s/%s", l.state.Job.RepoHostNameWithPort(), l.state.Job.RepoUserName, l.state.Job.RepoName))
+	list, err := os.ReadDir(pathDir)
 	if err != nil {
 		return gerrors.Wrap(err)
 	}
@@ -162,7 +233,7 @@ func (l Local) UpdateState(ctx context.Context) error {
 	for _, value := range list {
 		if !value.IsDir() {
 			if strings.HasPrefix(value.Name(), fmt.Sprintf("l;%s;", l.state.Job.JobID)) {
-				if err = os.Remove(filepath.Join(l.fullPath(ctx), fmt.Sprintf("jobs/%s/%s", l.state.Job.RepoUserName, l.state.Job.RepoName), value.Name())); err != nil {
+				if err = os.Remove(filepath.Join(pathDir, value.Name())); err != nil {
 					return gerrors.Wrap(err)
 				}
 			}
@@ -173,41 +244,43 @@ func (l Local) UpdateState(ctx context.Context) error {
 	if err != nil {
 		return gerrors.Wrap(err)
 	}
-	pathJob := fmt.Sprintf("jobs/%s/%s/%s.yaml", l.state.Job.RepoUserName, l.state.Job.RepoName, l.state.Job.JobID)
+	pathJob := fmt.Sprintf("jobs/%s/%s/%s/%s.yaml", l.state.Job.RepoHostNameWithPort(), l.state.Job.RepoUserName, l.state.Job.RepoName, l.state.Job.JobID)
 	log.Trace(ctx, "Write to file job", "Path", pathJob)
 
-	theFile, err := os.OpenFile(filepath.Join(l.fullPath(ctx), pathJob), os.O_WRONLY|os.O_CREATE, 0777)
+	theFile, err := os.OpenFile(filepath.Join(l.path, pathJob), os.O_WRONLY|os.O_CREATE|os.O_TRUNC, 0777)
 	if err != nil {
 		return gerrors.Wrap(err)
 	}
 	defer theFile.Close()
-	_, err = theFile.Write(theFileBody)
-	if err != nil {
+
+	if _, err = theFile.Write(theFileBody); err != nil {
 		return gerrors.Wrap(err)
 	}
-	appString := ""
+	appString := make([]string, 0, len(l.state.Job.Apps))
 	for _, app := range l.state.Job.Apps {
-		appString += app.Name
+		appString = append(appString, app.Name)
 	}
 
 	artifactSlice := make([]string, 0, 5)
 	for _, art := range l.state.Job.Artifacts {
-		artifactSlice = append(artifactSlice, art.Path)
+		artifactSlice = append(artifactSlice, strings.ReplaceAll(art.Path, `/`, "_"))
 	}
 
-	pathLockJob := fmt.Sprintf("jobs/%s/%s/l;%s;%s;%d;%s;%s;%s;%s",
+	pathLockJob := fmt.Sprintf("jobs/%s/%s/%s/l;%s;%s;%s;%d;%s;%s;%s;%s",
+		l.state.Job.RepoHostNameWithPort(),
 		l.state.Job.RepoUserName,
 		l.state.Job.RepoName,
 		l.state.Job.JobID,
 		l.state.Job.ProviderName,
+		l.state.Job.LocalRepoUserName,
 		l.state.Job.SubmittedAt,
 		l.state.Job.Status,
 		strings.Join(artifactSlice, ","),
-		appString,
+		strings.Join(appString, ","),
 		l.state.Job.TagName)
 	log.Trace(ctx, "Write to file lock job", "Path", pathLockJob)
 
-	if _, err = os.OpenFile(filepath.Join(l.fullPath(ctx), pathLockJob), os.O_WRONLY|os.O_CREATE|os.O_APPEND, 0777); err != nil {
+	if _, err = os.OpenFile(filepath.Join(l.path, pathLockJob), os.O_WRONLY|os.O_CREATE|os.O_APPEND, 0777); err != nil {
 		return gerrors.Wrap(err)
 	}
 	return nil
@@ -220,7 +293,7 @@ func (l Local) CheckStop(ctx context.Context) (bool, error) {
 	}
 	pathStateFile := fmt.Sprintf("runners/%s.stop", l.runnerID)
 	log.Trace(ctx, "Reading metadata from state file", "path", pathStateFile)
-	if _, err := os.Stat(filepath.Join(l.fullPath(ctx), pathStateFile)); err == nil {
+	if _, err := os.Stat(filepath.Join(l.path, pathStateFile)); err == nil {
 		log.Trace(ctx, "Status equals stopping")
 		return true, nil
 	}
@@ -231,8 +304,18 @@ func (l Local) Shutdown(ctx context.Context) error {
 	return nil
 }
 
-func (l Local) GetArtifact(ctx context.Context, runName, localPath, remotePath string, _ bool) artifacts.Artifacter {
-	panic("not implement")
+func (l *Local) GetArtifact(ctx context.Context, runName, localPath, remotePath string, _ bool) artifacts.Artifacter {
+	if l == nil {
+		return nil
+	}
+	rootPath := path.Join(common.HomeDir(), consts.USER_ARTIFACTS_PATH, runName)
+	log.Trace(ctx, "Create simple artifact's engine. Local", "Root path", rootPath)
+	art, err := local.NewLocal(l.path, rootPath, localPath, remotePath)
+	if err != nil {
+		log.Error(ctx, "Error create simple engine", "err", err)
+		return nil
+	}
+	return art
 }
 
 func (l Local) CreateLogger(ctx context.Context, logGroup, logName string) io.Writer {
@@ -254,29 +337,4 @@ func (l Local) CreateLogger(ctx context.Context, logGroup, logName string) io.Wr
 
 type File struct {
 	Path string `yaml:"path"`
-}
-
-func init() {
-	backend.RegisterBackend("local", func(ctx context.Context, pathConfig string) (backend.Backend, error) {
-		file := File{}
-		theConfig, err := ioutil.ReadFile(pathConfig)
-		if err != nil {
-			fmt.Println("[ERROR]", err.Error())
-			return nil, err
-		}
-		err = yaml.Unmarshal(theConfig, &file)
-		if err != nil {
-			fmt.Println("[ERROR]", err.Error())
-			return nil, err
-		}
-		return New(file.Path), nil
-	})
-}
-
-func New(path string) *Local {
-	if path == "" {
-		fmt.Println("[ERROR]", "path is empty")
-		return nil
-	}
-	return &Local{path: path}
 }
