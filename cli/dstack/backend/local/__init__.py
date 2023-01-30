@@ -1,7 +1,7 @@
 import sys
 from typing import List, Optional, Generator, Dict, Tuple
 
-from dstack.backend.local import jobs, runs, tags, runners, repos, secrets, logs
+from dstack.backend.local import jobs, runs, tags, runners, repos, secrets, logs, artifacts
 from dstack.backend.local.config import LocalConfig
 from dstack.backend import Backend, BackendType
 from dstack.core.app import AppSpec
@@ -99,7 +99,8 @@ class LocalBackend(Backend):
 
     def list_run_artifact_files(self, repo_address: RepoAddress, run_name: str) -> \
             Generator[Tuple[str, str, int], None, None]:
-        pass
+        return artifacts.list_run_artifact_files(self.backend_config.path,
+                                                 repo_address, run_name)
 
     def list_tag_heads(self, repo_address: RepoAddress) -> List[TagHead]:
         pass
@@ -141,7 +142,8 @@ class LocalBackend(Backend):
 
     def list_run_artifact_files_and_folders(self, repo_address: RepoAddress, job_id: str,
                                             path: str) -> List[Tuple[str, bool]]:
-        pass
+        return artifacts.list_run_artifact_files_and_folders(self.backend_config.path,
+                                                             repo_address, job_id, path)
 
     def list_secret_names(self, repo_address: RepoAddress) -> List[str]:
         return secrets.list_secret_names(self.backend_config.path, repo_address)

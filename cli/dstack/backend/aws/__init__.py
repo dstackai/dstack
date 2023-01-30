@@ -115,8 +115,8 @@ class AwsBackend(Backend):
 
     def list_run_artifact_files(self, repo_address: RepoAddress, run_name: str) -> \
             Generator[Tuple[str, str, int], None, None]:
-        return artifacts.list_run_artifact_files(self._s3_client(), self.backend_config.bucket_name,
-                                                 repo_address, run_name)
+            return artifacts.list_run_artifact_files(self._s3_client(), self.backend_config.bucket_name,
+                                                     repo_address, run_name)
 
     def download_run_artifact_files(self, repo_address: RepoAddress, run_name: str,
                                     output_dir: Optional[str]):

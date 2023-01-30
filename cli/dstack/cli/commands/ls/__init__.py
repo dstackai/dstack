@@ -16,15 +16,15 @@ def _run_name(repo_data, backend, args):
         tag_head = backend.get_tag_head(repo_data, tag_name)
         if tag_head:
             return tag_head.run_name
-        else:
-            sys.exit(f"Cannot find the tag '{tag_name}'")
+#        else:
+#            sys.exit(f"Cannot find the tag '{tag_name}'")
     else:
         run_name = args.run_name_or_tag_name
         job_heads = backend.list_job_heads(repo_data, run_name)
         if job_heads:
             return run_name
-        else:
-            sys.exit(f"Cannot find the run '{run_name}'")
+#        else:
+#            sys.exit(f"Cannot find the run '{run_name}'")
 
 
 def sizeof_fmt(num, suffix='B'):
@@ -55,13 +55,21 @@ class LsCommand(BasicCommand):
         table.add_column("ARTIFACT", style="bold", no_wrap=True)
         table.add_column("FILE")
         table.add_column("SIZE", style="dark_sea_green4")
+        table.add_column("BACKEND", style="bold")
+        anyone = False
         for backend in list_backends():
             run_name = _run_name(repo_data, backend, args)
+            if run_name is None:
+                continue
+            anyone = True
             run_artifact_files = backend.list_run_artifact_files(repo_data, run_name)
             previous_artifact_name = None
             for (artifact_name, file_name, file_size) in run_artifact_files:
                 table.add_row(artifact_name if previous_artifact_name != artifact_name else "",
-                              file_name, sizeof_fmt(file_size))
+                              file_name, sizeof_fmt(file_size), backend.name)
                 previous_artifact_name = artifact_name
-        console.print(table)
+        if anyone:
+            console.print(table)
+        else:
+            sys.exit(f"Nothing found '{args.run_name_or_tag_name}'")
 

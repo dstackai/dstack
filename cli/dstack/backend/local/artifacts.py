@@ -2,11 +2,8 @@ import os
 from pathlib import Path
 from typing import List, Tuple, Optional, Generator
 
-from boto3.s3 import transfer
-from tqdm import tqdm
-
 from dstack.core.repo import RepoAddress
-from dstack.backend.local.common import list_objects, put_object, get_object, delete_object
+from dstack.backend.local.common import list_objects, put_object, get_object, delete_object, list_all_objects
 
 
 def dest_file_path(key: str, output_path: Path) -> Path:
@@ -17,9 +14,15 @@ def download_run_artifact_files(path: str, repo_address: RepoAddress,
                                 run_name: str, output_dir: Optional[str]):
     pass
 
+
 def list_run_artifact_files(path: str, repo_address: RepoAddress,
                             run_name: str) -> Generator[Tuple[str, str, int], None, None]:
-    pass
+    root = Path(path) / "artifacts" / repo_address.path()
+    artifact_prefix = f"{run_name},"
+    list_iterator = list_all_objects(Root=root, Prefix=artifact_prefix)
+    for job_id, path, file_size in list_iterator:
+        if file_size > 0:
+            yield job_id, path, file_size
 
 
 def __remove_prefix(text, prefix):

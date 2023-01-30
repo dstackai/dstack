@@ -43,6 +43,22 @@ def delete_object(Root: str, Key: str):
     if os.path.exists(path):
         os.remove(path)
 
+def list_all_objects(Root: str, Prefix: str):
+    if not os.path.exists(Root):
+        return []
+    files = os.listdir(Root)
+    list_dir = []
+    for file in files:
+        if file.startswith(Prefix) and os.path.isdir(os.path.join(Root, file)):
+            list_dir.append(file)
+    for _dir in list_dir:
+        for root, sub_dirs, files in os.walk(os.path.join(Root, _dir)):
+            for filename in files:
+                clear_root = root.replace(os.path.join(Root, _dir), "")
+                file_path = os.path.join(clear_root, filename)
+                file_size = os.path.getsize(os.path.join(root, filename))
+                yield _dir, file_path, file_size
+
 
 def get_secret_value(SecretId: str, Root:str):
     _check_db(Root)
@@ -55,6 +71,7 @@ def get_secret_value(SecretId: str, Root:str):
     if value:
         return value[0]
     return value
+
 
 def update_secret(SecretId: str, SecretString: str, Root:str):
     _check_db(Root)
