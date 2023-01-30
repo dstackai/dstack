@@ -95,7 +95,7 @@ export const HubList: React.FC = () => {
                         content: (hub) => hub.region,
                     },
                     {
-                        id: 'region',
+                        id: 'bucket',
                         header: t('hubs.card.bucket'),
                         content: (hub) => hub.bucket,
                     },
