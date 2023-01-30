@@ -1,8 +1,6 @@
 name: Manual GCP image build for STGN
 
-on:
-  workflow_dispatch:
-  push:
+on: [workflow_dispatch]
 
 jobs:
   gcp-image-build:
@@ -36,4 +34,7 @@ jobs:
         run: |
           VERSION=${{ github.run_number }}
           ./packer build -var build_id=$VERSION ${{ matrix.variants }}.json
+      - name: Publish image
+        run: |
+          VERSION=${{ github.run_number }}
           gcloud compute images add-iam-policy-binding stgn-dstack-$VERSION --member='allAuthenticatedUsers' --role='roles/compute.imageUser'
