@@ -137,20 +137,20 @@ func (l Local) Bucket(ctx context.Context) string {
 
 func (l Local) ListSubDir(ctx context.Context, dir string) ([]string, error) {
 	log.Trace(ctx, "Fetching list sub dir")
-	list, err := os.ReadDir(filepath.Join(l.path, dir))
+	listDir := strings.Split(dir, "/")
+	root := strings.Join(listDir[:len(listDir)-1], string(filepath.Separator))
+	prefix := listDir[len(listDir)-1]
+	list, err := os.ReadDir(filepath.Join(l.path, root))
 	if err != nil {
 		return nil, gerrors.Wrap(err)
 	}
-	listDir := make([]string, 0, 5)
+	listJob := make([]string, 0, 5)
 	for _, value := range list {
-		if value.IsDir() {
-			listDir = append(listDir, value.Name())
+		if strings.HasPrefix(value.Name(), prefix) {
+			listJob = append(listJob, filepath.Join(root, value.Name()))
 		}
 	}
-	if err != nil {
-		return nil, gerrors.Wrap(err)
-	}
-	return listDir, nil
+	return listJob, nil
 }
 
 func (l *Local) Init(ctx context.Context, ID string) error {

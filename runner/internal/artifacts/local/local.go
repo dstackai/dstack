@@ -47,7 +47,7 @@ func (s *Local) DockerBindings(workDir string) ([]mount.Mount, error) {
 	return []mount.Mount{
 		{
 			Type:   mount.TypeBind,
-			Source: path.Join(s.workDir, s.pathLocal),
+			Source: path.Join(s.path, s.pathRemote),
 			Target: dir,
 		},
 	}, nil
@@ -60,9 +60,9 @@ func NewLocal(pathRoot, workDir, pathLocal, pathRemote string) (*Local, error) {
 		pathLocal:  pathLocal,
 		pathRemote: pathRemote,
 	}
-	dir := path.Join(s.workDir, pathLocal)
-	err := os.MkdirAll(dir, 0o755)
-	if err != nil {
+	dir := path.Join(s.path, s.pathRemote)
+
+	if err := os.MkdirAll(dir, 0o755); err != nil {
 		return nil, gerrors.Wrap(err)
 	}
 	return s, nil
