@@ -1,54 +1,42 @@
-import sys
-from enum import Enum
-from typing import List, Optional, Generator, Tuple, Dict
+from typing import Optional, List, Generator
+import uuid
 
-# from dstack.core.config import load_config
-from dstack.core.app import AppSpec
-from dstack.core.repo import RepoData, RepoCredentials, RepoAddress, RepoHead
-from dstack.core.job import Job, JobHead
-from dstack.core.secret import Secret
-from dstack.core.log_event import LogEvent
-from dstack.core.tag import TagHead
-from dstack.core.run import RunHead
-from dstack.core.runners import Runner
+from dstack.backend.gcp.config import GCPConfig
+from dstack.backend import *
+from dstack.core.repo import RepoProtocol
+from dstack.core.repo import RepoData, RepoAddress
+from dstack.backend.gcp import jobs, runs, storage
 
 
-class BackendType(Enum):
-    REMOTE = "remote"
-    LOCAL = "local"
+class GCPBackend(Backend):
+    NAME = "gcp"
 
-    def __str__(self):
-        return str(self.value)
-
-
-class Backend(object):
-    NAME = 'name the backend'
-    _loaded = False
-
-    @property
-    def name(self) -> str:
-        return self.NAME # + "*" if self.type() == BackendType.REMOTE else ""
+    def __init__(self):
+        self.config = GCPConfig()
+        self._storage_client = storage.get_client(project_id=self.config.project_id)
+        self.configure()
+        self._loaded = True
 
     def configure(self):
-        pass
+        self._bucket = storage.get_or_create_bucket(self._storage_client, self.config.bucket_name)
 
     def create_run(self, repo_address: RepoAddress) -> str:
-        pass
+        return runs.create_run(self._bucket)
 
     def submit_job(self, job: Job, counter: List[int]):
-        pass
+        job.runner_id = uuid.uuid4().hex
+        jobs.create_job(self._bucket, job)
+        jobs.run_job(self.config, self._bucket, job)
 
     def get_job(self, repo_address: RepoAddress, job_id: str) -> Optional[Job]:
-        pass
+        return jobs.get_job(self._bucket, repo_address, job_id)
 
     def list_job_heads(self, repo_address: RepoAddress, run_name: Optional[str] = None) -> List[JobHead]:
-        pass
+        return jobs.list_job_heads(self._bucket, repo_address, run_name)
 
     def list_jobs(self, repo_address: RepoAddress, run_name: str) -> List[Job]:
-        pass
-
-    def run_job(self, job: Job) -> Runner:
-        pass
+        # Doesn't seem to be used
+        raise NotImplementedError()
 
     def stop_job(self, repo_address: RepoAddress, job_id: str, abort: bool):
         pass
@@ -56,31 +44,14 @@ class Backend(object):
     def delete_job_head(self, repo_address: RepoAddress, job_id: str):
         pass
 
-    def stop_jobs(self, repo_address: RepoAddress, run_name: Optional[str], abort: bool):
-        job_heads = self.list_job_heads(repo_address, run_name)
-        for job_head in job_heads:
-            if job_head.status.is_unfinished():
-                self.stop_job(repo_address, job_head.job_id, abort)
-
-    def delete_job_heads(self, repo_address: RepoAddress, run_name: Optional[str]):
-        job_heads = []
-        for job_head in self.list_job_heads(repo_address, run_name):
-            if job_head.status.is_finished():
-                job_heads.append(job_head)
-            else:
-                if run_name:
-                    sys.exit("The run is not finished yet. Stop the run first.")
-
-        for job_head in job_heads:
-            self.delete_job_head(repo_address, job_head.job_id)
-
     def list_run_heads(self, repo_address: RepoAddress, run_name: Optional[str] = None,
                        include_request_heads: bool = True) -> List[RunHead]:
-        pass
+        # Doesn't seem to be used
+        raise NotImplementedError()
 
     def get_run_heads(self, repo_address: RepoAddress, job_heads: List[JobHead],
                       include_request_heads: bool = True) -> List[RunHead]:
-        pass
+        return runs.get_run_heads(self._bucket, repo_address, job_heads, include_request_heads)
 
     def poll_logs(self, repo_address: RepoAddress, job_heads: List[JobHead], start_time: int,
                   attached: bool) -> Generator[LogEvent, None, None]:
@@ -133,7 +104,7 @@ class Backend(object):
         pass
 
     def get_repo_credentials(self, repo_address: RepoAddress) -> Optional[RepoCredentials]:
-        pass
+        return RepoCredentials(RepoProtocol.HTTPS, None, None)
 
     def save_repo_credentials(self, repo_address: RepoAddress, repo_credentials: RepoCredentials):
         pass
@@ -155,10 +126,7 @@ class Backend(object):
         pass
 
     def delete_secret(self, repo_address: RepoAddress, secret_name: str):
-        ...
-
-    def loaded(self):
-        return self._loaded
+        pass
 
     def type(self) -> BackendType:
-        ...
+        return BackendType.REMOTE
