@@ -14,7 +14,7 @@ from dstack.core.instance import InstanceType
 from dstack.core.request import RequestStatus, RequestHead
 from dstack.core.job import Job, JobStatus, Requirements
 from dstack.core.repo import RepoAddress, _repo_address_path
-from dstack.runners import Resources, Runner, Gpu
+from dstack.core.runners import Resources, Runner, Gpu
 
 CREATE_INSTANCE_RETRY_RATE_SECS = 3
 

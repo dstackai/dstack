@@ -10,7 +10,7 @@ from dstack.core.secret import Secret
 from dstack.core.log_event import LogEvent
 from dstack.core.tag import TagHead
 from dstack.core.run import RunHead
-from dstack.runners import Runner
+from dstack.core.runners import Runner
 
 
 class BackendType(Enum):
