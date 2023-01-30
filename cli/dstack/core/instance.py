@@ -1,4 +1,4 @@
-from dstack.runners import Resources
+from dstack.core.runners import Resources
 
 
 class InstanceType:
@@ -7,4 +7,4 @@ class InstanceType:
         self.resources = resources
 
     def __str__(self) -> str:
-        return f'InstanceType(instance_name="{self.instance_name}", resources={self.resources})'.__str__()
+        return f'InstanceType(instance_name="{self.instance_name}", resources={self.resources})'
