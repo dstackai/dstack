@@ -26,6 +26,11 @@
     "empty_message_text": "No hubs to display.",
     "nomatch_message_title": "No matches",
     "nomatch_message_text": "We can't find a match.",
-    "nomatch_message_button_label": "Clear filter"
+    "nomatch_message_button_label": "Clear filter",
+    "card": {
+      "type": "Type",
+      "region": "Region",
+      "bucket": "Bucket"
+    }
   }
 }

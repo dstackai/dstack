@@ -1,9 +1,8 @@
 import React, { useEffect, useMemo } from 'react';
-import { Box, Cards, Header, SpaceBetween, Button, NavigateLink, Link, TextFilter, Pagination } from 'components';
+import { Box, Cards, Header, SpaceBetween, Button, NavigateLink, TextFilter, Pagination } from 'components';
 import { useCollection } from 'hooks';
 import { useDeleteHubsMutation, useGetHubsQuery } from 'services/hub';
 import { ROUTES } from 'routes';
-import styles from './styles.module.scss';
 import { useTranslation } from 'react-i18next';
 
 export const HubList: React.FC = () => {
@@ -86,18 +85,19 @@ export const HubList: React.FC = () => {
 
                 sections: [
                     {
-                        id: 'actions',
-                        header: '',
-                        content: (hub) => (
-                            <div className={styles.cardFooter}>
-                                <SpaceBetween data-selector="card-buttons" direction="horizontal" size="m">
-                                    <div />
-                                    {hub.permission === 'write' && (
-                                        <Link onFollow={() => console.log('edit')}>{t('common.edit')}</Link>
-                                    )}
-                                </SpaceBetween>
-                            </div>
-                        ),
+                        id: 'type',
+                        header: t('hubs.card.type'),
+                        content: (hub) => hub.type,
+                    },
+                    {
+                        id: 'region',
+                        header: t('hubs.card.region'),
+                        content: (hub) => hub.region,
+                    },
+                    {
+                        id: 'region',
+                        header: t('hubs.card.bucket'),
+                        content: (hub) => hub.bucket,
                     },
                 ],
             }}
