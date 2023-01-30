@@ -53,11 +53,11 @@ export const HubList: React.FC = () => {
     const renderCounter = () => {
         const { selectedItems } = collectionProps;
 
-        if (!items.length) return '';
+        if (!data?.length) return '';
 
         if (selectedItems?.length) return `(${selectedItems?.length}/${data?.length ?? 0})`;
 
-        return `(${items.length})`;
+        return `(${data.length})`;
     };
 
     const isDisabledEdit = useMemo(() => {
