@@ -1,0 +1,7 @@
+repos:
+  - repo: https://github.com/psf/black
+    rev: 22.12.0
+    hooks:
+      - id: black
+        language_version: python3.11
+        args: ['--config', 'black.toml']
