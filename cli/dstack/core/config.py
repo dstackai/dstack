@@ -19,7 +19,7 @@ class BackendConfig(ABC):
 
     @property
     def name(self):
-        return self.NAME or ''
+        return self.NAME or ""
 
     def save(self, path: Path = get_config_path()):
         pass

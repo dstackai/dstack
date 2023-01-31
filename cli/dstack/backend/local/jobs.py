@@ -3,28 +3,53 @@ import os
 from pathlib import Path
 import yaml
 
-from dstack.backend.local.common import list_objects, put_object, get_object, delete_object
+from dstack.backend.local.common import (
+    list_objects,
+    put_object,
+    get_object,
+    delete_object,
+)
 from dstack.core.job import Job, JobStatus, JobHead
 from dstack.core.repo import RepoAddress
 
 
-def list_job_heads(path: str, repo_address: RepoAddress,
-                   run_name: Optional[str] = None) -> List[JobHead]:
+def list_job_heads(
+    path: str, repo_address: RepoAddress, run_name: Optional[str] = None
+) -> List[JobHead]:
     root = os.path.join(path, "jobs", repo_address.path())
     job_head_key_prefix = "l;"
     job_head_key_run_prefix = job_head_key_prefix + run_name if run_name else job_head_key_prefix
     response = list_objects(Root=root, Prefix=job_head_key_run_prefix)
     job_heads = []
     for obj in response:
-        t = obj[len(job_head_key_prefix):].split(';')
+        t = obj[len(job_head_key_prefix) :].split(";")
         if len(t) == 8:
-            job_id, provider_name, local_repo_user_name, submitted_at, status, artifacts, app_names, tag_name = tuple(
-                t)
-            run_name, workflow_name, job_index = tuple(job_id.split(','))
-            job_heads.append(JobHead(job_id, repo_address, run_name, workflow_name or None, provider_name,
-                                     local_repo_user_name, JobStatus(status), int(submitted_at),
-                                     artifacts.split(',') if artifacts else None, tag_name or None,
-                                     app_names.split(',') or None))
+            (
+                job_id,
+                provider_name,
+                local_repo_user_name,
+                submitted_at,
+                status,
+                artifacts,
+                app_names,
+                tag_name,
+            ) = tuple(t)
+            run_name, workflow_name, job_index = tuple(job_id.split(","))
+            job_heads.append(
+                JobHead(
+                    job_id,
+                    repo_address,
+                    run_name,
+                    workflow_name or None,
+                    provider_name,
+                    local_repo_user_name,
+                    JobStatus(status),
+                    int(submitted_at),
+                    artifacts.split(",") if artifacts else None,
+                    tag_name or None,
+                    app_names.split(",") or None,
+                )
+            )
     return job_heads
 
 
@@ -68,19 +93,35 @@ def list_job_head(path: str, repo_address: RepoAddress, job_id: str) -> Optional
     job_head_key_prefix = f"l;{job_id};"
     response = list_objects(Root=root, Prefix=job_head_key_prefix)
     for obj in response:
-        t = obj[len(job_head_key_prefix):].split(';')
+        t = obj[len(job_head_key_prefix) :].split(";")
         if len(t) == 7:
-            provider_name, local_repo_user_name, submitted_at, status, artifacts, app_names, tag_name = tuple(t)
-            run_name, workflow_name, job_index = tuple(job_id.split(','))
-            return JobHead(job_id, repo_address, run_name, workflow_name or None, provider_name,
-                           local_repo_user_name or None, JobStatus(status), int(submitted_at),
-                           artifacts.split(',') if artifacts else None, tag_name or None,
-                           app_names.split(',') or None)
+            (
+                provider_name,
+                local_repo_user_name,
+                submitted_at,
+                status,
+                artifacts,
+                app_names,
+                tag_name,
+            ) = tuple(t)
+            run_name, workflow_name, job_index = tuple(job_id.split(","))
+            return JobHead(
+                job_id,
+                repo_address,
+                run_name,
+                workflow_name or None,
+                provider_name,
+                local_repo_user_name or None,
+                JobStatus(status),
+                int(submitted_at),
+                artifacts.split(",") if artifacts else None,
+                tag_name or None,
+                app_names.split(",") or None,
+            )
     return None
 
 
-def list_jobs(path: str, repo_address: RepoAddress,
-              run_name: Optional[str] = None) -> List[Job]:
+def list_jobs(path: str, repo_address: RepoAddress, run_name: Optional[str] = None) -> List[Job]:
     root = os.path.join(path, "jobs", repo_address.path())
     job_key_run_prefix = f"{run_name},"
     response = list_objects(Root=root, Prefix=job_key_run_prefix)

@@ -21,7 +21,7 @@ class BackendType(Enum):
 
 
 class Backend(object):
-    NAME = 'name the backend'
+    NAME = "name the backend"
     _loaded = False
 
     @property
@@ -40,7 +40,9 @@ class Backend(object):
     def get_job(self, repo_address: RepoAddress, job_id: str) -> Optional[Job]:
         pass
 
-    def list_job_heads(self, repo_address: RepoAddress, run_name: Optional[str] = None) -> List[JobHead]:
+    def list_job_heads(
+        self, repo_address: RepoAddress, run_name: Optional[str] = None
+    ) -> List[JobHead]:
         pass
 
     def list_jobs(self, repo_address: RepoAddress, run_name: str) -> List[Job]:
@@ -73,31 +75,58 @@ class Backend(object):
         for job_head in job_heads:
             self.delete_job_head(repo_address, job_head.job_id)
 
-    def list_run_heads(self, repo_address: RepoAddress, run_name: Optional[str] = None,
-                       include_request_heads: bool = True) -> List[RunHead]:
+    def list_run_heads(
+        self,
+        repo_address: RepoAddress,
+        run_name: Optional[str] = None,
+        include_request_heads: bool = True,
+    ) -> List[RunHead]:
         pass
 
-    def get_run_heads(self, repo_address: RepoAddress, job_heads: List[JobHead],
-                      include_request_heads: bool = True) -> List[RunHead]:
+    def get_run_heads(
+        self,
+        repo_address: RepoAddress,
+        job_heads: List[JobHead],
+        include_request_heads: bool = True,
+    ) -> List[RunHead]:
         pass
 
-    def poll_logs(self, repo_address: RepoAddress, job_heads: List[JobHead], start_time: int,
-                  attached: bool) -> Generator[LogEvent, None, None]:
+    def poll_logs(
+        self,
+        repo_address: RepoAddress,
+        job_heads: List[JobHead],
+        start_time: int,
+        attached: bool,
+    ) -> Generator[LogEvent, None, None]:
         pass
 
-    def query_logs(self, repo_address: RepoAddress, run_name: str, start_time: int, end_time: Optional[int],
-                   next_token: Optional[str], job_host_names: Dict[str, Optional[str]],
-                   job_ports: Dict[str, Optional[List[int]]], job_app_specs: Dict[str, Optional[List[AppSpec]]]) \
-            -> Tuple[List[LogEvent], Optional[str], Dict[str, Optional[str]], Dict[str, Optional[List[int]]],
-            Dict[str, Optional[List[AppSpec]]]]:
+    def query_logs(
+        self,
+        repo_address: RepoAddress,
+        run_name: str,
+        start_time: int,
+        end_time: Optional[int],
+        next_token: Optional[str],
+        job_host_names: Dict[str, Optional[str]],
+        job_ports: Dict[str, Optional[List[int]]],
+        job_app_specs: Dict[str, Optional[List[AppSpec]]],
+    ) -> Tuple[
+        List[LogEvent],
+        Optional[str],
+        Dict[str, Optional[str]],
+        Dict[str, Optional[List[int]]],
+        Dict[str, Optional[List[AppSpec]]],
+    ]:
         pass
 
-    def download_run_artifact_files(self, repo_address: RepoAddress, run_name: str,
-                                    output_dir: Optional[str]):
+    def download_run_artifact_files(
+        self, repo_address: RepoAddress, run_name: str, output_dir: Optional[str]
+    ):
         pass
 
-    def list_run_artifact_files(self, repo_address: RepoAddress, run_name: str) -> \
-            Generator[Tuple[str, str, int], None, None]:
+    def list_run_artifact_files(
+        self, repo_address: RepoAddress, run_name: str
+    ) -> Generator[Tuple[str, str, int], None, None]:
         pass
 
     def list_tag_heads(self, repo_address: RepoAddress) -> List[TagHead]:
@@ -106,8 +135,13 @@ class Backend(object):
     def get_tag_head(self, repo_address: RepoAddress, tag_name: str) -> Optional[TagHead]:
         pass
 
-    def add_tag_from_run(self, repo_address: RepoAddress, tag_name: str, run_name: str,
-                         run_jobs: Optional[List[Job]]):
+    def add_tag_from_run(
+        self,
+        repo_address: RepoAddress,
+        tag_name: str,
+        run_name: str,
+        run_jobs: Optional[List[Job]],
+    ):
         pass
 
     def add_tag_from_local_dirs(self, repo_data: RepoData, tag_name: str, local_dirs: List[str]):
@@ -137,8 +171,9 @@ class Backend(object):
     def save_repo_credentials(self, repo_address: RepoAddress, repo_credentials: RepoCredentials):
         pass
 
-    def list_run_artifact_files_and_folders(self, repo_address: RepoAddress, job_id: str,
-                                            path: str) -> List[Tuple[str, bool]]:
+    def list_run_artifact_files_and_folders(
+        self, repo_address: RepoAddress, job_id: str, path: str
+    ) -> List[Tuple[str, bool]]:
         pass
 
     def list_secret_names(self, repo_address: RepoAddress) -> List[str]:

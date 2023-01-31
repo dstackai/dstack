@@ -16,24 +16,43 @@ def _verb(abort: bool):
 
 
 class StopCommand(BasicCommand):
-    NAME = 'stop'
-    DESCRIPTION = 'Stop runs'
+    NAME = "stop"
+    DESCRIPTION = "Stop runs"
 
     def __init__(self, parser):
         super(StopCommand, self).__init__(parser)
 
     def register(self):
-        self._parser.add_argument("run_name", metavar="RUN", type=str, nargs="?", help="A name of a run")
-        self._parser.add_argument("-a", "--all", help="Stop all unfinished runs", dest="all", action="store_true")
-        self._parser.add_argument("-x", "--abort", help="Don't wait for a graceful stop and abort the run immediately",
-                            dest="abort", action="store_true")
-        self._parser.add_argument("-y", "--yes", help="Don't ask for confirmation", action="store_true")
+        self._parser.add_argument(
+            "run_name", metavar="RUN", type=str, nargs="?", help="A name of a run"
+        )
+        self._parser.add_argument(
+            "-a",
+            "--all",
+            help="Stop all unfinished runs",
+            dest="all",
+            action="store_true",
+        )
+        self._parser.add_argument(
+            "-x",
+            "--abort",
+            help="Don't wait for a graceful stop and abort the run immediately",
+            dest="abort",
+            action="store_true",
+        )
+        self._parser.add_argument(
+            "-y", "--yes", help="Don't ask for confirmation", action="store_true"
+        )
 
     @check_config
     @check_git
     def _command(self, args: Namespace):
-        if (args.run_name and (args.yes or Confirm.ask(f"[red]{_verb(args.abort)} the run '{args.run_name}'?[/]"))) \
-                or (args.all and (args.yes or Confirm.ask(f"[red]{_verb(args.abort)} all runs?[/]"))):
+        if (
+            args.run_name
+            and (
+                args.yes or Confirm.ask(f"[red]{_verb(args.abort)} the run '{args.run_name}'?[/]")
+            )
+        ) or (args.all and (args.yes or Confirm.ask(f"[red]{_verb(args.abort)} all runs?[/]"))):
             repo_data = load_repo_data()
             for backend in list_backends():
                 job_heads = backend.list_job_heads(repo_data, args.run_name)

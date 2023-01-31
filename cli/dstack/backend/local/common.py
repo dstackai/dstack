@@ -3,6 +3,7 @@ from typing import List, Optional
 from pathlib import Path
 import sqlite3
 
+
 def list_objects(Root: str, Prefix: str, MaxKeys: Optional[int] = None) -> List[str]:
     if not os.path.exists(Root):
         return []
@@ -22,7 +23,7 @@ def list_objects(Root: str, Prefix: str, MaxKeys: Optional[int] = None) -> List[
 def put_object(Body: str, Root: str, Key: str):
     if not os.path.exists(Root):
         Path(Root).mkdir(parents=True)
-    with open(os.path.join(Root, Key), 'w') as f:
+    with open(os.path.join(Root, Key), "w") as f:
         f.write(Body)
 
 
@@ -33,7 +34,7 @@ def get_object(Root: str, Key: str):
         raise IOError
     with open(os.path.join(Root, Key)) as f:
         body = f.read()
-    return body or ''
+    return body or ""
 
 
 def delete_object(Root: str, Key: str):
@@ -42,6 +43,7 @@ def delete_object(Root: str, Key: str):
     path = os.path.join(Root, Key)
     if os.path.exists(path):
         os.remove(path)
+
 
 def list_all_objects(Root: str, Prefix: str):
     if not os.path.exists(Root):
@@ -60,12 +62,12 @@ def list_all_objects(Root: str, Prefix: str):
                 yield _dir, file_path, file_size
 
 
-def get_secret_value(SecretId: str, Root:str):
+def get_secret_value(SecretId: str, Root: str):
     _check_db(Root)
     path_db = os.path.join(Root, "_secrets_")
     con = sqlite3.connect(path_db)
     cur = con.cursor()
-    cur.execute("SELECT secret_string FROM KV WHERE secret_name=?", (SecretId, ))
+    cur.execute("SELECT secret_string FROM KV WHERE secret_name=?", (SecretId,))
     value = cur.fetchone()
     con.close()
     if value:
@@ -73,7 +75,7 @@ def get_secret_value(SecretId: str, Root:str):
     return value
 
 
-def update_secret(SecretId: str, SecretString: str, Root:str):
+def update_secret(SecretId: str, SecretString: str, Root: str):
     _check_db(Root)
     path_db = os.path.join(Root, "_secrets_")
     con = sqlite3.connect(path_db)
@@ -83,7 +85,7 @@ def update_secret(SecretId: str, SecretString: str, Root:str):
     con.close()
 
 
-def create_secret(SecretId: str, SecretString: str, Description: str, Root:str):
+def create_secret(SecretId: str, SecretString: str, Description: str, Root: str):
     _check_db(Root)
     path_db = os.path.join(Root, "_secrets_")
     con = sqlite3.connect(path_db)
@@ -93,7 +95,7 @@ def create_secret(SecretId: str, SecretString: str, Description: str, Root:str):
     con.close()
 
 
-def put_secret_value(SecretId: str, SecretString: str, Root:str):
+def put_secret_value(SecretId: str, SecretString: str, Root: str):
     _check_db(Root)
     path_db = os.path.join(Root, "_secrets_")
     con = sqlite3.connect(path_db)
@@ -103,7 +105,7 @@ def put_secret_value(SecretId: str, SecretString: str, Root:str):
     con.close()
 
 
-def delete_secret(SecretId: str, Root:str):
+def delete_secret(SecretId: str, Root: str):
     _check_db(Root)
     path_db = os.path.join(Root, "_secrets_")
     con = sqlite3.connect(path_db)
@@ -120,7 +122,6 @@ def _check_db(Root: str):
     if not os.path.exists(path_db):
         con = sqlite3.connect(path_db)
         cur = con.cursor()
-        cur.execute('''CREATE TABLE IF NOT EXISTS KV (secret_name TEXT, secret_string TEXT);''')
+        cur.execute("""CREATE TABLE IF NOT EXISTS KV (secret_name TEXT, secret_string TEXT);""")
         con.commit()
         con.close()
-

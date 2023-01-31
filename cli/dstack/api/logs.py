@@ -5,8 +5,14 @@ from dstack.core.repo import RepoAddress
 from dstack.core.job import JobHead
 
 
-def poll_logs(backend: Backend, repo_address: RepoAddress, job_heads: List[JobHead], start_time: int,
-              attach: bool, from_run: bool = False):
+def poll_logs(
+    backend: Backend,
+    repo_address: RepoAddress,
+    job_heads: List[JobHead],
+    start_time: int,
+    attach: bool,
+    from_run: bool = False,
+):
     try:
         for event in backend.poll_logs(repo_address, job_heads, start_time, attach):
             print(event.log_message)

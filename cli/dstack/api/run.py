@@ -5,7 +5,9 @@ from dstack.core.repo import RepoData
 from dstack.api.repo import load_repo_data
 
 
-def get_runs(repo_data: RepoData, backend: Backend, run_name: str = "", all: bool = False) -> List[RunHead]:
+def get_runs(
+    repo_data: RepoData, backend: Backend, run_name: str = "", all: bool = False
+) -> List[RunHead]:
     runs = []
     job_heads = backend.list_job_heads(repo_data, run_name)
     runs_backend = backend.get_run_heads(repo_data, job_heads)
@@ -21,12 +23,14 @@ def get_runs(repo_data: RepoData, backend: Backend, run_name: str = "", all: boo
     return runs
 
 
-def list_runs(backends: Union[List[Backend], Backend], run_name: str = "", all: bool = False) -> List[RunHead]:
+def list_runs(
+    backends: Union[List[Backend], Backend], run_name: str = "", all: bool = False
+) -> List[RunHead]:
     repo_data = load_repo_data()
     runs = []
     if type(backends) == list:
         for backend in backends:
-           runs = runs + [run for run in get_runs(repo_data, backend, run_name, all)]
+            runs = runs + [run for run in get_runs(repo_data, backend, run_name, all)]
     else:
         runs = runs + [run for run in get_runs(repo_data, backends, run_name, all)]
     runs = reversed(runs)
