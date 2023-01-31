@@ -24,10 +24,17 @@ export const fetchBaseQuery = (
 > => {
     if (isMockingEnabled) {
         return async ({ url, method, body, params }) => {
-            await wait(Math.floor(Math.random() * 3000));
+            const response = getResponse({ url, method });
+            // const response = getResponse({ url, method, responseType: 'failed' });
 
-            return getResponse({ url, method });
-            // return getResponse({ url, method, responseType: 'failed' });
+            console.log('Mock request', {
+                url,
+                method,
+                response,
+            });
+
+            await wait(Math.floor(Math.random() * 3000));
+            return response;
         };
     }
 

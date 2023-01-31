@@ -1,7 +1,12 @@
 {
   "dstack": "Dstack",
   "common": {
-    "loading": "Loading"
+    "loading": "Loading",
+    "add": "Add",
+    "edit": "Edit",
+    "delete": "Delete",
+    "match_count_with_value_one": "{{count}} match",
+    "match_count_with_value_other": "{{count}} matches"
   },
   "auth": {
     "invalid_token": "Invalid token",
@@ -12,5 +17,20 @@
   "navigation": {
     "hubs": "Hubs",
     "users": "Users"
+  },
+
+  "hubs": {
+    "page_title": "Hubs",
+    "search_placeholder": "Find hubs",
+    "empty_message_title": "No hubs",
+    "empty_message_text": "No hubs to display.",
+    "nomatch_message_title": "No matches",
+    "nomatch_message_text": "We can't find a match.",
+    "nomatch_message_button_label": "Clear filter",
+    "card": {
+      "type": "Type",
+      "region": "Region",
+      "bucket": "Bucket"
+    }
   }
 }

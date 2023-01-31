@@ -31,6 +31,12 @@ const mocksMap: MocksMap = {
             failed: {},
         },
     },
+    [API.HUB.BASE()]: {
+        DELETE: {
+            success: {},
+            failed: { status: 403 },
+        },
+    },
 };
 
 export type getResponseArgs = {

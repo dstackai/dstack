@@ -1,3 +1,8 @@
 declare interface IHub {
-    name: string,
+    id: number,
+    hub_name: string,
+    permission: 'read' | 'write'
+    type: 'AWS',
+    region?: string,
+    bucket?: string,
 }

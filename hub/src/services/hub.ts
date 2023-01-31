@@ -17,7 +17,17 @@ export const hubApi = createApi({
                 };
             },
         }),
+
+        deleteHubs: builder.mutation<void, IHub['hub_name'][]>({
+            query: (hubNames) => ({
+                url: API.HUB.BASE(),
+                method: 'DELETE',
+                params: {
+                    hubs: hubNames,
+                },
+            }),
+        }),
     }),
 });
 
-export const { useGetHubsQuery } = hubApi;
+export const { useGetHubsQuery, useDeleteHubsMutation } = hubApi;

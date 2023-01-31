@@ -1,23 +1,11 @@
-const listSuccess: IHub[] = [
-    {
-        name: 'Hub 1',
-    },
-    {
-        name: 'Hub 2',
-    },
-    {
-        name: 'Hub 3',
-    },
-    {
-        name: 'Hub 4',
-    },
-    {
-        name: 'Hub 5',
-    },
-    {
-        name: 'Hub 6',
-    },
-];
+const listSuccess: IHub[] = new Array(50).fill({}).map((i, index) => ({
+    id: index,
+    hub_name: `hub_${index}`,
+    permission: index < 8 ? 'write' : 'read',
+    type: 'AWS',
+    region: `hub_${index}_region`,
+    bucket: `hub_${index}_bucket`,
+}));
 
 export default {
     list: {
