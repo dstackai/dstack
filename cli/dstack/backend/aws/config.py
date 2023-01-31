@@ -10,6 +10,7 @@ from botocore.client import BaseClient
 from rich.prompt import Confirm
 
 from dstack.core.config import BackendConfig, get_config_path
+from dstack.core.error import ConfigError
 from dstack.cli.common import ask_choice, _is_termios_available
 
 regions = [
@@ -54,10 +55,7 @@ class AWSConfig(BackendConfig):
                 self.bucket_name = config_data["bucket"]
                 self.subnet_id = config_data.get("subnet")
         else:
-            self.profile_name = os.getenv("DSTACK_AWS_PROFILE") or os.getenv("AWS_PROFILE")
-            self.region_name = os.getenv("DSTACK_AWS_REGION") or os.getenv("AWS_DEFAULT_REGION")
-            self.bucket_name = ""
-            self.subnet_id = os.getenv("DSTACK_AWS_EC2_SUBNET")
+            raise ConfigError
 
     def save(self, path: Path = get_config_path()):
         if not path.parent.exists():
@@ -73,7 +71,6 @@ class AWSConfig(BackendConfig):
             yaml.dump(config_data, f)
 
     def configure(self):
-
         self.load()
         default_profile_name = self.profile_name
         default_region_name = self.region_name
