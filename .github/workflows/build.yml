@@ -9,6 +9,16 @@ on:
       - 'master'
 
 jobs:
+  python-lint:
+      runs-on: ubuntu-latest
+      steps:
+        - uses: actions/checkout@v2
+        - name: Run black
+          uses: psf/black@stable
+          with:
+            options: "--config black.toml --check --verbose"
+            src: "./cli"
+
   cli-test-master:
     runs-on: ${{ matrix.os }}
     strategy:

@@ -8,6 +8,8 @@ class DepSpec:
         self.mount = mount
 
     def __str__(self) -> str:
-        return f'DepSpec(repo_address={self.repo_address}, ' \
-               f'run_name="{self.run_name}",' \
-               f'mount={self.mount})'
+        return (
+            f"DepSpec(repo_address={self.repo_address}, "
+            f'run_name="{self.run_name}",'
+            f"mount={self.mount})"
+        )

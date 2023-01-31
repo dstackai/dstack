@@ -2,8 +2,8 @@ from argparse import Namespace
 
 
 class BasicCommand(object):
-    NAME = 'name the command'
-    DESCRIPTION = 'describe the command'
+    NAME = "name the command"
+    DESCRIPTION = "describe the command"
     SUBCOMMANDS = []
 
     def __init__(self, parser):

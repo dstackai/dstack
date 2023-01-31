@@ -21,9 +21,9 @@ from dstack.core.runners import Resources, Gpu
 def _arch() -> str:
     uname = platform.uname()
     if uname.system == "Darwin":
-        brand = cpuinfo.get_cpu_info().get('brand_raw')
-        m_arch = 'm1' in brand.lower() or 'm2' in brand.lower()
-        arch = 'arm64' if m_arch else 'x86_64'
+        brand = cpuinfo.get_cpu_info().get("brand_raw")
+        m_arch = "m1" in brand.lower() or "m2" in brand.lower()
+        arch = "arm64" if m_arch else "x86_64"
     else:
         arch = uname.machine
     return arch
@@ -60,19 +60,34 @@ def _config_directory_path() -> Path:
 
 
 def _runner_path() -> Path:
-    return _config_directory_path() / "tmp" / "runner" / "bin" / _runner_version() / _runner_filename()
+    return (
+        _config_directory_path()
+        / "tmp"
+        / "runner"
+        / "bin"
+        / _runner_version()
+        / _runner_filename()
+    )
 
 
-def _get_runner_config_dir(runner_id: str, config: Optional[BackendConfig] = None, create: Optional[bool] = None) -> Path:
+def _get_runner_config_dir(
+    runner_id: str,
+    config: Optional[BackendConfig] = None,
+    create: Optional[bool] = None,
+) -> Path:
     runner_config_dir_path = _config_directory_path() / "tmp" / "runner" / "configs" / runner_id
     if create:
         runner_config_dir_path.mkdir(parents=True, exist_ok=True)
         config.save(path=runner_config_dir_path / "config.yaml")
         runner_config_path = runner_config_dir_path / "runner.yaml"
-        runner_config_path.write_text(yaml.dump({
-            "id": runner_id,
-            "hostname": "127.0.0.1",
-        }))
+        runner_config_path.write_text(
+            yaml.dump(
+                {
+                    "id": runner_id,
+                    "hostname": "127.0.0.1",
+                }
+            )
+        )
     return runner_config_dir_path
 
 
@@ -92,8 +107,10 @@ def _runner_bucket() -> str:
 
 
 def _runner_url() -> str:
-    return f"https://{_runner_bucket()}.s3.{runner_bucket_region}.amazonaws.com" \
-           f"/{_runner_version()}/binaries/{_runner_filename()}"
+    return (
+        f"https://{_runner_bucket()}.s3.{runner_bucket_region}.amazonaws.com"
+        f"/{_runner_version()}/binaries/{_runner_filename()}"
+    )
 
 
 def _download_runner(url: str, path: Path):
@@ -101,7 +118,7 @@ def _download_runner(url: str, path: Path):
         total_length = int(r.headers.get("Content-Length"))
 
         with tqdm.wrapattr(r.raw, "read", total=total_length, desc=f"Downloading runner") as raw:
-            with open(path, 'wb') as output:
+            with open(path, "wb") as output:
                 shutil.copyfileobj(raw, output)
         os.chmod(path, 0o755)
 
@@ -114,9 +131,13 @@ def _install_runner_if_necessary():
 
 
 def _unserialize_runner_resources(data: dict) -> Resources:
-    return Resources(data["cpus"], data["memory_mib"],
-                     [Gpu(g["name"], g["memory_mib"]) for g in data["gpus"]] if data.get("gpus") else [],
-                     False, True)
+    return Resources(
+        data["cpus"],
+        data["memory_mib"],
+        [Gpu(g["name"], g["memory_mib"]) for g in data["gpus"]] if data.get("gpus") else [],
+        False,
+        True,
+    )
 
 
 def check_runner_resources(runner_id: str) -> Resources:
@@ -124,8 +145,13 @@ def check_runner_resources(runner_id: str) -> Resources:
     config = load_config()
     runner_config_dir = _get_runner_config_dir(runner_id, config, create=True)
     runner_config_path = runner_config_dir / "runner.yaml"
-    result = subprocess.run([f"{_runner_path()} --config-dir {runner_config_dir} check"], shell=True,
-                            stdout=subprocess.DEVNULL, stderr=subprocess.PIPE, text=True)
+    result = subprocess.run(
+        [f"{_runner_path()} --config-dir {runner_config_dir} check"],
+        shell=True,
+        stdout=subprocess.DEVNULL,
+        stderr=subprocess.PIPE,
+        text=True,
+    )
 
     if result.returncode > 0:
         raise Exception(result.stderr)
@@ -137,10 +163,18 @@ def start_runner_process(runner_id: str) -> str:
     _install_runner_if_necessary()
     runner_config_dir = _get_runner_config_dir(runner_id)
     proc = subprocess.Popen(
-        [_runner_path(), "--config-dir", runner_config_dir, "--log-level", "6", "start"],
+        [
+            _runner_path(),
+            "--config-dir",
+            runner_config_dir,
+            "--log-level",
+            "6",
+            "start",
+        ],
         stdout=subprocess.DEVNULL,
         stderr=subprocess.STDOUT,
-        start_new_session=True)
+        start_new_session=True,
+    )
     return f"l-{proc.pid}"
 
 
@@ -163,5 +197,5 @@ def is_running(request_id: str) -> bool:
         return False
 
 
-if __name__ == '__main__':
+if __name__ == "__main__":
     pass

@@ -9,7 +9,7 @@ class Base(DeclarativeBase):
     pass
 
 
-data_path = os.getenv('DSTACK_HUB_DATA') or Path.home() / ".dstack" / "hub" / "data"
+data_path = os.getenv("DSTACK_HUB_DATA") or Path.home() / ".dstack" / "hub" / "data"
 if not data_path.exists():
     data_path.mkdir(parents=True, exist_ok=True)
 

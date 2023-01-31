@@ -21,7 +21,14 @@ class CodeProvider(Provider):
         self.resources = None
         self.image_name = None
 
-    def load(self, backend: Backend, provider_args: List[str], workflow_name: Optional[str], provider_data: Dict[str, Any], run_name: str):
+    def load(
+        self,
+        backend: Backend,
+        provider_args: List[str],
+        workflow_name: Optional[str],
+        provider_data: Dict[str, Any],
+        run_name: str,
+    ):
         super().load(backend, provider_args, workflow_name, provider_data, run_name)
         self.setup = self._get_list_data("setup") or self._get_list_data("before_run")
         self.python = self._safe_python_version("python")
@@ -46,23 +53,27 @@ class CodeProvider(Provider):
         env = {}
         connection_token = uuid.uuid4().hex
         env["CONNECTION_TOKEN"] = connection_token
-        return [JobSpec(
-            image_name=self.image_name,
-            commands=self._commands(),
-            env=env,
-            working_dir=self.working_dir,
-            artifact_specs=self.artifact_specs,
-            port_count=1,
-            requirements=self.resources,
-            app_specs=[AppSpec(
-                port_index=0,
-                app_name="code",
-                url_query_params={
-                    "tkn": connection_token,
-                    "folder": "/workflow"
-                }
-            )]
-        )]
+        return [
+            JobSpec(
+                image_name=self.image_name,
+                commands=self._commands(),
+                env=env,
+                working_dir=self.working_dir,
+                artifact_specs=self.artifact_specs,
+                port_count=1,
+                requirements=self.resources,
+                app_specs=[
+                    AppSpec(
+                        port_index=0,
+                        app_name="code",
+                        url_query_params={
+                            "tkn": connection_token,
+                            "folder": "/workflow",
+                        },
+                    )
+                ],
+            )
+        ]
 
     def _image_name(self) -> str:
         cuda_is_required = self.resources and self.resources.gpus
@@ -74,16 +85,18 @@ class CodeProvider(Provider):
         commands = []
         if self.env:
             self._extend_commands_with_env(commands, self.env)
-        commands.extend([
-            "mkdir -p /tmp",
-            "if [ $(uname -m) = \"aarch64\" ]; then arch=\"arm64\"; else arch=\"x64\"; fi",
-            f"wget -q https://github.com/gitpod-io/openvscode-server/releases/download/"
-            f"openvscode-server-v{self.version}/openvscode-server-v{self.version}-linux-$arch.tar.gz -O "
-            f"/tmp/openvscode-server-v{self.version}-linux-$arch.tar.gz",
-            f"tar -xzf /tmp/openvscode-server-v{self.version}-linux-$arch.tar.gz -C /tmp",
-            f"/tmp/openvscode-server-v{self.version}-linux-$arch/bin/openvscode-server --install-extension ms-python.python",
-            "rm /usr/bin/python2*",
-        ])
+        commands.extend(
+            [
+                "mkdir -p /tmp",
+                'if [ $(uname -m) = "aarch64" ]; then arch="arm64"; else arch="x64"; fi',
+                f"wget -q https://github.com/gitpod-io/openvscode-server/releases/download/"
+                f"openvscode-server-v{self.version}/openvscode-server-v{self.version}-linux-$arch.tar.gz -O "
+                f"/tmp/openvscode-server-v{self.version}-linux-$arch.tar.gz",
+                f"tar -xzf /tmp/openvscode-server-v{self.version}-linux-$arch.tar.gz -C /tmp",
+                f"/tmp/openvscode-server-v{self.version}-linux-$arch/bin/openvscode-server --install-extension ms-python.python",
+                "rm /usr/bin/python2*",
+            ]
+        )
         if self.setup:
             commands.extend(self.setup)
         commands.append(

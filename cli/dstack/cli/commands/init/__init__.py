@@ -7,17 +7,29 @@ from dstack.api.backend import list_backends
 
 
 class InitCommand(BasicCommand):
-    NAME = 'init'
-    DESCRIPTION = 'Authorize dstack to access the current Git repo'
+    NAME = "init"
+    DESCRIPTION = "Authorize dstack to access the current Git repo"
 
     def __init__(self, parser):
         super(InitCommand, self).__init__(parser)
 
     def register(self):
-        self._parser.add_argument("-t", "--token", metavar="OAUTH_TOKEN", help="An authentication token for Git", type=str,
-                            dest="gh_token")
-        self._parser.add_argument("-i", "--identity", metavar="SSH_PRIVATE_KEY", help="A path to the private SSH key file",
-                            type=str, dest="identity_file")
+        self._parser.add_argument(
+            "-t",
+            "--token",
+            metavar="OAUTH_TOKEN",
+            help="An authentication token for Git",
+            type=str,
+            dest="gh_token",
+        )
+        self._parser.add_argument(
+            "-i",
+            "--identity",
+            metavar="SSH_PRIVATE_KEY",
+            help="A path to the private SSH key file",
+            type=str,
+            dest="identity_file",
+        )
 
     @check_config
     @check_git

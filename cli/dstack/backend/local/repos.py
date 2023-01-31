@@ -2,7 +2,15 @@ import json
 import os
 from typing import List, Optional
 
-from dstack.backend.local.common import list_objects, put_object, get_object, delete_object, get_secret_value, update_secret, create_secret
+from dstack.backend.local.common import (
+    list_objects,
+    put_object,
+    get_object,
+    delete_object,
+    get_secret_value,
+    update_secret,
+    create_secret,
+)
 from dstack.backend import RepoHead
 from dstack.core.repo import RepoCredentials, RepoProtocol, RepoAddress
 
@@ -13,14 +21,19 @@ def list_repo_heads(path: str) -> List[RepoHead]:
     response = list_objects(Root=root, Prefix=tag_head_prefix)
     repo_heads = []
     for obj in response:
-        tokens = obj[len(tag_head_prefix):].split(';')
+        tokens = obj[len(tag_head_prefix) :].split(";")
         if len(tokens) == 5:
             repo_host_port, repo_user_name, repo_name, last_run_at, tags_count = tuple(tokens)
-            t = repo_host_port.split(':')
+            t = repo_host_port.split(":")
             repo_host_name = t[0]
             repo_port = t[1] if len(t) > 1 else None
-            repo_heads.append(RepoHead(RepoAddress(repo_host_name, repo_port, repo_user_name, repo_name),
-                                       int(last_run_at) if last_run_at else None, int(tags_count)))
+            repo_heads.append(
+                RepoHead(
+                    RepoAddress(repo_host_name, repo_port, repo_user_name, repo_name),
+                    int(last_run_at) if last_run_at else None,
+                    int(tags_count),
+                )
+            )
     return repo_heads
 
 
@@ -29,9 +42,8 @@ def _get_repo_head(path: str, repo_address: RepoAddress) -> Optional[RepoHead]:
     repo_head_prefix = f"l;{repo_address.path(delimiter=',')};"
     response = list_objects(Root=root, Prefix=repo_head_prefix)
     if len(response) != 0:
-        last_run_at, tags_count = tuple(response[0][len(repo_head_prefix):].split(';'))
-        return RepoHead(repo_address, int(last_run_at) if last_run_at else None,
-                        int(tags_count))
+        last_run_at, tags_count = tuple(response[0][len(repo_head_prefix) :].split(";"))
+        return RepoHead(repo_address, int(last_run_at) if last_run_at else None, int(tags_count))
     else:
         return None
 
@@ -42,14 +54,13 @@ def _create_or_update_repo_head(path: str, repo_head: RepoHead):
     response = list_objects(Root=root, Prefix=repo_head_prefix)
     for obj in response:
         delete_object(Root=root, Key=obj)
-    repo_head_key = f"{repo_head_prefix}" \
-                    f"{repo_head.last_run_at or ''};" \
-                    f"{repo_head.tags_count}"
+    repo_head_key = (
+        f"{repo_head_prefix}" f"{repo_head.last_run_at or ''};" f"{repo_head.tags_count}"
+    )
     put_object(Body="", Root=root, Key=repo_head_key)
 
 
-def update_repo_last_run_at(path: str, repo_address: RepoAddress,
-                            last_run_at: int):
+def update_repo_last_run_at(path: str, repo_address: RepoAddress, last_run_at: int):
     repo_head = _get_repo_head(path, repo_address) or RepoHead(repo_address, None, tags_count=0)
     repo_head.last_run_at = last_run_at
     _create_or_update_repo_head(path, repo_head)
@@ -78,8 +89,7 @@ def delete_repo(path: str, repo_address: RepoAddress):
         delete_object(Root=root, Key=obj)
 
 
-def get_repo_credentials(path: str, repo_address: RepoAddress) \
-        -> Optional[RepoCredentials]:
+def get_repo_credentials(path: str, repo_address: RepoAddress) -> Optional[RepoCredentials]:
     root = os.path.join(path, "repos")
     secret_name = f"/dstack/credentials/{repo_address.path()}"
     try:
@@ -88,7 +98,7 @@ def get_repo_credentials(path: str, repo_address: RepoAddress) \
         return RepoCredentials(
             RepoProtocol(credentials_data["protocol"]),
             credentials_data.get("private_key"),
-            credentials_data.get("oauth_token")
+            credentials_data.get("oauth_token"),
         )
     except Exception as e:
         return None
@@ -97,9 +107,7 @@ def get_repo_credentials(path: str, repo_address: RepoAddress) \
 def save_repo_credentials(path: str, repo_address: RepoAddress, repo_credentials: RepoCredentials):
     root = os.path.join(path, "repos")
     secret_name = f"/dstack/credentials/{repo_address.path()}"
-    credentials_data = {
-        "protocol": repo_credentials.protocol.value
-    }
+    credentials_data = {"protocol": repo_credentials.protocol.value}
     if repo_credentials.protocol == RepoProtocol.HTTPS and repo_credentials.oauth_token:
         credentials_data["oauth_token"] = repo_credentials.oauth_token
     elif repo_credentials.protocol == RepoProtocol.SSH:
@@ -108,14 +116,11 @@ def save_repo_credentials(path: str, repo_address: RepoAddress, repo_credentials
         else:
             raise Exception("No private key is specified")
     if get_secret_value(SecretId=secret_name, Root=root):
-        update_secret(
-            SecretId=secret_name,
-            SecretString=json.dumps(credentials_data)
-        )
+        update_secret(SecretId=secret_name, SecretString=json.dumps(credentials_data))
     else:
         create_secret(
             SecretId=secret_name,
             SecretString=json.dumps(credentials_data),
             Description="Generated by dstack",
-            Root=root
-         )
+            Root=root,
+        )

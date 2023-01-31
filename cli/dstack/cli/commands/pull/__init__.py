@@ -26,17 +26,26 @@ def _run_name(repo_data, backend, args):
 
 
 class PullCommand(BasicCommand):
-    NAME = 'pull'
-    DESCRIPTION = 'Download artifacts'
+    NAME = "pull"
+    DESCRIPTION = "Download artifacts"
 
     def __init__(self, parser):
         super(PullCommand, self).__init__(parser)
 
     def register(self):
-        self._parser.add_argument("run_name_or_tag_name", metavar="(RUN | :TAG)", type=str,
-                                     help="A name of a run or a tag")
-        self._parser.add_argument("-o", "--output", help="The directory to download artifacts to. "
-                                                            "By default, it's the current directory.", type=str)
+        self._parser.add_argument(
+            "run_name_or_tag_name",
+            metavar="(RUN | :TAG)",
+            type=str,
+            help="A name of a run or a tag",
+        )
+        self._parser.add_argument(
+            "-o",
+            "--output",
+            help="The directory to download artifacts to. "
+            "By default, it's the current directory.",
+            type=str,
+        )
 
     @check_config
     @check_git

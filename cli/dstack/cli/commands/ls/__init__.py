@@ -16,35 +16,41 @@ def _run_name(repo_data, backend, args):
         tag_head = backend.get_tag_head(repo_data, tag_name)
         if tag_head:
             return tag_head.run_name
-#        else:
-#            sys.exit(f"Cannot find the tag '{tag_name}'")
+    #        else:
+    #            sys.exit(f"Cannot find the tag '{tag_name}'")
     else:
         run_name = args.run_name_or_tag_name
         job_heads = backend.list_job_heads(repo_data, run_name)
         if job_heads:
             return run_name
+
+
 #        else:
 #            sys.exit(f"Cannot find the run '{run_name}'")
 
 
-def sizeof_fmt(num, suffix='B'):
-    for unit in ['', 'Ki', 'Mi', 'Gi', 'Ti', 'Pi', 'Ei', 'Zi']:
+def sizeof_fmt(num, suffix="B"):
+    for unit in ["", "Ki", "Mi", "Gi", "Ti", "Pi", "Ei", "Zi"]:
         if abs(num) < 1024.0:
             return "%3.1f%s%s" % (num, unit, suffix)
         num /= 1024.0
-    return "%.1f%s%s" % (num, 'Yi', suffix)
+    return "%.1f%s%s" % (num, "Yi", suffix)
 
 
 class LsCommand(BasicCommand):
-    NAME = 'ls'
-    DESCRIPTION = 'List artifacts'
+    NAME = "ls"
+    DESCRIPTION = "List artifacts"
 
     def __init__(self, parser):
         super(LsCommand, self).__init__(parser)
 
     def register(self):
-        self._parser.add_argument("run_name_or_tag_name", metavar="RUN | :TAG", type=str,
-                                 help="A name of a run or a tag")
+        self._parser.add_argument(
+            "run_name_or_tag_name",
+            metavar="RUN | :TAG",
+            type=str,
+            help="A name of a run or a tag",
+        )
 
     @check_config
     @check_git
@@ -65,11 +71,14 @@ class LsCommand(BasicCommand):
             run_artifact_files = backend.list_run_artifact_files(repo_data, run_name)
             previous_artifact_name = None
             for (artifact_name, file_name, file_size) in run_artifact_files:
-                table.add_row(artifact_name if previous_artifact_name != artifact_name else "",
-                              file_name, sizeof_fmt(file_size), backend.name)
+                table.add_row(
+                    artifact_name if previous_artifact_name != artifact_name else "",
+                    file_name,
+                    sizeof_fmt(file_size),
+                    backend.name,
+                )
                 previous_artifact_name = artifact_name
         if anyone:
             console.print(table)
         else:
             sys.exit(f"Nothing found '{args.run_name_or_tag_name}'")
-

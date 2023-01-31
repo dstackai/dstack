@@ -7,7 +7,7 @@ from botocore.utils import parse_timestamp, datetime2timestamp
 
 def _quoted(s: Optional[str]) -> str:
     if s:
-        return f"\"{s}\""
+        return f'"{s}"'
     else:
         return "None"
 
@@ -26,6 +26,7 @@ def pretty_date(time: Any = False):
     'just now', etc
     """
     from datetime import datetime
+
     now = datetime.now()
     if type(time) is int:
         diff = now - datetime.fromtimestamp(time)
@@ -37,7 +38,7 @@ def pretty_date(time: Any = False):
     day_diff = diff.days
 
     if day_diff < 0:
-        return ''
+        return ""
 
     if day_diff == 0:
         if second_diff < 10:
@@ -64,13 +65,11 @@ def pretty_date(time: Any = False):
 
 
 def since(timestamp):
-    regex = re.compile(
-        r"(?P<amount>\d+)(?P<unit>s|m|h|d|w)$"
-    )
+    regex = re.compile(r"(?P<amount>\d+)(?P<unit>s|m|h|d|w)$")
     re_match = regex.match(timestamp)
     if re_match:
         datetime_value = _relative_timestamp_to_datetime(
-            int(re_match.group('amount')), re_match.group('unit')
+            int(re_match.group("amount")), re_match.group("unit")
         )
     else:
         datetime_value = parse_timestamp(timestamp)
@@ -79,10 +78,10 @@ def since(timestamp):
 
 def _relative_timestamp_to_datetime(amount, unit):
     multiplier = {
-        's': 1,
-        'm': 60,
-        'h': 3600,
-        'd': 24 * 3600,
-        'w': 7 * 24 * 3600,
+        "s": 1,
+        "m": 60,
+        "h": 3600,
+        "d": 24 * 3600,
+        "w": 7 * 24 * 3600,
     }[unit]
     return datetime.utcnow() + timedelta(seconds=amount * multiplier * -1)

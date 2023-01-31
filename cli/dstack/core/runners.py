@@ -13,7 +13,14 @@ class Gpu:
 
 
 class Resources:
-    def __init__(self, cpus: int, memory_mib: int, gpus: Optional[List[Gpu]], interruptible: bool, local: bool):
+    def __init__(
+        self,
+        cpus: int,
+        memory_mib: int,
+        gpus: Optional[List[Gpu]],
+        interruptible: bool,
+        local: bool,
+    ):
         self.cpus = cpus
         self.memory_mib = memory_mib
         self.gpus = gpus
@@ -21,10 +28,12 @@ class Resources:
         self.local = local
 
     def __str__(self) -> str:
-        return f'Resources(cpus={self.cpus}, memory_mib={self.memory_mib}, ' \
-               f'gpus=[{", ".join(map(lambda g: str(g), self.gpus))}], ' \
-               f'interruptible={self.interruptible}, ' \
-               f'local={self.local})'
+        return (
+            f"Resources(cpus={self.cpus}, memory_mib={self.memory_mib}, "
+            f'gpus=[{", ".join(map(lambda g: str(g), self.gpus))}], '
+            f"interruptible={self.interruptible}, "
+            f"local={self.local})"
+        )
 
 
 class Runner:
@@ -38,10 +47,13 @@ class Runner:
         resources = {
             "cpus": self.resources.cpus,
             "memory_mib": self.resources.memory_mib,
-            "gpus": [{
-                "name": gpu.name,
-                "memory_mib": gpu.memory_mib,
-            } for gpu in (self.resources.gpus or [])],
+            "gpus": [
+                {
+                    "name": gpu.name,
+                    "memory_mib": gpu.memory_mib,
+                }
+                for gpu in (self.resources.gpus or [])
+            ],
             "interruptible": self.resources.interruptible is True,
             "local": self.resources.local is True,
         }
@@ -52,6 +64,7 @@ class Runner:
             "job": self.job.serialize(),
         }
         return data
+
     @staticmethod
     def unserialize(data: dict):
         return Runner(

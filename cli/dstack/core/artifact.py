@@ -4,8 +4,7 @@ class ArtifactSpec:
         self.mount = mount
 
     def __str__(self) -> str:
-        return f'ArtifactSpec(artifact_path="{self.artifact_path}", ' \
-               f'mount={self.mount})'
+        return f'ArtifactSpec(artifact_path="{self.artifact_path}", ' f"mount={self.mount})"
 
 
 class ArtifactHead:

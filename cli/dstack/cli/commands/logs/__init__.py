@@ -10,8 +10,8 @@ from dstack.api.logs import poll_logs
 
 
 class LogCommand(BasicCommand):
-    NAME = 'logs'
-    DESCRIPTION = 'Show logs'
+    NAME = "logs"
+    DESCRIPTION = "Show logs"
 
     def __init__(self, parser):
         super(LogCommand, self).__init__(parser)
@@ -19,15 +19,24 @@ class LogCommand(BasicCommand):
     def register(self):
         # TODO: Add --format (short|detailed)
         self._parser.add_argument("run_name", metavar="RUN", type=str, help="A name of a run")
-        self._parser.add_argument("-a", "--attach",
-                                  help="Whether to continuously poll for new logs. By default, the command "
-                                       "will exit once there are no more logs to display. To exit from this "
-                                       "mode, use Control-C.", action="store_true")
-        self._parser.add_argument("-s", "--since",
-                                  help="From what time to begin displaying logs. By default, logs will be displayed starting "
-                                       "from 24 hours in the past. The value provided can be an ISO 8601 timestamp or a "
-                                       "relative time. For example, a value of 5m would indicate to display logs starting five "
-                                       "minutes in the past.", type=str, default="1d")
+        self._parser.add_argument(
+            "-a",
+            "--attach",
+            help="Whether to continuously poll for new logs. By default, the command "
+            "will exit once there are no more logs to display. To exit from this "
+            "mode, use Control-C.",
+            action="store_true",
+        )
+        self._parser.add_argument(
+            "-s",
+            "--since",
+            help="From what time to begin displaying logs. By default, logs will be displayed starting "
+            "from 24 hours in the past. The value provided can be an ISO 8601 timestamp or a "
+            "relative time. For example, a value of 5m would indicate to display logs starting five "
+            "minutes in the past.",
+            type=str,
+            default="1d",
+        )
 
     @check_config
     @check_git

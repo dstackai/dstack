@@ -10,22 +10,34 @@ from dstack.api.backend import list_backends
 
 
 class RMCommand(BasicCommand):
-    NAME = 'rm'
-    DESCRIPTION = 'Remove runs'
+    NAME = "rm"
+    DESCRIPTION = "Remove runs"
 
     def __init__(self, parser):
         super(RMCommand, self).__init__(parser)
 
     def register(self):
-        self._parser.add_argument("run_name", metavar="RUN", type=str, nargs="?", help="A name of a run")
-        self._parser.add_argument("-a", "--all", help="Remove all finished runs", dest="all", action="store_true")
-        self._parser.add_argument("-y", "--yes", help="Don't ask for confirmation", action="store_true")
+        self._parser.add_argument(
+            "run_name", metavar="RUN", type=str, nargs="?", help="A name of a run"
+        )
+        self._parser.add_argument(
+            "-a",
+            "--all",
+            help="Remove all finished runs",
+            dest="all",
+            action="store_true",
+        )
+        self._parser.add_argument(
+            "-y", "--yes", help="Don't ask for confirmation", action="store_true"
+        )
 
     @check_config
     @check_git
     def _command(self, args: Namespace):
-        if (args.run_name and (args.yes or Confirm.ask(f"[red]Delete the run '{args.run_name}'?[/]"))) \
-                or (args.all and (args.yes or Confirm.ask("[red]Delete all runs?[/]"))):
+        if (
+            args.run_name
+            and (args.yes or Confirm.ask(f"[red]Delete the run '{args.run_name}'?[/]"))
+        ) or (args.all and (args.yes or Confirm.ask("[red]Delete all runs?[/]"))):
             repo_data = load_repo_data()
 
             for backend in list_backends():

@@ -19,9 +19,6 @@ class LocalConfig(BackendConfig):
     def save(self, path: Path = get_config_path()):
         if not path.parent.exists():
             path.parent.mkdir(parents=True)
-        with path.open('w') as f:
-            config_data = {
-                "backend": "local",
-                "path": self.path
-            }
+        with path.open("w") as f:
+            config_data = {"backend": "local", "path": self.path}
             yaml.dump(config_data, f)

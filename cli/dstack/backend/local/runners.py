@@ -22,7 +22,12 @@ from dstack.core.request import RequestStatus, RequestHead
 from dstack.core.job import Job, JobStatus, Requirements
 from dstack.core.repo import RepoAddress
 from dstack.core.runners import Resources, Runner, Gpu
-from dstack.backend.local.common import list_objects, put_object, get_object, delete_object
+from dstack.backend.local.common import (
+    list_objects,
+    put_object,
+    get_object,
+    delete_object,
+)
 
 CREATE_INSTANCE_RETRY_RATE_SECS = 3
 
@@ -75,12 +80,17 @@ def _matches(resources: Resources, requirements: Optional[Requirements]) -> bool
         if gpu_count > len(resources.gpus or []):
             return False
         if requirements.gpus.name and gpu_count > len(
-                list(filter(lambda gpu: gpu.name == requirements.gpus.name,
-                            resources.gpus or []))):
+            list(filter(lambda gpu: gpu.name == requirements.gpus.name, resources.gpus or []))
+        ):
             return False
         if requirements.gpus.memory_mib and gpu_count > len(
-                list(filter(lambda gpu: gpu.memory_mib >= requirements.gpus.memory_mib,
-                            resources.gpus or []))):
+            list(
+                filter(
+                    lambda gpu: gpu.memory_mib >= requirements.gpus.memory_mib,
+                    resources.gpus or [],
+                )
+            )
+        ):
             return False
         if requirements.interruptible and not resources.interruptible:
             return False
@@ -112,10 +122,18 @@ def start_runner_process(runner_id: str) -> str:
     _install_runner_if_necessary()
     runner_config_dir = _get_runner_config_dir(runner_id)
     proc = subprocess.Popen(
-        [_runner_path(), "--config-dir", runner_config_dir, "--log-level", "6", "start"],
+        [
+            _runner_path(),
+            "--config-dir",
+            runner_config_dir,
+            "--log-level",
+            "6",
+            "start",
+        ],
         stdout=subprocess.DEVNULL,
         stderr=subprocess.STDOUT,
-        start_new_session=True)
+        start_new_session=True,
+    )
     return f"l-{proc.pid}"
 
 
@@ -123,8 +141,13 @@ def check_runner_resources(runner_id: str) -> Resources:
     _install_runner_if_necessary()
     runner_config_dir = _get_runner_config_dir(runner_id, create=True)
     runner_config_path = runner_config_dir / "runner.yaml"
-    result = subprocess.run([f"{_runner_path()} --config-dir {runner_config_dir} check"], shell=True,
-                            stdout=subprocess.DEVNULL, stderr=subprocess.PIPE, text=True)
+    result = subprocess.run(
+        [f"{_runner_path()} --config-dir {runner_config_dir} check"],
+        shell=True,
+        stdout=subprocess.DEVNULL,
+        stderr=subprocess.PIPE,
+        text=True,
+    )
 
     if result.returncode > 0:
         raise Exception(result.stderr)
@@ -133,9 +156,13 @@ def check_runner_resources(runner_id: str) -> Resources:
 
 
 def _unserialize_runner_resources(data: dict) -> Resources:
-    return Resources(data["cpus"], data["memory_mib"],
-                     [Gpu(g["name"], g["memory_mib"]) for g in data["gpus"]] if data.get("gpus") else [],
-                     False, True)
+    return Resources(
+        data["cpus"],
+        data["memory_mib"],
+        [Gpu(g["name"], g["memory_mib"]) for g in data["gpus"]] if data.get("gpus") else [],
+        False,
+        True,
+    )
 
 
 def _runner_version() -> str:
@@ -158,14 +185,16 @@ def _download_runner(url: str, path: str):
         total_length = int(r.headers.get("Content-Length"))
 
         with tqdm.wrapattr(r.raw, "read", total=total_length, desc=f"Downloading runner") as raw:
-            with open(path, 'wb') as output:
+            with open(path, "wb") as output:
                 shutil.copyfileobj(raw, output)
         os.chmod(path, 0o755)
 
 
 def _runner_url() -> str:
-    return f"https://{_runner_bucket()}.s3.{runner_bucket_region}.amazonaws.com" \
-           f"/{_runner_version()}/binaries/{_runner_filename()}"
+    return (
+        f"https://{_runner_bucket()}.s3.{runner_bucket_region}.amazonaws.com"
+        f"/{_runner_version()}/binaries/{_runner_filename()}"
+    )
 
 
 def _runner_bucket() -> str:
@@ -176,14 +205,20 @@ def _runner_bucket() -> str:
 
 
 def _get_runner_config_dir(runner_id: str, create: Optional[bool] = None) -> str:
-    runner_config_dir_path = Path(os.path.join(_config_directory_path(), "tmp", "runner", "configs", runner_id))
+    runner_config_dir_path = Path(
+        os.path.join(_config_directory_path(), "tmp", "runner", "configs", runner_id)
+    )
     if create:
         runner_config_dir_path.mkdir(parents=True, exist_ok=True)
         runner_config_path = runner_config_dir_path / "runner.yaml"
-        runner_config_path.write_text(yaml.dump({
-            "id": runner_id,
-            "hostname": "127.0.0.1",
-        }))
+        runner_config_path.write_text(
+            yaml.dump(
+                {
+                    "id": runner_id,
+                    "hostname": "127.0.0.1",
+                }
+            )
+        )
     return runner_config_dir_path
 
 
@@ -199,7 +234,11 @@ def get_request_head(path: str, job: Job, runner: Optional[Runner] = None) -> Re
             request_id = runner.request_id
     if request_id:
         _running = is_running(request_id)
-        return RequestHead(job.job_id, RequestStatus.RUNNING if _running else RequestStatus.TERMINATED, None)
+        return RequestHead(
+            job.job_id,
+            RequestStatus.RUNNING if _running else RequestStatus.TERMINATED,
+            None,
+        )
     else:
         return RequestHead(job.job_id, RequestStatus.TERMINATED, "PID is not specified")
 
@@ -213,9 +252,9 @@ def _stop_runner(path: str, runner: Runner):
 def _arch() -> str:
     uname = platform.uname()
     if uname.system == "Darwin":
-        brand = cpuinfo.get_cpu_info().get('brand_raw')
-        m_arch = 'm1' in brand.lower() or 'm2' in brand.lower()
-        arch = 'arm64' if m_arch else 'x86_64'
+        brand = cpuinfo.get_cpu_info().get("brand_raw")
+        m_arch = "m1" in brand.lower() or "m2" in brand.lower()
+        arch = "arm64" if m_arch else "x86_64"
     else:
         arch = uname.machine
     return arch
@@ -252,29 +291,49 @@ def _config_directory_path() -> Path:
 
 
 def _runner_path() -> Path:
-    return _config_directory_path() / "tmp" / "runner" / "bin" / _runner_version() / _runner_filename()
+    return (
+        _config_directory_path()
+        / "tmp"
+        / "runner"
+        / "bin"
+        / _runner_version()
+        / _runner_filename()
+    )
 
 
-def stop_job(path: str, repo_address: RepoAddress,
-             job_id: str, abort: bool):
+def stop_job(path: str, repo_address: RepoAddress, job_id: str, abort: bool):
     job_head = jobs.list_job_head(path, repo_address, job_id)
     job = jobs.get_job(path, repo_address, job_id)
     runner = _get_runner(path, job.runner_id) if job else None
-    request_status = get_request_head(path, job, runner).status if job else RequestStatus.TERMINATED
-    if job_head and job_head.status.is_unfinished() or job and job.status.is_unfinished() \
-            or runner and runner.job.status.is_unfinished() \
-            or request_status != RequestStatus.TERMINATED:
+    request_status = (
+        get_request_head(path, job, runner).status if job else RequestStatus.TERMINATED
+    )
+    if (
+        job_head
+        and job_head.status.is_unfinished()
+        or job
+        and job.status.is_unfinished()
+        or runner
+        and runner.job.status.is_unfinished()
+        or request_status != RequestStatus.TERMINATED
+    ):
         if abort:
             new_status = JobStatus.ABORTED
-        elif not job_head \
-                or job_head.status in [JobStatus.SUBMITTED, JobStatus.DOWNLOADING] \
-                or not job \
-                or job.status in [JobStatus.SUBMITTED, JobStatus.DOWNLOADING] \
-                or request_status == RequestStatus.TERMINATED \
-                or not runner:
+        elif (
+            not job_head
+            or job_head.status in [JobStatus.SUBMITTED, JobStatus.DOWNLOADING]
+            or not job
+            or job.status in [JobStatus.SUBMITTED, JobStatus.DOWNLOADING]
+            or request_status == RequestStatus.TERMINATED
+            or not runner
+        ):
             new_status = JobStatus.STOPPED
-        elif job_head and job_head.status != JobStatus.UPLOADING \
-                or job and job.status != JobStatus.UPLOADING:
+        elif (
+            job_head
+            and job_head.status != JobStatus.UPLOADING
+            or job
+            and job.status != JobStatus.UPLOADING
+        ):
             new_status = JobStatus.STOPPING
         else:
             new_status = None
@@ -285,8 +344,14 @@ def stop_job(path: str, repo_address: RepoAddress,
                 else:
                     runner.job.status = new_status
                     _update_runner(path, runner)
-            if job_head and job_head.status.is_unfinished() and job_head.status != new_status or \
-                    job and job.status.is_unfinished() and job.status != new_status:
+            if (
+                job_head
+                and job_head.status.is_unfinished()
+                and job_head.status != new_status
+                or job
+                and job.status.is_unfinished()
+                and job.status != new_status
+            ):
                 job.status = new_status
                 jobs.update_job(path, job)
 
