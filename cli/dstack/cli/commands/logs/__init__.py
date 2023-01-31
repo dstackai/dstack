@@ -42,11 +42,13 @@ class LogCommand(BasicCommand):
     @check_git
     def _command(self, args: Namespace):
         repo_data = load_repo_data()
+        anyone = False
         for backend in list_backends():
             start_time = since(args.since)
             job_heads = backend.list_job_heads(repo_data, args.run_name)
             if job_heads:
+                anyone = True
                 poll_logs(backend, repo_data, job_heads, start_time, args.attach)
-                return
-            else:
-                sys.exit(f"Cannot find the run '{args.run_name}'")
+
+        if not anyone:
+            sys.exit(f"Cannot find the run '{args.run_name}'")
