@@ -13,7 +13,7 @@ def list_objects(Root: str, Prefix: str, MaxKeys: Optional[int] = None) -> List[
     for file in files:
         if file.startswith(Prefix):
             if MaxKeys:
-                if count_keys < MaxKeys:
+                if count_keys == MaxKeys:
                     break
             l.append(file)
             count_keys += 1
