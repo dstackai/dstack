@@ -137,10 +137,14 @@ class LocalBackend(Backend):
         return artifacts.list_run_artifact_files(self.backend_config.path, repo_address, run_name)
 
     def list_tag_heads(self, repo_address: RepoAddress) -> List[TagHead]:
-        pass
+        return tags.list_tag_heads(
+           self.backend_config.path, repo_address
+        )
 
     def get_tag_head(self, repo_address: RepoAddress, tag_name: str) -> Optional[TagHead]:
-        pass
+        return tags.get_tag_head(
+            self.backend_config.path, repo_address, tag_name
+        )
 
     def add_tag_from_run(
         self,
@@ -149,13 +153,24 @@ class LocalBackend(Backend):
         run_name: str,
         run_jobs: Optional[List[Job]],
     ):
-        pass
+        tags.create_tag_from_run(
+            self.backend_config.path,
+            repo_address,
+            tag_name,
+            run_name,
+            run_jobs,
+        )
 
     def add_tag_from_local_dirs(self, repo_data: RepoData, tag_name: str, local_dirs: List[str]):
-        pass
+        tags.create_tag_from_local_dirs(
+            self.backend_config.path,
+            repo_data,
+            tag_name,
+            local_dirs,
+        )
 
     def delete_tag_head(self, repo_address: RepoAddress, tag_head: TagHead):
-        pass
+        tags.delete_tag(self.backend_config.path, repo_address, tag_head)
 
     def list_repo_heads(self) -> List[RepoHead]:
         return repos.list_repo_heads(self.backend_config.path)

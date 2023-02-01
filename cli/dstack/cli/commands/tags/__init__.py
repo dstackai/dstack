@@ -84,7 +84,6 @@ class TAGCommand(BasicCommand):
             for backend in list_backends():
                 tag_head = backend.get_tag_head(repo_data, args.tag_name)
                 if tag_head:
-                    current_backend = backend
                     if args.yes or Confirm.ask(
                         f"[red]The tag '{args.tag_name}' already exists. "
                         f"Do you want to override it?[/]"
@@ -93,14 +92,16 @@ class TAGCommand(BasicCommand):
                         break
                     else:
                         return
-            if args.run_name:
-                current_backend.add_tag_from_run(
-                    repo_data, args.tag_name, args.run_name, run_jobs=None
-                )
-            else:
-                current_backend.add_tag_from_local_dirs(
-                    repo_data, args.tag_name, args.artifact_paths
-                )
+                if not (args.run_name is None):
+                    jobs_heads = backend.list_job_heads(repo_data, args.run_name)
+                    if len(jobs_heads) != 0:
+                        backend.add_tag_from_run(
+                            repo_data, args.tag_name, args.run_name, run_jobs=None
+                        )
+                else:
+                    backend.add_tag_from_local_dirs(
+                        repo_data, args.tag_name, args.artifact_paths
+                    )
             print(f"[grey58]OK[/]")
         else:
             sys.exit("Specify -r RUN or -a PATH to create a tag")
@@ -115,8 +116,8 @@ class TAGCommand(BasicCommand):
             if tag_head:
                 current_backend = backend
                 break
-        if not tag_head:
+        if current_backend is None:
             sys.exit(f"The tag '{args.tag_name}' doesn't exist")
-        elif args.yes or Confirm.ask(f" [red]Delete the tag '{tag_head.tag_name}'?[/]"):
+        if args.yes or Confirm.ask(f" [red]Delete the tag '{tag_head.tag_name}'?[/]"):
             current_backend.delete_tag_head(repo_data, tag_head)
             print(f"[grey58]OK[/]")
