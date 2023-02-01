@@ -18,6 +18,7 @@ jobs:
           with:
             options: "--config black.toml --check --verbose"
             src: "./cli"
+            version: "~= 22.0"
 
   cli-test-master:
     runs-on: ${{ matrix.os }}
