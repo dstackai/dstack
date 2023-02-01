@@ -4,6 +4,7 @@ from typing import List, Optional
 from botocore.client import BaseClient
 
 from dstack.backend.aws import runners
+from dstack.backend.aws.utils import retry_operation_on_service_errors
 from dstack.backend import RepoHead
 from dstack.core.repo import RepoCredentials, RepoProtocol, RepoAddress
 
@@ -159,22 +160,27 @@ def save_repo_credentials(
             raise e
     role_name = runners.role_name(iam_client, bucket_name)
     account_id = sts_client.get_caller_identity()["Account"]
-    secretsmanager_client.put_resource_policy(
+    resource_policy = json.dumps(
+        {
+            "Version": "2012-10-17",
+            "Statement": [
+                {
+                    "Effect": "Allow",
+                    "Principal": {"AWS": f"arn:aws:iam::{account_id}:role/{role_name}"},
+                    "Action": [
+                        "secretsmanager:GetSecretValue",
+                        "secretsmanager:ListSecrets",
+                    ],
+                    "Resource": "*",
+                }
+            ],
+        }
+    )
+    # The policy may not exist yet if we just created it because of AWS eventual consistency
+    retry_operation_on_service_errors(
+        secretsmanager_client.put_resource_policy,
+        ["MalformedPolicyDocumentException"],
+        delay=5,
         SecretId=secret_name,
-        ResourcePolicy=json.dumps(
-            {
-                "Version": "2012-10-17",
-                "Statement": [
-                    {
-                        "Effect": "Allow",
-                        "Principal": {"AWS": f"arn:aws:iam::{account_id}:role/{role_name}"},
-                        "Action": [
-                            "secretsmanager:GetSecretValue",
-                            "secretsmanager:ListSecrets",
-                        ],
-                        "Resource": "*",
-                    }
-                ],
-            }
-        ),
+        ResourcePolicy=resource_policy,
     )
