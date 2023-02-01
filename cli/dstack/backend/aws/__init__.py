@@ -23,6 +23,7 @@ from dstack.core.run import RunHead
 from dstack.core.log_event import LogEvent
 from dstack.core.tag import TagHead
 from dstack.core.secret import Secret
+from dstack.core.error import ConfigError
 
 
 class AwsBackend(Backend):
@@ -30,8 +31,11 @@ class AwsBackend(Backend):
 
     def __init__(self):
         self.backend_config = AWSConfig()
-        self.backend_config.load()
-        self._loaded = True
+        try:
+            self.backend_config.load()
+            self._loaded = True
+        except ConfigError:
+            self._loaded = False
 
     def _s3_client(self) -> BaseClient:
         session = boto3.Session(
