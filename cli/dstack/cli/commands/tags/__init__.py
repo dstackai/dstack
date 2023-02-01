@@ -80,7 +80,6 @@ class TAGCommand(BasicCommand):
     def add_tag(self, args: Namespace):
         if args.run_name or args.artifact_paths:
             repo_data = load_repo_data()
-            current_backend = None
             for backend in list_backends():
                 tag_head = backend.get_tag_head(repo_data, args.tag_name)
                 if tag_head:
