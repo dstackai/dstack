@@ -31,6 +31,8 @@ export const fetchBaseQuery = (
                 url,
                 method,
                 response,
+                body,
+                params,
             });
 
             await wait(Math.floor(Math.random() * 3000));

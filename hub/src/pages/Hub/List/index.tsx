@@ -1,5 +1,5 @@
 import React, { useEffect, useMemo } from 'react';
-import { Box, Cards, Header, SpaceBetween, Button, NavigateLink, TextFilter, Pagination } from 'components';
+import { Cards, Header, SpaceBetween, Button, NavigateLink, TextFilter, Pagination, ListEmptyMessage } from 'components';
 import { useCollection } from 'hooks';
 import { useDeleteHubsMutation, useGetHubsQuery } from 'services/hub';
 import { ROUTES } from 'routes';
@@ -9,27 +9,16 @@ export const HubList: React.FC = () => {
     const { t } = useTranslation();
     const { isLoading, data } = useGetHubsQuery();
     const [deleteHubs, { isLoading: isDeleting }] = useDeleteHubsMutation();
+
     const renderEmptyMessage = (): React.ReactNode => {
-        return (
-            <Box textAlign="center" color="inherit">
-                <b>{t('hubs.empty_message_title')}</b>
-                <Box padding={{ bottom: 's' }} variant="p" color="inherit">
-                    {t('hubs.empty_message_text')}
-                </Box>
-            </Box>
-        );
+        return <ListEmptyMessage title={t('hubs.empty_message_title')} message={t('hubs.empty_message_text')} />;
     };
 
     const renderNoMatchMessage = (onClearFilter: () => void): React.ReactNode => {
         return (
-            <Box textAlign="center" color="inherit">
-                <b>{t('hubs.nomatch_message_title')}</b>
-                <Box padding={{ bottom: 's' }} variant="p" color="inherit">
-                    {t('hubs.nomatch_message_text')}
-                </Box>
-
+            <ListEmptyMessage title={t('hubs.nomatch_message_title')} message={t('hubs.nomatch_message_text')}>
                 <Button onClick={onClearFilter}>{t('hubs.nomatch_message_button_label')}</Button>
-            </Box>
+            </ListEmptyMessage>
         );
     };
 
@@ -58,6 +47,10 @@ export const HubList: React.FC = () => {
         if (selectedItems?.length) return `(${selectedItems?.length}/${data?.length ?? 0})`;
 
         return `(${data.length})`;
+    };
+
+    const getIsTableItemDisabled = () => {
+        return isDeleting;
     };
 
     const isDisabledEdit = useMemo(() => {
@@ -103,6 +96,7 @@ export const HubList: React.FC = () => {
             }}
             items={items}
             loading={isLoading}
+            isItemDisabled={getIsTableItemDisabled}
             loadingText="Loading"
             selectionType="multi"
             header={

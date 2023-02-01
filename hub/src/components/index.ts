@@ -15,3 +15,4 @@ export { default as Table } from '@cloudscape-design/components/table';
 
 // custom components
 export { NavigateLink } from './NavigateLink';
+export { ListEmptyMessage } from './ListEmptyMessage';

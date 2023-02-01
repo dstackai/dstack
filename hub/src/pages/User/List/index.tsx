@@ -1,6 +1,6 @@
-import React, { useMemo } from 'react';
-import { Button, Table, Header, Pagination, SpaceBetween, TextFilter, NavigateLink, Box } from 'components';
-import { useGetUserListQuery } from 'services/user';
+import React, { useEffect, useMemo } from 'react';
+import { Button, Table, Header, Pagination, SpaceBetween, TextFilter, NavigateLink, ListEmptyMessage } from 'components';
+import { useDeleteUsersMutation, useGetUserListQuery } from 'services/user';
 import { useCollection } from 'hooks';
 import { ROUTES } from 'routes';
 import { useTranslation } from 'react-i18next';
@@ -8,6 +8,7 @@ import { useTranslation } from 'react-i18next';
 export const UserList: React.FC = () => {
     const { t } = useTranslation();
     const { isLoading, data } = useGetUserListQuery();
+    const [deleteUsers, { isLoading: isDeleting }] = useDeleteUsersMutation();
 
     const COLUMN_DEFINITIONS = [
         {
@@ -35,26 +36,14 @@ export const UserList: React.FC = () => {
     ];
 
     const renderEmptyMessage = (): React.ReactNode => {
-        return (
-            <Box textAlign="center" color="inherit">
-                <b>{t('users.empty_message_title')}</b>
-                <Box padding={{ bottom: 's' }} variant="p" color="inherit">
-                    {t('hubs.empty_message_text')}
-                </Box>
-            </Box>
-        );
+        return <ListEmptyMessage title={t('users.empty_message_title')} message={t('hubs.empty_message_text')} />;
     };
 
     const renderNoMatchMessage = (onClearFilter: () => void): React.ReactNode => {
         return (
-            <Box textAlign="center" color="inherit">
-                <b>{t('users.nomatch_message_title')}</b>
-                <Box padding={{ bottom: 's' }} variant="p" color="inherit">
-                    {t('users.nomatch_message_text')}
-                </Box>
-
+            <ListEmptyMessage title={t('users.nomatch_message_title')} message={t('users.nomatch_message_text')}>
                 <Button onClick={onClearFilter}>{t('users.nomatch_message_button_label')}</Button>
-            </Box>
+            </ListEmptyMessage>
         );
     };
 
@@ -67,16 +56,26 @@ export const UserList: React.FC = () => {
         selection: {},
     });
 
+    useEffect(() => {
+        if (!isDeleting) actions.setSelectedItems([]);
+    }, [isDeleting]);
+
     const deleteSelectedUserHandler = () => {
-        return null;
+        const { selectedItems } = collectionProps;
+
+        if (selectedItems?.length) deleteUsers(selectedItems.map((user) => user.user_name));
+    };
+
+    const getIsTableItemDisabled = () => {
+        return isDeleting;
     };
 
     const isDisabledDelete = useMemo(() => {
-        return collectionProps.selectedItems?.length === 0;
+        return isDeleting || collectionProps.selectedItems?.length === 0;
     }, [collectionProps.selectedItems]);
 
     const isDisabledEdit = useMemo(() => {
-        return collectionProps.selectedItems?.length !== 1;
+        return isDeleting || collectionProps.selectedItems?.length !== 1;
     }, [collectionProps.selectedItems]);
 
     const renderCounter = () => {
@@ -93,10 +92,11 @@ export const UserList: React.FC = () => {
         <Table
             {...collectionProps}
             variant="full-page"
+            isItemDisabled={getIsTableItemDisabled}
             columnDefinitions={COLUMN_DEFINITIONS}
             items={items}
             loading={isLoading}
-            loadingText={t('common.loading') ?? ''}
+            loadingText={t('common.loading')}
             selectionType="multi"
             stickyHeader={true}
             header={
@@ -120,8 +120,8 @@ export const UserList: React.FC = () => {
             filter={
                 <TextFilter
                     {...filterProps}
-                    filteringPlaceholder={t('users.search_placeholder') || ''}
-                    countText={t('common.match_count_with_value', { count: filteredItemsCount }) ?? ''}
+                    filteringPlaceholder={t('users.search_placeholder')}
+                    countText={t('common.match_count_with_value', { count: filteredItemsCount })}
                     disabled={isLoading}
                 />
             }

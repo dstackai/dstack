@@ -25,7 +25,17 @@ export const userApi = createApi({
                 };
             },
         }),
+
+        deleteUsers: builder.mutation<void, IUser['user_name'][]>({
+            query: (hubNames) => ({
+                url: API.USERS.BASE(),
+                method: 'DELETE',
+                params: {
+                    users: hubNames,
+                },
+            }),
+        }),
     }),
 });
 
-export const { useGetUserDataQuery, useGetUserListQuery } = userApi;
+export const { useGetUserDataQuery, useGetUserListQuery, useDeleteUsersMutation } = userApi;

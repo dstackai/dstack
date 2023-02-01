@@ -10,8 +10,6 @@ type MockItem = {
     failed: unknown;
 };
 
-type RequestMethod = 'GET' | 'POST';
-
 type MocksMap = {
     [key: string]: {
         [key: string]: MockItem;
@@ -28,6 +26,12 @@ const mocksMap: MocksMap = {
     [API.USERS.LIST()]: {
         GET: {
             success: user.list.success,
+            failed: { status: 403 },
+        },
+    },
+    [API.USERS.BASE()]: {
+        DELETE: {
+            success: {},
             failed: { status: 403 },
         },
     },
