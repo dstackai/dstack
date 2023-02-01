@@ -60,9 +60,7 @@ class LocalBackend(Backend):
     def delete_job_head(self, repo_address: RepoAddress, job_id: str):
         jobs.delete_job_head(self.backend_config.path, repo_address, job_id)
 
-    def stop_jobs(
-        self, repo_address: RepoAddress, run_name: Optional[str], abort: bool
-    ):
+    def stop_jobs(self, repo_address: RepoAddress, run_name: Optional[str], abort: bool):
         job_heads = self.list_job_heads(repo_address, run_name)
         for job_head in job_heads:
             if job_head.status.is_unfinished():
@@ -96,16 +94,10 @@ class LocalBackend(Backend):
         job_heads: List[JobHead],
         include_request_heads: bool = True,
     ) -> List[RunHead]:
-        return runs.get_run_heads(
-            self.backend_config.path, job_heads, include_request_heads
-        )
+        return runs.get_run_heads(self.backend_config.path, job_heads, include_request_heads)
 
     def poll_logs(
-        self,
-        repo_address: RepoAddress,
-        job_heads: List[JobHead],
-        start_time: int,
-        attached: bool,
+        self, repo_address: RepoAddress, job_heads: List[JobHead], start_time: int, attached: bool,
     ) -> Generator[LogEvent, None, None]:
         return logs.poll_logs(
             self.backend_config.path, repo_address, job_heads, start_time, attached
@@ -138,16 +130,12 @@ class LocalBackend(Backend):
     def list_run_artifact_files(
         self, repo_address: RepoAddress, run_name: str
     ) -> Generator[Tuple[str, str, int], None, None]:
-        return artifacts.list_run_artifact_files(
-            self.backend_config.path, repo_address, run_name
-        )
+        return artifacts.list_run_artifact_files(self.backend_config.path, repo_address, run_name)
 
     def list_tag_heads(self, repo_address: RepoAddress) -> List[TagHead]:
         pass
 
-    def get_tag_head(
-        self, repo_address: RepoAddress, tag_name: str
-    ) -> Optional[TagHead]:
+    def get_tag_head(self, repo_address: RepoAddress, tag_name: str) -> Optional[TagHead]:
         pass
 
     def add_tag_from_run(
@@ -159,9 +147,7 @@ class LocalBackend(Backend):
     ):
         pass
 
-    def add_tag_from_local_dirs(
-        self, repo_data: RepoData, tag_name: str, local_dirs: List[str]
-    ):
+    def add_tag_from_local_dirs(self, repo_data: RepoData, tag_name: str, local_dirs: List[str]):
         pass
 
     def delete_tag_head(self, repo_address: RepoAddress, tag_head: TagHead):
@@ -171,9 +157,7 @@ class LocalBackend(Backend):
         return repos.list_repo_heads(self.backend_config.path)
 
     def update_repo_last_run_at(self, repo_address: RepoAddress, last_run_at: int):
-        repos.update_repo_last_run_at(
-            self.backend_config.path, repo_address, last_run_at
-        )
+        repos.update_repo_last_run_at(self.backend_config.path, repo_address, last_run_at)
 
     def increment_repo_tags_count(self, repo_address: RepoAddress):
         repos.increment_repo_tags_count(self.backend_config.path, repo_address)
@@ -184,17 +168,11 @@ class LocalBackend(Backend):
     def delete_repo(self, repo_address: RepoAddress):
         repos.delete_repo(self.backend_config.path, repo_address)
 
-    def get_repo_credentials(
-        self, repo_address: RepoAddress
-    ) -> Optional[RepoCredentials]:
+    def get_repo_credentials(self, repo_address: RepoAddress) -> Optional[RepoCredentials]:
         return repos.get_repo_credentials(self.backend_config.path, repo_address)
 
-    def save_repo_credentials(
-        self, repo_address: RepoAddress, repo_credentials: RepoCredentials
-    ):
-        repos.save_repo_credentials(
-            self.backend_config.path, repo_address, repo_credentials
-        )
+    def save_repo_credentials(self, repo_address: RepoAddress, repo_credentials: RepoCredentials):
+        repos.save_repo_credentials(self.backend_config.path, repo_address, repo_credentials)
 
     def list_run_artifact_files_and_folders(
         self, repo_address: RepoAddress, job_id: str, path: str
@@ -206,9 +184,7 @@ class LocalBackend(Backend):
     def list_secret_names(self, repo_address: RepoAddress) -> List[str]:
         return secrets.list_secret_names(self.backend_config.path, repo_address)
 
-    def get_secret(
-        self, repo_address: RepoAddress, secret_name: str
-    ) -> Optional[Secret]:
+    def get_secret(self, repo_address: RepoAddress, secret_name: str) -> Optional[Secret]:
         return secrets.get_secret(self.backend_config.path, repo_address, secret_name)
 
     def add_secret(self, repo_address: RepoAddress, secret: Secret):
@@ -218,9 +194,7 @@ class LocalBackend(Backend):
         return secrets.update_secret(self.backend_config.path, repo_address, secret)
 
     def delete_secret(self, repo_address: RepoAddress, secret_name: str):
-        return secrets.remove_secret(
-            self.backend_config.path, repo_address, secret_name
-        )
+        return secrets.remove_secret(self.backend_config.path, repo_address, secret_name)
 
     def type(self) -> BackendType:
         return BackendType.LOCAL

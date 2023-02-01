@@ -18,9 +18,7 @@ class LogCommand(BasicCommand):
 
     def register(self):
         # TODO: Add --format (short|detailed)
-        self._parser.add_argument(
-            "run_name", metavar="RUN", type=str, help="A name of a run"
-        )
+        self._parser.add_argument("run_name", metavar="RUN", type=str, help="A name of a run")
         self._parser.add_argument(
             "-a",
             "--attach",

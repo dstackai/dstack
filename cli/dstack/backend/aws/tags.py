@@ -15,10 +15,7 @@ from dstack.core.repo import RepoAddress, LocalRepoData
 
 def _unserialize_artifact_heads(artifact_heads):
     return (
-        [
-            ArtifactHead(a.split("=")[0], a.split("=")[1])
-            for a in artifact_heads.split(":")
-        ]
+        [ArtifactHead(a.split("=")[0], a.split("=")[1]) for a in artifact_heads.split(":")]
         if artifact_heads
         else None
     )
@@ -163,15 +160,10 @@ def create_tag_from_run(
 
 
 def delete_tag(
-    s3_client: BaseClient,
-    bucket_name: str,
-    repo_address: RepoAddress,
-    tag_head: TagHead,
+    s3_client: BaseClient, bucket_name: str, repo_address: RepoAddress, tag_head: TagHead,
 ):
     tag_jobs = []
-    job_heads = jobs.list_job_heads(
-        s3_client, bucket_name, repo_address, tag_head.run_name
-    )
+    job_heads = jobs.list_job_heads(s3_client, bucket_name, repo_address, tag_head.run_name)
     for job_head in job_heads:
         job = jobs.get_job(s3_client, bucket_name, repo_address, job_head.job_id)
         if job:
@@ -231,12 +223,7 @@ def create_tag_from_local_dirs(
     jobs.create_job(s3_client, bucket_name, job, create_head=False)
     for index, local_path in enumerate(local_paths):
         artifacts.upload_job_artifact_files(
-            s3_client,
-            bucket_name,
-            repo_data,
-            job.job_id,
-            tag_artifacts[index],
-            local_path,
+            s3_client, bucket_name, repo_data, job.job_id, tag_artifacts[index], local_path,
         )
     tag_head = TagHead(
         repo_data,

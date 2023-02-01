@@ -16,21 +16,15 @@ def list_repo_heads(s3_client: BaseClient, bucket_name: str) -> List[RepoHead]:
         for obj in response["Contents"]:
             tokens = obj["Key"][len(tag_head_prefix) :].split(";")
             if len(tokens) == 5:
-                (
-                    repo_host_port,
-                    repo_user_name,
-                    repo_name,
-                    last_run_at,
-                    tags_count,
-                ) = tuple(tokens)
+                (repo_host_port, repo_user_name, repo_name, last_run_at, tags_count,) = tuple(
+                    tokens
+                )
                 t = repo_host_port.split(":")
                 repo_host_name = t[0]
                 repo_port = t[1] if len(t) > 1 else None
                 repo_heads.append(
                     RepoHead(
-                        RepoAddress(
-                            repo_host_name, repo_port, repo_user_name, repo_name
-                        ),
+                        RepoAddress(repo_host_name, repo_port, repo_user_name, repo_name),
                         int(last_run_at) if last_run_at else None,
                         int(tags_count),
                     )
@@ -47,25 +41,19 @@ def _get_repo_head(
         last_run_at, tags_count = tuple(
             response["Contents"][0]["Key"][len(repo_head_prefix) :].split(";")
         )
-        return RepoHead(
-            repo_address, int(last_run_at) if last_run_at else None, int(tags_count)
-        )
+        return RepoHead(repo_address, int(last_run_at) if last_run_at else None, int(tags_count))
     else:
         return None
 
 
-def _create_or_update_repo_head(
-    s3_client: BaseClient, bucket_name: str, repo_head: RepoHead
-):
+def _create_or_update_repo_head(s3_client: BaseClient, bucket_name: str, repo_head: RepoHead):
     repo_head_prefix = f"repos/l;{repo_head.path(delimiter=',')};"
     response = s3_client.list_objects_v2(Bucket=bucket_name, Prefix=repo_head_prefix)
     if "Contents" in response:
         for obj in response["Contents"]:
             s3_client.delete_object(Bucket=bucket_name, Key=obj["Key"])
     repo_head_key = (
-        f"{repo_head_prefix}"
-        f"{repo_head.last_run_at or ''};"
-        f"{repo_head.tags_count}"
+        f"{repo_head_prefix}" f"{repo_head.last_run_at or ''};" f"{repo_head.tags_count}"
     )
     s3_client.put_object(Body="", Bucket=bucket_name, Key=repo_head_key)
 
@@ -80,9 +68,7 @@ def update_repo_last_run_at(
     _create_or_update_repo_head(s3_client, bucket_name, repo_head)
 
 
-def increment_repo_tags_count(
-    s3_client: BaseClient, bucket_name: str, repo_address: RepoAddress
-):
+def increment_repo_tags_count(s3_client: BaseClient, bucket_name: str, repo_address: RepoAddress):
     repo_head = _get_repo_head(s3_client, bucket_name, repo_address) or RepoHead(
         repo_address, None, tags_count=0
     )
@@ -90,9 +76,7 @@ def increment_repo_tags_count(
     _create_or_update_repo_head(s3_client, bucket_name, repo_head)
 
 
-def decrement_repo_tags_count(
-    s3_client: BaseClient, bucket_name: str, repo_address: RepoAddress
-):
+def decrement_repo_tags_count(s3_client: BaseClient, bucket_name: str, repo_address: RepoAddress):
     repo_head = _get_repo_head(s3_client, bucket_name, repo_address)
     if repo_head:
         repo_head.tags_count = repo_head.tags_count - 1
@@ -179,13 +163,8 @@ def save_repo_credentials(
                 "Statement": [
                     {
                         "Effect": "Allow",
-                        "Principal": {
-                            "AWS": f"arn:aws:iam::{account_id}:role/{role_name}"
-                        },
-                        "Action": [
-                            "secretsmanager:GetSecretValue",
-                            "secretsmanager:ListSecrets",
-                        ],
+                        "Principal": {"AWS": f"arn:aws:iam::{account_id}:role/{role_name}"},
+                        "Action": ["secretsmanager:GetSecretValue", "secretsmanager:ListSecrets",],
                         "Resource": "*",
                     }
                 ],

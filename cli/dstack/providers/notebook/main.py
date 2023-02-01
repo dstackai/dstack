@@ -39,9 +39,7 @@ class NotebookProvider(Provider):
         self.image_name = self._image_name()
 
     def _create_parser(self, workflow_name: Optional[str]) -> Optional[ArgumentParser]:
-        parser = ArgumentParser(
-            prog="dstack run " + (workflow_name or self.provider_name)
-        )
+        parser = ArgumentParser(prog="dstack run " + (workflow_name or self.provider_name))
         self._add_base_args(parser)
         return parser
 
@@ -64,11 +62,7 @@ class NotebookProvider(Provider):
                 port_count=1,
                 requirements=self.resources,
                 app_specs=[
-                    AppSpec(
-                        port_index=0,
-                        app_name="notebook",
-                        url_query_params={"token": token},
-                    )
+                    AppSpec(port_index=0, app_name="notebook", url_query_params={"token": token},)
                 ],
             )
         ]

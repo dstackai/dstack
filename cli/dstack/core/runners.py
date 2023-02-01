@@ -37,9 +37,7 @@ class Resources:
 
 
 class Runner:
-    def __init__(
-        self, runner_id: str, request_id: Optional[str], resources: Resources, job: Job
-    ):
+    def __init__(self, runner_id: str, request_id: Optional[str], resources: Resources, job: Job):
         self.runner_id = runner_id
         self.request_id = request_id
         self.job = job

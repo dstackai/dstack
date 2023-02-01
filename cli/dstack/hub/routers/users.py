@@ -17,9 +17,7 @@ security = HTTPBearer()
 @router.get("/info")
 async def info(authorization: HTTPAuthorizationCredentials = Depends(security)) -> Dict:
     with Session(metadata.engine, expire_on_commit=False) as session:
-        user = (
-            session.query(User).where(User.token == authorization.credentials).first()
-        )
+        user = session.query(User).where(User.token == authorization.credentials).first()
         if user:
             return {"user_name": user.name}
         else:

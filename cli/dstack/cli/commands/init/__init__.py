@@ -37,7 +37,5 @@ class InitCommand(BasicCommand):
         local_repo_data = load_repo_data(args.gh_token, args.identity_file)
         local_repo_data.ls_remote()
         for backend in list_backends():
-            backend.save_repo_credentials(
-                local_repo_data, local_repo_data.repo_credentials()
-            )
+            backend.save_repo_credentials(local_repo_data, local_repo_data.repo_credentials())
         print(f"[grey58]OK[/]")

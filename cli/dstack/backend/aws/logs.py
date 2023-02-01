@@ -40,20 +40,14 @@ def _render_log_message(
     host_name = job_host_names[job_id]
     ports = job_ports[job_id]
     app_specs = job_app_specs[job_id]
-    pat = re.compile(
-        f"http://(localhost|0.0.0.0|127.0.0.1|{host_name}):[\\S]*[^(.+)\\s\\n\\r]"
-    )
+    pat = re.compile(f"http://(localhost|0.0.0.0|127.0.0.1|{host_name}):[\\S]*[^(.+)\\s\\n\\r]")
     if re.search(pat, log):
         if host_name != "none" and ports and app_specs:
             for app_spec in app_specs:
                 port = ports[app_spec.port_index]
                 url_path = app_spec.url_path or ""
                 url_query_params = app_spec.url_query_params
-                url_query = (
-                    ("?" + parse.urlencode(url_query_params))
-                    if url_query_params
-                    else ""
-                )
+                url_query = ("?" + parse.urlencode(url_query_params)) if url_query_params else ""
                 app_url = f"http://{host_name}:{port}"
                 if url_path or url_query_params:
                     app_url += "/"
@@ -65,9 +59,7 @@ def _render_log_message(
         event["timestamp"],
         job_id,
         log,
-        LogEventSource.STDOUT
-        if message["source"] == "stdout"
-        else LogEventSource.STDERR,
+        LogEventSource.STDOUT if message["source"] == "stdout" else LogEventSource.STDERR,
     )
 
 
@@ -105,15 +97,11 @@ def _filter_log_events_loop(
             if event["eventId"] not in event_ids_per_timestamp[event["timestamp"]]:
                 event_ids_per_timestamp[event["timestamp"]].add(event["eventId"])
                 yield event
-        event_ids_per_timestamp = _get_latest_events_and_timestamp(
-            event_ids_per_timestamp
-        )
+        event_ids_per_timestamp = _get_latest_events_and_timestamp(event_ids_per_timestamp)
         if "nextToken" in response:
             filter_logs_events_kwargs["nextToken"] = response["nextToken"]
         else:
-            _reset_filter_log_events_params(
-                filter_logs_events_kwargs, event_ids_per_timestamp
-            )
+            _reset_filter_log_events_params(filter_logs_events_kwargs, event_ids_per_timestamp)
             time.sleep(POLL_LOGS_RATE_SECS)
             counter = counter + 1
             if counter % CHECK_STATUS_EVERY_N == 0:
@@ -138,16 +126,13 @@ def _filter_log_events_loop(
                     finished_counter += 1
 
 
-def create_log_group_if_not_exists(
-    logs_client: BaseClient, bucket_name: str, log_group_name: str
-):
+def create_log_group_if_not_exists(logs_client: BaseClient, bucket_name: str, log_group_name: str):
     response = logs_client.describe_log_groups(logGroupNamePrefix=log_group_name)
     if not response["logGroups"] or not any(
         filter(lambda g: g["logGroupName"] == log_group_name, response["logGroups"])
     ):
         logs_client.create_log_group(
-            logGroupName=log_group_name,
-            tags={"owner": "dstack", "dstack_bucket": bucket_name,},
+            logGroupName=log_group_name, tags={"owner": "dstack", "dstack_bucket": bucket_name,},
         )
 
 

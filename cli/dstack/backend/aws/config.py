@@ -39,9 +39,7 @@ class AWSConfig(BackendConfig):
         self.region_name = (
             os.getenv("DSTACK_AWS_REGION") or os.getenv("AWS_DEFAULT_REGION") or None
         )
-        self.profile_name = (
-            os.getenv("DSTACK_AWS_PROFILE") or os.getenv("AWS_PROFILE") or None
-        )
+        self.profile_name = os.getenv("DSTACK_AWS_PROFILE") or os.getenv("AWS_PROFILE") or None
         self.subnet_id = os.getenv("DSTACK_AWS_EC2_SUBNET") or None
 
     def load(self, path: Path = get_config_path()):
@@ -52,12 +50,8 @@ class AWSConfig(BackendConfig):
                     raise Exception(f"It's not AWS config")
                 if not config_data.get("bucket"):
                     raise Exception(f"For AWS backend:the bucket field is required")
-                self.profile_name = config_data.get("profile") or os.getenv(
-                    "AWS_PROFILE"
-                )
-                self.region_name = config_data.get("region") or os.getenv(
-                    "AWS_DEFAULT_REGION"
-                )
+                self.profile_name = config_data.get("profile") or os.getenv("AWS_PROFILE")
+                self.region_name = config_data.get("region") or os.getenv("AWS_DEFAULT_REGION")
                 self.bucket_name = config_data["bucket"]
                 self.subnet_id = config_data.get("subnet")
         else:
@@ -105,22 +99,16 @@ class AWSConfig(BackendConfig):
         print(f"[grey58]OK[/]")
 
     def _s3_client(self) -> BaseClient:
-        session = boto3.Session(
-            profile_name=self.profile_name, region_name=self.region_name
-        )
+        session = boto3.Session(profile_name=self.profile_name, region_name=self.region_name)
         return session.client("s3")
 
     def validate_bucket(self, bucket_name):
         s3_client = self._s3_client()
         try:
             response = s3_client.head_bucket(Bucket=bucket_name)
-            bucket_region = response["ResponseMetadata"]["HTTPHeaders"][
-                "x-amz-bucket-region"
-            ]
+            bucket_region = response["ResponseMetadata"]["HTTPHeaders"]["x-amz-bucket-region"]
             if bucket_region != self.region_name:
-                print(
-                    f"[red bold]✗[/red bold] [red]The bucket belongs to another AWS region."
-                )
+                print(f"[red bold]✗[/red bold] [red]The bucket belongs to another AWS region.")
                 return False
         except Exception as e:
             if (
@@ -147,9 +135,7 @@ class AWSConfig(BackendConfig):
                         if self.region_name != "us-east-1":
                             s3_client.create_bucket(
                                 Bucket=bucket_name,
-                                CreateBucketConfiguration={
-                                    "LocationConstraint": self.region_name
-                                },
+                                CreateBucketConfiguration={"LocationConstraint": self.region_name},
                             )
                         else:
                             s3_client.create_bucket(Bucket=bucket_name)
@@ -186,9 +172,7 @@ class AWSConfig(BackendConfig):
             profile_name = None
         return profile_name
 
-    def ask_bucket(
-        self, default_bucket_name: Optional[str], default_subnet_id: Optional[str]
-    ):
+    def ask_bucket(self, default_bucket_name: Optional[str], default_subnet_id: Optional[str]):
         bucket_options = []
         if not default_bucket_name:
             try:
@@ -219,9 +203,7 @@ class AWSConfig(BackendConfig):
             )
             bucket_index = bucket_menu.show()
             bucket_title = bucket_options[bucket_index].replace("[", "\\[")
-            print(
-                f"[sea_green3 bold]✓[/sea_green3 bold] [grey74]{bucket_title}[/grey74]"
-            )
+            print(f"[sea_green3 bold]✓[/sea_green3 bold] [grey74]{bucket_title}[/grey74]")
         else:
             bucket_index = 1
         if bucket_index == 0 and default_bucket_name:
@@ -239,9 +221,9 @@ class AWSConfig(BackendConfig):
             "[sea_green3 bold]?[/sea_green3 bold] [bold]Enter S3 bucket name[/bold]",
             default=default_bucket_name,
         )
-        match = re.compile(
-            r"(?!(^xn--|-s3alias$))^[a-z0-9][a-z0-9-]{1,61}[a-z0-9]$"
-        ).match(bucket_name)
+        match = re.compile(r"(?!(^xn--|-s3alias$))^[a-z0-9][a-z0-9-]{1,61}[a-z0-9]$").match(
+            bucket_name
+        )
         if match:
             if self.validate_bucket(bucket_name):
                 return bucket_name
@@ -267,10 +249,7 @@ class AWSConfig(BackendConfig):
         existing_subnets = [s["SubnetId"] for s in subnets_response["Subnets"]]
         subnet_options = ["Default [no preference]"]
         subnet_options.extend(
-            [
-                (s["SubnetId"] + " [" + s["VpcId"] + "]")
-                for s in subnets_response["Subnets"]
-            ]
+            [(s["SubnetId"] + " [" + s["VpcId"] + "]") for s in subnets_response["Subnets"]]
         )
         choice = ask_choice(
             "Choose EC2 subnet",

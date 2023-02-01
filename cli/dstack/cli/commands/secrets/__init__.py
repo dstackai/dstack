@@ -30,11 +30,7 @@ class SecretCommand(BasicCommand):
             "secret_name", metavar="NAME", type=str, help="The name of the secret"
         )
         add_secrets_parser.add_argument(
-            "secret_value",
-            metavar="VALUE",
-            type=str,
-            help="The value of the secret",
-            nargs="?",
+            "secret_value", metavar="VALUE", type=str, help="The value of the secret", nargs="?",
         )
         add_secrets_parser.add_argument(
             "-y", "--yes", help="Don't ask for confirmation", action="store_true"
@@ -46,11 +42,7 @@ class SecretCommand(BasicCommand):
             "secret_name", metavar="NAME", type=str, help="The name of the secret"
         )
         update_secrets_parser.add_argument(
-            "secret_value",
-            metavar="VALUE",
-            type=str,
-            help="The value of the secret",
-            nargs="?",
+            "secret_value", metavar="VALUE", type=str, help="The value of the secret", nargs="?",
         )
         update_secrets_parser.set_defaults(func=self.update_secret)
 
@@ -69,12 +61,8 @@ class SecretCommand(BasicCommand):
                     f"[red]The secret '{args.secret_name}' already exists. "
                     f"Do you want to override it?[/]"
                 ):
-                    secret_value = args.secret_value or Prompt.ask(
-                        "Value", password=True
-                    )
-                    backend.update_secret(
-                        repo_data, Secret(args.secret_name, secret_value)
-                    )
+                    secret_value = args.secret_value or Prompt.ask("Value", password=True)
+                    backend.update_secret(repo_data, Secret(args.secret_name, secret_value))
                     print(f"[grey58]OK[/]")
                 else:
                     return
@@ -99,9 +87,7 @@ class SecretCommand(BasicCommand):
         repo_data = load_repo_data()
         for backend in list_backends():
             secret = backend.get_secret(repo_data, args.secret_name)
-            if secret and Confirm.ask(
-                f" [red]Delete the secret '{secret.secret_name}'?[/]"
-            ):
+            if secret and Confirm.ask(f" [red]Delete the secret '{secret.secret_name}'?[/]"):
                 backend.delete_secret(repo_data, secret.secret_name)
                 print(f"[grey58]OK[/]")
 

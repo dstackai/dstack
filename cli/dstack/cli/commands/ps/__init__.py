@@ -35,11 +35,7 @@ def _status_color(run: RunHead, val: str, run_column: bool, status_column: bool)
         color = "dark_orange"
     else:
         color = _status_colors.get(run.status)
-    return (
-        f"[{'bold ' if run_column else ''}{color}]{val}[/]"
-        if color is not None
-        else val
-    )
+    return f"[{'bold ' if run_column else ''}{color}]{val}[/]" if color is not None else val
 
 
 def pretty_print_status(run: RunHead) -> str:
@@ -56,8 +52,7 @@ def pretty_print_status(run: RunHead) -> str:
 
 def print_runs(runs: List[RunHead]):
     runs_by_name = [
-        (run_name, list(run))
-        for run_name, run in groupby(runs, lambda run: run.run_name)
+        (run_name, list(run)) for run_name, run in groupby(runs, lambda run: run.run_name)
     ]
     console = Console()
     table = Table(box=None)
@@ -74,9 +69,7 @@ def print_runs(runs: List[RunHead]):
             submitted_at = pretty_date(round(run.submitted_at / 1000))
             table.add_row(
                 _status_color(run, run_name, True, False),
-                _status_color(
-                    run, run.workflow_name or run.provider_name, False, False
-                ),
+                _status_color(run, run.workflow_name or run.provider_name, False, False),
                 _status_color(run, submitted_at, False, False),
                 _status_color(run, run.local_repo_user_name or "", False, False),
                 pretty_print_status(run),

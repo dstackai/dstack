@@ -93,12 +93,8 @@ def _get_instance_types(ec2_client: BaseClient) -> List[InstanceType]:
             )
 
     def compare(i1, i2):
-        r1_gpu_total_memory_mib = sum(
-            map(lambda g: g.memory_mib, i1.resources.gpus or [])
-        )
-        r2_gpu_total_memory_mib = sum(
-            map(lambda g: g.memory_mib, i2.resources.gpus or [])
-        )
+        r1_gpu_total_memory_mib = sum(map(lambda g: g.memory_mib, i1.resources.gpus or []))
+        r2_gpu_total_memory_mib = sum(map(lambda g: g.memory_mib, i2.resources.gpus or []))
         if r1_gpu_total_memory_mib < r2_gpu_total_memory_mib:
             return -1
         elif r1_gpu_total_memory_mib > r2_gpu_total_memory_mib:
@@ -128,11 +124,7 @@ def _matches(resources: Resources, requirements: Optional[Requirements]) -> bool
         if gpu_count > len(resources.gpus or []):
             return False
         if requirements.gpus.name and gpu_count > len(
-            list(
-                filter(
-                    lambda gpu: gpu.name == requirements.gpus.name, resources.gpus or []
-                )
-            )
+            list(filter(lambda gpu: gpu.name == requirements.gpus.name, resources.gpus or []))
         ):
             return False
         if requirements.gpus.memory_mib and gpu_count > len(
@@ -186,10 +178,7 @@ def _create_runner(
     if runner.job.status == JobStatus.STOPPING:
         metadata["status"] = "stopping"
     s3_client.put_object(
-        Body=yaml.dump(_serialize_runner(runner)),
-        Bucket=bucket_name,
-        Key=key,
-        Metadata=metadata,
+        Body=yaml.dump(_serialize_runner(runner)), Bucket=bucket_name, Key=key, Metadata=metadata,
     )
     log_group_name = f"/dstack/runners/{bucket_name}"
     logs.create_log_group_if_not_exists(logs_client, bucket_name, log_group_name)
@@ -201,21 +190,14 @@ def _update_runner(s3_client: BaseClient, bucket_name: str, runner: Runner):
     if runner.job.status == JobStatus.STOPPING:
         metadata["status"] = "stopping"
     s3_client.put_object(
-        Body=yaml.dump(_serialize_runner(runner)),
-        Bucket=bucket_name,
-        Key=key,
-        Metadata=metadata,
+        Body=yaml.dump(_serialize_runner(runner)), Bucket=bucket_name, Key=key, Metadata=metadata,
     )
 
 
-def get_security_group_id(
-    ec2_client: BaseClient, bucket_name: str, subnet_id: Optional[str]
-):
+def get_security_group_id(ec2_client: BaseClient, bucket_name: str, subnet_id: Optional[str]):
     _subnet_postfix = (subnet_id.replace("-", "_") + "_") if subnet_id else ""
     security_group_name = (
-        "dstack_security_group_"
-        + _subnet_postfix
-        + bucket_name.replace("-", "_").lower()
+        "dstack_security_group_" + _subnet_postfix + bucket_name.replace("-", "_").lower()
     )
     if not version.__is_release__:
         security_group_name += "_stgn"
@@ -275,10 +257,7 @@ def _serialize_config_yaml(bucket_name: str, region_name: str):
 
 
 def _serialize_runner_yaml(
-    runner_id: str,
-    resources: Resources,
-    runner_port_range_from: int,
-    runner_port_range_to: int,
+    runner_id: str, resources: Resources, runner_port_range_from: int, runner_port_range_to: int,
 ):
     s = (
         f"id: {runner_id}\\n"
@@ -305,9 +284,7 @@ def _user_data(
     port_range_from: int = 3000,
     port_range_to: int = 4000,
 ) -> str:
-    sysctl_port_range_from = (
-        int((port_range_to - port_range_from) / 2) + port_range_from
-    )
+    sysctl_port_range_from = int((port_range_to - port_range_from) / 2) + port_range_from
     sysctl_port_range_to = port_range_to - 1
     runner_port_range_from = port_range_from
     runner_port_range_to = sysctl_port_range_from - 1
@@ -370,9 +347,7 @@ def role_name(iam_client: BaseClient, bucket_name: str) -> str:
                                 "Action": "ec2:*",
                                 "Resource": "*",
                                 "Condition": {
-                                    "StringEquals": {
-                                        "aws:ResourceTag/dstack_bucket": bucket_name,
-                                    }
+                                    "StringEquals": {"aws:ResourceTag/dstack_bucket": bucket_name,}
                                 },
                             },
                         ],
@@ -446,9 +421,7 @@ def _get_default_ami_image_version() -> Optional[str]:
 
 
 def _get_ami_image(
-    ec2_client: BaseClient,
-    cuda: bool,
-    _version: Optional[str] = _get_default_ami_image_version(),
+    ec2_client: BaseClient, cuda: bool, _version: Optional[str] = _get_default_ami_image_version(),
 ) -> Tuple[str, str]:
     ami_name = "dstack"
     if cuda:
@@ -456,9 +429,7 @@ def _get_ami_image(
     if not version.__is_release__:
         ami_name = "[stgn] " + ami_name
     ami_name = ami_name + f"-{_version or '*'}"
-    response = ec2_client.describe_images(
-        Filters=[{"Name": "name", "Values": [ami_name]},],
-    )
+    response = ec2_client.describe_images(Filters=[{"Name": "name", "Values": [ami_name]},],)
     images = list(
         filter(
             lambda i: cuda == ("cuda" in i["Name"]) and i["State"] == "available",
@@ -522,19 +493,14 @@ def _run_instance(
         tags.append({"Key": "dstack_user_email", "Value": local_repo_user_email})
     response = ec2_client.run_instances(
         BlockDeviceMappings=[
-            {
-                "DeviceName": "/dev/sda1",
-                "Ebs": {"VolumeSize": 100, "VolumeType": "gp2",},
-            }
+            {"DeviceName": "/dev/sda1", "Ebs": {"VolumeSize": 100, "VolumeType": "gp2",},}
         ],
         ImageId=_get_ami_image(ec2_client, len(instance_type.resources.gpus) > 0)[0],
         InstanceType=instance_type.instance_name,
         MinCount=1,
         MaxCount=1,
         IamInstanceProfile={"Arn": instance_profile_arn(iam_client, bucket_name),},
-        UserData=_user_data(
-            bucket_name, region_name, runner_id, instance_type.resources
-        ),
+        UserData=_user_data(bucket_name, region_name, runner_id, instance_type.resources),
         TagSpecifications=[{"ResourceType": "instance", "Tags": tags,},],
         **launch_specification,
     )
@@ -656,9 +622,7 @@ def run_job(
             jobs.update_job(s3_client, bucket_name, job)
             raise e
     else:
-        raise Exception(
-            "Can't create a request for a job which status is not SUBMITTED"
-        )
+        raise Exception("Can't create a request for a job which status is not SUBMITTED")
 
 
 def _delete_runner(s3_client: BaseClient, bucket_name: str, runner: Runner):
@@ -666,15 +630,11 @@ def _delete_runner(s3_client: BaseClient, bucket_name: str, runner: Runner):
     s3_client.delete_object(Bucket=bucket_name, Key=key)
 
 
-def _get_runner(
-    s3_client: BaseClient, bucket_name: str, runner_id: str
-) -> Optional[Runner]:
+def _get_runner(s3_client: BaseClient, bucket_name: str, runner_id: str) -> Optional[Runner]:
     key = f"runners/{runner_id}.yaml"
     try:
         obj = s3_client.get_object(Bucket=bucket_name, Key=key)
-        return _unserialize_runner(
-            yaml.load(obj["Body"].read().decode("utf-8"), yaml.FullLoader)
-        )
+        return _unserialize_runner(yaml.load(obj["Body"].read().decode("utf-8"), yaml.FullLoader))
     except Exception as e:
         if (
             hasattr(e, "response")
@@ -779,31 +739,24 @@ def get_request_head(
                         raise Exception(
                             f"Unsupported EC2 spot instance request status code: {status['Code']}"
                         )
-                    return RequestHead(
-                        job.job_id, request_status, status.get("Message")
-                    )
+                    return RequestHead(job.job_id, request_status, status.get("Message"))
                 else:
                     return RequestHead(job.job_id, RequestStatus.TERMINATED, None)
             except Exception as e:
                 if (
                     hasattr(e, "response")
                     and e.response.get("Error")
-                    and e.response["Error"].get("Code")
-                    == "InvalidSpotInstanceRequestID.NotFound"
+                    and e.response["Error"].get("Code") == "InvalidSpotInstanceRequestID.NotFound"
                 ):
                     return RequestHead(
-                        job.job_id,
-                        RequestStatus.TERMINATED,
-                        e.response["Error"].get("Message"),
+                        job.job_id, RequestStatus.TERMINATED, e.response["Error"].get("Message"),
                     )
                 else:
                     raise e
         else:
             try:
                 response = ec2_client.describe_instances(InstanceIds=[request_id])
-                if response.get("Reservations") and response["Reservations"][0].get(
-                    "Instances"
-                ):
+                if response.get("Reservations") and response["Reservations"][0].get("Instances"):
                     state = response["Reservations"][0]["Instances"][0]["State"]
                     if state["Name"] in ["running"]:
                         request_status = RequestStatus.RUNNING
@@ -817,9 +770,7 @@ def get_request_head(
                     ]:
                         request_status = RequestStatus.TERMINATED
                     else:
-                        raise Exception(
-                            f"Unsupported EC2 instance state name: {state['Name']}"
-                        )
+                        raise Exception(f"Unsupported EC2 instance state name: {state['Name']}")
                     return RequestHead(job.job_id, request_status, None)
                 else:
                     return RequestHead(job.job_id, RequestStatus.TERMINATED, None)
@@ -830,9 +781,7 @@ def get_request_head(
                     and e.response["Error"].get("Code") == "InvalidInstanceID.NotFound"
                 ):
                     return RequestHead(
-                        job.job_id,
-                        RequestStatus.TERMINATED,
-                        e.response["Error"].get("Message"),
+                        job.job_id, RequestStatus.TERMINATED, e.response["Error"].get("Message"),
                     )
                 else:
                     raise e
@@ -845,9 +794,7 @@ def get_request_head(
         return RequestHead(job.job_id, RequestStatus.TERMINATED, message)
 
 
-def _stop_runner(
-    ec2_client: BaseClient, s3_client: BaseClient, bucket_name: str, runner: Runner
-):
+def _stop_runner(ec2_client: BaseClient, s3_client: BaseClient, bucket_name: str, runner: Runner):
     if runner.request_id:
         if runner.resources.local:
             pass
@@ -905,11 +852,7 @@ def stop_job(
         else:
             new_status = None
         if new_status:
-            if (
-                runner
-                and runner.job.status.is_unfinished()
-                and runner.job.status != new_status
-            ):
+            if runner and runner.job.status.is_unfinished() and runner.job.status != new_status:
                 if new_status.is_finished():
                     _stop_runner(ec2_client, s3_client, bucket_name, runner)
                 else:

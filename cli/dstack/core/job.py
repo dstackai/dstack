@@ -422,15 +422,9 @@ class Job(JobHead):
                 if isinstance(artifact, str):
                     artifact_spec = ArtifactSpec(artifact, False)
                 else:
-                    artifact_spec = ArtifactSpec(
-                        artifact["path"], artifact.get("mount") is True
-                    )
+                    artifact_spec = ArtifactSpec(artifact["path"], artifact.get("mount") is True)
                 artifact_specs.append(artifact_spec)
-        master_job = (
-            JobRefId(job_data["master_job_id"])
-            if job_data.get("master_job_id")
-            else None
-        )
+        master_job = JobRefId(job_data["master_job_id"]) if job_data.get("master_job_id") else None
         app_specs = (
             [
                 AppSpec(

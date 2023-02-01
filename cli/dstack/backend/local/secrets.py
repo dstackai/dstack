@@ -26,16 +26,13 @@ def list_secret_names(path: str, repo_address: RepoAddress) -> List[str]:
     return secret_names
 
 
-def get_secret(
-    path: str, repo_address: RepoAddress, secret_name: str
-) -> Optional[Secret]:
+def get_secret(path: str, repo_address: RepoAddress, secret_name: str) -> Optional[Secret]:
     root = os.path.join(path, "secrets", repo_address.path())
     try:
         return Secret(
             secret_name,
             get_secret_value(
-                SecretId=f"/dstack/secrets/{repo_address.path()}/{secret_name}",
-                Root=root,
+                SecretId=f"/dstack/secrets/{repo_address.path()}/{secret_name}", Root=root,
             ),
         )
     except Exception as e:
@@ -65,8 +62,6 @@ def update_secret(path: str, repo_address: RepoAddress, secret: Secret):
 
 def remove_secret(path: str, repo_address: RepoAddress, secret_name: str):
     root = os.path.join(path, "secrets", repo_address.path())
-    delete_secret(
-        SecretId=f"/dstack/secrets/{repo_address.path()}/{secret_name}", Root=root
-    )
+    delete_secret(SecretId=f"/dstack/secrets/{repo_address.path()}/{secret_name}", Root=root)
     key = f"l;{secret_name}"
     delete_object(Root=root, Key=key)

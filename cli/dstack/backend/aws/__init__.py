@@ -89,16 +89,11 @@ class AwsBackend(Backend):
 
     def create_run(self, repo_address: RepoAddress) -> str:
         return runs.create_run(
-            self._s3_client(),
-            self._logs_client(),
-            self.backend_config.bucket_name,
-            repo_address,
+            self._s3_client(), self._logs_client(), self.backend_config.bucket_name, repo_address,
         )
 
     def submit_job(self, job: Job, counter: List[int]):
-        jobs.create_job(
-            self._s3_client(), self.backend_config.bucket_name, job, counter
-        )
+        jobs.create_job(self._s3_client(), self.backend_config.bucket_name, job, counter)
         runners.run_job(
             self._logs_client(),
             self._ec2_client(),
@@ -182,11 +177,7 @@ class AwsBackend(Backend):
         )
 
     def poll_logs(
-        self,
-        repo_address: RepoAddress,
-        job_heads: List[JobHead],
-        start_time: int,
-        attached: bool,
+        self, repo_address: RepoAddress, job_heads: List[JobHead], start_time: int, attached: bool,
     ) -> Generator[LogEvent, None, None]:
         return logs.poll_logs(
             self._ec2_client(),
@@ -241,11 +232,7 @@ class AwsBackend(Backend):
         self, repo_address: RepoAddress, run_name: str, output_dir: Optional[str]
     ):
         artifacts.download_run_artifact_files(
-            self._s3_client(),
-            self.backend_config.bucket_name,
-            repo_address,
-            run_name,
-            output_dir,
+            self._s3_client(), self.backend_config.bucket_name, repo_address, run_name, output_dir,
         )
 
     def list_tag_heads(self, repo_address: RepoAddress) -> List[TagHead]:
@@ -253,9 +240,7 @@ class AwsBackend(Backend):
             self._s3_client(), self.backend_config.bucket_name, repo_address
         )
 
-    def get_tag_head(
-        self, repo_address: RepoAddress, tag_name: str
-    ) -> Optional[TagHead]:
+    def get_tag_head(self, repo_address: RepoAddress, tag_name: str) -> Optional[TagHead]:
         return tags.get_tag_head(
             self._s3_client(), self.backend_config.bucket_name, repo_address, tag_name
         )
@@ -277,9 +262,7 @@ class AwsBackend(Backend):
         )
 
     def delete_tag_head(self, repo_address: RepoAddress, tag_head: TagHead):
-        tags.delete_tag(
-            self._s3_client(), self.backend_config.bucket_name, repo_address, tag_head
-        )
+        tags.delete_tag(self._s3_client(), self.backend_config.bucket_name, repo_address, tag_head)
 
     def add_tag_from_local_dirs(
         self, repo_data: LocalRepoData, tag_name: str, local_dirs: List[str]
@@ -298,10 +281,7 @@ class AwsBackend(Backend):
 
     def update_repo_last_run_at(self, repo_address: RepoAddress, last_run_at: int):
         repos.update_repo_last_run_at(
-            self._s3_client(),
-            self.backend_config.bucket_name,
-            repo_address,
-            last_run_at,
+            self._s3_client(), self.backend_config.bucket_name, repo_address, last_run_at,
         )
 
     def increment_repo_tags_count(self, repo_address: RepoAddress):
@@ -315,20 +295,14 @@ class AwsBackend(Backend):
         )
 
     def delete_repo(self, repo_address: RepoAddress):
-        repos.delete_repo(
-            self._s3_client(), self.backend_config.bucket_name, repo_address
-        )
+        repos.delete_repo(self._s3_client(), self.backend_config.bucket_name, repo_address)
 
-    def get_repo_credentials(
-        self, repo_address: RepoAddress
-    ) -> Optional[RepoCredentials]:
+    def get_repo_credentials(self, repo_address: RepoAddress) -> Optional[RepoCredentials]:
         return repos.get_repo_credentials(
             self._secretsmanager_client(), self.backend_config.bucket_name, repo_address
         )
 
-    def save_repo_credentials(
-        self, repo_address: RepoAddress, repo_credentials: RepoCredentials
-    ):
+    def save_repo_credentials(self, repo_address: RepoAddress, repo_credentials: RepoCredentials):
         repos.save_repo_credentials(
             self._sts_client(),
             self._iam_client(),
@@ -342,11 +316,7 @@ class AwsBackend(Backend):
         self, repo_address: RepoAddress, job_id: str, path: str
     ) -> List[Tuple[str, bool]]:
         return artifacts.list_run_artifact_files_and_folders(
-            self._s3_client(),
-            self.backend_config.bucket_name,
-            repo_address,
-            job_id,
-            path,
+            self._s3_client(), self.backend_config.bucket_name, repo_address, job_id, path,
         )
 
     def list_secret_names(self, repo_address: RepoAddress) -> List[str]:
@@ -354,9 +324,7 @@ class AwsBackend(Backend):
             self._s3_client(), self.backend_config.bucket_name, repo_address
         )
 
-    def get_secret(
-        self, repo_address: RepoAddress, secret_name: str
-    ) -> Optional[Secret]:
+    def get_secret(self, repo_address: RepoAddress, secret_name: str) -> Optional[Secret]:
         return secrets.get_secret(
             self._secretsmanager_client(),
             self.backend_config.bucket_name,

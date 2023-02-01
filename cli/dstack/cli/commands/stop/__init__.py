@@ -27,11 +27,7 @@ class StopCommand(BasicCommand):
             "run_name", metavar="RUN", type=str, nargs="?", help="A name of a run"
         )
         self._parser.add_argument(
-            "-a",
-            "--all",
-            help="Stop all unfinished runs",
-            dest="all",
-            action="store_true",
+            "-a", "--all", help="Stop all unfinished runs", dest="all", action="store_true",
         )
         self._parser.add_argument(
             "-x",
@@ -50,15 +46,9 @@ class StopCommand(BasicCommand):
         if (
             args.run_name
             and (
-                args.yes
-                or Confirm.ask(
-                    f"[red]{_verb(args.abort)} the run '{args.run_name}'?[/]"
-                )
+                args.yes or Confirm.ask(f"[red]{_verb(args.abort)} the run '{args.run_name}'?[/]")
             )
-        ) or (
-            args.all
-            and (args.yes or Confirm.ask(f"[red]{_verb(args.abort)} all runs?[/]"))
-        ):
+        ) or (args.all and (args.yes or Confirm.ask(f"[red]{_verb(args.abort)} all runs?[/]"))):
             repo_data = load_repo_data()
             for backend in list_backends():
                 job_heads = backend.list_job_heads(repo_data, args.run_name)

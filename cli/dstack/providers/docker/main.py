@@ -38,9 +38,7 @@ class DockerProvider(Provider):
         self.resources = self._resources()
 
     def _create_parser(self, workflow_name: Optional[str]) -> Optional[ArgumentParser]:
-        parser = ArgumentParser(
-            prog="dstack run " + (workflow_name or self.provider_name)
-        )
+        parser = ArgumentParser(prog="dstack run " + (workflow_name or self.provider_name))
         self._add_base_args(parser)
         parser.add_argument("-p", "--ports", type=int)
         if not workflow_name:
@@ -65,9 +63,7 @@ class DockerProvider(Provider):
             apps = []
             for i in range(self.ports):
                 apps.append(
-                    AppSpec(
-                        port_index=i, app_name="docker" + (i if self.ports > 1 else ""),
-                    )
+                    AppSpec(port_index=i, app_name="docker" + (i if self.ports > 1 else ""),)
                 )
         commands = []
         if self.setup:

@@ -36,9 +36,7 @@ def download_run_artifact_files(
             if obj["Size"] > 0 and not key.endswith("/"):
                 keys.append(key)
 
-    downloader = transfer.S3Transfer(
-        s3_client, transfer.TransferConfig(), transfer.OSUtils()
-    )
+    downloader = transfer.S3Transfer(s3_client, transfer.TransferConfig(), transfer.OSUtils())
 
     # TODO: Make download files in parallel
     with tqdm(
@@ -58,9 +56,7 @@ def download_run_artifact_files(
             file_path = dest_file_path(key, output_path)
             file_path.parent.mkdir(parents=True, exist_ok=True)
 
-            downloader.download_file(
-                bucket_name, key, str(file_path), callback=callback
-            )
+            downloader.download_file(bucket_name, key, str(file_path), callback=callback)
 
 
 def list_run_artifact_files(
@@ -72,9 +68,7 @@ def list_run_artifact_files(
     for page in page_iterator:
         for obj in page.get("Contents") or []:
             if obj["Size"] > 0:
-                yield obj["Key"].split("/")[5], "/".join(
-                    obj["Key"].split("/")[6:]
-                ), obj["Size"]
+                yield obj["Key"].split("/")[5], "/".join(obj["Key"].split("/")[6:]), obj["Size"]
 
 
 def __remove_prefix(text, prefix):
@@ -98,9 +92,7 @@ def upload_job_artifact_files(
             file_size = os.path.getsize(file_path)
             total_size += file_size
 
-    uploader = transfer.S3Transfer(
-        s3_client, transfer.TransferConfig(), transfer.OSUtils()
-    )
+    uploader = transfer.S3Transfer(s3_client, transfer.TransferConfig(), transfer.OSUtils())
 
     with tqdm(
         total=total_size,
@@ -127,16 +119,10 @@ def upload_job_artifact_files(
 
 
 def list_run_artifact_files_and_folders(
-    s3_client: BaseClient,
-    bucket_name: str,
-    repo_address: RepoAddress,
-    job_id: str,
-    path: str,
+    s3_client: BaseClient, bucket_name: str, repo_address: RepoAddress, job_id: str, path: str,
 ) -> List[Tuple[str, bool]]:
     prefix = (
-        f"artifacts/{repo_address.path()}/{job_id}/"
-        + path
-        + ("" if path.endswith("/") else "/")
+        f"artifacts/{repo_address.path()}/{job_id}/" + path + ("" if path.endswith("/") else "/")
     )
     response = s3_client.list_objects(Bucket=bucket_name, Prefix=prefix, Delimiter="/")
     folders = []

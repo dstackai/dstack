@@ -18,9 +18,7 @@ def list_job_heads(
 ) -> List[JobHead]:
     root = os.path.join(path, "jobs", repo_address.path())
     job_head_key_prefix = "l;"
-    job_head_key_run_prefix = (
-        job_head_key_prefix + run_name if run_name else job_head_key_prefix
-    )
+    job_head_key_run_prefix = job_head_key_prefix + run_name if run_name else job_head_key_prefix
     response = list_objects(Root=root, Prefix=job_head_key_run_prefix)
     job_heads = []
     for obj in response:
@@ -90,9 +88,7 @@ def update_job(path: str, job: Job):
     put_object(Body=yaml.dump(job.serialize()), Root=root, Key=key)
 
 
-def list_job_head(
-    path: str, repo_address: RepoAddress, job_id: str
-) -> Optional[JobHead]:
+def list_job_head(path: str, repo_address: RepoAddress, job_id: str) -> Optional[JobHead]:
     root = os.path.join(path, "jobs", repo_address.path())
     job_head_key_prefix = f"l;{job_id};"
     response = list_objects(Root=root, Prefix=job_head_key_prefix)
@@ -125,9 +121,7 @@ def list_job_head(
     return None
 
 
-def list_jobs(
-    path: str, repo_address: RepoAddress, run_name: Optional[str] = None
-) -> List[Job]:
+def list_jobs(path: str, repo_address: RepoAddress, run_name: Optional[str] = None) -> List[Job]:
     root = os.path.join(path, "jobs", repo_address.path())
     job_key_run_prefix = f"{run_name},"
     response = list_objects(Root=root, Prefix=job_key_run_prefix)
