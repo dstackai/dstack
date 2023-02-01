@@ -1,8 +1,9 @@
 import collections
-from typing import List, Optional
 from importlib.util import find_spec
-from rich.prompt import Prompt
+from typing import List, Optional
 
+from rich import print
+from rich.prompt import Prompt
 
 _is_termios_available = find_spec("termios") is not None
 

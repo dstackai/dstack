@@ -1,17 +1,17 @@
 import os
+import re
+from pathlib import Path
+from typing import Optional
+
 import boto3
 import yaml
-import re
-
-from typing import Optional
-from pathlib import Path
-from rich.prompt import Prompt
 from botocore.client import BaseClient
-from rich.prompt import Confirm
+from rich import print
+from rich.prompt import Confirm, Prompt
 
+from dstack.cli.common import ask_choice, _is_termios_available
 from dstack.core.config import BackendConfig, get_config_path
 from dstack.core.error import ConfigError
-from dstack.cli.common import ask_choice, _is_termios_available
 
 regions = [
     ("US East, N. Virginia", "us-east-1"),
@@ -71,7 +71,10 @@ class AWSConfig(BackendConfig):
             yaml.dump(config_data, f)
 
     def configure(self):
-        self.load()
+        try:
+            self.load()
+        except ConfigError:
+            pass
         default_profile_name = self.profile_name
         default_region_name = self.region_name
         default_bucket_name = self.bucket_name
