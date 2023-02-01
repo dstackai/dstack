@@ -55,7 +55,7 @@ class AWSConfig(BackendConfig):
                 self.bucket_name = config_data["bucket"]
                 self.subnet_id = config_data.get("subnet")
         else:
-            raise ConfigError
+            raise ConfigError()
 
     def save(self, path: Path = get_config_path()):
         if not path.parent.exists():
