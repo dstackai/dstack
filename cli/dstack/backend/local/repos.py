@@ -116,7 +116,7 @@ def save_repo_credentials(path: str, repo_address: RepoAddress, repo_credentials
         else:
             raise Exception("No private key is specified")
     if get_secret_value(SecretId=secret_name, Root=root):
-        update_secret(SecretId=secret_name, SecretString=json.dumps(credentials_data))
+        update_secret(SecretId=secret_name, SecretString=json.dumps(credentials_data), Root=root)
     else:
         create_secret(
             SecretId=secret_name,
