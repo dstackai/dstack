@@ -1,3 +1,5 @@
+from typing import List
+
 from google.cloud import storage, exceptions
 
 
@@ -21,3 +23,15 @@ def read_object(bucket: storage.Bucket, object_name: str) -> str:
     blob = bucket.get_blob(object_name)
     with blob.open() as f:
         return f.read()
+
+
+def delete_object(bucket: storage.Bucket, object_name: str):
+    blob = bucket.blob(object_name)
+    blob.delete()
+
+
+def list_objects(bucket: storage.Bucket, prefix: str) -> List[str]:
+    # TODO pagination
+    blobs = bucket.client.list_blobs(bucket.name, prefix=prefix)
+    object_names = [blob.name for blob in blobs]
+    return object_names

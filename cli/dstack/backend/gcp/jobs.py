@@ -23,29 +23,35 @@ def create_job(bucket: Bucket, job: Job):
     storage.put_object(bucket, _job_head_key(job), '')
 
 
-def run_job(gcp_config: GCPConfig, bucket: Bucket, job: Job):
-    instance_type = _get_instance_type(job)
-    runner = Runner(job.runner_id, None, instance_type.resources, job)
-    runners.create_runner(bucket, runner)
-    runners.launch_runner(gcp_config, bucket, runner)
+def get_job(bucket: Bucket, repo_address: RepoAddress, job_id: str) -> Optional[Job]:
+    prefix = f"jobs/{_repo_address_path(repo_address)}"
+    key = f"{prefix}/{job_id}.yaml"
+    obj = storage.read_object(bucket, key)
+    job = unserialize_job(yaml.load(obj, yaml.FullLoader))
+    return job
 
 
-def _get_instance_type(job: Job) -> InstanceType:
-    return InstanceType(
-        instance_name="n1-standard-1",
-        resources=Resources(cpus=1, memory_mib=3750, gpus=[], interruptible=False, local=False),
-    )
+def update_job(bucket: Bucket, job: Job):
+    delete_job_head(bucket, job.repo_address, job.job_id)
+    create_job(bucket, job)
+
+
+def delete_job_head(bucket: Bucket, repo_address: RepoAddress, job_id: str):
+    jobs_prefix = f"jobs/{_repo_address_path(repo_address)}"
+    job_head_key_prefix = f"{jobs_prefix}/l;{job_id};"
+    object_names = storage.list_objects(bucket, prefix=job_head_key_prefix)
+    for object_name in object_names:
+        storage.delete_object(bucket, object_name)
 
 
 def list_job_heads(bucket: Bucket, repo_address: RepoAddress, run_name: Optional[str] = None) -> List[JobHead]:
     jobs_prefix = f"jobs/{_repo_address_path(repo_address)}"
     job_head_key_prefix = f"{jobs_prefix}/l;"
     job_head_key_run_prefix = job_head_key_prefix + run_name if run_name else job_head_key_prefix
-    # TODO pagination
-    blobs = bucket.client.list_blobs(bucket.name, prefix=job_head_key_run_prefix)
+    object_names = storage.list_objects(bucket, prefix=job_head_key_run_prefix)
     job_heads = []
-    for blob in blobs:
-        t = blob.name.split(";")
+    for object_name in object_names:
+        t = object_name.split(";")
         _, job_id, provider_name, local_repo_user_name, submitted_at, status, artifacts, app_names, tag_name = t
         run_name, workflow_name, job_index = tuple(job_id.split(','))
         job_heads.append(JobHead(job_id, repo_address, run_name, workflow_name or None, provider_name,
@@ -55,9 +61,32 @@ def list_job_heads(bucket: Bucket, repo_address: RepoAddress, run_name: Optional
     return job_heads
 
 
-def get_job(bucket: Bucket, repo_address: RepoAddress, job_id: str) -> Optional[Job]:
-    prefix = f"jobs/{_repo_address_path(repo_address)}"
-    key = f"{prefix}/{job_id}.yaml"
-    obj = storage.read_object(bucket, key)
-    job = unserialize_job(yaml.load(obj, yaml.FullLoader))
-    return job
+def run_job(gcp_config: GCPConfig, bucket: Bucket, job: Job):
+    instance_type = _get_instance_type(job)
+    runner = Runner(job.runner_id, None, instance_type.resources, job)
+    runners.create_runner(bucket, runner)
+    # We save request_id (aka instance name) but we can infer it from the job/runner
+    runner.request_id = runners.launch_runner(gcp_config, bucket, runner)
+    job.request_id = runner.request_id
+    runners.update_runner(bucket, runner)
+    update_job(bucket, job)
+
+
+def _get_instance_type(job: Job) -> InstanceType:
+    return InstanceType(
+        instance_name="n1-standard-1",
+        resources=Resources(cpus=1, memory_mib=3750, gpus=[], interruptible=False, local=False),
+    )
+
+
+def stop_job(gcp_config: GCPConfig, bucket: Bucket, repo_address: RepoAddress, job_id: str, abort: bool):
+    job = get_job(bucket, repo_address, job_id)
+    if job.status.is_finished():
+        return
+    # TODO: proper, graceful stopping
+    # Update runner instead of stop if Stopping
+    runner = runners.get_runner(bucket, job.runner_id)
+    runners.stop_runner(gcp_config, runner)
+    job.status = JobStatus.STOPPED
+    update_job(bucket, job)
+    runners.delete_runner(bucket, job.runner_id)

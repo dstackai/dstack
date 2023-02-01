@@ -39,10 +39,10 @@ class GCPBackend(Backend):
         raise NotImplementedError()
 
     def stop_job(self, repo_address: RepoAddress, job_id: str, abort: bool):
-        pass
+        jobs.stop_job(self.config, self._bucket, repo_address, job_id, abort)
 
     def delete_job_head(self, repo_address: RepoAddress, job_id: str):
-        pass
+        jobs.delete_job_head(self._bucket, repo_address, job_id)
 
     def list_run_heads(self, repo_address: RepoAddress, run_name: Optional[str] = None,
                        include_request_heads: bool = True) -> List[RunHead]:

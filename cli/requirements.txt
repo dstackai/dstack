@@ -15,3 +15,5 @@ websocket-client
 cursor
 simple-term-menu
 jinja2
+google-cloud-storage
+google-cloud-compute

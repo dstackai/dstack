@@ -10,7 +10,9 @@ DEFAULT_REMOTE = "aws"
 DEFAULT = "local"
 
 
-backends_classes = [AwsBackend, GCPBackend, LocalBackend]
+# backends_classes = [AwsBackend, GCPBackend, LocalBackend]
+# for testing
+backends_classes = [GCPBackend, LocalBackend]
 
 
 def get_all_backends():

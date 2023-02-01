@@ -4,11 +4,12 @@ import warnings
 
 from google.cloud.storage import Bucket
 from google.cloud import compute_v1
+import google.api_core.exceptions
 import yaml
 
 from dstack.backend.gcp import storage, utils as gcp_utils
 from dstack.core.runners import Runner
-from dstack.backend.aws.runners import _serialize_runner
+from dstack.backend.aws.runners import _serialize_runner, _unserialize_runner
 from dstack.backend.gcp.config import GCPConfig
 
 
@@ -17,14 +18,35 @@ def create_runner(bucket: Bucket, runner: Runner):
     storage.put_object(bucket, runner_filepath, yaml.dump(_serialize_runner(runner)))
 
 
-def launch_runner(gcp_config: GCPConfig, bucket: Bucket, runner: Runner):
-    return
-    _launch_instance(
+def update_runner(bucket: Bucket, runner: Runner):
+    # Simply override the existing runner
+    create_runner(bucket, runner)
+
+
+def get_runner(bucket: Bucket, runner_id: str) -> Runner:
+    runner_filepath = f"runners/{runner_id}.yaml"
+    obj = storage.read_object(bucket, runner_filepath)
+    return _unserialize_runner(yaml.load(obj, yaml.FullLoader))
+
+
+def delete_runner(bucket: Bucket, runner_id: str):
+    runner_filepath = f"runners/{runner_id}.yaml"
+    storage.delete_object(bucket, runner_filepath)
+
+
+def launch_runner(gcp_config: GCPConfig, bucket: Bucket, runner: Runner) -> str:
+    instance = _launch_instance(
         project_id=gcp_config.project_id,
         zone=gcp_config.zone,
         image_name="stgn-dstack-5",
-        instance_name=f"dstack-{runner.job.run_name}",
+        instance_name=_get_instance_name(runner),
     )
+    return instance.name
+
+
+def _get_instance_name(runner: Runner) -> str:
+    # TODO support multiple jobs per run
+    return f"dstack-{runner.job.run_name}"
 
 
 def _launch_instance(project_id: str, zone: str, image_name: str, instance_name: str) -> compute_v1.Instance:
@@ -214,11 +236,33 @@ def _create_instance(
     return instance_client.get(project=project_id, zone=zone, instance=instance_name)
 
 
+def stop_runner(gcp_config: GCPConfig, runner: Runner):
+    _delete_instance(
+        instance_name=_get_instance_name(runner),
+        project_id=gcp_config.project_id,
+        zone=gcp_config.zone,
+    )
+
+
+def _delete_instance(project_id: str, zone: str, instance_name: str):
+    delete_request = compute_v1.DeleteInstanceRequest(
+        instance=instance_name,
+        project=project_id,
+        zone=zone,
+    )
+    client = compute_v1.InstancesClient()
+    try:
+        client.delete(delete_request)
+    except google.api_core.exceptions.NotFound:
+        pass
+
+
 def main():
     project_id = "dstack"
     image_name = "stgn-dstack-5"
     zone= "us-central1-a"
-    _launch_instance(project_id, zone, image_name, image_name)
+    # _launch_instance(project_id, zone, image_name, image_name)
+    _delete_instance(project_id, zone, 'stgn-dstack-5')
 
 
 if __name__ == "__main__":
