@@ -71,6 +71,7 @@ setup(
         "py-cpuinfo",
         "psutil",
         "jinja2",
+        "pygtail",
     ],
     classifiers=[
         "Development Status :: 2 - Pre-Alpha",
