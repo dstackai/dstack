@@ -2,6 +2,7 @@ import os
 from typing import List, Optional
 
 from dstack.backend import Secret
+from dstack.core.error import SecretError
 from dstack.core.repo import RepoAddress
 from dstack.backend.local.common import (
     list_objects,
@@ -36,7 +37,7 @@ def get_secret(path: str, repo_address: RepoAddress, secret_name: str) -> Option
                 Root=root,
             ),
         )
-    except Exception as e:
+    except SecretError:
         return None
 
 

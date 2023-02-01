@@ -11,6 +11,7 @@ from dstack.backend.local.common import (
     update_secret,
     create_secret,
 )
+from dstack.core.error import SecretError
 from dstack.backend import RepoHead
 from dstack.core.repo import RepoCredentials, RepoProtocol, RepoAddress
 
@@ -100,7 +101,7 @@ def get_repo_credentials(path: str, repo_address: RepoAddress) -> Optional[RepoC
             credentials_data.get("private_key"),
             credentials_data.get("oauth_token"),
         )
-    except Exception as e:
+    except SecretError:
         return None
 
 
@@ -115,9 +116,10 @@ def save_repo_credentials(path: str, repo_address: RepoAddress, repo_credentials
             credentials_data["private_key"] = repo_credentials.private_key
         else:
             raise Exception("No private key is specified")
-    if get_secret_value(SecretId=secret_name, Root=root):
+    try:
+        get_secret_value(SecretId=secret_name, Root=root)
         update_secret(SecretId=secret_name, SecretString=json.dumps(credentials_data), Root=root)
-    else:
+    except SecretError:
         create_secret(
             SecretId=secret_name,
             SecretString=json.dumps(credentials_data),

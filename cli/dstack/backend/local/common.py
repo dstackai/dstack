@@ -1,5 +1,6 @@
 import os
 from typing import List, Optional, Dict
+from dstack.core.error import SecretError
 from pathlib import Path
 import sqlite3
 
@@ -71,9 +72,9 @@ def get_secret_value(SecretId: str, Root: str):
     cur.execute("SELECT secret_string FROM KV WHERE secret_name=?", (SecretId,))
     value = cur.fetchone()
     con.close()
-    if value:
+    if not(value is None):
         return value[0]
-    return value
+    raise SecretError("Not found")
 
 
 def update_secret(SecretId: str, SecretString: str, Root: str):
@@ -111,15 +112,15 @@ def delete_secret(SecretId: str, Root: str):
     path_db = os.path.join(Root, "_secrets_")
     con = sqlite3.connect(path_db)
     cur = con.cursor()
-    cur.execute("DELETE FROM KV WHERE secret_name=?", SecretId)
+    cur.execute("DELETE FROM KV WHERE secret_name=?", (SecretId, ))
     con.commit()
     con.close()
 
 
 def _check_db(Root: str):
-    path_db = os.path.join(Root, "_secrets_")
-    if not os.path.exists(Root):
-        os.mkdir(Root)
+    path_db = Path(Root) / "_secrets_"
+    if not Path(Root).exists():
+        Path(Root).mkdir(parents=True)
     if not os.path.exists(path_db):
         con = sqlite3.connect(path_db)
         cur = con.cursor()

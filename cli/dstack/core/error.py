@@ -15,6 +15,11 @@ class BackendError(Exception):
         self.message = message
 
 
+class SecretError(Exception):
+    def __init__(self, message: Optional[str] = None):
+        self.message = message
+
+
 def check_config(func):
     def decorator(*args, **kwargs):
         try:
