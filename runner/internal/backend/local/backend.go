@@ -18,6 +18,7 @@ import (
 	"github.com/dstackai/dstack/runner/internal/gerrors"
 	"github.com/dstackai/dstack/runner/internal/log"
 	"github.com/dstackai/dstack/runner/internal/models"
+	"github.com/dstackai/dstack/runner/internal/states"
 	"gopkg.in/yaml.v3"
 )
 
@@ -291,11 +292,23 @@ func (l Local) CheckStop(ctx context.Context) (bool, error) {
 		log.Trace(ctx, "State not exist")
 		return false, gerrors.Wrap(backend.ErrLoadStateFile)
 	}
-	pathStateFile := fmt.Sprintf("runners/%s.stop", l.runnerID)
+	pathStateFile := fmt.Sprintf("runners/m;%s;status", l.runnerID)
 	log.Trace(ctx, "Reading metadata from state file", "path", pathStateFile)
 	if _, err := os.Stat(filepath.Join(l.path, pathStateFile)); err == nil {
-		log.Trace(ctx, "Status equals stopping")
-		return true, nil
+		file, err := os.Open(filepath.Join(l.path, pathStateFile))
+		if err != nil {
+			return false, gerrors.Wrap(err)
+		}
+		body, err := io.ReadAll(file)
+		if err != nil {
+			return false, gerrors.Wrap(err)
+		}
+		if string(body) == states.Stopping {
+			log.Trace(ctx, "Status equals stopping")
+			return true, nil
+		}
+		log.Trace(ctx, "Metadata", "status", string(body))
+		return false, nil
 	}
 	return false, nil
 }
@@ -323,16 +336,13 @@ func (l Local) CreateLogger(ctx context.Context, logGroup, logName string) io.Wr
 		log.Trace(ctx, "State not exist")
 		return nil
 	}
-	var err error
-	if l.logger == nil {
-		log.Trace(ctx, "Create Cloudwatch")
-		if l.logger, err = NewLogger(logGroup, logName); err != nil {
-			log.Error(ctx, "Fail create Cloudwatch", "err", err)
-			return nil
-		}
+	log.Trace(ctx, "Build logger", "LogGroup", logGroup, "LogName", logName)
+	logger, err := NewLogger(logGroup, logName)
+	if err != nil {
+		log.Error(ctx, "Failed create logger", "LogGroup", logGroup, "LogName", logName)
+		return nil
 	}
-	log.Trace(ctx, "Build std writer", "LogGroup", logGroup, "LogName", logName)
-	return l.logger.logger.Writer()
+	return logger
 }
 
 type File struct {

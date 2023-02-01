@@ -1,5 +1,5 @@
 import os
-from typing import List, Optional
+from typing import List, Optional, Dict
 from pathlib import Path
 import sqlite3
 
@@ -20,10 +20,11 @@ def list_objects(Root: str, Prefix: str, MaxKeys: Optional[int] = None) -> List[
     return l
 
 
-def put_object(Body: str, Root: str, Key: str):
+def put_object(Root: str, Key: str, Body: str):
     if not os.path.exists(Root):
         Path(Root).mkdir(parents=True)
     with open(os.path.join(Root, Key), "w") as f:
+        f.truncate()
         f.write(Body)
 
 

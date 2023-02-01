@@ -35,12 +35,9 @@ CREATE_INSTANCE_RETRY_RATE_SECS = 3
 def _create_runner(path: str, runner: Runner):
     root = os.path.join(path, "runners")
     key = f"{runner.runner_id}.yaml"
-    metadata = {}
     if runner.job.status == JobStatus.STOPPING:
-        metadata["status"] = "stopping"
+        put_object(Root=root, Key=f"m;{runner.runner_id};status", Body="stopping")
     put_object(Body=yaml.dump(runner.serialize()), Root=root, Key=key)
-    # log_group_name = f"/dstack/runners/{bucket_name}"
-    # logs.create_log_group_if_not_exists(logs_client, bucket_name, log_group_name)
 
 
 def _delete_runner(path: str, runner: Runner):
@@ -62,9 +59,8 @@ def _get_runner(path: str, runner_id: str) -> Optional[Runner]:
 def _update_runner(path: str, runner: Runner):
     root = os.path.join(path, "runners")
     key = f"{runner.runner_id}.yaml"
-    metadata = {}
     if runner.job.status == JobStatus.STOPPING:
-        metadata["status"] = "stopping"
+        put_object(Root=root, Key=f"m;{runner.runner_id};status", Body="stopping")
     put_object(Body=yaml.dump(runner.serialize()), Root=root, Key=key)
 
 
