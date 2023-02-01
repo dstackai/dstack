@@ -8,8 +8,8 @@ export const API = {
         INFO: () => `${API.USERS.BASE()}/info`,
     },
 
-    HUB: {
-        BASE: () => `${API.BASE()}/hub`,
-        LIST: () => `${API.HUB.BASE()}/list`,
+    HUBS: {
+        BASE: () => `${API.BASE()}/hubs`,
+        LIST: () => `${API.HUBS.BASE()}/list`,
     },
 };

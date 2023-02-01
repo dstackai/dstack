@@ -35,13 +35,13 @@ const mocksMap: MocksMap = {
             failed: { status: 403 },
         },
     },
-    [API.HUB.LIST()]: {
+    [API.HUBS.LIST()]: {
         GET: {
             success: hub.list.success,
             failed: {},
         },
     },
-    [API.HUB.BASE()]: {
+    [API.HUBS.BASE()]: {
         DELETE: {
             success: {},
             failed: { status: 403 },

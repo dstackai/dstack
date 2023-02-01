@@ -13,14 +13,14 @@ export const hubApi = createApi({
         getHubs: builder.query<IHub[], void>({
             query: () => {
                 return {
-                    url: API.HUB.LIST(),
+                    url: API.HUBS.LIST(),
                 };
             },
         }),
 
         deleteHubs: builder.mutation<void, IHub['hub_name'][]>({
             query: (hubNames) => ({
-                url: API.HUB.BASE(),
+                url: API.HUBS.BASE(),
                 method: 'DELETE',
                 params: {
                     hubs: hubNames,
