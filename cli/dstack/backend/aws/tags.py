@@ -15,7 +15,10 @@ from dstack.core.repo import RepoAddress, LocalRepoData
 
 def _unserialize_artifact_heads(artifact_heads):
     return (
-        [ArtifactHead(a.split("=")[0], a.split("=")[1]) for a in artifact_heads.split(":")]
+        [
+            ArtifactHead(a.split("=")[0], a.split("=")[1])
+            for a in artifact_heads.split(":")
+        ]
         if artifact_heads
         else None
     )
@@ -166,7 +169,9 @@ def delete_tag(
     tag_head: TagHead,
 ):
     tag_jobs = []
-    job_heads = jobs.list_job_heads(s3_client, bucket_name, repo_address, tag_head.run_name)
+    job_heads = jobs.list_job_heads(
+        s3_client, bucket_name, repo_address, tag_head.run_name
+    )
     for job_head in job_heads:
         job = jobs.get_job(s3_client, bucket_name, repo_address, job_head.job_id)
         if job:

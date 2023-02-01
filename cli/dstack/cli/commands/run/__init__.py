@@ -42,7 +42,9 @@ POLL_FINISHED_STATE_RATE_SECS = 1
 
 def _load_workflows_from_file(workflows_file: Path) -> List[Any]:
     workflows_yaml = yaml.load(workflows_file.open(), Loader=yaml.FullLoader)
-    workflows_schema_yaml = pkg_resources.resource_string("dstack.schemas", "workflows.json")
+    workflows_schema_yaml = pkg_resources.resource_string(
+        "dstack.schemas", "workflows.json"
+    )
     validate(workflows_yaml, yaml.load(workflows_schema_yaml, Loader=yaml.FullLoader))
     return workflows_yaml.get("workflows") or []
 
@@ -58,9 +60,9 @@ def _load_workflows():
         if workflows_dir.is_dir():
             for workflows_file in os.listdir(workflows_dir):
                 workflows_file_path = workflows_dir / workflows_file
-                if workflows_file_path.name.endswith(".yaml") or workflows_file_path.name.endswith(
-                    ".yml"
-                ):
+                if workflows_file_path.name.endswith(
+                    ".yaml"
+                ) or workflows_file_path.name.endswith(".yml"):
                     workflows.extend(_load_workflows_from_file(workflows_file_path))
     return workflows
 
@@ -89,7 +91,9 @@ def parse_run_args(
     return provider_name, provider_args, workflow_name, workflow_data
 
 
-def poll_logs_ws(backend: Backend, repo_address: RepoAddress, job_head: JobHead, console):
+def poll_logs_ws(
+    backend: Backend, repo_address: RepoAddress, job_head: JobHead, console
+):
     job = backend.get_job(repo_address, job_head.job_id)
 
     def on_message(ws: WebSocketApp, message):
@@ -103,7 +107,9 @@ def poll_logs_ws(backend: Backend, repo_address: RepoAddress, job_head: JobHead,
                     url_path = app_spec.url_path or ""
                     url_query_params = app_spec.url_query_params
                     url_query = (
-                        ("?" + parse.urlencode(url_query_params)) if url_query_params else ""
+                        ("?" + parse.urlencode(url_query_params))
+                        if url_query_params
+                        else ""
                     )
                     app_url = f"http://{job.host_name}:{port}"
                     if url_path or url_query_params:
@@ -144,7 +150,11 @@ def poll_logs_ws(backend: Backend, repo_address: RepoAddress, job_head: JobHead,
         while True:
             _job_head = backend.get_job(repo_address, job_head.job_id)
             run = next(
-                iter(backend.get_run_heads(repo_address, [_job_head], include_request_heads=False))
+                iter(
+                    backend.get_run_heads(
+                        repo_address, [_job_head], include_request_heads=False
+                    )
+                )
             )
             if run.status.is_finished():
                 break
@@ -166,20 +176,27 @@ def poll_run(repo_address: RepoAddress, job_heads: List[JobHead], backend: Backe
             SpinnerColumn(),
             transient=True,
         ) as progress:
-            task = progress.add_task("Provisioning... It may take up to a minute.", total=None)
+            task = progress.add_task(
+                "Provisioning... It may take up to a minute.", total=None
+            )
             while True:
                 time.sleep(POLL_PROVISION_RATE_SECS)
                 _job_heads = [
-                    backend.get_job(repo_address, job_head.job_id) for job_head in job_heads
+                    backend.get_job(repo_address, job_head.job_id)
+                    for job_head in job_heads
                 ]
                 run = next(iter(backend.get_run_heads(repo_address, _job_heads)))
                 if run.status == JobStatus.DOWNLOADING and not downloading:
-                    progress.update(task, description="Downloading deps... It may take a while.")
+                    progress.update(
+                        task, description="Downloading deps... It may take a while."
+                    )
                     downloading = True
                 elif run.status not in [JobStatus.SUBMITTED, JobStatus.DOWNLOADING]:
                     progress.update(task, total=100)
                     break
-                if run.has_request_status([RequestStatus.TERMINATED, RequestStatus.NO_CAPACITY]):
+                if run.has_request_status(
+                    [RequestStatus.TERMINATED, RequestStatus.NO_CAPACITY]
+                ):
                     if run.has_request_status([RequestStatus.TERMINATED]):
                         progress.update(
                             task,
@@ -190,7 +207,9 @@ def poll_run(repo_address: RepoAddress, job_heads: List[JobHead], backend: Backe
                     elif not request_errors_printed and run.has_request_status(
                         [RequestStatus.NO_CAPACITY]
                     ):
-                        progress.update(task, description=f"[dark_orange]No capacity[/]")
+                        progress.update(
+                            task, description=f"[dark_orange]No capacity[/]"
+                        )
                         request_errors_printed = True
                 elif request_errors_printed:
                     progress.update(
@@ -269,7 +288,9 @@ class RunCommand(BasicCommand):
     @check_backend
     def _command(self, args: Namespace):
         if not args.workflow_or_provider:
-            print("Usage: dstack run [-h] WORKFLOW [-d] [-l] [-t TAG] [OPTIONS ...] [ARGS ...]\n")
+            print(
+                "Usage: dstack run [-h] WORKFLOW [-d] [-l] [-t TAG] [OPTIONS ...] [ARGS ...]\n"
+            )
             workflows = _load_workflows()
             workflow_names = [w["name"] for w in workflows if w.get("name")]
             print(
@@ -310,7 +331,9 @@ class RunCommand(BasicCommand):
 
                 if backend.get_repo_credentials(repo_data):
                     run_name = backend.create_run(repo_data)
-                    provider.load(backend, provider_args, workflow_name, workflow_data, run_name)
+                    provider.load(
+                        backend, provider_args, workflow_name, workflow_data, run_name
+                    )
                     if args.tag_name:
                         tag_head = backend.get_tag_head(repo_data, args.tag_name)
                         if tag_head:

@@ -69,8 +69,12 @@ class SecretCommand(BasicCommand):
                     f"[red]The secret '{args.secret_name}' already exists. "
                     f"Do you want to override it?[/]"
                 ):
-                    secret_value = args.secret_value or Prompt.ask("Value", password=True)
-                    backend.update_secret(repo_data, Secret(args.secret_name, secret_value))
+                    secret_value = args.secret_value or Prompt.ask(
+                        "Value", password=True
+                    )
+                    backend.update_secret(
+                        repo_data, Secret(args.secret_name, secret_value)
+                    )
                     print(f"[grey58]OK[/]")
                 else:
                     return
@@ -95,7 +99,9 @@ class SecretCommand(BasicCommand):
         repo_data = load_repo_data()
         for backend in list_backends():
             secret = backend.get_secret(repo_data, args.secret_name)
-            if secret and Confirm.ask(f" [red]Delete the secret '{secret.secret_name}'?[/]"):
+            if secret and Confirm.ask(
+                f" [red]Delete the secret '{secret.secret_name}'?[/]"
+            ):
                 backend.delete_secret(repo_data, secret.secret_name)
                 print(f"[grey58]OK[/]")
 

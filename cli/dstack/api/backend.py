@@ -11,7 +11,9 @@ DEFAULT = "local"
 
 def list_backends() -> List[Backend]:
     all_backends = [cls() for cls in Backend.__subclasses__()]  # pylint: disable=E1101
-    return [current_backend for current_backend in all_backends if current_backend.loaded()]
+    return [
+        current_backend for current_backend in all_backends if current_backend.loaded()
+    ]
 
 
 def dict_backends() -> Dict[str, Backend]:

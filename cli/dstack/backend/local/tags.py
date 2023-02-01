@@ -20,7 +20,10 @@ from dstack.core.repo import RepoAddress, RepoData
 
 def _unserialize_artifact_heads(artifact_heads):
     return (
-        [ArtifactHead(a.split("=")[0], a.split("=")[1]) for a in artifact_heads.split(":")]
+        [
+            ArtifactHead(a.split("=")[0], a.split("=")[1])
+            for a in artifact_heads.split(":")
+        ]
         if artifact_heads
         else None
     )
@@ -58,7 +61,9 @@ def list_tag_heads(path: str, repo_address: RepoAddress):
     return tag_heads
 
 
-def get_tag_head(path: str, repo_address: RepoAddress, tag_name: str) -> Optional[TagHead]:
+def get_tag_head(
+    path: str, repo_address: RepoAddress, tag_name: str
+) -> Optional[TagHead]:
     root = os.path.join(path, "tags", repo_address.path())
     tag_head_prefix = f"l;{tag_name};"
     response = list_objects(Root=root, Prefix=tag_head_prefix)

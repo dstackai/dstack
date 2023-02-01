@@ -80,7 +80,11 @@ def _matches(resources: Resources, requirements: Optional[Requirements]) -> bool
         if gpu_count > len(resources.gpus or []):
             return False
         if requirements.gpus.name and gpu_count > len(
-            list(filter(lambda gpu: gpu.name == requirements.gpus.name, resources.gpus or []))
+            list(
+                filter(
+                    lambda gpu: gpu.name == requirements.gpus.name, resources.gpus or []
+                )
+            )
         ):
             return False
         if requirements.gpus.memory_mib and gpu_count > len(
@@ -115,7 +119,9 @@ def run_job(path: str, job: Job):
             jobs.update_job(path, job)
             raise e
     else:
-        raise Exception("Can't create a request for a job which status is not SUBMITTED")
+        raise Exception(
+            "Can't create a request for a job which status is not SUBMITTED"
+        )
 
 
 def start_runner_process(runner_id: str) -> str:
@@ -159,7 +165,9 @@ def _unserialize_runner_resources(data: dict) -> Resources:
     return Resources(
         data["cpus"],
         data["memory_mib"],
-        [Gpu(g["name"], g["memory_mib"]) for g in data["gpus"]] if data.get("gpus") else [],
+        [Gpu(g["name"], g["memory_mib"]) for g in data["gpus"]]
+        if data.get("gpus")
+        else [],
         False,
         True,
     )
@@ -184,7 +192,9 @@ def _download_runner(url: str, path: str):
     with requests.get(url, stream=True) as r:
         total_length = int(r.headers.get("Content-Length"))
 
-        with tqdm.wrapattr(r.raw, "read", total=total_length, desc=f"Downloading runner") as raw:
+        with tqdm.wrapattr(
+            r.raw, "read", total=total_length, desc=f"Downloading runner"
+        ) as raw:
             with open(path, "wb") as output:
                 shutil.copyfileobj(raw, output)
         os.chmod(path, 0o755)
@@ -212,17 +222,14 @@ def _get_runner_config_dir(runner_id: str, create: Optional[bool] = None) -> str
         runner_config_dir_path.mkdir(parents=True, exist_ok=True)
         runner_config_path = runner_config_dir_path / "runner.yaml"
         runner_config_path.write_text(
-            yaml.dump(
-                {
-                    "id": runner_id,
-                    "hostname": "127.0.0.1",
-                }
-            )
+            yaml.dump({"id": runner_id, "hostname": "127.0.0.1",})
         )
     return runner_config_dir_path
 
 
-def get_request_head(path: str, job: Job, runner: Optional[Runner] = None) -> RequestHead:
+def get_request_head(
+    path: str, job: Job, runner: Optional[Runner] = None
+) -> RequestHead:
     request_id = None
     if job.request_id:
         request_id = job.request_id
@@ -338,7 +345,11 @@ def stop_job(path: str, repo_address: RepoAddress, job_id: str, abort: bool):
         else:
             new_status = None
         if new_status:
-            if runner and runner.job.status.is_unfinished() and runner.job.status != new_status:
+            if (
+                runner
+                and runner.job.status.is_unfinished()
+                and runner.job.status != new_status
+            ):
                 if new_status.is_finished():
                     _stop_runner(path, runner)
                 else:

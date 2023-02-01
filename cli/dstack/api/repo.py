@@ -22,8 +22,12 @@ def load_repo_data(
         repo_hash = tracking_branch.commit.hexsha
         repo_url = repo.remote(remote_name).url
 
-        local_repo_user_name = repo.config_reader().get_value("user", "name", "") or None
-        local_repo_user_email = repo.config_reader().get_value("user", "email", "") or None
+        local_repo_user_name = (
+            repo.config_reader().get_value("user", "name", "") or None
+        )
+        local_repo_user_email = (
+            repo.config_reader().get_value("user", "email", "") or None
+        )
 
         repo_url_parsed = giturlparse.parse(repo_url)
         repo_oauth_token = oauth_token
@@ -60,7 +64,9 @@ def load_repo_data(
             repo_branch,
             repo_hash,
             repo_diff,
-            RepoProtocol.HTTPS if repo_url_parsed.protocol == "https" else RepoProtocol.SSH,
+            RepoProtocol.HTTPS
+            if repo_url_parsed.protocol == "https"
+            else RepoProtocol.SSH,
             repo_identity_file or os.path.expanduser("~/.ssh/id_rsa"),
             repo_oauth_token,
             local_repo_user_name,

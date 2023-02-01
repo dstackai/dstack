@@ -36,7 +36,9 @@ class RepoAddress:
 
 
 class RepoHead(RepoAddress):
-    def __init__(self, repo_address: RepoAddress, last_run_at: Optional[int], tags_count: int):
+    def __init__(
+        self, repo_address: RepoAddress, last_run_at: Optional[int], tags_count: int
+    ):
         super().__init__(
             repo_address.repo_host_name,
             repo_address.repo_port,
@@ -170,22 +172,26 @@ class LocalRepoData(RepoData):
             )
         else:
             if self.identity_file:
-                git_ssh_command = (
-                    f"ssh -o IdentitiesOnly=yes -F /dev/null -o IdentityFile={self.identity_file}"
-                )
+                git_ssh_command = f"ssh -o IdentitiesOnly=yes -F /dev/null -o IdentityFile={self.identity_file}"
                 if self.repo_port:
                     url = f"ssh@{self.path()}.git"
                 else:
                     url = f"git@{self.repo_host_name}:{self.repo_user_name}/{self.repo_name}.git"
-                return git.cmd.Git().ls_remote(url, env=dict(GIT_SSH_COMMAND=git_ssh_command))
+                return git.cmd.Git().ls_remote(
+                    url, env=dict(GIT_SSH_COMMAND=git_ssh_command)
+                )
             else:
                 raise Exception("No identity file is specified")
 
     def repo_credentials(self) -> RepoCredentials:
         if self.protocol == RepoProtocol.HTTPS:
-            return RepoCredentials(self.protocol, private_key=None, oauth_token=self.oauth_token)
+            return RepoCredentials(
+                self.protocol, private_key=None, oauth_token=self.oauth_token
+            )
         elif self.identity_file:
             with open(self.identity_file, "r") as f:
-                return RepoCredentials(self.protocol, private_key=f.read(), oauth_token=None)
+                return RepoCredentials(
+                    self.protocol, private_key=f.read(), oauth_token=None
+                )
         else:
             raise Exception("No identity file is specified")

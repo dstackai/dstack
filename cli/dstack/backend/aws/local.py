@@ -75,18 +75,15 @@ def _get_runner_config_dir(
     config: Optional[BackendConfig] = None,
     create: Optional[bool] = None,
 ) -> Path:
-    runner_config_dir_path = _config_directory_path() / "tmp" / "runner" / "configs" / runner_id
+    runner_config_dir_path = (
+        _config_directory_path() / "tmp" / "runner" / "configs" / runner_id
+    )
     if create:
         runner_config_dir_path.mkdir(parents=True, exist_ok=True)
         config.save(path=runner_config_dir_path / "config.yaml")
         runner_config_path = runner_config_dir_path / "runner.yaml"
         runner_config_path.write_text(
-            yaml.dump(
-                {
-                    "id": runner_id,
-                    "hostname": "127.0.0.1",
-                }
-            )
+            yaml.dump({"id": runner_id, "hostname": "127.0.0.1",})
         )
     return runner_config_dir_path
 
@@ -117,7 +114,9 @@ def _download_runner(url: str, path: Path):
     with requests.get(url, stream=True) as r:
         total_length = int(r.headers.get("Content-Length"))
 
-        with tqdm.wrapattr(r.raw, "read", total=total_length, desc=f"Downloading runner") as raw:
+        with tqdm.wrapattr(
+            r.raw, "read", total=total_length, desc=f"Downloading runner"
+        ) as raw:
             with open(path, "wb") as output:
                 shutil.copyfileobj(raw, output)
         os.chmod(path, 0o755)
@@ -134,7 +133,9 @@ def _unserialize_runner_resources(data: dict) -> Resources:
     return Resources(
         data["cpus"],
         data["memory_mib"],
-        [Gpu(g["name"], g["memory_mib"]) for g in data["gpus"]] if data.get("gpus") else [],
+        [Gpu(g["name"], g["memory_mib"]) for g in data["gpus"]]
+        if data.get("gpus")
+        else [],
         False,
         True,
     )

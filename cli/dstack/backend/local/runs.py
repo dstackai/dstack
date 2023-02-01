@@ -18,7 +18,9 @@ def create_run(path: str, repo_address: RepoAddress) -> str:
 
 def _create_run(path: str, job_head: JobHead, include_request_heads: bool) -> RunHead:
     app_heads = (
-        list(map(lambda app_name: AppHead(job_head.job_id, app_name), job_head.app_names))
+        list(
+            map(lambda app_name: AppHead(job_head.job_id, app_name), job_head.app_names)
+        )
         if job_head.app_names
         else None
     )
@@ -55,7 +57,9 @@ def _create_run(path: str, job_head: JobHead, include_request_heads: bool) -> Ru
     return run_head
 
 
-def _update_run(path: str, run: RunHead, job_head: JobHead, include_request_heads: bool):
+def _update_run(
+    path: str, run: RunHead, job_head: JobHead, include_request_heads: bool
+):
     run.submitted_at = min(run.submitted_at, job_head.submitted_at)
     if job_head.artifact_paths:
         if run.artifact_heads is None:

@@ -64,7 +64,9 @@ class TorchrunProvider(Provider):
                 args_init += " " + ",".join(
                     map(lambda arg: '"' + arg.replace('"', '\\"') + '"', self.args)
                 )
-        torchrun_command = f"torchrun {nproc} --nnodes={self.nodes} --node_rank={node_rank}"
+        torchrun_command = (
+            f"torchrun {nproc} --nnodes={self.nodes} --node_rank={node_rank}"
+        )
         if node_rank == 0:
             commands.append(
                 f"{torchrun_command} --master_addr $JOB_HOSTNAME --master_port $JOB_PORT_0 {self.script} {args_init}"
@@ -102,7 +104,9 @@ class TorchrunProvider(Provider):
         return job_specs
 
     def _create_parser(self, workflow_name: Optional[str]) -> Optional[ArgumentParser]:
-        parser = ArgumentParser(prog="dstack run " + (workflow_name or self.provider_name))
+        parser = ArgumentParser(
+            prog="dstack run " + (workflow_name or self.provider_name)
+        )
         self._add_base_args(parser)
         parser.add_argument("--nnodes", type=int, nargs="?")
         if not workflow_name:

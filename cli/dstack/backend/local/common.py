@@ -80,7 +80,9 @@ def update_secret(SecretId: str, SecretString: str, Root: str):
     path_db = os.path.join(Root, "_secrets_")
     con = sqlite3.connect(path_db)
     cur = con.cursor()
-    cur.execute("UPDATE KV SET secret_string = ? WHERE secret_name=?", (SecretString, SecretId))
+    cur.execute(
+        "UPDATE KV SET secret_string = ? WHERE secret_name=?", (SecretString, SecretId)
+    )
     con.commit()
     con.close()
 
@@ -100,7 +102,9 @@ def put_secret_value(SecretId: str, SecretString: str, Root: str):
     path_db = os.path.join(Root, "_secrets_")
     con = sqlite3.connect(path_db)
     cur = con.cursor()
-    cur.execute("UPDATE KV SET secret_string = ? WHERE secret_name=?", (SecretString, SecretId))
+    cur.execute(
+        "UPDATE KV SET secret_string = ? WHERE secret_name=?", (SecretString, SecretId)
+    )
     con.commit()
     con.close()
 
@@ -122,6 +126,8 @@ def _check_db(Root: str):
     if not os.path.exists(path_db):
         con = sqlite3.connect(path_db)
         cur = con.cursor()
-        cur.execute("""CREATE TABLE IF NOT EXISTS KV (secret_name TEXT, secret_string TEXT);""")
+        cur.execute(
+            """CREATE TABLE IF NOT EXISTS KV (secret_name TEXT, secret_string TEXT);"""
+        )
         con.commit()
         con.close()

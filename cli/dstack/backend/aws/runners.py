@@ -24,10 +24,7 @@ def _serialize_runner(runner: Runner) -> dict:
         "cpus": runner.resources.cpus,
         "memory_mib": runner.resources.memory_mib,
         "gpus": [
-            {
-                "name": gpu.name,
-                "memory_mib": gpu.memory_mib,
-            }
+            {"name": gpu.name, "memory_mib": gpu.memory_mib,}
             for gpu in (runner.resources.gpus or [])
         ],
         "interruptible": runner.resources.interruptible is True,
@@ -96,8 +93,12 @@ def _get_instance_types(ec2_client: BaseClient) -> List[InstanceType]:
             )
 
     def compare(i1, i2):
-        r1_gpu_total_memory_mib = sum(map(lambda g: g.memory_mib, i1.resources.gpus or []))
-        r2_gpu_total_memory_mib = sum(map(lambda g: g.memory_mib, i2.resources.gpus or []))
+        r1_gpu_total_memory_mib = sum(
+            map(lambda g: g.memory_mib, i1.resources.gpus or [])
+        )
+        r2_gpu_total_memory_mib = sum(
+            map(lambda g: g.memory_mib, i2.resources.gpus or [])
+        )
         if r1_gpu_total_memory_mib < r2_gpu_total_memory_mib:
             return -1
         elif r1_gpu_total_memory_mib > r2_gpu_total_memory_mib:
@@ -127,7 +128,11 @@ def _matches(resources: Resources, requirements: Optional[Requirements]) -> bool
         if gpu_count > len(resources.gpus or []):
             return False
         if requirements.gpus.name and gpu_count > len(
-            list(filter(lambda gpu: gpu.name == requirements.gpus.name, resources.gpus or []))
+            list(
+                filter(
+                    lambda gpu: gpu.name == requirements.gpus.name, resources.gpus or []
+                )
+            )
         ):
             return False
         if requirements.gpus.memory_mib and gpu_count > len(
@@ -203,22 +208,19 @@ def _update_runner(s3_client: BaseClient, bucket_name: str, runner: Runner):
     )
 
 
-def get_security_group_id(ec2_client: BaseClient, bucket_name: str, subnet_id: Optional[str]):
+def get_security_group_id(
+    ec2_client: BaseClient, bucket_name: str, subnet_id: Optional[str]
+):
     _subnet_postfix = (subnet_id.replace("-", "_") + "_") if subnet_id else ""
     security_group_name = (
-        "dstack_security_group_" + _subnet_postfix + bucket_name.replace("-", "_").lower()
+        "dstack_security_group_"
+        + _subnet_postfix
+        + bucket_name.replace("-", "_").lower()
     )
     if not version.__is_release__:
         security_group_name += "_stgn"
     response = ec2_client.describe_security_groups(
-        Filters=[
-            {
-                "Name": "group-name",
-                "Values": [
-                    security_group_name,
-                ],
-            },
-        ],
+        Filters=[{"Name": "group-name", "Values": [security_group_name,],},],
     )
     if response.get("SecurityGroups"):
         security_group_id = response["SecurityGroups"][0]["GroupId"]
@@ -263,12 +265,7 @@ def get_security_group_id(ec2_client: BaseClient, bucket_name: str, subnet_id: O
             GroupId=security_group_id, IpPermissions=ip_permissions
         )
         ec2_client.authorize_security_group_egress(
-            GroupId=security_group_id,
-            IpPermissions=[
-                {
-                    "IpProtocol": "-1",
-                }
-            ],
+            GroupId=security_group_id, IpPermissions=[{"IpProtocol": "-1",}],
         )
     return security_group_id
 
@@ -308,7 +305,9 @@ def _user_data(
     port_range_from: int = 3000,
     port_range_to: int = 4000,
 ) -> str:
-    sysctl_port_range_from = int((port_range_to - port_range_from) / 2) + port_range_from
+    sysctl_port_range_from = (
+        int((port_range_to - port_range_from) / 2) + port_range_from
+    )
     sysctl_port_range_to = port_range_to - 1
     runner_port_range_from = port_range_from
     runner_port_range_to = sysctl_port_range_from - 1
@@ -432,8 +431,7 @@ def instance_profile_arn(iam_client: BaseClient, bucket_name: str) -> str:
             )
             _instance_profile_arn = response["InstanceProfile"]["Arn"]
             iam_client.add_role_to_instance_profile(
-                InstanceProfileName=_role_name,
-                RoleName=_role_name,
+                InstanceProfileName=_role_name, RoleName=_role_name,
             )
             return _instance_profile_arn
         else:
@@ -459,9 +457,7 @@ def _get_ami_image(
         ami_name = "[stgn] " + ami_name
     ami_name = ami_name + f"-{_version or '*'}"
     response = ec2_client.describe_images(
-        Filters=[
-            {"Name": "name", "Values": [ami_name]},
-        ],
+        Filters=[{"Name": "name", "Values": [ami_name]},],
     )
     images = list(
         filter(
@@ -528,26 +524,18 @@ def _run_instance(
         BlockDeviceMappings=[
             {
                 "DeviceName": "/dev/sda1",
-                "Ebs": {
-                    "VolumeSize": 100,
-                    "VolumeType": "gp2",
-                },
+                "Ebs": {"VolumeSize": 100, "VolumeType": "gp2",},
             }
         ],
         ImageId=_get_ami_image(ec2_client, len(instance_type.resources.gpus) > 0)[0],
         InstanceType=instance_type.instance_name,
         MinCount=1,
         MaxCount=1,
-        IamInstanceProfile={
-            "Arn": instance_profile_arn(iam_client, bucket_name),
-        },
-        UserData=_user_data(bucket_name, region_name, runner_id, instance_type.resources),
-        TagSpecifications=[
-            {
-                "ResourceType": "instance",
-                "Tags": tags,
-            },
-        ],
+        IamInstanceProfile={"Arn": instance_profile_arn(iam_client, bucket_name),},
+        UserData=_user_data(
+            bucket_name, region_name, runner_id, instance_type.resources
+        ),
+        TagSpecifications=[{"ResourceType": "instance", "Tags": tags,},],
         **launch_specification,
     )
     if instance_type.resources.interruptible:
@@ -668,7 +656,9 @@ def run_job(
             jobs.update_job(s3_client, bucket_name, job)
             raise e
     else:
-        raise Exception("Can't create a request for a job which status is not SUBMITTED")
+        raise Exception(
+            "Can't create a request for a job which status is not SUBMITTED"
+        )
 
 
 def _delete_runner(s3_client: BaseClient, bucket_name: str, runner: Runner):
@@ -676,11 +666,15 @@ def _delete_runner(s3_client: BaseClient, bucket_name: str, runner: Runner):
     s3_client.delete_object(Bucket=bucket_name, Key=key)
 
 
-def _get_runner(s3_client: BaseClient, bucket_name: str, runner_id: str) -> Optional[Runner]:
+def _get_runner(
+    s3_client: BaseClient, bucket_name: str, runner_id: str
+) -> Optional[Runner]:
     key = f"runners/{runner_id}.yaml"
     try:
         obj = s3_client.get_object(Bucket=bucket_name, Key=key)
-        return _unserialize_runner(yaml.load(obj["Body"].read().decode("utf-8"), yaml.FullLoader))
+        return _unserialize_runner(
+            yaml.load(obj["Body"].read().decode("utf-8"), yaml.FullLoader)
+        )
     except Exception as e:
         if (
             hasattr(e, "response")
@@ -695,9 +689,7 @@ def _get_runner(s3_client: BaseClient, bucket_name: str, runner_id: str) -> Opti
 def _cancel_spot_request(ec2_client: BaseClient, request_id: str):
     ec2_client.cancel_spot_instance_requests(SpotInstanceRequestIds=[request_id])
     response = ec2_client.describe_instances(
-        Filters=[
-            {"Name": "spot-instance-request-id", "Values": [request_id]},
-        ],
+        Filters=[{"Name": "spot-instance-request-id", "Values": [request_id]},],
     )
     if response.get("Reservations") and response["Reservations"][0].get("Instances"):
         ec2_client.terminate_instances(
@@ -787,14 +779,17 @@ def get_request_head(
                         raise Exception(
                             f"Unsupported EC2 spot instance request status code: {status['Code']}"
                         )
-                    return RequestHead(job.job_id, request_status, status.get("Message"))
+                    return RequestHead(
+                        job.job_id, request_status, status.get("Message")
+                    )
                 else:
                     return RequestHead(job.job_id, RequestStatus.TERMINATED, None)
             except Exception as e:
                 if (
                     hasattr(e, "response")
                     and e.response.get("Error")
-                    and e.response["Error"].get("Code") == "InvalidSpotInstanceRequestID.NotFound"
+                    and e.response["Error"].get("Code")
+                    == "InvalidSpotInstanceRequestID.NotFound"
                 ):
                     return RequestHead(
                         job.job_id,
@@ -806,7 +801,9 @@ def get_request_head(
         else:
             try:
                 response = ec2_client.describe_instances(InstanceIds=[request_id])
-                if response.get("Reservations") and response["Reservations"][0].get("Instances"):
+                if response.get("Reservations") and response["Reservations"][0].get(
+                    "Instances"
+                ):
                     state = response["Reservations"][0]["Instances"][0]["State"]
                     if state["Name"] in ["running"]:
                         request_status = RequestStatus.RUNNING
@@ -820,7 +817,9 @@ def get_request_head(
                     ]:
                         request_status = RequestStatus.TERMINATED
                     else:
-                        raise Exception(f"Unsupported EC2 instance state name: {state['Name']}")
+                        raise Exception(
+                            f"Unsupported EC2 instance state name: {state['Name']}"
+                        )
                     return RequestHead(job.job_id, request_status, None)
                 else:
                     return RequestHead(job.job_id, RequestStatus.TERMINATED, None)
@@ -846,7 +845,9 @@ def get_request_head(
         return RequestHead(job.job_id, RequestStatus.TERMINATED, message)
 
 
-def _stop_runner(ec2_client: BaseClient, s3_client: BaseClient, bucket_name: str, runner: Runner):
+def _stop_runner(
+    ec2_client: BaseClient, s3_client: BaseClient, bucket_name: str, runner: Runner
+):
     if runner.request_id:
         if runner.resources.local:
             pass
@@ -904,7 +905,11 @@ def stop_job(
         else:
             new_status = None
         if new_status:
-            if runner and runner.job.status.is_unfinished() and runner.job.status != new_status:
+            if (
+                runner
+                and runner.job.status.is_unfinished()
+                and runner.job.status != new_status
+            ):
                 if new_status.is_finished():
                     _stop_runner(ec2_client, s3_client, bucket_name, runner)
                 else:

@@ -110,7 +110,9 @@ class Provider:
                 self.args = args
 
         run = Run(self.run_name, Args(self.provider_data.get("run_args") or []))
-        self.provider_data = self._inject_context_recursively(self.provider_data, run=run)
+        self.provider_data = self._inject_context_recursively(
+            self.provider_data, run=run
+        )
 
     @staticmethod
     def _inject_context_recursively(obj: Any, **kwargs: Any) -> Any:
@@ -122,7 +124,9 @@ class Provider:
                 d[k] = Provider._inject_context_recursively(obj[k], **kwargs)
             return d
         elif isinstance(obj, list):
-            return [Provider._inject_context_recursively(item, **kwargs) for item in obj]
+            return [
+                Provider._inject_context_recursively(item, **kwargs) for item in obj
+            ]
         else:
             return obj
 
@@ -161,8 +165,12 @@ class Provider:
     def _add_base_args(parser: ArgumentParser):
         parser.add_argument("-r", "--requirements", metavar="PATH", type=str)
         parser.add_argument("-e", "--env", action="append")
-        parser.add_argument("-a", "--artifact", metavar="PATH", dest="artifacts", action="append")
-        parser.add_argument("--dep", metavar="(:TAG | WORKFLOW)", dest="deps", action="append")
+        parser.add_argument(
+            "-a", "--artifact", metavar="PATH", dest="artifacts", action="append"
+        )
+        parser.add_argument(
+            "--dep", metavar="(:TAG | WORKFLOW)", dest="deps", action="append"
+        )
         parser.add_argument("-w", "--working-dir", metavar="PATH", type=str)
         group = parser.add_mutually_exclusive_group()
         group.add_argument("-i", "--interruptible", action="store_true")
@@ -276,14 +284,17 @@ class Provider:
         if self.provider_data.get("deps"):
             repo_data = load_repo_data()
             return [
-                self._parse_dep_spec(dep, backend, repo_data) for dep in self.provider_data["deps"]
+                self._parse_dep_spec(dep, backend, repo_data)
+                for dep in self.provider_data["deps"]
             ]
         else:
             return None
 
     def _artifact_specs(self) -> Optional[List[ArtifactSpec]]:
         if self.provider_data.get("artifacts"):
-            return [self._parse_artifact_spec(a) for a in self.provider_data["artifacts"]]
+            return [
+                self._parse_artifact_spec(a) for a in self.provider_data["artifacts"]
+            ]
         else:
             return None
 
@@ -302,7 +313,9 @@ class Provider:
             )
 
     @staticmethod
-    def _parse_dep_spec(dep: Union[dict, str], backend: Backend, repo_data: RepoData) -> DepSpec:
+    def _parse_dep_spec(
+        dep: Union[dict, str], backend: Backend, repo_data: RepoData
+    ) -> DepSpec:
         if isinstance(dep, str):
             mount = False
             if dep.startswith(":"):
@@ -322,7 +335,9 @@ class Provider:
                 return Provider._workflow_dep(backend, repo_data, t[0], mount)
         elif len(t) == 3:
             # This doesn't allow to refer to projects from other repos
-            repo_address = RepoAddress(repo_data.repo_host_name, repo_data.repo_port, t[0], t[1])
+            repo_address = RepoAddress(
+                repo_data.repo_host_name, repo_data.repo_port, t[0], t[1]
+            )
             if tag_dep:
                 return Provider._tag_dep(backend, repo_address, t[2], mount)
             else:
@@ -338,7 +353,9 @@ class Provider:
         if tag_head:
             return DepSpec(repo_address, tag_head.run_name, mount)
         else:
-            sys.exit(f"Cannot find the tag '{tag_name}' in the '{repo_address.path()}' repo")
+            sys.exit(
+                f"Cannot find the tag '{tag_name}' in the '{repo_address.path()}' repo"
+            )
 
     @staticmethod
     def _workflow_dep(
@@ -398,7 +415,9 @@ class Provider:
                 if cpu > 0:
                     resources.cpus = cpu
             if self.provider_data["resources"].get("memory"):
-                resources.memory_mib = _str_to_mib(self.provider_data["resources"]["memory"])
+                resources.memory_mib = _str_to_mib(
+                    self.provider_data["resources"]["memory"]
+                )
             gpu = self.provider_data["resources"].get("gpu")
             if gpu:
                 if str(gpu).isnumeric():
@@ -418,15 +437,21 @@ class Provider:
                         resources.gpus = GpusRequirements(gpu_count, name=gpu_name)
             for resource_name in self.provider_data["resources"]:
                 if resource_name.endswith("/gpu") and len(resource_name) > 4:
-                    if not str(self.provider_data["resources"][resource_name]).isnumeric():
+                    if not str(
+                        self.provider_data["resources"][resource_name]
+                    ).isnumeric():
                         sys.exit(f"resources.'{resource_name}' should be an integer")
                     gpu = int(self.provider_data["resources"][resource_name])
                     if gpu > 0:
                         resources.gpus = GpusRequirements(gpu, name=resource_name[:-4])
             if self.provider_data["resources"].get("shm_size"):
-                resources.shm_size_mib = _str_to_mib(self.provider_data["resources"]["shm_size"])
+                resources.shm_size_mib = _str_to_mib(
+                    self.provider_data["resources"]["shm_size"]
+                )
             if self.provider_data["resources"].get("interruptible"):
-                resources.interruptible = self.provider_data["resources"]["interruptible"]
+                resources.interruptible = self.provider_data["resources"][
+                    "interruptible"
+                ]
             if self.provider_data["resources"].get("local"):
                 resources.local = self.provider_data["resources"]["local"]
             if (
@@ -459,4 +484,6 @@ def get_provider_names() -> List[str]:
 
 
 def load_provider(provider_name) -> Provider:
-    return importlib.import_module(f"dstack.providers.{provider_name}.main").__provider__()
+    return importlib.import_module(
+        f"dstack.providers.{provider_name}.main"
+    ).__provider__()

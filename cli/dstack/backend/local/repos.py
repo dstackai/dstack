@@ -23,7 +23,9 @@ def list_repo_heads(path: str) -> List[RepoHead]:
     for obj in response:
         tokens = obj[len(tag_head_prefix) :].split(";")
         if len(tokens) == 5:
-            repo_host_port, repo_user_name, repo_name, last_run_at, tags_count = tuple(tokens)
+            repo_host_port, repo_user_name, repo_name, last_run_at, tags_count = tuple(
+                tokens
+            )
             t = repo_host_port.split(":")
             repo_host_name = t[0]
             repo_port = t[1] if len(t) > 1 else None
@@ -43,7 +45,9 @@ def _get_repo_head(path: str, repo_address: RepoAddress) -> Optional[RepoHead]:
     response = list_objects(Root=root, Prefix=repo_head_prefix)
     if len(response) != 0:
         last_run_at, tags_count = tuple(response[0][len(repo_head_prefix) :].split(";"))
-        return RepoHead(repo_address, int(last_run_at) if last_run_at else None, int(tags_count))
+        return RepoHead(
+            repo_address, int(last_run_at) if last_run_at else None, int(tags_count)
+        )
     else:
         return None
 
@@ -55,19 +59,25 @@ def _create_or_update_repo_head(path: str, repo_head: RepoHead):
     for obj in response:
         delete_object(Root=root, Key=obj)
     repo_head_key = (
-        f"{repo_head_prefix}" f"{repo_head.last_run_at or ''};" f"{repo_head.tags_count}"
+        f"{repo_head_prefix}"
+        f"{repo_head.last_run_at or ''};"
+        f"{repo_head.tags_count}"
     )
     put_object(Body="", Root=root, Key=repo_head_key)
 
 
 def update_repo_last_run_at(path: str, repo_address: RepoAddress, last_run_at: int):
-    repo_head = _get_repo_head(path, repo_address) or RepoHead(repo_address, None, tags_count=0)
+    repo_head = _get_repo_head(path, repo_address) or RepoHead(
+        repo_address, None, tags_count=0
+    )
     repo_head.last_run_at = last_run_at
     _create_or_update_repo_head(path, repo_head)
 
 
 def increment_repo_tags_count(path: str, repo_address: RepoAddress):
-    repo_head = _get_repo_head(path, repo_address) or RepoHead(repo_address, None, tags_count=0)
+    repo_head = _get_repo_head(path, repo_address) or RepoHead(
+        repo_address, None, tags_count=0
+    )
     repo_head.tags_count = repo_head.tags_count + 1
     _create_or_update_repo_head(path, repo_head)
 
@@ -89,7 +99,9 @@ def delete_repo(path: str, repo_address: RepoAddress):
         delete_object(Root=root, Key=obj)
 
 
-def get_repo_credentials(path: str, repo_address: RepoAddress) -> Optional[RepoCredentials]:
+def get_repo_credentials(
+    path: str, repo_address: RepoAddress
+) -> Optional[RepoCredentials]:
     root = os.path.join(path, "repos")
     secret_name = f"/dstack/credentials/{repo_address.path()}"
     try:
@@ -104,7 +116,9 @@ def get_repo_credentials(path: str, repo_address: RepoAddress) -> Optional[RepoC
         return None
 
 
-def save_repo_credentials(path: str, repo_address: RepoAddress, repo_credentials: RepoCredentials):
+def save_repo_credentials(
+    path: str, repo_address: RepoAddress, repo_credentials: RepoCredentials
+):
     root = os.path.join(path, "repos")
     secret_name = f"/dstack/credentials/{repo_address.path()}"
     credentials_data = {"protocol": repo_credentials.protocol.value}

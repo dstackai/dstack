@@ -50,9 +50,15 @@ class StopCommand(BasicCommand):
         if (
             args.run_name
             and (
-                args.yes or Confirm.ask(f"[red]{_verb(args.abort)} the run '{args.run_name}'?[/]")
+                args.yes
+                or Confirm.ask(
+                    f"[red]{_verb(args.abort)} the run '{args.run_name}'?[/]"
+                )
             )
-        ) or (args.all and (args.yes or Confirm.ask(f"[red]{_verb(args.abort)} all runs?[/]"))):
+        ) or (
+            args.all
+            and (args.yes or Confirm.ask(f"[red]{_verb(args.abort)} all runs?[/]"))
+        ):
             repo_data = load_repo_data()
             for backend in list_backends():
                 job_heads = backend.list_job_heads(repo_data, args.run_name)

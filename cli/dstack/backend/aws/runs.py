@@ -33,7 +33,9 @@ def _create_run(
     include_request_heads: bool,
 ) -> RunHead:
     app_heads = (
-        list(map(lambda app_name: AppHead(job_head.job_id, app_name), job_head.app_names))
+        list(
+            map(lambda app_name: AppHead(job_head.job_id, app_name), job_head.app_names)
+        )
         if job_head.app_names
         else None
     )
@@ -51,8 +53,12 @@ def _create_run(
     if include_request_heads and job_head.status.is_unfinished():
         if request_heads is None:
             request_heads = []
-        job = jobs.get_job(s3_client, bucket_name, job_head.repo_address, job_head.job_id)
-        request_head = runners.get_request_head(ec2_client, s3_client, bucket_name, job, None)
+        job = jobs.get_job(
+            s3_client, bucket_name, job_head.repo_address, job_head.job_id
+        )
+        request_head = runners.get_request_head(
+            ec2_client, s3_client, bucket_name, job, None
+        )
         request_heads.append(request_head)
     run_head = RunHead(
         job_head.repo_address,
@@ -106,8 +112,12 @@ def _update_run(
         if include_request_heads:
             if run.request_heads is None:
                 run.request_heads = []
-            job = jobs.get_job(s3_client, bucket_name, job_head.repo_address, job_head.job_id)
-            request_head = runners.get_request_head(ec2_client, s3_client, bucket_name, job, None)
+            job = jobs.get_job(
+                s3_client, bucket_name, job_head.repo_address, job_head.job_id
+            )
+            request_head = runners.get_request_head(
+                ec2_client, s3_client, bucket_name, job, None
+            )
             run.request_heads.append(request_head)
 
 
@@ -127,7 +137,9 @@ def get_run_heads(
             )
         else:
             run = runs_by_id[run_id]
-            _update_run(ec2_client, s3_client, bucket_name, run, job_head, include_request_heads)
+            _update_run(
+                ec2_client, s3_client, bucket_name, run, job_head, include_request_heads
+            )
     return sorted(list(runs_by_id.values()), key=lambda r: r.submitted_at, reverse=True)
 
 
@@ -140,4 +152,6 @@ def list_run_heads(
     include_request_heads: bool,
 ) -> List[RunHead]:
     job_heads = jobs.list_job_heads(s3_client, bucket_name, repo_address, run_name)
-    return get_run_heads(ec2_client, s3_client, bucket_name, job_heads, include_request_heads)
+    return get_run_heads(
+        ec2_client, s3_client, bucket_name, job_heads, include_request_heads
+    )

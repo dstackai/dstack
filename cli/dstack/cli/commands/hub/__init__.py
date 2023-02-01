@@ -50,5 +50,7 @@ class HubCommand(BasicCommand):
             help="Bind socket to this port. Default: 3000.",
             default=3000,
         )
-        hub_parser.add_argument("--token", metavar="TOKEN", type=str, help="The admin user token")
+        hub_parser.add_argument(
+            "--token", metavar="TOKEN", type=str, help="The admin user token"
+        )
         hub_parser.set_defaults(func=self.hub_start)

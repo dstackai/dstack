@@ -33,7 +33,9 @@ def get_job(
     key = f"{prefix}/{job_id}.yaml"
     try:
         obj = s3_client.get_object(Bucket=bucket_name, Key=key)
-        job = Job.unserialize(yaml.load(obj["Body"].read().decode("utf-8"), yaml.FullLoader))
+        job = Job.unserialize(
+            yaml.load(obj["Body"].read().decode("utf-8"), yaml.FullLoader)
+        )
         return job
     except Exception as e:
         if (
@@ -49,7 +51,9 @@ def get_job(
 def update_job(s3_client: BaseClient, bucket_name: str, job: Job):
     prefix = f"jobs/{job.repo_data.path()}"
     job_head_key_prefix = f"{prefix}/l;{job.job_id};"
-    response = s3_client.list_objects_v2(Bucket=bucket_name, Prefix=job_head_key_prefix, MaxKeys=1)
+    response = s3_client.list_objects_v2(
+        Bucket=bucket_name, Prefix=job_head_key_prefix, MaxKeys=1
+    )
     for obj in response["Contents"]:
         s3_client.delete_object(Bucket=bucket_name, Key=obj["Key"])
     job_head_key = job.job_head_key()
@@ -66,8 +70,12 @@ def list_job_heads(
 ) -> List[JobHead]:
     prefix = f"jobs/{repo_address.path()}"
     job_head_key_prefix = f"{prefix}/l;"
-    job_head_key_run_prefix = job_head_key_prefix + run_name if run_name else job_head_key_prefix
-    response = s3_client.list_objects_v2(Bucket=bucket_name, Prefix=job_head_key_run_prefix)
+    job_head_key_run_prefix = (
+        job_head_key_prefix + run_name if run_name else job_head_key_prefix
+    )
+    response = s3_client.list_objects_v2(
+        Bucket=bucket_name, Prefix=job_head_key_run_prefix
+    )
     job_heads = []
     if "Contents" in response:
         for obj in response["Contents"]:
@@ -162,6 +170,8 @@ def delete_job_head(
 ):
     prefix = f"jobs/{repo_address.path()}"
     job_head_key_prefix = f"{prefix}/l;{job_id};"
-    response = s3_client.list_objects_v2(Bucket=bucket_name, Prefix=job_head_key_prefix, MaxKeys=1)
+    response = s3_client.list_objects_v2(
+        Bucket=bucket_name, Prefix=job_head_key_prefix, MaxKeys=1
+    )
     for obj in response["Contents"]:
         s3_client.delete_object(Bucket=bucket_name, Key=obj["Key"])

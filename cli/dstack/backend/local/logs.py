@@ -44,14 +44,20 @@ def _render_log_message(
     host_name = job_host_names[job_id]
     ports = job_ports[job_id]
     app_specs = job_app_specs[job_id]
-    pat = re.compile(f"http://(localhost|0.0.0.0|127.0.0.1|{host_name}):[\\S]*[^(.+)\\s\\n\\r]")
+    pat = re.compile(
+        f"http://(localhost|0.0.0.0|127.0.0.1|{host_name}):[\\S]*[^(.+)\\s\\n\\r]"
+    )
     if re.search(pat, log):
         if host_name != "none" and ports and app_specs:
             for app_spec in app_specs:
                 port = ports[app_spec.port_index]
                 url_path = app_spec.url_path or ""
                 url_query_params = app_spec.url_query_params
-                url_query = ("?" + parse.urlencode(url_query_params)) if url_query_params else ""
+                url_query = (
+                    ("?" + parse.urlencode(url_query_params))
+                    if url_query_params
+                    else ""
+                )
                 app_url = f"http://{host_name}:{port}"
                 if url_path or url_query_params:
                     app_url += "/"
@@ -63,7 +69,9 @@ def _render_log_message(
         event["timestamp"],
         job_id,
         log,
-        LogEventSource.STDOUT if message["source"] == "stdout" else LogEventSource.STDERR,
+        LogEventSource.STDOUT
+        if message["source"] == "stdout"
+        else LogEventSource.STDERR,
     )
 
 
@@ -72,7 +80,9 @@ def events_loop(path: str, repo_address: RepoAddress, job_heads: List[JobHead]):
     finished_counter = 0
     tails = {}
 
-    _jobs = [jobs.get_job(path, repo_address, job_head.job_id) for job_head in job_heads]
+    _jobs = [
+        jobs.get_job(path, repo_address, job_head.job_id) for job_head in job_heads
+    ]
     for _job in _jobs:
         path_dir = (
             Path.home()
@@ -96,7 +106,10 @@ def events_loop(path: str, repo_address: RepoAddress, job_heads: List[JobHead]):
 
     while True:
         if counter % CHECK_STATUS_EVERY_N == 0:
-            _jobs = [jobs.get_job(path, repo_address, job_head.job_id) for job_head in job_heads]
+            _jobs = [
+                jobs.get_job(path, repo_address, job_head.job_id)
+                for job_head in job_heads
+            ]
 
             for _job in _jobs:
                 for line_log in tails[_job.job_id]:
@@ -110,7 +123,9 @@ def events_loop(path: str, repo_address: RepoAddress, job_heads: List[JobHead]):
                         "timestamp": time.time(),
                     }
 
-            run = next(iter(runs.get_run_heads(path, _jobs, include_request_heads=False)))
+            run = next(
+                iter(runs.get_run_heads(path, _jobs, include_request_heads=False))
+            )
             if run.status.is_finished():
                 if finished_counter == WAIT_N_ONCE_FINISHED:
                     break

@@ -34,9 +34,9 @@ async def update_admin_user() -> User:
             )
             session.add(admin_user)
             session.commit()
-        elif os.getenv("DSTACK_HUB_ADMIN_TOKEN") is not None and admin_user.token != os.getenv(
+        elif os.getenv(
             "DSTACK_HUB_ADMIN_TOKEN"
-        ):
+        ) is not None and admin_user.token != os.getenv("DSTACK_HUB_ADMIN_TOKEN"):
             admin_user.token = os.getenv("DSTACK_HUB_ADMIN_TOKEN")
             session.commit()
 
@@ -53,4 +53,6 @@ async def custom_http_exception_handler(request, exc):
     if request.url.path.startswith("/api"):
         return JSONResponse({"message": exc.detail}, status_code=404)
     else:
-        return HTMLResponse(pkg_resources.resource_string(__name__, "statics/index.html"))
+        return HTMLResponse(
+            pkg_resources.resource_string(__name__, "statics/index.html")
+        )

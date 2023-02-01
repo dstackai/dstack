@@ -57,7 +57,9 @@ class Backend(object):
     def delete_job_head(self, repo_address: RepoAddress, job_id: str):
         pass
 
-    def stop_jobs(self, repo_address: RepoAddress, run_name: Optional[str], abort: bool):
+    def stop_jobs(
+        self, repo_address: RepoAddress, run_name: Optional[str], abort: bool
+    ):
         job_heads = self.list_job_heads(repo_address, run_name)
         for job_head in job_heads:
             if job_head.status.is_unfinished():
@@ -132,7 +134,9 @@ class Backend(object):
     def list_tag_heads(self, repo_address: RepoAddress) -> List[TagHead]:
         pass
 
-    def get_tag_head(self, repo_address: RepoAddress, tag_name: str) -> Optional[TagHead]:
+    def get_tag_head(
+        self, repo_address: RepoAddress, tag_name: str
+    ) -> Optional[TagHead]:
         pass
 
     def add_tag_from_run(
@@ -144,7 +148,9 @@ class Backend(object):
     ):
         pass
 
-    def add_tag_from_local_dirs(self, repo_data: RepoData, tag_name: str, local_dirs: List[str]):
+    def add_tag_from_local_dirs(
+        self, repo_data: RepoData, tag_name: str, local_dirs: List[str]
+    ):
         pass
 
     def delete_tag_head(self, repo_address: RepoAddress, tag_head: TagHead):
@@ -165,10 +171,14 @@ class Backend(object):
     def delete_repo(self, repo_address: RepoAddress):
         pass
 
-    def get_repo_credentials(self, repo_address: RepoAddress) -> Optional[RepoCredentials]:
+    def get_repo_credentials(
+        self, repo_address: RepoAddress
+    ) -> Optional[RepoCredentials]:
         pass
 
-    def save_repo_credentials(self, repo_address: RepoAddress, repo_credentials: RepoCredentials):
+    def save_repo_credentials(
+        self, repo_address: RepoAddress, repo_credentials: RepoCredentials
+    ):
         pass
 
     def list_run_artifact_files_and_folders(
@@ -179,7 +189,9 @@ class Backend(object):
     def list_secret_names(self, repo_address: RepoAddress) -> List[str]:
         pass
 
-    def get_secret(self, repo_address: RepoAddress, secret_name: str) -> Optional[Secret]:
+    def get_secret(
+        self, repo_address: RepoAddress, secret_name: str
+    ) -> Optional[Secret]:
         pass
 
     def add_secret(self, repo_address: RepoAddress, secret: Secret):

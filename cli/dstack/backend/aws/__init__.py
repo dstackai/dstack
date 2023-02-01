@@ -96,7 +96,9 @@ class AwsBackend(Backend):
         )
 
     def submit_job(self, job: Job, counter: List[int]):
-        jobs.create_job(self._s3_client(), self.backend_config.bucket_name, job, counter)
+        jobs.create_job(
+            self._s3_client(), self.backend_config.bucket_name, job, counter
+        )
         runners.run_job(
             self._logs_client(),
             self._ec2_client(),
@@ -251,7 +253,9 @@ class AwsBackend(Backend):
             self._s3_client(), self.backend_config.bucket_name, repo_address
         )
 
-    def get_tag_head(self, repo_address: RepoAddress, tag_name: str) -> Optional[TagHead]:
+    def get_tag_head(
+        self, repo_address: RepoAddress, tag_name: str
+    ) -> Optional[TagHead]:
         return tags.get_tag_head(
             self._s3_client(), self.backend_config.bucket_name, repo_address, tag_name
         )
@@ -273,7 +277,9 @@ class AwsBackend(Backend):
         )
 
     def delete_tag_head(self, repo_address: RepoAddress, tag_head: TagHead):
-        tags.delete_tag(self._s3_client(), self.backend_config.bucket_name, repo_address, tag_head)
+        tags.delete_tag(
+            self._s3_client(), self.backend_config.bucket_name, repo_address, tag_head
+        )
 
     def add_tag_from_local_dirs(
         self, repo_data: LocalRepoData, tag_name: str, local_dirs: List[str]
@@ -309,14 +315,20 @@ class AwsBackend(Backend):
         )
 
     def delete_repo(self, repo_address: RepoAddress):
-        repos.delete_repo(self._s3_client(), self.backend_config.bucket_name, repo_address)
+        repos.delete_repo(
+            self._s3_client(), self.backend_config.bucket_name, repo_address
+        )
 
-    def get_repo_credentials(self, repo_address: RepoAddress) -> Optional[RepoCredentials]:
+    def get_repo_credentials(
+        self, repo_address: RepoAddress
+    ) -> Optional[RepoCredentials]:
         return repos.get_repo_credentials(
             self._secretsmanager_client(), self.backend_config.bucket_name, repo_address
         )
 
-    def save_repo_credentials(self, repo_address: RepoAddress, repo_credentials: RepoCredentials):
+    def save_repo_credentials(
+        self, repo_address: RepoAddress, repo_credentials: RepoCredentials
+    ):
         repos.save_repo_credentials(
             self._sts_client(),
             self._iam_client(),
@@ -342,7 +354,9 @@ class AwsBackend(Backend):
             self._s3_client(), self.backend_config.bucket_name, repo_address
         )
 
-    def get_secret(self, repo_address: RepoAddress, secret_name: str) -> Optional[Secret]:
+    def get_secret(
+        self, repo_address: RepoAddress, secret_name: str
+    ) -> Optional[Secret]:
         return secrets.get_secret(
             self._secretsmanager_client(),
             self.backend_config.bucket_name,

@@ -39,7 +39,9 @@ class LabProvider(Provider):
         self.image_name = self._image_name()
 
     def _create_parser(self, workflow_name: Optional[str]) -> Optional[ArgumentParser]:
-        parser = ArgumentParser(prog="dstack run " + (workflow_name or self.provider_name))
+        parser = ArgumentParser(
+            prog="dstack run " + (workflow_name or self.provider_name)
+        )
         self._add_base_args(parser)
         return parser
 
@@ -85,7 +87,8 @@ class LabProvider(Provider):
         commands.extend(
             [
                 "conda install psutil -y",
-                "pip install jupyterlab" + (f"=={self.version}" if self.version else ""),
+                "pip install jupyterlab"
+                + (f"=={self.version}" if self.version else ""),
                 "pip install ipywidgets",
                 "jupyter nbextension enable --py widgetsnbextension",
                 "mkdir -p /root/.jupyter",

@@ -77,11 +77,5 @@ def since(timestamp):
 
 
 def _relative_timestamp_to_datetime(amount, unit):
-    multiplier = {
-        "s": 1,
-        "m": 60,
-        "h": 3600,
-        "d": 24 * 3600,
-        "w": 7 * 24 * 3600,
-    }[unit]
+    multiplier = {"s": 1, "m": 60, "h": 3600, "d": 24 * 3600, "w": 7 * 24 * 3600,}[unit]
     return datetime.utcnow() + timedelta(seconds=amount * multiplier * -1)

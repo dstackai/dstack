@@ -37,7 +37,9 @@ class Resources:
 
 
 class Runner:
-    def __init__(self, runner_id: str, request_id: Optional[str], resources: Resources, job: Job):
+    def __init__(
+        self, runner_id: str, request_id: Optional[str], resources: Resources, job: Job
+    ):
         self.runner_id = runner_id
         self.request_id = request_id
         self.job = job
@@ -48,10 +50,7 @@ class Runner:
             "cpus": self.resources.cpus,
             "memory_mib": self.resources.memory_mib,
             "gpus": [
-                {
-                    "name": gpu.name,
-                    "memory_mib": gpu.memory_mib,
-                }
+                {"name": gpu.name, "memory_mib": gpu.memory_mib,}
                 for gpu in (self.resources.gpus or [])
             ],
             "interruptible": self.resources.interruptible is True,
