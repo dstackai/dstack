@@ -32,5 +32,18 @@
       "region": "Region",
       "bucket": "Bucket"
     }
+  },
+  "users": {
+    "page_title": "Users",
+    "search_placeholder": "Find users",
+    "empty_message_title": "No users",
+    "empty_message_text": "No users to display.",
+    "nomatch_message_title": "No matches",
+    "nomatch_message_text": "We can't find a match.",
+    "nomatch_message_button_label": "Clear filter",
+    "user_name": "User name",
+    "token": "Token",
+    "email": "Email",
+    "permission_level": "Permission Level"
   }
 }

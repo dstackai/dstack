@@ -4,13 +4,13 @@ import { useSearchParams, Routes, Route, Navigate } from 'react-router-dom';
 import { useGetUserDataQuery } from 'services/user';
 import { useAppDispatch, useAppSelector } from 'hooks';
 import AppLayout from 'layouts/AppLayout';
-import { Box } from 'components';
 import { ROUTES } from 'routes';
 import { selectAuthToken, setAuthData, setUserData } from './slice';
 import { AuthErrorMessage } from './AuthErrorMessage';
 import { Loading } from './Loading';
 import { Logout } from './Logout';
 import { Hub } from 'pages/Hub';
+import { User } from 'pages/User';
 
 const App: React.FC = () => {
     const { t } = useTranslation();
@@ -68,7 +68,7 @@ const App: React.FC = () => {
             <Routes>
                 <Route path={ROUTES.BASE} element={<Navigate replace to={ROUTES.HUB.LIST} />} />
                 <Route path={ROUTES.HUB.LIST} element={<Hub />} />
-                <Route path={ROUTES.USER.LIST} element={<Box variant="h1">User list</Box>} />
+                <Route path={ROUTES.USER.LIST} element={<User />} />
                 <Route path={ROUTES.LOGOUT} element={<Logout />} />
             </Routes>
         </AppLayout>

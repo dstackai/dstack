@@ -14,5 +14,9 @@ export const ROUTES = {
 
     USER: {
         LIST: '/users',
+        DETAILS: {
+            TEMPLATE: `/users/:name`,
+            FORMAT: (name: string) => buildRoute(ROUTES.USER.DETAILS.TEMPLATE, { name }),
+        },
     },
 };

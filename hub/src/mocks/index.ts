@@ -25,6 +25,12 @@ const mocksMap: MocksMap = {
             failed: user.info.failed,
         },
     },
+    [API.USERS.LIST()]: {
+        GET: {
+            success: user.list.success,
+            failed: { status: 403 },
+        },
+    },
     [API.HUB.LIST()]: {
         GET: {
             success: hub.list.success,

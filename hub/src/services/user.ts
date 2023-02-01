@@ -17,7 +17,15 @@ export const userApi = createApi({
                 };
             },
         }),
+
+        getUserList: builder.query<IUser[], void>({
+            query: () => {
+                return {
+                    url: API.USERS.LIST(),
+                };
+            },
+        }),
     }),
 });
 
-export const { useGetUserDataQuery } = userApi;
+export const { useGetUserDataQuery, useGetUserListQuery } = userApi;

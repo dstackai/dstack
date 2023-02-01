@@ -11,6 +11,7 @@ export { default as Header } from '@cloudscape-design/components/header';
 export { default as Link } from '@cloudscape-design/components/link';
 export { default as TextFilter } from '@cloudscape-design/components/text-filter';
 export { default as Pagination } from '@cloudscape-design/components/pagination';
+export { default as Table } from '@cloudscape-design/components/table';
 
 // custom components
 export { NavigateLink } from './NavigateLink';
