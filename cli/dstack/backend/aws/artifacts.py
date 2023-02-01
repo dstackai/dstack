@@ -114,12 +114,19 @@ def upload_job_artifact_files(
                     file_path.as_posix(), local_path.absolute().as_posix()
                 )
                 uploader.upload_file(
-                    str(file_path), bucket_name, key, callback=callback,
+                    str(file_path),
+                    bucket_name,
+                    key,
+                    callback=callback,
                 )
 
 
 def list_run_artifact_files_and_folders(
-    s3_client: BaseClient, bucket_name: str, repo_address: RepoAddress, job_id: str, path: str,
+    s3_client: BaseClient,
+    bucket_name: str,
+    repo_address: RepoAddress,
+    job_id: str,
+    path: str,
 ) -> List[Tuple[str, bool]]:
     prefix = (
         f"artifacts/{repo_address.path()}/{job_id}/" + path + ("" if path.endswith("/") else "/")

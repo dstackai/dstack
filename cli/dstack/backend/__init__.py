@@ -92,7 +92,11 @@ class Backend(object):
         pass
 
     def poll_logs(
-        self, repo_address: RepoAddress, job_heads: List[JobHead], start_time: int, attached: bool,
+        self,
+        repo_address: RepoAddress,
+        job_heads: List[JobHead],
+        start_time: int,
+        attached: bool,
     ) -> Generator[LogEvent, None, None]:
         pass
 

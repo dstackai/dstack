@@ -12,7 +12,10 @@ from dstack.core.repo import RepoAddress
 
 
 def create_run(
-    s3_client: BaseClient, logs_client: BaseClient, bucket_name: str, repo_address: RepoAddress,
+    s3_client: BaseClient,
+    logs_client: BaseClient,
+    bucket_name: str,
+    repo_address: RepoAddress,
 ) -> str:
     name = random_name.next_name()
     run_name_index = run_names.next_run_name_index(s3_client, bucket_name, name)
@@ -91,7 +94,12 @@ def _update_run(
         if run.app_heads is None:
             run.app_heads = []
         run.app_heads.extend(
-            list(map(lambda app_name: AppHead(job_head.job_id, app_name), job_head.app_names,))
+            list(
+                map(
+                    lambda app_name: AppHead(job_head.job_id, app_name),
+                    job_head.app_names,
+                )
+            )
         )
     if job_head.status.is_unfinished():
         run.status = job_head.status

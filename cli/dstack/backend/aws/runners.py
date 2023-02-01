@@ -24,7 +24,10 @@ def _serialize_runner(runner: Runner) -> dict:
         "cpus": runner.resources.cpus,
         "memory_mib": runner.resources.memory_mib,
         "gpus": [
-            {"name": gpu.name, "memory_mib": gpu.memory_mib,}
+            {
+                "name": gpu.name,
+                "memory_mib": gpu.memory_mib,
+            }
             for gpu in (runner.resources.gpus or [])
         ],
         "interruptible": runner.resources.interruptible is True,
@@ -178,7 +181,10 @@ def _create_runner(
     if runner.job.status == JobStatus.STOPPING:
         metadata["status"] = "stopping"
     s3_client.put_object(
-        Body=yaml.dump(_serialize_runner(runner)), Bucket=bucket_name, Key=key, Metadata=metadata,
+        Body=yaml.dump(_serialize_runner(runner)),
+        Bucket=bucket_name,
+        Key=key,
+        Metadata=metadata,
     )
     log_group_name = f"/dstack/runners/{bucket_name}"
     logs.create_log_group_if_not_exists(logs_client, bucket_name, log_group_name)
@@ -190,7 +196,10 @@ def _update_runner(s3_client: BaseClient, bucket_name: str, runner: Runner):
     if runner.job.status == JobStatus.STOPPING:
         metadata["status"] = "stopping"
     s3_client.put_object(
-        Body=yaml.dump(_serialize_runner(runner)), Bucket=bucket_name, Key=key, Metadata=metadata,
+        Body=yaml.dump(_serialize_runner(runner)),
+        Bucket=bucket_name,
+        Key=key,
+        Metadata=metadata,
     )
 
 
@@ -202,7 +211,14 @@ def get_security_group_id(ec2_client: BaseClient, bucket_name: str, subnet_id: O
     if not version.__is_release__:
         security_group_name += "_stgn"
     response = ec2_client.describe_security_groups(
-        Filters=[{"Name": "group-name", "Values": [security_group_name,],},],
+        Filters=[
+            {
+                "Name": "group-name",
+                "Values": [
+                    security_group_name,
+                ],
+            },
+        ],
     )
     if response.get("SecurityGroups"):
         security_group_id = response["SecurityGroups"][0]["GroupId"]
@@ -247,7 +263,12 @@ def get_security_group_id(ec2_client: BaseClient, bucket_name: str, subnet_id: O
             GroupId=security_group_id, IpPermissions=ip_permissions
         )
         ec2_client.authorize_security_group_egress(
-            GroupId=security_group_id, IpPermissions=[{"IpProtocol": "-1",}],
+            GroupId=security_group_id,
+            IpPermissions=[
+                {
+                    "IpProtocol": "-1",
+                }
+            ],
         )
     return security_group_id
 
@@ -257,7 +278,10 @@ def _serialize_config_yaml(bucket_name: str, region_name: str):
 
 
 def _serialize_runner_yaml(
-    runner_id: str, resources: Resources, runner_port_range_from: int, runner_port_range_to: int,
+    runner_id: str,
+    resources: Resources,
+    runner_port_range_from: int,
+    runner_port_range_to: int,
 ):
     s = (
         f"id: {runner_id}\\n"
@@ -347,7 +371,9 @@ def role_name(iam_client: BaseClient, bucket_name: str) -> str:
                                 "Action": "ec2:*",
                                 "Resource": "*",
                                 "Condition": {
-                                    "StringEquals": {"aws:ResourceTag/dstack_bucket": bucket_name,}
+                                    "StringEquals": {
+                                        "aws:ResourceTag/dstack_bucket": bucket_name,
+                                    }
                                 },
                             },
                         ],
@@ -406,7 +432,8 @@ def instance_profile_arn(iam_client: BaseClient, bucket_name: str) -> str:
             )
             _instance_profile_arn = response["InstanceProfile"]["Arn"]
             iam_client.add_role_to_instance_profile(
-                InstanceProfileName=_role_name, RoleName=_role_name,
+                InstanceProfileName=_role_name,
+                RoleName=_role_name,
             )
             return _instance_profile_arn
         else:
@@ -421,7 +448,9 @@ def _get_default_ami_image_version() -> Optional[str]:
 
 
 def _get_ami_image(
-    ec2_client: BaseClient, cuda: bool, _version: Optional[str] = _get_default_ami_image_version(),
+    ec2_client: BaseClient,
+    cuda: bool,
+    _version: Optional[str] = _get_default_ami_image_version(),
 ) -> Tuple[str, str]:
     ami_name = "dstack"
     if cuda:
@@ -429,7 +458,11 @@ def _get_ami_image(
     if not version.__is_release__:
         ami_name = "[stgn] " + ami_name
     ami_name = ami_name + f"-{_version or '*'}"
-    response = ec2_client.describe_images(Filters=[{"Name": "name", "Values": [ami_name]},],)
+    response = ec2_client.describe_images(
+        Filters=[
+            {"Name": "name", "Values": [ami_name]},
+        ],
+    )
     images = list(
         filter(
             lambda i: cuda == ("cuda" in i["Name"]) and i["State"] == "available",
@@ -493,15 +526,28 @@ def _run_instance(
         tags.append({"Key": "dstack_user_email", "Value": local_repo_user_email})
     response = ec2_client.run_instances(
         BlockDeviceMappings=[
-            {"DeviceName": "/dev/sda1", "Ebs": {"VolumeSize": 100, "VolumeType": "gp2",},}
+            {
+                "DeviceName": "/dev/sda1",
+                "Ebs": {
+                    "VolumeSize": 100,
+                    "VolumeType": "gp2",
+                },
+            }
         ],
         ImageId=_get_ami_image(ec2_client, len(instance_type.resources.gpus) > 0)[0],
         InstanceType=instance_type.instance_name,
         MinCount=1,
         MaxCount=1,
-        IamInstanceProfile={"Arn": instance_profile_arn(iam_client, bucket_name),},
+        IamInstanceProfile={
+            "Arn": instance_profile_arn(iam_client, bucket_name),
+        },
         UserData=_user_data(bucket_name, region_name, runner_id, instance_type.resources),
-        TagSpecifications=[{"ResourceType": "instance", "Tags": tags,},],
+        TagSpecifications=[
+            {
+                "ResourceType": "instance",
+                "Tags": tags,
+            },
+        ],
         **launch_specification,
     )
     if instance_type.resources.interruptible:
@@ -649,7 +695,9 @@ def _get_runner(s3_client: BaseClient, bucket_name: str, runner_id: str) -> Opti
 def _cancel_spot_request(ec2_client: BaseClient, request_id: str):
     ec2_client.cancel_spot_instance_requests(SpotInstanceRequestIds=[request_id])
     response = ec2_client.describe_instances(
-        Filters=[{"Name": "spot-instance-request-id", "Values": [request_id]},],
+        Filters=[
+            {"Name": "spot-instance-request-id", "Values": [request_id]},
+        ],
     )
     if response.get("Reservations") and response["Reservations"][0].get("Instances"):
         ec2_client.terminate_instances(
@@ -749,7 +797,9 @@ def get_request_head(
                     and e.response["Error"].get("Code") == "InvalidSpotInstanceRequestID.NotFound"
                 ):
                     return RequestHead(
-                        job.job_id, RequestStatus.TERMINATED, e.response["Error"].get("Message"),
+                        job.job_id,
+                        RequestStatus.TERMINATED,
+                        e.response["Error"].get("Message"),
                     )
                 else:
                     raise e
@@ -781,7 +831,9 @@ def get_request_head(
                     and e.response["Error"].get("Code") == "InvalidInstanceID.NotFound"
                 ):
                     return RequestHead(
-                        job.job_id, RequestStatus.TERMINATED, e.response["Error"].get("Message"),
+                        job.job_id,
+                        RequestStatus.TERMINATED,
+                        e.response["Error"].get("Message"),
                     )
                 else:
                     raise e

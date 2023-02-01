@@ -27,7 +27,11 @@ class StopCommand(BasicCommand):
             "run_name", metavar="RUN", type=str, nargs="?", help="A name of a run"
         )
         self._parser.add_argument(
-            "-a", "--all", help="Stop all unfinished runs", dest="all", action="store_true",
+            "-a",
+            "--all",
+            help="Stop all unfinished runs",
+            dest="all",
+            action="store_true",
         )
         self._parser.add_argument(
             "-x",

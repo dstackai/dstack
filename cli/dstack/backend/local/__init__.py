@@ -97,7 +97,11 @@ class LocalBackend(Backend):
         return runs.get_run_heads(self.backend_config.path, job_heads, include_request_heads)
 
     def poll_logs(
-        self, repo_address: RepoAddress, job_heads: List[JobHead], start_time: int, attached: bool,
+        self,
+        repo_address: RepoAddress,
+        job_heads: List[JobHead],
+        start_time: int,
+        attached: bool,
     ) -> Generator[LogEvent, None, None]:
         return logs.poll_logs(
             self.backend_config.path, repo_address, job_heads, start_time, attached

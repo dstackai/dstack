@@ -345,7 +345,9 @@ class Provider:
         backend: Backend, repo_address: RepoAddress, workflow_name: str, mount: bool
     ) -> DepSpec:
         job_heads = sorted(
-            backend.list_job_heads(repo_address), key=lambda j: j.submitted_at, reverse=True,
+            backend.list_job_heads(repo_address),
+            key=lambda j: j.submitted_at,
+            reverse=True,
         )
         run_name = next(
             iter(

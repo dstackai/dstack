@@ -30,7 +30,11 @@ class SecretCommand(BasicCommand):
             "secret_name", metavar="NAME", type=str, help="The name of the secret"
         )
         add_secrets_parser.add_argument(
-            "secret_value", metavar="VALUE", type=str, help="The value of the secret", nargs="?",
+            "secret_value",
+            metavar="VALUE",
+            type=str,
+            help="The value of the secret",
+            nargs="?",
         )
         add_secrets_parser.add_argument(
             "-y", "--yes", help="Don't ask for confirmation", action="store_true"
@@ -42,7 +46,11 @@ class SecretCommand(BasicCommand):
             "secret_name", metavar="NAME", type=str, help="The name of the secret"
         )
         update_secrets_parser.add_argument(
-            "secret_value", metavar="VALUE", type=str, help="The value of the secret", nargs="?",
+            "secret_value",
+            metavar="VALUE",
+            type=str,
+            help="The value of the secret",
+            nargs="?",
         )
         update_secrets_parser.set_defaults(func=self.update_secret)
 

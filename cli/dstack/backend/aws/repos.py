@@ -16,9 +16,13 @@ def list_repo_heads(s3_client: BaseClient, bucket_name: str) -> List[RepoHead]:
         for obj in response["Contents"]:
             tokens = obj["Key"][len(tag_head_prefix) :].split(";")
             if len(tokens) == 5:
-                (repo_host_port, repo_user_name, repo_name, last_run_at, tags_count,) = tuple(
-                    tokens
-                )
+                (
+                    repo_host_port,
+                    repo_user_name,
+                    repo_name,
+                    last_run_at,
+                    tags_count,
+                ) = tuple(tokens)
                 t = repo_host_port.split(":")
                 repo_host_name = t[0]
                 repo_port = t[1] if len(t) > 1 else None
@@ -164,7 +168,10 @@ def save_repo_credentials(
                     {
                         "Effect": "Allow",
                         "Principal": {"AWS": f"arn:aws:iam::{account_id}:role/{role_name}"},
-                        "Action": ["secretsmanager:GetSecretValue", "secretsmanager:ListSecrets",],
+                        "Action": [
+                            "secretsmanager:GetSecretValue",
+                            "secretsmanager:ListSecrets",
+                        ],
                         "Resource": "*",
                     }
                 ],

@@ -71,14 +71,23 @@ def _runner_path() -> Path:
 
 
 def _get_runner_config_dir(
-    runner_id: str, config: Optional[BackendConfig] = None, create: Optional[bool] = None,
+    runner_id: str,
+    config: Optional[BackendConfig] = None,
+    create: Optional[bool] = None,
 ) -> Path:
     runner_config_dir_path = _config_directory_path() / "tmp" / "runner" / "configs" / runner_id
     if create:
         runner_config_dir_path.mkdir(parents=True, exist_ok=True)
         config.save(path=runner_config_dir_path / "config.yaml")
         runner_config_path = runner_config_dir_path / "runner.yaml"
-        runner_config_path.write_text(yaml.dump({"id": runner_id, "hostname": "127.0.0.1",}))
+        runner_config_path.write_text(
+            yaml.dump(
+                {
+                    "id": runner_id,
+                    "hostname": "127.0.0.1",
+                }
+            )
+        )
     return runner_config_dir_path
 
 
@@ -154,7 +163,14 @@ def start_runner_process(runner_id: str) -> str:
     _install_runner_if_necessary()
     runner_config_dir = _get_runner_config_dir(runner_id)
     proc = subprocess.Popen(
-        [_runner_path(), "--config-dir", runner_config_dir, "--log-level", "6", "start",],
+        [
+            _runner_path(),
+            "--config-dir",
+            runner_config_dir,
+            "--log-level",
+            "6",
+            "start",
+        ],
         stdout=subprocess.DEVNULL,
         stderr=subprocess.STDOUT,
         start_new_session=True,

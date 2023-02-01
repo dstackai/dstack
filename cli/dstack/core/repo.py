@@ -8,7 +8,11 @@ from dstack.util import _quoted, _quoted_masked
 
 class RepoAddress:
     def __init__(
-        self, repo_host_name: str, repo_port: Optional[int], repo_user_name: str, repo_name: str,
+        self,
+        repo_host_name: str,
+        repo_port: Optional[int],
+        repo_user_name: str,
+        repo_name: str,
     ) -> None:
         self.repo_host_name = repo_host_name
         self.repo_port = repo_port
@@ -61,7 +65,10 @@ class RepoProtocol(Enum):
 
 class RepoCredentials:
     def __init__(
-        self, protocol: RepoProtocol, private_key: Optional[str], oauth_token: Optional[str],
+        self,
+        protocol: RepoProtocol,
+        private_key: Optional[str],
+        oauth_token: Optional[str],
     ):
         self.protocol = protocol
         self.private_key = private_key

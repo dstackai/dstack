@@ -48,7 +48,11 @@ def default_func(_: Namespace):
 def main():
     parser = ArgumentParser(add_help=False)
     parser.add_argument(
-        "-v", "--version", action="version", version=f"{version}", help="Show program's version",
+        "-v",
+        "--version",
+        action="version",
+        version=f"{version}",
+        help="Show program's version",
     )
     parser.add_argument(
         "-h",

@@ -40,7 +40,11 @@ def __remove_prefix(text, prefix):
 
 
 def upload_job_artifact_files(
-    path: str, repo_address: RepoAddress, job_id: str, artifact_name: str, local_path: Path,
+    path: str,
+    repo_address: RepoAddress,
+    job_id: str,
+    artifact_name: str,
+    local_path: Path,
 ):
     pass
 

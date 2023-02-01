@@ -101,7 +101,11 @@ def events_loop(path: str, repo_address: RepoAddress, job_heads: List[JobHead]):
             for _job in _jobs:
                 for line_log in tails[_job.job_id]:
                     yield {
-                        "message": {"source": "stdout", "log": line_log, "job_id": _job.job_id,},
+                        "message": {
+                            "source": "stdout",
+                            "log": line_log,
+                            "job_id": _job.job_id,
+                        },
                         "eventId": _job.runner_id,
                         "timestamp": time.time(),
                     }

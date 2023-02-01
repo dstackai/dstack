@@ -83,7 +83,10 @@ def add_secret(
                     {
                         "Effect": "Allow",
                         "Principal": {"AWS": f"arn:aws:iam::{account_id}:role/{role_name}"},
-                        "Action": ["secretsmanager:GetSecretValue", "secretsmanager:ListSecrets",],
+                        "Action": [
+                            "secretsmanager:GetSecretValue",
+                            "secretsmanager:ListSecrets",
+                        ],
                         "Resource": "*",
                     }
                 ],
@@ -103,7 +106,8 @@ def update_secret(
 ):
     secret_id = f"/dstack/{bucket_name}/secrets/{repo_address.path()}/{secret.secret_name}"
     secretsmanager_client.put_secret_value(
-        SecretId=secret_id, SecretString=secret.secret_value,
+        SecretId=secret_id,
+        SecretString=secret.secret_value,
     )
     secret_head_key = _secret_head_key(repo_address, secret.secret_name)
     s3_client.put_object(Body="", Bucket=bucket_name, Key=secret_head_key)

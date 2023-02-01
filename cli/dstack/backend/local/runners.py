@@ -122,7 +122,14 @@ def start_runner_process(runner_id: str) -> str:
     _install_runner_if_necessary()
     runner_config_dir = _get_runner_config_dir(runner_id)
     proc = subprocess.Popen(
-        [_runner_path(), "--config-dir", runner_config_dir, "--log-level", "6", "start",],
+        [
+            _runner_path(),
+            "--config-dir",
+            runner_config_dir,
+            "--log-level",
+            "6",
+            "start",
+        ],
         stdout=subprocess.DEVNULL,
         stderr=subprocess.STDOUT,
         start_new_session=True,
@@ -204,7 +211,14 @@ def _get_runner_config_dir(runner_id: str, create: Optional[bool] = None) -> str
     if create:
         runner_config_dir_path.mkdir(parents=True, exist_ok=True)
         runner_config_path = runner_config_dir_path / "runner.yaml"
-        runner_config_path.write_text(yaml.dump({"id": runner_id, "hostname": "127.0.0.1",}))
+        runner_config_path.write_text(
+            yaml.dump(
+                {
+                    "id": runner_id,
+                    "hostname": "127.0.0.1",
+                }
+            )
+        )
     return runner_config_dir_path
 
 
@@ -221,7 +235,9 @@ def get_request_head(path: str, job: Job, runner: Optional[Runner] = None) -> Re
     if request_id:
         _running = is_running(request_id)
         return RequestHead(
-            job.job_id, RequestStatus.RUNNING if _running else RequestStatus.TERMINATED, None,
+            job.job_id,
+            RequestStatus.RUNNING if _running else RequestStatus.TERMINATED,
+            None,
         )
     else:
         return RequestHead(job.job_id, RequestStatus.TERMINATED, "PID is not specified")

@@ -65,7 +65,9 @@ def _load_workflows():
     return workflows
 
 
-def parse_run_args(args: Namespace,) -> Tuple[str, List[str], Optional[str], Dict[str, Any]]:
+def parse_run_args(
+    args: Namespace,
+) -> Tuple[str, List[str], Optional[str], Dict[str, Any]]:
     provider_args = args.args + args.unknown
     workflow_name = None
     workflow_data = {}
@@ -129,7 +131,11 @@ def poll_logs_ws(backend: Backend, repo_address: RepoAddress, job_head: JobHead,
     url = f"ws://{job.host_name}:{job.env['WS_LOGS_PORT']}/logsws"
     cursor.hide()
     _ws = websocket.WebSocketApp(
-        url, on_message=on_message, on_error=on_error, on_open=on_open, on_close=on_close,
+        url,
+        on_message=on_message,
+        on_error=on_error,
+        on_open=on_open,
+        on_close=on_close,
     )
     _ws.run_forever()
     cursor.show()
@@ -176,7 +182,9 @@ def poll_run(repo_address: RepoAddress, job_heads: List[JobHead], backend: Backe
                 if run.has_request_status([RequestStatus.TERMINATED, RequestStatus.NO_CAPACITY]):
                     if run.has_request_status([RequestStatus.TERMINATED]):
                         progress.update(
-                            task, description=f"[red]Request(s) terminated[/]", total=100,
+                            task,
+                            description=f"[red]Request(s) terminated[/]",
+                            total=100,
                         )
                         break
                     elif not request_errors_printed and run.has_request_status(
@@ -197,7 +205,12 @@ def poll_run(repo_address: RepoAddress, job_heads: List[JobHead], backend: Backe
             poll_logs_ws(backend, repo_address, job_heads[0], console)
         else:
             poll_logs(
-                backend, repo_address, job_heads, since("1d"), attach=True, from_run=True,
+                backend,
+                repo_address,
+                job_heads,
+                since("1d"),
+                attach=True,
+                from_run=True,
             )
     except KeyboardInterrupt:
         run_name = job_heads[0].run_name
@@ -222,7 +235,11 @@ class RunCommand(BasicCommand):
             nargs="?",
         )
         self._parser.add_argument(
-            "--remote", metavar="BACKEND", nargs=argparse.ZERO_OR_MORE, help="", type=str,
+            "--remote",
+            metavar="BACKEND",
+            nargs=argparse.ZERO_OR_MORE,
+            help="",
+            type=str,
         )
         self._parser.add_argument(
             "-t",
@@ -233,7 +250,10 @@ class RunCommand(BasicCommand):
             dest="tag_name",
         )
         self._parser.add_argument(
-            "-d", "--detach", help="Do not poll for status update and logs", action="store_true",
+            "-d",
+            "--detach",
+            help="Do not poll for status update and logs",
+            action="store_true",
         )
         self._parser.add_argument(
             "args",
@@ -277,9 +297,12 @@ class RunCommand(BasicCommand):
                         backend_name = args.remote[0]
                 backend = get_backend_by_name(backend_name)
 
-                (provider_name, provider_args, workflow_name, workflow_data,) = parse_run_args(
-                    args
-                )
+                (
+                    provider_name,
+                    provider_args,
+                    workflow_name,
+                    workflow_data,
+                ) = parse_run_args(args)
                 provider = providers.load_provider(provider_name)
                 if hasattr(args, "help") and args.help:
                     provider.help(workflow_name)

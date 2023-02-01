@@ -132,7 +132,11 @@ def create_log_group_if_not_exists(logs_client: BaseClient, bucket_name: str, lo
         filter(lambda g: g["logGroupName"] == log_group_name, response["logGroups"])
     ):
         logs_client.create_log_group(
-            logGroupName=log_group_name, tags={"owner": "dstack", "dstack_bucket": bucket_name,},
+            logGroupName=log_group_name,
+            tags={
+                "owner": "dstack",
+                "dstack_bucket": bucket_name,
+            },
         )
 
 

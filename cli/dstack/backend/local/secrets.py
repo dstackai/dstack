@@ -32,7 +32,8 @@ def get_secret(path: str, repo_address: RepoAddress, secret_name: str) -> Option
         return Secret(
             secret_name,
             get_secret_value(
-                SecretId=f"/dstack/secrets/{repo_address.path()}/{secret_name}", Root=root,
+                SecretId=f"/dstack/secrets/{repo_address.path()}/{secret_name}",
+                Root=root,
             ),
         )
     except Exception as e:

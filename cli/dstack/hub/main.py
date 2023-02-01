@@ -29,7 +29,8 @@ async def update_admin_user() -> User:
         admin_user = session.get(User, "admin")
         if admin_user is None:
             admin_user = User(
-                name="admin", token=os.getenv("DSTACK_HUB_ADMIN_TOKEN") or str(uuid.uuid4()),
+                name="admin",
+                token=os.getenv("DSTACK_HUB_ADMIN_TOKEN") or str(uuid.uuid4()),
             )
             session.add(admin_user)
             session.commit()

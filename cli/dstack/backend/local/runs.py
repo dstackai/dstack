@@ -72,7 +72,12 @@ def _update_run(path: str, run: RunHead, job_head: JobHead, include_request_head
         if run.app_heads is None:
             run.app_heads = []
         run.app_heads.extend(
-            list(map(lambda app_name: AppHead(job_head.job_id, app_name), job_head.app_names,))
+            list(
+                map(
+                    lambda app_name: AppHead(job_head.job_id, app_name),
+                    job_head.app_names,
+                )
+            )
         )
     if job_head.status.is_unfinished():
         run.status = job_head.status
@@ -99,7 +104,10 @@ def get_run_heads(
 
 
 def list_run_heads(
-    path: str, repo_address: RepoAddress, run_name: Optional[str], include_request_heads: bool,
+    path: str,
+    repo_address: RepoAddress,
+    run_name: Optional[str],
+    include_request_heads: bool,
 ) -> List[RunHead]:
     job_heads = jobs.list_job_heads(path, repo_address, run_name)
     return get_run_heads(path, job_heads, include_request_heads)

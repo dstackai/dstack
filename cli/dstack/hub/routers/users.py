@@ -22,5 +22,6 @@ async def info(authorization: HTTPAuthorizationCredentials = Depends(security)) 
             return {"user_name": user.name}
         else:
             raise HTTPException(
-                status_code=status.HTTP_403_FORBIDDEN, detail=f"Token is invalid",
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail=f"Token is invalid",
             )

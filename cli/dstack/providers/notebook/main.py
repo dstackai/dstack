@@ -62,7 +62,11 @@ class NotebookProvider(Provider):
                 port_count=1,
                 requirements=self.resources,
                 app_specs=[
-                    AppSpec(port_index=0, app_name="notebook", url_query_params={"token": token},)
+                    AppSpec(
+                        port_index=0,
+                        app_name="notebook",
+                        url_query_params={"token": token},
+                    )
                 ],
             )
         ]

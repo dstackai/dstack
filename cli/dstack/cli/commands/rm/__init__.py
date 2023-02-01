@@ -21,7 +21,11 @@ class RMCommand(BasicCommand):
             "run_name", metavar="RUN", type=str, nargs="?", help="A name of a run"
         )
         self._parser.add_argument(
-            "-a", "--all", help="Remove all finished runs", dest="all", action="store_true",
+            "-a",
+            "--all",
+            help="Remove all finished runs",
+            dest="all",
+            action="store_true",
         )
         self._parser.add_argument(
             "-y", "--yes", help="Don't ask for confirmation", action="store_true"

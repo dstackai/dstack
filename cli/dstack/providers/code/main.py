@@ -66,7 +66,10 @@ class CodeProvider(Provider):
                     AppSpec(
                         port_index=0,
                         app_name="code",
-                        url_query_params={"tkn": connection_token, "folder": "/workflow",},
+                        url_query_params={
+                            "tkn": connection_token,
+                            "folder": "/workflow",
+                        },
                     )
                 ],
             )

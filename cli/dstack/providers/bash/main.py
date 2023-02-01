@@ -63,7 +63,10 @@ class BashProvider(Provider):
             apps = []
             for i in range(self.ports):
                 apps.append(
-                    AppSpec(port_index=i, app_name="bash" + (i if self.ports > 1 else ""),)
+                    AppSpec(
+                        port_index=i,
+                        app_name="bash" + (i if self.ports > 1 else ""),
+                    )
                 )
         return [
             JobSpec(

@@ -48,7 +48,10 @@ class Runner:
             "cpus": self.resources.cpus,
             "memory_mib": self.resources.memory_mib,
             "gpus": [
-                {"name": gpu.name, "memory_mib": gpu.memory_mib,}
+                {
+                    "name": gpu.name,
+                    "memory_mib": gpu.memory_mib,
+                }
                 for gpu in (self.resources.gpus or [])
             ],
             "interruptible": self.resources.interruptible is True,

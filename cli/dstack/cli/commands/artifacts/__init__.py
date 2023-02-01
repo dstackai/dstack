@@ -45,7 +45,10 @@ class ArtifactCommand(BasicCommand):
     def register(self):
         subparsers = self._parser.add_subparsers()
 
-        list_parser = subparsers.add_parser("list", help="List artifacts",)
+        list_parser = subparsers.add_parser(
+            "list",
+            help="List artifacts",
+        )
         list_parser.add_argument(
             "run_name_or_tag_name",
             metavar="RUN | :TAG",
@@ -54,7 +57,10 @@ class ArtifactCommand(BasicCommand):
         )
         list_parser.set_defaults(func=self.list)
 
-        download_parser = subparsers.add_parser("download", help="Download artifacts",)
+        download_parser = subparsers.add_parser(
+            "download",
+            help="Download artifacts",
+        )
         download_parser.add_argument(
             "run_name_or_tag_name",
             metavar="(RUN | :TAG)",
