@@ -27,7 +27,7 @@ class Backend(object):
 
     @property
     def name(self) -> str:
-        return self.NAME + ("*" if self.type() == BackendType.REMOTE else "")
+        return self.NAME
 
     def configure(self):
         pass
