@@ -8,7 +8,7 @@ from rich.table import Table
 from dstack.cli.commands import BasicCommand
 from dstack.core.error import check_config, check_git
 from dstack.api.repo import load_repo_data
-from dstack.util import pretty_date
+from dstack.utils.common import pretty_date
 from dstack.api.backend import list_backends
 
 
@@ -98,9 +98,7 @@ class TAGCommand(BasicCommand):
                             repo_data, args.tag_name, args.run_name, run_jobs=None
                         )
                 else:
-                    backend.add_tag_from_local_dirs(
-                        repo_data, args.tag_name, args.artifact_paths
-                    )
+                    backend.add_tag_from_local_dirs(repo_data, args.tag_name, args.artifact_paths)
             print(f"[grey58]OK[/]")
         else:
             sys.exit("Specify -r RUN or -a PATH to create a tag")

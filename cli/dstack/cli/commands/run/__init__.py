@@ -18,7 +18,6 @@ from cursor import cursor
 import websocket
 from websocket import WebSocketApp
 
-
 from dstack import providers
 from dstack.core.error import check_config, check_git, check_backend
 from dstack.core.repo import RepoAddress
@@ -31,7 +30,8 @@ from dstack.api.repo import load_repo_data
 from dstack.api.backend import get_backend_by_name, DEFAULT, DEFAULT_REMOTE
 from dstack.api.logs import poll_logs
 from dstack.api.run import list_runs
-from dstack.util import since
+from dstack.utils.common import since
+
 
 __all__ = "RunCommand"
 

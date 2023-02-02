@@ -2,7 +2,7 @@ from typing import Optional, List
 
 from dstack.core.artifact import ArtifactHead
 from dstack.core.repo import RepoAddress
-from dstack.util import _quoted
+from dstack.utils.common import _quoted
 
 
 class TagHead:
@@ -45,7 +45,9 @@ class TagHead:
 
     def serialize_artifact_heads(self):
         return (
-            ":".join([a.job_id + "=" + a.artifact_path.replace('/', '_') for a in self.artifact_heads])
+            ":".join(
+                [a.job_id + "=" + a.artifact_path.replace("/", "_") for a in self.artifact_heads]
+            )
             if self.artifact_heads
             else ""
         )

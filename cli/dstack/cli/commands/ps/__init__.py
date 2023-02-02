@@ -12,7 +12,8 @@ from dstack.api.run import list_runs
 from dstack.core.request import RequestStatus
 from dstack.core.run import RunHead
 from dstack.api.backend import list_backends
-from dstack.util import pretty_date
+from dstack.utils.common import pretty_date
+
 
 _status_colors = {
     JobStatus.SUBMITTED: "yellow",

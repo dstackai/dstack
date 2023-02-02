@@ -3,7 +3,7 @@ from typing import Optional
 
 import git
 
-from dstack.util import _quoted, _quoted_masked
+from dstack.utils.common import _quoted, _quoted_masked
 
 
 class RepoAddress:

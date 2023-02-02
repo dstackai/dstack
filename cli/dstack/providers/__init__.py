@@ -20,7 +20,7 @@ from dstack.core.job import (
 )
 from dstack.core.repo import RepoData, RepoAddress
 from dstack.api.repo import load_repo_data
-from dstack.util import _quoted
+from dstack.utils.common import _quoted
 
 
 def _str_to_mib(s: str) -> int:

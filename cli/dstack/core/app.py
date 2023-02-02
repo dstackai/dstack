@@ -1,6 +1,6 @@
 from typing import Optional, Dict
 
-from dstack.util import _quoted
+from dstack.utils.common import _quoted
 
 
 class AppSpec:

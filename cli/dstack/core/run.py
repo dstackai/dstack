@@ -1,12 +1,12 @@
 from typing import Optional, List
 
-from dstack.util import _quoted
 from dstack.core.app import AppHead
 from dstack.core.artifact import ArtifactHead
 from dstack.core.repo import RepoAddress
 from dstack.core.request import RequestHead, RequestStatus
 from dstack.core.job import JobStatus
 from dstack.utils import random_names
+from dstack.utils.common import _quoted
 
 
 class RunHead:

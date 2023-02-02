@@ -6,7 +6,7 @@ from dstack.core.artifact import ArtifactSpec
 from dstack.core.app import AppSpec
 from dstack.core.dependents import DepSpec
 from dstack.core.repo import RepoData, RepoAddress
-from dstack.util import _quoted
+from dstack.utils.common import _quoted
 
 
 class GpusRequirements:
