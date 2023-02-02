@@ -12,14 +12,8 @@ from dstack.backend.local.common import (
 )
 
 
-def dest_file_path(key: str, output_path: Path) -> Path:
-    return output_path / "/".join(key.split("/")[5:])
-
-
-def download_run_artifact_files(
-    path: str, repo_address: RepoAddress, run_name: str, output_dir: Optional[str]
-):
-    pass
+def get_artifacts_path(dstack_dir: Path, repo_address: RepoAddress) -> Path:
+    return Path.joinpath(dstack_dir, "artifacts", repo_address.path())
 
 
 def list_run_artifact_files(

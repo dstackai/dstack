@@ -9,8 +9,12 @@ from tqdm import tqdm
 from dstack.core.repo import RepoAddress
 
 
-def dest_file_path(key: str, output_path: Path) -> Path:
-    return output_path / "/".join(key.split("/")[5:])
+def dest_file_path(key: str, output_dir: Path, output_job_dirs: bool) -> Path:
+    if output_dir:
+        file_path = "/".join(key.split("/")[4:])
+    else:
+        file_path = "/".join(key.split("/")[5:])
+    return output_dir / file_path
 
 
 def download_run_artifact_files(
@@ -19,6 +23,7 @@ def download_run_artifact_files(
     repo_address: RepoAddress,
     run_name: str,
     output_dir: Optional[str],
+    output_job_dirs: bool,
 ):
     artifact_prefix = f"artifacts/{repo_address.path()}/{run_name},"
 
@@ -31,7 +36,6 @@ def download_run_artifact_files(
     for page in page_iterator:
         for obj in page.get("Contents") or []:
             key = obj["Key"]
-
             total_size += obj["Size"]
             if obj["Size"] > 0 and not key.endswith("/"):
                 keys.append(key)
@@ -50,12 +54,9 @@ def download_run_artifact_files(
         def callback(size):
             pbar.update(size)
 
-        for i in range(len(keys)):
-            key = keys[i]
-
-            file_path = dest_file_path(key, output_path)
+        for key in keys:
+            file_path = dest_file_path(key, output_path, output_job_dirs)
             file_path.parent.mkdir(parents=True, exist_ok=True)
-
             downloader.download_file(bucket_name, key, str(file_path), callback=callback)
 
 

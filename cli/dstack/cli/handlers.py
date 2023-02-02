@@ -9,7 +9,7 @@ import dstack.cli.commands.logs
 import dstack.cli.commands.ls
 import dstack.cli.commands.ps
 
-# import dstack.cli.commands.pull
+import dstack.cli.commands.pull
 import dstack.cli.commands.rm
 import dstack.cli.commands.run
 import dstack.cli.commands.secrets

@@ -129,8 +129,8 @@ def create_tag_from_run(
                     job_with_anther_tag = job
         if job_with_anther_tag:
             raise BackendError(
-                f"The run '{job_with_anther_tag.run_name} refers to another tag: "
-                f"{job_with_anther_tag.tag_name}'"
+                f"The run '{job_with_anther_tag.run_name}' refers to another tag: "
+                f"'{job_with_anther_tag.tag_name}'"
             )
         if not tag_jobs:
             sys.exit(f"Cannot find the run '{run_name}'")

@@ -57,6 +57,9 @@ class Backend(object):
     def delete_job_head(self, repo_address: RepoAddress, job_id: str):
         pass
 
+    def store_job(self, repo_address: RepoAddress, job: Job):
+        pass
+
     def stop_jobs(self, repo_address: RepoAddress, run_name: Optional[str], abort: bool):
         job_heads = self.list_job_heads(repo_address, run_name)
         for job_head in job_heads:
@@ -120,7 +123,11 @@ class Backend(object):
         pass
 
     def download_run_artifact_files(
-        self, repo_address: RepoAddress, run_name: str, output_dir: Optional[str]
+        self,
+        repo_address: RepoAddress,
+        run_name: str,
+        output_dir: Optional[str],
+        output_job_dirs: bool = True,
     ):
         pass
 

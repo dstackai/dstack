@@ -236,7 +236,11 @@ class AwsBackend(Backend):
         )
 
     def download_run_artifact_files(
-        self, repo_address: RepoAddress, run_name: str, output_dir: Optional[str]
+        self,
+        repo_address: RepoAddress,
+        run_name: str,
+        output_dir: Optional[str],
+        output_job_dirs: bool = True,
     ):
         artifacts.download_run_artifact_files(
             self._s3_client(),
@@ -244,6 +248,7 @@ class AwsBackend(Backend):
             repo_address,
             run_name,
             output_dir,
+            output_job_dirs,
         )
 
     def list_tag_heads(self, repo_address: RepoAddress) -> List[TagHead]:

@@ -1,4 +1,5 @@
 import sys
+from pathlib import Path
 from typing import List, Optional, Generator, Dict, Tuple
 
 from dstack.backend.local import (
@@ -56,6 +57,9 @@ class LocalBackend(Backend):
 
     def stop_job(self, repo_address: RepoAddress, job_id: str, abort: bool):
         runners.stop_job(self.backend_config.path, repo_address, job_id, abort)
+
+    def store_job(self, job: Job):
+        jobs.store_job(self.backend_config.path, job)
 
     def delete_job_head(self, repo_address: RepoAddress, job_id: str):
         jobs.delete_job_head(self.backend_config.path, repo_address, job_id)
@@ -126,25 +130,16 @@ class LocalBackend(Backend):
     ]:
         pass
 
-    def download_run_artifact_files(
-        self, repo_address: RepoAddress, run_name: str, output_dir: Optional[str]
-    ):
-        pass
-
     def list_run_artifact_files(
         self, repo_address: RepoAddress, run_name: str
     ) -> Generator[Tuple[str, str, int], None, None]:
         return artifacts.list_run_artifact_files(self.backend_config.path, repo_address, run_name)
 
     def list_tag_heads(self, repo_address: RepoAddress) -> List[TagHead]:
-        return tags.list_tag_heads(
-           self.backend_config.path, repo_address
-        )
+        return tags.list_tag_heads(self.backend_config.path, repo_address)
 
     def get_tag_head(self, repo_address: RepoAddress, tag_name: str) -> Optional[TagHead]:
-        return tags.get_tag_head(
-            self.backend_config.path, repo_address, tag_name
-        )
+        return tags.get_tag_head(self.backend_config.path, repo_address, tag_name)
 
     def add_tag_from_run(
         self,
@@ -217,3 +212,6 @@ class LocalBackend(Backend):
 
     def type(self) -> BackendType:
         return BackendType.LOCAL
+
+    def get_artifacts_path(self, repo_address: RepoAddress) -> Path:
+        return artifacts.get_artifacts_path(self.backend_config.path, repo_address)

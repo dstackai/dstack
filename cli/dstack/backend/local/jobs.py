@@ -62,7 +62,7 @@ def create_job(path: str, job: Job, counter: List[int] = [], create_head: bool =
     if create_head:
         put_object(Body="", Root=root, Key=job.job_head_key(add_prefix=False))
     key = f"{job_id}.yaml"
-    put_object(Body=yaml.dump(Job.unserialize), Root=root, Key=key)
+    put_object(Body=yaml.dump(job.serialize()), Root=root, Key=key)
     counter[0] += 1
 
 
@@ -139,3 +139,7 @@ def delete_job_head(path: str, repo_address: RepoAddress, job_id: str):
     response = list_objects(Root=root, Prefix=job_head_key_prefix, MaxKeys=1)
     for obj in response:
         delete_object(Root=root, Key=obj)
+
+
+def store_job(dstack_dir: Path, job: Job):
+    create_job(dstack_dir, job)
