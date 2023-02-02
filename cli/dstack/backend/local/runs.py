@@ -1,8 +1,7 @@
 from typing import Optional, List
 
-from dstack import random_name
 from dstack.backend.local import run_names, logs, jobs, runners
-from dstack.core.run import RunHead
+from dstack.core.run import RunHead, generate_local_run_name_prefix
 from dstack.core.app import AppHead
 from dstack.core.artifact import ArtifactHead
 from dstack.core.job import JobHead
@@ -10,7 +9,7 @@ from dstack.core.repo import RepoAddress
 
 
 def create_run(path: str, repo_address: RepoAddress) -> str:
-    name = random_name.next_name()
+    name = generate_local_run_name_prefix()
     run_name_index = run_names.next_run_name_index(path, name)
     run_name = f"{name}-{run_name_index}"
     return run_name

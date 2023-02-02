@@ -1,4 +1,6 @@
 import random
+from typing import List
+
 
 __adjectives = [
     "afraid",
@@ -134,6 +136,7 @@ __adjectives = [
     "young",
 ]
 
+
 __animals = [
     "ape",
     "baboon",
@@ -240,5 +243,17 @@ __animals = [
 ]
 
 
-def next_name() -> str:
-    return random.choice(__adjectives) + "-" + random.choice(__animals)
+def get_adjectives() -> List[str]:
+    return __adjectives
+
+
+def get_animals() -> List[str]:
+    return __animals
+
+
+def generate_name() -> str:
+    return generate_name_from_sets(__adjectives, __animals)
+
+
+def generate_name_from_sets(set1: List[str], set2: List[str]) -> str:
+    return random.choice(set1) + "-" + random.choice(set2)

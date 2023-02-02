@@ -6,6 +6,7 @@ from dstack.core.artifact import ArtifactHead
 from dstack.core.repo import RepoAddress
 from dstack.core.request import RequestHead, RequestStatus
 from dstack.core.job import JobStatus
+from dstack.utils import random_names
 
 
 class RunHead:
@@ -69,3 +70,17 @@ class RunHead:
         return self.status.is_unfinished() and any(
             filter(lambda s: s.status in statuses, self.request_heads or [])
         )
+
+
+_adjectives = random_names.get_adjectives()
+_adjectives_subset_1 = _adjectives[::2]
+_adjectives_subset_2 = _adjectives[1::2]
+_animals = random_names.get_animals()
+
+
+def generate_local_run_name_prefix() -> str:
+    return random_names.generate_name_from_sets(_adjectives_subset_1, _animals)
+
+
+def generate_remote_run_name_prefix() -> str:
+    return random_names.generate_name_from_sets(_adjectives_subset_2, _animals)
