@@ -39,7 +39,7 @@ class RMCommand(BasicCommand):
             and (args.yes or Confirm.ask(f"[red]Delete the run '{args.run_name}'?[/]"))
         ) or (args.all and (args.yes or Confirm.ask("[red]Delete all runs?[/]"))):
             repo_data = load_repo_data()
-
+            deleted_run = False
             for backend in list_backends():
                 job_heads = backend.list_job_heads(repo_data, args.run_name)
                 if job_heads:
@@ -51,10 +51,10 @@ class RMCommand(BasicCommand):
                             sys.exit("The run is not finished yet. Stop the run first.")
                     for job_head in finished_job_heads:
                         backend.delete_job_head(repo_data, job_head.job_id)
-                    print(f"[grey58]OK[/]")
-                    return
-            if args.run_name:
+                        deleted_run = True
+            if args.run_name and not deleted_run:
                 sys.exit(f"Cannot find the run '{args.run_name}'")
+            print(f"[grey58]OK[/]")
         else:
             if not args.run_name and not args.all:
                 sys.exit("Specify a run name or use --all to delete all runs")
