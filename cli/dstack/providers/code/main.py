@@ -32,7 +32,7 @@ class CodeProvider(Provider):
         super().load(backend, provider_args, workflow_name, provider_data, run_name)
         self.setup = self._get_list_data("setup") or self._get_list_data("before_run")
         self.python = self._safe_python_version("python")
-        self.version = self.provider_data.get("version") or "1.72.3"
+        self.version = self.provider_data.get("version") or "1.74.3"
         self.env = self._env()
         self.artifact_specs = self._artifact_specs()
         self.working_dir = self.provider_data.get("working_dir")
