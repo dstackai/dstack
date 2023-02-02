@@ -6,7 +6,7 @@ from rich.prompt import Confirm
 from rich.table import Table
 
 from dstack.cli.commands import BasicCommand
-from dstack.core.error import check_config, check_git
+from dstack.core.error import check_config, check_git, BackendError
 from dstack.api.repo import load_repo_data
 from dstack.utils.common import pretty_date
 from dstack.api.backend import list_backends
@@ -88,17 +88,26 @@ class TAGCommand(BasicCommand):
                         f"Do you want to override it?[/]"
                     ):
                         backend.delete_tag_head(repo_data, tag_head)
-                        break
                     else:
                         return
-                if not (args.run_name is None):
+                if args.run_name is not None:
                     jobs_heads = backend.list_job_heads(repo_data, args.run_name)
                     if len(jobs_heads) != 0:
-                        backend.add_tag_from_run(
-                            repo_data, args.tag_name, args.run_name, run_jobs=None
-                        )
+                        try:
+                            backend.add_tag_from_run(
+                                repo_data, args.tag_name, args.run_name, run_jobs=None
+                            )
+                        except BackendError as e:
+                            print(e)
+                            exit(1)
                 else:
-                    backend.add_tag_from_local_dirs(repo_data, args.tag_name, args.artifact_paths)
+                    try:
+                        backend.add_tag_from_local_dirs(
+                            repo_data, args.tag_name, args.artifact_paths
+                        )
+                    except BackendError as e:
+                        print(e)
+                        exit(1)
             print(f"[grey58]OK[/]")
         else:
             sys.exit("Specify -r RUN or -a PATH to create a tag")
@@ -106,15 +115,16 @@ class TAGCommand(BasicCommand):
     @check_config
     def delete_tag(self, args: Namespace):
         repo_data = load_repo_data()
-        current_backend = None
-        tag_head = None
+        tag_heads = []
         for backend in list_backends():
             tag_head = backend.get_tag_head(repo_data, args.tag_name)
-            if tag_head:
-                current_backend = backend
-                break
-        if current_backend is None:
+            if tag_head is not None:
+                tag_heads.append((backend, tag_head))
+
+        if len(tag_heads) == 0:
             sys.exit(f"The tag '{args.tag_name}' doesn't exist")
-        if args.yes or Confirm.ask(f" [red]Delete the tag '{tag_head.tag_name}'?[/]"):
-            current_backend.delete_tag_head(repo_data, tag_head)
+
+        if args.yes or Confirm.ask(f" [red]Delete the tag '{args.tag_name}'?[/]"):
+            for backend, tag_head in tag_heads:
+                backend.delete_tag_head(repo_data, tag_head)
             print(f"[grey58]OK[/]")
