@@ -147,7 +147,6 @@ jobs:
           GOOS: ${{ matrix.goos }}
           GOARCH: ${{ matrix.goarch }}
           ACTIONSOS: ${{ matrix.runson }}
-          CGO_ENABLED: 1
         run: |
           VERSION=$((${{ github.run_number }} + 150))
           go build -ldflags "-X '$REPO_NAME/runner/version.Version=$VERSION' -X '$REPO_NAME/runner/pkg/log.CloudLog=true' -extldflags '-static'" -o dstack-runner-${{ matrix.goos }}-${{ matrix.goarch }}
