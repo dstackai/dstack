@@ -81,16 +81,18 @@ class TAGCommand(BasicCommand):
         if args.run_name or args.artifact_paths:
             repo_data = load_repo_data()
             added_tag = False
+            confirmed_override = False
             for backend in list_backends():
                 tag_head = backend.get_tag_head(repo_data, args.tag_name)
                 if tag_head:
-                    if args.yes or Confirm.ask(
-                        f"[red]The tag '{args.tag_name}' already exists. "
-                        f"Do you want to override it?[/]"
-                    ):
-                        backend.delete_tag_head(repo_data, tag_head)
-                    else:
-                        return
+                    if not args.yes and not confirmed_override:
+                        confirmed_override = Confirm.ask(
+                            f"[red]The tag '{args.tag_name}' already exists. "
+                            f"Do you want to override it?[/]"
+                        )
+                        if not confirmed_override:
+                            return
+                    backend.delete_tag_head(repo_data, tag_head)
                 if args.run_name is not None:
                     jobs_heads = backend.list_job_heads(repo_data, args.run_name)
                     if len(jobs_heads) == 0:
@@ -99,6 +101,7 @@ class TAGCommand(BasicCommand):
                         backend.add_tag_from_run(
                             repo_data, args.tag_name, args.run_name, run_jobs=None
                         )
+                        added_tag = True
                     except BackendError as e:
                         print(e)
                         exit(1)
@@ -107,7 +110,6 @@ class TAGCommand(BasicCommand):
                         backend.add_tag_from_local_dirs(
                             repo_data, args.tag_name, args.artifact_paths
                         )
-                        added_tag = True
                     except BackendError as e:
                         print(e)
                         exit(1)
