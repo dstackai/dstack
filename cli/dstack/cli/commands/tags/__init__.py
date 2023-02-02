@@ -80,6 +80,7 @@ class TAGCommand(BasicCommand):
     def add_tag(self, args: Namespace):
         if args.run_name or args.artifact_paths:
             repo_data = load_repo_data()
+            added_tag = False
             for backend in list_backends():
                 tag_head = backend.get_tag_head(repo_data, args.tag_name)
                 if tag_head:
@@ -92,22 +93,27 @@ class TAGCommand(BasicCommand):
                         return
                 if args.run_name is not None:
                     jobs_heads = backend.list_job_heads(repo_data, args.run_name)
-                    if len(jobs_heads) != 0:
-                        try:
-                            backend.add_tag_from_run(
-                                repo_data, args.tag_name, args.run_name, run_jobs=None
-                            )
-                        except BackendError as e:
-                            print(e)
-                            exit(1)
+                    if len(jobs_heads) == 0:
+                        continue
+                    try:
+                        backend.add_tag_from_run(
+                            repo_data, args.tag_name, args.run_name, run_jobs=None
+                        )
+                    except BackendError as e:
+                        print(e)
+                        exit(1)
                 else:
                     try:
                         backend.add_tag_from_local_dirs(
                             repo_data, args.tag_name, args.artifact_paths
                         )
+                        added_tag = True
                     except BackendError as e:
                         print(e)
                         exit(1)
+            if args.run_name is not None and not added_tag:
+                print(f"The run '{args.run_name}' doesn't exist")
+                exit(1)
             print(f"[grey58]OK[/]")
         else:
             sys.exit("Specify -r RUN or -a PATH to create a tag")
