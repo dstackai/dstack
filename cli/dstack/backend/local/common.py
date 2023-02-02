@@ -72,7 +72,7 @@ def get_secret_value(SecretId: str, Root: str):
     cur.execute("SELECT secret_string FROM KV WHERE secret_name=?", (SecretId,))
     value = cur.fetchone()
     con.close()
-    if not(value is None):
+    if not (value is None):
         return value[0]
     raise SecretError("Not found")
 
@@ -112,7 +112,7 @@ def delete_secret(SecretId: str, Root: str):
     path_db = os.path.join(Root, "_secrets_")
     con = sqlite3.connect(path_db)
     cur = con.cursor()
-    cur.execute("DELETE FROM KV WHERE secret_name=?", (SecretId, ))
+    cur.execute("DELETE FROM KV WHERE secret_name=?", (SecretId,))
     con.commit()
     con.close()
 

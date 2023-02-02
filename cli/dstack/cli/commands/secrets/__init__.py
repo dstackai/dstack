@@ -98,8 +98,10 @@ class SecretCommand(BasicCommand):
         anyone = False
         for backend in list_backends():
             secret = backend.get_secret(repo_data, args.secret_name)
-            if not(secret is None) and Confirm.ask(f" [red]Delete the secret '{secret.secret_name}'"
-                                                   f"  (backend: {backend.name})?[/]"):
+            if not (secret is None) and Confirm.ask(
+                f" [red]Delete the secret '{secret.secret_name}'"
+                f"  (backend: {backend.name})?[/]"
+            ):
                 anyone = True
                 backend.delete_secret(repo_data, secret.secret_name)
                 print(f"[grey58]OK[/]")
