@@ -1,5 +1,7 @@
-import boto3
+from pathlib import Path
 from typing import Optional, List, Generator, Dict, Tuple
+
+import boto3
 from botocore.client import BaseClient
 
 from dstack.backend import Backend, BackendType
@@ -135,6 +137,9 @@ class AwsBackend(Backend):
             job,
         )
 
+    def store_job(self, job: Job):
+        jobs.store_job(self._s3_client(), self.backend_config.bucket_name, job)
+
     def stop_job(self, repo_address: RepoAddress, job_id: str, abort: bool):
         runners.stop_job(
             self._ec2_client(),
@@ -249,6 +254,22 @@ class AwsBackend(Backend):
             run_name,
             output_dir,
             output_job_dirs,
+        )
+
+    def upload_job_artifact_files(
+        self,
+        repo_address: RepoAddress,
+        job_id: str,
+        artifact_name: str,
+        local_path: Path,
+    ):
+        artifacts.upload_job_artifact_files(
+            s3_client=self._s3_client(),
+            bucket_name=self.backend_config.bucket_name,
+            repo_address=repo_address,
+            job_id=job_id,
+            artifact_name=artifact_name,
+            local_path=local_path,
         )
 
     def list_tag_heads(self, repo_address: RepoAddress) -> List[TagHead]:

@@ -58,7 +58,7 @@ def list_all_objects(Root: str, Prefix: str):
     for _dir in list_dir:
         for root, sub_dirs, files in os.walk(os.path.join(Root, _dir)):
             for filename in files:
-                clear_root = root.replace(os.path.join(Root, _dir), "")
+                clear_root = Path(root).name
                 file_path = os.path.join(clear_root, filename)
                 file_size = os.path.getsize(os.path.join(root, filename))
                 yield _dir, file_path, file_size

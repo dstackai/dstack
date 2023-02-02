@@ -22,8 +22,16 @@ def create_job(
         s3_client.put_object(Body="", Bucket=bucket_name, Key=job.job_head_key())
     prefix = f"jobs/{job.repo_data.path()}"
     key = f"{prefix}/{job_id}.yaml"
-    s3_client.put_object(Body=yaml.dump(Job.unserialize), Bucket=bucket_name, Key=key)
+    s3_client.put_object(Body=yaml.dump(job.serialize()), Bucket=bucket_name, Key=key)
     counter[0] += 1
+
+
+def store_job(
+    s3_client: BaseClient,
+    bucket_name: str,
+    job: Job,
+):
+    create_job(s3_client, bucket_name, job)
 
 
 def get_job(

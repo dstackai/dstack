@@ -69,7 +69,13 @@ def list_run_artifact_files(
     for page in page_iterator:
         for obj in page.get("Contents") or []:
             if obj["Size"] > 0:
-                yield obj["Key"].split("/")[5], "/".join(obj["Key"].split("/")[6:]), obj["Size"]
+                t = obj["Key"].split("/")
+                print(t)
+                job_id = t[4]
+                artifact_name = t[5]
+                artifact_file = "/".join(t[6:])
+                print(artifact_file)
+                yield job_id, artifact_name, artifact_file, obj["Size"]
 
 
 def __remove_prefix(text, prefix):

@@ -70,7 +70,7 @@ class LsCommand(BasicCommand):
             anyone = True
             run_artifact_files = backend.list_run_artifact_files(repo_data, run_name)
             previous_artifact_name = None
-            for (artifact_name, file_name, file_size) in run_artifact_files:
+            for (_, artifact_name, file_name, file_size) in run_artifact_files:
                 table.add_row(
                     artifact_name if previous_artifact_name != artifact_name else "",
                     file_name,

@@ -1,5 +1,6 @@
 import sys
 from enum import Enum
+from pathlib import Path
 from typing import List, Optional, Generator, Tuple, Dict
 
 from dstack.core.app import AppSpec
@@ -57,7 +58,7 @@ class Backend(object):
     def delete_job_head(self, repo_address: RepoAddress, job_id: str):
         pass
 
-    def store_job(self, repo_address: RepoAddress, job: Job):
+    def store_job(self, job: Job):
         pass
 
     def stop_jobs(self, repo_address: RepoAddress, run_name: Optional[str], abort: bool):
@@ -131,9 +132,18 @@ class Backend(object):
     ):
         pass
 
+    def upload_job_artifact_files(
+        self,
+        repo_address: RepoAddress,
+        job_id: str,
+        artifact_name: str,
+        local_path: Path,
+    ):
+        pass
+
     def list_run_artifact_files(
         self, repo_address: RepoAddress, run_name: str
-    ) -> Generator[Tuple[str, str, int], None, None]:
+    ) -> Generator[Tuple[str, str, str, int], None, None]:
         pass
 
     def list_tag_heads(self, repo_address: RepoAddress) -> List[TagHead]:

@@ -1,8 +1,17 @@
-from typing import List, Union
+from typing import List, Union, Tuple, Optional
 from dstack.backend import Backend
 from dstack.core.run import RunHead
 from dstack.core.repo import RepoData
+from dstack.core.tag import TagHead
 from dstack.api.repo import load_repo_data
+
+
+class RunNotFoundError(Exception):
+    pass
+
+
+class TagNotFoundError(Exception):
+    pass
 
 
 def get_runs(
@@ -35,3 +44,20 @@ def list_runs(
         runs = runs + [run for run in get_runs(repo_data, backends, run_name, all)]
     runs = reversed(runs)
     return runs
+
+
+def get_tagged_run_name(repo_data, backend, run_name_or_tag_name) -> Tuple[str, Optional[TagHead]]:
+    if run_name_or_tag_name.startswith(":"):
+        tag_name = run_name_or_tag_name[1:]
+        tag_head = backend.get_tag_head(repo_data, tag_name)
+        if tag_head is not None:
+            return tag_head.run_name, tag_head
+        else:
+            raise TagNotFoundError()
+    else:
+        run_name = run_name_or_tag_name
+        job_heads = backend.list_job_heads(repo_data, run_name)
+        if job_heads:
+            return run_name, None
+        else:
+            raise RunNotFoundError()
