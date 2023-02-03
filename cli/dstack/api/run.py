@@ -1,4 +1,6 @@
-from typing import List, Union, Tuple, Optional
+from collections import defaultdict
+from typing import List, Tuple, Optional
+
 from dstack.backend import Backend
 from dstack.core.run import RunHead
 from dstack.core.repo import RepoData
@@ -14,14 +16,41 @@ class TagNotFoundError(Exception):
     pass
 
 
-def get_runs(
+def list_runs_with_merged_backends(
+    backends: List[Backend], run_name: str = "", all: bool = False
+) -> List[Tuple[RunHead, List[Backend]]]:
+    runs = list_runs(backends, run_name, all)
+    run_name_to_run_map = {r.run_name: r for r, _ in runs}
+
+    run_name_to_backends_map = defaultdict(list)
+    for run, backend in runs:
+        run_name_to_backends_map[run.run_name].append(backend)
+
+    runs_with_merged_backends = []
+    for run_name in run_name_to_run_map:
+        runs_with_merged_backends.append(
+            (run_name_to_run_map[run_name], run_name_to_backends_map[run_name])
+        )
+    return runs_with_merged_backends
+
+
+def list_runs(
+    backends: List[Backend], run_name: str = "", all: bool = False
+) -> List[Tuple[RunHead, Backend]]:
+    repo_data = load_repo_data()
+    runs = []
+    for backend in backends:
+        runs += [(run, backend) for run in _get_runs(repo_data, backend, run_name, all)]
+    return list(reversed(runs))
+
+
+def _get_runs(
     repo_data: RepoData, backend: Backend, run_name: str = "", all: bool = False
 ) -> List[RunHead]:
     runs = []
     job_heads = backend.list_job_heads(repo_data, run_name)
     runs_backend = backend.get_run_heads(repo_data, job_heads)
     for run in runs_backend:
-        run.backend_name = backend.name
         runs.append(run)
     if not all:
         unfinished = any(run.status.is_unfinished() for run in runs)
@@ -29,20 +58,6 @@ def get_runs(
             runs = list(filter(lambda r: r.status.is_unfinished(), runs))
         else:
             runs = runs[:1]
-    return runs
-
-
-def list_runs(
-    backends: Union[List[Backend], Backend], run_name: str = "", all: bool = False
-) -> List[RunHead]:
-    repo_data = load_repo_data()
-    runs = []
-    if type(backends) == list:
-        for backend in backends:
-            runs = runs + [run for run in get_runs(repo_data, backend, run_name, all)]
-    else:
-        runs = runs + [run for run in get_runs(repo_data, backends, run_name, all)]
-    runs = reversed(runs)
     return runs
 
 

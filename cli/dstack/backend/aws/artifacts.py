@@ -70,11 +70,9 @@ def list_run_artifact_files(
         for obj in page.get("Contents") or []:
             if obj["Size"] > 0:
                 t = obj["Key"].split("/")
-                print(t)
                 job_id = t[4]
                 artifact_name = t[5]
                 artifact_file = "/".join(t[6:])
-                print(artifact_file)
                 yield job_id, artifact_name, artifact_file, obj["Size"]
 
 

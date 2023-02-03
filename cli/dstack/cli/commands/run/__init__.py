@@ -10,7 +10,6 @@ from argparse import Namespace
 from jsonschema import validate, ValidationError
 from pathlib import Path
 from typing import List, Any, Tuple, Optional, Dict
-from rich.console import Console
 from rich.progress import SpinnerColumn, Progress, TextColumn
 from rich.prompt import Confirm
 from urllib import parse
@@ -25,11 +24,11 @@ from dstack.backend import Backend
 from dstack.core.job import JobHead, JobStatus
 from dstack.core.request import RequestStatus
 from dstack.cli.commands import BasicCommand
-from dstack.cli.commands.ps import print_runs
+from dstack.cli.common import print_runs, console
 from dstack.api.repo import load_repo_data
 from dstack.api.backend import get_backend_by_name, DEFAULT, DEFAULT_REMOTE
 from dstack.api.logs import poll_logs
-from dstack.api.run import list_runs
+from dstack.api.run import list_runs_with_merged_backends
 from dstack.utils.common import since
 
 
@@ -89,7 +88,7 @@ def parse_run_args(
     return provider_name, provider_args, workflow_name, workflow_data
 
 
-def poll_logs_ws(backend: Backend, repo_address: RepoAddress, job_head: JobHead, console):
+def poll_logs_ws(backend: Backend, repo_address: RepoAddress, job_head: JobHead):
     job = backend.get_job(repo_address, job_head.job_id)
 
     def on_message(ws: WebSocketApp, message):
@@ -120,7 +119,7 @@ def poll_logs_ws(backend: Backend, repo_address: RepoAddress, job_head: JobHead,
                 backend.stop_jobs(repo_address, run_name, abort=True)
                 console.print(f"[grey58]OK[/]")
         else:
-            print(str(err))
+            console.print(str(err))
 
     def on_open(_: WebSocketApp):
         pass
@@ -156,7 +155,6 @@ def poll_logs_ws(backend: Backend, repo_address: RepoAddress, job_head: JobHead,
 
 
 def poll_run(repo_address: RepoAddress, job_heads: List[JobHead], backend: Backend):
-    console = Console()
     try:
         console.print()
         request_errors_printed = False
@@ -202,7 +200,7 @@ def poll_run(repo_address: RepoAddress, job_heads: List[JobHead], backend: Backe
         console.print("[grey58]To interrupt, press Ctrl+C.[/]")
         console.print()
         if len(job_heads) == 1 and run and run.status == JobStatus.RUNNING:
-            poll_logs_ws(backend, repo_address, job_heads[0], console)
+            poll_logs_ws(backend, repo_address, job_heads[0])
         else:
             poll_logs(
                 backend,
@@ -309,7 +307,7 @@ class RunCommand(BasicCommand):
                 backend.update_repo_last_run_at(
                     repo_data, last_run_at=int(round(time.time() * 1000))
                 )
-                print_runs(list_runs(backend, run_name=run_name))
+                print_runs(list_runs_with_merged_backends([backend], run_name=run_name))
                 if not args.detach:
                     poll_run(repo_data, jobs, backend)
             else:

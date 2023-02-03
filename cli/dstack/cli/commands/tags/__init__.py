@@ -1,5 +1,7 @@
 import sys
 from argparse import Namespace
+from collections import defaultdict
+
 from rich import print
 from rich.console import Console
 from rich.prompt import Confirm
@@ -7,9 +9,10 @@ from rich.table import Table
 
 from dstack.cli.commands import BasicCommand
 from dstack.core.error import check_config, check_git, BackendError
+from dstack.api.backend import list_backends
+from dstack.api.tags import list_tag_heads_with_merged_backends
 from dstack.api.repo import load_repo_data
 from dstack.utils.common import pretty_date
-from dstack.api.backend import list_backends
 
 
 class TAGCommand(BasicCommand):
@@ -62,18 +65,19 @@ class TAGCommand(BasicCommand):
         table.add_column("CREATED", style="grey58", no_wrap=True)
         table.add_column("RUN", style="grey58", no_wrap=True)
         table.add_column("OWNER", style="grey58", no_wrap=True, max_width=16)
-        table.add_column("BACKEND", style="bold green", no_wrap=True, max_width=8)
-        for backend in list_backends():
-            tag_heads = backend.list_tag_heads(repo_data)
-            for tag_head in tag_heads:
-                created_at = pretty_date(round(tag_head.created_at / 1000))
-                table.add_row(
-                    tag_head.tag_name,
-                    created_at,
-                    tag_head.run_name,
-                    tag_head.local_repo_user_name or "",
-                    backend.name,
-                )
+        table.add_column("BACKENDS", style="bold green", no_wrap=True)
+
+        tag_heads = list_tag_heads_with_merged_backends(list_backends(), repo_data)
+
+        for tag_head, backends in tag_heads:
+            created_at = pretty_date(round(tag_head.created_at / 1000))
+            table.add_row(
+                tag_head.tag_name,
+                created_at,
+                tag_head.run_name,
+                tag_head.local_repo_user_name or "",
+                ", ".join(b.name for b in backends),
+            )
         console.print(table)
 
     @check_config
