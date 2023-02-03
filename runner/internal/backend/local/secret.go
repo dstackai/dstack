@@ -7,7 +7,7 @@ import (
 	"fmt"
 	"path/filepath"
 
-	_ "github.com/mattn/go-sqlite3"
+	_ "modernc.org/sqlite"
 
 	"github.com/dstackai/dstack/runner/internal/gerrors"
 	"github.com/dstackai/dstack/runner/internal/log"
@@ -24,7 +24,7 @@ func NewClientSecret(path string) *ClientSecret {
 }
 
 func (sm *ClientSecret) fetchSecret(_ context.Context, path string, secrets map[string]string) (map[string]string, error) {
-	db, err := sql.Open("sqlite3", filepath.Join(sm.path, path, "_secrets_"))
+	db, err := sql.Open("sqlite", filepath.Join(sm.path, path, "_secrets_"))
 	if err != nil {
 		return nil, gerrors.Wrap(err)
 	}
@@ -52,7 +52,7 @@ func (sm *ClientSecret) fetchSecret(_ context.Context, path string, secrets map[
 }
 
 func (sm *ClientSecret) fetchCredentials(ctx context.Context, repoHostnameWithPort, repoUserName, repoName string) *models.GitCredentials {
-	db, err := sql.Open("sqlite3", filepath.Join(sm.path, "repos", "_secrets_"))
+	db, err := sql.Open("sqlite", filepath.Join(sm.path, "repos", "_secrets_"))
 	if err != nil {
 		log.Error(ctx, "Connecting database. Credentials Local", "RepoHostnameWithPort", repoHostnameWithPort, "RepoUserName", repoUserName, "RepoName", repoName, "err", err)
 		return nil
