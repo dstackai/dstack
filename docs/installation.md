@@ -1,6 +1,6 @@
 ## Install the CLI
 
-Use `pip`, To install the CLI:
+Use `pip`, to install the CLI:
 
 ```shell hl_lines="1"
 pip install dstack --upgrade

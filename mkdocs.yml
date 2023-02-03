@@ -151,8 +151,8 @@ nav:
       - CLI:
           - dstack run: reference/cli/run.md
           - dstack ps: reference/cli/ps.md
-          - dstack push: reference/cli/run.md
-          - dstack pull: reference/cli/run.md
+          - dstack push: reference/cli/push.md
+          - dstack pull: reference/cli/pull.md
           - dstack stop: reference/cli/stop.md
           - dstack logs: reference/cli/logs.md
           - dstack ls: reference/cli/ls.md
