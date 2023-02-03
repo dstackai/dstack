@@ -14,3 +14,11 @@ class ArtifactHead:
 
     def __str__(self) -> str:
         return f'ArtifactHead(job_id="{self.job_id}", artifact_path="{self.artifact_path})'
+
+
+class Artifact:
+    def __init__(self, job_id: str, name: str, file: str, filesize_in_bytes: int):
+        self.job_id = job_id
+        self.name = name
+        self.file = file
+        self.filesize_in_bytes = filesize_in_bytes

@@ -14,6 +14,7 @@ from dstack.backend.local import (
 )
 from dstack.backend.local.config import LocalConfig
 from dstack.backend import Backend, BackendType
+from dstack.core.artifact import Artifact
 from dstack.core.app import AppSpec
 from dstack.core.repo import RepoData, RepoAddress, RepoHead, RepoCredentials
 from dstack.core.job import Job, JobHead
@@ -132,7 +133,7 @@ class LocalBackend(Backend):
 
     def list_run_artifact_files(
         self, repo_address: RepoAddress, run_name: str
-    ) -> Generator[Tuple[str, str, int], None, None]:
+    ) -> Generator[Artifact, None, None]:
         return artifacts.list_run_artifact_files(self.backend_config.path, repo_address, run_name)
 
     def list_tag_heads(self, repo_address: RepoAddress) -> List[TagHead]:

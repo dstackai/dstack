@@ -19,7 +19,10 @@ def list_tag_heads_with_merged_backends(
     tag_heads_with_merged_backends = []
     for tag_run_name in tag_run_name_to_tag_map:
         tag_heads_with_merged_backends.append(
-            (tag_run_name_to_tag_map[tag_run_name], tag_run_name_to_backends_map[tag_run_name])
+            (
+                tag_run_name_to_tag_map[tag_run_name],
+                list(sorted(tag_run_name_to_backends_map[tag_run_name], key=lambda b: b.name)),
+            )
         )
     return tag_heads_with_merged_backends
 
@@ -30,4 +33,4 @@ def list_tag_heads(
     tags = []
     for backend in backends:
         tags += [(t, backend) for t in backend.list_tag_heads(repo_address)]
-    return tags
+    return list(sorted(tags, key=lambda t: -t[0].created_at))

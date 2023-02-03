@@ -29,7 +29,10 @@ def list_runs_with_merged_backends(
     runs_with_merged_backends = []
     for run_name in run_name_to_run_map:
         runs_with_merged_backends.append(
-            (run_name_to_run_map[run_name], run_name_to_backends_map[run_name])
+            (
+                run_name_to_run_map[run_name],
+                list(sorted(run_name_to_backends_map[run_name], key=lambda b: b.name)),
+            )
         )
     return runs_with_merged_backends
 
@@ -41,7 +44,7 @@ def list_runs(
     runs = []
     for backend in backends:
         runs += [(run, backend) for run in _get_runs(repo_data, backend, run_name, all)]
-    return list(reversed(runs))
+    return list(sorted(runs, key=lambda r: -r[0].submitted_at))
 
 
 def _get_runs(

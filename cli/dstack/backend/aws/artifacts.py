@@ -6,6 +6,7 @@ from boto3.s3 import transfer
 from botocore.client import BaseClient
 from tqdm import tqdm
 
+from dstack.core.artifact import Artifact
 from dstack.core.repo import RepoAddress
 
 
@@ -62,7 +63,7 @@ def download_run_artifact_files(
 
 def list_run_artifact_files(
     s3_client: BaseClient, bucket_name: str, repo_address: RepoAddress, run_name: str
-) -> Generator[Tuple[str, str, int], None, None]:
+) -> Generator[Artifact, None, None]:
     artifact_prefix = f"artifacts/{repo_address.path()}/{run_name},"
     paginator = s3_client.get_paginator("list_objects")
     page_iterator = paginator.paginate(Bucket=bucket_name, Prefix=artifact_prefix)
@@ -73,7 +74,7 @@ def list_run_artifact_files(
                 job_id = t[4]
                 artifact_name = t[5]
                 artifact_file = "/".join(t[6:])
-                yield job_id, artifact_name, artifact_file, obj["Size"]
+                yield Artifact(job_id, artifact_name, artifact_file, obj["Size"])
 
 
 def __remove_prefix(text, prefix):

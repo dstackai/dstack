@@ -18,6 +18,7 @@ from dstack.backend.aws import (
     config,
 )
 from dstack.backend.aws.config import AWSConfig
+from dstack.core.artifact import Artifact
 from dstack.core.app import AppSpec
 from dstack.core.repo import LocalRepoData, RepoAddress, RepoHead, RepoCredentials
 from dstack.core.job import Job, JobHead
@@ -235,7 +236,7 @@ class AwsBackend(Backend):
 
     def list_run_artifact_files(
         self, repo_address: RepoAddress, run_name: str
-    ) -> Generator[Tuple[str, str, int], None, None]:
+    ) -> Generator[Artifact, None, None]:
         return artifacts.list_run_artifact_files(
             self._s3_client(), self.backend_config.bucket_name, repo_address, run_name
         )

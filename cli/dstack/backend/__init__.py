@@ -4,6 +4,7 @@ from pathlib import Path
 from typing import List, Optional, Generator, Tuple, Dict
 
 from dstack.core.app import AppSpec
+from dstack.core.artifact import Artifact
 from dstack.core.repo import RepoData, RepoCredentials, RepoAddress, RepoHead
 from dstack.core.job import Job, JobHead
 from dstack.core.secret import Secret
@@ -143,7 +144,7 @@ class Backend(object):
 
     def list_run_artifact_files(
         self, repo_address: RepoAddress, run_name: str
-    ) -> Generator[Tuple[str, str, str, int], None, None]:
+    ) -> Generator[Artifact, None, None]:
         pass
 
     def list_tag_heads(self, repo_address: RepoAddress) -> List[TagHead]:
