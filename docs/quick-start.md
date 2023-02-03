@@ -12,27 +12,35 @@ pip install dstack --upgrade
 
 ## 2. Create a repo
 
-To use `dstack`, your project must be under Git and have at least one remote repository configured, regardless of the provider (such
-as GitHub, GitLab, BitBucket, etc.). 
+To use `dstack`, your project must be managed by Git and have at least one remote branch configured.
+Your repository can be hosted on GitHub, GitLab, BitBucket, or any other platform.
 
 !!! info "NOTE:"
-    Although `dstack` does not require committing your code with every run, it does
-    require that the project be under Git. This ensures that the code of each run is tracked.
+    If you haven't set up a remote branch in your repo yet, don't worry! Here's how you can do it:
+    
+    ```shell
+    echo "# Quick start" >> README.md
+    git init
+    git add README.md
+    git commit -m "first commit"
+    git branch -M main
+    git remote add origin "<your remote repo URL>"
+    git push -u origin main
+    ```
 
 ### Init the repo
 
-After creating a repository, run the following command:
+Once you've set up a remote branch in your repo, go ahead and run this command:
 
 ```shell hl_lines="1"
 dstack init
 ```
 
-!!! info "NOTE:"
-    Keep in mind, all `dstack` commands need to be run from the repo directory.
+Now that everything is in place, you can use dstack with your project.
 
 ## 3. Prepare data
 
-Now that the repo is set up, let's create a Python script to prepare the data for our training.
+Let us begin by creating a Python script that will prepare the data for our training script.
 
 ### Create a Python script
 
@@ -77,7 +85,9 @@ dstack run mnist-data
 ```
 
 !!! info "NOTE:"
-    Double check that the `.dstack` and `mnist` folders are staged before you run the workflow.
+    Although `dstack` tracks your code on every run, committing changes to the repository is not necessary. 
+    You just need to ensure that your code changes are in the staging area. 
+    Here's how to ensure it:
 
     ```shell hl_lines="1"
     git add .dstack mnist
@@ -118,8 +128,8 @@ dstack ps
 This command displays either the current running workflows or the last completed run:
 
 ```shell hl_lines="1"
-RUN             WORKFLOW    SUBMITTED  OWNER           STATUS  TAG 
-grumpy-zebra-1  mnist-data  a min ago  peterschmidt85  Done    
+RUN             WORKFLOW    SUBMITTED  OWNER           STATUS     TAG  BACKEND
+grumpy-zebra-1  mnist-data  now        peterschmidt85  Submitted       local
 ```
 
 To see all runs, use the `dstack ps -a` command.
@@ -224,7 +234,7 @@ workflows:
   - name: train-mnist
     provider: bash
     deps:
-      workflow: mnist-data 
+      - workflow: mnist-data 
     commands:
       - pip install torchvision pytorch-lightning tensorboard
       - python mnist/train_mnist.py
@@ -242,6 +252,13 @@ Now, you can run the defined workflow using the `dstack run` command:
 ```shell hl_lines="1"
 dstack run train-mnist
 ```
+
+!!! info "NOTE:"
+    Double-check the changes are in the staging area again.
+
+    ```shell hl_lines="1"
+    git add mnist
+    ```
 
 As the workflow is running, you will see its output:
 
@@ -315,7 +332,7 @@ dstack push grumpy-zebra-1
 Now, we can run the `train-mnist` workflow remotely (e.g. in the configured cloud):
 
 ```shell hl_lines="1"
-dstack run mnist-train --remote
+dstack run train-mnist --remote
 ```
 
 When you run a workflow remotely, `dstack` automatically creates the necessary infrastructure (within the
