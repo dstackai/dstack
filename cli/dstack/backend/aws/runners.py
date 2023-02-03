@@ -68,7 +68,7 @@ def _get_instance_types(ec2_client: BaseClient) -> List[InstanceType]:
             Filters=[
                 {
                     "Name": "instance-type",
-                    "Values": ["c5.*", "m5.*", "p2.*", "p3.*", "p4.*", "p5.*"],
+                    "Values": ["c5.*", "m5.*", "p2.*", "p3.*", "p4d.*", "p4de.*"],
                 },
             ],
             **kwargs,
@@ -621,54 +621,39 @@ def run_job(
     subnet_id: Optional[str],
     job: Job,
 ):
-    if job.status == JobStatus.SUBMITTED:
-        runner = None
-        try:
-            job.runner_id = uuid.uuid4().hex
-            jobs.update_job(s3_client, bucket_name, job)
-            if job.requirements and job.requirements.local:
-                """
-                resources = local.check_runner_resources(job.runner_id)
-                if _matches(resources, job.requirements):
-                    runner = Runner(job.runner_id, None, resources, job)
-                    _create_runner(logs_client, s3_client, bucket_name, runner)
-                    runner.request_id = local.start_runner_process(job.runner_id)
-                else:
-                    job.status = JobStatus.FAILED
-                    jobs.update_job(s3_client, bucket_name, job)
-                    sys.exit(f"Local resources do not match requirements")
-                    IVAN
-                """
-            else:
-                instance_type = _get_instance_type(ec2_client, job.requirements)
-                runner = Runner(job.runner_id, None, instance_type.resources, job)
-                _create_runner(logs_client, s3_client, bucket_name, runner)
-                if instance_type:
-                    runner.request_id = _run_instance_retry(
-                        ec2_client,
-                        iam_client,
-                        bucket_name,
-                        region_name,
-                        subnet_id,
-                        job.runner_id,
-                        instance_type,
-                        job.local_repo_user_name,
-                        job.local_repo_user_email,
-                        job.repo_address,
-                    )
-                else:
-                    job.status = JobStatus.FAILED
-                    job.request_id = runner.request_id
-                    jobs.update_job(s3_client, bucket_name, job)
-                    sys.exit(f"No instance type matching requirements")
-            _update_runner(s3_client, bucket_name, runner)
-        except Exception as e:
-            job.status = JobStatus.FAILED
-            job.request_id = runner.request_id if runner else None
-            jobs.update_job(s3_client, bucket_name, job)
-            raise e
-    else:
+    if job.status != JobStatus.SUBMITTED:
         raise Exception("Can't create a request for a job which status is not SUBMITTED")
+
+    runner = None
+    try:
+        job.runner_id = uuid.uuid4().hex
+        jobs.update_job(s3_client, bucket_name, job)
+        instance_type = _get_instance_type(ec2_client, job.requirements)
+        if instance_type is None:
+            job.status = JobStatus.FAILED
+            jobs.update_job(s3_client, bucket_name, job)
+            sys.exit(f"No instance type matching requirements.")
+
+        runner = Runner(job.runner_id, None, instance_type.resources, job)
+        _create_runner(logs_client, s3_client, bucket_name, runner)
+        runner.request_id = _run_instance_retry(
+            ec2_client,
+            iam_client,
+            bucket_name,
+            region_name,
+            subnet_id,
+            job.runner_id,
+            instance_type,
+            job.local_repo_user_name,
+            job.local_repo_user_email,
+            job.repo_address,
+        )
+        _update_runner(s3_client, bucket_name, runner)
+    except Exception as e:
+        job.status = JobStatus.FAILED
+        job.request_id = runner.request_id if runner else None
+        jobs.update_job(s3_client, bucket_name, job)
+        raise e
 
 
 def _delete_runner(s3_client: BaseClient, bucket_name: str, runner: Runner):
