@@ -1,4 +1,3 @@
-import collections
 from importlib.util import find_spec
 from typing import List, Optional
 
@@ -6,17 +5,6 @@ from rich import print
 from rich.prompt import Prompt
 
 _is_termios_available = find_spec("termios") is not None
-
-
-def __flatten(d, parent_key="", sep="."):
-    items = []
-    for k, v in d.items():
-        new_key = parent_key + sep + k if parent_key else k
-        if isinstance(v, collections.MutableMapping):
-            items.extend(__flatten(v, new_key, sep=sep).items())
-        else:
-            items.append((new_key, v))
-    return dict(items)
 
 
 def ask_choice(

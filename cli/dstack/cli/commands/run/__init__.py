@@ -227,11 +227,15 @@ class RunCommand(BasicCommand):
         super(RunCommand, self).__init__(parser)
 
     def register(self):
+        workflow_help = "A name of the workflow"
+        workflows = _load_workflows()
+        if len(workflows) > 0:
+            workflow_help = "{" + ",".join(w["name"] for w in workflows if w.get("name")) + "}"
         self._parser.add_argument(
             "workflow_or_provider",
             metavar="WORKFLOW",
             type=str,
-            help="A name of a workflow",
+            help=workflow_help,
             nargs="?",
         )
         self._parser.add_argument(
@@ -261,74 +265,56 @@ class RunCommand(BasicCommand):
             nargs=argparse.ZERO_OR_MORE,
             help="Override provider arguments",
         )
-        # self._parser.add_argument('-h', '--help', action='store_true', default=argparse.SUPPRESS,
-        # help='Show this help message and exit')
 
     @check_config
     @check_git
     @check_backend
     def _command(self, args: Namespace):
         if not args.workflow_or_provider:
-            print("Usage: dstack run [-h] WORKFLOW [-d] [-l] [-t TAG] [OPTIONS ...] [ARGS ...]\n")
-            workflows = _load_workflows()
-            workflow_names = [w["name"] for w in workflows if w.get("name")]
-            print(
-                f"Positional arguments:\n"
-                f'  WORKFLOW              {{{",".join(workflow_names)}}}\n'
-            )
-            print(
-                "Options:\n"
-                "  -t TAG, --tag TAG      A tag name. Warning, if the tag already exists, it will be overridden.\n"
-                "  -d, --detach           Do not poll for status update and logs\n"
-                "  -h, --help             Show this help output, or the help for a specified workflow or provider.\n"
-            )
-            print(
-                "To see the help output for a particular workflow, use the following command:\n"
-                "  dstack run WORKFLOW --help"
-            )
-        else:
-            try:
-                repo_data = load_repo_data()
-                backend_name = DEFAULT
-                if args.remote is not None:
-                    if len(args.remote) == 0:
-                        backend_name = DEFAULT_REMOTE
-                    else:
-                        backend_name = args.remote[0]
-                backend = get_backend_by_name(backend_name)
-
-                (
-                    provider_name,
-                    provider_args,
-                    workflow_name,
-                    workflow_data,
-                ) = parse_run_args(args)
-                provider = providers.load_provider(provider_name)
-                if hasattr(args, "help") and args.help:
-                    provider.help(workflow_name)
-                    sys.exit()
-
-                if backend.get_repo_credentials(repo_data):
-                    run_name = backend.create_run(repo_data)
-                    provider.load(backend, provider_args, workflow_name, workflow_data, run_name)
-                    if args.tag_name:
-                        tag_head = backend.get_tag_head(repo_data, args.tag_name)
-                        if tag_head:
-                            # if args.yes or Confirm.ask(f"[red]The tag '{args.tag_name}' already exists. "
-                            #                            f"Do you want to override it?[/]"):
-                            backend.delete_tag_head(repo_data, tag_head)
-                            # else:
-                            #     return
-                    jobs = provider.submit_jobs(backend, args.tag_name)
-                    backend.update_repo_last_run_at(
-                        repo_data, last_run_at=int(round(time.time() * 1000))
-                    )
-                    print_runs(list_runs(backend, run_name=run_name))
-                    if not args.detach:
-                        poll_run(repo_data, jobs, backend)
+            self._parser.print_help()
+            exit(1)
+        try:
+            repo_data = load_repo_data()
+            backend_name = DEFAULT
+            if args.remote is not None:
+                if len(args.remote) == 0:
+                    backend_name = DEFAULT_REMOTE
                 else:
-                    sys.exit(f"Call 'dstack init' first")
-            except ValidationError as e:
-                sys.exit(
-                    f"There a syntax error in one of the files inside the {os.getcwd()}/.dstack/workflows directory:\n\n{e}"
+                    backend_name = args.remote[0]
+            backend = get_backend_by_name(backend_name)
+
+            (
+                provider_name,
+                provider_args,
+                workflow_name,
+                workflow_data,
+            ) = parse_run_args(args)
+            provider = providers.load_provider(provider_name)
+            if hasattr(args, "help") and args.help:
+                provider.help(workflow_name)
+                sys.exit()
+
+            if backend.get_repo_credentials(repo_data):
+                run_name = backend.create_run(repo_data)
+                provider.load(backend, provider_args, workflow_name, workflow_data, run_name)
+                if args.tag_name:
+                    tag_head = backend.get_tag_head(repo_data, args.tag_name)
+                    if tag_head:
+                        # if args.yes or Confirm.ask(f"[red]The tag '{args.tag_name}' already exists. "
+                        #                            f"Do you want to override it?[/]"):
+                        backend.delete_tag_head(repo_data, tag_head)
+                        # else:
+                        #     return
+                jobs = provider.submit_jobs(backend, args.tag_name)
+                backend.update_repo_last_run_at(
+                    repo_data, last_run_at=int(round(time.time() * 1000))
                 )
+                print_runs(list_runs(backend, run_name=run_name))
+                if not args.detach:
+                    poll_run(repo_data, jobs, backend)
+            else:
+                sys.exit(f"Call 'dstack init' first")
+        except ValidationError as e:
+            sys.exit(
+                f"There a syntax error in one of the files inside the {os.getcwd()}/.dstack/workflows directory:\n\n{e}"
+            )

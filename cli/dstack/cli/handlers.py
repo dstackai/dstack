@@ -18,7 +18,7 @@ import dstack.cli.commands.tags
 
 def cli_initialize(parser):
     commands = [
-        cls(parser=parser) for cls in BasicCommand.__subclasses__()
+        cls(parser=parser) for cls in sorted(BasicCommand.__subclasses__(), key=lambda x: str(x))
     ]  # pylint: disable=E1101
     for command in commands:
         command.register()
