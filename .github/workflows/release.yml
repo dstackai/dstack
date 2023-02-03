@@ -119,7 +119,7 @@ jobs:
         include:
           - {goos: "linux", goarch: "386", runson: "ubuntu-latest"}
           - {goos: "linux", goarch: "amd64", runson: "ubuntu-latest"}
-          - {goos: "windows", goarch: "386", runson: "ubuntu-latest"}
+#          - {goos: "windows", goarch: "386", runson: "ubuntu-latest"}
           - {goos: "windows", goarch: "amd64", runson: "ubuntu-latest"}
           - {goos: "darwin", goarch: "amd64", runson: "macos-latest"}
           - {goos: "darwin", goarch: "arm64", runson: "macos-latest"}
@@ -152,7 +152,7 @@ jobs:
         include:
           - {goos: "linux", goarch: "386", runson: "ubuntu-latest", platform: "x86", extension: ""}
           - {goos: "linux", goarch: "amd64", runson: "ubuntu-latest", platform: "amd64", extension: ""}
-          - {goos: "windows", goarch: "386", runson: "ubuntu-latest", platform: "x86", extension: ".exe"}
+#          - {goos: "windows", goarch: "386", runson: "ubuntu-latest", platform: "x86", extension: ".exe"}
           - {goos: "windows", goarch: "amd64", runson: "ubuntu-latest", platform: "amd64", extension: ".exe"}
           - {goos: "darwin", goarch: "amd64", runson: "macos-latest", platform: "amd64", extension: ""}
           - {goos: "darwin", goarch: "arm64", runson: "macos-latest", platform: "arm64", extension: ""}
