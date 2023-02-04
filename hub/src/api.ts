@@ -5,6 +5,7 @@ export const API = {
     USERS: {
         BASE: () => `${API.BASE()}/users`,
         LIST: () => `${API.USERS.BASE()}/list`,
+        DETAILS: (name: IUser['user_name'] | string) => `${API.USERS.BASE()}/${name}`,
         INFO: () => `${API.USERS.BASE()}/info`,
     },
 

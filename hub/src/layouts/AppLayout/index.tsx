@@ -70,7 +70,7 @@ const AppLayout: React.FC<{ children: React.ReactNode }> = ({ children }) => {
                         activeHref={pathname}
                         items={[
                             { type: 'link', text: t('navigation.hubs'), href: ROUTES.HUB.LIST },
-                            { type: 'link', text: t('navigation.users'), href: ROUTES.USER.LIST },
+                            { type: 'link', text: t('navigation.members'), href: ROUTES.MEMBER.LIST },
                         ]}
                         onFollow={onFollowHandler}
                     />

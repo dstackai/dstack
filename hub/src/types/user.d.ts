@@ -1,4 +1,4 @@
-declare type TPermissionLevel = 'Read' | 'Admin'
+declare type TPermissionLevel = 'Read' | 'Admin' | 'Run'
 
 declare interface IUser {
     id: number

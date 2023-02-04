@@ -12,7 +12,10 @@ export { default as Link } from '@cloudscape-design/components/link';
 export { default as TextFilter } from '@cloudscape-design/components/text-filter';
 export { default as Pagination } from '@cloudscape-design/components/pagination';
 export { default as Table } from '@cloudscape-design/components/table';
+export { default as ContentLayout } from '@cloudscape-design/components/content-layout';
+export { default as ColumnLayout } from '@cloudscape-design/components/column-layout';
 
 // custom components
 export { NavigateLink } from './NavigateLink';
 export { ListEmptyMessage } from './ListEmptyMessage';
+export { DetailsHeader } from './DetailsHeader';

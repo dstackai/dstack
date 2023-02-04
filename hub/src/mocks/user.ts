@@ -17,7 +17,24 @@ const successList: IUser[] = new Array(50).fill({}).map((i, index) => ({
     user_name: `user_${index}`,
     token: broofa(),
     email: `user_${index}@email.ru`,
-    permission_level: Math.random() > 0.5 ? 'Read' : 'Admin',
+    permission_level: (function () {
+        const val = Math.random();
+        let permission: TPermissionLevel = 'Read';
+
+        switch (true) {
+            case val > 0.65:
+                permission = 'Read';
+                break;
+            case val <= 0.65 && val >= 0.3:
+                permission = 'Admin';
+                break;
+            case val < 0.3:
+                permission = 'Run';
+                break;
+        }
+
+        return permission;
+    })(),
 }));
 
 export default {

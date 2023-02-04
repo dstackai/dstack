@@ -26,6 +26,14 @@ export const userApi = createApi({
             },
         }),
 
+        getUser: builder.query<IUser, { name: IUser['user_name'] }>({
+            query: (arg) => {
+                return {
+                    url: API.USERS.DETAILS(arg.name),
+                };
+            },
+        }),
+
         deleteUsers: builder.mutation<void, IUser['user_name'][]>({
             query: (hubNames) => ({
                 url: API.USERS.BASE(),
@@ -38,4 +46,4 @@ export const userApi = createApi({
     }),
 });
 
-export const { useGetUserDataQuery, useGetUserListQuery, useDeleteUsersMutation } = userApi;
+export const { useGetUserDataQuery, useGetUserListQuery, useGetUserQuery, useDeleteUsersMutation } = userApi;

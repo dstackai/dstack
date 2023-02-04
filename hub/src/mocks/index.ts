@@ -1,5 +1,6 @@
 import { QueryReturnValue } from '@reduxjs/toolkit/dist/query/baseQueryTypes';
 import { FetchBaseQueryError, FetchBaseQueryMeta } from '@reduxjs/toolkit/dist/query/fetchBaseQuery';
+import { matchPath } from 'react-router';
 import { API } from 'api';
 
 import user from './user';
@@ -26,6 +27,12 @@ const mocksMap: MocksMap = {
     [API.USERS.LIST()]: {
         GET: {
             success: user.list.success,
+            failed: { status: 403 },
+        },
+    },
+    [API.USERS.DETAILS(':name')]: {
+        GET: {
+            success: user.list.success[0],
             failed: { status: 403 },
         },
     },
@@ -59,11 +66,18 @@ export type getResponseReturned = QueryReturnValue<unknown, FetchBaseQueryError,
 
 export const getResponse = ({ url, method = 'GET', responseType = 'success' }: getResponseArgs): getResponseReturned => {
     const formattedUrl = url.replace(/\?.+/gi, '');
+    const matchUrl = Object.keys(mocksMap).find((path) => !!matchPath(path, formattedUrl));
 
-    if (responseType === 'failed')
-        return {
-            error: mocksMap[formattedUrl][method][responseType] as FetchBaseQueryError,
-        };
+    if (matchUrl) {
+        if (responseType === 'failed')
+            return {
+                error: mocksMap[matchUrl][method][responseType] as FetchBaseQueryError,
+            };
 
-    return { data: mocksMap[formattedUrl][method][responseType] };
+        return { data: mocksMap[matchUrl][method][responseType] };
+    }
+
+    return {
+        error: { status: 404 } as FetchBaseQueryError,
+    };
 };

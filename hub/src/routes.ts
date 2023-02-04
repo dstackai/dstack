@@ -12,11 +12,11 @@ export const ROUTES = {
         },
     },
 
-    USER: {
-        LIST: '/users',
+    MEMBER: {
+        LIST: '/members',
         DETAILS: {
-            TEMPLATE: `/users/:name`,
-            FORMAT: (name: string) => buildRoute(ROUTES.USER.DETAILS.TEMPLATE, { name }),
+            TEMPLATE: `/members/:name`,
+            FORMAT: (name: string) => buildRoute(ROUTES.MEMBER.DETAILS.TEMPLATE, { name }),
         },
     },
 };

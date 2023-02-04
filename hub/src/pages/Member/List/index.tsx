@@ -5,7 +5,7 @@ import { useCollection } from 'hooks';
 import { ROUTES } from 'routes';
 import { useTranslation } from 'react-i18next';
 
-export const UserList: React.FC = () => {
+export const MemberList: React.FC = () => {
     const { t } = useTranslation();
     const { isLoading, data } = useGetUserListQuery();
     const [deleteUsers, { isLoading: isDeleting }] = useDeleteUsersMutation();
@@ -15,7 +15,7 @@ export const UserList: React.FC = () => {
             id: 'name',
             header: 'User name',
             cell: (item: IUser) => (
-                <NavigateLink href={ROUTES.USER.DETAILS.FORMAT(item.user_name)}>{item.user_name}</NavigateLink>
+                <NavigateLink href={ROUTES.MEMBER.DETAILS.FORMAT(item.user_name)}>{item.user_name}</NavigateLink>
             ),
         },
         {
