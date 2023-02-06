@@ -2,7 +2,7 @@ from collections import defaultdict
 from typing import List, Optional, Tuple
 
 from dstack.api.repo import load_repo_data
-from dstack.backend import Backend
+from dstack.backend.base import Backend
 from dstack.core.repo import RepoData
 from dstack.core.run import RunHead
 from dstack.core.tag import TagHead

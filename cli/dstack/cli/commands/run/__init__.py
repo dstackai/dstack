@@ -22,7 +22,7 @@ from dstack.api.backend import DEFAULT, DEFAULT_REMOTE, get_backend_by_name
 from dstack.api.logs import poll_logs
 from dstack.api.repo import load_repo_data
 from dstack.api.run import list_runs_with_merged_backends
-from dstack.backend import Backend
+from dstack.backend.base import Backend
 from dstack.cli.commands import BasicCommand
 from dstack.cli.common import console, print_runs
 from dstack.core.error import check_backend, check_config, check_git

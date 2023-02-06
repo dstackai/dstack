@@ -2,7 +2,7 @@ import uuid
 from argparse import ArgumentParser
 from typing import Any, Dict, List, Optional
 
-from dstack.backend import Backend
+from dstack.backend.base import Backend
 from dstack.core.app import AppSpec
 from dstack.core.job import JobSpec
 from dstack.providers import Provider

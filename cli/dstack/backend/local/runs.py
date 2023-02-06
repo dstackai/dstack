@@ -100,13 +100,3 @@ def get_run_heads(
             run = runs_by_id[run_id]
             _update_run(path, run, job_head, include_request_heads)
     return sorted(list(runs_by_id.values()), key=lambda r: r.submitted_at, reverse=True)
-
-
-def list_run_heads(
-    path: str,
-    repo_address: RepoAddress,
-    run_name: Optional[str],
-    include_request_heads: bool,
-) -> List[RunHead]:
-    job_heads = jobs.list_job_heads(path, repo_address, run_name)
-    return get_run_heads(path, job_heads, include_request_heads)

@@ -4,7 +4,6 @@ from typing import Dict, Generator, List, Optional, Tuple
 import boto3
 from botocore.client import BaseClient
 
-from dstack.backend import Backend, BackendType
 from dstack.backend.aws import (
     artifacts,
     config,
@@ -18,7 +17,7 @@ from dstack.backend.aws import (
     tags,
 )
 from dstack.backend.aws.config import AWSConfig
-from dstack.core.app import AppSpec
+from dstack.backend.base import RemoteBackend
 from dstack.core.artifact import Artifact
 from dstack.core.error import ConfigError
 from dstack.core.job import Job, JobHead
@@ -29,8 +28,10 @@ from dstack.core.secret import Secret
 from dstack.core.tag import TagHead
 
 
-class AwsBackend(Backend):
-    NAME = "aws"
+class AwsBackend(RemoteBackend):
+    @property
+    def name(self):
+        return "aws"
 
     def __init__(self):
         self.backend_config = AWSConfig()
@@ -156,21 +157,6 @@ class AwsBackend(Backend):
             self._s3_client(), self.backend_config.bucket_name, repo_address, job_id
         )
 
-    def list_run_heads(
-        self,
-        repo_address: RepoAddress,
-        run_name: Optional[str] = None,
-        include_request_heads: bool = True,
-    ) -> List[RunHead]:
-        return runs.list_run_heads(
-            self._ec2_client(),
-            self._s3_client(),
-            self.backend_config.bucket_name,
-            repo_address,
-            run_name,
-            include_request_heads,
-        )
-
     def get_run_heads(
         self,
         repo_address: RepoAddress,
@@ -201,37 +187,6 @@ class AwsBackend(Backend):
             job_heads,
             start_time,
             attached,
-        )
-
-    def query_logs(
-        self,
-        repo_address: RepoAddress,
-        run_name: str,
-        start_time: int,
-        end_time: Optional[int],
-        next_token: Optional[str],
-        job_host_names: Dict[str, Optional[str]],
-        job_ports: Dict[str, Optional[List[int]]],
-        job_app_specs: Dict[str, Optional[List[AppSpec]]],
-    ) -> Tuple[
-        List[LogEvent],
-        Optional[str],
-        Dict[str, Optional[str]],
-        Dict[str, Optional[List[int]]],
-        Dict[str, Optional[List[AppSpec]]],
-    ]:
-        return logs.query_logs(
-            self._s3_client(),
-            self._logs_client(),
-            self.backend_config.bucket_name,
-            repo_address,
-            run_name,
-            start_time,
-            end_time,
-            next_token,
-            job_host_names,
-            job_ports,
-            job_app_specs,
         )
 
     def list_run_artifact_files(
@@ -405,6 +360,3 @@ class AwsBackend(Backend):
             repo_address,
             secret_name,
         )
-
-    def type(self) -> BackendType:
-        return BackendType.REMOTE

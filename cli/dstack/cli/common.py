@@ -5,7 +5,7 @@ from rich.console import Console
 from rich.prompt import Prompt
 from rich.table import Table
 
-from dstack.backend import Backend
+from dstack.backend.base import Backend
 from dstack.core.job import JobStatus
 from dstack.core.request import RequestStatus
 from dstack.core.run import RunHead

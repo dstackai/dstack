@@ -2,7 +2,7 @@ import sys
 from pathlib import Path
 from typing import Dict, Generator, List, Optional, Tuple
 
-from dstack.backend import Backend, BackendType
+from dstack.backend.base import Backend, BackendType
 from dstack.backend.local import artifacts, jobs, logs, repos, runners, runs, secrets, tags
 from dstack.backend.local.config import LocalConfig
 from dstack.core.app import AppSpec
@@ -16,12 +16,18 @@ from dstack.core.tag import TagHead
 
 
 class LocalBackend(Backend):
-    NAME = "local"
-
     def __init__(self):
         self.backend_config = LocalConfig()
         self.backend_config.load()
         self._loaded = True
+
+    @property
+    def name(self):
+        return "local"
+
+    @property
+    def type(self) -> BackendType:
+        return BackendType.LOCAL
 
     def configure(self):
         pass
@@ -56,34 +62,6 @@ class LocalBackend(Backend):
     def delete_job_head(self, repo_address: RepoAddress, job_id: str):
         jobs.delete_job_head(self.backend_config.path, repo_address, job_id)
 
-    def stop_jobs(self, repo_address: RepoAddress, run_name: Optional[str], abort: bool):
-        job_heads = self.list_job_heads(repo_address, run_name)
-        for job_head in job_heads:
-            if job_head.status.is_unfinished():
-                self.stop_job(repo_address, job_head.job_id, abort)
-
-    def delete_job_heads(self, repo_address: RepoAddress, run_name: Optional[str]):
-        job_heads = []
-        for job_head in self.list_job_heads(repo_address, run_name):
-            if job_head.status.is_finished():
-                job_heads.append(job_head)
-            else:
-                if run_name:
-                    sys.exit("The run is not finished yet. Stop the run first.")
-
-        for job_head in job_heads:
-            self.delete_job_head(repo_address, job_head.job_id)
-
-    def list_run_heads(
-        self,
-        repo_address: RepoAddress,
-        run_name: Optional[str] = None,
-        include_request_heads: bool = True,
-    ) -> List[RunHead]:
-        return runs.list_run_heads(
-            self.backend_config.path, repo_address, run_name, include_request_heads
-        )
-
     def get_run_heads(
         self,
         repo_address: RepoAddress,
@@ -102,25 +80,6 @@ class LocalBackend(Backend):
         return logs.poll_logs(
             self.backend_config.path, repo_address, job_heads, start_time, attached
         )
-
-    def query_logs(
-        self,
-        repo_address: RepoAddress,
-        run_name: str,
-        start_time: int,
-        end_time: Optional[int],
-        next_token: Optional[str],
-        job_host_names: Dict[str, Optional[str]],
-        job_ports: Dict[str, Optional[List[int]]],
-        job_app_specs: Dict[str, Optional[List[AppSpec]]],
-    ) -> Tuple[
-        List[LogEvent],
-        Optional[str],
-        Dict[str, Optional[str]],
-        Dict[str, Optional[List[int]]],
-        Dict[str, Optional[List[AppSpec]]],
-    ]:
-        pass
 
     def list_run_artifact_files(
         self, repo_address: RepoAddress, run_name: str
@@ -201,9 +160,6 @@ class LocalBackend(Backend):
 
     def delete_secret(self, repo_address: RepoAddress, secret_name: str):
         return secrets.remove_secret(self.backend_config.path, repo_address, secret_name)
-
-    def type(self) -> BackendType:
-        return BackendType.LOCAL
 
     def get_artifacts_path(self, repo_address: RepoAddress) -> Path:
         return artifacts.get_artifacts_path(self.backend_config.path, repo_address)

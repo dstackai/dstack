@@ -1,7 +1,7 @@
 from collections import defaultdict
 from typing import List, Optional, Tuple, Union
 
-from dstack.backend import Backend
+from dstack.backend.base import Backend
 from dstack.core.repo import RepoAddress
 from dstack.core.tag import TagHead
 

@@ -33,19 +33,3 @@ def __remove_prefix(text, prefix):
     if text.startswith(prefix):
         return text[len(prefix) :]
     return text
-
-
-def upload_job_artifact_files(
-    path: str,
-    repo_address: RepoAddress,
-    job_id: str,
-    artifact_name: str,
-    local_path: Path,
-):
-    pass
-
-
-def list_run_artifact_files_and_folders(
-    path_backend_dir: str, repo_address: RepoAddress, job_id: str, path: str
-) -> List[Tuple[str, bool]]:
-    pass
