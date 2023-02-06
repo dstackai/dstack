@@ -1,4 +1,3 @@
-import sys
 from argparse import Namespace
 
 from rich.table import Table
@@ -6,30 +5,11 @@ from rich.table import Table
 from dstack.api.artifacts import list_artifacts_with_merged_backends
 from dstack.api.backend import list_backends
 from dstack.api.repo import load_repo_data
+from dstack.api.run import RunNotFoundError, TagNotFoundError, get_tagged_run_name
 from dstack.cli.commands import BasicCommand
 from dstack.cli.common import console
 from dstack.core.error import check_config, check_git
-
-
-def _run_name(repo_data, backend, args):
-    if args.run_name_or_tag_name.startswith(":"):
-        tag_name = args.run_name_or_tag_name[1:]
-        tag_head = backend.get_tag_head(repo_data, tag_name)
-        if tag_head:
-            return tag_head.run_name
-    else:
-        run_name = args.run_name_or_tag_name
-        job_heads = backend.list_job_heads(repo_data, run_name)
-        if job_heads:
-            return run_name
-
-
-def sizeof_fmt(num, suffix="B"):
-    for unit in ["", "Ki", "Mi", "Gi", "Ti", "Pi", "Ei", "Zi"]:
-        if abs(num) < 1024.0:
-            return "%3.1f%s%s" % (num, unit, suffix)
-        num /= 1024.0
-    return "%.1f%s%s" % (num, "Yi", suffix)
+from dstack.utils.common import sizeof_fmt
 
 
 class LsCommand(BasicCommand):
@@ -58,8 +38,13 @@ class LsCommand(BasicCommand):
 
         repo_data = load_repo_data()
         backends = list_backends()
-        run_names = [_run_name(repo_data, b, args) for b in backends]
-        run_names = [r for r in run_names if r is not None]
+        run_names = []
+        for backend in backends:
+            try:
+                run_name, _ = get_tagged_run_name(repo_data, backend, args.run_name_or_tag_name)
+                run_names.append(run_name)
+            except (TagNotFoundError, RunNotFoundError):
+                pass
 
         if len(run_names) == 0:
             console.print(f"Cannot find the run or tag '{args.run_name_or_tag_name}'")
