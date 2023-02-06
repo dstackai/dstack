@@ -2,18 +2,18 @@ import os
 from typing import List, Optional
 
 from dstack.backend import Secret
-from dstack.core.error import SecretError
-from dstack.core.repo import RepoAddress
 from dstack.backend.local.common import (
+    create_secret,
+    delete_object,
+    delete_secret,
+    get_object,
+    get_secret_value,
     list_objects,
     put_object,
-    get_object,
-    delete_object,
-    get_secret_value,
-    create_secret,
     put_secret_value,
-    delete_secret,
 )
+from dstack.core.error import SecretError
+from dstack.core.repo import RepoAddress
 
 
 def list_secret_names(path: str, repo_address: RepoAddress) -> List[str]:

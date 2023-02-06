@@ -1,8 +1,8 @@
 import argparse
 import sys
 
-from dstack.version import __version__ as version
 from dstack.cli.handlers import cli_initialize
+from dstack.version import __version__ as version
 
 
 def main():

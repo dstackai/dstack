@@ -1,7 +1,8 @@
 import os
 import sys
-import giturlparse
 from typing import Optional
+
+import giturlparse
 import yaml
 from git import Repo as GitRepo
 from paramiko.config import SSHConfig

@@ -1,5 +1,5 @@
 from collections import defaultdict
-from typing import List, Union, Tuple, Optional
+from typing import List, Optional, Tuple, Union
 
 from dstack.backend import Backend
 from dstack.core.artifact import Artifact

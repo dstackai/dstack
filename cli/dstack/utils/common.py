@@ -1,8 +1,8 @@
-from typing import Optional, Any
-from datetime import datetime, timedelta
 import re
+from datetime import datetime, timedelta
+from typing import Any, Optional
 
-from botocore.utils import parse_timestamp, datetime2timestamp
+from botocore.utils import datetime2timestamp, parse_timestamp
 
 
 def _quoted(s: Optional[str]) -> str:

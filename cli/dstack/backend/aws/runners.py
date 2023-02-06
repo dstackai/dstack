@@ -2,7 +2,7 @@ import json
 import sys
 import time
 import uuid
-from functools import reduce, cmp_to_key
+from functools import cmp_to_key, reduce
 from typing import List, Optional, Tuple
 
 import yaml
@@ -11,10 +11,10 @@ from botocore.client import BaseClient
 from dstack import version
 from dstack.backend.aws import jobs, logs
 from dstack.core.instance import InstanceType
-from dstack.core.request import RequestStatus, RequestHead
 from dstack.core.job import Job, JobStatus, Requirements
 from dstack.core.repo import RepoAddress
-from dstack.core.runners import Resources, Runner, Gpu
+from dstack.core.request import RequestHead, RequestStatus
+from dstack.core.runners import Gpu, Resources, Runner
 
 CREATE_INSTANCE_RETRY_RATE_SECS = 3
 

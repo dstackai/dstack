@@ -1,17 +1,17 @@
 import sys
 from enum import Enum
 from pathlib import Path
-from typing import List, Optional, Generator, Tuple, Dict
+from typing import Dict, Generator, List, Optional, Tuple
 
 from dstack.core.app import AppSpec
 from dstack.core.artifact import Artifact
-from dstack.core.repo import RepoData, RepoCredentials, RepoAddress, RepoHead
 from dstack.core.job import Job, JobHead
-from dstack.core.secret import Secret
 from dstack.core.log_event import LogEvent
-from dstack.core.tag import TagHead
+from dstack.core.repo import RepoAddress, RepoCredentials, RepoData, RepoHead
 from dstack.core.run import RunHead
 from dstack.core.runners import Runner
+from dstack.core.secret import Secret
+from dstack.core.tag import TagHead
 
 
 class BackendType(Enum):

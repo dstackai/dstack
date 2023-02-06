@@ -1,10 +1,10 @@
 from argparse import Namespace
 
+from dstack.api.backend import list_backends
+from dstack.api.run import list_runs_with_merged_backends
 from dstack.cli.commands import BasicCommand
 from dstack.cli.common import print_runs
 from dstack.core.error import check_config, check_git
-from dstack.api.run import list_runs_with_merged_backends
-from dstack.api.backend import list_backends
 
 
 class PSCommand(BasicCommand):

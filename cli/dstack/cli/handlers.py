@@ -1,5 +1,3 @@
-from dstack.cli.commands import BasicCommand
-import dstack.cli.commands.run
 import dstack.cli.commands.config
 
 # import dstack.cli.commands.hub
@@ -14,6 +12,7 @@ import dstack.cli.commands.run
 import dstack.cli.commands.secrets
 import dstack.cli.commands.stop
 import dstack.cli.commands.tags
+from dstack.cli.commands import BasicCommand
 
 
 def cli_initialize(parser):

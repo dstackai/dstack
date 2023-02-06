@@ -1,16 +1,16 @@
 import os
 from pathlib import Path
-from typing import List, Tuple, Optional, Generator
+from typing import Generator, List, Optional, Tuple
 
-from dstack.core.artifact import Artifact
-from dstack.core.repo import RepoAddress
 from dstack.backend.local.common import (
+    delete_object,
+    get_object,
+    list_all_objects,
     list_objects,
     put_object,
-    get_object,
-    delete_object,
-    list_all_objects,
 )
+from dstack.core.artifact import Artifact
+from dstack.core.repo import RepoAddress
 
 
 def get_artifacts_path(dstack_dir: Path, repo_address: RepoAddress) -> Path:

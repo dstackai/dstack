@@ -4,22 +4,22 @@ import time
 from abc import abstractmethod
 from argparse import ArgumentParser, Namespace
 from pkgutil import iter_modules
-from typing import Optional, List, Dict, Any, Union
+from typing import Any, Dict, List, Optional, Union
 
 from jinja2 import Template
 
+from dstack.api.repo import load_repo_data
 from dstack.backend import Backend
 from dstack.core.job import (
-    Job,
-    JobStatus,
-    JobSpec,
-    Requirements,
-    GpusRequirements,
-    DepSpec,
     ArtifactSpec,
+    DepSpec,
+    GpusRequirements,
+    Job,
+    JobSpec,
+    JobStatus,
+    Requirements,
 )
-from dstack.core.repo import RepoData, RepoAddress
-from dstack.api.repo import load_repo_data
+from dstack.core.repo import RepoAddress, RepoData
 from dstack.utils.common import _quoted
 
 

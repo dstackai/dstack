@@ -1,9 +1,9 @@
-from typing import List, Optional, Dict, Any
+from typing import Any, Dict, List, Optional
 
 import yaml
 from botocore.client import BaseClient
 
-from dstack.core.job import Job, JobStatus, JobHead
+from dstack.core.job import Job, JobHead, JobStatus
 from dstack.core.repo import RepoAddress
 
 

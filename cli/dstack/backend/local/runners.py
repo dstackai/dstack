@@ -1,33 +1,28 @@
-import sys
 import os
-import uuid
-import signal
-from typing import List, Optional, Tuple
-import subprocess
 import platform
-import cpuinfo
+import shutil
+import signal
+import subprocess
+import sys
+import uuid
+from pathlib import Path
+from typing import List, Optional, Tuple
 
-from tqdm import tqdm
+import cpuinfo
 import psutil
 import requests
 import yaml
-from pathlib import Path
-
 from psutil import NoSuchProcess
-import shutil
+from tqdm import tqdm
+
 from dstack import version
 from dstack.backend.local import jobs, logs
+from dstack.backend.local.common import delete_object, get_object, list_objects, put_object
 from dstack.core.instance import InstanceType
-from dstack.core.request import RequestStatus, RequestHead
 from dstack.core.job import Job, JobStatus, Requirements
 from dstack.core.repo import RepoAddress
-from dstack.core.runners import Resources, Runner, Gpu
-from dstack.backend.local.common import (
-    list_objects,
-    put_object,
-    get_object,
-    delete_object,
-)
+from dstack.core.request import RequestHead, RequestStatus
+from dstack.core.runners import Gpu, Resources, Runner
 
 CREATE_INSTANCE_RETRY_RATE_SECS = 3
 

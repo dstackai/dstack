@@ -1,15 +1,11 @@
-from typing import List, Optional, Dict, Any
 import os
 from pathlib import Path
+from typing import Any, Dict, List, Optional
+
 import yaml
 
-from dstack.backend.local.common import (
-    list_objects,
-    put_object,
-    get_object,
-    delete_object,
-)
-from dstack.core.job import Job, JobStatus, JobHead
+from dstack.backend.local.common import delete_object, get_object, list_objects, put_object
+from dstack.core.job import Job, JobHead, JobStatus
 from dstack.core.repo import RepoAddress
 
 

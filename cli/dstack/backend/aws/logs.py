@@ -2,15 +2,15 @@ import json
 import re
 import time
 from collections import defaultdict
-from typing import Optional, Dict, List, Generator, Any, Tuple
+from typing import Any, Dict, Generator, List, Optional, Tuple
 from urllib import parse
 
 from botocore.client import BaseClient
 
 from dstack.backend.aws import jobs, runs
-from dstack.core.log_event import LogEvent, LogEventSource
-from dstack.core.job import JobHead
 from dstack.core.app import AppSpec
+from dstack.core.job import JobHead
+from dstack.core.log_event import LogEvent, LogEventSource
 from dstack.core.repo import RepoAddress
 
 WAIT_N_ONCE_FINISHED = 1
