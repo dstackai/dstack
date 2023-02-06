@@ -10,15 +10,24 @@ on:
 
 jobs:
   python-lint:
-      runs-on: ubuntu-latest
-      steps:
-        - uses: actions/checkout@v2
-        - name: Run black
-          uses: psf/black@stable
-          with:
-            options: "--config black.toml --check --verbose"
-            src: "./cli"
-            version: "~= 22.0"
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v2
+      - uses: actions/setup-python@v2
+        with:
+          python-version: 3.11
+      - name: Run isort
+        uses: isort/isort-action@master
+        with:
+          isort-version: 5.12.0
+          configuration: "--settings-file pyconfig.toml --check-only --diff"
+          sort-paths: "cli"
+      - name: Run black
+        uses: psf/black@stable
+        with:
+          options: "--config pyconfig.toml --check --verbose"
+          src: "./cli"
+          version: "~= 22.0"
 
   cli-test-master:
     runs-on: ${{ matrix.os }}
