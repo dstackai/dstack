@@ -3,10 +3,9 @@ from typing import List, Optional
 
 from botocore.client import BaseClient
 
-from dstack.backend import RepoHead
 from dstack.backend.aws import runners
 from dstack.backend.aws.utils import retry_operation_on_service_errors
-from dstack.core.repo import RepoAddress, RepoCredentials, RepoProtocol
+from dstack.core.repo import RepoAddress, RepoCredentials, RepoHead, RepoProtocol
 
 
 def list_repo_heads(s3_client: BaseClient, bucket_name: str) -> List[RepoHead]:
