@@ -41,7 +41,7 @@ We use [`black`](https://github.com/psf/black) to format Python code and [`isort
 2. `black --config pyconfig.toml cli`
 
 
-There are also helper pre-commits installed for [`black`](https://black.readthedocs.io/en/stable/integrations/source_version_control.html) and [`isort`](https://pycqa.github.io/isort/docs/configuration/pre-commit.html) that makes commit fail if the code is not formatted or the imports are not sorted. They also change the code as required so that you can review the changes and commit again.
+There are also helper pre-commits installed for [`black`](https://black.readthedocs.io/en/stable/integrations/source_version_control.html) and [`isort`](https://pycqa.github.io/isort/docs/configuration/pre-commit.html) that make commits fail if the code is not formatted or the imports are not sorted. They also change the code as required so that you can review the changes and commit again.
 
 ## P.S.
 
