@@ -6,10 +6,10 @@ from rich.console import Console
 from rich.prompt import Confirm, Prompt
 from rich.table import Table
 
-from dstack.core.error import check_config, check_git
-from dstack.cli.commands import BasicCommand
-from dstack.api.repo import load_repo_data
 from dstack.api.backend import list_backends
+from dstack.api.repo import load_repo_data
+from dstack.cli.commands import BasicCommand
+from dstack.core.error import check_config, check_git
 from dstack.core.secret import Secret
 
 

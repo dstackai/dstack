@@ -1,36 +1,35 @@
-import sys
-import os
-import time
-import re
-
-import yaml
-import pkg_resources
 import argparse
+import os
+import re
+import sys
+import time
 from argparse import Namespace
-from jsonschema import validate, ValidationError
 from pathlib import Path
-from typing import List, Any, Tuple, Optional, Dict
-from rich.progress import SpinnerColumn, Progress, TextColumn
-from rich.prompt import Confirm
+from typing import Any, Dict, List, Optional, Tuple
 from urllib import parse
-from cursor import cursor
+
+import pkg_resources
 import websocket
+import yaml
+from cursor import cursor
+from jsonschema import ValidationError, validate
+from rich.progress import Progress, SpinnerColumn, TextColumn
+from rich.prompt import Confirm
 from websocket import WebSocketApp
 
 from dstack import providers
-from dstack.core.error import check_config, check_git, check_backend
-from dstack.core.repo import RepoAddress
-from dstack.backend import Backend
-from dstack.core.job import JobHead, JobStatus
-from dstack.core.request import RequestStatus
-from dstack.cli.commands import BasicCommand
-from dstack.cli.common import print_runs, console
-from dstack.api.repo import load_repo_data
-from dstack.api.backend import get_backend_by_name, DEFAULT, DEFAULT_REMOTE
+from dstack.api.backend import DEFAULT, DEFAULT_REMOTE, get_backend_by_name
 from dstack.api.logs import poll_logs
+from dstack.api.repo import load_repo_data
 from dstack.api.run import list_runs_with_merged_backends
+from dstack.backend import Backend
+from dstack.cli.commands import BasicCommand
+from dstack.cli.common import console, print_runs
+from dstack.core.error import check_backend, check_config, check_git
+from dstack.core.job import JobHead, JobStatus
+from dstack.core.repo import RepoAddress
+from dstack.core.request import RequestStatus
 from dstack.utils.common import since
-
 
 __all__ = "RunCommand"
 

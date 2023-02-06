@@ -1,14 +1,14 @@
 import sys
-
 from argparse import Namespace
+
 from rich.table import Table
 
-from dstack.core.error import check_config, check_git
+from dstack.api.artifacts import list_artifacts_with_merged_backends
+from dstack.api.backend import list_backends
+from dstack.api.repo import load_repo_data
 from dstack.cli.commands import BasicCommand
 from dstack.cli.common import console
-from dstack.api.artifacts import list_artifacts_with_merged_backends
-from dstack.api.repo import load_repo_data
-from dstack.api.backend import list_backends
+from dstack.core.error import check_config, check_git
 
 
 def _run_name(repo_data, backend, args):

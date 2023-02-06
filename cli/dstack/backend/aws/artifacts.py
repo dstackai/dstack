@@ -1,6 +1,6 @@
 import os
 from pathlib import Path
-from typing import List, Tuple, Optional, Generator
+from typing import Generator, List, Optional, Tuple
 
 from boto3.s3 import transfer
 from botocore.client import BaseClient

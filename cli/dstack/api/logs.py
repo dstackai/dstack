@@ -1,8 +1,8 @@
 from typing import List
 
 from dstack.backend import Backend
-from dstack.core.repo import RepoAddress
 from dstack.core.job import JobHead
+from dstack.core.repo import RepoAddress
 
 
 def poll_logs(

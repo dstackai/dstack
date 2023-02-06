@@ -1,21 +1,16 @@
+import os
 import sys
 import time
-import os
-from typing import Optional, List
 from pathlib import Path
+from typing import List, Optional
 
-from dstack.backend.local.common import (
-    list_objects,
-    put_object,
-    get_object,
-    delete_object,
-)
-from dstack.backend.local import jobs, runs, artifacts, repos
-from dstack.core.tag import TagHead
+from dstack.backend.local import artifacts, jobs, repos, runs
+from dstack.backend.local.common import delete_object, get_object, list_objects, put_object
 from dstack.core.artifact import ArtifactHead, ArtifactSpec
 from dstack.core.error import BackendError
 from dstack.core.job import Job, JobStatus
 from dstack.core.repo import RepoAddress, RepoData
+from dstack.core.tag import TagHead
 
 
 def _unserialize_artifact_heads(artifact_heads):

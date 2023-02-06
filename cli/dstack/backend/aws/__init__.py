@@ -1,32 +1,32 @@
 from pathlib import Path
-from typing import Optional, List, Generator, Dict, Tuple
+from typing import Dict, Generator, List, Optional, Tuple
 
 import boto3
 from botocore.client import BaseClient
 
 from dstack.backend import Backend, BackendType
 from dstack.backend.aws import (
-    logs,
     artifacts,
-    jobs,
-    run_names,
-    runs,
-    runners,
-    tags,
-    repos,
-    secrets,
     config,
+    jobs,
+    logs,
+    repos,
+    run_names,
+    runners,
+    runs,
+    secrets,
+    tags,
 )
 from dstack.backend.aws.config import AWSConfig
-from dstack.core.artifact import Artifact
 from dstack.core.app import AppSpec
-from dstack.core.repo import LocalRepoData, RepoAddress, RepoHead, RepoCredentials
-from dstack.core.job import Job, JobHead
-from dstack.core.run import RunHead
-from dstack.core.log_event import LogEvent
-from dstack.core.tag import TagHead
-from dstack.core.secret import Secret
+from dstack.core.artifact import Artifact
 from dstack.core.error import ConfigError
+from dstack.core.job import Job, JobHead
+from dstack.core.log_event import LogEvent
+from dstack.core.repo import LocalRepoData, RepoAddress, RepoCredentials, RepoHead
+from dstack.core.run import RunHead
+from dstack.core.secret import Secret
+from dstack.core.tag import TagHead
 
 
 class AwsBackend(Backend):

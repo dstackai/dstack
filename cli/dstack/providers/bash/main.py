@@ -1,10 +1,10 @@
 from argparse import ArgumentParser
-from typing import List, Optional, Dict, Any
+from typing import Any, Dict, List, Optional
 
-from dstack.core.job import JobSpec
-from dstack.core.app import AppSpec
-from dstack.providers import Provider
 from dstack.backend import Backend
+from dstack.core.app import AppSpec
+from dstack.core.job import JobSpec
+from dstack.providers import Provider
 
 
 class BashProvider(Provider):

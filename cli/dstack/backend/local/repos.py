@@ -2,18 +2,18 @@ import json
 import os
 from typing import List, Optional
 
+from dstack.backend import RepoHead
 from dstack.backend.local.common import (
+    create_secret,
+    delete_object,
+    get_object,
+    get_secret_value,
     list_objects,
     put_object,
-    get_object,
-    delete_object,
-    get_secret_value,
     update_secret,
-    create_secret,
 )
 from dstack.core.error import SecretError
-from dstack.backend import RepoHead
-from dstack.core.repo import RepoCredentials, RepoProtocol, RepoAddress
+from dstack.core.repo import RepoAddress, RepoCredentials, RepoProtocol
 
 
 def list_repo_heads(path: str) -> List[RepoHead]:

@@ -1,7 +1,6 @@
 from typing import Dict
 
-from fastapi import APIRouter, Depends
-from fastapi import status, HTTPException
+from fastapi import APIRouter, Depends, HTTPException, status
 from fastapi.security import HTTPBearer
 from fastapi.security.http import HTTPAuthorizationCredentials
 from sqlalchemy.orm import Session

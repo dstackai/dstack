@@ -1,9 +1,9 @@
-from typing import List, Dict, Optional
+from typing import Dict, List, Optional
+
 from dstack.backend import Backend
-from dstack.core.error import BackendError
 from dstack.backend.aws import AwsBackend
 from dstack.backend.local import LocalBackend
-
+from dstack.core.error import BackendError
 
 DEFAULT_REMOTE = "aws"
 DEFAULT = "local"

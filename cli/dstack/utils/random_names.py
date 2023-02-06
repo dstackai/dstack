@@ -1,7 +1,6 @@
 import random
 from typing import List
 
-
 __adjectives = [
     "afraid",
     "ancient",

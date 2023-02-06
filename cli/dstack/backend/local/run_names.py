@@ -1,5 +1,6 @@
-import yaml
 import os
+
+import yaml
 
 from dstack.backend.local.common import get_object, put_object
 

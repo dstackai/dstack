@@ -1,14 +1,14 @@
 from importlib.util import find_spec
 from typing import List, Optional, Tuple
 
-from rich.prompt import Prompt
 from rich.console import Console
+from rich.prompt import Prompt
 from rich.table import Table
 
+from dstack.backend import Backend
 from dstack.core.job import JobStatus
 from dstack.core.request import RequestStatus
 from dstack.core.run import RunHead
-from dstack.backend import Backend
 from dstack.utils.common import pretty_date
 
 _is_termios_available = find_spec("termios") is not None

@@ -1,27 +1,18 @@
 import sys
 from pathlib import Path
-from typing import List, Optional, Generator, Dict, Tuple
+from typing import Dict, Generator, List, Optional, Tuple
 
-from dstack.backend.local import (
-    jobs,
-    runs,
-    tags,
-    runners,
-    repos,
-    secrets,
-    logs,
-    artifacts,
-)
-from dstack.backend.local.config import LocalConfig
 from dstack.backend import Backend, BackendType
-from dstack.core.artifact import Artifact
+from dstack.backend.local import artifacts, jobs, logs, repos, runners, runs, secrets, tags
+from dstack.backend.local.config import LocalConfig
 from dstack.core.app import AppSpec
-from dstack.core.repo import RepoData, RepoAddress, RepoHead, RepoCredentials
+from dstack.core.artifact import Artifact
 from dstack.core.job import Job, JobHead
-from dstack.core.run import RunHead
 from dstack.core.log_event import LogEvent
-from dstack.core.tag import TagHead
+from dstack.core.repo import RepoAddress, RepoCredentials, RepoData, RepoHead
+from dstack.core.run import RunHead
 from dstack.core.secret import Secret
+from dstack.core.tag import TagHead
 
 
 class LocalBackend(Backend):

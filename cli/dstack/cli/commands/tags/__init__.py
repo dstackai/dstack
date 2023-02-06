@@ -7,11 +7,11 @@ from rich.console import Console
 from rich.prompt import Confirm
 from rich.table import Table
 
-from dstack.cli.commands import BasicCommand
-from dstack.core.error import check_config, check_git, BackendError
 from dstack.api.backend import list_backends
-from dstack.api.tags import list_tag_heads_with_merged_backends
 from dstack.api.repo import load_repo_data
+from dstack.api.tags import list_tag_heads_with_merged_backends
+from dstack.cli.commands import BasicCommand
+from dstack.core.error import BackendError, check_config, check_git
 from dstack.utils.common import pretty_date
 
 

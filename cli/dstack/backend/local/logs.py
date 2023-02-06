@@ -4,16 +4,16 @@ import re
 import time
 from collections import defaultdict
 from pathlib import Path
-from typing import Optional, Dict, List, Generator, Any, Tuple
+from typing import Any, Dict, Generator, List, Optional, Tuple
 from urllib import parse
-from pygtail import Pygtail
 
 from botocore.client import BaseClient
+from pygtail import Pygtail
 
 from dstack.backend.local import jobs, runs
-from dstack.core.log_event import LogEvent, LogEventSource
-from dstack.core.job import JobHead
 from dstack.core.app import AppSpec
+from dstack.core.job import JobHead
+from dstack.core.log_event import LogEvent, LogEventSource
 from dstack.core.repo import RepoAddress
 
 WAIT_N_ONCE_FINISHED = 1

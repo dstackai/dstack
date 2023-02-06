@@ -15,7 +15,7 @@ from tqdm import tqdm
 
 from dstack import version
 from dstack.core.config import BackendConfig
-from dstack.core.runners import Resources, Gpu
+from dstack.core.runners import Gpu, Resources
 
 
 def _arch() -> str:

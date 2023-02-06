@@ -9,7 +9,7 @@ from botocore.client import BaseClient
 from rich import print
 from rich.prompt import Confirm, Prompt
 
-from dstack.cli.common import ask_choice, _is_termios_available
+from dstack.cli.common import _is_termios_available, ask_choice
 from dstack.core.config import BackendConfig, get_config_path
 from dstack.core.error import ConfigError
 
