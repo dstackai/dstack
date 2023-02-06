@@ -1,6 +1,5 @@
 import sys
 from argparse import Namespace
-from collections import defaultdict
 
 from rich import print
 from rich.console import Console

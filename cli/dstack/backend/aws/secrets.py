@@ -3,9 +3,9 @@ from typing import List, Optional
 
 from botocore.client import BaseClient
 
-from dstack.backend import Secret
 from dstack.backend.aws import runners
 from dstack.core.repo import RepoAddress
+from dstack.core.secret import Secret
 
 
 def list_secret_names(

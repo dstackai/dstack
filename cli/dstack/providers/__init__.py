@@ -9,7 +9,7 @@ from typing import Any, Dict, List, Optional, Union
 from jinja2 import Template
 
 from dstack.api.repo import load_repo_data
-from dstack.backend import Backend
+from dstack.backend.base import Backend
 from dstack.core.job import (
     ArtifactSpec,
     DepSpec,
