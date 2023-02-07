@@ -9,6 +9,7 @@ from rich.table import Table
 from dstack.api.backend import list_backends
 from dstack.api.repo import load_repo_data
 from dstack.api.tags import list_tag_heads_with_merged_backends
+from dstack.backend.base import BackendType
 from dstack.cli.commands import BasicCommand
 from dstack.core.error import BackendError, check_config, check_git
 from dstack.utils.common import pretty_date
@@ -39,6 +40,9 @@ class TAGCommand(BasicCommand):
             help="A path to local directory to upload as an artifact",
             action="append",
             dest="artifact_paths",
+        )
+        add_tags_parser.add_argument(
+            "-r", "--remote", help="Upload artifact to remote", action="store_true"
         )
         add_tags_parser.add_argument(
             "-y", "--yes", help="Don't ask for confirmation", action="store_true"
@@ -109,6 +113,14 @@ class TAGCommand(BasicCommand):
                         print(e)
                         exit(1)
                 else:
+                    if not args.remote:
+                        print(
+                            "Uploading directories as artifacts supported only for remotes. "
+                            "Please specify `--remote`."
+                        )
+                        exit(1)
+                    if backend.type is not BackendType.REMOTE:
+                        continue
                     try:
                         backend.add_tag_from_local_dirs(
                             repo_data, args.tag_name, args.artifact_paths
