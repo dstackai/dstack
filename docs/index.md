@@ -7,11 +7,11 @@ hide:
 # Reproducible ML workflows
 
 `dstack` is an open-source tool that allows running reproducible ML workflows independently of
-infrastructure. It allows running ML workflows locally or remotely, using any configured cloud vendor. 
-Additionally, `dstack` facilitates versioning and reuse of artifacts (such as data and models), across teams.
+infrastructure. It allows running ML workflows locally or remotely using any configured cloud vendor. 
+Additionally, `dstack` facilitates versioning and reuse of artifacts (such as data and models) across teams.
 
 In brief, `dstack` simplifies the process of establishing ML training pipelines that are independent of a
-particular vendor, and facilitates collaboration within teams on data and models.
+particular vendor and facilitates collaboration within teams on data and models.
 
 [//]: # (### How it works)
 

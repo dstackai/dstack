@@ -4,7 +4,7 @@ This tutorial will guide you through using `dstack` locally and remotely, step b
 
 ## 1. Install the CLI
 
-Use `pip`, to install the CLI:
+Use `pip` to install `dstack`:
 
 ```shell hl_lines="1"
 pip install dstack --upgrade
@@ -56,9 +56,9 @@ if __name__ == '__main__':
     MNIST("./data", train=False, download=True)
 ```
 
-This script downloads the MNIST dataset and save it locally in the data folder.
+This script downloads the MNIST dataset and saves it locally to the `data` folder.
 
-To run it via `dstack`, it must be defined as a workflow in a YAML file in the
+To run the script via `dstack`, it must be defined as a workflow in a YAML file in the
 `.dstack/workflows` folder within the repo. 
 
 ### Create a workflow YAML file
@@ -78,13 +78,14 @@ workflows:
 
 ### Run the workflow locally
 
-Now, you can run the defined workflow using the `dstack run` command:
+Now you can run the defined workflow using the `dstack run` command:
 
 ```shell hl_lines="1"
 dstack run mnist-data
 ```
 
 !!! info "NOTE:"
+
     Although `dstack` tracks your code on every run, committing changes to the repository is not necessary. 
     You just need to ensure that your code changes are in the staging area. 
     Here's how to ensure it:
@@ -125,7 +126,7 @@ To check the status of recent runs, use the [`dstack ps`](reference/cli/index.md
 dstack ps
 ```
 
-This command displays either the current running workflows or the last completed run:
+This command displays either the currently running workflows or the last completed run:
 
 ```shell hl_lines="1"
 RUN             WORKFLOW    SUBMITTED  OWNER           STATUS     TAG  BACKEND
@@ -242,12 +243,12 @@ workflows:
       - path: ./lightning_logs
 ```
 
-To reuse data across workflows, in the `train-mnist` workflow, we added a dependency on the `mnist-data` workflow .
+To reuse data across workflows, we made the `train-mnist` workflow dependent on the `mnist-data` workflow.
 When we run `train-mnist`, `dstack` will automatically put the data from the last `mnist-data` run in the `data` folder.
 
 ### Run the workflow locally
 
-Now, you can run the defined workflow using the `dstack run` command:
+Now you can run the defined workflow using the `dstack run` command:
 
 ```shell hl_lines="1"
 dstack run train-mnist
@@ -315,7 +316,7 @@ dstack push grumpy-zebra-1
     compared to a pushing a local run.
 
     Therefore, if your goal is to reuse the `mnist-data` artifacts remotely, it is more convenient to run 
-    the `mnist-data` workflow remotely in the first hand.
+    the `mnist-data` workflow remotely in the first place.
 
 ## 7. Train a model remotely
 
@@ -328,15 +329,15 @@ dstack push grumpy-zebra-1
     dstack run mnist-data --remote
     ```
 
-Now, we can run the `train-mnist` workflow remotely (e.g. in the configured cloud):
+Now we can run the `train-mnist` workflow remotely (e.g. in the configured cloud):
 
 ```shell hl_lines="1"
 dstack run train-mnist --remote
 ```
 
-When you run a workflow remotely, `dstack` automatically creates the necessary infrastructure (within the
-configured cloud account), runs the workflow, and upon completion, stores the artifacts and destroys the
-infrastructure.
+When you run a workflow remotely, `dstack` automatically creates the necessary infrastructure within the
+configured cloud account, runs the workflow, and stores the artifacts and destroys the
+infrastructure upon completion.
 
 !!! info "NOTE:"
     You can specify hardware resource requirements (like GPU, memory, interruptible instances, etc.) 
