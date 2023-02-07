@@ -6,7 +6,8 @@
     "edit": "Edit",
     "delete": "Delete",
     "match_count_with_value_one": "{{count}} match",
-    "match_count_with_value_other": "{{count}} matches"
+    "match_count_with_value_other": "{{count}} matches",
+    "sign_out": "Sign out"
   },
   "auth": {
     "invalid_token": "Invalid token",
@@ -16,7 +17,7 @@
 
   "navigation": {
     "hubs": "Hubs",
-    "members": "Members"
+    "users": "Users"
   },
 
   "hubs": {
@@ -34,7 +35,7 @@
     }
   },
   "users": {
-    "page_title": "Members",
+    "page_title": "Users",
     "search_placeholder": "Find members",
     "empty_message_title": "No members",
     "empty_message_text": "No members to display.",
@@ -44,7 +45,12 @@
     "user_name": "User name",
     "token": "Token",
     "email": "Email",
-    "permission_level": "Permission Level",
+    "global_role": "Global role",
     "general_info": "General info"
+  },
+  "roles": {
+    "run": "Run",
+    "admin": "Admin",
+    "read": "Read"
   }
 }

@@ -1,37 +1,36 @@
 import React, { useEffect, useMemo } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { Button, Table, Header, Pagination, SpaceBetween, TextFilter, NavigateLink, ListEmptyMessage } from 'components';
 import { useDeleteUsersMutation, useGetUserListQuery } from 'services/user';
-import { useCollection } from 'hooks';
+import { useBreadcrumbs, useCollection } from 'hooks';
 import { ROUTES } from 'routes';
 import { useTranslation } from 'react-i18next';
 
-export const MemberList: React.FC = () => {
+export const UserList: React.FC = () => {
     const { t } = useTranslation();
     const { isLoading, data } = useGetUserListQuery();
     const [deleteUsers, { isLoading: isDeleting }] = useDeleteUsersMutation();
+    const navigate = useNavigate();
+
+    useBreadcrumbs([
+        {
+            text: t('navigation.users'),
+            href: ROUTES.USER.LIST,
+        },
+    ]);
 
     const COLUMN_DEFINITIONS = [
         {
             id: 'name',
-            header: 'User name',
+            header: t('users.user_name'),
             cell: (item: IUser) => (
-                <NavigateLink href={ROUTES.MEMBER.DETAILS.FORMAT(item.user_name)}>{item.user_name}</NavigateLink>
+                <NavigateLink href={ROUTES.USER.DETAILS.FORMAT(item.user_name)}>{item.user_name}</NavigateLink>
             ),
         },
         {
-            id: 'email',
-            header: 'Email',
-            cell: (item: IUser) => item.email,
-        },
-        {
-            id: 'token',
-            header: 'Token',
-            cell: (item: IUser) => item.token,
-        },
-        {
-            id: 'permission_level',
-            header: 'Permission Level',
-            cell: (item: IUser) => item.permission_level,
+            id: 'global_role',
+            header: t('users.global_role'),
+            cell: (item: IUser) => t(`roles.${item.global_role}`),
         },
     ];
 
@@ -64,6 +63,12 @@ export const MemberList: React.FC = () => {
         const { selectedItems } = collectionProps;
 
         if (selectedItems?.length) deleteUsers(selectedItems.map((user) => user.user_name));
+    };
+
+    const editSelectedUserHandler = () => {
+        const { selectedItems } = collectionProps;
+
+        if (selectedItems?.length) navigate(ROUTES.USER.DETAILS.FORMAT(selectedItems[0].user_name));
     };
 
     const getIsTableItemDisabled = () => {
@@ -105,7 +110,9 @@ export const MemberList: React.FC = () => {
                     counter={renderCounter()}
                     actions={
                         <SpaceBetween size="xs" direction="horizontal">
-                            <Button disabled={isDisabledEdit}>{t('common.edit')}</Button>
+                            <Button onClick={editSelectedUserHandler} disabled={isDisabledEdit}>
+                                {t('common.edit')}
+                            </Button>
 
                             <Button onClick={deleteSelectedUserHandler} disabled={isDisabledDelete}>
                                 {t('common.delete')}

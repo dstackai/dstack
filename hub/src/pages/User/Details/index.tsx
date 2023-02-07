@@ -3,30 +3,43 @@ import { useNavigate, useParams } from 'react-router-dom';
 import { ContentLayout, SpaceBetween, Container, Header, ColumnLayout, Box } from 'components';
 import { DetailsHeader } from 'components';
 import { useTranslation } from 'react-i18next';
+import { useBreadcrumbs } from 'hooks';
 import { useDeleteUsersMutation, useGetUserQuery } from 'services/user';
 import { ROUTES } from 'routes';
 
-export const MemberDetails: React.FC = () => {
+export const UserDetails: React.FC = () => {
     const { t } = useTranslation();
     const params = useParams();
+    const paramUserName = params.name ?? '';
     const navigate = useNavigate();
-    const { data } = useGetUserQuery({ name: params.name ?? '' }, { skip: !params.name });
+    const { data } = useGetUserQuery({ name: paramUserName }, { skip: !params.name });
     const [deleteUsers, { isLoading: isDeleting, data: deleteData }] = useDeleteUsersMutation();
 
+    useBreadcrumbs([
+        {
+            text: t('navigation.users'),
+            href: ROUTES.USER.LIST,
+        },
+        {
+            text: paramUserName,
+            href: ROUTES.USER.DETAILS.FORMAT(paramUserName),
+        },
+    ]);
+
     useEffect(() => {
-        if (!isDeleting && deleteData) navigate(ROUTES.MEMBER.LIST);
+        if (!isDeleting && deleteData) navigate(ROUTES.USER.LIST);
     }, [isDeleting, deleteData]);
 
     const deleteSUserHandler = () => {
         if (!data) return;
-        deleteUsers([data.user_name]);
+        deleteUsers([paramUserName]);
     };
 
     return (
         <ContentLayout
             header={
                 <DetailsHeader
-                    title={data?.user_name}
+                    title={paramUserName}
                     editAction={() => console.log('edit')}
                     deleteAction={deleteSUserHandler}
                     editDisabled={isDeleting}
@@ -45,19 +58,8 @@ export const MemberDetails: React.FC = () => {
                                 </div>
 
                                 <div>
-                                    <Box variant="awsui-key-label">{t('users.email')}</Box>
-                                    <div>{data.email}</div>
-                                </div>
-                            </SpaceBetween>
-
-                            <SpaceBetween size="l">
-                                <div>
-                                    <Box variant="awsui-key-label">{t('users.token')}</Box>
-                                    <div>{data.token}</div>
-                                </div>
-                                <div>
-                                    <Box variant="awsui-key-label">{t('users.permission_level')}</Box>
-                                    <div>{data.permission_level}</div>
+                                    <Box variant="awsui-key-label">{t('users.global_role')}</Box>
+                                    <div>{t(`roles.${data.global_role}`)}</div>
                                 </div>
                             </SpaceBetween>
                         </ColumnLayout>

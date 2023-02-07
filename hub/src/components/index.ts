@@ -14,6 +14,7 @@ export { default as Pagination } from '@cloudscape-design/components/pagination'
 export { default as Table } from '@cloudscape-design/components/table';
 export { default as ContentLayout } from '@cloudscape-design/components/content-layout';
 export { default as ColumnLayout } from '@cloudscape-design/components/column-layout';
+export { default as BreadcrumbGroup } from '@cloudscape-design/components/breadcrumb-group';
 
 // custom components
 export { NavigateLink } from './NavigateLink';

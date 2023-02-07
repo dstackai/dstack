@@ -10,7 +10,7 @@ export const DetailsHeader: React.FC<IProps> = ({ title, editAction, deleteActio
 
     return (
         <Header
-            variant="h1"
+            variant="awsui-h1-sticky"
             actions={
                 <SpaceBetween direction="horizontal" size="xs">
                     {editAction && (

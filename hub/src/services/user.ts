@@ -9,6 +9,8 @@ export const userApi = createApi({
         prepareHeaders: fetchBaseQueryHeaders,
     }),
 
+    tagTypes: ['User'],
+
     endpoints: (builder) => ({
         getUserData: builder.query<IUserSmall, void>({
             query: () => {
@@ -24,6 +26,9 @@ export const userApi = createApi({
                     url: API.USERS.LIST(),
                 };
             },
+
+            providesTags: (result) =>
+                result ? [...result.map(({ user_name }) => ({ type: 'User' as const, id: user_name })), 'User'] : ['User'],
         }),
 
         getUser: builder.query<IUser, { name: IUser['user_name'] }>({
@@ -32,6 +37,8 @@ export const userApi = createApi({
                     url: API.USERS.DETAILS(arg.name),
                 };
             },
+
+            providesTags: (result) => (result ? [{ type: 'User' as const, id: result.user_name }] : []),
         }),
 
         deleteUsers: builder.mutation<void, IUser['user_name'][]>({
@@ -42,6 +49,8 @@ export const userApi = createApi({
                     users: hubNames,
                 },
             }),
+
+            invalidatesTags: ['User'],
         }),
     }),
 });

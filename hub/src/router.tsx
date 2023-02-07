@@ -4,7 +4,7 @@ import { Navigate } from 'react-router-dom';
 import App from 'App';
 import { HubList } from 'pages/Hub';
 import { Logout } from 'App/Logout';
-import { MemberList, MemberDetails } from 'pages/Member';
+import { UserList, UserDetails } from 'pages/User';
 import { ROUTES } from './routes';
 import { AuthErrorMessage } from './App/AuthErrorMessage';
 
@@ -25,12 +25,12 @@ export const router = createBrowserRouter([
             },
             // members
             {
-                path: ROUTES.MEMBER.LIST,
-                element: <MemberList />,
+                path: ROUTES.USER.LIST,
+                element: <UserList />,
             },
             {
-                path: ROUTES.MEMBER.DETAILS.TEMPLATE,
-                element: <MemberDetails />,
+                path: ROUTES.USER.DETAILS.TEMPLATE,
+                element: <UserDetails />,
             },
 
             // auth

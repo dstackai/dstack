@@ -1,11 +1,9 @@
-declare type TPermissionLevel = 'Read' | 'Admin' | 'Run'
+declare type TUserRole = 'read' | 'admin' | 'run'
 
 declare interface IUser {
-    id: number
     user_name: string;
     token: string
-    email: string;
-    permission_level: TPermissionLevel
+    global_role: TUserRole
 }
 
 declare interface IUserAuthData extends Pick<IUser, 'token'>{}

@@ -1,6 +1,6 @@
 import React, { useEffect, useMemo } from 'react';
 import { Cards, Header, SpaceBetween, Button, NavigateLink, TextFilter, Pagination, ListEmptyMessage } from 'components';
-import { useCollection } from 'hooks';
+import { useBreadcrumbs, useCollection } from 'hooks';
 import { useDeleteHubsMutation, useGetHubsQuery } from 'services/hub';
 import { ROUTES } from 'routes';
 import { useTranslation } from 'react-i18next';
@@ -9,6 +9,13 @@ export const HubList: React.FC = () => {
     const { t } = useTranslation();
     const { isLoading, data } = useGetHubsQuery();
     const [deleteHubs, { isLoading: isDeleting }] = useDeleteHubsMutation();
+
+    useBreadcrumbs([
+        {
+            text: t('navigation.hubs'),
+            href: ROUTES.HUB.LIST,
+        },
+    ]);
 
     const renderEmptyMessage = (): React.ReactNode => {
         return <ListEmptyMessage title={t('hubs.empty_message_title')} message={t('hubs.empty_message_text')} />;

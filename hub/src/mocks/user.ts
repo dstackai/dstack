@@ -13,23 +13,21 @@ function broofa() {
 }
 
 const successList: IUser[] = new Array(50).fill({}).map((i, index) => ({
-    id: index,
     user_name: `user_${index}`,
     token: broofa(),
-    email: `user_${index}@email.ru`,
-    permission_level: (function () {
+    global_role: (function () {
         const val = Math.random();
-        let permission: TPermissionLevel = 'Read';
+        let permission: TUserRole = 'read';
 
         switch (true) {
             case val > 0.65:
-                permission = 'Read';
+                permission = 'read';
                 break;
             case val <= 0.65 && val >= 0.3:
-                permission = 'Admin';
+                permission = 'admin';
                 break;
             case val < 0.3:
-                permission = 'Run';
+                permission = 'run';
                 break;
         }
 
