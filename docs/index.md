@@ -37,7 +37,7 @@ Having your first ML workflows up and running will take less than 30 min.
 - [**3. Basics**
    Browse the basic examples of how to use `dstack`.
   ](basics/hello-world.md)
-- [**3. Slack**
+- [**4. Slack**
    Join our Slack chat to get support from us and the community.
   ](https://join.slack.com/t/dstackai/shared_invite/zt-xdnsytie-D4qU9BvJP8vkbkHXdi6clQ)
 

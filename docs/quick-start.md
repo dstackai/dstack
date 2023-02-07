@@ -320,8 +320,7 @@ dstack push grumpy-zebra-1
 ## 7. Train a model remotely
 
 !!! info "NOTE:"
-    Before running the `mnist-train` workflow remotely, we have to ensure that the `mnist-data`  artifacts  
-    are available remotely.
+    Before running the `mnist-train` workflow remotely, we have to ensure that the `mnist-data` artifacts are available remotely.
 
     Either follow the previous step of pushing the artifacts, or run the `mnist-data` workflow remotely:
 
