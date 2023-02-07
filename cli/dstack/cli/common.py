@@ -29,7 +29,7 @@ def ask_choice(
     if _is_termios_available:
         from simple_term_menu import TerminalMenu
 
-        print(
+        console.print(
             f"[sea_green3 bold]?[/sea_green3 bold] [bold]{title}[/bold] "
             "[gray46]Use arrows to move, type to filter[/gray46]"
         )
@@ -64,7 +64,7 @@ def ask_choice(
             if value in values:
                 return value
             else:
-                print(
+                console.print(
                     f"[red]Please select one of the available options: \\[{', '.join(values)}][/red]"
                 )
                 return ask_choice(title, labels, values, selected_value, show_choices)
