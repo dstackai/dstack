@@ -20,3 +20,4 @@ export { default as BreadcrumbGroup } from '@cloudscape-design/components/breadc
 export { NavigateLink } from './NavigateLink';
 export { ListEmptyMessage } from './ListEmptyMessage';
 export { DetailsHeader } from './DetailsHeader';
+export { Loader } from './Loader';

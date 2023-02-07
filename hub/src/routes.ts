@@ -18,5 +18,9 @@ export const ROUTES = {
             TEMPLATE: `/users/:name`,
             FORMAT: (name: string) => buildRoute(ROUTES.USER.DETAILS.TEMPLATE, { name }),
         },
+        EDIT: {
+            TEMPLATE: `/users/:name/edit`,
+            FORMAT: (name: string) => buildRoute(ROUTES.USER.EDIT.TEMPLATE, { name }),
+        },
     },
 };

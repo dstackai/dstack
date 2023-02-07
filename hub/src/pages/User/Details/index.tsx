@@ -1,6 +1,6 @@
 import React, { useEffect } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
-import { ContentLayout, SpaceBetween, Container, Header, ColumnLayout, Box } from 'components';
+import { ContentLayout, SpaceBetween, Container, Header, ColumnLayout, Box, Loader } from 'components';
 import { DetailsHeader } from 'components';
 import { useTranslation } from 'react-i18next';
 import { useBreadcrumbs } from 'hooks';
@@ -12,7 +12,7 @@ export const UserDetails: React.FC = () => {
     const params = useParams();
     const paramUserName = params.name ?? '';
     const navigate = useNavigate();
-    const { data } = useGetUserQuery({ name: paramUserName }, { skip: !params.name });
+    const { isLoading, data } = useGetUserQuery({ name: paramUserName }, { skip: !params.name });
     const [deleteUsers, { isLoading: isDeleting, data: deleteData }] = useDeleteUsersMutation();
 
     useBreadcrumbs([
@@ -47,6 +47,12 @@ export const UserDetails: React.FC = () => {
                 />
             }
         >
+            {isLoading && !data && (
+                <Container>
+                    <Loader />
+                </Container>
+            )}
+
             {data && (
                 <SpaceBetween size="l">
                     <Container header={<Header variant="h2">{t('users.general_info')}</Header>}>
