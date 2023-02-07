@@ -85,14 +85,13 @@ dstack run mnist-data
 ```
 
 !!! info "NOTE:"
-
-    Although `dstack` tracks your code on every run, committing changes to the repository is not necessary. 
-    You just need to ensure that your code changes are in the staging area. 
-    Here's how to ensure it:
-
+    In order for the files to be available in a workflow, they have to be tracked by Git.
+    To ensure Git tracks the files, run:
     ```shell hl_lines="1"
     git add .dstack mnist
     ```
+
+    After that, `dstack` will keep track of the file changes automatically, so you don't have to run `git add` on every change.
 
 As the workflow is running, you will see its output:
 
@@ -253,13 +252,6 @@ Now you can run the defined workflow using the `dstack run` command:
 ```shell hl_lines="1"
 dstack run train-mnist
 ```
-
-!!! info "NOTE:"
-    Double-check the changes are in the staging area again.
-
-    ```shell hl_lines="1"
-    git add mnist
-    ```
 
 As the workflow is running, you will see its output:
 
