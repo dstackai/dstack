@@ -71,6 +71,6 @@ class PushCommand(BasicCommand):
             )
 
         for job in jobs:
-            remote_backend.store_job(job)
+            remote_backend.create_job(job)
 
         print("Push completed")

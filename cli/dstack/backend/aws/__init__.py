@@ -99,27 +99,12 @@ class AwsBackend(RemoteBackend):
             repo_address,
         )
 
-    def submit_job(self, job: Job, counter: List[int]):
-        jobs.create_job(self._s3_client(), self.backend_config.bucket_name, job, counter)
-        runners.run_job(
-            self._logs_client(),
-            self._ec2_client(),
-            self._iam_client(),
-            self._s3_client(),
-            self.backend_config.bucket_name,
-            self.backend_config.region_name,
-            self.backend_config.subnet_id,
-            job,
-        )
+    def create_job(self, job: Job):
+        jobs.create_job(self._s3_client(), self.backend_config.bucket_name, job)
 
     def get_job(self, repo_address: RepoAddress, job_id: str) -> Optional[Job]:
         return jobs.get_job(
             self._s3_client(), self.backend_config.bucket_name, repo_address, job_id
-        )
-
-    def list_job_heads(self, repo_address: RepoAddress, run_name: Optional[str] = None):
-        return jobs.list_job_heads(
-            self._s3_client(), self.backend_config.bucket_name, repo_address, run_name
         )
 
     def list_jobs(self, repo_address: RepoAddress, run_name: str) -> List[Job]:
@@ -139,9 +124,6 @@ class AwsBackend(RemoteBackend):
             job,
         )
 
-    def store_job(self, job: Job):
-        jobs.store_job(self._s3_client(), self.backend_config.bucket_name, job)
-
     def stop_job(self, repo_address: RepoAddress, job_id: str, abort: bool):
         runners.stop_job(
             self._ec2_client(),
@@ -152,17 +134,23 @@ class AwsBackend(RemoteBackend):
             abort,
         )
 
+    def list_job_heads(self, repo_address: RepoAddress, run_name: Optional[str] = None):
+        return jobs.list_job_heads(
+            self._s3_client(), self.backend_config.bucket_name, repo_address, run_name
+        )
+
     def delete_job_head(self, repo_address: RepoAddress, job_id: str):
         jobs.delete_job_head(
             self._s3_client(), self.backend_config.bucket_name, repo_address, job_id
         )
 
-    def get_run_heads(
+    def list_run_heads(
         self,
         repo_address: RepoAddress,
-        job_heads: List[JobHead],
+        run_name: Optional[str] = None,
         include_request_heads: bool = True,
     ) -> List[RunHead]:
+        job_heads = self.list_job_heads(repo_address, run_name)
         return runs.get_run_heads(
             self._ec2_client(),
             self._s3_client(),
@@ -254,9 +242,6 @@ class AwsBackend(RemoteBackend):
             run_jobs,
         )
 
-    def delete_tag_head(self, repo_address: RepoAddress, tag_head: TagHead):
-        tags.delete_tag(self._s3_client(), self.backend_config.bucket_name, repo_address, tag_head)
-
     def add_tag_from_local_dirs(
         self, repo_data: LocalRepoData, tag_name: str, local_dirs: List[str]
     ):
@@ -269,8 +254,8 @@ class AwsBackend(RemoteBackend):
             local_dirs,
         )
 
-    def list_repo_heads(self) -> List[RepoHead]:
-        return repos.list_repo_heads(self._s3_client(), self.backend_config.bucket_name)
+    def delete_tag_head(self, repo_address: RepoAddress, tag_head: TagHead):
+        tags.delete_tag(self._s3_client(), self.backend_config.bucket_name, repo_address, tag_head)
 
     def update_repo_last_run_at(self, repo_address: RepoAddress, last_run_at: int):
         repos.update_repo_last_run_at(
@@ -279,19 +264,6 @@ class AwsBackend(RemoteBackend):
             repo_address,
             last_run_at,
         )
-
-    def increment_repo_tags_count(self, repo_address: RepoAddress):
-        repos.increment_repo_tags_count(
-            self._s3_client(), self.backend_config.bucket_name, repo_address
-        )
-
-    def decrement_repo_tags_count(self, repo_address: RepoAddress):
-        repos.decrement_repo_tags_count(
-            self._s3_client(), self.backend_config.bucket_name, repo_address
-        )
-
-    def delete_repo(self, repo_address: RepoAddress):
-        repos.delete_repo(self._s3_client(), self.backend_config.bucket_name, repo_address)
 
     def get_repo_credentials(self, repo_address: RepoAddress) -> Optional[RepoCredentials]:
         return repos.get_repo_credentials(
@@ -306,17 +278,6 @@ class AwsBackend(RemoteBackend):
             self.backend_config.bucket_name,
             repo_address,
             repo_credentials,
-        )
-
-    def list_run_artifact_files_and_folders(
-        self, repo_address: RepoAddress, job_id: str, path: str
-    ) -> List[Tuple[str, bool]]:
-        return artifacts.list_run_artifact_files_and_folders(
-            self._s3_client(),
-            self.backend_config.bucket_name,
-            repo_address,
-            job_id,
-            path,
         )
 
     def list_secret_names(self, repo_address: RepoAddress) -> List[str]:

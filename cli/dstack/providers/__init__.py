@@ -237,11 +237,10 @@ class Provider:
         repo_data = load_repo_data()
         # [TODO] Handle master job
         jobs = []
-        counter = []
-        for job_spec in job_specs:
+        for i, job_spec in enumerate(job_specs):
             submitted_at = int(round(time.time() * 1000))
             job = Job(
-                None,
+                f"{self.run_name},{self.workflow_name or ''},{i}",
                 repo_data,
                 self.run_name,
                 self.workflow_name or None,
@@ -266,7 +265,7 @@ class Provider:
                 None,
                 tag_name,
             )
-            backend.submit_job(job, counter)
+            backend.submit_job(job)
             jobs.append(job)
         if tag_name:
             backend.add_tag_from_run(repo_data, tag_name, self.run_name, jobs)

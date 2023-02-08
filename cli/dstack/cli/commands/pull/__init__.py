@@ -61,6 +61,6 @@ class PullCommand(BasicCommand):
         )
 
         for job in jobs:
-            local_backend.store_job(job)
+            local_backend.create_job(job)
 
         print("Pull completed")
