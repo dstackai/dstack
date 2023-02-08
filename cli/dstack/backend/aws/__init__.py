@@ -17,7 +17,9 @@ from dstack.backend.aws import (
     tags,
 )
 from dstack.backend.aws.config import AWSConfig
+from dstack.backend.aws.storage import AWSStorage
 from dstack.backend.base import RemoteBackend
+from dstack.backend.base import jobs as base_jobs
 from dstack.core.artifact import Artifact
 from dstack.core.error import ConfigError
 from dstack.core.job import Job, JobHead
@@ -40,6 +42,9 @@ class AwsBackend(RemoteBackend):
             self._loaded = True
         except ConfigError:
             self._loaded = False
+        self._storage = AWSStorage(
+            s3_client=self._s3_client(), bucket_name=self.backend_config.bucket_name
+        )
 
     def _s3_client(self) -> BaseClient:
         session = boto3.Session(
@@ -100,17 +105,13 @@ class AwsBackend(RemoteBackend):
         )
 
     def create_job(self, job: Job):
-        jobs.create_job(self._s3_client(), self.backend_config.bucket_name, job)
+        base_jobs.create_job(self._storage, job)
 
     def get_job(self, repo_address: RepoAddress, job_id: str) -> Optional[Job]:
-        return jobs.get_job(
-            self._s3_client(), self.backend_config.bucket_name, repo_address, job_id
-        )
+        return base_jobs.get_job(self._storage, repo_address, job_id)
 
     def list_jobs(self, repo_address: RepoAddress, run_name: str) -> List[Job]:
-        return jobs.list_jobs(
-            self._s3_client(), self.backend_config.bucket_name, repo_address, run_name
-        )
+        return base_jobs.list_jobs(self._storage, repo_address, run_name)
 
     def run_job(self, job: Job):
         runners.run_job(
@@ -134,15 +135,13 @@ class AwsBackend(RemoteBackend):
             abort,
         )
 
-    def list_job_heads(self, repo_address: RepoAddress, run_name: Optional[str] = None):
-        return jobs.list_job_heads(
-            self._s3_client(), self.backend_config.bucket_name, repo_address, run_name
-        )
+    def list_job_heads(
+        self, repo_address: RepoAddress, run_name: Optional[str] = None
+    ) -> List[JobHead]:
+        return base_jobs.list_job_heads(self._storage, repo_address, run_name)
 
     def delete_job_head(self, repo_address: RepoAddress, job_id: str):
-        jobs.delete_job_head(
-            self._s3_client(), self.backend_config.bucket_name, repo_address, job_id
-        )
+        base_jobs.delete_job_head(self._storage, repo_address, job_id)
 
     def list_run_heads(
         self,
