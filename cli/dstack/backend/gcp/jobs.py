@@ -1,33 +1,31 @@
-from typing import Optional, List
+from typing import List, Optional
 
-from google.cloud.storage import Bucket
 import yaml
+from google.cloud.storage import Bucket
 
-from dstack.core.instance import InstanceType
-from dstack.backend import Job, JobHead, RepoAddress
-from dstack.core.job import JobStatus
-from dstack.core.repo import _repo_address_path
-from dstack.core.runners import Resources, Runner
-from dstack.backend.aws.jobs import serialize_job, _job_head_key, unserialize_job
 from dstack.backend.gcp import runners, storage
 from dstack.backend.gcp.config import GCPConfig
+from dstack.core.instance import InstanceType
+from dstack.core.job import Job, JobHead, JobStatus
+from dstack.core.repo import RepoAddress
+from dstack.core.runners import Resources, Runner
 
 
 def create_job(bucket: Bucket, job: Job):
     counter = 0
     job_id = f"{job.run_name},{job.workflow_name or ''},{counter}"
     job.set_id(job_id)
-    prefix = f"jobs/{_repo_address_path(job.repo_address)}"
+    prefix = f"jobs/{job.repo_address.path()}"
     key = f"{prefix}/{job_id}.yaml"
-    storage.put_object(bucket, key, yaml.dump(serialize_job(job)))
-    storage.put_object(bucket, _job_head_key(job), '')
+    storage.put_object(bucket, key, yaml.dump(job.serialize()))
+    storage.put_object(bucket, job.job_head_key(), "")
 
 
 def get_job(bucket: Bucket, repo_address: RepoAddress, job_id: str) -> Optional[Job]:
-    prefix = f"jobs/{_repo_address_path(repo_address)}"
+    prefix = f"jobs/{job.repo_address.path()}"
     key = f"{prefix}/{job_id}.yaml"
     obj = storage.read_object(bucket, key)
-    job = unserialize_job(yaml.load(obj, yaml.FullLoader))
+    job = Job.unserialize(yaml.load(obj, yaml.FullLoader))
     return job
 
 
@@ -37,27 +35,50 @@ def update_job(bucket: Bucket, job: Job):
 
 
 def delete_job_head(bucket: Bucket, repo_address: RepoAddress, job_id: str):
-    jobs_prefix = f"jobs/{_repo_address_path(repo_address)}"
+    jobs_prefix = f"jobs/{repo_address.path()}"
     job_head_key_prefix = f"{jobs_prefix}/l;{job_id};"
     object_names = storage.list_objects(bucket, prefix=job_head_key_prefix)
     for object_name in object_names:
         storage.delete_object(bucket, object_name)
 
 
-def list_job_heads(bucket: Bucket, repo_address: RepoAddress, run_name: Optional[str] = None) -> List[JobHead]:
-    jobs_prefix = f"jobs/{_repo_address_path(repo_address)}"
+def list_job_heads(
+    bucket: Bucket, repo_address: RepoAddress, run_name: Optional[str] = None
+) -> List[JobHead]:
+    jobs_prefix = f"jobs/{repo_address.path()}"
     job_head_key_prefix = f"{jobs_prefix}/l;"
     job_head_key_run_prefix = job_head_key_prefix + run_name if run_name else job_head_key_prefix
     object_names = storage.list_objects(bucket, prefix=job_head_key_run_prefix)
     job_heads = []
     for object_name in object_names:
         t = object_name.split(";")
-        _, job_id, provider_name, local_repo_user_name, submitted_at, status, artifacts, app_names, tag_name = t
-        run_name, workflow_name, job_index = tuple(job_id.split(','))
-        job_heads.append(JobHead(job_id, repo_address, run_name, workflow_name or None, provider_name,
-                                    local_repo_user_name, JobStatus(status), int(submitted_at),
-                                    artifacts.split(',') if artifacts else None, tag_name or None,
-                                    app_names.split(',') or None))
+        (
+            _,
+            job_id,
+            provider_name,
+            local_repo_user_name,
+            submitted_at,
+            status,
+            artifacts,
+            app_names,
+            tag_name,
+        ) = t
+        run_name, workflow_name, job_index = tuple(job_id.split(","))
+        job_heads.append(
+            JobHead(
+                job_id,
+                repo_address,
+                run_name,
+                workflow_name or None,
+                provider_name,
+                local_repo_user_name,
+                JobStatus(status),
+                int(submitted_at),
+                artifacts.split(",") if artifacts else None,
+                tag_name or None,
+                app_names.split(",") or None,
+            )
+        )
     return job_heads
 
 
@@ -79,7 +100,9 @@ def _get_instance_type(job: Job) -> InstanceType:
     )
 
 
-def stop_job(gcp_config: GCPConfig, bucket: Bucket, repo_address: RepoAddress, job_id: str, abort: bool):
+def stop_job(
+    gcp_config: GCPConfig, bucket: Bucket, repo_address: RepoAddress, job_id: str, abort: bool
+):
     job = get_job(bucket, repo_address, job_id)
     if job.status.is_finished():
         return

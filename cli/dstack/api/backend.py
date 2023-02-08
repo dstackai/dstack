@@ -1,10 +1,10 @@
-from typing import List, Dict, Optional
-from dstack.backend import Backend
-from dstack.core.error import BackendError
+from typing import Dict, List, Optional
+
 from dstack.backend.aws import AwsBackend
+from dstack.backend.base import Backend, RemoteBackend
 from dstack.backend.gcp import GCPBackend
 from dstack.backend.local import LocalBackend
-
+from dstack.core.error import BackendError
 
 DEFAULT_REMOTE = "aws"
 DEFAULT = "local"
@@ -20,7 +20,7 @@ def get_all_backends():
 
 
 def list_backends() -> List[Backend]:
-    return [backend for backend in get_all_backends() if backend.loaded()]
+    return [backend for backend in get_all_backends() if backend.loaded]
 
 
 def dict_backends() -> Dict[str, Backend]:
@@ -32,3 +32,11 @@ def get_backend_by_name(name: str) -> Optional[Backend]:
     if backend is None:
         raise BackendError(f"Backend {name} not found")
     return backend
+
+
+def get_current_remote_backend() -> RemoteBackend:
+    return get_backend_by_name(DEFAULT_REMOTE)
+
+
+def get_local_backend() -> LocalBackend:
+    return LocalBackend()

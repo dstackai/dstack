@@ -147,10 +147,12 @@ func (s *S3) UpdateState(ctx context.Context) error {
 	if err != nil {
 		return gerrors.Wrap(err)
 	}
-	appString := ""
+
+	bufApp := make([]string, 0, len(s.state.Job.Apps))
 	for _, app := range s.state.Job.Apps {
-		appString += app.Name
+		bufApp = append(bufApp, app.Name)
 	}
+	appString := strings.Join(bufApp, ",")
 
 	artifactSlice := make([]string, 0)
 	for _, art := range s.state.Job.Artifacts {

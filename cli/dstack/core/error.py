@@ -1,15 +1,22 @@
-import sys
 import os
+import sys
+from typing import Optional
+
 from git import InvalidGitRepositoryError
 
 
 class ConfigError(Exception):
-    def __init__(self, message: str):
+    def __init__(self, message: Optional[str] = None):
         self.message = message
 
 
 class BackendError(Exception):
-    def __init__(self, message: str):
+    def __init__(self, message: Optional[str] = None):
+        self.message = message
+
+
+class SecretError(Exception):
+    def __init__(self, message: Optional[str] = None):
         self.message = message
 
 

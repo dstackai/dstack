@@ -32,7 +32,8 @@ setup(
     package_dir={"": "cli"},
     packages=find_packages("cli"),
     package_data={
-        "dstack.schemas": ["*.json"]
+        "dstack.schemas": ["*.json"],
+        "dstack.hub": ["statics/*", "statics/**/*", "statics/**/**/*"]
     },
     include_package_data=True,
     scripts=[],
@@ -59,12 +60,18 @@ setup(
         "paramiko",
         "git-url-parse",
         "rich",
+        "fastapi",
+        "starlette",
+        "uvicorn",
+        "pydantic",
+        "sqlalchemy",
         "websocket-client",
         "cursor",
         "simple-term-menu",
         "py-cpuinfo",
         "psutil",
         "jinja2",
+        "pygtail",
     ],
     classifiers=[
         "Development Status :: 2 - Pre-Alpha",

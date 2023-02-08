@@ -1,8 +1,8 @@
 import argparse
 from argparse import ArgumentParser
-from typing import List, Optional, Dict, Any
+from typing import Any, Dict, List, Optional
 
-from dstack.jobs import Requirements, GpusRequirements, JobSpec
+from dstack.jobs import GpusRequirements, JobSpec, Requirements
 from dstack.providers import Provider
 
 
@@ -19,7 +19,13 @@ class TorchrunProvider(Provider):
         self.resources = None
         self.args = None
 
-    def load(self, provider_args: List[str], workflow_name: Optional[str], provider_data: Dict[str, Any], run_name: str):
+    def load(
+        self,
+        provider_args: List[str],
+        workflow_name: Optional[str],
+        provider_data: Dict[str, Any],
+        run_name: str,
+    ):
         super().load(provider_args, workflow_name, provider_data, run_name)
         self.script = self.provider_data.get("script") or self.provider_data.get("file")
         self.setup = self._get_list_data("setup") or self._get_list_data("before_run")
@@ -55,7 +61,9 @@ class TorchrunProvider(Provider):
             if isinstance(self.args, str):
                 args_init += " " + self.args
             if isinstance(self.args, list):
-                args_init += " " + ",".join(map(lambda arg: "\"" + arg.replace('"', '\\"') + "\"", self.args))
+                args_init += " " + ",".join(
+                    map(lambda arg: '"' + arg.replace('"', '\\"') + '"', self.args)
+                )
         torchrun_command = f"torchrun {nproc} --nnodes={self.nodes} --node_rank={node_rank}"
         if node_rank == 0:
             commands.append(
@@ -81,14 +89,16 @@ class TorchrunProvider(Provider):
         job_specs = [master_job]
         if self.nodes > 1:
             for i in range(self.nodes - 1):
-                job_specs.append(JobSpec(
-                    image_name=self._image_name(),
-                    commands=self._commands(i + 1),
-                    working_dir=self.working_dir,
-                    env=self.env,
-                    requirements=self.resources,
-                    master_job=master_job
-                ))
+                job_specs.append(
+                    JobSpec(
+                        image_name=self._image_name(),
+                        commands=self._commands(i + 1),
+                        working_dir=self.working_dir,
+                        env=self.env,
+                        requirements=self.resources,
+                        master_job=master_job,
+                    )
+                )
         return job_specs
 
     def _create_parser(self, workflow_name: Optional[str]) -> Optional[ArgumentParser]:

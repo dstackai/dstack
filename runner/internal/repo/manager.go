@@ -65,7 +65,7 @@ func (m *Manager) WithSSHAuth(pem, password string) *Manager {
 
 func (m *Manager) Checkout() error {
 	log.Info(m.ctx, "git checkout", "auth", fmt.Sprintf("%T", (&m.clo).Auth))
-	if _, err := os.Stat(m.localPath); !os.IsNotExist(err) {
+	if _, err := os.Stat(m.localPath); err == nil {
 		if err = os.RemoveAll(m.localPath); err != nil {
 			log.Error(m.ctx, "Failed clear directory")
 		}

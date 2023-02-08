@@ -10,6 +10,7 @@ const (
 	Stopped           = "stopped"
 	Downloading       = "downloading"
 	Uploading         = "uploading"
+	Stopping          = "stopping"
 )
 
 func (s State) String() string {

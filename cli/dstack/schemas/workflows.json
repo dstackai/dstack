@@ -263,6 +263,18 @@
             "code"
           ]
         },
+        "version": {
+          "description": "The version of openvscode-server",
+          "anyOf": [
+            {
+              "type": "string",
+              "pattern": "^\\d+(\\.\\d+)+$"
+            },
+            {
+              "type": "number"
+            }
+          ]
+        },
         "setup": {
           "$ref": "#/definitions/setup"
         },

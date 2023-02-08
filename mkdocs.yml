@@ -22,6 +22,7 @@ theme:
   favicon: images/dstack_fav_32.ico
   icon:
     repo: fontawesome/brands/github
+    edit: material/pencil
   font:
     text: Source Sans Pro
     code: IBM Plex Mono
@@ -43,15 +44,16 @@ theme:
   features:
     - content.code.copy
     - content.action.edit
-#    - navigation.indexes
+    #    - navigation.indexes
     - navigation.tabs
-#    - navigation.instant
+    #    - navigation.instant
     #    - toc.integrate
     - navigation.sections
-    - navigation.expand
+    #    - navigation.expand
     - navigation.top
     - announce.dismiss
     - navigation.tracking
+    - navigation.footer
 
 # Plugins
 plugins:
@@ -99,8 +101,8 @@ extra:
   social:
     - icon: fontawesome/brands/github
       link: https://github.com/dstackai/dstack
-#    - icon: fontawesome/brands/python
-#      link: https://pypi.org/project/dstack/
+    #    - icon: fontawesome/brands/python
+    #      link: https://pypi.org/project/dstack/
     - icon: fontawesome/brands/slack
       link: https://join.slack.com/t/dstackai/shared_invite/zt-xdnsytie-D4qU9BvJP8vkbkHXdi6clQ
     - icon: material/rss
@@ -110,19 +112,55 @@ extra:
 
 # Page tree
 nav:
-  - Docs:
-    - Getting started:
-        - Introduction: index.md
-        - Installation: installation.md
-        - Quickstart: tutorials/quickstart.md
-        - Examples: examples/index.md
-    - Reference:
-        - Providers: reference/providers/index.md
-        - CLI: reference/cli/index.md
-    - Community:
-        - Slack: https://join.slack.com/t/dstackai/shared_invite/zt-xdnsytie-D4qU9BvJP8vkbkHXdi6clQ
-    - Releases:
-        - Changelog: https://github.com/dstackai/dstack/releases
-        - Newsletter: https://dstack.curated.co/
+  - Guide:
+      - Getting started:
+          - Overview: index.md
+          - Installation: installation.md
+          - Quick start: quick-start.md
+      #        - Concepts: basics/concepts.md
+          - Troubleshooting: troubleshooting.md
+      - Basics:
+          - Hello world: basics/hello-world.md
+          - Artifacts: basics/artifacts.md
+          - Deps: basics/deps.md
+          - Resources: basics/resources.md
+          - Environment variables: basics/environment-variables.md
+          - Args: basics/args.md
+          - Apps: basics/apps.md
+          - Python: basics/python.md
+          - Dev environments: basics/dev-environments.md
+          - Secrets: basics/secrets.md
+      #    - Advanced:
+      #        - Hub:
+      #          - Deploying hub: advanced/deploying-hub.md
+      #        - Integrations:
+      #            - Weights & Biases: advanced/integrations/wandb.md
+      #        - Troubleshooting: advanced/troubleshooting.md
+      #    - Community:
+      #        - Slack: https://join.slack.com/t/dstackai/shared_invite/zt-xdnsytie-D4qU9BvJP8vkbkHXdi6clQ
+      #        - Contributing: c.md
+      - What's new:
+          - Changelog: https://github.com/dstackai/dstack/releases
+          - Newsletter: https://dstack.curated.co/
+  - Reference:
+      - Providers:
+          - bash: reference/providers/bash.md
+          - code: reference/providers/code.md
+          - lab: reference/providers/lab.md
+          - notebook: reference/providers/notebook.md
+          - docker: reference/providers/docker.md
+      - CLI:
+          - dstack run: reference/cli/run.md
+          - dstack ps: reference/cli/ps.md
+          - dstack push: reference/cli/push.md
+          - dstack pull: reference/cli/pull.md
+          - dstack stop: reference/cli/stop.md
+          - dstack logs: reference/cli/logs.md
+          - dstack ls: reference/cli/ls.md
+          - dstack tags: reference/cli/tags.md
+          - dstack init: reference/cli/init.md
+          - dstack config: reference/cli/config.md
+          - dstack secrets: reference/cli/secrets.md
+          - dstack rm: reference/cli/rm.md
   - Slack: https://join.slack.com/t/dstackai/shared_invite/zt-xdnsytie-D4qU9BvJP8vkbkHXdi6clQ
 #  - GitHub: https://github.com/dstackai/dstack

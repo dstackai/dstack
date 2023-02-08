@@ -1,6 +1,6 @@
 from typing import List
 
-from google.cloud import storage, exceptions
+from google.cloud import exceptions, storage
 
 
 def get_client(project_id: str) -> storage.Client:

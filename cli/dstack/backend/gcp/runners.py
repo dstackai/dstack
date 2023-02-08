@@ -1,21 +1,21 @@
 import re
-from typing import Any, List
 import warnings
+from typing import Any, List
 
-from google.cloud.storage import Bucket
-from google.cloud import compute_v1
 import google.api_core.exceptions
 import yaml
+from google.cloud import compute_v1
+from google.cloud.storage import Bucket
 
-from dstack.backend.gcp import storage, utils as gcp_utils
-from dstack.core.runners import Runner
-from dstack.backend.aws.runners import _serialize_runner, _unserialize_runner
+from dstack.backend.gcp import storage
+from dstack.backend.gcp import utils as gcp_utils
 from dstack.backend.gcp.config import GCPConfig
+from dstack.core.runners import Runner
 
 
 def create_runner(bucket: Bucket, runner: Runner):
     runner_filepath = f"runners/{runner.runner_id}.yaml"
-    storage.put_object(bucket, runner_filepath, yaml.dump(_serialize_runner(runner)))
+    storage.put_object(bucket, runner_filepath, yaml.dump(runner.serialize()))
 
 
 def update_runner(bucket: Bucket, runner: Runner):
@@ -26,7 +26,7 @@ def update_runner(bucket: Bucket, runner: Runner):
 def get_runner(bucket: Bucket, runner_id: str) -> Runner:
     runner_filepath = f"runners/{runner_id}.yaml"
     obj = storage.read_object(bucket, runner_filepath)
-    return _unserialize_runner(yaml.load(obj, yaml.FullLoader))
+    return Runner.unserialize(yaml.load(obj, yaml.FullLoader))
 
 
 def delete_runner(bucket: Bucket, runner_id: str):
@@ -49,7 +49,9 @@ def _get_instance_name(runner: Runner) -> str:
     return f"dstack-{runner.job.run_name}"
 
 
-def _launch_instance(project_id: str, zone: str, image_name: str, instance_name: str) -> compute_v1.Instance:
+def _launch_instance(
+    project_id: str, zone: str, image_name: str, instance_name: str
+) -> compute_v1.Instance:
     disk = _disk_from_image(
         disk_type=f"zones/{zone}/diskTypes/pd-balanced",
         disk_size_gb=20,
@@ -197,18 +199,14 @@ def _create_instance(
 
     if preemptible:
         # Set the preemptible setting
-        warnings.warn(
-            "Preemptible VMs are being replaced by Spot VMs.", DeprecationWarning
-        )
+        warnings.warn("Preemptible VMs are being replaced by Spot VMs.", DeprecationWarning)
         instance.scheduling = compute_v1.Scheduling()
         instance.scheduling.preemptible = True
 
     if spot:
         # Set the Spot VM setting
         instance.scheduling = compute_v1.Scheduling()
-        instance.scheduling.provisioning_model = (
-            compute_v1.Scheduling.ProvisioningModel.SPOT.name
-        )
+        instance.scheduling.provisioning_model = compute_v1.Scheduling.ProvisioningModel.SPOT.name
         instance.scheduling.instance_termination_action = instance_termination_action
 
     if custom_hostname is not None:
@@ -260,9 +258,9 @@ def _delete_instance(project_id: str, zone: str, instance_name: str):
 def main():
     project_id = "dstack"
     image_name = "stgn-dstack-5"
-    zone= "us-central1-a"
+    zone = "us-central1-a"
     # _launch_instance(project_id, zone, image_name, image_name)
-    _delete_instance(project_id, zone, 'stgn-dstack-5')
+    _delete_instance(project_id, zone, "stgn-dstack-5")
 
 
 if __name__ == "__main__":

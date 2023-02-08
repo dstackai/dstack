@@ -1,10 +1,10 @@
 from argparse import ArgumentParser
-from typing import List, Optional, Dict, Any
+from typing import Any, Dict, List, Optional
 
-from dstack.core.job import JobSpec
+from dstack.backend.base import Backend
 from dstack.core.app import AppSpec
+from dstack.core.job import JobSpec
 from dstack.providers import Provider
-from dstack.backend import Backend
 
 
 class BashProvider(Provider):
@@ -21,7 +21,14 @@ class BashProvider(Provider):
         self.commands = None
         self.image_name = None
 
-    def load(self, backend: Backend,  provider_args: List[str], workflow_name: Optional[str], provider_data: Dict[str, Any], run_name: str):
+    def load(
+        self,
+        backend: Backend,
+        provider_args: List[str],
+        workflow_name: Optional[str],
+        provider_data: Dict[str, Any],
+        run_name: str,
+    ):
         super().load(backend, provider_args, workflow_name, provider_data, run_name)
         self.setup = self._get_list_data("setup") or self._get_list_data("before_run")
         self.python = self._safe_python_version("python")
@@ -61,15 +68,17 @@ class BashProvider(Provider):
                         app_name="bash" + (i if self.ports > 1 else ""),
                     )
                 )
-        return [JobSpec(
-            image_name=self.image_name,
-            commands=self._commands(),
-            working_dir=self.working_dir,
-            artifact_specs=self.artifact_specs,
-            port_count=self.ports,
-            requirements=self.resources,
-            app_specs=apps
-        )]
+        return [
+            JobSpec(
+                image_name=self.image_name,
+                commands=self._commands(),
+                working_dir=self.working_dir,
+                artifact_specs=self.artifact_specs,
+                port_count=self.ports,
+                requirements=self.resources,
+                app_specs=apps,
+            )
+        ]
 
     def _image_name(self) -> str:
         cuda_is_required = self.resources and self.resources.gpus

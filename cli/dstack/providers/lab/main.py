@@ -1,11 +1,12 @@
 import uuid
 from argparse import ArgumentParser
-from typing import List, Optional, Dict, Any
+from typing import Any, Dict, List, Optional
 
-from dstack.core.job import JobSpec
+from dstack.backend.base import Backend
 from dstack.core.app import AppSpec
+from dstack.core.job import JobSpec
 from dstack.providers import Provider
-from dstack.backend import Backend
+
 
 class LabProvider(Provider):
     def __init__(self):
@@ -19,7 +20,14 @@ class LabProvider(Provider):
         self.resources = None
         self.image_name = None
 
-    def load(self, backend: Backend, provider_args: List[str], workflow_name: Optional[str], provider_data: Dict[str, Any], run_name: str):
+    def load(
+        self,
+        backend: Backend,
+        provider_args: List[str],
+        workflow_name: Optional[str],
+        provider_data: Dict[str, Any],
+        run_name: str,
+    ):
         super().load(backend, provider_args, workflow_name, provider_data, run_name)
         self.setup = self._get_list_data("setup") or self._get_list_data("before_run")
         self.python = self._safe_python_version("python")
@@ -44,23 +52,25 @@ class LabProvider(Provider):
         env = {}
         token = uuid.uuid4().hex
         env["TOKEN"] = token
-        return [JobSpec(
-            image_name=self.image_name,
-            commands=self._commands(),
-            env=env,
-            working_dir=self.working_dir,
-            artifact_specs=self.artifact_specs,
-            port_count=1,
-            requirements=self.resources,
-            app_specs=[AppSpec(
-                port_index=0,
-                app_name="lab",
-                url_path="lab",
-                url_query_params={
-                    "token": token
-                }
-            )]
-        )]
+        return [
+            JobSpec(
+                image_name=self.image_name,
+                commands=self._commands(),
+                env=env,
+                working_dir=self.working_dir,
+                artifact_specs=self.artifact_specs,
+                port_count=1,
+                requirements=self.resources,
+                app_specs=[
+                    AppSpec(
+                        port_index=0,
+                        app_name="lab",
+                        url_path="lab",
+                        url_query_params={"token": token},
+                    )
+                ],
+            )
+        ]
 
     def _image_name(self) -> str:
         cuda_is_required = self.resources and self.resources.gpus
@@ -72,24 +82,24 @@ class LabProvider(Provider):
         commands = []
         if self.env:
             self._extend_commands_with_env(commands, self.env)
-        commands.extend([
-            "conda install psutil -y",
-            "pip install jupyterlab" + (f"=={self.version}" if self.version else ""),
-            "pip install ipywidgets",
-            "jupyter nbextension enable --py widgetsnbextension",
-            "mkdir -p /root/.jupyter",
-            "echo \"c.ServerApp.allow_root = True\" > /root/.jupyter/jupyter_server_config.py",
-            "echo \"c.ServerApp.allow_origin = '*'\" >> /root/.jupyter/jupyter_server_config.py",
-            "echo \"c.ServerApp.open_browser = False\" >> /root/.jupyter/jupyter_server_config.py",
-            "echo \"c.ServerApp.port = $PORT_0\" >> /root/.jupyter/jupyter_server_config.py",
-            "echo \"c.ServerApp.token = '$TOKEN'\" >> /root/.jupyter/jupyter_server_config.py",
-            "echo \"c.ServerApp.ip = '0.0.0.0'\" >> /root/.jupyter/jupyter_server_config.py",
-        ])
+        commands.extend(
+            [
+                "conda install psutil -y",
+                "pip install jupyterlab" + (f"=={self.version}" if self.version else ""),
+                "pip install ipywidgets",
+                "jupyter nbextension enable --py widgetsnbextension",
+                "mkdir -p /root/.jupyter",
+                'echo "c.ServerApp.allow_root = True" > /root/.jupyter/jupyter_server_config.py',
+                "echo \"c.ServerApp.allow_origin = '*'\" >> /root/.jupyter/jupyter_server_config.py",
+                'echo "c.ServerApp.open_browser = False" >> /root/.jupyter/jupyter_server_config.py',
+                'echo "c.ServerApp.port = $PORT_0" >> /root/.jupyter/jupyter_server_config.py',
+                "echo \"c.ServerApp.token = '$TOKEN'\" >> /root/.jupyter/jupyter_server_config.py",
+                "echo \"c.ServerApp.ip = '0.0.0.0'\" >> /root/.jupyter/jupyter_server_config.py",
+            ]
+        )
         if self.setup:
             commands.extend(self.setup)
-        commands.append(
-            f"jupyter lab"
-        )
+        commands.append(f"jupyter lab")
         return commands
 
 

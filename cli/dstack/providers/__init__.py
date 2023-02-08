@@ -4,34 +4,42 @@ import time
 from abc import abstractmethod
 from argparse import ArgumentParser, Namespace
 from pkgutil import iter_modules
-from typing import Optional, List, Dict, Any, Union
+from typing import Any, Dict, List, Optional, Union
 
 from jinja2 import Template
 
-from dstack.backend import Backend
-from dstack.core.job import Job, JobStatus, JobSpec, Requirements, GpusRequirements, DepSpec, ArtifactSpec
-from dstack.core.repo import RepoData, RepoAddress, _repo_address_path
 from dstack.api.repo import load_repo_data
-from dstack.util import _quoted
+from dstack.backend.base import Backend
+from dstack.core.job import (
+    ArtifactSpec,
+    DepSpec,
+    GpusRequirements,
+    Job,
+    JobSpec,
+    JobStatus,
+    Requirements,
+)
+from dstack.core.repo import RepoAddress, RepoData
+from dstack.utils.common import _quoted
 
 
 def _str_to_mib(s: str) -> int:
     ns = s.replace(" ", "").lower()
-    if ns.endswith('mib'):
+    if ns.endswith("mib"):
         return int(s[:-3])
-    elif ns.endswith('gib'):
+    elif ns.endswith("gib"):
         return int(s[:-3]) * 1024
-    elif ns.endswith('mi'):
+    elif ns.endswith("mi"):
         return int(s[:-2])
-    elif ns.endswith('gi'):
+    elif ns.endswith("gi"):
         return int(s[:-2]) * 1024
-    elif ns.endswith('mb'):
+    elif ns.endswith("mb"):
         return int(int(s[:-2]) * 1000 * 1000 / 1024 / 1024)
-    elif ns.endswith('gb'):
+    elif ns.endswith("gb"):
         return int(int(s[:-2]) * (1000 * 1000 * 1000) / 1024 / 1024)
-    elif ns.endswith('m'):
+    elif ns.endswith("m"):
         return int(int(s[:-1]) * 1000 * 1000 / 1024 / 1024)
-    elif ns.endswith('g'):
+    elif ns.endswith("g"):
         return int(int(s[:-1]) * (1000 * 1000 * 1000) / 1024 / 1024)
     else:
         raise Exception(f"Unknown memory unit: {s}")
@@ -49,11 +57,13 @@ class Provider:
         self.loaded = False
 
     def __str__(self) -> str:
-        return f'Provider(name="{self.provider_name}", ' \
-               f'workflow_data="{self.provider_data}", ' \
-               f'workflow_name="{_quoted(self.workflow_name)}, ' \
-               f'provider_name="{self.provider_name}", ' \
-               f'run_as_provider={self.run_as_provider})'
+        return (
+            f'Provider(name="{self.provider_name}", '
+            f'workflow_data="{self.provider_data}", '
+            f'workflow_name="{_quoted(self.workflow_name)}, '
+            f'provider_name="{self.provider_name}", '
+            f"run_as_provider={self.run_as_provider})"
+        )
 
     # TODO: This is a dirty hack
     def _safe_python_version(self, name: str):
@@ -70,8 +80,10 @@ class Provider:
             python_version = f"{version_info.major}.{version_info.minor}"
         supported_python_versions = ["3.7", "3.8", "3.9", "3.10", "3.11"]
         if python_version not in supported_python_versions:
-            sys.exit(f"Python version `{python_version}` is not supported. "
-                     f"Supported versions: {str(supported_python_versions)}.")
+            sys.exit(
+                f"Python version `{python_version}` is not supported. "
+                f"Supported versions: {str(supported_python_versions)}."
+            )
         return python_version
 
     def _inject_context(self):
@@ -85,7 +97,7 @@ class Provider:
                 for arg in self.args:
                     if _str:
                         _str += " "
-                    if ' ' in arg:
+                    if " " in arg:
                         _str += '"' + arg.replace('"', '\\"') + '"'
                     else:
                         _str += arg
@@ -114,8 +126,14 @@ class Provider:
         else:
             return obj
 
-    def load(self, backend: Backend, provider_args: List[str], workflow_name: Optional[str], provider_data: Dict[str, Any],
-             run_name: str):
+    def load(
+        self,
+        backend: Backend,
+        provider_args: List[str],
+        workflow_name: Optional[str],
+        provider_data: Dict[str, Any],
+        run_name: str,
+    ):
         self.provider_args = provider_args
         self.workflow_name = workflow_name
         self.provider_data = provider_data
@@ -142,9 +160,9 @@ class Provider:
     @staticmethod
     def _add_base_args(parser: ArgumentParser):
         parser.add_argument("-r", "--requirements", metavar="PATH", type=str)
-        parser.add_argument("-e", "--env", action='append')
-        parser.add_argument("-a", "--artifact", metavar="PATH", dest="artifacts", action='append')
-        parser.add_argument("--dep", metavar="(:TAG | WORKFLOW)", dest="deps", action='append')
+        parser.add_argument("-e", "--env", action="append")
+        parser.add_argument("-a", "--artifact", metavar="PATH", dest="artifacts", action="append")
+        parser.add_argument("--dep", metavar="(:TAG | WORKFLOW)", dest="deps", action="append")
         parser.add_argument("-w", "--working-dir", metavar="PATH", type=str)
         group = parser.add_mutually_exclusive_group()
         group.add_argument("-i", "--interruptible", action="store_true")
@@ -169,8 +187,16 @@ class Provider:
             env = self.provider_data.get("env") or []
             env.extend(args.env)
             self.provider_data["env"] = env
-        if args.cpu or args.memory or args.gpu or args.gpu_name or args.gpu_memory or args.shm_size \
-                or args.interruptible or args.local:
+        if (
+            args.cpu
+            or args.memory
+            or args.gpu
+            or args.gpu_name
+            or args.gpu_memory
+            or args.shm_size
+            or args.interruptible
+            or args.local
+        ):
             resources = self.provider_data.get("resources") or {}
             self.provider_data["resources"] = resources
             if args.cpu:
@@ -178,11 +204,13 @@ class Provider:
             if args.memory:
                 resources["memory"] = args.memory
             if args.gpu or args.gpu_name or args.gpu_memory:
-                gpu = self.provider_data["resources"].get("gpu") or {} if self.provider_data.get("resources") else {}
+                gpu = (
+                    self.provider_data["resources"].get("gpu") or {}
+                    if self.provider_data.get("resources")
+                    else {}
+                )
                 if type(gpu) is int:
-                    gpu = {
-                        "count": gpu
-                    }
+                    gpu = {"count": gpu}
                 resources["gpu"] = gpu
                 if args.gpu:
                     gpu["count"] = args.gpu
@@ -212,11 +240,32 @@ class Provider:
         counter = []
         for job_spec in job_specs:
             submitted_at = int(round(time.time() * 1000))
-            job = Job(None, repo_data, self.run_name, self.workflow_name or None, self.provider_name,
-                      repo_data.local_repo_user_name, repo_data.local_repo_user_email, JobStatus.SUBMITTED,
-                      submitted_at, job_spec.image_name, job_spec.commands, job_spec.env, job_spec.working_dir,
-                      job_spec.artifact_specs, job_spec.port_count, None, None, job_spec.requirements, self.dep_specs,
-                      job_spec.master_job, job_spec.app_specs, None, None, tag_name)
+            job = Job(
+                None,
+                repo_data,
+                self.run_name,
+                self.workflow_name or None,
+                self.provider_name,
+                repo_data.local_repo_user_name,
+                repo_data.local_repo_user_email,
+                JobStatus.SUBMITTED,
+                submitted_at,
+                job_spec.image_name,
+                job_spec.commands,
+                job_spec.env,
+                job_spec.working_dir,
+                job_spec.artifact_specs,
+                job_spec.port_count,
+                None,
+                None,
+                job_spec.requirements,
+                self.dep_specs,
+                job_spec.master_job,
+                job_spec.app_specs,
+                None,
+                None,
+                tag_name,
+            )
             backend.submit_job(job, counter)
             jobs.append(job)
         if tag_name:
@@ -226,7 +275,9 @@ class Provider:
     def _dep_specs(self, backend: Backend) -> Optional[List[DepSpec]]:
         if self.provider_data.get("deps"):
             repo_data = load_repo_data()
-            return [self._parse_dep_spec(dep, backend, repo_data) for dep in self.provider_data["deps"]]
+            return [
+                self._parse_dep_spec(dep, backend, repo_data) for dep in self.provider_data["deps"]
+            ]
         else:
             return None
 
@@ -240,13 +291,15 @@ class Provider:
     def _parse_artifact_spec(artifact: Union[dict, str]) -> ArtifactSpec:
         def remove_prefix(text: str, prefix: str) -> str:
             if text.startswith(prefix):
-                return text[len(prefix):]
+                return text[len(prefix) :]
             return text
 
         if isinstance(artifact, str):
             return ArtifactSpec(remove_prefix(artifact, "./"), False)
         else:
-            return ArtifactSpec(remove_prefix(artifact["path"], "./"), artifact.get("mount") is True)
+            return ArtifactSpec(
+                remove_prefix(artifact["path"], "./"), artifact.get("mount") is True
+            )
 
     @staticmethod
     def _parse_dep_spec(dep: Union[dict, str], backend: Backend, repo_data: RepoData) -> DepSpec:
@@ -278,25 +331,42 @@ class Provider:
             sys.exit(f"Invalid dep format: {dep}")
 
     @staticmethod
-    def _tag_dep(backend: Backend, repo_address: RepoAddress, tag_name: str, mount: bool) -> DepSpec:
+    def _tag_dep(
+        backend: Backend, repo_address: RepoAddress, tag_name: str, mount: bool
+    ) -> DepSpec:
         tag_head = backend.get_tag_head(repo_address, tag_name)
         if tag_head:
             return DepSpec(repo_address, tag_head.run_name, mount)
         else:
-            sys.exit(f"Cannot find the tag '{tag_name}' in the '{_repo_address_path(repo_address)}' repo")
+            sys.exit(f"Cannot find the tag '{tag_name}' in the '{repo_address.path()}' repo")
 
     @staticmethod
-    def _workflow_dep(backend: Backend, repo_address: RepoAddress, workflow_name: str,
-                      mount: bool) -> DepSpec:
-        job_heads = sorted(backend.list_job_heads(repo_address), key=lambda j: j.submitted_at, reverse=True)
-        run_name = next(iter([job_head.run_name for job_head in job_heads if
-                              job_head.workflow_name == workflow_name and job_head.status == JobStatus.DONE]),
-                        None)
+    def _workflow_dep(
+        backend: Backend, repo_address: RepoAddress, workflow_name: str, mount: bool
+    ) -> DepSpec:
+        job_heads = sorted(
+            backend.list_job_heads(repo_address),
+            key=lambda j: j.submitted_at,
+            reverse=True,
+        )
+        run_name = next(
+            iter(
+                [
+                    job_head.run_name
+                    for job_head in job_heads
+                    if job_head.workflow_name == workflow_name
+                    and job_head.status == JobStatus.DONE
+                ]
+            ),
+            None,
+        )
         if run_name:
             return DepSpec(repo_address, run_name, mount)
         else:
-            sys.exit(f"Cannot find any successful workflow with the name '{workflow_name}' "
-                     f"in the '{_repo_address_path(repo_address)}' repo")
+            sys.exit(
+                f"Cannot find any successful workflow with the name '{workflow_name}' "
+                f"in the '{repo_address.path()}' repo"
+            )
 
     def _env(self) -> Optional[Dict[str, str]]:
         if self.provider_data.get("env"):
@@ -359,8 +429,14 @@ class Provider:
                 resources.interruptible = self.provider_data["resources"]["interruptible"]
             if self.provider_data["resources"].get("local"):
                 resources.local = self.provider_data["resources"]["local"]
-            if resources.cpus or resources.memory_mib or resources.gpus or resources.shm_size_mib \
-                    or resources.interruptible or resources.local:
+            if (
+                resources.cpus
+                or resources.memory_mib
+                or resources.gpus
+                or resources.shm_size_mib
+                or resources.interruptible
+                or resources.local
+            ):
                 return resources
             else:
                 return None
@@ -371,8 +447,15 @@ class Provider:
 
 
 def get_provider_names() -> List[str]:
-    return list(map(lambda m: m[1], filter(lambda m: m.ispkg and not m[1].startswith("_"),
-                                           iter_modules(sys.modules[__name__].__path__))))
+    return list(
+        map(
+            lambda m: m[1],
+            filter(
+                lambda m: m.ispkg and not m[1].startswith("_"),
+                iter_modules(sys.modules[__name__].__path__),
+            ),
+        )
+    )
 
 
 def load_provider(provider_name) -> Provider:

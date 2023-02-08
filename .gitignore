@@ -1,6 +1,8 @@
 **/__pycache__/
 *.py[co]
 
+/venv/
+/.cache/
 
 /cli/dstack.egg-info/
 

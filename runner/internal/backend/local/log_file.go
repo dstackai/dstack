@@ -15,13 +15,21 @@ type Logger struct {
 	logger *logrus.Entry
 }
 
+func (l *Logger) Write(p []byte) (int, error) {
+	return l.logger.Writer().Write(p)
+}
+
 func NewLogger(logGroup, logName string) (*Logger, error) {
-	std := logrus.StandardLogger()
+	//std := logrus.StandardLogger()
+	if _, err := os.Stat(filepath.Join(common.HomeDir(), consts.DSTACK_DIR_PATH, "logs", logGroup)); err != nil {
+		os.MkdirAll(filepath.Join(common.HomeDir(), consts.DSTACK_DIR_PATH, "logs", logGroup), 0777)
+	}
 	f, err := os.OpenFile(filepath.Join(common.HomeDir(), consts.DSTACK_DIR_PATH, "logs", logGroup, fmt.Sprintf("%s.log", logName)), os.O_WRONLY|os.O_CREATE|os.O_APPEND, 0777)
 	if err != nil {
 		return nil, gerrors.Wrap(err)
 	}
-	std.SetOutput(f)
-	l := Logger{logger: logrus.NewEntry(std)}
+	logger := logrus.New()
+	logger.SetOutput(f)
+	l := Logger{logger: logrus.NewEntry(logger)}
 	return &l, nil
 }
