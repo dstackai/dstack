@@ -51,8 +51,7 @@ def _get_runs(
     repo_data: RepoData, backend: Backend, run_name: str = "", all: bool = False
 ) -> List[RunHead]:
     runs = []
-    job_heads = backend.list_job_heads(repo_data, run_name)
-    runs_backend = backend.get_run_heads(repo_data, job_heads)
+    runs_backend = backend.list_run_heads(repo_data, run_name)
     for run in runs_backend:
         runs.append(run)
     if not all:

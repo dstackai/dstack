@@ -107,11 +107,6 @@ class AwsBackend(RemoteBackend):
             self._s3_client(), self.backend_config.bucket_name, repo_address, job_id
         )
 
-    def list_job_heads(self, repo_address: RepoAddress, run_name: Optional[str] = None):
-        return jobs.list_job_heads(
-            self._s3_client(), self.backend_config.bucket_name, repo_address, run_name
-        )
-
     def list_jobs(self, repo_address: RepoAddress, run_name: str) -> List[Job]:
         return jobs.list_jobs(
             self._s3_client(), self.backend_config.bucket_name, repo_address, run_name
@@ -139,17 +134,23 @@ class AwsBackend(RemoteBackend):
             abort,
         )
 
+    def list_job_heads(self, repo_address: RepoAddress, run_name: Optional[str] = None):
+        return jobs.list_job_heads(
+            self._s3_client(), self.backend_config.bucket_name, repo_address, run_name
+        )
+
     def delete_job_head(self, repo_address: RepoAddress, job_id: str):
         jobs.delete_job_head(
             self._s3_client(), self.backend_config.bucket_name, repo_address, job_id
         )
 
-    def get_run_heads(
+    def list_run_heads(
         self,
         repo_address: RepoAddress,
-        job_heads: List[JobHead],
+        run_name: Optional[str] = None,
         include_request_heads: bool = True,
     ) -> List[RunHead]:
+        job_heads = self.list_job_heads(repo_address, run_name)
         return runs.get_run_heads(
             self._ec2_client(),
             self._s3_client(),

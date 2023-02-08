@@ -141,9 +141,7 @@ def poll_logs_ws(backend: Backend, repo_address: RepoAddress, job_head: JobHead)
     try:
         while True:
             _job_head = backend.get_job(repo_address, job_head.job_id)
-            run = next(
-                iter(backend.get_run_heads(repo_address, [_job_head], include_request_heads=False))
-            )
+            run = backend.list_run_heads(repo_address, _job_head.run_name)[0]
             if run.status.is_finished():
                 break
             time.sleep(POLL_FINISHED_STATE_RATE_SECS)
@@ -154,6 +152,7 @@ def poll_logs_ws(backend: Backend, repo_address: RepoAddress, job_head: JobHead)
 
 
 def poll_run(repo_address: RepoAddress, job_heads: List[JobHead], backend: Backend):
+    run_name = job_heads[0].run_name
     try:
         console.print()
         request_errors_printed = False
@@ -166,10 +165,7 @@ def poll_run(repo_address: RepoAddress, job_heads: List[JobHead], backend: Backe
             task = progress.add_task("Provisioning... It may take up to a minute.", total=None)
             while True:
                 time.sleep(POLL_PROVISION_RATE_SECS)
-                _job_heads = [
-                    backend.get_job(repo_address, job_head.job_id) for job_head in job_heads
-                ]
-                run = next(iter(backend.get_run_heads(repo_address, _job_heads)))
+                run = backend.list_run_heads(repo_address, run_name)[0]
                 if run.status == JobStatus.DOWNLOADING and not downloading:
                     progress.update(task, description="Downloading deps... It may take a while.")
                     downloading = True
@@ -210,7 +206,6 @@ def poll_run(repo_address: RepoAddress, job_heads: List[JobHead], backend: Backe
                 from_run=True,
             )
     except KeyboardInterrupt:
-        run_name = job_heads[0].run_name
         if Confirm.ask(f" [red]Abort the run '{run_name}'?[/]"):
             backend.stop_jobs(repo_address, run_name, abort=True)
             console.print(f"[grey58]OK[/]")

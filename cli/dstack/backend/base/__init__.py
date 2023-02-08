@@ -60,12 +60,6 @@ class Backend(ABC):
         pass
 
     @abstractmethod
-    def list_job_heads(
-        self, repo_address: RepoAddress, run_name: Optional[str] = None
-    ) -> List[JobHead]:
-        pass
-
-    @abstractmethod
     def list_jobs(self, repo_address: RepoAddress, run_name: str) -> List[Job]:
         pass
 
@@ -84,6 +78,12 @@ class Backend(ABC):
                 self.stop_job(repo_address, job_head.job_id, abort)
 
     @abstractmethod
+    def list_job_heads(
+        self, repo_address: RepoAddress, run_name: Optional[str] = None
+    ) -> List[JobHead]:
+        pass
+
+    @abstractmethod
     def delete_job_head(self, repo_address: RepoAddress, job_id: str):
         pass
 
@@ -98,20 +98,11 @@ class Backend(ABC):
         for job_head in job_heads:
             self.delete_job_head(repo_address, job_head.job_id)
 
+    @abstractmethod
     def list_run_heads(
         self,
         repo_address: RepoAddress,
         run_name: Optional[str] = None,
-        include_request_heads: bool = True,
-    ) -> List[RunHead]:
-        job_heads = self.list_job_heads(repo_address, run_name)
-        return self.get_run_heads(repo_address, job_heads, include_request_heads)
-
-    @abstractmethod
-    def get_run_heads(
-        self,
-        repo_address: RepoAddress,
-        job_heads: List[JobHead],
         include_request_heads: bool = True,
     ) -> List[RunHead]:
         pass

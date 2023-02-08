@@ -5,7 +5,6 @@ from typing import Dict, Generator, List, Optional, Tuple
 from dstack.backend.base import Backend, BackendType
 from dstack.backend.local import artifacts, jobs, logs, repos, runners, runs, secrets, tags
 from dstack.backend.local.config import LocalConfig
-from dstack.core.app import AppSpec
 from dstack.core.artifact import Artifact
 from dstack.core.job import Job, JobHead
 from dstack.core.log_event import LogEvent
@@ -41,11 +40,6 @@ class LocalBackend(Backend):
     def get_job(self, repo_address: RepoAddress, job_id: str) -> Optional[Job]:
         return jobs.get_job(self.backend_config.path, repo_address, job_id)
 
-    def list_job_heads(
-        self, repo_address: RepoAddress, run_name: Optional[str] = None
-    ) -> List[JobHead]:
-        return jobs.list_job_heads(self.backend_config.path, repo_address, run_name)
-
     def list_jobs(self, repo_address: RepoAddress, run_name: str) -> List[Job]:
         return jobs.list_jobs(self.backend_config.path, repo_address, run_name)
 
@@ -55,15 +49,21 @@ class LocalBackend(Backend):
     def stop_job(self, repo_address: RepoAddress, job_id: str, abort: bool):
         runners.stop_job(self.backend_config.path, repo_address, job_id, abort)
 
+    def list_job_heads(
+        self, repo_address: RepoAddress, run_name: Optional[str] = None
+    ) -> List[JobHead]:
+        return jobs.list_job_heads(self.backend_config.path, repo_address, run_name)
+
     def delete_job_head(self, repo_address: RepoAddress, job_id: str):
         jobs.delete_job_head(self.backend_config.path, repo_address, job_id)
 
-    def get_run_heads(
+    def list_run_heads(
         self,
         repo_address: RepoAddress,
-        job_heads: List[JobHead],
+        run_name: Optional[str] = None,
         include_request_heads: bool = True,
     ) -> List[RunHead]:
+        job_heads = self.list_job_heads(repo_address, run_name)
         return runs.get_run_heads(self.backend_config.path, job_heads, include_request_heads)
 
     def poll_logs(
