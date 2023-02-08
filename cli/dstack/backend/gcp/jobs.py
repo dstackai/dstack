@@ -12,17 +12,14 @@ from dstack.core.runners import Resources, Runner
 
 
 def create_job(bucket: Bucket, job: Job):
-    counter = 0
-    job_id = f"{job.run_name},{job.workflow_name or ''},{counter}"
-    job.set_id(job_id)
     prefix = f"jobs/{job.repo_address.path()}"
-    key = f"{prefix}/{job_id}.yaml"
+    key = f"{prefix}/{job.job_id}.yaml"
     storage.put_object(bucket, key, yaml.dump(job.serialize()))
     storage.put_object(bucket, job.job_head_key(), "")
 
 
 def get_job(bucket: Bucket, repo_address: RepoAddress, job_id: str) -> Optional[Job]:
-    prefix = f"jobs/{job.repo_address.path()}"
+    prefix = f"jobs/{repo_address.path()}"
     key = f"{prefix}/{job_id}.yaml"
     obj = storage.read_object(bucket, key)
     job = Job.unserialize(yaml.load(obj, yaml.FullLoader))

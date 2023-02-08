@@ -31,7 +31,7 @@ class GCPBackend(RemoteBackend):
 
     @property
     def name(self) -> str:
-        "gcp"
+        return "gcp"
 
     def configure(self):
         self._bucket = storage.get_or_create_bucket(self._storage_client, self.config.bucket_name)
@@ -39,40 +39,41 @@ class GCPBackend(RemoteBackend):
     def create_run(self, repo_address: RepoAddress) -> str:
         return runs.create_run(self._bucket)
 
-    def submit_job(self, job: Job, counter: List[int]):
-        job.runner_id = uuid.uuid4().hex
+    def create_job(self, job: Job):
         jobs.create_job(self._bucket, job)
-        jobs.run_job(self.config, self._bucket, job)
+
+    # def submit_job(self, job: Job, counter: List[int]):
+    #     job.runner_id = uuid.uuid4().hex
+    #     jobs.create_job(self._bucket, job)
+    #     jobs.run_job(self.config, self._bucket, job)
 
     def get_job(self, repo_address: RepoAddress, job_id: str) -> Optional[Job]:
         return jobs.get_job(self._bucket, repo_address, job_id)
+
+    def list_jobs(self, repo_address: RepoAddress, run_name: str) -> List[Job]:
+        raise NotImplementedError()
+
+    def run_job(self, job: Job) -> Runner:
+        jobs.run_job(self.config, self._bucket, job)
+
+    def stop_job(self, repo_address: RepoAddress, job_id: str, abort: bool):
+        jobs.stop_job(self.config, self._bucket, repo_address, job_id, abort)
 
     def list_job_heads(
         self, repo_address: RepoAddress, run_name: Optional[str] = None
     ) -> List[JobHead]:
         return jobs.list_job_heads(self._bucket, repo_address, run_name)
 
-    def list_jobs(self, repo_address: RepoAddress, run_name: str) -> List[Job]:
-        raise NotImplementedError()
-
-    def run_job(self, job: Job) -> Runner:
-        raise NotImplementedError()
-
-    def stop_job(self, repo_address: RepoAddress, job_id: str, abort: bool):
-        jobs.stop_job(self.config, self._bucket, repo_address, job_id, abort)
-
     def delete_job_head(self, repo_address: RepoAddress, job_id: str):
         jobs.delete_job_head(self._bucket, repo_address, job_id)
 
-    def store_job(self, job: Job):
-        raise NotImplementedError()
-
-    def get_run_heads(
+    def list_run_heads(
         self,
         repo_address: RepoAddress,
-        job_heads: List[JobHead],
+        run_name: Optional[str] = None,
         include_request_heads: bool = True,
     ) -> List[RunHead]:
+        job_heads = self.list_job_heads(repo_address, run_name)
         return runs.get_run_heads(self._bucket, repo_address, job_heads, include_request_heads)
 
     def poll_logs(
@@ -112,23 +113,12 @@ class GCPBackend(RemoteBackend):
     def delete_tag_head(self, repo_address: RepoAddress, tag_head: TagHead):
         pass
 
-    def list_repo_heads(self) -> List[RepoHead]:
-        pass
-
     def update_repo_last_run_at(self, repo_address: RepoAddress, last_run_at: int):
         pass
 
-    def increment_repo_tags_count(self, repo_address: RepoAddress):
-        pass
-
-    def decrement_repo_tags_count(self, repo_address: RepoAddress):
-        pass
-
-    def delete_repo(self, repo_address: RepoAddress):
-        pass
-
     def get_repo_credentials(self, repo_address: RepoAddress) -> Optional[RepoCredentials]:
-        pass
+        # TODO
+        return RepoCredentials(RepoProtocol.HTTPS, None, None)
 
     def save_repo_credentials(self, repo_address: RepoAddress, repo_credentials: RepoCredentials):
         pass
