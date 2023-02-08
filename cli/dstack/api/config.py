@@ -1,6 +1,7 @@
 from typing import Dict, List
 
 from dstack.backend.aws.config import AWSConfig
+from dstack.backend.hub.config import HUBConfig
 from dstack.core.config import BackendConfig
 
 

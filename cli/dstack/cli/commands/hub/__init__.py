@@ -16,7 +16,6 @@ class HubCommand(BasicCommand):
     def __init__(self, parser):
         super(HubCommand, self).__init__(parser)
 
-    @check_config
     def hub_start(self, args: Namespace):
         os.environ["DSTACK_HUB_HOST"] = args.host
         os.environ["DSTACK_HUB_PORT"] = str(args.port)

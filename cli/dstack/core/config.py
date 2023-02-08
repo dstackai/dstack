@@ -25,10 +25,10 @@ class BackendConfig(ABC):
         pass
 
     def load(self, path: Path = get_config_path()):
-        ...
+        pass
 
     def configure(self):
-        ...
+        pass
 
     @property
     def configured(self):
