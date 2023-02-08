@@ -95,7 +95,6 @@ class Backend(ABC):
             else:
                 if run_name:
                     sys.exit("The run is not finished yet. Stop the run first.")
-
         for job_head in job_heads:
             self.delete_job_head(repo_address, job_head.job_id)
 
@@ -162,23 +161,7 @@ class Backend(ABC):
         pass
 
     @abstractmethod
-    def list_repo_heads(self) -> List[RepoHead]:
-        pass
-
-    @abstractmethod
     def update_repo_last_run_at(self, repo_address: RepoAddress, last_run_at: int):
-        pass
-
-    @abstractmethod
-    def increment_repo_tags_count(self, repo_address: RepoAddress):
-        pass
-
-    @abstractmethod
-    def decrement_repo_tags_count(self, repo_address: RepoAddress):
-        pass
-
-    @abstractmethod
-    def delete_repo(self, repo_address: RepoAddress):
         pass
 
     @abstractmethod

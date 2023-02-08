@@ -241,9 +241,6 @@ class AwsBackend(RemoteBackend):
             run_jobs,
         )
 
-    def delete_tag_head(self, repo_address: RepoAddress, tag_head: TagHead):
-        tags.delete_tag(self._s3_client(), self.backend_config.bucket_name, repo_address, tag_head)
-
     def add_tag_from_local_dirs(
         self, repo_data: LocalRepoData, tag_name: str, local_dirs: List[str]
     ):
@@ -256,8 +253,8 @@ class AwsBackend(RemoteBackend):
             local_dirs,
         )
 
-    def list_repo_heads(self) -> List[RepoHead]:
-        return repos.list_repo_heads(self._s3_client(), self.backend_config.bucket_name)
+    def delete_tag_head(self, repo_address: RepoAddress, tag_head: TagHead):
+        tags.delete_tag(self._s3_client(), self.backend_config.bucket_name, repo_address, tag_head)
 
     def update_repo_last_run_at(self, repo_address: RepoAddress, last_run_at: int):
         repos.update_repo_last_run_at(
@@ -266,19 +263,6 @@ class AwsBackend(RemoteBackend):
             repo_address,
             last_run_at,
         )
-
-    def increment_repo_tags_count(self, repo_address: RepoAddress):
-        repos.increment_repo_tags_count(
-            self._s3_client(), self.backend_config.bucket_name, repo_address
-        )
-
-    def decrement_repo_tags_count(self, repo_address: RepoAddress):
-        repos.decrement_repo_tags_count(
-            self._s3_client(), self.backend_config.bucket_name, repo_address
-        )
-
-    def delete_repo(self, repo_address: RepoAddress):
-        repos.delete_repo(self._s3_client(), self.backend_config.bucket_name, repo_address)
 
     def get_repo_credentials(self, repo_address: RepoAddress) -> Optional[RepoCredentials]:
         return repos.get_repo_credentials(
@@ -293,17 +277,6 @@ class AwsBackend(RemoteBackend):
             self.backend_config.bucket_name,
             repo_address,
             repo_credentials,
-        )
-
-    def list_run_artifact_files_and_folders(
-        self, repo_address: RepoAddress, job_id: str, path: str
-    ) -> List[Tuple[str, bool]]:
-        return artifacts.list_run_artifact_files_and_folders(
-            self._s3_client(),
-            self.backend_config.bucket_name,
-            repo_address,
-            job_id,
-            path,
         )
 
     def list_secret_names(self, repo_address: RepoAddress) -> List[str]:

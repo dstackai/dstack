@@ -114,33 +114,14 @@ class LocalBackend(Backend):
     def delete_tag_head(self, repo_address: RepoAddress, tag_head: TagHead):
         tags.delete_tag(self.backend_config.path, repo_address, tag_head)
 
-    def list_repo_heads(self) -> List[RepoHead]:
-        return repos.list_repo_heads(self.backend_config.path)
-
     def update_repo_last_run_at(self, repo_address: RepoAddress, last_run_at: int):
         repos.update_repo_last_run_at(self.backend_config.path, repo_address, last_run_at)
-
-    def increment_repo_tags_count(self, repo_address: RepoAddress):
-        repos.increment_repo_tags_count(self.backend_config.path, repo_address)
-
-    def decrement_repo_tags_count(self, repo_address: RepoAddress):
-        repos.decrement_repo_tags_count(self.backend_config.path, repo_address)
-
-    def delete_repo(self, repo_address: RepoAddress):
-        repos.delete_repo(self.backend_config.path, repo_address)
 
     def get_repo_credentials(self, repo_address: RepoAddress) -> Optional[RepoCredentials]:
         return repos.get_repo_credentials(self.backend_config.path, repo_address)
 
     def save_repo_credentials(self, repo_address: RepoAddress, repo_credentials: RepoCredentials):
         repos.save_repo_credentials(self.backend_config.path, repo_address, repo_credentials)
-
-    def list_run_artifact_files_and_folders(
-        self, repo_address: RepoAddress, job_id: str, path: str
-    ) -> List[Tuple[str, bool]]:
-        return artifacts.list_run_artifact_files_and_folders(
-            self.backend_config.path, repo_address, job_id, path
-        )
 
     def list_secret_names(self, repo_address: RepoAddress) -> List[str]:
         return secrets.list_secret_names(self.backend_config.path, repo_address)
