@@ -11,27 +11,13 @@ def create_job(
     s3_client: BaseClient,
     bucket_name: str,
     job: Job,
-    counter: List[int] = [],
     create_head: bool = True,
 ):
-    if len(counter) == 0:
-        counter.append(0)
-    job_id = f"{job.run_name},{job.workflow_name or ''},{counter[0]}"
-    job.set_id(job_id)
     if create_head:
         s3_client.put_object(Body="", Bucket=bucket_name, Key=job.job_head_key())
     prefix = f"jobs/{job.repo_data.path()}"
-    key = f"{prefix}/{job_id}.yaml"
+    key = f"{prefix}/{job.job_id}.yaml"
     s3_client.put_object(Body=yaml.dump(job.serialize()), Bucket=bucket_name, Key=key)
-    counter[0] += 1
-
-
-def store_job(
-    s3_client: BaseClient,
-    bucket_name: str,
-    job: Job,
-):
-    create_job(s3_client, bucket_name, job)
 
 
 def get_job(
