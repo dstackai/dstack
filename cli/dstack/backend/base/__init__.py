@@ -48,8 +48,12 @@ class Backend(ABC):
         pass
 
     @abstractmethod
-    def submit_job(self, job: Job, counter: List[int]):
+    def create_job(self, job: Job):
         pass
+
+    def submit_job(self, job: Job):
+        self.create_job(job)
+        self.run_job(job)
 
     @abstractmethod
     def get_job(self, repo_address: RepoAddress, job_id: str) -> Optional[Job]:
@@ -73,19 +77,15 @@ class Backend(ABC):
     def stop_job(self, repo_address: RepoAddress, job_id: str, abort: bool):
         pass
 
-    @abstractmethod
-    def delete_job_head(self, repo_address: RepoAddress, job_id: str):
-        pass
-
-    @abstractmethod
-    def store_job(self, job: Job):
-        pass
-
     def stop_jobs(self, repo_address: RepoAddress, run_name: Optional[str], abort: bool):
         job_heads = self.list_job_heads(repo_address, run_name)
         for job_head in job_heads:
             if job_head.status.is_unfinished():
                 self.stop_job(repo_address, job_head.job_id, abort)
+
+    @abstractmethod
+    def delete_job_head(self, repo_address: RepoAddress, job_id: str):
+        pass
 
     def delete_job_heads(self, repo_address: RepoAddress, run_name: Optional[str]):
         job_heads = []

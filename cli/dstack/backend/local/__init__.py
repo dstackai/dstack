@@ -35,9 +35,8 @@ class LocalBackend(Backend):
     def create_run(self, repo_address: RepoAddress) -> str:
         return runs.create_run(self.backend_config.path, repo_address)
 
-    def submit_job(self, job: Job, counter: List[int]):
-        jobs.create_job(self.backend_config.path, job, counter)
-        runners.run_job(self.backend_config.path, job)
+    def create_job(self, job: Job):
+        jobs.create_job(self.backend_config.path, job)
 
     def get_job(self, repo_address: RepoAddress, job_id: str) -> Optional[Job]:
         return jobs.get_job(self.backend_config.path, repo_address, job_id)
@@ -55,9 +54,6 @@ class LocalBackend(Backend):
 
     def stop_job(self, repo_address: RepoAddress, job_id: str, abort: bool):
         runners.stop_job(self.backend_config.path, repo_address, job_id, abort)
-
-    def store_job(self, job: Job):
-        jobs.store_job(self.backend_config.path, job)
 
     def delete_job_head(self, repo_address: RepoAddress, job_id: str):
         jobs.delete_job_head(self.backend_config.path, repo_address, job_id)

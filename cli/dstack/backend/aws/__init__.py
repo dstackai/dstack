@@ -99,18 +99,8 @@ class AwsBackend(RemoteBackend):
             repo_address,
         )
 
-    def submit_job(self, job: Job, counter: List[int]):
-        jobs.create_job(self._s3_client(), self.backend_config.bucket_name, job, counter)
-        runners.run_job(
-            self._logs_client(),
-            self._ec2_client(),
-            self._iam_client(),
-            self._s3_client(),
-            self.backend_config.bucket_name,
-            self.backend_config.region_name,
-            self.backend_config.subnet_id,
-            job,
-        )
+    def create_job(self, job: Job):
+        jobs.create_job(self._s3_client(), self.backend_config.bucket_name, job)
 
     def get_job(self, repo_address: RepoAddress, job_id: str) -> Optional[Job]:
         return jobs.get_job(
@@ -138,9 +128,6 @@ class AwsBackend(RemoteBackend):
             self.backend_config.subnet_id,
             job,
         )
-
-    def store_job(self, job: Job):
-        jobs.store_job(self._s3_client(), self.backend_config.bucket_name, job)
 
     def stop_job(self, repo_address: RepoAddress, job_id: str, abort: bool):
         runners.stop_job(

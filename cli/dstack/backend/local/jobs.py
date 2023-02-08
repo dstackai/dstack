@@ -49,17 +49,12 @@ def list_job_heads(
     return job_heads
 
 
-def create_job(path: str, job: Job, counter: List[int] = [], create_head: bool = True):
-    if len(counter) == 0:
-        counter.append(0)
-    job_id = f"{job.run_name},{job.workflow_name or ''},{counter[0]}"
-    job.set_id(job_id)
+def create_job(path: str, job: Job, create_head: bool = True):
     root = os.path.join(path, "jobs", job.repo_address.path())
     if create_head:
         put_object(Body="", Root=root, Key=job.job_head_key(add_prefix=False))
-    key = f"{job_id}.yaml"
+    key = f"{job.job_id}.yaml"
     put_object(Body=yaml.dump(job.serialize()), Root=root, Key=key)
-    counter[0] += 1
 
 
 def get_job(path: str, repo_address: RepoAddress, job_id: str) -> Optional[Job]:
@@ -135,7 +130,3 @@ def delete_job_head(path: str, repo_address: RepoAddress, job_id: str):
     response = list_objects(Root=root, Prefix=job_head_key_prefix, MaxKeys=1)
     for obj in response:
         delete_object(Root=root, Key=obj)
-
-
-def store_job(dstack_dir: Path, job: Job):
-    create_job(dstack_dir, job)
