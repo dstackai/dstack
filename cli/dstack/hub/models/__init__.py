@@ -212,6 +212,7 @@ class Runner(BaseModel):
     resources: Resources
     job: Job
 
+
 class Secret(BaseModel):
     secret_name: str
     secret_value: str

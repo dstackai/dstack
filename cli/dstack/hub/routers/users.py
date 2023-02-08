@@ -4,7 +4,7 @@ from fastapi import APIRouter, Depends, HTTPException, status
 from fastapi.security import HTTPBearer
 from fastapi.security.http import HTTPAuthorizationCredentials
 
-from dstack.hub.models.user import UserInfo
+from dstack.hub.models import UserInfo
 from dstack.hub.repository.user import UserManager
 from dstack.hub.security.scope import Scope
 
