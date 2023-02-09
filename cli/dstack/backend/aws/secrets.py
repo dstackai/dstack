@@ -4,25 +4,60 @@ from typing import List, Optional
 from botocore.client import BaseClient
 
 from dstack.backend.aws import runners
+from dstack.backend.base.secrets import SecretsManager
 from dstack.core.repo import RepoAddress
 from dstack.core.secret import Secret
 
 
-def list_secret_names(
-    s3_client: BaseClient, bucket_name: str, repo_address: RepoAddress
-) -> List[str]:
-    prefix = f"secrets/{repo_address.path()}"
-    secret_head_prefix = f"{prefix}/l;"
-    response = s3_client.list_objects_v2(Bucket=bucket_name, Prefix=secret_head_prefix)
-    secret_names = []
-    if "Contents" in response:
-        for obj in response["Contents"]:
-            secret_name = obj["Key"][len(secret_head_prefix) :]
-            secret_names.append(secret_name)
-    return secret_names
+class AWSSecretsManager(SecretsManager):
+    def __init__(
+        self,
+        secretsmanager_client: BaseClient,
+        iam_client: BaseClient,
+        sts_client: BaseClient,
+        bucket_name: str,
+    ):
+        self.secretsmanager_client = secretsmanager_client
+        self.iam_client = iam_client
+        self.sts_client = sts_client
+        self.bucket_name = bucket_name
+
+    def get_secret(self, repo_address: RepoAddress, secret_name: str) -> Optional[Secret]:
+        return _get_secret(
+            secretsmanager_client=self.secretsmanager_client,
+            bucket_name=self.bucket_name,
+            repo_address=repo_address,
+            secret_name=secret_name,
+        )
+
+    def add_secret(self, repo_address: RepoAddress, secret: Secret):
+        _add_secret(
+            secretsmanager_client=self.secretsmanager_client,
+            sts_client=self.sts_client,
+            iam_client=self.iam_client,
+            bucket_name=self.bucket_name,
+            repo_address=repo_address,
+            secret=secret,
+        )
+
+    def update_secret(self, repo_address: RepoAddress, secret: Secret):
+        _update_secret(
+            secretsmanager_client=self.secretsmanager_client,
+            bucket_name=self.bucket_name,
+            repo_address=repo_address,
+            secret=secret,
+        )
+
+    def delete_secret(self, repo_address: RepoAddress, secret_name: str):
+        _delete_secret(
+            secretsmanager_client=self.secretsmanager_client,
+            bucket_name=self.bucket_name,
+            repo_address=repo_address,
+            secret_name=secret_name,
+        )
 
 
-def get_secret(
+def _get_secret(
     secretsmanager_client: BaseClient,
     bucket_name: str,
     repo_address: RepoAddress,
@@ -47,17 +82,10 @@ def get_secret(
             raise e
 
 
-def _secret_head_key(repo_address: RepoAddress, secret_name: str) -> str:
-    prefix = f"secrets/{repo_address.path()}"
-    key = f"{prefix}/l;{secret_name}"
-    return key
-
-
-def add_secret(
+def _add_secret(
     sts_client: BaseClient,
     iam_client: BaseClient,
     secretsmanager_client: BaseClient,
-    s3_client: BaseClient,
     bucket_name: str,
     repo_address: RepoAddress,
     secret: Secret,
@@ -93,13 +121,10 @@ def add_secret(
             }
         ),
     )
-    secret_head_key = _secret_head_key(repo_address, secret.secret_name)
-    s3_client.put_object(Body="", Bucket=bucket_name, Key=secret_head_key)
 
 
-def update_secret(
+def _update_secret(
     secretsmanager_client: BaseClient,
-    s3_client: BaseClient,
     bucket_name: str,
     repo_address: RepoAddress,
     secret: Secret,
@@ -109,13 +134,10 @@ def update_secret(
         SecretId=secret_id,
         SecretString=secret.secret_value,
     )
-    secret_head_key = _secret_head_key(repo_address, secret.secret_name)
-    s3_client.put_object(Body="", Bucket=bucket_name, Key=secret_head_key)
 
 
-def delete_secret(
+def _delete_secret(
     secretsmanager_client: BaseClient,
-    s3_client: BaseClient,
     bucket_name: str,
     repo_address: RepoAddress,
     secret_name: str,
@@ -124,5 +146,3 @@ def delete_secret(
         SecretId=f"/dstack/{bucket_name}/secrets/{repo_address.path()}/{secret_name}",
         ForceDeleteWithoutRecovery=True,
     )
-    secret_head_key = _secret_head_key(repo_address, secret_name)
-    s3_client.delete_object(Bucket=bucket_name, Key=secret_head_key)

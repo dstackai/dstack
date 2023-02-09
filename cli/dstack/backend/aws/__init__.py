@@ -4,13 +4,16 @@ from typing import Dict, Generator, List, Optional, Tuple
 import boto3
 from botocore.client import BaseClient
 
-from dstack.backend.aws import artifacts, config, logs, repos, secrets, tags
+from dstack.backend.aws import artifacts, config, logs, repos, tags
 from dstack.backend.aws.compute import AWSCompute
 from dstack.backend.aws.config import AWSConfig
+from dstack.backend.aws.secrets import AWSSecretsManager
 from dstack.backend.aws.storage import AWSStorage
 from dstack.backend.base import RemoteBackend
 from dstack.backend.base import jobs as base_jobs
+from dstack.backend.base import repos as base_repos
 from dstack.backend.base import runs as base_runs
+from dstack.backend.base import secrets as base_secrets
 from dstack.backend.base import tags as base_tags
 from dstack.core.artifact import Artifact
 from dstack.core.error import ConfigError
@@ -35,6 +38,7 @@ class AwsBackend(RemoteBackend):
         except ConfigError:
             self._loaded = False
             return
+
         self._storage = AWSStorage(
             s3_client=self._s3_client(), bucket_name=self.backend_config.bucket_name
         )
@@ -45,48 +49,37 @@ class AwsBackend(RemoteBackend):
             region_name=self.backend_config.region_name,
             subnet_id=self.backend_config.subnet_id,
         )
+        self._secrets_manager = AWSSecretsManager(
+            secretsmanager_client=self._secretsmanager_client(),
+            iam_client=self._iam_client(),
+            sts_client=self._sts_client(),
+            bucket_name=self.backend_config.bucket_name,
+        )
 
     def _s3_client(self) -> BaseClient:
-        session = boto3.Session(
-            profile_name=self.backend_config.profile_name,
-            region_name=self.backend_config.region_name,
-        )
-        return session.client("s3")
+        return self._get_client("s3")
 
     def _ec2_client(self) -> BaseClient:
-        session = boto3.Session(
-            profile_name=self.backend_config.profile_name,
-            region_name=self.backend_config.region_name,
-        )
-        return session.client("ec2")
+        return self._get_client("ec2")
 
     def _iam_client(self) -> BaseClient:
-        session = boto3.Session(
-            profile_name=self.backend_config.profile_name,
-            region_name=self.backend_config.region_name,
-        )
-        return session.client("iam")
+        return self._get_client("iam")
 
     def _logs_client(self) -> BaseClient:
-        session = boto3.Session(
-            profile_name=self.backend_config.profile_name,
-            region_name=self.backend_config.region_name,
-        )
-        return session.client("logs")
+        return self._get_client("logs")
 
     def _secretsmanager_client(self) -> BaseClient:
-        session = boto3.Session(
-            profile_name=self.backend_config.profile_name,
-            region_name=self.backend_config.region_name,
-        )
-        return session.client("secretsmanager")
+        return self._get_client("secretsmanager")
 
     def _sts_client(self) -> BaseClient:
+        return self._get_client("sts")
+
+    def _get_client(self, client_name: str) -> BaseClient:
         session = boto3.Session(
             profile_name=self.backend_config.profile_name,
             region_name=self.backend_config.region_name,
         )
-        return session.client("sts")
+        return session.client(client_name)
 
     def configure(self):
         config.configure(
@@ -225,9 +218,8 @@ class AwsBackend(RemoteBackend):
         base_tags.delete_tag(self._storage, repo_address, tag_head)
 
     def update_repo_last_run_at(self, repo_address: RepoAddress, last_run_at: int):
-        repos.update_repo_last_run_at(
-            self._s3_client(),
-            self.backend_config.bucket_name,
+        base_repos.update_repo_last_run_at(
+            self._storage,
             repo_address,
             last_run_at,
         )
@@ -248,43 +240,31 @@ class AwsBackend(RemoteBackend):
         )
 
     def list_secret_names(self, repo_address: RepoAddress) -> List[str]:
-        return secrets.list_secret_names(
-            self._s3_client(), self.backend_config.bucket_name, repo_address
-        )
+        return base_secrets.list_secret_names(self._storage, repo_address)
 
     def get_secret(self, repo_address: RepoAddress, secret_name: str) -> Optional[Secret]:
-        return secrets.get_secret(
-            self._secretsmanager_client(),
-            self.backend_config.bucket_name,
-            repo_address,
-            secret_name,
-        )
+        return base_secrets.get_secret(self._secrets_manager, repo_address, secret_name)
 
     def add_secret(self, repo_address: RepoAddress, secret: Secret):
-        return secrets.add_secret(
-            self._sts_client(),
-            self._iam_client(),
-            self._secretsmanager_client(),
-            self._s3_client(),
-            self.backend_config.bucket_name,
+        base_secrets.add_secret(
+            self._storage,
+            self._secrets_manager,
             repo_address,
             secret,
         )
 
     def update_secret(self, repo_address: RepoAddress, secret: Secret):
-        return secrets.update_secret(
-            self._secretsmanager_client(),
-            self._s3_client(),
-            self.backend_config.bucket_name,
+        base_secrets.update_secret(
+            self._storage,
+            self._secrets_manager,
             repo_address,
             secret,
         )
 
     def delete_secret(self, repo_address: RepoAddress, secret_name: str):
-        return secrets.delete_secret(
-            self._secretsmanager_client(),
-            self._s3_client(),
-            self.backend_config.bucket_name,
+        base_secrets.delete_secret(
+            self._storage,
+            self._secrets_manager,
             repo_address,
             secret_name,
         )
