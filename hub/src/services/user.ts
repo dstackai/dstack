@@ -41,6 +41,16 @@ export const userApi = createApi({
             providesTags: (result) => (result ? [{ type: 'User' as const, id: result.user_name }] : []),
         }),
 
+        createUser: builder.mutation<IUser, Omit<IUser, 'token'>>({
+            query: (user) => ({
+                url: API.USERS.BASE(),
+                method: 'POST',
+                params: user,
+            }),
+
+            invalidatesTags: (result) => [{ type: 'User' as const, id: result?.user_name }],
+        }),
+
         updateUser: builder.mutation<IUser, Partial<IUser> & Pick<IUser, 'user_name'>>({
             query: (user) => ({
                 url: API.USERS.DETAILS(user.user_name),
@@ -76,6 +86,7 @@ export const {
     useGetUserDataQuery,
     useGetUserListQuery,
     useGetUserQuery,
+    useCreateUserMutation,
     useDeleteUsersMutation,
     useUpdateUserMutation,
     useRefreshTokenMutation,

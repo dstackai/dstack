@@ -3,6 +3,7 @@
   "common": {
     "loading": "Loading",
     "add": "Add",
+    "create": "Create",
     "edit": "Edit",
     "delete": "Delete",
     "match_count_with_value_one": "{{count}} match",
@@ -48,6 +49,11 @@
     "token": "Token",
     "global_role": "Global role",
     "general_info": "General info",
+    "create": {
+      "page_title": "Create user",
+      "error_notification": "Create user error",
+      "success_notification": "User is created"
+    },
     "edit": {
       "error_notification": "Update user error",
       "success_notification": "User updating is successful",

@@ -65,6 +65,10 @@ export const UserList: React.FC = () => {
         if (selectedItems?.length) deleteUsers(selectedItems.map((user) => user.user_name));
     };
 
+    const addUserHandler = () => {
+        navigate(ROUTES.USER.ADD);
+    };
+
     const editSelectedUserHandler = () => {
         const { selectedItems } = collectionProps;
 
@@ -110,14 +114,17 @@ export const UserList: React.FC = () => {
                     counter={renderCounter()}
                     actions={
                         <SpaceBetween size="xs" direction="horizontal">
-                            <Button onClick={editSelectedUserHandler} disabled={isDisabledEdit}>
+                            <Button formAction="none" onClick={editSelectedUserHandler} disabled={isDisabledEdit}>
                                 {t('common.edit')}
                             </Button>
 
-                            <Button onClick={deleteSelectedUserHandler} disabled={isDisabledDelete}>
+                            <Button formAction="none" onClick={deleteSelectedUserHandler} disabled={isDisabledDelete}>
                                 {t('common.delete')}
                             </Button>
-                            <Button>{t('common.add')}</Button>
+
+                            <Button formAction="none" onClick={addUserHandler}>
+                                {t('common.add')}
+                            </Button>
                         </SpaceBetween>
                     }
                 >

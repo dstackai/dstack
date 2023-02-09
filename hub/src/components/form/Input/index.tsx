@@ -19,7 +19,7 @@ export const FormInput = <T extends FieldValues>({
         <Controller
             name={name}
             control={control}
-            render={({ field, fieldState: { error } }) => {
+            render={({ field: { onChange, ...fieldRest }, fieldState: { error } }) => {
                 return (
                     <FormField
                         description={description}
@@ -29,7 +29,12 @@ export const FormInput = <T extends FieldValues>({
                         constraintText={constraintText}
                         secondaryControl={secondaryControl}
                     >
-                        <InputCSD {...field} {...props} invalid={!!error} />
+                        <InputCSD
+                            {...fieldRest}
+                            {...props}
+                            invalid={!!error}
+                            onChange={({ detail }) => onChange(detail.value)}
+                        />
                     </FormField>
                 );
             }}

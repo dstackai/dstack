@@ -8,7 +8,7 @@ export interface Props {
     initialValues?: IUser;
     loading?: boolean;
     onCancel: () => void;
-    onSubmit: (user: Partial<IUser>) => void;
+    onSubmit: (user: IUser) => void;
     onRefreshToken?: () => void;
     disabledRefreshToken?: boolean;
 }
@@ -43,7 +43,7 @@ export const UserForm: React.FC<Props> = ({
         }
     };
 
-    const onSubmit = (data: Partial<IUser>) => {
+    const onSubmit = (data: IUser) => {
         onSubmitProp(data);
     };
 
