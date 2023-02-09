@@ -31,10 +31,10 @@ class AWSCompute(Compute):
             request_id=request_id,
         )
 
-    def get_instance_type(self, requirements: Requirements) -> Optional[InstanceType]:
+    def get_instance_type(self, job: Job) -> Optional[InstanceType]:
         return runners._get_instance_type(
             ec2_client=self.ec2_client,
-            requirements=requirements,
+            requirements=job.requirements,
         )
 
     def run_instance(self, job: Job, instance_type: InstanceType) -> str:

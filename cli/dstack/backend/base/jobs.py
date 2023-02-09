@@ -152,7 +152,7 @@ def run_job(
     try:
         job.runner_id = uuid.uuid4().hex
         update_job(storage, job)
-        instance_type = compute.get_instance_type(job.requirements)
+        instance_type = compute.get_instance_type(job)
         if instance_type is None:
             job.status = JobStatus.FAILED
             update_job(storage, job)

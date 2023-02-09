@@ -213,25 +213,15 @@ def _get_runner_config_dir(runner_id: str, create: Optional[bool] = None) -> str
     return runner_config_dir_path
 
 
-def get_request_head(path: str, job: Job, runner: Optional[Runner] = None) -> RequestHead:
-    request_id = None
-    if job.request_id:
-        request_id = job.request_id
-    elif runner and runner.request_id:
-        request_id = runner.request_id
-    elif not runner:
-        runner = _get_runner(path, job.runner_id)
-        if runner:
-            request_id = runner.request_id
-    if request_id:
-        _running = is_running(request_id)
-        return RequestHead(
-            job.job_id,
-            RequestStatus.RUNNING if _running else RequestStatus.TERMINATED,
-            None,
-        )
-    else:
+def get_request_head(job: Job, request_id: Optional[str]) -> RequestHead:
+    if request_id is None:
         return RequestHead(job.job_id, RequestStatus.TERMINATED, "PID is not specified")
+    _running = is_running(request_id)
+    return RequestHead(
+        job.job_id,
+        RequestStatus.RUNNING if _running else RequestStatus.TERMINATED,
+        None,
+    )
 
 
 def _stop_runner(path: str, runner: Runner):

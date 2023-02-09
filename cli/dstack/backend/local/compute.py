@@ -1,28 +1,25 @@
-from abc import ABC, abstractmethod
 from typing import Optional, Tuple
 
+from dstack.backend.base.compute import Compute
+from dstack.backend.local import runners
 from dstack.core.instance import InstanceType
 from dstack.core.job import Job, Requirements
 from dstack.core.request import RequestHead
 
 
-class Compute(ABC):
-    @abstractmethod
+class LocalCompute(Compute):
     def get_request_head(self, job: Job, request_id: Optional[str]) -> RequestHead:
-        pass
+        return runners.get_request_head(job, request_id)
 
-    @abstractmethod
     def get_instance_type(self, job: Job) -> Optional[InstanceType]:
-        pass
+        resources = runners.check_runner_resources(job.runner_id)
+        return InstanceType("local_runner", resources)
 
-    @abstractmethod
     def run_instance(self, job: Job, instance_type: InstanceType) -> str:
-        pass
+        return runners.start_runner_process(job.runner_id)
 
-    @abstractmethod
     def terminate_instance(self, request_id: str):
-        pass
+        runners.stop_process(request_id)
 
-    @abstractmethod
     def cancel_spot_request(self, request_id: str):
-        pass
+        runners.stop_process(request_id)
