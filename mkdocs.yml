@@ -139,6 +139,8 @@ nav:
       #    - Community:
       #        - Slack: https://join.slack.com/t/dstackai/shared_invite/zt-xdnsytie-D4qU9BvJP8vkbkHXdi6clQ
       #        - Contributing: c.md
+      - Tutorials:
+          - Stable Diffusion with Diffusers: tutorials/diffusers.md
       - What's new:
           - Changelog: https://github.com/dstackai/dstack/releases
           - Newsletter: https://dstack.curated.co/
