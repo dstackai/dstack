@@ -35,6 +35,16 @@ const mocksMap: MocksMap = {
             success: user.list.success[0],
             failed: { status: 403 },
         },
+        PATCH: {
+            success: user.list.success[0],
+            failed: { status: 403 },
+        },
+    },
+    [API.USERS.REFRESH_TOKEN(':name')]: {
+        POST: {
+            success: { token: user.list.success[0].token },
+            failed: { status: 403 },
+        },
     },
     [API.USERS.BASE()]: {
         DELETE: {
@@ -42,6 +52,8 @@ const mocksMap: MocksMap = {
             failed: { status: 403 },
         },
     },
+
+    // hubs
     [API.HUBS.LIST()]: {
         GET: {
             success: hub.list.success,

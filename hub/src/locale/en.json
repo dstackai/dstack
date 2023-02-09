@@ -7,7 +7,9 @@
     "delete": "Delete",
     "match_count_with_value_one": "{{count}} match",
     "match_count_with_value_other": "{{count}} matches",
-    "sign_out": "Sign out"
+    "sign_out": "Sign out",
+    "cancel": "Cancel",
+    "save": "Save"
   },
   "auth": {
     "invalid_token": "Invalid token",
@@ -44,9 +46,14 @@
     "nomatch_message_button_label": "Clear filter",
     "user_name": "User name",
     "token": "Token",
-    "email": "Email",
     "global_role": "Global role",
-    "general_info": "General info"
+    "general_info": "General info",
+    "edit": {
+      "error_notification": "Update user error",
+      "success_notification": "User updating is successful",
+      "refresh_token_success_notification": "Token refreshing is successful",
+      "refresh_token_error_notification": "Token refreshing error"
+    }
   },
   "roles": {
     "run": "Run",

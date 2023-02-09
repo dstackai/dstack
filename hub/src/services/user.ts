@@ -41,18 +41,42 @@ export const userApi = createApi({
             providesTags: (result) => (result ? [{ type: 'User' as const, id: result.user_name }] : []),
         }),
 
+        updateUser: builder.mutation<IUser, Partial<IUser> & Pick<IUser, 'user_name'>>({
+            query: (user) => ({
+                url: API.USERS.DETAILS(user.user_name),
+                method: 'PATCH',
+                params: user,
+            }),
+
+            invalidatesTags: (result) => [{ type: 'User' as const, id: result?.user_name }],
+        }),
+
+        refreshToken: builder.mutation<Pick<IUser, 'token'>, Pick<IUser, 'user_name'>>({
+            query: ({ user_name }) => ({
+                url: API.USERS.REFRESH_TOKEN(user_name),
+                method: 'POST',
+            }),
+
+            invalidatesTags: (result, error, { user_name }) => [{ type: 'User' as const, id: user_name }],
+        }),
+
         deleteUsers: builder.mutation<void, IUser['user_name'][]>({
-            query: (hubNames) => ({
+            query: (userNames) => ({
                 url: API.USERS.BASE(),
                 method: 'DELETE',
                 params: {
-                    users: hubNames,
+                    users: userNames,
                 },
             }),
-
-            invalidatesTags: ['User'],
         }),
     }),
 });
 
-export const { useGetUserDataQuery, useGetUserListQuery, useGetUserQuery, useDeleteUsersMutation } = userApi;
+export const {
+    useGetUserDataQuery,
+    useGetUserListQuery,
+    useGetUserQuery,
+    useDeleteUsersMutation,
+    useUpdateUserMutation,
+    useRefreshTokenMutation,
+} = userApi;

@@ -5,8 +5,9 @@ export const API = {
     USERS: {
         BASE: () => `${API.BASE()}/users`,
         LIST: () => `${API.USERS.BASE()}/list`,
-        DETAILS: (name: IUser['user_name'] | string) => `${API.USERS.BASE()}/${name}`,
+        DETAILS: (name: IUser['user_name']) => `${API.USERS.BASE()}/${name}`,
         INFO: () => `${API.USERS.BASE()}/info`,
+        REFRESH_TOKEN: (name: IUser['user_name']) => `${API.USERS.DETAILS(name)}/refresh-token`,
     },
 
     HUBS: {

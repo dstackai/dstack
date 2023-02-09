@@ -35,12 +35,16 @@ export const UserDetails: React.FC = () => {
         deleteUsers([paramUserName]);
     };
 
+    const editUserHandler = () => {
+        navigate(ROUTES.USER.EDIT.FORMAT(paramUserName));
+    };
+
     return (
         <ContentLayout
             header={
                 <DetailsHeader
                     title={paramUserName}
-                    editAction={() => console.log('edit')}
+                    editAction={editUserHandler}
                     deleteAction={deleteSUserHandler}
                     editDisabled={isDeleting}
                     deleteDisabled={isDeleting}

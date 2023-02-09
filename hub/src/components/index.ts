@@ -15,9 +15,18 @@ export { default as Table } from '@cloudscape-design/components/table';
 export { default as ContentLayout } from '@cloudscape-design/components/content-layout';
 export { default as ColumnLayout } from '@cloudscape-design/components/column-layout';
 export { default as BreadcrumbGroup } from '@cloudscape-design/components/breadcrumb-group';
+export { default as FormUI } from '@cloudscape-design/components/form';
+export { default as FormField } from '@cloudscape-design/components/form-field';
+export { default as InputCSD } from '@cloudscape-design/components/input';
+export { default as SelectCSD } from '@cloudscape-design/components/select';
+export { default as StatusIndicator } from '@cloudscape-design/components/status-indicator';
+export { default as Popover } from '@cloudscape-design/components/popover';
 
 // custom components
 export { NavigateLink } from './NavigateLink';
 export { ListEmptyMessage } from './ListEmptyMessage';
 export { DetailsHeader } from './DetailsHeader';
 export { Loader } from './Loader';
+export { FormInput } from './form/Input';
+export { FormSelect } from './form/Select';
+export { Notifications } from './Notifications';

@@ -3,7 +3,7 @@ import { createPortal } from 'react-dom';
 import { SideNavigationProps } from '@cloudscape-design/components/side-navigation';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
-import { AppLayout as GenericAppLayout, SideNavigation, TopNavigation, BreadcrumbGroup } from 'components';
+import { AppLayout as GenericAppLayout, SideNavigation, TopNavigation, BreadcrumbGroup, Notifications } from 'components';
 import { ROUTES } from 'routes';
 import { useAppSelector } from 'hooks';
 import { selectBreadcrumbs, selectUserName } from 'App/slice';
@@ -75,6 +75,7 @@ const AppLayout: React.FC<{ children: React.ReactNode }> = ({ children }) => {
                 splitPanelOpen
                 toolsHide
                 breadcrumbs={renderBreadcrumbs()}
+                notifications={<Notifications />}
                 navigation={
                     <SideNavigation
                         activeHref={activeHref}
