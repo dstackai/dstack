@@ -4,6 +4,7 @@ from typing import List, Optional
 from botocore.client import BaseClient
 
 from dstack.backend.aws import runners
+from dstack.backend.aws.utils import retry_operation_on_service_errors
 from dstack.backend.base.secrets import SecretsManager
 from dstack.core.repo import RepoAddress
 from dstack.core.secret import Secret
@@ -102,24 +103,29 @@ def _add_secret(
     )
     role_name = runners.role_name(iam_client, bucket_name)
     account_id = sts_client.get_caller_identity()["Account"]
-    secretsmanager_client.put_resource_policy(
-        SecretId=secret_id,
-        ResourcePolicy=json.dumps(
-            {
-                "Version": "2012-10-17",
-                "Statement": [
-                    {
-                        "Effect": "Allow",
-                        "Principal": {"AWS": f"arn:aws:iam::{account_id}:role/{role_name}"},
-                        "Action": [
-                            "secretsmanager:GetSecretValue",
-                            "secretsmanager:ListSecrets",
-                        ],
-                        "Resource": "*",
-                    }
-                ],
-            }
-        ),
+    resource_policy = json.dumps(
+        {
+            "Version": "2012-10-17",
+            "Statement": [
+                {
+                    "Effect": "Allow",
+                    "Principal": {"AWS": f"arn:aws:iam::{account_id}:role/{role_name}"},
+                    "Action": [
+                        "secretsmanager:GetSecretValue",
+                        "secretsmanager:ListSecrets",
+                    ],
+                    "Resource": "*",
+                }
+            ],
+        }
+    )
+    # The policy may not exist yet if we just created it because of AWS eventual consistency
+    retry_operation_on_service_errors(
+        secretsmanager_client.put_resource_policy,
+        ["MalformedPolicyDocumentException"],
+        delay=5,
+        SecretId=secret.secret_name,
+        ResourcePolicy=resource_policy,
     )
 
 

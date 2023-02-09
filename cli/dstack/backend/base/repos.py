@@ -1,7 +1,10 @@
+import json
 from typing import List, Optional
 
+from dstack.backend.base.secrets import SecretsManager
 from dstack.backend.base.storage import Storage
-from dstack.core.repo import RepoAddress, RepoHead
+from dstack.core.repo import RepoAddress, RepoCredentials, RepoHead, RepoProtocol
+from dstack.core.secret import Secret
 
 
 def get_repo_head(storage: Storage, repo_address: RepoAddress) -> Optional[RepoHead]:
@@ -52,6 +55,48 @@ def update_repo_last_run_at(storage: Storage, repo_address: RepoAddress, last_ru
 
 def delete_repo(storage: Storage, repo_address: RepoAddress):
     _delete_repo_head(storage, repo_address)
+
+
+def get_repo_credentials(
+    secrets_manager: SecretsManager, bucket_name: str, repo_address: RepoAddress
+) -> Optional[RepoCredentials]:
+    secret_name = f"/dstack/{bucket_name}/credentials/{repo_address.path()}"
+    secret = secrets_manager.get_secret(repo_address, secret_name)
+    if secret is None:
+        return None
+    credentials_data = json.loads(secret)
+    return RepoCredentials(
+        RepoProtocol(credentials_data["protocol"]),
+        credentials_data.get("private_key"),
+        credentials_data.get("oauth_token"),
+    )
+
+
+def save_repo_credentials(
+    secrets_manager: SecretsManager,
+    bucket_name: str,
+    repo_address: RepoAddress,
+    repo_credentials: RepoCredentials,
+):
+    secret_name = f"/dstack/{bucket_name}/credentials/{repo_address.path()}"
+    credentials_data = {"protocol": repo_credentials.protocol.value}
+    if repo_credentials.protocol == RepoProtocol.HTTPS and repo_credentials.oauth_token:
+        credentials_data["oauth_token"] = repo_credentials.oauth_token
+    elif repo_credentials.protocol == RepoProtocol.SSH:
+        if repo_credentials.private_key:
+            credentials_data["private_key"] = repo_credentials.private_key
+        else:
+            raise Exception("No private key is specified")
+
+    secret = secrets_manager.get_secret(repo_address, secret_name)
+    if secret is not None:
+        secrets_manager.update_secret(
+            repo_address=repo_address, secret=Secret(secret_name, json.dumps(credentials_data))
+        )
+    else:
+        secrets_manager.add_secret(
+            repo_address=repo_address, secret=Secret(secret_name, json.dumps(credentials_data))
+        )
 
 
 def _create_or_update_repo_head(storage: Storage, repo_head: RepoHead):

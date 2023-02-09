@@ -4,7 +4,7 @@ from typing import Dict, Generator, List, Optional, Tuple
 import boto3
 from botocore.client import BaseClient
 
-from dstack.backend.aws import artifacts, config, logs, repos, tags
+from dstack.backend.aws import artifacts, config, logs, tags
 from dstack.backend.aws.compute import AWSCompute
 from dstack.backend.aws.config import AWSConfig
 from dstack.backend.aws.secrets import AWSSecretsManager
@@ -225,15 +225,13 @@ class AwsBackend(RemoteBackend):
         )
 
     def get_repo_credentials(self, repo_address: RepoAddress) -> Optional[RepoCredentials]:
-        return repos.get_repo_credentials(
-            self._secretsmanager_client(), self.backend_config.bucket_name, repo_address
+        return base_repos.get_repo_credentials(
+            self._secrets_manager, self.backend_config.bucket_name, repo_address
         )
 
     def save_repo_credentials(self, repo_address: RepoAddress, repo_credentials: RepoCredentials):
-        repos.save_repo_credentials(
-            self._sts_client(),
-            self._iam_client(),
-            self._secretsmanager_client(),
+        base_repos.save_repo_credentials(
+            self._secrets_manager,
             self.backend_config.bucket_name,
             repo_address,
             repo_credentials,
