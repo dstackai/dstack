@@ -4,22 +4,13 @@ from typing import Dict, Generator, List, Optional, Tuple
 import boto3
 from botocore.client import BaseClient
 
-from dstack.backend.aws import (
-    artifacts,
-    config,
-    jobs,
-    logs,
-    repos,
-    run_names,
-    runners,
-    runs,
-    secrets,
-    tags,
-)
+from dstack.backend.aws import artifacts, config, logs, repos, secrets, tags
+from dstack.backend.aws.compute import AWSCompute
 from dstack.backend.aws.config import AWSConfig
 from dstack.backend.aws.storage import AWSStorage
 from dstack.backend.base import RemoteBackend
 from dstack.backend.base import jobs as base_jobs
+from dstack.backend.base import runs as base_runs
 from dstack.core.artifact import Artifact
 from dstack.core.error import ConfigError
 from dstack.core.job import Job, JobHead
@@ -42,8 +33,16 @@ class AwsBackend(RemoteBackend):
             self._loaded = True
         except ConfigError:
             self._loaded = False
+            return
         self._storage = AWSStorage(
             s3_client=self._s3_client(), bucket_name=self.backend_config.bucket_name
+        )
+        self._compute = AWSCompute(
+            ec2_client=self._ec2_client(),
+            iam_client=self._iam_client(),
+            bucket_name=self.backend_config.bucket_name,
+            region_name=self.backend_config.region_name,
+            subnet_id=self.backend_config.subnet_id,
         )
 
     def _s3_client(self) -> BaseClient:
@@ -97,12 +96,7 @@ class AwsBackend(RemoteBackend):
         )
 
     def create_run(self, repo_address: RepoAddress) -> str:
-        return runs.create_run(
-            self._s3_client(),
-            self._logs_client(),
-            self.backend_config.bucket_name,
-            repo_address,
-        )
+        return base_runs.create_run(self._storage, repo_address, self.type)
 
     def create_job(self, job: Job):
         base_jobs.create_job(self._storage, job)
@@ -114,26 +108,10 @@ class AwsBackend(RemoteBackend):
         return base_jobs.list_jobs(self._storage, repo_address, run_name)
 
     def run_job(self, job: Job):
-        runners.run_job(
-            self._logs_client(),
-            self._ec2_client(),
-            self._iam_client(),
-            self._s3_client(),
-            self.backend_config.bucket_name,
-            self.backend_config.region_name,
-            self.backend_config.subnet_id,
-            job,
-        )
+        base_jobs.run_job(self._storage, self._compute, job)
 
     def stop_job(self, repo_address: RepoAddress, job_id: str, abort: bool):
-        runners.stop_job(
-            self._ec2_client(),
-            self._s3_client(),
-            self.backend_config.bucket_name,
-            repo_address,
-            job_id,
-            abort,
-        )
+        base_jobs.stop_job(self._storage, self._compute, repo_address, job_id, abort)
 
     def list_job_heads(
         self, repo_address: RepoAddress, run_name: Optional[str] = None
@@ -150,12 +128,8 @@ class AwsBackend(RemoteBackend):
         include_request_heads: bool = True,
     ) -> List[RunHead]:
         job_heads = self.list_job_heads(repo_address, run_name)
-        return runs.get_run_heads(
-            self._ec2_client(),
-            self._s3_client(),
-            self.backend_config.bucket_name,
-            job_heads,
-            include_request_heads,
+        return base_runs.get_run_heads(
+            self._storage, self._compute, job_heads, include_request_heads
         )
 
     def poll_logs(
