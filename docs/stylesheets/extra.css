@@ -63,7 +63,8 @@
     color: var(--md-default-fg-color);
 }
 
-.md-typeset :is(.info,.tip,.warning)>:is(.admonition-title):before {
+.md-typeset :is(.info,.tip,.warning)>:is(.admonition-title,summary):before,
+.md-typeset :is(.info,.tip,.warning)>:is(.admonition-title,summary):after {
     background-color: var(--md-default-fg-color);
 }
 
