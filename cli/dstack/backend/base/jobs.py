@@ -251,7 +251,7 @@ def _get_job_heads_filenames_prefix(repo_address: RepoAddress, run_name: Optiona
 
 def _get_job_head_filename_prefix(repo_address: RepoAddress, job_id: str) -> str:
     prefix = _get_jobs_dir(repo_address)
-    key = f"{prefix}l;" f"{job_id};"
+    key = f"{prefix}l;{job_id};"
     return key
 
 

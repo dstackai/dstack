@@ -11,6 +11,7 @@ from dstack.backend.aws.storage import AWSStorage
 from dstack.backend.base import RemoteBackend
 from dstack.backend.base import jobs as base_jobs
 from dstack.backend.base import runs as base_runs
+from dstack.backend.base import tags as base_tags
 from dstack.core.artifact import Artifact
 from dstack.core.error import ConfigError
 from dstack.core.job import Job, JobHead
@@ -140,8 +141,8 @@ class AwsBackend(RemoteBackend):
         attached: bool,
     ) -> Generator[LogEvent, None, None]:
         return logs.poll_logs(
-            self._ec2_client(),
-            self._s3_client(),
+            self._storage,
+            self._compute,
             self._logs_client(),
             self.backend_config.bucket_name,
             repo_address,
@@ -190,14 +191,10 @@ class AwsBackend(RemoteBackend):
         )
 
     def list_tag_heads(self, repo_address: RepoAddress) -> List[TagHead]:
-        return tags.list_tag_heads(
-            self._s3_client(), self.backend_config.bucket_name, repo_address
-        )
+        return base_tags.list_tag_heads(self._storage, repo_address)
 
     def get_tag_head(self, repo_address: RepoAddress, tag_name: str) -> Optional[TagHead]:
-        return tags.get_tag_head(
-            self._s3_client(), self.backend_config.bucket_name, repo_address, tag_name
-        )
+        return base_tags.get_tag_head(self._storage, repo_address, tag_name)
 
     def add_tag_from_run(
         self,
@@ -206,9 +203,8 @@ class AwsBackend(RemoteBackend):
         run_name: str,
         run_jobs: Optional[List[Job]],
     ):
-        tags.create_tag_from_run(
-            self._s3_client(),
-            self.backend_config.bucket_name,
+        base_tags.create_tag_from_run(
+            self._storage,
             repo_address,
             tag_name,
             run_name,
@@ -219,16 +215,14 @@ class AwsBackend(RemoteBackend):
         self, repo_data: LocalRepoData, tag_name: str, local_dirs: List[str]
     ):
         tags.create_tag_from_local_dirs(
-            self._s3_client(),
-            self._logs_client(),
-            self.backend_config.bucket_name,
+            self._storage,
             repo_data,
             tag_name,
             local_dirs,
         )
 
     def delete_tag_head(self, repo_address: RepoAddress, tag_head: TagHead):
-        tags.delete_tag(self._s3_client(), self.backend_config.bucket_name, repo_address, tag_head)
+        base_tags.delete_tag(self._storage, repo_address, tag_head)
 
     def update_repo_last_run_at(self, repo_address: RepoAddress, last_run_at: int):
         repos.update_repo_last_run_at(

@@ -7,7 +7,9 @@ from urllib import parse
 
 from botocore.client import BaseClient
 
-from dstack.backend.aws import jobs, runs
+from dstack.backend.base import jobs, runs
+from dstack.backend.base.compute import Compute
+from dstack.backend.base.storage import Storage
 from dstack.core.app import AppSpec
 from dstack.core.job import JobHead
 from dstack.core.log_event import LogEvent, LogEventSource
@@ -21,8 +23,7 @@ POLL_LOGS_RATE_SECS = 1
 
 
 def _render_log_message(
-    s3_client: BaseClient,
-    bucket_name: str,
+    storage: Storage,
     event: Dict[str, Any],
     repo_address: RepoAddress,
     job_host_names: Dict[str, Optional[str]],
@@ -33,7 +34,7 @@ def _render_log_message(
     job_id = message["job_id"]
     log = message["log"]
     if job_id and job_id not in job_host_names:
-        job = jobs.get_job(s3_client, bucket_name, repo_address, job_id)
+        job = jobs.get_job(storage, repo_address, job_id)
         job_host_names[job_id] = job.host_name or "none" if job else "none"
         job_ports[job_id] = job.ports if job else None
         job_app_specs[job_id] = job.app_specs if job else None
@@ -79,10 +80,9 @@ def _reset_filter_log_events_params(fle_kwargs, event_ids_per_timestamp):
 
 
 def _filter_log_events_loop(
-    ec2_client: BaseClient,
-    s3_client: BaseClient,
+    storage: Storage,
+    compute: Compute,
     logs_client: BaseClient,
-    bucket_name: str,
     repo_address: RepoAddress,
     job_heads: List[JobHead],
     filter_logs_events_kwargs: dict,
@@ -92,7 +92,6 @@ def _filter_log_events_loop(
     finished_counter = 0
     while True:
         response = logs_client.filter_log_events(**filter_logs_events_kwargs)
-
         for event in response["events"]:
             if event["eventId"] not in event_ids_per_timestamp[event["timestamp"]]:
                 event_ids_per_timestamp[event["timestamp"]].add(event["eventId"])
@@ -106,17 +105,12 @@ def _filter_log_events_loop(
             counter = counter + 1
             if counter % CHECK_STATUS_EVERY_N == 0:
                 _job_heads = [
-                    jobs.get_job(s3_client, bucket_name, repo_address, job_head.job_id)
-                    for job_head in job_heads
+                    jobs.get_job(storage, repo_address, job_head.job_id) for job_head in job_heads
                 ]
                 run = next(
                     iter(
                         runs.get_run_heads(
-                            ec2_client,
-                            s3_client,
-                            bucket_name,
-                            _job_heads,
-                            include_request_heads=False,
+                            storage, compute, _job_heads, include_request_heads=False
                         )
                     )
                 )
@@ -166,8 +160,8 @@ def _filter_logs_events_kwargs(
 
 
 def poll_logs(
-    ec2_client: BaseClient,
-    s3_client: BaseClient,
+    storage: Storage,
+    compute: Compute,
     logs_client: BaseClient,
     bucket_name: str,
     repo_address: RepoAddress,
@@ -186,10 +180,9 @@ def poll_logs(
     try:
         if attached:
             for event in _filter_log_events_loop(
-                ec2_client,
-                s3_client,
+                storage,
+                compute,
                 logs_client,
-                bucket_name,
                 repo_address,
                 job_heads,
                 filter_logs_events_kwargs,
