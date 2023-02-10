@@ -1,0 +1,30 @@
+name: Manual Azure build for STGN
+
+on: [workflow_dispatch]
+
+jobs:
+  azure-image-build:
+    defaults:
+      run:
+        working-directory: runner
+    env:
+      AZURE_CLIENT_ID: ${{ secrets.AZURE_CLIENT_ID }}
+      AZURE_CLIENT_SECRET: ${{ secrets.AZURE_CLIENT_SECRET }}
+      AZURE_TENANT_ID: ${{ secrets.AZURE_TENANT_ID }}
+      AZURE_SUBSCRIPTION_ID: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
+    strategy:
+      matrix:
+        variants: [ azure-image ]
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v3
+      - name: Download packer
+        run: |
+          wget https://releases.hashicorp.com/packer/1.8.0/packer_1.8.0_linux_amd64.zip
+          unzip packer_1.8.0_linux_amd64.zip
+          chmod +x packer
+          cp -R ami/packer/* .
+      - name: Run packer
+        run: |
+          VERSION=${{ github.run_number }}
+          ./packer build -var build_id=$VERSION ${{ matrix.variants }}.json
