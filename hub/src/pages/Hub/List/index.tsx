@@ -1,12 +1,15 @@
 import React, { useEffect, useMemo } from 'react';
 import { Cards, Header, SpaceBetween, Button, NavigateLink, TextFilter, Pagination, ListEmptyMessage } from 'components';
-import { useBreadcrumbs, useCollection } from 'hooks';
+import { useAppSelector, useBreadcrumbs, useCollection } from 'hooks';
 import { useDeleteHubsMutation, useGetHubsQuery } from 'services/hub';
 import { ROUTES } from 'routes';
 import { useTranslation } from 'react-i18next';
+import { getHubRoleByUserName } from '../utils';
+import { selectUserName } from 'App/slice';
 
 export const HubList: React.FC = () => {
     const { t } = useTranslation();
+    const userName = useAppSelector(selectUserName) ?? '';
     const { isLoading, data } = useGetHubsQuery();
     const [deleteHubs, { isLoading: isDeleting }] = useDeleteHubsMutation();
 
@@ -63,13 +66,13 @@ export const HubList: React.FC = () => {
     const isDisabledEdit = useMemo(() => {
         if (collectionProps.selectedItems?.length !== 1) return true;
 
-        return collectionProps.selectedItems?.some((item) => item.permission !== 'write') ?? false;
+        return collectionProps.selectedItems?.some((item) => getHubRoleByUserName(item, userName) !== 'admin') ?? false;
     }, [isDeleting, collectionProps.selectedItems]);
 
     const isDisabledDelete = useMemo(() => {
         if (isDeleting || collectionProps.selectedItems?.length === 0) return true;
 
-        return collectionProps.selectedItems?.some((item) => item.permission !== 'write') ?? false;
+        return collectionProps.selectedItems?.some((item) => getHubRoleByUserName(item, userName) !== 'admin') ?? false;
     }, [isDeleting, collectionProps.selectedItems]);
 
     return (
@@ -87,17 +90,17 @@ export const HubList: React.FC = () => {
                     {
                         id: 'type',
                         header: t('hubs.card.type'),
-                        content: (hub) => hub.type,
+                        content: (hub) => t(`hubs.backend_type.${hub.backend.type}`),
                     },
                     {
                         id: 'region',
                         header: t('hubs.card.region'),
-                        content: (hub) => hub.region,
+                        content: (hub) => hub.backend.region_name,
                     },
                     {
                         id: 'bucket',
                         header: t('hubs.card.bucket'),
-                        content: (hub) => hub.bucket,
+                        content: (hub) => hub.backend.s3_bucket_name,
                     },
                 ],
             }}

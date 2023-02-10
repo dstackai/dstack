@@ -35,6 +35,9 @@
       "type": "Type",
       "region": "Region",
       "bucket": "Bucket"
+    },
+    "backend_type": {
+      "aws": "AWS"
     }
   },
   "users": {
