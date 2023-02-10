@@ -1,6 +1,6 @@
-import React, { useEffect } from 'react';
+import React, { useEffect, useState } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
-import { ContentLayout, SpaceBetween, Container, Header, ColumnLayout, Box, Loader } from 'components';
+import { ContentLayout, SpaceBetween, Container, Header, ColumnLayout, Box, Loader, ConfirmationDialog } from 'components';
 import { DetailsHeader } from 'components';
 import { useTranslation } from 'react-i18next';
 import { useBreadcrumbs } from 'hooks';
@@ -9,6 +9,7 @@ import { ROUTES } from 'routes';
 
 export const UserDetails: React.FC = () => {
     const { t } = useTranslation();
+    const [showDeleteConfirm, setShowConfirmDelete] = useState(false);
     const params = useParams();
     const paramUserName = params.name ?? '';
     const navigate = useNavigate();
@@ -30,9 +31,14 @@ export const UserDetails: React.FC = () => {
         if (!isDeleting && deleteData) navigate(ROUTES.USER.LIST);
     }, [isDeleting, deleteData]);
 
-    const deleteSUserHandler = () => {
+    const toggleDeleteConfirm = () => {
+        setShowConfirmDelete((val) => !val);
+    };
+
+    const deleteUserHandler = () => {
         if (!data) return;
         deleteUsers([paramUserName]);
+        setShowConfirmDelete(false);
     };
 
     const editUserHandler = () => {
@@ -40,42 +46,46 @@ export const UserDetails: React.FC = () => {
     };
 
     return (
-        <ContentLayout
-            header={
-                <DetailsHeader
-                    title={paramUserName}
-                    editAction={editUserHandler}
-                    deleteAction={deleteSUserHandler}
-                    editDisabled={isDeleting}
-                    deleteDisabled={isDeleting}
-                />
-            }
-        >
-            {isLoading && !data && (
-                <Container>
-                    <Loader />
-                </Container>
-            )}
-
-            {data && (
-                <SpaceBetween size="l">
-                    <Container header={<Header variant="h2">{t('users.general_info')}</Header>}>
-                        <ColumnLayout columns={2} variant="text-grid">
-                            <SpaceBetween size="l">
-                                <div>
-                                    <Box variant="awsui-key-label">{t('users.user_name')}</Box>
-                                    <div>{data.user_name}</div>
-                                </div>
-
-                                <div>
-                                    <Box variant="awsui-key-label">{t('users.global_role')}</Box>
-                                    <div>{t(`roles.${data.global_role}`)}</div>
-                                </div>
-                            </SpaceBetween>
-                        </ColumnLayout>
+        <>
+            <ContentLayout
+                header={
+                    <DetailsHeader
+                        title={paramUserName}
+                        editAction={editUserHandler}
+                        deleteAction={toggleDeleteConfirm}
+                        editDisabled={isDeleting}
+                        deleteDisabled={isDeleting}
+                    />
+                }
+            >
+                {isLoading && !data && (
+                    <Container>
+                        <Loader />
                     </Container>
-                </SpaceBetween>
-            )}
-        </ContentLayout>
+                )}
+
+                {data && (
+                    <SpaceBetween size="l">
+                        <Container header={<Header variant="h2">{t('users.general_info')}</Header>}>
+                            <ColumnLayout columns={2} variant="text-grid">
+                                <SpaceBetween size="l">
+                                    <div>
+                                        <Box variant="awsui-key-label">{t('users.user_name')}</Box>
+                                        <div>{data.user_name}</div>
+                                    </div>
+
+                                    <div>
+                                        <Box variant="awsui-key-label">{t('users.global_role')}</Box>
+                                        <div>{t(`roles.${data.global_role}`)}</div>
+                                    </div>
+                                </SpaceBetween>
+                            </ColumnLayout>
+                        </Container>
+                    </SpaceBetween>
+                )}
+            </ContentLayout>
+
+            <ConfirmationDialog visible={showDeleteConfirm} onDiscard={toggleDeleteConfirm} onConfirm={deleteUserHandler} />
+        </>
     );
 };

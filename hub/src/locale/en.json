@@ -65,5 +65,9 @@
     "run": "Run",
     "admin": "Admin",
     "read": "Read"
+  },
+  "confirm_dialog": {
+    "title": "Confirm delete",
+    "message": "Do you sure want to delete?"
   }
 }

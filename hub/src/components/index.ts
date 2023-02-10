@@ -30,3 +30,4 @@ export { Loader } from './Loader';
 export { FormInput } from './form/Input';
 export { FormSelect } from './form/Select';
 export { Notifications } from './Notifications';
+export { ConfirmationDialog } from './ConfirmationDialog';
