@@ -58,7 +58,10 @@
       "error_notification": "Update user error",
       "success_notification": "User updating is successful",
       "refresh_token_success_notification": "Token refreshing is successful",
-      "refresh_token_error_notification": "Token refreshing error"
+      "refresh_token_error_notification": "Token refreshing error",
+      "refresh_token_confirm_title": "Refresh token",
+      "refresh_token_confirm_message": "Do you sure want to refresh token?",
+      "refresh_token_button_label": "Refresh"
     }
   },
   "roles": {

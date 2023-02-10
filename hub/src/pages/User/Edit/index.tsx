@@ -1,9 +1,9 @@
-import React from 'react';
+import React, { useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useNavigate, useParams } from 'react-router-dom';
 import { pick } from 'lodash';
 import { useBreadcrumbs, useNotifications } from 'hooks';
-import { Container, ContentLayout, Header, Loader } from 'components';
+import { ConfirmationDialog, Container, ContentLayout, Header, Loader, Box } from 'components';
 import { UserForm } from '../Form';
 import { ROUTES } from 'routes';
 import { useGetUserQuery, useRefreshTokenMutation, useUpdateUserMutation } from 'services/user';
@@ -13,9 +13,14 @@ export const UserEdit: React.FC = () => {
     const params = useParams();
     const navigate = useNavigate();
     const paramUserName = params.name ?? '';
+    const [showRefreshConfirm, setShowRefreshConfirm] = useState(false);
     const { isLoading, data } = useGetUserQuery({ name: paramUserName }, { skip: !params.name });
     const [updateUser, { isLoading: isUserUpdating }] = useUpdateUserMutation();
     const [refreshToken, { isLoading: isTokenRefreshing }] = useRefreshTokenMutation();
+
+    const toggleRefreshConfirm = () => {
+        setShowRefreshConfirm((val) => !val);
+    };
 
     useBreadcrumbs([
         {
@@ -35,6 +40,8 @@ export const UserEdit: React.FC = () => {
     const [pushNotification] = useNotifications();
 
     const onRefreshTokenHandler = async () => {
+        setShowRefreshConfirm(false);
+
         try {
             await refreshToken({
                 user_name: paramUserName,
@@ -78,23 +85,34 @@ export const UserEdit: React.FC = () => {
     };
 
     return (
-        <ContentLayout header={<Header variant="awsui-h1-sticky">{paramUserName}</Header>}>
-            {isLoading && !data && (
-                <Container>
-                    <Loader />
-                </Container>
-            )}
+        <>
+            <ContentLayout header={<Header variant="awsui-h1-sticky">{paramUserName}</Header>}>
+                {isLoading && !data && (
+                    <Container>
+                        <Loader />
+                    </Container>
+                )}
 
-            {data && (
-                <UserForm
-                    initialValues={data}
-                    onSubmit={onSubmitHandler}
-                    loading={isUserUpdating}
-                    onCancel={onCancelHandler}
-                    onRefreshToken={onRefreshTokenHandler}
-                    disabledRefreshToken={isTokenRefreshing}
-                />
-            )}
-        </ContentLayout>
+                {data && (
+                    <UserForm
+                        initialValues={data}
+                        onSubmit={onSubmitHandler}
+                        loading={isUserUpdating}
+                        onCancel={onCancelHandler}
+                        onRefreshToken={toggleRefreshConfirm}
+                        disabledRefreshToken={isTokenRefreshing}
+                    />
+                )}
+            </ContentLayout>
+
+            <ConfirmationDialog
+                title={t('users.edit.refresh_token_confirm_title')}
+                content={<Box variant="span">{t('users.edit.refresh_token_confirm_message')}</Box>}
+                confirmButtonLabel={t('users.edit.refresh_token_button_label')}
+                visible={showRefreshConfirm}
+                onDiscard={toggleRefreshConfirm}
+                onConfirm={onRefreshTokenHandler}
+            />
+        </>
     );
 };

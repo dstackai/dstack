@@ -22,7 +22,6 @@ export const UserForm: React.FC<Props> = ({
     onSubmit: onSubmitProp,
 }) => {
     const { t } = useTranslation();
-
     const isEditing = !!initialValues;
 
     const { handleSubmit, control } = useForm<IUser>({
