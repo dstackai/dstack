@@ -1,10 +1,10 @@
 from abc import ABC, abstractmethod
-from typing import List, Optional
+from typing import Dict, List, Optional
 
 
 class Storage(ABC):
     @abstractmethod
-    def put_object(self, key: str, content: str):
+    def put_object(self, key: str, content: str, metadata: Optional[Dict] = None):
         pass
 
     @abstractmethod

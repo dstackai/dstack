@@ -1,6 +1,6 @@
 import os
 from pathlib import Path
-from typing import List, Optional
+from typing import Dict, List, Optional
 
 from dstack.backend.base.storage import Storage
 
@@ -9,7 +9,7 @@ class LocalStorage(Storage):
     def __init__(self, root_path: str):
         self.root_path = root_path
 
-    def put_object(self, key: str, content: str):
+    def put_object(self, key: str, content: str, metadata: Optional[Dict] = None):
         _put_object(
             Root=self.root_path,
             Key=key,

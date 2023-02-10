@@ -23,6 +23,18 @@ class SecretsManager(ABC):
     def delete_secret(self, repo_address: RepoAddress, secret_name: str):
         pass
 
+    @abstractmethod
+    def get_credentials(self, repo_address: RepoAddress) -> Optional[str]:
+        pass
+
+    @abstractmethod
+    def add_credentials(self, repo_address: RepoAddress, data: str):
+        pass
+
+    @abstractmethod
+    def update_credentials(self, repo_address: RepoAddress, data: str):
+        pass
+
 
 def list_secret_names(storage: Storage, repo_address: RepoAddress) -> List[str]:
     secret_head_prefix = _get_secret_heads_keys_prefix(repo_address)

@@ -1,6 +1,5 @@
-import sys
 from pathlib import Path
-from typing import Dict, Generator, List, Optional, Tuple
+from typing import Generator, List, Optional, Tuple
 
 from dstack.backend.base import Backend, BackendType
 from dstack.backend.base import jobs as base_jobs
@@ -8,9 +7,10 @@ from dstack.backend.base import repos as base_repos
 from dstack.backend.base import runs as base_runs
 from dstack.backend.base import secrets as base_secrets
 from dstack.backend.base import tags as base_tags
-from dstack.backend.local import artifacts, jobs, logs, repos, runners, runs, secrets, tags
+from dstack.backend.local import artifacts, logs, tags
 from dstack.backend.local.compute import LocalCompute
 from dstack.backend.local.config import LocalConfig
+from dstack.backend.local.secrets import LocalSecretsManager
 from dstack.backend.local.storage import LocalStorage
 from dstack.core.artifact import Artifact
 from dstack.core.job import Job, JobHead
@@ -28,6 +28,7 @@ class LocalBackend(Backend):
         self._loaded = True
         self._storage = LocalStorage(self.backend_config.path)
         self._compute = LocalCompute()
+        self._secrets_manager = LocalSecretsManager(self.backend_config.path)
 
     @property
     def name(self):
@@ -85,7 +86,7 @@ class LocalBackend(Backend):
         attached: bool,
     ) -> Generator[LogEvent, None, None]:
         return logs.poll_logs(
-            self.backend_config.path, repo_address, job_heads, start_time, attached
+            self._storage, self._compute, repo_address, job_heads, start_time, attached
         )
 
     def list_run_artifact_files(
@@ -133,25 +134,44 @@ class LocalBackend(Backend):
         )
 
     def get_repo_credentials(self, repo_address: RepoAddress) -> Optional[RepoCredentials]:
-        return repos.get_repo_credentials(self.backend_config.path, repo_address)
+        return base_repos.get_repo_credentials(self._secrets_manager, repo_address)
 
     def save_repo_credentials(self, repo_address: RepoAddress, repo_credentials: RepoCredentials):
-        repos.save_repo_credentials(self.backend_config.path, repo_address, repo_credentials)
+        base_repos.save_repo_credentials(
+            self._secrets_manager,
+            repo_address,
+            repo_credentials,
+        )
 
     def list_secret_names(self, repo_address: RepoAddress) -> List[str]:
-        return secrets.list_secret_names(self.backend_config.path, repo_address)
+        return base_secrets.list_secret_names(self._storage, repo_address)
 
     def get_secret(self, repo_address: RepoAddress, secret_name: str) -> Optional[Secret]:
-        return secrets.get_secret(self.backend_config.path, repo_address, secret_name)
+        return base_secrets.get_secret(self._secrets_manager, repo_address, secret_name)
 
     def add_secret(self, repo_address: RepoAddress, secret: Secret):
-        return secrets.add_secret(self.backend_config.path, repo_address, secret)
+        base_secrets.add_secret(
+            self._storage,
+            self._secrets_manager,
+            repo_address,
+            secret,
+        )
 
     def update_secret(self, repo_address: RepoAddress, secret: Secret):
-        return secrets.update_secret(self.backend_config.path, repo_address, secret)
+        base_secrets.update_secret(
+            self._storage,
+            self._secrets_manager,
+            repo_address,
+            secret,
+        )
 
     def delete_secret(self, repo_address: RepoAddress, secret_name: str):
-        return secrets.remove_secret(self.backend_config.path, repo_address, secret_name)
+        base_secrets.delete_secret(
+            self._storage,
+            self._secrets_manager,
+            repo_address,
+            secret_name,
+        )
 
     def get_artifacts_path(self, repo_address: RepoAddress) -> Path:
         return artifacts.get_artifacts_path(self.backend_config.path, repo_address)

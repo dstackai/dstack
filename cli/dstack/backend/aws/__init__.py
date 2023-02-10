@@ -90,6 +90,9 @@ class AwsBackend(RemoteBackend):
         )
 
     def create_run(self, repo_address: RepoAddress) -> str:
+        logs.create_log_group_if_not_exists(
+            self._logs_client(), self.backend_config.bucket_name, repo_address
+        )
         return base_runs.create_run(self._storage, repo_address, self.type)
 
     def create_job(self, job: Job):
@@ -225,14 +228,11 @@ class AwsBackend(RemoteBackend):
         )
 
     def get_repo_credentials(self, repo_address: RepoAddress) -> Optional[RepoCredentials]:
-        return base_repos.get_repo_credentials(
-            self._secrets_manager, self.backend_config.bucket_name, repo_address
-        )
+        return base_repos.get_repo_credentials(self._secrets_manager, repo_address)
 
     def save_repo_credentials(self, repo_address: RepoAddress, repo_credentials: RepoCredentials):
         base_repos.save_repo_credentials(
             self._secrets_manager,
-            self.backend_config.bucket_name,
             repo_address,
             repo_credentials,
         )

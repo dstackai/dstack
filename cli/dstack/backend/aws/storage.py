@@ -1,4 +1,4 @@
-from typing import List, Optional
+from typing import Dict, List, Optional
 
 import botocore.exceptions
 from botocore.client import BaseClient
@@ -11,11 +11,12 @@ class AWSStorage(Storage):
         self.s3_client = s3_client
         self.bucket_name = bucket_name
 
-    def put_object(self, key: str, content: str):
+    def put_object(self, key: str, content: str, metadata: Optional[Dict] = None):
         self.s3_client.put_object(
             Bucket=self.bucket_name,
             Key=key,
             Body=content,
+            Metadata=metadata if metadata is not None else {},
         )
 
     def get_object(self, key: str) -> Optional[str]:
