@@ -28,14 +28,14 @@ class PSCommand(BasicCommand):
         self._parser.add_argument(
             "-a",
             "--all",
-            help="Show status for all runs. "
-            "By default, it shows only status for unfinished runs, or the last finished.",
+            help="Show all runs. "
+            "By default, it only shows unfinished runs or the last finished.",
             action="store_true",
         )
         self._parser.add_argument(
             "-w",
             "--watch",
-            help="Show live status for runs in realtime.",
+            help="Watch statuses of runs in realtime",
             action="store_true",
         )
 
