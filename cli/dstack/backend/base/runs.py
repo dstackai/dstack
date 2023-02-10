@@ -1,33 +1,68 @@
-from typing import List, Optional
+from typing import List
 
-from botocore.client import BaseClient
+import yaml
 
-from dstack.backend.aws import jobs, logs, run_names, runners
+from dstack.backend.base import BackendType, jobs, runners
+from dstack.backend.base.compute import Compute
+from dstack.backend.base.storage import Storage
 from dstack.core.app import AppHead
 from dstack.core.artifact import ArtifactHead
 from dstack.core.job import JobHead
 from dstack.core.repo import RepoAddress
-from dstack.core.run import RunHead, generate_remote_run_name_prefix
+from dstack.core.run import (
+    RequestHead,
+    RunHead,
+    generate_local_run_name_prefix,
+    generate_remote_run_name_prefix,
+)
 
 
 def create_run(
-    s3_client: BaseClient,
-    logs_client: BaseClient,
-    bucket_name: str,
+    storage: Storage,
     repo_address: RepoAddress,
+    backend_type: BackendType,
 ) -> str:
-    name = generate_remote_run_name_prefix()
-    run_name_index = run_names.next_run_name_index(s3_client, bucket_name, name)
+    if backend_type is BackendType.LOCAL:
+        name = generate_local_run_name_prefix()
+    else:
+        name = generate_remote_run_name_prefix()
+    run_name_index = _next_run_name_index(storage, name)
     run_name = f"{name}-{run_name_index}"
-    log_group_name = f"/dstack/jobs/{bucket_name}/{repo_address.path()}"
-    logs.create_log_group_if_not_exists(logs_client, bucket_name, log_group_name)
     return run_name
 
 
+def _next_run_name_index(storage: Storage, run_name: str) -> int:
+    count = 0
+    key = f"run-names/{run_name}.yaml"
+    obj = storage.get_object(key)
+    if obj is None:
+        storage.put_object(key=key, content=yaml.dump({"count": 1}))
+        return 1
+    count = yaml.load(obj, yaml.FullLoader)["count"]
+    storage.put_object(key=key, content=yaml.dump({"count": count + 1}))
+    return count + 1
+
+
+def get_run_heads(
+    storage: Storage,
+    compute: Compute,
+    job_heads: List[JobHead],
+    include_request_heads: bool,
+) -> List[RunHead]:
+    runs_by_id = {}
+    for job_head in job_heads:
+        run_id = ",".join([job_head.run_name, job_head.workflow_name or ""])
+        if run_id not in runs_by_id:
+            runs_by_id[run_id] = _create_run(storage, compute, job_head, include_request_heads)
+        else:
+            run = runs_by_id[run_id]
+            _update_run(storage, compute, run, job_head, include_request_heads)
+    return sorted(list(runs_by_id.values()), key=lambda r: r.submitted_at, reverse=True)
+
+
 def _create_run(
-    ec2_client: BaseClient,
-    s3_client: BaseClient,
-    bucket_name: str,
+    storage: Storage,
+    compute: Compute,
     job_head: JobHead,
     include_request_heads: bool,
 ) -> RunHead:
@@ -50,8 +85,12 @@ def _create_run(
     if include_request_heads and job_head.status.is_unfinished():
         if request_heads is None:
             request_heads = []
-        job = jobs.get_job(s3_client, bucket_name, job_head.repo_address, job_head.job_id)
-        request_head = runners.get_request_head(ec2_client, s3_client, bucket_name, job, None)
+        job = jobs.get_job(storage, job_head.repo_address, job_head.job_id)
+        request_id = job.request_id
+        if request_id is None and job.runner_id is not None:
+            runner = runners.get_runner(storage, job.runner_id)
+            request_id = runner.request_id
+        request_head = compute.get_request_head(job, request_id)
         request_heads.append(request_head)
     run_head = RunHead(
         job_head.repo_address,
@@ -70,9 +109,8 @@ def _create_run(
 
 
 def _update_run(
-    ec2_client: BaseClient,
-    s3_client: BaseClient,
-    bucket_name: str,
+    storage: Storage,
+    compute: Compute,
     run: RunHead,
     job_head: JobHead,
     include_request_heads: bool,
@@ -105,26 +143,10 @@ def _update_run(
         if include_request_heads:
             if run.request_heads is None:
                 run.request_heads = []
-            job = jobs.get_job(s3_client, bucket_name, job_head.repo_address, job_head.job_id)
-            request_head = runners.get_request_head(ec2_client, s3_client, bucket_name, job, None)
+            job = jobs.get_job(storage, job_head.repo_address, job_head.job_id)
+            request_id = job.request_id
+            if request_id is None and job.runner_id is not None:
+                runner = runners.get_runner(storage, job.runner_id)
+                request_id = runner.request_id
+            request_head = compute.get_request_head(job, request_id)
             run.request_heads.append(request_head)
-
-
-def get_run_heads(
-    ec2_client: BaseClient,
-    s3_client: BaseClient,
-    bucket_name: str,
-    job_heads: List[JobHead],
-    include_request_heads: bool,
-) -> List[RunHead]:
-    runs_by_id = {}
-    for job_head in job_heads:
-        run_id = ",".join([job_head.run_name, job_head.workflow_name or ""])
-        if run_id not in runs_by_id:
-            runs_by_id[run_id] = _create_run(
-                ec2_client, s3_client, bucket_name, job_head, include_request_heads
-            )
-        else:
-            run = runs_by_id[run_id]
-            _update_run(ec2_client, s3_client, bucket_name, run, job_head, include_request_heads)
-    return sorted(list(runs_by_id.values()), key=lambda r: r.submitted_at, reverse=True)

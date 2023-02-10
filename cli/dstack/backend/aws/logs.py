@@ -1,14 +1,13 @@
-import json
-import re
 import time
 from collections import defaultdict
 from typing import Any, Dict, Generator, List, Optional, Tuple
-from urllib import parse
 
 from botocore.client import BaseClient
 
-from dstack.backend.aws import jobs, runs
-from dstack.core.app import AppSpec
+from dstack.backend.base import jobs, runs
+from dstack.backend.base.compute import Compute
+from dstack.backend.base.logs import render_log_message
+from dstack.backend.base.storage import Storage
 from dstack.core.job import JobHead
 from dstack.core.log_event import LogEvent, LogEventSource
 from dstack.core.repo import RepoAddress
@@ -18,49 +17,6 @@ WAIT_N_ONCE_FINISHED = 1
 CHECK_STATUS_EVERY_N = 3
 
 POLL_LOGS_RATE_SECS = 1
-
-
-def _render_log_message(
-    s3_client: BaseClient,
-    bucket_name: str,
-    event: Dict[str, Any],
-    repo_address: RepoAddress,
-    job_host_names: Dict[str, Optional[str]],
-    job_ports: Dict[str, Optional[List[int]]],
-    job_app_specs: Dict[str, Optional[List[AppSpec]]],
-) -> LogEvent:
-    message = json.loads(event["message"].strip())
-    job_id = message["job_id"]
-    log = message["log"]
-    if job_id and job_id not in job_host_names:
-        job = jobs.get_job(s3_client, bucket_name, repo_address, job_id)
-        job_host_names[job_id] = job.host_name or "none" if job else "none"
-        job_ports[job_id] = job.ports if job else None
-        job_app_specs[job_id] = job.app_specs if job else None
-    host_name = job_host_names[job_id]
-    ports = job_ports[job_id]
-    app_specs = job_app_specs[job_id]
-    pat = re.compile(f"http://(localhost|0.0.0.0|127.0.0.1|{host_name}):[\\S]*[^(.+)\\s\\n\\r]")
-    if re.search(pat, log):
-        if host_name != "none" and ports and app_specs:
-            for app_spec in app_specs:
-                port = ports[app_spec.port_index]
-                url_path = app_spec.url_path or ""
-                url_query_params = app_spec.url_query_params
-                url_query = ("?" + parse.urlencode(url_query_params)) if url_query_params else ""
-                app_url = f"http://{host_name}:{port}"
-                if url_path or url_query_params:
-                    app_url += "/"
-                    if url_query_params:
-                        app_url += url_query
-                log = re.sub(pat, app_url, log)
-    return LogEvent(
-        event["eventId"],
-        event["timestamp"],
-        job_id,
-        log,
-        LogEventSource.STDOUT if message["source"] == "stdout" else LogEventSource.STDERR,
-    )
 
 
 def _get_latest_events_and_timestamp(event_ids_per_timestamp):
@@ -79,10 +35,9 @@ def _reset_filter_log_events_params(fle_kwargs, event_ids_per_timestamp):
 
 
 def _filter_log_events_loop(
-    ec2_client: BaseClient,
-    s3_client: BaseClient,
+    storage: Storage,
+    compute: Compute,
     logs_client: BaseClient,
-    bucket_name: str,
     repo_address: RepoAddress,
     job_heads: List[JobHead],
     filter_logs_events_kwargs: dict,
@@ -92,7 +47,6 @@ def _filter_log_events_loop(
     finished_counter = 0
     while True:
         response = logs_client.filter_log_events(**filter_logs_events_kwargs)
-
         for event in response["events"]:
             if event["eventId"] not in event_ids_per_timestamp[event["timestamp"]]:
                 event_ids_per_timestamp[event["timestamp"]].add(event["eventId"])
@@ -106,17 +60,12 @@ def _filter_log_events_loop(
             counter = counter + 1
             if counter % CHECK_STATUS_EVERY_N == 0:
                 _job_heads = [
-                    jobs.get_job(s3_client, bucket_name, repo_address, job_head.job_id)
-                    for job_head in job_heads
+                    jobs.get_job(storage, repo_address, job_head.job_id) for job_head in job_heads
                 ]
                 run = next(
                     iter(
                         runs.get_run_heads(
-                            ec2_client,
-                            s3_client,
-                            bucket_name,
-                            _job_heads,
-                            include_request_heads=False,
+                            storage, compute, _job_heads, include_request_heads=False
                         )
                     )
                 )
@@ -126,7 +75,16 @@ def _filter_log_events_loop(
                     finished_counter += 1
 
 
-def create_log_group_if_not_exists(logs_client: BaseClient, bucket_name: str, log_group_name: str):
+def create_log_group_if_not_exists(
+    logs_client: BaseClient, bucket_name: str, repo_address: RepoAddress
+):
+    log_group_name = f"/dstack/jobs/{bucket_name}/{repo_address.path()}"
+    _create_log_group_if_not_exists(logs_client, bucket_name, log_group_name)
+
+
+def _create_log_group_if_not_exists(
+    logs_client: BaseClient, bucket_name: str, log_group_name: str
+):
     response = logs_client.describe_log_groups(logGroupNamePrefix=log_group_name)
     if not response["logGroups"] or not any(
         filter(lambda g: g["logGroupName"] == log_group_name, response["logGroups"])
@@ -166,8 +124,8 @@ def _filter_logs_events_kwargs(
 
 
 def poll_logs(
-    ec2_client: BaseClient,
-    s3_client: BaseClient,
+    storage: Storage,
+    compute: Compute,
     logs_client: BaseClient,
     bucket_name: str,
     repo_address: RepoAddress,
@@ -186,17 +144,15 @@ def poll_logs(
     try:
         if attached:
             for event in _filter_log_events_loop(
-                ec2_client,
-                s3_client,
+                storage,
+                compute,
                 logs_client,
-                bucket_name,
                 repo_address,
                 job_heads,
                 filter_logs_events_kwargs,
             ):
-                yield _render_log_message(
-                    s3_client,
-                    bucket_name,
+                yield render_log_message(
+                    storage,
                     event,
                     repo_address,
                     job_host_names,
@@ -207,9 +163,8 @@ def poll_logs(
             paginator = logs_client.get_paginator("filter_log_events")
             for page in paginator.paginate(**filter_logs_events_kwargs):
                 for event in page["events"]:
-                    yield _render_log_message(
-                        s3_client,
-                        bucket_name,
+                    yield render_log_message(
+                        storage,
                         event,
                         repo_address,
                         job_host_names,
