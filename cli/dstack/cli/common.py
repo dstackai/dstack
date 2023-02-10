@@ -70,7 +70,7 @@ def ask_choice(
                 return ask_choice(title, labels, values, selected_value, show_choices)
 
 
-def print_runs(runs_with_backends: List[Tuple[RunHead, List[Backend]]]):
+def generate_runs_table(runs_with_backends: List[Tuple[RunHead, List[Backend]]]):
     table = Table(box=None)
     table.add_column("RUN", style="bold", no_wrap=True)
     table.add_column("WORKFLOW", style="grey58", max_width=16)
@@ -91,7 +91,11 @@ def print_runs(runs_with_backends: List[Tuple[RunHead, List[Backend]]]):
             _status_color(run, run.tag_name or "", False, False),
             _status_color(run, ", ".join(b.name for b in backends), False, False),
         )
+    return table
 
+
+def print_runs(runs_with_backends: List[Tuple[RunHead, List[Backend]]]):
+    table = generate_runs_table(runs_with_backends)
     console.print(table)
 
 
