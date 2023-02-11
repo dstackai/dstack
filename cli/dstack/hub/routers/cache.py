@@ -4,19 +4,18 @@ import yaml
 import tempfile
 from pathlib import Path
 from fastapi import HTTPException, status
-from multiprocessing import Manager
 
 from dstack.backend.base import RemoteBackend
 from dstack.hub.db.models import Hub
 from dstack.api.backend import dict_backends
 from dstack.api.config import dict_config
 
-manager = Manager()
 
-cache = manager.dict()
+cache = {}
 
 
 def get_backend(hub: Hub) -> RemoteBackend:
+    global cache
     if cache.get(hub.name) is None:
         if hub.config == "":
             raise HTTPException(
@@ -37,6 +36,6 @@ def get_backend(hub: Hub) -> RemoteBackend:
             )
         json_data = json.loads(hub.config)
         config.load_json(json_data)
-        backend.backend_config = config
+        backend.__init__(config)
         cache[hub.name] = backend
     return cache.get(hub.name)

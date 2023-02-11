@@ -23,6 +23,7 @@ from dstack.core.repo import LocalRepoData, RepoAddress, RepoCredentials, RepoHe
 from dstack.core.run import RunHead
 from dstack.core.secret import Secret
 from dstack.core.tag import TagHead
+from dstack.core.config import BackendConfig
 
 
 class AwsBackend(RemoteBackend):
@@ -30,14 +31,19 @@ class AwsBackend(RemoteBackend):
     def name(self):
         return "aws"
 
-    def __init__(self):
-        self.backend_config = AWSConfig()
-        try:
-            self.backend_config.load()
+    def __init__(self, backend_config: Optional[BackendConfig] = None):
+        super().__init__(backend_config)
+        if backend_config is None:
+            self.backend_config = AWSConfig()
+            try:
+                self.backend_config.load()
+                self._loaded = True
+            except ConfigError:
+                self._loaded = False
+                return
+        else:
+            self.backend_config = backend_config
             self._loaded = True
-        except ConfigError:
-            self._loaded = False
-            return
 
         self._storage = AWSStorage(
             s3_client=self._s3_client(), bucket_name=self.backend_config.bucket_name

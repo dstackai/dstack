@@ -12,7 +12,7 @@ from dstack.core.run import RunHead
 from dstack.core.runners import Runner
 from dstack.core.secret import Secret
 from dstack.core.tag import TagHead
-
+from dstack.core.config import BackendConfig
 
 class BackendType(Enum):
     REMOTE = "remote"
@@ -185,6 +185,10 @@ class Backend(ABC):
 
 
 class RemoteBackend(Backend):
+
+    def __init__(self, backend_config: Optional[BackendConfig] = None):
+        pass
+
     @property
     def type(self) -> BackendType:
         return BackendType.REMOTE
