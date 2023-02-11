@@ -33,6 +33,11 @@ class AWSConfig(BackendConfig):
 
     _configured = True
 
+    bucket_name = None
+    region_name = None
+    profile_name = None
+    subnet_id = None
+
     def __init__(self):
         super().__init__()
         self.bucket_name = os.getenv("DSTACK_AWS_S3_BUCKET") or None
@@ -47,7 +52,7 @@ class AWSConfig(BackendConfig):
             with path.open() as f:
                 config_data = yaml.load(f, Loader=yaml.FullLoader)
                 if config_data.get("backend") != self.NAME:
-                    raise Exception(f"It's not AWS config")
+                    raise ConfigError(f"It's not AWS config")
                 if not config_data.get("bucket"):
                     raise Exception(f"For AWS backend:the bucket field is required")
                 self.profile_name = config_data.get("profile") or os.getenv("AWS_PROFILE")

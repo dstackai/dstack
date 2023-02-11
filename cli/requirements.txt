@@ -13,7 +13,7 @@ fastapi
 starlette
 uvicorn
 pydantic
-sqlalchemy
+sqlalchemy==2.0.2
 py-cpuinfo
 psutil
 websocket-client
@@ -21,3 +21,4 @@ cursor
 simple-term-menu
 jinja2
 pygtail
+aiosqlite
