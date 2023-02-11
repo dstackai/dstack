@@ -27,6 +27,7 @@ class UserManager:
     @staticmethod
     async def save(user: User):
         session.add(user)
+        await session.commit()
 
     @staticmethod
     async def scope(user: User, scope: str) -> bool:

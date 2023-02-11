@@ -1,8 +1,14 @@
 from pydantic import BaseModel
-from typing import Optional, List, Dict
+from typing import Optional, List, Dict, Union
 
 
 class Hub(BaseModel):
+    name: str
+    backend: str
+    config: str
+
+
+class HubInfo(BaseModel):
     name: str
     backend: str
 
@@ -168,14 +174,14 @@ class LogEvent(BaseModel):
 
 
 class RepoHead(RepoAddress):
-    last_run_at: Optional[int]
+    last_run_at: Union[int, None]
     tags_count: int
 
 
 class RepoCredentials(BaseModel):
     protocol: str
-    private_key: Optional[str]
-    oauth_token: Optional[str]
+    private_key: Union[str, None]
+    oauth_token: Union[str, None]
 
 
 class LocalRepoData(RepoData):

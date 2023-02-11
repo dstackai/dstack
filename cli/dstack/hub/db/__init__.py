@@ -14,4 +14,4 @@ if not data_path.exists():
 class Database:
     engine = create_async_engine(f"sqlite+aiosqlite:///{str(data_path.absolute())}/sqlite.db", echo=True)
     Base = declarative_base()
-    Session = sessionmaker(bind=engine, class_=AsyncSession)
+    Session = sessionmaker(bind=engine, expire_on_commit=False, class_=AsyncSession)

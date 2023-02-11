@@ -10,7 +10,7 @@ def list_config() -> List[BackendConfig]:
     return configs
 
 
-def list_dict() -> Dict[str, BackendConfig]:
+def dict_config() -> Dict[str, BackendConfig]:
     configs = [cls() for cls in BackendConfig.__subclasses__()]  # pylint: disable=E1101
     names = {}
     for config in configs:

@@ -15,7 +15,7 @@ class User(Base, Database.Base):
     __tablename__ = "users"
 
     name = Column(String(30), primary_key=True)
-    token = Column(String)
+    token = Column(String(200))
 
     def __init__(self, name: str, token: str):
         self.name = name
@@ -30,10 +30,12 @@ class Hub(Base, Database.Base):
 
     name = Column(String(30), primary_key=True)
     backend = Column(String(30))
+    config = Column(String(300))
 
-    def __init__(self, name: str, backend: str):
+    def __init__(self, name: str, backend: str, config: str):
         self.name = name
         self.backend = backend
+        self.config = config
 
     def __repr__(self) -> str:
         return super().__repr__()

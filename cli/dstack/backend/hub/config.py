@@ -26,6 +26,7 @@ class HUBConfig(BackendConfig):
         self.host = os.getenv("DSTACK_HUB_HOST") or "127.0.0.1"
         self.port = os.getenv("DSTACK_HUB_PORT") or "3000"
         self.token = os.getenv("DSTACK_HUB_TOKEN") or None
+        self.hub_name = os.getenv("DSTACK_HUB_NAME") or "test"  # TODO replace
 
     def load(self, path: Path = get_config_path()):
         if path.exists():
@@ -33,11 +34,12 @@ class HUBConfig(BackendConfig):
                 config_data = yaml.load(f, Loader=yaml.FullLoader)
                 if config_data.get("backend") != self.NAME:
                     raise ConfigError(f"It's not HUB config")
-                if not (config_data.get("token") is None):
+                if config_data.get("token") is None:
                     raise ConfigError(f"For HUB backend:the token field is required")
                 self.host = config_data.get("host") or "127.0.0.1"
                 self.port = config_data.get("port") or "3000"
                 self.token = config_data.get("token")
+                self.hub_name = config_data.get("hub_name") or "test"
         else:
             raise ConfigError()
 
@@ -45,7 +47,7 @@ class HUBConfig(BackendConfig):
         if not path.parent.exists():
             path.parent.mkdir(parents=True)
         with path.open("w") as f:
-            config_data = {"backend": self.NAME, "host": self.host, "token": self.token}
+            config_data = {"backend": self.NAME, "host": self.host, "token": self.token, "hub_name": self.hub_name}
             yaml.dump(config_data, f)
 
     def configure(self):
@@ -56,13 +58,14 @@ class HUBConfig(BackendConfig):
         default_host = self.host
         default_port = self.port
         default_token = self.token
+        default_hub_name = self.hub_name
 
-        self.host, self.port, self.token = self.ask_new_param(default_host=default_host, default_port=default_port,
-                                                              default_token=default_token)
+        self.host, self.port, self.token, self.hub_name = self.ask_new_param(default_host=default_host, default_port=default_port,
+                                                              default_token=default_token, default_hub_name=default_hub_name)
         self.save()
         print(f"[grey58]OK[/]")
 
-    def ask_new_param(self, default_host: str, default_port: str, default_token: str) -> (str, str, str):
+    def ask_new_param(self, default_host: str, default_port: str, default_token: str, default_hub_name: str) -> (str, str, str, str):
         host = Prompt.ask(
             "[sea_green3 bold]?[/sea_green3 bold] [bold]Enter HUB host name[/bold]",
             default=default_host,
@@ -75,6 +78,10 @@ class HUBConfig(BackendConfig):
             "[sea_green3 bold]?[/sea_green3 bold] [bold]Enter HUB token[/bold]",
             default=default_token,
         )
-        if HubClient.validate(host=host, port=port, token=token):
+        hub_name = Prompt.ask(
+            "[sea_green3 bold]?[/sea_green3 bold] [bold]Enter HUB name[/bold]",
+            default=default_hub_name,
+        )
+        if HubClient.validate(host=host, port=port, token=token, hub_name=hub_name):
             return host, port, token
-        return self.ask_new_param(default_host=host, default_port=port, default_token=token)
+        return self.ask_new_param(default_host=host, default_port=port, default_token=token, default_hub_name=default_hub_name)

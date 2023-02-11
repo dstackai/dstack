@@ -9,6 +9,7 @@ from starlette.staticfiles import StaticFiles
 from dstack.hub.db.models import User
 from dstack.hub.repository.user import UserManager
 from dstack.hub.routers import users, auth, hub, runs, jobs, runners, secrets, logs, artifacts, tags, repos
+from dstack.hub.db.migrate import migrate
 
 app = FastAPI(docs_url="/api/docs")
 app.include_router(users.router)
@@ -26,6 +27,7 @@ app.include_router(repos.router)
 
 @app.on_event("startup")
 async def startup_event():
+    await migrate()
     admin_user = await update_admin_user()
 
     url = f"http://{os.getenv('DSTACK_HUB_HOST')}:{os.getenv('DSTACK_HUB_PORT')}?token={admin_user.token}"
@@ -58,3 +60,4 @@ async def custom_http_exception_handler(request, exc):
         return JSONResponse({"message": exc.detail}, status_code=404)
     else:
         return HTMLResponse(pkg_resources.resource_string(__name__, "statics/index.html"))
+

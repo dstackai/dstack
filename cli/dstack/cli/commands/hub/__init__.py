@@ -6,7 +6,6 @@ import uvicorn
 
 from dstack import version
 from dstack.cli.commands import BasicCommand
-from dstack.core.error import check_config
 
 
 class HubCommand(BasicCommand):
