@@ -128,6 +128,7 @@ nav:
           - Args: basics/args.md
           - Apps: basics/apps.md
           - Python: basics/python.md
+          - Conda: basics/conda.md
           - Dev environments: basics/dev-environments.md
           - Secrets: basics/secrets.md
       #    - Advanced:
