@@ -42,7 +42,7 @@ async def update_admin_user() -> User:
         )
         await UserManager.save(admin_user)
     elif os.getenv("DSTACK_HUB_ADMIN_TOKEN") is not None and admin_user.token != os.getenv(
-            "DSTACK_HUB_ADMIN_TOKEN"
+        "DSTACK_HUB_ADMIN_TOKEN"
     ):
         admin_user.token = os.getenv("DSTACK_HUB_ADMIN_TOKEN")
         await UserManager.save(admin_user)
@@ -59,4 +59,3 @@ async def custom_http_exception_handler(request, exc):
         return JSONResponse({"message": exc.detail}, status_code=404)
     else:
         return HTMLResponse(pkg_resources.resource_string(__name__, "statics/index.html"))
-

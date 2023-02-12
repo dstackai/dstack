@@ -29,4 +29,3 @@ async def stop_runners(hub_name: str, body: StopRunners):
     hub = await get_hub(hub_name=hub_name)
     backend = get_backend(hub)
     backend.stop_job(repo_address=body.repo_address, job_id=body.job_id, abort=body.abort)
-

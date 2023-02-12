@@ -1,8 +1,8 @@
 from typing import Dict, List, Optional
 
 from dstack.backend.aws import AwsBackend
-from dstack.backend.hub import HubBackend
 from dstack.backend.base import Backend, RemoteBackend
+from dstack.backend.hub import HubBackend
 from dstack.backend.local import LocalBackend
 from dstack.core.error import BackendError
 

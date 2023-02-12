@@ -1,5 +1,6 @@
+from typing import Dict, List, Optional, Union
+
 from pydantic import BaseModel
-from typing import Optional, List, Dict, Union
 
 from dstack.core.repo import RepoAddress, LocalRepoData
 from dstack.core.job import Job

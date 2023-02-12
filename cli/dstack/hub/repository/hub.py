@@ -1,5 +1,7 @@
 from typing import List
+
 from sqlalchemy import select
+
 from dstack.hub.db import Database
 from dstack.hub.db.models import Hub
 from dstack.hub.models import HubInfo

@@ -1,17 +1,18 @@
 from typing import Dict, Optional, List
 from urllib.parse import urlunparse
+
 import requests
+
 from dstack.core.artifact import Artifact
 from dstack.core.job import Job, JobHead
 from dstack.core.log_event import LogEvent
-from dstack.core.repo import RepoAddress, RepoCredentials, LocalRepoData, RepoHead
+from dstack.core.repo import LocalRepoData, RepoAddress, RepoCredentials, RepoHead
 from dstack.core.run import RunHead
 from dstack.core.secret import Secret
 from dstack.core.tag import TagHead
 from dstack.hub.models import AddTagRun, AddTagPath, StopRunners, ReposUpdate, RunsList, JobsGet
 
-
-def _url(scheme='', host='', path='', params='', query='', fragment=''):
+def _url(scheme="", host="", path="", params="", query="", fragment=""):
     return urlunparse((scheme, host, path, params, query, fragment))
 
 
@@ -45,7 +46,11 @@ class HubClient:
         return headers
 
     def get_repos_credentials(self, repo_address: RepoAddress) -> Optional[RepoCredentials]:
-        url = _url(scheme="http", host=f"{self.host}:{self.port}", path=f"api/hub/{self.hub_name}/repos/credentials")
+        url = _url(
+            scheme="http",
+            host=f"{self.host}:{self.port}",
+            path=f"api/hub/{self.hub_name}/repos/credentials",
+        )
         try:
             headers = HubClient._auth(token=self.token)
             headers["Content-type"] = "application/json"
@@ -65,7 +70,11 @@ class HubClient:
         return None
 
     def save_repos_credentials(self, repo_address: RepoAddress, repo_credentials: RepoCredentials):
-        url = _url(scheme="http", host=f"{self.host}:{self.port}", path=f"api/hub/{self.hub_name}/repos/credentials")
+        url = _url(
+            scheme="http",
+            host=f"{self.host}:{self.port}",
+            path=f"api/hub/{self.hub_name}/repos/credentials",
+        )
         try:
             headers = HubClient._auth(token=self.token)
             headers["Content-type"] = "application/json"

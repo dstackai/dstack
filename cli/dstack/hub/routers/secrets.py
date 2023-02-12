@@ -18,7 +18,11 @@ async def get_secrets(hub_name: str, repo_address: RepoAddress, secret_name: str
     pass
 
 
-@router.get("/{hub_name}/secrets/list", dependencies=[Depends(Scope("secrets:list:write"))], response_model=List[str])
+@router.get(
+    "/{hub_name}/secrets/list",
+    dependencies=[Depends(Scope("secrets:list:write"))],
+    response_model=List[str],
+)
 async def list_secrets(hub_name: str, repo_address: RepoAddress):
     pass
 
@@ -36,4 +40,3 @@ async def update_secrets(hub_name: str, repo_address: RepoAddress, secret: Secre
 @router.get("/{hub_name}/secrets/delete", dependencies=[Depends(Scope("secrets:delete:write"))])
 async def delete_secrets(hub_name: str, repo_address: RepoAddress, secret_name: str):
     pass
-

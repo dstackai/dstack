@@ -3,12 +3,11 @@ from typing import List
 from fastapi import APIRouter, Depends, HTTPException, status
 from fastapi.security import HTTPBearer
 
-
-from dstack.hub.security.scope import Scope
-from dstack.hub.models import Hub, HubInfo
 from dstack.hub.db.models import Hub as HubDB
+from dstack.hub.models import Hub, HubInfo
 from dstack.hub.repository.hub import HubManager
 from dstack.hub.routers.util import get_hub
+from dstack.hub.security.scope import Scope
 
 router = APIRouter(prefix="/api/hub", tags=["hub"])
 
@@ -40,4 +39,3 @@ async def info_hub(hub_name: str) -> HubInfo:
             detail=f"Hub not found",
         )
     return hub
-

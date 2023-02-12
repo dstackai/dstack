@@ -2,17 +2,18 @@ import sys
 from abc import ABC, abstractmethod
 from enum import Enum
 from pathlib import Path
-from typing import Dict, Generator, List, Optional, Tuple
+from typing import Generator, List, Optional
 
 from dstack.core.artifact import Artifact
+from dstack.core.config import BackendConfig
 from dstack.core.job import Job, JobHead
 from dstack.core.log_event import LogEvent
-from dstack.core.repo import RepoAddress, RepoCredentials, RepoData, RepoHead
+from dstack.core.repo import RepoAddress, RepoCredentials, RepoData
 from dstack.core.run import RunHead
 from dstack.core.runners import Runner
 from dstack.core.secret import Secret
 from dstack.core.tag import TagHead
-from dstack.core.config import BackendConfig
+
 
 class BackendType(Enum):
     REMOTE = "remote"
@@ -185,7 +186,6 @@ class Backend(ABC):
 
 
 class RemoteBackend(Backend):
-
     def __init__(self, backend_config: Optional[BackendConfig] = None):
         pass
 

@@ -1,8 +1,9 @@
 from typing import Optional
+
 from sqlalchemy import select
+
 from dstack.hub.db import Database
 from dstack.hub.db.models import User
-
 
 session = Database.Session()
 
