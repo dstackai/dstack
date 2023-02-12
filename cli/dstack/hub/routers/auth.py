@@ -14,7 +14,7 @@ security = HTTPBearer()
 @router.get("/validate")
 async def validate(authorization: HTTPAuthorizationCredentials = Depends(security)):
     user = await UserManager.get_user_by_token(authorization.credentials)
-    if not(user is None):
+    if not (user is None):
         return
     else:
         raise HTTPException(

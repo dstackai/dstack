@@ -6,10 +6,22 @@ from fastapi import FastAPI
 from starlette.responses import HTMLResponse, JSONResponse
 from starlette.staticfiles import StaticFiles
 
+from dstack.hub.db.migrate import migrate
 from dstack.hub.db.models import User
 from dstack.hub.repository.user import UserManager
-from dstack.hub.routers import users, auth, hub, runs, jobs, runners, secrets, logs, artifacts, tags, repos
-from dstack.hub.db.migrate import migrate
+from dstack.hub.routers import (
+    artifacts,
+    auth,
+    hub,
+    jobs,
+    logs,
+    repos,
+    runners,
+    runs,
+    secrets,
+    tags,
+    users,
+)
 
 app = FastAPI(docs_url="/api/docs")
 app.include_router(users.router)
@@ -43,7 +55,7 @@ async def update_admin_user() -> User:
         )
         await UserManager.save(admin_user)
     elif os.getenv("DSTACK_HUB_ADMIN_TOKEN") is not None and admin_user.token != os.getenv(
-            "DSTACK_HUB_ADMIN_TOKEN"
+        "DSTACK_HUB_ADMIN_TOKEN"
     ):
         admin_user.token = os.getenv("DSTACK_HUB_ADMIN_TOKEN")
         await UserManager.save(admin_user)
@@ -60,4 +72,3 @@ async def custom_http_exception_handler(request, exc):
         return JSONResponse({"message": exc.detail}, status_code=404)
     else:
         return HTMLResponse(pkg_resources.resource_string(__name__, "statics/index.html"))
-

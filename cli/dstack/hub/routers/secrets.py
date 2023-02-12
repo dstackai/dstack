@@ -3,9 +3,8 @@ from typing import List, Union
 from fastapi import APIRouter, Depends
 from fastapi.security import HTTPBearer
 
-
-from dstack.hub.security.scope import Scope
 from dstack.hub.models import RepoAddress, Secret
+from dstack.hub.security.scope import Scope
 
 router = APIRouter(prefix="/api/hub", tags=["secrets"])
 
@@ -17,7 +16,11 @@ async def get_secrets(hub_name: str, repo_address: RepoAddress, secret_name: str
     pass
 
 
-@router.get("/{hub_name}/secrets/list", dependencies=[Depends(Scope("secrets:list:write"))], response_model=List[str])
+@router.get(
+    "/{hub_name}/secrets/list",
+    dependencies=[Depends(Scope("secrets:list:write"))],
+    response_model=List[str],
+)
 async def list_secrets(hub_name: str, repo_address: RepoAddress):
     pass
 
@@ -35,4 +38,3 @@ async def update_secrets(hub_name: str, repo_address: RepoAddress, secret: Secre
 @router.get("/{hub_name}/secrets/delete", dependencies=[Depends(Scope("secrets:delete:write"))])
 async def delete_secrets(hub_name: str, repo_address: RepoAddress, secret_name: str):
     pass
-

@@ -1,5 +1,5 @@
-from dstack.hub.db.models import Hub, User
 from dstack.hub.db import Database
+from dstack.hub.db.models import Hub, User
 
 
 async def migrate():

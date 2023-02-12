@@ -16,6 +16,7 @@ from dstack.backend.base import runs as base_runs
 from dstack.backend.base import secrets as base_secrets
 from dstack.backend.base import tags as base_tags
 from dstack.core.artifact import Artifact
+from dstack.core.config import BackendConfig
 from dstack.core.error import ConfigError
 from dstack.core.job import Job, JobHead
 from dstack.core.log_event import LogEvent
@@ -23,7 +24,6 @@ from dstack.core.repo import LocalRepoData, RepoAddress, RepoCredentials, RepoHe
 from dstack.core.run import RunHead
 from dstack.core.secret import Secret
 from dstack.core.tag import TagHead
-from dstack.core.config import BackendConfig
 
 
 class AwsBackend(RemoteBackend):

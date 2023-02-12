@@ -1,6 +1,5 @@
 from fastapi import HTTPException, status
 
-
 from dstack.hub.models import Hub
 from dstack.hub.repository.hub import HubManager
 

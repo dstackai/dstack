@@ -1,4 +1,4 @@
-from sqlalchemy import String, Column
+from sqlalchemy import Column, String
 
 from dstack.hub.db import Database
 
