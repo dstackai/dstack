@@ -116,6 +116,9 @@ def _get_instance_type(
         ),
         None,
     )
+    interruptible = False
+    if requirements and requirements.interruptible:
+        interruptible = True
     return (
         InstanceType(
             instance_name=instance_type.instance_name,
@@ -123,7 +126,7 @@ def _get_instance_type(
                 cpus=instance_type.resources.cpus,
                 memory_mib=instance_type.resources.memory_mib,
                 gpus=instance_type.resources.gpus,
-                interruptible=requirements and requirements.interruptible,
+                interruptible=interruptible,
                 local=False,
             ),
         )

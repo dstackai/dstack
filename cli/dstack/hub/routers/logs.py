@@ -5,7 +5,8 @@ from fastapi.security import HTTPBearer
 
 
 from dstack.hub.security.scope import Scope
-from dstack.hub.models import RepoAddress, JobHead
+from dstack.core.repo import RepoAddress
+from dstack.core.job import JobHead
 
 router = APIRouter(prefix="/api/hub", tags=["logs"])
 

@@ -8,12 +8,11 @@ from starlette.staticfiles import StaticFiles
 
 from dstack.hub.db.models import User
 from dstack.hub.repository.user import UserManager
-from dstack.hub.routers import users, auth, hub, runs, jobs, runners, secrets, logs, artifacts, tags, repos
+from dstack.hub.routers import users, hub, runs, jobs, runners, secrets, logs, artifacts, tags, repos
 from dstack.hub.db.migrate import migrate
 
 app = FastAPI(docs_url="/api/docs")
 app.include_router(users.router)
-app.include_router(auth.router)
 app.include_router(hub.router)
 app.include_router(runs.router)
 app.include_router(jobs.router)

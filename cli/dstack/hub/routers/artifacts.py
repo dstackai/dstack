@@ -4,7 +4,8 @@ from fastapi import APIRouter, Depends
 from fastapi.security import HTTPBearer
 
 from dstack.hub.security.scope import Scope
-from dstack.hub.models import RepoAddress, Artifact
+from dstack.core.repo import RepoAddress
+from dstack.core.artifact import Artifact
 
 router = APIRouter(prefix="/api/hub", tags=["artifacts"])
 

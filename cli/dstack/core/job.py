@@ -145,6 +145,14 @@ class JobHead(JobRef):
         )
 
 
+def check_dict(element: Any, field: str):
+    if type(element) == dict:
+        return element.get(field)
+    if hasattr(element, field):
+        return getattr(element, field)
+    return None
+
+
 class Job(JobHead):
     job_id: Optional[str]
     repo_data: RepoData
@@ -172,10 +180,20 @@ class Job(JobHead):
     tag_name: Optional[str]
 
     def __init__(self, **data: Any):
+        # TODO Ugly style
+        if type(data) == dict:
+            if "repo_address" in data:
+                del data["repo_address"]
+            if "artifact_paths" in data:
+                del data["artifact_paths"]
+            if "app_names" in data:
+                del data["app_names"]
         super().__init__(
             repo_address=data.get("repo_data"),
-            artifact_paths=[a.artifact_path for a in data.get("artifact_specs")] if data.get("artifact_specs") else None,
-            app_names=[a.app_name for a in data.get("app_specs")] if data.get("app_specs") else None,
+            artifact_paths=[check_dict(a, "artifact_path") for a in data.get("artifact_specs")] if data.get(
+                "artifact_specs") else None,
+            app_names=[check_dict(a, "app_name") for a in data.get("app_specs")] if data.get(
+                "app_specs") else None,
             **data
         )
 
@@ -335,18 +353,18 @@ class Job(JobHead):
         )
         if requirements:
             if (
-                not requirements.cpus
-                and (
+                    not requirements.cpus
+                    and (
                     not requirements.gpus
                     or (
-                        not requirements.gpus.count
-                        and not requirements.gpus.memory_mib
-                        and not requirements.gpus.name
+                            not requirements.gpus.count
+                            and not requirements.gpus.memory_mib
+                            and not requirements.gpus.name
                     )
-                )
-                and not requirements.interruptible
-                and not requirements.local
-                and not not requirements.shm_size_mib
+            )
+                    and not requirements.interruptible
+                    and not requirements.local
+                    and not not requirements.shm_size_mib
             ):
                 requirements = None
         dep_specs = []
@@ -373,16 +391,16 @@ class Job(JobHead):
                 artifact_specs.append(artifact_spec)
         master_job = JobRefId(job_id=job_data["master_job_id"]) if job_data.get("master_job_id") else None
         app_specs = (
-            [
-                AppSpec(
-                    port_index=a["port_index"],
-                    app_name=a["app_name"],
-                    url_path=a.get("url_path") or None,
-                    url_query_params=a.get("url_query_params") or None,
-                )
-                for a in (job_data.get("apps") or [])
-            ]
-        ) or None
+                        [
+                            AppSpec(
+                                port_index=a["port_index"],
+                                app_name=a["app_name"],
+                                url_path=a.get("url_path") or None,
+                                url_query_params=a.get("url_query_params") or None,
+                            )
+                            for a in (job_data.get("apps") or [])
+                        ]
+                    ) or None
         job = Job(
             job_id=job_data["job_id"],
             repo_data=RepoData(
