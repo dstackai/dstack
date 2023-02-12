@@ -1,6 +1,7 @@
 from abc import abstractmethod
 from enum import Enum
 from typing import Any, Dict, List, Optional
+from pydantic import BaseModel
 
 from dstack.core.app import AppSpec
 from dstack.core.artifact import ArtifactSpec
@@ -9,16 +10,10 @@ from dstack.core.repo import RepoAddress, RepoData
 from dstack.utils.common import _quoted
 
 
-class GpusRequirements:
-    def __init__(
-        self,
-        count: Optional[int] = None,
-        memory_mib: Optional[int] = None,
-        name: Optional[str] = None,
-    ):
-        self.count = count
-        self.memory_mib = memory_mib
-        self.name = name
+class GpusRequirements(BaseModel):
+    count: Optional[int] = None
+    memory_mib: Optional[int] = None
+    name: Optional[str] = None
 
     def __str__(self) -> str:
         return (
@@ -27,22 +22,13 @@ class GpusRequirements:
         )
 
 
-class Requirements:
-    def __init__(
-        self,
-        cpus: Optional[int] = None,
-        memory_mib: Optional[int] = None,
-        gpus: Optional[GpusRequirements] = None,
-        shm_size_mib: Optional[int] = None,
-        interruptible: Optional[bool] = None,
-        local: Optional[bool] = None,
-    ):
-        self.cpus = cpus
-        self.memory_mib = memory_mib
-        self.gpus = gpus
-        self.shm_size_mib = shm_size_mib
-        self.interruptible = interruptible
-        self.local = local
+class Requirements(BaseModel):
+    cpus: Optional[int] = None
+    memory_mib: Optional[int] = None
+    gpus: Optional[GpusRequirements] = None
+    shm_size_mib: Optional[int] = None
+    interruptible: Optional[bool] = None
+    local: Optional[bool] = None
 
     def __str__(self) -> str:
         return (
@@ -74,7 +60,7 @@ class Requirements:
         return req_data
 
 
-class JobRef:
+class JobRef(BaseModel):
     @abstractmethod
     def get_id(self) -> Optional[str]:
         pass
@@ -85,13 +71,12 @@ class JobRef:
 
 
 class JobRefId(JobRef):
+    job_id: str
+
     def get_id(self) -> Optional[str]:
         return self.job_id
 
     def set_id(self, job_id: Optional[str]):
-        self.job_id = job_id
-
-    def __init__(self, job_id: str):
         self.job_id = job_id
 
     def __str__(self) -> str:
@@ -118,31 +103,17 @@ class JobStatus(Enum):
 
 
 class JobHead(JobRef):
-    def __init__(
-        self,
-        job_id: str,
-        repo_address: RepoAddress,
-        run_name: str,
-        workflow_name: Optional[str],
-        provider_name: str,
-        local_repo_user_name: Optional[str],
-        status: JobStatus,
-        submitted_at: int,
-        artifact_paths: Optional[List[str]],
-        tag_name: Optional[str],
-        app_names: Optional[List[str]],
-    ):
-        self.job_id = job_id
-        self.repo_address = repo_address
-        self.run_name = run_name
-        self.workflow_name = workflow_name
-        self.provider_name = provider_name
-        self.local_repo_user_name = local_repo_user_name
-        self.status = status
-        self.submitted_at = submitted_at
-        self.artifact_paths = artifact_paths
-        self.tag_name = tag_name
-        self.app_names = app_names
+    job_id: str
+    repo_address: RepoAddress
+    run_name: str
+    workflow_name: Optional[str]
+    provider_name: str
+    local_repo_user_name: Optional[str]
+    status: JobStatus
+    submitted_at: int
+    artifact_paths: Optional[List[str]]
+    tag_name: Optional[str]
+    app_names: Optional[List[str]]
 
     def get_id(self) -> Optional[str]:
         return self.job_id
@@ -175,62 +146,38 @@ class JobHead(JobRef):
 
 
 class Job(JobHead):
-    def __init__(
-        self,
-        job_id: Optional[str],
-        repo_data: RepoData,
-        run_name: str,
-        workflow_name: Optional[str],
-        provider_name: str,
-        local_repo_user_name: Optional[str],
-        local_repo_user_email: Optional[str],
-        status: JobStatus,
-        submitted_at: int,
-        image_name: str,
-        commands: Optional[List[str]],
-        env: Optional[Dict[str, str]],
-        working_dir: Optional[str],
-        artifact_specs: Optional[List[ArtifactSpec]],
-        port_count: Optional[int],
-        ports: Optional[List[int]],
-        host_name: Optional[str],
-        requirements: Optional[Requirements],
-        dep_specs: Optional[List[DepSpec]],
-        master_job: Optional[JobRef],
-        app_specs: Optional[List[AppSpec]],
-        runner_id: Optional[str],
-        request_id: Optional[str],
-        tag_name: Optional[str],
-    ):
+    job_id: Optional[str]
+    repo_data: RepoData
+    run_name: str
+    workflow_name: Optional[str]
+    provider_name: str
+    local_repo_user_name: Optional[str]
+    local_repo_user_email: Optional[str]
+    status: JobStatus
+    submitted_at: int
+    image_name: str
+    commands: Optional[List[str]]
+    env: Optional[Dict[str, str]]
+    working_dir: Optional[str]
+    artifact_specs: Optional[List[ArtifactSpec]]
+    port_count: Optional[int]
+    ports: Optional[List[int]]
+    host_name: Optional[str]
+    requirements: Optional[Requirements]
+    dep_specs: Optional[List[DepSpec]]
+    master_job: Optional[JobRef]
+    app_specs: Optional[List[AppSpec]]
+    runner_id: Optional[str]
+    request_id: Optional[str]
+    tag_name: Optional[str]
+
+    def __init__(self, **data: Any):
         super().__init__(
-            job_id,
-            repo_data,
-            run_name,
-            workflow_name,
-            provider_name,
-            local_repo_user_name,
-            status,
-            submitted_at,
-            [a.artifact_path for a in artifact_specs] if artifact_specs else None,
-            tag_name,
-            [a.app_name for a in app_specs] if app_specs else None,
+            repo_address=data.get("repo_data"),
+            artifact_paths=[a.artifact_path for a in data.get("artifact_specs")] if data.get("artifact_specs") else None,
+            app_names=[a.app_name for a in data.get("app_specs")] if data.get("app_specs") else None,
+            **data
         )
-        self.repo_data = repo_data
-        self.local_repo_user_email = local_repo_user_email
-        self.runner_id = runner_id
-        self.request_id = request_id
-        self.image_name = image_name
-        self.commands = commands
-        self.env = env
-        self.working_dir = working_dir
-        self.artifact_specs = artifact_specs
-        self.port_count = port_count
-        self.ports = ports
-        self.host_name = host_name
-        self.requirements = requirements
-        self.dep_specs = dep_specs
-        self.master_job = master_job
-        self.app_specs = app_specs
 
     def get_id(self) -> Optional[str]:
         return self.job_id
@@ -370,18 +317,18 @@ class Job(JobHead):
         _requirements = job_data.get("requirements")
         requirements = (
             Requirements(
-                _requirements.get("cpus") or None,
-                _requirements.get("memory_mib") or None,
-                GpusRequirements(
-                    _requirements["gpus"].get("count") or None,
-                    _requirements["gpus"].get("memory") or None,
-                    _requirements["gpus"].get("name") or None,
+                cpus=_requirements.get("cpus") or None,
+                memory_mib=_requirements.get("memory_mib") or None,
+                gpus=GpusRequirements(
+                    count=_requirements["gpus"].get("count") or None,
+                    memory=_requirements["gpus"].get("memory") or None,
+                    name=_requirements["gpus"].get("name") or None,
                 )
                 if _requirements.get("gpus")
                 else None,
-                _requirements.get("shm_size_mib") or None,
-                _requirements.get("interruptible") or None,
-                _requirements.get("local") or None,
+                shm_size_mib=_requirements.get("shm_size_mib") or None,
+                interruptible=_requirements.get("interruptible") or None,
+                local=_requirements.get("local") or None,
             )
             if _requirements
             else None
@@ -406,96 +353,83 @@ class Job(JobHead):
         if job_data.get("deps"):
             for dep in job_data["deps"]:
                 dep_spec = DepSpec(
-                    RepoAddress(
-                        dep["repo_host_name"],
-                        dep.get("repo_port") or None,
-                        dep["repo_user_name"],
-                        dep["repo_name"],
+                    repo_address=RepoAddress(
+                        repo_host_name=dep["repo_host_name"],
+                        repo_port=dep.get("repo_port") or None,
+                        repo_user_name=dep["repo_user_name"],
+                        repo_name=dep["repo_name"],
                     ),
-                    dep["run_name"],
-                    dep.get("mount") is True,
+                    run_name=dep["run_name"],
+                    mount=dep.get("mount") is True,
                 )
                 dep_specs.append(dep_spec)
         artifact_specs = []
         if job_data.get("artifacts"):
             for artifact in job_data["artifacts"]:
                 if isinstance(artifact, str):
-                    artifact_spec = ArtifactSpec(artifact, False)
+                    artifact_spec = ArtifactSpec(artifact_path=artifact, mount=False)
                 else:
-                    artifact_spec = ArtifactSpec(artifact["path"], artifact.get("mount") is True)
+                    artifact_spec = ArtifactSpec(artifact_path=artifact["path"], mount=artifact.get("mount") is True)
                 artifact_specs.append(artifact_spec)
-        master_job = JobRefId(job_data["master_job_id"]) if job_data.get("master_job_id") else None
+        master_job = JobRefId(job_id=job_data["master_job_id"]) if job_data.get("master_job_id") else None
         app_specs = (
             [
                 AppSpec(
-                    a["port_index"],
-                    a["app_name"],
-                    a.get("url_path") or None,
-                    a.get("url_query_params") or None,
+                    port_index=a["port_index"],
+                    app_name=a["app_name"],
+                    url_path=a.get("url_path") or None,
+                    url_query_params=a.get("url_query_params") or None,
                 )
                 for a in (job_data.get("apps") or [])
             ]
         ) or None
         job = Job(
-            job_data["job_id"],
-            RepoData(
-                job_data["repo_host_name"],
-                job_data.get("repo_port") or None,
-                job_data["repo_user_name"],
-                job_data["repo_name"],
-                job_data["repo_branch"],
-                job_data["repo_hash"],
-                job_data["repo_diff"] or None,
+            job_id=job_data["job_id"],
+            repo_data=RepoData(
+                repo_host_name=job_data["repo_host_name"],
+                repo_port=job_data.get("repo_port") or None,
+                repo_user_name=job_data["repo_user_name"],
+                repo_name=job_data["repo_name"],
+                repo_branch=job_data["repo_branch"],
+                repo_hash=job_data["repo_hash"],
+                repo_diff=job_data["repo_diff"] or None,
             ),
-            job_data["run_name"],
-            job_data.get("workflow_name") or None,
-            job_data["provider_name"],
-            job_data.get("local_repo_user_name"),
-            job_data.get("local_repo_user_email") or None,
-            JobStatus(job_data["status"]),
-            job_data["submitted_at"],
-            job_data["image_name"],
-            job_data.get("commands") or None,
-            job_data["env"] or None,
-            job_data.get("working_dir") or None,
-            artifact_specs,
-            job_data.get("port_count") or None,
-            job_data.get("ports") or None,
-            job_data.get("host_name") or None,
-            requirements,
-            dep_specs or None,
-            master_job,
-            app_specs,
-            job_data.get("runner_id") or None,
-            job_data.get("request_id") or None,
-            job_data.get("tag_name") or None,
+            run_name=job_data["run_name"],
+            workflow_name=job_data.get("workflow_name") or None,
+            provider_name=job_data["provider_name"],
+            local_repo_user_name=job_data.get("local_repo_user_name"),
+            local_repo_user_email=job_data.get("local_repo_user_email") or None,
+            status=JobStatus(job_data["status"]),
+            submitted_at=job_data["submitted_at"],
+            image_name=job_data["image_name"],
+            commands=job_data.get("commands") or None,
+            env=job_data["env"] or None,
+            working_dir=job_data.get("working_dir") or None,
+            artifact_specs=artifact_specs,
+            port_count=job_data.get("port_count") or None,
+            ports=job_data.get("ports") or None,
+            host_name=job_data.get("host_name") or None,
+            requirements=requirements,
+            dep_specs=dep_specs or None,
+            master_job=master_job,
+            app_specs=app_specs,
+            runner_id=job_data.get("runner_id") or None,
+            request_id=job_data.get("request_id") or None,
+            tag_name=job_data.get("tag_name") or None,
         )
         return job
 
 
 class JobSpec(JobRef):
-    def __init__(
-        self,
-        image_name: str,
-        commands: Optional[List[str]] = None,
-        env: Optional[Dict[str, str]] = None,
-        working_dir: Optional[str] = None,
-        artifact_specs: Optional[List[ArtifactSpec]] = None,
-        port_count: Optional[int] = None,
-        requirements: Optional[Requirements] = None,
-        master_job: Optional[JobRef] = None,
-        app_specs: Optional[List[AppSpec]] = None,
-    ):
-        self.job_id = None
-        self.image_name = image_name
-        self.commands = commands
-        self.env = env
-        self.working_dir = working_dir
-        self.port_count = port_count
-        self.artifact_specs = artifact_specs
-        self.requirements = requirements
-        self.master_job = master_job
-        self.app_specs = app_specs
+    image_name: str
+    commands: Optional[List[str]] = None
+    env: Optional[Dict[str, str]] = None
+    working_dir: Optional[str] = None
+    artifact_specs: Optional[List[ArtifactSpec]] = None
+    port_count: Optional[int] = None
+    requirements: Optional[Requirements] = None
+    master_job: Optional[JobRef] = None
+    app_specs: Optional[List[AppSpec]] = None
 
     def get_id(self) -> Optional[str]:
         return self.job_id

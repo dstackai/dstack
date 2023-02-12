@@ -74,7 +74,7 @@ def list_run_artifact_files(
                 job_id = t[4]
                 artifact_name = t[5]
                 artifact_file = "/".join(t[6:])
-                yield Artifact(job_id, artifact_name, artifact_file, obj["Size"])
+                yield Artifact(job_id=job_id, name=artifact_name, file=artifact_file, filesize_in_bytes=obj["Size"])
 
 
 def __remove_prefix(text, prefix):

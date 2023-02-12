@@ -20,7 +20,7 @@ class LocalSecretsManager(SecretsManager):
         )
         if value is None:
             return None
-        return Secret(secret_name, value)
+        return Secret(secret_name=secret_name, secret_value=value)
 
     def add_secret(self, repo_address: RepoAddress, secret: Secret):
         _create_secret(

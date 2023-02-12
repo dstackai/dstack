@@ -5,7 +5,7 @@ from fastapi.security import HTTPBearer
 
 
 from dstack.hub.security.scope import Scope
-from dstack.hub.models import RepoAddress, RunHead, Job, JobHead
+from dstack.core.models import RepoAddress, RunHead, Job, JobHead
 
 router = APIRouter(prefix="/api/hub", tags=["jobs"])
 
@@ -32,6 +32,6 @@ async def list_heads_job(hub_name: str, repo_address: RepoAddress, run_name: str
     pass
 
 
-@router.get("/{hub_name}/jobs/delete", dependencies=[Depends(Scope("jobs:delete:write"))])
+@router.post("/{hub_name}/jobs/delete", dependencies=[Depends(Scope("jobs:delete:write"))])
 async def delete_job(hub_name: str, repo_address: RepoAddress, job_id: str):
     pass

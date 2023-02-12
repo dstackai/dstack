@@ -26,14 +26,14 @@ def get_tag_head(storage: Storage, repo_address: RepoAddress, tag_name: str) -> 
             artifact_heads,
         ) = tuple(t)
         return TagHead(
-            repo_address,
-            tag_name,
-            run_name,
-            workflow_name or None,
-            provider_name or None,
-            local_repo_user_name or None,
-            int(created_at),
-            _unserialize_artifact_heads(artifact_heads),
+            repo_address=repo_address,
+            tag_name=tag_name,
+            run_name=run_name,
+            workflow_name=workflow_name or None,
+            provider_name=provider_name or None,
+            local_repo_user_name=local_repo_user_name or None,
+            created_at=int(created_at),
+            artifact_heads=_unserialize_artifact_heads(artifact_heads),
         )
 
 
@@ -55,14 +55,14 @@ def list_tag_heads(storage: Storage, repo_address: RepoAddress):
             ) = tuple(t)
             tag_heads.append(
                 TagHead(
-                    repo_address,
-                    tag_name,
-                    run_name,
-                    workflow_name or None,
-                    provider_name or None,
-                    local_repo_user_name or None,
-                    int(created_at),
-                    _unserialize_artifact_heads(artifact_heads),
+                    repo_address=repo_address,
+                    tag_name=tag_name,
+                    run_name=run_name,
+                    workflow_name=workflow_name or None,
+                    provider_name=provider_name or None,
+                    local_repo_user_name=local_repo_user_name or None,
+                    created_at=int(created_at),
+                    artifact_heads=_unserialize_artifact_heads(artifact_heads),
                 )
             )
     return tag_heads
@@ -113,15 +113,15 @@ def create_tag_from_run(
             exit(f"Cannot find the run '{run_name}'")
 
     tag_head = TagHead(
-        repo_address,
-        tag_name,
-        run_name,
-        tag_jobs[0].workflow_name,
-        tag_jobs[0].provider_name,
-        tag_jobs[0].local_repo_user_name,
-        int(round(time.time() * 1000)),
-        [
-            ArtifactHead(run_job.job_id, artifact_spec.artifact_path)
+        repo_address=repo_address,
+        tag_name=tag_name,
+        run_name=run_name,
+        workflow_name=tag_jobs[0].workflow_name,
+        provider_name=tag_jobs[0].provider_name,
+        local_repo_user_name=tag_jobs[0].local_repo_user_name,
+        created_at=int(round(time.time() * 1000)),
+        artifact_heads=[
+            ArtifactHead(job_id=run_job.job_id, artifact_path=artifact_spec.artifact_path)
             for run_job in tag_jobs
             for artifact_spec in run_job.artifact_specs or []
         ]
@@ -167,7 +167,7 @@ def _get_tag_head_key(tag_head: TagHead) -> str:
 
 def _unserialize_artifact_heads(artifact_heads):
     return (
-        [ArtifactHead(a.split("=")[0], a.split("=")[1]) for a in artifact_heads.split(":")]
+        [ArtifactHead(job_id=a.split("=")[0], artifact_path=a.split("=")[1]) for a in artifact_heads.split(":")]
         if artifact_heads
         else None
     )

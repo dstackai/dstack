@@ -13,8 +13,15 @@ def get_repo_head(storage: Storage, repo_address: RepoAddress) -> Optional[RepoH
     if len(repo_heads_keys) == 0:
         return None
     repo_head_key = repo_heads_keys[0]
-    last_run_at, tags_count = repo_head_key[len(repo_head_prefix) :].split(";")
-    return RepoHead(repo_address, int(last_run_at) if last_run_at else None, int(tags_count))
+    last_run_at, tags_count = repo_head_key[len(repo_head_prefix):].split(";")
+    return RepoHead(
+        repo_host_name=repo_address.repo_host_name,
+        repo_port=repo_address.repo_port,
+        repo_user_name=repo_address.repo_user_name,
+        repo_name=repo_address.repo_name,
+        last_run_at=int(last_run_at) if last_run_at else None,
+        tags_count=int(tags_count)
+    )
 
 
 def list_repo_heads(storage: Storage) -> List[RepoHead]:
@@ -22,7 +29,7 @@ def list_repo_heads(storage: Storage) -> List[RepoHead]:
     repo_heads_keys = storage.list_objects(repo_heads_prefix)
     repo_heads = []
     for repo_head_key in repo_heads_keys:
-        tokens = repo_head_key[len(repo_heads_prefix) :].split(";")
+        tokens = repo_head_key[len(repo_heads_prefix):].split(";")
         # Skipt legacy repo heads
         if len(tokens) == 5:
             (
@@ -37,9 +44,12 @@ def list_repo_heads(storage: Storage) -> List[RepoHead]:
             repo_port = t[1] if len(t) > 1 else None
             repo_heads.append(
                 RepoHead(
-                    RepoAddress(repo_host_name, repo_port, repo_user_name, repo_name),
-                    int(last_run_at) if last_run_at else None,
-                    int(tags_count),
+                    repo_host_name=repo_host_name,
+                    repo_port=repo_port,
+                    repo_user_name=repo_user_name,
+                    repo_name=repo_name,
+                    last_run_at=int(last_run_at) if last_run_at else None,
+                    tags_count=int(tags_count),
                 )
             )
     return repo_heads
@@ -48,7 +58,14 @@ def list_repo_heads(storage: Storage) -> List[RepoHead]:
 def update_repo_last_run_at(storage: Storage, repo_address: RepoAddress, last_run_at: int):
     repo_head = get_repo_head(storage, repo_address)
     if repo_head is None:
-        repo_head = RepoHead(repo_address, None, tags_count=0)
+        repo_head = RepoHead(
+            repo_host_name=repo_address.repo_host_name,
+            repo_port=repo_address.repo_port,
+            repo_user_name=repo_address.repo_user_name,
+            repo_name=repo_address.repo_name,
+            last_run_at=None,
+            tags_count=0
+        )
     repo_head.last_run_at = last_run_at
     _create_or_update_repo_head(storage, repo_head)
 
@@ -58,23 +75,23 @@ def delete_repo(storage: Storage, repo_address: RepoAddress):
 
 
 def get_repo_credentials(
-    secrets_manager: SecretsManager, repo_address: RepoAddress
+        secrets_manager: SecretsManager, repo_address: RepoAddress
 ) -> Optional[RepoCredentials]:
     credentials_value = secrets_manager.get_credentials(repo_address)
     if credentials_value is None:
         return None
     credentials_data = json.loads(credentials_value)
     return RepoCredentials(
-        RepoProtocol(credentials_data["protocol"]),
-        credentials_data.get("private_key"),
-        credentials_data.get("oauth_token"),
+        protocol=RepoProtocol(credentials_data["protocol"]),
+        private_key=credentials_data.get("private_key"),
+        oauth_token=credentials_data.get("oauth_token"),
     )
 
 
 def save_repo_credentials(
-    secrets_manager: SecretsManager,
-    repo_address: RepoAddress,
-    repo_credentials: RepoCredentials,
+        secrets_manager: SecretsManager,
+        repo_address: RepoAddress,
+        repo_credentials: RepoCredentials,
 ):
     credentials_data = {"protocol": repo_credentials.protocol.value}
     if repo_credentials.protocol == RepoProtocol.HTTPS and repo_credentials.oauth_token:
@@ -93,8 +110,8 @@ def save_repo_credentials(
 
 
 def _create_or_update_repo_head(storage: Storage, repo_head: RepoHead):
-    _delete_repo_head(storage, repo_head.repo_address)
-    repo_head_prefix = _get_repo_head_filename_prefix(repo_head.repo_address)
+    _delete_repo_head(storage=storage, repo_address=RepoAddress.parse_obj(repo_head))
+    repo_head_prefix = _get_repo_head_filename_prefix(repo_address=RepoAddress.parse_obj(repo_head))
     repo_head_key = (
         f"{repo_head_prefix}" f"{repo_head.last_run_at or ''};" f"{repo_head.tags_count}"
     )

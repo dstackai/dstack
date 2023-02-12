@@ -46,12 +46,10 @@ class HubBackend(RemoteBackend):
         pass
 
     def create_run(self, repo_address: RepoAddress) -> str:
-        # /{hub_name}/runs/create
-        pass
+        return self._hub_client().create_run(repo_address=repo_address)
 
     def create_job(self, job: Job):
-        # /{hub_name}/jobs/create
-        pass
+        self._hub_client().create_job(job=job)
 
     def get_job(self, repo_address: RepoAddress, job_id: str) -> Optional[Job]:
         # /{hub_name}/jobs/get

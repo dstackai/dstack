@@ -1,4 +1,5 @@
 from typing import List, Optional
+from pydantic import BaseModel
 
 from dstack.core.app import AppHead
 from dstack.core.artifact import ArtifactHead
@@ -9,32 +10,18 @@ from dstack.utils import random_names
 from dstack.utils.common import _quoted
 
 
-class RunHead:
-    def __init__(
-        self,
-        repo_address: RepoAddress,
-        run_name: str,
-        workflow_name: Optional[str],
-        provider_name: str,
-        local_repo_user_name: Optional[str],
-        artifact_heads: Optional[List[ArtifactHead]],
-        status: JobStatus,
-        submitted_at: int,
-        tag_name: Optional[str],
-        app_heads: Optional[List[AppHead]],
-        request_heads: Optional[List[RequestHead]],
-    ):
-        self.repo_address = repo_address
-        self.run_name = run_name
-        self.workflow_name = workflow_name
-        self.provider_name = provider_name
-        self.local_repo_user_name = local_repo_user_name
-        self.artifact_heads = artifact_heads
-        self.status = status
-        self.submitted_at = submitted_at
-        self.tag_name = tag_name
-        self.app_heads = app_heads
-        self.request_heads = request_heads
+class RunHead(BaseModel):
+    repo_address: RepoAddress
+    run_name: str
+    workflow_name: Optional[str]
+    provider_name: str
+    local_repo_user_name: Optional[str]
+    artifact_heads: Optional[List[ArtifactHead]]
+    status: JobStatus
+    submitted_at: int
+    tag_name: Optional[str]
+    app_heads: Optional[List[AppHead]]
+    request_heads: Optional[List[RequestHead]]
 
     def __str__(self) -> str:
         artifact_heads = (

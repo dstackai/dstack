@@ -76,17 +76,17 @@ def list_job_head(storage: Storage, repo_address: RepoAddress, job_id: str) -> O
             ) = tuple(t)
             run_name, workflow_name, job_index = tuple(job_id.split(","))
             return JobHead(
-                job_id,
-                repo_address,
-                run_name,
-                workflow_name or None,
-                provider_name,
-                local_repo_user_name or None,
-                JobStatus(status),
-                int(submitted_at),
-                artifacts.split(",") if artifacts else None,
-                tag_name or None,
-                app_names.split(",") or None,
+                job_id=job_id,
+                repo_address=repo_address,
+                run_name=run_name,
+                workflow_name=workflow_name or None,
+                provider_name=provider_name,
+                local_repo_user_name=local_repo_user_name or None,
+                status=JobStatus(status),
+                submitted_at=int(submitted_at),
+                artifact_paths=artifacts.split(",") if artifacts else None,
+                tag_name=tag_name or None,
+                app_names=app_names.split(",") or None,
             )
     return None
 
@@ -117,17 +117,17 @@ def list_job_heads(
             run_name, workflow_name, job_index = tuple(job_id.split(","))
             job_heads.append(
                 JobHead(
-                    job_id,
-                    repo_address,
-                    run_name,
-                    workflow_name or None,
-                    provider_name,
-                    local_repo_user_name,
-                    JobStatus(status),
-                    int(submitted_at),
-                    artifacts.split(",") if artifacts else None,
-                    tag_name or None,
-                    app_names.split(",") or None,
+                    job_id=job_id,
+                    repo_address=repo_address,
+                    run_name=run_name,
+                    workflow_name=workflow_name or None,
+                    provider_name=provider_name,
+                    local_repo_user_name=local_repo_user_name,
+                    status=JobStatus(status),
+                    submitted_at=int(submitted_at),
+                    artifact_paths=artifacts.split(",") if artifacts else None,
+                    tag_name=tag_name or None,
+                    app_names=app_names.split(",") or None,
                 )
             )
     return job_heads
@@ -158,7 +158,7 @@ def run_job(
             update_job(storage, job)
             exit(f"No instance type matching requirements.")
 
-        runner = Runner(job.runner_id, None, instance_type.resources, job)
+        runner = Runner(runner_id=job.runner_id, request_id=None, resources=instance_type.resources, job=job)
         runners.create_runner(storage, runner)
         runner.request_id = compute.run_instance(job, instance_type)
         runners.update_runner(storage, runner)

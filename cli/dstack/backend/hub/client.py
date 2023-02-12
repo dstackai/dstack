@@ -92,3 +92,34 @@ class HubClient:
         except requests.ConnectionError:
             print(f"{self.host}:{self.port} connection refused")
         return None
+
+    def create_run(self, repo_address: RepoAddress) -> str:
+        url = _url(scheme="http", host=f"{self.host}:{self.port}", path=f"api/hub/{self.hub_name}/runs/create")
+        try:
+            resp = requests.post(url=url, headers=HubClient._auth(token=self.token), json=RepoAddressHUB(
+                repo_host_name=repo_address.repo_host_name,
+                repo_port=repo_address.repo_port,
+                repo_user_name=repo_address.repo_user_name,
+                repo_name=repo_address.repo_name
+            ).dict())
+            if resp.ok:
+                return resp.text
+            if resp.status_code == 401:
+                print("Unauthorized. Please set correct token")
+                return ""
+        except requests.ConnectionError:
+            print(f"{self.host}:{self.port} connection refused")
+        return ""
+
+    def create_job(self, job: Job):
+        url = _url(scheme="http", host=f"{self.host}:{self.port}", path=f"api/hub/{self.hub_name}/jobs/create")
+        try:
+            resp = requests.post(url=url, headers=HubClient._auth(token=self.token), json=job.serialize())
+            if resp.ok:
+                return resp.text
+            if resp.status_code == 401:
+                print("Unauthorized. Please set correct token")
+                return ""
+        except requests.ConnectionError:
+            print(f"{self.host}:{self.port} connection refused")
+        return ""

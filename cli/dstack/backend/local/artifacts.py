@@ -20,7 +20,7 @@ def list_run_artifact_files(
     for job_id, path, file_size in list_iterator:
         artifact, file = path.split("/", maxsplit=1)
         if file_size > 0:
-            yield Artifact(job_id, artifact, file, file_size)
+            yield Artifact(job_id=job_id, name=artifact, file=file, filesize_in_bytes=file_size)
 
 
 def upload_job_artifact_files(

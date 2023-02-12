@@ -67,14 +67,14 @@ def _create_run(
     include_request_heads: bool,
 ) -> RunHead:
     app_heads = (
-        list(map(lambda app_name: AppHead(job_head.job_id, app_name), job_head.app_names))
+        list(map(lambda app_name: AppHead(job_id=job_head.job_id, app_name=app_name), job_head.app_names))
         if job_head.app_names
         else None
     )
     artifact_heads = (
         list(
             map(
-                lambda artifact_path: ArtifactHead(job_head.job_id, artifact_path),
+                lambda artifact_path: ArtifactHead(job_id=job_head.job_id, artifact_path=artifact_path),
                 job_head.artifact_paths,
             )
         )
@@ -93,17 +93,17 @@ def _create_run(
         request_head = compute.get_request_head(job, request_id)
         request_heads.append(request_head)
     run_head = RunHead(
-        job_head.repo_address,
-        job_head.run_name,
-        job_head.workflow_name,
-        job_head.provider_name,
-        job_head.local_repo_user_name,
-        artifact_heads or None,
-        job_head.status,
-        job_head.submitted_at,
-        job_head.tag_name,
-        app_heads,
-        request_heads,
+        repo_address=job_head.repo_address,
+        run_name=job_head.run_name,
+        workflow_name=job_head.workflow_name,
+        provider_name=job_head.provider_name,
+        local_repo_user_name=job_head.local_repo_user_name,
+        artifact_heads=artifact_heads or None,
+        status=job_head.status,
+        submitted_at=job_head.submitted_at,
+        tag_name=job_head.tag_name,
+        app_heads=app_heads,
+        request_heads=request_heads,
     )
     return run_head
 
@@ -122,7 +122,7 @@ def _update_run(
         run.artifact_heads.extend(
             list(
                 map(
-                    lambda artifact_path: ArtifactHead(job_head.job_id, artifact_path),
+                    lambda artifact_path: ArtifactHead(job_id=job_head.job_id, artifact_path=artifact_path),
                     job_head.artifact_paths,
                 )
             )
@@ -133,7 +133,7 @@ def _update_run(
         run.app_heads.extend(
             list(
                 map(
-                    lambda app_name: AppHead(job_head.job_id, app_name),
+                    lambda app_name: AppHead(job_id=job_head.job_id, app_name=app_name),
                     job_head.app_names,
                 )
             )

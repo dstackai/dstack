@@ -1,23 +1,20 @@
 from enum import Enum
-from typing import Optional
+from typing import Optional, Any, Union
+from pydantic import BaseModel
 
 import git
 
 from dstack.utils.common import _quoted, _quoted_masked
 
 
-class RepoAddress:
-    def __init__(
-        self,
-        repo_host_name: str,
-        repo_port: Optional[int],
-        repo_user_name: str,
-        repo_name: str,
-    ) -> None:
-        self.repo_host_name = repo_host_name
-        self.repo_port = repo_port
-        self.repo_user_name = repo_user_name
-        self.repo_name = repo_name
+class RepoAddress(BaseModel):
+    repo_host_name: str
+    repo_port: Union[int, None]
+    repo_user_name: str
+    repo_name: str
+
+    def __init__(self, **data: Any) -> None:
+        super().__init__(**data)
 
     def __str__(self) -> str:
         return (
@@ -36,16 +33,11 @@ class RepoAddress:
 
 
 class RepoHead(RepoAddress):
-    def __init__(self, repo_address: RepoAddress, last_run_at: Optional[int], tags_count: int):
-        super().__init__(
-            repo_address.repo_host_name,
-            repo_address.repo_port,
-            repo_address.repo_user_name,
-            repo_address.repo_name,
-        )
-        self.last_run_at = last_run_at
-        self.tags_count = tags_count
-        self.repo_address = repo_address
+    last_run_at: Union[int, None]
+    tags_count: int
+
+    def __init__(self, **data: Any) -> None:
+        super().__init__(**data)
 
     def __str__(self) -> str:
         return (
@@ -63,16 +55,13 @@ class RepoProtocol(Enum):
     HTTPS = "https"
 
 
-class RepoCredentials:
-    def __init__(
-        self,
-        protocol: RepoProtocol,
-        private_key: Optional[str],
-        oauth_token: Optional[str],
-    ):
-        self.protocol = protocol
-        self.private_key = private_key
-        self.oauth_token = oauth_token
+class RepoCredentials(BaseModel):
+    protocol: RepoProtocol
+    private_key: Union[str, None]
+    oauth_token: Union[str, None]
+
+    def __init__(self, **data: Any) -> None:
+        super().__init__(**data)
 
     def __str__(self) -> str:
         return (
@@ -83,24 +72,12 @@ class RepoCredentials:
 
 
 class RepoData(RepoAddress):
-    def __init__(
-        self,
-        repo_host_name: str,
-        repo_port: Optional[int],
-        repo_user_name: str,
-        repo_name: str,
-        repo_branch: str,
-        repo_hash: str,
-        repo_diff: Optional[str],
-    ):
-        super().__init__(repo_host_name, repo_port, repo_user_name, repo_name)
-        self.repo_host_name = repo_host_name
-        self.repo_port = repo_port
-        self.repo_user_name = repo_user_name
-        self.repo_name = repo_name
-        self.repo_branch = repo_branch
-        self.repo_hash = repo_hash
-        self.repo_diff = repo_diff
+    repo_branch: str
+    repo_hash: str
+    repo_diff: Union[str, None]
+
+    def __init__(self, **data: Any) -> None:
+        super().__init__(**data)
 
     def __str__(self) -> str:
         return (
@@ -115,35 +92,14 @@ class RepoData(RepoAddress):
 
 
 class LocalRepoData(RepoData):
-    def __init__(
-        self,
-        repo_host_name: str,
-        repo_port: Optional[int],
-        repo_user_name: str,
-        repo_name: str,
-        repo_branch: str,
-        repo_hash: str,
-        repo_diff: Optional[str],
-        protocol: RepoProtocol,
-        identity_file: Optional[str],
-        oauth_token: Optional[str],
-        local_repo_user_name: Optional[str],
-        local_repo_user_email: Optional[str],
-    ):
-        super().__init__(
-            repo_host_name,
-            repo_port,
-            repo_user_name,
-            repo_name,
-            repo_branch,
-            repo_hash,
-            repo_diff,
-        )
-        self.protocol = protocol
-        self.identity_file = identity_file
-        self.oauth_token = oauth_token
-        self.local_repo_user_name = local_repo_user_name
-        self.local_repo_user_email = local_repo_user_email
+    protocol: RepoProtocol
+    identity_file: Union[str, None]
+    oauth_token: Union[str, None]
+    local_repo_user_name: Union[str, None]
+    local_repo_user_email: Union[str, None]
+
+    def __init__(self, **data: Any) -> None:
+        super().__init__(**data)
 
     def __str__(self) -> str:
         return (
@@ -183,9 +139,9 @@ class LocalRepoData(RepoData):
 
     def repo_credentials(self) -> RepoCredentials:
         if self.protocol == RepoProtocol.HTTPS:
-            return RepoCredentials(self.protocol, private_key=None, oauth_token=self.oauth_token)
+            return RepoCredentials(protocol=self.protocol, private_key=None, oauth_token=self.oauth_token)
         elif self.identity_file:
             with open(self.identity_file, "r") as f:
-                return RepoCredentials(self.protocol, private_key=f.read(), oauth_token=None)
+                return RepoCredentials(protocol=self.protocol, private_key=f.read(), oauth_token=None)
         else:
             raise Exception("No identity file is specified")

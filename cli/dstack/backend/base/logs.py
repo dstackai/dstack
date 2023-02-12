@@ -55,9 +55,9 @@ def render_log_message(
                         app_url += url_query
                 log = re.sub(pat, app_url, log)
     return LogEvent(
-        event["eventId"],
-        event["timestamp"],
-        job_id,
-        log,
-        LogEventSource.STDOUT if message["source"] == "stdout" else LogEventSource.STDERR,
+        event_id=event["eventId"],
+        timestamp=event["timestamp"],
+        job_id=job_id,
+        log_message=log,
+        log_source=LogEventSource.STDOUT if message["source"] == "stdout" else LogEventSource.STDERR,
     )
