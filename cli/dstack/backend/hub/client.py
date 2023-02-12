@@ -1,4 +1,4 @@
-from typing import Dict, Optional
+from typing import Dict, Optional, List
 from urllib.parse import urlunparse
 import requests
 from dstack.core.artifact import Artifact
@@ -8,8 +8,7 @@ from dstack.core.repo import RepoAddress, RepoCredentials, LocalRepoData, RepoHe
 from dstack.core.run import RunHead
 from dstack.core.secret import Secret
 from dstack.core.tag import TagHead
-
-from dstack.hub.models import RepoAddress as RepoAddressHUB, RepoCredentials as RepoCredentialsHUB
+from dstack.hub.models import AddTagRun, AddTagPath
 
 
 def _url(scheme='', host='', path='', params='', query='', fragment=''):
@@ -48,12 +47,7 @@ class HubClient:
     def get_repos_credentials(self, repo_address: RepoAddress) -> Optional[RepoCredentials]:
         url = _url(scheme="http", host=f"{self.host}:{self.port}", path=f"api/hub/{self.hub_name}/repos/credentials")
         try:
-            resp = requests.get(url=url, headers=HubClient._auth(token=self.token), json=RepoAddressHUB(
-                repo_host_name=repo_address.repo_host_name,
-                repo_port=repo_address.repo_port,
-                repo_user_name=repo_address.repo_user_name,
-                repo_name=repo_address.repo_name
-            ).dict())
+            resp = requests.get(url=url, headers=HubClient._auth(token=self.token), json=repo_address.dict())
             if resp.ok:
                 json_data = resp.json()
                 return RepoCredentials(
@@ -71,19 +65,10 @@ class HubClient:
     def save_repos_credentials(self, repo_address: RepoAddress, repo_credentials: RepoCredentials):
         url = _url(scheme="http", host=f"{self.host}:{self.port}", path=f"api/hub/{self.hub_name}/repos/credentials")
         try:
-            body = {
-                "repo_address": RepoAddressHUB(
-                    repo_host_name=repo_address.repo_host_name,
-                    repo_port=repo_address.repo_port,
-                    repo_user_name=repo_address.repo_user_name,
-                    repo_name=repo_address.repo_name
-                ).dict(),
-                "repo_credentials": RepoCredentialsHUB(
-                    protocol=repo_credentials.protocol.value,
-                    private_key=repo_credentials.private_key,
-                    oauth_token=repo_credentials.oauth_token,
-                ).dict()}
-            resp = requests.post(url=url, headers=HubClient._auth(token=self.token), json=body)
+            resp = requests.post(url=url, headers=HubClient._auth(token=self.token), json={
+                "repo_address": repo_address.dict(),
+                "repo_credentials": repo_credentials.dict()
+            })
             if resp.ok:
                 return None
             if resp.status_code == 401:
@@ -96,12 +81,7 @@ class HubClient:
     def create_run(self, repo_address: RepoAddress) -> str:
         url = _url(scheme="http", host=f"{self.host}:{self.port}", path=f"api/hub/{self.hub_name}/runs/create")
         try:
-            resp = requests.post(url=url, headers=HubClient._auth(token=self.token), json=RepoAddressHUB(
-                repo_host_name=repo_address.repo_host_name,
-                repo_port=repo_address.repo_port,
-                repo_user_name=repo_address.repo_user_name,
-                repo_name=repo_address.repo_name
-            ).dict())
+            resp = requests.post(url=url, headers=HubClient._auth(token=self.token), json=repo_address.dict())
             if resp.ok:
                 return resp.text
             if resp.status_code == 401:
@@ -123,3 +103,88 @@ class HubClient:
         except requests.ConnectionError:
             print(f"{self.host}:{self.port} connection refused")
         return ""
+
+    def get_tag_head(self, repo_address: RepoAddress, tag_name: str) -> Optional[TagHead]:
+        url = _url(scheme="http", host=f"{self.host}:{self.port}", path=f"api/hub/{self.hub_name}/tags/{tag_name}")
+        try:
+            resp = requests.get(url=url, headers=HubClient._auth(token=self.token), json=repo_address.dict())
+            if resp.ok:
+                return TagHead.parse_obj(resp.json())
+            if resp.status_code == 401:
+                print("Unauthorized. Please set correct token")
+                return None
+        except requests.ConnectionError:
+            print(f"{self.host}:{self.port} connection refused")
+        return None
+
+    def list_tag_heads(self, repo_address: RepoAddress) -> Optional[List[TagHead]]:
+        url = _url(scheme="http", host=f"{self.host}:{self.port}", path=f"api/hub/{self.hub_name}/tags/list/heads")
+        try:
+            resp = requests.get(url=url, headers=HubClient._auth(token=self.token), json=repo_address.dict())
+            if resp.ok:
+                body = resp.json()
+                return [TagHead.parse_obj(tag) for tag in body]
+            if resp.status_code == 401:
+                print("Unauthorized. Please set correct token")
+                return None
+        except requests.ConnectionError:
+            print(f"{self.host}:{self.port} connection refused")
+        return None
+
+    def add_tag_from_run(self, repo_address: RepoAddress,
+                         tag_name: str,
+                         run_name: str,
+                         run_jobs: Optional[List[Job]],
+                         ):
+        url = _url(scheme="http", host=f"{self.host}:{self.port}", path=f"api/hub/{self.hub_name}/tags/add/run")
+        try:
+            resp = requests.post(url=url, headers=HubClient._auth(token=self.token), json=AddTagRun(
+                repo_address=repo_address,
+                tag_name=tag_name,
+                run_name=run_name,
+                run_jobs=run_jobs,
+            ).dict())
+            if resp.ok:
+                return None
+            if resp.status_code == 401:
+                print("Unauthorized. Please set correct token")
+                return None
+        except requests.ConnectionError:
+            print(f"{self.host}:{self.port} connection refused")
+        return None
+
+    def add_tag_from_local_dirs(self, repo_data: LocalRepoData,
+                                tag_name: str,
+                                local_dirs: List[str],
+                                ):
+        url = _url(scheme="http", host=f"{self.host}:{self.port}", path=f"api/hub/{self.hub_name}/tags/add/path")
+        try:
+            resp = requests.post(url=url, headers=HubClient._auth(token=self.token), json=AddTagPath(
+                repo_data=repo_data,
+                tag_name=tag_name,
+                local_dirs=local_dirs,
+            ).dict())
+            if resp.ok:
+                return None
+            if resp.status_code == 401:
+                print("Unauthorized. Please set correct token")
+                return None
+        except requests.ConnectionError:
+            print(f"{self.host}:{self.port} connection refused")
+        return None
+
+    def delete_tag_head(self, repo_address: RepoAddress, tag_head: TagHead):
+        url = _url(scheme="http",
+                   host=f"{self.host}:{self.port}",
+                   path=f"api/hub/{self.hub_name}/tags/{tag_head.tag_name}/delete"
+                   )
+        try:
+            resp = requests.post(url=url, headers=HubClient._auth(token=self.token), json=repo_address.dict())
+            if resp.ok:
+                return None
+            if resp.status_code == 401:
+                print("Unauthorized. Please set correct token")
+                return None
+        except requests.ConnectionError:
+            print(f"{self.host}:{self.port} connection refused")
+        return None

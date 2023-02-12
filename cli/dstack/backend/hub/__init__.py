@@ -122,12 +122,10 @@ class HubBackend(RemoteBackend):
         pass
 
     def list_tag_heads(self, repo_address: RepoAddress) -> List[TagHead]:
-        # /{hub_name}/tags/list/heads
-        pass
+        return self._hub_client().list_tag_heads(repo_address=repo_address)
 
     def get_tag_head(self, repo_address: RepoAddress, tag_name: str) -> Optional[TagHead]:
-        # /{hub_name}/tags/get
-        pass
+        return self._hub_client().get_tag_head(repo_address=repo_address, tag_name=tag_name)
 
     def add_tag_from_run(
             self,
@@ -136,18 +134,22 @@ class HubBackend(RemoteBackend):
             run_name: str,
             run_jobs: Optional[List[Job]],
     ):
-        # /{hub_name}/tags/add
-        pass
+        return self._hub_client().add_tag_from_run(repo_address=repo_address,
+                                                   tag_name=tag_name,
+                                                   run_name=run_name,
+                                                   run_jobs=run_jobs)
 
     def add_tag_from_local_dirs(
             self, repo_data: LocalRepoData, tag_name: str, local_dirs: List[str]
     ):
         # /{hub_name}/tags/add
-        pass
+        return self._hub_client().add_tag_from_local_dirs(repo_data=repo_data,
+                                                          tag_name=tag_name,
+                                                          local_dirs=local_dirs)
 
     def delete_tag_head(self, repo_address: RepoAddress, tag_head: TagHead):
         # /{hub_name}/tags/delete
-        pass
+        return self._hub_client().delete_tag_head(repo_address=repo_address, tag_head=tag_head)
 
     def update_repo_last_run_at(self, repo_address: RepoAddress, last_run_at: int):
         # /{hub_name}/repos/update
