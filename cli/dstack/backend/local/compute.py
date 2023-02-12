@@ -13,7 +13,7 @@ class LocalCompute(Compute):
 
     def get_instance_type(self, job: Job) -> Optional[InstanceType]:
         resources = runners.check_runner_resources(job.runner_id)
-        return InstanceType("local_runner", resources)
+        return InstanceType(instance_name="local_runner", resources=resources)
 
     def run_instance(self, job: Job, instance_type: InstanceType) -> str:
         return runners.start_runner_process(job.runner_id)

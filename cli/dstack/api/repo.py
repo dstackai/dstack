@@ -58,16 +58,16 @@ def load_repo_data(
     # TODO: Doesn't support unstaged changes
     repo_diff = repo.git.diff(repo_hash)
     return LocalRepoData(
-        repo_host_name,
-        repo_port,
-        repo_url_parsed.owner,
-        repo_url_parsed.name,
-        repo_branch,
-        repo_hash,
-        repo_diff,
-        RepoProtocol.HTTPS if repo_url_parsed.protocol == "https" else RepoProtocol.SSH,
-        repo_identity_file or os.path.expanduser("~/.ssh/id_rsa"),
-        repo_oauth_token,
-        local_repo_user_name,
-        local_repo_user_email,
+        repo_host_name=repo_host_name,
+        repo_port=repo_port,
+        repo_user_name=repo_url_parsed.owner,
+        repo_name=repo_url_parsed.name,
+        repo_branch=repo_branch,
+        repo_hash=repo_hash,
+        repo_diff=repo_diff,
+        protocol=RepoProtocol.HTTPS if repo_url_parsed.protocol == "https" else RepoProtocol.SSH,
+        identity_file=repo_identity_file or os.path.expanduser("~/.ssh/id_rsa"),
+        oauth_token=repo_oauth_token,
+        local_repo_user_name=local_repo_user_name,
+        local_repo_user_email=local_repo_user_email,
     )

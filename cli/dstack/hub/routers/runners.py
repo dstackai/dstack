@@ -3,10 +3,14 @@ from typing import List, Union
 from fastapi import APIRouter, Depends
 from fastapi.security import HTTPBearer
 
-from dstack.hub.models import Job, JobHead, RepoAddress, RunHead
-from dstack.hub.routers.cache import get_backend
-from dstack.hub.routers.util import get_hub
+
 from dstack.hub.security.scope import Scope
+from dstack.core.repo import RepoAddress
+from dstack.core.job import Job
+from dstack.hub.models import StopRunners
+from dstack.hub.routers.util import get_hub
+from dstack.hub.routers.cache import get_backend
+
 
 router = APIRouter(prefix="/api/hub", tags=["runners"])
 
@@ -14,12 +18,14 @@ security = HTTPBearer()
 
 
 @router.post("/{hub_name}/runners/run", dependencies=[Depends(Scope("runners:run:write"))])
-async def create_runners(hub_name: str, job: Job):
-    hub = get_hub(hub_name)
-    print(hub)
-    print(job)
+async def run_runners(hub_name: str, job: Job):
+    hub = await get_hub(hub_name=hub_name)
+    backend = get_backend(hub)
+    backend.run_job(job=job)
 
 
-@router.get("/{hub_name}/runners/stop", dependencies=[Depends(Scope("runners:stop:write"))])
-async def delete_runners(hub_name: str, repo_address: RepoAddress, job_id: str, abort: bool):
-    pass
+@router.post("/{hub_name}/runners/stop", dependencies=[Depends(Scope("runners:stop:write"))])
+async def stop_runners(hub_name: str, body: StopRunners):
+    hub = await get_hub(hub_name=hub_name)
+    backend = get_backend(hub)
+    backend.stop_job(repo_address=body.repo_address, job_id=body.job_id, abort=body.abort)

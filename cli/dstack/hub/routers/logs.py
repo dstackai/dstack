@@ -3,8 +3,10 @@ from typing import List, Union
 from fastapi import APIRouter, Depends
 from fastapi.security import HTTPBearer
 
-from dstack.hub.models import JobHead, RepoAddress
+
 from dstack.hub.security.scope import Scope
+from dstack.core.repo import RepoAddress
+from dstack.core.job import JobHead
 
 router = APIRouter(prefix="/api/hub", tags=["logs"])
 

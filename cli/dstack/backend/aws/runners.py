@@ -35,7 +35,7 @@ def _get_instance_types(ec2_client: BaseClient) -> List[InstanceType]:
         for instance_type in response["InstanceTypes"]:
             gpus = (
                 [
-                    [Gpu(gpu["Name"], gpu["MemoryInfo"]["SizeInMiB"])] * gpu["Count"]
+                    [Gpu(name=gpu["Name"], memory_mib=gpu["MemoryInfo"]["SizeInMiB"])] * gpu["Count"]
                     for gpu in instance_type["GpuInfo"]["Gpus"]
                 ]
                 if instance_type.get("GpuInfo") and instance_type["GpuInfo"].get("Gpus")
@@ -43,13 +43,13 @@ def _get_instance_types(ec2_client: BaseClient) -> List[InstanceType]:
             )
             instance_types.append(
                 InstanceType(
-                    instance_type["InstanceType"],
-                    Resources(
-                        instance_type["VCpuInfo"]["DefaultVCpus"],
-                        instance_type["MemoryInfo"]["SizeInMiB"],
-                        reduce(list.__add__, gpus) if gpus else [],
-                        "spot" in instance_type["SupportedUsageClasses"],
-                        False,
+                    instance_name=instance_type["InstanceType"],
+                    resources=Resources(
+                        cpus=instance_type["VCpuInfo"]["DefaultVCpus"],
+                        memory_mib=instance_type["MemoryInfo"]["SizeInMiB"],
+                        gpus=reduce(list.__add__, gpus) if gpus else [],
+                        interruptible="spot" in instance_type["SupportedUsageClasses"],
+                        local=False,
                     ),
                 )
             )
@@ -116,15 +116,18 @@ def _get_instance_type(
         ),
         None,
     )
+    interruptible = False
+    if requirements and requirements.interruptible:
+        interruptible = True
     return (
         InstanceType(
-            instance_type.instance_name,
-            Resources(
-                instance_type.resources.cpus,
-                instance_type.resources.memory_mib,
-                instance_type.resources.gpus,
-                requirements and requirements.interruptible,
-                False,
+            instance_name=instance_type.instance_name,
+            resources=Resources(
+                cpus=instance_type.resources.cpus,
+                memory_mib=instance_type.resources.memory_mib,
+                gpus=instance_type.resources.gpus,
+                interruptible=interruptible,
+                local=False,
             ),
         )
         if instance_type
@@ -579,7 +582,7 @@ def get_request_head(
             if interruptible
             else "The instance ID is not specified"
         )
-        return RequestHead(job.job_id, RequestStatus.TERMINATED, message)
+        return RequestHead(job_id=job.job_id, status=RequestStatus.TERMINATED, message=message)
 
     if interruptible:
         try:
@@ -624,9 +627,9 @@ def get_request_head(
                     raise Exception(
                         f"Unsupported EC2 spot instance request status code: {status['Code']}"
                     )
-                return RequestHead(job.job_id, request_status, status.get("Message"))
+                return RequestHead(job_id=job.job_id, status=request_status, message=status.get("Message"))
             else:
-                return RequestHead(job.job_id, RequestStatus.TERMINATED, None)
+                return RequestHead(job_id=job.job_id, status=RequestStatus.TERMINATED, message=None)
         except Exception as e:
             if (
                 hasattr(e, "response")
@@ -634,9 +637,9 @@ def get_request_head(
                 and e.response["Error"].get("Code") == "InvalidSpotInstanceRequestID.NotFound"
             ):
                 return RequestHead(
-                    job.job_id,
-                    RequestStatus.TERMINATED,
-                    e.response["Error"].get("Message"),
+                    job_id=job.job_id,
+                    status=RequestStatus.TERMINATED,
+                    message=e.response["Error"].get("Message"),
                 )
             else:
                 raise e
@@ -658,9 +661,9 @@ def get_request_head(
                     request_status = RequestStatus.TERMINATED
                 else:
                     raise Exception(f"Unsupported EC2 instance state name: {state['Name']}")
-                return RequestHead(job.job_id, request_status, None)
+                return RequestHead(job_id=job.job_id, status=request_status, message=None)
             else:
-                return RequestHead(job.job_id, RequestStatus.TERMINATED, None)
+                return RequestHead(job_id=job.job_id, status=RequestStatus.TERMINATED, message=None)
         except Exception as e:
             if (
                 hasattr(e, "response")
@@ -668,9 +671,9 @@ def get_request_head(
                 and e.response["Error"].get("Code") == "InvalidInstanceID.NotFound"
             ):
                 return RequestHead(
-                    job.job_id,
-                    RequestStatus.TERMINATED,
-                    e.response["Error"].get("Message"),
+                    job_id=job.job_id,
+                    status=RequestStatus.TERMINATED,
+                    message=e.response["Error"].get("Message"),
                 )
             else:
                 raise e

@@ -46,16 +46,14 @@ class HubBackend(RemoteBackend):
         pass
 
     def create_run(self, repo_address: RepoAddress) -> str:
-        # /{hub_name}/runs/create
-        pass
+        return self._hub_client().create_run(repo_address=repo_address)
 
     def create_job(self, job: Job):
-        # /{hub_name}/jobs/create
-        pass
+        self._hub_client().create_job(job=job)
 
     def get_job(self, repo_address: RepoAddress, job_id: str) -> Optional[Job]:
         # /{hub_name}/jobs/get
-        pass
+        return self._hub_client().get_job(repo_address=repo_address,job_id=job_id)
 
     def list_jobs(self, repo_address: RepoAddress, run_name: str) -> List[Job]:
         # /{hub_name}/jobs/list
@@ -63,15 +61,15 @@ class HubBackend(RemoteBackend):
 
     def run_job(self, job: Job):
         # /{hub_name}/runners/run
-        pass
+        self._hub_client().run_job(job=job)
 
     def stop_job(self, repo_address: RepoAddress, job_id: str, abort: bool):
         # /{hub_name}/runners/stop
-        pass
+        self._hub_client().stop_job(repo_address=repo_address, job_id=job_id, abort=abort)
 
-    def list_job_heads(self, repo_address: RepoAddress, run_name: Optional[str] = None):
+    def list_job_heads(self, repo_address: RepoAddress, run_name: Optional[str] = None) -> List[JobHead]:
         # /{hub_name}/jobs/list/heads
-        pass
+        return self._hub_client().list_job_heads(repo_address=repo_address, run_name=run_name)
 
     def delete_job_head(self, repo_address: RepoAddress, job_id: str):
         # /{hub_name}/jobs/delete
@@ -83,9 +81,11 @@ class HubBackend(RemoteBackend):
         run_name: Optional[str] = None,
         include_request_heads: bool = True,
     ) -> List[RunHead]:
-        job_heads = self.list_job_heads(repo_address, run_name)
-        # /{hub_name}/runs/list
-        pass
+        return self._hub_client().list_run_heads(
+            repo_address=repo_address,
+            run_name=run_name,
+            include_request_heads=include_request_heads
+        )
 
     def poll_logs(
         self,
@@ -124,12 +124,10 @@ class HubBackend(RemoteBackend):
         pass
 
     def list_tag_heads(self, repo_address: RepoAddress) -> List[TagHead]:
-        # /{hub_name}/tags/list/heads
-        pass
+        return self._hub_client().list_tag_heads(repo_address=repo_address)
 
     def get_tag_head(self, repo_address: RepoAddress, tag_name: str) -> Optional[TagHead]:
-        # /{hub_name}/tags/get
-        pass
+        return self._hub_client().get_tag_head(repo_address=repo_address, tag_name=tag_name)
 
     def add_tag_from_run(
         self,
@@ -138,22 +136,26 @@ class HubBackend(RemoteBackend):
         run_name: str,
         run_jobs: Optional[List[Job]],
     ):
-        # /{hub_name}/tags/add
-        pass
+        return self._hub_client().add_tag_from_run(repo_address=repo_address,
+                                                   tag_name=tag_name,
+                                                   run_name=run_name,
+                                                   run_jobs=run_jobs)
 
     def add_tag_from_local_dirs(
         self, repo_data: LocalRepoData, tag_name: str, local_dirs: List[str]
     ):
         # /{hub_name}/tags/add
-        pass
+        return self._hub_client().add_tag_from_local_dirs(repo_data=repo_data,
+                                                          tag_name=tag_name,
+                                                          local_dirs=local_dirs)
 
     def delete_tag_head(self, repo_address: RepoAddress, tag_head: TagHead):
         # /{hub_name}/tags/delete
-        pass
+        return self._hub_client().delete_tag_head(repo_address=repo_address, tag_head=tag_head)
 
     def update_repo_last_run_at(self, repo_address: RepoAddress, last_run_at: int):
         # /{hub_name}/repos/update
-        pass
+        return self._hub_client().update_repo_last_run_at(repo_address=repo_address, last_run_at=last_run_at)
 
     def get_repo_credentials(self, repo_address: RepoAddress) -> Optional[RepoCredentials]:
         return self._hub_client().get_repos_credentials(repo_address=repo_address)
