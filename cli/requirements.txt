@@ -23,4 +23,5 @@ jinja2
 pygtail
 google-cloud-storage
 google-cloud-compute
+google-cloud-secret-manager
 aiosqlite

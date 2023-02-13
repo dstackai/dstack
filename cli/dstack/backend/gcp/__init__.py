@@ -12,6 +12,7 @@ from dstack.backend.base import secrets as base_secrets
 from dstack.backend.base import tags as base_tags
 from dstack.backend.gcp.compute import GCPCompute
 from dstack.backend.gcp.config import GCPConfig
+from dstack.backend.gcp.secrets import GCPSecretsManager
 from dstack.backend.gcp.storage import GCPStorage
 from dstack.core.artifact import Artifact
 from dstack.core.job import Job, JobHead
@@ -31,6 +32,10 @@ class GCPBackend(RemoteBackend):
             project_id=self.config.project_id, bucket_name=self.config.bucket_name
         )
         self._compute = GCPCompute(gcp_config=self.config)
+        self._secrets_manager = GCPSecretsManager(
+            project_id=self.config.project_id,
+            bucket_name=self.config.bucket_name,
+        )
         self.configure()
         self._loaded = True
 
@@ -129,26 +134,44 @@ class GCPBackend(RemoteBackend):
         )
 
     def get_repo_credentials(self, repo_address: RepoAddress) -> Optional[RepoCredentials]:
-        # TODO
-        return RepoCredentials(protocol=RepoProtocol.HTTPS, private_key=None, oauth_token=None)
+        return base_repos.get_repo_credentials(self._secrets_manager, repo_address)
 
     def save_repo_credentials(self, repo_address: RepoAddress, repo_credentials: RepoCredentials):
-        pass
+        base_repos.save_repo_credentials(
+            self._secrets_manager,
+            repo_address,
+            repo_credentials,
+        )
 
     def list_secret_names(self, repo_address: RepoAddress) -> List[str]:
-        pass
+        return base_secrets.list_secret_names(self._storage, repo_address)
 
     def get_secret(self, repo_address: RepoAddress, secret_name: str) -> Optional[Secret]:
-        pass
+        return base_secrets.get_secret(self._secrets_manager, repo_address, secret_name)
 
     def add_secret(self, repo_address: RepoAddress, secret: Secret):
-        pass
+        base_secrets.add_secret(
+            self._storage,
+            self._secrets_manager,
+            repo_address,
+            secret,
+        )
 
     def update_secret(self, repo_address: RepoAddress, secret: Secret):
-        pass
+        base_secrets.update_secret(
+            self._storage,
+            self._secrets_manager,
+            repo_address,
+            secret,
+        )
 
     def delete_secret(self, repo_address: RepoAddress, secret_name: str):
-        pass
+        base_secrets.delete_secret(
+            self._storage,
+            self._secrets_manager,
+            repo_address,
+            secret_name,
+        )
 
     def download_run_artifact_files(
         self,
