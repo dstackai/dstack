@@ -30,7 +30,6 @@ export const appSlice = createSlice({
     reducers: {
         setAuthData: (state, action: PayloadAction<IUserAuthData>) => {
             state.authData = action.payload;
-            console.log('payload', action.payload);
             localStorage.setItem(AUTH_DATA_STORAGE_KEY, JSON.stringify(action.payload));
         },
         removeAuthData: (state) => {

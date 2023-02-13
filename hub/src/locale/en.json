@@ -38,6 +38,23 @@
     },
     "backend_type": {
       "aws": "AWS"
+    },
+    "edit": {
+      "general_info": "General info",
+      "cloud_settings": "Cloud settings",
+      "backend_type": "Backend type",
+      "aws": {
+        "access_key": "Access key",
+        "secret_key": "Secret key",
+        "region_name":  "Region name",
+        "s3_bucket_name": "S3 bucket name",
+        "ec2_subnet_id":  "Ec2 subnet id"
+      },
+      "members": {
+        "section_title": "Members",
+        "name": "User name",
+        "role": "Hub role"
+      }
     }
   },
   "users": {

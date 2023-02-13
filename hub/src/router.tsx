@@ -2,8 +2,8 @@ import React from 'react';
 import { createBrowserRouter } from 'react-router-dom';
 import { Navigate } from 'react-router-dom';
 import App from 'App';
-import { HubList } from 'pages/Hub';
 import { Logout } from 'App/Logout';
+import { HubList, HubDetails, HubEdit } from 'pages/Hub';
 import { UserList, UserDetails, UserEdit, UserAdd } from 'pages/User';
 import { ROUTES } from './routes';
 import { AuthErrorMessage } from './App/AuthErrorMessage';
@@ -22,6 +22,14 @@ export const router = createBrowserRouter([
             {
                 path: ROUTES.HUB.LIST,
                 element: <HubList />,
+            },
+            {
+                path: ROUTES.HUB.DETAILS.TEMPLATE,
+                element: <HubDetails />,
+            },
+            {
+                path: ROUTES.HUB.EDIT.TEMPLATE,
+                element: <HubEdit />,
             },
             // members
             {

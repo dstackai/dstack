@@ -1,5 +1,15 @@
-import React, { useEffect, useMemo } from 'react';
-import { Cards, Header, SpaceBetween, Button, NavigateLink, TextFilter, Pagination, ListEmptyMessage } from 'components';
+import React, { useEffect, useMemo, useState } from 'react';
+import {
+    Cards,
+    Header,
+    SpaceBetween,
+    Button,
+    NavigateLink,
+    TextFilter,
+    Pagination,
+    ListEmptyMessage,
+    ConfirmationDialog,
+} from 'components';
 import { useAppSelector, useBreadcrumbs, useCollection } from 'hooks';
 import { useDeleteHubsMutation, useGetHubsQuery } from 'services/hub';
 import { ROUTES } from 'routes';
@@ -9,6 +19,7 @@ import { selectUserName } from 'App/slice';
 
 export const HubList: React.FC = () => {
     const { t } = useTranslation();
+    const [showDeleteConfirm, setShowConfirmDelete] = useState(false);
     const userName = useAppSelector(selectUserName) ?? '';
     const { isLoading, data } = useGetHubsQuery();
     const [deleteHubs, { isLoading: isDeleting }] = useDeleteHubsMutation();
@@ -19,6 +30,10 @@ export const HubList: React.FC = () => {
             href: ROUTES.HUB.LIST,
         },
     ]);
+
+    const toggleDeleteConfirm = () => {
+        setShowConfirmDelete((val) => !val);
+    };
 
     const renderEmptyMessage = (): React.ReactNode => {
         return <ListEmptyMessage title={t('hubs.empty_message_title')} message={t('hubs.empty_message_text')} />;
@@ -47,6 +62,7 @@ export const HubList: React.FC = () => {
 
     const deleteSelectedHubsHandler = () => {
         if (collectionProps.selectedItems?.length) deleteHubs(collectionProps.selectedItems.map((hub) => hub.hub_name));
+        setShowConfirmDelete(false);
     };
 
     const renderCounter = () => {
@@ -76,66 +92,74 @@ export const HubList: React.FC = () => {
     }, [isDeleting, collectionProps.selectedItems]);
 
     return (
-        <Cards
-            {...collectionProps}
-            variant="full-page"
-            cardDefinition={{
-                header: (hub) => (
-                    <NavigateLink fontSize="heading-m" href={ROUTES.HUB.DETAILS.FORMAT(hub.hub_name)}>
-                        {hub.hub_name}
-                    </NavigateLink>
-                ),
+        <>
+            <Cards
+                {...collectionProps}
+                variant="full-page"
+                cardDefinition={{
+                    header: (hub) => (
+                        <NavigateLink fontSize="heading-m" href={ROUTES.HUB.DETAILS.FORMAT(hub.hub_name)}>
+                            {hub.hub_name}
+                        </NavigateLink>
+                    ),
 
-                sections: [
-                    {
-                        id: 'type',
-                        header: t('hubs.card.type'),
-                        content: (hub) => t(`hubs.backend_type.${hub.backend.type}`),
-                    },
-                    {
-                        id: 'region',
-                        header: t('hubs.card.region'),
-                        content: (hub) => hub.backend.region_name,
-                    },
-                    {
-                        id: 'bucket',
-                        header: t('hubs.card.bucket'),
-                        content: (hub) => hub.backend.s3_bucket_name,
-                    },
-                ],
-            }}
-            items={items}
-            loading={isLoading}
-            isItemDisabled={getIsTableItemDisabled}
-            loadingText="Loading"
-            selectionType="multi"
-            header={
-                <Header
-                    variant="awsui-h1-sticky"
-                    counter={renderCounter()}
-                    actions={
-                        <SpaceBetween size="xs" direction="horizontal">
-                            <Button>{t('common.add')}</Button>
-                            <Button disabled={isDisabledEdit}>{t('common.edit')}</Button>
+                    sections: [
+                        {
+                            id: 'type',
+                            header: t('hubs.card.type'),
+                            content: (hub) => t(`hubs.backend_type.${hub.backend.type}`),
+                        },
+                        {
+                            id: 'region',
+                            header: t('hubs.card.region'),
+                            content: (hub) => hub.backend.region_name,
+                        },
+                        {
+                            id: 'bucket',
+                            header: t('hubs.card.bucket'),
+                            content: (hub) => hub.backend.s3_bucket_name,
+                        },
+                    ],
+                }}
+                items={items}
+                loading={isLoading}
+                isItemDisabled={getIsTableItemDisabled}
+                loadingText="Loading"
+                selectionType="multi"
+                header={
+                    <Header
+                        variant="awsui-h1-sticky"
+                        counter={renderCounter()}
+                        actions={
+                            <SpaceBetween size="xs" direction="horizontal">
+                                <Button>{t('common.add')}</Button>
+                                <Button disabled={isDisabledEdit}>{t('common.edit')}</Button>
 
-                            <Button onClick={deleteSelectedHubsHandler} disabled={isDisabledDelete}>
-                                {t('common.delete')}
-                            </Button>
-                        </SpaceBetween>
-                    }
-                >
-                    {t('hubs.page_title')}
-                </Header>
-            }
-            filter={
-                <TextFilter
-                    {...filterProps}
-                    filteringPlaceholder={t('hubs.search_placeholder') || ''}
-                    countText={t('common.match_count_with_value', { count: filteredItemsCount }) ?? ''}
-                    disabled={isLoading}
-                />
-            }
-            pagination={<Pagination {...paginationProps} disabled={isLoading} />}
-        />
+                                <Button onClick={toggleDeleteConfirm} disabled={isDisabledDelete}>
+                                    {t('common.delete')}
+                                </Button>
+                            </SpaceBetween>
+                        }
+                    >
+                        {t('hubs.page_title')}
+                    </Header>
+                }
+                filter={
+                    <TextFilter
+                        {...filterProps}
+                        filteringPlaceholder={t('hubs.search_placeholder') || ''}
+                        countText={t('common.match_count_with_value', { count: filteredItemsCount }) ?? ''}
+                        disabled={isLoading}
+                    />
+                }
+                pagination={<Pagination {...paginationProps} disabled={isLoading} />}
+            />
+
+            <ConfirmationDialog
+                visible={showDeleteConfirm}
+                onDiscard={toggleDeleteConfirm}
+                onConfirm={deleteSelectedHubsHandler}
+            />
+        </>
     );
 };

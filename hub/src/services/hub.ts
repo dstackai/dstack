@@ -18,6 +18,14 @@ export const hubApi = createApi({
             },
         }),
 
+        getHub: builder.query<IHub, { name: IHub['hub_name'] }>({
+            query: ({ name }) => {
+                return {
+                    url: API.HUBS.DETAILS(name),
+                };
+            },
+        }),
+
         deleteHubs: builder.mutation<void, IHub['hub_name'][]>({
             query: (hubNames) => ({
                 url: API.HUBS.BASE(),
@@ -30,4 +38,4 @@ export const hubApi = createApi({
     }),
 });
 
-export const { useGetHubsQuery, useDeleteHubsMutation } = hubApi;
+export const { useGetHubsQuery, useGetHubQuery, useDeleteHubsMutation } = hubApi;

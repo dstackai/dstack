@@ -6,9 +6,14 @@ export const ROUTES = {
 
     HUB: {
         LIST: '/hubs',
+        ADD: '/hubs/add',
         DETAILS: {
             TEMPLATE: `/hubs/:name`,
             FORMAT: (name: string) => buildRoute(ROUTES.HUB.DETAILS.TEMPLATE, { name }),
+        },
+        EDIT: {
+            TEMPLATE: `/hubs/:name/edit`,
+            FORMAT: (name: string) => buildRoute(ROUTES.HUB.EDIT.TEMPLATE, { name }),
         },
     },
 
