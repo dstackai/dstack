@@ -16,47 +16,11 @@ from psutil import NoSuchProcess
 from tqdm import tqdm
 
 from dstack import version
-from dstack.backend.local import jobs, logs
-from dstack.backend.local.common import delete_object, get_object, list_objects, put_object
-from dstack.core.instance import InstanceType
 from dstack.core.job import Job, JobStatus, Requirements
-from dstack.core.repo import RepoAddress
 from dstack.core.request import RequestHead, RequestStatus
 from dstack.core.runners import Gpu, Resources, Runner
 
 CREATE_INSTANCE_RETRY_RATE_SECS = 3
-
-
-def _create_runner(path: str, runner: Runner):
-    root = os.path.join(path, "runners")
-    key = f"{runner.runner_id}.yaml"
-    if runner.job.status == JobStatus.STOPPING:
-        put_object(Root=root, Key=f"m;{runner.runner_id};status", Body="stopping")
-    put_object(Body=yaml.dump(runner.serialize()), Root=root, Key=key)
-
-
-def _delete_runner(path: str, runner: Runner):
-    root = os.path.join(path, "runners")
-    key = f"{runner.runner_id}.yaml"
-    delete_object(Root=root, Key=key)
-
-
-def _get_runner(path: str, runner_id: str) -> Optional[Runner]:
-    root = os.path.join(path, "runners")
-    key = f"{runner_id}.yaml"
-    try:
-        obj = get_object(Root=root, Key=key)
-        return Runner.unserialize(yaml.load(obj, yaml.FullLoader))
-    except Exception as e:
-        return None
-
-
-def _update_runner(path: str, runner: Runner):
-    root = os.path.join(path, "runners")
-    key = f"{runner.runner_id}.yaml"
-    if runner.job.status == JobStatus.STOPPING:
-        put_object(Root=root, Key=f"m;{runner.runner_id};status", Body="stopping")
-    put_object(Body=yaml.dump(runner.serialize()), Root=root, Key=key)
 
 
 def _matches(resources: Resources, requirements: Optional[Requirements]) -> bool:
@@ -86,27 +50,6 @@ def _matches(resources: Resources, requirements: Optional[Requirements]) -> bool
         if requirements.interruptible and not resources.interruptible:
             return False
     return True
-
-
-def run_job(path: str, job: Job):
-    if job.status == JobStatus.SUBMITTED:
-        runner = None
-        try:
-            job.runner_id = uuid.uuid4().hex
-            jobs.update_job(path, job)
-            resources = check_runner_resources(job.runner_id)
-            runner = Runner(job.runner_id, None, resources, job)
-            _create_runner(path, runner)
-            runner.request_id = start_runner_process(job.runner_id)
-
-            _update_runner(path, runner)
-        except Exception as e:
-            job.status = JobStatus.FAILED
-            job.request_id = runner.request_id if runner else None
-            jobs.update_job(path, job)
-            raise e
-    else:
-        raise Exception("Can't create a request for a job which status is not SUBMITTED")
 
 
 def start_runner_process(runner_id: str) -> str:
@@ -148,11 +91,13 @@ def check_runner_resources(runner_id: str) -> Resources:
 
 def _unserialize_runner_resources(data: dict) -> Resources:
     return Resources(
-        data["cpus"],
-        data["memory_mib"],
-        [Gpu(g["name"], g["memory_mib"]) for g in data["gpus"]] if data.get("gpus") else [],
-        False,
-        True,
+        cpus=data["cpus"],
+        memory_mib=data["memory_mib"],
+        gpus=[Gpu(name=g["name"], memory_mib=g["memory_mib"]) for g in data["gpus"]]
+        if data.get("gpus")
+        else [],
+        interruptible=False,
+        local=True,
     )
 
 
@@ -213,31 +158,17 @@ def _get_runner_config_dir(runner_id: str, create: Optional[bool] = None) -> str
     return runner_config_dir_path
 
 
-def get_request_head(path: str, job: Job, runner: Optional[Runner] = None) -> RequestHead:
-    request_id = None
-    if job.request_id:
-        request_id = job.request_id
-    elif runner and runner.request_id:
-        request_id = runner.request_id
-    elif not runner:
-        runner = _get_runner(path, job.runner_id)
-        if runner:
-            request_id = runner.request_id
-    if request_id:
-        _running = is_running(request_id)
+def get_request_head(job: Job, request_id: Optional[str]) -> RequestHead:
+    if request_id is None:
         return RequestHead(
-            job.job_id,
-            RequestStatus.RUNNING if _running else RequestStatus.TERMINATED,
-            None,
+            job_id=job.job_id, status=RequestStatus.TERMINATED, message="PID is not specified"
         )
-    else:
-        return RequestHead(job.job_id, RequestStatus.TERMINATED, "PID is not specified")
-
-
-def _stop_runner(path: str, runner: Runner):
-    if runner.request_id:
-        stop_process(runner.request_id)
-    _delete_runner(path, runner)
+    _running = is_running(request_id)
+    return RequestHead(
+        job_id=job.job_id,
+        status=RequestStatus.RUNNING if _running else RequestStatus.TERMINATED,
+        message=None,
+    )
 
 
 def _arch() -> str:
@@ -290,61 +221,6 @@ def _runner_path() -> Path:
         / _runner_version()
         / _runner_filename()
     )
-
-
-def stop_job(path: str, repo_address: RepoAddress, job_id: str, abort: bool):
-    job_head = jobs.list_job_head(path, repo_address, job_id)
-    job = jobs.get_job(path, repo_address, job_id)
-    runner = _get_runner(path, job.runner_id) if job else None
-    request_status = (
-        get_request_head(path, job, runner).status if job else RequestStatus.TERMINATED
-    )
-    if (
-        job_head
-        and job_head.status.is_unfinished()
-        or job
-        and job.status.is_unfinished()
-        or runner
-        and runner.job.status.is_unfinished()
-        or request_status != RequestStatus.TERMINATED
-    ):
-        if abort:
-            new_status = JobStatus.ABORTED
-        elif (
-            not job_head
-            or job_head.status in [JobStatus.SUBMITTED, JobStatus.DOWNLOADING]
-            or not job
-            or job.status in [JobStatus.SUBMITTED, JobStatus.DOWNLOADING]
-            or request_status == RequestStatus.TERMINATED
-            or not runner
-        ):
-            new_status = JobStatus.STOPPED
-        elif (
-            job_head
-            and job_head.status != JobStatus.UPLOADING
-            or job
-            and job.status != JobStatus.UPLOADING
-        ):
-            new_status = JobStatus.STOPPING
-        else:
-            new_status = None
-        if new_status:
-            if runner and runner.job.status.is_unfinished() and runner.job.status != new_status:
-                if new_status.is_finished():
-                    _stop_runner(path, runner)
-                else:
-                    runner.job.status = new_status
-                    _update_runner(path, runner)
-            if (
-                job_head
-                and job_head.status.is_unfinished()
-                and job_head.status != new_status
-                or job
-                and job.status.is_unfinished()
-                and job.status != new_status
-            ):
-                job.status = new_status
-                jobs.update_job(path, job)
 
 
 def stop_process(request_id: str):

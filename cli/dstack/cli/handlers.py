@@ -1,6 +1,5 @@
 import dstack.cli.commands.config
-
-# import dstack.cli.commands.hub
+import dstack.cli.commands.hub
 import dstack.cli.commands.init
 import dstack.cli.commands.logs
 import dstack.cli.commands.ls

@@ -240,30 +240,30 @@ class Provider:
         for i, job_spec in enumerate(job_specs):
             submitted_at = int(round(time.time() * 1000))
             job = Job(
-                f"{self.run_name},{self.workflow_name or ''},{i}",
-                repo_data,
-                self.run_name,
-                self.workflow_name or None,
-                self.provider_name,
-                repo_data.local_repo_user_name,
-                repo_data.local_repo_user_email,
-                JobStatus.SUBMITTED,
-                submitted_at,
-                job_spec.image_name,
-                job_spec.commands,
-                job_spec.env,
-                job_spec.working_dir,
-                job_spec.artifact_specs,
-                job_spec.port_count,
-                None,
-                None,
-                job_spec.requirements,
-                self.dep_specs,
-                job_spec.master_job,
-                job_spec.app_specs,
-                None,
-                None,
-                tag_name,
+                job_id=f"{self.run_name},{self.workflow_name or ''},{i}",
+                repo_data=repo_data,
+                run_name=self.run_name,
+                workflow_name=self.workflow_name or None,
+                provider_name=self.provider_name,
+                local_repo_user_name=repo_data.local_repo_user_name,
+                local_repo_user_email=repo_data.local_repo_user_email,
+                status=JobStatus.SUBMITTED,
+                submitted_at=submitted_at,
+                image_name=job_spec.image_name,
+                commands=job_spec.commands,
+                env=job_spec.env,
+                working_dir=job_spec.working_dir,
+                artifact_specs=job_spec.artifact_specs,
+                port_count=job_spec.port_count,
+                ports=None,
+                host_name=None,
+                requirements=job_spec.requirements,
+                dep_specs=self.dep_specs,
+                master_job=job_spec.master_job,
+                app_specs=job_spec.app_specs,
+                runner_id=None,
+                request_id=None,
+                tag_name=tag_name,
             )
             backend.submit_job(job)
             jobs.append(job)
@@ -294,10 +294,11 @@ class Provider:
             return text
 
         if isinstance(artifact, str):
-            return ArtifactSpec(remove_prefix(artifact, "./"), False)
+            return ArtifactSpec(artifact_path=remove_prefix(artifact, "./"), mount=False)
         else:
             return ArtifactSpec(
-                remove_prefix(artifact["path"], "./"), artifact.get("mount") is True
+                artifact_path=remove_prefix(artifact["path"], "./"),
+                mount=artifact.get("mount") is True,
             )
 
     @staticmethod
@@ -321,7 +322,12 @@ class Provider:
                 return Provider._workflow_dep(backend, repo_data, t[0], mount)
         elif len(t) == 3:
             # This doesn't allow to refer to projects from other repos
-            repo_address = RepoAddress(repo_data.repo_host_name, repo_data.repo_port, t[0], t[1])
+            repo_address = RepoAddress(
+                repo_host_name=repo_data.repo_host_name,
+                repo_port=repo_data.repo_port,
+                repo_user_name=t[0],
+                repo_name=t[1],
+            )
             if tag_dep:
                 return Provider._tag_dep(backend, repo_address, t[2], mount)
             else:
@@ -335,7 +341,7 @@ class Provider:
     ) -> DepSpec:
         tag_head = backend.get_tag_head(repo_address, tag_name)
         if tag_head:
-            return DepSpec(repo_address, tag_head.run_name, mount)
+            return DepSpec(repo_address=repo_address, run_name=tag_head.run_name, mount=mount)
         else:
             sys.exit(f"Cannot find the tag '{tag_name}' in the '{repo_address.path()}' repo")
 
@@ -360,7 +366,7 @@ class Provider:
             None,
         )
         if run_name:
-            return DepSpec(repo_address, run_name, mount)
+            return DepSpec(repo_address=repo_address, run_name=run_name, mount=mount)
         else:
             sys.exit(
                 f"Cannot find any successful workflow with the name '{workflow_name}' "
@@ -403,7 +409,7 @@ class Provider:
                 if str(gpu).isnumeric():
                     gpu = int(self.provider_data["resources"]["gpu"])
                     if gpu > 0:
-                        resources.gpus = GpusRequirements(gpu)
+                        resources.gpus = GpusRequirements(count=gpu)
                 else:
                     gpu_count = 0
                     gpu_name = None
@@ -414,14 +420,14 @@ class Provider:
                         if not gpu_count:
                             gpu_count = 1
                     if gpu_count:
-                        resources.gpus = GpusRequirements(gpu_count, name=gpu_name)
+                        resources.gpus = GpusRequirements(count=gpu_count, name=gpu_name)
             for resource_name in self.provider_data["resources"]:
                 if resource_name.endswith("/gpu") and len(resource_name) > 4:
                     if not str(self.provider_data["resources"][resource_name]).isnumeric():
                         sys.exit(f"resources.'{resource_name}' should be an integer")
                     gpu = int(self.provider_data["resources"][resource_name])
                     if gpu > 0:
-                        resources.gpus = GpusRequirements(gpu, name=resource_name[:-4])
+                        resources.gpus = GpusRequirements(count=gpu, name=resource_name[:-4])
             if self.provider_data["resources"].get("shm_size"):
                 resources.shm_size_mib = _str_to_mib(self.provider_data["resources"]["shm_size"])
             if self.provider_data["resources"].get("interruptible"):

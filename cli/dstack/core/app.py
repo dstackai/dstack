@@ -1,20 +1,15 @@
-from typing import Dict, Optional
+from typing import Dict, Optional, Union
+
+from pydantic import BaseModel
 
 from dstack.utils.common import _quoted
 
 
-class AppSpec:
-    def __init__(
-        self,
-        port_index: int,
-        app_name: str,
-        url_path: Optional[str] = None,
-        url_query_params: Optional[Dict[str, str]] = None,
-    ):
-        self.port_index = port_index
-        self.app_name = app_name
-        self.url_path = url_path
-        self.url_query_params = url_query_params
+class AppSpec(BaseModel):
+    port_index: int
+    app_name: str
+    url_path: Union[str, None] = (None,)
+    url_query_params: Union[Dict[str, str], None] = (None,)
 
     def __str__(self) -> str:
         return (
@@ -23,10 +18,9 @@ class AppSpec:
         )
 
 
-class AppHead:
-    def __init__(self, job_id: str, app_name: str):
-        self.job_id = job_id
-        self.app_name = app_name
+class AppHead(BaseModel):
+    job_id: str
+    app_name: str
 
     def __str__(self) -> str:
         return f'AppHead(job_id="{self.job_id}", app_name="{self.app_name})'

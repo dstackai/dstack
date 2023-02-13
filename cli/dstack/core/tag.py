@@ -1,30 +1,21 @@
 from typing import List, Optional
 
+from pydantic import BaseModel
+
 from dstack.core.artifact import ArtifactHead
 from dstack.core.repo import RepoAddress
 from dstack.utils.common import _quoted
 
 
-class TagHead:
-    def __init__(
-        self,
-        repo_address: RepoAddress,
-        tag_name: str,
-        run_name: str,
-        workflow_name: Optional[str],
-        provider_name: Optional[str],
-        local_repo_user_name: Optional[str],
-        created_at: int,
-        artifact_heads: Optional[List[ArtifactHead]],
-    ):
-        self.repo_address = repo_address
-        self.tag_name = tag_name
-        self.run_name = run_name
-        self.workflow_name = workflow_name
-        self.provider_name = provider_name
-        self.local_repo_user_name = local_repo_user_name
-        self.created_at = created_at
-        self.artifact_heads = artifact_heads
+class TagHead(BaseModel):
+    repo_address: RepoAddress
+    tag_name: str
+    run_name: str
+    workflow_name: Optional[str]
+    provider_name: Optional[str]
+    local_repo_user_name: Optional[str]
+    created_at: int
+    artifact_heads: Optional[List[ArtifactHead]]
 
     def __str__(self) -> str:
         artifact_heads = (

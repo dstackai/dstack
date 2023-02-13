@@ -4,37 +4,87 @@ from typing import List, Optional
 from botocore.client import BaseClient
 
 from dstack.backend.aws import runners
+from dstack.backend.aws.utils import retry_operation_on_service_errors
+from dstack.backend.base.secrets import SecretsManager
 from dstack.core.repo import RepoAddress
 from dstack.core.secret import Secret
 
 
-def list_secret_names(
-    s3_client: BaseClient, bucket_name: str, repo_address: RepoAddress
-) -> List[str]:
-    prefix = f"secrets/{repo_address.path()}"
-    secret_head_prefix = f"{prefix}/l;"
-    response = s3_client.list_objects_v2(Bucket=bucket_name, Prefix=secret_head_prefix)
-    secret_names = []
-    if "Contents" in response:
-        for obj in response["Contents"]:
-            secret_name = obj["Key"][len(secret_head_prefix) :]
-            secret_names.append(secret_name)
-    return secret_names
+class AWSSecretsManager(SecretsManager):
+    def __init__(
+        self,
+        secretsmanager_client: BaseClient,
+        iam_client: BaseClient,
+        sts_client: BaseClient,
+        bucket_name: str,
+    ):
+        self.secretsmanager_client = secretsmanager_client
+        self.iam_client = iam_client
+        self.sts_client = sts_client
+        self.bucket_name = bucket_name
+
+    def get_secret(self, repo_address: RepoAddress, secret_name: str) -> Optional[Secret]:
+        value = _get_secret_value(
+            secretsmanager_client=self.secretsmanager_client,
+            secret_key=_get_secret_key(self.bucket_name, repo_address, secret_name),
+        )
+        if value is None:
+            return None
+        return Secret(secret_name=secret_name, secret_value=value)
+
+    def add_secret(self, repo_address: RepoAddress, secret: Secret):
+        _add_secret(
+            secretsmanager_client=self.secretsmanager_client,
+            sts_client=self.sts_client,
+            iam_client=self.iam_client,
+            bucket_name=self.bucket_name,
+            secret_key=_get_secret_key(self.bucket_name, repo_address, secret.secret_name),
+            secret_value=secret.secret_value,
+        )
+
+    def update_secret(self, repo_address: RepoAddress, secret: Secret):
+        _update_secret(
+            secretsmanager_client=self.secretsmanager_client,
+            secret_key=_get_secret_key(self.bucket_name, repo_address, secret.secret_name),
+            secret_value=secret.secret_value,
+        )
+
+    def delete_secret(self, repo_address: RepoAddress, secret_name: str):
+        _delete_secret(
+            secretsmanager_client=self.secretsmanager_client,
+            secret_key=_get_secret_key(self.bucket_name, repo_address, secret_name),
+        )
+
+    def get_credentials(self, repo_address: RepoAddress) -> Optional[str]:
+        return _get_secret_value(
+            secretsmanager_client=self.secretsmanager_client,
+            secret_key=_get_credentials_key(self.bucket_name, repo_address),
+        )
+
+    def add_credentials(self, repo_address: RepoAddress, data: str):
+        _add_secret(
+            secretsmanager_client=self.secretsmanager_client,
+            sts_client=self.sts_client,
+            iam_client=self.iam_client,
+            bucket_name=self.bucket_name,
+            secret_key=_get_credentials_key(self.bucket_name, repo_address),
+            secret_value=data,
+        )
+
+    def update_credentials(self, repo_address: RepoAddress, data: str):
+        _update_secret(
+            secretsmanager_client=self.secretsmanager_client,
+            secret_key=_get_credentials_key(self.bucket_name, repo_address),
+            secret_value=data,
+        )
 
 
-def get_secret(
+def _get_secret_value(
     secretsmanager_client: BaseClient,
-    bucket_name: str,
-    repo_address: RepoAddress,
-    secret_name: str,
+    secret_key: str,
 ) -> Optional[Secret]:
     try:
-        return Secret(
-            secret_name,
-            secretsmanager_client.get_secret_value(
-                SecretId=f"/dstack/{bucket_name}/secrets/{repo_address.path()}/{secret_name}"
-            )["SecretString"],
-        )
+        return secretsmanager_client.get_secret_value(SecretId=secret_key)["SecretString"]
     except Exception as e:
         if (
             hasattr(e, "response")
@@ -47,25 +97,17 @@ def get_secret(
             raise e
 
 
-def _secret_head_key(repo_address: RepoAddress, secret_name: str) -> str:
-    prefix = f"secrets/{repo_address.path()}"
-    key = f"{prefix}/l;{secret_name}"
-    return key
-
-
-def add_secret(
+def _add_secret(
     sts_client: BaseClient,
     iam_client: BaseClient,
     secretsmanager_client: BaseClient,
-    s3_client: BaseClient,
     bucket_name: str,
-    repo_address: RepoAddress,
-    secret: Secret,
+    secret_key: str,
+    secret_value: str,
 ):
-    secret_id = f"/dstack/{bucket_name}/secrets/{repo_address.path()}/{secret.secret_name}"
     secretsmanager_client.create_secret(
-        Name=secret_id,
-        SecretString=secret.secret_value,
+        Name=secret_key,
+        SecretString=secret_value,
         Description="Generated by dstack",
         Tags=[
             {"Key": "owner", "Value": "dstack"},
@@ -74,55 +116,56 @@ def add_secret(
     )
     role_name = runners.role_name(iam_client, bucket_name)
     account_id = sts_client.get_caller_identity()["Account"]
-    secretsmanager_client.put_resource_policy(
-        SecretId=secret_id,
-        ResourcePolicy=json.dumps(
-            {
-                "Version": "2012-10-17",
-                "Statement": [
-                    {
-                        "Effect": "Allow",
-                        "Principal": {"AWS": f"arn:aws:iam::{account_id}:role/{role_name}"},
-                        "Action": [
-                            "secretsmanager:GetSecretValue",
-                            "secretsmanager:ListSecrets",
-                        ],
-                        "Resource": "*",
-                    }
-                ],
-            }
-        ),
+    resource_policy = json.dumps(
+        {
+            "Version": "2012-10-17",
+            "Statement": [
+                {
+                    "Effect": "Allow",
+                    "Principal": {"AWS": f"arn:aws:iam::{account_id}:role/{role_name}"},
+                    "Action": [
+                        "secretsmanager:GetSecretValue",
+                        "secretsmanager:ListSecrets",
+                    ],
+                    "Resource": "*",
+                }
+            ],
+        }
     )
-    secret_head_key = _secret_head_key(repo_address, secret.secret_name)
-    s3_client.put_object(Body="", Bucket=bucket_name, Key=secret_head_key)
+    # The policy may not exist yet if we just created it because of AWS eventual consistency
+    retry_operation_on_service_errors(
+        secretsmanager_client.put_resource_policy,
+        ["MalformedPolicyDocumentException"],
+        delay=5,
+        SecretId=secret_key,
+        ResourcePolicy=resource_policy,
+    )
 
 
-def update_secret(
+def _update_secret(
     secretsmanager_client: BaseClient,
-    s3_client: BaseClient,
-    bucket_name: str,
-    repo_address: RepoAddress,
-    secret: Secret,
+    secret_key: str,
+    secret_value: str,
 ):
-    secret_id = f"/dstack/{bucket_name}/secrets/{repo_address.path()}/{secret.secret_name}"
     secretsmanager_client.put_secret_value(
-        SecretId=secret_id,
-        SecretString=secret.secret_value,
+        SecretId=secret_key,
+        SecretString=secret_value,
     )
-    secret_head_key = _secret_head_key(repo_address, secret.secret_name)
-    s3_client.put_object(Body="", Bucket=bucket_name, Key=secret_head_key)
 
 
-def delete_secret(
+def _delete_secret(
     secretsmanager_client: BaseClient,
-    s3_client: BaseClient,
-    bucket_name: str,
-    repo_address: RepoAddress,
-    secret_name: str,
+    secret_key: str,
 ):
     secretsmanager_client.delete_secret(
-        SecretId=f"/dstack/{bucket_name}/secrets/{repo_address.path()}/{secret_name}",
+        SecretId=secret_key,
         ForceDeleteWithoutRecovery=True,
     )
-    secret_head_key = _secret_head_key(repo_address, secret_name)
-    s3_client.delete_object(Bucket=bucket_name, Key=secret_head_key)
+
+
+def _get_secret_key(bucket_name: str, repo_address: RepoAddress, secret_name: str) -> str:
+    return f"/dstack/{bucket_name}/secrets/{repo_address.path()}/{secret_name}"
+
+
+def _get_credentials_key(bucket_name: str, repo_address: RepoAddress) -> str:
+    return f"/dstack/{bucket_name}/credentials/{repo_address.path()}"

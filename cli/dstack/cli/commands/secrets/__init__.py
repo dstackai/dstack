@@ -70,13 +70,17 @@ class SecretCommand(BasicCommand):
                     f"Do you want to override it?[/]"
                 ):
                     secret_value = args.secret_value or Prompt.ask("Value", password=True)
-                    backend.update_secret(repo_data, Secret(args.secret_name, secret_value))
+                    backend.update_secret(
+                        repo_data, Secret(secret_name=args.secret_name, secret_value=secret_value)
+                    )
                     print(f"[grey58]OK (backend: {backend.name})[/]")
                 else:
                     return
             else:
                 secret_value = args.secret_value or Prompt.ask("Value", password=True)
-                backend.add_secret(repo_data, Secret(args.secret_name, secret_value))
+                backend.add_secret(
+                    repo_data, Secret(secret_name=args.secret_name, secret_value=secret_value)
+                )
                 print(f"[grey58]OK (backend: {backend.name})[/]")
 
     @check_config

@@ -1,6 +1,8 @@
 from enum import Enum
 from typing import Optional
 
+from pydantic import BaseModel
+
 
 class LogEventSource(Enum):
     STDOUT = "stdout"
@@ -10,17 +12,9 @@ class LogEventSource(Enum):
         return str(self.value)
 
 
-class LogEvent:
-    def __init__(
-        self,
-        event_id: str,
-        timestamp: int,
-        job_id: Optional[str],
-        log_message: str,
-        log_source: LogEventSource,
-    ):
-        self.event_id = event_id
-        self.timestamp = timestamp
-        self.job_id = job_id
-        self.log_message = log_message
-        self.log_source = log_source
+class LogEvent(BaseModel):
+    event_id: str
+    timestamp: int
+    job_id: Optional[str]
+    log_message: str
+    log_source: LogEventSource

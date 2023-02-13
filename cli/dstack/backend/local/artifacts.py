@@ -2,13 +2,7 @@ import os
 from pathlib import Path
 from typing import Generator, List, Optional, Tuple
 
-from dstack.backend.local.common import (
-    delete_object,
-    get_object,
-    list_all_objects,
-    list_objects,
-    put_object,
-)
+from dstack.backend.local.storage import _list_all_objects
 from dstack.core.artifact import Artifact
 from dstack.core.repo import RepoAddress
 
@@ -22,17 +16,11 @@ def list_run_artifact_files(
 ) -> Generator[Artifact, None, None]:
     root = Path.joinpath(path, "artifacts", repo_address.path())
     artifact_prefix = f"{run_name},"
-    list_iterator = list_all_objects(Root=root, Prefix=artifact_prefix)
+    list_iterator = _list_all_objects(Root=root, Prefix=artifact_prefix)
     for job_id, path, file_size in list_iterator:
         artifact, file = path.split("/", maxsplit=1)
         if file_size > 0:
-            yield Artifact(job_id, artifact, file, file_size)
-
-
-def __remove_prefix(text, prefix):
-    if text.startswith(prefix):
-        return text[len(prefix) :]
-    return text
+            yield Artifact(job_id=job_id, name=artifact, file=file, filesize_in_bytes=file_size)
 
 
 def upload_job_artifact_files(

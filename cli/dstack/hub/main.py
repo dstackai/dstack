@@ -3,21 +3,41 @@ import uuid
 
 import pkg_resources
 from fastapi import FastAPI
-from sqlalchemy.orm import Session
 from starlette.responses import HTMLResponse, JSONResponse
 from starlette.staticfiles import StaticFiles
 
-from dstack.hub.db import metadata
-from dstack.hub.db.users import User
-from dstack.hub.routers import users
+from dstack.hub.db.migrate import migrate
+from dstack.hub.db.models import User
+from dstack.hub.repository.user import UserManager
+from dstack.hub.routers import (
+    artifacts,
+    hub,
+    jobs,
+    logs,
+    repos,
+    runners,
+    runs,
+    secrets,
+    tags,
+    users,
+)
 
 app = FastAPI(docs_url="/api/docs")
 app.include_router(users.router)
+app.include_router(hub.router)
+app.include_router(runs.router)
+app.include_router(jobs.router)
+app.include_router(runners.router)
+app.include_router(secrets.router)
+app.include_router(logs.router)
+app.include_router(artifacts.router)
+app.include_router(tags.router)
+app.include_router(repos.router)
 
 
 @app.on_event("startup")
 async def startup_event():
-    metadata.create_all()
+    await migrate()
     admin_user = await update_admin_user()
 
     url = f"http://{os.getenv('DSTACK_HUB_HOST')}:{os.getenv('DSTACK_HUB_PORT')}?token={admin_user.token}"
@@ -25,22 +45,18 @@ async def startup_event():
 
 
 async def update_admin_user() -> User:
-    with Session(metadata.engine, expire_on_commit=False) as session:
-        admin_user = session.get(User, "admin")
-        if admin_user is None:
-            admin_user = User(
-                name="admin",
-                token=os.getenv("DSTACK_HUB_ADMIN_TOKEN") or str(uuid.uuid4()),
-            )
-            session.add(admin_user)
-            session.commit()
-        elif os.getenv("DSTACK_HUB_ADMIN_TOKEN") is not None and admin_user.token != os.getenv(
-            "DSTACK_HUB_ADMIN_TOKEN"
-        ):
-            admin_user.token = os.getenv("DSTACK_HUB_ADMIN_TOKEN")
-            session.commit()
-
-        session.expunge(admin_user)
+    admin_user = await UserManager.get_user_by_name("admin")
+    if admin_user is None:
+        admin_user = User(
+            name="admin",
+            token=os.getenv("DSTACK_HUB_ADMIN_TOKEN") or str(uuid.uuid4()),
+        )
+        await UserManager.save(admin_user)
+    elif os.getenv("DSTACK_HUB_ADMIN_TOKEN") is not None and admin_user.token != os.getenv(
+        "DSTACK_HUB_ADMIN_TOKEN"
+    ):
+        admin_user.token = os.getenv("DSTACK_HUB_ADMIN_TOKEN")
+        await UserManager.save(admin_user)
     return admin_user
 
 

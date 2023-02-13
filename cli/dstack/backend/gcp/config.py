@@ -10,6 +10,9 @@ class GCPConfig(BackendConfig):
         self.zone = "us-central1-a"
         self.bucket_name = "dstack-bucket"
 
+    def configure(self):
+        pass
+
     def load(self, path: Path = get_config_path()):
         super().load(path=path)
 

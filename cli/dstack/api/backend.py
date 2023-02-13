@@ -3,6 +3,7 @@ from typing import Dict, List, Optional
 from dstack.backend.aws import AwsBackend
 from dstack.backend.base import Backend, RemoteBackend
 from dstack.backend.gcp import GCPBackend
+from dstack.backend.hub import HubBackend
 from dstack.backend.local import LocalBackend
 from dstack.core.error import BackendError
 
@@ -19,12 +20,18 @@ def get_all_backends():
     return [backend_cls() for backend_cls in backends_classes]
 
 
-def list_backends() -> List[Backend]:
-    return [backend for backend in get_all_backends() if backend.loaded]
+def list_backends(all_backend: bool = False) -> List[Backend]:
+    l = []
+    for backend in get_all_backends():
+        if all_backend:
+            l.append(backend)
+        elif backend.loaded:
+            l.append(backend)
+    return l
 
 
-def dict_backends() -> Dict[str, Backend]:
-    return {backend.name: backend for backend in list_backends()}
+def dict_backends(all_backend: bool = False) -> Dict[str, Backend]:
+    return {backend.name: backend for backend in list_backends(all_backend=all_backend)}
 
 
 def get_backend_by_name(name: str) -> Optional[Backend]:
