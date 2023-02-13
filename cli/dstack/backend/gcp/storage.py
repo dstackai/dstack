@@ -1,37 +1,46 @@
-from typing import List
+from typing import Dict, List, Optional
 
 from google.cloud import exceptions, storage
 
-
-def get_client(project_id: str) -> storage.Client:
-    return storage.Client(project=project_id)
+from dstack.backend.base.storage import Storage
 
 
-def get_or_create_bucket(storage_client: storage.Client, bucket_name: str):
-    try:
-        return storage_client.create_bucket(bucket_name)
-    except exceptions.Conflict:
-        return storage_client.bucket(bucket_name)
+class GCPStorage(Storage):
+    def __init__(self, project_id: str, bucket_name: str):
+        self.storage_client = self._get_client(project_id)
+        self.bucket_name = bucket_name
 
+    def configure(self):
+        self.bucket = self._get_or_create_bucket(self.bucket_name)
 
-def put_object(bucket: storage.Bucket, object_name: str, data: str):
-    blob = bucket.blob(object_name)
-    blob.upload_from_string(data)
+    def put_object(self, key: str, content: str, metadata: Optional[Dict] = None):
+        blob = self.bucket.blob(key)
+        blob.upload_from_string(content)
 
+    def get_object(self, key: str) -> Optional[str]:
+        blob = self.bucket.get_blob(key)
+        if blob is None:
+            return None
+        with blob.open() as f:
+            return f.read()
 
-def read_object(bucket: storage.Bucket, object_name: str) -> str:
-    blob = bucket.get_blob(object_name)
-    with blob.open() as f:
-        return f.read()
+    def delete_object(self, key: str):
+        try:
+            self.bucket.delete_blob(key)
+        except exceptions.NotFound:
+            pass
 
+    def list_objects(self, keys_prefix: str) -> List[str]:
+        # TODO pagination
+        blobs = self.bucket.client.list_blobs(self.bucket.name, prefix=keys_prefix)
+        object_names = [blob.name for blob in blobs]
+        return object_names
 
-def delete_object(bucket: storage.Bucket, object_name: str):
-    blob = bucket.blob(object_name)
-    blob.delete()
+    def _get_client(self, project_id: str) -> storage.Client:
+        return storage.Client(project=project_id)
 
-
-def list_objects(bucket: storage.Bucket, prefix: str) -> List[str]:
-    # TODO pagination
-    blobs = bucket.client.list_blobs(bucket.name, prefix=prefix)
-    object_names = [blob.name for blob in blobs]
-    return object_names
+    def _get_or_create_bucket(self, bucket_name: str):
+        try:
+            return self.storage_client.create_bucket(bucket_name)
+        except exceptions.Conflict:
+            return self.storage_client.bucket(bucket_name)

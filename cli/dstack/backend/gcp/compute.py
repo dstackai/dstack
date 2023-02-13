@@ -1,56 +1,84 @@
 import re
 import warnings
-from typing import Any, List
+from typing import Any, List, Optional, Tuple
 
 import google.api_core.exceptions
-import yaml
 from google.cloud import compute_v1
-from google.cloud.storage import Bucket
 
-from dstack.backend.gcp import storage
+from dstack.backend.base.compute import Compute
 from dstack.backend.gcp import utils as gcp_utils
 from dstack.backend.gcp.config import GCPConfig
-from dstack.core.runners import Runner
+from dstack.core.instance import InstanceType
+from dstack.core.job import Job, Requirements
+from dstack.core.request import RequestHead, RequestStatus
+from dstack.core.runners import Resources, Runner
 
 
-def create_runner(bucket: Bucket, runner: Runner):
-    runner_filepath = f"runners/{runner.runner_id}.yaml"
-    storage.put_object(bucket, runner_filepath, yaml.dump(runner.serialize()))
+class GCPCompute(Compute):
+    def __init__(
+        self,
+        gcp_config: GCPConfig,
+    ):
+        self.gcp_config = gcp_config
+
+    def get_request_head(self, job: Job, request_id: Optional[str]) -> RequestHead:
+        if request_id is None:
+            return RequestHead(
+                job_id=job.job_id,
+                status=RequestStatus.TERMINATED,
+                message="request_id is not specified",
+            )
+        instance_status = _get_instance_status(
+            project_id=self.gcp_config.project_id,
+            zone=self.gcp_config.zone,
+            instance_name=request_id,
+        )
+        return RequestHead(
+            job_id=job.job_id,
+            status=instance_status,
+            message=None,
+        )
+
+    def get_instance_type(self, job: Job) -> Optional[InstanceType]:
+        return InstanceType(
+            instance_name="n1-standard-1",
+            resources=Resources(
+                cpus=1, memory_mib=3750, gpus=[], interruptible=False, local=False
+            ),
+        )
+
+    def run_instance(self, job: Job, instance_type: InstanceType) -> str:
+        instance = _launch_instance(
+            project_id=self.gcp_config.project_id,
+            zone=self.gcp_config.zone,
+            image_name="stgn-dstack-5",
+            instance_name=_get_instance_name(job),
+        )
+        return instance.name
+
+    def terminate_instance(self, request_id: str):
+        _terminate_instance(
+            gcp_config=self.gcp_config,
+            instance_name=request_id,
+        )
+
+    def cancel_spot_request(self, request_id: str):
+        _terminate_instance(
+            gcp_config=self.gcp_config,
+            instance_name=request_id,
+        )
 
 
-def update_runner(bucket: Bucket, runner: Runner):
-    # Simply override the existing runner
-    create_runner(bucket, runner)
-
-
-def get_runner(bucket: Bucket, runner_id: str) -> Runner:
-    runner_filepath = f"runners/{runner_id}.yaml"
-    obj = storage.read_object(bucket, runner_filepath)
-    return Runner.unserialize(yaml.load(obj, yaml.FullLoader))
-
-
-def delete_runner(bucket: Bucket, runner_id: str):
-    runner_filepath = f"runners/{runner_id}.yaml"
-    storage.delete_object(bucket, runner_filepath)
-
-
-def launch_runner(gcp_config: GCPConfig, bucket: Bucket, runner: Runner) -> str:
-    instance = _launch_instance(
-        project_id=gcp_config.project_id,
-        zone=gcp_config.zone,
-        image_name="stgn-dstack-5",
-        instance_name=_get_instance_name(runner),
-    )
-    return instance.name
-
-
-def _get_instance_name(runner: Runner) -> str:
+def _get_instance_name(job: Job) -> str:
     # TODO support multiple jobs per run
-    return f"dstack-{runner.job.run_name}"
+    return f"dstack-{job.run_name}"
 
 
 def _launch_instance(
-    project_id: str, zone: str, image_name: str, instance_name: str
+    project_id: str,
+    zone: str,
+    image_name: str,
+    instance_name: str,
 ) -> compute_v1.Instance:
     disk = _disk_from_image(
         disk_type=f"zones/{zone}/diskTypes/pd-balanced",
@@ -234,9 +262,22 @@ def _create_instance(
     return instance_client.get(project=project_id, zone=zone, instance=instance_name)
 
 
-def stop_runner(gcp_config: GCPConfig, runner: Runner):
+def _get_instance_status(project_id: str, zone: str, instance_name: str) -> RequestStatus:
+    get_instance_request = compute_v1.GetInstanceRequest(
+        instance=instance_name,
+        project=project_id,
+        zone=zone,
+    )
+    client = compute_v1.InstancesClient()
+    instance = client.get(get_instance_request)
+    if instance.status in ["PROVISIONING", "STAGING", "RUNNING"]:
+        return RequestStatus.RUNNING
+    return RequestStatus.TERMINATED
+
+
+def _terminate_instance(gcp_config: GCPConfig, instance_name: str):
     _delete_instance(
-        instance_name=_get_instance_name(runner),
+        instance_name=instance_name,
         project_id=gcp_config.project_id,
         zone=gcp_config.zone,
     )
@@ -256,11 +297,7 @@ def _delete_instance(project_id: str, zone: str, instance_name: str):
 
 
 def main():
-    project_id = "dstack"
-    image_name = "stgn-dstack-5"
-    zone = "us-central1-a"
-    # _launch_instance(project_id, zone, image_name, image_name)
-    _delete_instance(project_id, zone, "stgn-dstack-5")
+    pass
 
 
 if __name__ == "__main__":
