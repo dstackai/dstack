@@ -3,14 +3,12 @@ from typing import List, Union
 from fastapi import APIRouter, Depends
 from fastapi.security import HTTPBearer
 
-
-from dstack.hub.security.scope import Scope
-from dstack.core.repo import RepoAddress
 from dstack.core.job import Job
+from dstack.core.repo import RepoAddress
 from dstack.hub.models import StopRunners
-from dstack.hub.routers.util import get_hub
 from dstack.hub.routers.cache import get_backend
-
+from dstack.hub.routers.util import get_hub
+from dstack.hub.security.scope import Scope
 
 router = APIRouter(prefix="/api/hub", tags=["runners"])
 

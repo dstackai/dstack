@@ -167,7 +167,10 @@ def _get_tag_head_key(tag_head: TagHead) -> str:
 
 def _unserialize_artifact_heads(artifact_heads):
     return (
-        [ArtifactHead(job_id=a.split("=")[0], artifact_path=a.split("=")[1]) for a in artifact_heads.split(":")]
+        [
+            ArtifactHead(job_id=a.split("=")[0], artifact_path=a.split("=")[1])
+            for a in artifact_heads.split(":")
+        ]
         if artifact_heads
         else None
     )

@@ -127,12 +127,12 @@ class Provider:
             return obj
 
     def load(
-            self,
-            backend: Backend,
-            provider_args: List[str],
-            workflow_name: Optional[str],
-            provider_data: Dict[str, Any],
-            run_name: str,
+        self,
+        backend: Backend,
+        provider_args: List[str],
+        workflow_name: Optional[str],
+        provider_data: Dict[str, Any],
+        run_name: str,
     ):
         self.provider_args = provider_args
         self.workflow_name = workflow_name
@@ -188,14 +188,14 @@ class Provider:
             env.extend(args.env)
             self.provider_data["env"] = env
         if (
-                args.cpu
-                or args.memory
-                or args.gpu
-                or args.gpu_name
-                or args.gpu_memory
-                or args.shm_size
-                or args.interruptible
-                or args.local
+            args.cpu
+            or args.memory
+            or args.gpu
+            or args.gpu_name
+            or args.gpu_memory
+            or args.shm_size
+            or args.interruptible
+            or args.local
         ):
             resources = self.provider_data.get("resources") or {}
             self.provider_data["resources"] = resources
@@ -290,14 +290,15 @@ class Provider:
     def _parse_artifact_spec(artifact: Union[dict, str]) -> ArtifactSpec:
         def remove_prefix(text: str, prefix: str) -> str:
             if text.startswith(prefix):
-                return text[len(prefix):]
+                return text[len(prefix) :]
             return text
 
         if isinstance(artifact, str):
             return ArtifactSpec(artifact_path=remove_prefix(artifact, "./"), mount=False)
         else:
             return ArtifactSpec(
-                artifact_path=remove_prefix(artifact["path"], "./"), mount=artifact.get("mount") is True
+                artifact_path=remove_prefix(artifact["path"], "./"),
+                mount=artifact.get("mount") is True,
             )
 
     @staticmethod
@@ -321,10 +322,12 @@ class Provider:
                 return Provider._workflow_dep(backend, repo_data, t[0], mount)
         elif len(t) == 3:
             # This doesn't allow to refer to projects from other repos
-            repo_address = RepoAddress(repo_host_name=repo_data.repo_host_name,
-                                       repo_port=repo_data.repo_port,
-                                       repo_user_name=t[0],
-                                       repo_name=t[1])
+            repo_address = RepoAddress(
+                repo_host_name=repo_data.repo_host_name,
+                repo_port=repo_data.repo_port,
+                repo_user_name=t[0],
+                repo_name=t[1],
+            )
             if tag_dep:
                 return Provider._tag_dep(backend, repo_address, t[2], mount)
             else:
@@ -334,7 +337,7 @@ class Provider:
 
     @staticmethod
     def _tag_dep(
-            backend: Backend, repo_address: RepoAddress, tag_name: str, mount: bool
+        backend: Backend, repo_address: RepoAddress, tag_name: str, mount: bool
     ) -> DepSpec:
         tag_head = backend.get_tag_head(repo_address, tag_name)
         if tag_head:
@@ -344,7 +347,7 @@ class Provider:
 
     @staticmethod
     def _workflow_dep(
-            backend: Backend, repo_address: RepoAddress, workflow_name: str, mount: bool
+        backend: Backend, repo_address: RepoAddress, workflow_name: str, mount: bool
     ) -> DepSpec:
         job_heads = sorted(
             backend.list_job_heads(repo_address),
@@ -357,7 +360,7 @@ class Provider:
                     job_head.run_name
                     for job_head in job_heads
                     if job_head.workflow_name == workflow_name
-                       and job_head.status == JobStatus.DONE
+                    and job_head.status == JobStatus.DONE
                 ]
             ),
             None,
@@ -432,12 +435,12 @@ class Provider:
             if self.provider_data["resources"].get("local"):
                 resources.local = self.provider_data["resources"]["local"]
             if (
-                    resources.cpus
-                    or resources.memory_mib
-                    or resources.gpus
-                    or resources.shm_size_mib
-                    or resources.interruptible
-                    or resources.local
+                resources.cpus
+                or resources.memory_mib
+                or resources.gpus
+                or resources.shm_size_mib
+                or resources.interruptible
+                or resources.local
             ):
                 return resources
             else:

@@ -35,7 +35,8 @@ def _get_instance_types(ec2_client: BaseClient) -> List[InstanceType]:
         for instance_type in response["InstanceTypes"]:
             gpus = (
                 [
-                    [Gpu(name=gpu["Name"], memory_mib=gpu["MemoryInfo"]["SizeInMiB"])] * gpu["Count"]
+                    [Gpu(name=gpu["Name"], memory_mib=gpu["MemoryInfo"]["SizeInMiB"])]
+                    * gpu["Count"]
                     for gpu in instance_type["GpuInfo"]["Gpus"]
                 ]
                 if instance_type.get("GpuInfo") and instance_type["GpuInfo"].get("Gpus")
@@ -627,9 +628,13 @@ def get_request_head(
                     raise Exception(
                         f"Unsupported EC2 spot instance request status code: {status['Code']}"
                     )
-                return RequestHead(job_id=job.job_id, status=request_status, message=status.get("Message"))
+                return RequestHead(
+                    job_id=job.job_id, status=request_status, message=status.get("Message")
+                )
             else:
-                return RequestHead(job_id=job.job_id, status=RequestStatus.TERMINATED, message=None)
+                return RequestHead(
+                    job_id=job.job_id, status=RequestStatus.TERMINATED, message=None
+                )
         except Exception as e:
             if (
                 hasattr(e, "response")
@@ -663,7 +668,9 @@ def get_request_head(
                     raise Exception(f"Unsupported EC2 instance state name: {state['Name']}")
                 return RequestHead(job_id=job.job_id, status=request_status, message=None)
             else:
-                return RequestHead(job_id=job.job_id, status=RequestStatus.TERMINATED, message=None)
+                return RequestHead(
+                    job_id=job.job_id, status=RequestStatus.TERMINATED, message=None
+                )
         except Exception as e:
             if (
                 hasattr(e, "response")

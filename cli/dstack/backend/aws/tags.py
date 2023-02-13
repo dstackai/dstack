@@ -75,7 +75,10 @@ def create_tag_from_local_dirs(
         provider_name=job.provider_name,
         local_repo_user_name=job.local_repo_user_name,
         created_at=job.submitted_at,
-        artifact_heads=[ArtifactHead(job_id=job.job_id, artifact_path=a.artifact_path) for a in job.artifact_specs]
+        artifact_heads=[
+            ArtifactHead(job_id=job.job_id, artifact_path=a.artifact_path)
+            for a in job.artifact_specs
+        ]
         if job.artifact_specs
         else None,
     )

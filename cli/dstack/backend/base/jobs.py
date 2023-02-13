@@ -158,7 +158,9 @@ def run_job(
             update_job(storage, job)
             exit(f"No instance type matching requirements.")
 
-        runner = Runner(runner_id=job.runner_id, request_id=None, resources=instance_type.resources, job=job)
+        runner = Runner(
+            runner_id=job.runner_id, request_id=None, resources=instance_type.resources, job=job
+        )
         runners.create_runner(storage, runner)
         runner.request_id = compute.run_instance(job, instance_type)
         runners.update_runner(storage, runner)

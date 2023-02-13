@@ -1,4 +1,5 @@
 from typing import Dict, Optional, Union
+
 from pydantic import BaseModel
 
 from dstack.utils.common import _quoted
@@ -7,8 +8,8 @@ from dstack.utils.common import _quoted
 class AppSpec(BaseModel):
     port_index: int
     app_name: str
-    url_path: Union[str, None] = None,
-    url_query_params: Union[Dict[str, str], None] = None,
+    url_path: Union[str, None] = (None,)
+    url_query_params: Union[Dict[str, str], None] = (None,)
 
     def __str__(self) -> str:
         return (

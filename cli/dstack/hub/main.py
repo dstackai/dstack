@@ -6,10 +6,21 @@ from fastapi import FastAPI
 from starlette.responses import HTMLResponse, JSONResponse
 from starlette.staticfiles import StaticFiles
 
+from dstack.hub.db.migrate import migrate
 from dstack.hub.db.models import User
 from dstack.hub.repository.user import UserManager
-from dstack.hub.routers import users, hub, runs, jobs, runners, secrets, logs, artifacts, tags, repos
-from dstack.hub.db.migrate import migrate
+from dstack.hub.routers import (
+    artifacts,
+    hub,
+    jobs,
+    logs,
+    repos,
+    runners,
+    runs,
+    secrets,
+    tags,
+    users,
+)
 
 app = FastAPI(docs_url="/api/docs")
 app.include_router(users.router)

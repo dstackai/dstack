@@ -59,5 +59,7 @@ def render_log_message(
         timestamp=event["timestamp"],
         job_id=job_id,
         log_message=log,
-        log_source=LogEventSource.STDOUT if message["source"] == "stdout" else LogEventSource.STDERR,
+        log_source=LogEventSource.STDOUT
+        if message["source"] == "stdout"
+        else LogEventSource.STDERR,
     )

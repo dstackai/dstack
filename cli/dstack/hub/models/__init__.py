@@ -2,8 +2,8 @@ from typing import Dict, List, Optional, Union
 
 from pydantic import BaseModel
 
-from dstack.core.repo import RepoAddress, LocalRepoData
 from dstack.core.job import Job
+from dstack.core.repo import LocalRepoData, RepoAddress
 
 
 class Hub(BaseModel):

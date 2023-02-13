@@ -67,14 +67,21 @@ def _create_run(
     include_request_heads: bool,
 ) -> RunHead:
     app_heads = (
-        list(map(lambda app_name: AppHead(job_id=job_head.job_id, app_name=app_name), job_head.app_names))
+        list(
+            map(
+                lambda app_name: AppHead(job_id=job_head.job_id, app_name=app_name),
+                job_head.app_names,
+            )
+        )
         if job_head.app_names
         else None
     )
     artifact_heads = (
         list(
             map(
-                lambda artifact_path: ArtifactHead(job_id=job_head.job_id, artifact_path=artifact_path),
+                lambda artifact_path: ArtifactHead(
+                    job_id=job_head.job_id, artifact_path=artifact_path
+                ),
                 job_head.artifact_paths,
             )
         )
@@ -122,7 +129,9 @@ def _update_run(
         run.artifact_heads.extend(
             list(
                 map(
-                    lambda artifact_path: ArtifactHead(job_id=job_head.job_id, artifact_path=artifact_path),
+                    lambda artifact_path: ArtifactHead(
+                        job_id=job_head.job_id, artifact_path=artifact_path
+                    ),
                     job_head.artifact_paths,
                 )
             )

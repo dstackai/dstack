@@ -1,4 +1,4 @@
-from typing import Dict, Optional, List
+from typing import Dict, List, Optional
 from urllib.parse import urlunparse
 
 import requests
@@ -10,7 +10,8 @@ from dstack.core.repo import LocalRepoData, RepoAddress, RepoCredentials, RepoHe
 from dstack.core.run import RunHead
 from dstack.core.secret import Secret
 from dstack.core.tag import TagHead
-from dstack.hub.models import AddTagRun, AddTagPath, StopRunners, ReposUpdate, RunsList, JobsGet
+from dstack.hub.models import AddTagPath, AddTagRun, JobsGet, ReposUpdate, RunsList, StopRunners
+
 
 def _url(scheme="", host="", path="", params="", query="", fragment=""):
     return urlunparse((scheme, host, path, params, query, fragment))
@@ -78,10 +79,14 @@ class HubClient:
         try:
             headers = HubClient._auth(token=self.token)
             headers["Content-type"] = "application/json"
-            resp = requests.post(url=url, headers=headers, data={
-                "repo_address": repo_address.json(),
-                "repo_credentials": repo_credentials.json()
-            })
+            resp = requests.post(
+                url=url,
+                headers=headers,
+                data={
+                    "repo_address": repo_address.json(),
+                    "repo_credentials": repo_credentials.json(),
+                },
+            )
             if resp.ok:
                 return None
             if resp.status_code == 401:
@@ -92,7 +97,11 @@ class HubClient:
         return None
 
     def create_run(self, repo_address: RepoAddress) -> str:
-        url = _url(scheme="http", host=f"{self.host}:{self.port}", path=f"api/hub/{self.hub_name}/runs/create")
+        url = _url(
+            scheme="http",
+            host=f"{self.host}:{self.port}",
+            path=f"api/hub/{self.hub_name}/runs/create",
+        )
         try:
             headers = HubClient._auth(token=self.token)
             headers["Content-type"] = "application/json"
@@ -107,7 +116,11 @@ class HubClient:
         return ""
 
     def create_job(self, job: Job):
-        url = _url(scheme="http", host=f"{self.host}:{self.port}", path=f"api/hub/{self.hub_name}/jobs/create")
+        url = _url(
+            scheme="http",
+            host=f"{self.host}:{self.port}",
+            path=f"api/hub/{self.hub_name}/jobs/create",
+        )
         try:
             headers = HubClient._auth(token=self.token)
             headers["Content-type"] = "application/json"
@@ -122,7 +135,11 @@ class HubClient:
         return None
 
     def run_job(self, job: Job):
-        url = _url(scheme="http", host=f"{self.host}:{self.port}", path=f"api/hub/{self.hub_name}/runners/run")
+        url = _url(
+            scheme="http",
+            host=f"{self.host}:{self.port}",
+            path=f"api/hub/{self.hub_name}/runners/run",
+        )
         try:
             headers = HubClient._auth(token=self.token)
             headers["Content-type"] = "application/json"
@@ -137,15 +154,23 @@ class HubClient:
         return None
 
     def stop_job(self, repo_address: RepoAddress, job_id: str, abort: bool):
-        url = _url(scheme="http", host=f"{self.host}:{self.port}", path=f"api/hub/{self.hub_name}/runners/stop")
+        url = _url(
+            scheme="http",
+            host=f"{self.host}:{self.port}",
+            path=f"api/hub/{self.hub_name}/runners/stop",
+        )
         try:
             headers = HubClient._auth(token=self.token)
             headers["Content-type"] = "application/json"
-            resp = requests.post(url=url, headers=headers, data=StopRunners(
-                repo_address=repo_address,
-                job_id=job_id,
-                abort=abort,
-            ).json())
+            resp = requests.post(
+                url=url,
+                headers=headers,
+                data=StopRunners(
+                    repo_address=repo_address,
+                    job_id=job_id,
+                    abort=abort,
+                ).json(),
+            )
             if resp.ok:
                 return None
             if resp.status_code == 401:
@@ -156,7 +181,11 @@ class HubClient:
         return None
 
     def get_tag_head(self, repo_address: RepoAddress, tag_name: str) -> Optional[TagHead]:
-        url = _url(scheme="http", host=f"{self.host}:{self.port}", path=f"api/hub/{self.hub_name}/tags/{tag_name}")
+        url = _url(
+            scheme="http",
+            host=f"{self.host}:{self.port}",
+            path=f"api/hub/{self.hub_name}/tags/{tag_name}",
+        )
         try:
             headers = HubClient._auth(token=self.token)
             headers["Content-type"] = "application/json"
@@ -171,7 +200,11 @@ class HubClient:
         return None
 
     def list_tag_heads(self, repo_address: RepoAddress) -> Optional[List[TagHead]]:
-        url = _url(scheme="http", host=f"{self.host}:{self.port}", path=f"api/hub/{self.hub_name}/tags/list/heads")
+        url = _url(
+            scheme="http",
+            host=f"{self.host}:{self.port}",
+            path=f"api/hub/{self.hub_name}/tags/list/heads",
+        )
         try:
             headers = HubClient._auth(token=self.token)
             headers["Content-type"] = "application/json"
@@ -186,21 +219,31 @@ class HubClient:
             print(f"{self.host}:{self.port} connection refused")
         return None
 
-    def add_tag_from_run(self, repo_address: RepoAddress,
-                         tag_name: str,
-                         run_name: str,
-                         run_jobs: Optional[List[Job]],
-                         ):
-        url = _url(scheme="http", host=f"{self.host}:{self.port}", path=f"api/hub/{self.hub_name}/tags/add/run")
+    def add_tag_from_run(
+        self,
+        repo_address: RepoAddress,
+        tag_name: str,
+        run_name: str,
+        run_jobs: Optional[List[Job]],
+    ):
+        url = _url(
+            scheme="http",
+            host=f"{self.host}:{self.port}",
+            path=f"api/hub/{self.hub_name}/tags/add/run",
+        )
         try:
             headers = HubClient._auth(token=self.token)
             headers["Content-type"] = "application/json"
-            resp = requests.post(url=url, headers=headers, data=AddTagRun(
-                repo_address=repo_address,
-                tag_name=tag_name,
-                run_name=run_name,
-                run_jobs=run_jobs,
-            ).json())
+            resp = requests.post(
+                url=url,
+                headers=headers,
+                data=AddTagRun(
+                    repo_address=repo_address,
+                    tag_name=tag_name,
+                    run_name=run_name,
+                    run_jobs=run_jobs,
+                ).json(),
+            )
             if resp.ok:
                 return None
             if resp.status_code == 401:
@@ -210,19 +253,29 @@ class HubClient:
             print(f"{self.host}:{self.port} connection refused")
         return None
 
-    def add_tag_from_local_dirs(self, repo_data: LocalRepoData,
-                                tag_name: str,
-                                local_dirs: List[str],
-                                ):
-        url = _url(scheme="http", host=f"{self.host}:{self.port}", path=f"api/hub/{self.hub_name}/tags/add/path")
+    def add_tag_from_local_dirs(
+        self,
+        repo_data: LocalRepoData,
+        tag_name: str,
+        local_dirs: List[str],
+    ):
+        url = _url(
+            scheme="http",
+            host=f"{self.host}:{self.port}",
+            path=f"api/hub/{self.hub_name}/tags/add/path",
+        )
         try:
             headers = HubClient._auth(token=self.token)
             headers["Content-type"] = "application/json"
-            resp = requests.post(url=url, headers=headers, data=AddTagPath(
-                repo_data=repo_data,
-                tag_name=tag_name,
-                local_dirs=local_dirs,
-            ).json())
+            resp = requests.post(
+                url=url,
+                headers=headers,
+                data=AddTagPath(
+                    repo_data=repo_data,
+                    tag_name=tag_name,
+                    local_dirs=local_dirs,
+                ).json(),
+            )
             if resp.ok:
                 return None
             if resp.status_code == 401:
@@ -233,10 +286,11 @@ class HubClient:
         return None
 
     def delete_tag_head(self, repo_address: RepoAddress, tag_head: TagHead):
-        url = _url(scheme="http",
-                   host=f"{self.host}:{self.port}",
-                   path=f"api/hub/{self.hub_name}/tags/{tag_head.tag_name}/delete"
-                   )
+        url = _url(
+            scheme="http",
+            host=f"{self.host}:{self.port}",
+            path=f"api/hub/{self.hub_name}/tags/{tag_head.tag_name}/delete",
+        )
         try:
             headers = HubClient._auth(token=self.token)
             headers["Content-type"] = "application/json"
@@ -251,17 +305,22 @@ class HubClient:
         return None
 
     def update_repo_last_run_at(self, repo_address: RepoAddress, last_run_at: int):
-        url = _url(scheme="http",
-                   host=f"{self.host}:{self.port}",
-                   path=f"api/hub/{self.hub_name}/repos/update"
-                   )
+        url = _url(
+            scheme="http",
+            host=f"{self.host}:{self.port}",
+            path=f"api/hub/{self.hub_name}/repos/update",
+        )
         try:
             headers = HubClient._auth(token=self.token)
             headers["Content-type"] = "application/json"
-            resp = requests.post(url=url, headers=headers, data=ReposUpdate(
-                repo_address=repo_address,
-                last_run_at=last_run_at,
-            ).json())
+            resp = requests.post(
+                url=url,
+                headers=headers,
+                data=ReposUpdate(
+                    repo_address=repo_address,
+                    last_run_at=last_run_at,
+                ).json(),
+            )
             if resp.ok:
                 return None
             if resp.status_code == 401:
@@ -271,15 +330,18 @@ class HubClient:
             print(f"{self.host}:{self.port} connection refused")
         return None
 
-    def list_job_heads(self, repo_address: RepoAddress, run_name: Optional[str] = None) -> Optional[List[JobHead]]:
+    def list_job_heads(
+        self, repo_address: RepoAddress, run_name: Optional[str] = None
+    ) -> Optional[List[JobHead]]:
         query = ""
-        if not(run_name is None):
+        if not (run_name is None):
             query = f"run_name={run_name}"
-        url = _url(scheme="http",
-                   host=f"{self.host}:{self.port}",
-                   path=f"api/hub/{self.hub_name}/jobs/list/heads",
-                   query=query
-                   )
+        url = _url(
+            scheme="http",
+            host=f"{self.host}:{self.port}",
+            path=f"api/hub/{self.hub_name}/jobs/list/heads",
+            query=query,
+        )
         try:
             headers = HubClient._auth(token=self.token)
             headers["Content-type"] = "application/json"
@@ -294,22 +356,29 @@ class HubClient:
             print(f"{self.host}:{self.port} connection refused")
         return None
 
-    def list_run_heads(self,
-                       repo_address: RepoAddress,
-                       run_name: Optional[str] = None,
-                       include_request_heads: bool = True) -> List[RunHead]:
-        url = _url(scheme="http",
-                   host=f"{self.host}:{self.port}",
-                   path=f"api/hub/{self.hub_name}/runs/list",
-                   )
+    def list_run_heads(
+        self,
+        repo_address: RepoAddress,
+        run_name: Optional[str] = None,
+        include_request_heads: bool = True,
+    ) -> List[RunHead]:
+        url = _url(
+            scheme="http",
+            host=f"{self.host}:{self.port}",
+            path=f"api/hub/{self.hub_name}/runs/list",
+        )
         try:
             headers = HubClient._auth(token=self.token)
             headers["Content-type"] = "application/json"
-            resp = requests.get(url=url, headers=headers, data=RunsList(
-                repo_address=repo_address,
-                run_name=run_name,
-                include_request_heads=include_request_heads,
-            ).json())
+            resp = requests.get(
+                url=url,
+                headers=headers,
+                data=RunsList(
+                    repo_address=repo_address,
+                    run_name=run_name,
+                    include_request_heads=include_request_heads,
+                ).json(),
+            )
             if resp.ok:
                 body = resp.json()
                 return [RunHead.parse_obj(run) for run in body]
@@ -321,14 +390,22 @@ class HubClient:
         return []
 
     def get_job(self, repo_address: RepoAddress, job_id: str) -> Optional[Job]:
-        url = _url(scheme="http", host=f"{self.host}:{self.port}", path=f"api/hub/{self.hub_name}/jobs/get")
+        url = _url(
+            scheme="http",
+            host=f"{self.host}:{self.port}",
+            path=f"api/hub/{self.hub_name}/jobs/get",
+        )
         try:
             headers = HubClient._auth(token=self.token)
             headers["Content-type"] = "application/json"
-            resp = requests.get(url=url, headers=headers, data=JobsGet(
-                repo_address=repo_address,
-                job_id=job_id,
-            ).json())
+            resp = requests.get(
+                url=url,
+                headers=headers,
+                data=JobsGet(
+                    repo_address=repo_address,
+                    job_id=job_id,
+                ).json(),
+            )
             if resp.ok:
                 json_data = resp.json()
                 return Job.parse_obj(json_data)

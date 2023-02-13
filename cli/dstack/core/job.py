@@ -1,6 +1,7 @@
 from abc import abstractmethod
 from enum import Enum
 from typing import Any, Dict, List, Optional
+
 from pydantic import BaseModel
 
 from dstack.core.app import AppSpec
@@ -190,11 +191,13 @@ class Job(JobHead):
                 del data["app_names"]
         super().__init__(
             repo_address=data.get("repo_data"),
-            artifact_paths=[check_dict(a, "artifact_path") for a in data.get("artifact_specs")] if data.get(
-                "artifact_specs") else None,
-            app_names=[check_dict(a, "app_name") for a in data.get("app_specs")] if data.get(
-                "app_specs") else None,
-            **data
+            artifact_paths=[check_dict(a, "artifact_path") for a in data.get("artifact_specs")]
+            if data.get("artifact_specs")
+            else None,
+            app_names=[check_dict(a, "app_name") for a in data.get("app_specs")]
+            if data.get("app_specs")
+            else None,
+            **data,
         )
 
     def get_id(self) -> Optional[str]:
@@ -353,18 +356,18 @@ class Job(JobHead):
         )
         if requirements:
             if (
-                    not requirements.cpus
-                    and (
+                not requirements.cpus
+                and (
                     not requirements.gpus
                     or (
-                            not requirements.gpus.count
-                            and not requirements.gpus.memory_mib
-                            and not requirements.gpus.name
+                        not requirements.gpus.count
+                        and not requirements.gpus.memory_mib
+                        and not requirements.gpus.name
                     )
-            )
-                    and not requirements.interruptible
-                    and not requirements.local
-                    and not not requirements.shm_size_mib
+                )
+                and not requirements.interruptible
+                and not requirements.local
+                and not not requirements.shm_size_mib
             ):
                 requirements = None
         dep_specs = []
@@ -387,20 +390,24 @@ class Job(JobHead):
                 if isinstance(artifact, str):
                     artifact_spec = ArtifactSpec(artifact_path=artifact, mount=False)
                 else:
-                    artifact_spec = ArtifactSpec(artifact_path=artifact["path"], mount=artifact.get("mount") is True)
+                    artifact_spec = ArtifactSpec(
+                        artifact_path=artifact["path"], mount=artifact.get("mount") is True
+                    )
                 artifact_specs.append(artifact_spec)
-        master_job = JobRefId(job_id=job_data["master_job_id"]) if job_data.get("master_job_id") else None
+        master_job = (
+            JobRefId(job_id=job_data["master_job_id"]) if job_data.get("master_job_id") else None
+        )
         app_specs = (
-                        [
-                            AppSpec(
-                                port_index=a["port_index"],
-                                app_name=a["app_name"],
-                                url_path=a.get("url_path") or None,
-                                url_query_params=a.get("url_query_params") or None,
-                            )
-                            for a in (job_data.get("apps") or [])
-                        ]
-                    ) or None
+            [
+                AppSpec(
+                    port_index=a["port_index"],
+                    app_name=a["app_name"],
+                    url_path=a.get("url_path") or None,
+                    url_query_params=a.get("url_query_params") or None,
+                )
+                for a in (job_data.get("apps") or [])
+            ]
+        ) or None
         job = Job(
             job_id=job_data["job_id"],
             repo_data=RepoData(

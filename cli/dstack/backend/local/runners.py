@@ -93,7 +93,9 @@ def _unserialize_runner_resources(data: dict) -> Resources:
     return Resources(
         cpus=data["cpus"],
         memory_mib=data["memory_mib"],
-        gpus=[Gpu(name=g["name"], memory_mib=g["memory_mib"]) for g in data["gpus"]] if data.get("gpus") else [],
+        gpus=[Gpu(name=g["name"], memory_mib=g["memory_mib"]) for g in data["gpus"]]
+        if data.get("gpus")
+        else [],
         interruptible=False,
         local=True,
     )
@@ -158,7 +160,9 @@ def _get_runner_config_dir(runner_id: str, create: Optional[bool] = None) -> str
 
 def get_request_head(job: Job, request_id: Optional[str]) -> RequestHead:
     if request_id is None:
-        return RequestHead(job_id=job.job_id, status=RequestStatus.TERMINATED, message="PID is not specified")
+        return RequestHead(
+            job_id=job.job_id, status=RequestStatus.TERMINATED, message="PID is not specified"
+        )
     _running = is_running(request_id)
     return RequestHead(
         job_id=job.job_id,

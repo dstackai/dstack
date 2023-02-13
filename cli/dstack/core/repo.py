@@ -1,8 +1,8 @@
 from enum import Enum
-from typing import Optional, Any, Union
-from pydantic import BaseModel
+from typing import Any, Optional, Union
 
 import git
+from pydantic import BaseModel
 
 from dstack.utils.common import _quoted, _quoted_masked
 
@@ -139,9 +139,13 @@ class LocalRepoData(RepoData):
 
     def repo_credentials(self) -> RepoCredentials:
         if self.protocol == RepoProtocol.HTTPS:
-            return RepoCredentials(protocol=self.protocol, private_key=None, oauth_token=self.oauth_token)
+            return RepoCredentials(
+                protocol=self.protocol, private_key=None, oauth_token=self.oauth_token
+            )
         elif self.identity_file:
             with open(self.identity_file, "r") as f:
-                return RepoCredentials(protocol=self.protocol, private_key=f.read(), oauth_token=None)
+                return RepoCredentials(
+                    protocol=self.protocol, private_key=f.read(), oauth_token=None
+                )
         else:
             raise Exception("No identity file is specified")

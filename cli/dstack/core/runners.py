@@ -1,4 +1,5 @@
 from typing import List, Optional
+
 from pydantic import BaseModel
 
 from dstack.core.job import Job
@@ -64,7 +65,10 @@ class Runner(BaseModel):
             resources=Resources(
                 cpus=data["resources"]["cpus"],
                 memory_mib=data["resources"]["memory_mib"],
-                gpus=[Gpu(name=g["name"], memory_mib=g["memory_mib"]) for g in data["resources"]["gpus"]],
+                gpus=[
+                    Gpu(name=g["name"], memory_mib=g["memory_mib"])
+                    for g in data["resources"]["gpus"]
+                ],
                 interruptible=data["resources"]["interruptible"] is True,
                 local=data["resources"].get("local") is True,
             ),

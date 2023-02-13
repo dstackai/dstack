@@ -13,7 +13,6 @@ class LocalSecretsManager(SecretsManager):
         self.root_path = root_path
 
     def get_secret(self, repo_address: RepoAddress, secret_name: str) -> Optional[Secret]:
-        print(secret_name)
         value = _get_secret_value(
             db_filepath=_get_secrets_db_filepath(self.root_path, repo_address),
             key=_get_secret_key(repo_address, secret_name),

@@ -3,10 +3,9 @@ from typing import List, Union
 from fastapi import APIRouter, Depends
 from fastapi.security import HTTPBearer
 
-
-from dstack.hub.security.scope import Scope
 from dstack.core.repo import RepoAddress
 from dstack.core.secret import Secret
+from dstack.hub.security.scope import Scope
 
 router = APIRouter(prefix="/api/hub", tags=["secrets"])
 

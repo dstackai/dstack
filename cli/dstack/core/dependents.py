@@ -1,5 +1,6 @@
-from dstack.core.repo import RepoAddress
 from pydantic import BaseModel
+
+from dstack.core.repo import RepoAddress
 
 
 class DepSpec(BaseModel):

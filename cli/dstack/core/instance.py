@@ -1,5 +1,6 @@
-from dstack.core.runners import Resources
 from pydantic import BaseModel
+
+from dstack.core.runners import Resources
 
 
 class InstanceType(BaseModel):
