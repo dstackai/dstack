@@ -33,7 +33,7 @@ export const UserEdit: React.FC = () => {
         },
         {
             text: t('common.edit'),
-            href: ROUTES.USER.DETAILS.FORMAT(paramUserName),
+            href: ROUTES.USER.EDIT.FORMAT(paramUserName),
         },
     ]);
 

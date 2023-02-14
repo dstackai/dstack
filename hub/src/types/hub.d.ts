@@ -1,10 +1,10 @@
+declare type THubBackendType = 'aws';
 declare interface IHub {
     hub_name: string,
     backend: { type: THubBackendType } & THubBackendAWS,
     members: IHubMember[]
 }
 
-declare type THubBackendType = 'aws';
 
 declare interface THubBackendAWS {
     access_key: string,

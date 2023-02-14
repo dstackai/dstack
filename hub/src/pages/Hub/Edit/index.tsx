@@ -1,10 +1,53 @@
 import React from 'react';
-import { Box } from 'components';
+import { Container, Header, Loader, ContentLayout } from 'components';
+import { useTranslation } from 'react-i18next';
+import { useNavigate, useParams } from 'react-router-dom';
+import { useGetHubQuery } from 'services/hub';
+import { useBreadcrumbs, useNotifications } from 'hooks';
+import { ROUTES } from 'routes';
+import { HubForm } from '../Form';
 
 export const HubEdit: React.FC = () => {
+    const { t } = useTranslation();
+    const params = useParams();
+    const paramHubName = params.name ?? '';
+    const navigate = useNavigate();
+    const [pushNotification] = useNotifications();
+    const { data, isLoading } = useGetHubQuery({ name: paramHubName });
+
+    useBreadcrumbs([
+        {
+            text: t('navigation.hubs'),
+            href: ROUTES.HUB.LIST,
+        },
+        {
+            text: paramHubName,
+            href: ROUTES.HUB.DETAILS.FORMAT(paramHubName),
+        },
+
+        {
+            text: t('common.edit'),
+            href: ROUTES.USER.EDIT.FORMAT(paramHubName),
+        },
+    ]);
+
+    const onCancelHandler = () => {
+        navigate(ROUTES.HUB.DETAILS.FORMAT(paramHubName));
+    };
+
+    const onSubmitHandler = async (hubData: Partial<IHub>) => {
+        console.log(hubData);
+    };
+
     return (
-        <div>
-            <Box variant="h1">Edit hub</Box>
-        </div>
+        <ContentLayout header={<Header variant="awsui-h1-sticky">{paramHubName}</Header>}>
+            {isLoading && !data && (
+                <Container>
+                    <Loader />
+                </Container>
+            )}
+
+            {data && <HubForm initialValues={data} onSubmit={onSubmitHandler} onCancel={onCancelHandler} />}
+        </ContentLayout>
     );
 };

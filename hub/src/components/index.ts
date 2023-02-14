@@ -21,6 +21,9 @@ export { default as InputCSD } from '@cloudscape-design/components/input';
 export { default as SelectCSD } from '@cloudscape-design/components/select';
 export { default as StatusIndicator } from '@cloudscape-design/components/status-indicator';
 export { default as Popover } from '@cloudscape-design/components/popover';
+export { default as Autosuggest } from '@cloudscape-design/components/autosuggest';
+export type { AutosuggestProps } from '@cloudscape-design/components/autosuggest';
+export { default as Grid } from '@cloudscape-design/components/grid';
 
 // custom components
 export { NavigateLink } from './NavigateLink';
