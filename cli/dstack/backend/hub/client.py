@@ -14,6 +14,7 @@ from dstack.hub.models import (
     AddTagPath,
     AddTagRun,
     JobsGet,
+    JobsList,
     ReposUpdate,
     RunsList,
     SecretAddUpdate,
@@ -546,3 +547,27 @@ class HubClient:
         except requests.ConnectionError:
             print(f"{self.host}:{self.port} connection refused")
         return None
+
+    def list_jobs(self, repo_address: RepoAddress, run_name: str) -> List[Job]:
+        url = _url(
+            scheme="http",
+            host=f"{self.host}:{self.port}",
+            path=f"api/hub/{self.hub_name}/jobs/list",
+        )
+        try:
+            headers = HubClient._auth(token=self.token)
+            headers["Content-type"] = "application/json"
+            resp = requests.post(
+                url=url,
+                headers=headers,
+                data=JobsList(repo_address=repo_address, run_name=run_name).json(),
+            )
+            if resp.ok:
+                job_data = resp.json()
+                return [Job.parse_obj(job) for job in job_data]
+            if resp.status_code == 401:
+                print("Unauthorized. Please set correct token")
+                return []
+        except requests.ConnectionError:
+            print(f"{self.host}:{self.port} connection refused")
+        return []

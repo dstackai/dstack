@@ -57,6 +57,11 @@ class JobsGet(BaseModel):
     job_id: str
 
 
+class JobsList(BaseModel):
+    repo_address: RepoAddress
+    run_name: str
+
+
 class SecretAddUpdate(BaseModel):
     repo_address: RepoAddress
     secret: Secret
