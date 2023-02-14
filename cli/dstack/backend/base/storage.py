@@ -1,5 +1,5 @@
 from abc import ABC, abstractmethod
-from typing import Dict, List, Optional
+from typing import Callable, Dict, List, Optional
 
 from dstack.core.storage import StorageFile
 
@@ -23,4 +23,12 @@ class Storage(ABC):
 
     @abstractmethod
     def list_files(self, dirpath: str) -> List[StorageFile]:
+        pass
+
+    @abstractmethod
+    def download_file(self, source_path: str, dest_path: str, callback: Callable[[int], None]):
+        pass
+
+    @abstractmethod
+    def upload_file(self, source_path: str, dest_path: str, callback: Callable[[int], None]):
         pass

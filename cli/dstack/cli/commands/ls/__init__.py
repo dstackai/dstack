@@ -51,14 +51,12 @@ class LsCommand(BasicCommand):
             exit(1)
 
         artifacts = list_artifacts_with_merged_backends(backends, load_repo_data(), run_names[0])
-        previous_artifact_name = None
         for artifact, backends in artifacts:
-            table.add_row(
-                artifact.name if previous_artifact_name != artifact.name else "",
-                artifact.file,
-                sizeof_fmt(artifact.filesize_in_bytes),
-                ", ".join(b.name for b in backends),
-            )
-            previous_artifact_name = artifact.name
-
+            for i, file in enumerate(artifact.files):
+                table.add_row(
+                    artifact.name if i == 0 else "",
+                    file.filepath,
+                    sizeof_fmt(file.filesize_in_bytes),
+                    ", ".join(b.name for b in backends),
+                )
         console.print(table)

@@ -4,7 +4,7 @@ from typing import Dict, Generator, List, Optional, Tuple
 import boto3
 from botocore.client import BaseClient
 
-from dstack.backend.aws import artifacts, config, logs, tags
+from dstack.backend.aws import config, logs, tags
 from dstack.backend.aws.compute import AWSCompute
 from dstack.backend.aws.config import AWSConfig
 from dstack.backend.aws.secrets import AWSSecretsManager
@@ -162,15 +162,12 @@ class AwsBackend(RemoteBackend):
         repo_address: RepoAddress,
         run_name: str,
         output_dir: Optional[str],
-        output_job_dirs: bool = True,
     ):
-        artifacts.download_run_artifact_files(
-            self._s3_client(),
-            self.backend_config.bucket_name,
+        base_artifacts.download_run_artifact_files(
+            self._storage,
             repo_address,
             run_name,
             output_dir,
-            output_job_dirs,
         )
 
     def upload_job_artifact_files(
@@ -180,9 +177,8 @@ class AwsBackend(RemoteBackend):
         artifact_name: str,
         local_path: Path,
     ):
-        artifacts.upload_job_artifact_files(
-            s3_client=self._s3_client(),
-            bucket_name=self.backend_config.bucket_name,
+        base_artifacts.upload_job_artifact_files(
+            storage=self._storage,
             repo_address=repo_address,
             job_id=job_id,
             artifact_name=artifact_name,

@@ -197,7 +197,6 @@ class RemoteBackend(Backend):
         repo_address: RepoAddress,
         run_name: str,
         output_dir: Optional[str],
-        output_job_dirs: bool = True,
     ):
         pass
 

@@ -1,6 +1,6 @@
 import os
 from pathlib import Path
-from typing import Dict, List, Optional
+from typing import Callable, Dict, List, Optional
 
 from dstack.backend.base.storage import Storage
 from dstack.core.storage import StorageFile
@@ -53,6 +53,12 @@ class LocalStorage(Storage):
                     )
                 )
         return files
+
+    def download_file(self, source_path: str, dest_path: str, callback: Callable[[int], None]):
+        pass
+
+    def upload_file(self, source_path: str, dest_path: str, callback: Callable[[int], None]):
+        pass
 
 
 def _list_objects(Root: str, Prefix: str, MaxKeys: Optional[int] = None) -> List[str]:

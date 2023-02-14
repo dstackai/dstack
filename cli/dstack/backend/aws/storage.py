@@ -1,6 +1,7 @@
-from typing import Dict, List, Optional
+from typing import Callable, Dict, List, Optional
 
 import botocore.exceptions
+from boto3.s3 import transfer
 from botocore.client import BaseClient
 
 from dstack.backend.base.storage import Storage
@@ -57,3 +58,15 @@ class AWSStorage(Storage):
                         )
                     )
         return files
+
+    def download_file(self, source_path: str, dest_path: str, callback: Callable[[int], None]):
+        downloader = transfer.S3Transfer(
+            self.s3_client, transfer.TransferConfig(), transfer.OSUtils()
+        )
+        downloader.download_file(self.bucket_name, source_path, dest_path, callback=callback)
+
+    def upload_file(self, source_path: str, dest_path: str, callback: Callable[[int], None]):
+        uploader = transfer.S3Transfer(
+            self.s3_client, transfer.TransferConfig(), transfer.OSUtils()
+        )
+        uploader.upload_file(source_path, self.bucket_name, dest_path, callback)
