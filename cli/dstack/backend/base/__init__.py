@@ -119,9 +119,7 @@ class Backend(ABC):
         pass
 
     @abstractmethod
-    def list_run_artifact_files(
-        self, repo_address: RepoAddress, run_name: str
-    ) -> Generator[Artifact, None, None]:
+    def list_run_artifact_files(self, repo_address: RepoAddress, run_name: str) -> List[Artifact]:
         # TODO: add a flag for non-recursive listing.
         # Backends may implement this via list_run_artifact_files_and_folders()
         pass

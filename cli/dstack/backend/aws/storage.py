@@ -4,6 +4,7 @@ import botocore.exceptions
 from botocore.client import BaseClient
 
 from dstack.backend.base.storage import Storage
+from dstack.core.storage import StorageFile
 
 
 class AWSStorage(Storage):
@@ -39,3 +40,20 @@ class AWSStorage(Storage):
         for obj_metadata in response["Contents"]:
             object_keys.append(obj_metadata["Key"])
         return object_keys
+
+    def list_files(self, dirpath: str) -> List[StorageFile]:
+        prefix = dirpath
+        paginator = self.s3_client.get_paginator("list_objects")
+        page_iterator = paginator.paginate(Bucket=self.bucket_name, Prefix=prefix)
+        files = []
+        for page in page_iterator:
+            for obj in page.get("Contents") or []:
+                if obj["Size"] > 0:
+                    filepath = obj["Key"]
+                    files.append(
+                        StorageFile(
+                            filepath=filepath.removeprefix(prefix),
+                            filesize_in_bytes=obj["Size"],
+                        )
+                    )
+        return files

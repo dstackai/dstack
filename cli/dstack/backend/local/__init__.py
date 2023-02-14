@@ -2,6 +2,7 @@ from pathlib import Path
 from typing import Generator, List, Optional, Tuple
 
 from dstack.backend.base import Backend, BackendType
+from dstack.backend.base import artifacts as base_artifacts
 from dstack.backend.base import jobs as base_jobs
 from dstack.backend.base import repos as base_repos
 from dstack.backend.base import runs as base_runs
@@ -89,10 +90,8 @@ class LocalBackend(Backend):
             self._storage, self._compute, repo_address, job_heads, start_time, attached
         )
 
-    def list_run_artifact_files(
-        self, repo_address: RepoAddress, run_name: str
-    ) -> Generator[Artifact, None, None]:
-        return artifacts.list_run_artifact_files(self.backend_config.path, repo_address, run_name)
+    def list_run_artifact_files(self, repo_address: RepoAddress, run_name: str) -> List[Artifact]:
+        return base_artifacts.list_run_artifact_files(self._storage, repo_address, run_name)
 
     def list_tag_heads(self, repo_address: RepoAddress) -> List[TagHead]:
         return base_tags.list_tag_heads(self._storage, repo_address)

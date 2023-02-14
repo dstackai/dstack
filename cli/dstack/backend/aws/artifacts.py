@@ -1,12 +1,11 @@
 import os
 from pathlib import Path
-from typing import Generator, List, Optional, Tuple
+from typing import List, Optional, Tuple
 
 from boto3.s3 import transfer
 from botocore.client import BaseClient
 from tqdm import tqdm
 
-from dstack.core.artifact import Artifact
 from dstack.core.repo import RepoAddress
 
 
@@ -59,27 +58,6 @@ def download_run_artifact_files(
             file_path = dest_file_path(key, output_path, output_job_dirs)
             file_path.parent.mkdir(parents=True, exist_ok=True)
             downloader.download_file(bucket_name, key, str(file_path), callback=callback)
-
-
-def list_run_artifact_files(
-    s3_client: BaseClient, bucket_name: str, repo_address: RepoAddress, run_name: str
-) -> Generator[Artifact, None, None]:
-    artifact_prefix = f"artifacts/{repo_address.path()}/{run_name},"
-    paginator = s3_client.get_paginator("list_objects")
-    page_iterator = paginator.paginate(Bucket=bucket_name, Prefix=artifact_prefix)
-    for page in page_iterator:
-        for obj in page.get("Contents") or []:
-            if obj["Size"] > 0:
-                t = obj["Key"].split("/")
-                job_id = t[4]
-                artifact_name = t[5]
-                artifact_file = "/".join(t[6:])
-                yield Artifact(
-                    job_id=job_id,
-                    name=artifact_name,
-                    file=artifact_file,
-                    filesize_in_bytes=obj["Size"],
-                )
 
 
 def __remove_prefix(text, prefix):

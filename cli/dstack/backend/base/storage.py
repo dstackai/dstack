@@ -1,6 +1,8 @@
 from abc import ABC, abstractmethod
 from typing import Dict, List, Optional
 
+from dstack.core.storage import StorageFile
+
 
 class Storage(ABC):
     @abstractmethod
@@ -17,4 +19,8 @@ class Storage(ABC):
 
     @abstractmethod
     def list_objects(self, keys_prefix: str) -> List[str]:
+        pass
+
+    @abstractmethod
+    def list_files(self, dirpath: str) -> List[StorageFile]:
         pass

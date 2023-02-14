@@ -3,6 +3,7 @@ from pathlib import Path
 from typing import Dict, List, Optional
 
 from dstack.backend.base.storage import Storage
+from dstack.core.storage import StorageFile
 
 
 class LocalStorage(Storage):
@@ -36,6 +37,22 @@ class LocalStorage(Storage):
             Root=self.root_path,
             Prefix=keys_prefix,
         )
+
+    def list_files(self, dirpath: str) -> List[StorageFile]:
+        full_dirpath = os.path.join(self.root_path, dirpath)
+        files = []
+        for dirpath, dirnames, filenames in os.walk(full_dirpath):
+            for filename in filenames:
+                full_filepath = os.path.join(dirpath, filename)
+                filesize = os.path.getsize(full_filepath)
+                filepath = full_filepath.removeprefix(full_dirpath)
+                files.append(
+                    StorageFile(
+                        filepath=filepath,
+                        filesize_in_bytes=filesize,
+                    )
+                )
+        return files
 
 
 def _list_objects(Root: str, Prefix: str, MaxKeys: Optional[int] = None) -> List[str]:
@@ -79,21 +96,3 @@ def _delete_object(Root: str, Key: str):
     path = os.path.join(Root, Key)
     if os.path.exists(path):
         os.remove(path)
-
-
-def _list_all_objects(Root: str, Prefix: str):
-    if not os.path.exists(Root):
-        return []
-    files = os.listdir(Root)
-    list_dir = []
-    for file in files:
-        if file.startswith(Prefix) and os.path.isdir(os.path.join(Root, file)):
-            list_dir.append(file)
-    for _dir in list_dir:
-        job_dir = os.path.join(Root, _dir)
-        for root, sub_dirs, files in os.walk(job_dir):
-            clear_root = Path(root).relative_to(job_dir)
-            for filename in files:
-                file_path = os.path.join(clear_root, filename)
-                file_size = os.path.getsize(os.path.join(root, filename))
-                yield _dir, file_path, file_size

@@ -10,6 +10,7 @@ from dstack.backend.aws.config import AWSConfig
 from dstack.backend.aws.secrets import AWSSecretsManager
 from dstack.backend.aws.storage import AWSStorage
 from dstack.backend.base import RemoteBackend
+from dstack.backend.base import artifacts as base_artifacts
 from dstack.backend.base import jobs as base_jobs
 from dstack.backend.base import repos as base_repos
 from dstack.backend.base import runs as base_runs
@@ -153,12 +154,8 @@ class AwsBackend(RemoteBackend):
             attached,
         )
 
-    def list_run_artifact_files(
-        self, repo_address: RepoAddress, run_name: str
-    ) -> Generator[Artifact, None, None]:
-        return artifacts.list_run_artifact_files(
-            self._s3_client(), self.backend_config.bucket_name, repo_address, run_name
-        )
+    def list_run_artifact_files(self, repo_address: RepoAddress, run_name: str) -> List[Artifact]:
+        return base_artifacts.list_run_artifact_files(self._storage, repo_address, run_name)
 
     def download_run_artifact_files(
         self,
