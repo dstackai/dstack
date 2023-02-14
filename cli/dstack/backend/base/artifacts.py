@@ -7,7 +7,6 @@ from tqdm import tqdm
 from dstack.backend.base import jobs
 from dstack.backend.base.storage import Storage
 from dstack.core.artifact import Artifact
-from dstack.core.job import Job
 from dstack.core.repo import RepoAddress
 
 
@@ -35,10 +34,10 @@ def download_run_artifact_files(
     storage: Storage,
     repo_address: RepoAddress,
     run_name: str,
-    artifacts_dest_dir: Optional[str],
+    output_dir: Optional[str],
 ):
-    if artifacts_dest_dir is None:
-        artifacts_dest_dir = os.getcwd()
+    if output_dir is None:
+        output_dir = os.getcwd()
     artifacts = list_run_artifact_files(storage, repo_address, run_name)
     for artifact in artifacts:
         total_size = sum(f.filesize_in_bytes for f in artifact.files)
@@ -56,9 +55,7 @@ def download_run_artifact_files(
             for file in artifact.files:
                 artifacts_dir = _get_job_artifacts_dir(repo_address, artifact.job_id)
                 source_path = os.path.join(artifacts_dir, artifact.name, file.filepath)
-                dest_path = os.path.join(
-                    artifacts_dest_dir, artifact.job_id, artifact.name, file.filepath
-                )
+                dest_path = os.path.join(output_dir, artifact.job_id, artifact.name, file.filepath)
                 Path(dest_path).parent.mkdir(parents=True, exist_ok=True)
                 storage.download_file(source_path, dest_path, callback)
 

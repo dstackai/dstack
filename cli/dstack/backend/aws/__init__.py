@@ -4,7 +4,7 @@ from typing import Dict, Generator, List, Optional, Tuple
 import boto3
 from botocore.client import BaseClient
 
-from dstack.backend.aws import config, logs, tags
+from dstack.backend.aws import config, logs
 from dstack.backend.aws.compute import AWSCompute
 from dstack.backend.aws.config import AWSConfig
 from dstack.backend.aws.secrets import AWSSecretsManager
@@ -164,10 +164,10 @@ class AwsBackend(RemoteBackend):
         output_dir: Optional[str],
     ):
         base_artifacts.download_run_artifact_files(
-            self._storage,
-            repo_address,
-            run_name,
-            output_dir,
+            storage=self._storage,
+            repo_address=repo_address,
+            run_name=run_name,
+            output_dir=output_dir,
         )
 
     def upload_job_artifact_files(
@@ -209,11 +209,12 @@ class AwsBackend(RemoteBackend):
     def add_tag_from_local_dirs(
         self, repo_data: LocalRepoData, tag_name: str, local_dirs: List[str]
     ):
-        tags.create_tag_from_local_dirs(
+        base_tags.create_tag_from_local_dirs(
             self._storage,
             repo_data,
             tag_name,
             local_dirs,
+            self.type,
         )
 
     def delete_tag_head(self, repo_address: RepoAddress, tag_head: TagHead):

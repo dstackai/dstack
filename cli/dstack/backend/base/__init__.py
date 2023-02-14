@@ -8,7 +8,7 @@ from dstack.core.artifact import Artifact
 from dstack.core.config import BackendConfig
 from dstack.core.job import Job, JobHead
 from dstack.core.log_event import LogEvent
-from dstack.core.repo import RepoAddress, RepoCredentials, RepoData
+from dstack.core.repo import LocalRepoData, RepoAddress, RepoCredentials
 from dstack.core.run import RunHead
 from dstack.core.runners import Runner
 from dstack.core.secret import Secret
@@ -125,6 +125,25 @@ class Backend(ABC):
         pass
 
     @abstractmethod
+    def download_run_artifact_files(
+        self,
+        repo_address: RepoAddress,
+        run_name: str,
+        output_dir: Optional[str],
+    ):
+        pass
+
+    @abstractmethod
+    def upload_job_artifact_files(
+        self,
+        repo_address: RepoAddress,
+        job_id: str,
+        artifact_name: str,
+        local_path: Path,
+    ):
+        pass
+
+    @abstractmethod
     def list_tag_heads(self, repo_address: RepoAddress) -> List[TagHead]:
         pass
 
@@ -143,7 +162,9 @@ class Backend(ABC):
         pass
 
     @abstractmethod
-    def add_tag_from_local_dirs(self, repo_data: RepoData, tag_name: str, local_dirs: List[str]):
+    def add_tag_from_local_dirs(
+        self, repo_data: LocalRepoData, tag_name: str, local_dirs: List[str]
+    ):
         pass
 
     @abstractmethod
@@ -190,22 +211,3 @@ class RemoteBackend(Backend):
     @property
     def type(self) -> BackendType:
         return BackendType.REMOTE
-
-    @abstractmethod
-    def download_run_artifact_files(
-        self,
-        repo_address: RepoAddress,
-        run_name: str,
-        output_dir: Optional[str],
-    ):
-        pass
-
-    @abstractmethod
-    def upload_job_artifact_files(
-        self,
-        repo_address: RepoAddress,
-        job_id: str,
-        artifact_name: str,
-        local_path: Path,
-    ):
-        pass

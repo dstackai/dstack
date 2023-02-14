@@ -1,4 +1,5 @@
 import os
+import shutil
 from pathlib import Path
 from typing import Callable, Dict, List, Optional
 
@@ -55,10 +56,15 @@ class LocalStorage(Storage):
         return files
 
     def download_file(self, source_path: str, dest_path: str, callback: Callable[[int], None]):
-        pass
+        full_source_path = os.path.join(self.root_path, source_path)
+        shutil.copy2(full_source_path, dest_path)
+        callback(os.path.getsize(dest_path))
 
     def upload_file(self, source_path: str, dest_path: str, callback: Callable[[int], None]):
-        pass
+        full_dest_path = os.path.join(self.root_path, dest_path)
+        Path(full_dest_path).parent.mkdir(parents=True, exist_ok=True)
+        shutil.copy2(source_path, full_dest_path)
+        callback(os.path.getsize(source_path))
 
 
 def _list_objects(Root: str, Prefix: str, MaxKeys: Optional[int] = None) -> List[str]:

@@ -27,8 +27,16 @@ class Storage(ABC):
 
     @abstractmethod
     def download_file(self, source_path: str, dest_path: str, callback: Callable[[int], None]):
+        """
+        `source_path` - storage path relative to the storage root.
+        `dest_path` - local absolute path.
+        """
         pass
 
     @abstractmethod
     def upload_file(self, source_path: str, dest_path: str, callback: Callable[[int], None]):
+        """
+        `source_path` - local absolute path.
+        `dest_path` - storage path relative to the storage root.
+        """
         pass
