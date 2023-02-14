@@ -7,6 +7,7 @@ from dstack.backend.base import BackendType, RemoteBackend
 from dstack.backend.hub.client import HubClient
 from dstack.backend.hub.config import HUBConfig
 from dstack.core.artifact import Artifact
+from dstack.core.config import BackendConfig
 from dstack.core.error import ConfigError
 from dstack.core.job import Job, JobHead
 from dstack.core.log_event import LogEvent
@@ -17,7 +18,10 @@ from dstack.core.tag import TagHead
 
 
 class HubBackend(RemoteBackend):
-    def __init__(self):
+    _client = None
+
+    def __init__(self, config: Optional[BackendConfig] = None):
+        super().__init__(config)
         self.backend_config = HUBConfig()
         try:
             self.backend_config.load()
@@ -26,13 +30,14 @@ class HubBackend(RemoteBackend):
             self._loaded = False
 
     def _hub_client(self) -> HubClient:
-        _client = HubClient(
-            host=self.backend_config.host,
-            port=self.backend_config.port,
-            token=self.backend_config.token,
-            hub_name=self.backend_config.hub_name,
-        )
-        return _client
+        if self._client is None:
+            self._client = HubClient(
+                host=self.backend_config.host,
+                port=self.backend_config.port,
+                token=self.backend_config.token,
+                hub_name=self.backend_config.hub_name,
+            )
+        return self._client
 
     @property
     def name(self):
@@ -52,11 +57,9 @@ class HubBackend(RemoteBackend):
         self._hub_client().create_job(job=job)
 
     def get_job(self, repo_address: RepoAddress, job_id: str) -> Optional[Job]:
-        # /{hub_name}/jobs/get
         return self._hub_client().get_job(repo_address=repo_address, job_id=job_id)
 
     def list_jobs(self, repo_address: RepoAddress, run_name: str) -> List[Job]:
-        # /{hub_name}/jobs/list
         pass
 
     def run_job(self, job: Job):
@@ -169,21 +172,17 @@ class HubBackend(RemoteBackend):
         )
 
     def list_secret_names(self, repo_address: RepoAddress) -> List[str]:
-        # /{hub_name}/secrets/list
-        pass
+        return self._hub_client().list_secret_names(repo_address=repo_address)
 
     def get_secret(self, repo_address: RepoAddress, secret_name: str) -> Optional[Secret]:
-        # /{hub_name}/secrets/get
-        pass
+        return self._hub_client().get_secret(repo_address=repo_address, secret_name=secret_name)
 
     def add_secret(self, repo_address: RepoAddress, secret: Secret):
-        # /{hub_name}/secrets/add
-        pass
+        self._hub_client().add_secret(repo_address=repo_address, secret=secret)
 
     def update_secret(self, repo_address: RepoAddress, secret: Secret):
-        # /{hub_name}/secrets/update
-        pass
+        self._hub_client().update_secret(repo_address=repo_address, secret=secret)
 
     def delete_secret(self, repo_address: RepoAddress, secret_name: str):
         # /{hub_name}/secrets/delete
-        pass
+        self._hub_client().delete_secret(repo_address=repo_address, secret_name=secret_name)

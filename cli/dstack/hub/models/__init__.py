@@ -4,6 +4,7 @@ from pydantic import BaseModel
 
 from dstack.core.job import Job
 from dstack.core.repo import LocalRepoData, RepoAddress
+from dstack.core.secret import Secret
 
 
 class Hub(BaseModel):
@@ -54,3 +55,8 @@ class RunsList(BaseModel):
 class JobsGet(BaseModel):
     repo_address: RepoAddress
     job_id: str
+
+
+class SecretAddUpdate(BaseModel):
+    repo_address: RepoAddress
+    secret: Secret
