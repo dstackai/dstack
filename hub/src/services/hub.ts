@@ -9,6 +9,8 @@ export const hubApi = createApi({
         prepareHeaders: fetchBaseQueryHeaders,
     }),
 
+    tagTypes: ['Hubs'],
+
     endpoints: (builder) => ({
         getHubs: builder.query<IHub[], void>({
             query: () => {
@@ -16,6 +18,9 @@ export const hubApi = createApi({
                     url: API.HUBS.LIST(),
                 };
             },
+
+            providesTags: (result) =>
+                result ? [...result.map(({ hub_name }) => ({ type: 'Hubs' as const, id: hub_name })), 'Hubs'] : ['Hubs'],
         }),
 
         getHub: builder.query<IHub, { name: IHub['hub_name'] }>({
@@ -24,6 +29,18 @@ export const hubApi = createApi({
                     url: API.HUBS.DETAILS(name),
                 };
             },
+
+            providesTags: (result) => (result ? [{ type: 'Hubs' as const, id: result.hub_name }] : []),
+        }),
+
+        updateHub: builder.mutation<IHub, Partial<IHub> & Pick<IHub, 'hub_name'>>({
+            query: (hub) => ({
+                url: API.USERS.DETAILS(hub.hub_name),
+                method: 'PATCH',
+                params: hub,
+            }),
+
+            invalidatesTags: (result) => [{ type: 'Hubs' as const, id: result?.hub_name }],
         }),
 
         deleteHubs: builder.mutation<void, IHub['hub_name'][]>({
@@ -38,4 +55,4 @@ export const hubApi = createApi({
     }),
 });
 
-export const { useGetHubsQuery, useGetHubQuery, useDeleteHubsMutation } = hubApi;
+export const { useGetHubsQuery, useGetHubQuery, useUpdateHubMutation, useDeleteHubsMutation } = hubApi;

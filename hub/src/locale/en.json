@@ -55,7 +55,9 @@
         "section_title": "Members",
         "name": "User name",
         "role": "Hub role"
-      }
+      },
+      "error_notification": "Update hub error",
+      "success_notification": "Hub updating is successful"
     }
   },
   "users": {

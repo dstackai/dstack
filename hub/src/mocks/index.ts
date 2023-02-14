@@ -69,6 +69,10 @@ const mocksMap: MocksMap = {
             success: hub.list.success[0],
             failed: { status: 403 },
         },
+        PATCH: {
+            success: hub.list.success[0],
+            failed: { status: 403 },
+        },
     },
     [API.HUBS.BASE()]: {
         DELETE: {

@@ -111,7 +111,13 @@ export const HubForm: React.FC<IProps> = ({ initialValues, onCancel, loading, on
                     expandToViewport
                     secondaryControl={
                         <div className={styles.deleteMemberButtonWrapper}>
-                            <Button formAction="none" onClick={() => remove(field.index)} variant="icon" iconName="remove" />
+                            <Button
+                                disabled={loading}
+                                formAction="none"
+                                onClick={() => remove(field.index)}
+                                variant="icon"
+                                iconName="remove"
+                            />
                         </div>
                     }
                 />
@@ -170,6 +176,7 @@ export const HubForm: React.FC<IProps> = ({ initialValues, onCancel, loading, on
                         }
                         filter={
                             <UserAutosuggest
+                                disabled={loading}
                                 onSelect={({ detail }) => addMember(detail.value)}
                                 optionsFilter={(options) => options.filter((o) => !fields.find((f) => f.user_name === o.value))}
                             />

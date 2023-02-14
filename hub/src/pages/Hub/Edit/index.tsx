@@ -2,7 +2,7 @@ import React from 'react';
 import { Container, Header, Loader, ContentLayout } from 'components';
 import { useTranslation } from 'react-i18next';
 import { useNavigate, useParams } from 'react-router-dom';
-import { useGetHubQuery } from 'services/hub';
+import { useGetHubQuery, useUpdateHubMutation } from 'services/hub';
 import { useBreadcrumbs, useNotifications } from 'hooks';
 import { ROUTES } from 'routes';
 import { HubForm } from '../Form';
@@ -14,6 +14,7 @@ export const HubEdit: React.FC = () => {
     const navigate = useNavigate();
     const [pushNotification] = useNotifications();
     const { data, isLoading } = useGetHubQuery({ name: paramHubName });
+    const [updateHub, { isLoading: isHubUpdating }] = useUpdateHubMutation();
 
     useBreadcrumbs([
         {
@@ -36,7 +37,24 @@ export const HubEdit: React.FC = () => {
     };
 
     const onSubmitHandler = async (hubData: Partial<IHub>) => {
-        console.log(hubData);
+        try {
+            const data = await updateHub({
+                ...hubData,
+                hub_name: paramHubName,
+            }).unwrap();
+
+            pushNotification({
+                type: 'success',
+                content: t('hubs.edit.success_notification'),
+            });
+
+            navigate(ROUTES.HUB.DETAILS.FORMAT(data.hub_name ?? paramHubName));
+        } catch (e) {
+            pushNotification({
+                type: 'error',
+                content: t('hubs.edit.error_notification'),
+            });
+        }
     };
 
     return (
@@ -47,7 +65,9 @@ export const HubEdit: React.FC = () => {
                 </Container>
             )}
 
-            {data && <HubForm initialValues={data} onSubmit={onSubmitHandler} onCancel={onCancelHandler} />}
+            {data && (
+                <HubForm initialValues={data} loading={isHubUpdating} onSubmit={onSubmitHandler} onCancel={onCancelHandler} />
+            )}
         </ContentLayout>
     );
 };
