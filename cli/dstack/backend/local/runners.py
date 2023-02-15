@@ -3,8 +3,6 @@ import platform
 import shutil
 import signal
 import subprocess
-import sys
-import uuid
 from pathlib import Path
 from typing import List, Optional, Tuple
 

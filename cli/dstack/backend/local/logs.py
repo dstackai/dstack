@@ -86,14 +86,9 @@ def poll_logs(
     start_time: int,
     attached: bool,
 ) -> Generator[LogEvent, None, None]:
-    job_host_names = {}
-    job_ports = {}
-    job_app_specs = {}
     try:
         # Read log_file
         for event in events_loop(storage, compute, repo_address, job_heads):
-            yield render_log_message(
-                storage, event, repo_address, job_host_names, job_ports, job_app_specs
-            )
+            yield render_log_message(storage, event, repo_address)
     except Exception as e:
         raise e

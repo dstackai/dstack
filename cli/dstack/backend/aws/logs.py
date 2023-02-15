@@ -1,6 +1,6 @@
 import time
 from collections import defaultdict
-from typing import Any, Dict, Generator, List, Optional, Tuple
+from typing import Generator, List, Optional, Tuple
 
 from botocore.client import BaseClient
 
@@ -137,10 +137,6 @@ def poll_logs(
     filter_logs_events_kwargs = _filter_logs_events_kwargs(
         bucket_name, repo_address, run_name, start_time, end_time=None, next_token=None
     )
-    job_host_names = {}
-    job_ports = {}
-    job_app_specs = {}
-
     try:
         if attached:
             for event in _filter_log_events_loop(
@@ -155,9 +151,6 @@ def poll_logs(
                     storage,
                     event,
                     repo_address,
-                    job_host_names,
-                    job_ports,
-                    job_app_specs,
                 )
         else:
             paginator = logs_client.get_paginator("filter_log_events")
@@ -167,9 +160,6 @@ def poll_logs(
                         storage,
                         event,
                         repo_address,
-                        job_host_names,
-                        job_ports,
-                        job_app_specs,
                     )
     except Exception as e:
         if (
