@@ -4,7 +4,8 @@ from typing import Generator, List, Optional
 
 from google.auth._default import _CLOUD_SDK_CREDENTIALS_WARNING
 
-from dstack.backend.base import RemoteBackend
+from dstack.backend.base import CloudBackend
+from dstack.backend.base import artifacts as base_artifacts
 from dstack.backend.base import jobs as base_jobs
 from dstack.backend.base import repos as base_repos
 from dstack.backend.base import runs as base_runs
@@ -17,7 +18,7 @@ from dstack.backend.gcp.storage import GCPStorage
 from dstack.core.artifact import Artifact
 from dstack.core.job import Job, JobHead
 from dstack.core.log_event import LogEvent
-from dstack.core.repo import RepoAddress, RepoCredentials, RepoData, RepoProtocol
+from dstack.core.repo import LocalRepoData, RepoAddress, RepoCredentials
 from dstack.core.run import RunHead
 from dstack.core.secret import Secret
 from dstack.core.tag import TagHead
@@ -25,7 +26,7 @@ from dstack.core.tag import TagHead
 warnings.filterwarnings("ignore", message=_CLOUD_SDK_CREDENTIALS_WARNING)
 
 
-class GCPBackend(RemoteBackend):
+class GCPBackend(CloudBackend):
     def __init__(self):
         self.config = GCPConfig()
         self._storage = GCPStorage(
@@ -92,12 +93,36 @@ class GCPBackend(RemoteBackend):
     ) -> Generator[LogEvent, None, None]:
         pass
 
-    def list_run_artifact_files(
-        self, repo_address: RepoAddress, run_name: str
-    ) -> Generator[Artifact, None, None]:
-        # TODO: add a flag for non-recursive listing.
-        # Backends may implement this via list_run_artifact_files_and_folders()
-        pass
+    def list_run_artifact_files(self, repo_address: RepoAddress, run_name: str) -> List[Artifact]:
+        return base_artifacts.list_run_artifact_files(self._storage, repo_address, run_name)
+
+    def download_run_artifact_files(
+        self,
+        repo_address: RepoAddress,
+        run_name: str,
+        output_dir: Optional[str],
+    ):
+        base_artifacts.download_run_artifact_files(
+            storage=self._storage,
+            repo_address=repo_address,
+            run_name=run_name,
+            output_dir=output_dir,
+        )
+
+    def upload_job_artifact_files(
+        self,
+        repo_address: RepoAddress,
+        job_id: str,
+        artifact_name: str,
+        local_path: Path,
+    ):
+        base_artifacts.upload_job_artifact_files(
+            storage=self._storage,
+            repo_address=repo_address,
+            job_id=job_id,
+            artifact_name=artifact_name,
+            local_path=local_path,
+        )
 
     def list_tag_heads(self, repo_address: RepoAddress) -> List[TagHead]:
         return base_tags.list_tag_heads(self._storage, repo_address)
@@ -120,8 +145,16 @@ class GCPBackend(RemoteBackend):
             run_jobs,
         )
 
-    def add_tag_from_local_dirs(self, repo_data: RepoData, tag_name: str, local_dirs: List[str]):
-        pass
+    def add_tag_from_local_dirs(
+        self, repo_data: LocalRepoData, tag_name: str, local_dirs: List[str]
+    ):
+        base_tags.create_tag_from_local_dirs(
+            self._storage,
+            repo_data,
+            tag_name,
+            local_dirs,
+            self.type,
+        )
 
     def delete_tag_head(self, repo_address: RepoAddress, tag_head: TagHead):
         base_tags.delete_tag(self._storage, repo_address, tag_head)
@@ -173,20 +206,8 @@ class GCPBackend(RemoteBackend):
             secret_name,
         )
 
-    def download_run_artifact_files(
-        self,
-        repo_address: RepoAddress,
-        run_name: str,
-        output_dir: Optional[str],
-        output_job_dirs: bool = True,
-    ):
-        pass
+    def get_signed_download_url(self, object_key: str) -> str:
+        return self._storage.get_signed_download_url(object_key)
 
-    def upload_job_artifact_files(
-        self,
-        repo_address: RepoAddress,
-        job_id: str,
-        artifact_name: str,
-        local_path: Path,
-    ):
-        pass
+    def get_signed_upload_url(self, object_key: str) -> str:
+        return self._storage.get_signed_upload_url(object_key)

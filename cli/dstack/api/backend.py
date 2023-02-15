@@ -1,7 +1,7 @@
 from typing import Dict, List, Optional
 
 from dstack.backend.aws import AwsBackend
-from dstack.backend.base import Backend, RemoteBackend
+from dstack.backend.base import Backend, BackendType, RemoteBackend
 from dstack.backend.gcp import GCPBackend
 from dstack.backend.hub import HubBackend
 from dstack.backend.local import LocalBackend
@@ -41,8 +41,11 @@ def get_backend_by_name(name: str) -> Optional[Backend]:
     return backend
 
 
-def get_current_remote_backend() -> RemoteBackend:
-    return get_backend_by_name(DEFAULT_REMOTE)
+def get_current_remote_backend() -> Optional[RemoteBackend]:
+    for backend in list_backends():
+        if backend.type is BackendType.REMOTE:
+            return backend
+    return None
 
 
 def get_local_backend() -> LocalBackend:
