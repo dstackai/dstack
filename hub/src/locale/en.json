@@ -44,6 +44,8 @@
       "hub_name": "Hub name",
       "cloud_settings": "Cloud settings",
       "backend_type": "Backend type",
+      "members_empty_message_title": "No members",
+      "members_empty_message_text": "Select hub's members",
       "aws": {
         "access_key": "Access key",
         "secret_key": "Secret key",
@@ -58,6 +60,11 @@
       },
       "error_notification": "Update hub error",
       "success_notification": "Hub updating is successful"
+    },
+    "create": {
+      "page_title": "Create hub",
+      "error_notification": "Create hub error",
+      "success_notification": "Hub is created"
     }
   },
   "users": {
@@ -102,3 +109,4 @@
     "message": "Do you sure want to delete?"
   }
 }
+

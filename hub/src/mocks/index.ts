@@ -79,6 +79,10 @@ const mocksMap: MocksMap = {
             success: {},
             failed: { status: 403 },
         },
+        POST: {
+            success: hub.list.success[0],
+            failed: { status: 403 },
+        },
     },
 };
 

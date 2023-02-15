@@ -16,12 +16,14 @@ import { ROUTES } from 'routes';
 import { useTranslation } from 'react-i18next';
 import { getHubRoleByUserName } from '../utils';
 import { selectUserName } from 'App/slice';
+import { useNavigate } from 'react-router-dom';
 
 export const HubList: React.FC = () => {
     const { t } = useTranslation();
     const [showDeleteConfirm, setShowConfirmDelete] = useState(false);
     const userName = useAppSelector(selectUserName) ?? '';
     const { isLoading, data } = useGetHubsQuery();
+    const navigate = useNavigate();
     const [deleteHubs, { isLoading: isDeleting }] = useDeleteHubsMutation();
 
     useBreadcrumbs([
@@ -63,6 +65,15 @@ export const HubList: React.FC = () => {
     const deleteSelectedHubsHandler = () => {
         if (collectionProps.selectedItems?.length) deleteHubs(collectionProps.selectedItems.map((hub) => hub.hub_name));
         setShowConfirmDelete(false);
+    };
+
+    const editSelectedHubHandler = () => {
+        if (collectionProps.selectedItems?.length === 1)
+            navigate(ROUTES.HUB.EDIT.FORMAT(collectionProps.selectedItems[0].hub_name));
+    };
+
+    const addHubHandler = () => {
+        navigate(ROUTES.HUB.ADD);
     };
 
     const renderCounter = () => {
@@ -132,8 +143,10 @@ export const HubList: React.FC = () => {
                         counter={renderCounter()}
                         actions={
                             <SpaceBetween size="xs" direction="horizontal">
-                                <Button>{t('common.add')}</Button>
-                                <Button disabled={isDisabledEdit}>{t('common.edit')}</Button>
+                                <Button onClick={addHubHandler}>{t('common.add')}</Button>
+                                <Button onClick={editSelectedHubHandler} disabled={isDisabledEdit}>
+                                    {t('common.edit')}
+                                </Button>
 
                                 <Button onClick={toggleDeleteConfirm} disabled={isDisabledDelete}>
                                     {t('common.delete')}

@@ -1,8 +1,8 @@
 import React from 'react';
 import { useTranslation } from 'react-i18next';
-// move type to special file
+//TODO move type to special file
 import { TRoleSelectOption } from 'pages/User/Form/types';
-import { Container, Header, FormUI, SpaceBetween, Button, FormInput, FormSelect, Table } from 'components';
+import { Container, Header, FormUI, SpaceBetween, Button, FormInput, FormSelect, Table, ListEmptyMessage } from 'components';
 import { useForm, useFieldArray } from 'react-hook-form';
 import { IProps, TBackendSelectOption } from './types';
 import { UserAutosuggest } from './UsersAutosuggest';
@@ -155,7 +155,7 @@ export const HubForm: React.FC<IProps> = ({ initialValues, onCancel, loading, on
                     <Container header={<Header variant="h2">{t('hubs.edit.cloud_settings')}</Header>}>
                         <SpaceBetween size="l">
                             <FormSelect
-                                label={t('users.global_role')}
+                                label={t('hubs.edit.backend_type')}
                                 control={control}
                                 name="backend.type"
                                 options={backendSelectOptions}
@@ -179,6 +179,12 @@ export const HubForm: React.FC<IProps> = ({ initialValues, onCancel, loading, on
                                 disabled={loading}
                                 onSelect={({ detail }) => addMember(detail.value)}
                                 optionsFilter={(options) => options.filter((o) => !fields.find((f) => f.user_name === o.value))}
+                            />
+                        }
+                        empty={
+                            <ListEmptyMessage
+                                title={t('hubs.edit.members_empty_message_title')}
+                                message={t('hubs.edit.members_empty_message_text')}
                             />
                         }
                     />

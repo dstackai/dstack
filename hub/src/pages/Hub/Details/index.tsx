@@ -73,26 +73,26 @@ export const HubDetails: React.FC = () => {
                         <SpaceBetween size="l">
                             <div>
                                 <Box variant="awsui-key-label">{t('hubs.edit.aws.access_key')}</Box>
-                                <div>{t(`hubs.backend_type.${data.backend.access_key}`)}</div>
+                                <div>{data.backend.access_key}</div>
                             </div>
                             <div>
                                 <Box variant="awsui-key-label">{t('hubs.edit.aws.region_name')}</Box>
-                                <div>{t(`hubs.backend_type.${data.backend.region_name}`)}</div>
+                                <div>{data.backend.region_name}</div>
                             </div>
                             <div>
                                 <Box variant="awsui-key-label">{t('hubs.edit.aws.ec2_subnet_id')}</Box>
-                                <div>{t(`hubs.backend_type.${data.backend.ec2_subnet_id}`)}</div>
+                                <div>{data.backend.ec2_subnet_id}</div>
                             </div>
                         </SpaceBetween>
 
                         <SpaceBetween size="l">
                             <div>
                                 <Box variant="awsui-key-label">{t('hubs.edit.aws.secret_key')}</Box>
-                                <div>{t(`hubs.backend_type.${data.backend.secret_key}`)}</div>
+                                <div>{data.backend.secret_key}</div>
                             </div>
                             <div>
                                 <Box variant="awsui-key-label">{t('hubs.edit.aws.s3_bucket_name')}</Box>
-                                <div>{t(`hubs.backend_type.${data.backend.s3_bucket_name}`)}</div>
+                                <div>{data.backend.s3_bucket_name}</div>
                             </div>
                         </SpaceBetween>
                     </ColumnLayout>

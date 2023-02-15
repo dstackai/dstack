@@ -3,7 +3,7 @@ import { createBrowserRouter } from 'react-router-dom';
 import { Navigate } from 'react-router-dom';
 import App from 'App';
 import { Logout } from 'App/Logout';
-import { HubList, HubDetails, HubEdit } from 'pages/Hub';
+import { HubList, HubDetails, HubEdit, HubAdd } from 'pages/Hub';
 import { UserList, UserDetails, UserEdit, UserAdd } from 'pages/User';
 import { ROUTES } from './routes';
 import { AuthErrorMessage } from './App/AuthErrorMessage';
@@ -30,6 +30,10 @@ export const router = createBrowserRouter([
             {
                 path: ROUTES.HUB.EDIT.TEMPLATE,
                 element: <HubEdit />,
+            },
+            {
+                path: ROUTES.HUB.ADD,
+                element: <HubAdd />,
             },
             // members
             {
