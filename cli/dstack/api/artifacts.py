@@ -13,18 +13,18 @@ def list_artifacts_with_merged_backends(
 ) -> List[Tuple[Artifact, List[Backend]]]:
     artifacts = list_artifacts(backends, repo_address, run_name)
 
-    artifact_name_file_to_artifact_map = {(a.name, a.file): a for a, _ in artifacts}
+    artifact_name_to_artifact_map = {a.name: a for a, _ in artifacts}
 
-    artifact_name_file_to_backends_map = defaultdict(list)
+    artifact_name_to_backends_map = defaultdict(list)
     for artifact, backend in artifacts:
-        artifact_name_file_to_backends_map[(artifact.name, artifact.file)].append(backend)
+        artifact_name_to_backends_map[artifact.name].append(backend)
 
     artifacts_with_merged_backends = []
-    for artifact_name_file in artifact_name_file_to_artifact_map:
+    for artifact_name in artifact_name_to_artifact_map:
         artifacts_with_merged_backends.append(
             (
-                artifact_name_file_to_artifact_map[artifact_name_file],
-                artifact_name_file_to_backends_map[artifact_name_file],
+                artifact_name_to_artifact_map[artifact_name],
+                artifact_name_to_backends_map[artifact_name],
             )
         )
     return artifacts_with_merged_backends

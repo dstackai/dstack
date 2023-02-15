@@ -113,13 +113,9 @@ class TAGCommand(BasicCommand):
                         print(e)
                         exit(1)
                 else:
-                    if not args.remote:
-                        print(
-                            "Uploading directories as artifacts supported only for remotes. "
-                            "Please specify `--remote`."
-                        )
-                        exit(1)
-                    if backend.type is not BackendType.REMOTE:
+                    if not args.remote and backend.type is BackendType.REMOTE:
+                        continue
+                    if args.remote and backend.type is BackendType.LOCAL:
                         continue
                     try:
                         backend.add_tag_from_local_dirs(

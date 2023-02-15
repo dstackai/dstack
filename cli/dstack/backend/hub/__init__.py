@@ -99,9 +99,7 @@ class HubBackend(RemoteBackend):
         # /{hub_name}/logs/poll
         pass
 
-    def list_run_artifact_files(
-        self, repo_address: RepoAddress, run_name: str
-    ) -> Generator[Artifact, None, None]:
+    def list_run_artifact_files(self, repo_address: RepoAddress, run_name: str) -> List[Artifact]:
         # /{hub_name}/artifacts/list
         pass
 
@@ -110,7 +108,6 @@ class HubBackend(RemoteBackend):
         repo_address: RepoAddress,
         run_name: str,
         output_dir: Optional[str],
-        output_job_dirs: bool = True,
     ):
         # /{hub_name}/artifacts/download
         pass
