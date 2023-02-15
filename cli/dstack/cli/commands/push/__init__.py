@@ -58,15 +58,14 @@ class PushCommand(BasicCommand):
         run_artifacts = local_backend.list_run_artifact_files(
             repo_address=repo_data, run_name=run_name
         )
-        unique_artifacts = {(a.job_id, a.name) for a in run_artifacts}
 
-        for job_id, artifact_name in unique_artifacts:
+        for artifact in run_artifacts:
             remote_backend.upload_job_artifact_files(
                 repo_address=repo_data,
-                job_id=job_id,
-                artifact_name=artifact_name,
+                job_id=artifact.job_id,
+                artifact_name=artifact.name,
                 local_path=Path(
-                    local_backend.get_artifacts_path(repo_data), job_id, artifact_name
+                    local_backend.get_artifacts_path(repo_data), artifact.job_id, artifact.name
                 ),
             )
 

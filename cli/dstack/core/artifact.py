@@ -1,4 +1,8 @@
+from typing import List
+
 from pydantic import BaseModel
+
+from dstack.core.storage import StorageFile
 
 
 class ArtifactSpec(BaseModel):
@@ -20,5 +24,4 @@ class ArtifactHead(BaseModel):
 class Artifact(BaseModel):
     job_id: str
     name: str
-    file: str
-    filesize_in_bytes: int
+    files: List[StorageFile]
