@@ -1,5 +1,5 @@
 from pathlib import Path
-from typing import Dict, Generator, List, Optional, Tuple
+from typing import Dict, Generator, List, Optional
 
 import boto3
 from botocore.client import BaseClient
@@ -9,7 +9,7 @@ from dstack.backend.aws.compute import AWSCompute
 from dstack.backend.aws.config import AWSConfig
 from dstack.backend.aws.secrets import AWSSecretsManager
 from dstack.backend.aws.storage import AWSStorage
-from dstack.backend.base import RemoteBackend
+from dstack.backend.base import CloudBackend
 from dstack.backend.base import artifacts as base_artifacts
 from dstack.backend.base import jobs as base_jobs
 from dstack.backend.base import repos as base_repos
@@ -21,19 +21,18 @@ from dstack.core.config import BackendConfig
 from dstack.core.error import ConfigError
 from dstack.core.job import Job, JobHead
 from dstack.core.log_event import LogEvent
-from dstack.core.repo import LocalRepoData, RepoAddress, RepoCredentials, RepoHead
+from dstack.core.repo import LocalRepoData, RepoAddress, RepoCredentials
 from dstack.core.run import RunHead
 from dstack.core.secret import Secret
 from dstack.core.tag import TagHead
 
 
-class AwsBackend(RemoteBackend):
+class AwsBackend(CloudBackend):
     @property
     def name(self):
         return "aws"
 
     def __init__(self, backend_config: Optional[BackendConfig] = None):
-        super().__init__(backend_config)
         if backend_config is None:
             self.backend_config = AWSConfig()
             try:
@@ -266,3 +265,9 @@ class AwsBackend(RemoteBackend):
             repo_address,
             secret_name,
         )
+
+    def get_signed_download_url(self, object_key: str) -> str:
+        return self._storage.get_signed_download_url(object_key)
+
+    def get_signed_upload_url(self, object_key: str) -> str:
+        return self._storage.get_signed_upload_url(object_key)

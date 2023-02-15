@@ -3,6 +3,8 @@ from typing import Callable, Dict, List, Optional
 
 from dstack.core.storage import StorageFile
 
+SIGNED_URL_EXPIRATION = 3600
+
 
 class Storage(ABC):
     @abstractmethod
@@ -39,4 +41,14 @@ class Storage(ABC):
         `source_path` - local absolute path.
         `dest_path` - storage path relative to the storage root.
         """
+        pass
+
+
+class CloudStorage(Storage):
+    @abstractmethod
+    def get_signed_download_url(self, key: str) -> str:
+        pass
+
+    @abstractmethod
+    def get_signed_upload_url(self, key: str) -> str:
         pass

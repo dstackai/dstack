@@ -205,9 +205,16 @@ class Backend(ABC):
 
 
 class RemoteBackend(Backend):
-    def __init__(self, backend_config: Optional[BackendConfig] = None):
-        pass
-
     @property
     def type(self) -> BackendType:
         return BackendType.REMOTE
+
+
+class CloudBackend(RemoteBackend):
+    @abstractmethod
+    def get_signed_download_url(self, object_key: str) -> str:
+        pass
+
+    @abstractmethod
+    def get_signed_upload_url(self, object_key: str) -> str:
+        pass
