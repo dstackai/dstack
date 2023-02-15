@@ -65,7 +65,7 @@ class BashProvider(Provider):
                 apps.append(
                     AppSpec(
                         port_index=i,
-                        app_name="bash" + (i if self.ports > 1 else ""),
+                        app_name="bash" + (str(i) if self.ports > 1 else ""),
                     )
                 )
         return [
