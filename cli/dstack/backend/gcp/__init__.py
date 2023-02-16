@@ -13,6 +13,7 @@ from dstack.backend.base import secrets as base_secrets
 from dstack.backend.base import tags as base_tags
 from dstack.backend.gcp.compute import GCPCompute
 from dstack.backend.gcp.config import GCPConfig
+from dstack.backend.gcp.logs import GCPLogging
 from dstack.backend.gcp.secrets import GCPSecretsManager
 from dstack.backend.gcp.storage import GCPStorage
 from dstack.core.artifact import Artifact
@@ -34,6 +35,10 @@ class GCPBackend(CloudBackend):
         )
         self._compute = GCPCompute(gcp_config=self.config)
         self._secrets_manager = GCPSecretsManager(
+            project_id=self.config.project_id,
+            bucket_name=self.config.bucket_name,
+        )
+        self._logging = GCPLogging(
             project_id=self.config.project_id,
             bucket_name=self.config.bucket_name,
         )
@@ -91,7 +96,11 @@ class GCPBackend(CloudBackend):
         start_time: int,
         attached: bool,
     ) -> Generator[LogEvent, None, None]:
-        pass
+        yield from self._logging.poll_logs(
+            storage=self._storage,
+            repo_address=repo_address,
+            run_name=job_heads[0].run_name,
+        )
 
     def list_run_artifact_files(self, repo_address: RepoAddress, run_name: str) -> List[Artifact]:
         return base_artifacts.list_run_artifact_files(self._storage, repo_address, run_name)
