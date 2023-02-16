@@ -595,3 +595,26 @@ class HubClient:
         except requests.ConnectionError:
             print(f"{self.host}:{self.port} connection refused")
         return []
+
+    def delete_job_head(self, repo_address: RepoAddress, job_id: str):
+        url = _url(
+            scheme="http",
+            host=f"{self.host}:{self.port}",
+            path=f"api/hub/{self.hub_name}/jobs/delete",
+        )
+        try:
+            headers = HubClient._auth(token=self.token)
+            headers["Content-type"] = "application/json"
+            resp = requests.post(
+                url=url,
+                headers=headers,
+                data=JobsGet(repo_address=repo_address, job_id=job_id).json(),
+            )
+            if resp.ok:
+                return None
+            if resp.status_code == 401:
+                print("Unauthorized. Please set correct token")
+                return None
+        except requests.ConnectionError:
+            print(f"{self.host}:{self.port} connection refused")
+        return None
