@@ -62,6 +62,11 @@ class JobsList(BaseModel):
     run_name: str
 
 
+class ArtifactsList(BaseModel):
+    repo_address: RepoAddress
+    run_name: str
+
+
 class SecretAddUpdate(BaseModel):
     repo_address: RepoAddress
     secret: Secret
