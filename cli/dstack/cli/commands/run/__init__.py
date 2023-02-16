@@ -6,7 +6,6 @@ import time
 from argparse import Namespace
 from pathlib import Path
 from typing import Any, Dict, List, Optional, Tuple
-from urllib import parse
 
 import pkg_resources
 import websocket
@@ -23,6 +22,7 @@ from dstack.api.logs import poll_logs
 from dstack.api.repo import load_repo_data
 from dstack.api.run import list_runs_with_merged_backends
 from dstack.backend.base import Backend
+from dstack.backend.base.logs import get_logs_host_replace_pattern, get_logs_host_replace_sub
 from dstack.cli.commands import BasicCommand
 from dstack.cli.common import console, print_runs
 from dstack.core.error import check_backend, check_config, check_git
@@ -89,27 +89,16 @@ def parse_run_args(
 
 def poll_logs_ws(backend: Backend, repo_address: RepoAddress, job_head: JobHead):
     job = backend.get_job(repo_address, job_head.job_id)
+    host_replace_pattern = get_logs_host_replace_pattern(job)
+    if host_replace_pattern is not None:
+        host_replace_pattern = host_replace_pattern.encode()
+    host_replace_sub = get_logs_host_replace_sub(job).encode()
 
     def on_message(ws: WebSocketApp, message):
-        pat = re.compile(
-            f"http://(localhost|0.0.0.0|127.0.0.1|{job.host_name}):[\\S]*[^(.+)\\s\\n\\r]"
-        )
-        if re.search(pat, message):
-            if job.host_name and job.ports and job.app_specs:
-                for app_spec in job.app_specs:
-                    port = job.ports[app_spec.port_index]
-                    url_path = app_spec.url_path or ""
-                    url_query_params = app_spec.url_query_params
-                    url_query = (
-                        ("?" + parse.urlencode(url_query_params)) if url_query_params else ""
-                    )
-                    app_url = f"http://{job.host_name}:{port}"
-                    if url_path or url_query_params:
-                        app_url += "/"
-                        if url_query_params:
-                            app_url += url_query
-                    message = re.sub(pat, app_url, message)
-        sys.stdout.write(message)
+        if host_replace_pattern is not None:
+            message = re.sub(host_replace_pattern, host_replace_sub, message)
+        sys.stdout.buffer.write(message)
+        sys.stdout.buffer.flush()
 
     def on_error(_: WebSocketApp, err: Exception):
         if isinstance(err, KeyboardInterrupt):
@@ -118,7 +107,7 @@ def poll_logs_ws(backend: Backend, repo_address: RepoAddress, job_head: JobHead)
                 backend.stop_jobs(repo_address, run_name, abort=True)
                 console.print(f"[grey58]OK[/]")
         else:
-            console.print(str(err))
+            console.print(err)
 
     def on_open(_: WebSocketApp):
         pass
