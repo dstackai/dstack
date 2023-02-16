@@ -28,8 +28,13 @@ warnings.filterwarnings("ignore", message=_CLOUD_SDK_CREDENTIALS_WARNING)
 
 
 class GCPBackend(CloudBackend):
-    def __init__(self):
-        self.config = GCPConfig()
+    def __init__(self, config: Optional[GCPConfig] = None):
+        if config is None:
+            config = GCPConfig.load()
+            if config is None:
+                self._loaded = False
+                return
+        self.config = config
         self._storage = GCPStorage(
             project_id=self.config.project_id, bucket_name=self.config.bucket_name
         )
