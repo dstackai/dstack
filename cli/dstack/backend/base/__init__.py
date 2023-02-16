@@ -205,6 +205,9 @@ class Backend(ABC):
 
 
 class RemoteBackend(Backend):
+    def __init__(self, backend_config: Optional[BackendConfig] = None):
+        pass
+
     @property
     def type(self) -> BackendType:
         return BackendType.REMOTE

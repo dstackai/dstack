@@ -1,8 +1,7 @@
 from typing import List, Union
 
-from fastapi import APIRouter, Depends, status
+from fastapi import APIRouter, Depends
 from fastapi.security import HTTPBearer
-from starlette.responses import StreamingResponse
 
 from dstack.core.artifact import Artifact
 from dstack.core.repo import RepoAddress
@@ -24,13 +23,7 @@ security = HTTPBearer()
 async def list_artifacts(hub_name: str, body: ArtifactsList):
     hub = await get_hub(hub_name=hub_name)
     backend = get_backend(hub)
-    return StreamingResponse(
-        content=backend.list_run_artifact_files(
-            repo_address=body.repo_address, run_name=body.run_name
-        ),
-        status_code=status.HTTP_200_OK,
-        media_type="text/html",
-    )
+    return backend.list_run_artifact_files(repo_address=body.repo_address, run_name=body.run_name)
 
 
 @router.get(

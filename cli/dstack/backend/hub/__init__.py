@@ -101,7 +101,9 @@ class HubBackend(RemoteBackend):
 
     def list_run_artifact_files(self, repo_address: RepoAddress, run_name: str) -> List[Artifact]:
         # /{hub_name}/artifacts/list
-        pass
+        return self._hub_client().list_run_artifact_files(
+            repo_address=repo_address, run_name=run_name
+        )
 
     def download_run_artifact_files(
         self,

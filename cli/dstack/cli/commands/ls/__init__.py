@@ -39,10 +39,12 @@ class LsCommand(BasicCommand):
         repo_data = load_repo_data()
         backends = list_backends()
         run_names = []
+        backends_run_name = []
         for backend in backends:
             try:
                 run_name, _ = get_tagged_run_name(repo_data, backend, args.run_name_or_tag_name)
                 run_names.append(run_name)
+                backends_run_name.append(backend)
             except (TagNotFoundError, RunNotFoundError):
                 pass
 
@@ -50,7 +52,9 @@ class LsCommand(BasicCommand):
             console.print(f"Cannot find the run or tag '{args.run_name_or_tag_name}'")
             exit(1)
 
-        artifacts = list_artifacts_with_merged_backends(backends, load_repo_data(), run_names[0])
+        artifacts = list_artifacts_with_merged_backends(
+            backends_run_name, load_repo_data(), run_names[0]
+        )
         for artifact, backends in artifacts:
             for i, file in enumerate(artifact.files):
                 table.add_row(
