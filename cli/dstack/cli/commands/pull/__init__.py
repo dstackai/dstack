@@ -57,7 +57,6 @@ class PullCommand(BasicCommand):
             repo_address=repo_data,
             run_name=run_name,
             output_dir=local_backend.get_artifacts_path(repo_data),
-            output_job_dirs=True,
         )
 
         for job in jobs:

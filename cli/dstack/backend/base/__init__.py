@@ -8,7 +8,7 @@ from dstack.core.artifact import Artifact
 from dstack.core.config import BackendConfig
 from dstack.core.job import Job, JobHead
 from dstack.core.log_event import LogEvent
-from dstack.core.repo import RepoAddress, RepoCredentials, RepoData
+from dstack.core.repo import LocalRepoData, RepoAddress, RepoCredentials
 from dstack.core.run import RunHead
 from dstack.core.runners import Runner
 from dstack.core.secret import Secret
@@ -119,11 +119,28 @@ class Backend(ABC):
         pass
 
     @abstractmethod
-    def list_run_artifact_files(
-        self, repo_address: RepoAddress, run_name: str
-    ) -> Generator[Artifact, None, None]:
+    def list_run_artifact_files(self, repo_address: RepoAddress, run_name: str) -> List[Artifact]:
         # TODO: add a flag for non-recursive listing.
         # Backends may implement this via list_run_artifact_files_and_folders()
+        pass
+
+    @abstractmethod
+    def download_run_artifact_files(
+        self,
+        repo_address: RepoAddress,
+        run_name: str,
+        output_dir: Optional[str],
+    ):
+        pass
+
+    @abstractmethod
+    def upload_job_artifact_files(
+        self,
+        repo_address: RepoAddress,
+        job_id: str,
+        artifact_name: str,
+        local_path: Path,
+    ):
         pass
 
     @abstractmethod
@@ -145,7 +162,9 @@ class Backend(ABC):
         pass
 
     @abstractmethod
-    def add_tag_from_local_dirs(self, repo_data: RepoData, tag_name: str, local_dirs: List[str]):
+    def add_tag_from_local_dirs(
+        self, repo_data: LocalRepoData, tag_name: str, local_dirs: List[str]
+    ):
         pass
 
     @abstractmethod
@@ -186,29 +205,16 @@ class Backend(ABC):
 
 
 class RemoteBackend(Backend):
-    def __init__(self, backend_config: Optional[BackendConfig] = None):
-        pass
-
     @property
     def type(self) -> BackendType:
         return BackendType.REMOTE
 
+
+class CloudBackend(RemoteBackend):
     @abstractmethod
-    def download_run_artifact_files(
-        self,
-        repo_address: RepoAddress,
-        run_name: str,
-        output_dir: Optional[str],
-        output_job_dirs: bool = True,
-    ):
+    def get_signed_download_url(self, object_key: str) -> str:
         pass
 
     @abstractmethod
-    def upload_job_artifact_files(
-        self,
-        repo_address: RepoAddress,
-        job_id: str,
-        artifact_name: str,
-        local_path: Path,
-    ):
+    def get_signed_upload_url(self, object_key: str) -> str:
         pass

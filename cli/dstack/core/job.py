@@ -252,23 +252,6 @@ class Job(JobHead):
             f"tag_name={_quoted(self.tag_name)})"
         )
 
-    def job_head_key(self, add_prefix=True):
-        prefix = ""
-        if add_prefix:
-            prefix = f"jobs/{self.repo_data.path()}/"
-        key = (
-            f"{prefix}l;"
-            f"{self.job_id};"
-            f"{self.provider_name};"
-            f"{self.local_repo_user_name or ''};"
-            f"{self.submitted_at};"
-            f"{self.status.value};"
-            f"{','.join([a.artifact_path.replace('/', '_') for a in (self.artifact_specs or [])])};"
-            f"{','.join([a.app_name for a in (self.app_specs or [])])};"
-            f"{self.tag_name or ''}"
-        )
-        return key
-
     def serialize(self) -> dict:
         deps = []
         if self.dep_specs:

@@ -2,12 +2,13 @@ from pathlib import Path
 from typing import Generator, List, Optional, Tuple
 
 from dstack.backend.base import Backend, BackendType
+from dstack.backend.base import artifacts as base_artifacts
 from dstack.backend.base import jobs as base_jobs
 from dstack.backend.base import repos as base_repos
 from dstack.backend.base import runs as base_runs
 from dstack.backend.base import secrets as base_secrets
 from dstack.backend.base import tags as base_tags
-from dstack.backend.local import artifacts, logs, tags
+from dstack.backend.local import artifacts, logs
 from dstack.backend.local.compute import LocalCompute
 from dstack.backend.local.config import LocalConfig
 from dstack.backend.local.secrets import LocalSecretsManager
@@ -15,7 +16,7 @@ from dstack.backend.local.storage import LocalStorage
 from dstack.core.artifact import Artifact
 from dstack.core.job import Job, JobHead
 from dstack.core.log_event import LogEvent
-from dstack.core.repo import RepoAddress, RepoCredentials, RepoData, RepoHead
+from dstack.core.repo import LocalRepoData, RepoAddress, RepoCredentials
 from dstack.core.run import RunHead
 from dstack.core.secret import Secret
 from dstack.core.tag import TagHead
@@ -89,10 +90,36 @@ class LocalBackend(Backend):
             self._storage, self._compute, repo_address, job_heads, start_time, attached
         )
 
-    def list_run_artifact_files(
-        self, repo_address: RepoAddress, run_name: str
-    ) -> Generator[Artifact, None, None]:
-        return artifacts.list_run_artifact_files(self.backend_config.path, repo_address, run_name)
+    def list_run_artifact_files(self, repo_address: RepoAddress, run_name: str) -> List[Artifact]:
+        return base_artifacts.list_run_artifact_files(self._storage, repo_address, run_name)
+
+    def download_run_artifact_files(
+        self,
+        repo_address: RepoAddress,
+        run_name: str,
+        output_dir: Optional[str],
+    ):
+        base_artifacts.download_run_artifact_files(
+            storage=self._storage,
+            repo_address=repo_address,
+            run_name=run_name,
+            output_dir=output_dir,
+        )
+
+    def upload_job_artifact_files(
+        self,
+        repo_address: RepoAddress,
+        job_id: str,
+        artifact_name: str,
+        local_path: Path,
+    ):
+        base_artifacts.upload_job_artifact_files(
+            storage=self._storage,
+            repo_address=repo_address,
+            job_id=job_id,
+            artifact_name=artifact_name,
+            local_path=local_path,
+        )
 
     def list_tag_heads(self, repo_address: RepoAddress) -> List[TagHead]:
         return base_tags.list_tag_heads(self._storage, repo_address)
@@ -115,12 +142,15 @@ class LocalBackend(Backend):
             run_jobs,
         )
 
-    def add_tag_from_local_dirs(self, repo_data: RepoData, tag_name: str, local_dirs: List[str]):
-        tags.create_tag_from_local_dirs(
-            self.backend_config.path,
+    def add_tag_from_local_dirs(
+        self, repo_data: LocalRepoData, tag_name: str, local_dirs: List[str]
+    ):
+        base_tags.create_tag_from_local_dirs(
+            self._storage,
             repo_data,
             tag_name,
             local_dirs,
+            self.type,
         )
 
     def delete_tag_head(self, repo_address: RepoAddress, tag_head: TagHead):

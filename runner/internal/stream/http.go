@@ -105,7 +105,7 @@ func (s *Server) getLogs(w http.ResponseWriter, r *http.Request) {
 			s.mu.RUnlock()
 			continue
 		}
-		_ = connection.WriteMessage(websocket.TextMessage, s.buf[currentPos])
+		_ = connection.WriteMessage(websocket.BinaryMessage, s.buf[currentPos])
 		currentPos++
 		s.mu.RUnlock()
 		if hasID {

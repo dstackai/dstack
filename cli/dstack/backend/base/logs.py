@@ -1,12 +1,9 @@
 import json
 import re
-from typing import Any, Dict, Generator, List, Optional, Tuple
-from urllib import parse
+from typing import Any, Dict
 
-from dstack.backend.base import jobs, runs
+from dstack.backend.base import jobs
 from dstack.backend.base.storage import Storage
-from dstack.core.app import AppSpec
-from dstack.core.job import JobHead
 from dstack.core.log_event import LogEvent, LogEventSource
 from dstack.core.repo import RepoAddress
 
@@ -21,9 +18,6 @@ def render_log_message(
     storage: Storage,
     event: Dict[str, Any],
     repo_address: RepoAddress,
-    job_host_names: Dict[str, Optional[str]],
-    job_ports: Dict[str, Optional[List[int]]],
-    job_app_specs: Dict[str, Optional[List[AppSpec]]],
 ) -> LogEvent:
     if isinstance(event, str):
         event = json.loads(event)
@@ -32,28 +26,11 @@ def render_log_message(
         message = json.loads(message)
     job_id = message["job_id"]
     log = message["log"]
-    if job_id and job_id not in job_host_names:
-        job = jobs.get_job(storage, repo_address, job_id)
-        job_host_names[job_id] = job.host_name or "none" if job else "none"
-        job_ports[job_id] = job.ports if job else None
-        job_app_specs[job_id] = job.app_specs if job else None
-    host_name = job_host_names[job_id]
-    ports = job_ports[job_id]
-    app_specs = job_app_specs[job_id]
-    pat = re.compile(f"http://(localhost|0.0.0.0|127.0.0.1|{host_name}):[\\S]*[^(.+)\\s\\n\\r]")
-    if re.search(pat, log):
-        if host_name != "none" and ports and app_specs:
-            for app_spec in app_specs:
-                port = ports[app_spec.port_index]
-                url_path = app_spec.url_path or ""
-                url_query_params = app_spec.url_query_params
-                url_query = ("?" + parse.urlencode(url_query_params)) if url_query_params else ""
-                app_url = f"http://{host_name}:{port}"
-                if url_path or url_query_params:
-                    app_url += "/"
-                    if url_query_params:
-                        app_url += url_query
-                log = re.sub(pat, app_url, log)
+    job = jobs.get_job(storage, repo_address, job_id)
+    pat = get_logs_host_replace_pattern(job)
+    sub = get_logs_host_replace_sub(job)
+    if pat is not None:
+        log = re.sub(pat, sub, log)
     return LogEvent(
         event_id=event["eventId"],
         timestamp=event["timestamp"],
@@ -63,3 +40,21 @@ def render_log_message(
         if message["source"] == "stdout"
         else LogEventSource.STDERR,
     )
+
+
+def get_logs_host_replace_pattern(job: str) -> str:
+    if not (job.host_name and job.ports and job.app_specs):
+        return None
+    ports = []
+    for app_spec in job.app_specs:
+        ports.append(job.ports[app_spec.port_index])
+    return (
+        f"http://(localhost|0.0.0.0|127.0.0.1|{job.host_name}):"
+        + "("
+        + "|".join(str(p) for p in ports)
+        + ")"
+    )
+
+
+def get_logs_host_replace_sub(job: str) -> str:
+    return rf"http://{job.host_name}:\2"
