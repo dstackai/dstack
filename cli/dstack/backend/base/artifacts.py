@@ -17,6 +17,8 @@ def list_run_artifact_files(
     artifacts = []
     for job in jobs_list:
         job_artifacts_dir = _get_job_artifacts_dir(repo_address, job.job_id)
+        if job.artifact_paths is None:
+            continue
         for artifact_path in job.artifact_paths:
             artifact_path = os.path.join(artifact_path, "")
             job_artifact_files_path = os.path.join(job_artifacts_dir, artifact_path)
