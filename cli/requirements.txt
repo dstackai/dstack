@@ -28,3 +28,5 @@ google-cloud-secret-manager
 google-cloud-logging
 aiosqlite
 packaging
+azure-keyvault-secrets
+azure-identity

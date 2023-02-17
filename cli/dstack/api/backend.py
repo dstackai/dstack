@@ -2,12 +2,13 @@ from typing import Dict, List, Optional
 
 from dstack import version
 from dstack.backend.aws import AwsBackend
+from dstack.backend.azure import AzureBackend
 from dstack.backend.base import Backend, BackendType, RemoteBackend
 from dstack.backend.gcp import GCPBackend
 from dstack.backend.hub import HubBackend
 from dstack.backend.local import LocalBackend
 
-backends_classes = [AwsBackend, GCPBackend, LocalBackend]
+backends_classes = [AwsBackend, GCPBackend, AzureBackend, LocalBackend]
 if not version.__is_release__:
     backends_classes.append(HubBackend)
 
