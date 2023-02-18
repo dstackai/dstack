@@ -74,6 +74,12 @@ const mocksMap: MocksMap = {
             failed: { status: 403 },
         },
     },
+    [API.HUBS.MEMBERS(':name')]: {
+        POST: {
+            success: hub.list.success[0].members,
+            failed: { status: 403 },
+        },
+    },
     [API.HUBS.BASE()]: {
         DELETE: {
             success: {},

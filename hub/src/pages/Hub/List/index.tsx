@@ -117,18 +117,18 @@ export const HubList: React.FC = () => {
                     sections: [
                         {
                             id: 'type',
-                            header: t('hubs.card.type'),
+                            header: t('hubs.card.backend'),
                             content: (hub) => t(`hubs.backend_type.${hub.backend.type}`),
                         },
                         {
                             id: 'region',
                             header: t('hubs.card.region'),
-                            content: (hub) => hub.backend.region_name,
+                            content: (hub) => hub.backend.region_name_title,
                         },
                         {
                             id: 'bucket',
                             header: t('hubs.card.bucket'),
-                            content: (hub) => hub.backend.s3_bucket_name,
+                            content: (hub) => `s3://${hub.backend.s3_bucket_name}`,
                         },
                     ],
                 }}

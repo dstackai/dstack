@@ -1,8 +1,8 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState, useCallback } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useNavigate, useParams } from 'react-router-dom';
-import { Table } from 'components';
-import { useBreadcrumbs, useCollection } from 'hooks';
+import { debounce } from 'lodash';
+import { useBreadcrumbs } from 'hooks';
 import { ROUTES } from 'routes';
 import {
     Box,
@@ -13,10 +13,11 @@ import {
     DetailsHeader,
     Header,
     Loader,
-    NavigateLink,
     SpaceBetween,
+    Button,
 } from 'components';
-import { useGetHubQuery, useDeleteHubsMutation } from 'services/hub';
+import { useGetHubQuery, useDeleteHubsMutation, useUpdateHubMembersMutation } from 'services/hub';
+import { HubMembers } from '../Members';
 
 export const HubDetails: React.FC = () => {
     const { t } = useTranslation();
@@ -26,6 +27,7 @@ export const HubDetails: React.FC = () => {
     const navigate = useNavigate();
     const { data, isLoading } = useGetHubQuery({ name: paramHubName });
     const [deleteHubs, { isLoading: isDeleting, data: deleteData }] = useDeleteHubsMutation();
+    const [updateHubMembers] = useUpdateHubMembersMutation();
 
     useBreadcrumbs([
         {
@@ -38,11 +40,18 @@ export const HubDetails: React.FC = () => {
         },
     ]);
 
-    const { items } = useCollection(data?.members ?? [], {});
-
     useEffect(() => {
         if (!isDeleting && deleteData) navigate(ROUTES.HUB.LIST);
     }, [isDeleting, deleteData]);
+
+    const changeMembersHandler = (members: IHubMember[]) => {
+        updateHubMembers({
+            hub_name: paramHubName,
+            members,
+        });
+    };
+
+    const debouncedMembersHandler = useCallback(debounce(changeMembersHandler, 1000), []);
 
     const toggleDeleteConfirm = () => {
         setShowConfirmDelete((val) => !val);
@@ -62,86 +71,34 @@ export const HubDetails: React.FC = () => {
         if (!data) return null;
 
         return (
-            <>
-                <SpaceBetween size="xxl">
-                    <div>
-                        <Box variant="awsui-key-label">{t('hubs.edit.backend_type')}</Box>
-                        <div>{t(`hubs.backend_type.${data.backend.type}`)}</div>
-                    </div>
+            <ColumnLayout columns={4} variant="text-grid">
+                <div>
+                    <Box variant="awsui-key-label">{t('hubs.edit.backend_type')}</Box>
+                    <div>{t(`hubs.backend_type.${data.backend.type}`)}</div>
+                </div>
 
-                    <ColumnLayout columns={2} variant="text-grid">
-                        <SpaceBetween size="l">
-                            <div>
-                                <Box variant="awsui-key-label">{t('hubs.edit.aws.access_key')}</Box>
-                                <div>{data.backend.access_key}</div>
-                            </div>
-                            <div>
-                                <Box variant="awsui-key-label">{t('hubs.edit.aws.region_name')}</Box>
-                                <div>{data.backend.region_name}</div>
-                            </div>
-                            <div>
-                                <Box variant="awsui-key-label">{t('hubs.edit.aws.ec2_subnet_id')}</Box>
-                                <div>{data.backend.ec2_subnet_id}</div>
-                            </div>
-                        </SpaceBetween>
+                <div>
+                    <Box variant="awsui-key-label">{t('hubs.edit.aws.region_name')}</Box>
+                    <div>{data.backend.region_name_title}</div>
+                </div>
 
-                        <SpaceBetween size="l">
-                            <div>
-                                <Box variant="awsui-key-label">{t('hubs.edit.aws.secret_key')}</Box>
-                                <div>{data.backend.secret_key}</div>
-                            </div>
-                            <div>
-                                <Box variant="awsui-key-label">{t('hubs.edit.aws.s3_bucket_name')}</Box>
-                                <div>{data.backend.s3_bucket_name}</div>
-                            </div>
-                        </SpaceBetween>
-                    </ColumnLayout>
-                </SpaceBetween>
-            </>
-        );
-    };
+                <div>
+                    <Box variant="awsui-key-label">{t('hubs.edit.aws.s3_bucket_name')}</Box>
+                    <div>s3://{data.backend.s3_bucket_name}</div>
+                </div>
 
-    const renderMembersSection = (): React.ReactNode => {
-        const COLUMN_DEFINITIONS = [
-            {
-                id: 'name',
-                header: t('hubs.edit.members.name'),
-                cell: (item: IHubMember) => (
-                    <NavigateLink href={ROUTES.USER.DETAILS.FORMAT(item.user_name)}>{item.user_name}</NavigateLink>
-                ),
-            },
-            {
-                id: 'global_role',
-                header: t('hubs.edit.members.role'),
-                cell: (item: IHubMember) => t(`roles.${item.hub_role}`),
-            },
-        ];
-
-        return (
-            <Table
-                columnDefinitions={COLUMN_DEFINITIONS}
-                items={items}
-                header={
-                    <Header variant="h2" counter={`(${items.length})`}>
-                        {t('hubs.edit.members.section_title')}
-                    </Header>
-                }
-            />
+                <div>
+                    <Box variant="awsui-key-label">{t('hubs.edit.aws.ec2_subnet_id')}</Box>
+                    <div>{data.backend.ec2_subnet_id}</div>
+                </div>
+            </ColumnLayout>
         );
     };
 
     return (
         <>
             <ContentLayout
-                header={
-                    <DetailsHeader
-                        title={paramHubName}
-                        editAction={editUserHandler}
-                        editDisabled={isDeleting}
-                        deleteAction={toggleDeleteConfirm}
-                        deleteDisabled={isDeleting}
-                    />
-                }
+                header={<DetailsHeader title={paramHubName} deleteAction={toggleDeleteConfirm} deleteDisabled={isDeleting} />}
             >
                 {isLoading && !data && (
                     <Container>
@@ -151,11 +108,24 @@ export const HubDetails: React.FC = () => {
 
                 {data && (
                     <SpaceBetween size="l">
-                        <Container header={<Header variant="h2">{t('hubs.edit.cloud_settings')}</Header>}>
+                        <Container
+                            header={
+                                <Header
+                                    variant="h2"
+                                    actions={
+                                        <Button onClick={editUserHandler} disabled={isDeleting}>
+                                            {t('common.edit')}
+                                        </Button>
+                                    }
+                                >
+                                    {t('hubs.edit.backend')}
+                                </Header>
+                            }
+                        >
                             {renderAwsSettingsSection()}
                         </Container>
 
-                        {renderMembersSection()}
+                        <HubMembers onChange={debouncedMembersHandler} initialValues={data.members} />
                     </SpaceBetween>
                 )}
             </ContentLayout>

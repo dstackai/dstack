@@ -22,7 +22,7 @@ const AppLayout: React.FC<{ children: React.ReactNode }> = ({ children }) => {
     const { pathname } = useLocation();
     const activeHref = '/' + pathname.split('/')[1];
 
-    const userName = useAppSelector(selectUserName);
+    const userName = useAppSelector(selectUserName) ?? '';
     const breadcrumbs = useAppSelector(selectBreadcrumbs);
 
     const onFollowHandler: SideNavigationProps['onFollow'] = (event) => {
@@ -41,7 +41,10 @@ const AppLayout: React.FC<{ children: React.ReactNode }> = ({ children }) => {
         overflowMenuDismissIconAriaLabel: '',
     };
 
-    const profileActions = [{ type: 'button', href: ROUTES.LOGOUT, id: 'signout', text: t('common.sign_out') }];
+    const profileActions = [
+        { type: 'button', href: ROUTES.USER.DETAILS.FORMAT(userName), id: 'profile', text: t('common.profile') },
+        { type: 'button', href: ROUTES.LOGOUT, id: 'signout', text: t('common.sign_out') },
+    ];
 
     return (
         <>
@@ -57,7 +60,6 @@ const AppLayout: React.FC<{ children: React.ReactNode }> = ({ children }) => {
                             {
                                 type: 'menu-dropdown',
                                 text: userName,
-                                description: userName,
                                 iconName: 'user-profile',
                                 items: profileActions,
                                 // eslint-disable-next-line @typescript-eslint/ban-ts-comment
@@ -78,6 +80,10 @@ const AppLayout: React.FC<{ children: React.ReactNode }> = ({ children }) => {
                 notifications={<Notifications />}
                 navigation={
                     <SideNavigation
+                        header={{
+                            text: t('navigation.settings'),
+                            href: ROUTES.BASE,
+                        }}
                         activeHref={activeHref}
                         items={[
                             { type: 'link', text: t('navigation.hubs'), href: ROUTES.HUB.LIST },

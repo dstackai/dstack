@@ -3,6 +3,7 @@ import { Controller, FieldValues } from 'react-hook-form';
 import FormField from '@cloudscape-design/components/form-field';
 import SelectCSD from '@cloudscape-design/components/select';
 import { FormSelectProps } from './types';
+import { SelectProps } from '@cloudscape-design/components/select/interfaces';
 
 export const FormSelect = <T extends FieldValues>({
     name,
@@ -13,6 +14,7 @@ export const FormSelect = <T extends FieldValues>({
     description,
     secondaryControl,
     stretch,
+    onChange: onChangeProp,
     ...props
 }: FormSelectProps<T>) => {
     return (
@@ -21,6 +23,11 @@ export const FormSelect = <T extends FieldValues>({
             control={control}
             render={({ field: { onChange, ...fieldRest }, fieldState: { error } }) => {
                 const selectedOption = props.options?.find((i) => i.value === fieldRest.value) ?? null;
+
+                const onChangeSelect: SelectProps['onChange'] = (event) => {
+                    onChange(event.detail.selectedOption.value);
+                    onChangeProp && onChangeProp(event);
+                };
 
                 return (
                     <FormField
@@ -33,7 +40,7 @@ export const FormSelect = <T extends FieldValues>({
                     >
                         <SelectCSD
                             selectedOption={selectedOption}
-                            onChange={({ detail }) => onChange(detail.selectedOption.value)}
+                            onChange={onChangeSelect}
                             {...fieldRest}
                             {...props}
                             invalid={!!error}

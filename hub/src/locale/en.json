@@ -10,7 +10,8 @@
     "match_count_with_value_other": "{{count}} matches",
     "sign_out": "Sign out",
     "cancel": "Cancel",
-    "save": "Save"
+    "save": "Save",
+    "profile": "Profile"
   },
   "auth": {
     "invalid_token": "Invalid token",
@@ -19,6 +20,7 @@
   },
 
   "navigation": {
+    "settings": "Settings",
     "hubs": "Hubs",
     "users": "Users"
   },
@@ -32,7 +34,7 @@
     "nomatch_message_text": "We can't find a match.",
     "nomatch_message_button_label": "Clear filter",
     "card": {
-      "type": "Type",
+      "backend": "Backend",
       "region": "Region",
       "bucket": "Bucket"
     },
@@ -42,16 +44,16 @@
     "edit": {
       "general_info": "General info",
       "hub_name": "Hub name",
-      "cloud_settings": "Cloud settings",
-      "backend_type": "Backend type",
+      "backend": "Backend",
+      "backend_type": "Type",
       "members_empty_message_title": "No members",
       "members_empty_message_text": "Select hub's members",
       "aws": {
         "access_key": "Access key",
         "secret_key": "Secret key",
-        "region_name":  "Region name",
-        "s3_bucket_name": "S3 bucket name",
-        "ec2_subnet_id":  "Ec2 subnet id"
+        "region_name":  "Region",
+        "s3_bucket_name": "Bucket",
+        "ec2_subnet_id":  "Subnet ID"
       },
       "members": {
         "section_title": "Members",

@@ -5,6 +5,7 @@ const listSuccess: IHub[] = new Array(50).fill({}).map((i, index) => ({
         access_key: `hub_${index}_access_key`,
         secret_key: `hub_${index}_secret_key`,
         region_name: `hub_${index}_region_name`,
+        region_name_title: `Hub ${index} Region`,
         s3_bucket_name: `hub_${index}_s3_bucket_name`,
         ec2_subnet_id: `hub_${index}_ec2_subnet_id`,
     },

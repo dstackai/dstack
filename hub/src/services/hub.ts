@@ -45,12 +45,22 @@ export const hubApi = createApi({
 
         updateHub: builder.mutation<IHub, Partial<IHub> & Pick<IHub, 'hub_name'>>({
             query: (hub) => ({
-                url: API.USERS.DETAILS(hub.hub_name),
+                url: API.HUBS.DETAILS(hub.hub_name),
                 method: 'PATCH',
                 params: hub,
             }),
 
             invalidatesTags: (result) => [{ type: 'Hubs' as const, id: result?.hub_name }],
+        }),
+
+        updateHubMembers: builder.mutation<IHub, Pick<IHub, 'hub_name' | 'members'>>({
+            query: (hub) => ({
+                url: API.HUBS.MEMBERS(hub.hub_name),
+                method: 'POST',
+                params: hub.members,
+            }),
+
+            invalidatesTags: (result, error, params) => [{ type: 'Hubs' as const, id: params?.hub_name }],
         }),
 
         deleteHubs: builder.mutation<void, IHub['hub_name'][]>({
@@ -65,4 +75,11 @@ export const hubApi = createApi({
     }),
 });
 
-export const { useGetHubsQuery, useGetHubQuery, useCreateHubMutation, useUpdateHubMutation, useDeleteHubsMutation } = hubApi;
+export const {
+    useGetHubsQuery,
+    useGetHubQuery,
+    useCreateHubMutation,
+    useUpdateHubMutation,
+    useUpdateHubMembersMutation,
+    useDeleteHubsMutation,
+} = hubApi;

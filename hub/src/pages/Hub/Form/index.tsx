@@ -1,12 +1,8 @@
 import React from 'react';
 import { useTranslation } from 'react-i18next';
-//TODO move type to special file
-import { TRoleSelectOption } from 'pages/User/Form/types';
-import { Container, Header, FormUI, SpaceBetween, Button, FormInput, FormSelect, Table, ListEmptyMessage } from 'components';
-import { useForm, useFieldArray } from 'react-hook-form';
+import { Container, Header, FormUI, SpaceBetween, Button, FormInput, FormSelect } from 'components';
+import { useForm } from 'react-hook-form';
 import { IProps, TBackendSelectOption } from './types';
-import { UserAutosuggest } from './UsersAutosuggest';
-import styles from './styles.module.scss';
 
 export const HubForm: React.FC<IProps> = ({ initialValues, onCancel, loading, onSubmit: onSubmitProp }) => {
     const { t } = useTranslation();
@@ -16,30 +12,11 @@ export const HubForm: React.FC<IProps> = ({ initialValues, onCancel, loading, on
         defaultValues: initialValues,
     });
 
-    const { fields, append, remove } = useFieldArray({
-        control,
-        name: 'members',
-    });
-
-    const fieldsWithIndex = fields.map((field, index) => ({ ...field, index }));
     const backendType = watch('backend.type');
     const backendSelectOptions: TBackendSelectOption[] = [{ label: t('hubs.backend_type.aws'), value: 'aws' }];
 
-    const roleSelectOptions: TRoleSelectOption[] = [
-        { label: t('roles.admin'), value: 'admin' },
-        { label: t('roles.run'), value: 'run' },
-        { label: t('roles.read'), value: 'read' },
-    ];
-
     const onSubmit = (data: IHub) => {
         onSubmitProp(data);
-    };
-
-    const addMember = (user_name: string) => {
-        append({
-            user_name,
-            hub_role: 'read',
-        });
     };
 
     const renderAwsBackendFields = () => {
@@ -93,38 +70,6 @@ export const HubForm: React.FC<IProps> = ({ initialValues, onCancel, loading, on
         }
     };
 
-    const COLUMN_DEFINITIONS = [
-        {
-            id: 'name',
-            header: t('hubs.edit.members.name'),
-            cell: (item: IHubMember) => item.user_name,
-        },
-        {
-            id: 'global_role',
-            header: t('hubs.edit.members.role'),
-            cell: (field: IHubMember & { index: number }) => (
-                <FormSelect
-                    control={control}
-                    name={`members.${field.index}.hub_role`}
-                    options={roleSelectOptions}
-                    disabled={loading}
-                    expandToViewport
-                    secondaryControl={
-                        <div className={styles.deleteMemberButtonWrapper}>
-                            <Button
-                                disabled={loading}
-                                formAction="none"
-                                onClick={() => remove(field.index)}
-                                variant="icon"
-                                iconName="remove"
-                            />
-                        </div>
-                    }
-                />
-            ),
-        },
-    ];
-
     return (
         <form onSubmit={handleSubmit(onSubmit)}>
             <FormUI
@@ -141,16 +86,18 @@ export const HubForm: React.FC<IProps> = ({ initialValues, onCancel, loading, on
                 }
             >
                 <SpaceBetween size="l">
-                    <Container header={<Header variant="h2">{t('hubs.edit.general_info')}</Header>}>
-                        <SpaceBetween size="l">
-                            <FormInput
-                                label={t('hubs.edit.hub_name')}
-                                control={control}
-                                name="hub_name"
-                                disabled={loading || isEditing}
-                            />
-                        </SpaceBetween>
-                    </Container>
+                    {!isEditing && (
+                        <Container header={<Header variant="h2">{t('hubs.edit.general_info')}</Header>}>
+                            <SpaceBetween size="l">
+                                <FormInput
+                                    label={t('hubs.edit.hub_name')}
+                                    control={control}
+                                    name="hub_name"
+                                    disabled={loading}
+                                />
+                            </SpaceBetween>
+                        </Container>
+                    )}
 
                     <Container header={<Header variant="h2">{t('hubs.edit.cloud_settings')}</Header>}>
                         <SpaceBetween size="l">
@@ -165,29 +112,6 @@ export const HubForm: React.FC<IProps> = ({ initialValues, onCancel, loading, on
                             {renderBackendFields()}
                         </SpaceBetween>
                     </Container>
-
-                    <Table
-                        columnDefinitions={COLUMN_DEFINITIONS}
-                        items={fieldsWithIndex}
-                        header={
-                            <Header variant="h2" counter={`(${fieldsWithIndex?.length})`}>
-                                {t('hubs.edit.members.section_title')}
-                            </Header>
-                        }
-                        filter={
-                            <UserAutosuggest
-                                disabled={loading}
-                                onSelect={({ detail }) => addMember(detail.value)}
-                                optionsFilter={(options) => options.filter((o) => !fields.find((f) => f.user_name === o.value))}
-                            />
-                        }
-                        empty={
-                            <ListEmptyMessage
-                                title={t('hubs.edit.members_empty_message_title')}
-                                message={t('hubs.edit.members_empty_message_text')}
-                            />
-                        }
-                    />
                 </SpaceBetween>
             </FormUI>
         </form>
