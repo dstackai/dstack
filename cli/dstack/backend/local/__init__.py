@@ -99,10 +99,11 @@ class LocalBackend(Backend):
         run_name: str,
         output_dir: Optional[str],
     ):
+        list_artifacts = self.list_run_artifact_files(repo_address=repo_address, run_name=run_name)
         base_artifacts.download_run_artifact_files(
             storage=self._storage,
             repo_address=repo_address,
-            run_name=run_name,
+            artifacts=list_artifacts,
             output_dir=output_dir,
         )
 
