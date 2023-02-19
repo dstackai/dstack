@@ -16,6 +16,7 @@ from dstack.hub.models import (
     AddTagRun,
     JobsGet,
     JobsList,
+    LinkUpload,
     PollLogs,
     ReposUpdate,
     RunsList,
@@ -663,6 +664,52 @@ class HubClient:
                             json_data = json.loads(_body)
                             _body = bytearray()
                             yield LogEvent.parse_obj(json_data)
+            if resp.status_code == 401:
+                print("Unauthorized. Please set correct token")
+                return None
+        except requests.ConnectionError:
+            print(f"{self.host}:{self.port} connection refused")
+        return None
+
+    def upload_file(self, dest_path: str) -> Optional[str]:
+        url = _url(
+            scheme="http",
+            host=f"{self.host}:{self.port}",
+            path=f"api/hub/{self.hub_name}/link/upload",
+        )
+        try:
+            headers = HubClient._auth(token=self.token)
+            headers["Content-type"] = "application/json"
+            resp = requests.post(
+                url=url,
+                headers=headers,
+                data=LinkUpload(object_key=dest_path).json(),
+            )
+            if resp.ok:
+                return resp.text
+            if resp.status_code == 401:
+                print("Unauthorized. Please set correct token")
+                return None
+        except requests.ConnectionError:
+            print(f"{self.host}:{self.port} connection refused")
+        return None
+
+    def download_file(self, dest_path: str) -> Optional[str]:
+        url = _url(
+            scheme="http",
+            host=f"{self.host}:{self.port}",
+            path=f"api/hub/{self.hub_name}/link/download",
+        )
+        try:
+            headers = HubClient._auth(token=self.token)
+            headers["Content-type"] = "application/json"
+            resp = requests.get(
+                url=url,
+                headers=headers,
+                data=LinkUpload(object_key=dest_path).json(),
+            )
+            if resp.ok:
+                return resp.text
             if resp.status_code == 401:
                 print("Unauthorized. Please set correct token")
                 return None

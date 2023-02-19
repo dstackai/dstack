@@ -7,13 +7,13 @@ from fastapi import HTTPException, status
 
 from dstack.api.backend import dict_backends
 from dstack.api.config import dict_config
-from dstack.backend.base import RemoteBackend
+from dstack.backend.base import CloudBackend
 from dstack.hub.db.models import Hub
 
 cache = {}
 
 
-def get_backend(hub: Hub) -> RemoteBackend:
+def get_backend(hub: Hub) -> CloudBackend:
     global cache
     if cache.get(hub.name) is None:
         if hub.config == "":

@@ -77,3 +77,7 @@ class PollLogs(BaseModel):
     job_heads: List[JobHead]
     start_time: int
     attached: bool
+
+
+class LinkUpload(BaseModel):
+    object_key: str

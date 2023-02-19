@@ -4,8 +4,10 @@ from pathlib import Path
 from typing import Dict, Generator, List, Optional, Tuple
 
 from dstack.backend.base import BackendType, RemoteBackend
+from dstack.backend.base import artifacts as base_artifacts
 from dstack.backend.hub.client import HubClient
 from dstack.backend.hub.config import HUBConfig
+from dstack.backend.hub.storage import HUBStorage
 from dstack.core.artifact import Artifact
 from dstack.core.config import BackendConfig
 from dstack.core.error import ConfigError
@@ -19,6 +21,7 @@ from dstack.core.tag import TagHead
 
 class HubBackend(RemoteBackend):
     _client = None
+    _storage = None
 
     def __init__(self, config: Optional[BackendConfig] = None):
         super().__init__(config)
@@ -26,6 +29,7 @@ class HubBackend(RemoteBackend):
         try:
             self.backend_config.load()
             self._loaded = True
+            self._storage = HUBStorage(self._hub_client())
         except ConfigError:
             self._loaded = False
 
@@ -116,7 +120,13 @@ class HubBackend(RemoteBackend):
         output_dir: Optional[str],
     ):
         # /{hub_name}/artifacts/download
-        pass
+        artifacts = self.list_run_artifact_files(repo_address=repo_address, run_name=run_name)
+        base_artifacts.download_run_artifact_files(
+            storage=self._storage,
+            repo_address=repo_address,
+            artifacts=artifacts,
+            output_dir=output_dir,
+        )
 
     def upload_job_artifact_files(
         self,
@@ -126,7 +136,13 @@ class HubBackend(RemoteBackend):
         local_path: Path,
     ):
         # /{hub_name}/artifacts/upload
-        pass
+        base_artifacts.upload_job_artifact_files(
+            storage=self._storage,
+            repo_address=repo_address,
+            job_id=job_id,
+            artifact_name=artifact_name,
+            local_path=local_path,
+        )
 
     def list_tag_heads(self, repo_address: RepoAddress) -> List[TagHead]:
         return self._hub_client().list_tag_heads(repo_address=repo_address)
