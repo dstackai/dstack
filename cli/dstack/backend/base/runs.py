@@ -96,7 +96,8 @@ def _create_run(
         request_id = job.request_id
         if request_id is None and job.runner_id is not None:
             runner = runners.get_runner(storage, job.runner_id)
-            request_id = runner.request_id
+            if not (runner is None):
+                request_id = runner.request_id
         request_head = compute.get_request_head(job, request_id)
         request_heads.append(request_head)
     run_head = RunHead(

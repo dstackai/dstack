@@ -6,7 +6,7 @@ from dstack.backend.hub import HubBackend
 from dstack.backend.local import LocalBackend
 from dstack.core.error import BackendError
 
-DEFAULT_REMOTE = "aws"
+DEFAULT_REMOTE = "hub"
 DEFAULT = "local"
 
 backends_classes = [AwsBackend, LocalBackend, HubBackend]

@@ -155,7 +155,10 @@ def poll_run(repo_address: RepoAddress, job_heads: List[JobHead], backend: Backe
             task = progress.add_task("Provisioning... It may take up to a minute.", total=None)
             while True:
                 time.sleep(POLL_PROVISION_RATE_SECS)
-                run = backend.list_run_heads(repo_address, run_name)[0]
+                run_heads = backend.list_run_heads(repo_address, run_name)
+                if len(run_heads) == 0:
+                    continue
+                run = run_heads[0]
                 if run.status == JobStatus.DOWNLOADING and not downloading:
                     progress.update(task, description="Downloading deps... It may take a while.")
                     downloading = True

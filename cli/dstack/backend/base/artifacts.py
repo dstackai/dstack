@@ -35,12 +35,11 @@ def list_run_artifact_files(
 def download_run_artifact_files(
     storage: Storage,
     repo_address: RepoAddress,
-    run_name: str,
+    artifacts: List[Artifact],
     output_dir: Optional[str],
 ):
     if output_dir is None:
         output_dir = os.getcwd()
-    artifacts = list_run_artifact_files(storage, repo_address, run_name)
     for artifact in artifacts:
         total_size = sum(f.filesize_in_bytes for f in artifact.files)
         with tqdm(

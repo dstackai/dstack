@@ -13,6 +13,7 @@ from dstack.hub.routers import (
     artifacts,
     hub,
     jobs,
+    link,
     logs,
     repos,
     runners,
@@ -33,6 +34,7 @@ app.include_router(logs.router)
 app.include_router(artifacts.router)
 app.include_router(tags.router)
 app.include_router(repos.router)
+app.include_router(link.router)
 
 
 @app.on_event("startup")
