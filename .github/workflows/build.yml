@@ -117,7 +117,7 @@ jobs:
         run: pip install awscli
       - run: |
           VERSION=$((${{ github.run_number }} + 150))
-          echo $VERSION | aws s3 cp - s3://get-dstack/stgn-cli/latest-version
+          echo $VERSION | aws s3 cp - s3://get-dstack/stgn-cli/latest-version --acl public-read
 
   runner-test-master:
     defaults:
