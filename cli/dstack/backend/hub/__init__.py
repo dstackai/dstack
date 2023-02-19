@@ -74,8 +74,7 @@ class HubBackend(RemoteBackend):
         return self._hub_client().list_job_heads(repo_address=repo_address, run_name=run_name)
 
     def delete_job_head(self, repo_address: RepoAddress, job_id: str):
-        # /{hub_name}/jobs/delete
-        pass
+        self._hub_client().delete_job_head(repo_address=repo_address, job_id=job_id)
 
     def list_run_heads(
         self,
@@ -97,7 +96,12 @@ class HubBackend(RemoteBackend):
         attached: bool,
     ) -> Generator[LogEvent, None, None]:
         # /{hub_name}/logs/poll
-        pass
+        return self._hub_client().poll_logs(
+            repo_address=repo_address,
+            job_heads=job_heads,
+            start_time=start_time,
+            attached=attached,
+        )
 
     def list_run_artifact_files(self, repo_address: RepoAddress, run_name: str) -> List[Artifact]:
         # /{hub_name}/artifacts/list

@@ -2,7 +2,7 @@ from typing import Dict, List, Optional, Union
 
 from pydantic import BaseModel
 
-from dstack.core.job import Job
+from dstack.core.job import Job, JobHead
 from dstack.core.repo import LocalRepoData, RepoAddress
 from dstack.core.secret import Secret
 
@@ -70,3 +70,10 @@ class ArtifactsList(BaseModel):
 class SecretAddUpdate(BaseModel):
     repo_address: RepoAddress
     secret: Secret
+
+
+class PollLogs(BaseModel):
+    repo_address: RepoAddress
+    job_heads: List[JobHead]
+    start_time: int
+    attached: bool

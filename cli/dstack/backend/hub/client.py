@@ -1,3 +1,4 @@
+import json
 from typing import Dict, Generator, List, Optional
 from urllib.parse import urlunparse
 
@@ -15,6 +16,7 @@ from dstack.hub.models import (
     AddTagRun,
     JobsGet,
     JobsList,
+    PollLogs,
     ReposUpdate,
     RunsList,
     SecretAddUpdate,
@@ -612,6 +614,55 @@ class HubClient:
             )
             if resp.ok:
                 return None
+            if resp.status_code == 401:
+                print("Unauthorized. Please set correct token")
+                return None
+        except requests.ConnectionError:
+            print(f"{self.host}:{self.port} connection refused")
+        return None
+
+    def poll_logs(
+        self,
+        repo_address: RepoAddress,
+        job_heads: List[JobHead],
+        start_time: int,
+        attached: bool,
+    ) -> Generator[LogEvent, None, None]:
+        url = _url(
+            scheme="http",
+            host=f"{self.host}:{self.port}",
+            path=f"api/hub/{self.hub_name}/logs/poll",
+        )
+        try:
+            headers = HubClient._auth(token=self.token)
+            headers["Content-type"] = "application/json"
+            data = PollLogs(
+                repo_address=repo_address,
+                job_heads=job_heads,
+                start_time=start_time,
+                attached=attached,
+            ).json()
+            resp = requests.get(
+                url=url,
+                headers=headers,
+                data=data,
+                stream=True,
+            )
+            if resp.ok:
+                _braces = 0
+                _body = bytearray()
+                for chunk in resp.iter_content(chunk_size=128):
+                    for b in chunk:
+                        if b == 123:
+                            _braces += 1
+                        elif b == 125:
+                            _braces -= 1
+                        _body.append(b)
+
+                        if _braces == 0:
+                            json_data = json.loads(_body)
+                            _body = bytearray()
+                            yield LogEvent.parse_obj(json_data)
             if resp.status_code == 401:
                 print("Unauthorized. Please set correct token")
                 return None
