@@ -187,6 +187,7 @@ def create_tag_from_local_dirs(
             repo_data,
             job.job_id,
             tag_artifacts[index],
+            tag_artifacts[index],
             local_path,
         )
     tag_head = TagHead(

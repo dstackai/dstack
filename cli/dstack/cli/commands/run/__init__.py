@@ -267,7 +267,9 @@ class RunCommand(BasicCommand):
                 else:
                     backend_name = args.remote[0]
             backend = get_backend_by_name(backend_name)
-
+            if backend is None:
+                console.print(f"Backend '{backend_name}' not configured")
+                exit(1)
             (
                 provider_name,
                 provider_args,

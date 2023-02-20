@@ -139,6 +139,7 @@ class Backend(ABC):
         repo_address: RepoAddress,
         job_id: str,
         artifact_name: str,
+        artifact_path: str,
         local_path: Path,
     ):
         pass
