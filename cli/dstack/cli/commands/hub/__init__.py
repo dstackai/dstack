@@ -1,4 +1,3 @@
-import argparse
 import os
 from argparse import Namespace
 
@@ -10,7 +9,7 @@ from dstack.cli.commands import BasicCommand
 
 class HubCommand(BasicCommand):
     NAME = "hub"
-    DESCRIPTION = argparse.SUPPRESS
+    DESCRIPTION = None  # Hidden by default
 
     def __init__(self, parser):
         super(HubCommand, self).__init__(parser)
