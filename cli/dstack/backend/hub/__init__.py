@@ -133,6 +133,7 @@ class HubBackend(RemoteBackend):
         repo_address: RepoAddress,
         job_id: str,
         artifact_name: str,
+        artifact_path: str,
         local_path: Path,
     ):
         # /{hub_name}/artifacts/upload
@@ -141,6 +142,7 @@ class HubBackend(RemoteBackend):
             repo_address=repo_address,
             job_id=job_id,
             artifact_name=artifact_name,
+            artifact_path=artifact_path,
             local_path=local_path,
         )
 

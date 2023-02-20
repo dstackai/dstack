@@ -112,6 +112,7 @@ class LocalBackend(Backend):
         repo_address: RepoAddress,
         job_id: str,
         artifact_name: str,
+        artifact_path: str,
         local_path: Path,
     ):
         base_artifacts.upload_job_artifact_files(
@@ -119,6 +120,7 @@ class LocalBackend(Backend):
             repo_address=repo_address,
             job_id=job_id,
             artifact_name=artifact_name,
+            artifact_path=artifact_path,
             local_path=local_path,
         )
 

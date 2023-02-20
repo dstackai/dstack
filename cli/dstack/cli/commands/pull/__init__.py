@@ -4,6 +4,7 @@ from dstack.api.backend import get_current_remote_backend, get_local_backend
 from dstack.api.repo import load_repo_data
 from dstack.api.run import RunNotFoundError, TagNotFoundError, get_tagged_run_name
 from dstack.cli.commands import BasicCommand
+from dstack.cli.common import console
 from dstack.core.error import BackendError, check_config, check_git
 
 
@@ -27,15 +28,18 @@ class PullCommand(BasicCommand):
     def _command(self, args: Namespace):
         repo_data = load_repo_data()
         remote_backend = get_current_remote_backend()
+        if remote_backend is None:
+            console.print(f"No remote backend configured. Run `dstack config`.")
+            exit(1)
         try:
             run_name, tag_head = get_tagged_run_name(
                 repo_data, remote_backend, args.run_name_or_tag_name
             )
         except TagNotFoundError as e:
-            print(f"Cannot find the remote tag '{args.run_name_or_tag_name}'")
+            console.print(f"Cannot find the remote tag '{args.run_name_or_tag_name}'")
             exit(1)
         except RunNotFoundError as e:
-            print(f"Cannot find the remote run '{args.run_name_or_tag_name}'")
+            console.print(f"Cannot find the remote run '{args.run_name_or_tag_name}'")
             exit(1)
 
         local_backend = get_local_backend()
@@ -62,4 +66,4 @@ class PullCommand(BasicCommand):
         for job in jobs:
             local_backend.create_job(job)
 
-        print("Pull completed")
+        console.print("Pull completed")
