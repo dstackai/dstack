@@ -75,6 +75,7 @@ setup(
         "psutil",
         "jinja2",
         "pygtail",
+        "packaging",
     ],
     classifiers=[
         "Development Status :: 2 - Pre-Alpha",

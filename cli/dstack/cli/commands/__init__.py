@@ -1,5 +1,7 @@
 from argparse import Namespace, _SubParsersAction
 
+from dstack.cli.updates import check_for_updates
+
 
 class BasicCommand(object):
     NAME = "name the command"
@@ -14,7 +16,7 @@ class BasicCommand(object):
             action="help",
             help="Show this help message and exit",
         )
-        self._parser.set_defaults(func=self._command)
+        self._parser.set_defaults(func=self.__command)
 
     @property
     def name(self):
@@ -26,6 +28,10 @@ class BasicCommand(object):
 
     def register(self):
         ...
+
+    def __command(self, args: Namespace):
+        check_for_updates()
+        self._command(args)
 
     def _command(self, args: Namespace):
         ...
