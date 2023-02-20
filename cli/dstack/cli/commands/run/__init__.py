@@ -106,6 +106,7 @@ def poll_logs_ws(backend: Backend, repo_address: RepoAddress, job_head: JobHead)
             if Confirm.ask(f"\n [red]Abort the run '{run_name}'?[/]"):
                 backend.stop_jobs(repo_address, run_name, abort=True)
                 console.print(f"[grey58]OK[/]")
+                exit()
         else:
             console.print(err)
 
@@ -154,7 +155,10 @@ def poll_run(repo_address: RepoAddress, job_heads: List[JobHead], backend: Backe
             task = progress.add_task("Provisioning... It may take up to a minute.", total=None)
             while True:
                 time.sleep(POLL_PROVISION_RATE_SECS)
-                run = backend.list_run_heads(repo_address, run_name)[0]
+                run_heads = backend.list_run_heads(repo_address, run_name)
+                if len(run_heads) == 0:
+                    continue
+                run = run_heads[0]
                 if run.status == JobStatus.DOWNLOADING and not downloading:
                     progress.update(task, description="Downloading deps... It may take a while.")
                     downloading = True
@@ -263,7 +267,9 @@ class RunCommand(BasicCommand):
                 else:
                     backend_name = args.remote[0]
             backend = get_backend_by_name(backend_name)
-
+            if backend is None:
+                console.print(f"Backend '{backend_name}' not configured")
+                exit(1)
             (
                 provider_name,
                 provider_args,

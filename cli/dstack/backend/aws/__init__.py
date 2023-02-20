@@ -162,10 +162,11 @@ class AwsBackend(CloudBackend):
         run_name: str,
         output_dir: Optional[str],
     ):
+        artifacts = self.list_run_artifact_files(repo_address=repo_address, run_name=run_name)
         base_artifacts.download_run_artifact_files(
             storage=self._storage,
             repo_address=repo_address,
-            run_name=run_name,
+            artifacts=artifacts,
             output_dir=output_dir,
         )
 
@@ -174,6 +175,7 @@ class AwsBackend(CloudBackend):
         repo_address: RepoAddress,
         job_id: str,
         artifact_name: str,
+        artifact_path: str,
         local_path: Path,
     ):
         base_artifacts.upload_job_artifact_files(
@@ -181,6 +183,7 @@ class AwsBackend(CloudBackend):
             repo_address=repo_address,
             job_id=job_id,
             artifact_name=artifact_name,
+            artifact_path=artifact_path,
             local_path=local_path,
         )
 

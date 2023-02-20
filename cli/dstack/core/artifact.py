@@ -24,4 +24,5 @@ class ArtifactHead(BaseModel):
 class Artifact(BaseModel):
     job_id: str
     name: str
+    path: str
     files: List[StorageFile]

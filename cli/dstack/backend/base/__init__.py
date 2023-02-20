@@ -139,6 +139,7 @@ class Backend(ABC):
         repo_address: RepoAddress,
         job_id: str,
         artifact_name: str,
+        artifact_path: str,
         local_path: Path,
     ):
         pass
@@ -205,6 +206,9 @@ class Backend(ABC):
 
 
 class RemoteBackend(Backend):
+    def __init__(self, backend_config: Optional[BackendConfig] = None):
+        pass
+
     @property
     def type(self) -> BackendType:
         return BackendType.REMOTE

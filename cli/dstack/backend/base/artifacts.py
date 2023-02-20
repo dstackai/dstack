@@ -20,12 +20,14 @@ def list_run_artifact_files(
         if job.artifact_paths is None:
             continue
         for artifact_path in job.artifact_paths:
-            artifact_path = os.path.join(artifact_path, "")
+            artifact_name = os.path.join(artifact_path, "")
+            artifact_path = artifact_name.lstrip(os.sep)
             job_artifact_files_path = os.path.join(job_artifacts_dir, artifact_path)
             artifact_files = storage.list_files(job_artifact_files_path)
             artifact = Artifact(
                 job_id=job.job_id,
-                name=artifact_path,
+                name=artifact_name,
+                path=artifact_path,
                 files=artifact_files,
             )
             artifacts.append(artifact)
@@ -35,12 +37,11 @@ def list_run_artifact_files(
 def download_run_artifact_files(
     storage: Storage,
     repo_address: RepoAddress,
-    run_name: str,
+    artifacts: List[Artifact],
     output_dir: Optional[str],
 ):
     if output_dir is None:
         output_dir = os.getcwd()
-    artifacts = list_run_artifact_files(storage, repo_address, run_name)
     for artifact in artifacts:
         total_size = sum(f.filesize_in_bytes for f in artifact.files)
         with tqdm(
@@ -56,8 +57,8 @@ def download_run_artifact_files(
 
             for file in artifact.files:
                 artifacts_dir = _get_job_artifacts_dir(repo_address, artifact.job_id)
-                source_path = os.path.join(artifacts_dir, artifact.name, file.filepath)
-                dest_path = os.path.join(output_dir, artifact.job_id, artifact.name, file.filepath)
+                source_path = os.path.join(artifacts_dir, artifact.path, file.filepath)
+                dest_path = os.path.join(output_dir, artifact.job_id, artifact.path, file.filepath)
                 Path(dest_path).parent.mkdir(parents=True, exist_ok=True)
                 storage.download_file(source_path, dest_path, callback)
 
@@ -67,6 +68,7 @@ def upload_job_artifact_files(
     repo_address: RepoAddress,
     job_id: str,
     artifact_name: str,
+    artifact_path: str,
     local_path: Path,
 ):
     artifacts_dir = _get_job_artifacts_dir(repo_address, job_id)
@@ -92,7 +94,7 @@ def upload_job_artifact_files(
                 filepath = os.path.join(root, filename)
                 source_path = filepath
                 dest_path = os.path.join(
-                    artifacts_dir, artifact_name, Path(filepath).relative_to(local_path)
+                    artifacts_dir, artifact_path, Path(filepath).relative_to(local_path)
                 )
                 storage.upload_file(source_path, dest_path, callback)
 

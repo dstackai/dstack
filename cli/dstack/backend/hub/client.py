@@ -1,4 +1,5 @@
-from typing import Dict, List, Optional
+import json
+from typing import Dict, Generator, List, Optional
 from urllib.parse import urlunparse
 
 import requests
@@ -10,7 +11,18 @@ from dstack.core.repo import LocalRepoData, RepoAddress, RepoCredentials, RepoHe
 from dstack.core.run import RunHead
 from dstack.core.secret import Secret
 from dstack.core.tag import TagHead
-from dstack.hub.models import AddTagPath, AddTagRun, JobsGet, ReposUpdate, RunsList, StopRunners
+from dstack.hub.models import (
+    AddTagPath,
+    AddTagRun,
+    JobsGet,
+    JobsList,
+    LinkUpload,
+    PollLogs,
+    ReposUpdate,
+    RunsList,
+    SecretAddUpdate,
+    StopRunners,
+)
 
 
 def _url(scheme="", host="", path="", params="", query="", fragment=""):
@@ -409,6 +421,295 @@ class HubClient:
             if resp.ok:
                 json_data = resp.json()
                 return Job.parse_obj(json_data)
+            if resp.status_code == 401:
+                print("Unauthorized. Please set correct token")
+                return None
+        except requests.ConnectionError:
+            print(f"{self.host}:{self.port} connection refused")
+        return None
+
+    def list_secret_names(self, repo_address: RepoAddress) -> List[str]:
+        url = _url(
+            scheme="http",
+            host=f"{self.host}:{self.port}",
+            path=f"api/hub/{self.hub_name}/secrets/list",
+        )
+        try:
+            headers = HubClient._auth(token=self.token)
+            headers["Content-type"] = "application/json"
+            resp = requests.get(
+                url=url,
+                headers=headers,
+                data=repo_address.json(),
+            )
+            if resp.ok:
+                json_data = resp.json()
+                return json_data
+            if resp.status_code == 401:
+                print("Unauthorized. Please set correct token")
+                return []
+        except requests.ConnectionError:
+            print(f"{self.host}:{self.port} connection refused")
+        return []
+
+    def get_secret(self, repo_address: RepoAddress, secret_name: str) -> Optional[Secret]:
+        url = _url(
+            scheme="http",
+            host=f"{self.host}:{self.port}",
+            path=f"api/hub/{self.hub_name}/secrets/get/{secret_name}",
+        )
+        try:
+            headers = HubClient._auth(token=self.token)
+            headers["Content-type"] = "application/json"
+            resp = requests.get(
+                url=url,
+                headers=headers,
+                data=repo_address.json(),
+            )
+            if resp.ok:
+                json_data = resp.json()
+                return Secret.parse_obj(json_data)
+            if resp.status_code == 401:
+                print("Unauthorized. Please set correct token")
+                return None
+        except requests.ConnectionError:
+            print(f"{self.host}:{self.port} connection refused")
+        return None
+
+    def add_secret(self, repo_address: RepoAddress, secret: Secret):
+        url = _url(
+            scheme="http",
+            host=f"{self.host}:{self.port}",
+            path=f"api/hub/{self.hub_name}/secrets/add",
+        )
+        try:
+            headers = HubClient._auth(token=self.token)
+            headers["Content-type"] = "application/json"
+            resp = requests.post(
+                url=url,
+                headers=headers,
+                data=SecretAddUpdate(
+                    repo_address=repo_address,
+                    secret=secret,
+                ).json(),
+            )
+            if resp.ok:
+                return None
+            if resp.status_code == 401:
+                print("Unauthorized. Please set correct token")
+                return None
+        except requests.ConnectionError:
+            print(f"{self.host}:{self.port} connection refused")
+        return None
+
+    def update_secret(self, repo_address: RepoAddress, secret: Secret):
+        url = _url(
+            scheme="http",
+            host=f"{self.host}:{self.port}",
+            path=f"api/hub/{self.hub_name}/secrets/update",
+        )
+        try:
+            headers = HubClient._auth(token=self.token)
+            headers["Content-type"] = "application/json"
+            resp = requests.post(
+                url=url,
+                headers=headers,
+                data=SecretAddUpdate(
+                    repo_address=repo_address,
+                    secret=secret,
+                ).json(),
+            )
+            if resp.ok:
+                return None
+            if resp.status_code == 401:
+                print("Unauthorized. Please set correct token")
+                return None
+        except requests.ConnectionError:
+            print(f"{self.host}:{self.port} connection refused")
+        return None
+
+    def delete_secret(self, repo_address: RepoAddress, secret_name: str):
+        url = _url(
+            scheme="http",
+            host=f"{self.host}:{self.port}",
+            path=f"api/hub/{self.hub_name}/secrets/delete/{secret_name}",
+        )
+        try:
+            headers = HubClient._auth(token=self.token)
+            headers["Content-type"] = "application/json"
+            resp = requests.post(
+                url=url,
+                headers=headers,
+                data=repo_address.json(),
+            )
+            if resp.ok:
+                return None
+            if resp.status_code == 401:
+                print("Unauthorized. Please set correct token")
+                return None
+        except requests.ConnectionError:
+            print(f"{self.host}:{self.port} connection refused")
+        return None
+
+    def list_jobs(self, repo_address: RepoAddress, run_name: str) -> List[Job]:
+        url = _url(
+            scheme="http",
+            host=f"{self.host}:{self.port}",
+            path=f"api/hub/{self.hub_name}/jobs/list",
+        )
+        try:
+            headers = HubClient._auth(token=self.token)
+            headers["Content-type"] = "application/json"
+            resp = requests.post(
+                url=url,
+                headers=headers,
+                data=JobsList(repo_address=repo_address, run_name=run_name).json(),
+            )
+            if resp.ok:
+                job_data = resp.json()
+                return [Job.parse_obj(job) for job in job_data]
+            if resp.status_code == 401:
+                print("Unauthorized. Please set correct token")
+                return []
+        except requests.ConnectionError:
+            print(f"{self.host}:{self.port} connection refused")
+        return []
+
+    def list_run_artifact_files(self, repo_address: RepoAddress, run_name: str) -> List[Artifact]:
+        url = _url(
+            scheme="http",
+            host=f"{self.host}:{self.port}",
+            path=f"api/hub/{self.hub_name}/artifacts/list",
+        )
+        try:
+            headers = HubClient._auth(token=self.token)
+            headers["Content-type"] = "application/json"
+            resp = requests.get(
+                url=url,
+                headers=headers,
+                data=JobsList(repo_address=repo_address, run_name=run_name).json(),
+            )
+            if resp.ok:
+                artifact_data = resp.json()
+                return [Artifact.parse_obj(artifact) for artifact in artifact_data]
+            if resp.status_code == 401:
+                print("Unauthorized. Please set correct token")
+                return []
+        except requests.ConnectionError:
+            print(f"{self.host}:{self.port} connection refused")
+        return []
+
+    def delete_job_head(self, repo_address: RepoAddress, job_id: str):
+        url = _url(
+            scheme="http",
+            host=f"{self.host}:{self.port}",
+            path=f"api/hub/{self.hub_name}/jobs/delete",
+        )
+        try:
+            headers = HubClient._auth(token=self.token)
+            headers["Content-type"] = "application/json"
+            resp = requests.post(
+                url=url,
+                headers=headers,
+                data=JobsGet(repo_address=repo_address, job_id=job_id).json(),
+            )
+            if resp.ok:
+                return None
+            if resp.status_code == 401:
+                print("Unauthorized. Please set correct token")
+                return None
+        except requests.ConnectionError:
+            print(f"{self.host}:{self.port} connection refused")
+        return None
+
+    def poll_logs(
+        self,
+        repo_address: RepoAddress,
+        job_heads: List[JobHead],
+        start_time: int,
+        attached: bool,
+    ) -> Generator[LogEvent, None, None]:
+        url = _url(
+            scheme="http",
+            host=f"{self.host}:{self.port}",
+            path=f"api/hub/{self.hub_name}/logs/poll",
+        )
+        try:
+            headers = HubClient._auth(token=self.token)
+            headers["Content-type"] = "application/json"
+            data = PollLogs(
+                repo_address=repo_address,
+                job_heads=job_heads,
+                start_time=start_time,
+                attached=attached,
+            ).json()
+            resp = requests.get(
+                url=url,
+                headers=headers,
+                data=data,
+                stream=True,
+            )
+            if resp.ok:
+                _braces = 0
+                _body = bytearray()
+                for chunk in resp.iter_content(chunk_size=128):
+                    for b in chunk:
+                        if b == 123:
+                            _braces += 1
+                        elif b == 125:
+                            _braces -= 1
+                        _body.append(b)
+
+                        if _braces == 0:
+                            json_data = json.loads(_body)
+                            _body = bytearray()
+                            yield LogEvent.parse_obj(json_data)
+            if resp.status_code == 401:
+                print("Unauthorized. Please set correct token")
+                return None
+        except requests.ConnectionError:
+            print(f"{self.host}:{self.port} connection refused")
+        return None
+
+    def upload_file(self, dest_path: str) -> Optional[str]:
+        url = _url(
+            scheme="http",
+            host=f"{self.host}:{self.port}",
+            path=f"api/hub/{self.hub_name}/link/upload",
+        )
+        try:
+            headers = HubClient._auth(token=self.token)
+            headers["Content-type"] = "application/json"
+            resp = requests.post(
+                url=url,
+                headers=headers,
+                data=LinkUpload(object_key=dest_path).json(),
+            )
+            if resp.ok:
+                return resp.text
+            if resp.status_code == 401:
+                print("Unauthorized. Please set correct token")
+                return None
+        except requests.ConnectionError:
+            print(f"{self.host}:{self.port} connection refused")
+        return None
+
+    def download_file(self, dest_path: str) -> Optional[str]:
+        url = _url(
+            scheme="http",
+            host=f"{self.host}:{self.port}",
+            path=f"api/hub/{self.hub_name}/link/download",
+        )
+        try:
+            headers = HubClient._auth(token=self.token)
+            headers["Content-type"] = "application/json"
+            resp = requests.get(
+                url=url,
+                headers=headers,
+                data=LinkUpload(object_key=dest_path).json(),
+            )
+            if resp.ok:
+                return resp.text
             if resp.status_code == 401:
                 print("Unauthorized. Please set correct token")
                 return None

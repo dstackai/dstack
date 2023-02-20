@@ -5,7 +5,7 @@ from fastapi.security import HTTPBearer
 
 from dstack.core.job import Job, JobHead
 from dstack.core.repo import RepoAddress
-from dstack.hub.models import JobsGet
+from dstack.hub.models import JobsGet, JobsList
 from dstack.hub.routers.cache import get_backend
 from dstack.hub.routers.util import get_hub
 from dstack.hub.security.scope import Scope
@@ -36,8 +36,10 @@ async def get_job(hub_name: str, body: JobsGet):
     dependencies=[Depends(Scope("jobs:list:read"))],
     response_model=List[Job],
 )
-async def list_job(hub_name: str):
-    pass
+async def list_job(hub_name: str, body: JobsList):
+    hub = await get_hub(hub_name=hub_name)
+    backend = get_backend(hub)
+    return backend.list_jobs(repo_address=body.repo_address, run_name=body.run_name)
 
 
 @router.get(
@@ -51,10 +53,8 @@ async def list_heads_job(hub_name: str, repo_address: RepoAddress, run_name: Opt
     return backend.list_job_heads(repo_address=repo_address, run_name=run_name)
 
 
-@router.post(
-    "/{hub_name}/jobs/{job_id}/delete", dependencies=[Depends(Scope("jobs:delete:write"))]
-)
-async def delete_job(hub_name: str, job_id: str, repo_address: RepoAddress):
+@router.post("/{hub_name}/jobs/delete", dependencies=[Depends(Scope("jobs:delete:write"))])
+async def delete_job(hub_name: str, body: JobsGet):
     hub = await get_hub(hub_name=hub_name)
     backend = get_backend(hub)
-    backend.delete_job_head(repo_address=repo_address, job_id=job_id)
+    backend.delete_job_head(repo_address=body.repo_address, job_id=body.job_id)

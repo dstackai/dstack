@@ -91,7 +91,9 @@ class SecretCommand(BasicCommand):
             if backend.get_secret(repo_data, args.secret_name):
                 anyone = True
                 secret_value = args.secret_value or Prompt.ask("Value", password=True)
-                backend.update_secret(repo_data, Secret(args.secret_name, secret_value))
+                backend.update_secret(
+                    repo_data, Secret(secret_name=args.secret_name, secret_value=secret_value)
+                )
                 print(f"[grey58]OK (backend: {backend.name})[/]")
         if not anyone:
             sys.exit(f"The secret '{args.secret_name}' doesn't exist")

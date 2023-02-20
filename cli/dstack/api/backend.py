@@ -5,7 +5,6 @@ from dstack.backend.base import Backend, BackendType, RemoteBackend
 from dstack.backend.gcp import GCPBackend
 from dstack.backend.hub import HubBackend
 from dstack.backend.local import LocalBackend
-from dstack.core.error import BackendError
 
 DEFAULT_REMOTE = "aws"
 DEFAULT = "local"
@@ -35,10 +34,7 @@ def dict_backends(all_backend: bool = False) -> Dict[str, Backend]:
 
 
 def get_backend_by_name(name: str) -> Optional[Backend]:
-    backend = dict_backends().get(name)
-    if backend is None:
-        raise BackendError(f"Backend {name} not found")
-    return backend
+    return dict_backends().get(name)
 
 
 def get_current_remote_backend() -> Optional[RemoteBackend]:
