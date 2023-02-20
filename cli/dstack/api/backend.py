@@ -1,5 +1,6 @@
 from typing import Dict, List, Optional
 
+from dstack import version
 from dstack.backend.aws import AwsBackend
 from dstack.backend.base import Backend, RemoteBackend
 from dstack.backend.hub import HubBackend
@@ -8,7 +9,9 @@ from dstack.backend.local import LocalBackend
 DEFAULT_REMOTE = "aws"
 DEFAULT = "local"
 
-backends_classes = [AwsBackend, LocalBackend, HubBackend]
+backends_classes = [AwsBackend, LocalBackend]
+if not version.__is_release__:
+    backends_classes.append(HubBackend)
 
 
 def get_all_backends():
