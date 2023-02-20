@@ -2,7 +2,7 @@ import re
 import sys
 from pathlib import Path
 
-from setuptools import setup, find_packages
+from setuptools import find_packages, setup
 
 project_dir = Path(__file__).parent
 
@@ -20,8 +20,11 @@ def get_version():
 
 
 def get_long_description():
-    return re.sub(r"<picture>\s*|<source[^>]*>\s*|\s*</picture>|<video[^>]*>\s*|</video>\s*|### Demo\s*", "",
-                  open(project_dir / "README.md").read())
+    return re.sub(
+        r"<picture>\s*|<source[^>]*>\s*|\s*</picture>|<video[^>]*>\s*|</video>\s*|### Demo\s*",
+        "",
+        open(project_dir / "README.md").read(),
+    )
 
 
 setup(
@@ -33,7 +36,7 @@ setup(
     packages=find_packages("cli"),
     package_data={
         "dstack.schemas": ["*.json"],
-        "dstack.hub": ["statics/*", "statics/**/*", "statics/**/**/*"]
+        "dstack.hub": ["statics/*", "statics/**/*", "statics/**/**/*"],
     },
     include_package_data=True,
     scripts=[],
@@ -72,11 +75,12 @@ setup(
         "psutil",
         "jinja2",
         "pygtail",
+        "packaging",
     ],
     classifiers=[
         "Development Status :: 2 - Pre-Alpha",
         "Topic :: Scientific/Engineering :: Artificial Intelligence",
         "License :: OSI Approved :: Mozilla Public License 2.0 (MPL 2.0)",
-        "Programming Language :: Python :: 3"
-    ]
+        "Programming Language :: Python :: 3",
+    ],
 )
