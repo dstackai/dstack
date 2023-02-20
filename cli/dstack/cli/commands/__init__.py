@@ -1,6 +1,6 @@
 from argparse import Namespace, _SubParsersAction
 
-from dstack.cli.updates import _check_for_updates
+from dstack.cli.updates import check_for_updates
 
 
 class BasicCommand(object):
@@ -30,7 +30,7 @@ class BasicCommand(object):
         ...
 
     def __command(self, args: Namespace):
-        _check_for_updates()
+        check_for_updates()
         self._command(args)
 
     def _command(self, args: Namespace):
