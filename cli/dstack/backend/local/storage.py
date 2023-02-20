@@ -45,7 +45,7 @@ class LocalStorage(Storage):
         for dirpath, dirnames, filenames in os.walk(full_dirpath):
             for filename in filenames:
                 full_filepath = os.path.join(dirpath, filename)
-                filesize = os.path.getsize(full_filepath)
+                filesize = os.stat(full_filepath, follow_symlinks=False).st_size
                 filepath = full_filepath.removeprefix(full_dirpath)
                 files.append(
                     StorageFile(
