@@ -155,7 +155,7 @@ func (c *Copier) statUpload(local string) {
 		return nil
 	})
 	if err != nil {
-
+		fmt.Println("[ERROR]", err)
 	}
 	c.pb.average()
 }
@@ -283,7 +283,6 @@ func (c *Copier) Download(ctx context.Context, bucket, remote, local string) {
 				return
 			}
 			c.updateBars(file.Size)
-			return
 		}(file)
 	}
 	c.threads.acquire(MAX_THREADS)
@@ -340,7 +339,6 @@ func (c *Copier) Upload(ctx context.Context, bucket, remote, local string) {
 				return
 			}
 			c.updateBars(file.info.Size())
-			return
 		}(file)
 	}
 	c.threads.acquire(MAX_THREADS)
