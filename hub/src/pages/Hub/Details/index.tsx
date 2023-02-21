@@ -2,7 +2,7 @@ import React, { useEffect, useState, useCallback } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useNavigate, useParams } from 'react-router-dom';
 import { debounce } from 'lodash';
-import { useBreadcrumbs } from 'hooks';
+import { useAppSelector, useBreadcrumbs } from 'hooks';
 import { ROUTES } from 'routes';
 import {
     Box,
@@ -15,9 +15,13 @@ import {
     Loader,
     SpaceBetween,
     Button,
+    StatusIndicator,
+    Popover,
 } from 'components';
+import { selectAuthToken } from 'App/slice';
 import { useGetHubQuery, useDeleteHubsMutation, useUpdateHubMembersMutation } from 'services/hub';
 import { HubMembers } from '../Members';
+import styles from './styles.module.scss';
 
 export const HubDetails: React.FC = () => {
     const { t } = useTranslation();
@@ -28,6 +32,7 @@ export const HubDetails: React.FC = () => {
     const { data, isLoading } = useGetHubQuery({ name: paramHubName });
     const [deleteHubs, { isLoading: isDeleting, data: deleteData }] = useDeleteHubsMutation();
     const [updateHubMembers] = useUpdateHubMembersMutation();
+    const currentUserToken = useAppSelector(selectAuthToken);
 
     useBreadcrumbs([
         {
@@ -49,6 +54,16 @@ export const HubDetails: React.FC = () => {
             hub_name: paramHubName,
             members,
         });
+    };
+
+    const cliCommand = `dstack config hub --url ${location.origin}/${paramHubName} --token ${currentUserToken}`;
+
+    const onCopyCliCommand = async () => {
+        try {
+            await navigator.clipboard.writeText(cliCommand);
+        } catch (err) {
+            console.error('Failed to copy: ', err);
+        }
     };
 
     const debouncedMembersHandler = useCallback(debounce(changeMembersHandler, 1000), []);
@@ -123,6 +138,45 @@ export const HubDetails: React.FC = () => {
                             }
                         >
                             {renderAwsSettingsSection()}
+                        </Container>
+                        <Container
+                            header={
+                                <Header
+                                    variant="h2"
+                                    actions={
+                                        <Popover
+                                            dismissButton={false}
+                                            position="top"
+                                            size="small"
+                                            triggerType="custom"
+                                            content={<StatusIndicator type="success">{t('common.copied')}</StatusIndicator>}
+                                        >
+                                            <Button
+                                                formAction="none"
+                                                iconName="copy"
+                                                variant="normal"
+                                                onClick={onCopyCliCommand}
+                                            >
+                                                {t('common.copy')}
+                                            </Button>
+                                        </Popover>
+                                    }
+                                >
+                                    {t('hubs.edit.cli')}
+                                </Header>
+                            }
+                        >
+                            <SpaceBetween size="s">
+                                <div className={styles.code}>
+                                    <Box variant="code" color="text-status-inactive">
+                                        {cliCommand}
+                                    </Box>
+                                </div>
+
+                                <Box variant="p" color="text-body-secondary">
+                                    Use the code snippet below to configure your CLI to use this hub as a remote
+                                </Box>
+                            </SpaceBetween>
                         </Container>
 
                         <HubMembers onChange={debouncedMembersHandler} initialValues={data.members} />

@@ -11,7 +11,9 @@
     "sign_out": "Sign out",
     "cancel": "Cancel",
     "save": "Save",
-    "profile": "Profile"
+    "profile": "Profile",
+    "copied": "Copied",
+    "copy": "Copy"
   },
   "auth": {
     "invalid_token": "Invalid token",
@@ -39,18 +41,26 @@
       "bucket": "Bucket"
     },
     "backend_type": {
-      "aws": "AWS"
+      "aws": "AWS",
+      "aws_description": "Amazon Web Services",
+      "gcp": "GCP",
+      "gcp_description": "Google Cloud Platform",
+      "azure": "Azure",
+      "azure_description": "Microsoft Azure"
     },
     "edit": {
-      "general_info": "General info",
+      "general": "General",
       "hub_name": "Hub name",
       "backend": "Backend",
       "backend_type": "Type",
       "members_empty_message_title": "No members",
       "members_empty_message_text": "Select hub's members",
+      "cli": "CLI",
       "aws": {
         "access_key": "Access key",
         "secret_key": "Secret key",
+        "access_key_id": "Access key ID",
+        "secret_key_id": "Secret key ID",
         "region_name":  "Region",
         "s3_bucket_name": "Bucket",
         "ec2_subnet_id":  "Subnet ID"

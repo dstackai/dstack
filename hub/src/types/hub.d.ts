@@ -1,4 +1,4 @@
-declare type THubBackendType = 'aws';
+declare type THubBackendType = 'aws' | 'gcp' | 'azure';
 declare interface IHub {
     hub_name: string,
     backend: { type: THubBackendType } & THubBackendAWSWithTitles,
