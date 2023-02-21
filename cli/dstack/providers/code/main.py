@@ -62,7 +62,15 @@ class CodeProvider(Provider):
                 artifact_specs=self.artifact_specs,
                 port_count=1,
                 requirements=self.resources,
-                app_specs=[AppSpec(port_index=0, app_name="code")],
+                app_specs=[
+                    AppSpec(
+                        port_index=0,
+                        app_name="code",
+                        url_query_params={
+                            "tkn": connection_token,
+                        },
+                    )
+                ],
             )
         ]
 
