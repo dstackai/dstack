@@ -62,16 +62,7 @@ class CodeProvider(Provider):
                 artifact_specs=self.artifact_specs,
                 port_count=1,
                 requirements=self.resources,
-                app_specs=[
-                    AppSpec(
-                        port_index=0,
-                        app_name="code",
-                        url_query_params={
-                            "tkn": connection_token,
-                            "folder": "/workflow",
-                        },
-                    )
-                ],
+                app_specs=[AppSpec(port_index=0, app_name="code")],
             )
         ]
 
@@ -100,7 +91,7 @@ class CodeProvider(Provider):
         if self.setup:
             commands.extend(self.setup)
         commands.append(
-            f"/tmp/openvscode-server-v{self.version}-linux-$arch/bin/openvscode-server --port $PORT_0 --host 0.0.0.0 --connection-token $CONNECTION_TOKEN"
+            f"/tmp/openvscode-server-v{self.version}-linux-$arch/bin/openvscode-server --port $PORT_0 --host 0.0.0.0 --connection-token $CONNECTION_TOKEN --default-folder /workflow"
         )
         return commands
 
