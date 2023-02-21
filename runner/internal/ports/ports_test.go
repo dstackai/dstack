@@ -25,7 +25,7 @@ func TestMgr_Register(t *testing.T) {
 	m.Unregister(taskID)
 	ports = m.Ports(taskID)
 	assert.Equal(t, ports, []string{})
-	taskID, err = m.Register(1, []string{"80"})
+	_, err = m.Register(1, []string{"80"})
 	assert.Equal(t, err, nil)
 	_, err = m.Register(0, []string{
 		"80",
@@ -57,7 +57,7 @@ func TestMgr_RegisterSingle(t *testing.T) {
 	m.Unregister(taskID)
 	ports = m.Ports(taskID)
 	assert.Equal(t, ports, []string{})
-	taskID, err = m.Register(0, []string{"80"})
+	_, err = m.Register(0, []string{"80"})
 	assert.Equal(t, err, nil)
 	_, err = m.Register(0, []string{
 		"80",

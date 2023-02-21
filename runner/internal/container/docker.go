@@ -24,7 +24,6 @@ type Container interface {
 }
 
 type Docker struct {
-	ctx         context.Context
 	client      *docker.Client
 	runtime     string
 	nCpu        int
