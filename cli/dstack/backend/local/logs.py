@@ -60,7 +60,7 @@ def events_loop(
                     yield {
                         "message": {
                             "source": "stdout",
-                            "log": line_log,
+                            "log": line_log.rstrip("\n"),
                             "job_id": _job.job_id,
                         },
                         "eventId": _job.runner_id,
