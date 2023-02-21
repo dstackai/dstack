@@ -14,20 +14,29 @@ router = APIRouter(prefix="/api/hub", tags=["hub"])
 security = HTTPBearer()
 
 
-@router.get("", dependencies=[Depends(Scope("hub:list:read"))], response_model=List[HubInfo])
+@router.post("", dependencies=[Depends(Scope("hub:list:read"))], response_model=List[HubInfo])
+async def hub_create(body: HubInfo) -> HubInfo:
+    hub = await HubManager.get(name=body.name)
+    if hub is not None:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Hub is exists")
+    await HubManager.save(hub)
+    return hub
+
+
+@router.get("/list", dependencies=[Depends(Scope("hub:list:read"))], response_model=List[HubInfo])
 async def list_hub() -> List[HubInfo]:
     return await HubManager.list_info()
-
-
-@router.post("{hub_name}/delete", dependencies=[Depends(Scope("hub:list:write"))])
-async def delete_hub(hub_name: str):
-    hub = await get_hub(hub_name=hub_name)
-    await HubManager.remove(hub)
 
 
 @router.post("/add", dependencies=[Depends(Scope("hub:add:write"))])
 async def add_hub(hub: Hub):
     await HubManager.save(HubDB(name=hub.name, backend=hub.backend, config=hub.config))
+
+
+@router.delete("{hub_name}", dependencies=[Depends(Scope("hub:list:write"))])
+async def delete_hub(hub_name: str):
+    hub = await get_hub(hub_name=hub_name)
+    await HubManager.remove(hub)
 
 
 @router.get("{hub_name}/info", dependencies=[Depends(Scope("hub:list:read"))])

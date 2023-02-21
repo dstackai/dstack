@@ -7,6 +7,12 @@ from dstack.core.repo import LocalRepoData, RepoAddress
 from dstack.core.secret import Secret
 
 
+class User(BaseModel):
+    user_name: str
+    token: str
+    global_role: str
+
+
 class Hub(BaseModel):
     name: str
     backend: str
