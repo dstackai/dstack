@@ -136,7 +136,9 @@ jobs:
         uses: golangci/golangci-lint-action@v3
         with:
           version: v1.51.2
-          args: --issues-exit-code=0
+          args:
+          - "--issues-exit-code=0"
+          - "--timeout=20m"
           working-directory: runner
 
       - name: Test
