@@ -8,6 +8,7 @@ from pydantic.fields import Field
 from pydantic.main import BaseModel
 from pydantic.networks import stricturl
 from pydantic.tools import parse_obj_as
+from pydantic.types import constr
 from rich import print
 from rich.prompt import Confirm, Prompt
 
@@ -19,8 +20,14 @@ class Secret(BaseModel):
     url: stricturl(allowed_schemes={"https"})
 
 
+class Storage(BaseModel):
+    url: stricturl(allowed_schemes={"https"})
+    container: str
+
+
 class Config(BaseModel):
     secret: Secret
+    storage: Storage
     backend: str = Field(default="azure")
 
 
@@ -44,9 +51,35 @@ vault_name_pattern = re.compile(r"^[a-z](?:-[0-9a-z]|[0-9a-z])$")
 vault_name_min_length = 3
 vault_name_max_length = 24
 
-
-dns_suffixes = frozenset(
+# https://learn.microsoft.com/en-us/azure/key-vault/general/about-keys-secrets-certificates#dns-suffixes-for-base-url
+vault_dns_suffixes = frozenset(
     ("vault.azure.net", "vault.azure.cn", "vault.usgovcloudapi.net", "vault.microsoftazure.de")
+)
+
+
+# https://learn.microsoft.com/en-us/azure/storage/common/storage-account-overview#storage-account-name
+# Storage account names must be between 3 and 24 characters in length and may contain numbers and lowercase letters only.
+# It is ok for digit as first character.
+storage_account_name_pattern = re.compile(r"^[a-z][0-9a-z]$")
+storage_account_name_min_length = 3
+storage_account_name_max_length = 24
+
+# https://learn.microsoft.com/en-us/rest/api/storageservices/Naming-and-Referencing-Containers--Blobs--and-Metadata#resource-uri-syntax
+# There are different storage types https://learn.microsoft.com/en-us/azure/storage/common/storage-account-overview#standard-endpoints
+blob_dns_suffixes = frozenset(("blob.core.windows.net",))
+
+# https://learn.microsoft.com/en-us/rest/api/storageservices/naming-and-referencing-containers--blobs--and-metadata#container-names
+# - Container names must start or end with a letter or number, and can contain only letters, numbers, and the dash (-) character.
+# - Every dash (-) character must be immediately preceded and followed by a letter or number; consecutive dashes are not permitted in container names.
+# - All letters in a container name must be lowercase.
+# - Container names must be from 3 through 63 characters long.
+container_name_pattern = r"^[0-9a-z](?:-[0-9a-z]|[0-9a-z])$"
+container_account_name_min_length = 3
+container_account_name_max_length = 63
+container_validator = constr(
+    regex=container_name_pattern,
+    min_length=container_account_name_min_length,
+    max_length=container_account_name_max_length,
 )
 
 
@@ -91,8 +124,12 @@ class AzureConfig(BackendConfig):
             pass
 
         default_secret_url = {}
+        default_storage_url = {}
+        default_storage_container = {"default": "dstack"}
         if self.config is not None:
             default_secret_url["default"] = self.config.secret.url
+            default_storage_url["default"] = self.config.storage.url
+            default_storage_container["default"] = self.config.storage.container
 
         while True:
             secret_url = Prompt.ask(
@@ -105,10 +142,46 @@ class AzureConfig(BackendConfig):
             except ValidationError as e:
                 print(f"Url is not valid. Errors are {e!r}.")
                 continue
-            # https://learn.microsoft.com/en-us/azure/key-vault/general/about-keys-secrets-certificates#dns-suffixes-for-base-url
             vault_name, suffix = secret_url_parsed.host.split(".", 1)
-            if suffix not in dns_suffixes:
-                print(f"Suffix {suffix!r} should be from list {', '.join(sorted(dns_suffixes))}.")
+            if suffix not in vault_dns_suffixes:
+                print(
+                    f"Suffix {suffix!r} should be from list {', '.join(sorted(vault_dns_suffixes))}."
+                )
+                continue
+
+            break
+
+        while True:
+            storage_url = Prompt.ask(
+                "[sea_green3 bold]?[/sea_green3 bold] [bold]Enter Blob Storage url[/bold]",
+                **default_storage_url,
+            )
+            # XXX: It is copy-paste from Storage.url type annotation.
+            try:
+                storage_url_parsed = parse_obj_as(
+                    stricturl(allowed_schemes={"https"}), storage_url
+                )
+            except ValidationError as e:
+                print(f"Url is not valid. Errors are {e!r}.")
+                continue
+            storage_account_name, suffix = storage_url_parsed.host.split(".", 1)
+            if suffix not in blob_dns_suffixes:
+                print(
+                    f"Suffix {suffix!r} should be from list {', '.join(sorted(blob_dns_suffixes))}."
+                )
+                continue
+
+            break
+
+        while True:
+            storage_container = Prompt.ask(
+                "[sea_green3 bold]?[/sea_green3 bold] [bold]Enter Blob Storage container[/bold]",
+                **default_storage_container,
+            )
+            try:
+                storage_container_parsed = parse_obj_as(container_validator, storage_container)
+            except ValidationError as e:
+                print(f"Url is not valid. Errors are {e!r}.")
                 continue
 
             break
@@ -116,7 +189,11 @@ class AzureConfig(BackendConfig):
         config_data = {
             "secret": {
                 "url": secret_url_parsed,
-            }
+            },
+            "storage": {
+                "url": storage_url_parsed,
+                "container": storage_container_parsed,
+            },
         }
 
         self.config = Config(**config_data)

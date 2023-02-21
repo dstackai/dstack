@@ -3,10 +3,14 @@ from typing import Generator, List, Optional
 
 from azure.identity import DefaultAzureCredential
 
+from dstack.backend.azure.compute import AzureCompute
 from dstack.backend.azure.config import AzureConfig
 from dstack.backend.azure.secrets import AzureSecretsManager
-from dstack.backend.base import RemoteBackend
+from dstack.backend.azure.storage import AzureStorage
+from dstack.backend.base import CloudBackend
+from dstack.backend.base import jobs as base_jobs
 from dstack.backend.base import repos as base_repos
+from dstack.backend.base import runs as base_runs
 from dstack.core.artifact import Artifact
 from dstack.core.error import ConfigError
 from dstack.core.job import Job, JobHead
@@ -18,7 +22,7 @@ from dstack.core.secret import Secret
 from dstack.core.tag import TagHead
 
 
-class AzureBackend(RemoteBackend):
+class AzureBackend(CloudBackend):
     def __init__(self):
         config = AzureConfig()
         try:
@@ -28,10 +32,18 @@ class AzureBackend(RemoteBackend):
         except ConfigError:
             self._loaded = False
             return
-        self.backend_config = config.config
+        self._backend_config = config.config
+        credential = DefaultAzureCredential()
         self._secrets_manager = AzureSecretsManager(
-            credential=DefaultAzureCredential(), vault_url=self.backend_config.secret.url
+            vault_url=self._backend_config.secret.url,
+            credential=credential,
         )
+        self._storage = AzureStorage(
+            account_url=self._backend_config.storage.url,
+            credential=credential,
+            container_name=self._backend_config.storage.container,
+        )
+        self._compute = AzureCompute()
 
     @property
     def name(self) -> str:
@@ -58,6 +70,7 @@ class AzureBackend(RemoteBackend):
         repo_address: RepoAddress,
         job_id: str,
         artifact_name: str,
+        artifact_path: str,
         local_path: Path,
     ):
         raise NotImplementedError
@@ -66,10 +79,10 @@ class AzureBackend(RemoteBackend):
         raise NotImplementedError
 
     def create_run(self, repo_address: RepoAddress) -> str:
-        raise NotImplementedError
+        return base_runs.create_run(self._storage, repo_address, self.type)
 
     def create_job(self, job: Job):
-        raise NotImplementedError
+        base_jobs.create_job(self._storage, job)
 
     def get_job(self, repo_address: RepoAddress, job_id: str) -> Optional[Job]:
         raise NotImplementedError
@@ -77,8 +90,8 @@ class AzureBackend(RemoteBackend):
     def list_jobs(self, repo_address: RepoAddress, run_name: str) -> List[Job]:
         raise NotImplementedError
 
-    def run_job(self, job: Job) -> Runner:
-        raise NotImplementedError
+    def run_job(self, job: Job):
+        base_jobs.run_job(self._storage, self._compute, job)
 
     def stop_job(self, repo_address: RepoAddress, job_id: str, abort: bool):
         raise NotImplementedError
@@ -155,4 +168,10 @@ class AzureBackend(RemoteBackend):
         raise NotImplementedError
 
     def delete_secret(self, repo_address: RepoAddress, secret_name: str):
+        raise NotImplementedError
+
+    def get_signed_download_url(self, object_key: str) -> str:
+        raise NotImplementedError
+
+    def get_signed_upload_url(self, object_key: str) -> str:
         raise NotImplementedError

@@ -11,7 +11,7 @@ from dstack.core.secret import Secret
 
 
 class AzureSecretsManager(SecretsManager):
-    def __init__(self, credential: TokenCredential, vault_url: str):
+    def __init__(self, vault_url: str, credential: TokenCredential):
         self.secrets_client = SecretClient(vault_url=vault_url, credential=credential)
 
     def get_secret(self, repo_address: RepoAddress, secret_name: str) -> Optional[Secret]:
@@ -74,10 +74,10 @@ def _encode(key: str) -> str:
 
 
 def _get_secret_key(repo_address: RepoAddress, secret_name: str) -> str:
-    key = f"dstack-secrets-{repo_address.path(delimiter='-')}-{secret_name}"
+    key = f"dstack-secrets-{repo_address.path()}-{secret_name}"
     return _encode(key)
 
 
 def _get_credentials_key(repo_address: RepoAddress) -> str:
-    key = f"dstack-credentials-{repo_address.path(delimiter='-')}"
+    key = f"dstack-credentials-{repo_address.path()}"
     return _encode(key)
