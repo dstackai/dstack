@@ -1,6 +1,9 @@
 package models
 
-import "fmt"
+import (
+	"fmt"
+	"strings"
+)
 
 type Resource struct {
 	CPUs          int    `yaml:"cpus,omitempty"`
@@ -82,17 +85,25 @@ type GPU struct {
 	Name      string `yaml:"name,omitempty"`
 	MemoryMiB int    `yaml:"memory_mib,omitempty"`
 }
+
 type State struct {
 	Job       *Job     `yaml:"job"`
 	RequestID string   `yaml:"request_id"`
 	Resources Resource `yaml:"resources"`
 	RunnerID  string   `yaml:"runner_id"`
 }
+
 type GitCredentials struct {
 	Protocol   string  `json:"protocol"`
 	OAuthToken *string `json:"oauth_token,omitempty"`
 	PrivateKey *string `json:"private_key,omitempty"`
 	Passphrase *string `json:"passphrase,omitempty"`
+}
+
+type RepoData struct {
+	RepoHost string
+	RepoUserName string
+	RepoName string
 }
 
 func (j *Job) RepoHostNameWithPort() string {
@@ -101,9 +112,14 @@ func (j *Job) RepoHostNameWithPort() string {
 	}
 	return fmt.Sprintf("%s:%d", j.RepoHostName, j.RepoPort)
 }
+
 func (d *Dep) RepoHostNameWithPort() string {
 	if d.RepoPort == 0 {
 		return d.RepoHostName
 	}
 	return fmt.Sprintf("%s:%d", d.RepoHostName, d.RepoPort)
+}
+
+func (rd *RepoData) RepoDataPath(sep string) string {
+	return strings.Join([]string{rd.RepoHost, rd.RepoUserName, rd.RepoName}, sep)
 }

@@ -23,6 +23,7 @@ require (
 )
 
 require (
+	cloud.google.com/go/secretmanager v1.10.0
 	cloud.google.com/go/storage v1.29.0
 	github.com/aws/aws-sdk-go-v2/feature/ec2/imds v1.12.15
 	github.com/aws/aws-sdk-go-v2/internal/configsources v1.1.21 // indirect
