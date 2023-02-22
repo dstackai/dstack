@@ -1,4 +1,4 @@
-import React, { useCallback, useState } from 'react';
+import React, { useCallback, useEffect, useState } from 'react';
 import { IProps } from './types';
 import { ColumnLayout, FormInput, FormSelect, FormSelectOptions, FormS3BucketSelector } from 'components';
 import { useTranslation } from 'react-i18next';
@@ -14,6 +14,10 @@ export const AWSBackend: React.FC<IProps> = ({ loading: loadingProp }) => {
     const [subnets, setSubnets] = useState<FormSelectOptions>([]);
 
     const [getBackendValues, { isLoading }] = useBackendValuesMutation();
+
+    useEffect(() => {
+        changeFormHandler().catch(console.log);
+    }, []);
 
     const loading = loadingProp || isLoading;
 
@@ -31,7 +35,7 @@ export const AWSBackend: React.FC<IProps> = ({ loading: loadingProp }) => {
                 setRegions(response.region_name.values);
             }
 
-            if (response.region_name.selected) {
+            if (response.region_name.selected !== undefined) {
                 setValue('backend.region_name', response.region_name.selected);
             }
 
@@ -39,7 +43,7 @@ export const AWSBackend: React.FC<IProps> = ({ loading: loadingProp }) => {
                 setBuckets(response.s3_bucket_name.values);
             }
 
-            if (response.s3_bucket_name.selected) {
+            if (response.s3_bucket_name.selected !== undefined) {
                 setValue('backend.s3_bucket_name', 's3://' + response.s3_bucket_name.selected);
             }
 
@@ -47,7 +51,7 @@ export const AWSBackend: React.FC<IProps> = ({ loading: loadingProp }) => {
                 setSubnets(response.ec2_subnet_id.values);
             }
 
-            if (response.ec2_subnet_id.selected) {
+            if (response.ec2_subnet_id.selected !== undefined) {
                 setValue('backend.ec2_subnet_id', response.ec2_subnet_id.selected);
             }
         } catch (e) {

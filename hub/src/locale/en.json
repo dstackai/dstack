@@ -50,6 +50,7 @@
     },
     "edit": {
       "general": "General",
+      "edit_backend": "Edit backend",
       "hub_name": "Hub name",
       "backend": "Backend",
       "backend_type": "Type",

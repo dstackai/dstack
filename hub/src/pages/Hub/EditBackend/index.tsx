@@ -7,7 +7,7 @@ import { useBreadcrumbs, useNotifications } from 'hooks';
 import { ROUTES } from 'routes';
 import { HubForm } from '../Form';
 
-export const HubEdit: React.FC = () => {
+export const HubEditBackend: React.FC = () => {
     const { t } = useTranslation();
     const params = useParams();
     const paramHubName = params.name ?? '';
@@ -27,7 +27,7 @@ export const HubEdit: React.FC = () => {
         },
 
         {
-            text: t('common.edit'),
+            text: t('hubs.edit.edit_backend'),
             href: ROUTES.USER.EDIT.FORMAT(paramHubName),
         },
     ]);

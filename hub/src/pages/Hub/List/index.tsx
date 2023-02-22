@@ -69,7 +69,7 @@ export const HubList: React.FC = () => {
 
     const editSelectedHubHandler = () => {
         if (collectionProps.selectedItems?.length === 1)
-            navigate(ROUTES.HUB.EDIT.FORMAT(collectionProps.selectedItems[0].hub_name));
+            navigate(ROUTES.HUB.EDIT_BACKEND.FORMAT(collectionProps.selectedItems[0].hub_name));
     };
 
     const addHubHandler = () => {

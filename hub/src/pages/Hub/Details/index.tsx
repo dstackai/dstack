@@ -79,7 +79,7 @@ export const HubDetails: React.FC = () => {
     };
 
     const editUserHandler = () => {
-        navigate(ROUTES.HUB.EDIT.FORMAT(paramHubName));
+        navigate(ROUTES.HUB.EDIT_BACKEND.FORMAT(paramHubName));
     };
 
     const renderAwsSettingsSection = (): React.ReactNode => {

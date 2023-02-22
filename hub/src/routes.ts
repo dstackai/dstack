@@ -11,9 +11,9 @@ export const ROUTES = {
             TEMPLATE: `/hubs/:name`,
             FORMAT: (name: string) => buildRoute(ROUTES.HUB.DETAILS.TEMPLATE, { name }),
         },
-        EDIT: {
-            TEMPLATE: `/hubs/:name/edit`,
-            FORMAT: (name: string) => buildRoute(ROUTES.HUB.EDIT.TEMPLATE, { name }),
+        EDIT_BACKEND: {
+            TEMPLATE: `/hubs/:name/edit/backend`,
+            FORMAT: (name: string) => buildRoute(ROUTES.HUB.EDIT_BACKEND.TEMPLATE, { name }),
         },
     },
 
