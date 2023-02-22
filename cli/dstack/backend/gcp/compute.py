@@ -269,7 +269,10 @@ def _get_instance_status(project_id: str, zone: str, instance_name: str) -> Requ
         zone=zone,
     )
     client = compute_v1.InstancesClient()
-    instance = client.get(get_instance_request)
+    try:
+        instance = client.get(get_instance_request)
+    except google.api_core.exceptions.NotFound:
+        return RequestStatus.TERMINATED
     if instance.status in ["PROVISIONING", "STAGING", "RUNNING"]:
         return RequestStatus.RUNNING
     return RequestStatus.TERMINATED
