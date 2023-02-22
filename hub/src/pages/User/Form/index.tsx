@@ -24,7 +24,7 @@ export const UserForm: React.FC<Props> = ({
     const { t } = useTranslation();
     const isEditing = !!initialValues;
 
-    const { handleSubmit, control } = useForm<IUser>({
+    const { handleSubmit, control, getValues } = useForm<IUser>({
         defaultValues: initialValues,
     });
 
@@ -46,29 +46,36 @@ export const UserForm: React.FC<Props> = ({
         onSubmitProp(data);
     };
 
+    const onChangeHandler = () => {
+        if (isEditing) {
+            onSubmit(getValues());
+        }
+    };
+
     return (
         <form onSubmit={handleSubmit(onSubmit)}>
             <FormUI
                 actions={
-                    <SpaceBetween direction="horizontal" size="xs">
-                        <Button formAction="none" disabled={loading} variant="link" onClick={onCancel}>
-                            {t('common.cancel')}
-                        </Button>
+                    <>
+                        {!isEditing && (
+                            <SpaceBetween direction="horizontal" size="xs">
+                                <Button formAction="none" disabled={loading} variant="link" onClick={onCancel}>
+                                    {t('common.cancel')}
+                                </Button>
 
-                        <Button loading={loading} disabled={loading} variant="primary">
-                            {t('common.save')}
-                        </Button>
-                    </SpaceBetween>
+                                <Button loading={loading} disabled={loading} variant="primary">
+                                    {t('common.save')}
+                                </Button>
+                            </SpaceBetween>
+                        )}
+                    </>
                 }
             >
-                <Container header={<Header variant="h2">{t('users.general_info')}</Header>}>
+                <Container header={<Header variant="h2">{t('users.account_settings')}</Header>}>
                     <SpaceBetween size="l">
-                        <FormInput
-                            label={t('users.user_name')}
-                            control={control}
-                            name="user_name"
-                            disabled={loading || isEditing}
-                        />
+                        {!isEditing && (
+                            <FormInput label={t('users.user_name')} control={control} name="user_name" disabled={loading} />
+                        )}
 
                         <FormSelect
                             label={t('users.global_role')}
@@ -76,6 +83,7 @@ export const UserForm: React.FC<Props> = ({
                             name="global_role"
                             options={roleSelectOptions}
                             disabled={loading}
+                            onChange={onChangeHandler}
                         />
 
                         {initialValues && (
@@ -83,7 +91,7 @@ export const UserForm: React.FC<Props> = ({
                                 label={t('users.token')}
                                 control={control}
                                 name="token"
-                                disabled
+                                readOnly
                                 secondaryControl={
                                     <SpaceBetween size="xs" direction="horizontal">
                                         <Popover
@@ -99,7 +107,7 @@ export const UserForm: React.FC<Props> = ({
                                                 disabled={loading}
                                                 formAction="none"
                                                 iconName="copy"
-                                                variant="normal"
+                                                variant="link"
                                                 onClick={onCopyToken}
                                             />
                                         </Popover>
@@ -108,10 +116,11 @@ export const UserForm: React.FC<Props> = ({
                                             <Button
                                                 disabled={loading || disabledRefreshToken}
                                                 formAction="none"
-                                                iconName="refresh"
                                                 variant="normal"
                                                 onClick={onRefreshToken}
-                                            />
+                                            >
+                                                {t('users.edit.refresh_token_button_label')}
+                                            </Button>
                                         )}
                                     </SpaceBetween>
                                 }

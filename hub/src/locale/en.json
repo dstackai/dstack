@@ -91,7 +91,7 @@
     "user_name": "User name",
     "token": "Token",
     "global_role": "Global role",
-    "general_info": "General info",
+    "account_settings": "Account settings",
     "create": {
       "page_title": "Create user",
       "error_notification": "Create user error",
@@ -100,11 +100,11 @@
     "edit": {
       "error_notification": "Update user error",
       "success_notification": "User updating is successful",
-      "refresh_token_success_notification": "Token refreshing is successful",
-      "refresh_token_error_notification": "Token refreshing error",
-      "refresh_token_confirm_title": "Refresh token",
-      "refresh_token_confirm_message": "Do you sure want to refresh token?",
-      "refresh_token_button_label": "Refresh"
+      "refresh_token_success_notification": "Token rotating is successful",
+      "refresh_token_error_notification": "Token rotating error",
+      "refresh_token_confirm_title": "Rotate token",
+      "refresh_token_confirm_message": "Do you sure want to rotate token?",
+      "refresh_token_button_label": "Rotate"
     }
   },
   "users_autosuggest": {

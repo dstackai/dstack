@@ -65,7 +65,7 @@ export const UserEdit: React.FC = () => {
 
     const onSubmitHandler = async (userData: Partial<IUser>) => {
         try {
-            const data = await updateUser({
+            await updateUser({
                 ...pick(userData, ['global_role']),
                 user_name: paramUserName,
             }).unwrap();
@@ -74,8 +74,6 @@ export const UserEdit: React.FC = () => {
                 type: 'success',
                 content: t('users.edit.success_notification'),
             });
-
-            navigate(ROUTES.USER.DETAILS.FORMAT(data.user_name ?? paramUserName));
         } catch (e) {
             pushNotification({
                 type: 'error',
