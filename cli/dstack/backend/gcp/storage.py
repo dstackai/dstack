@@ -6,6 +6,7 @@ from google.cloud import exceptions, storage
 
 from dstack.backend.base.storage import SIGNED_URL_EXPIRATION, CloudStorage
 from dstack.core.storage import StorageFile
+from dstack.utils.common import removeprefix
 
 
 class GCPStorage(CloudStorage):
@@ -46,7 +47,7 @@ class GCPStorage(CloudStorage):
         files = []
         for blob in blobs:
             file = StorageFile(
-                filepath=blob.name.removeprefix(prefix),
+                filepath=removeprefix(blob.name, prefix),
                 filesize_in_bytes=blob.size,
             )
             files.append(file)
