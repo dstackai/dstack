@@ -90,6 +90,12 @@ const mocksMap: MocksMap = {
             failed: { status: 403 },
         },
     },
+    [API.HUBS.BACKEND_VALUES()]: {
+        POST: {
+            success: hub.backendValues.success,
+            failed: { status: 400 },
+        },
+    },
 };
 
 export type getResponseArgs = {

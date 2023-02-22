@@ -72,6 +72,14 @@ export const hubApi = createApi({
                 },
             }),
         }),
+
+        backendValues: builder.mutation<IHubAwsBackendValues, Partial<THubBackend>>({
+            query: (data) => ({
+                url: API.HUBS.BACKEND_VALUES(),
+                method: 'POST',
+                params: data,
+            }),
+        }),
     }),
 });
 
@@ -82,4 +90,5 @@ export const {
     useUpdateHubMutation,
     useUpdateHubMembersMutation,
     useDeleteHubsMutation,
+    useBackendValuesMutation,
 } = hubApi;

@@ -1,69 +1,55 @@
 import React from 'react';
 import { useTranslation } from 'react-i18next';
-import { Container, Header, FormUI, SpaceBetween, Button, FormInput, FormSelect } from 'components';
-import { useForm } from 'react-hook-form';
-import { IProps, TBackendSelectOption } from './types';
+import { Container, Header, FormUI, SpaceBetween, Button, FormInput, FormTiles } from 'components';
+import { useForm, FormProvider } from 'react-hook-form';
+import { IProps, TBackendOption } from './types';
+import { AWSBackend } from './AWS';
 
 export const HubForm: React.FC<IProps> = ({ initialValues, onCancel, loading, onSubmit: onSubmitProp }) => {
     const { t } = useTranslation();
     const isEditing = !!initialValues;
 
-    const { handleSubmit, control, watch } = useForm<IHub>({
-        defaultValues: initialValues,
+    const formMethods = useForm<IHub>({
+        defaultValues: initialValues ?? {
+            backend: {
+                type: 'aws',
+            },
+        },
     });
 
+    const { handleSubmit, control, watch } = formMethods;
+
     const backendType = watch('backend.type');
-    const backendSelectOptions: TBackendSelectOption[] = [{ label: t('hubs.backend_type.aws'), value: 'aws' }];
+
+    const backendOptions: TBackendOption[] = [
+        {
+            label: t('hubs.backend_type.aws'),
+            value: 'aws',
+            description: t('hubs.backend_type.aws_description'),
+            disabled: loading,
+        },
+        {
+            label: t('hubs.backend_type.gcp'),
+            value: 'gcp',
+            description: t('hubs.backend_type.gcp_description'),
+            disabled: true,
+        },
+        {
+            label: t('hubs.backend_type.azure'),
+            value: 'azure',
+            description: t('hubs.backend_type.azure_description'),
+            disabled: true,
+        },
+    ];
 
     const onSubmit = (data: IHub) => {
         onSubmitProp(data);
     };
 
-    const renderAwsBackendFields = () => {
-        return (
-            <>
-                <FormInput
-                    label={t('hubs.edit.aws.access_key')}
-                    control={control}
-                    name="backend.access_key"
-                    disabled={loading}
-                />
-
-                <FormInput
-                    label={t('hubs.edit.aws.secret_key')}
-                    control={control}
-                    name="backend.secret_key"
-                    disabled={loading}
-                />
-
-                <FormInput
-                    label={t('hubs.edit.aws.region_name')}
-                    control={control}
-                    name="backend.region_name"
-                    disabled={loading}
-                />
-
-                <FormInput
-                    label={t('hubs.edit.aws.s3_bucket_name')}
-                    control={control}
-                    name="backend.s3_bucket_name"
-                    disabled={loading}
-                />
-
-                <FormInput
-                    label={t('hubs.edit.aws.ec2_subnet_id')}
-                    control={control}
-                    name="backend.ec2_subnet_id"
-                    disabled={loading}
-                />
-            </>
-        );
-    };
-
     const renderBackendFields = () => {
         switch (backendType) {
             case 'aws': {
-                return renderAwsBackendFields();
+                return <AWSBackend loading={loading} />;
             }
             default:
                 return null;
@@ -71,49 +57,44 @@ export const HubForm: React.FC<IProps> = ({ initialValues, onCancel, loading, on
     };
 
     return (
-        <form onSubmit={handleSubmit(onSubmit)}>
-            <FormUI
-                actions={
-                    <SpaceBetween direction="horizontal" size="xs">
-                        <Button formAction="none" disabled={loading} variant="link" onClick={onCancel}>
-                            {t('common.cancel')}
-                        </Button>
+        <FormProvider {...formMethods}>
+            <form onSubmit={handleSubmit(onSubmit)}>
+                <FormUI
+                    actions={
+                        <SpaceBetween direction="horizontal" size="xs">
+                            <Button formAction="none" disabled={loading} variant="link" onClick={onCancel}>
+                                {t('common.cancel')}
+                            </Button>
 
-                        <Button loading={loading} disabled={loading} variant="primary">
-                            {t('common.save')}
-                        </Button>
-                    </SpaceBetween>
-                }
-            >
-                <SpaceBetween size="l">
-                    {!isEditing && (
-                        <Container header={<Header variant="h2">{t('hubs.edit.general_info')}</Header>}>
+                            <Button loading={loading} disabled={loading} variant="primary">
+                                {t('common.save')}
+                            </Button>
+                        </SpaceBetween>
+                    }
+                >
+                    <SpaceBetween size="l">
+                        {!isEditing && (
+                            <Container header={<Header variant="h2">{t('hubs.edit.general')}</Header>}>
+                                <SpaceBetween size="l">
+                                    <FormInput
+                                        label={t('hubs.edit.hub_name')}
+                                        control={control}
+                                        name="hub_name"
+                                        disabled={loading}
+                                    />
+                                </SpaceBetween>
+                            </Container>
+                        )}
+
+                        <Container header={<Header variant="h2">{t('hubs.edit.backend')}</Header>}>
                             <SpaceBetween size="l">
-                                <FormInput
-                                    label={t('hubs.edit.hub_name')}
-                                    control={control}
-                                    name="hub_name"
-                                    disabled={loading}
-                                />
+                                <FormTiles control={control} name="backend.type" items={backendOptions} />
+                                {renderBackendFields()}
                             </SpaceBetween>
                         </Container>
-                    )}
-
-                    <Container header={<Header variant="h2">{t('hubs.edit.cloud_settings')}</Header>}>
-                        <SpaceBetween size="l">
-                            <FormSelect
-                                label={t('hubs.edit.backend_type')}
-                                control={control}
-                                name="backend.type"
-                                options={backendSelectOptions}
-                                disabled={loading}
-                            />
-
-                            {renderBackendFields()}
-                        </SpaceBetween>
-                    </Container>
-                </SpaceBetween>
-            </FormUI>
-        </form>
+                    </SpaceBetween>
+                </FormUI>
+            </form>
+        </FormProvider>
     );
 };

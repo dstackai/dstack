@@ -1,9 +1,34 @@
 declare type THubBackendType = 'aws' | 'gcp' | 'azure';
+
+declare type THubBackend = { type: THubBackendType } & THubBackendAWSWithTitles
 declare interface IHub {
     hub_name: string,
-    backend: { type: THubBackendType } & THubBackendAWSWithTitles,
+    backend: THubBackend,
     members: IHubMember[]
 }
+
+declare type TAwsBucket = {
+    name: string;
+    created?: string;
+    region?: string;
+}
+
+declare interface IHubAwsBackendValues {
+        region_name: {
+            selected?: string,
+            values: { value: string, label: string}[]
+        },
+        s3_bucket_name: {
+            selected?: string,
+            values: TAwsBucket[]
+        },
+        ec2_subnet_id: {
+            selected?: string,
+            values: { value: string, label: string}[]
+        },
+}
+
+declare type IHubBackendValues = { type: THubBackendType } & IHubAwsBackendValues
 
 declare interface THubBackendAWS {
     access_key: string,

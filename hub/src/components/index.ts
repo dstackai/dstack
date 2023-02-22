@@ -32,5 +32,8 @@ export { DetailsHeader } from './DetailsHeader';
 export { Loader } from './Loader';
 export { FormInput } from './form/Input';
 export { FormSelect } from './form/Select';
+export type { FormSelectOptions } from './form/Select/types';
+export { FormS3BucketSelector } from './form/S3BucketSelector';
+export { FormTiles } from './form/Tiles';
 export { Notifications } from './Notifications';
 export { ConfirmationDialog } from './ConfirmationDialog';

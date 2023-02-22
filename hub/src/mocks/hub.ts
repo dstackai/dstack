@@ -33,8 +33,31 @@ const listSuccess: IHub[] = new Array(50).fill({}).map((i, index) => ({
     })),
 }));
 
+const backendValuesSuccess: IHubBackendValues = {
+    type: 'aws',
+    region_name: {
+        selected: 'region_1',
+        values: new Array(10).fill({}).map((_, index) => ({ value: `region_${index}`, label: `Region ${index}` })),
+    },
+    s3_bucket_name: {
+        // selected: 'bucket_1',
+        values: new Array(10).fill({}).map((_, index) => ({
+            name: `bucket_${index}`,
+            created: `bucket_${index}_date`,
+            region: `bucket_${index}_region`,
+        })),
+    },
+    ec2_subnet_id: {
+        // selected: 'subnet_1',
+        values: new Array(10).fill({}).map((_, index) => ({ value: `subnet_${index}`, label: `Subnet ${index}` })),
+    },
+};
+
 export default {
     list: {
         success: listSuccess,
+    },
+    backendValues: {
+        success: backendValuesSuccess,
     },
 };

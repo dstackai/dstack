@@ -13,6 +13,7 @@ export const FormInput = <T extends FieldValues>({
     description,
     secondaryControl,
     stretch,
+    onChange: onChangeProp,
     ...props
 }: FormInputProps<T>) => {
     return (
@@ -33,7 +34,10 @@ export const FormInput = <T extends FieldValues>({
                             {...fieldRest}
                             {...props}
                             invalid={!!error}
-                            onChange={({ detail }) => onChange(detail.value)}
+                            onChange={(event) => {
+                                onChange(event.detail.value);
+                                onChangeProp && onChangeProp(event);
+                            }}
                         />
                     </FormField>
                 );

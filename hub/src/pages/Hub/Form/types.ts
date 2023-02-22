@@ -5,4 +5,4 @@ export interface IProps {
     onSubmit: (user: IHub) => void;
 }
 
-export type TBackendSelectOption = { label: string; value: THubBackendType };
+export type TBackendOption = { label: string; value: THubBackendType; description: string; disabled?: boolean };
