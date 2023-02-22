@@ -101,9 +101,9 @@ type GitCredentials struct {
 }
 
 type RepoData struct {
-	RepoHost string
+	RepoHost     string
 	RepoUserName string
-	RepoName string
+	RepoName     string
 }
 
 func (j *Job) RepoHostNameWithPort() string {
@@ -111,6 +111,39 @@ func (j *Job) RepoHostNameWithPort() string {
 		return j.RepoHostName
 	}
 	return fmt.Sprintf("%s:%d", j.RepoHostName, j.RepoPort)
+}
+
+func (j *Job) JobFilepath() string {
+	return fmt.Sprintf("jobs/%s/%s/%s/%s;", j.RepoHostNameWithPort(), j.RepoUserName, j.RepoName, j.JobID)
+}
+
+func (j *Job) JobHeadFilepathPrefix() string {
+	return fmt.Sprintf("jobs/%s/%s/%s/l;%s;", j.RepoHostNameWithPort(), j.RepoUserName, j.RepoName, j.JobID)
+}
+
+func (j *Job) JobHeadFilepath() string {
+	appsSlice := make([]string, len(j.Apps))
+	for _, app := range j.Apps {
+		appsSlice = append(appsSlice, app.Name)
+	}
+	artifactSlice := make([]string, len(j.Artifacts))
+	for _, art := range j.Artifacts {
+		artifactSlice = append(artifactSlice, art.Path)
+	}
+	return fmt.Sprintf(
+		"jobs/%s/%s/%s/l;%s;%s;%s;%d;%s;%s;%s;%s",
+		j.RepoHostNameWithPort(),
+		j.RepoUserName,
+		j.RepoName,
+		j.JobID,
+		j.ProviderName,
+		j.LocalRepoUserName,
+		j.SubmittedAt,
+		j.Status,
+		strings.Join(artifactSlice, ","),
+		strings.Join(appsSlice, ","),
+		j.TagName,
+	)
 }
 
 func (d *Dep) RepoHostNameWithPort() string {
