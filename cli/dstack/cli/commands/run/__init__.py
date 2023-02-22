@@ -100,7 +100,7 @@ def poll_logs_ws(backend: Backend, repo_address: RepoAddress, job_head: JobHead)
             if Confirm.ask(f"\n [red]Abort the run '{run_name}'?[/]"):
                 backend.stop_jobs(repo_address, run_name, abort=True)
                 console.print(f"[grey58]OK[/]")
-                exit()
+            exit()
         else:
             console.print(err)
 
