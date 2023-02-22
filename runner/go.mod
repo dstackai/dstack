@@ -23,6 +23,7 @@ require (
 )
 
 require (
+	cloud.google.com/go/compute v1.14.0
 	cloud.google.com/go/secretmanager v1.10.0
 	cloud.google.com/go/storage v1.29.0
 	github.com/aws/aws-sdk-go-v2/feature/ec2/imds v1.12.15
@@ -38,6 +39,7 @@ require (
 	github.com/morikuni/aec v1.0.0 // indirect
 	github.com/opencontainers/image-spec v1.0.1
 	google.golang.org/api v0.106.0
+	google.golang.org/genproto v0.0.0-20230110181048-76db0878b65f
 	gopkg.in/yaml.v3 v3.0.1
 	modernc.org/sqlite v1.20.3
 )
