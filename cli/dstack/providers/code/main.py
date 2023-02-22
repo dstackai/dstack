@@ -68,7 +68,6 @@ class CodeProvider(Provider):
                         app_name="code",
                         url_query_params={
                             "tkn": connection_token,
-                            "folder": "/workflow",
                         },
                     )
                 ],
@@ -100,7 +99,7 @@ class CodeProvider(Provider):
         if self.setup:
             commands.extend(self.setup)
         commands.append(
-            f"/tmp/openvscode-server-v{self.version}-linux-$arch/bin/openvscode-server --port $PORT_0 --host 0.0.0.0 --connection-token $CONNECTION_TOKEN"
+            f"/tmp/openvscode-server-v{self.version}-linux-$arch/bin/openvscode-server --port $PORT_0 --host 0.0.0.0 --connection-token $CONNECTION_TOKEN --default-folder /workflow"
         )
         return commands
 

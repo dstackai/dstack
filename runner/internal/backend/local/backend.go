@@ -47,8 +47,6 @@ type Local struct {
 	runnerID  string
 	state     *models.State
 	cliSecret *ClientSecret
-	artifacts []artifacts.Artifacter
-	logger    *Logger
 }
 
 func New() *Local {

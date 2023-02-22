@@ -9,7 +9,10 @@ class BasicCommand(object):
     SUBCOMMANDS = []
 
     def __init__(self, parser: _SubParsersAction):
-        self._parser = parser.add_parser(self.name, help=self.description, add_help=False)
+        kwargs = {}
+        if self.description:
+            kwargs["help"] = self.description
+        self._parser = parser.add_parser(self.name, add_help=False, **kwargs)
         self._parser.add_argument(
             "-h",
             "--help",

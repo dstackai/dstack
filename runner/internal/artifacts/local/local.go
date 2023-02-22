@@ -9,7 +9,6 @@ import (
 
 	"github.com/docker/docker/api/types/mount"
 	"github.com/dstackai/dstack/runner/internal/artifacts"
-	"github.com/dstackai/dstack/runner/internal/artifacts/client"
 	"github.com/dstackai/dstack/runner/internal/gerrors"
 	"github.com/dstackai/dstack/runner/internal/log"
 )
@@ -21,8 +20,6 @@ type Local struct {
 	workDir    string
 	pathLocal  string
 	pathRemote string
-
-	transfer *client.Copier
 }
 
 func (s *Local) BeforeRun(ctx context.Context) error {

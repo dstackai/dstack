@@ -1,9 +1,11 @@
 import json
 import re
-from typing import Any, Dict
+import urllib.parse
+from typing import Any, Dict, List
 
 from dstack.backend.base import jobs
 from dstack.backend.base.storage import Storage
+from dstack.core.app import AppSpec
 from dstack.core.job import Job
 from dstack.core.log_event import LogEvent, LogEventSource
 from dstack.core.repo import RepoAddress
@@ -28,7 +30,7 @@ def render_log_message(
     job_id = message["job_id"]
     log = message["log"]
     job = jobs.get_job(storage, repo_address, job_id)
-    log = replace_logs_host(log, job)
+    log = fix_urls(log.encode(), job).decode()
     return LogEvent(
         event_id=event["eventId"],
         timestamp=event["timestamp"],
@@ -40,27 +42,28 @@ def render_log_message(
     )
 
 
-def replace_logs_host(log: str, job: Job) -> str:
-    pat = get_logs_host_replace_pattern(job)
-    sub = get_logs_host_replace_sub(job)
-    if pat is not None:
-        log = re.sub(pat, sub, log)
+def fix_urls(log: bytes, job: Job) -> bytes:
+    if not (job.host_name and job.ports and job.app_specs):
+        return log
+    for app_spec in job.app_specs:
+        log = _fix_url_for_app(log, job, app_spec)
     return log
 
 
-def get_logs_host_replace_pattern(job: str) -> str:
-    if not (job.host_name and job.ports and job.app_specs):
-        return None
-    ports = []
-    for app_spec in job.app_specs:
-        ports.append(job.ports[app_spec.port_index])
-    return (
-        f"http://(localhost|0.0.0.0|127.0.0.1|{job.host_name}):"
-        + "("
-        + "|".join(str(p) for p in ports)
-        + ")"
-    )
-
-
-def get_logs_host_replace_sub(job: str) -> str:
-    return rf"http://{job.host_name}:\2"
+def _fix_url_for_app(log: bytes, job: Job, app_spec: AppSpec) -> bytes:
+    port = job.ports[app_spec.port_index]
+    url_pattern = f"http://(localhost|0.0.0.0|127.0.0.1|{job.host_name}):{port}\S*".encode()
+    match = re.search(url_pattern, log)
+    if match is None:
+        return log
+    url = match.group(0)
+    parsed_url = urllib.parse.urlparse(url)
+    qs = urllib.parse.parse_qs(parsed_url.query)
+    qs = {k: v[0] for k, v in qs.items()}
+    if app_spec.url_query_params is not None:
+        for k, v in app_spec.url_query_params.items():
+            qs[k.encode()] = v.encode()
+    new_url = parsed_url._replace(
+        netloc=f"{job.host_name}:{port}".encode(), query=urllib.parse.urlencode(qs).encode()
+    ).geturl()
+    return log.replace(url, new_url)

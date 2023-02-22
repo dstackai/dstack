@@ -32,7 +32,7 @@ def load_repo_data(
 
     repo_url_parsed = giturlparse.parse(repo_url)
     repo_oauth_token = oauth_token
-    repo_identity_file = identity_file
+    repo_identity_file = os.path.expanduser(identity_file) if identity_file else None
     repo_host_name = repo_url_parsed.resource
     repo_port = repo_url_parsed.port
     if repo_url_parsed.protocol == "ssh":
