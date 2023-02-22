@@ -5,6 +5,7 @@ from typing import Callable, Dict, List, Optional
 
 from dstack.backend.base.storage import Storage
 from dstack.core.storage import StorageFile
+from dstack.utils.common import removeprefix
 
 
 class LocalStorage(Storage):
@@ -46,7 +47,7 @@ class LocalStorage(Storage):
             for filename in filenames:
                 full_filepath = os.path.join(dirpath, filename)
                 filesize = os.stat(full_filepath, follow_symlinks=False).st_size
-                filepath = full_filepath.removeprefix(full_dirpath)
+                filepath = removeprefix(full_filepath, full_dirpath)
                 files.append(
                     StorageFile(
                         filepath=filepath,
