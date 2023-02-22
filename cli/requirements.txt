@@ -31,3 +31,5 @@ packaging
 azure-identity
 azure-keyvault-secrets
 azure-storage-blob
+azure-mgmt-subscription
+azure-mgmt-compute

@@ -2,6 +2,7 @@ from pathlib import Path
 from typing import Generator, List, Optional
 
 from azure.identity import DefaultAzureCredential
+from azure.mgmt.subscription import SubscriptionClient
 
 from dstack.backend.azure.compute import AzureCompute
 from dstack.backend.azure.config import AzureConfig
@@ -35,15 +36,22 @@ class AzureBackend(CloudBackend):
         self._backend_config = config.config
         credential = DefaultAzureCredential()
         self._secrets_manager = AzureSecretsManager(
-            vault_url=self._backend_config.secret.url,
             credential=credential,
+            vault_url=self._backend_config.secret.url,
         )
         self._storage = AzureStorage(
-            account_url=self._backend_config.storage.url,
             credential=credential,
+            account_url=self._backend_config.storage.url,
             container_name=self._backend_config.storage.container,
         )
-        self._compute = AzureCompute()
+        # XXX: This is a valid way to obtain subscription, because only local credential is supported.
+        subscription_client = SubscriptionClient(credential)
+        subscriptions = [sub.as_dict() for sub in subscription_client.subscriptions.list()]
+        assert len(subscriptions) == 1
+        self._compute = AzureCompute(
+            credential=credential,
+            subscription_id=subscriptions[0]["subscription_id"],
+        )
 
     @property
     def name(self) -> str:
