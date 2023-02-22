@@ -3,7 +3,7 @@ from typing import Generator
 from google.cloud import logging
 
 from dstack.backend.base import jobs
-from dstack.backend.base.logs import replace_logs_host
+from dstack.backend.base.logs import fix_urls
 from dstack.backend.base.storage import Storage
 from dstack.core.log_event import LogEvent, LogEventSource
 from dstack.core.repo import RepoAddress
@@ -36,7 +36,7 @@ def log_entry_to_log_event(
     job_id = log_entry.payload["job_id"]
     log = log_entry.payload["log"]
     job = jobs.get_job(storage, repo_address, job_id)
-    log = replace_logs_host(log, job)
+    log = fix_urls(log.encode(), job).decode()
     return LogEvent(
         event_id=log_entry.insert_id,
         timestamp=log_entry.timestamp,
