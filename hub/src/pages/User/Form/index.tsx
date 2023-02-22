@@ -1,7 +1,18 @@
 import React from 'react';
 import { useTranslation } from 'react-i18next';
 import { useForm } from 'react-hook-form';
-import { Container, Header, FormUI, SpaceBetween, Button, FormInput, FormSelect, Popover, StatusIndicator } from 'components';
+import {
+    Container,
+    Header,
+    FormUI,
+    SpaceBetween,
+    Button,
+    FormInput,
+    FormSelect,
+    Popover,
+    StatusIndicator,
+    ColumnLayout,
+} from 'components';
 import { TRoleSelectOption } from './types';
 
 export interface Props {
@@ -25,7 +36,9 @@ export const UserForm: React.FC<Props> = ({
     const isEditing = !!initialValues;
 
     const { handleSubmit, control, getValues } = useForm<IUser>({
-        defaultValues: initialValues,
+        defaultValues: initialValues ?? {
+            global_role: 'read',
+        },
     });
 
     const roleSelectOptions: TRoleSelectOption[] = [
@@ -73,18 +86,20 @@ export const UserForm: React.FC<Props> = ({
             >
                 <Container header={<Header variant="h2">{t('users.account_settings')}</Header>}>
                     <SpaceBetween size="l">
-                        {!isEditing && (
-                            <FormInput label={t('users.user_name')} control={control} name="user_name" disabled={loading} />
-                        )}
+                        <ColumnLayout columns={isEditing ? 1 : 2}>
+                            {!isEditing && (
+                                <FormInput label={t('users.user_name')} control={control} name="user_name" disabled={loading} />
+                            )}
 
-                        <FormSelect
-                            label={t('users.global_role')}
-                            control={control}
-                            name="global_role"
-                            options={roleSelectOptions}
-                            disabled={loading}
-                            onChange={onChangeHandler}
-                        />
+                            <FormSelect
+                                label={t('users.global_role')}
+                                control={control}
+                                name="global_role"
+                                options={roleSelectOptions}
+                                disabled={loading}
+                                onChange={onChangeHandler}
+                            />
+                        </ColumnLayout>
 
                         {initialValues && (
                             <FormInput
