@@ -3,6 +3,7 @@ package gcp
 import (
 	"bytes"
 	"context"
+	"errors"
 	"io"
 
 	"cloud.google.com/go/storage"
@@ -10,10 +11,12 @@ import (
 	"google.golang.org/api/iterator"
 )
 
+var ErrTagNotFound = errors.New("tag not found")
+
 type GCPStorage struct {
-	client      *storage.Client
-	bucket      *storage.BucketHandle
-	project     string
+	client     *storage.Client
+	bucket     *storage.BucketHandle
+	project    string
 	bucketName string
 }
 
@@ -25,9 +28,9 @@ func NewGCPStorage(project, bucketName string) (*GCPStorage, error) {
 		return nil, gerrors.New("Cannot access bucket")
 	}
 	return &GCPStorage{
-		client:      client,
-		bucket:      bucket,
-		project:     project,
+		client:     client,
+		bucket:     bucket,
+		project:    project,
 		bucketName: bucketName,
 	}, nil
 }
@@ -85,4 +88,16 @@ func (gstorage *GCPStorage) RenameFile(ctx context.Context, oldKey, newKey strin
 	}
 	err = src.Delete(ctx)
 	return gerrors.Wrap(err)
+}
+
+func (gstorage *GCPStorage) GetMetadata(ctx context.Context, key, tag string) (string, error) {
+	obj := gstorage.bucket.Object(key)
+	attrs, err := obj.Attrs(ctx)
+	if err != nil {
+		return "", gerrors.Wrap(err)
+	}
+	if value, ok := attrs.Metadata[tag]; ok {
+		return value, nil
+	}
+	return "", gerrors.Wrap(ErrTagNotFound)
 }
