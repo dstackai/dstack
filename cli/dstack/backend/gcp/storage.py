@@ -18,6 +18,7 @@ class GCPStorage(CloudStorage):
 
     def put_object(self, key: str, content: str, metadata: Optional[Dict] = None):
         blob = self.bucket.blob(key)
+        blob.metadata = metadata
         blob.upload_from_string(content)
 
     def get_object(self, key: str) -> Optional[str]:
