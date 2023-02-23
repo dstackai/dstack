@@ -35,11 +35,7 @@ func (gcompute *GCPCompute) TerminateInstance(ctx context.Context, instanceID st
 		Project:  gcompute.project,
 		Zone:     gcompute.zone,
 	}
-	op, err := gcompute.instancesClient.Delete(ctx, req)
-	if err != nil {
-		return gerrors.Wrap(err)
-	}
-	err = op.Wait(ctx)
+	_, err := gcompute.instancesClient.Delete(ctx, req)
 	if err != nil {
 		return gerrors.Wrap(err)
 	}
