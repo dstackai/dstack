@@ -1,79 +1,91 @@
+from pathlib import Path
+from typing import Dict, Generator, List, Optional
+
 import boto3
-from typing import Optional, List, Generator, Dict, Tuple
 from botocore.client import BaseClient
 
-from dstack.backend import Backend, BackendType
-from dstack.backend.aws import (
-    logs,
-    artifacts,
-    jobs,
-    run_names,
-    runs,
-    runners,
-    tags,
-    repos,
-    secrets,
-    config,
-)
+from dstack.backend.aws import config, logs
+from dstack.backend.aws.compute import AWSCompute
 from dstack.backend.aws.config import AWSConfig
-from dstack.core.app import AppSpec
-from dstack.core.repo import LocalRepoData, RepoAddress, RepoHead, RepoCredentials
+from dstack.backend.aws.secrets import AWSSecretsManager
+from dstack.backend.aws.storage import AWSStorage
+from dstack.backend.base import CloudBackend
+from dstack.backend.base import artifacts as base_artifacts
+from dstack.backend.base import jobs as base_jobs
+from dstack.backend.base import repos as base_repos
+from dstack.backend.base import runs as base_runs
+from dstack.backend.base import secrets as base_secrets
+from dstack.backend.base import tags as base_tags
+from dstack.core.artifact import Artifact
+from dstack.core.config import BackendConfig
+from dstack.core.error import ConfigError
 from dstack.core.job import Job, JobHead
-from dstack.core.run import RunHead
 from dstack.core.log_event import LogEvent
-from dstack.core.tag import TagHead
+from dstack.core.repo import LocalRepoData, RepoAddress, RepoCredentials
+from dstack.core.run import RunHead
 from dstack.core.secret import Secret
+from dstack.core.tag import TagHead
 
 
-class AwsBackend(Backend):
-    NAME = "aws"
+class AwsBackend(CloudBackend):
+    @property
+    def name(self):
+        return "aws"
 
-    def __init__(self):
-        self.backend_config = AWSConfig()
-        self.backend_config.load()
-        self._loaded = True
+    def __init__(self, backend_config: Optional[BackendConfig] = None):
+        if backend_config is None:
+            self.backend_config = AWSConfig()
+            try:
+                self.backend_config.load()
+                self._loaded = True
+            except ConfigError:
+                self._loaded = False
+                return
+        else:
+            self.backend_config = backend_config
+            self._loaded = True
+
+        self._storage = AWSStorage(
+            s3_client=self._s3_client(), bucket_name=self.backend_config.bucket_name
+        )
+        self._compute = AWSCompute(
+            ec2_client=self._ec2_client(),
+            iam_client=self._iam_client(),
+            bucket_name=self.backend_config.bucket_name,
+            region_name=self.backend_config.region_name,
+            subnet_id=self.backend_config.subnet_id,
+        )
+        self._secrets_manager = AWSSecretsManager(
+            secretsmanager_client=self._secretsmanager_client(),
+            iam_client=self._iam_client(),
+            sts_client=self._sts_client(),
+            bucket_name=self.backend_config.bucket_name,
+        )
 
     def _s3_client(self) -> BaseClient:
-        session = boto3.Session(
-            profile_name=self.backend_config.profile_name,
-            region_name=self.backend_config.region_name,
-        )
-        return session.client("s3")
+        return self._get_client("s3")
 
     def _ec2_client(self) -> BaseClient:
-        session = boto3.Session(
-            profile_name=self.backend_config.profile_name,
-            region_name=self.backend_config.region_name,
-        )
-        return session.client("ec2")
+        return self._get_client("ec2")
 
     def _iam_client(self) -> BaseClient:
-        session = boto3.Session(
-            profile_name=self.backend_config.profile_name,
-            region_name=self.backend_config.region_name,
-        )
-        return session.client("iam")
+        return self._get_client("iam")
 
     def _logs_client(self) -> BaseClient:
-        session = boto3.Session(
-            profile_name=self.backend_config.profile_name,
-            region_name=self.backend_config.region_name,
-        )
-        return session.client("logs")
+        return self._get_client("logs")
 
     def _secretsmanager_client(self) -> BaseClient:
-        session = boto3.Session(
-            profile_name=self.backend_config.profile_name,
-            region_name=self.backend_config.region_name,
-        )
-        return session.client("secretsmanager")
+        return self._get_client("secretsmanager")
 
     def _sts_client(self) -> BaseClient:
+        return self._get_client("sts")
+
+    def _get_client(self, client_name: str) -> BaseClient:
         session = boto3.Session(
             profile_name=self.backend_config.profile_name,
             region_name=self.backend_config.region_name,
         )
-        return session.client("sts")
+        return session.client(client_name)
 
     def configure(self):
         config.configure(
@@ -84,67 +96,33 @@ class AwsBackend(Backend):
         )
 
     def create_run(self, repo_address: RepoAddress) -> str:
-        return runs.create_run(
-            self._s3_client(),
-            self._logs_client(),
-            self.backend_config.bucket_name,
-            repo_address,
+        logs.create_log_group_if_not_exists(
+            self._logs_client(), self.backend_config.bucket_name, repo_address
         )
+        return base_runs.create_run(self._storage, repo_address, self.type)
 
-    def submit_job(self, job: Job, counter: List[int]):
-        jobs.create_job(self._s3_client(), self.backend_config.bucket_name, job, counter)
-        runners.run_job(
-            self._logs_client(),
-            self._ec2_client(),
-            self._iam_client(),
-            self._s3_client(),
-            self.backend_config.bucket_name,
-            self.backend_config.region_name,
-            self.backend_config.subnet_id,
-            job,
-        )
+    def create_job(self, job: Job):
+        base_jobs.create_job(self._storage, job)
 
     def get_job(self, repo_address: RepoAddress, job_id: str) -> Optional[Job]:
-        return jobs.get_job(
-            self._s3_client(), self.backend_config.bucket_name, repo_address, job_id
-        )
-
-    def list_job_heads(self, repo_address: RepoAddress, run_name: Optional[str] = None):
-        return jobs.list_job_heads(
-            self._s3_client(), self.backend_config.bucket_name, repo_address, run_name
-        )
+        return base_jobs.get_job(self._storage, repo_address, job_id)
 
     def list_jobs(self, repo_address: RepoAddress, run_name: str) -> List[Job]:
-        return jobs.list_jobs(
-            self._s3_client(), self.backend_config.bucket_name, repo_address, run_name
-        )
+        return base_jobs.list_jobs(self._storage, repo_address, run_name)
 
     def run_job(self, job: Job):
-        runners.run_job(
-            self._logs_client(),
-            self._ec2_client(),
-            self._iam_client(),
-            self._s3_client(),
-            self.backend_config.bucket_name,
-            self.backend_config.region_name,
-            self.backend_config.subnet_id,
-            job,
-        )
+        base_jobs.run_job(self._storage, self._compute, job)
 
     def stop_job(self, repo_address: RepoAddress, job_id: str, abort: bool):
-        runners.stop_job(
-            self._ec2_client(),
-            self._s3_client(),
-            self.backend_config.bucket_name,
-            repo_address,
-            job_id,
-            abort,
-        )
+        base_jobs.stop_job(self._storage, self._compute, repo_address, job_id, abort)
+
+    def list_job_heads(
+        self, repo_address: RepoAddress, run_name: Optional[str] = None
+    ) -> List[JobHead]:
+        return base_jobs.list_job_heads(self._storage, repo_address, run_name)
 
     def delete_job_head(self, repo_address: RepoAddress, job_id: str):
-        jobs.delete_job_head(
-            self._s3_client(), self.backend_config.bucket_name, repo_address, job_id
-        )
+        base_jobs.delete_job_head(self._storage, repo_address, job_id)
 
     def list_run_heads(
         self,
@@ -152,27 +130,9 @@ class AwsBackend(Backend):
         run_name: Optional[str] = None,
         include_request_heads: bool = True,
     ) -> List[RunHead]:
-        return runs.list_run_heads(
-            self._ec2_client(),
-            self._s3_client(),
-            self.backend_config.bucket_name,
-            repo_address,
-            run_name,
-            include_request_heads,
-        )
-
-    def get_run_heads(
-        self,
-        repo_address: RepoAddress,
-        job_heads: List[JobHead],
-        include_request_heads: bool = True,
-    ) -> List[RunHead]:
-        return runs.get_run_heads(
-            self._ec2_client(),
-            self._s3_client(),
-            self.backend_config.bucket_name,
-            job_heads,
-            include_request_heads,
+        job_heads = self.list_job_heads(repo_address, run_name)
+        return base_runs.get_run_heads(
+            self._storage, self._compute, job_heads, include_request_heads
         )
 
     def poll_logs(
@@ -183,8 +143,8 @@ class AwsBackend(Backend):
         attached: bool,
     ) -> Generator[LogEvent, None, None]:
         return logs.poll_logs(
-            self._ec2_client(),
-            self._s3_client(),
+            self._storage,
+            self._compute,
             self._logs_client(),
             self.backend_config.bucket_name,
             repo_address,
@@ -193,64 +153,45 @@ class AwsBackend(Backend):
             attached,
         )
 
-    def query_logs(
+    def list_run_artifact_files(self, repo_address: RepoAddress, run_name: str) -> List[Artifact]:
+        return base_artifacts.list_run_artifact_files(self._storage, repo_address, run_name)
+
+    def download_run_artifact_files(
         self,
         repo_address: RepoAddress,
         run_name: str,
-        start_time: int,
-        end_time: Optional[int],
-        next_token: Optional[str],
-        job_host_names: Dict[str, Optional[str]],
-        job_ports: Dict[str, Optional[List[int]]],
-        job_app_specs: Dict[str, Optional[List[AppSpec]]],
-    ) -> Tuple[
-        List[LogEvent],
-        Optional[str],
-        Dict[str, Optional[str]],
-        Dict[str, Optional[List[int]]],
-        Dict[str, Optional[List[AppSpec]]],
-    ]:
-        return logs.query_logs(
-            self._s3_client(),
-            self._logs_client(),
-            self.backend_config.bucket_name,
-            repo_address,
-            run_name,
-            start_time,
-            end_time,
-            next_token,
-            job_host_names,
-            job_ports,
-            job_app_specs,
-        )
-
-    def list_run_artifact_files(
-        self, repo_address: RepoAddress, run_name: str
-    ) -> Generator[Tuple[str, str, int], None, None]:
-        return artifacts.list_run_artifact_files(
-            self._s3_client(), self.backend_config.bucket_name, repo_address, run_name
-        )
-
-    def download_run_artifact_files(
-        self, repo_address: RepoAddress, run_name: str, output_dir: Optional[str]
+        output_dir: Optional[str],
     ):
-        artifacts.download_run_artifact_files(
-            self._s3_client(),
-            self.backend_config.bucket_name,
-            repo_address,
-            run_name,
-            output_dir,
+        artifacts = self.list_run_artifact_files(repo_address=repo_address, run_name=run_name)
+        base_artifacts.download_run_artifact_files(
+            storage=self._storage,
+            repo_address=repo_address,
+            artifacts=artifacts,
+            output_dir=output_dir,
+        )
+
+    def upload_job_artifact_files(
+        self,
+        repo_address: RepoAddress,
+        job_id: str,
+        artifact_name: str,
+        artifact_path: str,
+        local_path: Path,
+    ):
+        base_artifacts.upload_job_artifact_files(
+            storage=self._storage,
+            repo_address=repo_address,
+            job_id=job_id,
+            artifact_name=artifact_name,
+            artifact_path=artifact_path,
+            local_path=local_path,
         )
 
     def list_tag_heads(self, repo_address: RepoAddress) -> List[TagHead]:
-        return tags.list_tag_heads(
-            self._s3_client(), self.backend_config.bucket_name, repo_address
-        )
+        return base_tags.list_tag_heads(self._storage, repo_address)
 
     def get_tag_head(self, repo_address: RepoAddress, tag_name: str) -> Optional[TagHead]:
-        return tags.get_tag_head(
-            self._s3_client(), self.backend_config.bucket_name, repo_address, tag_name
-        )
+        return base_tags.get_tag_head(self._storage, repo_address, tag_name)
 
     def add_tag_from_run(
         self,
@@ -259,121 +200,77 @@ class AwsBackend(Backend):
         run_name: str,
         run_jobs: Optional[List[Job]],
     ):
-        tags.create_tag_from_run(
-            self._s3_client(),
-            self.backend_config.bucket_name,
+        base_tags.create_tag_from_run(
+            self._storage,
             repo_address,
             tag_name,
             run_name,
             run_jobs,
         )
 
-    def delete_tag_head(self, repo_address: RepoAddress, tag_head: TagHead):
-        tags.delete_tag(self._s3_client(), self.backend_config.bucket_name, repo_address, tag_head)
-
     def add_tag_from_local_dirs(
         self, repo_data: LocalRepoData, tag_name: str, local_dirs: List[str]
     ):
-        tags.create_tag_from_local_dirs(
-            self._s3_client(),
-            self._logs_client(),
-            self.backend_config.bucket_name,
+        base_tags.create_tag_from_local_dirs(
+            self._storage,
             repo_data,
             tag_name,
             local_dirs,
+            self.type,
         )
 
-    def list_repo_heads(self) -> List[RepoHead]:
-        return repos.list_repo_heads(self._s3_client(), self.backend_config.bucket_name)
+    def delete_tag_head(self, repo_address: RepoAddress, tag_head: TagHead):
+        base_tags.delete_tag(self._storage, repo_address, tag_head)
 
     def update_repo_last_run_at(self, repo_address: RepoAddress, last_run_at: int):
-        repos.update_repo_last_run_at(
-            self._s3_client(),
-            self.backend_config.bucket_name,
+        base_repos.update_repo_last_run_at(
+            self._storage,
             repo_address,
             last_run_at,
         )
 
-    def increment_repo_tags_count(self, repo_address: RepoAddress):
-        repos.increment_repo_tags_count(
-            self._s3_client(), self.backend_config.bucket_name, repo_address
-        )
-
-    def decrement_repo_tags_count(self, repo_address: RepoAddress):
-        repos.decrement_repo_tags_count(
-            self._s3_client(), self.backend_config.bucket_name, repo_address
-        )
-
-    def delete_repo(self, repo_address: RepoAddress):
-        repos.delete_repo(self._s3_client(), self.backend_config.bucket_name, repo_address)
-
     def get_repo_credentials(self, repo_address: RepoAddress) -> Optional[RepoCredentials]:
-        return repos.get_repo_credentials(
-            self._secretsmanager_client(), self.backend_config.bucket_name, repo_address
-        )
+        return base_repos.get_repo_credentials(self._secrets_manager, repo_address)
 
     def save_repo_credentials(self, repo_address: RepoAddress, repo_credentials: RepoCredentials):
-        repos.save_repo_credentials(
-            self._sts_client(),
-            self._iam_client(),
-            self._secretsmanager_client(),
-            self.backend_config.bucket_name,
+        base_repos.save_repo_credentials(
+            self._secrets_manager,
             repo_address,
             repo_credentials,
         )
 
-    def list_run_artifact_files_and_folders(
-        self, repo_address: RepoAddress, job_id: str, path: str
-    ) -> List[Tuple[str, bool]]:
-        return artifacts.list_run_artifact_files_and_folders(
-            self._s3_client(),
-            self.backend_config.bucket_name,
-            repo_address,
-            job_id,
-            path,
-        )
-
     def list_secret_names(self, repo_address: RepoAddress) -> List[str]:
-        return secrets.list_secret_names(
-            self._s3_client(), self.backend_config.bucket_name, repo_address
-        )
+        return base_secrets.list_secret_names(self._storage, repo_address)
 
     def get_secret(self, repo_address: RepoAddress, secret_name: str) -> Optional[Secret]:
-        return secrets.get_secret(
-            self._secretsmanager_client(),
-            self.backend_config.bucket_name,
-            repo_address,
-            secret_name,
-        )
+        return base_secrets.get_secret(self._secrets_manager, repo_address, secret_name)
 
     def add_secret(self, repo_address: RepoAddress, secret: Secret):
-        return secrets.add_secret(
-            self._sts_client(),
-            self._iam_client(),
-            self._secretsmanager_client(),
-            self._s3_client(),
-            self.backend_config.bucket_name,
+        base_secrets.add_secret(
+            self._storage,
+            self._secrets_manager,
             repo_address,
             secret,
         )
 
     def update_secret(self, repo_address: RepoAddress, secret: Secret):
-        return secrets.update_secret(
-            self._secretsmanager_client(),
-            self._s3_client(),
-            self.backend_config.bucket_name,
+        base_secrets.update_secret(
+            self._storage,
+            self._secrets_manager,
             repo_address,
             secret,
         )
 
     def delete_secret(self, repo_address: RepoAddress, secret_name: str):
-        return secrets.delete_secret(
-            self._secretsmanager_client(),
-            self._s3_client(),
-            self.backend_config.bucket_name,
+        base_secrets.delete_secret(
+            self._storage,
+            self._secrets_manager,
             repo_address,
             secret_name,
         )
 
-    def type(self) -> BackendType:
-        return BackendType.REMOTE
+    def get_signed_download_url(self, object_key: str) -> str:
+        return self._storage.get_signed_download_url(object_key)
+
+    def get_signed_upload_url(self, object_key: str) -> str:
+        return self._storage.get_signed_upload_url(object_key)

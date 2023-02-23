@@ -1,0 +1,7 @@
+[tool.black]
+line-length = 99
+
+[isort]
+profile = "black"
+known_local_folder = "dstack"
+line_length = 99

@@ -1,9 +1,11 @@
 from argparse import Namespace
 
-from dstack.core.error import check_config, check_git
-from dstack.cli.commands import BasicCommand
-from dstack.api.repo import load_repo_data
+from rich import print
+
 from dstack.api.backend import list_backends
+from dstack.api.repo import load_repo_data
+from dstack.cli.commands import BasicCommand
+from dstack.core.error import check_config, check_git
 
 
 class InitCommand(BasicCommand):

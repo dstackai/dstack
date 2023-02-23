@@ -1,8 +1,8 @@
 import argparse
 from argparse import ArgumentParser
-from typing import List, Optional, Dict, Any
+from typing import Any, Dict, List, Optional
 
-from dstack.jobs import Requirements, GpusRequirements, JobSpec
+from dstack.jobs import GpusRequirements, JobSpec, Requirements
 from dstack.providers import Provider
 
 

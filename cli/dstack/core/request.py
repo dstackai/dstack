@@ -1,6 +1,8 @@
 from enum import Enum
 from typing import Optional
 
+from pydantic import BaseModel
+
 
 class RequestStatus(Enum):
     RUNNING = "fullfilled"
@@ -9,11 +11,10 @@ class RequestStatus(Enum):
     NO_CAPACITY = "no_capacity"
 
 
-class RequestHead:
-    def __init__(self, job_id: str, status: RequestStatus, message: Optional[str]):
-        self.job_id = job_id
-        self.status = status
-        self.message = message
+class RequestHead(BaseModel):
+    job_id: str
+    status: RequestStatus
+    message: Optional[str]
 
     def __str__(self) -> str:
         return (

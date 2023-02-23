@@ -289,7 +289,10 @@ func (ex *Executor) prepareGit(ctx context.Context) error {
 	job := ex.backend.Job(ctx)
 	dir := path.Join(common.HomeDir(), consts.RUNS_PATH, job.RunName, job.JobID)
 	if _, err := os.Stat(dir); err != nil {
-		os.MkdirAll(dir, 0777)
+		if err = os.MkdirAll(dir, 0777); err != nil {
+			return gerrors.Wrap(err)
+		}
+
 	}
 	ex.repo = repo.NewManager(ctx, fmt.Sprintf(consts.REPO_HTTPS_URL, job.RepoHostNameWithPort(), job.RepoUserName, job.RepoName), job.RepoBranch, job.RepoHash).WithLocalPath(dir)
 	cred := ex.backend.GitCredentials(ctx)
@@ -514,7 +517,9 @@ func uniqueMount(m []mount.Mount) []mount.Mount {
 
 func createLocalLog(dir, fileName string) (*os.File, error) {
 	if _, err := os.Stat(dir); err != nil {
-		os.MkdirAll(dir, 0777)
+		if err = os.MkdirAll(dir, 0777); err != nil {
+			return nil, gerrors.Wrap(err)
+		}
 	}
 	fileLog, err := os.OpenFile(filepath.Join(dir, fmt.Sprintf("%s.log", fileName)), os.O_RDWR|os.O_CREATE|os.O_APPEND, 0o777)
 	if err != nil {

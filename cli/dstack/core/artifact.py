@@ -1,16 +1,28 @@
-class ArtifactSpec:
-    def __init__(self, artifact_path: str, mount: bool):
-        self.artifact_path = artifact_path
-        self.mount = mount
+from typing import List
+
+from pydantic import BaseModel
+
+from dstack.core.storage import StorageFile
+
+
+class ArtifactSpec(BaseModel):
+    artifact_path: str
+    mount: bool
 
     def __str__(self) -> str:
         return f'ArtifactSpec(artifact_path="{self.artifact_path}", ' f"mount={self.mount})"
 
 
-class ArtifactHead:
-    def __init__(self, job_id: str, artifact_path: str):
-        self.job_id = job_id
-        self.artifact_path = artifact_path
+class ArtifactHead(BaseModel):
+    job_id: str
+    artifact_path: str
 
     def __str__(self) -> str:
         return f'ArtifactHead(job_id="{self.job_id}", artifact_path="{self.artifact_path})'
+
+
+class Artifact(BaseModel):
+    job_id: str
+    name: str
+    path: str
+    files: List[StorageFile]

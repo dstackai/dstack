@@ -1,36 +1,19 @@
-import sys
-
 from argparse import Namespace
 
-from dstack.core.error import check_config, check_git
-from dstack.cli.commands import BasicCommand
+from dstack.api.backend import get_current_remote_backend, get_local_backend
 from dstack.api.repo import load_repo_data
-from dstack.api.backend import list_backends
-
-
-def _run_name(repo_data, backend, args):
-    if args.run_name_or_tag_name.startswith(":"):
-        tag_name = args.run_name_or_tag_name[1:]
-        tag_head = backend.get_tag_head(repo_data, tag_name)
-        if tag_head:
-            return tag_head.run_name
-        else:
-            sys.exit(f"Cannot find the tag '{tag_name}'")
-    else:
-        run_name = args.run_name_or_tag_name
-        job_heads = backend.list_job_heads(repo_data, run_name)
-        if job_heads:
-            return run_name
-        else:
-            sys.exit(f"Cannot find the run '{run_name}'")
+from dstack.api.run import RunNotFoundError, TagNotFoundError, get_tagged_run_name
+from dstack.cli.commands import BasicCommand
+from dstack.cli.common import console
+from dstack.core.error import BackendError, check_config, check_git
 
 
 class PullCommand(BasicCommand):
     NAME = "pull"
-    DESCRIPTION = "Download artifacts"
+    DESCRIPTION = "Copy a run and its artifacts from remote to local"
 
     def __init__(self, parser):
-        super(PullCommand, self).__init__(parser)
+        super().__init__(parser)
 
     def register(self):
         self._parser.add_argument(
@@ -39,18 +22,48 @@ class PullCommand(BasicCommand):
             type=str,
             help="A name of a run or a tag",
         )
-        self._parser.add_argument(
-            "-o",
-            "--output",
-            help="The directory to download artifacts to. "
-            "By default, it's the current directory.",
-            type=str,
-        )
 
     @check_config
     @check_git
     def _command(self, args: Namespace):
         repo_data = load_repo_data()
-        for backend in list_backends():
-            run_name = _run_name(repo_data, backend, args)
-            backend.download_run_artifact_files(repo_data, run_name, args.output)
+        remote_backend = get_current_remote_backend()
+        if remote_backend is None:
+            console.print(f"No remote backend configured. Run `dstack config`.")
+            exit(1)
+        try:
+            run_name, tag_head = get_tagged_run_name(
+                repo_data, remote_backend, args.run_name_or_tag_name
+            )
+        except TagNotFoundError as e:
+            console.print(f"Cannot find the remote tag '{args.run_name_or_tag_name}'")
+            exit(1)
+        except RunNotFoundError as e:
+            console.print(f"Cannot find the remote run '{args.run_name_or_tag_name}'")
+            exit(1)
+
+        local_backend = get_local_backend()
+        jobs = remote_backend.list_jobs(repo_data, run_name)
+
+        if tag_head is not None:
+            try:
+                local_backend.add_tag_from_run(
+                    repo_address=repo_data,
+                    tag_name=tag_head.tag_name,
+                    run_name=tag_head.run_name,
+                    run_jobs=jobs,
+                )
+            except BackendError as e:
+                print(e)
+                exit(1)
+
+        remote_backend.download_run_artifact_files(
+            repo_address=repo_data,
+            run_name=run_name,
+            output_dir=local_backend.get_artifacts_path(repo_data),
+        )
+
+        for job in jobs:
+            local_backend.create_job(job)
+
+        console.print("Pull completed")

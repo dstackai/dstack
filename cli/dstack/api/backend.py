@@ -1,32 +1,44 @@
-from typing import List, Dict, Optional
-from dstack.backend import Backend
-from dstack.core.run import RunHead
-from dstack.core.error import BackendError
+from typing import Dict, List, Optional
+
+from dstack import version
 from dstack.backend.aws import AwsBackend
+from dstack.backend.base import Backend, RemoteBackend
+from dstack.backend.hub import HubBackend
 from dstack.backend.local import LocalBackend
 
 DEFAULT_REMOTE = "aws"
 DEFAULT = "local"
 
+backends_classes = [AwsBackend, LocalBackend]
+if not version.__is_release__:
+    backends_classes.append(HubBackend)
 
-def list_backends() -> List[Backend]:
-    all_backends = [cls() for cls in Backend.__subclasses__()]  # pylint: disable=E1101
-    return [current_backend for current_backend in all_backends if current_backend.loaded()]
+
+def get_all_backends():
+    return [backend_cls() for backend_cls in backends_classes]
 
 
-def dict_backends() -> Dict[str, Backend]:
-    all_backends = [cls() for cls in Backend.__subclasses__()]  # pylint: disable=E1101
-    d = {}
-    for current_backend in all_backends:
-        if current_backend.loaded():
-            d[current_backend.name] = current_backend
-    return d
+def list_backends(all_backend: bool = False) -> List[Backend]:
+    l = []
+    for backend in get_all_backends():
+        if all_backend:
+            l.append(backend)
+        elif backend.loaded:
+            l.append(backend)
+    return l
+
+
+def dict_backends(all_backend: bool = False) -> Dict[str, Backend]:
+    return {backend.name: backend for backend in list_backends(all_backend=all_backend)}
 
 
 def get_backend_by_name(name: str) -> Optional[Backend]:
-    all_backends = [cls() for cls in Backend.__subclasses__()]  # pylint: disable=E1101
-    for current_backend in all_backends:
-        if current_backend.loaded():
-            if current_backend.NAME == name:
-                return current_backend
-    raise BackendError(f"Not a backend named {name}")
+    return dict_backends().get(name)
+
+
+def get_current_remote_backend() -> Optional[RemoteBackend]:
+    return get_backend_by_name(DEFAULT_REMOTE)
+
+
+def get_local_backend() -> LocalBackend:
+    return LocalBackend()

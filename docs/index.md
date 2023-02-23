@@ -11,7 +11,7 @@ infrastructure. It allows running ML workflows locally or remotely, using any co
 Additionally, `dstack` facilitates versioning and reuse of artifacts (such as data and models), across teams.
 
 In brief, `dstack` simplifies the process of establishing ML training pipelines that are independent of a
-particular vendor, and facilitates collaboration within teams on data and models.
+particular vendor and facilitates collaboration within teams on data and models.
 
 [//]: # (### How it works)
 
@@ -37,7 +37,7 @@ Having your first ML workflows up and running will take less than 30 min.
 - [**3. Basics**
    Browse the basic examples of how to use `dstack`.
   ](basics/hello-world.md)
-- [**3. Slack**
+- [**4. Slack**
    Join our Slack chat to get support from us and the community.
   ](https://join.slack.com/t/dstackai/shared_invite/zt-xdnsytie-D4qU9BvJP8vkbkHXdi6clQ)
 

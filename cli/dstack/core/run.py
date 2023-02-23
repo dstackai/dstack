@@ -1,39 +1,28 @@
-from typing import Optional, List
+from typing import List, Optional
 
-from dstack.util import _quoted
+from pydantic import BaseModel
+
 from dstack.core.app import AppHead
 from dstack.core.artifact import ArtifactHead
+from dstack.core.job import JobStatus
 from dstack.core.repo import RepoAddress
 from dstack.core.request import RequestHead, RequestStatus
-from dstack.core.job import JobStatus
+from dstack.utils import random_names
+from dstack.utils.common import _quoted
 
 
-class RunHead:
-    def __init__(
-        self,
-        repo_address: RepoAddress,
-        run_name: str,
-        workflow_name: Optional[str],
-        provider_name: str,
-        local_repo_user_name: Optional[str],
-        artifact_heads: Optional[List[ArtifactHead]],
-        status: JobStatus,
-        submitted_at: int,
-        tag_name: Optional[str],
-        app_heads: Optional[List[AppHead]],
-        request_heads: Optional[List[RequestHead]],
-    ):
-        self.repo_address = repo_address
-        self.run_name = run_name
-        self.workflow_name = workflow_name
-        self.provider_name = provider_name
-        self.local_repo_user_name = local_repo_user_name
-        self.artifact_heads = artifact_heads
-        self.status = status
-        self.submitted_at = submitted_at
-        self.tag_name = tag_name
-        self.app_heads = app_heads
-        self.request_heads = request_heads
+class RunHead(BaseModel):
+    repo_address: RepoAddress
+    run_name: str
+    workflow_name: Optional[str]
+    provider_name: str
+    local_repo_user_name: Optional[str]
+    artifact_heads: Optional[List[ArtifactHead]]
+    status: JobStatus
+    submitted_at: int
+    tag_name: Optional[str]
+    app_heads: Optional[List[AppHead]]
+    request_heads: Optional[List[RequestHead]]
 
     def __str__(self) -> str:
         artifact_heads = (
@@ -69,3 +58,17 @@ class RunHead:
         return self.status.is_unfinished() and any(
             filter(lambda s: s.status in statuses, self.request_heads or [])
         )
+
+
+_adjectives = random_names.get_adjectives()
+_adjectives_subset_1 = _adjectives[::2]
+_adjectives_subset_2 = _adjectives[1::2]
+_animals = random_names.get_animals()
+
+
+def generate_local_run_name_prefix() -> str:
+    return random_names.generate_name_from_sets(_adjectives_subset_1, _animals)
+
+
+def generate_remote_run_name_prefix() -> str:
+    return random_names.generate_name_from_sets(_adjectives_subset_2, _animals)

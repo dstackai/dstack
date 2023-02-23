@@ -10,14 +10,24 @@ on:
 
 jobs:
   python-lint:
-      runs-on: ubuntu-latest
-      steps:
-        - uses: actions/checkout@v2
-        - name: Run black
-          uses: psf/black@stable
-          with:
-            options: "--config black.toml --check --verbose"
-            src: "./cli"
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v2
+      - uses: actions/setup-python@v2
+        with:
+          python-version: 3.11
+      - name: Run isort
+        uses: isort/isort-action@master
+        with:
+          isort-version: 5.12.0
+          configuration: "--settings-file pyconfig.toml --check-only --diff"
+          sort-paths: "cli"
+      - name: Run black
+        uses: psf/black@stable
+        with:
+          options: "--config pyconfig.toml --check --verbose"
+          src: "./cli"
+          version: "~= 22.0"
 
   cli-test-master:
     runs-on: ${{ matrix.os }}
@@ -95,6 +105,20 @@ jobs:
           python setup.py sdist bdist_wheel
           python -m twine upload --repository testpypi --username ${{ secrets.TESTPYPI_USERNAME }} --password ${{ secrets.TESTPYPI_PASSWORD }} dist/*
 
+  update-get-dstack-master:
+    runs-on: ubuntu-latest
+    needs:
+      - cli-upload-master
+    env:
+      AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
+      AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+    steps:
+      - name: Install AWS
+        run: pip install awscli
+      - run: |
+          VERSION=$((${{ github.run_number }} + 150))
+          echo $VERSION | aws s3 cp - s3://get-dstack/stgn-cli/latest-version --acl public-read
+
   runner-test-master:
     defaults:
       run:
@@ -106,13 +130,13 @@ jobs:
       - name: Set up Go
         uses: actions/setup-go@v3
         with:
-          go-version: 1.17
+          go-version: 1.19
 
       - name: golangci-lint
         uses: golangci/golangci-lint-action@v3
         with:
-          version: v1.29
-          args: --issues-exit-code=0
+          version: v1.51.2
+          args: --issues-exit-code=0 --timeout=20m
           working-directory: runner
 
       - name: Test
@@ -134,7 +158,7 @@ jobs:
         include:
           - {goos: "linux", goarch: "386", runson: "ubuntu-latest"}
           - {goos: "linux", goarch: "amd64", runson: "ubuntu-latest"}
-          - {goos: "windows", goarch: "386", runson: "ubuntu-latest"}
+#          - {goos: "windows", goarch: "386", runson: "ubuntu-latest"}
           - {goos: "windows", goarch: "amd64", runson: "ubuntu-latest"}
           - {goos: "darwin", goarch: "amd64", runson: "macos-latest"}
           - {goos: "darwin", goarch: "arm64", runson: "macos-latest"}
@@ -167,7 +191,7 @@ jobs:
         include:
           - {goos: "linux", goarch: "386", runson: "ubuntu-latest", platform: "x86", extension: ""}
           - {goos: "linux", goarch: "amd64", runson: "ubuntu-latest", platform: "amd64", extension: ""}
-          - {goos: "windows", goarch: "386", runson: "ubuntu-latest", platform: "x86", extension: ".exe"}
+#          - {goos: "windows", goarch: "386", runson: "ubuntu-latest", platform: "x86", extension: ".exe"}
           - {goos: "windows", goarch: "amd64", runson: "ubuntu-latest", platform: "amd64", extension: ".exe"}
           - {goos: "darwin", goarch: "amd64", runson: "macos-latest", platform: "amd64", extension: ""}
           - {goos: "darwin", goarch: "arm64", runson: "macos-latest", platform: "arm64", extension: ""}

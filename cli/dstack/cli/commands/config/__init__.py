@@ -1,9 +1,8 @@
-import sys
 from argparse import Namespace
 
+from dstack.api.config import dict_config
 from dstack.cli.commands import BasicCommand
 from dstack.cli.common import ask_choice
-from dstack.api.config import list_dict
 
 
 class ConfigCommand(BasicCommand):
@@ -14,18 +13,17 @@ class ConfigCommand(BasicCommand):
         super(ConfigCommand, self).__init__(parser)
 
     def register(self):
-        ...
+        pass
 
     def _command(self, args: Namespace):
-        configs = list_dict()
-        config_name = ask_choice(
-            title="Choose backend",
-            values=list(configs.keys()),
-            labels=list(configs.keys()),
-            selected_value="aws",
-        )
-
-        if not configs[config_name]:
-            sys.exit(f"The backend '{config_name}' doesn't exist")
-
-        configs[config_name].configure()
+        configs = dict_config()
+        if len(configs) > 1:
+            backend_name = ask_choice(
+                "Choose backend",
+                [f"[{key}]" for key in configs.keys()],
+                [key for key in configs.keys()],
+                "aws",
+            )
+            configs[backend_name].configure()
+        else:
+            configs["aws"].configure()

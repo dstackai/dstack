@@ -4,4 +4,10 @@ repos:
     hooks:
       - id: black
         language_version: python3.11
-        args: ['--config', 'black.toml']
+        args: ['--config', 'pyconfig.toml']
+  - repo: https://github.com/pycqa/isort
+    rev: 5.12.0
+    hooks:
+      - id: isort
+        name: isort (python)
+        args: ['--settings-file', 'pyconfig.toml']

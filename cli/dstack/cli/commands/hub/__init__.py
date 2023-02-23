@@ -1,4 +1,3 @@
-import argparse
 import os
 from argparse import Namespace
 
@@ -6,17 +5,15 @@ import uvicorn
 
 from dstack import version
 from dstack.cli.commands import BasicCommand
-from dstack.core.error import check_config
 
 
 class HubCommand(BasicCommand):
     NAME = "hub"
-    DESCRIPTION = argparse.SUPPRESS
+    DESCRIPTION = None  # Hidden by default
 
     def __init__(self, parser):
         super(HubCommand, self).__init__(parser)
 
-    @check_config
     def hub_start(self, args: Namespace):
         os.environ["DSTACK_HUB_HOST"] = args.host
         os.environ["DSTACK_HUB_PORT"] = str(args.port)

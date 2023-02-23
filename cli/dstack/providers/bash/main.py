@@ -1,10 +1,10 @@
 from argparse import ArgumentParser
-from typing import List, Optional, Dict, Any
+from typing import Any, Dict, List, Optional
 
-from dstack.core.job import JobSpec
+from dstack.backend.base import Backend
 from dstack.core.app import AppSpec
+from dstack.core.job import JobSpec
 from dstack.providers import Provider
-from dstack.backend import Backend
 
 
 class BashProvider(Provider):
@@ -65,7 +65,7 @@ class BashProvider(Provider):
                 apps.append(
                     AppSpec(
                         port_index=i,
-                        app_name="bash" + (i if self.ports > 1 else ""),
+                        app_name="bash" + (str(i) if self.ports > 1 else ""),
                     )
                 )
         return [

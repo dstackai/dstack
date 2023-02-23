@@ -14,7 +14,7 @@ Reproducible ML workflows
 
 <p align="center">
 <code>dstack</code> is an open-source tool that allows running reproducible ML workflows independently of
-infrastructure, and collaborate around data and models. 
+the environment (locally or in the cloud), and collaborate around data and models. 
 </p>
 
 [![Slack](https://img.shields.io/badge/slack-join%20community-blueviolet?logo=slack&style=for-the-badge)](https://join.slack.com/t/dstackai/shared_invite/zt-xdnsytie-D4qU9BvJP8vkbkHXdi6clQ)
@@ -32,7 +32,7 @@ infrastructure, and collaborate around data and models.
 </div>
 
 `dstack` is an open-source tool that allows running reproducible ML workflows independently of
-infrastructure. It allows running ML workflows locally or remotely, using any configured cloud vendor. 
+the environment. It allows running ML workflows locally or remotely (e.g. in a configured cloud account). 
 Additionally, `dstack` facilitates versioning and reuse of artifacts (such as data and models), across teams.
 
 In brief, `dstack` simplifies the process of establishing ML training pipelines that are independent of a
@@ -42,20 +42,58 @@ particular vendor, and facilitates collaboration within teams on data and models
 
 * Define workflows via YAML
 * Run workflows locally via CLI
-* Reuse artifacts (data and models) across workflows
+* Track and reuse artifacts across workflows
 * Run workflows remotely (in any configured cloud) via CLI
-* Share artifacts (data and models) across teams
+* Version and share artifacts across teams
 
 ## Installation
 
-Use pip to install `dstack` locally:
+Use pip to install the `dstack` CLI:
 
 ```shell
 pip install dstack --upgrade
 ```
 
-To run workflows remotely (e.g. in the cloud) or share artifacts outside your machine, you must configure your remote
-settings using the `dstack config` command:
+## Example
+
+Here's an example from the [Quick start](https://docs.dstack.ai/quick-start).
+
+```yaml
+workflows:
+  - name: mnist-data
+    provider: bash
+    commands:
+      - pip install torchvision
+      - python mnist/mnist_data.py
+    artifacts:
+      - path: ./data
+
+  - name: train-mnist
+    provider: bash
+    deps:
+      - workflow: mnist-data
+    commands:
+      - pip install torchvision pytorch-lightning tensorboard
+      - python mnist/train_mnist.py
+    artifacts:
+      - path: ./lightning_logs
+```
+
+With workflows defined in this manner, `dstack` allows for effortless execution either locally or in a configured cloud
+account, while also enabling reuse of artifacts.
+
+## Run locally
+
+Use the `dstack` CLI to run workflows locally:
+
+```shell
+dstack run mnist-data
+```
+
+## Configure a remote
+
+To run workflows remotely (e.g. in the cloud) or share artifacts outside your machine, 
+you must configure your remote settings using the `dstack config` command:
 
 ```shell
 dstack config
@@ -71,38 +109,26 @@ S3 bucket: dstack-142421590066-eu-west-1
 EC2 subnet: none
 ```
 
-## Example
+For more details on how to configure a remote, check the [installation](https://docs.dstack.ai/installation/#optional-configure-a-remote) guide.
 
-Here's an example from [dstack-examples](https://github.com/dstackai/dstack-examples).
+## Run remotely
 
-```yaml
-workflows:
-  # Saves the MNIST dataset as reusable artifact for other workflows
-  - name: mnist-data
-    provider: bash
-    commands:
-      - pip install -r mnist/requirements.txt
-      - python mnist/download.py
-    artifacts:
-      # Saves the folder with the dataset as an artifact
-      - path: ./data
+Once a remote is configured, use the `--remote` flag with the `dstack run` command to run the 
+workflow in the configured cloud:
 
-  # Trains a model using the dataset from the `mnist-data` workflow
-  - name: mnist-train
-    provider: bash
-    deps:
-      # Depends on the artifacts from the `mnist-data` workflow
-      - workflow: mnist-data
-    commands:
-      - pip install -r mnist/requirements.txt
-      - python mnist/train.py
-    artifacts:
-      # Saves the `folder with logs and checkpoints as an artifact
-      - path: ./lightning_logs
+```shell
+dstack run mnist-data --remote
 ```
 
-With workflows defined in this manner, `dstack` allows for effortless execution either locally 
-or in a configured cloud account, while also enabling versioning and reuse of artifacts.
+You can configure the required resources to run the workflows either via the `resources` property in YAML
+or the `dstack run` command's arguments, such as `--gpu`, `--gpu-name`, etc:
+
+```shell
+dstack run train-mnist --remote --gpu 1
+```
+
+When you run a workflow remotely, `dstack` automatically creates resources in the configured cloud,
+and releases them once the workflow is finished.
 
 ## More information
 
