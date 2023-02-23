@@ -24,17 +24,34 @@ export const fetchBaseQuery = (
 > => {
     if (isMockingEnabled) {
         return async ({ url, method, body, params }) => {
-            const response = getResponse({ url, method });
-            // const response = getResponse({ url, method, responseType: 'failed' });
+            try {
+                const response = getResponse({ url, method });
+                // const response = getResponse({ url, method, responseType: 'failed' });
 
-            console.log('Mock request', {
-                url,
-                method,
-                response,
-            });
+                console.log('Mock request', {
+                    url,
+                    method,
+                    response,
+                    body,
+                    params,
+                });
 
-            await wait(Math.floor(Math.random() * 3000));
-            return response;
+                await wait(Math.floor(Math.random() * 3000));
+
+                return response;
+            } catch (error) {
+                const response = { error: { status: 500 } as FetchBaseQueryError };
+
+                console.log('Mock request', {
+                    url,
+                    method,
+                    response,
+                    body,
+                    params,
+                });
+
+                return response;
+            }
         };
     }
 
