@@ -120,7 +120,7 @@ func start(logLevel int, httpPort int, configDir string) {
 
 	go func() {
 		if err = ex.Run(ctxSig); err != nil {
-			log.Error(logCtx, "dstack-runner ended with an error: ", err)
+			log.Error(logCtx, "dstack-runner ended with an error: ", "err", err)
 		}
 		wg.Done()
 	}()
