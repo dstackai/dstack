@@ -251,14 +251,9 @@ def _create_instance(
     request.project = project_id
     request.instance_resource = instance
 
-    # Wait for the create operation to complete.
-    print(f"Creating the {instance_name} instance in {zone}...")
-
     operation = instance_client.insert(request=request)
-
     gcp_utils.wait_for_extended_operation(operation, "instance creation")
 
-    print(f"Instance {instance_name} created.")
     return instance_client.get(project=project_id, zone=zone, instance=instance_name)
 
 
