@@ -113,6 +113,14 @@ func (j *Job) RepoHostNameWithPort() string {
 	return fmt.Sprintf("%s:%d", j.RepoHostName, j.RepoPort)
 }
 
+func (j *Job) JobRepoData() *RepoData {
+	return &RepoData{
+		RepoHost:     j.RepoHostNameWithPort(),
+		RepoUserName: j.RepoUserName,
+		RepoName:     j.RepoName,
+	}
+}
+
 func (j *Job) JobFilepath() string {
 	return fmt.Sprintf("jobs/%s/%s/%s/%s;", j.RepoHostNameWithPort(), j.RepoUserName, j.RepoName, j.JobID)
 }
@@ -155,4 +163,8 @@ func (d *Dep) RepoHostNameWithPort() string {
 
 func (rd *RepoData) RepoDataPath(sep string) string {
 	return strings.Join([]string{rd.RepoHost, rd.RepoUserName, rd.RepoName}, sep)
+}
+
+func (rd *RepoData) SecretsPrefix() string {
+	return fmt.Sprintf("secrets/%s/%s/%s/l;", rd.RepoHost, rd.RepoUserName, rd.RepoName)
 }

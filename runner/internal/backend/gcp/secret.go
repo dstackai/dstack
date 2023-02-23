@@ -3,6 +3,7 @@ package gcp
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"strings"
 
@@ -11,6 +12,8 @@ import (
 	"github.com/dstackai/dstack/runner/internal/gerrors"
 	"github.com/dstackai/dstack/runner/internal/models"
 )
+
+var ErrSecretNotFound = errors.New("secret not found")
 
 type GCPSecretManager struct {
 	client  *secretmanager.Client
@@ -54,7 +57,11 @@ func (sm *GCPSecretManager) getSecretValue(ctx context.Context, key string) (str
 	}
 	version, err := sm.client.AccessSecretVersion(ctx, req)
 	if err != nil {
-		return "", gerrors.Wrap(err)
+		if strings.Contains(err.Error(), "NotFound") {
+			return "", gerrors.Wrap(ErrSecretNotFound)
+		} else {
+			return "", gerrors.Wrap(err)
+		}
 	}
 	return string(version.Payload.GetData()), nil
 }

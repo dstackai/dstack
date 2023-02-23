@@ -15,6 +15,7 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"strings"
 
 	"github.com/dstackai/dstack/runner/internal/artifacts"
 	"github.com/dstackai/dstack/runner/internal/gerrors"
@@ -186,4 +187,26 @@ func (gbackend *GCPBackend) GetJobByPath(ctx context.Context, path string) (*mod
 func (gbackend *GCPBackend) Bucket(ctx context.Context) string {
 	log.Trace(ctx, "Getting bucket")
 	return gbackend.bucket
+}
+
+func (gbackend *GCPBackend) Secrets(ctx context.Context) (map[string]string, error) {
+	log.Trace(ctx, "Getting secrets")
+	prefix := gbackend.state.Job.JobRepoData().SecretsPrefix()
+	secretFilenames, err := gbackend.storage.ListFile(ctx, prefix)
+	if err != nil {
+		return nil, gerrors.Wrap(err)
+	}
+	secrets := make(map[string]string, 0)
+	for _, secretFilename := range secretFilenames {
+		secretName := strings.ReplaceAll(secretFilename, prefix, "")
+		secretValue, err := gbackend.secretManager.FetchSecret(ctx, gbackend.state.Job.JobRepoData(), secretName)
+		if err != nil {
+			if errors.Is(err, ErrSecretNotFound) {
+				continue
+			}
+			return nil, gerrors.Wrap(err)
+		}
+		secrets[secretName] = secretValue
+	}
+	return secrets, nil
 }
