@@ -28,10 +28,15 @@ def get_latest_version() -> Optional[str]:
         f"https://get.dstack.ai"
         f"/{'cli' if version.__is_release__ else 'stgn-cli'}"
         f"/latest-version"
-        f"?anonymous_installation_id={anonymous_installation_id()}"
     )
     try:
-        response = requests.get(latest_version_url)
+        response = requests.get(
+            latest_version_url,
+            params={
+                "anonymous_installation_id": anonymous_installation_id(),
+                "version": version.__version__,
+            },
+        )
         if response.status_code == 200:
             return response.text.strip()
         else:

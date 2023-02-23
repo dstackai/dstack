@@ -1,6 +1,5 @@
 import argparse
 import os
-import re
 import sys
 import time
 from argparse import Namespace
@@ -22,7 +21,7 @@ from dstack.api.logs import poll_logs
 from dstack.api.repo import load_repo_data
 from dstack.api.run import list_runs_with_merged_backends
 from dstack.backend.base import Backend
-from dstack.backend.base.logs import get_logs_host_replace_pattern, get_logs_host_replace_sub
+from dstack.backend.base.logs import fix_urls
 from dstack.cli.commands import BasicCommand
 from dstack.cli.common import console, print_runs
 from dstack.core.error import check_backend, check_config, check_git
@@ -89,14 +88,9 @@ def parse_run_args(
 
 def poll_logs_ws(backend: Backend, repo_address: RepoAddress, job_head: JobHead):
     job = backend.get_job(repo_address, job_head.job_id)
-    host_replace_pattern = get_logs_host_replace_pattern(job)
-    if host_replace_pattern is not None:
-        host_replace_pattern = host_replace_pattern.encode()
-    host_replace_sub = get_logs_host_replace_sub(job).encode()
 
     def on_message(ws: WebSocketApp, message):
-        if host_replace_pattern is not None:
-            message = re.sub(host_replace_pattern, host_replace_sub, message)
+        message = fix_urls(message, job)
         sys.stdout.buffer.write(message)
         sys.stdout.buffer.flush()
 
@@ -106,7 +100,7 @@ def poll_logs_ws(backend: Backend, repo_address: RepoAddress, job_head: JobHead)
             if Confirm.ask(f"\n [red]Abort the run '{run_name}'?[/]"):
                 backend.stop_jobs(repo_address, run_name, abort=True)
                 console.print(f"[grey58]OK[/]")
-                exit()
+            exit()
         else:
             console.print(err)
 

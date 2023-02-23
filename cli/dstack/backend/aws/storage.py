@@ -6,6 +6,7 @@ from botocore.client import BaseClient
 
 from dstack.backend.base.storage import SIGNED_URL_EXPIRATION, CloudStorage
 from dstack.core.storage import StorageFile
+from dstack.utils.common import removeprefix
 
 
 class AWSStorage(CloudStorage):
@@ -53,7 +54,7 @@ class AWSStorage(CloudStorage):
                     filepath = obj["Key"]
                     files.append(
                         StorageFile(
-                            filepath=filepath.removeprefix(prefix),
+                            filepath=removeprefix(filepath, prefix),
                             filesize_in_bytes=obj["Size"],
                         )
                     )

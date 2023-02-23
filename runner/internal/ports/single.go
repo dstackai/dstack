@@ -65,9 +65,7 @@ func (m *single) Ports(id string) []string {
 	defer m.mu.Unlock()
 	resp := make([]string, 0)
 	if p, ok := m.pool[id]; ok {
-		for _, port := range p {
-			resp = append(resp, port)
-		}
+		resp = append(resp, p...)
 	}
 	return resp
 }
