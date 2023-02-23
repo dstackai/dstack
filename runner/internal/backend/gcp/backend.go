@@ -1,16 +1,6 @@
 package gcp
 
 import (
-
-	// "errors"
-	// "fmt"
-
-	// "os"
-	// "path"
-	// "strings"
-	// "time"
-
-	// "github.com/dstackai/dstack/runner/consts"
 	"context"
 	"errors"
 	"fmt"
@@ -18,14 +8,11 @@ import (
 	"strings"
 
 	"github.com/dstackai/dstack/runner/internal/artifacts"
+	"github.com/dstackai/dstack/runner/internal/backend"
 	"github.com/dstackai/dstack/runner/internal/gerrors"
-	"gopkg.in/yaml.v2"
-
-	// "github.com/dstackai/dstack/runner/internal/artifacts/simple"
-
-	// "github.com/dstackai/dstack/runner/internal/common"
 	"github.com/dstackai/dstack/runner/internal/log"
 	"github.com/dstackai/dstack/runner/internal/models"
+	"gopkg.in/yaml.v2"
 )
 
 type GCPBackend struct {
@@ -35,27 +22,28 @@ type GCPBackend struct {
 	storage       *GCPStorage
 	compute       *GCPCompute
 	secretManager *GCPSecretManager
+	logging       *GCPLogging
 	runnerID      string
 	state         *models.State
 	artifacts     []artifacts.Artifacter
 }
 
-// func init() {
-// 	backend.RegisterBackend("aws", func(ctx context.Context, pathConfig string) (backend.Backend, error) {
-// 		// TODO read config
-// 		// log.Trace(ctx, "Read config file", "path", pathConfig)
-// 		// theConfig, err := ioutil.ReadFile(pathConfig)
-// 		// if err != nil {
-// 		// 	return nil, gerrors.Wrap(err)
-// 		// }
-// 		// log.Trace(ctx, "Unmarshal config")
-// 		// err = yaml.Unmarshal(theConfig, &file)
-// 		// if err != nil {
-// 		// 	return nil, gerrors.Wrap(err)
-// 		// }
-// 		return New("dstack", "us-central1-a", "dstack-bucket"), nil
-// 	})
-// }
+func init() {
+	backend.RegisterBackend("gcp", func(ctx context.Context, pathConfig string) (backend.Backend, error) {
+		// TODO read config
+		// log.Trace(ctx, "Read config file", "path", pathConfig)
+		// theConfig, err := ioutil.ReadFile(pathConfig)
+		// if err != nil {
+		// 	return nil, gerrors.Wrap(err)
+		// }
+		// log.Trace(ctx, "Unmarshal config")
+		// err = yaml.Unmarshal(theConfig, &file)
+		// if err != nil {
+		// 	return nil, gerrors.Wrap(err)
+		// }
+		return New("dstack", "us-central1-a", "dstack-bucket"), nil
+	})
+}
 
 func New(project, zone, bucket string) *GCPBackend {
 	storage, err := NewGCPStorage(project, bucket)
@@ -70,6 +58,7 @@ func New(project, zone, bucket string) *GCPBackend {
 	if secretManager == nil {
 		return nil
 	}
+	logging := NewGCPLogging(project)
 	return &GCPBackend{
 		project:       project,
 		zone:          zone,
@@ -77,6 +66,7 @@ func New(project, zone, bucket string) *GCPBackend {
 		storage:       storage,
 		compute:       compute,
 		secretManager: secretManager,
+		logging:       logging,
 	}
 }
 
@@ -151,7 +141,28 @@ func (gbackend *GCPBackend) CheckStop(ctx context.Context) (bool, error) {
 }
 
 func (gbackend *GCPBackend) Shutdown(ctx context.Context) error {
-	return gbackend.compute.TerminateInstance(ctx, gbackend.state.RequestID)
+	err := gbackend.compute.TerminateInstance(ctx, gbackend.state.RequestID)
+	if err != nil {
+		return err
+	}
+	err = gbackend.compute.instancesClient.Close()
+	if err != nil {
+		return err
+	}
+	err = gbackend.storage.client.Close()
+	if err != nil {
+		return err
+	}
+	err = gbackend.secretManager.client.Close()
+	if err != nil {
+		return err
+	}
+	return gbackend.logging.client.Close()
+}
+
+func (gbackend *GCPBackend) GetArtifact(ctx context.Context, runName, localPath, remotePath string, mount bool) artifacts.Artifacter {
+	// TODO
+	return nil
 }
 
 func (gbackend *GCPBackend) Requirements(ctx context.Context) models.Requirements {
@@ -165,7 +176,7 @@ func (gbackend *GCPBackend) MasterJob(ctx context.Context) *models.Job {
 }
 
 func (gbackend *GCPBackend) CreateLogger(ctx context.Context, logGroup, logName string) io.Writer {
-	logger := NewGCPLogger(ctx, gbackend.project, gbackend.state.Job.JobID, logGroup, logName)
+	logger := gbackend.logging.NewGCPLogger(ctx, gbackend.state.Job.JobID, logGroup, logName)
 	if logger == nil {
 		log.Error(ctx, "Failed to create logger")
 		return nil
@@ -209,4 +220,13 @@ func (gbackend *GCPBackend) Secrets(ctx context.Context) (map[string]string, err
 		secrets[secretName] = secretValue
 	}
 	return secrets, nil
+}
+
+func (gbackend *GCPBackend) GitCredentials(ctx context.Context) *models.GitCredentials {
+	log.Trace(ctx, "Getting credentials")
+	creds, err := gbackend.secretManager.FetchCredentials(ctx, gbackend.state.Job.JobRepoData())
+	if err != nil {
+		return nil
+	}
+	return creds
 }

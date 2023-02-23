@@ -17,21 +17,28 @@ type LogMesage struct {
 	Source string `json:"source"`
 }
 
-type GCPLogger struct {
+type GCPLogging struct {
 	client *logging.Client
+}
+
+type GCPLogger struct {
 	logger *logging.Logger
 	jobID  string
 }
 
-func NewGCPLogger(ctx context.Context, project, jobID, logGroup, logName string) *GCPLogger {
+func NewGCPLogging(project string) *GCPLogging {
+	ctx := context.TODO()
 	client, err := logging.NewClient(ctx, project)
 	if err != nil {
 		return nil
 	}
+	return &GCPLogging{client: client}
+}
+
+func (glogging *GCPLogging) NewGCPLogger(ctx context.Context, jobID, logGroup, logName string) *GCPLogger {
 	logID := getLogID(logGroup, logName)
-	logger := client.Logger(logID)
+	logger := glogging.client.Logger(logID)
 	return &GCPLogger{
-		client: client,
 		jobID:  jobID,
 		logger: logger,
 	}
@@ -57,7 +64,9 @@ func (glogger *GCPLogger) flushLogs(ctx context.Context, ticker *time.Ticker) {
 	for {
 		select {
 		case <-ctx.Done():
-			glogger.client.Close()
+			// Backend will Close() the client on Shutdown(), flushing the logs.
+			// We don't want to Close() from this goroutine since google libraries may
+			// send audit logs after ctx.Done().
 			return
 		case <-ticker.C:
 			glogger.logger.Flush()
