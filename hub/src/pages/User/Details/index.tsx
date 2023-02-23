@@ -6,6 +6,7 @@ import { useTranslation } from 'react-i18next';
 import { useBreadcrumbs } from 'hooks';
 import { useDeleteUsersMutation, useGetUserQuery } from 'services/user';
 import { ROUTES } from 'routes';
+import Button from '@cloudscape-design/components/button';
 
 export const UserDetails: React.FC = () => {
     const { t } = useTranslation();
@@ -48,15 +49,7 @@ export const UserDetails: React.FC = () => {
     return (
         <>
             <ContentLayout
-                header={
-                    <DetailsHeader
-                        title={paramUserName}
-                        editAction={editUserHandler}
-                        deleteAction={toggleDeleteConfirm}
-                        editDisabled={isDeleting}
-                        deleteDisabled={isDeleting}
-                    />
-                }
+                header={<DetailsHeader title={paramUserName} deleteAction={toggleDeleteConfirm} deleteDisabled={isDeleting} />}
             >
                 {isLoading && !data && (
                     <Container>
@@ -66,7 +59,20 @@ export const UserDetails: React.FC = () => {
 
                 {data && (
                     <SpaceBetween size="l">
-                        <Container header={<Header variant="h2">{t('users.general_info')}</Header>}>
+                        <Container
+                            header={
+                                <Header
+                                    variant="h2"
+                                    actions={
+                                        <Button onClick={editUserHandler} disabled={isDeleting}>
+                                            {t('common.edit')}
+                                        </Button>
+                                    }
+                                >
+                                    {t('users.account_settings')}
+                                </Header>
+                            }
+                        >
                             <ColumnLayout columns={2} variant="text-grid">
                                 <SpaceBetween size="l">
                                     <div>

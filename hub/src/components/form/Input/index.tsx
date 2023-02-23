@@ -13,6 +13,7 @@ export const FormInput = <T extends FieldValues>({
     description,
     secondaryControl,
     stretch,
+    leftContent,
     onChange: onChangeProp,
     ...props
 }: FormInputProps<T>) => {
@@ -30,6 +31,7 @@ export const FormInput = <T extends FieldValues>({
                         constraintText={constraintText}
                         secondaryControl={secondaryControl}
                     >
+                        {leftContent}
                         <InputCSD
                             {...fieldRest}
                             {...props}

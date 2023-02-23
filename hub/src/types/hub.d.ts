@@ -35,7 +35,7 @@ declare interface THubBackendAWS {
     secret_key: string,
     region_name: string,
     s3_bucket_name: string,
-    ec2_subnet_id: string,
+    ec2_subnet_id: string | null,
 }
 
 declare interface THubBackendAWSWithTitles extends THubBackendAWS {

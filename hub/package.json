@@ -86,7 +86,7 @@
   },
   "dependencies": {
     "@cloudscape-design/collection-hooks": "^1.0.19",
-    "@cloudscape-design/components": "^3.0.174",
+    "@cloudscape-design/components": "^3.0.206",
     "@cloudscape-design/global-styles": "^1.0.7",
     "@hookform/resolvers": "^2.9.10",
     "@reduxjs/toolkit": "^1.9.1",

@@ -2,6 +2,7 @@ import React from 'react';
 import { useTranslation } from 'react-i18next';
 import { useForm } from 'react-hook-form';
 import {
+    Box,
     Container,
     Header,
     FormUI,
@@ -12,6 +13,7 @@ import {
     Popover,
     StatusIndicator,
     ColumnLayout,
+    FormField,
 } from 'components';
 import { TRoleSelectOption } from './types';
 
@@ -35,7 +37,7 @@ export const UserForm: React.FC<Props> = ({
     const { t } = useTranslation();
     const isEditing = !!initialValues;
 
-    const { handleSubmit, control, getValues } = useForm<IUser>({
+    const { handleSubmit, control } = useForm<IUser>({
         defaultValues: initialValues ?? {
             global_role: 'read',
         },
@@ -59,29 +61,19 @@ export const UserForm: React.FC<Props> = ({
         onSubmitProp(data);
     };
 
-    const onChangeHandler = () => {
-        if (isEditing) {
-            onSubmit(getValues());
-        }
-    };
-
     return (
         <form onSubmit={handleSubmit(onSubmit)}>
             <FormUI
                 actions={
-                    <>
-                        {!isEditing && (
-                            <SpaceBetween direction="horizontal" size="xs">
-                                <Button formAction="none" disabled={loading} variant="link" onClick={onCancel}>
-                                    {t('common.cancel')}
-                                </Button>
+                    <SpaceBetween direction="horizontal" size="xs">
+                        <Button formAction="none" disabled={loading} variant="link" onClick={onCancel}>
+                            {t('common.cancel')}
+                        </Button>
 
-                                <Button loading={loading} disabled={loading} variant="primary">
-                                    {t('common.save')}
-                                </Button>
-                            </SpaceBetween>
-                        )}
-                    </>
+                        <Button loading={loading} disabled={loading} variant="primary">
+                            {t('common.save')}
+                        </Button>
+                    </SpaceBetween>
                 }
             >
                 <Container header={<Header variant="h2">{t('users.account_settings')}</Header>}>
@@ -97,49 +89,42 @@ export const UserForm: React.FC<Props> = ({
                                 name="global_role"
                                 options={roleSelectOptions}
                                 disabled={loading}
-                                onChange={onChangeHandler}
                             />
                         </ColumnLayout>
 
                         {initialValues && (
-                            <FormInput
-                                label={t('users.token')}
-                                control={control}
-                                name="token"
-                                readOnly
-                                secondaryControl={
-                                    <SpaceBetween size="xs" direction="horizontal">
-                                        <Popover
-                                            dismissButton={false}
-                                            position="top"
-                                            size="small"
-                                            triggerType="custom"
-                                            content={
-                                                <StatusIndicator type="success">{t('users.token_copied')}</StatusIndicator>
-                                            }
-                                        >
-                                            <Button
-                                                disabled={loading}
-                                                formAction="none"
-                                                iconName="copy"
-                                                variant="link"
-                                                onClick={onCopyToken}
-                                            />
-                                        </Popover>
+                            <FormField label={t('users.token')}>
+                                <Box margin={{ right: 'xxs' }} display="inline-block">
+                                    <Popover
+                                        dismissButton={false}
+                                        position="top"
+                                        size="small"
+                                        triggerType="custom"
+                                        content={<StatusIndicator type="success">{t('users.token_copied')}</StatusIndicator>}
+                                    >
+                                        <Button
+                                            disabled={loading}
+                                            formAction="none"
+                                            iconName="copy"
+                                            variant="link"
+                                            onClick={onCopyToken}
+                                        />
+                                    </Popover>
+                                </Box>
 
-                                        {onRefreshToken && (
-                                            <Button
-                                                disabled={loading || disabledRefreshToken}
-                                                formAction="none"
-                                                variant="normal"
-                                                onClick={onRefreshToken}
-                                            >
-                                                {t('users.edit.refresh_token_button_label')}
-                                            </Button>
-                                        )}
-                                    </SpaceBetween>
-                                }
-                            />
+                                {initialValues.token}
+
+                                <Box margin={{ left: 'l' }} display="inline-block">
+                                    <Button
+                                        disabled={loading || disabledRefreshToken}
+                                        formAction="none"
+                                        variant="normal"
+                                        onClick={onRefreshToken}
+                                    >
+                                        {t('users.edit.refresh_token_button_label')}
+                                    </Button>
+                                </Box>
+                            </FormField>
                         )}
                     </SpaceBetween>
                 </Container>

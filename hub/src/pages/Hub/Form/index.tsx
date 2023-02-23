@@ -1,6 +1,6 @@
 import React from 'react';
 import { useTranslation } from 'react-i18next';
-import { Container, Header, FormUI, SpaceBetween, Button, FormInput, FormTiles } from 'components';
+import { Container, Header, FormUI, SpaceBetween, Button, FormInput, FormField, FormTiles } from 'components';
 import { useForm, FormProvider } from 'react-hook-form';
 import { IProps, TBackendOption } from './types';
 import { AWSBackend } from './AWS';
@@ -87,6 +87,8 @@ export const HubForm: React.FC<IProps> = ({ initialValues, onCancel, loading, on
                         )}
 
                         <Container header={<Header variant="h2">{t('hubs.edit.backend')}</Header>}>
+                            <FormField label={t('hubs.edit.backend_type')} />
+
                             <SpaceBetween size="l">
                                 <FormTiles control={control} name="backend.type" items={backendOptions} />
                                 {renderBackendFields()}

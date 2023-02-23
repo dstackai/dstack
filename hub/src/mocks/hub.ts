@@ -40,7 +40,7 @@ const backendValuesSuccess: IHubBackendValues = {
         values: new Array(10).fill({}).map((_, index) => ({ value: `region_${index}`, label: `Region ${index}` })),
     },
     s3_bucket_name: {
-        // selected: 'bucket_1',
+        selected: 's3://bucket_1',
         values: new Array(10).fill({}).map((_, index) => ({
             name: `bucket_${index}`,
             created: `bucket_${index}_date`,

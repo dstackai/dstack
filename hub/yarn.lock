@@ -1065,10 +1065,10 @@
   resolved "https://registry.yarnpkg.com/@cloudscape-design/collection-hooks/-/collection-hooks-1.0.19.tgz#3c0d50751a2c5965b5dcb7e94def81dcda1ea782"
   integrity sha512-dd5K+o0bTxmNephTglVSwKPTOs+S+hekKCAf1M7dthuCsgEiYVSMAan+Uu+e7EG64atPGIsg+me9BJofF7VmFA==
 
-"@cloudscape-design/components@^3.0.174":
-  version "3.0.174"
-  resolved "https://registry.npmjs.org/@cloudscape-design/components/-/components-3.0.174.tgz"
-  integrity sha512-YB4Nt+MgbEo5nsJq9d2jdw7GheeaEk5jtWegvbvmPu8qUk8Ir1nJ1C5UnrBzuhDYtq9Ts4GH6GCR6GP4WfVY2g==
+"@cloudscape-design/components@^3.0.206":
+  version "3.0.206"
+  resolved "https://registry.yarnpkg.com/@cloudscape-design/components/-/components-3.0.206.tgz#896b9d18f43dc871165c2f4f5c2ca1ad9eaedbf4"
+  integrity sha512-FLzDg70oxdQ83wcgRRvoKuzULHMrxvF1eWS5aNcMr1ZKhb66ghQBvXsDZIEKnQRyXyEGX09x2yqy5sZgbJx8jg==
   dependencies:
     "@cloudscape-design/collection-hooks" "^1.0.0"
     "@cloudscape-design/test-utils-core" "^1.0.0"
@@ -1998,14 +1998,9 @@
   resolved "https://registry.npmjs.org/@types/json-schema/-/json-schema-7.0.11.tgz"
   integrity sha512-wOuvG1SN4Us4rez+tylwwwCV1psiNVOkJeM3AUWUNWg/jDQY2+HE/444y5gc+jBmRqASOm2Oeh5c1axHobwRKQ==
 
-"@types/lodash@^4.14.175":
+"@types/lodash@^4.14.175", "@types/lodash@^4.14.191":
   version "4.14.191"
   resolved "https://registry.npmjs.org/@types/lodash/-/lodash-4.14.191.tgz"
-  integrity sha512-BdZ5BCCvho3EIXw6wUCXHe7rS53AIDPLE+JzwgT+OsJk53oBfbSmZZ7CX4VaRoN78N+TJpFi9QPlfIVNmJYWxQ==
-
-"@types/lodash@^4.14.191":
-  version "4.14.191"
-  resolved "https://registry.yarnpkg.com/@types/lodash/-/lodash-4.14.191.tgz#09511e7f7cba275acd8b419ddac8da9a6a79e2fa"
   integrity sha512-BdZ5BCCvho3EIXw6wUCXHe7rS53AIDPLE+JzwgT+OsJk53oBfbSmZZ7CX4VaRoN78N+TJpFi9QPlfIVNmJYWxQ==
 
 "@types/mime@*":

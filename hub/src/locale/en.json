@@ -5,7 +5,7 @@
     "add": "Add",
     "create": "Create",
     "edit": "Edit",
-    "delete": "Delete",
+    "delete": "Remove",
     "match_count_with_value_one": "{{count}} match",
     "match_count_with_value_other": "{{count}} matches",
     "sign_out": "Sign out",
@@ -108,7 +108,7 @@
     }
   },
   "users_autosuggest": {
-    "placeholder": "Select user",
+    "placeholder": "Add member",
     "loading": "Loading users",
     "no_match": "No matches found"
   },

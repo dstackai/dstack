@@ -1,7 +1,7 @@
 import { S3ResourceSelectorProps } from '@cloudscape-design/components/s3-resource-selector';
 
 export const getResourceSelectorI18n = (
-    params: Partial<S3ResourceSelectorProps['i18nStrings']>,
+    params?: Partial<S3ResourceSelectorProps['i18nStrings']>,
 ): S3ResourceSelectorProps['i18nStrings'] => ({
     inContextInputPlaceholder: 's3://bucket',
     inContextSelectPlaceholder: '',
@@ -9,7 +9,7 @@ export const getResourceSelectorI18n = (
     inContextViewButton: 'View',
     inContextViewButtonAriaLabel: 'View (opens in a new tab)',
     inContextLoadingText: '',
-    inContextUriLabel: 'Bucket URI',
+    inContextUriLabel: '',
     inContextVersionSelectLabel: '',
     modalTitle: 'Choose an archive in S3',
     modalCancelButton: 'Cancel',

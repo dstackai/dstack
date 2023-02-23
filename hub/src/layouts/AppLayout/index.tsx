@@ -80,14 +80,20 @@ const AppLayout: React.FC<{ children: React.ReactNode }> = ({ children }) => {
                 notifications={<Notifications />}
                 navigation={
                     <SideNavigation
-                        header={{
-                            text: t('navigation.settings'),
-                            href: ROUTES.BASE,
-                        }}
+                        // header={{
+                        //     text: t('navigation.settings'),
+                        //     href: ROUTES.BASE,
+                        // }}
                         activeHref={activeHref}
                         items={[
-                            { type: 'link', text: t('navigation.hubs'), href: ROUTES.HUB.LIST },
-                            { type: 'link', text: t('navigation.users'), href: ROUTES.USER.LIST },
+                            {
+                                type: 'section-group',
+                                title: t('navigation.settings'),
+                                items: [
+                                    { type: 'link', text: t('navigation.hubs'), href: ROUTES.HUB.LIST },
+                                    { type: 'link', text: t('navigation.users'), href: ROUTES.USER.LIST },
+                                ],
+                            },
                         ]}
                         onFollow={onFollowHandler}
                     />

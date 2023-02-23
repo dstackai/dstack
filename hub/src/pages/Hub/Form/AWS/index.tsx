@@ -1,6 +1,6 @@
 import React, { useCallback, useEffect, useState } from 'react';
 import { IProps } from './types';
-import { ColumnLayout, FormInput, FormSelect, FormSelectOptions, FormS3BucketSelector } from 'components';
+import { SpaceBetween, FormInput, FormSelect, FormSelectOptions, FormS3BucketSelector } from 'components';
 import { useTranslation } from 'react-i18next';
 import { useFormContext } from 'react-hook-form';
 import { useBackendValuesMutation } from 'services/hub';
@@ -44,7 +44,7 @@ export const AWSBackend: React.FC<IProps> = ({ loading: loadingProp }) => {
             }
 
             if (response.s3_bucket_name.selected !== undefined) {
-                setValue('backend.s3_bucket_name', 's3://' + response.s3_bucket_name.selected);
+                setValue('backend.s3_bucket_name', response.s3_bucket_name.selected);
             }
 
             if (response.ec2_subnet_id.values.length) {
@@ -62,7 +62,7 @@ export const AWSBackend: React.FC<IProps> = ({ loading: loadingProp }) => {
     const debouncedChangeFormHandler = useCallback(debounce(changeFormHandler, 1000), []);
 
     return (
-        <ColumnLayout columns={2}>
+        <SpaceBetween size="l">
             <FormInput
                 label={t('hubs.edit.aws.access_key_id')}
                 control={control}
@@ -105,6 +105,6 @@ export const AWSBackend: React.FC<IProps> = ({ loading: loadingProp }) => {
                 onChange={changeFormHandler}
                 options={subnets}
             />
-        </ColumnLayout>
+        </SpaceBetween>
     );
 };

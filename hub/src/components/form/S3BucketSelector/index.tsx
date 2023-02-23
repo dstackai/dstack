@@ -1,6 +1,6 @@
 import React, { useMemo } from 'react';
 import { Controller, FieldValues } from 'react-hook-form';
-// import FormField from '@cloudscape-design/components/form-field';
+import FormField from '@cloudscape-design/components/form-field';
 import S3ResourceSelector from '@cloudscape-design/components/s3-resource-selector';
 import { S3ResourceSelectorProps } from '@cloudscape-design/components/s3-resource-selector';
 import { FormS3BucketSelectorProps } from './types';
@@ -11,11 +11,11 @@ export const FormS3BucketSelector = <T extends FieldValues>({
     control,
     label,
     buckets: bucketsProp,
-    // info,
-    // constraintText,
-    // description,
-    // secondaryControl,
-    // stretch,
+    info,
+    constraintText,
+    description,
+    secondaryControl,
+    stretch,
     onChange: onChangeProp,
     ...props
 }: FormS3BucketSelectorProps<T>) => {
@@ -36,9 +36,7 @@ export const FormS3BucketSelector = <T extends FieldValues>({
         fetchBuckets: fetchBuckets,
         fetchObjects: fetch,
         fetchVersions: fetch,
-        i18nStrings: getResourceSelectorI18n({
-            inContextUriLabel: label,
-        }),
+        i18nStrings: getResourceSelectorI18n(),
     };
 
     return (
@@ -53,23 +51,23 @@ export const FormS3BucketSelector = <T extends FieldValues>({
                 };
 
                 return (
-                    // <FormField
-                    //     // description={description}
-                    //     // label={label}
-                    //     // info={info}
-                    //     stretch={stretch}
-                    //     constraintText={constraintText}
-                    //     secondaryControl={secondaryControl}
-                    // >
-                    <S3ResourceSelector
-                        resource={resource}
-                        onChange={onChangeSelect}
-                        {...fieldRest}
-                        {...props}
-                        {...customProps}
-                        invalid={!!error}
-                    />
-                    // </FormField>
+                    <FormField
+                        description={description}
+                        label={label}
+                        info={info}
+                        stretch={stretch}
+                        constraintText={constraintText}
+                        secondaryControl={secondaryControl}
+                    >
+                        <S3ResourceSelector
+                            resource={resource}
+                            onChange={onChangeSelect}
+                            {...fieldRest}
+                            {...props}
+                            {...customProps}
+                            invalid={!!error}
+                        />
+                    </FormField>
                 );
             }}
         />

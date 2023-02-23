@@ -167,15 +167,15 @@ export const HubDetails: React.FC = () => {
                             }
                         >
                             <SpaceBetween size="s">
+                                <Box variant="p" color="text-body-secondary">
+                                    Use the code snippet below to configure your CLI to use this hub as a remote
+                                </Box>
+
                                 <div className={styles.code}>
                                     <Box variant="code" color="text-status-inactive">
                                         {cliCommand}
                                     </Box>
                                 </div>
-
-                                <Box variant="p" color="text-body-secondary">
-                                    Use the code snippet below to configure your CLI to use this hub as a remote
-                                </Box>
                             </SpaceBetween>
                         </Container>
 
