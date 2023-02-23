@@ -122,7 +122,7 @@ func (j *Job) JobRepoData() *RepoData {
 }
 
 func (j *Job) JobFilepath() string {
-	return fmt.Sprintf("jobs/%s/%s/%s/%s;", j.RepoHostNameWithPort(), j.RepoUserName, j.RepoName, j.JobID)
+	return fmt.Sprintf("jobs/%s/%s/%s/%s.yaml", j.RepoHostNameWithPort(), j.RepoUserName, j.RepoName, j.JobID)
 }
 
 func (j *Job) JobHeadFilepathPrefix() string {
