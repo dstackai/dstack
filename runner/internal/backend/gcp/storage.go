@@ -5,9 +5,15 @@ import (
 	"context"
 	"errors"
 	"io"
+	"io/fs"
+	"os"
+	"path"
+	"path/filepath"
+	"strings"
 
 	"cloud.google.com/go/storage"
 	"github.com/dstackai/dstack/runner/internal/gerrors"
+	"github.com/dstackai/dstack/runner/internal/log"
 	"google.golang.org/api/iterator"
 )
 
@@ -100,4 +106,53 @@ func (gstorage *GCPStorage) GetMetadata(ctx context.Context, key, tag string) (s
 		return value, nil
 	}
 	return "", gerrors.Wrap(ErrTagNotFound)
+}
+
+func (gstorage *GCPStorage) UploadDir(ctx context.Context, src, dst string) error {
+	// TODO upload in parallel
+	for file := range walkFiles(ctx, src) {
+		key := path.Join(dst, strings.TrimPrefix(file, src))
+		gstorage.uploadFile(ctx, file, key)
+	}
+	return nil
+}
+
+func (gstorage *GCPStorage) DownloadDir(ctx context.Context, src, dst string) error {
+	return nil
+}
+
+func walkFiles(ctx context.Context, local string) chan string {
+	files := make(chan string)
+	go func() {
+		defer close(files)
+		err := filepath.Walk(local, func(path string, info fs.FileInfo, err error) error {
+			if err != nil {
+				return err
+			}
+			files <- path
+			return nil
+		})
+		if err != nil {
+			log.Error(ctx, "Error while walking files", "err", err)
+		}
+	}()
+	return files
+}
+
+func (gstorage *GCPStorage) uploadFile(ctx context.Context, src, dst string) error {
+	f, err := os.Open(src)
+	if err != nil {
+		return gerrors.Wrap(err)
+	}
+	obj := gstorage.bucket.Object(dst)
+	writer := obj.NewWriter(ctx)
+	_, err = io.Copy(writer, f)
+	if err != nil {
+		return gerrors.Wrap(err)
+	}
+	return writer.Close()
+}
+
+func (gstorage *GCPStorage) downloadFile(ctx context.Context, src, dst string) error {
+	return nil
 }

@@ -5,10 +5,13 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"path"
 	"strings"
 
+	"github.com/dstackai/dstack/runner/consts"
 	"github.com/dstackai/dstack/runner/internal/artifacts"
 	"github.com/dstackai/dstack/runner/internal/backend"
+	"github.com/dstackai/dstack/runner/internal/common"
 	"github.com/dstackai/dstack/runner/internal/gerrors"
 	"github.com/dstackai/dstack/runner/internal/log"
 	"github.com/dstackai/dstack/runner/internal/models"
@@ -25,7 +28,6 @@ type GCPBackend struct {
 	logging       *GCPLogging
 	runnerID      string
 	state         *models.State
-	artifacts     []artifacts.Artifacter
 }
 
 func init() {
@@ -161,8 +163,8 @@ func (gbackend *GCPBackend) Shutdown(ctx context.Context) error {
 }
 
 func (gbackend *GCPBackend) GetArtifact(ctx context.Context, runName, localPath, remotePath string, mount bool) artifacts.Artifacter {
-	// TODO
-	return nil
+	workDir := path.Join(common.HomeDir(), consts.USER_ARTIFACTS_PATH, runName)
+	return NewGCPArtifacter(gbackend.storage, workDir, localPath, remotePath)
 }
 
 func (gbackend *GCPBackend) Requirements(ctx context.Context) models.Requirements {

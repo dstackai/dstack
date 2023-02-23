@@ -150,7 +150,7 @@ def run_job(
 
     runner = None
     try:
-        job.runner_id = "testrunner"  # uuid.uuid4().hex
+        job.runner_id = uuid.uuid4().hex
         update_job(storage, job)
         instance_type = compute.get_instance_type(job)
         if instance_type is None:
