@@ -1,3 +1,4 @@
+import time
 from typing import Generator
 
 from google.cloud import logging
@@ -7,6 +8,9 @@ from dstack.backend.base.logs import fix_urls
 from dstack.backend.base.storage import Storage
 from dstack.core.log_event import LogEvent, LogEventSource
 from dstack.core.repo import RepoAddress
+
+POLL_LOGS_ATTEMPTS = 5
+POLL_LOGS_WAIT_TIME = 2
 
 
 class GCPLogging:
@@ -23,9 +27,18 @@ class GCPLogging:
     ) -> Generator[LogEvent, None, None]:
         log_name = _get_log_name(self.bucket_name, repo_address, run_name)
         logger = self.logging_client.logger(log_name)
-        log_entries = logger.list_entries()
-        for log_entry in log_entries:
-            yield _log_entry_to_log_event(storage, repo_address, log_entry)
+        # Hack: It takes some time for logs to become available after runner writes them.
+        # So we try reading logs multiple times.
+        # The proper solution would be for the runner to ensure logs availability before marking job as Done.
+        found_log = False
+        for _ in range(POLL_LOGS_ATTEMPTS):
+            log_entries = logger.list_entries()
+            for log_entry in log_entries:
+                found_log = True
+                yield _log_entry_to_log_event(storage, repo_address, log_entry)
+            if found_log:
+                break
+            time.sleep(POLL_LOGS_WAIT_TIME)
 
 
 def _get_log_name(bucket_name: str, repo_address: RepoAddress, run_name) -> str:

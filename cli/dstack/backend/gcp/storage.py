@@ -23,11 +23,11 @@ class GCPStorage(CloudStorage):
         blob.upload_from_string(content)
 
     def get_object(self, key: str) -> Optional[str]:
-        blob = self.bucket.get_blob(key)
-        if blob is None:
+        blob = self.bucket.blob(key)
+        try:
+            return blob.download_as_text()
+        except exceptions.NotFound:
             return None
-        with blob.open() as f:
-            return f.read()
 
     def delete_object(self, key: str):
         try:

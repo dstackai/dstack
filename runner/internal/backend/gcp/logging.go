@@ -67,6 +67,7 @@ func (glogger *GCPLogger) flushLogs(ctx context.Context, ticker *time.Ticker) {
 			// Backend will Close() the client on Shutdown(), flushing the logs.
 			// We don't want to Close() from this goroutine since google libraries may
 			// send audit logs after ctx.Done().
+			glogger.logger.Flush()
 			return
 		case <-ticker.C:
 			glogger.logger.Flush()

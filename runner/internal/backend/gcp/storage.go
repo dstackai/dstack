@@ -49,7 +49,10 @@ func (gstorage *GCPStorage) GetFile(ctx context.Context, key string) ([]byte, er
 	}
 	defer reader.Close()
 	buffer := new(bytes.Buffer)
-	io.Copy(buffer, reader)
+	_, err = io.Copy(buffer, reader)
+	if err != nil {
+		return nil, gerrors.Wrap(err)
+	}
 	return buffer.Bytes(), nil
 }
 
@@ -57,7 +60,10 @@ func (gstorage *GCPStorage) PutFile(ctx context.Context, key string, contents []
 	obj := gstorage.bucket.Object(key)
 	writer := obj.NewWriter(ctx)
 	reader := bytes.NewReader(contents)
-	io.Copy(writer, reader)
+	_, err := io.Copy(writer, reader)
+	if err != nil {
+		return gerrors.Wrap(err)
+	}
 	return writer.Close()
 }
 

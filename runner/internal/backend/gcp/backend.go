@@ -96,18 +96,6 @@ func (gbackend *GCPBackend) Job(ctx context.Context) *models.Job {
 }
 
 func (gbackend *GCPBackend) UpdateState(ctx context.Context) error {
-	log.Trace(ctx, "Fetching list jobs", "Repo username", gbackend.state.Job.RepoUserName, "Repo name", gbackend.state.Job.RepoName, "Job ID", gbackend.state.Job.JobID)
-	files, err := gbackend.storage.ListFile(ctx, gbackend.state.Job.JobHeadFilepathPrefix())
-	if err != nil {
-		return gerrors.Wrap(err)
-	}
-	for _, file := range files {
-		log.Trace(ctx, "Deleting file job", "Bucket", gbackend.bucket, "Path", file)
-		err = gbackend.storage.DeleteFile(ctx, file)
-		if err != nil {
-			return gerrors.Wrap(err)
-		}
-	}
 	log.Trace(ctx, "Marshaling job")
 	contents, err := yaml.Marshal(&gbackend.state.Job)
 	if err != nil {
@@ -119,11 +107,18 @@ func (gbackend *GCPBackend) UpdateState(ctx context.Context) error {
 	if err != nil {
 		return gerrors.Wrap(err)
 	}
-	jobHeadFilepath := gbackend.state.Job.JobHeadFilepath()
-	log.Trace(ctx, "Write to file lock job", "Path", jobHeadFilepath)
-	err = gbackend.storage.PutFile(ctx, jobHeadFilepath, []byte{})
+	log.Trace(ctx, "Fetching list jobs", "Repo username", gbackend.state.Job.RepoUserName, "Repo name", gbackend.state.Job.RepoName, "Job ID", gbackend.state.Job.JobID)
+	files, err := gbackend.storage.ListFile(ctx, gbackend.state.Job.JobHeadFilepathPrefix())
 	if err != nil {
 		return gerrors.Wrap(err)
+	}
+	jobHeadFilepath := gbackend.state.Job.JobHeadFilepath()
+	for _, file := range files[:1] {
+		log.Trace(ctx, "Renaming file job", "From", file, "To", jobHeadFilepath)
+		err = gbackend.storage.RenameFile(ctx, file, jobHeadFilepath)
+		if err != nil {
+			return gerrors.Wrap(err)
+		}
 	}
 	return nil
 }
