@@ -12,6 +12,7 @@ from pydantic.types import constr
 from rich import print
 from rich.prompt import Confirm, Prompt
 
+from dstack.cli.common import ask_choice
 from dstack.core.config import BackendConfig, get_config_path
 from dstack.core.error import ConfigError
 
@@ -28,6 +29,7 @@ class Storage(BaseModel):
 class Config(BaseModel):
     secret: Secret
     storage: Storage
+    location: str
     backend: str = Field(default="azure")
 
 
@@ -83,6 +85,23 @@ container_validator = constr(
 )
 
 
+# XXX: It is based on approximate match with dstack.backend.aws.config.regions.
+locations = [
+    ("(US) East US, Virginia", "eastus"),
+    ("(US) East US 2, Virginia", "eastus2"),
+    ("(US) South Central US, Texas", "southcentralus"),
+    ("(US) West US 2, Washington", "westus2"),
+    ("(US) West US 3, Phoenix", "westus3"),
+    ("(Asia Pacific) Southeast Asia, Singapore", "southeastasia"),
+    ("(Canada) Canada Central, Toronto", "canadacentral"),
+    ("(Europe) Germany West Central, Frankfurt", "germanywestcentral"),
+    ("(Europe) North Europe, Ireland", "northeurope"),
+    ("(Europe) UK South, London", "uksouth"),
+    ("(Europe) France Central, Paris", "francecentral"),
+    ("(Europe) Sweden Central, Gävle", "swedencentral"),
+]
+
+
 class AzureConfig(BackendConfig):
     # XXX: duplicate name from AzureBackend.
     # XXX: duplicate name from Config.
@@ -114,7 +133,7 @@ class AzureConfig(BackendConfig):
             except ValidationError as e:
                 raise ConfigError(f"Parsing config data failed with {e!r} from {path!r}.")
             if config.backend != self.NAME:
-                raise ConfigError(f"It's not Asure config. It's {config.backend!r} in {path!r}.")
+                raise ConfigError(f"It's not Azure config. It's {config.backend!r} in {path!r}.")
             self.config = config
 
     def configure(self):
@@ -186,6 +205,13 @@ class AzureConfig(BackendConfig):
 
             break
 
+        location = ask_choice(
+            "Choose Azure location",
+            [f"{l[0]} [{l[1]}]" for l in locations],
+            [l[1] for l in locations],
+            None,
+        )
+
         config_data = {
             "secret": {
                 "url": secret_url_parsed,
@@ -194,6 +220,7 @@ class AzureConfig(BackendConfig):
                 "url": storage_url_parsed,
                 "container": storage_container_parsed,
             },
+            "location": location,
         }
 
         self.config = Config(**config_data)

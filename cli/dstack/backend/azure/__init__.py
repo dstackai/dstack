@@ -51,6 +51,7 @@ class AzureBackend(CloudBackend):
         self._compute = AzureCompute(
             credential=credential,
             subscription_id=subscriptions[0]["subscription_id"],
+            location=self._backend_config.location,
         )
 
     @property

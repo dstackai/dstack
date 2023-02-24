@@ -33,3 +33,5 @@ azure-keyvault-secrets
 azure-storage-blob
 azure-mgmt-subscription
 azure-mgmt-compute
+azure-mgmt-network
+azure-mgmt-resource

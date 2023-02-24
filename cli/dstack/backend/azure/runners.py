@@ -16,10 +16,10 @@ def _key_for_instance(i1: InstanceType) -> Tuple:
     )
 
 
-def _get_instance_types(client: ComputeManagementClient) -> List[InstanceType]:
+def _get_instance_types(client: ComputeManagementClient, location: str) -> List[InstanceType]:
     instance_types = []
     # XXX: remove query for location. This is shortcut for development phrase.
-    for resource in client.resource_skus.list(filter="location eq 'eastus'"):
+    for resource in client.resource_skus.list(filter=f"location eq '{location}'"):
         if resource.resource_type != "virtualMachines":
             continue
         if resource.restrictions:
@@ -50,21 +50,19 @@ def _get_instance_types(client: ComputeManagementClient) -> List[InstanceType]:
     return instance_types
 
 
+# XXX: make this function common (base) for aws too. This is copy from aws.
 def _get_instance_type(
     instance_types: List[InstanceType], requirements: Optional[Requirements]
 ) -> Optional[InstanceType]:
     instance_type = next(
-        (
-            instance_type
-            for instance_type in instance_types
-            if _matches(instance_type.resources, requirements)
-        ),
+        filter(lambda i: _matches(i.resources, requirements), instance_types),
         None,
     )
     if instance_type is None:
         return
     incorruptible = False
     if requirements and requirements.interruptible:
+        raise NotImplementedError
         incorruptible = True
     return (
         InstanceType(
