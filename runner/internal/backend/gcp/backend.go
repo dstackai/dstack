@@ -91,7 +91,7 @@ func (gbackend *GCPBackend) Init(ctx context.Context, ID string) error {
 
 func (gbackend *GCPBackend) Job(ctx context.Context) *models.Job {
 	log.Trace(ctx, "Getting job from state")
-	log.Trace(ctx, "Get job", "job ID", gbackend.state.Job.JobID)
+	log.Trace(ctx, "Get job", "ID", gbackend.state.Job.JobID)
 	return gbackend.state.Job
 }
 
@@ -188,13 +188,21 @@ func (gbackend *GCPBackend) CreateLogger(ctx context.Context, logGroup, logName 
 }
 
 func (gbackend *GCPBackend) ListSubDir(ctx context.Context, dir string) ([]string, error) {
-	// TODO
-	return nil, nil
+	return gbackend.storage.ListFile(ctx, dir)
 }
 
 func (gbackend *GCPBackend) GetJobByPath(ctx context.Context, path string) (*models.Job, error) {
-	// TODO
-	return nil, nil
+	log.Trace(ctx, "Fetching job by path", "Path", path)
+	content, err := gbackend.storage.GetFile(ctx, path)
+	if err != nil {
+		return nil, gerrors.Wrap(err)
+	}
+	job := new(models.Job)
+	err = yaml.Unmarshal(content, &job)
+	if err != nil {
+		return nil, gerrors.Wrap(err)
+	}
+	return job, nil
 }
 
 func (gbackend *GCPBackend) Bucket(ctx context.Context) string {

@@ -118,6 +118,14 @@ func (gstorage *GCPStorage) UploadDir(ctx context.Context, src, dst string) erro
 }
 
 func (gstorage *GCPStorage) DownloadDir(ctx context.Context, src, dst string) error {
+	files, err := gstorage.ListFile(ctx, src)
+	if err != nil {
+		return gerrors.Wrap(err)
+	}
+	for _, file := range files {
+		dstFilepath := path.Join(dst, strings.TrimPrefix(file, src))
+		gstorage.downloadFile(ctx, file, dstFilepath)
+	}
 	return nil
 }
 
@@ -154,5 +162,21 @@ func (gstorage *GCPStorage) uploadFile(ctx context.Context, src, dst string) err
 }
 
 func (gstorage *GCPStorage) downloadFile(ctx context.Context, src, dst string) error {
+	os.MkdirAll(filepath.Dir(dst), 0o755)
+	obj := gstorage.bucket.Object(src)
+	reader, err := obj.NewReader(ctx)
+	if err != nil {
+		return gerrors.Wrap(err)
+	}
+	defer reader.Close()
+	file, err := os.Create(dst)
+	if err != nil {
+		return gerrors.Wrap(err)
+	}
+	defer file.Close()
+	_, err = io.Copy(file, reader)
+	if err != nil {
+		return gerrors.Wrap(err)
+	}
 	return nil
 }
