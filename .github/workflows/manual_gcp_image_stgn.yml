@@ -1,7 +1,6 @@
 name: Manual GCP image build for STGN
 
-on:
-  push:
+on: [workflow_dispatch]
 
 jobs:
   gcp-image-build:
