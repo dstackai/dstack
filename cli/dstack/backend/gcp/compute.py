@@ -4,6 +4,7 @@ from typing import Any, List, Optional, Tuple
 
 import google.api_core.exceptions
 from google.cloud import compute_v1
+from google.oauth2 import service_account
 
 from dstack import version
 from dstack.backend.aws.runners import _serialize_runner_yaml
@@ -22,8 +23,13 @@ class GCPCompute(Compute):
     def __init__(
         self,
         gcp_config: GCPConfig,
+        credentials: Optional[service_account.Credentials],
     ):
         self.gcp_config = gcp_config
+        self.credentials = credentials
+        self.instances_client = compute_v1.InstancesClient(credentials=self.credentials)
+        self.images_client = compute_v1.ImagesClient(credentials=self.credentials)
+        self.firewalls_client = compute_v1.FirewallsClient(credentials=self.credentials)
 
     def get_request_head(self, job: Job, request_id: Optional[str]) -> RequestHead:
         if request_id is None:
@@ -33,6 +39,7 @@ class GCPCompute(Compute):
                 message="request_id is not specified",
             )
         instance_status = _get_instance_status(
+            client=self.instances_client,
             project_id=self.gcp_config.project_id,
             zone=self.gcp_config.zone,
             instance_name=request_id,
@@ -53,29 +60,33 @@ class GCPCompute(Compute):
 
     def run_instance(self, job: Job, instance_type: InstanceType) -> str:
         instance = _launch_instance(
+            instances_client=self.instances_client,
+            firewalls_client=self.firewalls_client,
             project_id=self.gcp_config.project_id,
             zone=self.gcp_config.zone,
-            image_name=_get_image_name(),
+            image_name=_get_image_name(images_client=self.images_client),
             instance_name=_get_instance_name(job),
             user_data_script=_get_user_data_script(self.gcp_config, job, instance_type),
-            service_account=self.gcp_config.service_account,
+            service_account=self.credentials.service_account_email,
         )
         return instance.name
 
     def terminate_instance(self, request_id: str):
         _terminate_instance(
+            client=self.instances_client,
             gcp_config=self.gcp_config,
             instance_name=request_id,
         )
 
     def cancel_spot_request(self, request_id: str):
         _terminate_instance(
+            client=self.instances_client,
             gcp_config=self.gcp_config,
             instance_name=request_id,
         )
 
 
-def _get_image_name() -> Optional[str]:
+def _get_image_name(images_client: compute_v1.ImagesClient) -> Optional[str]:
     if version.__is_release__:
         image_prefix = "dstack-"
     else:
@@ -83,7 +94,6 @@ def _get_image_name() -> Optional[str]:
     list_request = compute_v1.ListImagesRequest()
     list_request.project = "dstack"
     list_request.order_by = "creationTimestamp desc"
-    images_client = compute_v1.ImagesClient()
     images = images_client.list(list_request)
     for image in images:
         # Specifying both a list filter and sort order is not currently supported in compute_v1
@@ -112,6 +122,8 @@ HOME=/root nohup dstack-runner --log-level 6 start --http-port 4000
 
 
 def _launch_instance(
+    instances_client: compute_v1.InstancesClient,
+    firewalls_client: compute_v1.FirewallsClient,
     project_id: str,
     zone: str,
     image_name: str,
@@ -120,7 +132,7 @@ def _launch_instance(
     service_account: str,
 ) -> compute_v1.Instance:
     try:
-        _create_firewall_rules(project_id=project_id)
+        _create_firewall_rules(firewalls_client=firewalls_client, project_id=project_id)
     except google.api_core.exceptions.Conflict:
         pass
     disk = _disk_from_image(
@@ -131,6 +143,7 @@ def _launch_instance(
         auto_delete=False,
     )
     instance = _create_instance(
+        instances_client=instances_client,
         project_id=project_id,
         zone=zone,
         instance_name=instance_name,
@@ -181,6 +194,7 @@ def _disk_from_image(
 
 
 def _create_instance(
+    instances_client: compute_v1.InstancesClient,
     project_id: str,
     zone: str,
     instance_name: str,
@@ -240,8 +254,6 @@ def _create_instance(
     Returns:
         Instance object.
     """
-    instance_client = compute_v1.InstancesClient()
-
     # Use the network interface provided in the network_link argument.
     network_interface = compute_v1.NetworkInterface()
     network_interface.name = network_link
@@ -314,13 +326,14 @@ def _create_instance(
     request.project = project_id
     request.instance_resource = instance
 
-    operation = instance_client.insert(request=request)
+    operation = instances_client.insert(request=request)
     gcp_utils.wait_for_extended_operation(operation, "instance creation")
 
-    return instance_client.get(project=project_id, zone=zone, instance=instance_name)
+    return instances_client.get(project=project_id, zone=zone, instance=instance_name)
 
 
 def _create_firewall_rules(
+    firewalls_client: compute_v1.FirewallsClient,
     project_id: str,
     network: str = "global/networks/default",
 ):
@@ -357,18 +370,18 @@ def _create_firewall_rules(
 
     firewall_rule.target_tags = [DSTACK_INSTANCE_TAG]
 
-    firewall_client = compute_v1.FirewallsClient()
-    operation = firewall_client.insert(project=project_id, firewall_resource=firewall_rule)
+    operation = firewalls_client.insert(project=project_id, firewall_resource=firewall_rule)
     gcp_utils.wait_for_extended_operation(operation, "firewall rule creation")
 
 
-def _get_instance_status(project_id: str, zone: str, instance_name: str) -> RequestStatus:
+def _get_instance_status(
+    client: compute_v1.InstancesClient, project_id: str, zone: str, instance_name: str
+) -> RequestStatus:
     get_instance_request = compute_v1.GetInstanceRequest(
         instance=instance_name,
         project=project_id,
         zone=zone,
     )
-    client = compute_v1.InstancesClient()
     try:
         instance = client.get(get_instance_request)
     except google.api_core.exceptions.NotFound:
@@ -378,21 +391,25 @@ def _get_instance_status(project_id: str, zone: str, instance_name: str) -> Requ
     return RequestStatus.TERMINATED
 
 
-def _terminate_instance(gcp_config: GCPConfig, instance_name: str):
+def _terminate_instance(
+    client: compute_v1.InstancesClient, gcp_config: GCPConfig, instance_name: str
+):
     _delete_instance(
+        client=client,
         instance_name=instance_name,
         project_id=gcp_config.project_id,
         zone=gcp_config.zone,
     )
 
 
-def _delete_instance(project_id: str, zone: str, instance_name: str):
+def _delete_instance(
+    client: compute_v1.InstancesClient, project_id: str, zone: str, instance_name: str
+):
     delete_request = compute_v1.DeleteInstanceRequest(
         instance=instance_name,
         project=project_id,
         zone=zone,
     )
-    client = compute_v1.InstancesClient()
     try:
         client.delete(delete_request)
     except google.api_core.exceptions.NotFound:

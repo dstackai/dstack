@@ -14,7 +14,7 @@ class GCPConfig(BackendConfig):
     def __init__(
         self,
     ):
-        self.service_account = "my-dstack-sa@dstack.iam.gserviceaccount.com"
+        self.credentials = None
         self.project_id = "dstack"
         self.zone = "us-central1-a"
         self.bucket_name = "dstack-bucket"

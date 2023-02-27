@@ -3,6 +3,7 @@ from datetime import timedelta
 from typing import Callable, Dict, List, Optional
 
 from google.cloud import exceptions, storage
+from google.oauth2 import service_account
 
 from dstack.backend.base.storage import SIGNED_URL_EXPIRATION, CloudStorage
 from dstack.core.storage import StorageFile
@@ -10,9 +11,11 @@ from dstack.utils.common import removeprefix
 
 
 class GCPStorage(CloudStorage):
-    def __init__(self, project_id: str, bucket_name: str):
-        self.storage_client = self._get_client(project_id)
+    def __init__(
+        self, project_id: str, bucket_name: str, credentials: Optional[service_account.Credentials]
+    ):
         self.bucket_name = bucket_name
+        self.storage_client = storage.Client(project=project_id, credentials=credentials)
 
     def configure(self):
         self.bucket = self._get_or_create_bucket(self.bucket_name)
@@ -75,9 +78,6 @@ class GCPStorage(CloudStorage):
             method="PUT",
         )
         return url
-
-    def _get_client(self, project_id: str) -> storage.Client:
-        return storage.Client(project=project_id)
 
     def _get_or_create_bucket(self, bucket_name: str):
         try:

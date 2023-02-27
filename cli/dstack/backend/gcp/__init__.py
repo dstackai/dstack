@@ -1,8 +1,10 @@
+import os
 import warnings
 from pathlib import Path
 from typing import Generator, List, Optional
 
 from google.auth._default import _CLOUD_SDK_CREDENTIALS_WARNING
+from google.oauth2 import service_account
 
 from dstack.backend.base import CloudBackend
 from dstack.backend.base import artifacts as base_artifacts
@@ -32,21 +34,36 @@ class GCPBackend(CloudBackend):
         if config is None:
             config = GCPConfig.load()
             if config is None:
-                self._loaded = False
                 return
         self.config = config
+
+        if self.config.credentials is not None:
+            credentials = service_account.Credentials.from_service_account_info(
+                self.config.credentials
+            )
+        else:
+            credentials_file = os.getenv("GOOGLE_APPLICATION_CREDENTIALS")
+            if not credentials_file:
+                return
+            credentials = service_account.Credentials.from_service_account_file(credentials_file)
+
         self._storage = GCPStorage(
-            project_id=self.config.project_id, bucket_name=self.config.bucket_name
+            project_id=self.config.project_id,
+            bucket_name=self.config.bucket_name,
+            credentials=credentials,
         )
-        self._compute = GCPCompute(gcp_config=self.config)
+        self._compute = GCPCompute(gcp_config=self.config, credentials=credentials)
         self._secrets_manager = GCPSecretsManager(
             project_id=self.config.project_id,
             bucket_name=self.config.bucket_name,
+            credentials=credentials,
         )
         self._logging = GCPLogging(
             project_id=self.config.project_id,
             bucket_name=self.config.bucket_name,
+            credentials=credentials,
         )
+
         self.configure()
         self._loaded = True
 

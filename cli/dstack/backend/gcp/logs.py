@@ -1,7 +1,8 @@
 import time
-from typing import Generator
+from typing import Generator, Optional
 
 from google.cloud import logging
+from google.oauth2 import service_account
 
 from dstack.backend.base import jobs
 from dstack.backend.base.logs import fix_urls
@@ -14,10 +15,12 @@ POLL_LOGS_WAIT_TIME = 2
 
 
 class GCPLogging:
-    def __init__(self, project_id: str, bucket_name: str):
+    def __init__(
+        self, project_id: str, bucket_name: str, credentials: Optional[service_account.Credentials]
+    ):
         self.project_id = project_id
         self.bucket_name = bucket_name
-        self.logging_client = logging.Client(project=project_id)
+        self.logging_client = logging.Client(project=project_id, credentials=credentials)
 
     def poll_logs(
         self,

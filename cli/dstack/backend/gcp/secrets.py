@@ -2,6 +2,7 @@ from typing import List, Optional
 
 from google.api_core import exceptions
 from google.cloud import secretmanager
+from google.oauth2 import service_account
 
 from dstack.backend.base.secrets import SecretsManager
 from dstack.core.repo import RepoAddress
@@ -9,10 +10,12 @@ from dstack.core.secret import Secret
 
 
 class GCPSecretsManager(SecretsManager):
-    def __init__(self, project_id: str, bucket_name: str):
+    def __init__(
+        self, project_id: str, bucket_name: str, credentials: Optional[service_account.Credentials]
+    ):
         self.project_id = project_id
         self.bucket_name = bucket_name
-        self.secrets_client = secretmanager.SecretManagerServiceClient()
+        self.secrets_client = secretmanager.SecretManagerServiceClient(credentials=credentials)
 
     def get_secret(self, repo_address: RepoAddress, secret_name: str) -> Optional[Secret]:
         secret_value = self._get_secret_value(
