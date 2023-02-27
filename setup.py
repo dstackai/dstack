@@ -76,6 +76,10 @@ setup(
         "jinja2",
         "pygtail",
         "packaging",
+        "google-cloud-storage",
+        "google-cloud-compute",
+        "google-cloud-secret-manager",
+        "google-cloud-logging",
     ],
     classifiers=[
         "Development Status :: 2 - Pre-Alpha",
