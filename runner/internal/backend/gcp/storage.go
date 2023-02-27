@@ -91,6 +91,9 @@ func (gstorage *GCPStorage) DeleteFile(ctx context.Context, key string) error {
 }
 
 func (gstorage *GCPStorage) RenameFile(ctx context.Context, oldKey, newKey string) error {
+	if newKey == oldKey {
+		return nil
+	}
 	src := gstorage.bucket.Object(oldKey)
 	dst := gstorage.bucket.Object(newKey)
 	copier := dst.CopierFrom(src)
