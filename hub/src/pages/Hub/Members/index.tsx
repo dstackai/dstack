@@ -3,11 +3,12 @@ import { useTranslation } from 'react-i18next';
 import { useForm, useFieldArray } from 'react-hook-form';
 //TODO move type to special file
 import { TRoleSelectOption } from 'pages/User/Form/types';
-import { Header, Button, FormSelect, Table, ListEmptyMessage, Link } from 'components';
+import { Header, Button, FormSelect, Table, ListEmptyMessage, Link, Pagination } from 'components';
 import { UserAutosuggest } from './UsersAutosuggest';
 import { IProps, THubMemberWithIndex, TFormValues } from './types';
-import styles from './styles.module.scss';
 import { ROUTES } from 'routes';
+import { useCollection } from 'hooks';
+import styles from './styles.module.scss';
 
 export const HubMembers: React.FC<IProps> = ({ initialValues, loading, onChange }) => {
     const { t } = useTranslation();
@@ -25,6 +26,19 @@ export const HubMembers: React.FC<IProps> = ({ initialValues, loading, onChange 
     const onChangeHandler = () => onChange(getValues('members'));
 
     const fieldsWithIndex = fields.map<THubMemberWithIndex>((field, index) => ({ ...field, index }));
+
+    const { items, paginationProps } = useCollection(fieldsWithIndex, {
+        filtering: {
+            empty: (
+                <ListEmptyMessage
+                    title={t('hubs.edit.members_empty_message_title')}
+                    message={t('hubs.edit.members_empty_message_text')}
+                />
+            ),
+        },
+        pagination: { pageSize: 10 },
+        selection: {},
+    });
 
     const roleSelectOptions: TRoleSelectOption[] = [
         { label: t('roles.admin'), value: 'admin' },
@@ -99,11 +113,11 @@ export const HubMembers: React.FC<IProps> = ({ initialValues, loading, onChange 
                 selectedItems={selectedItems}
                 onSelectionChange={(event) => setSelectedItems(event.detail.selectedItems)}
                 columnDefinitions={COLUMN_DEFINITIONS}
-                items={fieldsWithIndex}
+                items={items}
                 header={
                     <Header
                         variant="h2"
-                        counter={`(${fieldsWithIndex?.length})`}
+                        counter={`(${items?.length})`}
                         actions={
                             <Button formAction="none" onClick={deleteSelectedMembers} disabled={!selectedItems.length}>
                                 {t('common.delete')}
@@ -120,12 +134,7 @@ export const HubMembers: React.FC<IProps> = ({ initialValues, loading, onChange 
                         optionsFilter={(options) => options.filter((o) => !fields.find((f) => f.user_name === o.value))}
                     />
                 }
-                empty={
-                    <ListEmptyMessage
-                        title={t('hubs.edit.members_empty_message_title')}
-                        message={t('hubs.edit.members_empty_message_text')}
-                    />
-                }
+                pagination={<Pagination {...paginationProps} />}
             />
         </form>
     );

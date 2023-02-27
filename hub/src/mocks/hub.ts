@@ -7,7 +7,7 @@ const listSuccess: IHub[] = new Array(50).fill({}).map((i, index) => ({
         region_name: `hub_${index}_region_name`,
         region_name_title: `Hub ${index} Region`,
         s3_bucket_name: `hub_${index}_s3_bucket_name`,
-        ec2_subnet_id: `hub_${index}_ec2_subnet_id`,
+        ec2_subnet_id: null,
     },
 
     members: ['test_user', 'old_user', 'new_user'].map((userName) => ({
@@ -48,7 +48,7 @@ const backendValuesSuccess: IHubBackendValues = {
         })),
     },
     ec2_subnet_id: {
-        // selected: 'subnet_1',
+        selected: null,
         values: new Array(10).fill({}).map((_, index) => ({ value: `subnet_${index}`, label: `Subnet ${index}` })),
     },
 };

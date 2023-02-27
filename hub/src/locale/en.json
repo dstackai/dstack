@@ -5,7 +5,8 @@
     "add": "Add",
     "create": "Create",
     "edit": "Edit",
-    "delete": "Remove",
+    "delete": "Delete",
+    "remove": "Remove",
     "match_count_with_value_one": "{{count}} match",
     "match_count_with_value_other": "{{count}} matches",
     "sign_out": "Sign out",
@@ -106,6 +107,9 @@
       "refresh_token_confirm_message": "Do you sure want to rotate token?",
       "refresh_token_button_label": "Rotate"
     }
+  },
+  "validation": {
+    "required": "This is required field"
   },
   "users_autosuggest": {
     "placeholder": "Add member",

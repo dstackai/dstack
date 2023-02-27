@@ -23,7 +23,7 @@ declare interface IHubAwsBackendValues {
             values: TAwsBucket[]
         },
         ec2_subnet_id: {
-            selected?: string,
+            selected?: string | null,
             values: { value: string, label: string}[]
         },
 }

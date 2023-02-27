@@ -7,6 +7,7 @@ import { SelectProps } from '@cloudscape-design/components/select/interfaces';
 
 export const FormSelect = <T extends FieldValues>({
     name,
+    rules,
     control,
     label,
     info,
@@ -21,6 +22,7 @@ export const FormSelect = <T extends FieldValues>({
         <Controller
             name={name}
             control={control}
+            rules={rules}
             render={({ field: { onChange, ...fieldRest }, fieldState: { error } }) => {
                 const selectedOption = props.options?.find((i) => i.value === fieldRest.value) ?? null;
 
@@ -37,6 +39,7 @@ export const FormSelect = <T extends FieldValues>({
                         stretch={stretch}
                         constraintText={constraintText}
                         secondaryControl={secondaryControl}
+                        errorText={error?.message}
                     >
                         <SelectCSD
                             selectedOption={selectedOption}
