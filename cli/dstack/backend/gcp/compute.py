@@ -5,6 +5,8 @@ from typing import Any, List, Optional, Tuple
 import google.api_core.exceptions
 from google.cloud import compute_v1
 
+from dstack import version
+from dstack.backend.aws.runners import _serialize_runner_yaml
 from dstack.backend.base.compute import Compute
 from dstack.backend.gcp import utils as gcp_utils
 from dstack.backend.gcp.config import GCPConfig
@@ -51,8 +53,10 @@ class GCPCompute(Compute):
         instance = _launch_instance(
             project_id=self.gcp_config.project_id,
             zone=self.gcp_config.zone,
-            image_name="stgn-dstack-5",
+            image_name=_get_image_name(),
             instance_name=_get_instance_name(job),
+            user_data_script=_get_user_data_script(self.gcp_config, job, instance_type),
+            service_account=self.gcp_config.service_account,
         )
         return instance.name
 
@@ -69,9 +73,40 @@ class GCPCompute(Compute):
         )
 
 
+def _get_image_name() -> Optional[str]:
+    if version.__is_release__:
+        image_prefix = "dstack-"
+    else:
+        image_prefix = "stgn-dstack-"
+    list_request = compute_v1.ListImagesRequest()
+    list_request.project = "dstack"
+    list_request.order_by = "creationTimestamp desc"
+    images_client = compute_v1.ImagesClient()
+    images = images_client.list(list_request)
+    for image in images:
+        # Specifying both a list filter and sort order is not currently supported in compute_v1
+        # so we don't use list_request.filter to filter images
+        if image.name.startswith(image_prefix):
+            return image.name
+    return None
+
+
 def _get_instance_name(job: Job) -> str:
     # TODO support multiple jobs per run
     return f"dstack-{job.run_name}"
+
+
+def _get_user_data_script(gcp_config: GCPConfig, job: Job, instance_type: InstanceType) -> str:
+    config_content = gcp_config.serialize_yaml().replace("\n", "\\n")
+    runner_content = _serialize_runner_yaml(job.runner_id, instance_type.resources, 3000, 4000)
+    return f"""#!/bin/sh
+mkdir -p /root/.dstack/
+echo '{config_content}' > /root/.dstack/config.yaml
+echo '{runner_content}' > /root/.dstack/runner.yaml
+EXTERNAL_IP=`curl -H "Metadata-Flavor: Google" http://169.254.169.254/computeMetadata/v1/instance/network-interfaces/0/access-configs/0/external-ip`
+echo "hostname: $EXTERNAL_IP" >> /root/.dstack/runner.yaml
+HOME=/root nohup dstack-runner --log-level 6 start --http-port 4000
+"""
 
 
 def _launch_instance(
@@ -79,6 +114,8 @@ def _launch_instance(
     zone: str,
     image_name: str,
     instance_name: str,
+    user_data_script: str,
+    service_account: str,
 ) -> compute_v1.Instance:
     disk = _disk_from_image(
         disk_type=f"zones/{zone}/diskTypes/pd-balanced",
@@ -92,6 +129,9 @@ def _launch_instance(
         zone=zone,
         instance_name=instance_name,
         disks=[disk],
+        user_data_script=user_data_script,
+        service_account=service_account,
+        external_access=True,
     )
     return instance
 
@@ -151,6 +191,8 @@ def _create_instance(
     instance_termination_action: str = "STOP",
     custom_hostname: str = None,
     delete_protection: bool = False,
+    user_data_script: Optional[str] = None,
+    service_account: Optional[str] = None,
 ) -> compute_v1.Instance:
     """
     Send an instance creation request to the Compute Engine API and wait for it to complete.
@@ -245,6 +287,19 @@ def _create_instance(
         # Set the delete protection bit
         instance.deletion_protection = True
 
+    if user_data_script is not None:
+        instance.metadata = compute_v1.Metadata(
+            items=[compute_v1.Items(key="user-data", value=user_data_script)]
+        )
+
+    if service_account is not None:
+        instance.service_accounts = [
+            compute_v1.ServiceAccount(
+                email=service_account,
+                scopes=["https://www.googleapis.com/auth/cloud-platform"],
+            )
+        ]
+
     # Prepare the request to insert an instance.
     request = compute_v1.InsertInstanceRequest()
     request.zone = zone
@@ -292,11 +347,3 @@ def _delete_instance(project_id: str, zone: str, instance_name: str):
         client.delete(delete_request)
     except google.api_core.exceptions.NotFound:
         pass
-
-
-def main():
-    pass
-
-
-if __name__ == "__main__":
-    main()

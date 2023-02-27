@@ -1,6 +1,8 @@
 from pathlib import Path
 from typing import Dict
 
+import yaml
+
 from dstack.core.config import BackendConfig, get_config_path
 
 
@@ -12,6 +14,7 @@ class GCPConfig(BackendConfig):
     def __init__(
         self,
     ):
+        self.service_account = "my-dstack-sa@dstack.iam.gserviceaccount.com"
         self.project_id = "dstack"
         self.zone = "us-central1-a"
         self.bucket_name = "dstack-bucket"
@@ -28,7 +31,11 @@ class GCPConfig(BackendConfig):
 
     def serialize(self) -> Dict:
         return {
-            "project_id": self.project_id,
+            "backend": self.name,
+            "project": self.project_id,
             "zone": self.zone,
             "bucket": self.bucket_name,
         }
+
+    def serialize_yaml(self) -> str:
+        return yaml.dump(self.serialize())
