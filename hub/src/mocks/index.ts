@@ -1,5 +1,6 @@
 import { QueryReturnValue } from '@reduxjs/toolkit/dist/query/baseQueryTypes';
 import { FetchBaseQueryError, FetchBaseQueryMeta } from '@reduxjs/toolkit/dist/query/fetchBaseQuery';
+import { matchPath } from 'react-router';
 import { API } from 'api';
 
 import user from './user';
@@ -9,8 +10,6 @@ type MockItem = {
     success: unknown;
     failed: unknown;
 };
-
-type RequestMethod = 'GET' | 'POST';
 
 type MocksMap = {
     [key: string]: {
@@ -25,16 +24,76 @@ const mocksMap: MocksMap = {
             failed: user.info.failed,
         },
     },
-    [API.HUB.LIST()]: {
+    [API.USERS.LIST()]: {
         GET: {
-            success: hub.list.success,
-            failed: {},
+            success: user.list.success,
+            failed: { status: 403 },
         },
     },
-    [API.HUB.BASE()]: {
+    [API.USERS.DETAILS(':name')]: {
+        GET: {
+            success: user.list.success[0],
+            failed: { status: 403 },
+        },
+        PATCH: {
+            success: user.list.success[0],
+            failed: { status: 403 },
+        },
+    },
+    [API.USERS.REFRESH_TOKEN(':name')]: {
+        POST: {
+            success: { token: user.list.success[0].token },
+            failed: { status: 403 },
+        },
+    },
+    [API.USERS.BASE()]: {
         DELETE: {
             success: {},
             failed: { status: 403 },
+        },
+        POST: {
+            success: user.list.success[0],
+            failed: { status: 403 },
+        },
+    },
+
+    // hubs
+    [API.HUBS.LIST()]: {
+        GET: {
+            success: hub.list.success,
+            failed: { status: 403 },
+        },
+    },
+    [API.HUBS.DETAILS(':name')]: {
+        GET: {
+            success: hub.list.success[0],
+            failed: { status: 403 },
+        },
+        PATCH: {
+            success: hub.list.success[0],
+            failed: { status: 403 },
+        },
+    },
+    [API.HUBS.MEMBERS(':name')]: {
+        POST: {
+            success: hub.list.success[0].members,
+            failed: { status: 403 },
+        },
+    },
+    [API.HUBS.BASE()]: {
+        DELETE: {
+            success: {},
+            failed: { status: 403 },
+        },
+        POST: {
+            success: hub.list.success[0],
+            failed: { status: 403 },
+        },
+    },
+    [API.HUBS.BACKEND_VALUES()]: {
+        POST: {
+            success: hub.backendValues.success,
+            failed: { status: 400 },
         },
     },
 };
@@ -49,11 +108,18 @@ export type getResponseReturned = QueryReturnValue<unknown, FetchBaseQueryError,
 
 export const getResponse = ({ url, method = 'GET', responseType = 'success' }: getResponseArgs): getResponseReturned => {
     const formattedUrl = url.replace(/\?.+/gi, '');
+    const matchUrl = Object.keys(mocksMap).find((path) => !!matchPath(path, formattedUrl));
 
-    if (responseType === 'failed')
-        return {
-            error: mocksMap[formattedUrl][method][responseType] as FetchBaseQueryError,
-        };
+    if (matchUrl) {
+        if (responseType === 'failed')
+            return {
+                error: mocksMap[matchUrl][method][responseType] as FetchBaseQueryError,
+            };
 
-    return { data: mocksMap[formattedUrl][method][responseType] };
+        return { data: mocksMap[matchUrl][method][responseType] };
+    }
+
+    return {
+        error: { status: 404 } as FetchBaseQueryError,
+    };
 };

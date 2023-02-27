@@ -1,12 +1,12 @@
 import React from 'react';
 import { createRoot } from 'react-dom/client';
 import { Provider } from 'react-redux';
-import { BrowserRouter as Router } from 'react-router-dom';
-import App from 'App';
+import { RouterProvider } from 'react-router-dom';
 import { store } from './store';
 import '@cloudscape-design/global-styles/index.css';
 import 'assets/css/index.css';
 import 'locale';
+import { router } from './router';
 
 const container = document.getElementById('root');
 
@@ -16,9 +16,7 @@ if (container) {
     root.render(
         <React.StrictMode>
             <Provider store={store}>
-                <Router>
-                    <App />
-                </Router>
+                <RouterProvider router={router} />
             </Provider>
         </React.StrictMode>,
     );
