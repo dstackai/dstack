@@ -8,6 +8,7 @@ import { getResourceSelectorI18n } from './utils';
 
 export const FormS3BucketSelector = <T extends FieldValues>({
     name,
+    rules,
     control,
     label,
     buckets: bucketsProp,
@@ -43,6 +44,7 @@ export const FormS3BucketSelector = <T extends FieldValues>({
         <Controller
             name={name}
             control={control}
+            rules={rules}
             render={({ field: { onChange, value, ...fieldRest }, fieldState: { error } }) => {
                 const resource = { uri: value };
                 const onChangeSelect: S3ResourceSelectorProps['onChange'] = (event) => {
@@ -58,6 +60,7 @@ export const FormS3BucketSelector = <T extends FieldValues>({
                         stretch={stretch}
                         constraintText={constraintText}
                         secondaryControl={secondaryControl}
+                        errorText={error?.message}
                     >
                         <S3ResourceSelector
                             resource={resource}
