@@ -34,4 +34,4 @@ dstack run hello-arg "Hello, world!"
 ```
 
 !!! info "NOTE:"
-    It supports any arguments except those that are reserved for the [`dstack run`](../reference/cli/index.md#dstack-run) command.
+    It supports any arguments except those that are reserved for the [`dstack run`](../reference/cli/run.md) command.

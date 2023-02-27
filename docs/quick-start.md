@@ -119,7 +119,7 @@ Extracting /workflow/data/MNIST/raw/train-images-idx2-ubyte.gz
 
 ### Check status
 
-To check the status of recent runs, use the [`dstack ps`](reference/cli/index.md#dstack-ps) command:
+To check the status of recent runs, use the [`dstack ps`](reference/cli/ps.md) command:
 
 ```shell hl_lines="1"
 dstack ps
@@ -138,7 +138,7 @@ To see all runs, use the `dstack ps -a` command.
 
 Once a run is finished, its artifacts are saved and can be reused.
 
-You can list artifacts of any run using the [`dstack ls`](reference/cli/index.md#dstack-ls) command:
+You can list artifacts of any run using the [`dstack ls`](reference/cli/ls.md) command:
 
 ```shell hl_lines="1"
 dstack ls grumpy-zebra-1

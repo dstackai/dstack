@@ -31,7 +31,7 @@ via the `WANDB_API_KEY` environment variable:
           - wandb login
     ```
 
-Secrets can be managed via the [`dstack secrets`](../reference/cli/index.md#dstack-secrets-add) command.
+Secrets can be managed via the [`dstack secrets`](../reference/cli/secrets.md#dstack-secrets-add) command.
 
 !!! info "NOTE:"
     Secrets are currently only supported by remote workflows.

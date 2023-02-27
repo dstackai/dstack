@@ -413,15 +413,15 @@
 }
 
 [data-md-color-scheme=slate][data-md-color-primary=black], [data-md-color-primary=white] {
-    --md-primary-fg-color: #a344d7;
-    --md-accent-fg-color: #a344d7;
-    --md-typeset-a-color: #a344d7;
+    --md-primary-fg-color: #8a2be2;
+    --md-accent-fg-color: #8a2be2;
+    --md-typeset-a-color: #8a2be2;
     --md-code-hl-function-color: #962ece;
     --md-code-hl-keyword-color: #962ece;
-    --md-code-hl-string-color: #257c48;
+    --md-code-hl-string-color: #31a05e;
     --md-code-fg-color: rgba(0, 0, 0, 0.95);
     --md-code-hl-comment-color: #757585;
-    --md-code-hl-number-color: #cc6692;
+    --md-code-hl-number-color: #d9548c;
     --md-code-hl-operator-color: #5b6369;
     --md-code-hl-punctuation-color: #5b6369;
     --md-code-bg-color: #f7f7fb;

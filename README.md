@@ -9,12 +9,11 @@
 </h1>
 
 <h4 align="center">
-Reproducible ML workflows
+Easy-to-run & reproducible ML pipelines on any cloud
 </h4>
 
 <p align="center">
-<code>dstack</code> is an open-source tool that allows running reproducible ML workflows independently of
-the environment (locally or in the cloud), and collaborate around data and models. 
+<code>dstack</code> is an open-source tool that simplifies the process of establishing reproducible ML training pipelines independent of a particular vendor. 
 </p>
 
 [![Slack](https://img.shields.io/badge/slack-join%20community-blueviolet?logo=slack&style=for-the-badge)](https://join.slack.com/t/dstackai/shared_invite/zt-xdnsytie-D4qU9BvJP8vkbkHXdi6clQ)
@@ -31,20 +30,21 @@ the environment (locally or in the cloud), and collaborate around data and model
 
 </div>
 
-`dstack` is an open-source tool that allows running reproducible ML workflows independently of
-the environment. It allows running ML workflows locally or remotely (e.g. in a configured cloud account). 
-Additionally, `dstack` facilitates versioning and reuse of artifacts (such as data and models), across teams.
+`dstack` is an open-source tool that simplifies the process of establishing reproducible ML training pipelines independent of a
+particular vendor. 
 
-In brief, `dstack` simplifies the process of establishing ML training pipelines that are independent of a
-particular vendor, and facilitates collaboration within teams on data and models.
-
-### How does it work?
+### Features
 
 * Define workflows via YAML
-* Run workflows locally via CLI
-* Track and reuse artifacts across workflows
-* Run workflows remotely (in any configured cloud) via CLI
-* Version and share artifacts across teams
+* Run workflows either locally or in a configured cloud
+* Have instances created and destroyed automatically in your cloud 
+* Save costs by using spot instances efficiently
+* Save output artifacts and reuse them across workflows
+* Attach interactive dev environments to running workflows
+* Use frameworks and experiment trackers of your choice
+
+[//]: # (Manage usage quotas and monitor usage per team)
+[//]: # (Manage members of each team and their permissions)
 
 ## Installation
 

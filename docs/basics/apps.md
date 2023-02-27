@@ -3,7 +3,7 @@
 !!! info "NOTE:"
     The source code for the examples below can be found on [GitHub](https://github.com/dstackai/dstack-examples).
 
-Both the [`bash`](../reference/providers/index.md#bash) and [`docker`](../reference/providers/index.md#docker) providers 
+Both the [`bash`](../reference/providers/bash.md) and [`docker`](../reference/providers/docker.md) providers 
 allow workflows to host applications. To host apps within a workflow, you have to request the number of ports that your apps need. 
 Use the `ports` property for that.
 

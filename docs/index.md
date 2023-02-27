@@ -1,27 +1,29 @@
 ---
-title: Reproducible ML workflow
+title: Easy-to-run & reproducible ML pipelines on any cloud
 hide:
   - footer
 ---
 
-# Reproducible ML workflows
+# Easy-to-run & reproducible ML pipelines on any cloud
 
-`dstack` is an open-source tool that allows running reproducible ML workflows independently of
-infrastructure. It allows running ML workflows locally or remotely, using any configured cloud vendor. 
-Additionally, `dstack` facilitates versioning and reuse of artifacts (such as data and models), across teams.
+[![Slack](https://img.shields.io/badge/slack-join%20community-blueviolet?logo=slack&style=for-the-badge)](https://join.slack.com/t/dstackai/shared_invite/zt-xdnsytie-D4qU9BvJP8vkbkHXdi6clQ) 
+[//]: # ([![Slack]&#40;https://img.shields.io/github/stars/dstackai/dstack?logo=github&style=for-the-badge&#41;]&#40;https://join.slack.com/t/dstackai/shared_invite/zt-xdnsytie-D4qU9BvJP8vkbkHXdi6clQ&#41;)
 
-In brief, `dstack` simplifies the process of establishing ML training pipelines that are independent of a
-particular vendor and facilitates collaboration within teams on data and models.
+`dstack` is an open-source tool that simplifies the process of establishing reproducible ML training pipelines independent of a
+particular vendor. 
 
-[//]: # (### How it works)
+### Features
 
-[//]: # (* Define workflows via YAML)
-[//]: # (* Run workflows locally via CLI)
-[//]: # (* Reuse artifacts &#40;data and models&#41; across workflows)
-[//]: # (* Run workflows remotely &#40;in any configured cloud&#41; via CLI)
-[//]: # (* Share artifacts &#40;data and models&#41; across teams)
+* Define workflows via YAML
+* Run workflows either locally or in a configured cloud
+* Have instances created and destroyed automatically in your cloud 
+* Save costs by using spot instances efficiently
+* Save output artifacts and reuse them across workflows
+* Attach interactive dev environments to running workflows
+* Use frameworks and experiment trackers of your choice
 
-[//]: # (TODO: Later, tell something about managing teams, quotes, etc)
+[//]: # (Manage usage quotas and monitor usage per team)
+[//]: # (Manage members of each team and their permissions)
 
 ### Get started in 30 min
 
