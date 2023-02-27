@@ -10,7 +10,7 @@ from dstack.backend.local import LocalBackend
 DEFAULT_REMOTE = "aws"
 DEFAULT = "local"
 
-backends_classes = [GCPBackend, LocalBackend]
+backends_classes = [AwsBackend, GCPBackend, LocalBackend]
 if not version.__is_release__:
     backends_classes.append(HubBackend)
 

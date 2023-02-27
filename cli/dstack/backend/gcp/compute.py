@@ -15,6 +15,8 @@ from dstack.core.job import Job, Requirements
 from dstack.core.request import RequestHead, RequestStatus
 from dstack.core.runners import Resources, Runner
 
+DSTACK_INSTANCE_TAG = "dstack-runner-instance"
+
 
 class GCPCompute(Compute):
     def __init__(
@@ -117,6 +119,10 @@ def _launch_instance(
     user_data_script: str,
     service_account: str,
 ) -> compute_v1.Instance:
+    try:
+        _create_firewall_rules(project_id=project_id)
+    except google.api_core.exceptions.Conflict:
+        pass
     disk = _disk_from_image(
         disk_type=f"zones/{zone}/diskTypes/pd-balanced",
         disk_size_gb=20,
@@ -300,6 +306,8 @@ def _create_instance(
             )
         ]
 
+    instance.tags = compute_v1.Tags(items=[DSTACK_INSTANCE_TAG])
+
     # Prepare the request to insert an instance.
     request = compute_v1.InsertInstanceRequest()
     request.zone = zone
@@ -310,6 +318,48 @@ def _create_instance(
     gcp_utils.wait_for_extended_operation(operation, "instance creation")
 
     return instance_client.get(project=project_id, zone=zone, instance=instance_name)
+
+
+def _create_firewall_rules(
+    project_id: str,
+    network: str = "global/networks/default",
+):
+    """
+    Creates a simple firewall rule allowing for incoming HTTP and HTTPS access from the entire Internet.
+
+    Args:
+        project_id: project ID or project number of the Cloud project you want to use.
+        firewall_rule_name: name of the rule that is created.
+        network: name of the network the rule will be applied to. Available name formats:
+            * https://www.googleapis.com/compute/v1/projects/{project_id}/global/networks/{network}
+            * projects/{project_id}/global/networks/{network}
+            * global/networks/{network}
+
+    Returns:
+        A Firewall object.
+    """
+    firewall_rule = compute_v1.Firewall()
+    firewall_rule.name = "dstack-runner-allow-incoming"
+    firewall_rule.direction = "INGRESS"
+
+    allowed_ports_tcp = compute_v1.Allowed()
+    allowed_ports_tcp.I_p_protocol = "tcp"
+    allowed_ports_tcp.ports = ["3000-4000"]
+
+    allowed_ports_udp = compute_v1.Allowed()
+    allowed_ports_udp.I_p_protocol = "udp"
+    allowed_ports_udp.ports = ["3000-4000"]
+
+    firewall_rule.allowed = [allowed_ports_tcp, allowed_ports_udp]
+    firewall_rule.source_ranges = ["0.0.0.0/0"]
+    firewall_rule.network = network
+    firewall_rule.description = "Allowing TCP/UDP traffic on ports 3000-4000 from Internet."
+
+    firewall_rule.target_tags = [DSTACK_INSTANCE_TAG]
+
+    firewall_client = compute_v1.FirewallsClient()
+    operation = firewall_client.insert(project=project_id, firewall_resource=firewall_rule)
+    gcp_utils.wait_for_extended_operation(operation, "firewall rule creation")
 
 
 def _get_instance_status(project_id: str, zone: str, instance_name: str) -> RequestStatus:
