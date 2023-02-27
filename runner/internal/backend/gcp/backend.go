@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"io/ioutil"
 	"path"
 	"strings"
 
@@ -30,20 +31,26 @@ type GCPBackend struct {
 	state         *models.State
 }
 
+type GCPConfigFile struct {
+	Project string `yaml:"project"`
+	Zone    string `yaml:"zone"`
+	Bucket  string `yaml:"bucket"`
+}
+
 func init() {
 	backend.RegisterBackend("gcp", func(ctx context.Context, pathConfig string) (backend.Backend, error) {
-		// TODO read config
-		// log.Trace(ctx, "Read config file", "path", pathConfig)
-		// theConfig, err := ioutil.ReadFile(pathConfig)
-		// if err != nil {
-		// 	return nil, gerrors.Wrap(err)
-		// }
-		// log.Trace(ctx, "Unmarshal config")
-		// err = yaml.Unmarshal(theConfig, &file)
-		// if err != nil {
-		// 	return nil, gerrors.Wrap(err)
-		// }
-		return New("dstack", "us-central1-a", "dstack-bucket"), nil
+		configFile := GCPConfigFile{}
+		log.Trace(ctx, "Read config file", "path", pathConfig)
+		fileContent, err := ioutil.ReadFile(pathConfig)
+		if err != nil {
+			return nil, gerrors.Wrap(err)
+		}
+		log.Trace(ctx, "Unmarshal config")
+		err = yaml.Unmarshal(fileContent, &configFile)
+		if err != nil {
+			return nil, gerrors.Wrap(err)
+		}
+		return New(configFile.Project, configFile.Zone, configFile.Bucket), nil
 	})
 }
 
