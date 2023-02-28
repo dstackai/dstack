@@ -119,7 +119,7 @@ def _get_image_stage(
         pattern_value.append(".*")
     pattern = re.compile(rf"^{re.escape('-').join(pattern_value)}$")
     images = filter(lambda i: pattern.match(i.name), compute_client.images.list())
-    # XXX: the idea is return most recent, but Azure does not have creation date attribute for images.
+    # XXX: the idea is to return most recent, but Azure does not have creation date attribute for images.
     recent_images = sorted(images, key=attrgetter("name"), reverse=True)
     if not recent_images:
         raise Exception(f"Can't find an Azure image pattern={pattern.pattern!r}")
@@ -220,8 +220,8 @@ def _launch_instance(
             map(
                 random.choice,
                 (
-                    string.ascii_lowercase,
                     string.ascii_uppercase,
+                    string.ascii_lowercase,
                     string.digits,
                     string.punctuation,
                 ),

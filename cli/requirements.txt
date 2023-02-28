@@ -28,10 +28,10 @@ google-cloud-secret-manager
 google-cloud-logging
 aiosqlite
 packaging
-azure-identity
-azure-keyvault-secrets
-azure-storage-blob
-azure-mgmt-subscription
-azure-mgmt-compute
-azure-mgmt-network
-azure-mgmt-resource
+azure-identity>=1.12.0
+azure-keyvault-secrets>=4.6.0
+azure-storage-blob>=12.15.0
+azure-mgmt-subscription>=3.1.1
+azure-mgmt-compute>=29.1.0
+azure-mgmt-network>=22.2.0
+azure-mgmt-resource>=22.0.0
