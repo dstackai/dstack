@@ -19,7 +19,7 @@ def _verb(abort: bool):
 
 class StopCommand(BasicCommand):
     NAME = "stop"
-    DESCRIPTION = "Stop runs"
+    DESCRIPTION = "Stop run(s)"
 
     def __init__(self, parser):
         super(StopCommand, self).__init__(parser)

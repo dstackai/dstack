@@ -1,5 +1,7 @@
 from argparse import Namespace, _SubParsersAction
 
+from rich_argparse import RichHelpFormatter
+
 from dstack.cli.updates import check_for_updates
 
 
@@ -12,7 +14,9 @@ class BasicCommand(object):
         kwargs = {}
         if self.description:
             kwargs["help"] = self.description
-        self._parser = parser.add_parser(self.name, add_help=False, **kwargs)
+        self._parser = parser.add_parser(
+            self.name, add_help=False, formatter_class=RichHelpFormatter, **kwargs
+        )
         self._parser.add_argument(
             "-h",
             "--help",

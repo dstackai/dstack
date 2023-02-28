@@ -9,6 +9,7 @@ python-dateutil
 paramiko
 git-url-parse
 rich
+rich-argparse
 fastapi
 starlette
 uvicorn

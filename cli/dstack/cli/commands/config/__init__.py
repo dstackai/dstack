@@ -7,7 +7,7 @@ from dstack.cli.common import ask_choice
 
 class ConfigCommand(BasicCommand):
     NAME = "config"
-    DESCRIPTION = "Configure the backend"
+    DESCRIPTION = "Configure the remote backend"
 
     def __init__(self, parser):
         super(ConfigCommand, self).__init__(parser)

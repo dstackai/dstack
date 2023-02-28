@@ -12,7 +12,7 @@ from dstack.core.error import BackendError, check_config, check_git
 
 class PushCommand(BasicCommand):
     NAME = "push"
-    DESCRIPTION = "Copy a run and its artifacts from local to remote"
+    DESCRIPTION = "Push artifacts of a local run"
 
     def __init__(self, parser):
         super().__init__(parser)

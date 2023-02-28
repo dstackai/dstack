@@ -3,17 +3,22 @@ import sys
 
 from dstack.cli.handlers import cli_initialize
 from dstack.version import __version__ as version
+from rich_argparse import RichHelpFormatter
 
 
 def main():
+    RichHelpFormatter.usage_markup = True
+    RichHelpFormatter.styles["argparse.args"] = "bold sea_green3"
+    RichHelpFormatter.styles["argparse.groups"] = "bold gray74"
+    RichHelpFormatter.styles["argparse.text"] = "gray74"
     parser = argparse.ArgumentParser(
         description=(
-            "Not sure where to start? Call dstack config, followed by dstack init.\n"
-            "Define workflows within .dstack/workflows and run them via dstack run.\n"
+            "Not sure where to start? Call [bold sea_green3]dstack init[/bold sea_green3].\n"
+            "Define workflows within [bold sea_green3].dstack/workflows[/bold sea_green3] and run them via [bold sea_green3]dstack run[/bold sea_green3].\n"
         ),
-        formatter_class=argparse.RawTextHelpFormatter,
+        formatter_class=RichHelpFormatter,
         epilog=(
-            "Run 'dstack COMMAND --help' for more information on a particular command.\n\n"
+            "Run [bold sea_green3]dstack COMMAND --help[/bold sea_green3] for more information on a particular command.\n\n"
             "For more details, check https://docs.dstack.ai/reference/cli.\n "
         ),
         add_help=False,
