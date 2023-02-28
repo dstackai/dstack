@@ -2,7 +2,7 @@ name: Manual GCP image build for release
 
 on:
   workflow_dispatch:
-  # push:
+  push:
 
 
 jobs:
