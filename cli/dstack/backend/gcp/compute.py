@@ -71,6 +71,7 @@ class GCPCompute(Compute):
             instance_name=_get_instance_name(job),
             user_data_script=_get_user_data_script(self.gcp_config, job, instance_type),
             service_account=self.credentials.service_account_email,
+            interruptible=job.requirements.interruptible,
         )
         return instance.name
 
@@ -139,6 +140,7 @@ def _launch_instance(
     instance_name: str,
     user_data_script: str,
     service_account: str,
+    interruptible: bool,
 ) -> compute_v1.Instance:
     try:
         _create_firewall_rules(firewalls_client=firewalls_client, project_id=project_id)
@@ -160,6 +162,7 @@ def _launch_instance(
         user_data_script=user_data_script,
         service_account=service_account,
         external_access=True,
+        spot=interruptible,
     )
     return instance
 
@@ -215,7 +218,6 @@ def _create_instance(
     external_access: bool = False,
     external_ipv4: str = None,
     accelerators: List[compute_v1.AcceleratorConfig] = None,
-    preemptible: bool = False,
     spot: bool = False,
     instance_termination_action: str = "STOP",
     custom_hostname: str = None,
@@ -251,8 +253,6 @@ def _create_instance(
             This setting requires `external_access` to be set to True to work.
         accelerators: a list of AcceleratorConfig objects describing the accelerators that will
             be attached to the new instance.
-        preemptible: boolean value indicating if the new instance should be preemptible
-            or not. Preemptible VMs have been deprecated and you should now use Spot VMs.
         spot: boolean value indicating if the new instance should be a Spot VM or not.
         instance_termination_action: What action should be taken once a Spot VM is terminated.
             Possible values: "STOP", "DELETE"
@@ -263,7 +263,6 @@ def _create_instance(
     Returns:
         Instance object.
     """
-    # Use the network interface provided in the network_link argument.
     network_interface = compute_v1.NetworkInterface()
     network_interface.name = network_link
     if subnetwork_link:
@@ -281,7 +280,6 @@ def _create_instance(
             access.nat_i_p = external_ipv4
         network_interface.access_configs = [access]
 
-    # Collect information into the Instance object.
     instance = compute_v1.Instance()
     instance.network_interfaces = [network_interface]
     instance.name = instance_name
@@ -294,24 +292,15 @@ def _create_instance(
     if accelerators:
         instance.guest_accelerators = accelerators
 
-    if preemptible:
-        # Set the preemptible setting
-        warnings.warn("Preemptible VMs are being replaced by Spot VMs.", DeprecationWarning)
-        instance.scheduling = compute_v1.Scheduling()
-        instance.scheduling.preemptible = True
-
     if spot:
-        # Set the Spot VM setting
         instance.scheduling = compute_v1.Scheduling()
         instance.scheduling.provisioning_model = compute_v1.Scheduling.ProvisioningModel.SPOT.name
         instance.scheduling.instance_termination_action = instance_termination_action
 
     if custom_hostname is not None:
-        # Set the custom hostname for the instance
         instance.hostname = custom_hostname
 
     if delete_protection:
-        # Set the delete protection bit
         instance.deletion_protection = True
 
     if user_data_script is not None:
@@ -329,7 +318,6 @@ def _create_instance(
 
     instance.tags = compute_v1.Tags(items=[DSTACK_INSTANCE_TAG])
 
-    # Prepare the request to insert an instance.
     request = compute_v1.InsertInstanceRequest()
     request.zone = zone
     request.project = project_id
