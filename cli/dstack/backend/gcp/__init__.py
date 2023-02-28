@@ -14,7 +14,7 @@ from dstack.backend.base import runs as base_runs
 from dstack.backend.base import secrets as base_secrets
 from dstack.backend.base import tags as base_tags
 from dstack.backend.gcp.compute import GCPCompute
-from dstack.backend.gcp.config import GCPConfig
+from dstack.backend.gcp.config import GCPConfig, GCPConfigurator
 from dstack.backend.gcp.logs import GCPLogging
 from dstack.backend.gcp.secrets import GCPSecretsManager
 from dstack.backend.gcp.storage import GCPStorage
@@ -32,7 +32,7 @@ warnings.filterwarnings("ignore", message=_CLOUD_SDK_CREDENTIALS_WARNING)
 class GCPBackend(CloudBackend):
     def __init__(self, config: Optional[GCPConfig] = None):
         if config is None:
-            config = GCPConfig.load()
+            config = GCPConfigurator.load()
             if config is None:
                 return
         self.config = config
@@ -43,7 +43,7 @@ class GCPBackend(CloudBackend):
             )
         else:
             credentials_file = os.getenv("GOOGLE_APPLICATION_CREDENTIALS")
-            if not credentials_file:
+            if credentials_file is None:
                 return
             credentials = service_account.Credentials.from_service_account_file(credentials_file)
 

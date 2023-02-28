@@ -25,6 +25,7 @@ google-cloud-storage
 google-cloud-compute
 google-cloud-secret-manager
 google-cloud-logging
+google-api-python-client
 aiosqlite
 aiosqlite
 packaging

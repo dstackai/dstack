@@ -15,8 +15,6 @@ def get_dstack_dir():
 class BackendConfig(ABC):
     NAME = ""
 
-    _configured = False
-
     @property
     def name(self):
         return self.NAME or ""
@@ -37,7 +35,3 @@ class BackendConfig(ABC):
     @abstractmethod
     def configure(self):
         pass
-
-    @property
-    def configured(self):
-        return self._configured
