@@ -205,7 +205,7 @@ jobs:
         variant: [ gcp-image, gcp-image-cuda ]
         include:
           - variant: gcp-image
-            image_prefix: dstack
+            image_prefix: dstack-nocuda
           - variant: gcp-image-cuda
             image_prefix: dstack-cuda
     runs-on: ubuntu-latest

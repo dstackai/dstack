@@ -10,8 +10,8 @@
       "type": "googlecompute",
       "project_id": "dstack",
       "source_image": "ubuntu-1804-bionic-v20220616",
-      "image_name": "{{user `build_prefix`}}dstack-{{user `build_id`}}",
-      "instance_name": "{{user `build_prefix`}}dstack-{{user `build_id`}}",
+      "image_name": "{{user `build_prefix`}}dstack-nocuda-{{user `build_id`}}",
+      "instance_name": "{{user `build_prefix`}}dstack-nocuda-{{user `build_id`}}",
       "ssh_username": "ubuntu",
       "zone": "us-central1-a"
     }

@@ -14,7 +14,7 @@ from dstack.backend.gcp.config import GCPConfig
 from dstack.core.instance import InstanceType
 from dstack.core.job import Job, Requirements
 from dstack.core.request import RequestHead, RequestStatus
-from dstack.core.runners import Resources, Runner
+from dstack.core.runners import Gpu, Resources, Runner
 
 DSTACK_INSTANCE_TAG = "dstack-runner-instance"
 
@@ -64,7 +64,10 @@ class GCPCompute(Compute):
             firewalls_client=self.firewalls_client,
             project_id=self.gcp_config.project_id,
             zone=self.gcp_config.zone,
-            image_name=_get_image_name(images_client=self.images_client),
+            image_name=_get_image_name(
+                images_client=self.images_client,
+                instance_type=instance_type,
+            ),
             instance_name=_get_instance_name(job),
             user_data_script=_get_user_data_script(self.gcp_config, job, instance_type),
             service_account=self.credentials.service_account_email,
@@ -86,11 +89,17 @@ class GCPCompute(Compute):
         )
 
 
-def _get_image_name(images_client: compute_v1.ImagesClient) -> Optional[str]:
+def _get_image_name(
+    images_client: compute_v1.ImagesClient, instance_type: InstanceType
+) -> Optional[str]:
     if version.__is_release__:
         image_prefix = "dstack-"
     else:
         image_prefix = "stgn-dstack-"
+    if len(instance_type.resources.gpus) > 0:
+        image_prefix += "cuda-"
+    else:
+        image_prefix += "nocuda-"
     list_request = compute_v1.ListImagesRequest()
     list_request.project = "dstack"
     list_request.order_by = "creationTimestamp desc"

@@ -29,6 +29,10 @@ def list_backends(all_backend: bool = False) -> List[Backend]:
     return l
 
 
+def list_remote_backends() -> List[RemoteBackend]:
+    return [b for b in list_backends() if b.type is BackendType.REMOTE]
+
+
 def dict_backends(all_backend: bool = False) -> Dict[str, Backend]:
     return {backend.name: backend for backend in list_backends(all_backend=all_backend)}
 
@@ -38,10 +42,10 @@ def get_backend_by_name(name: str) -> Optional[Backend]:
 
 
 def get_current_remote_backend() -> Optional[RemoteBackend]:
-    for backend in list_backends():
-        if backend.type is BackendType.REMOTE:
-            return backend
-    return None
+    remote_backends = list_remote_backends()
+    if len(remote_backends) == 0:
+        return None
+    return remote_backends[0]
 
 
 def get_local_backend() -> LocalBackend:
