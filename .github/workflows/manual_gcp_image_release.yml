@@ -1,7 +1,8 @@
-name: Manual GCP image build for STGN
+name: Manual GCP image build for release
 
 on:
   workflow_dispatch:
+  push:
 
 
 jobs:
@@ -34,10 +35,10 @@ jobs:
           cp -R ami/packer/* .
       - name: Run packer
         run: |
-          VERSION=${{ github.run_number }}
-          ./packer build -var build_id=$VERSION ${{ matrix.variants }}.json
+          VERSION=${GITHUB_REF#refs/tags/}
+          VERSION=${VERSION//./-}
+          ./packer build -var build_id=$VERSION -var build_prefix='' -var dstack_stage=PROD ${{ matrix.variants }}.json
       - name: Publish images
         run: |
-          VERSION=${{ github.run_number }}
-          gcloud compute images add-iam-policy-binding stgn-dstack-$VERSION --member='allAuthenticatedUsers' --role='roles/compute.imageUser'
-          gcloud compute images add-iam-policy-binding stgn-dstack-cuda-$VERSION --member='allAuthenticatedUsers' --role='roles/compute.imageUser'
+          gcloud compute images add-iam-policy-binding dstack-$VERSION --member='allAuthenticatedUsers' --role='roles/compute.imageUser'
+          gcloud compute images add-iam-policy-binding dstack-cuda-$VERSION --member='allAuthenticatedUsers' --role='roles/compute.imageUser'
