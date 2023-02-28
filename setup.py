@@ -80,7 +80,6 @@ setup(
         "google-cloud-compute",
         "google-cloud-secret-manager",
         "google-cloud-logging",
-        "google-api-python-client",
     ],
     classifiers=[
         "Development Status :: 2 - Pre-Alpha",
