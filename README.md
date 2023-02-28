@@ -13,7 +13,7 @@ Easy-to-run & reproducible ML pipelines on any cloud
 </h4>
 
 <p align="center">
-<code>dstack</code> is an open-source tool that simplifies the process of establishing reproducible ML training pipelines independent of a particular vendor. 
+<code>dstack</code> is an open-source tool that streamlines the process of creating reproducible ML training pipelines that are independent of any specific vendor. 
 </p>
 
 [![Slack](https://img.shields.io/badge/slack-join%20community-blueviolet?logo=slack&style=for-the-badge)](https://join.slack.com/t/dstackai/shared_invite/zt-xdnsytie-D4qU9BvJP8vkbkHXdi6clQ)
@@ -30,21 +30,18 @@ Easy-to-run & reproducible ML pipelines on any cloud
 
 </div>
 
-`dstack` is an open-source tool that simplifies the process of establishing reproducible ML training pipelines independent of a
-particular vendor. 
+`dstack` is an open-source tool that streamlines the process of creating reproducible ML training pipelines that are
+independent of any specific vendor. It also promotes collaboration on data and models.
 
-### Features
+### Highlighted features
 
-* Define workflows via YAML
-* Run workflows either locally or in a configured cloud
-* Have instances created and destroyed automatically in your cloud 
-* Save costs by using spot instances efficiently
-* Save output artifacts and reuse them across workflows
-* Attach interactive dev environments to running workflows
-* Use frameworks and experiment trackers of your choice
-
-[//]: # (Manage usage quotas and monitor usage per team)
-[//]: # (Manage members of each team and their permissions)
+* Define ML pipelines via YAML and run either locally or on any cloud
+* Have cloud instances created and destroyed automatically
+* Use spot instances efficiently to save costs
+* Save artifacts and reuse them conveniently across workflows
+* Use interactive dev environments, such as notebooks or IDEs
+* Use any frameworks or experiment trackers. No code changes are required.
+* No Kubernetes or Docker is needed
 
 ## Installation
 

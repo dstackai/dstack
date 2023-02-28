@@ -7,25 +7,21 @@ hide:
 # Easy-to-run & reproducible ML pipelines on any cloud
 
 [![Slack](https://img.shields.io/badge/slack-join%20community-blueviolet?logo=slack&style=for-the-badge)](https://join.slack.com/t/dstackai/shared_invite/zt-xdnsytie-D4qU9BvJP8vkbkHXdi6clQ) 
-[//]: # ([![Slack]&#40;https://img.shields.io/github/stars/dstackai/dstack?logo=github&style=for-the-badge&#41;]&#40;https://join.slack.com/t/dstackai/shared_invite/zt-xdnsytie-D4qU9BvJP8vkbkHXdi6clQ&#41;)
 
-`dstack` is an open-source tool that simplifies the process of establishing reproducible ML training pipelines independent of a
-particular vendor. 
+`dstack` is an open-source tool that streamlines the process of creating reproducible ML training pipelines that are
+independent of any specific vendor. It also promotes collaboration on data and models.
 
-### Features
+### Highlighted features
 
-* Define workflows via YAML
-* Run workflows either locally or in a configured cloud
-* Have instances created and destroyed automatically in your cloud 
-* Save costs by using spot instances efficiently
-* Save output artifacts and reuse them across workflows
-* Attach interactive dev environments to running workflows
-* Use frameworks and experiment trackers of your choice
+* Define ML pipelines via YAML and run either locally or on any cloud
+* Have cloud instances created and destroyed automatically
+* Use spot instances efficiently to save costs
+* Save artifacts and reuse them conveniently across workflows
+* Use interactive dev environments, such as notebooks or IDEs
+* Use any frameworks or experiment trackers. No code changes are required.
+* No Kubernetes or Docker is needed
 
-[//]: # (Manage usage quotas and monitor usage per team)
-[//]: # (Manage members of each team and their permissions)
-
-### Get started in 30 min
+### Get started with dstack in 30 min
 
 Having your first ML workflows up and running will take less than 30 min.
 
@@ -36,11 +32,10 @@ Having your first ML workflows up and running will take less than 30 min.
 - [**2. Quick start**
    Try it yourself by following a simple step-by-step guide.
   ](quick-start.md)
-- [**3. Basics**
+- [**3. Concepts**
+   Learn about how `dstack` works and its core concepts.
+  ](concepts/how-dstack-works.md)
+- [**4. Basics**
    Browse the basic examples of how to use `dstack`.
   ](basics/hello-world.md)
-- [**4. Slack**
-   Join our Slack chat to get support from us and the community.
-  ](https://join.slack.com/t/dstackai/shared_invite/zt-xdnsytie-D4qU9BvJP8vkbkHXdi6clQ)
-
 </div>
