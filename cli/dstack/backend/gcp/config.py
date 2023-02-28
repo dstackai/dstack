@@ -42,10 +42,13 @@ class GCPConfig:
         return yaml.dump(self.serialize())
 
     @classmethod
-    def deserialize(cls, data: Dict) -> "GCPConfig":
-        project_id = data["project"]
-        zone = data["zone"]
-        bucket_name = data["bucket"]
+    def deserialize(cls, data: Dict) -> Optional["GCPConfig"]:
+        try:
+            project_id = data["project"]
+            zone = data["zone"]
+            bucket_name = data["bucket"]
+        except KeyError:
+            return None
         credentials_file = data.get("credentials_file")
         return cls(
             project_id=project_id,
@@ -55,7 +58,7 @@ class GCPConfig:
         )
 
     @classmethod
-    def deserialize_yaml(cls, yaml_content: str) -> "GCPConfig":
+    def deserialize_yaml(cls, yaml_content: str) -> Optional["GCPConfig"]:
         return cls.deserialize(yaml.load(yaml_content, yaml.FullLoader))
 
 
