@@ -18,27 +18,41 @@ class GCPConfig:
         project_id: str,
         zone: str,
         bucket_name: str,
+        credentials_file: Optional[str] = None,
         credentials: Optional[Dict] = None,
     ):
         self.project_id = project_id
         self.zone = zone
         self.bucket_name = bucket_name
+        self.credentials_file = credentials_file
         self.credentials = credentials
 
     def serialize(self) -> Dict:
-        return {
+        res = {
             "backend": "gcp",
             "project": self.project_id,
             "zone": self.zone,
             "bucket": self.bucket_name,
         }
+        if self.credentials_file is not None:
+            res["credentials_file"] = self.credentials_file
+        return res
 
     def serialize_yaml(self) -> str:
         return yaml.dump(self.serialize())
 
     @classmethod
     def deserialize(cls, data: Dict) -> "GCPConfig":
-        return cls(project_id=data["project"], zone=data["zone"], bucket_name=data["bucket"])
+        project_id = data["project"]
+        zone = data["zone"]
+        bucket_name = data["bucket"]
+        credentials_file = data.get("credentials_file")
+        return cls(
+            project_id=project_id,
+            zone=zone,
+            bucket_name=bucket_name,
+            credentials_file=credentials_file,
+        )
 
     @classmethod
     def deserialize_yaml(cls, yaml_content: str) -> "GCPConfig":
@@ -60,17 +74,9 @@ class GCPConfigurator(BackendConfig):
             f.write(config.serialize_yaml())
 
     def configure(self):
-        credentials_file = os.getenv("GOOGLE_APPLICATION_CREDENTIALS")
-        if credentials_file is None:
-            console.print(
-                "[red bold]✗[/red bold] GOOGLE_APPLICATION_CREDENTIALS is not set."
-                " It should point to the service account credentials file."
-                " Learn more about service account credentials: https://cloud.google.com/iam/docs/creating-managing-service-account-keys"
-            )
-            exit(1)
-
         zone = None
         bucket_name = None
+        credentials_file = None
         try:
             config = self.load()
         except Exception:
@@ -78,8 +84,11 @@ class GCPConfigurator(BackendConfig):
         else:
             zone = config.zone
             bucket_name = config.bucket_name
+            credentials_file = config.credentials_file
 
-        self.credentials = self._get_credentials(credentials_file)
+        self.credentials_file = self._ask_credentials_file(credentials_file)
+
+        self.credentials = self._get_credentials(self.credentials_file)
         self.project_id = self.credentials.project_id
 
         self.zone = self._ask_zone(zone)
@@ -88,12 +97,24 @@ class GCPConfigurator(BackendConfig):
         config = GCPConfig(
             project_id=self.project_id,
             zone=self.zone,
-            bucket_name=bucket_name,
+            bucket_name=self.bucket_name,
+            credentials_file=self.credentials_file,
         )
         self.save(config)
         console.print(f"[grey58]OK[/]")
 
-    def _get_credentials(self, credentials_file: str) -> service_account.Credentials:
+    def _ask_credentials_file(self, default_credentials_file: Optional[str]) -> str:
+        if default_credentials_file is None:
+            default_credentials_file = os.getenv("GOOGLE_APPLICATION_CREDENTIALS")
+        credentials_file = Prompt.ask(
+            "[sea_green3 bold]?[/sea_green3 bold] [bold]Enter path to credentials file[/bold]",
+            default=default_credentials_file,
+        )
+        if not credentials_file or self._get_credentials(credentials_file) is None:
+            return self._ask_credentials_file(default_credentials_file)
+        return credentials_file
+
+    def _get_credentials(self, credentials_file: str) -> Optional[service_account.Credentials]:
         try:
             credentials = service_account.Credentials.from_service_account_file(credentials_file)
             storage_client = storage.Client(credentials=credentials)
@@ -102,7 +123,7 @@ class GCPConfigurator(BackendConfig):
             console.print(
                 f"[red bold]✗[/red bold] Error while checking GCP credentials:\n{e}",
             )
-            exit(1)
+            return None
         return credentials
 
     def _ask_zone(self, default_zone: Optional[str]) -> str:

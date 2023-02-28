@@ -41,6 +41,10 @@ class GCPBackend(CloudBackend):
             credentials = service_account.Credentials.from_service_account_info(
                 self.config.credentials
             )
+        elif self.config.credentials_file is not None:
+            credentials = service_account.Credentials.from_service_account_file(
+                self.config.credentials_file
+            )
         else:
             credentials_file = os.getenv("GOOGLE_APPLICATION_CREDENTIALS")
             if credentials_file is None:
