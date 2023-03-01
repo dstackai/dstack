@@ -3,7 +3,7 @@ import re
 import string
 from operator import attrgetter
 from shlex import quote
-from typing import Optional
+from typing import List, Optional
 
 from azure.core.credentials import TokenCredential
 from azure.mgmt.compute import ComputeManagementClient
@@ -12,6 +12,7 @@ from azure.mgmt.compute.v2022_11_01.models import (
     HardwareProfile,
     Image,
     ImageReference,
+    InstanceViewStatus,
     ManagedDiskParameters,
     NetworkInterfaceReference,
     NetworkProfile,
@@ -51,7 +52,7 @@ from dstack.backend.base.compute import Compute
 from dstack.core.instance import InstanceType
 from dstack.core.job import Job
 from dstack.core.repo import RepoAddress
-from dstack.core.request import RequestHead
+from dstack.core.request import RequestHead, RequestStatus
 
 
 class AzureCompute(Compute):
@@ -71,7 +72,7 @@ class AzureCompute(Compute):
         raise NotImplementedError
 
     def terminate_instance(self, request_id: str):
-        raise NotImplementedError
+        raise NotImplementedError(request_id)
 
     def get_instance_type(self, job: Job) -> Optional[InstanceType]:
         instance_types = runners._get_instance_types(
@@ -94,7 +95,22 @@ class AzureCompute(Compute):
         )
 
     def get_request_head(self, job: Job, request_id: Optional[str]) -> RequestHead:
-        raise NotImplementedError
+        if request_id is None:
+            return RequestHead(
+                job_id=job.job_id,
+                status=RequestStatus.TERMINATED,
+                message="request_id is not specified",
+            )
+
+        instance_status = _get_instance_status(
+            self._compute_client,
+            request_id,
+        )
+        return RequestHead(
+            job_id=job.job_id,
+            status=instance_status,
+            message=None,
+        )
 
 
 def _get_image_published(
@@ -375,7 +391,7 @@ def _launch_instance(
             script=[
                 "sudo -s",
                 'sysctl -w net.ipv4.ip_local_port_range="${SYSCTL_PORT_RANGE_FROM} ${SYSCTL_PORT_RANGE_TO}"',
-                "mkdir /root/.dstack/",
+                "[ -d /root/.dstack/ ] || mkdir /root/.dstack/",
                 'echo "$DSTACK_CONFIG" > /root/.dstack/config.yaml',
                 'echo "$RUNNER_HEAD_CONFIG" > /root/.dstack/runner.yaml',
                 'echo "hostname: $PUBLIC_IP" >> /root/.dstack/runner.yaml',
@@ -405,6 +421,28 @@ def _launch_instance(
         ),
     ).result()
 
-    print(result.as_dict())
-
     return group_name
+
+
+def _get_instance_status(
+    compute_client: ComputeManagementClient, group_name: str
+) -> RequestStatus:
+    vm: VirtualMachine = compute_client.virtual_machines.get(
+        group_name, "virtual_machine_name", expand="instanceView"
+    )
+    # https://learn.microsoft.com/en-us/azure/virtual-machines/states-billing
+    statuses: List[InstanceViewStatus] = vm.instance_view.statuses
+    codes = list(filter(lambda c: c.startswith("PowerState/"), map(attrgetter("code"), statuses)))
+    assert len(codes) <= 1
+
+    if not codes:
+        return RequestStatus.TERMINATED
+    elif len(codes) == 1:
+        state = codes[0].split("/")[1]
+        # Original documentation uses capitalize words https://learn.microsoft.com/en-us/azure/virtual-machines/states-billing#power-states-and-billing
+        if state == "running":
+            return RequestStatus.RUNNING
+        elif state in {"stopping", "stopped", "deallocating", "deallocated"}:
+            return RequestStatus.TERMINATED
+
+    raise RuntimeError(f"unhandled state {codes!r}", codes)

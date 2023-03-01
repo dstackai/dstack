@@ -103,12 +103,12 @@ class AzureBackend(CloudBackend):
         base_jobs.run_job(self._storage, self._compute, job)
 
     def stop_job(self, repo_address: RepoAddress, job_id: str, abort: bool):
-        raise NotImplementedError
+        base_jobs.stop_job(self._storage, self._compute, repo_address, job_id, abort)
 
     def list_job_heads(
         self, repo_address: RepoAddress, run_name: Optional[str] = None
     ) -> List[JobHead]:
-        raise NotImplementedError
+        return base_jobs.list_job_heads(self._storage, repo_address, run_name)
 
     def delete_job_head(self, repo_address: RepoAddress, job_id: str):
         raise NotImplementedError
@@ -119,7 +119,10 @@ class AzureBackend(CloudBackend):
         run_name: Optional[str] = None,
         include_request_heads: bool = True,
     ) -> List[RunHead]:
-        raise NotImplementedError
+        job_heads = self.list_job_heads(repo_address, run_name)
+        return base_runs.get_run_heads(
+            self._storage, self._compute, job_heads, include_request_heads
+        )
 
     def poll_logs(
         self,
@@ -159,7 +162,11 @@ class AzureBackend(CloudBackend):
         raise NotImplementedError
 
     def update_repo_last_run_at(self, repo_address: RepoAddress, last_run_at: int):
-        raise NotImplementedError
+        base_repos.update_repo_last_run_at(
+            self._storage,
+            repo_address,
+            last_run_at,
+        )
 
     def get_repo_credentials(self, repo_address: RepoAddress) -> Optional[RepoCredentials]:
         return base_repos.get_repo_credentials(self._secrets_manager, repo_address)
