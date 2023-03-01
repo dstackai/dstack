@@ -32,13 +32,13 @@ class AWSCompute(Compute):
         )
 
     def get_instance_type(self, job: Job) -> Optional[InstanceType]:
-        return runners._get_instance_type(
+        return runners.get_instance_type(
             ec2_client=self.ec2_client,
             requirements=job.requirements,
         )
 
     def run_instance(self, job: Job, instance_type: InstanceType) -> str:
-        return runners._run_instance_retry(
+        return runners.run_instance_retry(
             ec2_client=self.ec2_client,
             iam_client=self.iam_client,
             bucket_name=self.bucket_name,
@@ -52,13 +52,13 @@ class AWSCompute(Compute):
         )
 
     def terminate_instance(self, request_id: str):
-        runners._terminate_instance(
+        runners.terminate_instance(
             ec2_client=self.ec2_client,
             request_id=request_id,
         )
 
     def cancel_spot_request(self, request_id: str):
-        runners._cancel_spot_request(
+        runners.cancel_spot_request(
             ec2_client=self.ec2_client,
             request_id=request_id,
         )

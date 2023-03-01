@@ -1,5 +1,4 @@
 import re
-import warnings
 from typing import Any, List, Optional, Tuple
 
 import google.api_core.exceptions
@@ -8,7 +7,7 @@ from google.oauth2 import service_account
 
 from dstack import version
 from dstack.backend.aws.runners import _serialize_runner_yaml
-from dstack.backend.base.compute import Compute
+from dstack.backend.base.compute import Compute, choose_instance_type
 from dstack.backend.gcp import utils as gcp_utils
 from dstack.backend.gcp.config import GCPConfig
 from dstack.core.instance import InstanceType
@@ -30,6 +29,7 @@ class GCPCompute(Compute):
         self.instances_client = compute_v1.InstancesClient(credentials=self.credentials)
         self.images_client = compute_v1.ImagesClient(credentials=self.credentials)
         self.firewalls_client = compute_v1.FirewallsClient(credentials=self.credentials)
+        self.machine_types_client = compute_v1.MachineTypesClient(credentials=self.credentials)
 
     def get_request_head(self, job: Job, request_id: Optional[str]) -> RequestHead:
         if request_id is None:
@@ -51,12 +51,13 @@ class GCPCompute(Compute):
         )
 
     def get_instance_type(self, job: Job) -> Optional[InstanceType]:
-        return InstanceType(
-            instance_name="n1-standard-1",
-            resources=Resources(
-                cpus=1, memory_mib=3750, gpus=[], interruptible=False, local=False
-            ),
+        instance_types = _get_instance_types(
+            machine_types_client=self.machine_types_client,
+            project_id=self.gcp_config.project_id,
+            zone=self.gcp_config.zone,
         )
+        instance_type = choose_instance_type(instance_types, job.requirements)
+        return instance_type
 
     def run_instance(self, job: Job, instance_type: InstanceType) -> str:
         instance = _launch_instance(
@@ -64,6 +65,7 @@ class GCPCompute(Compute):
             firewalls_client=self.firewalls_client,
             project_id=self.gcp_config.project_id,
             zone=self.gcp_config.zone,
+            machine_type=instance_type.instance_name,
             image_name=_get_image_name(
                 images_client=self.images_client,
                 instance_type=instance_type,
@@ -71,7 +73,7 @@ class GCPCompute(Compute):
             instance_name=_get_instance_name(job),
             user_data_script=_get_user_data_script(self.gcp_config, job, instance_type),
             service_account=self.credentials.service_account_email,
-            interruptible=job.requirements.interruptible,
+            interruptible=instance_type.resources.interruptible,
         )
         return instance.name
 
@@ -88,6 +90,82 @@ class GCPCompute(Compute):
             gcp_config=self.gcp_config,
             instance_name=request_id,
         )
+
+
+def _get_instance_status(
+    client: compute_v1.InstancesClient, project_id: str, zone: str, instance_name: str
+) -> RequestStatus:
+    get_instance_request = compute_v1.GetInstanceRequest(
+        instance=instance_name,
+        project=project_id,
+        zone=zone,
+    )
+    try:
+        instance = client.get(get_instance_request)
+    except google.api_core.exceptions.NotFound:
+        return RequestStatus.TERMINATED
+    if instance.status in ["PROVISIONING", "STAGING", "RUNNING"]:
+        return RequestStatus.RUNNING
+    return RequestStatus.TERMINATED
+
+
+def _get_instance_types(
+    machine_types_client: compute_v1.MachineTypesClient,
+    project_id: str,
+    zone: str,
+) -> List[InstanceType]:
+    machine_families = ["n1-*", "e2-*", "c2-*", "m1-*", "a2-*"]
+    machine_types = _list_machine_types(
+        machine_types_client=machine_types_client,
+        project_id=project_id,
+        zone=zone,
+        machine_families=machine_families,
+    )
+    return [_machine_type_to_instance_type(mt) for mt in machine_types]
+
+
+def _list_machine_types(
+    machine_types_client: compute_v1.MachineTypesClient,
+    project_id: str,
+    zone: str,
+    machine_families: List[str],
+) -> List[compute_v1.MachineType]:
+    list_machine_types_request = compute_v1.ListMachineTypesRequest()
+    list_machine_types_request.project = project_id
+    list_machine_types_request.zone = zone
+    list_machine_types_request.filter = " OR ".join(f"(name = {mf})" for mf in machine_families)
+    machine_types = machine_types_client.list(list_machine_types_request)
+    return [mt for mt in machine_types if not mt.deprecated.state == "DEPRECATED"]
+
+
+def _machine_type_to_instance_type(machine_type: compute_v1.MachineType) -> InstanceType:
+    gpus = []
+    for acc in machine_type.accelerators:
+        gpus.extend(
+            [
+                Gpu(
+                    name=acc.guest_accelerator_type,
+                    memory_mib=_get_gpu_memory(acc.guest_accelerator_type),
+                )
+                for _ in range(acc.guest_accelerator_count)
+            ]
+        )
+    return InstanceType(
+        instance_name=machine_type.name,
+        resources=Resources(
+            cpus=machine_type.guest_cpus,
+            memory_mib=machine_type.memory_mb,
+            gpus=gpus,
+            interruptible=True,
+            local=False,
+        ),
+    )
+
+
+def _get_gpu_memory(gpu_name: str) -> int:
+    if gpu_name == "nvidia-a100-80gb":
+        return 80 * 1024
+    return 40 * 1024
 
 
 def _get_image_name(
@@ -137,6 +215,7 @@ def _launch_instance(
     project_id: str,
     zone: str,
     image_name: str,
+    machine_type: str,
     instance_name: str,
     user_data_script: str,
     service_account: str,
@@ -157,6 +236,7 @@ def _launch_instance(
         instances_client=instances_client,
         project_id=project_id,
         zone=zone,
+        machine_type=machine_type,
         instance_name=instance_name,
         disks=[disk],
         user_data_script=user_data_script,
@@ -297,6 +377,8 @@ def _create_instance(
         instance.scheduling.provisioning_model = compute_v1.Scheduling.ProvisioningModel.SPOT.name
         instance.scheduling.instance_termination_action = instance_termination_action
 
+    instance.scheduling.on_host_maintenance = "TERMINATE"
+
     if custom_hostname is not None:
         instance.hostname = custom_hostname
 
@@ -369,23 +451,6 @@ def _create_firewall_rules(
 
     operation = firewalls_client.insert(project=project_id, firewall_resource=firewall_rule)
     gcp_utils.wait_for_extended_operation(operation, "firewall rule creation")
-
-
-def _get_instance_status(
-    client: compute_v1.InstancesClient, project_id: str, zone: str, instance_name: str
-) -> RequestStatus:
-    get_instance_request = compute_v1.GetInstanceRequest(
-        instance=instance_name,
-        project=project_id,
-        zone=zone,
-    )
-    try:
-        instance = client.get(get_instance_request)
-    except google.api_core.exceptions.NotFound:
-        return RequestStatus.TERMINATED
-    if instance.status in ["PROVISIONING", "STAGING", "RUNNING"]:
-        return RequestStatus.RUNNING
-    return RequestStatus.TERMINATED
 
 
 def _terminate_instance(
