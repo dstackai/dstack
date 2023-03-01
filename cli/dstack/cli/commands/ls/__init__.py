@@ -26,6 +26,20 @@ class LsCommand(BasicCommand):
             type=str,
             help="A name of a run or a tag",
         )
+        self._parser.add_argument("source_name",
+                                  type=str,
+                                  help="A prefix to search for file/folders",
+                                  nargs='?',
+                                  default="")
+
+
+        # TODO: -R – Show all individual files recursively (as of now)
+        # Ref: https://github.com/dstackai/dstack/issues/131
+        # self._parser.add_argument("-r", "--recursive", help="Show file/folders recursively", action="store_true")
+
+        # show total size
+        self._parser.add_argument("-t", "--total", help="total folder size", action="store_true")
+
 
     @check_config
     @check_git
@@ -55,12 +69,24 @@ class LsCommand(BasicCommand):
         artifacts = list_artifacts_with_merged_backends(
             backends_run_name, load_repo_data(), run_names[0]
         )
+        total_space = 0
         for artifact, backends in artifacts:
             for i, file in enumerate(artifact.files):
-                table.add_row(
-                    artifact.name if i == 0 else "",
-                    file.filepath,
-                    sizeof_fmt(file.filesize_in_bytes),
-                    ", ".join(b.name for b in backends),
-                )
+
+                if args.source_name == "" or file.filepath.startswith(args.source_name):
+                    table.add_row(
+                        artifact.name if i == 0 else "",
+                        file.filepath,
+                        sizeof_fmt(file.filesize_in_bytes),
+                        ", ".join(b.name for b in backends),
+                    )
+                    total_space += file.filesize_in_bytes
+
+        if args.total:
+            table.add_row(
+                "",
+                "",
+                sizeof_fmt(total_space),
+                "",
+            )
         console.print(table)
