@@ -14,7 +14,7 @@ in our [Slack channel](https://join.slack.com/t/dstackai/shared_invite/zt-xdnsyt
 To resolve an issue as quickly as possible, it is best to report it directly to the [tracker](https://github.com/dstackai/dstack/issues). 
 This is the most reliable method.
 
-[![Slack](https://img.shields.io/badge/github-new%20issue-brightgreen?logo=github&style=for-the-badge)](https://github.com/dstackai/dstack/issues/new?assignees=&labels=bug&template=bug_report.md&title=)
+[![Slack](https://img.shields.io/badge/github-new%20issue-brightgreen?logo=github&style=for-the-badge)](https://github.com/dstackai/dstack/issues/new?assignees=&labels=bug&template=bug_report.yaml&title=%5BBug%5D%3A+)
 
 When creating an issue report, it is essential to include the following information:
 
@@ -37,6 +37,6 @@ Providing this information will help ensure that the issue can be resolved as ef
 To request a feature, improvement, or integration with another tool, please create an issue directly in the
 [tracker](https://github.com/dstackai/dstack/issues).
 
-[![Slack](https://img.shields.io/badge/github-new%20issue-brightgreen?logo=github&style=for-the-badge)](https://github.com/dstackai/dstack/issues/new?assignees=&labels=enhancement&template=feature_request.md&title=)
+[![Slack](https://img.shields.io/badge/github-new%20issue-brightgreen?logo=github&style=for-the-badge)](https://github.com/dstackai/dstack/issues/new?assignees=&labels=feature&template=feature_request.yaml&title=%5BFeature%5D%3A+)
 
 Provide details on your use case, what is missing or inconvenient, and a clear description of how you envision the proposed feature to function.
