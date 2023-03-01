@@ -18,6 +18,15 @@ from dstack.core.runners import Gpu, Resources, Runner
 DSTACK_INSTANCE_TAG = "dstack-runner-instance"
 
 
+_supported_accelerators = [
+    {"accelerator_name": "nvidia-a100-80gb", "gpu_name": "A100", "memory_mb": 1024 * 80},
+    {"accelerator_name": "nvidia-tesla-a100", "gpu_name": "A100", "memory_mb": 1024 * 40},
+    {"accelerator_name": "nvidia-tesla-v100", "gpu_name": "V100", "memory_mb": 1024 * 16},
+    {"accelerator_name": "nvidia-tesla-p100", "gpu_name": "P100", "memory_mb": 1024 * 16},
+    {"accelerator_name": "nvidia-tesla-k80", "gpu_name": "K80", "memory_mb": 1024 * 12},
+]
+
+
 class GCPCompute(Compute):
     def __init__(
         self,
@@ -30,6 +39,9 @@ class GCPCompute(Compute):
         self.images_client = compute_v1.ImagesClient(credentials=self.credentials)
         self.firewalls_client = compute_v1.FirewallsClient(credentials=self.credentials)
         self.machine_types_client = compute_v1.MachineTypesClient(credentials=self.credentials)
+        self.accelerator_types_client = compute_v1.AcceleratorTypesClient(
+            credentials=self.credentials
+        )
 
     def get_request_head(self, job: Job, request_id: Optional[str]) -> RequestHead:
         if request_id is None:
@@ -51,13 +63,13 @@ class GCPCompute(Compute):
         )
 
     def get_instance_type(self, job: Job) -> Optional[InstanceType]:
-        instance_types = _get_instance_types(
+        return _choose_instance_type(
             machine_types_client=self.machine_types_client,
+            accelerator_types_client=self.accelerator_types_client,
             project_id=self.gcp_config.project_id,
             zone=self.gcp_config.zone,
+            requirements=job.requirements,
         )
-        instance_type = choose_instance_type(instance_types, job.requirements)
-        return instance_type
 
     def run_instance(self, job: Job, instance_type: InstanceType) -> str:
         instance = _launch_instance(
@@ -74,6 +86,11 @@ class GCPCompute(Compute):
             user_data_script=_get_user_data_script(self.gcp_config, job, instance_type),
             service_account=self.credentials.service_account_email,
             interruptible=instance_type.resources.interruptible,
+            accelerators=_get_accelerator_configs(
+                project_id=self.gcp_config.project_id,
+                zone=self.gcp_config.zone,
+                instance_type=instance_type,
+            ),
         )
         return instance.name
 
@@ -109,12 +126,105 @@ def _get_instance_status(
     return RequestStatus.TERMINATED
 
 
-def _get_instance_types(
+def _choose_instance_type(
+    machine_types_client: compute_v1.MachineTypesClient,
+    accelerator_types_client: compute_v1.AcceleratorTypesClient,
+    project_id: str,
+    zone: str,
+    requirements: Optional[Requirements],
+) -> Optional[InstanceType]:
+    if requirements is None or requirements.gpus is None:
+        return _get_nongpu_instance_type(
+            machine_types_client=machine_types_client,
+            project_id=project_id,
+            zone=zone,
+            requirements=requirements,
+        )
+    return _get_gpu_instance_type(
+        machine_types_client=machine_types_client,
+        accelerator_types_client=accelerator_types_client,
+        project_id=project_id,
+        zone=zone,
+        requirements=requirements,
+    )
+
+
+def _get_nongpu_instance_type(
     machine_types_client: compute_v1.MachineTypesClient,
     project_id: str,
     zone: str,
+    requirements: Requirements,
 ) -> List[InstanceType]:
-    machine_families = ["n1-*", "e2-*", "c2-*", "m1-*", "a2-*"]
+    machine_families = ["e2-medium", "e2-standard-*", "e2-highmem-*", "e2-highcpu-*", "m1-*"]
+    instance_types = _list_instance_types(
+        machine_types_client=machine_types_client,
+        project_id=project_id,
+        zone=zone,
+        machine_families=machine_families,
+    )
+    return choose_instance_type(instance_types, requirements)
+
+
+def _get_gpu_instance_type(
+    machine_types_client: compute_v1.MachineTypesClient,
+    accelerator_types_client: compute_v1.AcceleratorTypesClient,
+    project_id: str,
+    zone: str,
+    requirements: Requirements,
+) -> InstanceType:
+    # To create a GPU instance in GCP, we need to create a n1-* instance
+    # and attach an accelerator to it. The only exception are a2-* instances
+    # that already come with A100 accelerators.
+    instance_types_without_gpus = _list_instance_types(
+        machine_types_client=machine_types_client,
+        project_id=project_id,
+        zone=zone,
+        machine_families=["n1-*"],
+    )
+    instance_types_without_gpus = [
+        it
+        for it in instance_types_without_gpus
+        if it.instance_name not in ["n1-standard-1", "n1-highcpu-2"]
+    ]
+    instance_type = choose_instance_type(
+        instance_types=instance_types_without_gpus,
+        requirements=Requirements(
+            cpus=requirements.cpus,
+            memory_mib=requirements.memory_mib,
+            shm_size_mib=requirements.shm_size_mib,
+            interruptible=requirements.interruptible,
+            local=requirements.local,
+            gpus=None,
+        ),
+    )
+    instance_types_with_gpus = []
+    if instance_type is not None:
+        instance_types_with_gpus.extend(
+            _add_gpus_to_instance_type(
+                accelerator_types_client=accelerator_types_client,
+                project_id=project_id,
+                zone=zone,
+                instance_type=instance_type,
+                requirements=requirements,
+            )
+        )
+    instance_types_with_gpus.extend(
+        _list_instance_types(
+            machine_types_client=machine_types_client,
+            project_id=project_id,
+            zone=zone,
+            machine_families=["a2-*"],
+        )
+    )
+    return choose_instance_type(instance_types_with_gpus, requirements)
+
+
+def _list_instance_types(
+    machine_types_client: compute_v1.MachineTypesClient,
+    project_id: str,
+    zone: str,
+    machine_families: List[str],
+) -> List[InstanceType]:
     machine_types = _list_machine_types(
         machine_types_client=machine_types_client,
         project_id=project_id,
@@ -144,7 +254,7 @@ def _machine_type_to_instance_type(machine_type: compute_v1.MachineType) -> Inst
         gpus.extend(
             [
                 Gpu(
-                    name=acc.guest_accelerator_type,
+                    name=_accelerator_name_to_gpu_name(acc.guest_accelerator_type),
                     memory_mib=_get_gpu_memory(acc.guest_accelerator_type),
                 )
                 for _ in range(acc.guest_accelerator_count)
@@ -162,10 +272,75 @@ def _machine_type_to_instance_type(machine_type: compute_v1.MachineType) -> Inst
     )
 
 
-def _get_gpu_memory(gpu_name: str) -> int:
-    if gpu_name == "nvidia-a100-80gb":
-        return 80 * 1024
-    return 40 * 1024
+def _get_gpu_memory(accelerator_name: str) -> int:
+    for acc in _supported_accelerators:
+        if acc["accelerator_name"] == accelerator_name:
+            return acc["memory_mb"]
+
+
+def _add_gpus_to_instance_type(
+    accelerator_types_client: compute_v1.AcceleratorTypesClient,
+    project_id: str,
+    zone: str,
+    instance_type: InstanceType,
+    requirements: Requirements,
+) -> bool:
+    instance_types = []
+    accelerator_types = _list_accelerator_types(
+        accelerator_types_client=accelerator_types_client,
+        project_id=project_id,
+        zone=zone,
+        accelerator_families=["nvidia-tesla-v100", "nvidia-tesla-k80", "nvidia-tesla-p100"],
+    )
+    for at in accelerator_types:
+        for gpu_count in range(1, at.maximum_cards_per_instance):
+            instance_types.append(
+                InstanceType(
+                    instance_name=instance_type.instance_name,
+                    resources=Resources(
+                        cpus=instance_type.resources.cpus,
+                        memory_mib=instance_type.resources.memory_mib,
+                        interruptible=instance_type.resources.interruptible,
+                        local=instance_type.resources.local,
+                        gpus=[
+                            Gpu(
+                                name=_accelerator_name_to_gpu_name(at.name),
+                                memory_mib=_get_gpu_memory(at.name),
+                            )
+                            for _ in range(gpu_count)
+                        ],
+                    ),
+                )
+            )
+    return instance_types
+
+
+def _list_accelerator_types(
+    accelerator_types_client: compute_v1.AcceleratorTypesClient,
+    project_id: str,
+    zone: str,
+    accelerator_families: List[str],
+) -> List[compute_v1.AcceleratorType]:
+    list_accelerator_types_request = compute_v1.ListAcceleratorTypesRequest()
+    list_accelerator_types_request.project = project_id
+    list_accelerator_types_request.zone = zone
+    list_accelerator_types_request.filter = " OR ".join(
+        f"(name = {af})" for af in accelerator_families
+    )
+    accelerator_types = accelerator_types_client.list(list_accelerator_types_request)
+    return [at for at in accelerator_types]
+
+
+def _accelerator_name_to_gpu_name(accelerator_name: str) -> str:
+    for acc in _supported_accelerators:
+        if acc["accelerator_name"] == accelerator_name:
+            return acc["gpu_name"]
+
+
+def _gpu_to_accelerator_name(gpu: Gpu) -> str:
+    for acc in _supported_accelerators:
+        if acc["gpu_name"] == gpu.name and acc["memory_mb"] == gpu.memory_mib:
+            return acc["accelerator_name"]
 
 
 def _get_image_name(
@@ -209,6 +384,20 @@ HOME=/root nohup dstack-runner --log-level 6 start --http-port 4000
 """
 
 
+def _get_accelerator_configs(
+    project_id: str, zone: str, instance_type: InstanceType
+) -> List[compute_v1.AcceleratorConfig]:
+    if instance_type.instance_name.startswith("a2") or len(instance_type.resources.gpus) == 0:
+        return []
+    accelerator_config = compute_v1.AcceleratorConfig()
+    accelerator_config.accelerator_count = len(instance_type.resources.gpus)
+    accelerator_name = _gpu_to_accelerator_name(instance_type.resources.gpus[0])
+    accelerator_config.accelerator_type = (
+        f"projects/{project_id}/zones/{zone}/acceleratorTypes/{accelerator_name}"
+    )
+    return [accelerator_config]
+
+
 def _launch_instance(
     instances_client: compute_v1.InstancesClient,
     firewalls_client: compute_v1.FirewallsClient,
@@ -220,6 +409,7 @@ def _launch_instance(
     user_data_script: str,
     service_account: str,
     interruptible: bool,
+    accelerators: List[compute_v1.AcceleratorConfig],
 ) -> compute_v1.Instance:
     try:
         _create_firewall_rules(firewalls_client=firewalls_client, project_id=project_id)
@@ -243,6 +433,7 @@ def _launch_instance(
         service_account=service_account,
         external_access=True,
         spot=interruptible,
+        accelerators=accelerators,
     )
     return instance
 
@@ -372,12 +563,13 @@ def _create_instance(
     if accelerators:
         instance.guest_accelerators = accelerators
 
+    if accelerators or "a2-" in machine_type:
+        instance.scheduling.on_host_maintenance = "TERMINATE"
+
     if spot:
         instance.scheduling = compute_v1.Scheduling()
         instance.scheduling.provisioning_model = compute_v1.Scheduling.ProvisioningModel.SPOT.name
         instance.scheduling.instance_termination_action = instance_termination_action
-
-    instance.scheduling.on_host_maintenance = "TERMINATE"
 
     if custom_hostname is not None:
         instance.hostname = custom_hostname
