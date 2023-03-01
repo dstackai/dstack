@@ -43,9 +43,4 @@ def wait_for_extended_operation(
         print(f"Operation ID: {operation.name}", file=sys.stderr, flush=True)
         raise operation.exception() or RuntimeError(operation.error_message)
 
-    if operation.warnings:
-        print(f"Warnings during {verbose_name}:\n", file=sys.stderr, flush=True)
-        for warning in operation.warnings:
-            print(f" - {warning.code}: {warning.message}", file=sys.stderr, flush=True)
-
     return result

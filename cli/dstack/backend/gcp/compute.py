@@ -417,7 +417,7 @@ def _launch_instance(
         pass
     disk = _disk_from_image(
         disk_type=f"zones/{zone}/diskTypes/pd-balanced",
-        disk_size_gb=20,
+        disk_size_gb=100,
         boot=True,
         source_image=f"projects/dstack/global/images/{image_name}",
         auto_delete=False,
