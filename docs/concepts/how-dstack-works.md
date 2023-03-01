@@ -1,7 +1,8 @@
 # How dstack works 
 
-`dstack` enables you to define ML pipelines in YAML and run them through CLI. 
-You can run them either locally or remotely, for instance, in any configured cloud account, without the need for Kubernetes or Docker.
+`dstack` enables you to define ML pipelines in YAML and run them through CLI.
+You can run them either locally or remotely, for instance, in any configured cloud account, without the need for
+Kubernetes or custom Docker images.
 
 When you run a workflow remotely in a configured cloud account, `dstack` creates and destroys instances automatically, 
 based on the resource requirements. The workflows run in containers that have pre-configured Conda environments, 

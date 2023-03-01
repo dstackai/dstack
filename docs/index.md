@@ -19,7 +19,7 @@ independent of any specific vendor. It also promotes collaboration on data and m
 * Save artifacts and reuse them conveniently across workflows
 * Use interactive dev environments, such as notebooks or IDEs
 * Use any frameworks or experiment trackers. No code changes are required.
-* No Kubernetes or Docker is needed
+* No need for Kubernetes or custom Docker images
 
 ### Get started with dstack in 30 min
 

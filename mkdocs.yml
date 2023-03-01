@@ -133,15 +133,10 @@ nav:
             - Conda: basics/conda.md
             - Dev environments: basics/dev-environments.md
             - Secrets: basics/secrets.md
-      #    - Advanced:
-      #        - Hub:
-      #          - Deploying hub: advanced/deploying-hub.md
-      #        - Integrations:
-      #            - Weights & Biases: advanced/integrations/wandb.md
-      #        - Troubleshooting: advanced/troubleshooting.md
-      #    - Community:
-      #        - Slack: https://join.slack.com/t/dstackai/shared_invite/zt-xdnsytie-D4qU9BvJP8vkbkHXdi6clQ
-      #        - Contributing: c.md
+          - Examples: https://github.com/dstackai/dstack-examples
+      - Integrations:
+          - Experiment trackers:
+              - Weights & Biases: integrations/experiments/wandb.md
       - Tutorials:
           - Stable Diffusion with Diffusers: tutorials/diffusers.md
       - What's new:
