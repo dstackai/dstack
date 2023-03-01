@@ -18,6 +18,7 @@ from dstack.backend.gcp.config import GCPConfig, GCPConfigurator
 from dstack.backend.gcp.logs import GCPLogging
 from dstack.backend.gcp.secrets import GCPSecretsManager
 from dstack.backend.gcp.storage import GCPStorage
+from dstack.cli.common import console
 from dstack.core.artifact import Artifact
 from dstack.core.job import Job, JobHead
 from dstack.core.log_event import LogEvent
@@ -82,6 +83,9 @@ class GCPBackend(CloudBackend):
         return base_runs.create_run(self._storage, repo_address, self.type)
 
     def create_job(self, job: Job):
+        if job.artifact_specs and any(art_spec.mount for art_spec in job.artifact_specs):
+            console.print("Mount artifacts are not currently supported for 'gcp' backend")
+            exit(1)
         base_jobs.create_job(self._storage, job)
 
     def get_job(self, repo_address: RepoAddress, job_id: str) -> Optional[Job]:
