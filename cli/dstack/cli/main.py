@@ -1,9 +1,10 @@
 import argparse
 import sys
 
+from rich_argparse import RichHelpFormatter
+
 from dstack.cli.handlers import cli_initialize
 from dstack.version import __version__ as version
-from rich_argparse import RichHelpFormatter
 
 
 def main():
