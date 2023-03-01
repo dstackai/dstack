@@ -2,13 +2,21 @@
 
 This document outlines the best practices for troubleshooting issues when using `dstack`.
 
+## Need help or have a question?
+
+Have a questions about `dstack` or need help with using it yourself or with your team? Drop us a message 
+in our [Slack channel](https://join.slack.com/t/dstackai/shared_invite/zt-xdnsytie-D4qU9BvJP8vkbkHXdi6clQ).
+
+[![Slack](https://img.shields.io/badge/slack-join%20community-blueviolet?logo=slack&style=for-the-badge)](https://join.slack.com/t/dstackai/shared_invite/zt-xdnsytie-D4qU9BvJP8vkbkHXdi6clQ)
+
 ## Report a bug
 
 To resolve an issue as quickly as possible, it is best to report it directly to the [tracker](https://github.com/dstackai/dstack/issues). 
 This is the most reliable method.
 
-When creating an issue report, it is essential to include the following information:
+[![Slack](https://img.shields.io/badge/github-new%20issue-brightgreen?logo=github&style=for-the-badge)](https://github.com/dstackai/dstack/issues/new?assignees=&labels=bug&template=bug_report.md&title=)
 
+When creating an issue report, it is essential to include the following information:
 
 1. The version of the CLI (obtained from running `dstack --version`), the operating system, 
    Python, and the versions of local Python libraries (`pip freeze` or `conda list`).
@@ -29,9 +37,6 @@ Providing this information will help ensure that the issue can be resolved as ef
 To request a feature, improvement, or integration with another tool, please create an issue directly in the
 [tracker](https://github.com/dstackai/dstack/issues).
 
+[![Slack](https://img.shields.io/badge/github-new%20issue-brightgreen?logo=github&style=for-the-badge)](https://github.com/dstackai/dstack/issues/new?assignees=&labels=enhancement&template=feature_request.md&title=)
+
 Provide details on your use case, what is missing or inconvenient, and a clear description of how you envision the proposed feature to function.
-
-## Get help
-
-If you have questions about `dstack` or need assistance using it yourself or with your team, please post in the 
-`#get-support` channel in our [Slack workspace](https://join.slack.com/t/dstackai/shared_invite/zt-xdnsytie-D4qU9BvJP8vkbkHXdi6clQ).
