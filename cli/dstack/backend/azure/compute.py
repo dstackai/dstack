@@ -1,11 +1,13 @@
 import random
 import re
 import string
+import uuid
 from operator import attrgetter
 from shlex import quote
 from typing import List, Optional
 
 from azure.core.credentials import TokenCredential
+from azure.mgmt.authorization import AuthorizationManagementClient
 from azure.mgmt.compute import ComputeManagementClient
 from azure.mgmt.compute.v2022_11_01.models import (
     DiskCreateOptionTypes,
@@ -18,12 +20,14 @@ from azure.mgmt.compute.v2022_11_01.models import (
     NetworkProfile,
     OSDisk,
     OSProfile,
+    ResourceIdentityType,
     RunCommandInput,
     RunCommandInputParameter,
     RunCommandResult,
     StorageAccountTypes,
     StorageProfile,
     VirtualMachine,
+    VirtualMachineIdentity,
 )
 from azure.mgmt.network import NetworkManagementClient
 from azure.mgmt.network.v2022_07_01.models import (
@@ -66,6 +70,9 @@ class AzureCompute(Compute):
         self._network_client = NetworkManagementClient(
             credential=credential, subscription_id=subscription_id
         )
+        self._authorization_client = AuthorizationManagementClient(
+            credential=credential, subscription_id=subscription_id
+        )
         self._location = location
 
     def cancel_spot_request(self, request_id: str):
@@ -88,6 +95,7 @@ class AzureCompute(Compute):
             self._compute_client,
             self._resource_client,
             self._network_client,
+            self._authorization_client,
             self._location,
             instance_type,
             job.runner_id,
@@ -167,6 +175,7 @@ def _launch_instance(
     compute_client: ComputeManagementClient,
     resource_client: ResourceManagementClient,
     network_client: NetworkManagementClient,
+    authorization_client: AuthorizationManagementClient,
     location: str,
     instance_type: InstanceType,
     runner_id: str,
@@ -191,10 +200,12 @@ def _launch_instance(
     # XXX: Hardcode for seed up development
     group_name = "dstack-hardcode"
     if not resource_client.resource_groups.check_existence(group_name):
-        resource_client.resource_groups.create_or_update(
+        resource_group = resource_client.resource_groups.create_or_update(
             group_name,
             ResourceGroup(location=location),
         )
+    else:
+        resource_group = resource_client.resource_groups.get(group_name)
 
     # XXX: Azure tires to document restriction for name of different resource's kinds. Assume reusing of group name rules.
     # https://learn.microsoft.com/en-us/rest/api/virtualnetwork/virtual-networks/create-or-update?tabs=HTTP#uri-parameters
@@ -326,6 +337,7 @@ def _launch_instance(
         )
         for _ in range(4)
     )
+    # $ curl -s -H Metadata:true --noproxy "*" "http://169.254.169.254/metadata/instance?api-version=2021-02-01" | jq
     if "virtual_machine_name" not in set(
         map(
             attrgetter("name"),
@@ -337,7 +349,7 @@ def _launch_instance(
         from pathlib import Path
 
         with (Path().resolve() / "vm.txt").open("w") as stream:
-            stream.writelines([f"dstack_run@{ip_address.ip_address}\n", password])
+            stream.writelines([f"dstack_run@{ip_address.ip_address}\n", password, "\n"])
         vm: VirtualMachine = compute_client.virtual_machines.begin_create_or_update(
             group_name,
             "virtual_machine_name",
@@ -368,6 +380,7 @@ def _launch_instance(
                         )
                     ]
                 ),
+                identity=VirtualMachineIdentity(type=ResourceIdentityType.system_assigned),
             ),
         ).result()
     else:
@@ -375,6 +388,25 @@ def _launch_instance(
             group_name,
             "virtual_machine_name",
         )
+
+    # https://github.com/Azure-Samples/compute-python-msi-vm/blob/master/example.py
+    # https://techcommunity.microsoft.com/t5/apps-on-azure-blog/using-azure-key-vault-to-manage-your-secrets/ba-p/2057758
+    # https://learn.microsoft.com/en-us/azure/key-vault/general/rbac-guide?tabs=azure-cli#known-limits-and-performance
+    role_name = "Storage Blob Data Owner"
+    roles = list(
+        authorization_client.role_definitions.list(
+            sub.id, filter="roleName eq '{}'".format(role_name)
+        )
+    )
+    assert len(roles) == 1
+    contributor_role = roles[0]
+    role_assignment = authorization_client.role_assignments.create(
+        sub.id,
+        uuid.uuid4(),  # Role assignment random name
+        {"role_definition_id": contributor_role.id, "principal_id": vm.identity.principal_id},
+    )
+    print(role_assignment.as_dict())
+    # dstack_run@computername:~$ az login --identity
 
     port_range_from: int = 3000
     port_range_to: int = 4000

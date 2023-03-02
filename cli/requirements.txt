@@ -35,3 +35,4 @@ azure-mgmt-subscription>=3.1.1
 azure-mgmt-compute>=29.1.0
 azure-mgmt-network>=22.2.0
 azure-mgmt-resource>=22.0.0
+azure-mgmt-authorization>=3.0.0
