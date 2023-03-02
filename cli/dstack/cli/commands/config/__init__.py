@@ -1,6 +1,6 @@
 from argparse import Namespace
 
-from dstack.api.config import dict_config
+from dstack.api.config import dict_configurator
 from dstack.cli.commands import BasicCommand
 from dstack.cli.common import ask_choice
 
@@ -16,14 +16,16 @@ class ConfigCommand(BasicCommand):
         pass
 
     def _command(self, args: Namespace):
-        configs = dict_config()
-        if len(configs) > 1:
+        configurators = dict_configurator()
+        if args.unknown is not None and len(args.unknown) != 0:
+            configurators[args.unknown[0]].parse_args(args.unknown[1:])
+        elif len(configurators) > 1:
             backend_name = ask_choice(
                 "Choose backend",
-                [f"[{key}]" for key in configs.keys()],
-                [key for key in configs.keys()],
+                [f"[{key}]" for key in configurators.keys()],
+                [key for key in configurators.keys()],
                 "aws",
             )
-            configs[backend_name].configure()
+            configurators[backend_name].configure_cli()
         else:
-            configs["aws"].configure()
+            configurators["aws"].configure_cli()

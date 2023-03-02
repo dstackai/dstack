@@ -9,7 +9,7 @@ from dstack.core.secret import Secret
 
 class User(BaseModel):
     user_name: str
-    token: str
+    token: Optional[str]
     global_role: str
 
 
@@ -19,9 +19,31 @@ class Hub(BaseModel):
     config: str
 
 
+class Member(BaseModel):
+    user_name: str
+    hub_role: str
+
+
+class AWSConfig(BaseModel):
+    region_name: str = ""
+    region_name_title: str = ""
+    s3_bucket_name: str = ""
+    ec2_subnet_id: str = ""
+
+
+class AWSAuth(BaseModel):
+    access_key: str = ""
+    secret_key: str = ""
+
+
+class AWSBackend(AWSConfig, AWSAuth):
+    type: str = "aws"
+
+
 class HubInfo(BaseModel):
-    name: str
-    backend: str
+    hub_name: str
+    backend: AWSBackend
+    members: List[Member] = []
 
 
 class UserInfo(BaseModel):
@@ -87,3 +109,27 @@ class PollLogs(BaseModel):
 
 class LinkUpload(BaseModel):
     object_key: str
+
+
+class HubDelete(BaseModel):
+    users: List[str] = []
+
+
+class HubElementValue(BaseModel):
+    name: Optional[str]
+    created: Optional[str]
+    region: Optional[str]
+    value: Optional[str]
+    label: Optional[str]
+
+
+class HubElement(BaseModel):
+    selected: str
+    values: List[HubElementValue] = []
+
+
+class AWSHubValues(BaseModel):
+    type: str = "aws"
+    region_name: Optional[HubElement]
+    s3_bucket_name: Optional[HubElement]
+    ec2_subnet_id: Optional[HubElement]

@@ -208,3 +208,6 @@ class LocalBackend(Backend):
 
     def get_artifacts_path(self, repo_address: RepoAddress) -> Path:
         return artifacts.get_artifacts_path(self.backend_config.path, repo_address)
+
+    def get_configurator(self):
+        pass

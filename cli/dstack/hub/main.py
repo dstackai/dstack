@@ -49,11 +49,7 @@ async def startup_event():
 async def update_admin_user() -> User:
     admin_user = await UserManager.get_user_by_name("admin")
     if admin_user is None:
-        admin_user = User(
-            name="admin",
-            token=os.getenv("DSTACK_HUB_ADMIN_TOKEN") or str(uuid.uuid4()),
-        )
-        await UserManager.save(admin_user)
+        admin_user = await UserManager.create_admin()
     elif os.getenv("DSTACK_HUB_ADMIN_TOKEN") is not None and admin_user.token != os.getenv(
         "DSTACK_HUB_ADMIN_TOKEN"
     ):

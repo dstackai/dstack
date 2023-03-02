@@ -1,7 +1,7 @@
 import os
 import re
 from pathlib import Path
-from typing import Optional
+from typing import Dict, Optional
 
 import boto3
 import yaml
@@ -10,8 +10,9 @@ from rich import print
 from rich.prompt import Confirm, Prompt
 
 from dstack.cli.common import _is_termios_available, ask_choice
-from dstack.core.config import BackendConfig, get_config_path
+from dstack.core.config import BackendConfig, Configurator, get_config_path
 from dstack.core.error import ConfigError
+from dstack.hub.models import AWSHubValues, HubElement, HubElementValue
 
 regions = [
     ("US East, N. Virginia", "us-east-1"),
@@ -29,9 +30,6 @@ regions = [
 
 
 class AWSConfig(BackendConfig):
-    NAME = "aws"
-
-    _configured = True
 
     bucket_name = None
     region_name = None
@@ -51,7 +49,7 @@ class AWSConfig(BackendConfig):
         if path.exists():
             with path.open() as f:
                 config_data = yaml.load(f, Loader=yaml.FullLoader)
-                if config_data.get("backend") != self.NAME:
+                if config_data.get("backend") != "aws":
                     raise ConfigError(f"It's not AWS config")
                 if not config_data.get("bucket"):
                     raise Exception(f"For AWS backend:the bucket field is required")
@@ -66,7 +64,7 @@ class AWSConfig(BackendConfig):
         if not path.parent.exists():
             path.parent.mkdir(parents=True)
         with path.open("w") as f:
-            config_data = {"backend": self.NAME, "bucket": self.bucket_name}
+            config_data = {"backend": "aws", "bucket": self.bucket_name}
             if self.region_name:
                 config_data["region"] = self.region_name
             if self.profile_name:
@@ -75,39 +73,130 @@ class AWSConfig(BackendConfig):
                 config_data["subnet"] = self.subnet_id
             yaml.dump(config_data, f)
 
-    def configure(self):
+
+class AWSConfigurator(Configurator):
+    NAME = "aws"
+    config: AWSConfig
+
+    def get_backend_client(self, config: Dict):
+        region_name = config.get("region_name") or config.get("region_name") or "us-east-1"
+        access_key = config.get("access_key") or ""
+        secret_key = config.get("secret_key") or ""
         try:
-            self.load()
+            session = boto3.session.Session(
+                region_name=region_name,
+                aws_access_key_id=access_key,
+                aws_secret_access_key=secret_key,
+            )
+            sts_client = session.client("sts")
+            account_id = sts_client.get_caller_identity()["Account"]
+        except Exception as ex:
+            return None
+        return session
+
+    def get_config(self, config: Dict):
+        aws_config = AWSConfig()
+        aws_config.bucket_name = config.get("bucket_name") or config.get("s3_bucket_name") or ""
+        aws_config.region_name = config.get("region_name") or "us-east-1"
+        aws_config.profile_name = config.get("profile_name") or ""
+        aws_config.subnet_id = config.get("ec2_subnet_id") or config.get("subnet_id") or ""
+        return aws_config
+
+    def parse_args(self, args: list = []):
+        pass
+
+    def configure_hub(self, config: Dict):
+        # Step 1: create client and check access
+        region_name = config.get("region_name") or "us-east-1"
+        bucket_name = config.get("s3_bucket_name") or ""
+        subnet_id = config.get("ec2_subnet_id") or ""
+        # profile_name = config.get("profile_name") or ""
+        access_key = config.get("access_key") or ""
+        secret_key = config.get("secret_key") or ""
+
+        try:
+            session = boto3.session.Session(
+                # profile_name=profile_name,
+                region_name=region_name,
+                aws_access_key_id=access_key,
+                aws_secret_access_key=secret_key,
+            )
+        except Exception as ex:
+            return AWSHubValues()
+        if session is None:
+            return AWSHubValues()
+        hub_values = AWSHubValues()
+        hub_values.region_name = HubElement(selected=region_name)
+        for r in regions:
+            hub_values.region_name.values.append(HubElementValue(value=r[1], label=r[0]))
+        # Step 2: get bucket list
+        try:
+            _s3 = session.client("s3")
+            response = _s3.list_buckets()
+            hub_values.s3_bucket_name = HubElement(selected=bucket_name)
+            for bucket in response["Buckets"]:
+                hub_values.s3_bucket_name.values.append(
+                    HubElementValue(
+                        name=bucket["Name"],
+                        created=bucket["CreationDate"].strftime("%d.%m.%Y %H:%M:%S"),
+                        region=region_name,
+                    )
+                )
+        except Exception as ex:
+            return hub_values
+        # Step 3: get subnet_id list
+        try:
+            _ec2 = session.client("ec2")
+            response = _ec2.describe_subnets()
+            hub_values.ec2_subnet_id = HubElement(selected=subnet_id)
+            for subnet in response["Subnets"]:
+                hub_values.ec2_subnet_id.values.append(
+                    HubElementValue(
+                        value=subnet["SubnetId"],
+                        label=subnet["SubnetId"],
+                    )
+                )
+        except Exception as ex:
+            return hub_values
+
+        return hub_values
+
+    def configure_cli(self):
+        self.config = AWSConfig()
+        try:
+            self.config.load()
         except ConfigError:
             pass
-        default_profile_name = self.profile_name
-        default_region_name = self.region_name
-        default_bucket_name = self.bucket_name
-        default_subnet_id = self.subnet_id
+        default_profile_name = self.config.profile_name
+        default_region_name = self.config.region_name
+        default_bucket_name = self.config.bucket_name
+        default_subnet_id = self.config.subnet_id
 
-        self.profile_name = self._ask_profile_name(default_profile_name)
-        if not default_region_name or default_profile_name != self.profile_name:
+        self.config.profile_name = self._ask_profile_name(default_profile_name)
+        if not default_region_name or default_profile_name != self.config.profile_name:
             try:
-                my_session = boto3.session.Session(profile_name=self.profile_name)
+                my_session = boto3.session.Session(profile_name=self.config.profile_name)
                 default_region_name = my_session.region_name
             except Exception:
                 default_region_name = "us-east-1"
-        self.region_name = ask_choice(
+        self.config.region_name = ask_choice(
             "Choose AWS region",
             [(r[0] + " [" + r[1] + "]") for r in regions],
             [r[1] for r in regions],
             default_region_name,
         )
-        if self.region_name != default_region_name:
+        if self.config.region_name != default_region_name:
             default_bucket_name = None
             default_subnet_id = None
-        self.bucket_name = self.ask_bucket(default_bucket_name, default_subnet_id)
-        self.subnet_id = self.ask_subnet(default_subnet_id)
-        self.save()
+        self.config.bucket_name = self.ask_bucket(default_bucket_name, default_subnet_id)
+        self.config.subnet_id = self.ask_subnet(default_subnet_id)
+        self.config.save()
         print(f"[grey58]OK[/]")
 
     def _s3_client(self) -> BaseClient:
-        session = boto3.Session(profile_name=self.profile_name, region_name=self.region_name)
+        session = boto3.Session(
+            profile_name=self.config.profile_name, region_name=self.config.region_name
+        )
         return session.client("s3")
 
     def validate_bucket(self, bucket_name):
@@ -115,7 +204,7 @@ class AWSConfig(BackendConfig):
         try:
             response = s3_client.head_bucket(Bucket=bucket_name)
             bucket_region = response["ResponseMetadata"]["HTTPHeaders"]["x-amz-bucket-region"]
-            if bucket_region != self.region_name:
+            if bucket_region != self.config.region_name:
                 print(f"[red bold]✗[/red bold] [red]The bucket belongs to another AWS region.")
                 return False
         except Exception as e:
@@ -140,10 +229,12 @@ class AWSConfig(BackendConfig):
                         f"[red bold]The bucket doesn't exist. Create it?[/red bold]",
                         default="y",
                     ):
-                        if self.region_name != "us-east-1":
+                        if self.config.region_name != "us-east-1":
                             s3_client.create_bucket(
                                 Bucket=bucket_name,
-                                CreateBucketConfiguration={"LocationConstraint": self.region_name},
+                                CreateBucketConfiguration={
+                                    "LocationConstraint": self.config.region_name
+                                },
                             )
                         else:
                             s3_client.create_bucket(Bucket=bucket_name)
@@ -185,11 +276,11 @@ class AWSConfig(BackendConfig):
         if not default_bucket_name:
             try:
                 my_session = boto3.session.Session(
-                    profile_name=self.profile_name, region_name=self.region_name
+                    profile_name=self.config.profile_name, region_name=self.config.region_name
                 )
                 sts_client = my_session.client("sts")
                 account_id = sts_client.get_caller_identity()["Account"]
-                default_bucket_name = f"dstack-{account_id}-{self.region_name}"
+                default_bucket_name = f"dstack-{account_id}-{self.config.region_name}"
                 bucket_options.append(f"Default [{default_bucket_name}]")
             except Exception:
                 pass
@@ -248,7 +339,7 @@ class AWSConfig(BackendConfig):
     def ask_subnet(self, default_subnet_id: Optional[str]) -> Optional[str]:
         try:
             my_session = boto3.session.Session(
-                profile_name=self.profile_name, region_name=self.region_name
+                profile_name=self.config.profile_name, region_name=self.config.region_name
             )
             ec2_client = my_session.client("ec2")
             subnets_response = ec2_client.describe_subnets()

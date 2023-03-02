@@ -1,25 +1,26 @@
 from typing import Dict, List
 
-from dstack import version
-from dstack.backend.aws.config import AWSConfig
-from dstack.backend.hub.config import HUBConfig
-from dstack.core.config import BackendConfig
-
-configs_classes = [AWSConfig]
-if not version.__is_release__:
-    configs_classes.append(HUBConfig)
+from dstack.api.backend import list_backends
+from dstack.core.config import Configurator
 
 
-def list_config() -> List[BackendConfig]:
-    configs = [cls() for cls in configs_classes]
+def list_config() -> List[Configurator]:
+    configs = [
+        cls.get_configurator()
+        for cls in list_backends(all_backend=True)
+        if cls.get_configurator() is not None
+    ]
     return configs
 
 
-def dict_config() -> Dict[str, BackendConfig]:
-    configs = [cls() for cls in configs_classes]
+def dict_configurator() -> Dict[str, Configurator]:
+    configs = [
+        cls.get_configurator()
+        for cls in list_backends(all_backend=True)
+        if cls.get_configurator() is not None
+    ]
     names = {}
     for config in configs:
-        if config.configured:
-            names[config.name] = config
+        names[config.name] = config
 
     return names

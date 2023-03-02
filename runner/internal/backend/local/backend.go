@@ -20,11 +20,13 @@ import (
 	"github.com/dstackai/dstack/runner/internal/models"
 	"github.com/dstackai/dstack/runner/internal/states"
 	"gopkg.in/yaml.v3"
+	"modernc.org/mathutil"
 )
 
 var _ backend.Backend = (*Local)(nil)
 
 func init() {
+	mathutil.GCDByte()
 	backend.DefaultBackend = New()
 	backend.RegisterBackend("local", func(ctx context.Context, pathConfig string) (backend.Backend, error) {
 		file := File{}

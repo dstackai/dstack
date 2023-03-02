@@ -128,7 +128,7 @@ export const HubList: React.FC = () => {
                         {
                             id: 'bucket',
                             header: t('hubs.card.bucket'),
-                            content: (hub) => `s3://${hub.backend.s3_bucket_name}`,
+                            content: (hub) => `${hub.backend.s3_bucket_name}`,
                         },
                     ],
                 }}

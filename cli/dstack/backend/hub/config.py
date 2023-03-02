@@ -1,31 +1,24 @@
 import os
-import re
 from pathlib import Path
-from typing import Optional
+from typing import Any
+from urllib.parse import urlparse, urlunparse
 
-import boto3
 import yaml
-from botocore.client import BaseClient
 from rich import print
-from rich.prompt import Confirm, Prompt
+from rich.prompt import Prompt
 
 from dstack.backend.hub.client import HubClient
-from dstack.cli.common import _is_termios_available, ask_choice
-from dstack.core.config import BackendConfig, get_config_path
+from dstack.core.config import BackendConfig, Configurator, get_config_path
 from dstack.core.error import ConfigError
 
 
 class HUBConfig(BackendConfig):
     NAME = "hub"
 
-    _configured = True
-
     def __init__(self):
         super().__init__()
-        self.host = os.getenv("DSTACK_HUB_HOST") or "127.0.0.1"
-        self.port = os.getenv("DSTACK_HUB_PORT") or "3000"
+        self.url = os.getenv("DSTACK_HUB_URL") or None
         self.token = os.getenv("DSTACK_HUB_TOKEN") or None
-        self.hub_name = os.getenv("DSTACK_HUB_NAME") or "test"  # TODO replace
 
     def load(self, path: Path = get_config_path()):
         if path.exists():
@@ -33,70 +26,95 @@ class HUBConfig(BackendConfig):
                 config_data = yaml.load(f, Loader=yaml.FullLoader)
                 if config_data.get("backend") != self.NAME:
                     raise ConfigError(f"It's not HUB config")
+                if config_data.get("url") is None:
+                    raise ConfigError(f"For HUB backend:the URL field is required")
                 if config_data.get("token") is None:
                     raise ConfigError(f"For HUB backend:the token field is required")
-                self.host = config_data.get("host") or "127.0.0.1"
-                self.port = config_data.get("port") or "3000"
+                self.url = config_data.get("url")
                 self.token = config_data.get("token")
-                self.hub_name = config_data.get("hub_name") or "test"
         else:
             raise ConfigError()
 
     def save(self, path: Path = get_config_path()):
         if not path.parent.exists():
             path.parent.mkdir(parents=True)
+        unparse_url = urlparse(url=self.url)
+        new_path = unparse_url.path
+        if not new_path.endswith("/api/hub/"):
+            new_path = "/api/hub" + new_path
+
+        new_url = urlunparse(
+            (
+                unparse_url.scheme,
+                unparse_url.netloc,
+                new_path,
+                None,
+                None,
+                None,
+            )
+        )
         with path.open("w") as f:
             config_data = {
                 "backend": self.NAME,
-                "host": self.host,
+                "url": new_url,
                 "token": self.token,
-                "hub_name": self.hub_name,
             }
             yaml.dump(config_data, f)
 
-    def configure(self):
-        try:
-            self.load()
-        except ConfigError:
-            pass
-        default_host = self.host
-        default_port = self.port
-        default_token = self.token
-        default_hub_name = self.hub_name
 
-        self.host, self.port, self.token, self.hub_name = self.ask_new_param(
-            default_host=default_host,
-            default_port=default_port,
-            default_token=default_token,
-            default_hub_name=default_hub_name,
-        )
-        self.save()
+class HubConfigurator(Configurator):
+    NAME = "hub"
+
+    def get_config(self, config: Any):
+        pass
+
+    def get_backend_client(self, config: Any):
+        pass
+
+    def configure_hub(self, config: Any):
+        pass
+
+    def parse_args(self, args: list = []):
+        if len(args) % 2 != 0:
+            raise ConfigError("Arguments must be even")
+        config = HUBConfig()
+        for idx in range(0, len(args), 2):
+            arg = str(args[idx])
+            if arg.startswith("--"):
+                arg = arg[2:]
+            if hasattr(config, arg):
+                setattr(config, arg, args[idx + 1])
+        config.save()
         print(f"[grey58]OK[/]")
 
-    def ask_new_param(
-        self, default_host: str, default_port: str, default_token: str, default_hub_name: str
-    ) -> (str, str, str, str):
-        host = Prompt.ask(
-            "[sea_green3 bold]?[/sea_green3 bold] [bold]Enter HUB host name[/bold]",
-            default=default_host,
+    def configure_cli(self) -> HUBConfig:
+        config = HUBConfig()
+        try:
+            config.load()
+        except ConfigError:
+            pass
+        default_url = config.url
+        default_token = config.token
+
+        config.url, config.token = self.ask_new_param(
+            default_url=default_url,
+            default_token=default_token,
         )
-        port = Prompt.ask(
-            "[sea_green3 bold]?[/sea_green3 bold] [bold]Enter HUB host port[/bold]",
-            default=default_port,
+        config.save()
+        print(f"[grey58]OK[/]")
+
+    def ask_new_param(self, default_url: str, default_token: str) -> (str, str):
+        url = Prompt.ask(
+            "[sea_green3 bold]?[/sea_green3 bold] [bold]Enter HUB URL[/bold]",
+            default=default_url,
         )
         token = Prompt.ask(
             "[sea_green3 bold]?[/sea_green3 bold] [bold]Enter HUB token[/bold]",
             default=default_token,
         )
-        hub_name = Prompt.ask(
-            "[sea_green3 bold]?[/sea_green3 bold] [bold]Enter HUB name[/bold]",
-            default=default_hub_name,
-        )
-        if HubClient.validate(host=host, port=port, token=token, hub_name=hub_name):
-            return host, port, token
+        if HubClient.validate(url=url, token=token):
+            return url, token
         return self.ask_new_param(
-            default_host=host,
-            default_port=port,
+            default_url=url,
             default_token=token,
-            default_hub_name=default_hub_name,
         )

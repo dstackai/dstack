@@ -37,7 +37,7 @@ export const hubApi = createApi({
             query: (hub) => ({
                 url: API.HUBS.BASE(),
                 method: 'POST',
-                params: hub,
+                body: hub,
             }),
 
             invalidatesTags: (result) => [{ type: 'Hubs' as const, id: result?.hub_name }],
@@ -47,7 +47,7 @@ export const hubApi = createApi({
             query: (hub) => ({
                 url: API.HUBS.DETAILS(hub.hub_name),
                 method: 'PATCH',
-                params: hub,
+                body: hub,
             }),
 
             invalidatesTags: (result) => [{ type: 'Hubs' as const, id: result?.hub_name }],
