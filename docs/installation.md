@@ -10,37 +10,36 @@ pip install dstack --upgrade
     If you only plan to run workflows locally and do not want to share artifacts with others outside your machine, you do
     not need to configure anything else.
 
-## (Optional) Configure a remote
+## Configure a remote
 
 By default, workflows are run locally. If you want to be able to run workflows remotely (e.g. in a configured cloud account),
-you have to configure a remote using the `dstack config` command. The configuration will be saved in the `~/.dstack/config.yaml` file.
-The exact configuration steps vary depending on the remote type.
+you have to configure a remote using the `dstack config` command. 
+
+Please refer to the specific instructions below for configuring a remote, based on your desired cloud provider.
 
 !!! info "NOTE:"
-    Currently, `dstack` supports AWS and GCP as remotes.
-
-Once a remote is configured, you can run workflows remotely and push and pull artifacts.
+    Currently, you can configure only AWS and GCP as remotes. Support for Azure, and Hub[^1] are coming soon.
 
 ### AWS
 
 #### Create an S3 bucket
 
-Before you can use the `dstack config` command, you have to create an S3 bucket in your AWS account 
-that you'll use to store workflow artifacts and metadata.
+In order to use AWS as a remote, you first have to create an S3 bucket in your AWS account.
+This bucket will be used to store workflow artifacts and metadata.
 
 !!! info "NOTE:"
     Make sure to create an S3 bucket in the AWS region where you'd like to run your workflows.
 
 #### Configure AWS credentials
 
-The next step is to configure AWS credentials on your local machine so the `dstack` CLI
-may perform actions on `s3`, `logs`, `secretsmanager`, `ec2`, and `iam` services.
-
-If you'd like to limit the permissions to the most narrow scope, feel free to use the IAM policy template
-below.
+The next step is to configure AWS credentials on your local machine. The credentials should grant
+the permissions to perform actions on `s3`, `logs`, `secretsmanager`, `ec2`, and `iam` services.
 
 ??? info "IAM policy template"
-    If you're using this template, make sure to replace `{bucket_name}` and `{bucket_name_under_score}` variables
+    If you'd like to limit the permissions to the most narrow scope, feel free to use the IAM policy template
+    below.
+
+    Replace `{bucket_name}` and `{bucket_name_under_score}` variables in the template below
     with the values that correspond to your S3 bucket.
 
     For `{bucket_name}`, use the name of the S3 bucket. 
@@ -176,7 +175,7 @@ below.
 
 #### Configure the CLI
 
-Once the AWS credentials are configured, you can configure the CLI:
+Once the AWS credentials are configured on your local machine, you can configure the CLI:
 
 ```shell hl_lines="1"
 dstack config
@@ -186,62 +185,63 @@ This command will ask you to choose an AWS profile (to take the AWS credentials 
 an AWS region (must be the same for the S3 bucket), and the name of the S3 bucket.
 
 ```shell
+Backend: aws
 AWS profile: default
 AWS region: eu-west-1
 S3 bucket: dstack-142421590066-eu-west-1
 EC2 subnet: none
 ```
 
-That's it! Your've configured AWS as a remote.
+That's it! You've configured AWS as a remote.
 
 ### GCP
 
-#### Create a service account key
+!!! info "NOTE:"
+    Support for GCP is experimental. In order to try it, make sure to install the latest pre-release version of `dstack`:
 
-`dstack` needs a service account key to access and manage GCP resources.
-This tutorial demonstrates how to create such a key using [the `gcloud` CLI](https://cloud.google.com/sdk/docs/install).
+    ```shell hl_lines="1"
+    pip install dstack --pre --upgrade
+    ```
 
-First, create a new service account:
+#### 1. Create a project
 
-```shell
-gcloud iam service-accounts create ${MY_SERVICE_ACCOUNT}
-```
+In order to use AWS as a remote, you first have to create a project in your GCP account,
+and make sure that the required APIs and enabled for it.
 
-Grant IAM roles to the service account. The following roles are sufficient for `dstack`:
+??? info "Required APIs"
+    Here's the list of APIs that have to be enabled for the project.
 
-```shell
-gcloud projects add-iam-policy-binding dstack --member="serviceAccount:${MY_SERVICE_ACCOUNT}@${MY_PROJECT}.iam.gserviceaccount.com" --role="roles/iam.serviceAccountUser"
-gcloud projects add-iam-policy-binding dstack --member="serviceAccount:${MY_SERVICE_ACCOUNT}@${MY_PROJECT}.iam.gserviceaccount.com" --role="roles/compute.admin"
-gcloud projects add-iam-policy-binding dstack --member="serviceAccount:${MY_SERVICE_ACCOUNT}@${MY_PROJECT}.iam.gserviceaccount.com" --role="roles/storage.admin"
-gcloud projects add-iam-policy-binding dstack --member="serviceAccount:${MY_SERVICE_ACCOUNT}@${MY_PROJECT}.iam.gserviceaccount.com" --role="roles/secretmanager.admin"
-gcloud projects add-iam-policy-binding dstack --member="serviceAccount:${MY_SERVICE_ACCOUNT}@${MY_PROJECT}.iam.gserviceaccount.com" --role="roles/logging.admin"
-```
+    ```
+    cloudapis.googleapis.com
+    compute.googleapis.com 
+    logging.googleapis.com
+    secretmanager.googleapis.com
+    storage-api.googleapis.com
+    storage-component.googleapis.com 
+    storage.googleapis.com 
+    ```
 
-Create a service account key:
+#### 2. Create a storage bucket
 
-```shell
-gcloud iam service-accounts keys create ${MY_KEY_PATH} --iam-account="${MY_SERVICE_ACCOUNT}@${MY_PROJECT}.iam.gserviceaccount.com" 
-```
+Once the project is created, you can proceed and create a storage bucket in the created project. This bucket
+will be used to store workflow artifacts and metadata.
 
-The key will be saved as a json file specified by `MY_KEY_PATH`, e.g. `~/my-sa-key.json`.
+!!! info "NOTE:"
+    Make sure to create the bucket in the location where you'd like to run your workflows.
 
-Before you configure `dstack`, you also need to ensure that the following APIs are enabled in your GCP project:
+#### 3. Create a service account
 
-```
-cloudapis.googleapis.com
-compute.googleapis.com 
-logging.googleapis.com
-secretmanager.googleapis.com
-storage-api.googleapis.com
-storage-component.googleapis.com 
-storage.googleapis.com 
-```
+The next step is to create a service account in the created project and configure for it the 
+following roles: `Service Account User`, `Compute Admin`, `Storage Admin`, `Secret Manager Admin`, and `Logging Admin`.
 
-Use `gcloud services list --enabled` and `gcloud services enable` to list and enable APIs.
+#### 4. Create a service account key
 
-#### Configure the CLI
+Once the service account is set up, create a key for it, and download the corresponding JSON file on
+to local machine (e.g. to `~/Downloads/my-awesome-project-d7735ca1dd53.json`).
 
-Once you have a service account key, you can configure GCP as a remote for `dstack`:
+#### 5. Configure the CLI
+
+Once the service account key JSON file is on your machine, you can configure the CLI:
 
 ```shell
 dstack config
@@ -250,10 +250,16 @@ dstack config
 The command will ask you for a path to the a service account key, GCP region and zone, and storage bucket name. For example:
 
 ```
-Path to credentials file: ~/Projects/dstack/my-sa-key.json
+Backend: gcp
+Path to credentials file: ~/Downloads/my-awesome-project-d7735ca1dd53.json
 GCP region: us-central1
 GCP zone: us-central1-c
-Storage bucket: dstack-test
+Storage bucket: dstack-my-awesome-project
 ```
 
-That's it! Your've configured GCP as a remote.
+That's it! You've configured GCP as a remote.
+
+[^1]:
+    Use the `dstack hub start --port PORT` command (coming soon) to host a web application that provides a UI for configuring cloud
+    accounts and managing user tokens. Configure this hub as a remote for the CLI to enable the hub to act as a proxy
+    between the CLI and the configured account. This setup offers improved security and collaboration.
