@@ -1,12 +1,26 @@
 # How dstack works 
 
-`dstack` enables you to define ML pipelines in YAML and run them through CLI.
-You can run them either locally or remotely, for instance, in any configured cloud account, without the need for
-Kubernetes or custom Docker images.
+`dstack` allows YAML-defined ML pipelines to be run locally or remotely in any configured cloud accounts without
+Kubernetes or custom Docker images via CLI.
 
-When you run a workflow remotely in a configured cloud account, `dstack` creates and destroys instances automatically, 
-based on the resource requirements. The workflows run in containers that have pre-configured Conda environments, 
-CUDA drivers, and other necessary components. To optimize costs, `dstack` offers the option of using spot instances.
+Workflows can be scripts for data preparation or model training, web apps like Streamlit or Gradio, or development
+environments like JupyterLab or VS Code.
+
+!!! info "NOTE:"
+    When running a workflow remotely (e.g. in a configured cloud account), `dstack` automatically creates and
+    destroys instances based on resource requirements and cost strategy, such as using spot instances.
+
+## Remotes
+
+By default, workflows run locally. To run workflows remotely, you need to first configure a remote using the `dstack
+config` command. Once a remote is configured, use the `--remote` flag with the `dstack run` command to run a workflow in
+the remote.
+
+!!! info "NOTE:"
+    Currently, a remote can be an AWS or GCP account only. Support for Azure, and Hub[^1] are coming soon.
+
+Remotes facilitate collaboration by allowing multiple team members to access the same remote, view each other's runs,
+and reuse each other's artifacts.
 
 ## Workflows
 
@@ -33,33 +47,21 @@ workflows:
       - path: ./lightning_logs
 ```
 
-As workflows are defined using YAML, there's no need for modifying the code in your scripts. You have the freedom to
-choose any frameworks, experiment trackers, or cloud providers.
-
-Workflows can take the form of regular scripts, which may involve tasks such as data preparation or model training, as
-well as web applications such as Streamlit or Gradle. Additionally, they can also be development environments such as
-JupyterLab or VS Code.
-
-## Remotes
-
-By default, workflows run locally. However, to run workflows remotely (such as in a cloud), you need to
-configure a remote by using the `dstack config` command and then use the `--remote` flag with the `dstack run` command.
+YAML-defined workflows eliminate the need to modify code in your scripts, giving you the freedom to choose frameworks,
+experiment trackers, and cloud providers.
 
 !!! info "NOTE:"
-    Currently, `dstack` supports AWS and GCP as remotes. Support for Azure and Hub are coming soon.
-
-If multiple members on your team have the same remote configured, they can see each other's runs and reuse 
-each other's artifacts.
+    Workflows run in containers with pre-configured Conda environments, and CUDA drivers.
 
 ## Artifacts
 
-Artifacts can be utilized to preserve the output of a workflow for later use in other workflows. Artifacts may comprise
-data, model checkpoints, or even a pre-configured Conda environment.
+Artifacts enable you to save any files produced by a workflow for later reuse in other workflows. They may include data,
+model checkpoints, or even a pre-configured Conda environment.
 
-When executing a workflow locally, the artifacts are saved locally. If you want to use the artifacts of a local run
-outside your machine, you can push them to a configured remote using the `dstack push` command.
+When running a workflow locally, the artifacts are saved locally. To push the artifacts of a local to a configured remote,
+use the `dstack push` command.
 
-When running a workflow remotely, the artifacts are automatically pushed to the remote.
+When running a workflow remotely, the artifacts are pushed to the remote automatically.
 
 ## CLI
 
@@ -75,3 +77,8 @@ from your preferred IDE.
 
 Unlike end-to-end MLOps platforms, `dstack` is lightweight, developer-friendly, and designed to facilitate collaboration
 without imposing any particular approach.
+
+[^1]:
+    Use the `dstack hub start --port PORT` command (coming soon) to host a web application that provides a UI for configuring cloud
+    accounts and managing user tokens. Configure this hub as a remote for the CLI to enable the hub to act as a proxy
+    between the CLI and the configured account. This setup offers improved security and collaboration.

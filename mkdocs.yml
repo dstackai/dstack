@@ -86,6 +86,7 @@ markdown_extensions:
       permalink: true
   - attr_list
   - md_in_html
+  - footnotes
 
 # Customization
 extra_css:

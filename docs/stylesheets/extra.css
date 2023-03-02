@@ -974,3 +974,7 @@ html .md-footer-meta.md-typeset a:is(:focus,:hover) {
 .md-typeset.md-banner__inner .md-banner__button {
     color: var(--md-default-fg-color--light);
 }
+
+.md-typeset .footnote-backref {
+    vertical-align: inherit;
+}
