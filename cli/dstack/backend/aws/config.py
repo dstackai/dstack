@@ -31,8 +31,6 @@ regions = [
 class AWSConfig(BackendConfig):
     NAME = "aws"
 
-    _configured = True
-
     bucket_name = None
     region_name = None
     profile_name = None

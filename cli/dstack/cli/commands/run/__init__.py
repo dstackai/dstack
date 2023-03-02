@@ -16,7 +16,7 @@ from rich.prompt import Confirm
 from websocket import WebSocketApp
 
 from dstack import providers
-from dstack.api.backend import DEFAULT, DEFAULT_REMOTE, get_backend_by_name
+from dstack.api.backend import get_backend_by_name, get_current_remote_backend, get_local_backend
 from dstack.api.logs import poll_logs
 from dstack.api.repo import load_repo_data
 from dstack.api.run import list_runs_with_merged_backends
@@ -254,16 +254,20 @@ class RunCommand(BasicCommand):
             exit(1)
         try:
             repo_data = load_repo_data()
-            backend_name = DEFAULT
+            backend = get_local_backend()
             if args.remote is not None:
                 if len(args.remote) == 0:
-                    backend_name = DEFAULT_REMOTE
+                    remote_backend = get_current_remote_backend()
+                    if remote_backend is None:
+                        console.print(f"No remote configured. Run `dstack config`.")
+                        exit(1)
                 else:
-                    backend_name = args.remote[0]
-            backend = get_backend_by_name(backend_name)
-            if backend is None:
-                console.print(f"Backend '{backend_name}' not configured")
-                exit(1)
+                    remote_backend = get_backend_by_name(args.remote[0])
+                    if remote_backend is None:
+                        console.print(f"Backend '{args.remote[0]}' is not configured")
+                        exit(1)
+                backend = remote_backend
+
             (
                 provider_name,
                 provider_args,
@@ -281,11 +285,7 @@ class RunCommand(BasicCommand):
                 if args.tag_name:
                     tag_head = backend.get_tag_head(repo_data, args.tag_name)
                     if tag_head:
-                        # if args.yes or Confirm.ask(f"[red]The tag '{args.tag_name}' already exists. "
-                        #                            f"Do you want to override it?[/]"):
                         backend.delete_tag_head(repo_data, tag_head)
-                        # else:
-                        #     return
                 jobs = provider.submit_jobs(backend, args.tag_name)
                 backend.update_repo_last_run_at(
                     repo_data, last_run_at=int(round(time.time() * 1000))
@@ -294,7 +294,7 @@ class RunCommand(BasicCommand):
                 if not args.detach:
                     poll_run(repo_data, jobs, backend)
             else:
-                sys.exit(f"Call 'dstack init' first")
+                sys.exit(f"Call `dstack init` first")
         except ValidationError as e:
             sys.exit(
                 f"There a syntax error in one of the files inside the {os.getcwd()}/.dstack/workflows directory:\n\n{e}"

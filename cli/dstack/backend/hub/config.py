@@ -18,8 +18,6 @@ from dstack.core.error import ConfigError
 class HUBConfig(BackendConfig):
     NAME = "hub"
 
-    _configured = True
-
     def __init__(self):
         super().__init__()
         self.host = os.getenv("DSTACK_HUB_HOST") or "127.0.0.1"
