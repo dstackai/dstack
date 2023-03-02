@@ -113,6 +113,8 @@ class GCPConfigurator(BackendConfig):
             "[sea_green3 bold]?[/sea_green3 bold] [bold]Enter path to credentials file[/bold]",
             default=default_credentials_file,
         )
+        if credentials_file is not None:
+            credentials_file = os.path.expanduser(credentials_file)
         if not credentials_file or self._get_credentials(credentials_file) is None:
             return self._ask_credentials_file(default_credentials_file)
         return credentials_file
