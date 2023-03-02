@@ -13,20 +13,25 @@ pip install dstack --upgrade
 ## (Optional) Configure a remote
 
 By default, workflows are run locally. If you want to be able to run workflows remotely (e.g. in a configured cloud account),
-you have to configure a remote using the `dstack config` command.
+you have to configure a remote using the `dstack config` command. The configuration will be saved in the `~/.dstack/config.yaml` file.
+The exact configuration steps vary depending on the remote type.
 
 !!! info "NOTE:"
-    Currently, the only supported remote type is AWS.
+    Currently, `dstack` supports AWS and GCP as remotes.
 
-### Create an S3 bucket
+Once a remote is configured, you can run workflows remotely and push and pull artifacts.
+
+### AWS
+
+#### Create an S3 bucket
 
 Before you can use the `dstack config` command, you have to create an S3 bucket in your AWS account 
 that you'll use to store workflow artifacts and metadata.
 
 !!! info "NOTE:"
-    Make sure to create an S3 bucket in the AWS region, where you'd like to run your workflows.
+    Make sure to create an S3 bucket in the AWS region where you'd like to run your workflows.
 
-### Configure AWS credentials
+#### Configure AWS credentials
 
 The next step is to configure AWS credentials on your local machine so the `dstack` CLI
 may perform actions on `s3`, `logs`, `secretsmanager`, `ec2`, and `iam` services.
@@ -169,7 +174,7 @@ below.
     }
     ```
 
-### Configure the CLI
+#### Configure the CLI
 
 Once the AWS credentials are configured, you can configure the CLI:
 
@@ -187,6 +192,68 @@ S3 bucket: dstack-142421590066-eu-west-1
 EC2 subnet: none
 ```
 
-The configuration will be saved in the `~/.dstack/config.yaml` file.
+That's it! Your've configured AWS as a remote.
 
-Once a remote is configured, you can run workflows remotely and push and pull artifacts.
+### GCP
+
+#### Create a service account key
+
+`dstack` needs a service account key to access and manage GCP resources.
+This tutorial demonstrates how to create such a key using [the `gcloud` CLI](https://cloud.google.com/sdk/docs/install).
+
+First, create a new service account:
+
+```shell
+gcloud iam service-accounts create ${MY_SERVICE_ACCOUNT}
+```
+
+Grant IAM roles to the service account. The following roles are sufficient for `dstack`:
+
+```shell
+gcloud projects add-iam-policy-binding dstack --member="serviceAccount:${MY_SERVICE_ACCOUNT}@${MY_PROJECT}.iam.gserviceaccount.com" --role="roles/iam.serviceAccountUser"
+gcloud projects add-iam-policy-binding dstack --member="serviceAccount:${MY_SERVICE_ACCOUNT}@${MY_PROJECT}.iam.gserviceaccount.com" --role="roles/compute.admin"
+gcloud projects add-iam-policy-binding dstack --member="serviceAccount:${MY_SERVICE_ACCOUNT}@${MY_PROJECT}.iam.gserviceaccount.com" --role="roles/storage.admin"
+gcloud projects add-iam-policy-binding dstack --member="serviceAccount:${MY_SERVICE_ACCOUNT}@${MY_PROJECT}.iam.gserviceaccount.com" --role="roles/secretmanager.admin"
+gcloud projects add-iam-policy-binding dstack --member="serviceAccount:${MY_SERVICE_ACCOUNT}@${MY_PROJECT}.iam.gserviceaccount.com" --role="roles/logging.admin"
+```
+
+Create a service account key:
+
+```shell
+gcloud iam service-accounts keys create ${MY_KEY_PATH} --iam-account="${MY_SERVICE_ACCOUNT}@${MY_PROJECT}.iam.gserviceaccount.com" 
+```
+
+The key will be saved as a json file specified by `MY_KEY_PATH`, e.g. `~/my-sa-key.json`.
+
+Before you configure `dstack`, you also need to ensure that the following APIs are enabled in your GCP project:
+
+```
+cloudapis.googleapis.com
+compute.googleapis.com 
+logging.googleapis.com
+secretmanager.googleapis.com
+storage-api.googleapis.com
+storage-component.googleapis.com 
+storage.googleapis.com 
+```
+
+Use `gcloud services list --enabled` and `gcloud services enable` to list and enable APIs.
+
+#### Configure the CLI
+
+Once you have a service account key, you can configure GCP as a remote for `dstack`:
+
+```shell
+dstack config
+```
+
+The command will ask you for a path to the a service account key, GCP region and zone, and storage bucket name. For example:
+
+```
+Path to credentials file: ~/Projects/dstack/my-sa-key.json
+GCP region: us-central1
+GCP zone: us-central1-c
+Storage bucket: dstack-test
+```
+
+That's it! Your've configured GCP as a remote.

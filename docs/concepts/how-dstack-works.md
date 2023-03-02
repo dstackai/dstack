@@ -42,11 +42,11 @@ JupyterLab or VS Code.
 
 ## Remotes
 
-By default, workflows run locally. However, to run workflows remotely (such as in a cloud account), you need to
+By default, workflows run locally. However, to run workflows remotely (such as in a cloud), you need to
 configure a remote by using the `dstack config` command and then use the `--remote` flag with the `dstack run` command.
 
 !!! info "NOTE:"
-    Currently, a remote can be an AWS account only. Support for GCP, Azure, and Hub are coming soon.
+    Currently, `dstack` supports AWS and GCP as remotes. Support for Azure and Hub are coming soon.
 
 If multiple members on your team have the same remote configured, they can see each other's runs and reuse 
 each other's artifacts.
