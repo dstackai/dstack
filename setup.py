@@ -63,6 +63,7 @@ setup(
         "paramiko",
         "git-url-parse",
         "rich",
+        "rich-argparse",
         "fastapi",
         "starlette",
         "uvicorn",

@@ -5,6 +5,7 @@ import { AUTH_DATA_STORAGE_KEY } from './constants';
 interface AppState {
     userData: IUserSmall | null;
     authData: IUserAuthData | null;
+    breadcrumbs: TBreadcrumb[] | null;
 }
 
 const getInitialState = (): AppState => {
@@ -16,6 +17,7 @@ const getInitialState = (): AppState => {
     return {
         authData,
         userData: null,
+        breadcrumbs: null,
     };
 };
 
@@ -28,7 +30,6 @@ export const appSlice = createSlice({
     reducers: {
         setAuthData: (state, action: PayloadAction<IUserAuthData>) => {
             state.authData = action.payload;
-            console.log('payload', action.payload);
             localStorage.setItem(AUTH_DATA_STORAGE_KEY, JSON.stringify(action.payload));
         },
         removeAuthData: (state) => {
@@ -39,11 +40,16 @@ export const appSlice = createSlice({
         setUserData: (state, action: PayloadAction<IUserSmall>) => {
             state.userData = action.payload;
         },
+
+        setBreadcrumb: (state, action: PayloadAction<AppState['breadcrumbs']>) => {
+            state.breadcrumbs = action.payload;
+        },
     },
 });
 
-export const { setAuthData, removeAuthData, setUserData } = appSlice.actions;
+export const { setAuthData, removeAuthData, setUserData, setBreadcrumb } = appSlice.actions;
 export const selectUserData = (state: RootState) => state.app.userData;
 export const selectAuthToken = (state: RootState) => state.app.authData?.token;
 export const selectUserName = (state: RootState) => state.app.userData?.user_name;
+export const selectBreadcrumbs = (state: RootState) => state.app.breadcrumbs;
 export default appSlice.reducer;

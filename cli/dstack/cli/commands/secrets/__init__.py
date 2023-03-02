@@ -5,6 +5,7 @@ from rich import print
 from rich.console import Console
 from rich.prompt import Confirm, Prompt
 from rich.table import Table
+from rich_argparse import RichHelpFormatter
 
 from dstack.api.backend import list_backends
 from dstack.api.repo import load_repo_data
@@ -23,9 +24,11 @@ class SecretCommand(BasicCommand):
     def register(self):
         subparsers = self._parser.add_subparsers()
 
-        subparsers.add_parser("list", help="List secrets")
+        subparsers.add_parser("list", help="List secrets", formatter_class=RichHelpFormatter)
 
-        add_secrets_parser = subparsers.add_parser("add", help="Add a secret")
+        add_secrets_parser = subparsers.add_parser(
+            "add", help="Add a secret", formatter_class=RichHelpFormatter
+        )
         add_secrets_parser.add_argument(
             "secret_name", metavar="NAME", type=str, help="The name of the secret"
         )
@@ -41,7 +44,9 @@ class SecretCommand(BasicCommand):
         )
         add_secrets_parser.set_defaults(func=self.add_secret)
 
-        update_secrets_parser = subparsers.add_parser("update", help="Update a secret")
+        update_secrets_parser = subparsers.add_parser(
+            "update", help="Update a secret", formatter_class=RichHelpFormatter
+        )
         update_secrets_parser.add_argument(
             "secret_name", metavar="NAME", type=str, help="The name of the secret"
         )

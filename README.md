@@ -9,12 +9,11 @@
 </h1>
 
 <h4 align="center">
-Reproducible ML workflows
+Easy-to-run & reproducible ML pipelines on any cloud
 </h4>
 
 <p align="center">
-<code>dstack</code> is an open-source tool that allows running reproducible ML workflows independently of
-the environment (locally or in the cloud), and collaborate around data and models. 
+<code>dstack</code> is an open-source tool that streamlines the process of creating reproducible ML training pipelines that are independent of any specific vendor. 
 </p>
 
 [![Slack](https://img.shields.io/badge/slack-join%20community-blueviolet?logo=slack&style=for-the-badge)](https://join.slack.com/t/dstackai/shared_invite/zt-xdnsytie-D4qU9BvJP8vkbkHXdi6clQ)
@@ -31,20 +30,18 @@ the environment (locally or in the cloud), and collaborate around data and model
 
 </div>
 
-`dstack` is an open-source tool that allows running reproducible ML workflows independently of
-the environment. It allows running ML workflows locally or remotely (e.g. in a configured cloud account). 
-Additionally, `dstack` facilitates versioning and reuse of artifacts (such as data and models), across teams.
+`dstack` is an open-source tool that streamlines the process of creating reproducible ML training pipelines that are
+independent of any specific vendor. It also promotes collaboration on data and models.
 
-In brief, `dstack` simplifies the process of establishing ML training pipelines that are independent of a
-particular vendor, and facilitates collaboration within teams on data and models.
+### Highlighted features
 
-### How does it work?
-
-* Define workflows via YAML
-* Run workflows locally via CLI
-* Track and reuse artifacts across workflows
-* Run workflows remotely (in any configured cloud) via CLI
-* Version and share artifacts across teams
+* Define ML pipelines via YAML and run either locally or on any cloud
+* Have cloud instances created and destroyed automatically
+* Use spot instances efficiently to save costs
+* Save artifacts and reuse them conveniently across workflows
+* Use interactive dev environments, such as notebooks or IDEs
+* Use any frameworks or experiment trackers. No code changes are required.
+* No need for Kubernetes or custom Docker images
 
 ## Installation
 

@@ -10,7 +10,7 @@ from dstack.core.error import BackendError, check_config, check_git
 
 class PullCommand(BasicCommand):
     NAME = "pull"
-    DESCRIPTION = "Copy a run and its artifacts from remote to local"
+    DESCRIPTION = "Pull artifacts of a remote run"
 
     def __init__(self, parser):
         super().__init__(parser)

@@ -32,7 +32,7 @@ dstack run hello-txt
 ## List artifacts
 
 To see artifacts of a run, you can use the
-[`dstack ls`](../reference/cli/index.md#dstack-artifacts-list) command followed
+[`dstack ls`](../reference/cli/ls.md) command followed
 by the name of the run.
 
 ```shell hl_lines="1"

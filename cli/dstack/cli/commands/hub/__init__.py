@@ -2,6 +2,7 @@ import os
 from argparse import Namespace
 
 import uvicorn
+from rich_argparse import RichHelpFormatter
 
 from dstack import version
 from dstack.cli.commands import BasicCommand
@@ -30,7 +31,9 @@ class HubCommand(BasicCommand):
     def register(self):
         subparsers = self._parser.add_subparsers()
 
-        hub_parser = subparsers.add_parser("start", help="Start a hub server")
+        hub_parser = subparsers.add_parser(
+            "start", help="Start a hub server", formatter_class=RichHelpFormatter
+        )
 
         hub_parser.add_argument(
             "--host",

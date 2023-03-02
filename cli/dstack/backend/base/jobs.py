@@ -183,7 +183,9 @@ def stop_job(
     job = get_job(storage, repo_address, job_id)
     runner = runners.get_runner(storage, job.runner_id) if job else None
     request_status = (
-        compute.get_request_head(job, runner.request_id).status
+        compute.get_request_head(
+            job, (runner.request_id if runner else None) or job.request_id
+        ).status
         if job
         else RequestStatus.TERMINATED
     )
