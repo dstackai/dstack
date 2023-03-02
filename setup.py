@@ -77,10 +77,11 @@ setup(
         "jinja2",
         "pygtail",
         "packaging",
-        "google-cloud-storage",
-        "google-cloud-compute",
-        "google-cloud-secret-manager",
-        "google-cloud-logging",
+        "google-auth>=2.3.0",  # indirect
+        "google-cloud-storage>=2.0.0",
+        "google-cloud-compute>=1.5.0",
+        "google-cloud-secret-manager>=2.0.0",
+        "google-cloud-logging>=2.0.0",
     ],
     classifiers=[
         "Development Status :: 2 - Pre-Alpha",
