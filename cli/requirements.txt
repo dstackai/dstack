@@ -27,5 +27,4 @@ google-cloud-compute
 google-cloud-secret-manager
 google-cloud-logging
 aiosqlite
-aiosqlite
 packaging
