@@ -68,7 +68,9 @@ class GCPConfigurator(BackendConfig):
         return "gcp"
 
     @classmethod
-    def load(cls, path: Path = get_config_path()) -> GCPConfig:
+    def load(cls, path: Path = get_config_path()) -> Optional[GCPConfig]:
+        if not path.exists():
+            return None
         with open(path) as f:
             return GCPConfig.deserialize_yaml(f.read())
 
@@ -80,11 +82,8 @@ class GCPConfigurator(BackendConfig):
         zone = None
         bucket_name = None
         credentials_file = None
-        try:
-            config = self.load()
-        except Exception:
-            pass
-        else:
+        config = self.load()
+        if config is not None:
             zone = config.zone
             bucket_name = config.bucket_name
             credentials_file = config.credentials_file
