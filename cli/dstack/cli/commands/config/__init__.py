@@ -1,5 +1,6 @@
 from argparse import Namespace
 
+from dstack.api.backend import get_current_remote_backend
 from dstack.api.config import dict_config
 from dstack.cli.commands import BasicCommand
 from dstack.cli.common import ask_choice
@@ -17,13 +18,14 @@ class ConfigCommand(BasicCommand):
 
     def _command(self, args: Namespace):
         configs = dict_config()
-        if len(configs) > 1:
-            backend_name = ask_choice(
-                "Choose backend",
-                [f"[{key}]" for key in configs.keys()],
-                [key for key in configs.keys()],
-                "aws",
-            )
-            configs[backend_name].configure()
-        else:
-            configs["aws"].configure()
+        default_backend_name = None
+        remote_backend = get_current_remote_backend()
+        if remote_backend is not None:
+            default_backend_name = remote_backend.name
+        backend_name = ask_choice(
+            "Choose backend",
+            [f"[{key}]" for key in configs.keys()],
+            [key for key in configs.keys()],
+            default_backend_name,
+        )
+        configs[backend_name].configure()
