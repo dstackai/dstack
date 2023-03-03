@@ -11,17 +11,102 @@ from simple_term_menu import TerminalMenu
 from dstack.cli.common import ask_choice, console
 from dstack.core.config import BackendConfig, get_config_path
 
+DEFAULT_GEOGRAPHIC_AREA = "North America"
+
+
+GCP_LOCATIONS = [
+    {
+        "name": "North America",
+        "regions": [
+            "northamerica-northeast1",
+            "northamerica-northeast2",
+            "us-central1",
+            "us-east1",
+            "us-east4",
+            "us-east5",
+            "us-south1",
+            "us-west1",
+            "us-west2",
+            "us-west3",
+            "us-west4",
+        ],
+        "default_region": "us-west1",
+        "default_zone": "us-west1-b",
+    },
+    {
+        "name": "South America",
+        "regions": [
+            "southamerica-east1",
+            "southamerica-west1",
+        ],
+        "default_region": "southamerica-east1",
+        "default_zone": "southamerica-east1-b",
+    },
+    {
+        "name": "Europe",
+        "regions": [
+            "europe-central2",
+            "europe-north1",
+            "europe-southwest1",
+            "europe-west1",
+            "europe-west2",
+            "europe-west3",
+            "europe-west4",
+            "europe-west6",
+            "europe-west8",
+            "europe-west9",
+        ],
+        "default_region": "europe-west4",
+        "default_zone": "europe-west4-a",
+    },
+    {
+        "name": "Asia",
+        "regions": [
+            "asia-east1",
+            "asia-east2",
+            "asia-northeast1",
+            "asia-northeast2",
+            "asia-northeast3",
+            "asia-south1",
+            "asia-south2",
+            "asia-southeast1",
+            "asia-southeast2",
+        ],
+        "default_region": "asia-southeast1",
+        "default_zone": "asia-southeast1-b",
+    },
+    {
+        "name": "Middle East",
+        "regions": [
+            "me-west1",
+        ],
+        "default_region": "me-west1",
+        "default_zone": "me-west1-b",
+    },
+    {
+        "name": "Australia",
+        "regions": [
+            "australia-southeast1",
+            "australia-southeast2",
+        ],
+        "default_region": "australia-southeast1",
+        "default_zone": "australia-southeast1-c",
+    },
+]
+
 
 class GCPConfig:
     def __init__(
         self,
         project_id: str,
+        region: str,
         zone: str,
         bucket_name: str,
         credentials_file: Optional[str] = None,
         credentials: Optional[Dict] = None,
     ):
         self.project_id = project_id
+        self.region = region
         self.zone = zone
         self.bucket_name = bucket_name
         self.credentials_file = credentials_file
@@ -31,6 +116,7 @@ class GCPConfig:
         res = {
             "backend": "gcp",
             "project": self.project_id,
+            "region": self.region,
             "zone": self.zone,
             "bucket": self.bucket_name,
         }
@@ -45,6 +131,7 @@ class GCPConfig:
     def deserialize(cls, data: Dict) -> Optional["GCPConfig"]:
         try:
             project_id = data["project"]
+            region = data["region"]
             zone = data["zone"]
             bucket_name = data["bucket"]
         except KeyError:
@@ -52,6 +139,7 @@ class GCPConfig:
         credentials_file = data.get("credentials_file")
         return cls(
             project_id=project_id,
+            region=region,
             zone=zone,
             bucket_name=bucket_name,
             credentials_file=credentials_file,
@@ -59,7 +147,10 @@ class GCPConfig:
 
     @classmethod
     def deserialize_yaml(cls, yaml_content: str) -> Optional["GCPConfig"]:
-        return cls.deserialize(yaml.load(yaml_content, yaml.FullLoader))
+        content = yaml.load(yaml_content, yaml.FullLoader)
+        if content is None:
+            return None
+        return cls.deserialize(content)
 
 
 class GCPConfigurator(BackendConfig):
@@ -80,11 +171,13 @@ class GCPConfigurator(BackendConfig):
 
     def configure(self):
         zone = None
+        region = None
         bucket_name = None
         credentials_file = None
         config = self.load()
         if config is not None:
             zone = config.zone
+            region = config.region
             bucket_name = config.bucket_name
             credentials_file = config.credentials_file
 
@@ -93,11 +186,18 @@ class GCPConfigurator(BackendConfig):
         self.credentials = self._get_credentials(self.credentials_file)
         self.project_id = self.credentials.project_id
 
-        self.zone = self._ask_zone(zone)
+        default_area = self._get_region_geographic_area(region)
+        area = self._ask_geographic_area(default_area)
+        location = self._get_location(area)
+        region = self._ask_region(location, region)
+        self.region = region.name
+        self.zone = self._ask_zone(location, region, zone)
+
         self.bucket_name = self._ask_bucket(default_bucket=bucket_name)
 
         config = GCPConfig(
             project_id=self.project_id,
+            region=self.region,
             zone=self.zone,
             bucket_name=self.bucket_name,
             credentials_file=self.credentials_file,
@@ -130,35 +230,43 @@ class GCPConfigurator(BackendConfig):
             return None
         return credentials
 
-    def _ask_zone(self, default_zone: Optional[str]) -> str:
+    def _ask_geographic_area(self, default_area: Optional[str]) -> str:
+        if default_area is None:
+            default_area = DEFAULT_GEOGRAPHIC_AREA
+        area_names = sorted([l["name"] for l in GCP_LOCATIONS])
+        area_name = ask_choice(
+            "Choose GCP geographic area",
+            area_names,
+            area_names,
+            default_area,
+        )
+        return area_name
+
+    def _ask_region(self, location: Dict, default_region: Optional[str]) -> compute_v1.Region:
         regions_client = compute_v1.RegionsClient(credentials=self.credentials)
-        zones_client = compute_v1.ZonesClient(credentials=self.credentials)
-        default_region = None
-        if default_zone is not None:
-            get_zone_request = compute_v1.GetZoneRequest(
-                project=self.project_id, zone=default_zone
-            )
-            zone = zones_client.get(get_zone_request)
-            default_region = self._get_resource_name(zone.region)
         list_regions_request = compute_v1.ListRegionsRequest(project=self.project_id)
         regions = regions_client.list(list_regions_request)
-        region_names = [r.name for r in regions]
+        region_names = sorted([r.name for r in regions if r.name in location["regions"]])
         if default_region is None:
-            default_region = region_names[0]
+            default_region = location["default_region"]
         region_name = ask_choice(
             "Choose GCP region",
-            region_names,
-            region_names,
+            [f"No preference ({location['default_region']})"] + region_names,
+            [location["default_region"]] + region_names,
             default_region,
         )
-        region = {r.name: r for r in regions}[region_name]
-        zone_names = [self._get_resource_name(z) for z in region.zones]
+        return {r.name: r for r in regions}[region_name]
+
+    def _ask_zone(
+        self, location: Dict, region: compute_v1.Region, default_zone: Optional[str]
+    ) -> str:
+        zone_names = sorted([self._get_resource_name(z) for z in region.zones])
         if default_zone not in zone_names:
-            default_zone = zone_names[0]
+            default_zone = location["default_zone"]
         zone = ask_choice(
             "Choose GCP zone",
-            zone_names,
-            zone_names,
+            [f"No preference ({location['default_zone']})"] + zone_names,
+            [location["default_zone"]] + zone_names,
             default_zone,
         )
         return zone
@@ -169,7 +277,7 @@ class GCPConfigurator(BackendConfig):
             "[gray46]Use arrows to move, type to filter[/gray46]"
         )
         if default_bucket is None:
-            default_bucket = f"dstack-{self.project_id}"
+            default_bucket = f"dstack-{self.project_id}-{self.region}"
         bucket_options = [f"Default [{default_bucket}]", "Custom..."]
         bucket_menu = TerminalMenu(
             bucket_options,
@@ -198,7 +306,7 @@ class GCPConfigurator(BackendConfig):
     def _validate_bucket(self, bucket_name: str) -> bool:
         storage_client = storage.Client(project=self.project_id, credentials=self.credentials)
         try:
-            storage_client.get_bucket(bucket_name)
+            bucket = storage_client.get_bucket(bucket_name)
         except (ValueError, exceptions.BadRequest) as e:
             console.print(
                 "[red bold]✗[/red bold] Bucket name is not valid."
@@ -211,18 +319,42 @@ class GCPConfigurator(BackendConfig):
                 f"[red bold]The bucket doesn't exist. Create it?[/red bold]",
                 default="y",
             ):
-                # We create multi-region buckets by default
-                location = self._get_zone_location(self.zone)
-                storage_client.create_bucket(bucket_name, location=location)
+                storage_client.create_bucket(bucket_name, location=self.region)
                 return True
             else:
                 return False
+
+        if (
+            bucket.location != self.region
+            and bucket.location != self._get_zone_multi_region_location(self.zone)
+        ):
+            console.print(
+                f"[red bold]✗[/red bold] Bucket location is '{bucket.location.lower()}',"
+                f" but you chose '{self.region}' as region."
+                f" Please use a bucket located in '{self.region}'."
+            )
+            return False
+
         return True
 
     def _get_resource_name(self, resource_path: str) -> str:
         return resource_path.rsplit(sep="/", maxsplit=1)[1]
 
-    def _get_zone_location(self, zone: str) -> str:
+    def _get_region_geographic_area(self, region: Optional[str]) -> Optional[str]:
+        if region is None:
+            return None
+        for location in GCP_LOCATIONS:
+            if region in location["regions"]:
+                return location["name"]
+        return None
+
+    def _get_location(self, area: str) -> Optional[Dict]:
+        for location in GCP_LOCATIONS:
+            if location["name"] == area:
+                return location
+        return None
+
+    def _get_zone_multi_region_location(self, zone: str) -> str:
         if zone.startswith("asia"):
             return "ASIA"
         if zone.startswith("eu"):
