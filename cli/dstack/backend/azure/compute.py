@@ -60,7 +60,10 @@ from dstack.core.request import RequestHead, RequestStatus
 
 
 class AzureCompute(Compute):
-    def __init__(self, credential: TokenCredential, subscription_id: str, location: str):
+    # XXX: Config is leaking here. It is run_instance's parameter only.
+    def __init__(
+        self, credential: TokenCredential, subscription_id: str, location: str, config: Config
+    ):
         self._compute_client = ComputeManagementClient(
             credential=credential, subscription_id=subscription_id
         )
