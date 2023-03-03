@@ -246,13 +246,16 @@ class GCPConfigurator(BackendConfig):
         regions_client = compute_v1.RegionsClient(credentials=self.credentials)
         list_regions_request = compute_v1.ListRegionsRequest(project=self.project_id)
         regions = regions_client.list(list_regions_request)
-        region_names = sorted([r.name for r in regions if r.name in location["regions"]])
+        region_names = sorted(
+            [r.name for r in regions if r.name in location["regions"]],
+            key=lambda name: (name != location["default_region"], name),
+        )
         if default_region is None:
-            default_region = location["default_region"]
+            default_region = region_names[0]
         region_name = ask_choice(
             "Choose GCP region",
-            [f"No preference ({location['default_region']})"] + region_names,
-            [location["default_region"]] + region_names,
+            region_names,
+            region_names,
             default_region,
         )
         return {r.name: r for r in regions}[region_name]
@@ -260,13 +263,16 @@ class GCPConfigurator(BackendConfig):
     def _ask_zone(
         self, location: Dict, region: compute_v1.Region, default_zone: Optional[str]
     ) -> str:
-        zone_names = sorted([self._get_resource_name(z) for z in region.zones])
+        zone_names = sorted(
+            [self._get_resource_name(z) for z in region.zones],
+            key=lambda name: (name != location["default_zone"], name),
+        )
         if default_zone not in zone_names:
-            default_zone = location["default_zone"]
+            default_zone = zone_names[0]
         zone = ask_choice(
             "Choose GCP zone",
-            [f"No preference ({location['default_zone']})"] + zone_names,
-            [location["default_zone"]] + zone_names,
+            zone_names,
+            zone_names,
             default_zone,
         )
         return zone
@@ -324,10 +330,10 @@ class GCPConfigurator(BackendConfig):
             else:
                 return False
 
-        if (
-            bucket.location != self.region
-            and bucket.location != self._get_zone_multi_region_location(self.zone)
-        ):
+        if bucket.location.lower() not in [
+            self.region,
+            self._get_zone_multi_region_location(self.zone),
+        ]:
             console.print(
                 f"[red bold]✗[/red bold] Bucket location is '{bucket.location.lower()}',"
                 f" but you chose '{self.region}' as region."

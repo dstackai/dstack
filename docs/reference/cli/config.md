@@ -29,6 +29,7 @@ The command will ask you for a path to the a service account key, GCP region and
 
 ```
 Path to credentials file: ~/Projects/dstack/my-sa-key.json
+GCP geographic area: North America
 GCP region: us-central1
 GCP zone: us-central1-c
 Storage bucket: dstack-test

@@ -22,7 +22,7 @@ Please refer to the specific instructions below for configuring a remote, based 
 
 ### AWS
 
-#### Create an S3 bucket
+#### 1. Create an S3 bucket
 
 In order to use AWS as a remote, you first have to create an S3 bucket in your AWS account.
 This bucket will be used to store workflow artifacts and metadata.
@@ -30,7 +30,7 @@ This bucket will be used to store workflow artifacts and metadata.
 !!! info "NOTE:"
     Make sure to create an S3 bucket in the AWS region where you'd like to run your workflows.
 
-#### Configure AWS credentials
+#### 2. Configure AWS credentials
 
 The next step is to configure AWS credentials on your local machine. The credentials should grant
 the permissions to perform actions on `s3`, `logs`, `secretsmanager`, `ec2`, and `iam` services.
@@ -173,7 +173,7 @@ the permissions to perform actions on `s3`, `logs`, `secretsmanager`, `ec2`, and
     }
     ```
 
-#### Configure the CLI
+#### 3. Configure the CLI
 
 Once the AWS credentials are configured on your local machine, you can configure the CLI:
 
@@ -205,7 +205,7 @@ That's it! You've configured AWS as a remote.
 
 #### 1. Create a project
 
-In order to use AWS as a remote, you first have to create a project in your GCP account,
+In order to use GCP as a remote, you first have to create a project in your GCP account
 and make sure that the required APIs and enabled for it.
 
 ??? info "Required APIs"
@@ -223,7 +223,7 @@ and make sure that the required APIs and enabled for it.
 
 #### 2. Create a storage bucket
 
-Once the project is created, you can proceed and create a storage bucket in the created project. This bucket
+Once the project is created, you can proceed and create a storage bucket. This bucket
 will be used to store workflow artifacts and metadata.
 
 !!! info "NOTE:"
@@ -231,13 +231,13 @@ will be used to store workflow artifacts and metadata.
 
 #### 3. Create a service account
 
-The next step is to create a service account in the created project and configure for it the 
-following roles: `Service Account User`, `Compute Admin`, `Storage Admin`, `Secret Manager Admin`, and `Logging Admin`.
+The next step is to create a service account in the created project and configure the 
+following roles for it: `Service Account User`, `Compute Admin`, `Storage Admin`, `Secret Manager Admin`, and `Logging Admin`.
 
 #### 4. Create a service account key
 
-Once the service account is set up, create a key for it, and download the corresponding JSON file on
-to local machine (e.g. to `~/Downloads/my-awesome-project-d7735ca1dd53.json`).
+Once the service account is set up, create a key for it and download the corresponding JSON file
+to your local machine (e.g. to `~/Downloads/my-awesome-project-d7735ca1dd53.json`).
 
 #### 5. Configure the CLI
 
@@ -252,6 +252,7 @@ The command will ask you for a path to the a service account key, GCP region and
 ```
 Backend: gcp
 Path to credentials file: ~/Downloads/my-awesome-project-d7735ca1dd53.json
+GCP geographic area: North America
 GCP region: us-central1
 GCP zone: us-central1-c
 Storage bucket: dstack-my-awesome-project
