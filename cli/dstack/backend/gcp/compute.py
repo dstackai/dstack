@@ -162,7 +162,6 @@ def _get_nongpu_instance_type(
         zone=zone,
         machine_families=machine_families,
     )
-    instance_types = [it for it in instance_types if it.instance_name not in ["e2-highcpu-2"]]
     return choose_instance_type(instance_types, requirements)
 
 

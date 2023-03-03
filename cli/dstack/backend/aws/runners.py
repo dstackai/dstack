@@ -34,7 +34,7 @@ def _get_instance_types(ec2_client: BaseClient) -> List[InstanceType]:
             Filters=[
                 {
                     "Name": "instance-type",
-                    "Values": ["c5.*", "m5.*", "p2.*", "p3.*", "p4d.*", "p4de.*"],
+                    "Values": ["t2.small", "c5.*", "m5.*", "p2.*", "p3.*", "p4d.*", "p4de.*"],
                 },
             ],
             **kwargs,
