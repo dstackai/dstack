@@ -8,14 +8,17 @@ import (
 	"github.com/Azure/azure-sdk-for-go/sdk/azidentity"
 	"github.com/Azure/azure-sdk-for-go/sdk/storage/azblob"
 	"github.com/Azure/azure-sdk-for-go/sdk/storage/azblob/container"
+	"github.com/dstackai/dstack/runner/consts"
 	"github.com/dstackai/dstack/runner/internal/artifacts"
 	"github.com/dstackai/dstack/runner/internal/backend"
+	"github.com/dstackai/dstack/runner/internal/common"
 	"github.com/dstackai/dstack/runner/internal/gerrors"
 	"github.com/dstackai/dstack/runner/internal/log"
 	"github.com/dstackai/dstack/runner/internal/models"
 	"gopkg.in/yaml.v2"
 	"io"
 	"os"
+	"path"
 	"strings"
 )
 
@@ -174,9 +177,9 @@ func (azbackend *AzureBackend) Shutdown(ctx context.Context) error {
 	return nil
 }
 
-func (azbackend *AzureBackend) GetArtifact(ctx context.Context, rootPath, localPath, remotePath string, fs bool) artifacts.Artifacter {
-	//TODO implement me
-	panic("implement me")
+func (azbackend *AzureBackend) GetArtifact(ctx context.Context, runName, localPath, remotePath string, fs bool) artifacts.Artifacter {
+	workDir := path.Join(common.HomeDir(), consts.USER_ARTIFACTS_PATH, runName)
+	return NewGCPArtifacter(gbackend.storage, workDir, localPath, remotePath)
 }
 
 func (azbackend *AzureBackend) CreateLogger(ctx context.Context, logGroup, logName string) io.Writer {
