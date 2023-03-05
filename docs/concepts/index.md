@@ -1,7 +1,6 @@
-# How dstack works 
+# Concepts 
 
-`dstack` allows YAML-defined ML pipelines to be run locally or remotely in any configured cloud accounts without
-Kubernetes or custom Docker images via CLI.
+`dstack` allows YAML-defined ML workflows to be run locally or remotely in any configured cloud accounts via CLI.
 
 Workflows can be scripts for data preparation or model training, web apps like Streamlit or Gradio, or development
 environments like JupyterLab or VS Code.
@@ -72,8 +71,8 @@ runs, among others.
  
 ## Why dstack?
 
-`dstack` enables you to create ML pipelines that are independent of any particular vendor and run them effortlessly
-from your preferred IDE.
+`dstack` enables you to define ML workflows declaratively and run them effortlessly
+from your preferred IDE either locally or remotely on any cloud.
 
 Unlike end-to-end MLOps platforms, `dstack` is lightweight, developer-friendly, and designed to facilitate collaboration
 without imposing any particular approach.

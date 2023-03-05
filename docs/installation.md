@@ -7,12 +7,12 @@ pip install dstack --upgrade
 ```
 
 !!! info "NOTE:"
-    If you only plan to run workflows locally and do not want to share artifacts with others outside your machine, you do
-    not need to configure anything else.
+    By default, workflows run locally. If you only plan to run workflows locally and do not want to share artifacts 
+    with others outside your machine, you do not need to configure anything else.
 
-## Configure a remote
+### Configure a remote
 
-By default, workflows are run locally. If you want to be able to run workflows remotely (e.g. in a configured cloud account),
+If you want to be able to run workflows remotely (e.g. in a configured cloud account),
 you have to configure a remote using the `dstack config` command. 
 
 Please refer to the specific instructions below for configuring a remote, based on your desired cloud provider.
@@ -20,9 +20,9 @@ Please refer to the specific instructions below for configuring a remote, based 
 !!! info "NOTE:"
     Currently, you can configure only AWS and GCP as remotes. Support for Azure, and Hub[^1] are coming soon.
 
-### AWS
+## Configure an AWS remote
 
-#### 1. Create an S3 bucket
+### 1. Create an S3 bucket
 
 In order to use AWS as a remote, you first have to create an S3 bucket in your AWS account.
 This bucket will be used to store workflow artifacts and metadata.
@@ -30,7 +30,7 @@ This bucket will be used to store workflow artifacts and metadata.
 !!! info "NOTE:"
     Make sure to create an S3 bucket in the AWS region where you'd like to run your workflows.
 
-#### 2. Configure AWS credentials
+### 2. Configure AWS credentials
 
 The next step is to configure AWS credentials on your local machine. The credentials should grant
 the permissions to perform actions on `s3`, `logs`, `secretsmanager`, `ec2`, and `iam` services.
@@ -173,7 +173,7 @@ the permissions to perform actions on `s3`, `logs`, `secretsmanager`, `ec2`, and
     }
     ```
 
-#### 3. Configure the CLI
+### 3. Configure the CLI
 
 Once the AWS credentials are configured on your local machine, you can configure the CLI:
 
@@ -194,16 +194,16 @@ EC2 subnet: none
 
 That's it! You've configured AWS as a remote.
 
-### GCP
+## Configure a GCP remote
 
 !!! info "NOTE:"
-    Support for GCP is experimental. In order to try it, make sure to install the latest pre-release version of `dstack`:
+    Support for GCP is experimental. In order to try it, make sure to install the `0.2rc1` version of `dstack`:
 
     ```shell hl_lines="1"
-    pip install dstack --pre --upgrade
+    pip install dstack==0.2rc1
     ```
 
-#### 1. Create a project
+### 1. Create a project
 
 In order to use GCP as a remote, you first have to create a project in your GCP account
 and make sure that the required APIs and enabled for it.
@@ -221,7 +221,7 @@ and make sure that the required APIs and enabled for it.
     storage.googleapis.com 
     ```
 
-#### 2. Create a storage bucket
+### 2. Create a storage bucket
 
 Once the project is created, you can proceed and create a storage bucket. This bucket
 will be used to store workflow artifacts and metadata.
@@ -229,17 +229,17 @@ will be used to store workflow artifacts and metadata.
 !!! info "NOTE:"
     Make sure to create the bucket in the location where you'd like to run your workflows.
 
-#### 3. Create a service account
+### 3. Create a service account
 
 The next step is to create a service account in the created project and configure the 
 following roles for it: `Service Account User`, `Compute Admin`, `Storage Admin`, `Secret Manager Admin`, and `Logging Admin`.
 
-#### 4. Create a service account key
+### 4. Create a service account key
 
 Once the service account is set up, create a key for it and download the corresponding JSON file
 to your local machine (e.g. to `~/Downloads/my-awesome-project-d7735ca1dd53.json`).
 
-#### 5. Configure the CLI
+### 5. Configure the CLI
 
 Once the service account key JSON file is on your machine, you can configure the CLI:
 

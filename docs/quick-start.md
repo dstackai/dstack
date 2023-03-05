@@ -282,7 +282,7 @@ also run locally.
 To run workflows remotely or enable artifact reuse outside of your machine, you can configure a remote 
 using the [`dstack config`](reference/cli/config.md) command.
 
-See [Installation](installation.md#optional-configure-a-remote) to learn more about supported remote types and how to configure them.
+See [Installation](installation.md#configure-a-remote) to learn more about supported remote types and how to configure them.
 
 ## 6. Push artifacts
 

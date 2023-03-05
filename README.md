@@ -9,11 +9,11 @@
 </h1>
 
 <h4 align="center">
-Easy-to-run & reproducible ML pipelines on any cloud
+Easy-to-run ML workflows on any cloud
 </h4>
 
 <p align="center">
-<code>dstack</code> is an open-source tool that streamlines the process of creating reproducible ML training pipelines that are independent of any specific vendor. 
+Define ML workflows as code and run via CLI. Use any cloud. Collaborate within teams. 
 </p>
 
 [![Slack](https://img.shields.io/badge/slack-join%20community-blueviolet?logo=slack&style=for-the-badge)](https://join.slack.com/t/dstackai/shared_invite/zt-xdnsytie-D4qU9BvJP8vkbkHXdi6clQ)
@@ -30,18 +30,15 @@ Easy-to-run & reproducible ML pipelines on any cloud
 
 </div>
 
-`dstack` is an open-source tool that streamlines the process of creating reproducible ML training pipelines that are
-independent of any specific vendor. It also promotes collaboration on data and models.
+`dstack` is the most easy way to define ML workflows as code and run them either locally or remotely on any cloud.
 
 ### Highlighted features
 
-* Define ML pipelines via YAML and run either locally or on any cloud
-* Have cloud instances created and destroyed automatically
-* Use spot instances efficiently to save costs
-* Save artifacts and reuse them conveniently across workflows
-* Use interactive dev environments, such as notebooks or IDEs
-* Use any frameworks or experiment trackers. No code changes are required.
-* No need for Kubernetes or custom Docker images
+* Define ML workflows declaratively as code
+* Run workflows locally or remotely on any cloud (AWS, GCP, etc)
+* Use on-demand on spot instances conveniently
+* Save data, checkpoints, environments as artifacts and reuse them across workflows
+* No need to use custom Docker images or Kubernetes
 
 ## Installation
 
@@ -76,8 +73,8 @@ workflows:
       - path: ./lightning_logs
 ```
 
-With workflows defined in this manner, `dstack` allows for effortless execution either locally or in a configured cloud
-account, while also enabling reuse of artifacts.
+YAML-defined workflows eliminate the need to modify code in your scripts, giving you the freedom to choose frameworks,
+experiment trackers, and cloud providers.
 
 ## Run locally
 
@@ -87,7 +84,7 @@ Use the `dstack` CLI to run workflows locally:
 dstack run mnist-data
 ```
 
-## Configure a remote
+## Run remotely
 
 To run workflows remotely (e.g. in the cloud) or share artifacts outside your machine, 
 you must configure your remote settings using the `dstack config` command:
@@ -107,8 +104,6 @@ EC2 subnet: none
 ```
 
 For more details on how to configure a remote, check the [installation](https://docs.dstack.ai/installation/#optional-configure-a-remote) guide.
-
-## Run remotely
 
 Once a remote is configured, use the `--remote` flag with the `dstack run` command to run the 
 workflow in the configured cloud:
