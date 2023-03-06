@@ -290,6 +290,7 @@ class GCPConfigurator(BackendConfig):
             menu_cursor_style=["fg_red", "bold"],
             menu_highlight_style=["fg_red", "bold"],
             search_highlight_style=["fg_purple"],
+            raise_error_on_interrupt=True,
         )
         bucket_index = bucket_menu.show()
         bucket_title = bucket_options[bucket_index].replace("[", "\\[")

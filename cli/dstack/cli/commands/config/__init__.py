@@ -3,7 +3,7 @@ from argparse import Namespace
 from dstack.api.backend import get_current_remote_backend
 from dstack.api.config import dict_config
 from dstack.cli.commands import BasicCommand
-from dstack.cli.common import ask_choice
+from dstack.cli.common import ask_choice, console
 
 
 class ConfigCommand(BasicCommand):
@@ -22,10 +22,14 @@ class ConfigCommand(BasicCommand):
         remote_backend = get_current_remote_backend()
         if remote_backend is not None:
             default_backend_name = remote_backend.name
-        backend_name = ask_choice(
-            "Choose backend",
-            [f"[{key}]" for key in configs.keys()],
-            [key for key in configs.keys()],
-            default_backend_name,
-        )
-        configs[backend_name].configure()
+        try:
+            backend_name = ask_choice(
+                "Choose backend",
+                [f"[{key}]" for key in configs.keys()],
+                [key for key in configs.keys()],
+                default_backend_name,
+            )
+            configs[backend_name].configure()
+        except KeyboardInterrupt:
+            console.print("Configuration canceled")
+            exit(1)
