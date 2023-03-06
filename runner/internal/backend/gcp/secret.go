@@ -41,6 +41,7 @@ func (sm *GCPSecretManager) FetchSecret(ctx context.Context, repoData *models.Re
 
 func (sm *GCPSecretManager) FetchCredentials(ctx context.Context, repoData *models.RepoData) (*models.GitCredentials, error) {
 	key := getCreadentialsKey(sm.bucket, repoData)
+	// XXX: what is the purpose to use new?
 	creds := new(models.GitCredentials)
 	data, err := sm.getSecretValue(ctx, key)
 	if err != nil {

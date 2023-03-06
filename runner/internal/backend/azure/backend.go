@@ -23,16 +23,22 @@ type AzureConfigStorage struct {
 	Container string `yaml:"container"`
 }
 
+type AzureConfigSecret struct {
+	Url string `yaml:"url"`
+}
+
 type AzureConfig struct {
 	Storage AzureConfigStorage `yaml:"storage"`
+	Secret  AzureConfigSecret  `yaml:"secret"`
 }
 
 type AzureBackend struct {
-	config     AzureConfig
-	storage    AzureStorage
-	credential *azidentity.DefaultAzureCredential
-	runnerID   string
-	state      *models.State
+	config        AzureConfig
+	storage       AzureStorage
+	secretManager AzureSecretManager
+	credential    *azidentity.DefaultAzureCredential
+	runnerID      string
+	state         *models.State
 }
 
 func init() {
@@ -58,16 +64,21 @@ func New(config AzureConfig) *AzureBackend {
 		fmt.Printf("Authentication failure: %+v", err)
 		return nil
 	}
-	var storage *AzureStorage
-	storage, err = NewAzureStorage(credential, config.Storage.Url, config.Storage.Container)
+	storage, err := NewAzureStorage(credential, config.Storage.Url, config.Storage.Container)
 	if err != nil {
 		fmt.Printf("Initialization blob service failure: %+v", err)
 		return nil
 	}
+	secretManager, err := NewAzureSecretManager(credential, config.Secret.Url)
+	if err != nil {
+		fmt.Printf("Initialization key vault service failure: %+v", err)
+		return nil
+	}
 	return &AzureBackend{
-		config:     config,
-		credential: credential,
-		storage:    *storage,
+		config:        config,
+		credential:    credential,
+		storage:       *storage,
+		secretManager: *secretManager,
 	}
 }
 
@@ -174,8 +185,13 @@ func (azbackend *AzureBackend) Secrets(ctx context.Context) (map[string]string, 
 }
 
 func (azbackend *AzureBackend) GitCredentials(ctx context.Context) *models.GitCredentials {
-	//TODO implement me
-	panic("implement me")
+	log.Trace(ctx, "Getting credentials")
+	creds, err := azbackend.secretManager.FetchCredentials(ctx, azbackend.state.Job.JobRepoData())
+	if err != nil {
+		log.Error(ctx, "Getting credentials failure: %+v", err)
+		return nil
+	}
+	return creds
 }
 
 func (azbackend *AzureBackend) GetJobByPath(ctx context.Context, path string) (*models.Job, error) {
