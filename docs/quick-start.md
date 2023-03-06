@@ -2,6 +2,9 @@
 
 This tutorial will guide you through using `dstack` locally and remotely, step by step.
 
+!!! info "NOTE:"
+    The source code for this tutorial can be located in [`github.com/dstack-examples`](https://github.com/dstackai/dstack-examples/tree/main/tutorials/mnist)
+
 ## 1. Install the CLI
 
 Use `pip` to install `dstack`:
@@ -46,7 +49,7 @@ Let us begin by creating a Python script that will prepare the data for our trai
 
 ### Create a Python script
 
-Let us create the following `mnist/mnist_data.py` script: 
+Let us create the following `tutorials/mnist/mnist_data.py` script: 
 
 ```python
 from torchvision.datasets import MNIST
@@ -73,7 +76,7 @@ workflows:
     provider: bash
     commands:
       - pip install torchvision
-      - python mnist/mnist_data.py
+      - python tutorials/mnist/mnist_data.py
     artifacts:
       - path: ./data
 ```
@@ -90,7 +93,7 @@ dstack run mnist-data
     In order for the files to be available in a workflow, they have to be tracked by Git.
     To ensure Git tracks the files, run:
     ```shell hl_lines="1"
-    git add .dstack mnist
+    git add .dstack tutorials
     ```
 
     After that, `dstack` will keep track of the file changes automatically, so you don't have to run `git add` on every change.
@@ -166,7 +169,7 @@ Now, that the data is prepared, let's create a Python script to train a model.
 
 ### Create a Python script
 
-Let us create the following `mnist/train_mnist.py` script:
+Let us create the following `tutorials/mnist/train_mnist.py` script:
 
 ```python
 import torch
@@ -229,7 +232,7 @@ workflows:
     provider: bash
     commands:
       - pip install torchvision
-      - python mnist/mnist_data.py
+      - python tutorials/mnist/mnist_data.py
     artifacts:
       - path: ./data
         
@@ -239,7 +242,7 @@ workflows:
       - workflow: mnist-data 
     commands:
       - pip install torchvision pytorch-lightning tensorboard
-      - python mnist/train_mnist.py
+      - python tutorials/mnist/train_mnist.py
     artifacts:
       - path: ./lightning_logs
 ```

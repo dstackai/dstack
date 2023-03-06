@@ -4,7 +4,7 @@ This tutorial will demonstrate how to use the [`diffusers`](https://github.com/h
 a pretrained Stable Diffusion model.
 
 !!! info "NOTE:"
-    The source code for this tutorial can be located in [`github.com/dstack-examples`](https://github.com/dstackai/dstack-examples/tree/main/stable_diffusion).
+    The source code for this tutorial can be located in [`github.com/dstack-examples`](https://github.com/dstackai/dstack-examples/tree/main/tutorials/stable_diffusion)
 
 ## Requirements
 
