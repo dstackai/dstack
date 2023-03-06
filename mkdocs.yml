@@ -101,7 +101,7 @@ extra:
   generator: false
   analytics:
     provider: google
-    property: UA-4493451-5
+    property: G-JX21114P7B
   social:
     - icon: fontawesome/brands/github
       link: https://github.com/dstackai/dstack
