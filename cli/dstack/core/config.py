@@ -1,6 +1,6 @@
 from abc import ABC, abstractmethod
 from pathlib import Path
-from typing import Dict
+from typing import Dict, Optional
 
 import yaml
 
@@ -25,15 +25,11 @@ class Configurator(ABC):
         pass
 
     @abstractmethod
-    def configure_hub(self, config: Dict):
+    def configure_hub(self, data: Dict):
         pass
 
     @abstractmethod
-    def get_backend_client(self, config: Dict):
-        pass
-
-    @abstractmethod
-    def get_config(self, config: Dict):
+    def get_config(self, data: Dict):
         pass
 
     @abstractmethod
@@ -42,6 +38,9 @@ class Configurator(ABC):
 
 
 class BackendConfig(ABC):
+
+    credentials: Optional[Dict] = None
+
     @abstractmethod
     def save(self, path: Path = get_config_path()):
         pass
@@ -49,8 +48,3 @@ class BackendConfig(ABC):
     @abstractmethod
     def load(self, path: Path = get_config_path()):
         pass
-
-    def load_json(self, json_data):
-        for key, value in json_data.items():
-            if hasattr(self, key):
-                setattr(self, key, value)

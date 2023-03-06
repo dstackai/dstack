@@ -3,8 +3,7 @@ site_name: dstack
 site_url: https://docs.dstack.ai
 site_author: Andrey Cheptsov
 site_description: >-
-  dstack is a command-line utility to run ML workflows in the cloud,
-  while keeping your workflows highly reproducible.
+  Define ML workflows as code and run via CLI. Use any cloud. Collaborate within teams.
 
 # Repository
 repo_url: https://github.com/dstackai/dstack
@@ -21,7 +20,7 @@ theme:
   logo: assets/dstack_notext.svg
   favicon: images/dstack_fav_32.ico
   icon:
-    repo: fontawesome/brands/github
+    repo: /custom/github
     edit: material/pencil
   font:
     text: Source Sans Pro
@@ -59,7 +58,8 @@ theme:
 plugins:
   - social:
       cards_color:
-        fill: "#fefeff"
+        fill: "black"
+        text: "#FFFFFF"
       cards_font: Roboto
   - search
 #  - redirects:
@@ -71,6 +71,9 @@ markdown_extensions:
   - pymdownx.emoji:
       emoji_index: !!python/name:materialx.emoji.twemoji
       emoji_generator: !!python/name:materialx.emoji.to_svg
+      options:
+        custom_icons:
+          - overrides/.icons
   - attr_list
   - def_list
   - admonition
@@ -86,6 +89,7 @@ markdown_extensions:
       permalink: true
   - attr_list
   - md_in_html
+  - footnotes
 
 # Customization
 extra_css:
@@ -97,7 +101,7 @@ extra:
   generator: false
   analytics:
     provider: google
-    property: UA-4493451-5
+    property: G-JX21114P7B
   social:
     - icon: fontawesome/brands/github
       link: https://github.com/dstackai/dstack
@@ -105,46 +109,42 @@ extra:
     #      link: https://pypi.org/project/dstack/
     - icon: fontawesome/brands/slack
       link: https://join.slack.com/t/dstackai/shared_invite/zt-xdnsytie-D4qU9BvJP8vkbkHXdi6clQ
-    - icon: material/rss
-      link: https://dstack.curated.co/
+#    - icon: material/rss
+#      link: https://dstack.curated.co/
     - icon: fontawesome/brands/twitter
       link: https://twitter.com/dstackai
 
 # Page tree
 nav:
   - Guide:
-      - Getting started:
+      - Get started:
           - Overview: index.md
           - Installation: installation.md
           - Quick start: quick-start.md
-      #        - Concepts: basics/concepts.md
+          - Concepts: concepts/index.md
           - Troubleshooting: troubleshooting.md
-      - Basics:
-          - Hello world: basics/hello-world.md
-          - Artifacts: basics/artifacts.md
-          - Deps: basics/deps.md
-          - Resources: basics/resources.md
-          - Environment variables: basics/environment-variables.md
-          - Args: basics/args.md
-          - Apps: basics/apps.md
-          - Python: basics/python.md
-          - Conda: basics/conda.md
-          - Dev environments: basics/dev-environments.md
-          - Secrets: basics/secrets.md
-      #    - Advanced:
-      #        - Hub:
-      #          - Deploying hub: advanced/deploying-hub.md
-      #        - Integrations:
-      #            - Weights & Biases: advanced/integrations/wandb.md
-      #        - Troubleshooting: advanced/troubleshooting.md
-      #    - Community:
-      #        - Slack: https://join.slack.com/t/dstackai/shared_invite/zt-xdnsytie-D4qU9BvJP8vkbkHXdi6clQ
-      #        - Contributing: c.md
+      - Usage:
+          - Basics:
+            - Hello world: basics/hello-world.md
+            - Artifacts: basics/artifacts.md
+            - Deps: basics/deps.md
+            - Resources: basics/resources.md
+            - Environment variables: basics/environment-variables.md
+            - Args: basics/args.md
+            - Apps: basics/apps.md
+            - Python: basics/python.md
+            - Conda: basics/conda.md
+            - Dev environments: basics/dev-environments.md
+            - Secrets: basics/secrets.md
+          - Examples: https://github.com/dstackai/dstack-examples
+      - Integrations:
+          - Experiment trackers:
+              - Weights & Biases: integrations/experiments/wandb.md
       - Tutorials:
-          - Stable Diffusion with Diffusers: tutorials/diffusers.md
+          - Stable Diffusion: tutorials/diffusers.md
       - What's new:
           - Changelog: https://github.com/dstackai/dstack/releases
-          - Newsletter: https://dstack.curated.co/
+#          - Newsletter: https://dstack.curated.co/
   - Reference:
       - Providers:
           - bash: reference/providers/bash.md
@@ -166,4 +166,6 @@ nav:
           - dstack secrets: reference/cli/secrets.md
           - dstack rm: reference/cli/rm.md
   - Slack: https://join.slack.com/t/dstackai/shared_invite/zt-xdnsytie-D4qU9BvJP8vkbkHXdi6clQ
+  - Twitter: https://twitter.com/dstackai/
+#  - Newsletter: https://dstack.curated.co/
 #  - GitHub: https://github.com/dstackai/dstack

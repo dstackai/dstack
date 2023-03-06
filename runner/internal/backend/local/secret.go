@@ -35,7 +35,7 @@ func (sm *ClientSecret) fetchSecret(_ context.Context, path string, secrets map[
 	}
 	result := make(map[string]string)
 	for secret, secretPath := range secrets {
-		rows, err := stmt.Query("SELECT secret_string FROM KV WHERE secret_name=?", fmt.Sprintf("/dstack/secrets/%s", secretPath))
+		rows, err := stmt.Query(fmt.Sprintf("/dstack/secrets/%s", secretPath))
 		if err != nil {
 			return nil, gerrors.Wrap(err)
 		}

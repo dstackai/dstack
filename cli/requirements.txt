@@ -9,6 +9,7 @@ python-dateutil
 paramiko
 git-url-parse
 rich
+rich-argparse
 fastapi
 starlette
 uvicorn
@@ -21,5 +22,9 @@ cursor
 simple-term-menu
 jinja2
 pygtail
+google-cloud-storage
+google-cloud-compute
+google-cloud-secret-manager
+google-cloud-logging
 aiosqlite
 packaging

@@ -1,7 +1,7 @@
 import React from 'react';
 import { useTranslation } from 'react-i18next';
 import { Container, Header, FormUI, SpaceBetween, Button, FormInput, FormField, FormTiles } from 'components';
-import { useForm, FormProvider } from 'react-hook-form';
+import { useForm, FormProvider, DefaultValues } from 'react-hook-form';
 import { IProps, TBackendOption } from './types';
 import { AWSBackend } from './AWS';
 
@@ -9,12 +9,27 @@ export const HubForm: React.FC<IProps> = ({ initialValues, onCancel, loading, on
     const { t } = useTranslation();
     const isEditing = !!initialValues;
 
-    const formMethods = useForm<IHub>({
-        defaultValues: initialValues ?? {
+    const getDefaultValues = (): DefaultValues<IHub> => {
+        if (initialValues) {
+            return {
+                ...initialValues,
+                backend: {
+                    ...initialValues.backend,
+                    ...(initialValues.backend.ec2_subnet_id === null ? { ec2_subnet_id: '' } : {}),
+                },
+            };
+        }
+
+        return {
             backend: {
                 type: 'aws',
+                ec2_subnet_id: '',
             },
-        },
+        };
+    };
+
+    const formMethods = useForm<IHub>({
+        defaultValues: getDefaultValues(),
     });
 
     const { handleSubmit, control, watch } = formMethods;
@@ -43,6 +58,7 @@ export const HubForm: React.FC<IProps> = ({ initialValues, onCancel, loading, on
     ];
 
     const onSubmit = (data: IHub) => {
+        if (data.backend.ec2_subnet_id === '') data.backend.ec2_subnet_id = null;
         onSubmitProp(data);
     };
 
@@ -81,6 +97,7 @@ export const HubForm: React.FC<IProps> = ({ initialValues, onCancel, loading, on
                                         control={control}
                                         name="hub_name"
                                         disabled={loading}
+                                        rules={{ required: t('validation.required') }}
                                     />
                                 </SpaceBetween>
                             </Container>

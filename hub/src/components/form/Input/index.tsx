@@ -7,6 +7,7 @@ import { FormInputProps } from './types';
 export const FormInput = <T extends FieldValues>({
     name,
     control,
+    rules,
     label,
     info,
     constraintText,
@@ -21,6 +22,7 @@ export const FormInput = <T extends FieldValues>({
         <Controller
             name={name}
             control={control}
+            rules={rules}
             render={({ field: { onChange, ...fieldRest }, fieldState: { error } }) => {
                 return (
                     <FormField
@@ -30,6 +32,7 @@ export const FormInput = <T extends FieldValues>({
                         stretch={stretch}
                         constraintText={constraintText}
                         secondaryControl={secondaryControl}
+                        errorText={error?.message}
                     >
                         {leftContent}
                         <InputCSD

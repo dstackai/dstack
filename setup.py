@@ -47,7 +47,7 @@ setup(
     project_urls={
         "Source": "https://github.com/dstackai/dstack",
     },
-    description="An open-source tool for teams to build reproducible ML workflows",
+    description="Easy-to-run ML workflows on any cloud",
     long_description=get_long_description(),
     long_description_content_type="text/markdown",
     python_requires=">=3.7",
@@ -63,6 +63,7 @@ setup(
         "paramiko",
         "git-url-parse",
         "rich",
+        "rich-argparse",
         "fastapi",
         "starlette",
         "uvicorn",
@@ -76,6 +77,11 @@ setup(
         "jinja2",
         "pygtail",
         "packaging",
+        "google-auth>=2.3.0",  # indirect
+        "google-cloud-storage>=2.0.0",
+        "google-cloud-compute>=1.5.0",
+        "google-cloud-secret-manager>=2.0.0",
+        "google-cloud-logging>=2.0.0",
     ],
     classifiers=[
         "Development Status :: 2 - Pre-Alpha",

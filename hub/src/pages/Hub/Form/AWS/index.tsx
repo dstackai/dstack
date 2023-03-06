@@ -48,11 +48,11 @@ export const AWSBackend: React.FC<IProps> = ({ loading: loadingProp }) => {
             }
 
             if (response.ec2_subnet_id.values.length) {
-                setSubnets(response.ec2_subnet_id.values);
+                setSubnets([{ value: '', label: 'No preference' }, ...response.ec2_subnet_id.values]);
             }
 
             if (response.ec2_subnet_id.selected !== undefined) {
-                setValue('backend.ec2_subnet_id', response.ec2_subnet_id.selected);
+                setValue('backend.ec2_subnet_id', response.ec2_subnet_id.selected ?? '');
             }
         } catch (e) {
             console.log('fetch backends values error', e);
@@ -69,6 +69,7 @@ export const AWSBackend: React.FC<IProps> = ({ loading: loadingProp }) => {
                 name="backend.access_key"
                 onChange={debouncedChangeFormHandler}
                 disabled={loading}
+                rules={{ required: t('validation.required') }}
             />
 
             <FormInput
@@ -77,6 +78,7 @@ export const AWSBackend: React.FC<IProps> = ({ loading: loadingProp }) => {
                 name="backend.secret_key"
                 onChange={debouncedChangeFormHandler}
                 disabled={loading}
+                rules={{ required: t('validation.required') }}
             />
 
             <FormSelect
@@ -86,6 +88,7 @@ export const AWSBackend: React.FC<IProps> = ({ loading: loadingProp }) => {
                 disabled={loading}
                 onChange={changeFormHandler}
                 options={regions}
+                rules={{ required: t('validation.required') }}
             />
 
             <FormS3BucketSelector

@@ -5,6 +5,7 @@ from rich import print
 from rich.console import Console
 from rich.prompt import Confirm
 from rich.table import Table
+from rich_argparse import RichHelpFormatter
 
 from dstack.api.backend import list_backends
 from dstack.api.repo import load_repo_data
@@ -25,7 +26,9 @@ class TAGCommand(BasicCommand):
     def register(self):
         subparsers = self._parser.add_subparsers()
 
-        add_tags_parser = subparsers.add_parser("add", help="Add a tag")
+        add_tags_parser = subparsers.add_parser(
+            "add", help="Add a tag", formatter_class=RichHelpFormatter
+        )
         add_tags_parser.add_argument(
             "tag_name", metavar="TAG", type=str, help="The name of the tag"
         )
@@ -49,7 +52,9 @@ class TAGCommand(BasicCommand):
         )
         add_tags_parser.set_defaults(func=self.add_tag)
 
-        delete_tags_parser = subparsers.add_parser("delete", help="Delete a tag")
+        delete_tags_parser = subparsers.add_parser(
+            "delete", help="Delete a tag", formatter_class=RichHelpFormatter
+        )
         delete_tags_parser.add_argument(
             "tag_name", metavar="TAG_NAME", type=str, help="The name of the tag"
         )

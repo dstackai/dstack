@@ -57,7 +57,8 @@ def get_run_heads(
         else:
             run = runs_by_id[run_id]
             _update_run(storage, compute, run, job_head, include_request_heads)
-    return sorted(list(runs_by_id.values()), key=lambda r: r.submitted_at, reverse=True)
+    run_heads = list(sorted(runs_by_id.values(), key=lambda r: r.submitted_at, reverse=True))
+    return run_heads
 
 
 def _create_run(

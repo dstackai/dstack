@@ -36,7 +36,7 @@ class AwsBackend(CloudBackend):
     def name(self):
         return "aws"
 
-    def __init__(self, backend_config: Optional[BackendConfig] = None, custom_client: Any = None):
+    def __init__(self, backend_config: Optional[BackendConfig] = None):
         if backend_config is None:
             self.backend_config = AWSConfig()
             try:
@@ -49,8 +49,12 @@ class AwsBackend(CloudBackend):
             self.backend_config = backend_config
             self._loaded = True
 
-        if custom_client is not None:
-            self._session = custom_client
+        if self.backend_config.credentials is not None:
+            self._session = boto3.session.Session(
+                region_name=self.backend_config.region_name,
+                aws_access_key_id=self.backend_config.credentials.get("access_key"),
+                aws_secret_access_key=self.backend_config.credentials.get("secret_key"),
+            )
 
         self._storage = AWSStorage(
             s3_client=self._s3_client(), bucket_name=self.backend_config.bucket_name

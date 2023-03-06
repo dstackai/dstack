@@ -80,7 +80,13 @@ export const UserForm: React.FC<Props> = ({
                     <SpaceBetween size="l">
                         <ColumnLayout columns={isEditing ? 1 : 2}>
                             {!isEditing && (
-                                <FormInput label={t('users.user_name')} control={control} name="user_name" disabled={loading} />
+                                <FormInput
+                                    label={t('users.user_name')}
+                                    control={control}
+                                    name="user_name"
+                                    disabled={loading}
+                                    rules={{ required: t('validation.required') }}
+                                />
                             )}
 
                             <FormSelect

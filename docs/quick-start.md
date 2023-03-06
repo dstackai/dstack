@@ -16,7 +16,7 @@ To use `dstack`, your project must be managed by Git and have at least one remot
 Your repository can be hosted on GitHub, GitLab, BitBucket, or any other platform.
 
 !!! info "NOTE:"
-    If you haven't set up a remote branch in your repo yet, don't worry! Here's how you can do it:
+    If you haven't set up a remote branch in your repo yet, here's how you can do it:
     
     ```shell
     echo "# Quick start" >> README.md
@@ -36,7 +36,9 @@ Once you've set up a remote branch in your repo, go ahead and run this command:
 dstack init
 ```
 
-Now that everything is in place, you can use dstack with your project.
+It will set up the repo to work with `dstack`.
+
+Now that everything is in place, you can use `dstack` with your project.
 
 ## 3. Prepare data
 
@@ -119,7 +121,7 @@ Extracting /workflow/data/MNIST/raw/train-images-idx2-ubyte.gz
 
 ### Check status
 
-To check the status of recent runs, use the [`dstack ps`](reference/cli/index.md#dstack-ps) command:
+To check the status of recent runs, use the [`dstack ps`](reference/cli/ps.md) command:
 
 ```shell hl_lines="1"
 dstack ps
@@ -138,7 +140,7 @@ To see all runs, use the `dstack ps -a` command.
 
 Once a run is finished, its artifacts are saved and can be reused.
 
-You can list artifacts of any run using the [`dstack ls`](reference/cli/index.md#dstack-ls) command:
+You can list artifacts of any run using the [`dstack ls`](reference/cli/ls.md) command:
 
 ```shell hl_lines="1"
 dstack ls grumpy-zebra-1
@@ -277,22 +279,10 @@ val_loss      0.10975822806358337
 When you run a workflow locally, artifacts are stored in `~/.dstack/artifacts` and can only be reused by workflows that 
 also run locally.
 
-To run workflows remotely or enable artifact reuse outside of your machine, you must configure your remote settings
+To run workflows remotely or enable artifact reuse outside of your machine, you can configure a remote 
 using the [`dstack config`](reference/cli/config.md) command.
 
-```shell hl_lines="1"
-dstack config
-```
-
-This command prompts you to select an AWS profile for credentials, an AWS region for workflow execution, and an S3
-bucket to store remote artifacts and metadata.
-
-```shell
-AWS profile: default
-AWS region: eu-west-1
-S3 bucket: dstack-142421590066-eu-west-1
-EC2 subnet: none
-```
+See [Installation](installation.md#configure-a-remote) to learn more about supported remote types and how to configure them.
 
 ## 6. Push artifacts
 

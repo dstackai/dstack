@@ -30,15 +30,9 @@ def get_backend(hub: Hub) -> CloudBackend:
                 detail=f"Configurator not found for {hub.backend}",
             )
         json_data = json.loads(str(hub.config))
-        if hub.auth is not None:
-            json_data = json_data | json.loads(str(hub.auth))
-        client = configurator.get_backend_client(json_data)
-        if client is None:
-            raise HTTPException(
-                status_code=status.HTTP_409_CONFLICT,
-                detail=f"Client dont created for {hub.backend}",
-            )
         config = configurator.get_config(json_data)
-        backend.__init__(backend_config=config, custom_client=client)
+        if hub.auth is not None:
+            config.credentials = json.loads(str(hub.auth))
+        backend.__init__(backend_config=config)
         cache[hub.name] = backend
     return cache.get(hub.name)
