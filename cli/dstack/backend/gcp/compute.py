@@ -77,6 +77,8 @@ class GCPCompute(Compute):
             firewalls_client=self.firewalls_client,
             project_id=self.gcp_config.project_id,
             zone=self.gcp_config.zone,
+            network=_get_network_resource(self.gcp_config.vpc),
+            subnet=_get_subnet_resource(self.gcp_config.region, self.gcp_config.subnet),
             machine_type=instance_type.instance_name,
             image_name=_get_image_name(
                 images_client=self.images_client,
@@ -402,6 +404,14 @@ def _get_accelerator_configs(
     return [accelerator_config]
 
 
+def _get_network_resource(vpc: str) -> str:
+    return f"global/networks/{vpc}"
+
+
+def _get_subnet_resource(region: str, subnet: str) -> str:
+    return f"regions/{region}/subnetworks/{subnet}"
+
+
 def _get_labels(bucket: str, job: Job) -> Dict[str, str]:
     labels = {
         "owner": "dstack",
@@ -419,6 +429,8 @@ def _launch_instance(
     instances_client: compute_v1.InstancesClient,
     firewalls_client: compute_v1.FirewallsClient,
     project_id: str,
+    network: str,
+    subnet: str,
     zone: str,
     image_name: str,
     machine_type: str,
@@ -430,7 +442,11 @@ def _launch_instance(
     labels: Dict[str, str],
 ) -> compute_v1.Instance:
     try:
-        _create_firewall_rules(firewalls_client=firewalls_client, project_id=project_id)
+        _create_firewall_rules(
+            firewalls_client=firewalls_client,
+            project_id=project_id,
+            network=network,
+        )
     except google.api_core.exceptions.Conflict:
         pass
     disk = _disk_from_image(
@@ -444,6 +460,8 @@ def _launch_instance(
         instances_client=instances_client,
         project_id=project_id,
         zone=zone,
+        network_link=network,
+        subnetwork_link=subnet,
         machine_type=machine_type,
         instance_name=instance_name,
         disks=[disk],
@@ -646,7 +664,7 @@ def _create_firewall_rules(
         A Firewall object.
     """
     firewall_rule = compute_v1.Firewall()
-    firewall_rule.name = "dstack-runner-allow-incoming"
+    firewall_rule.name = f"dstack-runner-allow-incoming-" + network.replace("/", "-")
     firewall_rule.direction = "INGRESS"
 
     allowed_ports_tcp = compute_v1.Allowed()

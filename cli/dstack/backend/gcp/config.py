@@ -1,6 +1,6 @@
 import os
 from pathlib import Path
-from typing import Dict, Optional
+from typing import Dict, Optional, Tuple
 
 import yaml
 from google.cloud import compute_v1, exceptions, storage
@@ -102,6 +102,8 @@ class GCPConfig:
         region: str,
         zone: str,
         bucket_name: str,
+        vpc: str,
+        subnet: str,
         credentials_file: Optional[str] = None,
         credentials: Optional[Dict] = None,
     ):
@@ -109,6 +111,8 @@ class GCPConfig:
         self.region = region
         self.zone = zone
         self.bucket_name = bucket_name
+        self.vpc = vpc
+        self.subnet = subnet
         self.credentials_file = credentials_file
         self.credentials = credentials
 
@@ -119,6 +123,8 @@ class GCPConfig:
             "region": self.region,
             "zone": self.zone,
             "bucket": self.bucket_name,
+            "vpc": self.vpc,
+            "subnet": self.subnet,
         }
         if self.credentials_file is not None:
             res["credentials_file"] = self.credentials_file
@@ -134,6 +140,8 @@ class GCPConfig:
             region = data["region"]
             zone = data["zone"]
             bucket_name = data["bucket"]
+            vpc = data["vpc"]
+            subnet = data["subnet"]
         except KeyError:
             return None
         credentials_file = data.get("credentials_file")
@@ -142,6 +150,8 @@ class GCPConfig:
             region=region,
             zone=zone,
             bucket_name=bucket_name,
+            vpc=vpc,
+            subnet=subnet,
             credentials_file=credentials_file,
         )
 
@@ -170,16 +180,20 @@ class GCPConfigurator(BackendConfig):
             f.write(config.serialize_yaml())
 
     def configure(self):
-        zone = None
-        region = None
-        bucket_name = None
         credentials_file = None
+        region = None
+        zone = None
+        bucket_name = None
+        vpc = None
+        subnet = None
         config = self.load()
         if config is not None:
-            zone = config.zone
-            region = config.region
-            bucket_name = config.bucket_name
             credentials_file = config.credentials_file
+            region = config.region
+            zone = config.zone
+            bucket_name = config.bucket_name
+            vpc = config.vpc
+            subnet = config.subnet
 
         self.credentials_file = self._ask_credentials_file(credentials_file)
 
@@ -193,13 +207,16 @@ class GCPConfigurator(BackendConfig):
         self.region = region.name
         self.zone = self._ask_zone(location, region, zone)
 
-        self.bucket_name = self._ask_bucket(default_bucket=bucket_name)
+        self.bucket_name = self._ask_bucket(bucket_name)
+        self.vpc, self.subnet = self._ask_vpc_subnet(vpc, subnet)
 
         config = GCPConfig(
             project_id=self.project_id,
             region=self.region,
             zone=self.zone,
             bucket_name=self.bucket_name,
+            vpc=self.vpc,
+            subnet=self.subnet,
             credentials_file=self.credentials_file,
         )
         self.save(config)
@@ -344,6 +361,40 @@ class GCPConfigurator(BackendConfig):
 
         return True
 
+    def _ask_vpc_subnet(
+        self, default_vpc: Optional[str], default_subnet: Optional[str]
+    ) -> Tuple[str, str]:
+        no_preference_vpc_subnet = ("default", "default")
+        networks_client = compute_v1.NetworksClient(credentials=self.credentials)
+        list_networks_request = compute_v1.ListNetworksRequest(project=self.project_id)
+        networks = networks_client.list(list_networks_request)
+        subnets = []
+        for network in networks:
+            for subnet in network.subnetworks:
+                subnet_region = self._get_subnet_region(subnet)
+                if subnet_region != self.region:
+                    continue
+                subnets.append(
+                    {
+                        "vpc": network.name,
+                        "subnet": self._get_subnet_name(subnet),
+                    }
+                )
+        vpc_subnet_values = sorted(
+            [(s["vpc"], s["subnet"]) for s in subnets], key=lambda t: t != no_preference_vpc_subnet
+        )
+        vpc_subnet_labels = [
+            f"{t[1]} [{t[0]}]" if t != no_preference_vpc_subnet else "Default [no preference]"
+            for t in vpc_subnet_values
+        ]
+        vpc, subnet = ask_choice(
+            "Choose VPC subnet",
+            vpc_subnet_labels,
+            vpc_subnet_values,
+            (default_vpc, default_subnet),
+        )
+        return vpc, subnet
+
     def _get_resource_name(self, resource_path: str) -> str:
         return resource_path.rsplit(sep="/", maxsplit=1)[1]
 
@@ -367,3 +418,9 @@ class GCPConfigurator(BackendConfig):
         if zone.startswith("eu"):
             return "EU"
         return "US"
+
+    def _get_subnet_region(self, subnet_resource: str) -> str:
+        return subnet_resource.rsplit(sep="/", maxsplit=3)[1]
+
+    def _get_subnet_name(self, subnet_resource: str) -> str:
+        return subnet_resource.rsplit(sep="/", maxsplit=1)[1]
