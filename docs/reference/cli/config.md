@@ -40,4 +40,5 @@ GCP geographic area: North America
 GCP region: us-central1
 GCP zone: us-central1-c
 Storage bucket: dstack-test
+VPC subnet: default
 ```

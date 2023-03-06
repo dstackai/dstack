@@ -10,7 +10,7 @@ pip install dstack --upgrade
     By default, workflows run locally. If you only plan to run workflows locally and do not want to share artifacts 
     with others outside your machine, you do not need to configure anything else.
 
-### Configure a remote
+## Configure a remote
 
 If you want to be able to run workflows remotely (e.g. in a configured cloud account),
 you have to configure a remote using the `dstack config` command. 
@@ -256,6 +256,7 @@ GCP geographic area: North America
 GCP region: us-central1
 GCP zone: us-central1-c
 Storage bucket: dstack-my-awesome-project
+VPC subnet: default
 ```
 
 That's it! You've configured GCP as a remote.
