@@ -10,6 +10,7 @@ from simple_term_menu import TerminalMenu
 
 from dstack.cli.common import ask_choice, console
 from dstack.core.config import BackendConfig, get_config_path
+from dstack.core.error import ConfigError
 
 DEFAULT_GEOGRAPHIC_AREA = "North America"
 
@@ -95,7 +96,7 @@ GCP_LOCATIONS = [
 ]
 
 
-class GCPConfig:
+class GCPConfig(BackendConfig):
     def __init__(
         self,
         project_id: str,
@@ -143,7 +144,11 @@ class GCPConfig:
             vpc = data["vpc"]
             subnet = data["subnet"]
         except KeyError:
-            return None
+            raise ConfigError("It's not GCP config")
+
+        if data.get("backend") != "gcp":
+            raise ConfigError(f"It's not GCP config")
+
         credentials_file = data.get("credentials_file")
         return cls(
             project_id=project_id,
@@ -162,22 +167,22 @@ class GCPConfig:
             return None
         return cls.deserialize(content)
 
-
-class GCPConfigurator(BackendConfig):
-    @property
-    def name(self):
-        return "gcp"
-
     @classmethod
-    def load(cls, path: Path = get_config_path()) -> Optional[GCPConfig]:
+    def load(cls, path: Path = get_config_path()) -> Optional["GCPConfig"]:
         if not path.exists():
             return None
         with open(path) as f:
             return GCPConfig.deserialize_yaml(f.read())
 
-    def save(self, config: GCPConfig, path: Path = get_config_path()):
+    def save(self, path: Path = get_config_path()):
         with open(path, "w+") as f:
-            f.write(config.serialize_yaml())
+            f.write(self.serialize_yaml())
+
+
+class GCPConfigurator(BackendConfig):
+    @property
+    def name(self):
+        return "gcp"
 
     def configure(self):
         credentials_file = None

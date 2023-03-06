@@ -23,6 +23,3 @@ class LocalConfig(BackendConfig):
         with path.open("w") as f:
             config_data = {"backend": "local", "path": self.path}
             yaml.dump(config_data, f)
-
-    def configure(self):
-        pass

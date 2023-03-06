@@ -25,6 +25,7 @@ import (
 var _ backend.Backend = (*Local)(nil)
 
 func init() {
+
 	backend.DefaultBackend = New()
 	backend.RegisterBackend("local", func(ctx context.Context, pathConfig string) (backend.Backend, error) {
 		file := File{}

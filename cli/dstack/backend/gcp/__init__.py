@@ -20,6 +20,7 @@ from dstack.backend.gcp.secrets import GCPSecretsManager
 from dstack.backend.gcp.storage import GCPStorage
 from dstack.cli.common import console
 from dstack.core.artifact import Artifact
+from dstack.core.error import ConfigError
 from dstack.core.job import Job, JobHead
 from dstack.core.log_event import LogEvent
 from dstack.core.repo import LocalRepoData, RepoAddress, RepoCredentials
@@ -31,12 +32,17 @@ warnings.filterwarnings("ignore", message=_CLOUD_SDK_CREDENTIALS_WARNING)
 
 
 class GCPBackend(CloudBackend):
-    def __init__(self, config: Optional[GCPConfig] = None):
-        if config is None:
-            config = GCPConfigurator.load()
-            if config is None:
+    def __init__(self, backend_config: Optional[GCPConfig] = None):
+        if backend_config is None:
+            try:
+                self.config = GCPConfig.load()
+                self._loaded = True
+            except ConfigError:
+                self._loaded = False
                 return
-        self.config = config
+        else:
+            self.config = backend_config
+            self._loaded = True
 
         if self.config.credentials is not None:
             credentials = service_account.Credentials.from_service_account_info(
@@ -253,3 +259,6 @@ class GCPBackend(CloudBackend):
 
     def get_signed_upload_url(self, object_key: str) -> str:
         return self._storage.get_signed_upload_url(object_key)
+
+    def get_configurator(self):
+        return GCPConfigurator()
