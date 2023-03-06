@@ -1,3 +1,4 @@
+import re
 import sys
 from typing import Any
 
@@ -44,3 +45,10 @@ def wait_for_extended_operation(
         raise operation.exception() or RuntimeError(operation.error_message)
 
     return result
+
+
+def is_valid_label_value(value: str) -> bool:
+    if len(value) > 63:
+        return False
+    m = re.match(r"^[\w\d_-]+$", value)
+    return m is not None

@@ -1,5 +1,5 @@
 import re
-from typing import Any, List, Optional, Tuple
+from typing import Any, Dict, List, Optional, Tuple
 
 import google.api_core.exceptions
 from google.cloud import compute_v1
@@ -90,6 +90,10 @@ class GCPCompute(Compute):
                 project_id=self.gcp_config.project_id,
                 zone=self.gcp_config.zone,
                 instance_type=instance_type,
+            ),
+            labels=_get_labels(
+                bucket=self.gcp_config.bucket_name,
+                job=job,
             ),
         )
         return instance.name
@@ -398,6 +402,19 @@ def _get_accelerator_configs(
     return [accelerator_config]
 
 
+def _get_labels(bucket: str, job: Job) -> Dict[str, str]:
+    labels = {
+        "owner": "dstack",
+        "dstack_bucket": bucket,
+        "dstack_repo": job.repo_address.path("-").replace(".", "-"),
+    }
+    if job.local_repo_user_name is not None:
+        dstack_user_name = job.local_repo_user_name.lower().replace(" ", "_")
+        if gcp_utils.is_valid_label_value(dstack_user_name):
+            labels["dstack_user_name"] = dstack_user_name
+    return labels
+
+
 def _launch_instance(
     instances_client: compute_v1.InstancesClient,
     firewalls_client: compute_v1.FirewallsClient,
@@ -410,6 +427,7 @@ def _launch_instance(
     service_account: str,
     interruptible: bool,
     accelerators: List[compute_v1.AcceleratorConfig],
+    labels: Dict[str, str],
 ) -> compute_v1.Instance:
     try:
         _create_firewall_rules(firewalls_client=firewalls_client, project_id=project_id)
@@ -434,6 +452,7 @@ def _launch_instance(
         external_access=True,
         spot=interruptible,
         accelerators=accelerators,
+        labels=labels,
     )
     return instance
 
@@ -495,6 +514,7 @@ def _create_instance(
     delete_protection: bool = False,
     user_data_script: Optional[str] = None,
     service_account: Optional[str] = None,
+    labels: Optional[Dict[str, str]] = None,
 ) -> compute_v1.Instance:
     """
     Send an instance creation request to the Compute Engine API and wait for it to complete.
@@ -589,6 +609,9 @@ def _create_instance(
                 scopes=["https://www.googleapis.com/auth/cloud-platform"],
             )
         ]
+
+    if labels is not None:
+        instance.labels = labels
 
     instance.tags = compute_v1.Tags(items=[DSTACK_INSTANCE_TAG])
 
