@@ -9,7 +9,7 @@ from rich.prompt import Confirm, Prompt
 from simple_term_menu import TerminalMenu
 
 from dstack.cli.common import ask_choice, console
-from dstack.core.config import BackendConfig, get_config_path
+from dstack.core.config import BackendConfig, Configurator, get_config_path
 from dstack.core.error import ConfigError
 
 DEFAULT_GEOGRAPHIC_AREA = "North America"
@@ -179,19 +179,33 @@ class GCPConfig(BackendConfig):
             f.write(self.serialize_yaml())
 
 
-class GCPConfigurator(BackendConfig):
+class GCPConfigurator(Configurator):
     @property
     def name(self):
         return "gcp"
 
-    def configure(self):
+    def get_config(self, data: Dict) -> Optional[BackendConfig]:
+        return GCPConfig.deserialize(data=data)
+
+    def parse_args(self, args: list = []):
+        pass
+
+    def configure_hub(self, data: Dict):
+        pass
+
+    def configure_cli(self):
         credentials_file = None
         region = None
         zone = None
         bucket_name = None
         vpc = None
         subnet = None
-        config = self.load()
+
+        try:
+            config = GCPConfig.load()
+        except ConfigError:
+            config = None
+
         if config is not None:
             credentials_file = config.credentials_file
             region = config.region
@@ -224,7 +238,7 @@ class GCPConfigurator(BackendConfig):
             subnet=self.subnet,
             credentials_file=self.credentials_file,
         )
-        self.save(config)
+        config.save()
         console.print(f"[grey58]OK[/]")
 
     def _ask_credentials_file(self, default_credentials_file: Optional[str]) -> str:
