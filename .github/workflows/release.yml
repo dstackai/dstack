@@ -54,6 +54,7 @@ jobs:
     runs-on: ubuntu-latest
     needs:
       - cli-test-tag
+      - build-hub-tag
     steps:
       - uses: actions/checkout@v2
       - name: Set up Python 3.9
@@ -80,6 +81,7 @@ jobs:
           cp README.md cli
           python setup.py sdist bdist_wheel
           python -m twine upload --repository pypi --username ${{ secrets.PYPI_USERNAME }} --password ${{ secrets.PYPI_PASSWORD }} dist/*
+
   runner-test-master:
     defaults:
       run:
