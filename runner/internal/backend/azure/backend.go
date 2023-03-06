@@ -144,7 +144,7 @@ func (azbackend *AzureBackend) CheckStop(ctx context.Context) (bool, error) {
 
 func (azbackend *AzureBackend) Shutdown(ctx context.Context) error {
 	//TODO implement me
-	log.Trace(ctx, "Start shutdown")
+	log.Trace(ctx, "//TODO implement me: Start shutdown")
 	return nil
 }
 
@@ -154,8 +154,8 @@ func (azbackend *AzureBackend) GetArtifact(ctx context.Context, runName, localPa
 }
 
 func (azbackend *AzureBackend) CreateLogger(ctx context.Context, logGroup, logName string) io.Writer {
-	//TODO implement me
-	panic("implement me")
+	logger := NewAzureLogging()
+	return logger
 }
 
 func (azbackend *AzureBackend) ListSubDir(ctx context.Context, dir string) ([]string, error) {
@@ -164,8 +164,8 @@ func (azbackend *AzureBackend) ListSubDir(ctx context.Context, dir string) ([]st
 }
 
 func (azbackend *AzureBackend) Bucket(ctx context.Context) string {
-	//TODO implement me
-	panic("implement me")
+	log.Trace(ctx, "Getting bucket")
+	return "AZURE.bucket"
 }
 
 func (azbackend *AzureBackend) Secrets(ctx context.Context) (map[string]string, error) {
