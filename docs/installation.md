@@ -6,19 +6,25 @@ Use `pip` to install `dstack`:
 pip install dstack --upgrade
 ```
 
-!!! info "NOTE:"
-    By default, workflows run locally. If you only plan to run workflows locally and do not want to share artifacts 
-    with others outside your machine, you do not need to configure anything else.
+By default, workflows run locally. To run workflows remotely (e.g. in a configured cloud account), 
+configure a remote using the `dstack config` command.
 
-## Configure a remote
-
-If you want to be able to run workflows remotely (e.g. in a configured cloud account),
-you have to configure a remote using the `dstack config` command. 
+### Configure a remote
 
 Please refer to the specific instructions below for configuring a remote, based on your desired cloud provider.
 
-!!! info "NOTE:"
-    Currently, you can configure only AWS and GCP as remotes. Support for Azure, and Hub[^1] are coming soon.
+<div class="grid cards" markdown>
+- [**AWS**
+   Run workflows directly in the cloud using local AWS credentials.
+  ](#configure-an-aws-remote)
+- [**GCP**
+   Run workflows directly in the cloud using local GCP credentials.
+  ](#configure-a-gcp-remote)
+
+[//]: # (- [**Hub**)
+[//]: # (   Run workflows via dstack Hub using your personal access token.)
+[//]: # (  ]&#40;#configure-a-hub-remote&#41;)
+</div>
 
 ## Configure an AWS remote
 
@@ -260,8 +266,3 @@ VPC subnet: default
 ```
 
 That's it! You've configured GCP as a remote.
-
-[^1]:
-    Use the `dstack hub start --port PORT` command (coming soon) to host a web application that provides a UI for configuring cloud
-    accounts and managing user tokens. Configure this hub as a remote for the CLI to enable the hub to act as a proxy
-    between the CLI and the configured account. This setup offers improved security and collaboration.

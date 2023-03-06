@@ -93,17 +93,18 @@ you must configure your remote settings using the `dstack config` command:
 dstack config
 ```
 
-This command will ask you to choose an AWS profile (which will be used for AWS credentials), an AWS
-region (where workflows will be run), and an S3 bucket (to store remote artifacts and metadata).
+This command will ask you to choose the type of backend (e.g. AWS), and the corresponding
+settings (e.g. the region where to run workflows, an S3 bucket where to store artifacts, etc).
 
 ```shell
+Backend: aws
 AWS profile: default
 AWS region: eu-west-1
 S3 bucket: dstack-142421590066-eu-west-1
 EC2 subnet: none
 ```
 
-For more details on how to configure a remote, check the [installation](https://docs.dstack.ai/installation/#optional-configure-a-remote) guide.
+For more details on how to configure a remote, check the [installation](https://docs.dstack.ai/installation/#configure-a-remote) guide.
 
 Once a remote is configured, use the `--remote` flag with the `dstack run` command to run the 
 workflow in the configured cloud:

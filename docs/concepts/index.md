@@ -2,13 +2,6 @@
 
 `dstack` allows YAML-defined ML workflows to be run locally or remotely in any configured cloud accounts via CLI.
 
-Workflows can be scripts for data preparation or model training, web apps like Streamlit or Gradio, or development
-environments like JupyterLab or VS Code.
-
-!!! info "NOTE:"
-    When running a workflow remotely (e.g. in a configured cloud account), `dstack` automatically creates and
-    destroys instances based on resource requirements and cost strategy, such as using spot instances.
-
 ## Remotes
 
 By default, workflows run locally. To run workflows remotely, you need to first configure a remote using the `dstack
@@ -16,12 +9,16 @@ config` command. Once a remote is configured, use the `--remote` flag with the `
 the remote.
 
 !!! info "NOTE:"
-    Currently, a remote can be an AWS or GCP account only. Support for Azure, and Hub[^1] are coming soon.
+    When running a workflow remotely (e.g. in a configured cloud account), `dstack` automatically creates and
+    destroys instances based on resource requirements and cost strategy, such as using spot instances.
 
 Remotes facilitate collaboration by allowing multiple team members to access the same remote, view each other's runs,
 and reuse each other's artifacts.
 
 ## Workflows
+
+Workflows can be scripts for data preparation or model training, web apps like Streamlit or Gradio, or development
+environments like JupyterLab or VS Code.
 
 Here's an example from the [Quick start](https://docs.dstack.ai/quick-start).
 
@@ -76,8 +73,3 @@ from your preferred IDE either locally or remotely on any cloud.
 
 Unlike end-to-end MLOps platforms, `dstack` is lightweight, developer-friendly, and designed to facilitate collaboration
 without imposing any particular approach.
-
-[^1]:
-    Use the `dstack hub start --port PORT` command (coming soon) to host a web application that provides a UI for configuring cloud
-    accounts and managing user tokens. Configure this hub as a remote for the CLI to enable the hub to act as a proxy
-    between the CLI and the configured account. This setup offers improved security and collaboration.
