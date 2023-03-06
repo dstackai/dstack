@@ -1,13 +1,9 @@
 package azure
 
 import (
-	"bytes"
 	"context"
 	"fmt"
-	"github.com/Azure/azure-sdk-for-go/sdk/azcore/runtime"
 	"github.com/Azure/azure-sdk-for-go/sdk/azidentity"
-	"github.com/Azure/azure-sdk-for-go/sdk/storage/azblob"
-	"github.com/Azure/azure-sdk-for-go/sdk/storage/azblob/container"
 	"github.com/dstackai/dstack/runner/consts"
 	"github.com/dstackai/dstack/runner/internal/artifacts"
 	"github.com/dstackai/dstack/runner/internal/backend"
@@ -22,22 +18,21 @@ import (
 	"strings"
 )
 
-type AzureStorage struct {
+type AzureConfigStorage struct {
 	Url       string `yaml:"url"`
 	Container string `yaml:"container"`
 }
 
 type AzureConfig struct {
-	Storage AzureStorage `yaml:"storage"`
+	Storage AzureConfigStorage `yaml:"storage"`
 }
 
 type AzureBackend struct {
-	config          AzureConfig
-	credential      *azidentity.DefaultAzureCredential
-	storageClient   *azblob.Client
-	containerClient *container.Client
-	runnerID        string
-	state           *models.State
+	config     AzureConfig
+	storage    AzureStorage
+	credential *azidentity.DefaultAzureCredential
+	runnerID   string
+	state      *models.State
 }
 
 func init() {
@@ -63,37 +58,27 @@ func New(config AzureConfig) *AzureBackend {
 		fmt.Printf("Authentication failure: %+v", err)
 		return nil
 	}
-
-	storageClient, err := azblob.NewClient(config.Storage.Url, credential, nil)
+	var storage *AzureStorage
+	storage, err = NewAzureStorage(credential, config.Storage.Url, config.Storage.Container)
 	if err != nil {
 		fmt.Printf("Initialization blob service failure: %+v", err)
 		return nil
 	}
-	containerClient := storageClient.ServiceClient().NewContainerClient(config.Storage.Container)
-
 	return &AzureBackend{
-		config:          config,
-		credential:      credential,
-		storageClient:   storageClient,
-		containerClient: containerClient,
+		config:     config,
+		credential: credential,
+		storage:    *storage,
 	}
 }
 
 func (azbackend *AzureBackend) Init(ctx context.Context, ID string) error {
 	azbackend.runnerID = ID
-	// XXX: why does path leak here, while python's backend side works with abstract `key`?
 	runnerFilepath := fmt.Sprintf("runners/%s.yaml", ID)
-	contents := bytes.Buffer{}
-	get, err := azbackend.containerClient.NewBlobClient(runnerFilepath).DownloadStream(ctx, nil)
+	contents, err := azbackend.storage.GetFile(ctx, runnerFilepath)
 	if err != nil {
 		return gerrors.Wrap(err)
 	}
-	retryReader := get.NewRetryReader(ctx, &azblob.RetryReaderOptions{})
-	_, err2 := contents.ReadFrom(retryReader)
-	if err2 != nil {
-		return gerrors.Wrap(err)
-	}
-	err = yaml.Unmarshal(contents.Bytes(), &azbackend.state)
+	err = yaml.Unmarshal(contents, &azbackend.state)
 	if err != nil {
 		return gerrors.Wrap(err)
 	}
@@ -119,21 +104,6 @@ func (azbackend *AzureBackend) Requirements(ctx context.Context) models.Requirem
 	panic("implement me")
 }
 
-func listblobs(ctx context.Context, pager *runtime.Pager[container.ListBlobsFlatResponse]) ([]string, error) {
-	var result []string
-	for pager.More() {
-		resp, err := pager.NextPage(context.TODO())
-		if err != nil {
-			return nil, gerrors.Wrap(err)
-		}
-
-		for _, blob := range resp.Segment.BlobItems {
-			result = append(result, strings.Clone(*blob.Name))
-		}
-	}
-	return result, nil
-}
-
 func (azbackend *AzureBackend) UpdateState(ctx context.Context) error {
 	log.Trace(ctx, "Marshaling job")
 	contents, err := yaml.Marshal(&azbackend.state.Job)
@@ -142,26 +112,27 @@ func (azbackend *AzureBackend) UpdateState(ctx context.Context) error {
 	}
 	jobFilepath := azbackend.state.Job.JobFilepath()
 	log.Trace(ctx, "Write to file job", "Path", jobFilepath)
-	_, err = azbackend.storageClient.UploadBuffer(ctx, azbackend.config.Storage.Container, jobFilepath, contents, nil)
+	err = azbackend.storage.PutFile(ctx, jobFilepath, contents)
 	if err != nil {
 		return gerrors.Wrap(err)
 	}
 	log.Trace(ctx, "Fetching list jobs", "Repo username", azbackend.state.Job.RepoUserName, "Repo name", azbackend.state.Job.RepoName, "Job ID", azbackend.state.Job.JobID)
-	prefix := azbackend.state.Job.JobHeadFilepathPrefix()
-	pager := azbackend.containerClient.NewListBlobsFlatPager(&azblob.ListBlobsFlatOptions{Prefix: &prefix})
-	blobs, err2 := listblobs(ctx, pager)
-	if err2 != nil {
-		return gerrors.Wrap(err2)
-	}
-	if len(blobs) > 1 {
-		return fmt.Errorf("Unexpected blob listing result %s [%d]", strings.Join(blobs, ","), len(blobs))
-	}
-	jobHeadFilepath := azbackend.state.Job.JobHeadFilepath()
-	source := azbackend.containerClient.NewBlobClient(blobs[0])
-	azbackend.containerClient.NewBlobClient(jobHeadFilepath).CopyFromURL(ctx, source.URL(), nil)
-	_, err = source.Delete(ctx, nil)
+	files, err := azbackend.storage.ListFile(ctx, azbackend.state.Job.JobHeadFilepathPrefix())
 	if err != nil {
 		return gerrors.Wrap(err)
+	}
+	if len(files) > 1 {
+		return fmt.Errorf("Unexpected blob listing result %s [%d]", strings.Join(files, ","), len(files))
+	}
+	jobHeadFilepath := azbackend.state.Job.JobHeadFilepath()
+	// XXX: this is a clone from gcp/backend.go which uses for-loop and return nil for empty files.
+	if len(files) == 1 {
+		file := files[0]
+		log.Trace(ctx, "Renaming file job", "From", file, "To", jobHeadFilepath)
+		err = azbackend.storage.RenameFile(ctx, file, jobHeadFilepath)
+		if err != nil {
+			return gerrors.Wrap(err)
+		}
 	}
 	return nil
 }
@@ -179,7 +150,7 @@ func (azbackend *AzureBackend) Shutdown(ctx context.Context) error {
 
 func (azbackend *AzureBackend) GetArtifact(ctx context.Context, runName, localPath, remotePath string, fs bool) artifacts.Artifacter {
 	workDir := path.Join(common.HomeDir(), consts.USER_ARTIFACTS_PATH, runName)
-	return NewGCPArtifacter(gbackend.storage, workDir, localPath, remotePath)
+	return NewAzureArtifacter(azbackend.storage, workDir, localPath, remotePath)
 }
 
 func (azbackend *AzureBackend) CreateLogger(ctx context.Context, logGroup, logName string) io.Writer {

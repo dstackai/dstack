@@ -32,7 +32,7 @@ func NewGCPArtifacter(storage *GCPStorage, workDir, pathLocal, pathRemote string
 }
 
 func (gart *GCPArtifacter) BeforeRun(ctx context.Context) error {
-	log.Trace(ctx, "Upload artifact", "artifact", gart.pathLocal)
+	log.Trace(ctx, "Download artifact", "artifact", gart.pathLocal)
 	return gart.storage.DownloadDir(ctx, gart.pathRemote, path.Join(gart.workDir, gart.pathLocal))
 }
 
