@@ -3,7 +3,7 @@
 This tutorial will guide you through using `dstack` locally and remotely, step by step.
 
 !!! info "NOTE:"
-    The source code for this tutorial can be located in [`github.com/dstack-examples`](https://github.com/dstackai/dstack-examples/tree/main/tutorials/mnist)
+    The source code for this tutorial can be located in [`github.com/dstack-examples`](https://github.com/dstackai/dstack-examples).
 
 ## 1. Install the CLI
 

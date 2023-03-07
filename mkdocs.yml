@@ -141,7 +141,7 @@ nav:
           - Experiment trackers:
               - Weights & Biases: integrations/experiments/wandb.md
       - Tutorials:
-          - Stable Diffusion: tutorials/diffusers.md
+          - Stable Diffusion: tutorials/stable-diffusion.md
       - What's new:
           - Changelog: https://github.com/dstackai/dstack/releases
 #          - Newsletter: https://dstack.curated.co/
