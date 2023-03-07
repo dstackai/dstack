@@ -70,11 +70,14 @@ class LsCommand(BasicCommand):
         )
 
         for artifact, _ in artifacts:
-            artifact.files = [
-                f
-                for f in artifact.files
-                if str(Path(artifact.name, f.filepath)).startswith(args.prefix)
-            ]
+            artifact.files = sorted(
+                [
+                    f
+                    for f in artifact.files
+                    if str(Path(artifact.name, f.filepath)).startswith(args.prefix)
+                ],
+                key=lambda f: f.filepath,
+            )
 
         if args.recursive:
             for artifact, backends in artifacts:
