@@ -3,6 +3,7 @@ package azure
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"github.com/Azure/azure-sdk-for-go/sdk/azidentity"
 	"github.com/Azure/azure-sdk-for-go/sdk/keyvault/azsecrets"
@@ -12,6 +13,8 @@ import (
 	"regexp"
 	"strings"
 )
+
+var ErrSecretNotFound = errors.New("secret not found")
 
 type AzureSecretManager struct {
 	secretClient *azsecrets.Client
@@ -42,12 +45,21 @@ func (azsecret AzureSecretManager) FetchCredentials(ctx context.Context, repoDat
 }
 
 func (azsecret AzureSecretManager) getSecretValue(ctx context.Context, key string) (*string, error) {
+	//azsecret.secretClient.
 	response, err := azsecret.secretClient.GetSecret(ctx, key, "", nil)
 	if err != nil {
 		return nil, gerrors.Wrap(err)
 	}
 	value := strings.Clone(*response.Value)
 	return &value, nil
+}
+
+func (azsecret AzureSecretManager) FetchSecret(ctx context.Context, repoData *models.RepoData, name string) (*string, error) {
+	key, err := getSecretKey(repoData, name)
+	if err != nil {
+		return nil, gerrors.Wrap(err)
+	}
+	return azsecret.getSecretValue(ctx, key)
 }
 
 var keyPattern *regexp.Regexp
@@ -89,6 +101,16 @@ func encode(key string) string {
 		isOutOfRange = !isOutOfRange
 	}
 	return strings.Join(result, "")
+}
+
+func getSecretKey(repoData *models.RepoData, name string) (string, error) {
+	// XXX: sync default value for sep with python's cli implementation.
+	key := fmt.Sprintf("dstack-secrets-%s-%s", repoData.RepoDataPath("/"), name)
+	value, err := puny.Encode(encode(key))
+	if err != nil {
+		return "", err
+	}
+	return value, nil
 }
 
 func getCredentialKey(repoData *models.RepoData) (string, error) {

@@ -2,6 +2,7 @@ package azure
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"github.com/Azure/azure-sdk-for-go/sdk/azidentity"
 	"github.com/dstackai/dstack/runner/consts"
@@ -111,8 +112,8 @@ func (azbackend *AzureBackend) MasterJob(ctx context.Context) *models.Job {
 }
 
 func (azbackend *AzureBackend) Requirements(ctx context.Context) models.Requirements {
-	//TODO implement me
-	panic("implement me")
+	log.Trace(ctx, "Getting requirements")
+	return azbackend.state.Job.Requirements
 }
 
 func (azbackend *AzureBackend) UpdateState(ctx context.Context) error {
@@ -149,13 +150,20 @@ func (azbackend *AzureBackend) UpdateState(ctx context.Context) error {
 }
 
 func (azbackend *AzureBackend) CheckStop(ctx context.Context) (bool, error) {
-	//TODO implement me
-	panic("implement me")
+	//runnerFilepath := fmt.Sprintf("runners/%s.yaml", azbackend.runnerID)
+	//log.Trace(ctx, "Reading metadata from state file", "path", runnerFilepath)
+	//isExists, err := azbackend.storage.IsExists(ctx, runnerFilepath)
+	//if err != nil {
+	//	return false, gerrors.Wrap(err)
+	//}
+	//return isExists, nil
+	log.Trace(ctx, "//TODO implement me: AzureBackend.CheckStop")
+	return false, nil
 }
 
 func (azbackend *AzureBackend) Shutdown(ctx context.Context) error {
 	//TODO implement me
-	log.Trace(ctx, "//TODO implement me: Start shutdown")
+	log.Trace(ctx, "//TODO implement me: AzureBackend.Shutdown")
 	return nil
 }
 
@@ -180,8 +188,26 @@ func (azbackend *AzureBackend) Bucket(ctx context.Context) string {
 }
 
 func (azbackend *AzureBackend) Secrets(ctx context.Context) (map[string]string, error) {
-	//TODO implement me
-	panic("implement me")
+	log.Trace(ctx, "Getting secrets")
+	prefix := azbackend.state.Job.JobRepoData().SecretsPrefix()
+	secretFilenames, err := azbackend.storage.ListFile(ctx, prefix)
+	if err != nil {
+		return nil, gerrors.Wrap(err)
+	}
+	secrets := make(map[string]string, 0)
+	for _, secretFilename := range secretFilenames {
+		secretName := strings.ReplaceAll(secretFilename, prefix, "")
+		secretValue, err := azbackend.secretManager.FetchSecret(ctx, azbackend.state.Job.JobRepoData(), secretName)
+		if err != nil {
+			if errors.Is(err, ErrSecretNotFound) {
+				continue
+			}
+			fmt.Errorf("FetchSecret: %+v", err)
+			return nil, gerrors.Wrap(err)
+		}
+		secrets[secretName] = *secretValue
+	}
+	return secrets, nil
 }
 
 func (azbackend *AzureBackend) GitCredentials(ctx context.Context) *models.GitCredentials {

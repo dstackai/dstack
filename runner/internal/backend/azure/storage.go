@@ -8,6 +8,7 @@ import (
 	"github.com/Azure/azure-sdk-for-go/sdk/storage/azblob"
 	"github.com/Azure/azure-sdk-for-go/sdk/storage/azblob/container"
 	"github.com/dstackai/dstack/runner/internal/gerrors"
+	"io/fs"
 	"os"
 	"path"
 	"path/filepath"
@@ -111,3 +112,41 @@ func (azstorage AzureStorage) DownloadDir(ctx context.Context, src, dst string) 
 	}
 	return nil
 }
+
+func (azstorage AzureStorage) UploadDir(ctx context.Context, src string, dst string) error {
+	err := filepath.WalkDir(src, func(filePath string, entry fs.DirEntry, err error) error {
+		if err != nil {
+			return gerrors.Wrap(err)
+		}
+		if entry.IsDir() {
+			return nil
+		}
+		key := path.Join(dst, strings.TrimPrefix(src, filePath))
+		return gerrors.Wrap(azstorage.uploadFile(ctx, filePath, key))
+	})
+	return gerrors.Wrap(err)
+}
+
+func (azstorage AzureStorage) uploadFile(ctx context.Context, src string, key string) error {
+	file, err := os.Open(src)
+	if err != nil {
+		return gerrors.Wrap(err)
+	}
+	_, err = azstorage.storageClient.UploadFile(ctx, azstorage.container, key, file, nil)
+	if err != nil {
+		file.Close()
+		return gerrors.Wrap(err)
+	}
+	return gerrors.Wrap(file.Close())
+}
+
+//func (azstorage AzureStorage) IsExists(ctx context.Context, key string) (bool, error) {
+//	properties, err := azstorage.containerClient.NewBlobClient(key).GetProperties(ctx, nil)
+//	if err != nil {
+//		return false, gerrors.Wrap(err)
+//	}
+//	if properties.LastModified != nil {
+//		return true, nil
+//	}
+//	return false, nil
+//}
