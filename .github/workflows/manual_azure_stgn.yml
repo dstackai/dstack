@@ -14,7 +14,7 @@ jobs:
       AZURE_SUBSCRIPTION_ID: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
     strategy:
       matrix:
-        variants: [ azure-without-cuda-image, azure-cuda-image ]
+        variants: [ azure-without-cuda, azure-cuda ]
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v3
