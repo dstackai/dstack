@@ -8,8 +8,9 @@ import (
 	"github.com/Azure/azure-sdk-for-go/sdk/keyvault/azsecrets"
 	"github.com/dstackai/dstack/runner/internal/gerrors"
 	"github.com/dstackai/dstack/runner/internal/models"
+	"gitlab.com/golang-commonmark/puny"
 	"regexp"
-	strings "strings"
+	"strings"
 )
 
 type AzureSecretManager struct {
@@ -27,7 +28,10 @@ func NewAzureSecretManager(credential *azidentity.DefaultAzureCredential, url st
 }
 
 func (azsecret AzureSecretManager) FetchCredentials(ctx context.Context, repoData *models.RepoData) (*models.GitCredentials, error) {
-	key := getCreadentialsKey(repoData)
+	key, err := getCredentialKey(repoData)
+	if err != nil {
+		return nil, err
+	}
 	creds := models.GitCredentials{}
 	data, err := azsecret.getSecretValue(ctx, key)
 	if err != nil {
@@ -46,17 +50,31 @@ func (azsecret AzureSecretManager) getSecretValue(ctx context.Context, key strin
 	return &value, nil
 }
 
-var keyPattern *regexp.Regexp // = "([0-9a-zA-Z-]+)"
+var keyPattern *regexp.Regexp
 
 func init() {
 	keyPattern = regexp.MustCompile(`([0-9a-zA-Z-]+)`)
+}
+
+func splitPythonLike(pattern *regexp.Regexp, s string) []string {
+	var result []string
+	offset := 0
+	allowed := pattern.FindAllStringIndex(s, -1)
+	for _, valid := range allowed {
+		result = append(result, s[offset:valid[0]], s[valid[0]:valid[1]])
+		offset = valid[1]
+	}
+	if offset != len(s) {
+		result = append(result, s[offset:])
+	}
+	return result
 }
 
 // mirrored from dstack.backend.azure.secrets._encode
 func encode(key string) string {
 	var result []string
 	isOutOfRange := true
-	for _, chunk := range keyPattern.Split(key, -1) {
+	for _, chunk := range splitPythonLike(keyPattern, key) {
 		if isOutOfRange {
 			for _, c := range chunk {
 				if c < 128 {
@@ -73,8 +91,12 @@ func encode(key string) string {
 	return strings.Join(result, "")
 }
 
-func getCreadentialsKey(repoData *models.RepoData) string {
+func getCredentialKey(repoData *models.RepoData) (string, error) {
 	// XXX: sync default value for sep with python's cli implementation.
 	key := fmt.Sprintf("dstack-credentials-%s", repoData.RepoDataPath("/"))
-	return encode(key)
+	value, err := puny.Encode(encode(key))
+	if err != nil {
+		return "", err
+	}
+	return value, nil
 }
