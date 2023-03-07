@@ -133,3 +133,7 @@ class AWSHubValues(BaseModel):
     region_name: Optional[HubElement]
     s3_bucket_name: Optional[HubElement]
     ec2_subnet_id: Optional[HubElement]
+
+
+class UserPatch(BaseModel):
+    global_role: str
