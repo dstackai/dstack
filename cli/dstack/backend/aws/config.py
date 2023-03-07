@@ -5,6 +5,7 @@ from pathlib import Path
 from typing import Dict, Optional
 
 import boto3
+import botocore.exceptions
 import yaml
 from botocore.client import BaseClient
 from rich import print
@@ -12,7 +13,7 @@ from rich.prompt import Confirm, Prompt
 
 from dstack.cli.common import _is_termios_available, ask_choice
 from dstack.core.config import BackendConfig, Configurator, get_config_path
-from dstack.core.error import ConfigError
+from dstack.core.error import ConfigError, HubError
 from dstack.hub.models import AWSHubValues, HubElement, HubElementValue
 
 regions = [
@@ -145,15 +146,14 @@ class AWSConfigurator(Configurator):
 
         try:
             session = boto3.session.Session(
-                # profile_name=profile_name,
                 region_name=config.region_name,
                 aws_access_key_id=access_key,
                 aws_secret_access_key=secret_key,
             )
-        except Exception as ex:
-            return AWSHubValues()
-        if session is None:
-            return AWSHubValues()
+            sts = session.client("sts")
+            sts.get_caller_identity()
+        except botocore.exceptions.ClientError as ex:
+            raise HubError("Credentials are not valid")
         hub_values = AWSHubValues()
         hub_values.region_name = HubElement(selected=config.region_name)
         for r in regions:

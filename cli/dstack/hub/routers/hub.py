@@ -4,6 +4,7 @@ from fastapi import APIRouter, Body, Depends, HTTPException, Query, Request, sta
 from fastapi.security import HTTPBearer
 
 from dstack.api.backend import dict_backends
+from dstack.core.error import HubError
 from dstack.hub.db.models import Hub as HubDB
 from dstack.hub.models import AWSAuth, AWSBackend, AWSConfig, Hub, HubDelete, HubInfo
 from dstack.hub.repository.hub import HubManager
@@ -28,12 +29,21 @@ async def backend_configurator(req: Request, type_backend: str = Query(alias="ty
         )
     request_args = dict(req.query_params)
     configurator = backend.get_configurator()
-    return configurator.configure_hub(request_args)
+    try:
+        result = configurator.configure_hub(request_args)
+    except HubError as ex:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=ex.message,
+        )
+    except Exception as exx:
+        raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR)
+    return result
 
 
 @router.post("", dependencies=[Depends(Scope("hub:list:read"))], response_model=List[HubInfo])
 async def hub_create(body: HubInfo) -> HubInfo:
-    hub = await HubManager.get(name=body.name)
+    hub = await HubManager.get(name=body.hub_name)
     if hub is not None:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Hub is exists")
     await HubManager.save(hub)
