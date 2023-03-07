@@ -136,6 +136,9 @@ class GCPConfig(BackendConfig):
 
     @classmethod
     def deserialize(cls, data: Dict) -> Optional["GCPConfig"]:
+        if data.get("backend") != "gcp":
+            raise ConfigError(f"Not a GCP config")
+
         try:
             project_id = data["project"]
             region = data["region"]
@@ -144,10 +147,7 @@ class GCPConfig(BackendConfig):
             vpc = data["vpc"]
             subnet = data["subnet"]
         except KeyError:
-            raise ConfigError("It's not GCP config")
-
-        if data.get("backend") != "gcp":
-            raise ConfigError(f"It's not GCP config")
+            raise ConfigError("Cannot load config")
 
         credentials_file = data.get("credentials_file")
         return cls(
@@ -161,16 +161,16 @@ class GCPConfig(BackendConfig):
         )
 
     @classmethod
-    def deserialize_yaml(cls, yaml_content: str) -> Optional["GCPConfig"]:
+    def deserialize_yaml(cls, yaml_content: str) -> "GCPConfig":
         content = yaml.load(yaml_content, yaml.FullLoader)
         if content is None:
-            return None
+            raise ConfigError("Cannot load config")
         return cls.deserialize(content)
 
     @classmethod
-    def load(cls, path: Path = get_config_path()) -> Optional["GCPConfig"]:
+    def load(cls, path: Path = get_config_path()) -> "GCPConfig":
         if not path.exists():
-            return None
+            raise ConfigError("No config found")
         with open(path) as f:
             return GCPConfig.deserialize_yaml(f.read())
 
@@ -184,7 +184,7 @@ class GCPConfigurator(Configurator):
     def name(self):
         return "gcp"
 
-    def get_config(self, data: Dict) -> Optional[BackendConfig]:
+    def get_config(self, data: Dict) -> BackendConfig:
         return GCPConfig.deserialize(data=data)
 
     def parse_args(self, args: list = []):

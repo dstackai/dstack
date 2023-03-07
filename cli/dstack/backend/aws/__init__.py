@@ -36,7 +36,7 @@ class AwsBackend(CloudBackend):
     def name(self):
         return "aws"
 
-    def __init__(self, backend_config: Optional[BackendConfig] = None):
+    def __init__(self, backend_config: Optional[AWSConfig] = None):
         if backend_config is None:
             self.backend_config = AWSConfig()
             try:

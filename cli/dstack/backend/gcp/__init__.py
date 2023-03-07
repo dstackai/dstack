@@ -35,14 +35,11 @@ class GCPBackend(CloudBackend):
     def __init__(self, backend_config: Optional[GCPConfig] = None):
         if backend_config is None:
             try:
-                self.config = GCPConfig.load()
-                self._loaded = True
+                backend_config = GCPConfig.load()
             except ConfigError:
-                self._loaded = False
                 return
-        else:
-            self.config = backend_config
-            self._loaded = True
+
+        self.config = backend_config
 
         if self.config.credentials is not None:
             credentials = service_account.Credentials.from_service_account_info(
