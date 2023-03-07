@@ -5,7 +5,7 @@
 
 Secrets can be used to access passwords and tokens securely from remote workflows (without hard-coding them in the code).
 
-## Weights & Biases
+## Example
 
 Here's an example of how to use your Weight & Biases API token in your workflows. 
 

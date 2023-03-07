@@ -53,7 +53,7 @@ data  MNIST/raw/t10k-images-idx3-ubyte      7.5MiB
       MNIST/raw/train-labels-idx1-ubyte.gz  28.2KiB
 ```
 
-## Push artifacts to the cloud
+## Push artifacts
 
 When you run a workflow locally, artifacts are stored in `~/.dstack/artifacts` and can be reused only from the workflows
 that run locally too.

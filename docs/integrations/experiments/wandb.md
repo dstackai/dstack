@@ -49,7 +49,7 @@ To interrupt, press Ctrl+C.
 wandb: Currently logged in as: peterschmidt85. Use `wandb login --relogin` to force relogin
 ```
 
-## 2. Create a run and track metrics
+## 2. Create a run
 
 Now that you've checked that the API Key is configured, you can use the W&B Python API to create a run and track metrics
 from your Python script.
@@ -67,6 +67,8 @@ wandb.init(project="my-awesome-project", name=os.getenv("RUN_NAME"))
 !!! info "NOTE:"
     We're passing `os.getenv("RUN_NAME")` which contains the name of our `dstack` run, to the W&B run to match `dstack`'s
     run and W&B's run.
+
+## 3. Track metrics
 
 Now, we can use [`wandb.log()`](https://docs.wandb.ai/ref/python/log) and other APIs to track metrics from your training
 code:

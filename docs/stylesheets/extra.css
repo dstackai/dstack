@@ -680,7 +680,7 @@ html .md-footer-meta.md-typeset a:is(:focus,:hover) {
     padding: 9px 0 !important;
     font-weight: 700 !important;
     font-size: 0.75rem !important;
-    line-height: 1.4 !important;
+    line-height: 1.2 !important;
     -webkit-font-smoothing: auto !important;
 }
 
@@ -695,9 +695,15 @@ html .md-footer-meta.md-typeset a:is(:focus,:hover) {
     letter-spacing: -0.25px;
 }
 
+.md-typeset .tabbed-set>input:checked~.tabbed-labels code,
+.md-typeset .tabbed-set>input:first-child:checked~.tabbed-labels>:first-child {
+    font-weight: 500;
+    color: var(--md-code-fg-color);
+}
+
 .js .md-typeset .tabbed-labels:before {
-    height: 0.5px;
-    background-color: black;
+    height: 1px;
+    background-color: var(--md-typeset-a-color);
 }
 
 .md-typeset .tabbed-labels {

@@ -9,11 +9,10 @@ config` command. Once a remote is configured, use the `--remote` flag with the `
 the remote.
 
 !!! info "NOTE:"
-    When running a workflow remotely (e.g. in a configured cloud account), `dstack` automatically creates and
-    destroys instances based on resource requirements and cost strategy, such as using spot instances.
+    When running a workflow remotely, `dstack` automatically creates and
+    destroys cloud instances based on resource requirements and cost strategy, such as using spot instances.
 
-Remotes facilitate collaboration by allowing multiple team members to access the same remote, view each other's runs,
-and reuse each other's artifacts.
+Remotes facilitate collaboration as they allow multiple team members to access the same runs.
 
 ## Workflows
 

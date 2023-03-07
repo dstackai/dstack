@@ -6,27 +6,102 @@ Use `pip` to install `dstack`:
 pip install dstack --upgrade
 ```
 
-By default, workflows run locally. To run workflows remotely (e.g. in a configured cloud account), 
-configure a remote using the `dstack config` command.
+!!! info "NOTE:"
+    By default, workflows run locally. To run workflows locally, it is required to have either Docker or [NVIDIA Docker](https://github.com/NVIDIA/nvidia-docker) 
+    pre-installed.
 
 ### Configure a remote
 
-Please refer to the specific instructions below for configuring a remote, based on your desired cloud provider.
+To run workflows remotely (e.g. in a configured cloud account),
+configure a remote using the `dstack config` command.
 
-<div class="grid cards" markdown>
-- [**AWS**
-   Run workflows directly in the cloud using local AWS credentials.
-  ](#configure-an-aws-remote)
-- [**GCP**
-   Run workflows directly in the cloud using local GCP credentials.
-  ](#configure-a-gcp-remote)
+![dstack config](assets/dstack-config.png){ width="800" }
 
-[//]: # (- [**Hub**)
-[//]: # (   Run workflows via dstack Hub using your personal access token.)
-[//]: # (  ]&#40;#configure-a-hub-remote&#41;)
-</div>
+If you intend to collaborate in a team and would like to manage cloud credentials, users and other settings 
+via a user interface, it is recommended to choose `hub`.
 
-## Configure an AWS remote
+!!! info "NOTE:"
+    Choosing the `hub` remote with the `dstack config` CLI command requires you to have a Hub application up
+    and running. Refer to [Hub](#hub) for the details.
+
+If you intend to work alone and wish to run workflows directly in the cloud without any intermediate, 
+feel free to choose `aws` or `gcp`.
+
+!!! info "NOTE:"
+    Choosing the `aws` and `gcp` remotes, with the `dstack config` CLI command requires you to have local
+    cloud credentials to be configured on your local machine.
+    Refer to [AWS](#aws) and 
+    [GCP](#gcp) correspondingly for the details.
+
+## Hub
+
+Hub allows you to manage cloud credentials, users and other settings via a user interface.
+
+This way is preferred if you intend to collaborate as a team, and don't want every user to have 
+cloud credentials configured locally.
+
+In this case, the `dstack config` command is given with the URL of the Hub application and
+the personal access token.
+
+### 1. Start the Hub application
+
+Before you can use Hub, you first have to start the Hub application.
+You can run it either locally, on a dedicated server, or in the cloud.
+
+!!! info "NOTE:"
+    You can skip this step if the Hub application is already set up, and you're given with its URL
+    and a personal access token.
+
+Run the Hub application:
+
+```shell hl_lines="1"
+dstack hub start
+```
+
+If needed, the command allows you to override the port, host, and the admin token:
+
+![dstack config](assets/dstack-hub-help.png)
+
+Once the application is started, click the URL in the output to login as an admin.
+
+!!! warning "TODO:"
+    Add a screenshot of the `dstack hub start` command output with the login URL
+
+### 2. Create a hub
+
+After you've logged in as an admin, you can create a specific hub, and the user
+that will access the hub.
+
+!!! warning "TODO:"
+    Add a screenshot of the Hub Backend Edit page
+
+When creating a hub, you have to specify the corresponding cloud settings, incl.
+the credentials to the cloud, the region, the bucket, etc.
+
+!!! info "NOTE:"
+    You can configure multiple hubs, and for each specify different cloud settings and 
+    assign a different team.
+
+### 3. Configure the CLI
+
+Once the hub is created, copy the corresponding code snippet to configure
+this hub as a remote via the `dstack config` command.
+
+!!! warning "TODO:"
+    Add a screenshot of the Hub View Page showing the CLI code snippet
+
+The command includes the URL of the created hub accompanied with the personal access token of the user: 
+
+```shell hl_lines="1"
+dstack config hub --url http://localhost:3000/my-new-hub --token 8a019f6d-e01f-41e3-9e54-e3369f3deda0 
+```
+
+That's it! You've configured Hub as a remote.
+
+!!! warning "TODO:"
+    _Elaborate on how to create users and let them log in into the Hub application_
+
+## AWS
 
 ### 1. Create an S3 bucket
 
@@ -187,20 +262,14 @@ Once the AWS credentials are configured on your local machine, you can configure
 dstack config
 ```
 
-This command will ask you to choose an AWS profile (to take the AWS credentials from), 
+This command will ask you to choose an AWS profile (to take the AWS credentials from),
 an AWS region (must be the same for the S3 bucket), and the name of the S3 bucket.
 
-```shell
-Backend: aws
-AWS profile: default
-AWS region: eu-west-1
-S3 bucket: dstack-142421590066-eu-west-1
-EC2 subnet: none
-```
+![dstack config](assets/dstack-config-aws.png)
 
 That's it! You've configured AWS as a remote.
 
-## Configure a GCP remote
+## GCP
 
 !!! info "NOTE:"
     Support for GCP is experimental. In order to try it, make sure to install the `0.2rc1` version of `dstack`:
@@ -237,8 +306,9 @@ will be used to store workflow artifacts and metadata.
 
 ### 3. Create a service account
 
-The next step is to create a service account in the created project and configure the 
-following roles for it: `Service Account User`, `Compute Admin`, `Storage Admin`, `Secret Manager Admin`, and `Logging Admin`.
+The next step is to create a service account in the created project and configure the
+following roles for it: `Service Account User`, `Compute Admin`, `Storage Admin`, `Secret Manager Admin`,
+and `Logging Admin`.
 
 ### 4. Create a service account key
 
@@ -249,20 +319,13 @@ to your local machine (e.g. to `~/Downloads/my-awesome-project-d7735ca1dd53.json
 
 Once the service account key JSON file is on your machine, you can configure the CLI:
 
-```shell
+```shell hl_lines="1"
 dstack config
 ```
 
-The command will ask you for a path to the a service account key, GCP region and zone, and storage bucket name. For example:
+The command will ask you for a path to the a service account key, GCP region and zone, and storage bucket name. For
+example:
 
-```
-Backend: gcp
-Path to credentials file: ~/Downloads/my-awesome-project-d7735ca1dd53.json
-GCP geographic area: North America
-GCP region: us-central1
-GCP zone: us-central1-c
-Storage bucket: dstack-my-awesome-project
-VPC subnet: default
-```
+![dstack config](assets/dstack-config-gcp.png)
 
 That's it! You've configured GCP as a remote.
