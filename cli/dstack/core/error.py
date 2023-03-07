@@ -10,6 +10,11 @@ class ConfigError(Exception):
         self.message = message
 
 
+class HubError(Exception):
+    def __init__(self, message: Optional[str] = None):
+        self.message = message
+
+
 class BackendError(Exception):
     def __init__(self, message: Optional[str] = None):
         self.message = message

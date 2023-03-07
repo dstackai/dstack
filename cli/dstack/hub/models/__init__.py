@@ -112,7 +112,7 @@ class LinkUpload(BaseModel):
 
 
 class HubDelete(BaseModel):
-    users: List[str] = []
+    hub_names: List[str] = []
 
 
 class HubElementValue(BaseModel):
