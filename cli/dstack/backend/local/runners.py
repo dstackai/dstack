@@ -14,40 +14,9 @@ from psutil import NoSuchProcess
 from tqdm import tqdm
 
 from dstack import version
-from dstack.core.job import Job, JobStatus, Requirements
+from dstack.core.job import Job
 from dstack.core.request import RequestHead, RequestStatus
 from dstack.core.runners import Gpu, Resources, Runner
-
-CREATE_INSTANCE_RETRY_RATE_SECS = 3
-
-
-def _matches(resources: Resources, requirements: Optional[Requirements]) -> bool:
-    if not requirements:
-        return True
-    if requirements.cpus and requirements.cpus > resources.cpus:
-        return False
-    if requirements.memory_mib and requirements.memory_mib > resources.memory_mib:
-        return False
-    if requirements.gpus:
-        gpu_count = requirements.gpus.count or 1
-        if gpu_count > len(resources.gpus or []):
-            return False
-        if requirements.gpus.name and gpu_count > len(
-            list(filter(lambda gpu: gpu.name == requirements.gpus.name, resources.gpus or []))
-        ):
-            return False
-        if requirements.gpus.memory_mib and gpu_count > len(
-            list(
-                filter(
-                    lambda gpu: gpu.memory_mib >= requirements.gpus.memory_mib,
-                    resources.gpus or [],
-                )
-            )
-        ):
-            return False
-        if requirements.interruptible and not resources.interruptible:
-            return False
-    return True
 
 
 def start_runner_process(runner_id: str) -> str:
@@ -114,14 +83,15 @@ def _install_runner_if_necessary():
         _download_runner(_runner_url(), runner_path)
 
 
-def _download_runner(url: str, path: str):
+def _download_runner(url: str, path: Path):
+    runner_download_path = path.parent / "runner-download"
     with requests.get(url, stream=True) as r:
         total_length = int(r.headers.get("Content-Length"))
-
         with tqdm.wrapattr(r.raw, "read", total=total_length, desc=f"Downloading runner") as raw:
-            with open(path, "wb") as output:
+            with open(runner_download_path, "wb") as output:
                 shutil.copyfileobj(raw, output)
-        os.chmod(path, 0o755)
+    shutil.move(runner_download_path, path)
+    os.chmod(path, 0o755)
 
 
 def _runner_url() -> str:
