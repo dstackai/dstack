@@ -121,7 +121,7 @@ func (azstorage AzureStorage) UploadDir(ctx context.Context, src string, dst str
 		if entry.IsDir() {
 			return nil
 		}
-		key := path.Join(dst, strings.TrimPrefix(src, filePath))
+		key := path.Join(dst, strings.TrimPrefix(filePath, src))
 		return gerrors.Wrap(azstorage.uploadFile(ctx, filePath, key))
 	})
 	return gerrors.Wrap(err)
