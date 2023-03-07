@@ -10,12 +10,23 @@ from dstack.core.storage import StorageFile
 from dstack.utils.common import removeprefix
 
 
+class GCPStorageError(Exception):
+    pass
+
+
+class BucketNotFoundError(GCPStorageError):
+    pass
+
+
 class GCPStorage(CloudStorage):
     def __init__(
         self, project_id: str, bucket_name: str, credentials: Optional[service_account.Credentials]
     ):
         self.bucket_name = bucket_name
         self.storage_client = storage.Client(project=project_id, credentials=credentials)
+        self.bucket = self._get_bucket(self.bucket_name)
+        if self.bucket is None:
+            raise BucketNotFoundError()
 
     def configure(self):
         self.bucket = self._get_or_create_bucket(self.bucket_name)
@@ -79,8 +90,14 @@ class GCPStorage(CloudStorage):
         )
         return url
 
-    def _get_or_create_bucket(self, bucket_name: str):
+    def _get_or_create_bucket(self, bucket_name: str) -> storage.Bucket:
         try:
             return self.storage_client.create_bucket(bucket_name)
         except exceptions.Conflict:
             return self.storage_client.bucket(bucket_name)
+
+    def _get_bucket(self, bucket_name: str) -> Optional[storage.Bucket]:
+        try:
+            return self.storage_client.get_bucket(bucket_name)
+        except exceptions.NotFound:
+            return None

@@ -17,7 +17,7 @@ from dstack.backend.gcp.compute import GCPCompute
 from dstack.backend.gcp.config import GCPConfig, GCPConfigurator
 from dstack.backend.gcp.logs import GCPLogging
 from dstack.backend.gcp.secrets import GCPSecretsManager
-from dstack.backend.gcp.storage import GCPStorage
+from dstack.backend.gcp.storage import BucketNotFoundError, GCPStorage
 from dstack.cli.common import console
 from dstack.core.artifact import Artifact
 from dstack.core.error import ConfigError
@@ -55,11 +55,14 @@ class GCPBackend(CloudBackend):
                 return
             credentials = service_account.Credentials.from_service_account_file(credentials_file)
 
-        self._storage = GCPStorage(
-            project_id=self.config.project_id,
-            bucket_name=self.config.bucket_name,
-            credentials=credentials,
-        )
+        try:
+            self._storage = GCPStorage(
+                project_id=self.config.project_id,
+                bucket_name=self.config.bucket_name,
+                credentials=credentials,
+            )
+        except BucketNotFoundError:
+            return
         self._compute = GCPCompute(gcp_config=self.config, credentials=credentials)
         self._secrets_manager = GCPSecretsManager(
             project_id=self.config.project_id,
@@ -71,8 +74,6 @@ class GCPBackend(CloudBackend):
             bucket_name=self.config.bucket_name,
             credentials=credentials,
         )
-
-        self.configure()
         self._loaded = True
 
     @property
@@ -80,7 +81,7 @@ class GCPBackend(CloudBackend):
         return "gcp"
 
     def configure(self):
-        self._storage.configure()
+        pass
 
     def create_run(self, repo_address: RepoAddress) -> str:
         return base_runs.create_run(self._storage, repo_address, self.type)
