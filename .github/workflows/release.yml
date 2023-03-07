@@ -202,6 +202,7 @@ jobs:
     defaults:
       run:
         working-directory: runner
+    needs: [ runner-upload-master ]
     strategy:
       matrix:
         variant: [ gcp-image, gcp-image-cuda ]
