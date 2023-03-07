@@ -54,6 +54,7 @@ jobs:
     runs-on: ubuntu-latest
     needs:
       - cli-test-tag
+      - build-hub-tag
     steps:
       - uses: actions/checkout@v2
       - name: Set up Python 3.9
@@ -80,6 +81,7 @@ jobs:
           cp README.md cli
           python setup.py sdist bdist_wheel
           python -m twine upload --repository pypi --username ${{ secrets.PYPI_USERNAME }} --password ${{ secrets.PYPI_PASSWORD }} dist/*
+
   runner-test-master:
     defaults:
       run:
@@ -195,6 +197,49 @@ jobs:
         run: |
           VERSION=${GITHUB_REF#refs/tags/}
           ./packer build -var build_id=$VERSION -var build_prefix='' -var-file=prod-var.json ${{ matrix.variants }}.json
+  
+  gcp-images-build:
+    defaults:
+      run:
+        working-directory: runner
+    strategy:
+      matrix:
+        variant: [ gcp-image, gcp-image-cuda ]
+        include:
+          - variant: gcp-image
+            image_prefix: dstack-nocuda
+          - variant: gcp-image-cuda
+            image_prefix: dstack-cuda
+    runs-on: ubuntu-latest
+    permissions:
+      contents: 'read'
+      id-token: 'write'
+    steps:
+      - uses: actions/checkout@v3
+      - name: 'Authenticate to Google Cloud'
+        uses: 'google-github-actions/auth@v1'
+        with:
+          workload_identity_provider: 'projects/531508670106/locations/global/workloadIdentityPools/github-identity-pool/providers/github-id-provider'
+          service_account: 'github-actions@dstack.iam.gserviceaccount.com'
+          create_credentials_file: true
+      - name: 'Set up Cloud SDK'
+        uses: 'google-github-actions/setup-gcloud@v1'
+      - name: Download packer
+        run: |
+          wget https://releases.hashicorp.com/packer/1.8.0/packer_1.8.0_linux_amd64.zip
+          unzip packer_1.8.0_linux_amd64.zip
+          chmod +x packer
+          cp -R ami/packer/* .
+      - name: Run packer
+        run: |
+          VERSION=${GITHUB_REF#refs/tags/}
+          VERSION=${VERSION//./-}
+          ./packer build -var build_id=$VERSION -var build_prefix='' -var dstack_stage=PROD ${{ matrix.variant }}.json
+      - name: Publish image
+        run: |
+          VERSION=${GITHUB_REF#refs/tags/}
+          VERSION=${VERSION//./-}
+          gcloud compute images add-iam-policy-binding ${{ matrix.image_prefix }}-$VERSION --member='allAuthenticatedUsers' --role='roles/compute.imageUser'
 
   update-get-dstack-tag:
     runs-on: ubuntu-latest

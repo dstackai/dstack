@@ -1,5 +1,6 @@
 from abc import ABC, abstractmethod
 from pathlib import Path
+from typing import Dict, Optional
 
 import yaml
 
@@ -13,13 +14,8 @@ def get_dstack_dir():
 
 
 class BackendConfig(ABC):
-    NAME = ""
 
-    _configured = False
-
-    @property
-    def name(self):
-        return self.NAME or ""
+    credentials: Optional[Dict] = None
 
     @abstractmethod
     def save(self, path: Path = get_config_path()):
@@ -29,15 +25,26 @@ class BackendConfig(ABC):
     def load(self, path: Path = get_config_path()):
         pass
 
-    def load_json(self, json_data):
-        for key, value in json_data.items():
-            if hasattr(self, key):
-                setattr(self, key, value)
 
-    @abstractmethod
-    def configure(self):
-        pass
+class Configurator(ABC):
+    NAME = ""
 
     @property
-    def configured(self):
-        return self._configured
+    def name(self):
+        return self.NAME or ""
+
+    @abstractmethod
+    def configure_cli(self):
+        pass
+
+    @abstractmethod
+    def configure_hub(self, data: Dict):
+        pass
+
+    @abstractmethod
+    def get_config(self, data: Dict) -> BackendConfig:
+        pass
+
+    @abstractmethod
+    def parse_args(self, args: list = []):
+        pass

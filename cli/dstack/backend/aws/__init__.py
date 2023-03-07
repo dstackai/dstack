@@ -1,12 +1,12 @@
 from pathlib import Path
-from typing import Dict, Generator, List, Optional
+from typing import Any, Dict, Generator, List, Optional
 
 import boto3
 from botocore.client import BaseClient
 
 from dstack.backend.aws import config, logs
 from dstack.backend.aws.compute import AWSCompute
-from dstack.backend.aws.config import AWSConfig
+from dstack.backend.aws.config import AWSConfig, AWSConfigurator
 from dstack.backend.aws.secrets import AWSSecretsManager
 from dstack.backend.aws.storage import AWSStorage
 from dstack.backend.base import CloudBackend
@@ -28,11 +28,15 @@ from dstack.core.tag import TagHead
 
 
 class AwsBackend(CloudBackend):
+
+    _session: Optional[boto3.Session] = None
+    backend_config: AWSConfig
+
     @property
     def name(self):
         return "aws"
 
-    def __init__(self, backend_config: Optional[BackendConfig] = None):
+    def __init__(self, backend_config: Optional[AWSConfig] = None):
         if backend_config is None:
             self.backend_config = AWSConfig()
             try:
@@ -44,6 +48,13 @@ class AwsBackend(CloudBackend):
         else:
             self.backend_config = backend_config
             self._loaded = True
+
+        if self.backend_config.credentials is not None:
+            self._session = boto3.session.Session(
+                region_name=self.backend_config.region_name,
+                aws_access_key_id=self.backend_config.credentials.get("access_key"),
+                aws_secret_access_key=self.backend_config.credentials.get("secret_key"),
+            )
 
         self._storage = AWSStorage(
             s3_client=self._s3_client(), bucket_name=self.backend_config.bucket_name
@@ -81,11 +92,12 @@ class AwsBackend(CloudBackend):
         return self._get_client("sts")
 
     def _get_client(self, client_name: str) -> BaseClient:
-        session = boto3.Session(
-            profile_name=self.backend_config.profile_name,
-            region_name=self.backend_config.region_name,
-        )
-        return session.client(client_name)
+        if self._session is None:
+            self._session = boto3.Session(
+                profile_name=self.backend_config.profile_name,
+                region_name=self.backend_config.region_name,
+            )
+        return self._session.client(client_name)
 
     def configure(self):
         config.configure(
@@ -274,3 +286,6 @@ class AwsBackend(CloudBackend):
 
     def get_signed_upload_url(self, object_key: str) -> str:
         return self._storage.get_signed_upload_url(object_key)
+
+    def get_configurator(self):
+        return AWSConfigurator()

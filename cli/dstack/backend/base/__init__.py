@@ -2,7 +2,7 @@ import sys
 from abc import ABC, abstractmethod
 from enum import Enum
 from pathlib import Path
-from typing import Generator, List, Optional
+from typing import Any, Generator, List, Optional
 
 from dstack.core.artifact import Artifact
 from dstack.core.config import BackendConfig
@@ -204,9 +204,13 @@ class Backend(ABC):
     def delete_secret(self, repo_address: RepoAddress, secret_name: str):
         pass
 
+    @abstractmethod
+    def get_configurator(self):
+        pass
+
 
 class RemoteBackend(Backend):
-    def __init__(self, backend_config: Optional[BackendConfig] = None):
+    def __init__(self, backend_config: Optional[BackendConfig] = None, custom_client: Any = None):
         pass
 
     @property

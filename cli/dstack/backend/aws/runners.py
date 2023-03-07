@@ -1,19 +1,26 @@
 import json
 import time
-from functools import cmp_to_key, reduce
+from functools import reduce
 from typing import List, Optional, Tuple
 
-import yaml
 from botocore.client import BaseClient
 
 from dstack import version
+from dstack.backend.base.compute import choose_instance_type
 from dstack.core.instance import InstanceType
 from dstack.core.job import Job, JobStatus, Requirements
 from dstack.core.repo import RepoAddress
 from dstack.core.request import RequestHead, RequestStatus
-from dstack.core.runners import Gpu, Resources, Runner
+from dstack.core.runners import Gpu, Resources
 
 CREATE_INSTANCE_RETRY_RATE_SECS = 3
+
+
+def get_instance_type(
+    ec2_client: BaseClient, requirements: Optional[Requirements]
+) -> Optional[InstanceType]:
+    instance_types = _get_instance_types(ec2_client)
+    return choose_instance_type(instance_types, requirements)
 
 
 def _get_instance_types(ec2_client: BaseClient) -> List[InstanceType]:
@@ -27,7 +34,7 @@ def _get_instance_types(ec2_client: BaseClient) -> List[InstanceType]:
             Filters=[
                 {
                     "Name": "instance-type",
-                    "Values": ["c5.*", "m5.*", "p2.*", "p3.*", "p4d.*", "p4de.*"],
+                    "Values": ["t2.small", "c5.*", "m5.*", "p2.*", "p3.*", "p4d.*", "p4de.*"],
                 },
             ],
             **kwargs,
@@ -54,86 +61,7 @@ def _get_instance_types(ec2_client: BaseClient) -> List[InstanceType]:
                     ),
                 )
             )
-
-    def compare(i1, i2):
-        r1_gpu_total_memory_mib = sum(map(lambda g: g.memory_mib, i1.resources.gpus or []))
-        r2_gpu_total_memory_mib = sum(map(lambda g: g.memory_mib, i2.resources.gpus or []))
-        if r1_gpu_total_memory_mib < r2_gpu_total_memory_mib:
-            return -1
-        elif r1_gpu_total_memory_mib > r2_gpu_total_memory_mib:
-            return 1
-        if i1.resources.cpus < i2.resources.cpus:
-            return -1
-        elif i1.resources.cpus > i2.resources.cpus:
-            return 1
-        if i1.resources.memory_mib < i2.resources.memory_mib:
-            return -1
-        elif i1.resources.memory_mib > i2.resources.memory_mib:
-            return 1
-        return 0
-
-    return sorted(instance_types, key=cmp_to_key(compare))
-
-
-def _matches(resources: Resources, requirements: Optional[Requirements]) -> bool:
-    if not requirements:
-        return True
-    if requirements.cpus and requirements.cpus > resources.cpus:
-        return False
-    if requirements.memory_mib and requirements.memory_mib > resources.memory_mib:
-        return False
-    if requirements.gpus:
-        gpu_count = requirements.gpus.count or 1
-        if gpu_count > len(resources.gpus or []):
-            return False
-        if requirements.gpus.name and gpu_count > len(
-            list(filter(lambda gpu: gpu.name == requirements.gpus.name, resources.gpus or []))
-        ):
-            return False
-        if requirements.gpus.memory_mib and gpu_count > len(
-            list(
-                filter(
-                    lambda gpu: gpu.memory_mib >= requirements.gpus.memory_mib,
-                    resources.gpus or [],
-                )
-            )
-        ):
-            return False
-        if requirements.interruptible and not resources.interruptible:
-            return False
-    return True
-
-
-def _get_instance_type(
-    ec2_client: BaseClient, requirements: Optional[Requirements]
-) -> Optional[InstanceType]:
-    instance_types = _get_instance_types(ec2_client)
-
-    instance_type = next(
-        (
-            instance_type
-            for instance_type in instance_types
-            if _matches(instance_type.resources, requirements)
-        ),
-        None,
-    )
-    interruptible = False
-    if requirements and requirements.interruptible:
-        interruptible = True
-    return (
-        InstanceType(
-            instance_name=instance_type.instance_name,
-            resources=Resources(
-                cpus=instance_type.resources.cpus,
-                memory_mib=instance_type.resources.memory_mib,
-                gpus=instance_type.resources.gpus,
-                interruptible=interruptible,
-                local=False,
-            ),
-        )
-        if instance_type
-        else None
-    )
+    return instance_types
 
 
 def _get_security_group_id(ec2_client: BaseClient, bucket_name: str, subnet_id: Optional[str]):
@@ -491,7 +419,7 @@ def _run_instance(
     return request_id
 
 
-def _run_instance_retry(
+def run_instance_retry(
     ec2_client: BaseClient,
     iam_client: BaseClient,
     bucket_name: str,
@@ -525,7 +453,7 @@ def _run_instance_retry(
         ):
             if attempts > 0:
                 time.sleep(CREATE_INSTANCE_RETRY_RATE_SECS)
-                return _run_instance_retry(
+                return run_instance_retry(
                     ec2_client,
                     iam_client,
                     bucket_name,
@@ -544,7 +472,7 @@ def _run_instance_retry(
             raise e
 
 
-def _cancel_spot_request(ec2_client: BaseClient, request_id: str):
+def cancel_spot_request(ec2_client: BaseClient, request_id: str):
     ec2_client.cancel_spot_instance_requests(SpotInstanceRequestIds=[request_id])
     response = ec2_client.describe_instances(
         Filters=[
@@ -557,7 +485,7 @@ def _cancel_spot_request(ec2_client: BaseClient, request_id: str):
         )
 
 
-def _terminate_instance(ec2_client: BaseClient, request_id: str):
+def terminate_instance(ec2_client: BaseClient, request_id: str):
     try:
         ec2_client.terminate_instances(InstanceIds=[request_id])
     except Exception as e:

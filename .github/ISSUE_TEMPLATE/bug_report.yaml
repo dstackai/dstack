@@ -51,7 +51,7 @@ body:
       description: |
         If the run is local, attach the entire contents of `~/.dstack/tmp/runner/configs/<runner-id>/logs/<runner-id>`.
         
-        If the run is remote, attach the logs from the corresponding cloud. For example, if it's AWS, the logs can be found in the `/dstack/runners/<bucket>` CloudWatch group and the `<runner-id>` CloudWatch stream (within the configured AWS region).
+        If the run is remote, attach the logs from the corresponding cloud. If it's AWS, the logs can be found in the `/dstack/runners/<bucket>` CloudWatch group in the `<runner-id>` CloudWatch stream (within the configured AWS region). If it's GCP, the logs can be found under the `projects/dstack/logs/dstack-runners-<bucket>-<runner-id>` log name. To filter out the logs of a particular GCP run, type `dstack-runners <run-name>` into the Logs Explorer search field.
       render: shell
   - type: textarea
     id: additional-information

@@ -1,6 +1,9 @@
 package models
 
-import "fmt"
+import (
+	"fmt"
+	"strings"
+)
 
 type Resource struct {
 	CPUs          int    `yaml:"cpus,omitempty"`
@@ -82,17 +85,25 @@ type GPU struct {
 	Name      string `yaml:"name,omitempty"`
 	MemoryMiB int    `yaml:"memory_mib,omitempty"`
 }
+
 type State struct {
 	Job       *Job     `yaml:"job"`
 	RequestID string   `yaml:"request_id"`
 	Resources Resource `yaml:"resources"`
 	RunnerID  string   `yaml:"runner_id"`
 }
+
 type GitCredentials struct {
 	Protocol   string  `json:"protocol"`
 	OAuthToken *string `json:"oauth_token,omitempty"`
 	PrivateKey *string `json:"private_key,omitempty"`
 	Passphrase *string `json:"passphrase,omitempty"`
+}
+
+type RepoData struct {
+	RepoHost     string
+	RepoUserName string
+	RepoName     string
 }
 
 func (j *Job) RepoHostNameWithPort() string {
@@ -101,9 +112,59 @@ func (j *Job) RepoHostNameWithPort() string {
 	}
 	return fmt.Sprintf("%s:%d", j.RepoHostName, j.RepoPort)
 }
+
+func (j *Job) JobRepoData() *RepoData {
+	return &RepoData{
+		RepoHost:     j.RepoHostNameWithPort(),
+		RepoUserName: j.RepoUserName,
+		RepoName:     j.RepoName,
+	}
+}
+
+func (j *Job) JobFilepath() string {
+	return fmt.Sprintf("jobs/%s/%s/%s/%s.yaml", j.RepoHostNameWithPort(), j.RepoUserName, j.RepoName, j.JobID)
+}
+
+func (j *Job) JobHeadFilepathPrefix() string {
+	return fmt.Sprintf("jobs/%s/%s/%s/l;%s;", j.RepoHostNameWithPort(), j.RepoUserName, j.RepoName, j.JobID)
+}
+
+func (j *Job) JobHeadFilepath() string {
+	appsSlice := make([]string, len(j.Apps))
+	for _, app := range j.Apps {
+		appsSlice = append(appsSlice, app.Name)
+	}
+	artifactSlice := make([]string, len(j.Artifacts))
+	for _, art := range j.Artifacts {
+		artifactSlice = append(artifactSlice, art.Path)
+	}
+	return fmt.Sprintf(
+		"jobs/%s/%s/%s/l;%s;%s;%s;%d;%s;%s;%s;%s",
+		j.RepoHostNameWithPort(),
+		j.RepoUserName,
+		j.RepoName,
+		j.JobID,
+		j.ProviderName,
+		j.LocalRepoUserName,
+		j.SubmittedAt,
+		j.Status,
+		strings.Join(artifactSlice, ","),
+		strings.Join(appsSlice, ","),
+		j.TagName,
+	)
+}
+
 func (d *Dep) RepoHostNameWithPort() string {
 	if d.RepoPort == 0 {
 		return d.RepoHostName
 	}
 	return fmt.Sprintf("%s:%d", d.RepoHostName, d.RepoPort)
+}
+
+func (rd *RepoData) RepoDataPath(sep string) string {
+	return strings.Join([]string{rd.RepoHost, rd.RepoUserName, rd.RepoName}, sep)
+}
+
+func (rd *RepoData) SecretsPrefix() string {
+	return fmt.Sprintf("secrets/%s/%s/%s/l;", rd.RepoHost, rd.RepoUserName, rd.RepoName)
 }

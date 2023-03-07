@@ -25,7 +25,7 @@ const (
 	NVIDIA_DRIVER_INIT_ERROR = "stderr: nvidia-container-cli: initialization error: nvml error: driver not loaded: unknown"
 )
 
-//JOB ports
+// JOB ports
 const (
 	EXPOSE_PORT_START = 3000
 	EXPOSE_PORT_END   = 4000

@@ -6,36 +6,46 @@ Use `pip` to install `dstack`:
 pip install dstack --upgrade
 ```
 
+By default, workflows run locally. To run workflows remotely (e.g. in a configured cloud account), 
+configure a remote using the `dstack config` command.
+
+### Configure a remote
+
+Please refer to the specific instructions below for configuring a remote, based on your desired cloud provider.
+
+<div class="grid cards" markdown>
+- [**AWS**
+   Run workflows directly in the cloud using local AWS credentials.
+  ](#configure-an-aws-remote)
+- [**GCP**
+   Run workflows directly in the cloud using local GCP credentials.
+  ](#configure-a-gcp-remote)
+
+[//]: # (- [**Hub**)
+[//]: # (   Run workflows via dstack Hub using your personal access token.)
+[//]: # (  ]&#40;#configure-a-hub-remote&#41;)
+</div>
+
+## Configure an AWS remote
+
+### 1. Create an S3 bucket
+
+In order to use AWS as a remote, you first have to create an S3 bucket in your AWS account.
+This bucket will be used to store workflow artifacts and metadata.
+
 !!! info "NOTE:"
-    If you only plan to run workflows locally and do not want to share artifacts with others outside your machine, you do
-    not need to configure anything else.
+    Make sure to create an S3 bucket in the AWS region where you'd like to run your workflows.
 
-## (Optional) Configure a remote
+### 2. Configure AWS credentials
 
-By default, workflows are run locally. If you want to be able to run workflows remotely (e.g. in a configured cloud account),
-you have to configure a remote using the `dstack config` command.
-
-!!! info "NOTE:"
-    Currently, the only supported remote type is AWS.
-
-### Create an S3 bucket
-
-Before you can use the `dstack config` command, you have to create an S3 bucket in your AWS account 
-that you'll use to store workflow artifacts and metadata.
-
-!!! info "NOTE:"
-    Make sure to create an S3 bucket in the AWS region, where you'd like to run your workflows.
-
-### Configure AWS credentials
-
-The next step is to configure AWS credentials on your local machine so the `dstack` CLI
-may perform actions on `s3`, `logs`, `secretsmanager`, `ec2`, and `iam` services.
-
-If you'd like to limit the permissions to the most narrow scope, feel free to use the IAM policy template
-below.
+The next step is to configure AWS credentials on your local machine. The credentials should grant
+the permissions to perform actions on `s3`, `logs`, `secretsmanager`, `ec2`, and `iam` services.
 
 ??? info "IAM policy template"
-    If you're using this template, make sure to replace `{bucket_name}` and `{bucket_name_under_score}` variables
+    If you'd like to limit the permissions to the most narrow scope, feel free to use the IAM policy template
+    below.
+
+    Replace `{bucket_name}` and `{bucket_name_under_score}` variables in the template below
     with the values that correspond to your S3 bucket.
 
     For `{bucket_name}`, use the name of the S3 bucket. 
@@ -169,9 +179,9 @@ below.
     }
     ```
 
-### Configure the CLI
+### 3. Configure the CLI
 
-Once the AWS credentials are configured, you can configure the CLI:
+Once the AWS credentials are configured on your local machine, you can configure the CLI:
 
 ```shell hl_lines="1"
 dstack config
@@ -181,12 +191,78 @@ This command will ask you to choose an AWS profile (to take the AWS credentials 
 an AWS region (must be the same for the S3 bucket), and the name of the S3 bucket.
 
 ```shell
+Backend: aws
 AWS profile: default
 AWS region: eu-west-1
 S3 bucket: dstack-142421590066-eu-west-1
 EC2 subnet: none
 ```
 
-The configuration will be saved in the `~/.dstack/config.yaml` file.
+That's it! You've configured AWS as a remote.
 
-Once a remote is configured, you can run workflows remotely and push and pull artifacts.
+## Configure a GCP remote
+
+!!! info "NOTE:"
+    Support for GCP is experimental. In order to try it, make sure to install the `0.2rc1` version of `dstack`:
+
+    ```shell hl_lines="1"
+    pip install dstack==0.2rc1
+    ```
+
+### 1. Create a project
+
+In order to use GCP as a remote, you first have to create a project in your GCP account
+and make sure that the required APIs and enabled for it.
+
+??? info "Required APIs"
+    Here's the list of APIs that have to be enabled for the project.
+
+    ```
+    cloudapis.googleapis.com
+    compute.googleapis.com 
+    logging.googleapis.com
+    secretmanager.googleapis.com
+    storage-api.googleapis.com
+    storage-component.googleapis.com 
+    storage.googleapis.com 
+    ```
+
+### 2. Create a storage bucket
+
+Once the project is created, you can proceed and create a storage bucket. This bucket
+will be used to store workflow artifacts and metadata.
+
+!!! info "NOTE:"
+    Make sure to create the bucket in the location where you'd like to run your workflows.
+
+### 3. Create a service account
+
+The next step is to create a service account in the created project and configure the 
+following roles for it: `Service Account User`, `Compute Admin`, `Storage Admin`, `Secret Manager Admin`, and `Logging Admin`.
+
+### 4. Create a service account key
+
+Once the service account is set up, create a key for it and download the corresponding JSON file
+to your local machine (e.g. to `~/Downloads/my-awesome-project-d7735ca1dd53.json`).
+
+### 5. Configure the CLI
+
+Once the service account key JSON file is on your machine, you can configure the CLI:
+
+```shell
+dstack config
+```
+
+The command will ask you for a path to the a service account key, GCP region and zone, and storage bucket name. For example:
+
+```
+Backend: gcp
+Path to credentials file: ~/Downloads/my-awesome-project-d7735ca1dd53.json
+GCP geographic area: North America
+GCP region: us-central1
+GCP zone: us-central1-c
+Storage bucket: dstack-my-awesome-project
+VPC subnet: default
+```
+
+That's it! You've configured GCP as a remote.

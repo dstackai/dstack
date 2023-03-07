@@ -1,6 +1,6 @@
 # dstack config
 
-This command configures the AWS region and S3 bucket, where dstack will provision compute resources and save data.
+This command configures a remote backend. The configuration is stored in `~/.dstack/config.yaml`.
 
 ## Usage
 
@@ -8,7 +8,13 @@ This command configures the AWS region and S3 bucket, where dstack will provisio
 dstack config
 ```
 
-Make sure to use an S3 bucket name that isn't used by other AWS accounts.
+It will ask first you for a remote type. Currently, `dstack` supports AWS and GCP as remotes.
+The next steps vary depending on the remote type.
+
+### AWS
+
+The command will ask you to choose an AWS profile (to take the AWS credentials from), 
+an AWS region (must be the same for the S3 bucket), and the name of the S3 bucket. For example:
 
 ```shell
 AWS profile: default
@@ -17,4 +23,22 @@ S3 bucket: dstack-142421590066-eu-west-1
 EC2 subnet: none
 ```
 
-The configuration is stored in `~/.dstack/config.yaml`.
+### GCP
+
+!!! info "NOTE:"
+    Support for GCP is experimental. In order to try it, make sure to install the `0.2rc1` version of `dstack`:
+
+    ```shell hl_lines="1"
+    pip install dstack==0.2rc1
+    ```
+
+The command will ask you for a path to the a service account key, GCP region and zone, and storage bucket name. For example:
+
+```
+Path to credentials file: ~/Projects/dstack/my-sa-key.json
+GCP geographic area: North America
+GCP region: us-central1
+GCP zone: us-central1-c
+Storage bucket: dstack-test
+VPC subnet: default
+```

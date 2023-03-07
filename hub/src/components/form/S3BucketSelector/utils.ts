@@ -3,7 +3,7 @@ import { S3ResourceSelectorProps } from '@cloudscape-design/components/s3-resour
 export const getResourceSelectorI18n = (
     params?: Partial<S3ResourceSelectorProps['i18nStrings']>,
 ): S3ResourceSelectorProps['i18nStrings'] => ({
-    inContextInputPlaceholder: 's3://bucket',
+    inContextInputPlaceholder: 'bucket',
     inContextSelectPlaceholder: '',
     inContextBrowseButton: 'Browse S3',
     inContextViewButton: 'View',

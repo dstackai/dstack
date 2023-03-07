@@ -6,7 +6,7 @@ from typing import Dict, Generator, List, Optional, Tuple
 from dstack.backend.base import BackendType, RemoteBackend
 from dstack.backend.base import artifacts as base_artifacts
 from dstack.backend.hub.client import HubClient
-from dstack.backend.hub.config import HUBConfig
+from dstack.backend.hub.config import HUBConfig, HubConfigurator
 from dstack.backend.hub.storage import HUBStorage
 from dstack.core.artifact import Artifact
 from dstack.core.config import BackendConfig
@@ -36,10 +36,8 @@ class HubBackend(RemoteBackend):
     def _hub_client(self) -> HubClient:
         if self._client is None:
             self._client = HubClient(
-                host=self.backend_config.host,
-                port=self.backend_config.port,
+                url=self.backend_config.url,
                 token=self.backend_config.token,
-                hub_name=self.backend_config.hub_name,
             )
         return self._client
 
@@ -204,3 +202,6 @@ class HubBackend(RemoteBackend):
     def delete_secret(self, repo_address: RepoAddress, secret_name: str):
         # /{hub_name}/secrets/delete
         self._hub_client().delete_secret(repo_address=repo_address, secret_name=secret_name)
+
+    def get_configurator(self):
+        return HubConfigurator()
