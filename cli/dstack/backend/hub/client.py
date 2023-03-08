@@ -53,11 +53,10 @@ class HubClient:
 
     @staticmethod
     def validate(url: str, token: str) -> bool:
-        url = _url(url=url, additional_path="/info")
+        url = _url(url=url, additional_path="/api/users/info")
         try:
             resp = requests.get(url=url, headers=HubClient._auth(token=token))
             if resp.ok:
-                print(resp.json())
                 return True
             if resp.status_code == 401:
                 print("Unauthorized. Please set correct token")
