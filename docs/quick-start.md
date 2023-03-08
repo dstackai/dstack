@@ -122,6 +122,11 @@ Extracting /workflow/data/MNIST/raw/train-images-idx2-ubyte.gz
     By default, `dstack` runs workflows locally, which requires having either Docker or [NVIDIA Docker](https://github.com/NVIDIA/nvidia-docker) 
     installed locally.
 
+!!! info "NOTE:"
+    By default, `dstack` uses the same Python version to run workflows as your local Python version.
+    If you use Python 3.11, the `mnist-data` workflow will fail since it's not yet supported by `torchvision`.
+    To solve such problems, `dstack` allows you to specify a Python version for the workflow with the `python` parameter in the YAML file, e.g. `python: 3.9`.
+
 ### Check status
 
 To check the status of recent runs, use the [`dstack ps`](reference/cli/ps.md) command:
