@@ -51,6 +51,20 @@
     },
     {
       "type": "file",
+      "source": "/home/stepan/develop/dstack/runner/runner",
+      "destination": "/tmp/azure-runner"
+    },
+    {
+      "type": "shell",
+      "inline_shebang": "/bin/sh -x",
+      "inline": [
+        "sudo mv /tmp/azure-runner /usr/local/bin/dstack-runner",
+        "sudo chmod +x /usr/local/bin/dstack-runner",
+        "dstack-runner --version"
+      ]
+    },
+    {
+      "type": "file",
       "source": "provisioners/install-docker.sh",
       "destination": "/tmp/install-docker.sh"
     },

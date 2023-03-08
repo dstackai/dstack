@@ -30,6 +30,7 @@ class Config(BaseModel):
     secret: Secret
     storage: Storage
     location: str
+    subscription_id: str
     backend: str = Field(default="azure")
 
 

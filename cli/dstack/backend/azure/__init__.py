@@ -39,6 +39,7 @@ class AzureBackend(CloudBackend):
             credential=credential,
             vault_url=self._backend_config.secret.url,
         )
+        # https://learn.microsoft.com/en-us/azure/storage/blobs/assign-azure-role-data-access?tabs=portal
         self._storage = AzureStorage(
             credential=credential,
             account_url=self._backend_config.storage.url,
