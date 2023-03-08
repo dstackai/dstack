@@ -406,14 +406,21 @@ class Provider:
             else:
                 gpu_count = 0
                 gpu_name = None
+                gpu_memory = None
                 if str(gpu.get("count")).isnumeric():
                     gpu_count = int(gpu.get("count"))
                 if gpu.get("name"):
                     gpu_name = gpu.get("name")
                     if not gpu_count:
                         gpu_count = 1
+                if gpu.get("memory"):
+                    gpu_memory = _str_to_mib(gpu.get("memory"))
+                    if not gpu_count:
+                        gpu_count = 1
                 if gpu_count:
-                    resources.gpus = GpusRequirements(count=gpu_count, name=gpu_name)
+                    resources.gpus = GpusRequirements(
+                        count=gpu_count, name=gpu_name, memory_mib=gpu_memory
+                    )
         for resource_name in self.provider_data["resources"]:
             if resource_name.endswith("/gpu") and len(resource_name) > 4:
                 if not str(self.provider_data["resources"][resource_name]).isnumeric():
