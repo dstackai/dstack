@@ -30,7 +30,12 @@ class LsCommand(BasicCommand):
             help="A name of a run or a tag",
         )
         self._parser.add_argument(
-            "prefix", type=str, help="Show files starting with prefix", nargs="?", default=""
+            "prefix",
+            metavar="SEARCH_PREFIX",
+            type=str,
+            help="Show files starting with prefix",
+            nargs="?",
+            default="",
         )
 
         self._parser.add_argument(
