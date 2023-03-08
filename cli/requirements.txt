@@ -14,7 +14,7 @@ fastapi
 starlette
 uvicorn
 pydantic
-sqlalchemy==2.0.2
+sqlalchemy[asyncio]==2.0.2
 py-cpuinfo
 psutil
 websocket-client

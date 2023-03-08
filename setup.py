@@ -68,7 +68,7 @@ setup(
         "starlette",
         "uvicorn",
         "pydantic",
-        "sqlalchemy",
+        "sqlalchemy[asyncio]",
         "websocket-client",
         "cursor",
         "simple-term-menu",
