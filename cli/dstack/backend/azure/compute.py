@@ -52,7 +52,8 @@ from azure.mgmt.resource.resources.v2022_09_01.models import ResourceGroup
 from dstack import version
 from dstack.backend.aws.runners import _get_default_ami_image_version, _serialize_runner_yaml
 from dstack.backend.azure import runners
-from dstack.backend.base.compute import Compute
+from dstack.backend.azure.config import AzureConfig
+from dstack.backend.base.compute import Compute, choose_instance_type
 from dstack.core.instance import InstanceType
 from dstack.core.job import Job
 from dstack.core.repo import RepoAddress
@@ -62,7 +63,7 @@ from dstack.core.request import RequestHead, RequestStatus
 class AzureCompute(Compute):
     # XXX: Config is leaking here. It is run_instance's parameter only.
     def __init__(
-        self, credential: TokenCredential, subscription_id: str, location: str, config: Config
+        self, credential: TokenCredential, subscription_id: str, location: str, config: AzureConfig
     ):
         self._compute_client = ComputeManagementClient(
             credential=credential, subscription_id=subscription_id
@@ -88,10 +89,7 @@ class AzureCompute(Compute):
         instance_types = runners._get_instance_types(
             client=self._compute_client, location=self._location
         )
-        instance_types.sort(key=runners._key_for_instance)
-        return runners._get_instance_type(
-            instance_types=instance_types, requirements=job.requirements
-        )
+        return choose_instance_type(instance_types=instance_types, requirements=job.requirements)
 
     def run_instance(self, job: Job, instance_type: InstanceType) -> str:
         return _launch_instance(

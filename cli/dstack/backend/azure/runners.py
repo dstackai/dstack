@@ -2,7 +2,6 @@ from typing import List, Optional, Tuple
 
 from azure.mgmt.compute import ComputeManagementClient
 
-from dstack.backend.aws.runners import _matches
 from dstack.core.instance import InstanceType
 from dstack.core.job import Requirements
 from dstack.core.runners import Gpu, Resources

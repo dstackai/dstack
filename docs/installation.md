@@ -367,9 +367,26 @@ Once the service account key JSON file is on your machine, you can configure the
 dstack config
 ```
 
-The command will ask you for a path to the a service account key, GCP region and zone, and storage bucket name. For
+The command will ask you for a path to the service account key, GCP region and zone, and storage bucket name. For
 example:
 
 ![dstack config](assets/dstack-config-gcp.png)
 
 That's it! You've configured GCP as a remote.
+
+## Azure [Early access]
+
+Out team is exploring Azure platform capabilities. We have reached a state to run tasks in the cloud. This is early
+access to collect feedback from first adopters.
+
+Azure has a coups ways to authenticate. There is only supported so far. It is Azure CLI. Execute command:
+
+```shell hl_lines="1"
+az login
+```
+
+Also, it is required to be owner of subscription to allocate resources manually and to delegate dstask resource's
+management. Make sure to allocate resources in the same location.
+
+Create secret storage with command:
+

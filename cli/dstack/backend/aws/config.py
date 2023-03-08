@@ -65,7 +65,7 @@ class AWSConfig(BackendConfig):
         if path.exists():
             with path.open() as f:
                 config_data = yaml.load(f, Loader=yaml.FullLoader)
-                if config_data.get("backend") != "aws":
+                if not isinstance(config_data, Dict) or config_data.get("backend") != "aws":
                     raise ConfigError(f"It's not AWS config")
                 if not config_data.get("bucket"):
                     raise Exception(f"For AWS backend:the bucket field is required")

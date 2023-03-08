@@ -1,6 +1,6 @@
 import os
 from pathlib import Path
-from typing import Any
+from typing import Any, Dict
 from urllib.parse import urlparse, urlunparse
 
 import yaml
@@ -25,7 +25,7 @@ class HUBConfig(BackendConfig):
         if path.exists():
             with path.open() as f:
                 config_data = yaml.load(f, Loader=yaml.FullLoader)
-                if config_data.get("backend") != self.NAME:
+                if not isinstance(config_data, Dict) or config_data.get("backend") != self.NAME:
                     raise ConfigError(f"It's not HUB config")
                 if config_data.get("url") is None:
                     raise ConfigError(f"For HUB backend:the URL field is required")

@@ -1,6 +1,6 @@
 from abc import ABC, abstractmethod
 from pathlib import Path
-from typing import Dict, Optional
+from typing import Dict, List, Optional
 
 import yaml
 
@@ -46,5 +46,5 @@ class Configurator(ABC):
         pass
 
     @abstractmethod
-    def parse_args(self, args: list = []):
+    def parse_args(self, args: List = []):
         pass

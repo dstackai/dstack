@@ -1,8 +1,10 @@
 from pathlib import Path
+from typing import Dict
 
 import yaml
 
 from dstack.core.config import BackendConfig, get_config_path, get_dstack_dir
+from dstack.core.error import ConfigError
 
 
 class LocalConfig(BackendConfig):
@@ -15,6 +17,8 @@ class LocalConfig(BackendConfig):
         if path.exists():
             with path.open() as f:
                 config_data = yaml.load(f, Loader=yaml.FullLoader)
+                if not isinstance(config_data, Dict):
+                    config_data = {}
                 self.path = config_data.get("path") or get_dstack_dir()
 
     def save(self, path: Path = get_config_path()):

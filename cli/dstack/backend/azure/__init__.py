@@ -5,7 +5,7 @@ from azure.identity import DefaultAzureCredential
 from azure.mgmt.subscription import SubscriptionClient
 
 from dstack.backend.azure.compute import AzureCompute
-from dstack.backend.azure.config import AzureConfig
+from dstack.backend.azure.config import AzureConfig, AzureConfigurator
 from dstack.backend.azure.secrets import AzureSecretsManager
 from dstack.backend.azure.storage import AzureStorage
 from dstack.backend.base import CloudBackend
@@ -24,16 +24,15 @@ from dstack.core.tag import TagHead
 
 
 class AzureBackend(CloudBackend):
-    def __init__(self):
-        config = AzureConfig()
-        try:
-            config.load()
-            # XXX: this is flag for availability for using in command `run`.
-            self._loaded = True
-        except ConfigError:
-            self._loaded = False
-            return
-        self._backend_config = config.config
+    def __init__(self, backend_config: Optional[AzureConfig] = None):
+        if backend_config is None:
+            try:
+                backend_config = AzureConfig.load()
+            except ConfigError:
+                return
+
+        self.config = backend_config
+
         credential = DefaultAzureCredential()
         self._secrets_manager = AzureSecretsManager(
             credential=credential,
@@ -58,6 +57,9 @@ class AzureBackend(CloudBackend):
     @property
     def name(self) -> str:
         return "azure"
+
+    def get_configurator(self):
+        return AzureConfigurator()
 
     def save_repo_credentials(self, repo_address: RepoAddress, repo_credentials: RepoCredentials):
         base_repos.save_repo_credentials(

@@ -1,38 +1,25 @@
 import json
 import re
+from inspect import signature
 from pathlib import Path
+from typing import Dict, List
 
 import yaml
+from azure.identity import DefaultAzureCredential
+from azure.mgmt.subscription import SubscriptionClient
+from azure.mgmt.subscription.models import Subscription
 from pydantic.error_wrappers import ValidationError
 from pydantic.fields import Field
-from pydantic.main import BaseModel
+from pydantic.main import BaseModel, create_model
 from pydantic.networks import stricturl
 from pydantic.tools import parse_obj_as
 from pydantic.types import constr
 from rich import print
 from rich.prompt import Confirm, Prompt
 
-from dstack.cli.common import ask_choice
-from dstack.core.config import BackendConfig, get_config_path
+from dstack.cli.common import ask_choice, console
+from dstack.core.config import BackendConfig, Configurator, get_config_path
 from dstack.core.error import ConfigError
-
-
-class Secret(BaseModel):
-    url: stricturl(allowed_schemes={"https"})
-
-
-class Storage(BaseModel):
-    url: stricturl(allowed_schemes={"https"})
-    container: str
-
-
-class Config(BaseModel):
-    secret: Secret
-    storage: Storage
-    location: str
-    subscription_id: str
-    backend: str = Field(default="azure")
-
 
 # XXX: Where is full inclusive description of requirements for url of Key Vault?
 # This page says about "DNS Name":
@@ -103,126 +90,215 @@ locations = [
 ]
 
 
-class AzureConfig(BackendConfig):
-    # XXX: duplicate name from AzureBackend.
-    # XXX: duplicate name from Config.
-    NAME = "azure"
-    # XXX: this is flag for availability for using in command `config`.
-    _configured = True
+class ModelMeta(type(BackendConfig)):
+    def __new__(mcs, name, bases, namespace, **kwargs):
+        init = signature(namespace["__init__"])
+        parameters = iter(init.parameters.items())
+        # skip self.
+        next(parameters)
+        fields = {
+            name: (
+                parameter.annotation,
+                parameter.default if parameter.default is not parameter.empty else ...,
+            )
+            for name, parameter in parameters
+        }
+        Config = create_model(
+            f"{name}Model",
+            __config__=type("Config", (), {"orm_mode": True}),
+            **{"backend": (str, Field(default=namespace["NAME"])), **fields},
+        )
+        new_namespace = {**namespace, "__model__": Config}
+        return super().__new__(mcs, name, bases, new_namespace, **kwargs)
 
-    config: Config = None
+
+class AzureConfig(BackendConfig, metaclass=ModelMeta):
+    NAME = "azure"
+
+    def __init__(
+        self,
+        subscription_id: str,
+        location: str,
+        secret_url: stricturl(allowed_schemes={"https"}),
+        storage_url: stricturl(allowed_schemes={"https"}),
+        storage_container: str,
+    ):
+        self.subscription_id = subscription_id
+        self.location = location
+        self.secret_url = secret_url
+        self.storage_url = storage_url
+        self.storage_container = storage_container
 
     def save(self, path: Path = get_config_path()):
-        if not path.parent.exists():
-            path.parent.mkdir(parents=True)
-        with path.open("w") as f:
-            # XXX: this is overhead.
-            yaml.dump(json.loads(self.config.json()), f)
+        with open(path, "w+") as f:
+            f.write(self.serialize_yaml())
 
-    def load(self, path: Path = get_config_path()):
-        path = path.resolve()
+    def serialize_yaml(self) -> str:
+        return yaml.dump(self.serialize())
+
+    def serialize(self) -> Dict:
+        # XXX: this is a suboptimal way.
+        return json.loads(self.__class__.__model__.from_orm(self).json())
+
+    @classmethod
+    def deserialize_yaml(cls, yaml_content: str) -> "AzureConfig":
+        content = yaml.load(yaml_content, yaml.FullLoader)
+        if content is None:
+            raise ConfigError("Cannot load config")
+        return cls.deserialize(content)
+
+    @classmethod
+    def load(cls, path: Path = get_config_path()):
         if not path.exists():
-            raise ConfigError(f"Path {path!r} does not exist.")
-        with path.open() as f:
-            config_data = yaml.load(f, Loader=yaml.FullLoader)
-            if not isinstance(config_data, dict):
-                raise ConfigError(
-                    f"Shape of data {type(config_data)!r} is not dict from {path!r}."
-                )
-            try:
-                config = Config(**config_data)
-            except ValidationError as e:
-                raise ConfigError(f"Parsing config data failed with {e!r} from {path!r}.")
-            if config.backend != self.NAME:
-                raise ConfigError(f"It's not Azure config. It's {config.backend!r} in {path!r}.")
-            self.config = config
+            raise ConfigError("No config found")
+        with open(path) as f:
+            return cls.deserialize_yaml(f.read())
 
-    def configure(self):
+    @classmethod
+    def deserialize(cls, data: Dict) -> "AzureConfig":
         try:
-            self.load()
+            config = cls.__model__(**data)
+        except ValidationError as e:
+            raise ConfigError(f"Parsing config data failed with {e!r}.")
+        if config.backend != cls.NAME:
+            raise ConfigError(f"It's not Azure config. It's {config.backend!r}.")
+        return cls(**config.dict(exclude={"backend"}))
+
+
+omitted = object()
+
+
+class AzureConfigurator(Configurator):
+    # XXX: duplicate name from AzureBackend.
+    # XXX: duplicate name from AzureConfig.
+    NAME = "azure"
+
+    def parse_args(self, args: List = []):
+        pass
+
+    def get_config(self, data: Dict) -> BackendConfig:
+        return AzureConfig.deserialize(data=data)
+
+    def configure_hub(self, data: Dict):
+        pass
+
+    def configure_cli(self):
+        defaults = {}
+        try:
+            # XXX: signature of Configurator.load requires to return whole valid config.
+            # Which forbids to do recover some data and to use it as defaults.
+            config = AzureConfig.load()
         except ConfigError:
             pass
 
-        default_secret_url = {}
-        default_storage_url = {}
-        default_storage_container = {"default": "dstack"}
-        if self.config is not None:
-            default_secret_url["default"] = self.config.secret.url
-            default_storage_url["default"] = self.config.storage.url
-            default_storage_container["default"] = self.config.storage.container
+        else:
+            defaults = AzureConfig.__model__.from_orm(config).dict()
 
+        subscription_id = self._ask_subscription_id(defaults.get("subscription_id", omitted))
+        location = self._ask_location(defaults.get("location", omitted))
+        secret_url = self._ask_secret_url(defaults.get("secret_url", omitted))
+        storage_url = self._ask_storage_url(defaults.get("storage_url", omitted))
+        storage_container = self._ask_storage_container(defaults.get("storage_container", omitted))
+
+        config = AzureConfig.deserialize(
+            data={
+                "subscription_id": subscription_id,
+                "location": location,
+                "secret_url": secret_url,
+                "storage_url": storage_url,
+                "storage_container": storage_container,
+            }
+        )
+        config.save()
+        console.print(f"[grey58]OK[/]")
+
+    def _ask_subscription_id(self, default):
+        credential = DefaultAzureCredential()
+        subscription_client = SubscriptionClient(credential)
+        labels = []
+        values = []
+        subscription: Subscription
+        for subscription in subscription_client.subscriptions.list():
+            labels.append(f"{subscription.display_name} {subscription.subscription_id}")
+            values.append(subscription.id)
+        if default is omitted:
+            default = None
+        value = ask_choice("Choose Azure subscription", labels, values, selected_value=default)
+        return value
+
+    def _ask_location(self, default):
+        if default is omitted:
+            default = None
+        value = ask_choice(
+            "Choose Azure location",
+            [f"{l[0]} [{l[1]}]" for l in locations],
+            [l[1] for l in locations],
+            selected_value=default,
+        )
+        return value
+
+    def _ask_secret_url(self, default):
+        kwargs = {"default": default} if default is not omitted else {}
+        type_ = AzureConfig.__model__.__fields__["secret_url"].type_
         while True:
             secret_url = Prompt.ask(
                 "[sea_green3 bold]?[/sea_green3 bold] [bold]Enter Key Vault url[/bold]",
-                **default_secret_url,
+                **kwargs,
             )
-            # XXX: It is copy-paste from Security.url type annotation.
             try:
-                secret_url_parsed = parse_obj_as(stricturl(allowed_schemes={"https"}), secret_url)
+                secret_url_parsed = parse_obj_as(type_, secret_url)
             except ValidationError as e:
-                print(f"Url is not valid. Errors are {e!r}.")
+                console.print(f"Url is not valid. Errors:")
+                for error in e.errors():
+                    console.print(f" - {error['msg']}")
                 continue
             vault_name, suffix = secret_url_parsed.host.split(".", 1)
             if suffix not in vault_dns_suffixes:
-                print(
+                console.print(
                     f"Suffix {suffix!r} should be from list {', '.join(sorted(vault_dns_suffixes))}."
                 )
                 continue
 
-            break
+            return secret_url_parsed
 
+    def _ask_storage_url(self, default):
+        kwargs = {"default": default} if default is not omitted else {}
+        type_ = AzureConfig.__model__.__fields__["storage_url"].type_
         while True:
-            storage_url = Prompt.ask(
+            secret_url = Prompt.ask(
                 "[sea_green3 bold]?[/sea_green3 bold] [bold]Enter Blob Storage url[/bold]",
-                **default_storage_url,
+                **kwargs,
             )
-            # XXX: It is copy-paste from Storage.url type annotation.
             try:
-                storage_url_parsed = parse_obj_as(
-                    stricturl(allowed_schemes={"https"}), storage_url
-                )
+                storage_url_parsed = parse_obj_as(type_, secret_url)
             except ValidationError as e:
-                print(f"Url is not valid. Errors are {e!r}.")
+                console.print(f"Url is not valid. Errors:")
+                for error in e.errors():
+                    console.print(f" - {error['msg']}")
                 continue
-            storage_account_name, suffix = storage_url_parsed.host.split(".", 1)
+            vault_name, suffix = storage_url_parsed.host.split(".", 1)
             if suffix not in blob_dns_suffixes:
-                print(
+                console.print(
                     f"Suffix {suffix!r} should be from list {', '.join(sorted(blob_dns_suffixes))}."
                 )
                 continue
 
-            break
+            return storage_url_parsed
 
+    def _ask_storage_container(self, default):
+        kwargs = {"default": default} if default is not omitted else {}
+        type_ = AzureConfig.__model__.__fields__["storage_container"].type_
         while True:
-            storage_container = Prompt.ask(
+            secret_url = Prompt.ask(
                 "[sea_green3 bold]?[/sea_green3 bold] [bold]Enter Blob Storage container[/bold]",
-                **default_storage_container,
+                **kwargs,
             )
             try:
-                storage_container_parsed = parse_obj_as(container_validator, storage_container)
+                storage_container = parse_obj_as(type_, secret_url)
             except ValidationError as e:
-                print(f"Url is not valid. Errors are {e!r}.")
+                console.print(f"Url is not valid. Errors:")
+                for error in e.errors():
+                    console.print(f" - {error['msg']}")
                 continue
 
-            break
-
-        location = ask_choice(
-            "Choose Azure location",
-            [f"{l[0]} [{l[1]}]" for l in locations],
-            [l[1] for l in locations],
-            None,
-        )
-
-        config_data = {
-            "secret": {
-                "url": secret_url_parsed,
-            },
-            "storage": {
-                "url": storage_url_parsed,
-                "container": storage_container_parsed,
-            },
-            "location": location,
-        }
-
-        self.config = Config(**config_data)
-        self.save()
+            return storage_container
