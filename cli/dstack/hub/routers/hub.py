@@ -10,6 +10,7 @@ from dstack.hub.models import AWSAuth, AWSBackend, AWSConfig, Hub, HubDelete, Hu
 from dstack.hub.repository.hub import HubManager
 from dstack.hub.routers.util import get_hub
 from dstack.hub.security.scope import Scope
+from dstack.hub.util import info2hub
 
 router = APIRouter(prefix="/api/hubs", tags=["hub"])
 
@@ -41,13 +42,13 @@ async def backend_configurator(req: Request, type_backend: str = Query(alias="ty
     return result
 
 
-@router.post("", dependencies=[Depends(Scope("hub:list:read"))], response_model=List[HubInfo])
+@router.post("", dependencies=[Depends(Scope("hub:hubs:write"))], response_model=HubInfo)
 async def hub_create(body: HubInfo) -> HubInfo:
     hub = await HubManager.get(name=body.hub_name)
     if hub is not None:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Hub is exists")
-    await HubManager.save(hub)
-    return hub
+    await HubManager.save(info2hub(body))
+    return body
 
 
 @router.delete("", dependencies=[Depends(Scope("hub:list:write"))])
@@ -60,11 +61,6 @@ async def delete_hub(body: HubDelete):
 @router.get("/list", dependencies=[Depends(Scope("hub:list:read"))], response_model=List[HubInfo])
 async def list_hub() -> List[HubInfo]:
     return await HubManager.list_info()
-
-
-@router.post("/add", dependencies=[Depends(Scope("hub:add:write"))])
-async def add_hub(hub: Hub):
-    await HubManager.save(HubDB(name=hub.name, backend=hub.backend, config=hub.config))
 
 
 @router.get("/{hub_name}", dependencies=[Depends(Scope("hub:list:read"))])

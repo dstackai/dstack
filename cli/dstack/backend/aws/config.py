@@ -30,6 +30,8 @@ regions = [
     ("Europe, Stockholm", "eu-north-1"),
 ]
 
+_DEFAULT_REGION_NAME = "us-east-1"
+
 
 class AWSConfig(BackendConfig):
     bucket_name = None
@@ -46,17 +48,17 @@ class AWSConfig(BackendConfig):
         subnet_id: Optional[str] = None,
         credentials: Optional[Dict] = None,
     ):
-        self.bucket_name = bucket_name or os.getenv("DSTACK_AWS_S3_BUCKET") or None
+        self.bucket_name = bucket_name or os.getenv("DSTACK_AWS_S3_BUCKET") or ""
         self.region_name = (
             region_name
             or os.getenv("DSTACK_AWS_REGION")
             or os.getenv("AWS_DEFAULT_REGION")
-            or None
+            or _DEFAULT_REGION_NAME
         )
         self.profile_name = (
-            profile_name or os.getenv("DSTACK_AWS_PROFILE") or os.getenv("AWS_PROFILE") or None
+            profile_name or os.getenv("DSTACK_AWS_PROFILE") or os.getenv("AWS_PROFILE") or ""
         )
-        self.subnet_id = subnet_id or os.getenv("DSTACK_AWS_EC2_SUBNET") or None
+        self.subnet_id = subnet_id or os.getenv("DSTACK_AWS_EC2_SUBNET") or ""
         self.credentials = credentials
 
     def load(self, path: Path = get_config_path()):
@@ -101,10 +103,10 @@ class AWSConfig(BackendConfig):
 
     @classmethod
     def deserialize(cls, data: Dict) -> Optional["AWSConfig"]:
-        bucket_name = data.get("bucket_name") or data.get("s3_bucket_name")
-        region_name = data.get("region_name")
-        profile_name = data.get("profile_name")
-        subnet_id = data.get("subnet_id") or data.get("ec2_subnet_id") or data.get("subnet")
+        bucket_name = data.get("bucket_name") or data.get("s3_bucket_name") or ""
+        region_name = data.get("region_name") or _DEFAULT_REGION_NAME
+        profile_name = data.get("profile_name") or ""
+        subnet_id = data.get("subnet_id") or data.get("ec2_subnet_id") or data.get("subnet") or ""
         return cls(
             bucket_name=bucket_name,
             region_name=region_name,
@@ -207,7 +209,7 @@ class AWSConfigurator(Configurator):
                 my_session = boto3.session.Session(profile_name=self.config.profile_name)
                 default_region_name = my_session.region_name
             except Exception:
-                default_region_name = "us-east-1"
+                default_region_name = _DEFAULT_REGION_NAME
         self.config.region_name = ask_choice(
             "Choose AWS region",
             [(r[0] + " [" + r[1] + "]") for r in regions],
@@ -258,7 +260,7 @@ class AWSConfigurator(Configurator):
                         f"[red bold]The bucket doesn't exist. Create it?[/red bold]",
                         default="y",
                     ):
-                        if self.config.region_name != "us-east-1":
+                        if self.config.region_name != _DEFAULT_REGION_NAME:
                             s3_client.create_bucket(
                                 Bucket=bucket_name,
                                 CreateBucketConfiguration={
