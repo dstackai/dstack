@@ -130,6 +130,7 @@ class Backend(ABC):
         repo_address: RepoAddress,
         run_name: str,
         output_dir: Optional[str],
+        files_path: Optional[str] = None,
     ):
         pass
 

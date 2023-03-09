@@ -39,11 +39,23 @@ def download_run_artifact_files(
     repo_address: RepoAddress,
     artifacts: List[Artifact],
     output_dir: Optional[str],
+    files_path: Optional[str],
 ):
     if output_dir is None:
         output_dir = os.getcwd()
     for artifact in artifacts:
-        total_size = sum(f.filesize_in_bytes for f in artifact.files)
+        files = []
+        for file in artifact.files:
+            file_full_path = os.path.join(artifact.path, file.filepath)
+            if (
+                files_path is None
+                or Path(file_full_path) == Path(files_path)
+                or Path(files_path) in Path(file_full_path).parents
+            ):
+                files.append(file)
+        if len(files) == 0:
+            continue
+        total_size = sum(f.filesize_in_bytes for f in files)
         with tqdm(
             total=total_size,
             unit="B",
@@ -55,7 +67,7 @@ def download_run_artifact_files(
             def callback(size):
                 pbar.update(size)
 
-            for file in artifact.files:
+            for file in files:
                 artifacts_dir = _get_job_artifacts_dir(repo_address, artifact.job_id)
                 source_path = os.path.join(artifacts_dir, artifact.path, file.filepath)
                 dest_path = os.path.join(output_dir, artifact.job_id, artifact.path, file.filepath)
