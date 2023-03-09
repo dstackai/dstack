@@ -14,10 +14,7 @@ class AzureStorage(CloudStorage):
         # https://learn.microsoft.com/en-us/azure/storage/blobs/authorize-access-azure-active-directory
         # https://www.schaeflein.net/understanding-azure-storage-data-access-permissions/
         self._blob_service_client = BlobServiceClient(account_url, credential=credential)
-        try:
-            self._container_client = self._blob_service_client.create_container(container_name)
-        except ResourceExistsError:
-            self._container_client = self._blob_service_client.get_container_client(container_name)
+        self._container_client = self._blob_service_client.get_container_client(container_name)
 
     def upload_file(self, source_path: str, dest_path: str, callback: Callable[[int], None]):
         raise NotImplementedError

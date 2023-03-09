@@ -63,7 +63,11 @@ from dstack.core.request import RequestHead, RequestStatus
 class AzureCompute(Compute):
     # XXX: Config is leaking here. It is run_instance's parameter only.
     def __init__(
-        self, credential: TokenCredential, subscription_id: str, location: str, config: AzureConfig
+        self,
+        credential: TokenCredential,
+        subscription_id: str,
+        location: str,
+        backend_config: AzureConfig,
     ):
         self._compute_client = ComputeManagementClient(
             credential=credential, subscription_id=subscription_id
@@ -78,6 +82,7 @@ class AzureCompute(Compute):
             credential=credential, subscription_id=subscription_id
         )
         self._location = location
+        self.backend_config = backend_config
 
     def cancel_spot_request(self, request_id: str):
         raise NotImplementedError
