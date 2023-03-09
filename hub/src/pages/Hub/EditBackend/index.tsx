@@ -19,11 +19,11 @@ export const HubEditBackend: React.FC = () => {
     useBreadcrumbs([
         {
             text: t('navigation.projects'),
-            href: ROUTES.HUB.LIST,
+            href: ROUTES.PROJECT.LIST,
         },
         {
             text: paramHubName,
-            href: ROUTES.HUB.DETAILS.FORMAT(paramHubName),
+            href: ROUTES.PROJECT.DETAILS.FORMAT(paramHubName),
         },
 
         {
@@ -33,7 +33,7 @@ export const HubEditBackend: React.FC = () => {
     ]);
 
     const onCancelHandler = () => {
-        navigate(ROUTES.HUB.DETAILS.FORMAT(paramHubName));
+        navigate(ROUTES.PROJECT.DETAILS.FORMAT(paramHubName));
     };
 
     const onSubmitHandler = async (hubData: Partial<IHub>) => {
@@ -48,7 +48,7 @@ export const HubEditBackend: React.FC = () => {
                 content: t('projects.edit.success_notification'),
             });
 
-            navigate(ROUTES.HUB.DETAILS.FORMAT(data.hub_name ?? paramHubName));
+            navigate(ROUTES.PROJECT.DETAILS.FORMAT(data.hub_name ?? paramHubName));
         } catch (e) {
             pushNotification({
                 type: 'error',

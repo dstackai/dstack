@@ -16,16 +16,16 @@ export const HubAdd: React.FC = () => {
     useBreadcrumbs([
         {
             text: t('navigation.projects'),
-            href: ROUTES.HUB.LIST,
+            href: ROUTES.PROJECT.LIST,
         },
         {
             text: t('common.create'),
-            href: ROUTES.HUB.ADD,
+            href: ROUTES.PROJECT.ADD,
         },
     ]);
 
     const onCancelHandler = () => {
-        navigate(ROUTES.HUB.LIST);
+        navigate(ROUTES.PROJECT.LIST);
     };
 
     const onSubmitHandler = async (hubData: IHub) => {
@@ -37,7 +37,7 @@ export const HubAdd: React.FC = () => {
                 content: t('projects.create.success_notification'),
             });
 
-            navigate(ROUTES.HUB.DETAILS.FORMAT(data.hub_name));
+            navigate(ROUTES.PROJECT.DETAILS.FORMAT(data.hub_name));
         } catch (e) {
             pushNotification({
                 type: 'error',

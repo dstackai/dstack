@@ -37,16 +37,16 @@ export const HubDetails: React.FC = () => {
     useBreadcrumbs([
         {
             text: t('navigation.projects'),
-            href: ROUTES.HUB.LIST,
+            href: ROUTES.PROJECT.LIST,
         },
         {
             text: paramHubName,
-            href: ROUTES.HUB.DETAILS.FORMAT(paramHubName),
+            href: ROUTES.PROJECT.DETAILS.FORMAT(paramHubName),
         },
     ]);
 
     useEffect(() => {
-        if (!isDeleting && deleteData) navigate(ROUTES.HUB.LIST);
+        if (!isDeleting && deleteData) navigate(ROUTES.PROJECT.LIST);
     }, [isDeleting, deleteData]);
 
     const changeMembersHandler = (members: IHubMember[]) => {
@@ -79,7 +79,7 @@ export const HubDetails: React.FC = () => {
     };
 
     const editUserHandler = () => {
-        navigate(ROUTES.HUB.EDIT_BACKEND.FORMAT(paramHubName));
+        navigate(ROUTES.PROJECT.EDIT_BACKEND.FORMAT(paramHubName));
     };
 
     const renderAwsSettingsSection = (): React.ReactNode => {

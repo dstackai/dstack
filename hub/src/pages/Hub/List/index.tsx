@@ -30,7 +30,7 @@ export const HubList: React.FC = () => {
     useBreadcrumbs([
         {
             text: t('navigation.projects'),
-            href: ROUTES.HUB.LIST,
+            href: ROUTES.PROJECT.LIST,
         },
     ]);
 
@@ -39,7 +39,7 @@ export const HubList: React.FC = () => {
     };
 
     const addHubHandler = () => {
-        navigate(ROUTES.HUB.ADD);
+        navigate(ROUTES.PROJECT.ADD);
     };
 
     const renderEmptyMessage = (): React.ReactNode => {
@@ -85,7 +85,7 @@ export const HubList: React.FC = () => {
 
     const editSelectedHubHandler = () => {
         if (collectionProps.selectedItems?.length === 1)
-            navigate(ROUTES.HUB.EDIT_BACKEND.FORMAT(collectionProps.selectedItems[0].hub_name));
+            navigate(ROUTES.PROJECT.EDIT_BACKEND.FORMAT(collectionProps.selectedItems[0].hub_name));
     };
 
     const renderCounter = () => {
@@ -121,7 +121,7 @@ export const HubList: React.FC = () => {
                 variant="full-page"
                 cardDefinition={{
                     header: (hub) => (
-                        <NavigateLink fontSize="heading-m" href={ROUTES.HUB.DETAILS.FORMAT(hub.hub_name)}>
+                        <NavigateLink fontSize="heading-m" href={ROUTES.PROJECT.DETAILS.FORMAT(hub.hub_name)}>
                             {hub.hub_name}
                         </NavigateLink>
                     ),

@@ -17,22 +17,22 @@ export const router = createBrowserRouter([
             // hubs
             {
                 path: ROUTES.BASE,
-                element: <Navigate replace to={ROUTES.HUB.LIST} />,
+                element: <Navigate replace to={ROUTES.PROJECT.LIST} />,
             },
             {
-                path: ROUTES.HUB.LIST,
+                path: ROUTES.PROJECT.LIST,
                 element: <HubList />,
             },
             {
-                path: ROUTES.HUB.DETAILS.TEMPLATE,
+                path: ROUTES.PROJECT.DETAILS.TEMPLATE,
                 element: <HubDetails />,
             },
             {
-                path: ROUTES.HUB.EDIT_BACKEND.TEMPLATE,
+                path: ROUTES.PROJECT.EDIT_BACKEND.TEMPLATE,
                 element: <HubEditBackend />,
             },
             {
-                path: ROUTES.HUB.ADD,
+                path: ROUTES.PROJECT.ADD,
                 element: <HubAdd />,
             },
             // members
