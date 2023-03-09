@@ -3,14 +3,14 @@ const {join} = require('path');
 const HtmlWebpackPlugin = require('html-webpack-plugin');
 const FaviconsWebpackPlugin = require('favicons-webpack-plugin');
 const CopyPlugin = require("copy-webpack-plugin");
-const { environment, publicUrl, apiUrl, isDev, isProd, srcDir, landing, title, description } = require('./env');
+const { environment, publicUrl, apiUrl, isDev, isProd, srcDir, landing, title, description, enableMockingApi } = require('./env');
 const { getStyleLoaders } = require('./getStyleLoaders');
 
 const env = {
     NODE_ENV: JSON.stringify(environment),
     PUBLIC_URL: JSON.stringify(publicUrl),
     API_URL: JSON.stringify(apiUrl),
-    ENABLE_API_MOCKING: JSON.stringify(isDev),
+    ENABLE_MOCKING_API: JSON.stringify(enableMockingApi),
 };
 
 const sourceMap = !isProd;
