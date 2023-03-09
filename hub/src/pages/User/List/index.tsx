@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useState } from 'react';
+import React, { useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import {
     Button,
@@ -49,8 +49,16 @@ export const UserList: React.FC = () => {
         setShowConfirmDelete((val) => !val);
     };
 
+    const addUserHandler = () => {
+        navigate(ROUTES.USER.ADD);
+    };
+
     const renderEmptyMessage = (): React.ReactNode => {
-        return <ListEmptyMessage title={t('users.empty_message_title')} message={t('hubs.empty_message_text')} />;
+        return (
+            <ListEmptyMessage title={t('users.empty_message_title')} message={t('projects.empty_message_text')}>
+                <Button onClick={addUserHandler}>{t('common.add')}</Button>
+            </ListEmptyMessage>
+        );
     };
 
     const renderNoMatchMessage = (onClearFilter: () => void): React.ReactNode => {
@@ -70,18 +78,14 @@ export const UserList: React.FC = () => {
         selection: {},
     });
 
-    useEffect(() => {
-        if (!isDeleting) actions.setSelectedItems([]);
-    }, [isDeleting]);
-
     const deleteSelectedUserHandler = () => {
         const { selectedItems } = collectionProps;
-        if (selectedItems?.length) deleteUsers(selectedItems.map((user) => user.user_name));
+        if (selectedItems?.length) {
+            deleteUsers(selectedItems.map((user) => user.user_name))
+                .unwrap()
+                .then(() => actions.setSelectedItems([]));
+        }
         setShowConfirmDelete(false);
-    };
-
-    const addUserHandler = () => {
-        navigate(ROUTES.USER.ADD);
     };
 
     const editSelectedUserHandler = () => {

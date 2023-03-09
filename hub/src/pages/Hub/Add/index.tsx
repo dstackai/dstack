@@ -15,7 +15,7 @@ export const HubAdd: React.FC = () => {
 
     useBreadcrumbs([
         {
-            text: t('navigation.hubs'),
+            text: t('navigation.projects'),
             href: ROUTES.HUB.LIST,
         },
         {
@@ -34,20 +34,20 @@ export const HubAdd: React.FC = () => {
 
             pushNotification({
                 type: 'success',
-                content: t('hubs.create.success_notification'),
+                content: t('projects.create.success_notification'),
             });
 
             navigate(ROUTES.HUB.DETAILS.FORMAT(data.hub_name));
         } catch (e) {
             pushNotification({
                 type: 'error',
-                content: t('hubs.create.error_notification'),
+                content: t('projects.create.error_notification'),
             });
         }
     };
 
     return (
-        <ContentLayout header={<Header variant="awsui-h1-sticky">{t('hubs.create.page_title')}</Header>}>
+        <ContentLayout header={<Header variant="awsui-h1-sticky">{t('projects.create.page_title')}</Header>}>
             <HubForm onSubmit={onSubmitHandler} loading={isLoading} onCancel={onCancelHandler} />
         </ContentLayout>
     );

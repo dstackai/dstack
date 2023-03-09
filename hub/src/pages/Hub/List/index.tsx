@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useState } from 'react';
+import React, { useMemo, useState } from 'react';
 import {
     Cards,
     Header,
@@ -28,7 +28,7 @@ export const HubList: React.FC = () => {
 
     useBreadcrumbs([
         {
-            text: t('navigation.hubs'),
+            text: t('navigation.projects'),
             href: ROUTES.HUB.LIST,
         },
     ]);
@@ -37,14 +37,22 @@ export const HubList: React.FC = () => {
         setShowConfirmDelete((val) => !val);
     };
 
+    const addHubHandler = () => {
+        navigate(ROUTES.HUB.ADD);
+    };
+
     const renderEmptyMessage = (): React.ReactNode => {
-        return <ListEmptyMessage title={t('hubs.empty_message_title')} message={t('hubs.empty_message_text')} />;
+        return (
+            <ListEmptyMessage title={t('projects.empty_message_title')} message={t('projects.empty_message_text')}>
+                <Button onClick={addHubHandler}>{t('common.add')}</Button>
+            </ListEmptyMessage>
+        );
     };
 
     const renderNoMatchMessage = (onClearFilter: () => void): React.ReactNode => {
         return (
-            <ListEmptyMessage title={t('hubs.nomatch_message_title')} message={t('hubs.nomatch_message_text')}>
-                <Button onClick={onClearFilter}>{t('hubs.nomatch_message_button_label')}</Button>
+            <ListEmptyMessage title={t('projects.nomatch_message_title')} message={t('projects.nomatch_message_text')}>
+                <Button onClick={onClearFilter}>{t('projects.nomatch_message_button_label')}</Button>
             </ListEmptyMessage>
         );
     };
@@ -58,22 +66,19 @@ export const HubList: React.FC = () => {
         selection: {},
     });
 
-    useEffect(() => {
-        if (!isDeleting) actions.setSelectedItems([]);
-    }, [isDeleting]);
-
     const deleteSelectedHubsHandler = () => {
-        if (collectionProps.selectedItems?.length) deleteHubs(collectionProps.selectedItems.map((hub) => hub.hub_name));
+        if (collectionProps.selectedItems?.length) {
+            deleteHubs(collectionProps.selectedItems.map((hub) => hub.hub_name))
+                .unwrap()
+                .then(() => actions.setSelectedItems([]));
+        }
+
         setShowConfirmDelete(false);
     };
 
     const editSelectedHubHandler = () => {
         if (collectionProps.selectedItems?.length === 1)
             navigate(ROUTES.HUB.EDIT_BACKEND.FORMAT(collectionProps.selectedItems[0].hub_name));
-    };
-
-    const addHubHandler = () => {
-        navigate(ROUTES.HUB.ADD);
     };
 
     const renderCounter = () => {
@@ -117,17 +122,17 @@ export const HubList: React.FC = () => {
                     sections: [
                         {
                             id: 'type',
-                            header: t('hubs.card.backend'),
+                            header: t('projects.card.backend'),
                             content: (hub) => t(`hubs.backend_type.${hub.backend.type}`),
                         },
                         {
                             id: 'region',
-                            header: t('hubs.card.region'),
+                            header: t('projects.card.region'),
                             content: (hub) => hub.backend.region_name_title,
                         },
                         {
                             id: 'bucket',
-                            header: t('hubs.card.bucket'),
+                            header: t('projects.card.bucket'),
                             content: (hub) => `${hub.backend.s3_bucket_name}`,
                         },
                     ],
@@ -143,7 +148,6 @@ export const HubList: React.FC = () => {
                         counter={renderCounter()}
                         actions={
                             <SpaceBetween size="xs" direction="horizontal">
-                                <Button onClick={addHubHandler}>{t('common.add')}</Button>
                                 <Button onClick={editSelectedHubHandler} disabled={isDisabledEdit}>
                                     {t('common.edit')}
                                 </Button>
@@ -151,16 +155,18 @@ export const HubList: React.FC = () => {
                                 <Button onClick={toggleDeleteConfirm} disabled={isDisabledDelete}>
                                     {t('common.delete')}
                                 </Button>
+
+                                <Button onClick={addHubHandler}>{t('common.add')}</Button>
                             </SpaceBetween>
                         }
                     >
-                        {t('hubs.page_title')}
+                        {t('projects.page_title')}
                     </Header>
                 }
                 filter={
                     <TextFilter
                         {...filterProps}
-                        filteringPlaceholder={t('hubs.search_placeholder') || ''}
+                        filteringPlaceholder={t('projects.search_placeholder') || ''}
                         countText={t('common.match_count_with_value', { count: filteredItemsCount }) ?? ''}
                         disabled={isLoading}
                     />

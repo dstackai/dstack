@@ -36,7 +36,7 @@ export const HubDetails: React.FC = () => {
 
     useBreadcrumbs([
         {
-            text: t('navigation.hubs'),
+            text: t('navigation.projects'),
             href: ROUTES.HUB.LIST,
         },
         {
@@ -88,22 +88,22 @@ export const HubDetails: React.FC = () => {
         return (
             <ColumnLayout columns={4} variant="text-grid">
                 <div>
-                    <Box variant="awsui-key-label">{t('hubs.edit.backend_type')}</Box>
+                    <Box variant="awsui-key-label">{t('projects.edit.backend_type')}</Box>
                     <div>{t(`hubs.backend_type.${data.backend.type}`)}</div>
                 </div>
 
                 <div>
-                    <Box variant="awsui-key-label">{t('hubs.edit.aws.region_name')}</Box>
+                    <Box variant="awsui-key-label">{t('projects.edit.aws.region_name')}</Box>
                     <div>{data.backend.region_name_title}</div>
                 </div>
 
                 <div>
-                    <Box variant="awsui-key-label">{t('hubs.edit.aws.s3_bucket_name')}</Box>
+                    <Box variant="awsui-key-label">{t('projects.edit.aws.s3_bucket_name')}</Box>
                     <div>{data.backend.s3_bucket_name}</div>
                 </div>
 
                 <div>
-                    <Box variant="awsui-key-label">{t('hubs.edit.aws.ec2_subnet_id')}</Box>
+                    <Box variant="awsui-key-label">{t('projects.edit.aws.ec2_subnet_id')}</Box>
                     <div>{data.backend.ec2_subnet_id}</div>
                 </div>
             </ColumnLayout>
@@ -133,7 +133,7 @@ export const HubDetails: React.FC = () => {
                                         </Button>
                                     }
                                 >
-                                    {t('hubs.edit.backend')}
+                                    {t('projects.edit.backend')}
                                 </Header>
                             }
                         >
@@ -162,7 +162,7 @@ export const HubDetails: React.FC = () => {
                                         </Popover>
                                     }
                                 >
-                                    {t('hubs.edit.cli')}
+                                    {t('projects.edit.cli')}
                                 </Header>
                             }
                         >

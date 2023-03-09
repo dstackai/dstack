@@ -5,6 +5,8 @@ import { useForm, FormProvider, DefaultValues } from 'react-hook-form';
 import { IProps, TBackendOption } from './types';
 import { AWSBackend } from './AWS';
 
+import styles from './styles.module.scss';
+
 export const HubForm: React.FC<IProps> = ({ initialValues, onCancel, loading, onSubmit: onSubmitProp }) => {
     const { t } = useTranslation();
     const isEditing = !!initialValues;
@@ -38,23 +40,23 @@ export const HubForm: React.FC<IProps> = ({ initialValues, onCancel, loading, on
 
     const backendOptions: TBackendOption[] = [
         {
-            label: t('hubs.backend_type.aws'),
+            label: t('projects.backend_type.aws'),
             value: 'aws',
-            description: t('hubs.backend_type.aws_description'),
+            description: t('projects.backend_type.aws_description'),
             disabled: loading,
         },
-        {
-            label: t('hubs.backend_type.gcp'),
-            value: 'gcp',
-            description: t('hubs.backend_type.gcp_description'),
-            disabled: true,
-        },
-        {
-            label: t('hubs.backend_type.azure'),
-            value: 'azure',
-            description: t('hubs.backend_type.azure_description'),
-            disabled: true,
-        },
+        // {
+        //     label: t('projects.backend_type.gcp'),
+        //     value: 'gcp',
+        //     description: t('projects.backend_type.gcp_description'),
+        //     disabled: true,
+        // },
+        // {
+        //     label: t('projects.backend_type.azure'),
+        //     value: 'azure',
+        //     description: t('projects.backend_type.azure_description'),
+        //     disabled: true,
+        // },
     ];
 
     const onSubmit = (data: IHub) => {
@@ -90,10 +92,10 @@ export const HubForm: React.FC<IProps> = ({ initialValues, onCancel, loading, on
                 >
                     <SpaceBetween size="l">
                         {!isEditing && (
-                            <Container header={<Header variant="h2">{t('hubs.edit.general')}</Header>}>
+                            <Container header={<Header variant="h2">{t('projects.edit.general')}</Header>}>
                                 <SpaceBetween size="l">
                                     <FormInput
-                                        label={t('hubs.edit.hub_name')}
+                                        label={t('projects.edit.project_name')}
                                         control={control}
                                         name="hub_name"
                                         disabled={loading}
@@ -103,11 +105,13 @@ export const HubForm: React.FC<IProps> = ({ initialValues, onCancel, loading, on
                             </Container>
                         )}
 
-                        <Container header={<Header variant="h2">{t('hubs.edit.backend')}</Header>}>
-                            <FormField label={t('hubs.edit.backend_type')} />
+                        <Container header={<Header variant="h2">{t('projects.edit.backend')}</Header>}>
+                            <FormField label={t('projects.edit.backend_type')} />
 
                             <SpaceBetween size="l">
-                                <FormTiles control={control} name="backend.type" items={backendOptions} />
+                                <div className={styles.backendTypeTiles}>
+                                    <FormTiles control={control} name="backend.type" items={backendOptions} />
+                                </div>
                                 {renderBackendFields()}
                             </SpaceBetween>
                         </Container>

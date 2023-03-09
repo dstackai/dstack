@@ -64,25 +64,27 @@ export const AWSBackend: React.FC<IProps> = ({ loading: loadingProp }) => {
     return (
         <SpaceBetween size="l">
             <FormInput
-                label={t('hubs.edit.aws.access_key_id')}
+                label={t('projects.edit.aws.access_key_id')}
                 control={control}
                 name="backend.access_key"
                 onChange={debouncedChangeFormHandler}
                 disabled={loading}
                 rules={{ required: t('validation.required') }}
+                autoComplete="off"
             />
 
             <FormInput
-                label={t('hubs.edit.aws.secret_key_id')}
+                label={t('projects.edit.aws.secret_key_id')}
                 control={control}
                 name="backend.secret_key"
                 onChange={debouncedChangeFormHandler}
                 disabled={loading}
                 rules={{ required: t('validation.required') }}
+                autoComplete="off"
             />
 
             <FormSelect
-                label={t('hubs.edit.aws.region_name')}
+                label={t('projects.edit.aws.region_name')}
                 control={control}
                 name="backend.region_name"
                 disabled={loading}
@@ -92,7 +94,7 @@ export const AWSBackend: React.FC<IProps> = ({ loading: loadingProp }) => {
             />
 
             <FormS3BucketSelector
-                label={t('hubs.edit.aws.s3_bucket_name')}
+                label={t('projects.edit.aws.s3_bucket_name')}
                 control={control}
                 name="backend.s3_bucket_name"
                 selectableItemsTypes={['buckets']}
@@ -101,7 +103,7 @@ export const AWSBackend: React.FC<IProps> = ({ loading: loadingProp }) => {
             />
 
             <FormSelect
-                label={t('hubs.edit.aws.ec2_subnet_id')}
+                label={t('projects.edit.aws.ec2_subnet_id')}
                 control={control}
                 name="backend.ec2_subnet_id"
                 disabled={loading}

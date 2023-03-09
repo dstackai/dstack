@@ -90,7 +90,7 @@ const AppLayout: React.FC<{ children: React.ReactNode }> = ({ children }) => {
                                 type: 'section-group',
                                 title: t('navigation.settings'),
                                 items: [
-                                    { type: 'link', text: t('navigation.hubs'), href: ROUTES.HUB.LIST },
+                                    { type: 'link', text: t('navigation.projects'), href: ROUTES.HUB.LIST },
                                     { type: 'link', text: t('navigation.users'), href: ROUTES.USER.LIST },
                                 ],
                             },

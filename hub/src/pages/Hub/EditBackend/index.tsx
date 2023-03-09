@@ -18,7 +18,7 @@ export const HubEditBackend: React.FC = () => {
 
     useBreadcrumbs([
         {
-            text: t('navigation.hubs'),
+            text: t('navigation.projects'),
             href: ROUTES.HUB.LIST,
         },
         {
@@ -27,7 +27,7 @@ export const HubEditBackend: React.FC = () => {
         },
 
         {
-            text: t('hubs.edit.edit_backend'),
+            text: t('projects.edit.edit_backend'),
             href: ROUTES.USER.EDIT.FORMAT(paramHubName),
         },
     ]);
@@ -45,14 +45,14 @@ export const HubEditBackend: React.FC = () => {
 
             pushNotification({
                 type: 'success',
-                content: t('hubs.edit.success_notification'),
+                content: t('projects.edit.success_notification'),
             });
 
             navigate(ROUTES.HUB.DETAILS.FORMAT(data.hub_name ?? paramHubName));
         } catch (e) {
             pushNotification({
                 type: 'error',
-                content: t('hubs.edit.error_notification'),
+                content: t('projects.edit.error_notification'),
             });
         }
     };
