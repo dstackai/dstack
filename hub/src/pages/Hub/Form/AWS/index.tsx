@@ -1,14 +1,14 @@
 import React, { useCallback, useEffect, useState } from 'react';
-import { IProps } from './types';
 import { SpaceBetween, FormInput, FormSelect, FormSelectOptions, FormS3BucketSelector } from 'components';
 import { useTranslation } from 'react-i18next';
 import { useFormContext } from 'react-hook-form';
-import { useBackendValuesMutation } from 'services/hub';
 import { debounce } from 'lodash';
+import { useBackendValuesMutation } from 'services/hub';
+import { IProps } from './types';
 
 export const AWSBackend: React.FC<IProps> = ({ loading: loadingProp }) => {
     const { t } = useTranslation();
-    const { control, getValues, setValue } = useFormContext();
+    const { control, getValues, setValue, setError, clearErrors } = useFormContext();
     const [regions, setRegions] = useState<FormSelectOptions>([]);
     const [buckets, setBuckets] = useState<TAwsBucket[]>([]);
     const [subnets, setSubnets] = useState<FormSelectOptions>([]);
@@ -27,6 +27,9 @@ export const AWSBackend: React.FC<IProps> = ({ loading: loadingProp }) => {
         if (!backendFormValues.secret_key || !backendFormValues.access_key) {
             return;
         }
+
+        clearErrors('backend.access_key');
+        clearErrors('backend.secret_key');
 
         try {
             const response = await getBackendValues(backendFormValues).unwrap();
@@ -54,8 +57,16 @@ export const AWSBackend: React.FC<IProps> = ({ loading: loadingProp }) => {
             if (response.ec2_subnet_id.selected !== undefined) {
                 setValue('backend.ec2_subnet_id', response.ec2_subnet_id.selected ?? '');
             }
-        } catch (e) {
-            console.log('fetch backends values error', e);
+        } catch (errorResponse) {
+            console.log('fetch backends values error:', errorResponse);
+            // eslint-disable-next-line @typescript-eslint/ban-ts-comment
+            // @ts-ignore
+            const detailsError = errorResponse?.data?.detail;
+
+            if (detailsError) {
+                setError('backend.access_key', { type: 'custom', message: detailsError as string });
+                setError('backend.secret_key', { type: 'custom', message: detailsError as string });
+            }
         }
     };
 

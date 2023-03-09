@@ -77,7 +77,7 @@ export const hubApi = createApi({
             query: (data) => ({
                 url: API.HUBS.BACKEND_VALUES(),
                 method: 'POST',
-                body: data,
+                params: data,
             }),
         }),
     }),
