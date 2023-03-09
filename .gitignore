@@ -9,3 +9,6 @@
 /runner/runner
 
 /my/
+
+.idea/
+dist/

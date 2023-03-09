@@ -1,4 +1,7 @@
 from argparse import Namespace
+from collections import defaultdict
+from pathlib import Path
+from typing import Optional
 
 from rich.table import Table
 
@@ -25,6 +28,21 @@ class LsCommand(BasicCommand):
             metavar="RUN | :TAG",
             type=str,
             help="A name of a run or a tag",
+        )
+        self._parser.add_argument(
+            "prefix",
+            metavar="SEARCH_PREFIX",
+            type=str,
+            help="Show files starting with prefix",
+            nargs="?",
+            default="",
+        )
+
+        self._parser.add_argument(
+            "-r", "--recursive", help="Show all files recursively", action="store_true"
+        )
+        self._parser.add_argument(
+            "-t", "--total", help="Show total folder size", action="store_true"
         )
 
     @check_config
@@ -55,12 +73,62 @@ class LsCommand(BasicCommand):
         artifacts = list_artifacts_with_merged_backends(
             backends_run_name, load_repo_data(), run_names[0]
         )
-        for artifact, backends in artifacts:
-            for i, file in enumerate(artifact.files):
-                table.add_row(
-                    artifact.name if i == 0 else "",
-                    file.filepath,
-                    sizeof_fmt(file.filesize_in_bytes),
-                    ", ".join(b.name for b in backends),
-                )
+
+        for artifact, _ in artifacts:
+            artifact.files = sorted(
+                [
+                    f
+                    for f in artifact.files
+                    if str(Path(artifact.name, f.filepath)).startswith(args.prefix)
+                ],
+                key=lambda f: f.filepath,
+            )
+
+        if args.recursive:
+            for artifact, backends in artifacts:
+                for i, file in enumerate(artifact.files):
+                    table.add_row(
+                        artifact.name if i == 0 else "",
+                        file.filepath,
+                        sizeof_fmt(file.filesize_in_bytes),
+                        ", ".join(b.name for b in backends),
+                    )
+        else:
+            entries = {}
+            for artifact, backends in artifacts:
+                if entries.get(artifact.name) is None:
+                    entries[artifact.name] = {}
+                for i, file in enumerate(artifact.files):
+                    entry_name = _get_entry_name(file.filepath, args.prefix)
+                    if entries[artifact.name].get(entry_name) is None:
+                        entries[artifact.name][entry_name] = {"size": 0, "backends": set()}
+                    entries[artifact.name][entry_name]["size"] += file.filesize_in_bytes
+                    entries[artifact.name][entry_name]["backends"].update(backends)
+
+            for artifact_name, entry_map in entries.items():
+                first_entry = True
+                for entry_name, entry_dict in entry_map.items():
+                    table.add_row(
+                        artifact_name if first_entry else "",
+                        entry_name,
+                        sizeof_fmt(entry_dict["size"])
+                        if not entry_name.endswith("/") or args.total
+                        else "",
+                        ", ".join(b.name for b in entry_dict["backends"]),
+                    )
+                    first_entry = False
+
         console.print(table)
+
+
+def _get_entry_name(filepath: str, prefix: str) -> str:
+    if prefix == "":
+        prefix_parts_num = 1
+    else:
+        prefix_parts_num = len(Path(prefix).parts)
+
+    path_parts = Path(filepath).parts
+    entry_name = str(Path(*path_parts[:prefix_parts_num]))
+    if len(path_parts) > prefix_parts_num:
+        entry_name += "/"
+    return entry_name

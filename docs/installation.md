@@ -7,35 +7,120 @@ pip install dstack --upgrade
 ```
 
 !!! info "NOTE:"
-    If you only plan to run workflows locally and do not want to share artifacts with others outside your machine, you do
-    not need to configure anything else.
+    By default, workflows run locally. To run workflows locally, it is required to have either Docker or [NVIDIA Docker](https://github.com/NVIDIA/nvidia-docker) 
+    pre-installed.
 
-## (Optional) Configure a remote
+### Configure a remote
 
-By default, workflows are run locally. If you want to be able to run workflows remotely (e.g. in a configured cloud account),
-you have to configure a remote using the `dstack config` command.
+To run workflows remotely (e.g. in a configured cloud account),
+configure a remote using the `dstack config` command.
 
-!!! info "NOTE:"
-    Currently, the only supported remote type is AWS.
+![dstack config](assets/dstack-config.png){ width="800" }
 
-### Create an S3 bucket
-
-Before you can use the `dstack config` command, you have to create an S3 bucket in your AWS account 
-that you'll use to store workflow artifacts and metadata.
+If you intend to collaborate in a team and would like to manage cloud credentials, users and other settings 
+via a user interface, it is recommended to choose `hub`.
 
 !!! info "NOTE:"
-    Make sure to create an S3 bucket in the AWS region, where you'd like to run your workflows.
+    Choosing the `hub` remote with the `dstack config` CLI command requires you to have a Hub application up
+    and running. Refer to [Hub](#hub) for the details.
 
-### Configure AWS credentials
+If you intend to work alone and wish to run workflows directly in the cloud without any intermediate, 
+feel free to choose `aws` or `gcp`.
 
-The next step is to configure AWS credentials on your local machine so the `dstack` CLI
-may perform actions on `s3`, `logs`, `secretsmanager`, `ec2`, and `iam` services.
+!!! info "NOTE:"
+    Choosing the `aws` and `gcp` remotes, with the `dstack config` CLI command requires you to have local
+    cloud credentials to be configured on your local machine.
+    Refer to [AWS](#aws) and 
+    [GCP](#gcp) correspondingly for the details.
 
-If you'd like to limit the permissions to the most narrow scope, feel free to use the IAM policy template
-below.
+## Hub
+
+Hub allows you to manage cloud credentials, users and other settings via a user interface.
+
+This way is preferred if you intend to collaborate as a team, and don't want every user to have 
+cloud credentials configured locally.
+
+In this case, the `dstack config` command is given with the URL of the Hub application and
+the personal access token.
+
+### 1. Start the Hub application
+
+Before you can use Hub, you first have to start the Hub application.
+You can run it either locally, on a dedicated server, or in the cloud.
+
+!!! info "NOTE:"
+    You can skip this step if the Hub application is already set up, and you're given with its URL
+    and a personal access token.
+
+Run the Hub application:
+
+```shell hl_lines="1"
+dstack hub start
+```
+
+If needed, the command allows you to override the port, host, and the admin token:
+
+![dstack config](assets/dstack-hub-help.png)
+
+Once the application is started, click the URL in the output to login as an admin.
+
+!!! warning "TODO:"
+    Add a screenshot of the `dstack hub start` command output with the login URL
+
+### 2. Create a hub
+
+After you've logged in as an admin, you can create a specific hub, and the user
+that will access the hub.
+
+!!! warning "TODO:"
+    Add a screenshot of the Hub Backend Edit page
+
+When creating a hub, you have to specify the corresponding cloud settings, incl.
+the credentials to the cloud, the region, the bucket, etc.
+
+!!! info "NOTE:"
+    You can configure multiple hubs, and for each specify different cloud settings and 
+    assign a different team.
+
+### 3. Configure the CLI
+
+Once the hub is created, copy the corresponding code snippet to configure
+this hub as a remote via the `dstack config` command.
+
+!!! warning "TODO:"
+    Add a screenshot of the Hub View Page showing the CLI code snippet
+
+The command includes the URL of the created hub accompanied with the personal access token of the user: 
+
+```shell hl_lines="1"
+dstack config hub --url http://localhost:3000/my-new-hub --token 8a019f6d-e01f-41e3-9e54-e3369f3deda0 
+```
+
+That's it! You've configured Hub as a remote.
+
+!!! warning "TODO:"
+    _Elaborate on how to create users and let them log in into the Hub application_
+
+## AWS
+
+### 1. Create an S3 bucket
+
+In order to use AWS as a remote, you first have to create an S3 bucket in your AWS account.
+This bucket will be used to store workflow artifacts and metadata.
+
+!!! info "NOTE:"
+    Make sure to create an S3 bucket in the AWS region where you'd like to run your workflows.
+
+### 2. Configure AWS credentials
+
+The next step is to configure AWS credentials on your local machine. The credentials should grant
+the permissions to perform actions on `s3`, `logs`, `secretsmanager`, `ec2`, and `iam` services.
 
 ??? info "IAM policy template"
-    If you're using this template, make sure to replace `{bucket_name}` and `{bucket_name_under_score}` variables
+    If you'd like to limit the permissions to the most narrow scope, feel free to use the IAM policy template
+    below.
+
+    Replace `{bucket_name}` and `{bucket_name_under_score}` variables in the template below
     with the values that correspond to your S3 bucket.
 
     For `{bucket_name}`, use the name of the S3 bucket. 
@@ -169,24 +254,78 @@ below.
     }
     ```
 
-### Configure the CLI
+### 3. Configure the CLI
 
-Once the AWS credentials are configured, you can configure the CLI:
+Once the AWS credentials are configured on your local machine, you can configure the CLI:
 
 ```shell hl_lines="1"
 dstack config
 ```
 
-This command will ask you to choose an AWS profile (to take the AWS credentials from), 
+This command will ask you to choose an AWS profile (to take the AWS credentials from),
 an AWS region (must be the same for the S3 bucket), and the name of the S3 bucket.
 
-```shell
-AWS profile: default
-AWS region: eu-west-1
-S3 bucket: dstack-142421590066-eu-west-1
-EC2 subnet: none
+![dstack config](assets/dstack-config-aws.png)
+
+That's it! You've configured AWS as a remote.
+
+## GCP
+
+!!! info "NOTE:"
+    Support for GCP is experimental. In order to try it, make sure to install the `0.2rc1` version of `dstack`:
+
+    ```shell hl_lines="1"
+    pip install dstack==0.2rc1
+    ```
+
+### 1. Create a project
+
+In order to use GCP as a remote, you first have to create a project in your GCP account
+and make sure that the required APIs and enabled for it.
+
+??? info "Required APIs"
+    Here's the list of APIs that have to be enabled for the project.
+
+    ```
+    cloudapis.googleapis.com
+    compute.googleapis.com 
+    logging.googleapis.com
+    secretmanager.googleapis.com
+    storage-api.googleapis.com
+    storage-component.googleapis.com 
+    storage.googleapis.com 
+    ```
+
+### 2. Create a storage bucket
+
+Once the project is created, you can proceed and create a storage bucket. This bucket
+will be used to store workflow artifacts and metadata.
+
+!!! info "NOTE:"
+    Make sure to create the bucket in the location where you'd like to run your workflows.
+
+### 3. Create a service account
+
+The next step is to create a service account in the created project and configure the
+following roles for it: `Service Account User`, `Compute Admin`, `Storage Admin`, `Secret Manager Admin`,
+and `Logging Admin`.
+
+### 4. Create a service account key
+
+Once the service account is set up, create a key for it and download the corresponding JSON file
+to your local machine (e.g. to `~/Downloads/my-awesome-project-d7735ca1dd53.json`).
+
+### 5. Configure the CLI
+
+Once the service account key JSON file is on your machine, you can configure the CLI:
+
+```shell hl_lines="1"
+dstack config
 ```
 
-The configuration will be saved in the `~/.dstack/config.yaml` file.
+The command will ask you for a path to the a service account key, GCP region and zone, and storage bucket name. For
+example:
 
-Once a remote is configured, you can run workflows remotely and push and pull artifacts.
+![dstack config](assets/dstack-config-gcp.png)
+
+That's it! You've configured GCP as a remote.

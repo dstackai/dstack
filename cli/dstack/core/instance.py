@@ -8,4 +8,4 @@ class InstanceType(BaseModel):
     resources: Resources
 
     def __str__(self) -> str:
-        return f'InstanceType(instance_name="{self.instance_name}", resources={self.resources})'.__str__()
+        return f'InstanceType(instance_name="{self.instance_name}", resources={self.resources})'

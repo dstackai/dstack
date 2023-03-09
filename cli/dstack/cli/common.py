@@ -44,6 +44,7 @@ def ask_choice(
             search_key=None,
             search_highlight_style=["fg_purple"],
             cursor_index=cursor_index,
+            raise_error_on_interrupt=True,
         )
         chosen_menu_index = terminal_menu.show()
         chosen_menu_label = labels[chosen_menu_index].replace("[", "\\[")

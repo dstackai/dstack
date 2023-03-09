@@ -22,6 +22,9 @@ from dstack.core.job import (
 from dstack.core.repo import RepoAddress, RepoData
 from dstack.utils.common import _quoted
 
+DEFAULT_CPU = 2
+DEFAULT_MEM = "8GB"
+
 
 def _str_to_mib(s: str) -> int:
     ns = s.replace(" ", "").lower()
@@ -187,43 +190,34 @@ class Provider:
             env = self.provider_data.get("env") or []
             env.extend(args.env)
             self.provider_data["env"] = env
-        if (
-            args.cpu
-            or args.memory
-            or args.gpu
-            or args.gpu_name
-            or args.gpu_memory
-            or args.shm_size
-            or args.interruptible
-            or args.local
-        ):
-            resources = self.provider_data.get("resources") or {}
-            self.provider_data["resources"] = resources
-            if args.cpu:
-                resources["cpu"] = args.cpu
-            if args.memory:
-                resources["memory"] = args.memory
-            if args.gpu or args.gpu_name or args.gpu_memory:
-                gpu = (
-                    self.provider_data["resources"].get("gpu") or {}
-                    if self.provider_data.get("resources")
-                    else {}
-                )
-                if type(gpu) is int:
-                    gpu = {"count": gpu}
-                resources["gpu"] = gpu
-                if args.gpu:
-                    gpu["count"] = args.gpu
-                if args.gpu_memory:
-                    gpu["memory"] = args.gpu_memory
-                if args.gpu_name:
-                    gpu["name"] = args.gpu_name
-            if args.shm_size:
-                resources["shm_size"] = args.shm_size
-            if args.interruptible:
-                resources["interruptible"] = True
-            if args.local:
-                resources["local"] = True
+
+        resources = self.provider_data.get("resources") or {}
+        self.provider_data["resources"] = resources
+        if args.cpu:
+            resources["cpu"] = args.cpu
+        if args.memory:
+            resources["memory"] = args.memory
+        if args.gpu or args.gpu_name or args.gpu_memory:
+            gpu = (
+                self.provider_data["resources"].get("gpu") or {}
+                if self.provider_data.get("resources")
+                else {}
+            )
+            if type(gpu) is int:
+                gpu = {"count": gpu}
+            resources["gpu"] = gpu
+            if args.gpu:
+                gpu["count"] = args.gpu
+            if args.gpu_memory:
+                gpu["memory"] = args.gpu_memory
+            if args.gpu_name:
+                gpu["name"] = args.gpu_name
+        if args.shm_size:
+            resources["shm_size"] = args.shm_size
+        if args.interruptible:
+            resources["interruptible"] = True
+        if args.local:
+            resources["local"] = True
         if unknown_args:
             self.provider_data["run_args"] = unknown_args
 
@@ -393,58 +387,54 @@ class Provider:
         else:
             return v
 
-    def _resources(self) -> Optional[Requirements]:
-        if self.provider_data.get("resources"):
-            resources = Requirements()
-            if self.provider_data["resources"].get("cpu"):
-                if not str(self.provider_data["resources"]["cpu"]).isnumeric():
-                    sys.exit("resources.cpu should be an integer")
-                cpu = int(self.provider_data["resources"]["cpu"])
-                if cpu > 0:
-                    resources.cpus = cpu
-            if self.provider_data["resources"].get("memory"):
-                resources.memory_mib = _str_to_mib(self.provider_data["resources"]["memory"])
-            gpu = self.provider_data["resources"].get("gpu")
-            if gpu:
-                if str(gpu).isnumeric():
-                    gpu = int(self.provider_data["resources"]["gpu"])
-                    if gpu > 0:
-                        resources.gpus = GpusRequirements(count=gpu)
-                else:
-                    gpu_count = 0
-                    gpu_name = None
-                    if str(gpu.get("count")).isnumeric():
-                        gpu_count = int(gpu.get("count"))
-                    if gpu.get("name"):
-                        gpu_name = gpu.get("name")
-                        if not gpu_count:
-                            gpu_count = 1
-                    if gpu_count:
-                        resources.gpus = GpusRequirements(count=gpu_count, name=gpu_name)
-            for resource_name in self.provider_data["resources"]:
-                if resource_name.endswith("/gpu") and len(resource_name) > 4:
-                    if not str(self.provider_data["resources"][resource_name]).isnumeric():
-                        sys.exit(f"resources.'{resource_name}' should be an integer")
-                    gpu = int(self.provider_data["resources"][resource_name])
-                    if gpu > 0:
-                        resources.gpus = GpusRequirements(count=gpu, name=resource_name[:-4])
-            if self.provider_data["resources"].get("shm_size"):
-                resources.shm_size_mib = _str_to_mib(self.provider_data["resources"]["shm_size"])
-            if self.provider_data["resources"].get("interruptible"):
-                resources.interruptible = self.provider_data["resources"]["interruptible"]
-            if self.provider_data["resources"].get("local"):
-                resources.local = self.provider_data["resources"]["local"]
-            if (
-                resources.cpus
-                or resources.memory_mib
-                or resources.gpus
-                or resources.shm_size_mib
-                or resources.interruptible
-                or resources.local
-            ):
-                return resources
+    def _resources(self) -> Requirements:
+        resources = Requirements()
+        cpu = self.provider_data["resources"].get("cpu", DEFAULT_CPU)
+        if not str(cpu).isnumeric():
+            sys.exit("resources.cpu should be an integer")
+        cpu = int(cpu)
+        if cpu > 0:
+            resources.cpus = cpu
+        memory = self.provider_data["resources"].get("memory", DEFAULT_MEM)
+        resources.memory_mib = _str_to_mib(memory)
+        gpu = self.provider_data["resources"].get("gpu")
+        if gpu:
+            if str(gpu).isnumeric():
+                gpu = int(self.provider_data["resources"]["gpu"])
+                if gpu > 0:
+                    resources.gpus = GpusRequirements(count=gpu)
             else:
-                return None
+                gpu_count = 0
+                gpu_name = None
+                gpu_memory = None
+                if str(gpu.get("count")).isnumeric():
+                    gpu_count = int(gpu.get("count"))
+                if gpu.get("name"):
+                    gpu_name = gpu.get("name")
+                    if not gpu_count:
+                        gpu_count = 1
+                if gpu.get("memory"):
+                    gpu_memory = _str_to_mib(gpu.get("memory"))
+                    if not gpu_count:
+                        gpu_count = 1
+                if gpu_count:
+                    resources.gpus = GpusRequirements(
+                        count=gpu_count, name=gpu_name, memory_mib=gpu_memory
+                    )
+        for resource_name in self.provider_data["resources"]:
+            if resource_name.endswith("/gpu") and len(resource_name) > 4:
+                if not str(self.provider_data["resources"][resource_name]).isnumeric():
+                    sys.exit(f"resources.'{resource_name}' should be an integer")
+                gpu = int(self.provider_data["resources"][resource_name])
+                if gpu > 0:
+                    resources.gpus = GpusRequirements(count=gpu, name=resource_name[:-4])
+        if self.provider_data["resources"].get("shm_size"):
+            resources.shm_size_mib = _str_to_mib(self.provider_data["resources"]["shm_size"])
+        if self.provider_data["resources"].get("interruptible"):
+            resources.interruptible = self.provider_data["resources"]["interruptible"]
+        if self.provider_data["resources"].get("local"):
+            resources.local = self.provider_data["resources"]["local"]
+        return resources
 
     @staticmethod
     def _extend_commands_with_env(commands, env):

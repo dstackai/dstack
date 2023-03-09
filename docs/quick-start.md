@@ -2,6 +2,9 @@
 
 This tutorial will guide you through using `dstack` locally and remotely, step by step.
 
+!!! info "NOTE:"
+    The source code for this tutorial can be located in [`github.com/dstack-examples`](https://github.com/dstackai/dstack-examples).
+
 ## 1. Install the CLI
 
 Use `pip` to install `dstack`:
@@ -16,7 +19,7 @@ To use `dstack`, your project must be managed by Git and have at least one remot
 Your repository can be hosted on GitHub, GitLab, BitBucket, or any other platform.
 
 !!! info "NOTE:"
-    If you haven't set up a remote branch in your repo yet, don't worry! Here's how you can do it:
+    If you haven't set up a remote branch in your repo yet, here's how you can do it:
     
     ```shell
     echo "# Quick start" >> README.md
@@ -36,7 +39,9 @@ Once you've set up a remote branch in your repo, go ahead and run this command:
 dstack init
 ```
 
-Now that everything is in place, you can use dstack with your project.
+It will set up the repo to work with `dstack`.
+
+Now that everything is in place, you can use `dstack` with your project.
 
 ## 3. Prepare data
 
@@ -44,7 +49,7 @@ Let us begin by creating a Python script that will prepare the data for our trai
 
 ### Create a Python script
 
-Let us create the following `mnist/mnist_data.py` script: 
+Let us create the following `tutorials/mnist/mnist_data.py` script: 
 
 ```python
 from torchvision.datasets import MNIST
@@ -71,7 +76,7 @@ workflows:
     provider: bash
     commands:
       - pip install torchvision
-      - python mnist/mnist_data.py
+      - python tutorials/mnist/mnist_data.py
     artifacts:
       - path: ./data
 ```
@@ -88,7 +93,7 @@ dstack run mnist-data
     In order for the files to be available in a workflow, they have to be tracked by Git.
     To ensure Git tracks the files, run:
     ```shell hl_lines="1"
-    git add .dstack mnist
+    git add .dstack tutorials
     ```
 
     After that, `dstack` will keep track of the file changes automatically, so you don't have to run `git add` on every change.
@@ -117,9 +122,14 @@ Extracting /workflow/data/MNIST/raw/train-images-idx2-ubyte.gz
     By default, `dstack` runs workflows locally, which requires having either Docker or [NVIDIA Docker](https://github.com/NVIDIA/nvidia-docker) 
     installed locally.
 
+!!! info "NOTE:"
+    By default, `dstack` uses the same Python version to run workflows as your local Python version.
+    If you use Python 3.11, the `mnist-data` workflow will fail since it's not yet supported by `torchvision`.
+    To solve such problems, `dstack` allows you to specify a Python version for the workflow with the `python` parameter in the YAML file, e.g. `python: 3.9`.
+
 ### Check status
 
-To check the status of recent runs, use the [`dstack ps`](reference/cli/index.md#dstack-ps) command:
+To check the status of recent runs, use the [`dstack ps`](reference/cli/ps.md) command:
 
 ```shell hl_lines="1"
 dstack ps
@@ -138,7 +148,7 @@ To see all runs, use the `dstack ps -a` command.
 
 Once a run is finished, its artifacts are saved and can be reused.
 
-You can list artifacts of any run using the [`dstack ls`](reference/cli/index.md#dstack-ls) command:
+You can list artifacts of any run using the [`dstack ls`](reference/cli/ls.md) command:
 
 ```shell hl_lines="1"
 dstack ls grumpy-zebra-1
@@ -164,7 +174,7 @@ Now, that the data is prepared, let's create a Python script to train a model.
 
 ### Create a Python script
 
-Let us create the following `mnist/train_mnist.py` script:
+Let us create the following `tutorials/mnist/train_mnist.py` script:
 
 ```python
 import torch
@@ -227,7 +237,7 @@ workflows:
     provider: bash
     commands:
       - pip install torchvision
-      - python mnist/mnist_data.py
+      - python tutorials/mnist/mnist_data.py
     artifacts:
       - path: ./data
         
@@ -237,7 +247,7 @@ workflows:
       - workflow: mnist-data 
     commands:
       - pip install torchvision pytorch-lightning tensorboard
-      - python mnist/train_mnist.py
+      - python tutorials/mnist/train_mnist.py
     artifacts:
       - path: ./lightning_logs
 ```
@@ -277,22 +287,10 @@ val_loss      0.10975822806358337
 When you run a workflow locally, artifacts are stored in `~/.dstack/artifacts` and can only be reused by workflows that 
 also run locally.
 
-To run workflows remotely or enable artifact reuse outside of your machine, you must configure your remote settings
+To run workflows remotely or enable artifact reuse outside of your machine, you can configure a remote 
 using the [`dstack config`](reference/cli/config.md) command.
 
-```shell hl_lines="1"
-dstack config
-```
-
-This command prompts you to select an AWS profile for credentials, an AWS region for workflow execution, and an S3
-bucket to store remote artifacts and metadata.
-
-```shell
-AWS profile: default
-AWS region: eu-west-1
-S3 bucket: dstack-142421590066-eu-west-1
-EC2 subnet: none
-```
+See [Installation](installation.md#configure-a-remote) to learn more about supported remote types and how to configure them.
 
 ## 6. Push artifacts
 

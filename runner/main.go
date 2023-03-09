@@ -20,6 +20,7 @@ import (
 
 	"github.com/dstackai/dstack/runner/consts"
 	"github.com/dstackai/dstack/runner/internal/backend"
+	_ "github.com/dstackai/dstack/runner/internal/backend/gcp"
 	_ "github.com/dstackai/dstack/runner/internal/backend/local"
 	_ "github.com/dstackai/dstack/runner/internal/backend/s3"
 	"github.com/dstackai/dstack/runner/internal/common"
@@ -119,7 +120,7 @@ func start(logLevel int, httpPort int, configDir string) {
 
 	go func() {
 		if err = ex.Run(ctxSig); err != nil {
-			log.Error(logCtx, "dstack-runner ended with an error: ", err)
+			log.Error(logCtx, "dstack-runner ended with an error: ", "err", err)
 		}
 		wg.Done()
 	}()

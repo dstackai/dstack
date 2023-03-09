@@ -25,6 +25,7 @@ import (
 var _ backend.Backend = (*Local)(nil)
 
 func init() {
+
 	backend.DefaultBackend = New()
 	backend.RegisterBackend("local", func(ctx context.Context, pathConfig string) (backend.Backend, error) {
 		file := File{}
@@ -180,7 +181,7 @@ func (l Local) Job(ctx context.Context) *models.Job {
 		log.Trace(ctx, "State not exist")
 		return new(models.Job)
 	}
-	log.Trace(ctx, "Get job", "job ID", l.state.Job.JobID)
+	log.Trace(ctx, "Get job", "ID", l.state.Job.JobID)
 	return l.state.Job
 }
 

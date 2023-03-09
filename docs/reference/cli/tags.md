@@ -56,13 +56,15 @@ dstack tags add some_tag_2 -a ./output1 -a ./output2
 
 ## dstack tags delete
 
+The `tags delete` command deletes a given tag.
+
 ### Usage
 
 ```shell
 dstack tags delete [-y] TAG
 ```
 
-#### Arguments reference
+### Arguments reference
 
 The following arguments are required:
 

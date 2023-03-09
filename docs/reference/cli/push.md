@@ -6,11 +6,12 @@ to the configured cloud account).
 ## Usage
 
 ```shell
-dstack push RUN
+dstack push (RUN | :TAG)
 ```
 
 ### Arguments reference
 
-The following arguments are required:
+One of the following arguments is required:
 
 - `RUN` - A name of a run
+- `:TAG` - A name of a tag

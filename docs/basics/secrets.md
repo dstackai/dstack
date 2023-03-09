@@ -5,7 +5,7 @@
 
 Secrets can be used to access passwords and tokens securely from remote workflows (without hard-coding them in the code).
 
-## Weights & Biases
+## Example
 
 Here's an example of how to use your Weight & Biases API token in your workflows. 
 
@@ -31,7 +31,7 @@ via the `WANDB_API_KEY` environment variable:
           - wandb login
     ```
 
-Secrets can be managed via the [`dstack secrets`](../reference/cli/index.md#dstack-secrets-add) command.
+Secrets can be managed via the [`dstack secrets`](../reference/cli/secrets.md#dstack-secrets-add) command.
 
 !!! info "NOTE:"
     Secrets are currently only supported by remote workflows.

@@ -12,7 +12,7 @@ from dstack.core.error import check_config, check_git
 
 class RMCommand(BasicCommand):
     NAME = "rm"
-    DESCRIPTION = "Remove runs"
+    DESCRIPTION = "Remove run(s)"
 
     def __init__(self, parser):
         super(RMCommand, self).__init__(parser)
