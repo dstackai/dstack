@@ -14,8 +14,10 @@
     "save": "Save",
     "profile": "Profile",
     "copied": "Copied",
-    "copy": "Copy"
+    "copy": "Copy",
+    "server_error": "Server error: {{error}}"
   },
+
   "auth": {
     "invalid_token": "Invalid token",
     "you_are_not_logged_in": "You are not logged in",

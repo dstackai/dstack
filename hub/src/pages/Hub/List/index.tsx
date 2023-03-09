@@ -1,4 +1,5 @@
 import React, { useMemo, useState } from 'react';
+import { useNavigate } from 'react-router-dom';
 import {
     Cards,
     Header,
@@ -10,13 +11,12 @@ import {
     ListEmptyMessage,
     ConfirmationDialog,
 } from 'components';
-import { useAppSelector, useBreadcrumbs, useCollection } from 'hooks';
+import { useAppSelector, useBreadcrumbs, useCollection, useNotifications } from 'hooks';
 import { useDeleteHubsMutation, useGetHubsQuery } from 'services/hub';
 import { ROUTES } from 'routes';
 import { useTranslation } from 'react-i18next';
 import { getHubRoleByUserName } from '../utils';
 import { selectUserName } from 'App/slice';
-import { useNavigate } from 'react-router-dom';
 
 export const HubList: React.FC = () => {
     const { t } = useTranslation();
@@ -25,6 +25,7 @@ export const HubList: React.FC = () => {
     const { isLoading, data } = useGetHubsQuery();
     const navigate = useNavigate();
     const [deleteHubs, { isLoading: isDeleting }] = useDeleteHubsMutation();
+    const [pushNotification] = useNotifications();
 
     useBreadcrumbs([
         {
@@ -70,7 +71,13 @@ export const HubList: React.FC = () => {
         if (collectionProps.selectedItems?.length) {
             deleteHubs(collectionProps.selectedItems.map((hub) => hub.hub_name))
                 .unwrap()
-                .then(() => actions.setSelectedItems([]));
+                .then(() => actions.setSelectedItems([]))
+                .catch((error) => {
+                    pushNotification({
+                        type: 'error',
+                        content: t('common.server_error', { error: error?.error }),
+                    });
+                });
         }
 
         setShowConfirmDelete(false);

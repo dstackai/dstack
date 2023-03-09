@@ -9,8 +9,8 @@ import { BaseQueryFn } from '@reduxjs/toolkit/dist/query/baseQueryTypes';
 import { getResponse, getResponseArgs } from 'mocks';
 import { wait } from '../';
 
-// const isMockingEnabled = process.env.ENABLE_API_MOCKING;
-const isMockingEnabled = false;
+const isMockingEnabled = process.env.ENABLE_API_MOCKING;
+// const isMockingEnabled = false;
 
 export const fetchBaseQuery = (
     params?: FetchBaseQueryArgs,

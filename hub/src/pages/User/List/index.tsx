@@ -12,7 +12,7 @@ import {
     ConfirmationDialog,
 } from 'components';
 import { useDeleteUsersMutation, useGetUserListQuery } from 'services/user';
-import { useBreadcrumbs, useCollection } from 'hooks';
+import { useBreadcrumbs, useCollection, useNotifications } from 'hooks';
 import { ROUTES } from 'routes';
 import { useTranslation } from 'react-i18next';
 
@@ -22,6 +22,7 @@ export const UserList: React.FC = () => {
     const { isLoading, data } = useGetUserListQuery();
     const [deleteUsers, { isLoading: isDeleting }] = useDeleteUsersMutation();
     const navigate = useNavigate();
+    const [pushNotification] = useNotifications();
 
     useBreadcrumbs([
         {
@@ -83,7 +84,13 @@ export const UserList: React.FC = () => {
         if (selectedItems?.length) {
             deleteUsers(selectedItems.map((user) => user.user_name))
                 .unwrap()
-                .then(() => actions.setSelectedItems([]));
+                .then(() => actions.setSelectedItems([]))
+                .catch((error) => {
+                    pushNotification({
+                        type: 'error',
+                        content: t('common.server_error', { error: error?.error }),
+                    });
+                });
         }
         setShowConfirmDelete(false);
     };
