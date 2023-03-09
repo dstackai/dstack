@@ -37,7 +37,7 @@ export const hubApi = createApi({
             query: (hub) => ({
                 url: API.HUBS.BASE(),
                 method: 'POST',
-                params: hub,
+                body: hub,
             }),
 
             invalidatesTags: (result) => [{ type: 'Hubs' as const, id: result?.hub_name }],
@@ -47,7 +47,7 @@ export const hubApi = createApi({
             query: (hub) => ({
                 url: API.HUBS.DETAILS(hub.hub_name),
                 method: 'PATCH',
-                params: hub,
+                body: hub,
             }),
 
             invalidatesTags: (result) => [{ type: 'Hubs' as const, id: result?.hub_name }],
@@ -57,7 +57,7 @@ export const hubApi = createApi({
             query: (hub) => ({
                 url: API.HUBS.MEMBERS(hub.hub_name),
                 method: 'POST',
-                params: hub.members,
+                body: hub.members,
             }),
 
             invalidatesTags: (result, error, params) => [{ type: 'Hubs' as const, id: params?.hub_name }],
@@ -67,7 +67,7 @@ export const hubApi = createApi({
             query: (hubNames) => ({
                 url: API.HUBS.BASE(),
                 method: 'DELETE',
-                params: {
+                body: {
                     hubs: hubNames,
                 },
             }),
@@ -77,7 +77,7 @@ export const hubApi = createApi({
             query: (data) => ({
                 url: API.HUBS.BACKEND_VALUES(),
                 method: 'POST',
-                params: data,
+                body: data,
             }),
         }),
     }),

@@ -45,7 +45,7 @@ export const userApi = createApi({
             query: (user) => ({
                 url: API.USERS.BASE(),
                 method: 'POST',
-                params: user,
+                body: user,
             }),
 
             invalidatesTags: (result) => [{ type: 'User' as const, id: result?.user_name }],
@@ -55,7 +55,7 @@ export const userApi = createApi({
             query: (user) => ({
                 url: API.USERS.DETAILS(user.user_name),
                 method: 'PATCH',
-                params: user,
+                body: user,
             }),
 
             invalidatesTags: (result) => [{ type: 'User' as const, id: result?.user_name }],
@@ -74,7 +74,7 @@ export const userApi = createApi({
             query: (userNames) => ({
                 url: API.USERS.BASE(),
                 method: 'DELETE',
-                params: {
+                body: {
                     users: userNames,
                 },
             }),
