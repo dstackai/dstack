@@ -90,10 +90,14 @@ def _copy_artifact_files(
         console.print(f"Artifact source path '{source}' does not exist")
         exit(1)
     source_full_path = tmp_job_output_dir / source
+    target_path = Path(target)
     if source_full_path.is_dir():
+        if target_path.exists() and not target_path.is_dir():
+            console.print(f"Local target path '{target}' exists and is not a directory")
+            shutil.rmtree(tmp_job_output_dir)
+            exit(1)
         shutil.copytree(source_full_path, target, dirs_exist_ok=True)
     else:
-        target_path = Path(target)
         if not target_path.exists():
             if target.endswith("/"):
                 target_path.mkdir(parents=True, exist_ok=True)
