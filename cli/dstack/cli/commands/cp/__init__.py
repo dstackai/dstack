@@ -32,13 +32,13 @@ class CpCommand(BasicCommand):
             "source",
             metavar="SOURCE",
             type=str,
-            help="A name of a run or a tag",
+            help="A path of an artifact file or directory",
         )
         self._parser.add_argument(
             "target",
             metavar="TARGET",
             type=str,
-            help="A name of a run or a tag",
+            help="A local path to download artifact file or directory into",
         )
 
     @check_config
