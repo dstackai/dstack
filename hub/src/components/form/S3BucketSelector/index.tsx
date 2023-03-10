@@ -49,9 +49,10 @@ export const FormS3BucketSelector = <T extends FieldValues>({
             control={control}
             rules={rules}
             render={({ field: { onChange, value, ...fieldRest }, fieldState: { error } }) => {
-                const resource = { uri: value };
+                const resource = { uri: `s3://${value}` };
                 const onChangeSelect: S3ResourceSelectorProps['onChange'] = (event) => {
-                    onChange(event.detail.resource.uri);
+                    const bucket = event.detail.resource.uri.replace(/^s3:\/\//, '');
+                    onChange(bucket);
                     onChangeProp && onChangeProp(event);
                 };
 
