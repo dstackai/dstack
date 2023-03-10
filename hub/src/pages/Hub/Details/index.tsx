@@ -115,7 +115,7 @@ export const HubDetails: React.FC = () => {
 
                 <div>
                     <Box variant="awsui-key-label">{t('projects.edit.aws.s3_bucket_name')}</Box>
-                    <div>{data.backend.s3_bucket_name}</div>
+                    <div>s3://{data.backend.s3_bucket_name}</div>
                 </div>
 
                 <div>
