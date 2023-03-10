@@ -19,18 +19,10 @@ import (
 	"strings"
 )
 
-type AzureConfigStorage struct {
-	Url       string `yaml:"url"`
-	Container string `yaml:"container"`
-}
-
-type AzureConfigSecret struct {
-	Url string `yaml:"url"`
-}
-
 type AzureConfig struct {
-	Storage AzureConfigStorage `yaml:"storage"`
-	Secret  AzureConfigSecret  `yaml:"secret"`
+	SecretUrl        string `yaml:"secret_url"`
+	StorageUrl       string `yaml:"storage_url"`
+	StorageContainer string `yaml:"storage_container"`
 }
 
 type AzureBackend struct {
@@ -65,12 +57,12 @@ func New(config AzureConfig) *AzureBackend {
 		fmt.Printf("Authentication failure: %+v", err)
 		return nil
 	}
-	storage, err := NewAzureStorage(credential, config.Storage.Url, config.Storage.Container)
+	storage, err := NewAzureStorage(credential, config.StorageUrl, config.StorageContainer)
 	if err != nil {
 		fmt.Printf("Initialization blob service failure: %+v", err)
 		return nil
 	}
-	secretManager, err := NewAzureSecretManager(credential, config.Secret.Url)
+	secretManager, err := NewAzureSecretManager(credential, config.SecretUrl)
 	if err != nil {
 		fmt.Printf("Initialization key vault service failure: %+v", err)
 		return nil
