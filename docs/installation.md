@@ -388,5 +388,79 @@ az login
 Also, it is required to be owner of subscription to allocate resources manually and to delegate dstask resource's
 management. Make sure to allocate resources in the same location.
 
-Create secret storage with command:
+!!! info "ADVISORY IS REQUIRED:"
+    Text below consist of copy-pasted blocks from official document about [Key Vault](https://learn.microsoft.com/en-us/azure/key-vault/general/quick-create-cli).
+    Simple generic sentences are under Creative Commons Attribution 4.0 International [Licence](https://github.com/MicrosoftDocs/Contribute/blob/main/LICENSE).
+    https://learn.microsoft.com/en-us/azure/storage/blobs/storage-quickstart-blobs-cli
 
+
+The first step is create resource group. Use the [az group create](https://learn.microsoft.com/en-us/cli/azure/group#az-group-create)
+command to create a resource group named `dstackResourceGroup` in the `germanywestcentral` location.
+
+```shell hl_lines="1"
+az group create --name "dstackResourceGroup" --location "germanywestcentral"
+```
+
+Use the Azure CLI [az keyvault create](https://learn.microsoft.com/en-us/cli/azure/keyvault?view=azure-cli-latest#az-keyvault-create) command to create a Key Vault in the resource group from the previous step. You will need to provide some information:
+
+- Key vault name: A string of 3 to 24 characters that can contain only numbers (0-9), letters (a-z, A-Z), and hyphens (-)
+- Resource group name: dstackResourceGroup.
+- The location: germanywestcentral.
+
+```shell hl_lines="1"
+az keyvault create --name "<dstack-keyvault-name>" --resource-group "dstackResourceGroup" --location "germanywestcentral"
+```
+
+Create a general-purpose storage account with the [az storage account create](https://learn.microsoft.com/en-us/cli/azure/storage/account)
+command. Storage account names must be between 3 and 24 characters in length and may contain numbers and lowercase
+letters only.
+
+```shell hl_lines="1"
+az storage account create \
+    --name <dstack-storage-account> \
+    --resource-group dstackResourceGroup \
+    --location germanywestcentral \
+    --sku Standard_LRS
+```
+
+Create a container for storing blobs with the [az storage container create](https://learn.microsoft.com/en-us/cli/azure/storage/container)
+command.
+
+The following example uses your Azure AD account to authorize the operation to create the container. Before you create
+the container, assign the Storage Blob Data Contributor role to yourself. Even if you are the account owner, you need explicit permissions to perform data operations against the storage account.
+
+```shell hl_lines="1"
+az ad signed-in-user show --query "{ assignee_id: id }"
+{
+  "assignee_id": "<assignee-id>"
+}
+
+az storage account show --name <dstack-storage-account> --query "{ scope_id: id }"
+{
+  "scope_id": "<scope-id>"
+}
+
+az role assignment create \
+    --role "Storage Blob Data Contributor" \
+    --assignee <assignee-id> \
+    --scope <scope-id>
+
+az storage container create \
+    --account-name <dstack-storage-account> \
+    --name <dstack-storage-container> \
+    --auth-mode login
+```
+
+Prepare urls of resources to use in dstack configuration.
+
+```shell hl_lines="1"
+az keyvault show --name <dstack-keyvault-name> --query "{ secret_url: properties.vaultUri }"
+{
+  "secret_url": "https://<dstack-keyvault-name>.vault.azure.net/"
+}
+
+az storage account show --name <dstack-storage-account> --query "{ storage_url: primaryEndpoints.blob }"
+{
+  "storage_url": "https://<dstack-storage-account>.blob.core.windows.net/"
+}
+```

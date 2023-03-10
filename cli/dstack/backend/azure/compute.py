@@ -186,6 +186,7 @@ def _launch_instance(
     instance_type: InstanceType,
     runner_id: str,
     repo_address: RepoAddress,
+    backend_config: AzureConfig,
 ) -> str:
     image = _get_image(compute_client, len(instance_type.resources.gpus) > 0)
 
@@ -205,123 +206,73 @@ def _launch_instance(
 
     # XXX: Hardcode for seed up development
     group_name = "dstack-hardcode"
-    if not resource_client.resource_groups.check_existence(group_name):
-        resource_group = resource_client.resource_groups.create_or_update(
-            group_name,
-            ResourceGroup(location=location),
-        )
-    else:
-        resource_group = resource_client.resource_groups.get(group_name)
+    resource_group = resource_client.resource_groups.create_or_update(
+        group_name,
+        ResourceGroup(location=location),
+    )
 
     # XXX: Azure tires to document restriction for name of different resource's kinds. Assume reusing of group name rules.
     # https://learn.microsoft.com/en-us/rest/api/virtualnetwork/virtual-networks/create-or-update?tabs=HTTP#uri-parameters
-    if "network_name" not in set(
-        map(attrgetter("name"), network_client.virtual_networks.list(group_name))
-    ):
-        network_client.virtual_networks.begin_create_or_update(
-            group_name,
-            "network_name",
-            VirtualNetwork(
-                location=location, address_space=AddressSpace(address_prefixes=["10.0.0.0/16"])
-            ),
-        ).result()
+    network_client.virtual_networks.begin_create_or_update(
+        group_name,
+        "network_name",
+        VirtualNetwork(
+            location=location, address_space=AddressSpace(address_prefixes=["10.0.0.0/16"])
+        ),
+    ).result()
 
-    if "subnet_name" not in set(
-        map(attrgetter("name"), network_client.subnets.list(group_name, "network_name"))
-    ):
-        subnet = network_client.subnets.begin_create_or_update(
-            group_name, "network_name", "subnet_name", Subnet(address_prefix="10.0.0.0/24")
-        ).result()
-    else:
-        subnet = network_client.subnets.get(group_name, "network_name", "subnet_name")
+    subnet = network_client.subnets.begin_create_or_update(
+        group_name, "network_name", "subnet_name", Subnet(address_prefix="10.0.0.0/24")
+    ).result()
 
-    if "public_ip_address_name" not in set(
-        map(
-            attrgetter("name"),
-            network_client.public_ip_addresses.list(
-                group_name,
-            ),
-        )
-    ):
-        ip_address: PublicIPAddress = network_client.public_ip_addresses.begin_create_or_update(
-            group_name,
-            "public_ip_address_name",
-            PublicIPAddress(
-                location=location,
-                sku=PublicIPAddressSku(name=PublicIPAddressSkuName.STANDARD),
-                public_ip_allocation_method=IPAllocationMethod.STATIC,
-            ),
-        ).result()
-    else:
-        ip_address = network_client.public_ip_addresses.get(
-            group_name,
-            "public_ip_address_name",
-        )
+    ip_address: PublicIPAddress = network_client.public_ip_addresses.begin_create_or_update(
+        group_name,
+        "public_ip_address_name",
+        PublicIPAddress(
+            location=location,
+            sku=PublicIPAddressSku(name=PublicIPAddressSkuName.STANDARD),
+            public_ip_allocation_method=IPAllocationMethod.STATIC,
+        ),
+    ).result()
 
-    if "network_security_group_name" not in set(
-        map(
-            attrgetter("name"),
-            network_client.network_security_groups.list(
-                group_name,
-            ),
-        )
-    ):
-        network_security_group: NetworkSecurityGroup = (
-            network_client.network_security_groups.begin_create_or_update(
-                group_name,
-                "network_security_group_name",
-                NetworkSecurityGroup(
-                    location=location,
-                    security_rules=[
-                        SecurityRule(
-                            name="security_rule",
-                            protocol=SecurityRuleProtocol.TCP,
-                            source_address_prefix="Internet",
-                            source_port_range="*",
-                            destination_address_prefix="*",
-                            destination_port_range="22",
-                            access=SecurityRuleAccess.ALLOW,
-                            priority=100,
-                            direction=SecurityRuleDirection.INBOUND,
-                        )
-                    ],
-                ),
-            ).result()
-        )
-    else:
-        network_security_group = network_client.network_security_groups.get(
+    network_security_group: NetworkSecurityGroup = (
+        network_client.network_security_groups.begin_create_or_update(
             group_name,
             "network_security_group_name",
-        )
-
-    if "interface_name" not in set(
-        map(
-            attrgetter("name"),
-            network_client.network_interfaces.list(
-                group_name,
-            ),
-        )
-    ):
-        nic_result: NetworkInterface = network_client.network_interfaces.begin_create_or_update(
-            group_name,
-            "interface_name",
-            NetworkInterface(
+            NetworkSecurityGroup(
                 location=location,
-                network_security_group=NetworkSecurityGroup(id=network_security_group.id),
-                ip_configurations=[
-                    NetworkInterfaceIPConfiguration(
-                        name="DstackIpConfig",
-                        subnet=Subnet(id=subnet.id),
-                        public_ip_address=PublicIPAddress(id=ip_address.id),
+                security_rules=[
+                    SecurityRule(
+                        name="security_rule",
+                        protocol=SecurityRuleProtocol.TCP,
+                        source_address_prefix="Internet",
+                        source_port_range="*",
+                        destination_address_prefix="*",
+                        destination_port_range="22",
+                        access=SecurityRuleAccess.ALLOW,
+                        priority=100,
+                        direction=SecurityRuleDirection.INBOUND,
                     )
                 ],
             ),
         ).result()
-    else:
-        nic_result = network_client.network_interfaces.get(
-            group_name,
-            "interface_name",
-        )
+    )
+
+    nic_result: NetworkInterface = network_client.network_interfaces.begin_create_or_update(
+        group_name,
+        "interface_name",
+        NetworkInterface(
+            location=location,
+            network_security_group=NetworkSecurityGroup(id=network_security_group.id),
+            ip_configurations=[
+                NetworkInterfaceIPConfiguration(
+                    name="DstackIpConfig",
+                    subnet=Subnet(id=subnet.id),
+                    public_ip_address=PublicIPAddress(id=ip_address.id),
+                )
+            ],
+        ),
+    ).result()
 
     # The supplied password must be between 6-72 characters long and must satisfy at least 3 of password complexity requirements from the following:
     # 1) Contains an uppercase character
@@ -343,57 +294,43 @@ def _launch_instance(
         )
         for _ in range(4)
     )
-    # $ curl -s -H Metadata:true --noproxy "*" "http://169.254.169.254/metadata/instance?api-version=2021-02-01" | jq
-    if "virtual_machine_name" not in set(
-        map(
-            attrgetter("name"),
-            compute_client.virtual_machines.list(
-                group_name,
-            ),
-        )
-    ):
-        from pathlib import Path
+    from pathlib import Path
 
-        with (Path().resolve() / "vm.txt").open("w") as stream:
-            stream.writelines([f"dstack_run@{ip_address.ip_address}\n", password, "\n"])
-        vm: VirtualMachine = compute_client.virtual_machines.begin_create_or_update(
-            group_name,
-            "virtual_machine_name",
-            VirtualMachine(
-                location=location,
-                hardware_profile=HardwareProfile(
-                    vm_size=instance_type.instance_name,
-                ),
-                storage_profile=StorageProfile(
-                    image_reference=ImageReference(id=image.id),
-                    os_disk=OSDisk(
-                        create_option=DiskCreateOptionTypes.FROM_IMAGE,
-                        managed_disk=ManagedDiskParameters(
-                            storage_account_type=StorageAccountTypes.STANDARD_SSD_LRS
-                        ),
-                        disk_size_gb=100,
-                    ),
-                ),
-                os_profile=OSProfile(
-                    computer_name="computername",
-                    admin_username="dstack_run",
-                    admin_password=password,
-                ),
-                network_profile=NetworkProfile(
-                    network_interfaces=[
-                        NetworkInterfaceReference(
-                            id=nic_result.id,
-                        )
-                    ]
-                ),
-                identity=VirtualMachineIdentity(type=ResourceIdentityType.system_assigned),
+    with (Path().resolve() / "vm.txt").open("w") as stream:
+        stream.writelines([f"dstack_run@{ip_address.ip_address}\n", password, "\n"])
+    vm: VirtualMachine = compute_client.virtual_machines.begin_create_or_update(
+        group_name,
+        "virtual_machine_name",
+        VirtualMachine(
+            location=location,
+            hardware_profile=HardwareProfile(
+                vm_size=instance_type.instance_name,
             ),
-        ).result()
-    else:
-        vm = compute_client.virtual_machines.get(
-            group_name,
-            "virtual_machine_name",
-        )
+            storage_profile=StorageProfile(
+                image_reference=ImageReference(id=image.id),
+                os_disk=OSDisk(
+                    create_option=DiskCreateOptionTypes.FROM_IMAGE,
+                    managed_disk=ManagedDiskParameters(
+                        storage_account_type=StorageAccountTypes.STANDARD_SSD_LRS
+                    ),
+                    disk_size_gb=100,
+                ),
+            ),
+            os_profile=OSProfile(
+                computer_name="computername",
+                admin_username="dstack_run",
+                admin_password=password,
+            ),
+            network_profile=NetworkProfile(
+                network_interfaces=[
+                    NetworkInterfaceReference(
+                        id=nic_result.id,
+                    )
+                ]
+            ),
+            identity=VirtualMachineIdentity(type=ResourceIdentityType.system_assigned),
+        ),
+    ).result()
 
     # https://github.com/Azure-Samples/compute-python-msi-vm/blob/master/example.py
     # https://techcommunity.microsoft.com/t5/apps-on-azure-blog/using-azure-key-vault-to-manage-your-secrets/ba-p/2057758
@@ -454,7 +391,9 @@ def _launch_instance(
                         )
                     ),
                 ),
-                RunCommandInputParameter(name="DSTACK_CONFIG", value=quote("backend: azure\\n")),
+                RunCommandInputParameter(
+                    name="DSTACK_CONFIG", value=quote(backend_config.serialize_yaml())
+                ),
             ],
         ),
     ).result()

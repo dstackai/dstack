@@ -264,7 +264,7 @@ class RunCommand(BasicCommand):
                 else:
                     remote_backend = get_backend_by_name(args.remote[0])
                     if remote_backend is None:
-                        console.print(f"Backend '{args.remote[0]}' is not configured")
+                        console.print(f"Backend '{args.remote[0]}' is not configured.")
                         exit(1)
                 backend = remote_backend
 
@@ -294,7 +294,7 @@ class RunCommand(BasicCommand):
                 if not args.detach:
                     poll_run(repo_data, jobs, backend)
             else:
-                sys.exit(f"Call `dstack init` first")
+                sys.exit(f"Call `dstack init` first.")
         except ValidationError as e:
             sys.exit(
                 f"There a syntax error in one of the files inside the {os.getcwd()}/.dstack/workflows directory:\n\n{e}"

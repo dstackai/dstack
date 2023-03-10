@@ -50,6 +50,7 @@ class AzureBackend(CloudBackend):
             location=self.config.location,
             backend_config=self.config,
         )
+        self._loaded = True
 
     @property
     def name(self) -> str:
