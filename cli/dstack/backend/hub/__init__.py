@@ -116,6 +116,7 @@ class HubBackend(RemoteBackend):
         repo_address: RepoAddress,
         run_name: str,
         output_dir: Optional[str],
+        files_path: Optional[str] = None,
     ):
         # /{hub_name}/artifacts/download
         artifacts = self.list_run_artifact_files(repo_address=repo_address, run_name=run_name)
@@ -124,6 +125,7 @@ class HubBackend(RemoteBackend):
             repo_address=repo_address,
             artifacts=artifacts,
             output_dir=output_dir,
+            files_path=files_path,
         )
 
     def upload_job_artifact_files(

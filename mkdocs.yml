@@ -155,16 +155,17 @@ nav:
       - CLI:
           - dstack run: reference/cli/run.md
           - dstack ps: reference/cli/ps.md
-          - dstack push: reference/cli/push.md
-          - dstack pull: reference/cli/pull.md
-          - dstack stop: reference/cli/stop.md
           - dstack logs: reference/cli/logs.md
-          - dstack ls: reference/cli/ls.md
+          - dstack stop: reference/cli/stop.md
+          - dstack rm: reference/cli/rm.md
           - dstack tags: reference/cli/tags.md
+          - dstack pull: reference/cli/pull.md
+          - dstack push: reference/cli/push.md
+          - dstack ls: reference/cli/ls.md
+          - dstack cp: reference/cli/cp.md
           - dstack init: reference/cli/init.md
           - dstack config: reference/cli/config.md
           - dstack secrets: reference/cli/secrets.md
-          - dstack rm: reference/cli/rm.md
   - Slack: https://join.slack.com/t/dstackai/shared_invite/zt-xdnsytie-D4qU9BvJP8vkbkHXdi6clQ
   - Twitter: https://twitter.com/dstackai/
 #  - Newsletter: https://dstack.curated.co/
