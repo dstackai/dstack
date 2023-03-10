@@ -7,19 +7,34 @@ from typing import Dict, List
 import yaml
 from azure.identity import DefaultAzureCredential
 from azure.mgmt.subscription import SubscriptionClient
-from azure.mgmt.subscription.models import Subscription
+from azure.mgmt.subscription.models import Subscription, TenantIdDescription
 from pydantic.error_wrappers import ValidationError
 from pydantic.fields import Field
-from pydantic.main import BaseModel, create_model
+from pydantic.main import create_model
 from pydantic.networks import stricturl
 from pydantic.tools import parse_obj_as
 from pydantic.types import constr
-from rich import print
-from rich.prompt import Confirm, Prompt
+from rich.prompt import Prompt
 
 from dstack.cli.common import ask_choice, console
 from dstack.core.config import BackendConfig, Configurator, get_config_path
 from dstack.core.error import ConfigError
+
+# https://learn.microsoft.com/en-us/rest/api/resources/resource-groups/create-or-update?tabs=HTTP#uri-parameters
+# The name of the resource group to create or update.
+# Can include
+# alphanumeric,
+# underscore,
+# parentheses,
+# hyphen,
+# period (except at end),
+# and Unicode characters that match the allowed characters.
+# ^[-\w\._\(\)]+$
+group_name_validator = constr(
+    regex=r"^[-\w\._\(\)]+[-\w_\(\)]$|^[-\w\._\(\)]$",
+    min_length=1,
+    max_length=90,
+)
 
 # XXX: Where is full inclusive description of requirements for url of Key Vault?
 # This page says about "DNS Name":
@@ -118,14 +133,20 @@ class AzureConfig(BackendConfig, metaclass=ModelMeta):
     def __init__(
         self,
         subscription_id: str,
+        tenant_id: str,
         location: str,
         secret_url: stricturl(allowed_schemes={"https"}),
+        secret_resource_group: str,
         storage_url: stricturl(allowed_schemes={"https"}),
         storage_container: str,
     ):
         self.subscription_id = subscription_id
+        self.tenant_id = tenant_id
         self.location = location
         self.secret_url = secret_url
+        # XXX: it is possible to find resource group, because Key Vault has unique name. It would take much time for
+        # round-trip request to Azure.
+        self.secret_resource_group = secret_resource_group
         self.storage_url = storage_url
         self.storage_container = storage_container
 
@@ -195,16 +216,22 @@ class AzureConfigurator(Configurator):
             defaults = AzureConfig.__model__.from_orm(config).dict()
 
         subscription_id = self._ask_subscription_id(defaults.get("subscription_id", omitted))
+        tenant_id = self._ask_tenant_id(defaults.get("tenant_id", omitted))
         location = self._ask_location(defaults.get("location", omitted))
         secret_url = self._ask_secret_url(defaults.get("secret_url", omitted))
+        secret_resource_group = self._ask_secret_resource_group(
+            defaults.get("secret_resource_group", omitted)
+        )
         storage_url = self._ask_storage_url(defaults.get("storage_url", omitted))
         storage_container = self._ask_storage_container(defaults.get("storage_container", omitted))
 
         config = AzureConfig.deserialize(
             data={
                 "subscription_id": subscription_id,
+                "tenant_id": tenant_id,
                 "location": location,
                 "secret_url": secret_url,
+                "secret_resource_group": secret_resource_group,
                 "storage_url": storage_url,
                 "storage_container": storage_container,
             }
@@ -220,10 +247,24 @@ class AzureConfigurator(Configurator):
         subscription: Subscription
         for subscription in subscription_client.subscriptions.list():
             labels.append(f"{subscription.display_name} {subscription.subscription_id}")
-            values.append(subscription.id)
+            values.append(subscription.subscription_id)
         if default is omitted:
             default = None
         value = ask_choice("Choose Azure subscription", labels, values, selected_value=default)
+        return value
+
+    def _ask_tenant_id(self, default):
+        credential = DefaultAzureCredential()
+        subscription_client = SubscriptionClient(credential)
+        labels = []
+        values = []
+        tenant: TenantIdDescription
+        for tenant in subscription_client.tenants.list():
+            labels.append(tenant.tenant_id)
+            values.append(tenant.tenant_id)
+        if default is omitted:
+            default = None
+        value = ask_choice("Choose Azure Tenant", labels, values, selected_value=default)
         return value
 
     def _ask_location(self, default):
@@ -260,6 +301,24 @@ class AzureConfigurator(Configurator):
                 continue
 
             return secret_url_parsed
+
+    def _ask_secret_resource_group(self, default):
+        kwargs = {"default": default} if default is not omitted else {}
+        type_ = group_name_validator
+        while True:
+            secret_resource_group = Prompt.ask(
+                "[sea_green3 bold]?[/sea_green3 bold] [bold]Enter Key Vault's resource group[/bold]",
+                **kwargs,
+            )
+            try:
+                secret_resource_group_parsed = parse_obj_as(type_, secret_resource_group)
+            except ValidationError as e:
+                console.print(f"Resource group's name is not valid. Errors:")
+                for error in e.errors():
+                    console.print(f" - {error['msg']}")
+                continue
+
+            return secret_resource_group_parsed
 
     def _ask_storage_url(self, default):
         kwargs = {"default": default} if default is not omitted else {}

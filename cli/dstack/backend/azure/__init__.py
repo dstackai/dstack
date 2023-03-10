@@ -41,13 +41,18 @@ class AzureBackend(CloudBackend):
         # https://learn.microsoft.com/en-us/azure/storage/blobs/assign-azure-role-data-access?tabs=portal
         self._storage = AzureStorage(
             credential=credential,
+            subscription_id=self.config.subscription_id,
             account_url=self.config.storage_url,
             container_name=self.config.storage_container,
         )
         self._compute = AzureCompute(
             credential=credential,
             subscription_id=self.config.subscription_id,
+            tenant_id=self.config.tenant_id,
             location=self.config.location,
+            secret_vault_name=self.config.secret_url.host.split(".", 1)[0],
+            secret_vault_resource_group=self.config.secret_resource_group,
+            storage_account_name=self._storage.get_account_name(),
             backend_config=self.config,
         )
         self._loaded = True

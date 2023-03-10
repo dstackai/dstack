@@ -8,6 +8,7 @@ from typing import List, Optional
 
 from azure.core.credentials import TokenCredential
 from azure.mgmt.authorization import AuthorizationManagementClient
+from azure.mgmt.authorization.v2022_04_01.models import RoleAssignment
 from azure.mgmt.compute import ComputeManagementClient
 from azure.mgmt.compute.v2022_11_01.models import (
     DiskCreateOptionTypes,
@@ -29,6 +30,15 @@ from azure.mgmt.compute.v2022_11_01.models import (
     VirtualMachine,
     VirtualMachineIdentity,
 )
+from azure.mgmt.keyvault import KeyVaultManagementClient
+from azure.mgmt.keyvault.v2022_07_01.models import (
+    AccessPolicyEntry,
+    AccessPolicyUpdateKind,
+    Permissions,
+    SecretPermissions,
+    VaultAccessPolicyParameters,
+    VaultAccessPolicyProperties,
+)
 from azure.mgmt.network import NetworkManagementClient
 from azure.mgmt.network.v2022_07_01.models import (
     AddressSpace,
@@ -48,11 +58,14 @@ from azure.mgmt.network.v2022_07_01.models import (
 )
 from azure.mgmt.resource import ResourceManagementClient
 from azure.mgmt.resource.resources.v2022_09_01.models import ResourceGroup
+from azure.mgmt.storage import StorageManagementClient
+from azure.mgmt.storage.v2022_09_01.models import StorageAccount
 
 from dstack import version
 from dstack.backend.aws.runners import _get_default_ami_image_version, _serialize_runner_yaml
 from dstack.backend.azure import runners
 from dstack.backend.azure.config import AzureConfig
+from dstack.backend.azure.storage import AzureStorage
 from dstack.backend.base.compute import Compute, choose_instance_type
 from dstack.core.instance import InstanceType
 from dstack.core.job import Job
@@ -66,7 +79,11 @@ class AzureCompute(Compute):
         self,
         credential: TokenCredential,
         subscription_id: str,
+        tenant_id: str,
         location: str,
+        secret_vault_name: str,
+        secret_vault_resource_group: str,
+        storage_account_name: str,
         backend_config: AzureConfig,
     ):
         self._compute_client = ComputeManagementClient(
@@ -81,7 +98,22 @@ class AzureCompute(Compute):
         self._authorization_client = AuthorizationManagementClient(
             credential=credential, subscription_id=subscription_id
         )
+        self._tenant_id = tenant_id
         self._location = location
+        self._keyvault_manager = KeyVaultManagementClient(
+            credential=credential, subscription_id=subscription_id
+        )
+        self._secret_vault_name = secret_vault_name
+        self._secret_vault_resource_group = secret_vault_resource_group
+        storage_account_data: StorageAccount = next(
+            filter(
+                lambda sa: sa.name == storage_account_name,
+                StorageManagementClient(
+                    credential=credential, subscription_id=subscription_id
+                ).storage_accounts.list(),
+            )
+        )
+        self._storage_account_id = storage_account_data.id
         self.backend_config = backend_config
 
     def cancel_spot_request(self, request_id: str):
@@ -102,10 +134,16 @@ class AzureCompute(Compute):
             self._resource_client,
             self._network_client,
             self._authorization_client,
+            self._tenant_id,
             self._location,
             instance_type,
             job.runner_id,
             job.repo_address,
+            self._keyvault_manager,
+            self._secret_vault_resource_group,
+            self._secret_vault_name,
+            self._storage_account_id,
+            self.backend_config,
         )
 
     def get_request_head(self, job: Job, request_id: Optional[str]) -> RequestHead:
@@ -182,15 +220,19 @@ def _launch_instance(
     resource_client: ResourceManagementClient,
     network_client: NetworkManagementClient,
     authorization_client: AuthorizationManagementClient,
+    tenant_id: str,
     location: str,
     instance_type: InstanceType,
     runner_id: str,
     repo_address: RepoAddress,
+    keyvault_client: KeyVaultManagementClient,
+    secret_vault_resource_group: str,
+    secret_vault_name: str,
+    storage_account_id: str,
     backend_config: AzureConfig,
 ) -> str:
     image = _get_image(compute_client, len(instance_type.resources.gpus) > 0)
 
-    # Group is shared across runs. Other resources are allocated for particular run.
     # https://learn.microsoft.com/en-us/rest/api/resources/resource-groups/create-or-update?tabs=HTTP#uri-parameters
     # The name of the resource group to create or update.
     # Can include
@@ -201,11 +243,9 @@ def _launch_instance(
     # period (except at end),
     # and Unicode characters that match the allowed characters.
     # ^[-\w\._\(\)]+$
-    salt = "".join(random.choice(string.ascii_lowercase) for _ in range(5))
-    group_name = make_name(f"dstack-{repo_address.repo_name}-{runner_id}-{salt}")
+    # XXX: Maybe runner_id provides uniqueness.
+    group_name = make_name(f"dstack-{repo_address.repo_name}-{runner_id}")
 
-    # XXX: Hardcode for seed up development
-    group_name = "dstack-hardcode"
     resource_group = resource_client.resource_groups.create_or_update(
         group_name,
         ResourceGroup(location=location),
@@ -243,7 +283,7 @@ def _launch_instance(
                 location=location,
                 security_rules=[
                     SecurityRule(
-                        name="security_rule",
+                        name="ssh_access",
                         protocol=SecurityRuleProtocol.TCP,
                         source_address_prefix="Internet",
                         source_port_range="*",
@@ -252,7 +292,18 @@ def _launch_instance(
                         access=SecurityRuleAccess.ALLOW,
                         priority=100,
                         direction=SecurityRuleDirection.INBOUND,
-                    )
+                    ),
+                    SecurityRule(
+                        name="runner_service",
+                        protocol=SecurityRuleProtocol.TCP,
+                        source_address_prefix="Internet",
+                        source_port_range="*",
+                        destination_address_prefix="*",
+                        destination_port_range="3000-4000",
+                        access=SecurityRuleAccess.ALLOW,
+                        priority=101,
+                        direction=SecurityRuleDirection.INBOUND,
+                    ),
                 ],
             ),
         ).result()
@@ -332,24 +383,39 @@ def _launch_instance(
         ),
     ).result()
 
+    keyvault_client.vaults.update_access_policy(
+        secret_vault_resource_group,
+        secret_vault_name,
+        operation_kind=AccessPolicyUpdateKind.ADD,
+        parameters=VaultAccessPolicyParameters(
+            properties=VaultAccessPolicyProperties(
+                access_policies=[
+                    AccessPolicyEntry(
+                        tenant_id=tenant_id,
+                        object_id=vm.identity.principal_id,
+                        permissions=Permissions(
+                            secrets=[SecretPermissions.GET, SecretPermissions.LIST]
+                        ),
+                    )
+                ]
+            )
+        ),
+    )
     # https://github.com/Azure-Samples/compute-python-msi-vm/blob/master/example.py
     # https://techcommunity.microsoft.com/t5/apps-on-azure-blog/using-azure-key-vault-to-manage-your-secrets/ba-p/2057758
-    # https://learn.microsoft.com/en-us/azure/key-vault/general/rbac-guide?tabs=azure-cli#known-limits-and-performance
-    role_name = "Storage Blob Data Owner"
-    roles = list(
+    scope = storage_account_id
+    role_name = "Storage Blob Data Contributor"
+    contributor_role, *other = list(
         authorization_client.role_definitions.list(
-            sub.id, filter="roleName eq '{}'".format(role_name)
+            scope, filter="roleName eq '{}'".format(role_name)
         )
     )
-    assert len(roles) == 1
-    contributor_role = roles[0]
-    role_assignment = authorization_client.role_assignments.create(
-        sub.id,
+    assert not other
+    role_assignment: RoleAssignment = authorization_client.role_assignments.create(
+        scope,
         uuid.uuid4(),  # Role assignment random name
         {"role_definition_id": contributor_role.id, "principal_id": vm.identity.principal_id},
     )
-    print(role_assignment.as_dict())
-    # dstack_run@computername:~$ az login --identity
 
     port_range_from: int = 3000
     port_range_to: int = 4000
@@ -370,7 +436,7 @@ def _launch_instance(
                 'echo "$DSTACK_CONFIG" > /root/.dstack/config.yaml',
                 'echo "$RUNNER_HEAD_CONFIG" > /root/.dstack/runner.yaml',
                 'echo "hostname: $PUBLIC_IP" >> /root/.dstack/runner.yaml',
-                "HOME=/root nohup dstack-runner start --http-port 4000 &",
+                "HOME=/root nohup dstack-runner --log-level 6 start --http-port 4000 &",
             ],
             parameters=[
                 RunCommandInputParameter(name="PUBLIC_IP", value=quote(ip_address.ip_address)),
