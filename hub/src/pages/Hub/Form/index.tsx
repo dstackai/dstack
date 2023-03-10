@@ -5,6 +5,11 @@ import { useForm, FormProvider, DefaultValues } from 'react-hook-form';
 import { IProps, TBackendOption } from './types';
 import { AWSBackend } from './AWS';
 
+import styles from './styles.module.scss';
+import { isRequestFormErrors, isRequestFormFieldError } from '../../../libs/isErrorWithMessage';
+import { FormFieldError } from '../../../libs/types';
+import { FieldPath } from 'react-hook-form/dist/types/path';
+
 export const HubForm: React.FC<IProps> = ({ initialValues, onCancel, loading, onSubmit: onSubmitProp }) => {
     const { t } = useTranslation();
     const isEditing = !!initialValues;
@@ -32,34 +37,46 @@ export const HubForm: React.FC<IProps> = ({ initialValues, onCancel, loading, on
         defaultValues: getDefaultValues(),
     });
 
-    const { handleSubmit, control, watch } = formMethods;
+    const { handleSubmit, control, watch, setError, clearErrors } = formMethods;
 
     const backendType = watch('backend.type');
 
     const backendOptions: TBackendOption[] = [
         {
-            label: t('hubs.backend_type.aws'),
+            label: t('projects.backend_type.aws'),
             value: 'aws',
-            description: t('hubs.backend_type.aws_description'),
+            description: t('projects.backend_type.aws_description'),
             disabled: loading,
         },
-        {
-            label: t('hubs.backend_type.gcp'),
-            value: 'gcp',
-            description: t('hubs.backend_type.gcp_description'),
-            disabled: true,
-        },
-        {
-            label: t('hubs.backend_type.azure'),
-            value: 'azure',
-            description: t('hubs.backend_type.azure_description'),
-            disabled: true,
-        },
+        // {
+        //     label: t('projects.backend_type.gcp'),
+        //     value: 'gcp',
+        //     description: t('projects.backend_type.gcp_description'),
+        //     disabled: true,
+        // },
+        // {
+        //     label: t('projects.backend_type.azure'),
+        //     value: 'azure',
+        //     description: t('projects.backend_type.azure_description'),
+        //     disabled: true,
+        // },
     ];
 
     const onSubmit = (data: IHub) => {
         if (data.backend.ec2_subnet_id === '') data.backend.ec2_subnet_id = null;
-        onSubmitProp(data);
+
+        clearErrors();
+
+        onSubmitProp(data).catch((error) => {
+            if (!isRequestFormErrors(error.data)) return;
+
+            error.data.detail.forEach((item: FormFieldError) => {
+                if (isRequestFormFieldError(item)) {
+                    const [_, ...fieldName] = item.loc;
+                    setError(fieldName.join('.') as FieldPath<IHub>, { type: 'custom', message: item.msg });
+                }
+            });
+        });
     };
 
     const renderBackendFields = () => {
@@ -90,10 +107,10 @@ export const HubForm: React.FC<IProps> = ({ initialValues, onCancel, loading, on
                 >
                     <SpaceBetween size="l">
                         {!isEditing && (
-                            <Container header={<Header variant="h2">{t('hubs.edit.general')}</Header>}>
+                            <Container header={<Header variant="h2">{t('projects.edit.general')}</Header>}>
                                 <SpaceBetween size="l">
                                     <FormInput
-                                        label={t('hubs.edit.hub_name')}
+                                        label={t('projects.edit.project_name')}
                                         control={control}
                                         name="hub_name"
                                         disabled={loading}
@@ -103,11 +120,13 @@ export const HubForm: React.FC<IProps> = ({ initialValues, onCancel, loading, on
                             </Container>
                         )}
 
-                        <Container header={<Header variant="h2">{t('hubs.edit.backend')}</Header>}>
-                            <FormField label={t('hubs.edit.backend_type')} />
+                        <Container header={<Header variant="h2">{t('projects.edit.backend')}</Header>}>
+                            <FormField label={t('projects.edit.backend_type')} />
 
                             <SpaceBetween size="l">
-                                <FormTiles control={control} name="backend.type" items={backendOptions} />
+                                <div className={styles.backendTypeTiles}>
+                                    <FormTiles control={control} name="backend.type" items={backendOptions} />
+                                </div>
                                 {renderBackendFields()}
                             </SpaceBetween>
                         </Container>

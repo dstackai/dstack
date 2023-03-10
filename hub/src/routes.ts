@@ -4,16 +4,16 @@ export const ROUTES = {
     BASE: '/',
     LOGOUT: '/logout',
 
-    HUB: {
-        LIST: '/hubs',
-        ADD: '/hubs/add',
+    PROJECT: {
+        LIST: '/projects',
+        ADD: '/projects/add',
         DETAILS: {
-            TEMPLATE: `/hubs/:name`,
-            FORMAT: (name: string) => buildRoute(ROUTES.HUB.DETAILS.TEMPLATE, { name }),
+            TEMPLATE: `/projects/:name`,
+            FORMAT: (name: string) => buildRoute(ROUTES.PROJECT.DETAILS.TEMPLATE, { name }),
         },
         EDIT_BACKEND: {
-            TEMPLATE: `/hubs/:name/edit/backend`,
-            FORMAT: (name: string) => buildRoute(ROUTES.HUB.EDIT_BACKEND.TEMPLATE, { name }),
+            TEMPLATE: `/projects/:name/edit/backend`,
+            FORMAT: (name: string) => buildRoute(ROUTES.PROJECT.EDIT_BACKEND.TEMPLATE, { name }),
         },
     },
 

@@ -18,43 +18,47 @@ export const HubEditBackend: React.FC = () => {
 
     useBreadcrumbs([
         {
-            text: t('navigation.hubs'),
-            href: ROUTES.HUB.LIST,
+            text: t('navigation.projects'),
+            href: ROUTES.PROJECT.LIST,
         },
         {
             text: paramHubName,
-            href: ROUTES.HUB.DETAILS.FORMAT(paramHubName),
+            href: ROUTES.PROJECT.DETAILS.FORMAT(paramHubName),
         },
 
         {
-            text: t('hubs.edit.edit_backend'),
+            text: t('projects.edit.edit_backend'),
             href: ROUTES.USER.EDIT.FORMAT(paramHubName),
         },
     ]);
 
     const onCancelHandler = () => {
-        navigate(ROUTES.HUB.DETAILS.FORMAT(paramHubName));
+        navigate(ROUTES.PROJECT.DETAILS.FORMAT(paramHubName));
     };
 
-    const onSubmitHandler = async (hubData: Partial<IHub>) => {
+    const onSubmitHandler = async (hubData: Partial<IHub>): Promise<IHub> => {
+        const request = updateHub({
+            ...hubData,
+            hub_name: paramHubName,
+        }).unwrap();
+
         try {
-            const data = await updateHub({
-                ...hubData,
-                hub_name: paramHubName,
-            }).unwrap();
+            const data = await request;
 
             pushNotification({
                 type: 'success',
-                content: t('hubs.edit.success_notification'),
+                content: t('projects.edit.success_notification'),
             });
 
-            navigate(ROUTES.HUB.DETAILS.FORMAT(data.hub_name ?? paramHubName));
+            navigate(ROUTES.PROJECT.DETAILS.FORMAT(data.hub_name ?? paramHubName));
         } catch (e) {
             pushNotification({
                 type: 'error',
-                content: t('hubs.edit.error_notification'),
+                content: t('projects.edit.error_notification'),
             });
         }
+
+        return request;
     };
 
     return (

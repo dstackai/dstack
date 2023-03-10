@@ -3,14 +3,14 @@ const {join} = require('path');
 const HtmlWebpackPlugin = require('html-webpack-plugin');
 const FaviconsWebpackPlugin = require('favicons-webpack-plugin');
 const CopyPlugin = require("copy-webpack-plugin");
-const { environment, publicUrl, apiUrl, isDev, isProd, srcDir, landing, title, description } = require('./env');
+const { environment, publicUrl, apiUrl, isDev, isProd, srcDir, landing, title, description, enableMockingApi } = require('./env');
 const { getStyleLoaders } = require('./getStyleLoaders');
 
 const env = {
     NODE_ENV: JSON.stringify(environment),
     PUBLIC_URL: JSON.stringify(publicUrl),
     API_URL: JSON.stringify(apiUrl),
-    ENABLE_API_MOCKING: JSON.stringify(isDev),
+    ENABLE_MOCKING_API: JSON.stringify(enableMockingApi),
 };
 
 const sourceMap = !isProd;
@@ -139,20 +139,6 @@ module.exports = {
                 "og:image": `${publicUrl}splash_thumbnail.png`,
                 "og:description": description,
             },
-
-            customHeadHTML: [
-                isProd && `
-                <script>
-                    (function(i,s,o,g,r,a,m){i['GoogleAnalyticsObject']=r;i[r]=i[r]||function(){
-                    (i[r].q=i[r].q||[]).push(arguments)};i[r].l=1*new Date();a=s.createElement(o);
-                    m=s.getElementsByTagName(o)[0];a.async=1;a.src=g;m.parentNode.insertBefore(a,m)
-                    })(window,document,'script','https://www.google-analytics.com/analytics.js','ga');
-                    
-                    ga('create', 'UA-4493451-5', 'auto');
-                    ga('send', 'pageview');
-                </script>
-                `
-            ].filter(Boolean).join('')
         }),
 
         new CopyPlugin({

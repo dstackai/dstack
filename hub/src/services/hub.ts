@@ -57,7 +57,7 @@ export const hubApi = createApi({
             query: (hub) => ({
                 url: API.HUBS.MEMBERS(hub.hub_name),
                 method: 'POST',
-                params: hub.members,
+                body: hub.members,
             }),
 
             invalidatesTags: (result, error, params) => [{ type: 'Hubs' as const, id: params?.hub_name }],
@@ -67,10 +67,11 @@ export const hubApi = createApi({
             query: (hubNames) => ({
                 url: API.HUBS.BASE(),
                 method: 'DELETE',
-                params: {
+                body: {
                     hubs: hubNames,
                 },
             }),
+            invalidatesTags: (result, error, params) => params.map((hubName) => ({ type: 'Hubs' as const, id: hubName })),
         }),
 
         backendValues: builder.mutation<IHubAwsBackendValues, Partial<THubBackend>>({

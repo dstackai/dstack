@@ -15,39 +15,43 @@ export const HubAdd: React.FC = () => {
 
     useBreadcrumbs([
         {
-            text: t('navigation.hubs'),
-            href: ROUTES.HUB.LIST,
+            text: t('navigation.projects'),
+            href: ROUTES.PROJECT.LIST,
         },
         {
             text: t('common.create'),
-            href: ROUTES.HUB.ADD,
+            href: ROUTES.PROJECT.ADD,
         },
     ]);
 
     const onCancelHandler = () => {
-        navigate(ROUTES.HUB.LIST);
+        navigate(ROUTES.PROJECT.LIST);
     };
 
-    const onSubmitHandler = async (hubData: IHub) => {
+    const onSubmitHandler = async (hubData: IHub): Promise<IHub> => {
+        const request = createHub(hubData).unwrap();
+
         try {
-            const data = await createHub(hubData).unwrap();
+            const data = await request;
 
             pushNotification({
                 type: 'success',
-                content: t('hubs.create.success_notification'),
+                content: t('projects.create.success_notification'),
             });
 
-            navigate(ROUTES.HUB.DETAILS.FORMAT(data.hub_name));
+            navigate(ROUTES.PROJECT.DETAILS.FORMAT(data.hub_name));
         } catch (e) {
             pushNotification({
                 type: 'error',
-                content: t('hubs.create.error_notification'),
+                content: t('projects.create.error_notification'),
             });
         }
+
+        return request;
     };
 
     return (
-        <ContentLayout header={<Header variant="awsui-h1-sticky">{t('hubs.create.page_title')}</Header>}>
+        <ContentLayout header={<Header variant="awsui-h1-sticky">{t('projects.create.page_title')}</Header>}>
             <HubForm onSubmit={onSubmitHandler} loading={isLoading} onCancel={onCancelHandler} />
         </ContentLayout>
     );

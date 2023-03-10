@@ -78,6 +78,9 @@ export const userApi = createApi({
                     users: userNames,
                 },
             }),
+
+            invalidatesTags: (result, error, userNames) =>
+                userNames.map((userName) => ({ type: 'User' as const, id: userName })),
         }),
     }),
 });

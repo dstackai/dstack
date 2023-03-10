@@ -1,8 +1,8 @@
-import React, { useEffect, useState, useCallback } from 'react';
+import React, { useState, useCallback } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useNavigate, useParams } from 'react-router-dom';
 import { debounce } from 'lodash';
-import { useAppSelector, useBreadcrumbs } from 'hooks';
+import { useAppSelector, useBreadcrumbs, useNotifications } from 'hooks';
 import { ROUTES } from 'routes';
 import {
     Box,
@@ -18,42 +18,48 @@ import {
     StatusIndicator,
     Popover,
 } from 'components';
-import { selectAuthToken } from 'App/slice';
+import { selectAuthToken, selectUserName } from 'App/slice';
 import { useGetHubQuery, useDeleteHubsMutation, useUpdateHubMembersMutation } from 'services/hub';
 import { HubMembers } from '../Members';
 import styles from './styles.module.scss';
+import { getHubRoleByUserName } from '../utils';
 
 export const HubDetails: React.FC = () => {
     const { t } = useTranslation();
     const [showDeleteConfirm, setShowConfirmDelete] = useState(false);
     const params = useParams();
+    const userName = useAppSelector(selectUserName) ?? '';
     const paramHubName = params.name ?? '';
     const navigate = useNavigate();
     const { data, isLoading } = useGetHubQuery({ name: paramHubName });
-    const [deleteHubs, { isLoading: isDeleting, data: deleteData }] = useDeleteHubsMutation();
+    const [deleteHubs, { isLoading: isDeleting }] = useDeleteHubsMutation();
     const [updateHubMembers] = useUpdateHubMembersMutation();
     const currentUserToken = useAppSelector(selectAuthToken);
+    const [pushNotification] = useNotifications();
 
     useBreadcrumbs([
         {
-            text: t('navigation.hubs'),
-            href: ROUTES.HUB.LIST,
+            text: t('navigation.projects'),
+            href: ROUTES.PROJECT.LIST,
         },
         {
             text: paramHubName,
-            href: ROUTES.HUB.DETAILS.FORMAT(paramHubName),
+            href: ROUTES.PROJECT.DETAILS.FORMAT(paramHubName),
         },
     ]);
-
-    useEffect(() => {
-        if (!isDeleting && deleteData) navigate(ROUTES.HUB.LIST);
-    }, [isDeleting, deleteData]);
 
     const changeMembersHandler = (members: IHubMember[]) => {
         updateHubMembers({
             hub_name: paramHubName,
             members,
-        });
+        })
+            .unwrap()
+            .catch((error) => {
+                pushNotification({
+                    type: 'error',
+                    content: t('common.server_error', { error: error?.error }),
+                });
+            });
     };
 
     const cliCommand = `dstack config hub --url ${location.origin}/${paramHubName} --token ${currentUserToken}`;
@@ -74,12 +80,22 @@ export const HubDetails: React.FC = () => {
 
     const deleteUserHandler = () => {
         if (!data) return;
-        deleteHubs([paramHubName]);
+
+        deleteHubs([paramHubName])
+            .unwrap()
+            .then(() => navigate(ROUTES.PROJECT.LIST))
+            .catch((error) => {
+                pushNotification({
+                    type: 'error',
+                    content: t('common.server_error', { error: error?.error }),
+                });
+            });
+
         setShowConfirmDelete(false);
     };
 
     const editUserHandler = () => {
-        navigate(ROUTES.HUB.EDIT_BACKEND.FORMAT(paramHubName));
+        navigate(ROUTES.PROJECT.EDIT_BACKEND.FORMAT(paramHubName));
     };
 
     const renderAwsSettingsSection = (): React.ReactNode => {
@@ -88,32 +104,36 @@ export const HubDetails: React.FC = () => {
         return (
             <ColumnLayout columns={4} variant="text-grid">
                 <div>
-                    <Box variant="awsui-key-label">{t('hubs.edit.backend_type')}</Box>
-                    <div>{t(`hubs.backend_type.${data.backend.type}`)}</div>
+                    <Box variant="awsui-key-label">{t('projects.edit.backend_type')}</Box>
+                    <div>{t(`projects.backend_type.${data.backend.type}`)}</div>
                 </div>
 
                 <div>
-                    <Box variant="awsui-key-label">{t('hubs.edit.aws.region_name')}</Box>
+                    <Box variant="awsui-key-label">{t('projects.edit.aws.region_name')}</Box>
                     <div>{data.backend.region_name_title}</div>
                 </div>
 
                 <div>
-                    <Box variant="awsui-key-label">{t('hubs.edit.aws.s3_bucket_name')}</Box>
+                    <Box variant="awsui-key-label">{t('projects.edit.aws.s3_bucket_name')}</Box>
                     <div>{data.backend.s3_bucket_name}</div>
                 </div>
 
                 <div>
-                    <Box variant="awsui-key-label">{t('hubs.edit.aws.ec2_subnet_id')}</Box>
+                    <Box variant="awsui-key-label">{t('projects.edit.aws.ec2_subnet_id')}</Box>
                     <div>{data.backend.ec2_subnet_id}</div>
                 </div>
             </ColumnLayout>
         );
     };
 
+    const isDisabledButtons = isDeleting || !data || getHubRoleByUserName(data, userName) !== 'admin';
+
     return (
         <>
             <ContentLayout
-                header={<DetailsHeader title={paramHubName} deleteAction={toggleDeleteConfirm} deleteDisabled={isDeleting} />}
+                header={
+                    <DetailsHeader title={paramHubName} deleteAction={toggleDeleteConfirm} deleteDisabled={isDisabledButtons} />
+                }
             >
                 {isLoading && !data && (
                     <Container>
@@ -128,12 +148,12 @@ export const HubDetails: React.FC = () => {
                                 <Header
                                     variant="h2"
                                     actions={
-                                        <Button onClick={editUserHandler} disabled={isDeleting}>
+                                        <Button onClick={editUserHandler} disabled={isDisabledButtons}>
                                             {t('common.edit')}
                                         </Button>
                                     }
                                 >
-                                    {t('hubs.edit.backend')}
+                                    {t('projects.edit.backend')}
                                 </Header>
                             }
                         >
@@ -162,7 +182,7 @@ export const HubDetails: React.FC = () => {
                                         </Popover>
                                     }
                                 >
-                                    {t('hubs.edit.cli')}
+                                    {t('projects.edit.cli')}
                                 </Header>
                             }
                         >

@@ -10,4 +10,5 @@ export type FormS3BucketSelectorProps<T extends FieldValues> = Omit<
     Pick<ControllerProps<T>, 'control' | 'name' | 'rules'> & {
         label: string;
         buckets: TAwsBucket[];
+        disabled?: boolean;
     };

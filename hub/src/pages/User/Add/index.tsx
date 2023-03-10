@@ -11,6 +11,7 @@ export const UserAdd: React.FC = () => {
     const { t } = useTranslation();
     const navigate = useNavigate();
     const [createUser, { isLoading }] = useCreateUserMutation();
+    const [pushNotification] = useNotifications();
 
     useBreadcrumbs([
         {
@@ -22,8 +23,6 @@ export const UserAdd: React.FC = () => {
             href: ROUTES.USER.ADD,
         },
     ]);
-
-    const [pushNotification] = useNotifications();
 
     const onCancelHandler = () => {
         navigate(ROUTES.USER.LIST);

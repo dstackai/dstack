@@ -14,8 +14,10 @@
     "save": "Save",
     "profile": "Profile",
     "copied": "Copied",
-    "copy": "Copy"
+    "copy": "Copy",
+    "server_error": "Server error: {{error}}"
   },
+
   "auth": {
     "invalid_token": "Invalid token",
     "you_are_not_logged_in": "You are not logged in",
@@ -24,15 +26,15 @@
 
   "navigation": {
     "settings": "Settings",
-    "hubs": "Hubs",
+    "projects": "Projects",
     "users": "Users"
   },
 
-  "hubs": {
-    "page_title": "Hubs",
-    "search_placeholder": "Find hubs",
-    "empty_message_title": "No hubs",
-    "empty_message_text": "No hubs to display.",
+  "projects": {
+    "page_title": "Projects",
+    "search_placeholder": "Find projects",
+    "empty_message_title": "No projects",
+    "empty_message_text": "No projects to display.",
     "nomatch_message_title": "No matches",
     "nomatch_message_text": "We can't find a match.",
     "nomatch_message_button_label": "Clear filter",
@@ -52,11 +54,11 @@
     "edit": {
       "general": "General",
       "edit_backend": "Edit backend",
-      "hub_name": "Hub name",
+      "project_name": "Project name",
       "backend": "Backend",
       "backend_type": "Type",
       "members_empty_message_title": "No members",
-      "members_empty_message_text": "Select hub's members",
+      "members_empty_message_text": "Select project's members",
       "cli": "CLI",
       "aws": {
         "access_key": "Access key",
@@ -70,15 +72,15 @@
       "members": {
         "section_title": "Members",
         "name": "User name",
-        "role": "Hub role"
+        "role": "Project role"
       },
-      "error_notification": "Update hub error",
-      "success_notification": "Hub updating is successful"
+      "error_notification": "Update project error",
+      "success_notification": "Project updating is successful"
     },
     "create": {
-      "page_title": "Create hub",
-      "error_notification": "Create hub error",
-      "success_notification": "Hub is created"
+      "page_title": "Create project",
+      "error_notification": "Create project error",
+      "success_notification": "Project is created"
     }
   },
   "users": {
@@ -105,7 +107,10 @@
       "refresh_token_error_notification": "Token rotating error",
       "refresh_token_confirm_title": "Rotate token",
       "refresh_token_confirm_message": "Do you sure want to rotate token?",
-      "refresh_token_button_label": "Rotate"
+      "refresh_token_button_label": "Rotate",
+      "validation": {
+        "user_name_format": "Only letters, numbers, - or _"
+      }
     }
   },
   "validation": {
