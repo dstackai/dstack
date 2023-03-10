@@ -6,6 +6,9 @@ import { IProps, TBackendOption } from './types';
 import { AWSBackend } from './AWS';
 
 import styles from './styles.module.scss';
+import { isRequestFormErrors, isRequestFormFieldError } from '../../../libs/isErrorWithMessage';
+import { FormFieldError } from '../../../libs/types';
+import { FieldPath } from 'react-hook-form/dist/types/path';
 
 export const HubForm: React.FC<IProps> = ({ initialValues, onCancel, loading, onSubmit: onSubmitProp }) => {
     const { t } = useTranslation();
@@ -34,7 +37,7 @@ export const HubForm: React.FC<IProps> = ({ initialValues, onCancel, loading, on
         defaultValues: getDefaultValues(),
     });
 
-    const { handleSubmit, control, watch } = formMethods;
+    const { handleSubmit, control, watch, setError, clearErrors } = formMethods;
 
     const backendType = watch('backend.type');
 
@@ -61,7 +64,19 @@ export const HubForm: React.FC<IProps> = ({ initialValues, onCancel, loading, on
 
     const onSubmit = (data: IHub) => {
         if (data.backend.ec2_subnet_id === '') data.backend.ec2_subnet_id = null;
-        onSubmitProp(data);
+
+        clearErrors();
+
+        onSubmitProp(data).catch((error) => {
+            if (!isRequestFormErrors(error.data)) return;
+
+            error.data.detail.forEach((item: FormFieldError) => {
+                if (isRequestFormFieldError(item)) {
+                    const [_, ...fieldName] = item.loc;
+                    setError(fieldName.join('.') as FieldPath<IHub>, { type: 'custom', message: item.msg });
+                }
+            });
+        });
     };
 
     const renderBackendFields = () => {

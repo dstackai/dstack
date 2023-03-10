@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useState } from 'react';
+import React, { useCallback, useEffect, useState, useRef } from 'react';
 import { SpaceBetween, FormInput, FormSelect, FormSelectOptions, FormS3BucketSelector } from 'components';
 import { useTranslation } from 'react-i18next';
 import { useFormContext } from 'react-hook-form';
@@ -8,18 +8,25 @@ import { IProps } from './types';
 
 export const AWSBackend: React.FC<IProps> = ({ loading: loadingProp }) => {
     const { t } = useTranslation();
-    const { control, getValues, setValue, setError, clearErrors } = useFormContext();
+    const { control, getValues, setValue, setError, clearErrors, watch } = useFormContext();
     const [regions, setRegions] = useState<FormSelectOptions>([]);
     const [buckets, setBuckets] = useState<TAwsBucket[]>([]);
     const [subnets, setSubnets] = useState<FormSelectOptions>([]);
 
-    const [getBackendValues, { isLoading }] = useBackendValuesMutation();
+    const [getBackendValues, { isLoading: isLoadingValues }] = useBackendValuesMutation();
+
+    const requestRef = useRef<null | ReturnType<typeof getBackendValues>>(null);
 
     useEffect(() => {
         changeFormHandler().catch(console.log);
     }, []);
 
-    const loading = loadingProp || isLoading;
+    const loading = loadingProp;
+
+    const backendAccessKeyValue = watch('backend.access_key');
+    const backendSecretKeyValue = watch('backend.secret_key');
+
+    const disabledFields = loading || !backendAccessKeyValue || !backendSecretKeyValue;
 
     const changeFormHandler = async () => {
         const backendFormValues = getValues('backend');
@@ -32,7 +39,10 @@ export const AWSBackend: React.FC<IProps> = ({ loading: loadingProp }) => {
         clearErrors('backend.secret_key');
 
         try {
-            const response = await getBackendValues(backendFormValues).unwrap();
+            const request = getBackendValues(backendFormValues);
+            requestRef.current = request;
+
+            const response = await request.unwrap();
 
             if (response.region_name.values.length) {
                 setRegions(response.region_name.values);
@@ -72,13 +82,23 @@ export const AWSBackend: React.FC<IProps> = ({ loading: loadingProp }) => {
 
     const debouncedChangeFormHandler = useCallback(debounce(changeFormHandler, 1000), []);
 
+    const onChangeCredentialField = () => {
+        if (requestRef.current) requestRef.current.abort();
+        debouncedChangeFormHandler();
+    };
+
+    const onChangeSelectField = () => {
+        if (requestRef.current) requestRef.current.abort();
+        changeFormHandler().catch(console.log);
+    };
+
     return (
         <SpaceBetween size="l">
             <FormInput
                 label={t('projects.edit.aws.access_key_id')}
                 control={control}
                 name="backend.access_key"
-                onChange={debouncedChangeFormHandler}
+                onChange={onChangeCredentialField}
                 disabled={loading}
                 rules={{ required: t('validation.required') }}
                 autoComplete="off"
@@ -88,7 +108,7 @@ export const AWSBackend: React.FC<IProps> = ({ loading: loadingProp }) => {
                 label={t('projects.edit.aws.secret_key_id')}
                 control={control}
                 name="backend.secret_key"
-                onChange={debouncedChangeFormHandler}
+                onChange={onChangeCredentialField}
                 disabled={loading}
                 rules={{ required: t('validation.required') }}
                 autoComplete="off"
@@ -98,10 +118,11 @@ export const AWSBackend: React.FC<IProps> = ({ loading: loadingProp }) => {
                 label={t('projects.edit.aws.region_name')}
                 control={control}
                 name="backend.region_name"
-                disabled={loading}
-                onChange={changeFormHandler}
+                disabled={disabledFields}
+                onChange={onChangeSelectField}
                 options={regions}
                 rules={{ required: t('validation.required') }}
+                statusType={isLoadingValues ? 'loading' : undefined}
             />
 
             <FormS3BucketSelector
@@ -109,6 +130,7 @@ export const AWSBackend: React.FC<IProps> = ({ loading: loadingProp }) => {
                 control={control}
                 name="backend.s3_bucket_name"
                 selectableItemsTypes={['buckets']}
+                disabled={disabledFields}
                 // onChange={debouncedChangeFormHandler}
                 buckets={buckets}
             />
@@ -117,9 +139,10 @@ export const AWSBackend: React.FC<IProps> = ({ loading: loadingProp }) => {
                 label={t('projects.edit.aws.ec2_subnet_id')}
                 control={control}
                 name="backend.ec2_subnet_id"
-                disabled={loading}
-                onChange={changeFormHandler}
+                disabled={disabledFields}
+                onChange={onChangeSelectField}
                 options={subnets}
+                statusType={isLoadingValues ? 'loading' : undefined}
             />
         </SpaceBetween>
     );

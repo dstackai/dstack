@@ -28,9 +28,11 @@ export const HubAdd: React.FC = () => {
         navigate(ROUTES.PROJECT.LIST);
     };
 
-    const onSubmitHandler = async (hubData: IHub) => {
+    const onSubmitHandler = async (hubData: IHub): Promise<IHub> => {
+        const request = createHub(hubData).unwrap();
+
         try {
-            const data = await createHub(hubData).unwrap();
+            const data = await request;
 
             pushNotification({
                 type: 'success',
@@ -44,6 +46,8 @@ export const HubAdd: React.FC = () => {
                 content: t('projects.create.error_notification'),
             });
         }
+
+        return request;
     };
 
     return (

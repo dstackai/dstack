@@ -1,10 +1,12 @@
 import React, { useMemo } from 'react';
+import cn from 'classnames';
 import { Controller, FieldValues } from 'react-hook-form';
 import FormField from '@cloudscape-design/components/form-field';
 import S3ResourceSelector from '@cloudscape-design/components/s3-resource-selector';
 import { S3ResourceSelectorProps } from '@cloudscape-design/components/s3-resource-selector';
 import { FormS3BucketSelectorProps } from './types';
 import { getResourceSelectorI18n } from './utils';
+import styles from './styles.module.scss';
 
 export const FormS3BucketSelector = <T extends FieldValues>({
     name,
@@ -18,6 +20,7 @@ export const FormS3BucketSelector = <T extends FieldValues>({
     secondaryControl,
     stretch,
     onChange: onChangeProp,
+    disabled,
     ...props
 }: FormS3BucketSelectorProps<T>) => {
     const fetch = async () => Promise.resolve([]);
@@ -53,24 +56,26 @@ export const FormS3BucketSelector = <T extends FieldValues>({
                 };
 
                 return (
-                    <FormField
-                        description={description}
-                        label={label}
-                        info={info}
-                        stretch={stretch}
-                        constraintText={constraintText}
-                        secondaryControl={secondaryControl}
-                        errorText={error?.message}
-                    >
-                        <S3ResourceSelector
-                            resource={resource}
-                            onChange={onChangeSelect}
-                            {...fieldRest}
-                            {...props}
-                            {...customProps}
-                            invalid={!!error}
-                        />
-                    </FormField>
+                    <div className={cn(styles.bucketSelector, { disabled })}>
+                        <FormField
+                            description={description}
+                            label={label}
+                            info={info}
+                            stretch={stretch}
+                            constraintText={constraintText}
+                            secondaryControl={secondaryControl}
+                            errorText={error?.message}
+                        >
+                            <S3ResourceSelector
+                                resource={resource}
+                                onChange={onChangeSelect}
+                                {...fieldRest}
+                                {...props}
+                                {...customProps}
+                                invalid={!!error}
+                            />
+                        </FormField>
+                    </div>
                 );
             }}
         />

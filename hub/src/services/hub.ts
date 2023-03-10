@@ -71,6 +71,7 @@ export const hubApi = createApi({
                     hubs: hubNames,
                 },
             }),
+            invalidatesTags: (result, error, params) => params.map((hubName) => ({ type: 'Hubs' as const, id: hubName })),
         }),
 
         backendValues: builder.mutation<IHubAwsBackendValues, Partial<THubBackend>>({

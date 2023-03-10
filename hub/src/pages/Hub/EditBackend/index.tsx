@@ -36,12 +36,14 @@ export const HubEditBackend: React.FC = () => {
         navigate(ROUTES.PROJECT.DETAILS.FORMAT(paramHubName));
     };
 
-    const onSubmitHandler = async (hubData: Partial<IHub>) => {
+    const onSubmitHandler = async (hubData: Partial<IHub>): Promise<IHub> => {
+        const request = updateHub({
+            ...hubData,
+            hub_name: paramHubName,
+        }).unwrap();
+
         try {
-            const data = await updateHub({
-                ...hubData,
-                hub_name: paramHubName,
-            }).unwrap();
+            const data = await request;
 
             pushNotification({
                 type: 'success',
@@ -55,6 +57,8 @@ export const HubEditBackend: React.FC = () => {
                 content: t('projects.edit.error_notification'),
             });
         }
+
+        return request;
     };
 
     return (

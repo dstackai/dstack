@@ -4,10 +4,10 @@ import { useForm, useFieldArray } from 'react-hook-form';
 //TODO move type to special file
 import { TRoleSelectOption } from 'pages/User/Form/types';
 import { Header, Button, FormSelect, Table, ListEmptyMessage, Link, Pagination } from 'components';
-import { UserAutosuggest } from './UsersAutosuggest';
-import { IProps, THubMemberWithIndex, TFormValues } from './types';
 import { ROUTES } from 'routes';
 import { useCollection } from 'hooks';
+import { IProps, THubMemberWithIndex, TFormValues } from './types';
+import { UserAutosuggest } from './UsersAutosuggest';
 import styles from './styles.module.scss';
 
 export const HubMembers: React.FC<IProps> = ({ initialValues, loading, onChange }) => {

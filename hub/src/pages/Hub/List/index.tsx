@@ -130,7 +130,7 @@ export const HubList: React.FC = () => {
                         {
                             id: 'type',
                             header: t('projects.card.backend'),
-                            content: (hub) => t(`hubs.backend_type.${hub.backend.type}`),
+                            content: (hub) => t(`projects.backend_type.${hub.backend.type}`),
                         },
                         {
                             id: 'region',
