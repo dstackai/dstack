@@ -52,14 +52,14 @@
     {
       "type": "file",
       "source": "/home/stepan/develop/dstack/runner/runner",
-      "destination": "/usr/local/bin/dstack-runner"
+      "destination": "/tmp/azure-runner"
     },
     {
       "type": "shell",
       "inline_shebang": "/bin/sh -x",
       "inline": [
-        "sudo chmod +x /usr/local/bin/dstack-runner",
-        "dstack-runner --version"
+        "sudo mv /tmp/azure-runner /usr/local/bin/dstack-runner",
+        "sudo chmod +x /usr/local/bin/dstack-runner"
       ]
     },
     {
