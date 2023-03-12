@@ -28,7 +28,7 @@ class AWSConfig(BaseModel):
     region_name: str = ""
     region_name_title: str = ""
     s3_bucket_name: str = ""
-    ec2_subnet_id: str = ""
+    ec2_subnet_id: Optional[str] = ""
 
 
 class AWSAuth(BaseModel):
