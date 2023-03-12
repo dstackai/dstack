@@ -537,6 +537,7 @@ def get_request_head(
                     "instance-terminated-by-price",
                     "instance-stopped-by-price",
                     "instance-terminated-no-capacity",
+                    "marked-for-stop-by-experiment",
                     "limit-exceeded",
                     "price-too-low",
                 ]:

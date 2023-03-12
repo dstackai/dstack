@@ -10,7 +10,7 @@ declare namespace NodeJS {
     interface ProcessEnv {
         readonly NODE_ENV: 'development' | 'production' | 'test';
         readonly PUBLIC_URL: string;
-        readonly ENABLE_API_MOCKING: boolean;
+        readonly ENABLE_MOCKING_API: boolean;
         readonly API_URL: string;
     }
 }

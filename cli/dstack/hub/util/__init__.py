@@ -1,6 +1,7 @@
 import json
-from dstack.hub.models import Member, HubInfo, AWSBackend, AWSConfig, AWSAuth
+
 from dstack.hub.db.models import Hub
+from dstack.hub.models import AWSAuth, AWSBackend, AWSConfig, HubInfo, Member
 
 
 def info2hub(hub_info: HubInfo) -> Hub:

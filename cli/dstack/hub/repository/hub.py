@@ -62,7 +62,3 @@ class HubManager:
         for hub in hubs:
             hubs_info.append(hub2info(hub=hub))
         return hubs_info
-
-
-
-

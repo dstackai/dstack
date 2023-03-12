@@ -1,5 +1,6 @@
 from dstack import version
 from dstack.cli.commands.config import ConfigCommand
+from dstack.cli.commands.cp import CpCommand
 from dstack.cli.commands.hub import HubCommand
 from dstack.cli.commands.init import InitCommand
 from dstack.cli.commands.logs import LogCommand
@@ -15,6 +16,7 @@ from dstack.cli.commands.tags import TAGCommand
 
 commands_classes = [
     ConfigCommand,
+    CpCommand,
     InitCommand,
     LogCommand,
     LsCommand,

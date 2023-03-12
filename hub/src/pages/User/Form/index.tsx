@@ -85,7 +85,14 @@ export const UserForm: React.FC<Props> = ({
                                     control={control}
                                     name="user_name"
                                     disabled={loading}
-                                    rules={{ required: t('validation.required') }}
+                                    rules={{
+                                        required: t('validation.required'),
+
+                                        pattern: {
+                                            value: /^[a-zA-Z0-9-_]+$/,
+                                            message: t('users.edit.validation.user_name_format'),
+                                        },
+                                    }}
                                 />
                             )}
 

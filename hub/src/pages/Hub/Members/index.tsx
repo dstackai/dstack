@@ -4,10 +4,10 @@ import { useForm, useFieldArray } from 'react-hook-form';
 //TODO move type to special file
 import { TRoleSelectOption } from 'pages/User/Form/types';
 import { Header, Button, FormSelect, Table, ListEmptyMessage, Link, Pagination } from 'components';
-import { UserAutosuggest } from './UsersAutosuggest';
-import { IProps, THubMemberWithIndex, TFormValues } from './types';
 import { ROUTES } from 'routes';
 import { useCollection } from 'hooks';
+import { IProps, THubMemberWithIndex, TFormValues } from './types';
+import { UserAutosuggest } from './UsersAutosuggest';
 import styles from './styles.module.scss';
 
 export const HubMembers: React.FC<IProps> = ({ initialValues, loading, onChange }) => {
@@ -31,8 +31,8 @@ export const HubMembers: React.FC<IProps> = ({ initialValues, loading, onChange 
         filtering: {
             empty: (
                 <ListEmptyMessage
-                    title={t('hubs.edit.members_empty_message_title')}
-                    message={t('hubs.edit.members_empty_message_text')}
+                    title={t('projects.edit.members_empty_message_title')}
+                    message={t('projects.edit.members_empty_message_text')}
                 />
             ),
         },
@@ -64,7 +64,7 @@ export const HubMembers: React.FC<IProps> = ({ initialValues, loading, onChange 
     const COLUMN_DEFINITIONS = [
         {
             id: 'name',
-            header: t('hubs.edit.members.name'),
+            header: t('projects.edit.members.name'),
             cell: (item: IHubMember) => (
                 <Link target="_blank" href={ROUTES.USER.DETAILS.FORMAT(item.user_name)}>
                     {item.user_name}
@@ -73,7 +73,7 @@ export const HubMembers: React.FC<IProps> = ({ initialValues, loading, onChange 
         },
         {
             id: 'global_role',
-            header: t('hubs.edit.members.role'),
+            header: t('projects.edit.members.role'),
             cell: (field: IHubMember & { index: number }) => (
                 <div className={styles.role}>
                     <div className={styles.roleFieldWrapper}>
@@ -124,7 +124,7 @@ export const HubMembers: React.FC<IProps> = ({ initialValues, loading, onChange 
                             </Button>
                         }
                     >
-                        {t('hubs.edit.members.section_title')}
+                        {t('projects.edit.members.section_title')}
                     </Header>
                 }
                 filter={

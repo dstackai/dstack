@@ -18448,7 +18448,7 @@ try {
 /************************************************************************/
 /******/ 	// The module cache
 /******/ 	var __webpack_module_cache__ = {};
-/******/ 	
+/******/
 /******/ 	// The require function
 /******/ 	function __webpack_require__(moduleId) {
 /******/ 		// Check if module is in cache
@@ -18462,17 +18462,17 @@ try {
 /******/ 			loaded: false,
 /******/ 			exports: {}
 /******/ 		};
-/******/ 	
+/******/
 /******/ 		// Execute the module function
 /******/ 		__webpack_modules__[moduleId].call(module.exports, module, module.exports, __webpack_require__);
-/******/ 	
+/******/
 /******/ 		// Flag the module as loaded
 /******/ 		module.loaded = true;
-/******/ 	
+/******/
 /******/ 		// Return the exports of the module
 /******/ 		return module.exports;
 /******/ 	}
-/******/ 	
+/******/
 /************************************************************************/
 /******/ 	/* webpack/runtime/compat get default export */
 /******/ 	(() => {
@@ -18485,7 +18485,7 @@ try {
 /******/ 			return getter;
 /******/ 		};
 /******/ 	})();
-/******/ 	
+/******/
 /******/ 	/* webpack/runtime/create fake namespace object */
 /******/ 	(() => {
 /******/ 		var getProto = Object.getPrototypeOf ? (obj) => (Object.getPrototypeOf(obj)) : (obj) => (obj.__proto__);
@@ -18515,7 +18515,7 @@ try {
 /******/ 			return ns;
 /******/ 		};
 /******/ 	})();
-/******/ 	
+/******/
 /******/ 	/* webpack/runtime/define property getters */
 /******/ 	(() => {
 /******/ 		// define getter functions for harmony exports
@@ -18527,7 +18527,7 @@ try {
 /******/ 			}
 /******/ 		};
 /******/ 	})();
-/******/ 	
+/******/
 /******/ 	/* webpack/runtime/global */
 /******/ 	(() => {
 /******/ 		__webpack_require__.g = (function() {
@@ -18539,12 +18539,12 @@ try {
 /******/ 			}
 /******/ 		})();
 /******/ 	})();
-/******/ 	
+/******/
 /******/ 	/* webpack/runtime/hasOwnProperty shorthand */
 /******/ 	(() => {
 /******/ 		__webpack_require__.o = (obj, prop) => (Object.prototype.hasOwnProperty.call(obj, prop))
 /******/ 	})();
-/******/ 	
+/******/
 /******/ 	/* webpack/runtime/make namespace object */
 /******/ 	(() => {
 /******/ 		// define __esModule on exports
@@ -18555,7 +18555,7 @@ try {
 /******/ 			Object.defineProperty(exports, '__esModule', { value: true });
 /******/ 		};
 /******/ 	})();
-/******/ 	
+/******/
 /******/ 	/* webpack/runtime/node module decorator */
 /******/ 	(() => {
 /******/ 		__webpack_require__.nmd = (module) => {
@@ -18564,7 +18564,7 @@ try {
 /******/ 			return module;
 /******/ 		};
 /******/ 	})();
-/******/ 	
+/******/
 /******/ 	/* webpack/runtime/publicPath */
 /******/ 	(() => {
 /******/ 		var scriptUrl;
@@ -18584,7 +18584,7 @@ try {
 /******/ 		scriptUrl = scriptUrl.replace(/#.*$/, "").replace(/\?.*$/, "").replace(/\/[^\/]+$/, "/");
 /******/ 		__webpack_require__.p = scriptUrl;
 /******/ 	})();
-/******/ 	
+/******/
 /************************************************************************/
 var __webpack_exports__ = {};
 // This entry need to be wrapped in an IIFE because it need to be in strict mode.
@@ -35193,15 +35193,15 @@ function __classPrivateFieldIn(state, receiver) {
 
 ;// CONCATENATED MODULE: ./node_modules/@cloudscape-design/components/internal/base-component/styles.css.js
 
-    
+
     /* harmony default export */ const styles_css = ({});
-  
+
 ;// CONCATENATED MODULE: ./node_modules/@cloudscape-design/components/internal/environment.js
 
     var PACKAGE_VERSION = '3.0.0 (5609551)';
     var THEME = 'open-source-visual-refresh';
     var ALWAYS_VISUAL_REFRESH = true;
-    
+
 ;// CONCATENATED MODULE: ./node_modules/@cloudscape-design/components/internal/base-component/index.js
 // Copyright Amazon.com, Inc. or its affiliates. All Rights Reserved.
 // SPDX-License-Identifier: Apache-2.0
@@ -35422,7 +35422,7 @@ function useForwardFocus(mainRef, controlRef) {
 
 ;// CONCATENATED MODULE: ./node_modules/@cloudscape-design/components/button/styles.css.js
 
-    
+
     /* harmony default export */ const button_styles_css = ({
   "content": "awsui_content_vjswe_kz1sh_97",
   "button": "awsui_button_vjswe_kz1sh_101",
@@ -35443,7 +35443,7 @@ function useForwardFocus(mainRef, controlRef) {
   "icon-right": "awsui_icon-right_vjswe_kz1sh_908",
   "icon": "awsui_icon_vjswe_kz1sh_903"
 });
-  
+
 ;// CONCATENATED MODULE: ./node_modules/@cloudscape-design/components/internal/is-development.js
 // Copyright Amazon.com, Inc. or its affiliates. All Rights Reserved.
 // SPDX-License-Identifier: Apache-2.0
@@ -35474,7 +35474,7 @@ function logging_warnOnce(component, message) {
 
 ;// CONCATENATED MODULE: ./node_modules/@cloudscape-design/components/icon/styles.css.js
 
-    
+
     /* harmony default export */ const icon_styles_css = ({
   "icon": "awsui_icon_h11ix_k54ie_98",
   "icon-flex-height": "awsui_icon-flex-height_h11ix_k54ie_104",
@@ -35498,7 +35498,7 @@ function logging_warnOnce(component, message) {
   "variant-link": "awsui_variant-link_h11ix_k54ie_240",
   "badge": "awsui_badge_h11ix_k54ie_244"
 });
-  
+
 ;// CONCATENATED MODULE: ./node_modules/@cloudscape-design/components/icon/icons.js
 /* harmony default export */ const icons = ({
   "add-plus": "<svg xmlns=\"http://www.w3.org/2000/svg\" viewBox=\"0 0 16 16\" focusable=\"false\" aria-hidden=\"true\"><path d=\"M8 1v14M15 8H1\"/></svg>","angle-down": "<svg xmlns=\"http://www.w3.org/2000/svg\" viewBox=\"0 0 16 16\" focusable=\"false\" aria-hidden=\"true\"><path d=\"m1 4 7 7 7-7\"/></svg>","angle-left-double": "<svg xmlns=\"http://www.w3.org/2000/svg\" viewBox=\"0 0 16 16\" focusable=\"false\" aria-hidden=\"true\"><path d=\"M14 1 7 8l7 7\"/><path d=\"M9 1 2 8l7 7\"/></svg>","angle-left": "<svg xmlns=\"http://www.w3.org/2000/svg\" viewBox=\"0 0 16 16\" focusable=\"false\" aria-hidden=\"true\"><path d=\"M12 1 5 8l7 7\"/></svg>","angle-right-double": "<svg xmlns=\"http://www.w3.org/2000/svg\" viewBox=\"0 0 16 16\" focusable=\"false\" aria-hidden=\"true\"><path d=\"m2 1 7 7-7 7\"/><path d=\"m7 1 7 7-7 7\"/></svg>","angle-right": "<svg xmlns=\"http://www.w3.org/2000/svg\" viewBox=\"0 0 16 16\" focusable=\"false\" aria-hidden=\"true\"><path d=\"m4 1 7 7-7 7\"/></svg>","angle-up": "<svg xmlns=\"http://www.w3.org/2000/svg\" viewBox=\"0 0 16 16\" focusable=\"false\" aria-hidden=\"true\"><path d=\"m1 12 7-7 7 7\"/></svg>","arrow-left": "<svg xmlns=\"http://www.w3.org/2000/svg\" viewBox=\"0 0 16 16\" focusable=\"false\" aria-hidden=\"true\"><path d=\"M9 1 2 8l7 7M2 8h13\"/></svg>","audio-full": "<svg viewBox=\"0 0 16 16\" xmlns=\"http://www.w3.org/2000/svg\" focusable=\"false\" aria-hidden=\"true\"><path class=\"stroke-linejoin-round\" d=\"M7 15V1L1 6v4l6 5ZM15 3v10M11 5v6\"/></svg>","audio-half": "<svg viewBox=\"0 0 16 16\" xmlns=\"http://www.w3.org/2000/svg\" focusable=\"false\" aria-hidden=\"true\"><path class=\"stroke-linejoin-round\" d=\"M7 15V1L1 6v4l6 5ZM11 5v6\"/></svg>","audio-off": "<svg viewBox=\"0 0 16 16\" xmlns=\"http://www.w3.org/2000/svg\" focusable=\"false\" aria-hidden=\"true\"><path class=\"stroke-linejoin-round\" d=\"M7 15V1L1 6v4l6 5Z\"/><path d=\"m15.01 5.75-4.5 4.5M15.01 10.25l-4.5-4.5\"/></svg>","bug": "<svg xmlns=\"http://www.w3.org/2000/svg\" viewBox=\"0 0 16 16\" focusable=\"false\" aria-hidden=\"true\"><path class=\"stroke-linejoin-round\" d=\"M5 5h6a1 1 0 0 1 1 1v5.5A3.5 3.5 0 0 1 8.5 15h-1A3.5 3.5 0 0 1 4 11.5V6a1 1 0 0 1 1-1ZM5 5a3 3 0 0 1 6 0\"/><path d=\"M12 9h3M1 9h3M12 12h2l1 2M4 12H2l-1 2M12 6h2l1-2M4 6H2L1 4\"/></svg>","calendar": "<svg xmlns=\"http://www.w3.org/2000/svg\" viewBox=\"0 0 16 16\" focusable=\"false\" aria-hidden=\"true\"><path class=\"stroke-linejoin-round\" d=\"M2 2h12v12H2z\"/><path d=\"M4.99 8H5v.01h-.01zM7.99 8H8v.01h-.01zM10.99 8H11v.01h-.01zM4.99 5H5v.01h-.01zM7.99 5H8v.01h-.01zM10.99 5H11v.01h-.01zM4.99 11H5v.01h-.01zM7.99 11H8v.01h-.01z\"/></svg>","call": "<svg xmlns=\"http://www.w3.org/2000/svg\" viewBox=\"0 0 16 16\" focusable=\"false\" aria-hidden=\"true\"><path d=\"M9 2c2.8 0 5 2.2 5 5M7.9 13c1.3 1.3 3.5 1.3 4.8 0l1-1c.4-.4.4-1 0-1.4l-1.5-1.5c-.3-.3-1-.2-1.3.1l-.1.1c-.5.5-1.4.5-2 0L6.6 7.2c-.5-.5-.5-1.4 0-2l.1-.1c.3-.3.4-1 .1-1.3L5.3 2.3c-.3-.4-1-.4-1.3 0l-1 1C1.7 4.6 1.7 6.7 3 8.1L7.9 13z\"/></svg>","caret-down-filled": "<svg xmlns=\"http://www.w3.org/2000/svg\" viewBox=\"0 0 16 16\" focusable=\"false\" aria-hidden=\"true\"><path class=\"filled stroke-linejoin-round\" d=\"M4 5h8l-4 6-4-6z\"/></svg>","caret-down": "<svg xmlns=\"http://www.w3.org/2000/svg\" viewBox=\"0 0 16 16\" focusable=\"false\" aria-hidden=\"true\"><path class=\"stroke-linejoin-round\" d=\"M4 5h8l-4 6-4-6z\"/></svg>","caret-left-filled": "<svg xmlns=\"http://www.w3.org/2000/svg\" viewBox=\"0 0 16 16\" focusable=\"false\" aria-hidden=\"true\"><path class=\"filled stroke-linejoin-round\" d=\"M11 4v8L5 8l6-4z\"/></svg>","caret-right-filled": "<svg xmlns=\"http://www.w3.org/2000/svg\" viewBox=\"0 0 16 16\" focusable=\"false\" aria-hidden=\"true\"><path class=\"filled stroke-linejoin-round\" d=\"M5 4v8l6-4-6-4z\"/></svg>","caret-up-filled": "<svg xmlns=\"http://www.w3.org/2000/svg\" viewBox=\"0 0 16 16\" focusable=\"false\" aria-hidden=\"true\"><path class=\"filled stroke-linejoin-round\" d=\"M4 11h8L8 5l-4 6z\"/></svg>","caret-up": "<svg xmlns=\"http://www.w3.org/2000/svg\" viewBox=\"0 0 16 16\" focusable=\"false\" aria-hidden=\"true\"><path class=\"stroke-linejoin-round\" d=\"M4 11h8L8 5l-4 6z\"/></svg>","check": "<svg viewBox=\"0 0 16 16\" xmlns=\"http://www.w3.org/2000/svg\" focusable=\"false\" aria-hidden=\"true\"><path d=\"m14.254 4.254-8.25 8.25L6 12.5l-.004.004-4.25-4.25.008-.008L6 12.493l8.246-8.247.008.008Z\"/></svg>","close": "<svg xmlns=\"http://www.w3.org/2000/svg\" viewBox=\"0 0 16 16\" focusable=\"false\" aria-hidden=\"true\"><path d=\"m2 2 12 12M14 2 2 14\"/></svg>","contact": "<svg xmlns=\"http://www.w3.org/2000/svg\" viewBox=\"0 0 16 16\" focusable=\"false\" aria-hidden=\"true\"><path class=\"stroke-linejoin-round stroke-linecap-round\" d=\"M2 12.286h5.143L8.857 14l1.714-1.714H14V2H2v10.286z\"/><path class=\"stroke-linecap-round\" d=\"M4.99 7H5v.01h-.01zM7.99 7H8v.01h-.01zM10.99 7H11v.01h-.01z\"/></svg>","copy": "<svg xmlns=\"http://www.w3.org/2000/svg\" viewBox=\"0 0 16 16\" focusable=\"false\" aria-hidden=\"true\"><path class=\"stroke-linejoin-round\" d=\"M2 5h9v9H2z\"/><path class=\"stroke-linejoin-round\" d=\"M5 5V2h9v9h-3\"/></svg>","delete-marker": "<svg viewBox=\"0 0 16 16\" xmlns=\"http://www.w3.org/2000/svg\" focusable=\"false\" aria-hidden=\"true\"><path class=\"stroke-linejoin-round\" d=\"M3 8V1h6l5 5v9H9\"/><path d=\"M8 1v6h6\"/><path class=\"stroke-linejoin-round\" d=\"m6.87 14.38-4.24-4.25M2.63 14.38l4.24-4.25\"/></svg>","download": "<svg xmlns=\"http://www.w3.org/2000/svg\" viewBox=\"0 0 16 16\" focusable=\"false\" aria-hidden=\"true\"><path class=\"stroke-linejoin-round\" d=\"M11 2h3v12H2V2h3\"/><path d=\"m4 6 4 4 4-4M8 1v9\"/></svg>","edit": "<svg xmlns=\"http://www.w3.org/2000/svg\" viewBox=\"0 0 16 16\" focusable=\"false\" aria-hidden=\"true\"><path class=\"stroke-linejoin-round\" d=\"M13 8v6H3V2h6.5M6 10l8-8\"/></svg>","ellipsis": "<svg xmlns=\"http://www.w3.org/2000/svg\" viewBox=\"0 0 16 16\" focusable=\"false\" aria-hidden=\"true\"><circle class=\"filled\" cx=\"8\" cy=\"2.5\" r=\".5\"/><circle class=\"filled\" cx=\"8\" cy=\"8\" r=\".5\"/><circle class=\"filled\" cx=\"8\" cy=\"13.5\" r=\".5\"/></svg>","envelope": "<svg xmlns=\"http://www.w3.org/2000/svg\" viewBox=\"0 0 16 16\" focusable=\"false\" aria-hidden=\"true\"><path class=\"stroke-linejoin-round\" d=\"M1 2h14v12H1z\"/><path class=\"stroke-linejoin-round\" d=\"m1 4 7 6 7-6\"/></svg>","expand": "<svg xmlns=\"http://www.w3.org/2000/svg\" viewBox=\"0 0 16 16\" focusable=\"false\" aria-hidden=\"true\"><path d=\"M9 2h5v5M7 2H2v5M7 14H2V9M9 14h5V9M2 2l12 12M14 2 2 14\"/></svg>","external": "<svg xmlns=\"http://www.w3.org/2000/svg\" viewBox=\"0 0 16 16\" focusable=\"false\" aria-hidden=\"true\"><path class=\"stroke-linecap-square\" d=\"M10 2h4v4\"/><path d=\"m6 10 8-8\"/><path class=\"stroke-linejoin-round\" d=\"M14 9.048V14H2V2h5\"/></svg>","file-open": "<svg xmlns=\"http://www.w3.org/2000/svg\" viewBox=\"0 0 16 16\" focusable=\"false\" aria-hidden=\"true\"><path d=\"M8 1v4a1 1 0 0 0 1 1h4\"/><path class=\"stroke-linejoin-round\" d=\"M3 15h10V5L9 1H3v14z\"/><path d=\"m3 8 7 7\"/></svg>","file": "<svg xmlns=\"http://www.w3.org/2000/svg\" viewBox=\"0 0 16 16\" focusable=\"false\" aria-hidden=\"true\"><path class=\"stroke-linejoin-round\" d=\"M8 1v5h5\"/><path class=\"stroke-linejoin-round\" d=\"M3 15V1h6l4 4v10H3z\"/></svg>","filter": "<svg xmlns=\"http://www.w3.org/2000/svg\" viewBox=\"0 0 16 16\" focusable=\"false\" aria-hidden=\"true\"><path class=\"stroke-linejoin-round\" d=\"M15 2H1l5 6v7h4V8l5-6z\"/></svg>","flag": "<svg viewBox=\"0 0 16 16\" xmlns=\"http://www.w3.org/2000/svg\" focusable=\"false\" aria-hidden=\"true\"><path class=\"stroke-linejoin-round\" d=\"m2.71 9.18 1.11-.39C5.2 8.3 6.74 8.44 8 9.18c1.27.74 2.8.89 4.18.39l1.11-.39v-6l-1.11.39c-1.38.49-2.92.35-4.18-.39-1.27-.74-2.8-.89-4.18-.39l-1.11.39v11.83\"/></svg>","folder-open": "<svg xmlns=\"http://www.w3.org/2000/svg\" viewBox=\"0 0 16 16\" focusable=\"false\" aria-hidden=\"true\"><path class=\"stroke-linejoin-round\" d=\"M2 7V2h7l1 2h5v9a1 1 0 0 1-1 1H3L1 7h10l2.006 7\"/></svg>","folder": "<svg xmlns=\"http://www.w3.org/2000/svg\" viewBox=\"0 0 16 16\" focusable=\"false\" aria-hidden=\"true\"><path class=\"stroke-linejoin-round\" d=\"M14 14H2V2h5.143L9 5h5v9z\"/></svg>","group-active": "<svg viewBox=\"0 0 16 16\" xmlns=\"http://www.w3.org/2000/svg\" focusable=\"false\" aria-hidden=\"true\"><path class=\"stroke-linejoin-round\" d=\"M14 4a2 2 0 1 0-4 0 2 2 0 0 0 4 0ZM9 11v3h6v-3c0-1.66-1.34-3-3-3s-3 1.34-3 3Z\"/><path class=\"filled stroke-linejoin-round\" d=\"M6 4a2 2 0 1 0-4 0 2 2 0 0 0 4 0ZM1 11v3h6v-3c0-1.66-1.34-3-3-3s-3 1.34-3 3Z\"/></svg>","group": "<svg viewBox=\"0 0 16 16\" xmlns=\"http://www.w3.org/2000/svg\" focusable=\"false\" aria-hidden=\"true\"><path class=\"stroke-linejoin-round\" d=\"M14 4a2 2 0 1 0-4 0 2 2 0 0 0 4 0ZM9 11v3h6v-3c0-1.66-1.34-3-3-3s-3 1.34-3 3ZM6 4a2 2 0 1 0-4 0 2 2 0 0 0 4 0ZM1 11v3h6v-3c0-1.66-1.34-3-3-3s-3 1.34-3 3Z\"/></svg>","heart": "<svg xmlns=\"http://www.w3.org/2000/svg\" viewBox=\"0 0 16 16\" focusable=\"false\" aria-hidden=\"true\"><path d=\"M13.92 3.061a3.729 3.729 0 0 0-5.21 0L8 3.76l-.71-.699a3.729 3.729 0 0 0-5.21 0 3.58 3.58 0 0 0 0 5.123l5.21 5.124.003-.004L8 14l.707-.696.004.004 5.21-5.124a3.58 3.58 0 0 0 0-5.123Z\"/></svg>","insert-row": "<svg viewBox=\"0 0 16 16\" xmlns=\"http://www.w3.org/2000/svg\" focusable=\"false\" aria-hidden=\"true\"><path class=\"stroke-linejoin-round\" d=\"M15 6V3H1v9h5M16 11H8M12 15V7\"/></svg>","key": "<svg xmlns=\"http://www.w3.org/2000/svg\" viewBox=\"0 0 16 16\" focusable=\"false\" aria-hidden=\"true\"><path class=\"stroke-linejoin-round\" d=\"M9 10a5.023 5.023 0 0 1 0 1 3.996 3.996 0 1 1-3-3.874L13 1h2v5h-2v2h-2l.016 1.983Z\"/><path d=\"M4.99 11H5v.01h-.01z\"/></svg>","keyboard": "<svg viewBox=\"0 0 16 16\" xmlns=\"http://www.w3.org/2000/svg\" focusable=\"false\" aria-hidden=\"true\"><path class=\"stroke-linejoin-round\" d=\"M15 2H1v12h14V2Z\"/><path d=\"M6 5H4M9 5H7M12 5h-2M6 8H4M12 11H4M9 8H7M12 8h-2\"/></svg>","lock-private": "<svg xmlns=\"http://www.w3.org/2000/svg\" viewBox=\"0 0 16 16\" focusable=\"false\" aria-hidden=\"true\"><path class=\"stroke-linejoin-round\" d=\"M2 7h12v7H2z\"/><path d=\"M4 7V5a4 4 0 0 1 8 0v2\"/></svg>","menu": "<svg xmlns=\"http://www.w3.org/2000/svg\" viewBox=\"0 0 16 16\" focusable=\"false\" aria-hidden=\"true\"><path d=\"M15 8H1M15 3H1M15 13H1\"/></svg>","microphone-off": "<svg viewBox=\"0 0 16 16\" xmlns=\"http://www.w3.org/2000/svg\" focusable=\"false\" aria-hidden=\"true\"><path class=\"stroke-linejoin-round\" d=\"M13.76 1.34 2.11 12.98M4.75 10.8A5.002 5.002 0 0 0 13 7V6M8 15v-3M3 15h10\"/><path class=\"filled\" d=\"M8 1c-1.1 0-2 .9-2 2v1.09l2.88-2.88C8.61 1.08 8.32 1 8 1ZM6.64 8.46A2 2 0 0 0 8 9c1.1 0 2-.9 2-2V5.09L6.64 8.45v.01Z\"/><path class=\"stroke-linejoin-round\" d=\"M3.37 8.53C3.024 8.184 3 7.537 3 7V6\"/></svg>","microphone": "<svg xmlns=\"http://www.w3.org/2000/svg\" viewBox=\"0 0 16 16\" focusable=\"false\" aria-hidden=\"true\"><rect class=\"stroke-linejoin-round\" x=\"6\" y=\"1\" width=\"4\" height=\"8\" rx=\"2\"/><path class=\"stroke-linejoin-round\" d=\"M3 6v1a5 5 0 0 0 10 0V6M8 12v3M3 15h10\"/></svg>","multiscreen": "<svg viewBox=\"0 0 16 16\" xmlns=\"http://www.w3.org/2000/svg\" focusable=\"false\" aria-hidden=\"true\"><path class=\"stroke-linejoin-round\" d=\"M11 5H1v7h10V5Z\"/><path class=\"stroke-linejoin-round\" d=\"M11 8.229h4v-7H5V5M1 15h10M6 15v-3\"/></svg>","notification": "<svg xmlns=\"http://www.w3.org/2000/svg\" viewBox=\"0 0 16 16\" focusable=\"false\" aria-hidden=\"true\"><path class=\"stroke-linejoin-round\" d=\"M8 2.167c-3.5 0-3.5 4.666-3.5 4.666L1 11.5h14l-3.5-4.667s0-4.666-3.5-4.666ZM5.667 11.5v1.167a2.333 2.333 0 0 0 4.666 0V11.5\"/><path class=\"stroke-linecap-round\" d=\"M8 1v1.167\"/></svg>","redo": "<svg xmlns=\"http://www.w3.org/2000/svg\" viewBox=\"0 0 16 16\" focusable=\"false\" aria-hidden=\"true\"><path class=\"stroke-linejoin-round\" d=\"M12 5H6.38c-4.5 0-4.5 8 0 8H13\"/><path class=\"stroke-linejoin-round\" d=\"m10 8 3-3-3-3\"/></svg>","refresh": "<svg xmlns=\"http://www.w3.org/2000/svg\" viewBox=\"0 0 16 16\" focusable=\"false\" aria-hidden=\"true\"><path d=\"M10 5h5V0\"/><path d=\"M15 8a6.957 6.957 0 0 1-7 7 6.957 6.957 0 0 1-7-7 6.957 6.957 0 0 1 7-7 6.87 6.87 0 0 1 6.3 4\"/></svg>","remove": "<svg viewBox=\"0 0 16 16\" xmlns=\"http://www.w3.org/2000/svg\" focusable=\"false\" aria-hidden=\"true\"><path class=\"stroke-linejoin-round\" d=\"m3 3 1 11h8l1-11H3ZM1 3h14M10 2H6v1h4V2Z\"/></svg>","script": "<svg viewBox=\"0 0 16 17\" xmlns=\"http://www.w3.org/2000/svg\" focusable=\"false\" aria-hidden=\"true\"><path class=\"stroke-linejoin-round\" d=\"m9.53 4.397-3.06 7.4M4.5 11.597 1 8.097l3.5-3.5M11.5 11.597l3.5-3.5-3.5-3.5\"/></svg>","search": "<svg xmlns=\"http://www.w3.org/2000/svg\" viewBox=\"0 0 16 16\" focusable=\"false\" aria-hidden=\"true\"><circle cx=\"7\" cy=\"7\" r=\"5\"/><path d=\"m15 15-4.5-4.5\"/></svg>","security": "<svg viewBox=\"0 0 16 16\" xmlns=\"http://www.w3.org/2000/svg\" focusable=\"false\" aria-hidden=\"true\"><path class=\"stroke-linejoin-round\" d=\"M8 14.83s-6-1.925-6-6.74V3.265c3.31 0 5.99-1.916 5.99-1.916s2.7 1.916 6.01 1.916V8.09c0 4.815-6 6.74-6 6.74Z\"/><path d=\"M2 8.09V3.265c3.31 0 5.99-1.916 5.99-1.916M13.99 8.09V3.265C10.68 3.265 8 1.35 8 1.35\"/><path class=\"stroke-linejoin-round\" d=\"M8 4v5M8 10v2\"/></svg>","settings": "<svg xmlns=\"http://www.w3.org/2000/svg\" viewBox=\"0 0 16 16\" focusable=\"false\" aria-hidden=\"true\"><path d=\"M13.33 5.792a1.942 1.942 0 0 1 .287-1.97 6.984 6.984 0 0 0-1.44-1.439 1.943 1.943 0 0 1-3.159-1.308 6.965 6.965 0 0 0-2.037 0 1.943 1.943 0 0 1-3.158 1.308 6.962 6.962 0 0 0-1.44 1.44 1.943 1.943 0 0 1-1.308 3.158 6.972 6.972 0 0 0 0 2.037 1.943 1.943 0 0 1 1.308 3.159 6.952 6.952 0 0 0 1.44 1.44 1.942 1.942 0 0 1 3.159 1.308 6.962 6.962 0 0 0 2.036 0 1.942 1.942 0 0 1 3.159-1.308 6.974 6.974 0 0 0 1.44-1.44 1.943 1.943 0 0 1 1.308-3.159 6.974 6.974 0 0 0 0-2.037 1.942 1.942 0 0 1-1.596-1.189Z\"/><circle cx=\"8\" cy=\"8\" r=\"2\"/></svg>","share": "<svg xmlns=\"http://www.w3.org/2000/svg\" viewBox=\"0 0 16 16\" focusable=\"false\" aria-hidden=\"true\"><circle cx=\"11\" cy=\"4\" r=\"2\"/><circle cx=\"4\" cy=\"8\" r=\"2\"/><circle cx=\"11\" cy=\"12\" r=\"2\"/><path d=\"M9.2 4.9 5.8 7.1M9.2 11.1 5.8 8.9\"/></svg>","shrink": "<svg viewBox=\"0 0 16 16\" xmlns=\"http://www.w3.org/2000/svg\" focusable=\"false\" aria-hidden=\"true\"><path d=\"M10 1v5h5M10 6l5-5M6 15v-5H1M6 10l-5 5\"/></svg>","status-in-progress": "<svg xmlns=\"http://www.w3.org/2000/svg\" viewBox=\"0 0 16 16\" focusable=\"false\" aria-hidden=\"true\"><circle class=\"stroke-linejoin-round\" cx=\"8\" cy=\"8\" r=\"7\"/><path class=\"stroke-linecap-round\" d=\"M4.99 7.995H5v.01h-.01zM7.99 7.995H8v.01h-.01zM10.99 7.995H11v.01h-.01z\"/></svg>","status-info": "<svg xmlns=\"http://www.w3.org/2000/svg\" viewBox=\"0 0 16 16\" focusable=\"false\" aria-hidden=\"true\"><circle class=\"stroke-linejoin-round\" cx=\"8\" cy=\"8\" r=\"7\"/><path d=\"M8 11V8H6\"/><path class=\"stroke-linejoin-round\" d=\"M10 11H6\"/><path d=\"M7.99 5H8v.01h-.01z\"/></svg>","status-negative": "<svg xmlns=\"http://www.w3.org/2000/svg\" viewBox=\"0 0 16 16\" focusable=\"false\" aria-hidden=\"true\"><circle class=\"stroke-linejoin-round\" cx=\"8\" cy=\"8\" r=\"7\"/><path d=\"m10.828 5.172-5.656 5.656M10.828 10.828 5.172 5.172\"/></svg>","status-pending": "<svg xmlns=\"http://www.w3.org/2000/svg\" viewBox=\"0 0 16 16\" focusable=\"false\" aria-hidden=\"true\"><circle class=\"stroke-linejoin-round\" cx=\"8\" cy=\"8\" r=\"7\"/><path class=\"stroke-linecap-square\" d=\"M8 5v4H5\"/></svg>","status-positive": "<svg xmlns=\"http://www.w3.org/2000/svg\" viewBox=\"0 0 16 16\" focusable=\"false\" aria-hidden=\"true\"><circle class=\"stroke-linejoin-round\" cx=\"8\" cy=\"8\" r=\"7\"/><path class=\"stroke-linecap-square\" d=\"m5 8 2 2 3.521-3.521\"/></svg>","status-stopped": "<svg xmlns=\"http://www.w3.org/2000/svg\" viewBox=\"0 0 16 16\" focusable=\"false\" aria-hidden=\"true\"><circle class=\"stroke-linejoin-round\" cx=\"8\" cy=\"8\" r=\"7\"/><path class=\"stroke-linecap-square\" d=\"M11 8H5\"/></svg>","status-warning": "<svg xmlns=\"http://www.w3.org/2000/svg\" viewBox=\"0 0 16 16\" focusable=\"false\" aria-hidden=\"true\"><path class=\"stroke-linejoin-round\" d=\"m8 1 7 14H1L8 1z\"/><path d=\"M7.99 12H8v.01h-.01zM8 6v4\"/></svg>","suggestions": "<svg viewBox=\"0 0 16 16\" xmlns=\"http://www.w3.org/2000/svg\" focusable=\"false\" aria-hidden=\"true\"><path class=\"stroke-linejoin-round\" d=\"M6 14h4\"/><path d=\"M8 11h1c0-1.53 3-2.46 3-5.24.02-1.36-.61-2.4-1.57-3.09a4.208 4.208 0 0 0-4.86 0C4.61 3.36 3.98 4.4 4 5.76 4 8.54 7 9.47 7 11h1Z\"/></svg>","thumbs-down-filled": "<svg viewBox=\"0 0 16 16\" xmlns=\"http://www.w3.org/2000/svg\" focusable=\"false\" aria-hidden=\"true\"><path class=\"filled stroke-linejoin-round\" d=\"M6 9.58c0 .27.06.55.19.79l1.64 3.28c.1.21.32.34.55.34.34 0 .62-.28.62-.62v-3.33h3.44a2 2 0 0 0 1.94-2.48l-1.01-4.05a2 2 0 0 0-1.94-1.52H6v7.59Z\"/><path class=\"stroke-linejoin-round\" d=\"M6 2H2v7h4\"/></svg>","thumbs-down": "<svg viewBox=\"0 0 16 16\" xmlns=\"http://www.w3.org/2000/svg\" focusable=\"false\" aria-hidden=\"true\"><path class=\"stroke-linejoin-round\" d=\"M6 9.58c0 .27.06.55.19.79l1.64 3.28c.1.21.32.34.55.34.34 0 .62-.28.62-.62v-3.33h3.44a2 2 0 0 0 1.94-2.48l-1.01-4.05a2 2 0 0 0-1.94-1.52H6v7.59ZM6 2H2v7h4\"/></svg>","thumbs-up-filled": "<svg viewBox=\"0 0 16 16\" xmlns=\"http://www.w3.org/2000/svg\" focusable=\"false\" aria-hidden=\"true\"><path class=\"filled stroke-linejoin-round\" d=\"M6 6.42c0-.27.06-.55.19-.79l1.64-3.28c.1-.21.32-.34.55-.34.34 0 .62.28.62.62v3.33h3.44a2 2 0 0 1 1.94 2.48l-1.01 4.05a2 2 0 0 1-1.94 1.52H6V6.42Z\"/><path class=\"stroke-linejoin-round\" d=\"M6 14H2V7h4\"/></svg>","thumbs-up": "<svg viewBox=\"0 0 16 16\" xmlns=\"http://www.w3.org/2000/svg\" focusable=\"false\" aria-hidden=\"true\"><path class=\"stroke-linejoin-round\" d=\"M6 6.42c0-.27.06-.55.19-.79l1.64-3.28c.1-.21.32-.34.55-.34.34 0 .62.28.62.62v3.33h3.44a2 2 0 0 1 1.94 2.48l-1.01 4.05a2 2 0 0 1-1.94 1.52H6V6.42ZM6 14H2V7h4\"/></svg>","ticket": "<svg viewBox=\"0 0 16 16\" xmlns=\"http://www.w3.org/2000/svg\" focusable=\"false\" aria-hidden=\"true\"><path class=\"stroke-linejoin-round\" d=\"M8 4.275a2 2 0 0 1-2-2H3v12h3a2 2 0 1 1 4 0h3v-12h-3a2 2 0 0 1-2 2Z\"/></svg>","treeview-collapse": "<svg xmlns=\"http://www.w3.org/2000/svg\" viewBox=\"0 0 16 16\" focusable=\"false\" aria-hidden=\"true\"><path class=\"stroke-linejoin-round\" d=\"M5 8h6M2 2h12v12H2z\"/></svg>","treeview-expand": "<svg xmlns=\"http://www.w3.org/2000/svg\" viewBox=\"0 0 16 16\" focusable=\"false\" aria-hidden=\"true\"><path class=\"stroke-linejoin-round\" d=\"M5 8h6M8 11V5M2 2h12v12H2z\"/></svg>","undo": "<svg xmlns=\"http://www.w3.org/2000/svg\" viewBox=\"0 0 16 16\" focusable=\"false\" aria-hidden=\"true\"><path class=\"stroke-linejoin-round\" d=\"M4 13h5.625c4.5 0 4.5-8 0-8H3\"/><path class=\"stroke-linejoin-round\" d=\"M6 2 3 5l3 3\"/></svg>","unlocked": "<svg xmlns=\"http://www.w3.org/2000/svg\" viewBox=\"0 0 16 16\" focusable=\"false\" aria-hidden=\"true\"><path class=\"stroke-linejoin-round\" d=\"M2 7h12v7H2z\"/><path d=\"M11.874 4A4 4 0 0 0 4 5v2\"/></svg>","upload-download": "<svg viewBox=\"0 0 16 16\" xmlns=\"http://www.w3.org/2000/svg\" focusable=\"false\" aria-hidden=\"true\"><path d=\"M11 13.701v-10M8 6.702l3-3 3 3M4.98 2.662v10.04M7.98 9.662l-3 3-3-3\"/></svg>","upload": "<svg xmlns=\"http://www.w3.org/2000/svg\" viewBox=\"0 0 16 16\" focusable=\"false\" aria-hidden=\"true\"><path class=\"stroke-linejoin-round\" d=\"M5 14H2V2h12v12h-3\"/><path d=\"M12 10 8 6l-4 4M8 6v9\"/></svg>","user-profile-active": "<svg xmlns=\"http://www.w3.org/2000/svg\" viewBox=\"0 0 16 16\" focusable=\"false\" aria-hidden=\"true\"><path class=\"filled stroke-linejoin-round\" d=\"M4.61 4.39C4.61 2.52 6.13 1 8 1s3.39 1.52 3.39 3.39S9.87 7.78 8 7.78 4.61 6.26 4.61 4.39M2.05 14.08h11.91c0-2.25-1.17-4.23-2.9-5.3A5.77 5.77 0 0 0 8 7.91c-3.29 0-5.95 2.76-5.95 6.17z\"/></svg>","user-profile": "<svg xmlns=\"http://www.w3.org/2000/svg\" viewBox=\"0 0 16 16\" focusable=\"false\" aria-hidden=\"true\"><path class=\"stroke-linejoin-round\" d=\"M4.61 4.39C4.61 2.52 6.13 1 8 1s3.39 1.52 3.39 3.39S9.87 7.78 8 7.78 4.61 6.26 4.61 4.39M2.05 14.08h11.91c0-2.25-1.17-4.23-2.9-5.3A5.77 5.77 0 0 0 8 7.91c-3.29 0-5.95 2.76-5.95 6.17z\"/></svg>","video-off": "<svg viewBox=\"0 0 16 16\" xmlns=\"http://www.w3.org/2000/svg\" focusable=\"false\" aria-hidden=\"true\"><path class=\"stroke-linejoin-round\" d=\"M3 15h10M8 15v-3M8 12A5 5 0 1 0 8 2a5 5 0 0 0 0 10ZM6 5l4 4M10 5 6 9\"/></svg>","video-on": "<svg viewBox=\"0 0 16 16\" xmlns=\"http://www.w3.org/2000/svg\" focusable=\"false\" aria-hidden=\"true\"><path class=\"stroke-linejoin-round\" d=\"M3 15h10M8 15v-3M8 12A5 5 0 1 0 8 2a5 5 0 0 0 0 10Z\"/><path class=\"stroke-linejoin-round\" d=\"M8 8a1 1 0 1 0 0-2 1 1 0 0 0 0 2Z\"/></svg>","video-unavailable": "<svg viewBox=\"0 0 16 16\" xmlns=\"http://www.w3.org/2000/svg\" focusable=\"false\" aria-hidden=\"true\"><path class=\"stroke-linejoin-round\" d=\"M3 15h10M8 15v-3M8 12A5 5 0 1 0 8 2a5 5 0 0 0 0 10ZM5.5 7h5\"/></svg>","view-full": "<svg xmlns=\"http://www.w3.org/2000/svg\" viewBox=\"0 0 16 16\" focusable=\"false\" aria-hidden=\"true\"><path class=\"filled\" d=\"M5 5h6v6H5z\"/><path class=\"stroke-linejoin-round\" d=\"M2 2h12v12H2z\"/></svg>","view-horizontal": "<svg xmlns=\"http://www.w3.org/2000/svg\" viewBox=\"0 0 16 16\" focusable=\"false\" aria-hidden=\"true\"><path class=\"filled\" d=\"M5 9h6v2H5z\"/><path class=\"stroke-linejoin-round\" d=\"M2 2h12v12H2z\"/></svg>","view-vertical": "<svg xmlns=\"http://www.w3.org/2000/svg\" viewBox=\"0 0 16 16\" focusable=\"false\" aria-hidden=\"true\"><path class=\"filled\" d=\"M11 5v6H9V5z\"/><path class=\"stroke-linejoin-round\" d=\"M2 2h12v12H2z\"/></svg>","zoom-in": "<svg xmlns=\"http://www.w3.org/2000/svg\" viewBox=\"0 0 16 16\" focusable=\"false\" aria-hidden=\"true\"><circle cx=\"6.885\" cy=\"6.885\" r=\"5.385\"/><path d=\"m14.5 14.5-3.846-3.846M7 4v6M10 7H4\"/></svg>","zoom-out": "<svg xmlns=\"http://www.w3.org/2000/svg\" viewBox=\"0 0 16 16\" focusable=\"false\" aria-hidden=\"true\"><circle cx=\"6.885\" cy=\"6.885\" r=\"5.385\"/><path d=\"m14.5 14.5-3.846-3.846M10 7H4\"/></svg>","zoom-to-fit": "<svg viewBox=\"0 0 16 16\" xmlns=\"http://www.w3.org/2000/svg\" focusable=\"false\" aria-hidden=\"true\"><path d=\"M14 11v3h-4M2 11v3h4M2 5V2h4M14 5V2h-4M10 6H6v4h4V6Z\"/></svg>"
@@ -35862,7 +35862,7 @@ var InternalIcon = function (_a) {
             react.createElement("img", { src: url, alt: alt })));
     }
     var validIcon = name && Object.prototype.hasOwnProperty.call(icons, name);
-    return (react.createElement("span", tslib_es6_assign({}, baseProps, { 
+    return (react.createElement("span", tslib_es6_assign({}, baseProps, {
         // dangerouslySetInnerHTML is safe here, as we control the content coming from `icons`
         // eslint-disable-next-line react/no-danger
         dangerouslySetInnerHTML: validIcon ? { __html: icons[name] } : undefined, ref: mergedRef, style: inlineStyles })));
@@ -35874,7 +35874,7 @@ var InternalIcon = function (_a) {
 
 ;// CONCATENATED MODULE: ./node_modules/@cloudscape-design/components/spinner/styles.css.js
 
-    
+
     /* harmony default export */ const spinner_styles_css = ({
   "root": "awsui_root_1612d_9hw1o_127",
   "spinner-rotator": "awsui_spinner-rotator_1612d_9hw1o_1",
@@ -35890,7 +35890,7 @@ var InternalIcon = function (_a) {
   "circle-right": "awsui_circle-right_1612d_9hw1o_198",
   "spinner-line-right": "awsui_spinner-line-right_1612d_9hw1o_1"
 });
-  
+
 ;// CONCATENATED MODULE: ./node_modules/@cloudscape-design/components/spinner/internal.js
 
 // Copyright Amazon.com, Inc. or its affiliates. All Rights Reserved.
@@ -35977,11 +35977,11 @@ function checkSafeUrl(component, url) {
 
 ;// CONCATENATED MODULE: ./node_modules/@cloudscape-design/components/internal/components/screenreader-only/styles.css.js
 
-    
+
     /* harmony default export */ const screenreader_only_styles_css = ({
   "root": "awsui_root_xttbq_1yl3y_93"
 });
-  
+
 ;// CONCATENATED MODULE: ./node_modules/@cloudscape-design/components/internal/components/screenreader-only/index.js
 // Copyright Amazon.com, Inc. or its affiliates. All Rights Reserved.
 // SPDX-License-Identifier: Apache-2.0
@@ -36012,11 +36012,11 @@ function ScreenreaderOnly(props) {
 
 ;// CONCATENATED MODULE: ./node_modules/@cloudscape-design/components/internal/components/live-region/styles.css.js
 
-    
+
     /* harmony default export */ const live_region_styles_css = ({
   "root": "awsui_root_3bgfn_im8v7_5"
 });
-  
+
 ;// CONCATENATED MODULE: ./node_modules/@cloudscape-design/components/internal/components/live-region/index.js
 // Copyright Amazon.com, Inc. or its affiliates. All Rights Reserved.
 // SPDX-License-Identifier: Apache-2.0
@@ -36067,11 +36067,11 @@ function LiveRegion(_a) {
     /*
       When React state changes, React often produces too many DOM updates, causing NVDA to
       issue many announcements for the same logical event (See https://github.com/nvaccess/nvda/issues/7996).
-  
+
       The code below imitates a debouncing, scheduling a callback every time new React state
       update is detected. When a callback resolves, it copies content from a muted element
       to the live region, which is recognized by screen readers as an update.
-  
+
       If the use case requires no announcement to be ignored, use delay = 0, but ensure it
       does not impact the performance. If it does, prefer using a string as children prop.
     */
@@ -36154,7 +36154,7 @@ var InternalButton = react.forwardRef(function (_a, ref) {
         _b[button_styles_css["button-no-text"]] = !shouldHaveContent,
         _b[button_styles_css["is-activated"]] = __activated,
         _b));
-    var buttonProps = tslib_es6_assign(tslib_es6_assign(tslib_es6_assign(tslib_es6_assign({}, props), (__hideFocusOutline ? undefined : focusVisible)), __nativeAttributes), { 
+    var buttonProps = tslib_es6_assign(tslib_es6_assign(tslib_es6_assign(tslib_es6_assign({}, props), (__hideFocusOutline ? undefined : focusVisible)), __nativeAttributes), {
         // https://github.com/microsoft/TypeScript/issues/36659
         ref: useMergeRefs(buttonRef, __internalRootRef), 'aria-label': ariaLabel, 'aria-expanded': ariaExpanded, className: buttonClass, onClick: handleClick });
     var iconProps = {
@@ -36177,7 +36177,7 @@ var InternalButton = react.forwardRef(function (_a, ref) {
         // https://github.com/yannickcr/eslint-plugin-react/issues/2962
         // eslint-disable-next-line react/jsx-no-target-blank
         react.createElement(react.Fragment, null,
-            react.createElement("a", tslib_es6_assign({}, buttonProps, { href: href, target: target, 
+            react.createElement("a", tslib_es6_assign({}, buttonProps, { href: href, target: target,
                 // security recommendation: https://developer.mozilla.org/en-US/docs/Web/HTML/Element/a#target
                 rel: target === '_blank' ? 'noopener noreferrer' : undefined, tabIndex: isDisabled ? -1 : undefined, "aria-disabled": isDisabled ? true : undefined, download: download }), buttonContent),
             loading && loadingText && react.createElement(live_region, null, loadingText)));
@@ -36664,11 +36664,11 @@ function applyDefaults(contentType, stateFromProps, isRefresh) {
 
 ;// CONCATENATED MODULE: ./node_modules/@cloudscape-design/components/app-layout/notifications/styles.css.js
 
-    
+
     /* harmony default export */ const notifications_styles_css = ({
   "notifications-sticky": "awsui_notifications-sticky_1hmm4_1qn9j_9"
 });
-  
+
 ;// CONCATENATED MODULE: ./node_modules/@cloudscape-design/components/app-layout/notifications/index.js
 
 // Copyright Amazon.com, Inc. or its affiliates. All Rights Reserved.
@@ -36688,11 +36688,11 @@ var Notifications = react.forwardRef(function (_a, ref) {
 
 ;// CONCATENATED MODULE: ./node_modules/@cloudscape-design/components/app-layout/toggles/styles.css.js
 
-    
+
     /* harmony default export */ const toggles_styles_css = ({
   "close-button": "awsui_close-button_16w0h_1fczy_93"
 });
-  
+
 ;// CONCATENATED MODULE: ./node_modules/@cloudscape-design/components/app-layout/toggles/index.js
 // Copyright Amazon.com, Inc. or its affiliates. All Rights Reserved.
 // SPDX-License-Identifier: Apache-2.0
@@ -36740,20 +36740,20 @@ var CloseButton = react.forwardRef(function (_a, ref) {
 
 ;// CONCATENATED MODULE: ./node_modules/@cloudscape-design/components/app-layout/mobile-toolbar/styles.css.js
 
-    
+
     /* harmony default export */ const mobile_toolbar_styles_css = ({
   "block-body-scroll": "awsui_block-body-scroll_19d8l_l5x8d_97",
   "mobile-bar": "awsui_mobile-bar_19d8l_l5x8d_101",
   "mobile-bar-breadcrumbs": "awsui_mobile-bar-breadcrumbs_19d8l_l5x8d_115",
   "mobile-toggle": "awsui_mobile-toggle_19d8l_l5x8d_122"
 });
-  
+
 ;// CONCATENATED MODULE: ./node_modules/@cloudscape-design/components/app-layout/styles.scoped.css
 // extracted by mini-css-extract-plugin
 
 ;// CONCATENATED MODULE: ./node_modules/@cloudscape-design/components/app-layout/styles.css.js
 
-    
+
     /* harmony default export */ const app_layout_styles_css = ({
   "root": "awsui_root_lm6vo_hzagk_97",
   "layout-wrapper": "awsui_layout-wrapper_lm6vo_hzagk_98",
@@ -36794,13 +36794,13 @@ var CloseButton = react.forwardRef(function (_a, ref) {
   "mobile": "awsui_mobile_lm6vo_hzagk_301",
   "open": "awsui_open_lm6vo_hzagk_307"
 });
-  
+
 ;// CONCATENATED MODULE: ./node_modules/@cloudscape-design/components/app-layout/test-classes/styles.scoped.css
 // extracted by mini-css-extract-plugin
 
 ;// CONCATENATED MODULE: ./node_modules/@cloudscape-design/components/app-layout/test-classes/styles.css.js
 
-    
+
     /* harmony default export */ const test_classes_styles_css = ({
   "root": "awsui_root_1fj9k_avnjw_5",
   "navigation": "awsui_navigation_1fj9k_avnjw_9",
@@ -36816,7 +36816,7 @@ var CloseButton = react.forwardRef(function (_a, ref) {
   "mobile-bar": "awsui_mobile-bar_1fj9k_avnjw_49",
   "disable-body-scroll-root": "awsui_disable-body-scroll-root_1fj9k_avnjw_53"
 });
-  
+
 ;// CONCATENATED MODULE: ./node_modules/@cloudscape-design/components/app-layout/mobile-toolbar/index.js
 // Copyright Amazon.com, Inc. or its affiliates. All Rights Reserved.
 // SPDX-License-Identifier: Apache-2.0
@@ -37522,7 +37522,7 @@ function useResizeObserver(elementRef, onObserve) {
         if (element) {
             onObserve(convertResizeObserverEntry(new ResizeObserverEntry(element)));
         }
-    }, 
+    },
     // This effect is only needed for the first render to provide a synchronous update.
     // eslint-disable-next-line react-hooks/exhaustive-deps
     []);
@@ -37703,13 +37703,13 @@ function getLimitedValue(min, value, max) {
 
 ;// CONCATENATED MODULE: ./node_modules/@cloudscape-design/components/app-layout/content-wrapper/styles.css.js
 
-    
+
     /* harmony default export */ const content_wrapper_styles_css = ({
   "content-wrapper": "awsui_content-wrapper_zycdx_19ivr_97",
   "content-wrapper-mobile": "awsui_content-wrapper-mobile_zycdx_19ivr_101",
   "content-type-dashboard": "awsui_content-type-dashboard_zycdx_19ivr_106"
 });
-  
+
 ;// CONCATENATED MODULE: ./node_modules/@cloudscape-design/components/app-layout/content-wrapper/index.js
 // Copyright Amazon.com, Inc. or its affiliates. All Rights Reserved.
 // SPDX-License-Identifier: Apache-2.0
@@ -37910,7 +37910,7 @@ function useAppLayoutOffsets(element) {
 
 ;// CONCATENATED MODULE: ./node_modules/@cloudscape-design/components/app-layout/visual-refresh/styles.css.js
 
-    
+
     /* harmony default export */ const visual_refresh_styles_css = ({
   "appbar": "awsui_appbar_hyvsj_geabg_93",
   "appbar-nav": "awsui_appbar-nav_hyvsj_geabg_117",
@@ -37973,7 +37973,7 @@ function useAppLayoutOffsets(element) {
   "trigger": "awsui_trigger_hyvsj_geabg_1100",
   "selected": "awsui_selected_hyvsj_geabg_1139"
 });
-  
+
 ;// CONCATENATED MODULE: ./node_modules/@babel/runtime/helpers/esm/objectWithoutPropertiesLoose.js
 function objectWithoutPropertiesLoose_objectWithoutPropertiesLoose(source, excluded) {
   if (source == null) return {};
@@ -39258,7 +39258,7 @@ function Navigation() {
         return (react.createElement("div", { className: clsx_m(visual_refresh_styles_css["navigation-container"], (_a = {},
                 _a[test_classes_styles_css["drawer-closed"]] = !isNavigationOpen,
                 _a[visual_refresh_styles_css.unfocusable] = isUnfocusable,
-                _a)), 
+                _a)),
             // Overwrite the default nav width (depends on breakpoints) only when the `navigationWidth` property is set.
             style: tslib_es6_assign({}, (navigationWidth && (_b = {}, _b[custom_css_properties.navigationWidth] = "".concat(navigationWidth, "px"), _b))) },
             !isMobile && (react.createElement("nav", { "aria-hidden": isMobile || isNavigationOpen ? true : false, "aria-label": (_e = ariaLabels === null || ariaLabels === void 0 ? void 0 : ariaLabels.navigation) !== null && _e !== void 0 ? _e : undefined, className: clsx_m(visual_refresh_styles_css["show-navigation"], (_c = {},
@@ -39309,7 +39309,7 @@ function notifications_Notifications() {
 
 ;// CONCATENATED MODULE: ./node_modules/@cloudscape-design/components/split-panel/styles.css.js
 
-    
+
     /* harmony default export */ const split_panel_styles_css = ({
   "drawer": "awsui_drawer_1r9lg_19fwa_189",
   "refresh": "awsui_refresh_1r9lg_19fwa_189",
@@ -39371,7 +39371,7 @@ function notifications_Notifications() {
   "header-actions": "awsui_header-actions_1r9lg_19fwa_573",
   "divider": "awsui_divider_1r9lg_19fwa_581"
 });
-  
+
 ;// CONCATENATED MODULE: ./node_modules/@cloudscape-design/components/app-layout/visual-refresh/tools.js
 // Copyright Amazon.com, Inc. or its affiliates. All Rights Reserved.
 // SPDX-License-Identifier: Apache-2.0
@@ -39749,7 +39749,7 @@ var OldAppLayout = react.forwardRef(function (_a, ref) {
     var contentWrapperProps = {
         contentType: contentType,
         navigationPadding: navigationHide || !!navigationOpen,
-        toolsPadding: 
+        toolsPadding:
         // tools padding is displayed in one of the three cases
         // 1. Nothing on the that screen edge (no tools panel and no split panel)
         (toolsHide && (!splitPanelDisplayed || finalSplitPanePosition !== 'side')) ||
@@ -39823,7 +39823,7 @@ var OldAppLayout = react.forwardRef(function (_a, ref) {
                             contentHeader && (react.createElement("div", { className: clsx_m(app_layout_styles_css["content-header-wrapper"], !hasRenderedNotifications &&
                                     (isMobile || !breadcrumbs) &&
                                     app_layout_styles_css["content-extra-top-padding"], !hasRenderedNotifications && !breadcrumbs && app_layout_styles_css["content-header-wrapper-first-child"], !disableContentHeaderOverlap && app_layout_styles_css["content-header-wrapper-overlapped"]) }, contentHeader)))),
-                        react.createElement(content_wrapper, tslib_es6_assign({}, contentWrapperProps, { ref: mainContentRef, disablePaddings: disableContentPaddings, 
+                        react.createElement(content_wrapper, tslib_es6_assign({}, contentWrapperProps, { ref: mainContentRef, disablePaddings: disableContentPaddings,
                             // eslint-disable-next-line react/forbid-component-props
                             className: clsx_m(!disableContentPaddings && app_layout_styles_css["content-wrapper"], !disableContentPaddings &&
                                 (isMobile || !breadcrumbs) &&
@@ -39864,7 +39864,7 @@ function extends_extends() {
 ;// CONCATENATED MODULE: ./node_modules/dom-helpers/esm/hasClass.js
 /**
  * Checks if a given element has a CSS class.
- * 
+ *
  * @param element the element
  * @param className the CSS class name
  */
@@ -39876,7 +39876,7 @@ function hasClass(element, className) {
 
 /**
  * Adds a CSS class to a given element.
- * 
+ *
  * @param element the element
  * @param className the CSS class name
  */
@@ -39890,7 +39890,7 @@ function replaceClassName(origClass, classToRemove) {
 }
 /**
  * Removes a CSS class from a given element.
- * 
+ *
  * @param element the element
  * @param className the CSS class name
  */
@@ -40210,7 +40210,7 @@ function useUniqueId(prefix) {
 
 ;// CONCATENATED MODULE: ./node_modules/@cloudscape-design/components/expandable-section/styles.css.js
 
-    
+
     /* harmony default export */ const expandable_section_styles_css = ({
   "content-enter": "awsui_content-enter_gwq0h_1rk8x_97",
   "awsui-motion-fade-in": "awsui_awsui-motion-fade-in_gwq0h_1rk8x_1",
@@ -40234,7 +40234,7 @@ function useUniqueId(prefix) {
   "content-expanded": "awsui_content-expanded_gwq0h_1rk8x_290",
   "focusable": "awsui_focusable_gwq0h_1rk8x_294"
 });
-  
+
 ;// CONCATENATED MODULE: ./node_modules/@cloudscape-design/components/internal/utils/scrollable-containers.js
 var getOverflowParents = function (element) {
     var parents = [];
@@ -40430,7 +40430,7 @@ function useDynamicOverlap(props) {
 
 ;// CONCATENATED MODULE: ./node_modules/@cloudscape-design/components/container/styles.css.js
 
-    
+
     /* harmony default export */ const container_styles_css = ({
   "root": "awsui_root_14iqq_wbmbk_97",
   "root-fit-height": "awsui_root-fit-height_14iqq_wbmbk_108",
@@ -40450,7 +40450,7 @@ function useDynamicOverlap(props) {
   "footer": "awsui_footer_14iqq_wbmbk_227",
   "with-divider": "awsui_with-divider_14iqq_wbmbk_230"
 });
-  
+
 ;// CONCATENATED MODULE: ./node_modules/@cloudscape-design/components/container/internal.js
 
 // Copyright Amazon.com, Inc. or its affiliates. All Rights Reserved.
@@ -40534,7 +40534,7 @@ var ExpandableSectionContainer = function (_a) {
 
 ;// CONCATENATED MODULE: ./node_modules/@cloudscape-design/components/header/styles.css.js
 
-    
+
     /* harmony default export */ const header_styles_css = ({
   "root": "awsui_root_2qdw9_rse6p_93",
   "root-no-actions": "awsui_root-no-actions_2qdw9_rse6p_108",
@@ -40581,7 +40581,7 @@ var ExpandableSectionContainer = function (_a) {
   "heading-text-variant-h3": "awsui_heading-text-variant-h3_2qdw9_rse6p_281",
   "counter": "awsui_counter_2qdw9_rse6p_290"
 });
-  
+
 ;// CONCATENATED MODULE: ./node_modules/@cloudscape-design/components/header/internal.js
 
 // Copyright Amazon.com, Inc. or its affiliates. All Rights Reserved.
@@ -40742,7 +40742,7 @@ function InternalExpandableSection(_a) {
 
 ;// CONCATENATED MODULE: ./node_modules/@cloudscape-design/components/side-navigation/styles.css.js
 
-    
+
     /* harmony default export */ const side_navigation_styles_css = ({
   "root": "awsui_root_l0dv0_1mr3e_93",
   "header": "awsui_header_l0dv0_1mr3e_107",
@@ -40767,7 +40767,7 @@ function InternalExpandableSection(_a) {
   "divider-default": "awsui_divider-default_l0dv0_1mr3e_236",
   "divider-header": "awsui_divider-header_l0dv0_1mr3e_240"
 });
-  
+
 ;// CONCATENATED MODULE: ./node_modules/@cloudscape-design/components/side-navigation/util.js
 
 function hasActiveLink(items, activeHref) {
@@ -41064,7 +41064,7 @@ function useContainerBreakpoints(triggers) {
 
 ;// CONCATENATED MODULE: ./node_modules/@cloudscape-design/components/top-navigation/styles.css.js
 
-    
+
     /* harmony default export */ const top_navigation_styles_css = ({
   "icon": "awsui_icon_k5dlb_1a945_93",
   "top-navigation": "awsui_top-navigation_k5dlb_1a945_111",
@@ -41114,7 +41114,7 @@ function useContainerBreakpoints(triggers) {
   "overflow-menu-list-item-expandable": "awsui_overflow-menu-list-item-expandable_k5dlb_1a945_438",
   "expanded": "awsui_expanded_k5dlb_1a945_446"
 });
-  
+
 ;// CONCATENATED MODULE: ./node_modules/@cloudscape-design/components/top-navigation/use-top-navigation.js
 // Copyright Amazon.com, Inc. or its affiliates. All Rights Reserved.
 // SPDX-License-Identifier: Apache-2.0
@@ -41297,7 +41297,7 @@ function determineBestResponsiveState(possibleStates, sizes) {
 
 ;// CONCATENATED MODULE: ./node_modules/@cloudscape-design/components/link/styles.css.js
 
-    
+
     /* harmony default export */ const link_styles_css = ({
   "link": "awsui_link_4c84z_1r9bu_93",
   "variant-secondary": "awsui_variant-secondary_4c84z_1r9bu_138",
@@ -41320,7 +41320,7 @@ function determineBestResponsiveState(possibleStates, sizes) {
   "icon-wrapper": "awsui_icon-wrapper_4c84z_1r9bu_449",
   "icon": "awsui_icon_4c84z_1r9bu_449"
 });
-  
+
 ;// CONCATENATED MODULE: ./node_modules/@cloudscape-design/components/link/internal.js
 
 // Copyright Amazon.com, Inc. or its affiliates. All Rights Reserved.
@@ -41369,7 +41369,7 @@ var InternalLink = react.forwardRef(function (_a, ref) {
     useForwardFocus(ref, linkRef);
     // Visual refresh should only add styles to buttons that don't already have unique styles (e.g. primary/secondary variants)
     var applyButtonStyles = isButton && isVisualRefresh && !hasSpecialStyle;
-    var sharedProps = tslib_es6_assign(tslib_es6_assign(tslib_es6_assign({}, focusVisible), baseProps), { 
+    var sharedProps = tslib_es6_assign(tslib_es6_assign(tslib_es6_assign({}, focusVisible), baseProps), {
         // https://github.com/microsoft/TypeScript/issues/36659
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
         ref: useMergeRefs(linkRef, __internalRootRef), className: clsx_m(link_styles_css.link, baseProps.className, applyButtonStyles ? link_styles_css.button : null, link_styles_css[getVariantStyle(variant)], link_styles_css[getFontSizeStyle(variant, fontSize)], link_styles_css[getColorStyle(variant, color)]), 'aria-label': ariaLabel });
@@ -41410,7 +41410,7 @@ function getColorStyle(variant, color) {
 
 ;// CONCATENATED MODULE: ./node_modules/@cloudscape-design/components/button-dropdown/styles.css.js
 
-    
+
     /* harmony default export */ const button_dropdown_styles_css = ({
   "button-dropdown": "awsui_button-dropdown_sne0l_1gwdq_93",
   "items-list-container": "awsui_items-list-container_sne0l_1gwdq_97",
@@ -41421,13 +41421,13 @@ function getColorStyle(variant, color) {
   "title": "awsui_title_sne0l_1gwdq_153",
   "description": "awsui_description_sne0l_1gwdq_154"
 });
-  
+
 ;// CONCATENATED MODULE: ./node_modules/@cloudscape-design/components/internal/components/dropdown/styles.scoped.css
 // extracted by mini-css-extract-plugin
 
 ;// CONCATENATED MODULE: ./node_modules/@cloudscape-design/components/internal/components/dropdown/styles.css.js
 
-    
+
     /* harmony default export */ const dropdown_styles_css = ({
   "dropdown-content-wrapper": "awsui_dropdown-content-wrapper_qwoo0_1aum0_93",
   "awsui-motion-fade-in-dropdown": "awsui_awsui-motion-fade-in-dropdown_qwoo0_1aum0_1",
@@ -41450,7 +41450,7 @@ function getColorStyle(variant, color) {
   "ie11-wrapper": "awsui_ie11-wrapper_qwoo0_1aum0_257",
   "stretch-trigger-height": "awsui_stretch-trigger-height_qwoo0_1aum0_261"
 });
-  
+
 ;// CONCATENATED MODULE: ./node_modules/@cloudscape-design/components/internal/components/dropdown/dropdown-fit-handler.js
 // Copyright Amazon.com, Inc. or its affiliates. All Rights Reserved.
 // SPDX-License-Identifier: Apache-2.0
@@ -41991,7 +41991,7 @@ function indexEquals(left, right) {
 
 ;// CONCATENATED MODULE: ./node_modules/@cloudscape-design/components/button-dropdown/item-element/styles.css.js
 
-    
+
     /* harmony default export */ const item_element_styles_css = ({
   "item-element": "awsui_item-element_93a1u_lwral_93",
   "disabled": "awsui_disabled_93a1u_lwral_103",
@@ -42008,13 +42008,13 @@ function indexEquals(left, right) {
   "icon": "awsui_icon_93a1u_lwral_166",
   "external-icon": "awsui_external-icon_93a1u_lwral_171"
 });
-  
+
 ;// CONCATENATED MODULE: ./node_modules/@cloudscape-design/components/popover/styles.scoped.css
 // extracted by mini-css-extract-plugin
 
 ;// CONCATENATED MODULE: ./node_modules/@cloudscape-design/components/popover/styles.css.js
 
-    
+
     /* harmony default export */ const popover_styles_css = ({
   "arrow": "awsui_arrow_xjuzf_1qvsu_185",
   "arrow-outer": "awsui_arrow-outer_xjuzf_1qvsu_189",
@@ -42067,7 +42067,7 @@ function indexEquals(left, right) {
   "trigger-inner-text": "awsui_trigger-inner-text_xjuzf_1qvsu_783",
   "popover-content": "awsui_popover-content_xjuzf_1qvsu_787"
 });
-  
+
 ;// CONCATENATED MODULE: ./node_modules/@cloudscape-design/components/popover/arrow.js
 // Copyright Amazon.com, Inc. or its affiliates. All Rights Reserved.
 // SPDX-License-Identifier: Apache-2.0
@@ -42289,7 +42289,7 @@ function intersectRectangles(rectangles) {
 /**
  * A functions that returns the correct popover position based on screen dimensions.
  */
-function positions_calculatePosition(preferred, trigger, arrow, body, container, viewport, 
+function positions_calculatePosition(preferred, trigger, arrow, body, container, viewport,
 // the popover is only bound by the viewport if it is rendered in a portal
 renderWithPortal) {
     var bestPositionOutsideViewport = null;
@@ -42430,7 +42430,7 @@ function PopoverContainer(_a) {
         /*
           This is a heuristic. Some layout changes are caused by user clicks (e.g. toggling the tools panel, submitting a form),
           and by tracking the click event we can adapt the popover's position to the new layout.
-    
+
           TODO: extend this to Enter and Spacebar?
         */
         var updatePosition = function () { return requestAnimationFrame(function () { return updatePositionHandler(); }); };
@@ -42702,7 +42702,7 @@ function MenuItem(_a) {
     }, [highlighted]);
     var isDisabledWithReason = disabled && item.disabledReason;
     var _b = useHiddenDescription(item.disabledReason), targetProps = _b.targetProps, descriptionEl = _b.descriptionEl;
-    var menuItemProps = tslib_es6_assign(tslib_es6_assign({ className: item_element_styles_css["menu-item"], ref: menuItemRef, 
+    var menuItemProps = tslib_es6_assign(tslib_es6_assign({ className: item_element_styles_css["menu-item"], ref: menuItemRef,
         // We are using the roving tabindex technique to manage the focus state of the dropdown.
         // The current element will always have tabindex=0 which means that it can be tabbed to,
         // while all other items have tabindex=-1 so we can focus them when necessary.
@@ -42741,7 +42741,7 @@ var ExternalIcon = function (_a) {
 
 ;// CONCATENATED MODULE: ./node_modules/@cloudscape-design/components/button-dropdown/category-elements/styles.css.js
 
-    
+
     /* harmony default export */ const category_elements_styles_css = ({
   "header": "awsui_header_16mm3_qwnia_93",
   "disabled": "awsui_disabled_16mm3_qwnia_108",
@@ -42757,7 +42757,7 @@ var ExternalIcon = function (_a) {
   "expand-icon-right": "awsui_expand-icon-right_16mm3_qwnia_186",
   "items-list-container": "awsui_items-list-container_16mm3_qwnia_200"
 });
-  
+
 ;// CONCATENATED MODULE: ./node_modules/@cloudscape-design/components/button-dropdown/category-elements/expandable-category-element.js
 
 // Copyright Amazon.com, Inc. or its affiliates. All Rights Reserved.
@@ -42802,7 +42802,7 @@ var ExpandableCategoryElement = function (_a) {
             _b[category_elements_styles_css.disabled] = disabled,
             _b[category_elements_styles_css.highlighted] = highlighted,
             _b[category_elements_styles_css["is-focused"]] = isKeyboardHighlighted,
-            _b)), 
+            _b)),
         // We are using the roving tabindex technique to manage the focus state of the dropdown.
         // The current element will always have tabindex=0 which means that it can be tabbed to,
         // while all other items have tabindex=-1 so we can focus them when necessary.
@@ -42854,7 +42854,7 @@ var CategoryElement = function (_a) {
 
 ;// CONCATENATED MODULE: ./node_modules/@cloudscape-design/components/button-dropdown/mobile-expandable-group/styles.css.js
 
-    
+
     /* harmony default export */ const mobile_expandable_group_styles_css = ({
   "root": "awsui_root_14cnr_zbvdk_93",
   "trigger": "awsui_trigger_14cnr_zbvdk_106",
@@ -42862,7 +42862,7 @@ var CategoryElement = function (_a) {
   "nowrap": "awsui_nowrap_14cnr_zbvdk_120",
   "open": "awsui_open_14cnr_zbvdk_123"
 });
-  
+
 ;// CONCATENATED MODULE: ./node_modules/@cloudscape-design/components/button-dropdown/mobile-expandable-group/mobile-expandable-group.js
 // Copyright Amazon.com, Inc. or its affiliates. All Rights Reserved.
 // SPDX-License-Identifier: Apache-2.0
@@ -42920,7 +42920,7 @@ var MobileExpandableCategoryElement = function (_a) {
             _b[category_elements_styles_css["rolled-down"]] = expanded,
             _b[category_elements_styles_css.disabled] = disabled,
             _b[category_elements_styles_css["is-focused"]] = isKeyboardHighlighted,
-            _b)), 
+            _b)),
         // We are using the roving tabindex technique to manage the focus state of the dropdown.
         // The current element will always have tabindex=0 which means that it can be tabbed to,
         // while all other items have tabindex=-1 so we can focus them when necessary.
@@ -43364,12 +43364,12 @@ function useButtonDropdown(_a) {
 
 ;// CONCATENATED MODULE: ./node_modules/@cloudscape-design/components/internal/components/options-list/styles.css.js
 
-    
+
     /* harmony default export */ const options_list_styles_css = ({
   "options-list": "awsui_options-list_19gcf_fc5oi_93",
   "decrease-top-margin": "awsui_decrease-top-margin_19gcf_fc5oi_113"
 });
-  
+
 ;// CONCATENATED MODULE: ./node_modules/@cloudscape-design/components/internal/components/options-list/index.js
 
 // Copyright Amazon.com, Inc. or its affiliates. All Rights Reserved.
@@ -43421,7 +43421,7 @@ var OptionsList = function (_a, ref) {
 
 ;// CONCATENATED MODULE: ./node_modules/@cloudscape-design/components/box/styles.css.js
 
-    
+
     /* harmony default export */ const box_styles_css = ({
   "root": "awsui_root_18wu0_sz2t7_93",
   "box": "awsui_box_18wu0_sz2t7_205",
@@ -43613,7 +43613,7 @@ var OptionsList = function (_a, ref) {
   "f-left": "awsui_f-left_18wu0_sz2t7_997",
   "f-right": "awsui_f-right_18wu0_sz2t7_1001"
 });
-  
+
 ;// CONCATENATED MODULE: ./node_modules/@cloudscape-design/components/box/internal.js
 
 // Copyright Amazon.com, Inc. or its affiliates. All Rights Reserved.
@@ -43734,7 +43734,7 @@ var InternalButtonDropdown = react.forwardRef(function (_a, ref) {
 
 ;// CONCATENATED MODULE: ./node_modules/@cloudscape-design/components/internal/components/menu-dropdown/styles.css.js
 
-    
+
     /* harmony default export */ const menu_dropdown_styles_css = ({
   "button": "awsui_button_m5h9f_1qu3j_93",
   "expanded": "awsui_expanded_m5h9f_1qu3j_125",
@@ -43744,7 +43744,7 @@ var InternalButtonDropdown = react.forwardRef(function (_a, ref) {
   "text": "awsui_text_m5h9f_1qu3j_164",
   "icon": "awsui_icon_m5h9f_1qu3j_168"
 });
-  
+
 ;// CONCATENATED MODULE: ./node_modules/@cloudscape-design/components/internal/components/menu-dropdown/index.js
 
 // Copyright Amazon.com, Inc. or its affiliates. All Rights Reserved.
@@ -45172,7 +45172,7 @@ var header_Header = function (_a) {
         onBack && (react.createElement(button_internal
         // Used for test-utils, which require the selectable element to have a classname.
         // eslint-disable-next-line react/forbid-component-props
-        , { 
+        , {
             // Used for test-utils, which require the selectable element to have a classname.
             // eslint-disable-next-line react/forbid-component-props
             className: top_navigation_styles_css["overflow-menu-back-button"], ariaLabel: backIconAriaLabel, iconName: "angle-left", variant: "icon", onClick: function () { return onBack(); } })),
@@ -45181,7 +45181,7 @@ var header_Header = function (_a) {
             secondaryText && react.createElement("div", { className: top_navigation_styles_css["overflow-menu-header-text--secondary"] }, secondaryText)),
         react.createElement(button_internal
         // eslint-disable-next-line react/forbid-component-props
-        , { 
+        , {
             // eslint-disable-next-line react/forbid-component-props
             className: top_navigation_styles_css["overflow-menu-dismiss-button"], ariaLabel: dismissIconAriaLabel, iconName: "close", variant: "icon", onClick: function () { return onClose && onClose(); } })));
 };
@@ -45456,7 +45456,7 @@ function InternalTopNavigation(_a) {
         var showSearchUtility = isVirtual || (search && responsiveState.hideSearch);
         var showUtilities = isVirtual || !isSearchExpanded;
         var showMenuTrigger = isVirtual || menuTriggerVisible;
-        return (react.createElement(Wrapper, { ref: isVirtual ? virtualRef : mainRef, "aria-hidden": isVirtual ? true : undefined, 
+        return (react.createElement(Wrapper, { ref: isVirtual ? virtualRef : mainRef, "aria-hidden": isVirtual ? true : undefined,
             // Wrapper is an alias for "div" or "header".
             // eslint-disable-next-line react/forbid-component-props
             className: clsx_m(top_navigation_styles_css["top-navigation"], (_a = {},
@@ -45568,7 +45568,7 @@ applyDisplayName(Box, 'Box');
 
 ;// CONCATENATED MODULE: ./node_modules/@cloudscape-design/components/space-between/styles.css.js
 
-    
+
     /* harmony default export */ const space_between_styles_css = ({
   "root": "awsui_root_18582_66aol_93",
   "child": "awsui_child_18582_66aol_97",
@@ -45599,7 +45599,7 @@ applyDisplayName(Box, 'Box');
   "child-vertical-xl": "awsui_child-vertical-xl_18582_66aol_224",
   "child-vertical-xxl": "awsui_child-vertical-xxl_18582_66aol_228"
 });
-  
+
 // EXTERNAL MODULE: ./node_modules/react-keyed-flatten-children/index.js
 var react_keyed_flatten_children = __webpack_require__(262);
 ;// CONCATENATED MODULE: ./node_modules/@cloudscape-design/components/space-between/internal.js
@@ -45692,7 +45692,7 @@ applyDisplayName(Spinner, 'Spinner');
 
 ;// CONCATENATED MODULE: ./node_modules/@cloudscape-design/components/cards/styles.css.js
 
-    
+
     /* harmony default export */ const cards_styles_css = ({
   "card-inner": "awsui_card-inner_p8a6i_1f4yn_97",
   "root": "awsui_root_p8a6i_1f4yn_117",
@@ -45732,7 +45732,7 @@ applyDisplayName(Spinner, 'Spinner');
   "section-header": "awsui_section-header_p8a6i_1f4yn_302",
   "section-content": "awsui_section-content_p8a6i_1f4yn_308"
 });
-  
+
 ;// CONCATENATED MODULE: ./node_modules/@cloudscape-design/components/cards/cards-layout-helper.js
 var WIDTHS = [1920, 1400, 1200, 992, 768];
 // Transform the array of widths into a valid cardsPerRow property that is used as default
@@ -45767,7 +45767,7 @@ var getCardsPerRow = function (width, config) {
 
 ;// CONCATENATED MODULE: ./node_modules/@cloudscape-design/components/table/styles.css.js
 
-    
+
     /* harmony default export */ const table_styles_css = ({
   "root": "awsui_root_wih1l_1xb6i_97",
   "tools": "awsui_tools_wih1l_1xb6i_106",
@@ -45803,7 +45803,7 @@ var getCardsPerRow = function (width, config) {
   "row": "awsui_row_wih1l_1xb6i_295",
   "row-selected": "awsui_row-selected_wih1l_1xb6i_296"
 });
-  
+
 ;// CONCATENATED MODULE: ./node_modules/@cloudscape-design/components/table/tools-header.js
 // Copyright Amazon.com, Inc. or its affiliates. All Rights Reserved.
 // SPDX-License-Identifier: Apache-2.0
@@ -45864,13 +45864,13 @@ function checkSortingState(columnDefinitions, sortingComparator) {
 
 ;// CONCATENATED MODULE: ./node_modules/@cloudscape-design/components/table/selection-control/styles.css.js
 
-    
+
     /* harmony default export */ const selection_control_styles_css = ({
   "root": "awsui_root_1ut8b_1vvgk_93",
   "label": "awsui_label_1ut8b_1vvgk_97",
   "stud": "awsui_stud_1ut8b_1vvgk_111"
 });
-  
+
 ;// CONCATENATED MODULE: ./node_modules/@cloudscape-design/components/table/use-selection.js
 var _a, _b, _c;
 
@@ -46062,7 +46062,7 @@ function useSelection(_a) {
 
 ;// CONCATENATED MODULE: ./node_modules/@cloudscape-design/components/internal/components/abstract-switch/styles.css.js
 
-    
+
     /* harmony default export */ const abstract_switch_styles_css = ({
   "content": "awsui_content_1wepg_3hhd4_93",
   "description": "awsui_description_1wepg_3hhd4_94",
@@ -46077,7 +46077,7 @@ function useSelection(_a) {
   "description-disabled": "awsui_description-disabled_1wepg_3hhd4_148",
   "control": "awsui_control_1wepg_3hhd4_153"
 });
-  
+
 ;// CONCATENATED MODULE: ./node_modules/@cloudscape-design/components/internal/components/abstract-switch/index.js
 
 // Copyright Amazon.com, Inc. or its affiliates. All Rights Reserved.
@@ -46131,19 +46131,19 @@ function AbstractSwitch(_a) {
 
 ;// CONCATENATED MODULE: ./node_modules/@cloudscape-design/components/checkbox/styles.css.js
 
-    
+
     /* harmony default export */ const checkbox_styles_css = ({
   "root": "awsui_root_k2y2q_5zih0_93",
   "checkbox-control": "awsui_checkbox-control_k2y2q_5zih0_105",
   "outline": "awsui_outline_k2y2q_5zih0_113"
 });
-  
+
 ;// CONCATENATED MODULE: ./node_modules/@cloudscape-design/components/internal/components/checkbox-icon/styles.scoped.css
 // extracted by mini-css-extract-plugin
 
 ;// CONCATENATED MODULE: ./node_modules/@cloudscape-design/components/internal/components/checkbox-icon/styles.css.js
 
-    
+
     /* harmony default export */ const checkbox_icon_styles_css = ({
   "root": "awsui_root_1fn7j_18k9z_93",
   "styled-box": "awsui_styled-box_1fn7j_18k9z_100",
@@ -46153,7 +46153,7 @@ function AbstractSwitch(_a) {
   "styled-line": "awsui_styled-line_1fn7j_18k9z_124",
   "styled-line-disabled": "awsui_styled-line-disabled_1fn7j_18k9z_129"
 });
-  
+
 ;// CONCATENATED MODULE: ./node_modules/@cloudscape-design/components/internal/components/checkbox-icon/index.js
 
 // Copyright Amazon.com, Inc. or its affiliates. All Rights Reserved.
@@ -46245,12 +46245,12 @@ var InternalCheckbox = react.forwardRef(function (_a, ref) {
             checkboxRef.current.indeterminate = Boolean(indeterminate);
         }
     });
-    return (react.createElement(AbstractSwitch, tslib_es6_assign({}, baseProps, { className: clsx_m(checkbox_styles_css.root, baseProps.className), controlClassName: checkbox_styles_css["checkbox-control"], outlineClassName: checkbox_styles_css.outline, controlId: controlId, disabled: disabled, label: children, description: description, descriptionBottomPadding: true, ariaLabel: ariaLabel, ariaLabelledby: ariaLabelledby, ariaDescribedby: ariaDescribedby, nativeControl: function (nativeControlProps) { return (react.createElement("input", tslib_es6_assign({}, nativeControlProps, { ref: checkboxRef, type: "checkbox", checked: checked, name: name, tabIndex: tabIndex, onFocus: function () { return fireNonCancelableEvent(onFocus); }, onBlur: function () { return fireNonCancelableEvent(onBlur); }, 
+    return (react.createElement(AbstractSwitch, tslib_es6_assign({}, baseProps, { className: clsx_m(checkbox_styles_css.root, baseProps.className), controlClassName: checkbox_styles_css["checkbox-control"], outlineClassName: checkbox_styles_css.outline, controlId: controlId, disabled: disabled, label: children, description: description, descriptionBottomPadding: true, ariaLabel: ariaLabel, ariaLabelledby: ariaLabelledby, ariaDescribedby: ariaDescribedby, nativeControl: function (nativeControlProps) { return (react.createElement("input", tslib_es6_assign({}, nativeControlProps, { ref: checkboxRef, type: "checkbox", checked: checked, name: name, tabIndex: tabIndex, onFocus: function () { return fireNonCancelableEvent(onFocus); }, onBlur: function () { return fireNonCancelableEvent(onBlur); },
             // empty handler to suppress React controllability warning
             onChange: function () { } }))); }, onClick: function () {
             var _a;
             (_a = checkboxRef.current) === null || _a === void 0 ? void 0 : _a.focus();
-            fireNonCancelableEvent(onChange, 
+            fireNonCancelableEvent(onChange,
             // for deterministic transitions "indeterminate" -> "checked" -> "unchecked"
             indeterminate ? { checked: true, indeterminate: false } : { checked: !checked, indeterminate: false });
         }, styledControl: react.createElement(checkbox_icon, { checked: checked, indeterminate: indeterminate, disabled: disabled }), __internalRootRef: __internalRootRef })));
@@ -46262,7 +46262,7 @@ var InternalCheckbox = react.forwardRef(function (_a, ref) {
 
 ;// CONCATENATED MODULE: ./node_modules/@cloudscape-design/components/radio-group/styles.css.js
 
-    
+
     /* harmony default export */ const radio_group_styles_css = ({
   "root": "awsui_root_1mabk_1y9l8_93",
   "radio": "awsui_radio_1mabk_1y9l8_105",
@@ -46274,7 +46274,7 @@ var InternalCheckbox = react.forwardRef(function (_a, ref) {
   "styled-circle-fill": "awsui_styled-circle-fill_1mabk_1y9l8_153",
   "styled-circle-checked": "awsui_styled-circle-checked_1mabk_1y9l8_159"
 });
-  
+
 ;// CONCATENATED MODULE: ./node_modules/@cloudscape-design/components/radio-group/radio-button.js
 
 // Copyright Amazon.com, Inc. or its affiliates. All Rights Reserved.
@@ -46292,7 +46292,7 @@ var InternalCheckbox = react.forwardRef(function (_a, ref) {
     var isVisualRefresh = useVisualRefresh();
     var radioButtonRef = (0,react.useRef)(null);
     var mergedRefs = useMergeRefs(radioButtonRef, ref);
-    return (react.createElement(AbstractSwitch, { className: clsx_m(radio_group_styles_css.radio, description && radio_group_styles_css["radio--has-description"]), controlClassName: radio_group_styles_css["radio-control"], outlineClassName: radio_group_styles_css.outline, label: label, description: description, disabled: disabled, controlId: controlId, nativeControl: function (nativeControlProps) { return (react.createElement("input", tslib_es6_assign({}, nativeControlProps, { type: "radio", ref: mergedRefs, name: name, value: value, checked: checked, 
+    return (react.createElement(AbstractSwitch, { className: clsx_m(radio_group_styles_css.radio, description && radio_group_styles_css["radio--has-description"]), controlClassName: radio_group_styles_css["radio-control"], outlineClassName: radio_group_styles_css.outline, label: label, description: description, disabled: disabled, controlId: controlId, nativeControl: function (nativeControlProps) { return (react.createElement("input", tslib_es6_assign({}, nativeControlProps, { type: "radio", ref: mergedRefs, name: name, value: value, checked: checked,
             // empty handler to suppress React controllability warning
             onChange: function () { } }))); }, onClick: function () {
             var _a;
@@ -46369,7 +46369,7 @@ function SelectionControl(_a) {
 
 ;// CONCATENATED MODULE: ./node_modules/@cloudscape-design/components/status-indicator/styles.css.js
 
-    
+
     /* harmony default export */ const status_indicator_styles_css = ({
   "icon-shake": "awsui_icon-shake_1cbgc_1dmb0_97",
   "awsui-motion-shake-horizontally": "awsui_awsui-motion-shake-horizontally_1cbgc_1dmb0_1",
@@ -46392,7 +46392,7 @@ function SelectionControl(_a) {
   "container": "awsui_container_1cbgc_1dmb0_125",
   "overflow-ellipsis": "awsui_overflow-ellipsis_1cbgc_1dmb0_201"
 });
-  
+
 ;// CONCATENATED MODULE: ./node_modules/@cloudscape-design/components/status-indicator/internal.js
 
 // Copyright Amazon.com, Inc. or its affiliates. All Rights Reserved.
@@ -46675,7 +46675,7 @@ applyDisplayName(link_Link, 'Link');
 
 ;// CONCATENATED MODULE: ./node_modules/@cloudscape-design/components/input/styles.css.js
 
-    
+
     /* harmony default export */ const input_styles_css = ({
   "root": "awsui_root_2rhyz_dvvio_93",
   "input": "awsui_input_2rhyz_dvvio_97",
@@ -46691,7 +46691,7 @@ applyDisplayName(link_Link, 'Link');
   "input-icon-left": "awsui_input-icon-left_2rhyz_dvvio_230",
   "input-icon-right": "awsui_input-icon-right_2rhyz_dvvio_235"
 });
-  
+
 ;// CONCATENATED MODULE: ./node_modules/@cloudscape-design/components/input/utils.js
 // Copyright Amazon.com, Inc. or its affiliates. All Rights Reserved.
 // SPDX-License-Identifier: Apache-2.0
@@ -46812,7 +46812,7 @@ function InternalInput(_a, ref) {
     var attributes = tslib_es6_assign(tslib_es6_assign({ 'aria-label': ariaLabel, 'aria-labelledby': ariaLabelledby, 'aria-describedby': ariaDescribedby, name: name, placeholder: placeholder, autoFocus: autoFocus, id: controlId, className: clsx_m(input_styles_css.input, type && input_styles_css["input-type-".concat(type)], __rightIcon && input_styles_css["input-has-icon-right"], __leftIcon && input_styles_css["input-has-icon-left"], __noBorderRadius && input_styles_css["input-has-no-border-radius"], (_b = {},
             _b[input_styles_css["input-readonly"]] = readOnly,
             _b[input_styles_css["input-invalid"]] = invalid,
-            _b)), autoComplete: convertAutoComplete(autoComplete), disabled: disabled, readOnly: readOnly, type: type, step: step, inputMode: inputMode, spellCheck: spellcheck, onKeyDown: onKeyDown && (function (event) { return fireKeyboardEvent(onKeyDown, event); }), onKeyUp: onKeyUp && (function (event) { return fireKeyboardEvent(onKeyUp, event); }), 
+            _b)), autoComplete: convertAutoComplete(autoComplete), disabled: disabled, readOnly: readOnly, type: type, step: step, inputMode: inputMode, spellCheck: spellcheck, onKeyDown: onKeyDown && (function (event) { return fireKeyboardEvent(onKeyDown, event); }), onKeyUp: onKeyUp && (function (event) { return fireKeyboardEvent(onKeyUp, event); }),
         // We set a default value on the component in order to force it into the controlled mode.
         value: value !== null && value !== void 0 ? value : '', onChange: onChange && (function (event) { return handleChange(event.target.value); }), onBlur: function (e) {
             onBlur && fireNonCancelableEvent(onBlur);
@@ -46861,14 +46861,14 @@ function InternalInput(_a, ref) {
 
 ;// CONCATENATED MODULE: ./node_modules/@cloudscape-design/components/text-filter/styles.css.js
 
-    
+
     /* harmony default export */ const text_filter_styles_css = ({
   "root": "awsui_root_1sdq3_mhcwk_93",
   "input": "awsui_input_1sdq3_mhcwk_107",
   "results": "awsui_results_1sdq3_mhcwk_111",
   "results-visible": "awsui_results-visible_1sdq3_mhcwk_117"
 });
-  
+
 ;// CONCATENATED MODULE: ./node_modules/@cloudscape-design/components/text-filter/internal.js
 
 // Copyright Amazon.com, Inc. or its affiliates. All Rights Reserved.
@@ -46912,7 +46912,7 @@ applyDisplayName(TextFilter, 'TextFilter');
 
 ;// CONCATENATED MODULE: ./node_modules/@cloudscape-design/components/pagination/styles.css.js
 
-    
+
     /* harmony default export */ const pagination_styles_css = ({
   "root": "awsui_root_fvjdu_yr7md_93",
   "button": "awsui_button_fvjdu_yr7md_111",
@@ -46924,7 +46924,7 @@ applyDisplayName(TextFilter, 'TextFilter');
   "page-item": "awsui_page-item_fvjdu_yr7md_172",
   "root-disabled": "awsui_root-disabled_fvjdu_yr7md_188"
 });
-  
+
 ;// CONCATENATED MODULE: ./node_modules/@cloudscape-design/components/pagination/utils.js
 // Copyright Amazon.com, Inc. or its affiliates. All Rights Reserved.
 // SPDX-License-Identifier: Apache-2.0
@@ -47095,7 +47095,7 @@ var isSorted = function (column, sortingColumn) {
 
 ;// CONCATENATED MODULE: ./node_modules/@cloudscape-design/components/table/header-cell/styles.css.js
 
-    
+
     /* harmony default export */ const header_cell_styles_css = ({
   "header-cell": "awsui_header-cell_1spae_lzlsa_93",
   "header-cell-sticky": "awsui_header-cell-sticky_1spae_lzlsa_105",
@@ -47117,13 +47117,13 @@ var isSorted = function (column, sortingColumn) {
   "is-visual-refresh": "awsui_is-visual-refresh_1spae_lzlsa_221",
   "has-striped-rows": "awsui_has-striped-rows_1spae_lzlsa_232"
 });
-  
+
 ;// CONCATENATED MODULE: ./node_modules/@cloudscape-design/components/table/resizer/styles.scoped.css
 // extracted by mini-css-extract-plugin
 
 ;// CONCATENATED MODULE: ./node_modules/@cloudscape-design/components/table/resizer/styles.css.js
 
-    
+
     /* harmony default export */ const resizer_styles_css = ({
   "resize-active": "awsui_resize-active_x7peu_1tckh_93",
   "resize-active-with-focus": "awsui_resize-active-with-focus_x7peu_1tckh_93",
@@ -47132,7 +47132,7 @@ var isSorted = function (column, sortingColumn) {
   "has-focus": "awsui_has-focus_x7peu_1tckh_123",
   "tracker": "awsui_tracker_x7peu_1tckh_146"
 });
-  
+
 ;// CONCATENATED MODULE: ./node_modules/@cloudscape-design/components/table/use-column-widths.js
 
 // Copyright Amazon.com, Inc. or its affiliates. All Rights Reserved.
@@ -47491,7 +47491,7 @@ var Thead = react.forwardRef(function (_a, outerRef) {
 
 ;// CONCATENATED MODULE: ./node_modules/@cloudscape-design/components/table/body-cell/styles.css.js
 
-    
+
     /* harmony default export */ const body_cell_styles_css = ({
   "body-cell": "awsui_body-cell_c6tup_17cg6_93",
   "body-cell-wrap": "awsui_body-cell-wrap_c6tup_17cg6_102",
@@ -47512,7 +47512,7 @@ var Thead = react.forwardRef(function (_a, outerRef) {
   "body-cell-editor-row": "awsui_body-cell-editor-row_c6tup_17cg6_223",
   "body-cell-editor-controls": "awsui_body-cell-editor-controls_c6tup_17cg6_233"
 });
-  
+
 ;// CONCATENATED MODULE: ./node_modules/@cloudscape-design/components/table/body-cell/td-element.js
 
 // Copyright Amazon.com, Inc. or its affiliates. All Rights Reserved.
@@ -47530,7 +47530,7 @@ var TableTdElement = react.forwardRef(function (_a, ref) {
 
 ;// CONCATENATED MODULE: ./node_modules/@cloudscape-design/components/grid/styles.css.js
 
-    
+
     /* harmony default export */ const grid_styles_css = ({
   "grid": "awsui_grid_14yj0_1ecf3_93",
   "no-gutters": "awsui_no-gutters_14yj0_1ecf3_107",
@@ -47586,7 +47586,7 @@ var TableTdElement = react.forwardRef(function (_a, ref) {
   "offset-11": "awsui_offset-11_14yj0_1ecf3_276",
   "restore-pointer-events": "awsui_restore-pointer-events_14yj0_1ecf3_280"
 });
-  
+
 ;// CONCATENATED MODULE: ./node_modules/@cloudscape-design/components/grid/internal.js
 
 // Copyright Amazon.com, Inc. or its affiliates. All Rights Reserved.
@@ -47686,7 +47686,7 @@ function getGridDefinition(stretch, secondaryControlPresent, isRefresh) {
 
 ;// CONCATENATED MODULE: ./node_modules/@cloudscape-design/components/form-field/styles.css.js
 
-    
+
     /* harmony default export */ const form_field_styles_css = ({
   "error-icon-shake-wrapper": "awsui_error-icon-shake-wrapper_14mhv_yshzd_97",
   "awsui-motion-shake-horizontally": "awsui_awsui-motion-shake-horizontally_14mhv_yshzd_1",
@@ -47708,7 +47708,7 @@ function getGridDefinition(stretch, secondaryControlPresent, isRefresh) {
   "error__message": "awsui_error__message_14mhv_yshzd_234",
   "visually-hidden": "awsui_visually-hidden_14mhv_yshzd_238"
 });
-  
+
 ;// CONCATENATED MODULE: ./node_modules/@cloudscape-design/components/form-field/internal.js
 
 // Copyright Amazon.com, Inc. or its affiliates. All Rights Reserved.
@@ -48139,7 +48139,7 @@ function StickyHeader(_a, ref) {
     return (react.createElement("div", { className: clsx_m(table_styles_css["header-secondary"], table_styles_css["variant-".concat(variant)], (_b = {},
             _b[table_styles_css.stuck] = isStuck,
             _b[table_styles_css["table-has-header"]] = tableHasHeader,
-            _b)), "aria-hidden": true, 
+            _b)), "aria-hidden": true,
         // Prevents receiving focus in Firefox. Focus on the overflowing table is sufficient
         // to scroll the table horizontally
         tabIndex: -1, ref: secondaryWrapperRef, onScroll: onScroll },
@@ -48642,7 +48642,7 @@ var InternalTable = react.forwardRef(function (_a, ref) {
                     _b)), onScroll: handleScroll }, wrapperProps, focusVisibleProps),
                 !!renderAriaLive && !!firstIndex && (react.createElement(live_region, null,
                     react.createElement("span", null, renderAriaLive({ totalItemsCount: totalItemsCount, firstIndex: firstIndex, lastIndex: firstIndex + items.length })))),
-                react.createElement("table", { ref: tableRef, className: clsx_m(table_styles_css.table, resizableColumns && table_styles_css["table-layout-fixed"]), 
+                react.createElement("table", { ref: tableRef, className: clsx_m(table_styles_css.table, resizableColumns && table_styles_css["table-layout-fixed"]),
                     // Browsers have weird mechanism to guess whether it's a data table or a layout table.
                     // If we state explicitly, they get it always correctly even with low number of rows.
                     role: "table", "aria-label": ariaLabels === null || ariaLabels === void 0 ? void 0 : ariaLabels.tableLabel, "aria-rowcount": totalItemsCount ? totalItemsCount + 1 : -1 },
@@ -48714,7 +48714,7 @@ applyDisplayName(Table, 'Table');
 
 ;// CONCATENATED MODULE: ./node_modules/@cloudscape-design/components/content-layout/styles.css.js
 
-    
+
     /* harmony default export */ const content_layout_styles_css = ({
   "layout": "awsui_layout_5gtk3_1onm4_99",
   "is-visual-refresh": "awsui_is-visual-refresh_5gtk3_1onm4_99",
@@ -48724,7 +48724,7 @@ applyDisplayName(Table, 'Table');
   "has-breadcrumbs": "awsui_has-breadcrumbs_5gtk3_1onm4_132",
   "content": "awsui_content_5gtk3_1onm4_141"
 });
-  
+
 ;// CONCATENATED MODULE: ./node_modules/@cloudscape-design/components/content-layout/index.js
 
 // Copyright Amazon.com, Inc. or its affiliates. All Rights Reserved.
@@ -48781,7 +48781,7 @@ function repeat(value, times) {
 
 ;// CONCATENATED MODULE: ./node_modules/@cloudscape-design/components/column-layout/styles.css.js
 
-    
+
     /* harmony default export */ const column_layout_styles_css = ({
   "column-layout": "awsui_column-layout_vvxn7_1qidu_93",
   "grid": "awsui_grid_vvxn7_1qidu_104",
@@ -48797,7 +48797,7 @@ function repeat(value, times) {
   "grid-vertical-borders": "awsui_grid-vertical-borders_vvxn7_1qidu_153",
   "grid-horizontal-borders": "awsui_grid-horizontal-borders_vvxn7_1qidu_186"
 });
-  
+
 ;// CONCATENATED MODULE: ./node_modules/@cloudscape-design/components/column-layout/internal.js
 
 // Copyright Amazon.com, Inc. or its affiliates. All Rights Reserved.
@@ -48864,7 +48864,7 @@ applyDisplayName(ColumnLayout, 'ColumnLayout');
 
 ;// CONCATENATED MODULE: ./node_modules/@cloudscape-design/components/breadcrumb-group/styles.css.js
 
-    
+
     /* harmony default export */ const breadcrumb_group_styles_css = ({
   "breadcrumb-group": "awsui_breadcrumb-group_d19fg_zzbk1_93",
   "item": "awsui_item_d19fg_zzbk1_105",
@@ -48873,13 +48873,13 @@ applyDisplayName(ColumnLayout, 'ColumnLayout');
   "icon": "awsui_icon_d19fg_zzbk1_134",
   "mobile": "awsui_mobile_d19fg_zzbk1_138"
 });
-  
+
 ;// CONCATENATED MODULE: ./node_modules/@cloudscape-design/components/breadcrumb-group/item/styles.scoped.css
 // extracted by mini-css-extract-plugin
 
 ;// CONCATENATED MODULE: ./node_modules/@cloudscape-design/components/breadcrumb-group/item/styles.css.js
 
-    
+
     /* harmony default export */ const item_styles_css = ({
   "link": "awsui_link_1kosq_zkw11_93",
   "breadcrumb": "awsui_breadcrumb_1kosq_zkw11_97",
@@ -48891,7 +48891,7 @@ applyDisplayName(ColumnLayout, 'ColumnLayout');
   "virtual-item": "awsui_virtual-item_1kosq_zkw11_168",
   "item-popover": "awsui_item-popover_1kosq_zkw11_175"
 });
-  
+
 ;// CONCATENATED MODULE: ./node_modules/@cloudscape-design/components/breadcrumb-group/item/item.js
 
 // Copyright Amazon.com, Inc. or its affiliates. All Rights Reserved.
@@ -49068,7 +49068,7 @@ applyDisplayName(BreadcrumbGroup, 'BreadcrumbGroup');
 
 ;// CONCATENATED MODULE: ./node_modules/@cloudscape-design/components/alert/styles.css.js
 
-    
+
     /* harmony default export */ const alert_styles_css = ({
   "alert": "awsui_alert_mx3cw_wdted_93",
   "awsui-motion-fade-in": "awsui_awsui-motion-fade-in_mx3cw_wdted_1",
@@ -49090,7 +49090,7 @@ applyDisplayName(BreadcrumbGroup, 'BreadcrumbGroup');
   "type-success": "awsui_type-success_mx3cw_wdted_238",
   "type-info": "awsui_type-info_mx3cw_wdted_246"
 });
-  
+
 ;// CONCATENATED MODULE: ./node_modules/@cloudscape-design/components/alert/internal.js
 
 // Copyright Amazon.com, Inc. or its affiliates. All Rights Reserved.
@@ -49141,7 +49141,7 @@ function InternalAlert(_a) {
 
 ;// CONCATENATED MODULE: ./node_modules/@cloudscape-design/components/form/styles.css.js
 
-    
+
     /* harmony default export */ const form_styles_css = ({
   "root": "awsui_root_1i0s3_ntsvl_93",
   "header": "awsui_header_1i0s3_ntsvl_104",
@@ -49152,7 +49152,7 @@ function InternalAlert(_a) {
   "secondary-actions": "awsui_secondary-actions_1i0s3_ntsvl_129",
   "actions": "awsui_actions_1i0s3_ntsvl_120"
 });
-  
+
 ;// CONCATENATED MODULE: ./node_modules/@cloudscape-design/components/form/internal.js
 
 // Copyright Amazon.com, Inc. or its affiliates. All Rights Reserved.
@@ -49550,12 +49550,12 @@ var use_previous_usePrevious = function (value) {
 
 ;// CONCATENATED MODULE: ./node_modules/@cloudscape-design/components/internal/components/dropdown-status/styles.css.js
 
-    
+
     /* harmony default export */ const dropdown_status_styles_css = ({
   "root": "awsui_root_vrgzu_1obpu_93",
   "recovery": "awsui_recovery_vrgzu_1obpu_105"
 });
-  
+
 ;// CONCATENATED MODULE: ./node_modules/@cloudscape-design/components/internal/components/dropdown-status/index.js
 // Copyright Amazon.com, Inc. or its affiliates. All Rights Reserved.
 // SPDX-License-Identifier: Apache-2.0
@@ -49601,13 +49601,13 @@ var useDropdownStatus = function (_a) {
 
 ;// CONCATENATED MODULE: ./node_modules/@cloudscape-design/components/internal/components/dropdown-footer/styles.css.js
 
-    
+
     /* harmony default export */ const dropdown_footer_styles_css = ({
   "root": "awsui_root_1afi9_19bf4_93",
   "hidden": "awsui_hidden_1afi9_19bf4_103",
   "no-items": "awsui_no-items_1afi9_19bf4_106"
 });
-  
+
 ;// CONCATENATED MODULE: ./node_modules/@cloudscape-design/components/internal/components/dropdown-footer/index.js
 // Copyright Amazon.com, Inc. or its affiliates. All Rights Reserved.
 // SPDX-License-Identifier: Apache-2.0
@@ -49629,13 +49629,13 @@ var DropdownFooter = function (_a) {
 
 ;// CONCATENATED MODULE: ./node_modules/@cloudscape-design/components/autosuggest/styles.css.js
 
-    
+
     /* harmony default export */ const autosuggest_styles_css = ({
   "root": "awsui_root_12hwc_12ujv_5",
   "layout-strut": "awsui_layout-strut_12hwc_12ujv_9",
   "list-bottom": "awsui_list-bottom_12hwc_12ujv_15"
 });
-  
+
 ;// CONCATENATED MODULE: ./node_modules/@cloudscape-design/components/select/utils/check-option-value-field.js
 // Copyright Amazon.com, Inc. or its affiliates. All Rights Reserved.
 // SPDX-License-Identifier: Apache-2.0
@@ -50169,7 +50169,7 @@ function calculateRange(_ref4) {
 
 ;// CONCATENATED MODULE: ./node_modules/@cloudscape-design/components/internal/components/option/styles.css.js
 
-    
+
     /* harmony default export */ const option_styles_css = ({
   "option": "awsui_option_1p2cx_1tubf_97",
   "disabled": "awsui_disabled_1p2cx_1tubf_113",
@@ -50187,7 +50187,7 @@ function calculateRange(_ref4) {
   "filtering-match-highlight": "awsui_filtering-match-highlight_1p2cx_1tubf_191",
   "trigger-variant": "awsui_trigger-variant_1p2cx_1tubf_206"
 });
-  
+
 ;// CONCATENATED MODULE: ./node_modules/@cloudscape-design/components/internal/components/option/highlight-match.js
 // Copyright Amazon.com, Inc. or its affiliates. All Rights Reserved.
 // SPDX-License-Identifier: Apache-2.0
@@ -50343,7 +50343,7 @@ var Option = function (_a) {
 
 ;// CONCATENATED MODULE: ./node_modules/@cloudscape-design/components/internal/components/selectable-item/styles.css.js
 
-    
+
     /* harmony default export */ const selectable_item_styles_css = ({
   "selectable-item": "awsui_selectable-item_15o6u_1g6vu_93",
   "pad-bottom": "awsui_pad-bottom_15o6u_1g6vu_113",
@@ -50362,7 +50362,7 @@ var Option = function (_a) {
   "screenreader-content": "awsui_screenreader-content_15o6u_1g6vu_214",
   "option-content": "awsui_option-content_15o6u_1g6vu_220"
 });
-  
+
 ;// CONCATENATED MODULE: ./node_modules/@cloudscape-design/components/internal/components/selectable-item/index.js
 
 // Copyright Amazon.com, Inc. or its affiliates. All Rights Reserved.
@@ -50498,7 +50498,7 @@ var PlainList = function (_a) {
             scrollElementIntoView(item);
         }
     }, [autosuggestItemsState.highlightType, autosuggestItemsState.highlightedIndex]);
-    return (react.createElement(options_list, tslib_es6_assign({}, menuProps, { onLoadMore: handleLoadMore, open: true, ref: listRef, 
+    return (react.createElement(options_list, tslib_es6_assign({}, menuProps, { onLoadMore: handleLoadMore, open: true, ref: listRef,
         // to prevent closing the list when clicking the scrollbar on IE11
         nativeAttributes: { unselectable: 'on' } }),
         autosuggestItemsState.items.map(function (item, index) {
@@ -50542,7 +50542,7 @@ var VirtualList = function (_a) {
             rowVirtualizer.scrollToIndex(autosuggestItemsState.highlightedIndex);
         }
     }, [autosuggestItemsState.highlightType, autosuggestItemsState.highlightedIndex, rowVirtualizer]);
-    return (react.createElement(options_list, tslib_es6_assign({}, menuProps, { onLoadMore: handleLoadMore, ref: scrollRef, open: true, 
+    return (react.createElement(options_list, tslib_es6_assign({}, menuProps, { onLoadMore: handleLoadMore, ref: scrollRef, open: true,
         // to prevent closing the list when clicking the scrollbar on IE11
         nativeAttributes: { unselectable: 'on' } }),
         react.createElement("div", { "aria-hidden": "true", key: "total-size", className: autosuggest_styles_css["layout-strut"], style: { height: rowVirtualizer.totalSize + (autosuggestItemsState.items.length === 1 ? 1 : 0) } }),
@@ -50671,12 +50671,12 @@ var useAutosuggestLoadMore = function (_a) {
 
 ;// CONCATENATED MODULE: ./node_modules/@cloudscape-design/components/internal/components/autosuggest-input/styles.css.js
 
-    
+
     /* harmony default export */ const autosuggest_input_styles_css = ({
   "dropdown-footer": "awsui_dropdown-footer_vm8qf_jxdvh_5",
   "dropdown-content": "awsui_dropdown-content_vm8qf_jxdvh_10"
 });
-  
+
 ;// CONCATENATED MODULE: ./node_modules/@cloudscape-design/components/internal/components/autosuggest-input/index.js
 // Copyright Amazon.com, Inc. or its affiliates. All Rights Reserved.
 // SPDX-License-Identifier: Apache-2.0
@@ -53334,17 +53334,17 @@ var Input_excluded=["name","control","label","info","constraintText","descriptio
 
 ;// CONCATENATED MODULE: ./node_modules/@cloudscape-design/components/select/styles.css.js
 
-    
+
     /* harmony default export */ const select_styles_css = ({
   "root": "awsui_root_r2vco_1bz5w_93"
 });
-  
+
 ;// CONCATENATED MODULE: ./node_modules/@cloudscape-design/components/select/parts/styles.scoped.css
 // extracted by mini-css-extract-plugin
 
 ;// CONCATENATED MODULE: ./node_modules/@cloudscape-design/components/select/parts/styles.css.js
 
-    
+
     /* harmony default export */ const parts_styles_css = ({
   "placeholder": "awsui_placeholder_dwuol_1dl3j_93",
   "item": "awsui_item_dwuol_1dl3j_98",
@@ -53356,7 +53356,7 @@ var Input_excluded=["name","control","label","info","constraintText","descriptio
   "selected-icon": "awsui_selected-icon_dwuol_1dl3j_150",
   "show-label-tag": "awsui_show-label-tag_dwuol_1dl3j_154"
 });
-  
+
 ;// CONCATENATED MODULE: ./node_modules/@cloudscape-design/components/select/parts/filter.js
 
 // Copyright Amazon.com, Inc. or its affiliates. All Rights Reserved.
@@ -53378,7 +53378,7 @@ var Filter = react.forwardRef(function (_a, ref) {
 
 ;// CONCATENATED MODULE: ./node_modules/@cloudscape-design/components/internal/components/button-trigger/styles.css.js
 
-    
+
     /* harmony default export */ const button_trigger_styles_css = ({
   "button-trigger": "awsui_button-trigger_18eso_1nqbt_97",
   "arrow": "awsui_arrow_18eso_1nqbt_97",
@@ -53390,7 +53390,7 @@ var Filter = react.forwardRef(function (_a, ref) {
   "read-only": "awsui_read-only_18eso_1nqbt_169",
   "invalid": "awsui_invalid_18eso_1nqbt_186"
 });
-  
+
 ;// CONCATENATED MODULE: ./node_modules/@cloudscape-design/components/internal/components/button-trigger/index.js
 
 // Copyright Amazon.com, Inc. or its affiliates. All Rights Reserved.
@@ -54425,7 +54425,7 @@ function useVersionsFetch(fetchVersions) {
 
 ;// CONCATENATED MODULE: ./node_modules/@cloudscape-design/components/s3-resource-selector/s3-in-context/styles.css.js
 
-    
+
     /* harmony default export */ const s3_in_context_styles_css = ({
   "root": "awsui_root_1vtzr_7zub1_9",
   "view-button": "awsui_view-button_1vtzr_7zub1_13",
@@ -54435,7 +54435,7 @@ function useVersionsFetch(fetchVersions) {
   "layout-version": "awsui_layout-version_1vtzr_7zub1_35",
   "layout-divider": "awsui_layout-divider_1vtzr_7zub1_40"
 });
-  
+
 ;// CONCATENATED MODULE: ./node_modules/@cloudscape-design/components/s3-resource-selector/s3-in-context/search-input.js
 
 // Copyright Amazon.com, Inc. or its affiliates. All Rights Reserved.
@@ -54518,7 +54518,7 @@ var S3InContext = react.forwardRef(function (_a, ref) {
 
 ;// CONCATENATED MODULE: ./node_modules/@cloudscape-design/components/modal/styles.css.js
 
-    
+
     /* harmony default export */ const modal_styles_css = ({
   "dialog": "awsui_dialog_1d2i7_nzsqa_105",
   "modal-slide-up": "awsui_modal-slide-up_1d2i7_nzsqa_1",
@@ -54543,7 +54543,7 @@ var S3InContext = react.forwardRef(function (_a, ref) {
   "dismiss-control": "awsui_dismiss-control_1d2i7_nzsqa_312",
   "modal-open": "awsui_modal-open_1d2i7_nzsqa_316"
 });
-  
+
 ;// CONCATENATED MODULE: ./node_modules/@cloudscape-design/components/modal/body-scroll.js
 // Copyright Amazon.com, Inc. or its affiliates. All Rights Reserved.
 // SPDX-License-Identifier: Apache-2.0
@@ -54867,7 +54867,7 @@ function joinObjectPath(segments) {
 
 function ObjectsTable(_a) {
     var forwardFocusRef = _a.forwardFocusRef, pathSegments = _a.pathSegments, i18nStrings = _a.i18nStrings, isVisualRefresh = _a.isVisualRefresh, isItemDisabled = _a.isItemDisabled, selectableItemsTypes = _a.selectableItemsTypes, fetchData = _a.fetchData, visibleColumns = _a.visibleColumns, onDrilldown = _a.onDrilldown, onSelect = _a.onSelect;
-    return (react.createElement(BasicS3Table, { 
+    return (react.createElement(BasicS3Table, {
         // remount fresh component every we change the path to reset the inner state (e.g. selection/filtering)
         key: pathSegments.join('/'), forwardFocusRef: forwardFocusRef, trackBy: "Key", fetchData: function () {
             var bucketName = pathSegments[0], rest = pathSegments.slice(1);
@@ -54949,12 +54949,12 @@ function VersionsTable(_a) {
 
 ;// CONCATENATED MODULE: ./node_modules/@cloudscape-design/components/s3-resource-selector/s3-modal/styles.css.js
 
-    
+
     /* harmony default export */ const s3_modal_styles_css = ({
   "modal-actions": "awsui_modal-actions_12hyz_1p88p_5",
   "submit-button": "awsui_submit-button_12hyz_1p88p_9"
 });
-  
+
 ;// CONCATENATED MODULE: ./node_modules/@cloudscape-design/components/s3-resource-selector/s3-modal/index.js
 
 // Copyright Amazon.com, Inc. or its affiliates. All Rights Reserved.
@@ -55066,12 +55066,12 @@ function S3Modal(_a) {
 
 ;// CONCATENATED MODULE: ./node_modules/@cloudscape-design/components/s3-resource-selector/styles.css.js
 
-    
+
     /* harmony default export */ const s3_resource_selector_styles_css = ({
   "root": "awsui_root_1u0yw_rfo7y_5",
   "alert": "awsui_alert_1u0yw_rfo7y_9"
 });
-  
+
 ;// CONCATENATED MODULE: ./node_modules/@cloudscape-design/components/s3-resource-selector/index.js
 
 // Copyright Amazon.com, Inc. or its affiliates. All Rights Reserved.
@@ -55154,7 +55154,7 @@ var S3BucketSelector_excluded=["name","control","label","buckets","info","constr
 
 ;// CONCATENATED MODULE: ./node_modules/@cloudscape-design/components/tiles/styles.css.js
 
-    
+
     /* harmony default export */ const tiles_styles_css = ({
   "column-layout": "awsui_column-layout_vj6p7_gvt2c_93",
   "grid": "awsui_grid_vj6p7_gvt2c_104",
@@ -55185,7 +55185,7 @@ var S3BucketSelector_excluded=["name","control","label","buckets","info","constr
   "no-image": "awsui_no-image_vj6p7_gvt2c_365",
   "image": "awsui_image_vj6p7_gvt2c_369"
 });
-  
+
 ;// CONCATENATED MODULE: ./node_modules/@cloudscape-design/components/tiles/tile.js
 // Copyright Amazon.com, Inc. or its affiliates. All Rights Reserved.
 // SPDX-License-Identifier: Apache-2.0
@@ -55310,7 +55310,7 @@ var Tiles_excluded=["name","control","onChange"],Tiles_excluded2=["onChange"];va
 
 ;// CONCATENATED MODULE: ./node_modules/@cloudscape-design/components/flashbar/styles.css.js
 
-    
+
     /* harmony default export */ const flashbar_styles_css = ({
   "flash-refresh": "awsui_flash-refresh_1q84n_19pij_93",
   "enter": "awsui_enter_1q84n_19pij_93",
@@ -55346,7 +55346,7 @@ var Tiles_excluded=["name","control","onChange"],Tiles_excluded2=["onChange"];va
   "toggle": "awsui_toggle_1q84n_19pij_510",
   "icon": "awsui_icon_1q84n_19pij_573"
 });
-  
+
 ;// CONCATENATED MODULE: ./node_modules/@cloudscape-design/components/internal/utils/throttle.js
 // Copyright Amazon.com, Inc. or its affiliates. All Rights Reserved.
 // SPDX-License-Identifier: Apache-2.0
@@ -55921,7 +55921,7 @@ function Flashbar(_a) {
     function renderItem(item, key, transitionRootElement, transitionState) {
         return (react.createElement(Flash
         // eslint-disable-next-line react/forbid-component-props
-        , tslib_es6_assign({ 
+        , tslib_es6_assign({
             // eslint-disable-next-line react/forbid-component-props
             className: clsx_m(getVisualContextClassname('flashbar'), isVisualRefresh ? flashbar_styles_css["flash-refresh"] : ''), key: key, ref: transitionRootElement, transitionState: transitionState }, item)));
     }
@@ -55960,7 +55960,7 @@ var ConfirmationDialog=function(_ref){var titleProp=_ref.title,contentProp=_ref.
 ;// CONCATENATED MODULE: ./src/App/AuthErrorMessage/index.tsx
 var AuthErrorMessage=function(_ref){var title=_ref.title,text=_ref.text;return/*#__PURE__*/react.createElement(Box,{margin:{vertical:"xxxl"},textAlign:"center",color:"inherit"},/*#__PURE__*/react.createElement(SpaceBetween,{size:"xxs"},/*#__PURE__*/react.createElement("div",null,/*#__PURE__*/react.createElement("b",null,title),/*#__PURE__*/react.createElement(Box,{variant:"p",color:"inherit"},text))))};
 ;// CONCATENATED MODULE: ./src/routes.ts
-var ROUTES={BASE:"/",LOGOUT:"/logout",HUB:{LIST:"/hubs",ADD:"/hubs/add",DETAILS:{TEMPLATE:"/hubs/:name",FORMAT:function FORMAT(name){return buildRoute(ROUTES.HUB.DETAILS.TEMPLATE,{name:name})}},EDIT_BACKEND:{TEMPLATE:"/hubs/:name/edit/backend",FORMAT:function FORMAT(name){return buildRoute(ROUTES.HUB.EDIT_BACKEND.TEMPLATE,{name:name})}}},USER:{LIST:"/users",ADD:"/users/add",DETAILS:{TEMPLATE:"/users/:name",FORMAT:function FORMAT(name){return buildRoute(ROUTES.USER.DETAILS.TEMPLATE,{name:name})}},EDIT:{TEMPLATE:"/users/:name/edit",FORMAT:function FORMAT(name){return buildRoute(ROUTES.USER.EDIT.TEMPLATE,{name:name})}}}};
+var ROUTES={BASE:"/",LOGOUT:"/logout",PROJECT:{LIST:"/hubs",ADD:"/hubs/add",DETAILS:{TEMPLATE:"/hubs/:name",FORMAT:function FORMAT(name){return buildRoute(ROUTES.HUB.DETAILS.TEMPLATE,{name:name})}},EDIT_BACKEND:{TEMPLATE:"/hubs/:name/edit/backend",FORMAT:function FORMAT(name){return buildRoute(ROUTES.HUB.EDIT_BACKEND.TEMPLATE,{name:name})}}},USER:{LIST:"/users",ADD:"/users/add",DETAILS:{TEMPLATE:"/users/:name",FORMAT:function FORMAT(name){return buildRoute(ROUTES.USER.DETAILS.TEMPLATE,{name:name})}},EDIT:{TEMPLATE:"/users/:name/edit",FORMAT:function FORMAT(name){return buildRoute(ROUTES.USER.EDIT.TEMPLATE,{name:name})}}}};
 ;// CONCATENATED MODULE: ./src/assets/images/logo.svg
 var _path, _path2, _path3, _path4, _path5, _path6, _path7, _path8, _path9, _path10, _path11, _path12, _path13, _path14, _path15, _path16, _path17, _path18, _path19, _path20, _path21, _path22, _path23, _path24, _path25, _path26, _path27, _defs;
 var logo_excluded = (/* unused pure expression or super */ null && (["title", "titleId"]));
