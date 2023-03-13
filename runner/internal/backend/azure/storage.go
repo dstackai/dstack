@@ -3,6 +3,7 @@ package azure
 import (
 	"bytes"
 	"context"
+	"errors"
 	"fmt"
 	"github.com/Azure/azure-sdk-for-go/sdk/azcore"
 	"github.com/Azure/azure-sdk-for-go/sdk/storage/azblob"
@@ -14,6 +15,8 @@ import (
 	"path/filepath"
 	"strings"
 )
+
+var ErrTagNotFound = errors.New("tag not found")
 
 type AzureStorage struct {
 	storageClient   *azblob.Client
@@ -62,7 +65,7 @@ func (azstorage AzureStorage) ListFile(ctx context.Context, prefix string) ([]st
 	pager := azstorage.containerClient.NewListBlobsFlatPager(&azblob.ListBlobsFlatOptions{Prefix: &prefix})
 	var result []string
 	for pager.More() {
-		resp, err := pager.NextPage(context.TODO())
+		resp, err := pager.NextPage(ctx)
 		if err != nil {
 			return nil, gerrors.Wrap(err)
 		}
@@ -84,6 +87,17 @@ func (azstorage AzureStorage) RenameFile(ctx context.Context, oldKey, newKey str
 		return gerrors.Wrap(err)
 	}
 	return nil
+}
+
+func (azstorage AzureStorage) GetMetadata(ctx context.Context, key string, tag string) (string, error) {
+	properties, err := azstorage.containerClient.NewBlobClient(key).GetProperties(ctx, nil)
+	if err != nil {
+		return "", gerrors.Wrap(err)
+	}
+	if value, ok := properties.Metadata[tag]; ok {
+		return strings.Clone(*value), nil
+	}
+	return "", gerrors.Wrap(ErrTagNotFound)
 }
 
 func (azstorage AzureStorage) DownloadDir(ctx context.Context, src, dst string) error {
@@ -139,14 +153,3 @@ func (azstorage AzureStorage) uploadFile(ctx context.Context, src string, key st
 	}
 	return gerrors.Wrap(file.Close())
 }
-
-//func (azstorage AzureStorage) IsExists(ctx context.Context, key string) (bool, error) {
-//	properties, err := azstorage.containerClient.NewBlobClient(key).GetProperties(ctx, nil)
-//	if err != nil {
-//		return false, gerrors.Wrap(err)
-//	}
-//	if properties.LastModified != nil {
-//		return true, nil
-//	}
-//	return false, nil
-//}

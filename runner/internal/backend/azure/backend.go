@@ -20,6 +20,7 @@ import (
 )
 
 type AzureConfig struct {
+	SubscriptionId   string `yaml:"subscription_id"`
 	SecretUrl        string `yaml:"secret_url"`
 	StorageUrl       string `yaml:"storage_url"`
 	StorageContainer string `yaml:"storage_container"`
@@ -29,6 +30,7 @@ type AzureBackend struct {
 	config        AzureConfig
 	storage       AzureStorage
 	secretManager AzureSecretManager
+	compute       AzureCompute
 	credential    *azidentity.DefaultAzureCredential
 	runnerID      string
 	state         *models.State
@@ -67,11 +69,17 @@ func New(config AzureConfig) *AzureBackend {
 		fmt.Printf("Initialization key vault service failure: %+v", err)
 		return nil
 	}
+	compute, err := NewAzureCompute(credential, config.SubscriptionId)
+	if err != nil {
+		fmt.Printf("Initialization compute service failure: %+v", err)
+		return nil
+	}
 	return &AzureBackend{
 		config:        config,
 		credential:    credential,
 		storage:       *storage,
 		secretManager: *secretManager,
+		compute:       *compute,
 	}
 }
 
@@ -142,20 +150,25 @@ func (azbackend *AzureBackend) UpdateState(ctx context.Context) error {
 }
 
 func (azbackend *AzureBackend) CheckStop(ctx context.Context) (bool, error) {
-	//runnerFilepath := fmt.Sprintf("runners/%s.yaml", azbackend.runnerID)
-	//log.Trace(ctx, "Reading metadata from state file", "path", runnerFilepath)
-	//isExists, err := azbackend.storage.IsExists(ctx, runnerFilepath)
-	//if err != nil {
-	//	return false, gerrors.Wrap(err)
-	//}
-	//return isExists, nil
-	log.Trace(ctx, "//TODO implement me: AzureBackend.CheckStop")
+	runnerFilepath := fmt.Sprintf("runners/%s.yaml", azbackend.runnerID)
+	log.Trace(ctx, "Reading metadata from state file", "path", runnerFilepath)
+	status, err := azbackend.storage.GetMetadata(ctx, runnerFilepath, "status")
+	if err != nil && !errors.Is(err, ErrTagNotFound) {
+		return false, gerrors.Wrap(err)
+	}
+	if status == "stopping" {
+		log.Trace(ctx, "Status equals stopping")
+		return true, nil
+	}
 	return false, nil
 }
 
 func (azbackend *AzureBackend) Shutdown(ctx context.Context) error {
-	//TODO implement me
-	log.Trace(ctx, "//TODO implement me: AzureBackend.Shutdown")
+	log.Trace(ctx, "Starting shutdown")
+	err := azbackend.compute.TerminateInstance(ctx, azbackend.state.RequestID)
+	if err != nil {
+		return gerrors.Wrap(err)
+	}
 	return nil
 }
 

@@ -57,6 +57,7 @@ class AzureStorage(CloudStorage):
             data=content.encode("utf-8"),
             content_settings=ContentSettings(content_type="text/plain", content_encoding="utf-8"),
             overwrite=True,
+            metadata=metadata,
         )
 
     def get_signed_download_url(self, key: str) -> str:

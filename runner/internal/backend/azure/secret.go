@@ -62,11 +62,7 @@ func (azsecret AzureSecretManager) FetchSecret(ctx context.Context, repoData *mo
 	return azsecret.getSecretValue(ctx, key)
 }
 
-var keyPattern *regexp.Regexp
-
-func init() {
-	keyPattern = regexp.MustCompile(`([0-9a-zA-Z-]+)`)
-}
+var keyPattern = regexp.MustCompile(`([0-9a-zA-Z-]+)`)
 
 func splitPythonLike(pattern *regexp.Regexp, s string) []string {
 	var result []string

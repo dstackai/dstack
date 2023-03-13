@@ -2,11 +2,12 @@ import random
 import re
 import string
 import uuid
-from operator import attrgetter
+from operator import attrgetter, methodcaller
 from shlex import quote
-from typing import List, Optional
+from typing import List, Optional, Set
 
 from azure.core.credentials import TokenCredential
+from azure.core.polling import LROPoller
 from azure.mgmt.authorization import AuthorizationManagementClient
 from azure.mgmt.authorization.v2022_04_01.models import RoleAssignment
 from azure.mgmt.compute import ComputeManagementClient
@@ -57,7 +58,7 @@ from azure.mgmt.network.v2022_07_01.models import (
     VirtualNetwork,
 )
 from azure.mgmt.resource import ResourceManagementClient
-from azure.mgmt.resource.resources.v2022_09_01.models import ResourceGroup
+from azure.mgmt.resource.resources.v2022_09_01.models import GenericResourceExpanded, ResourceGroup
 from azure.mgmt.storage import StorageManagementClient
 from azure.mgmt.storage.v2022_09_01.models import StorageAccount
 
@@ -65,7 +66,6 @@ from dstack import version
 from dstack.backend.aws.runners import _get_default_ami_image_version, _serialize_runner_yaml
 from dstack.backend.azure import runners
 from dstack.backend.azure.config import AzureConfig
-from dstack.backend.azure.storage import AzureStorage
 from dstack.backend.base.compute import Compute, choose_instance_type
 from dstack.core.instance import InstanceType
 from dstack.core.job import Job
@@ -100,7 +100,7 @@ class AzureCompute(Compute):
         )
         self._tenant_id = tenant_id
         self._location = location
-        self._keyvault_manager = KeyVaultManagementClient(
+        self._keyvault_client = KeyVaultManagementClient(
             credential=credential, subscription_id=subscription_id
         )
         self._secret_vault_name = secret_vault_name
@@ -120,7 +120,16 @@ class AzureCompute(Compute):
         raise NotImplementedError
 
     def terminate_instance(self, request_id: str):
-        raise NotImplementedError(request_id)
+        _terminate_instance(
+            resource_client=self._resource_client,
+            authorization_client=self._authorization_client,
+            tenant_id=self._tenant_id,
+            resource_group_name=request_id,
+            keyvault_client=self._keyvault_client,
+            secret_vault_resource_group=self._secret_vault_resource_group,
+            secret_vault_name=self._secret_vault_name,
+            storage_account_id=self._storage_account_id,
+        )
 
     def get_instance_type(self, job: Job) -> Optional[InstanceType]:
         instance_types = runners._get_instance_types(
@@ -130,20 +139,20 @@ class AzureCompute(Compute):
 
     def run_instance(self, job: Job, instance_type: InstanceType) -> str:
         return _launch_instance(
-            self._compute_client,
-            self._resource_client,
-            self._network_client,
-            self._authorization_client,
-            self._tenant_id,
-            self._location,
-            instance_type,
-            job.runner_id,
-            job.repo_address,
-            self._keyvault_manager,
-            self._secret_vault_resource_group,
-            self._secret_vault_name,
-            self._storage_account_id,
-            self.backend_config,
+            compute_client=self._compute_client,
+            resource_client=self._resource_client,
+            network_client=self._network_client,
+            authorization_client=self._authorization_client,
+            tenant_id=self._tenant_id,
+            location=self._location,
+            instance_type=instance_type,
+            runner_id=job.runner_id,
+            repo_address=job.repo_address,
+            keyvault_client=self._keyvault_client,
+            secret_vault_resource_group=self._secret_vault_resource_group,
+            secret_vault_name=self._secret_vault_name,
+            storage_account_id=self._storage_account_id,
+            backend_config=self.backend_config,
         )
 
     def get_request_head(self, job: Job, request_id: Optional[str]) -> RequestHead:
@@ -489,3 +498,61 @@ def _get_instance_status(
             return RequestStatus.TERMINATED
 
     raise RuntimeError(f"unhandled state {codes!r}", codes)
+
+
+def _terminate_instance(
+    resource_client: ResourceManagementClient,
+    authorization_client: AuthorizationManagementClient,
+    tenant_id: str,
+    resource_group_name: str,
+    keyvault_client: KeyVaultManagementClient,
+    secret_vault_resource_group: str,
+    secret_vault_name: str,
+    storage_account_id: str,
+):
+    items: List[GenericResourceExpanded] = list(
+        resource_client.resources.list_by_resource_group(resource_group_name)
+    )
+    # XXX: it is expected to be the only one object.
+    scope = storage_account_id
+    role_assignments: List[RoleAssignment] = list(
+        authorization_client.role_assignments.list_for_scope(scope)
+    )
+    for resource in filter(attrgetter("identity"), items):
+        keyvault_client.vaults.list()
+        keyvault_client.vaults.update_access_policy(
+            secret_vault_resource_group,
+            secret_vault_name,
+            operation_kind=AccessPolicyUpdateKind.REMOVE,
+            parameters=VaultAccessPolicyParameters(
+                properties=VaultAccessPolicyProperties(
+                    access_policies=[
+                        AccessPolicyEntry(
+                            tenant_id=tenant_id,
+                            object_id=resource.identity.principal_id,
+                            permissions=Permissions(
+                                secrets=[SecretPermissions.GET, SecretPermissions.LIST]
+                            ),
+                        )
+                    ]
+                )
+            ),
+        )
+
+        # XXX: it is expected to be the only one object.
+        for role_assignment in filter(
+            lambda r: r.principal_id == resource.identity.principal_id, role_assignments
+        ):
+            authorization_client.role_assignments.delete_by_id(role_assignment.id)
+
+    pollers: Set[LROPoller] = set(
+        map(resource_client.resources.begin_delete_by_id, map(attrgetter("id")))
+    )
+    while not pollers:
+        done = set(filter(methodcaller("done"), pollers))
+        pollers -= done
+
+    items: List[GenericResourceExpanded] = list(
+        resource_client.resources.list_by_resource_group(resource_group_name)
+    )
+    assert not items, list(map(methodcaller("as_dict"), items))
