@@ -74,6 +74,7 @@ def _copy_artifact_files(
 ):
     tmp_output_dir = get_dstack_dir() / "tmp" / "copied_artifacts" / repo_address.path()
     tmp_output_dir.mkdir(parents=True, exist_ok=True)
+    source = _normalize_source(source)
     backend.download_run_artifact_files(
         repo_address=repo_address,
         run_name=run_name,
@@ -106,3 +107,10 @@ def _copy_artifact_files(
                 target_path.parent.mkdir(parents=True, exist_ok=True)
         shutil.copy2(source_full_path, target_path)
     shutil.rmtree(tmp_job_output_dir)
+
+
+def _normalize_source(source: str) -> str:
+    source = str(Path(source))
+    if source.startswith("/"):
+        source = source[1:]
+    return source
