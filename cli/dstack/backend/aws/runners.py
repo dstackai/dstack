@@ -188,7 +188,7 @@ echo $'{_serialize_runner_yaml(runner_id, resources, runner_port_range_from, run
 die() {{ status=$1; shift; echo "FATAL: $*"; exit $status; }}
 EC2_PUBLIC_HOSTNAME="`wget -q -O - http://169.254.169.254/latest/meta-data/public-hostname || die \"wget public-hostname has failed: $?\"`"
 echo "hostname: $EC2_PUBLIC_HOSTNAME" >> /root/.dstack/runner.yaml
-HOME=/root nohup dstack-runner start --http-port 4000 &
+HOME=/root nohup dstack-runner --log-level 6 start --http-port 4000 &
 """
     return user_data
 
@@ -354,7 +354,7 @@ def _run_instance(
 ) -> str:
     launch_specification = {}
     if not version.__is_release__:
-        launch_specification["KeyName"] = "stgn_dstack"
+        launch_specification["KeyName"] = "dstack_victor"
     if instance_type.resources.interruptible:
         launch_specification["InstanceMarketOptions"] = {
             "MarketType": "spot",

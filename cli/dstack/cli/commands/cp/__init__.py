@@ -73,6 +73,7 @@ def _copy_artifact_files(
     backend: Backend, repo_address: RepoAddress, run_name: str, source: str, target: str
 ):
     tmp_output_dir = get_dstack_dir() / "tmp" / "copied_artifacts" / repo_address.path()
+    tmp_output_dir.mkdir(parents=True, exist_ok=True)
     backend.download_run_artifact_files(
         repo_address=repo_address,
         run_name=run_name,
