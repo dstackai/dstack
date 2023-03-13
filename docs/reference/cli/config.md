@@ -25,13 +25,6 @@ EC2 subnet: none
 
 ### GCP
 
-!!! info "NOTE:"
-    Support for GCP is experimental. In order to try it, make sure to install the `0.2rc1` version of `dstack`:
-
-    ```shell hl_lines="1"
-    pip install dstack==0.2rc1
-    ```
-
 The command will ask you for a path to the a service account key, GCP region and zone, and storage bucket name. For example:
 
 ```

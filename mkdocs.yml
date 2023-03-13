@@ -11,7 +11,7 @@ repo_name: dstackai/dstack
 edit_uri: edit/master/docs/
 
 #Copyright
-copyright: © 2023 dstack GmbH
+copyright: Built with ❤️ by dstack
 
 # Configuration
 theme:
@@ -56,6 +56,8 @@ theme:
 
 # Plugins
 plugins:
+  - blog:
+      blog_dir: blog
   - social:
       cards_color:
         fill: "black"
@@ -166,6 +168,8 @@ nav:
           - dstack init: reference/cli/init.md
           - dstack config: reference/cli/config.md
           - dstack secrets: reference/cli/secrets.md
+  - Blog:
+    - blog/index.md
   - Slack: https://join.slack.com/t/dstackai/shared_invite/zt-xdnsytie-D4qU9BvJP8vkbkHXdi6clQ
   - Twitter: https://twitter.com/dstackai/
 #  - Newsletter: https://dstack.curated.co/

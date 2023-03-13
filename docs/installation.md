@@ -17,15 +17,17 @@ configure a remote using the `dstack config` command.
 
 ![dstack config](assets/dstack-config.png){ width="800" }
 
-If you intend to collaborate in a team and would like to manage cloud credentials, users and other settings 
-via a user interface, it is recommended to choose `hub`.
+[//]: # (If you intend to collaborate in a team and would like to manage cloud credentials, users and other settings )
+[//]: # (via a user interface, it is recommended to choose `hub`.)
 
-!!! info "NOTE:"
-    Choosing the `hub` remote with the `dstack config` CLI command requires you to have a Hub application up
-    and running. Refer to [Hub](#hub) for the details.
+[//]: # (!!! info "NOTE:")
+[//]: # (    Choosing the `hub` remote with the `dstack config` CLI command requires you to have a Hub application up)
+[//]: # (    and running. Refer to [Hub]&#40;#hub&#41; for the details.)
 
-If you intend to work alone and wish to run workflows directly in the cloud without any intermediate, 
-feel free to choose `aws` or `gcp`.
+[//]: # (If you intend to work alone and wish to run workflows directly in the cloud without any intermediate, )
+[//]: # (feel free to choose `aws` or `gcp`.)
+
+If you intend to run remote workflows directly in the cloud, feel free to choose `aws` or `gcp`.
 
 !!! info "NOTE:"
     Choosing the `aws` and `gcp` remotes, with the `dstack config` CLI command requires you to have local
@@ -33,73 +35,122 @@ feel free to choose `aws` or `gcp`.
     Refer to [AWS](#aws) and 
     [GCP](#gcp) correspondingly for the details.
 
-## Hub
-
-Hub allows you to manage cloud credentials, users and other settings via a user interface.
-
-This way is preferred if you intend to collaborate as a team, and don't want every user to have 
-cloud credentials configured locally.
-
-In this case, the `dstack config` command is given with the URL of the Hub application and
-the personal access token.
-
-### 1. Start the Hub application
-
-Before you can use Hub, you first have to start the Hub application.
-You can run it either locally, on a dedicated server, or in the cloud.
+If you would like to manage cloud credentials, users and other settings centrally
+via a user interface, it is recommended to choose `hub`.
 
 !!! info "NOTE:"
-    You can skip this step if the Hub application is already set up, and you're given with its URL
-    and a personal access token.
+    The `hub` remote is currently in an experimental phase. If you are interested in trying it out, please contact us 
+    via [Slack](https://join.slack.com/t/dstackai/shared_invite/zt-xdnsytie-D4qU9BvJP8vkbkHXdi6clQ).
 
-Run the Hub application:
+[//]: # (## Hub)
 
-```shell hl_lines="1"
-dstack hub start
-```
+[//]: # ()
+[//]: # (Hub allows you to manage cloud credentials, users and other settings via a user interface.)
 
-If needed, the command allows you to override the port, host, and the admin token:
+[//]: # ()
+[//]: # (This way is preferred if you intend to collaborate as a team, and don't want every user to have )
 
-![dstack config](assets/dstack-hub-help.png)
+[//]: # (cloud credentials configured locally.)
 
-Once the application is started, click the URL in the output to login as an admin.
+[//]: # ()
+[//]: # (In this case, the `dstack config` command is given with the URL of the Hub application and)
 
-!!! warning "TODO:"
-    Add a screenshot of the `dstack hub start` command output with the login URL
+[//]: # (the personal access token.)
 
-### 2. Create a hub
+[//]: # ()
+[//]: # (### 1. Start the Hub application)
 
-After you've logged in as an admin, you can create a specific hub, and the user
-that will access the hub.
+[//]: # ()
+[//]: # (Before you can use Hub, you first have to start the Hub application.)
 
-!!! warning "TODO:"
-    Add a screenshot of the Hub Backend Edit page
+[//]: # (You can run it either locally, on a dedicated server, or in the cloud.)
 
-When creating a hub, you have to specify the corresponding cloud settings, incl.
-the credentials to the cloud, the region, the bucket, etc.
+[//]: # ()
+[//]: # (!!! info "NOTE:")
 
-!!! info "NOTE:"
-    You can configure multiple hubs, and for each specify different cloud settings and 
-    assign a different team.
+[//]: # (    You can skip this step if the Hub application is already set up, and you're given with its URL)
 
-### 3. Configure the CLI
+[//]: # (    and a personal access token.)
 
-Once the hub is created, copy the corresponding code snippet to configure
-this hub as a remote via the `dstack config` command.
+[//]: # ()
+[//]: # (Run the Hub application:)
 
-!!! warning "TODO:"
-    Add a screenshot of the Hub View Page showing the CLI code snippet
+[//]: # ()
+[//]: # (```shell hl_lines="1")
 
-The command includes the URL of the created hub accompanied with the personal access token of the user: 
+[//]: # (dstack hub start)
 
-```shell hl_lines="1"
-dstack config hub --url http://localhost:3000/my-new-hub --token 8a019f6d-e01f-41e3-9e54-e3369f3deda0 
-```
+[//]: # (```)
 
-That's it! You've configured Hub as a remote.
+[//]: # ()
+[//]: # (If needed, the command allows you to override the port, host, and the admin token:)
 
-!!! warning "TODO:"
-    _Elaborate on how to create users and let them log in into the Hub application_
+[//]: # ()
+[//]: # (![dstack config]&#40;assets/dstack-hub-help.png&#41;)
+
+[//]: # ()
+[//]: # (Once the application is started, click the URL in the output to login as an admin.)
+
+[//]: # ()
+[//]: # (!!! warning "TODO:")
+
+[//]: # (    Add a screenshot of the `dstack hub start` command output with the login URL)
+
+[//]: # ()
+[//]: # (### 2. Create a hub)
+
+[//]: # ()
+[//]: # (After you've logged in as an admin, you can create a specific hub, and the user)
+
+[//]: # (that will access the hub.)
+
+[//]: # ()
+[//]: # (!!! warning "TODO:")
+
+[//]: # (    Add a screenshot of the Hub Backend Edit page)
+
+[//]: # ()
+[//]: # (When creating a hub, you have to specify the corresponding cloud settings, incl.)
+
+[//]: # (the credentials to the cloud, the region, the bucket, etc.)
+
+[//]: # ()
+[//]: # (!!! info "NOTE:")
+
+[//]: # (    You can configure multiple hubs, and for each specify different cloud settings and )
+
+[//]: # (    assign a different team.)
+
+[//]: # ()
+[//]: # (### 3. Configure the CLI)
+
+[//]: # ()
+[//]: # (Once the hub is created, copy the corresponding code snippet to configure)
+
+[//]: # (this hub as a remote via the `dstack config` command.)
+
+[//]: # ()
+[//]: # (!!! warning "TODO:")
+
+[//]: # (    Add a screenshot of the Hub View Page showing the CLI code snippet)
+
+[//]: # ()
+[//]: # (The command includes the URL of the created hub accompanied with the personal access token of the user: )
+
+[//]: # ()
+[//]: # (```shell hl_lines="1")
+
+[//]: # (dstack config hub --url http://localhost:3000/my-new-hub --token 8a019f6d-e01f-41e3-9e54-e3369f3deda0 )
+
+[//]: # (```)
+
+[//]: # ()
+[//]: # (That's it! You've configured Hub as a remote.)
+
+[//]: # ()
+[//]: # (!!! warning "TODO:")
+
+[//]: # (    _Elaborate on how to create users and let them log in into the Hub application_)
 
 ## AWS
 
@@ -271,13 +322,6 @@ That's it! You've configured AWS as a remote.
 
 ## GCP
 
-!!! info "NOTE:"
-    Support for GCP is experimental. In order to try it, make sure to install the `0.2rc1` version of `dstack`:
-
-    ```shell hl_lines="1"
-    pip install dstack==0.2rc1
-    ```
-
 ### 1. Create a project
 
 In order to use GCP as a remote, you first have to create a project in your GCP account
@@ -298,7 +342,7 @@ and make sure that the required APIs and enabled for it.
 
 ### 2. Create a storage bucket
 
-Once the project is created, you can proceed and create a storage bucket. This bucket
+Once the project is set up, you can proceed and create a storage bucket. This bucket
 will be used to store workflow artifacts and metadata.
 
 !!! info "NOTE:"
