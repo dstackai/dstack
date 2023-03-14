@@ -48,6 +48,7 @@ class HubInfo(BaseModel):
 
 class UserInfo(BaseModel):
     user_name: str
+    global_role: str
 
 
 class AddTagRun(BaseModel):

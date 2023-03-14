@@ -45,7 +45,7 @@ async def users_delete(body: HubDelete):
 @router.get("/info", response_model=UserInfo, dependencies=[Depends(Scope("users:info:read"))])
 async def users_info(authorization: HTTPAuthorizationCredentials = Depends(security)) -> UserInfo:
     user = await UserManager.get_user_by_token(authorization.credentials)
-    return UserInfo(user_name=user.name)
+    return UserInfo(user_name=user.name, global_role=user.hub_role.name)
 
 
 @router.get("/list", response_model=List[User], dependencies=[Depends(Scope("users:list:read"))])
