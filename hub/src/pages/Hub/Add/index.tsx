@@ -2,10 +2,11 @@ import React from 'react';
 import { ContentLayout, Header } from 'components';
 import { useTranslation } from 'react-i18next';
 import { useNavigate } from 'react-router-dom';
-import { HubForm } from '../Form';
 import { useBreadcrumbs, useNotifications } from 'hooks';
 import { ROUTES } from 'routes';
+import { isRequestErrorWithDetail } from 'libs';
 import { useCreateHubMutation } from 'services/hub';
+import { HubForm } from '../Form';
 
 export const HubAdd: React.FC = () => {
     const { t } = useTranslation();
@@ -41,10 +42,17 @@ export const HubAdd: React.FC = () => {
 
             navigate(ROUTES.PROJECT.DETAILS.FORMAT(data.hub_name));
         } catch (e) {
-            pushNotification({
-                type: 'error',
-                content: t('projects.create.error_notification'),
-            });
+            if (isRequestErrorWithDetail(e)) {
+                pushNotification({
+                    type: 'error',
+                    content: `${t('projects.create.error_notification')}: ${e.detail}`,
+                });
+            } else {
+                pushNotification({
+                    type: 'error',
+                    content: t('projects.create.error_notification'),
+                });
+            }
         }
 
         return request;

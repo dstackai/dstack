@@ -7,3 +7,7 @@ export type FormFieldError = {
 export type FormErrors = {
     detail: FormFieldError[];
 };
+
+export type RequestErrorWithDetail = {
+    detail: string;
+};

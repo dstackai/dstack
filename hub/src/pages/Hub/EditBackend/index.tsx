@@ -5,6 +5,7 @@ import { useNavigate, useParams } from 'react-router-dom';
 import { useGetHubQuery, useUpdateHubMutation } from 'services/hub';
 import { useBreadcrumbs, useNotifications } from 'hooks';
 import { ROUTES } from 'routes';
+import { isRequestErrorWithDetail } from 'libs';
 import { HubForm } from '../Form';
 
 export const HubEditBackend: React.FC = () => {
@@ -52,10 +53,17 @@ export const HubEditBackend: React.FC = () => {
 
             navigate(ROUTES.PROJECT.DETAILS.FORMAT(data.hub_name ?? paramHubName));
         } catch (e) {
-            pushNotification({
-                type: 'error',
-                content: t('projects.edit.error_notification'),
-            });
+            if (isRequestErrorWithDetail(e)) {
+                pushNotification({
+                    type: 'error',
+                    content: `${t('projects.edit.error_notification')}: ${e.detail}`,
+                });
+            } else {
+                pushNotification({
+                    type: 'error',
+                    content: t('projects.edit.error_notification'),
+                });
+            }
         }
 
         return request;

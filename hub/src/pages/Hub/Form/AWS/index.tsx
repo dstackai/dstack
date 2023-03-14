@@ -1,10 +1,11 @@
 import React, { useCallback, useEffect, useState, useRef } from 'react';
-import { SpaceBetween, FormInput, FormSelect, FormSelectOptions, FormS3BucketSelector } from 'components';
+import { SpaceBetween, FormInput, FormSelect, FormSelectOptions, FormS3BucketSelector, Spinner } from 'components';
 import { useTranslation } from 'react-i18next';
 import { useFormContext } from 'react-hook-form';
 import { debounce } from 'lodash';
 import { useBackendValuesMutation } from 'services/hub';
 import { IProps } from './types';
+import styles from './styles.module.scss';
 
 export const AWSBackend: React.FC<IProps> = ({ loading: loadingProp }) => {
     const { t } = useTranslation();
@@ -92,6 +93,15 @@ export const AWSBackend: React.FC<IProps> = ({ loading: loadingProp }) => {
         changeFormHandler().catch(console.log);
     };
 
+    const renderSpinner = () => {
+        if (isLoadingValues)
+            return (
+                <div className={styles.fieldSpinner}>
+                    <Spinner />
+                </div>
+            );
+    };
+
     return (
         <SpaceBetween size="l">
             <FormInput
@@ -123,6 +133,7 @@ export const AWSBackend: React.FC<IProps> = ({ loading: loadingProp }) => {
                 options={regions}
                 rules={{ required: t('validation.required') }}
                 statusType={isLoadingValues ? 'loading' : undefined}
+                secondaryControl={renderSpinner()}
             />
 
             <FormS3BucketSelector
@@ -133,6 +144,7 @@ export const AWSBackend: React.FC<IProps> = ({ loading: loadingProp }) => {
                 disabled={disabledFields}
                 // onChange={debouncedChangeFormHandler}
                 buckets={buckets}
+                secondaryControl={renderSpinner()}
             />
 
             <FormSelect
@@ -143,6 +155,7 @@ export const AWSBackend: React.FC<IProps> = ({ loading: loadingProp }) => {
                 onChange={onChangeSelectField}
                 options={subnets}
                 statusType={isLoadingValues ? 'loading' : undefined}
+                secondaryControl={renderSpinner()}
             />
         </SpaceBetween>
     );
