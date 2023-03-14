@@ -91,6 +91,7 @@ jobs:
           name: hub-dist
       - name: Copy hub dist
         run: |
+          mkdir -p cli/dstack/hub/statics
           cp -a hub-dist/** cli/dstack/hub/statics
       - name: Install dependencies
         run: |
