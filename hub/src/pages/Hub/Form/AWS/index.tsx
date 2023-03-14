@@ -13,7 +13,7 @@ export const AWSBackend: React.FC<IProps> = ({ loading: loadingProp }) => {
     const [buckets, setBuckets] = useState<TAwsBucket[]>([]);
     const [subnets, setSubnets] = useState<FormSelectOptions>([]);
 
-    const [getBackendValues, { isLoading: isLoadingValues }] = useBackendValuesMutation();
+    const [getBackendValues, { data: valuesData, isLoading: isLoadingValues }] = useBackendValuesMutation();
 
     const requestRef = useRef<null | ReturnType<typeof getBackendValues>>(null);
 
@@ -26,7 +26,7 @@ export const AWSBackend: React.FC<IProps> = ({ loading: loadingProp }) => {
     const backendAccessKeyValue = watch('backend.access_key');
     const backendSecretKeyValue = watch('backend.secret_key');
 
-    const disabledFields = loading || !backendAccessKeyValue || !backendSecretKeyValue;
+    const disabledFields = loading || !backendAccessKeyValue || !backendSecretKeyValue || !valuesData;
 
     const changeFormHandler = async () => {
         const backendFormValues = getValues('backend');

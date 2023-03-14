@@ -75,10 +75,10 @@ export const UserDetails: React.FC = () => {
                         >
                             <ColumnLayout columns={2} variant="text-grid">
                                 <SpaceBetween size="l">
-                                    <div>
-                                        <Box variant="awsui-key-label">{t('users.user_name')}</Box>
-                                        <div>{data.user_name}</div>
-                                    </div>
+                                    {/*<div>*/}
+                                    {/*    <Box variant="awsui-key-label">{t('users.user_name')}</Box>*/}
+                                    {/*    <div>{data.user_name}</div>*/}
+                                    {/*</div>*/}
 
                                     <div>
                                         <Box variant="awsui-key-label">{t('users.global_role')}</Box>
