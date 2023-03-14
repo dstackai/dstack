@@ -3,12 +3,13 @@ import time
 from functools import reduce
 from typing import List, Optional, Tuple
 
+import botocore.exceptions
 from botocore.client import BaseClient
 
 from dstack import version
-from dstack.backend.base.compute import choose_instance_type
+from dstack.backend.base.compute import NoCapacityError, choose_instance_type
 from dstack.core.instance import InstanceType
-from dstack.core.job import Job, JobStatus, Requirements
+from dstack.core.job import Job, Requirements
 from dstack.core.repo import RepoAddress
 from dstack.core.request import RequestHead, RequestStatus
 from dstack.core.runners import Gpu, Resources
@@ -445,12 +446,9 @@ def run_instance_retry(
             local_repo_user_email,
             repo_address,
         )
-    except Exception as e:
-        if (
-            hasattr(e, "response")
-            and e.response.get("Error")
-            and e.response["Error"].get("Code") == "InvalidParameterValue"
-        ):
+    except botocore.exceptions.ClientError as e:
+        # FIXME: why retry on "InvalidParameterValue"
+        if e.response["Error"]["Code"] == "InvalidParameterValue":
             if attempts > 0:
                 time.sleep(CREATE_INSTANCE_RETRY_RATE_SECS)
                 return run_instance_retry(
@@ -468,8 +466,9 @@ def run_instance_retry(
                 )
             else:
                 raise Exception("Failed to retry", e)
-        else:
-            raise e
+        elif e.response["Error"]["Code"] == "InsufficientInstanceCapacity":
+            raise NoCapacityError()
+        raise e
 
 
 def cancel_spot_request(ec2_client: BaseClient, request_id: str):

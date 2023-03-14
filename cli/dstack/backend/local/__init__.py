@@ -14,7 +14,7 @@ from dstack.backend.local.config import LocalConfig
 from dstack.backend.local.secrets import LocalSecretsManager
 from dstack.backend.local.storage import LocalStorage
 from dstack.core.artifact import Artifact
-from dstack.core.job import Job, JobHead
+from dstack.core.job import Job, JobHead, JobStatus
 from dstack.core.log_event import LogEvent
 from dstack.core.repo import LocalRepoData, RepoAddress, RepoCredentials
 from dstack.core.run import RunHead
@@ -54,8 +54,8 @@ class LocalBackend(Backend):
     def list_jobs(self, repo_address: RepoAddress, run_name: str) -> List[Job]:
         return base_jobs.list_jobs(self._storage, repo_address, run_name)
 
-    def run_job(self, job: Job):
-        base_jobs.run_job(self._storage, self._compute, job)
+    def run_job(self, job: Job, failed_to_start_job_new_status: JobStatus = JobStatus.FAILED):
+        base_jobs.run_job(self._storage, self._compute, job, failed_to_start_job_new_status)
 
     def stop_job(self, repo_address: RepoAddress, job_id: str, abort: bool):
         base_jobs.stop_job(self._storage, self._compute, repo_address, job_id, abort)

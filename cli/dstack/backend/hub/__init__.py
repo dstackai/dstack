@@ -11,7 +11,7 @@ from dstack.backend.hub.storage import HUBStorage
 from dstack.core.artifact import Artifact
 from dstack.core.config import BackendConfig
 from dstack.core.error import ConfigError
-from dstack.core.job import Job, JobHead
+from dstack.core.job import Job, JobHead, JobStatus
 from dstack.core.log_event import LogEvent
 from dstack.core.repo import LocalRepoData, RepoAddress, RepoCredentials, RepoHead
 from dstack.core.run import RunHead
@@ -64,7 +64,7 @@ class HubBackend(RemoteBackend):
     def list_jobs(self, repo_address: RepoAddress, run_name: str) -> List[Job]:
         return self._hub_client().list_jobs(repo_address=repo_address, run_name=run_name)
 
-    def run_job(self, job: Job):
+    def run_job(self, job: Job, failed_to_start_job_new_status: JobStatus = JobStatus.FAILED):
         self._hub_client().run_job(job=job)
 
     def stop_job(self, repo_address: RepoAddress, job_id: str, abort: bool):

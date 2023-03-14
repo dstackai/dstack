@@ -85,6 +85,7 @@ class JobRefId(JobRef):
 
 
 class JobStatus(Enum):
+    PENDING = "pending"
     SUBMITTED = "submitted"
     DOWNLOADING = "downloading"
     RUNNING = "running"

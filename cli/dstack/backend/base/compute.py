@@ -8,6 +8,14 @@ from dstack.core.request import RequestHead
 from dstack.core.runners import Resources
 
 
+class ComputeError(Exception):
+    pass
+
+
+class NoCapacityError(ComputeError):
+    pass
+
+
 class Compute(ABC):
     @abstractmethod
     def get_request_head(self, job: Job, request_id: Optional[str]) -> RequestHead:

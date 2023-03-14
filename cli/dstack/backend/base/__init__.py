@@ -6,11 +6,10 @@ from typing import Any, Generator, List, Optional
 
 from dstack.core.artifact import Artifact
 from dstack.core.config import BackendConfig
-from dstack.core.job import Job, JobHead
+from dstack.core.job import Job, JobHead, JobStatus
 from dstack.core.log_event import LogEvent
 from dstack.core.repo import LocalRepoData, RepoAddress, RepoCredentials
 from dstack.core.run import RunHead
-from dstack.core.runners import Runner
 from dstack.core.secret import Secret
 from dstack.core.tag import TagHead
 
@@ -65,7 +64,7 @@ class Backend(ABC):
         pass
 
     @abstractmethod
-    def run_job(self, job: Job) -> Runner:
+    def run_job(self, job: Job, failed_to_start_job_new_status: JobStatus = JobStatus.FAILED):
         pass
 
     @abstractmethod
