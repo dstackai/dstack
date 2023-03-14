@@ -160,6 +160,15 @@ func (ex *Executor) Run(ctx context.Context) error {
 			if errRun == nil {
 				job.Status = states.Done
 			} else {
+				// The container may fail due to instance interruption.
+				// In this case we'll let the CLI/hub update the job state accodingly.
+				isInterrupted, err := ex.backend.IsInterrupted(runCtx)
+				if err != nil {
+					log.Error(runCtx, "Failed to check if spot was interrupted", "err", err)
+				} else if isInterrupted {
+					log.Trace(runCtx, "Spot was interrupted")
+					return nil
+				}
 				log.Error(runCtx, "Failed run", "err", errRun)
 				job.Status = states.Failed
 			}

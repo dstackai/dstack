@@ -25,6 +25,7 @@ type Backend interface {
 	Requirements(ctx context.Context) models.Requirements
 	UpdateState(ctx context.Context) error
 	CheckStop(ctx context.Context) (bool, error)
+	IsInterrupted(ctx context.Context) (bool, error)
 	Shutdown(ctx context.Context) error
 	GetArtifact(ctx context.Context, rootPath, localPath, remotePath string, fs bool) artifacts.Artifacter
 	CreateLogger(ctx context.Context, logGroup, logName string) io.Writer

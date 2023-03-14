@@ -359,8 +359,8 @@ def _run_instance(
         launch_specification["InstanceMarketOptions"] = {
             "MarketType": "spot",
             "SpotOptions": {
-                "SpotInstanceType": "persistent",
-                "InstanceInterruptionBehavior": "stop",
+                "SpotInstanceType": "one-time",
+                "InstanceInterruptionBehavior": "terminate",
             },
         }
     if subnet_id:
@@ -523,6 +523,9 @@ def get_request_head(
                 if status["Code"] in [
                     "fulfilled",
                     "request-canceled-and-instance-running",
+                    "marked-for-stop-by-experiment",
+                    "marked-for-stop",
+                    "marked-for-termination",
                 ]:
                     request_status = RequestStatus.RUNNING
                 elif status["Code"] in [
@@ -537,7 +540,8 @@ def get_request_head(
                     "instance-terminated-by-price",
                     "instance-stopped-by-price",
                     "instance-terminated-no-capacity",
-                    "marked-for-stop-by-experiment",
+                    "instance-stopped-by-experiment",
+                    "instance-terminated-by-experiment",
                     "limit-exceeded",
                     "price-too-low",
                 ]:
@@ -549,8 +553,6 @@ def get_request_head(
                     "instance-terminated-by-schedule",
                     "instance-terminated-by-service",
                     "spot-instance-terminated-by-user",
-                    "marked-for-stop",
-                    "marked-for-termination",
                 ]:
                     request_status = RequestStatus.TERMINATED
                 else:

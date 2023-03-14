@@ -144,6 +144,10 @@ func (gbackend *GCPBackend) CheckStop(ctx context.Context) (bool, error) {
 	return false, nil
 }
 
+func (gbackend *GCPBackend) IsInterrupted(ctx context.Context) (bool, error) {
+	return false, nil
+}
+
 func (gbackend *GCPBackend) Shutdown(ctx context.Context) error {
 	err := gbackend.compute.TerminateInstance(ctx, gbackend.state.RequestID)
 	if err != nil {

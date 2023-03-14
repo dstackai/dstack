@@ -30,6 +30,7 @@ func NewClientEC2(region string) *ClientEC2 {
 	c.metaCli = imds.NewFromConfig(cfg)
 	return c
 }
+
 func (ec *ClientEC2) CancelSpot(ctx context.Context, requestID string) error {
 	log.Trace(ctx, "Cancel spot instance", "ID", requestID)
 	id, err := ec.getInstanceID(ctx)
@@ -51,6 +52,7 @@ func (ec *ClientEC2) CancelSpot(ctx context.Context, requestID string) error {
 	}
 	return nil
 }
+
 func (ec *ClientEC2) TerminateInstance(ctx context.Context, requestID string) error {
 	log.Trace(ctx, "Terminate instance", "ID", requestID)
 	_, err := ec.cli.TerminateInstances(ctx, &ec2.TerminateInstancesInput{
@@ -62,6 +64,35 @@ func (ec *ClientEC2) TerminateInstance(ctx context.Context, requestID string) er
 
 	return nil
 }
+
+func (ec *ClientEC2) IsInterruptedSpot(ctx context.Context, requestID string) (bool, error) {
+	log.Trace(ctx, "Checking if spot was interrupted", "RequestID", requestID)
+	input := &ec2.DescribeSpotInstanceRequestsInput{
+		SpotInstanceRequestIds: []string{requestID},
+	}
+	res, err := ec.cli.DescribeSpotInstanceRequests(ctx, input)
+	if err != nil {
+		return false, gerrors.Wrap(err)
+	}
+	if len(res.SpotInstanceRequests) == 0 {
+		return false, nil
+	}
+	request := res.SpotInstanceRequests[0]
+	switch *request.Status.Code {
+	case "instance-stopped-by-price":
+	case "instance-stopped-no-capacity":
+	case "instance-terminated-by-price":
+	case "instance-terminated-no-capacity":
+	case "marked-for-stop":
+	case "marked-for-termination":
+	case "marked-for-stop-by-experiment":
+	case "instance-stopped-by-experiment":
+	case "instance-terminated-by-experiment":
+		return true, nil
+	}
+	return false, nil
+}
+
 func (ec *ClientEC2) getInstanceID(ctx context.Context) (string, error) {
 	meta, err := ec.metaCli.GetMetadata(ctx, &imds.GetMetadataInput{Path: "instance-id"})
 	if err != nil {
