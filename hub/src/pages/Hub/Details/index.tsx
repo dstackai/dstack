@@ -39,9 +39,11 @@ export const HubDetails: React.FC = () => {
     const currentUserToken = useAppSelector(selectAuthToken);
     const [pushNotification] = useNotifications();
 
+    if (data) console.log(isDeleting, !data, getHubRoleByUserName(data, userName) !== 'admin', userGlobalRole !== 'admin');
+
     const isDisabledButtons = useMemo<boolean>(() => {
         return isDeleting || !data || (getHubRoleByUserName(data, userName) !== 'admin' && userGlobalRole !== 'admin');
-    }, []);
+    }, [data, userName, userGlobalRole]);
 
     useBreadcrumbs([
         {

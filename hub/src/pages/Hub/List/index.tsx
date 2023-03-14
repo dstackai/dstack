@@ -112,7 +112,7 @@ export const HubList: React.FC = () => {
                 (item) => getHubRoleByUserName(item, userName) !== 'admin' && userGlobalRole !== 'admin',
             ) ?? false
         );
-    }, [isDeleting, collectionProps.selectedItems]);
+    }, [isDeleting, userName, userGlobalRole, collectionProps.selectedItems]);
 
     const isDisabledDelete = useMemo(() => {
         if (isDeleting || collectionProps.selectedItems?.length === 0) return true;
@@ -122,7 +122,7 @@ export const HubList: React.FC = () => {
                 (item) => getHubRoleByUserName(item, userName) !== 'admin' && userGlobalRole !== 'admin',
             ) ?? false
         );
-    }, [isDeleting, collectionProps.selectedItems]);
+    }, [isDeleting, userName, userGlobalRole, collectionProps.selectedItems]);
 
     return (
         <>
