@@ -1,8 +1,13 @@
+import logging
 import os
+import sys
+import time
 import uuid
+from contextvars import ContextVar
+from typing import Optional
 
 import pkg_resources
-from fastapi import FastAPI
+from fastapi import FastAPI, Request
 from starlette.responses import HTMLResponse, JSONResponse
 from starlette.staticfiles import StaticFiles
 
@@ -22,6 +27,25 @@ from dstack.hub.routers import (
     tags,
     users,
 )
+
+_REQUEST_ID_ = "X-DSTACK-REQUEST-ID"
+
+request_id_ctx: ContextVar[Optional[str]] = ContextVar(_REQUEST_ID_, default=None)
+
+
+def filter_add_request_id(record: logging.LogRecord) -> bool:
+    record.request_id = request_id_ctx.get("")
+    return True
+
+
+logger = logging.getLogger("dstack.hub")
+handler = logging.StreamHandler(stream=sys.stdout)
+handler.setFormatter(
+    logging.Formatter(fmt="[%(request_id)s %(asctime)s: %(levelname)s] %(message)s")
+)
+logger.addHandler(handler)
+logger.addFilter(filter_add_request_id)
+logger.setLevel(logging.DEBUG)
 
 app = FastAPI(docs_url="/api/docs")
 app.include_router(users.router)
@@ -44,6 +68,35 @@ async def startup_event():
 
     url = f"http://{os.getenv('DSTACK_HUB_HOST')}:{os.getenv('DSTACK_HUB_PORT')}?token={admin_user.token}"
     print(f"The hub is available at {url}")
+
+
+@app.middleware("http")
+async def app_logging(request: Request, call_next):
+    request_id = str(uuid.uuid4()).replace("-", "")[:12]
+    request_id_ctx.set(request_id)
+    start_time = time.time()
+    response = await call_next(request)
+    process_time = time.time() - start_time
+    path = request.url.path
+    if request.query_params:
+        path += f"?{request.query_params}"
+    request_dict = {
+        "method": request.method,
+        "path": path,
+    }
+    try:
+        body = await request.json()
+        request_dict["body"] = body
+    except:
+        pass
+    if path.startswith("/api/"):
+        logger.info(
+            {
+                "request": request_dict,
+                "process_time": process_time,
+            }
+        )
+    return response
 
 
 async def update_admin_user() -> User:
