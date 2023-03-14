@@ -8,5 +8,5 @@ declare interface IUser {
 
 declare interface IUserAuthData extends Pick<IUser, 'token'>{}
 
-declare interface IUserSmall extends Pick<IUser, 'user_name'>{}
+declare interface IUserSmall extends Pick<IUser, 'user_name' | 'global_role'>{}
 

@@ -12,16 +12,18 @@ import {
     ConfirmationDialog,
 } from 'components';
 import { useAppSelector, useBreadcrumbs, useCollection, useNotifications } from 'hooks';
-import { useDeleteHubsMutation, useGetHubsQuery } from 'services/hub';
 import { ROUTES } from 'routes';
 import { useTranslation } from 'react-i18next';
+import { selectUserData } from 'App/slice';
+import { useDeleteHubsMutation, useGetHubsQuery } from 'services/hub';
 import { getHubRoleByUserName } from '../utils';
-import { selectUserName } from 'App/slice';
 
 export const HubList: React.FC = () => {
     const { t } = useTranslation();
     const [showDeleteConfirm, setShowConfirmDelete] = useState(false);
-    const userName = useAppSelector(selectUserName) ?? '';
+    const userData = useAppSelector(selectUserData);
+    const userName = userData?.user_name ?? '';
+    const userGlobalRole = userData?.global_role ?? '';
     const { isLoading, data } = useGetHubsQuery();
     const navigate = useNavigate();
     const [deleteHubs, { isLoading: isDeleting }] = useDeleteHubsMutation();
@@ -105,13 +107,21 @@ export const HubList: React.FC = () => {
     const isDisabledEdit = useMemo(() => {
         if (collectionProps.selectedItems?.length !== 1) return true;
 
-        return collectionProps.selectedItems?.some((item) => getHubRoleByUserName(item, userName) !== 'admin') ?? false;
+        return (
+            collectionProps.selectedItems?.some(
+                (item) => getHubRoleByUserName(item, userName) !== 'admin' && userGlobalRole !== 'admin',
+            ) ?? false
+        );
     }, [isDeleting, collectionProps.selectedItems]);
 
     const isDisabledDelete = useMemo(() => {
         if (isDeleting || collectionProps.selectedItems?.length === 0) return true;
 
-        return collectionProps.selectedItems?.some((item) => getHubRoleByUserName(item, userName) !== 'admin') ?? false;
+        return (
+            collectionProps.selectedItems?.some(
+                (item) => getHubRoleByUserName(item, userName) !== 'admin' && userGlobalRole !== 'admin',
+            ) ?? false
+        );
     }, [isDeleting, collectionProps.selectedItems]);
 
     return (

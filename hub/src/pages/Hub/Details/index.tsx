@@ -1,4 +1,4 @@
-import React, { useState, useCallback } from 'react';
+import React, { useState, useCallback, useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useNavigate, useParams } from 'react-router-dom';
 import { debounce } from 'lodash';
@@ -18,7 +18,7 @@ import {
     StatusIndicator,
     Popover,
 } from 'components';
-import { selectAuthToken, selectUserName } from 'App/slice';
+import { selectAuthToken, selectUserData } from 'App/slice';
 import { useGetHubQuery, useDeleteHubsMutation, useUpdateHubMembersMutation } from 'services/hub';
 import { HubMembers } from '../Members';
 import styles from './styles.module.scss';
@@ -28,7 +28,9 @@ export const HubDetails: React.FC = () => {
     const { t } = useTranslation();
     const [showDeleteConfirm, setShowConfirmDelete] = useState(false);
     const params = useParams();
-    const userName = useAppSelector(selectUserName) ?? '';
+    const userData = useAppSelector(selectUserData);
+    const userName = userData?.user_name ?? '';
+    const userGlobalRole = userData?.global_role ?? '';
     const paramHubName = params.name ?? '';
     const navigate = useNavigate();
     const { data, isLoading } = useGetHubQuery({ name: paramHubName });
@@ -36,6 +38,10 @@ export const HubDetails: React.FC = () => {
     const [updateHubMembers] = useUpdateHubMembersMutation();
     const currentUserToken = useAppSelector(selectAuthToken);
     const [pushNotification] = useNotifications();
+
+    const isDisabledButtons = useMemo<boolean>(() => {
+        return isDeleting || !data || (getHubRoleByUserName(data, userName) !== 'admin' && userGlobalRole !== 'admin');
+    }, []);
 
     useBreadcrumbs([
         {
@@ -125,8 +131,6 @@ export const HubDetails: React.FC = () => {
             </ColumnLayout>
         );
     };
-
-    const isDisabledButtons = isDeleting || !data || getHubRoleByUserName(data, userName) !== 'admin';
 
     return (
         <>
