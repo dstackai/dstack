@@ -2,12 +2,12 @@ import random
 import re
 import string
 import uuid
-from operator import attrgetter, methodcaller
+from operator import attrgetter
 from shlex import quote
-from typing import List, Optional, Set
+from time import monotonic, sleep
+from typing import List, Optional
 
 from azure.core.credentials import TokenCredential
-from azure.core.polling import LROPoller
 from azure.mgmt.authorization import AuthorizationManagementClient
 from azure.mgmt.authorization.v2022_04_01.models import RoleAssignment
 from azure.mgmt.compute import ComputeManagementClient
@@ -354,10 +354,7 @@ def _launch_instance(
         )
         for _ in range(4)
     )
-    from pathlib import Path
 
-    with (Path().resolve() / "vm.txt").open("w") as stream:
-        stream.writelines([f"dstack_run@{ip_address.ip_address}\n", password, "\n"])
     vm: VirtualMachine = compute_client.virtual_machines.begin_create_or_update(
         group_name,
         "virtual_machine_name",
@@ -412,19 +409,54 @@ def _launch_instance(
     )
     # https://github.com/Azure-Samples/compute-python-msi-vm/blob/master/example.py
     # https://techcommunity.microsoft.com/t5/apps-on-azure-blog/using-azure-key-vault-to-manage-your-secrets/ba-p/2057758
-    scope = storage_account_id
     role_name = "Storage Blob Data Contributor"
     contributor_role, *other = list(
         authorization_client.role_definitions.list(
-            scope, filter="roleName eq '{}'".format(role_name)
+            storage_account_id, filter="roleName eq '{}'".format(role_name)
         )
     )
     assert not other
     role_assignment: RoleAssignment = authorization_client.role_assignments.create(
-        scope,
+        storage_account_id,
         uuid.uuid4(),  # Role assignment random name
         {"role_definition_id": contributor_role.id, "principal_id": vm.identity.principal_id},
     )
+    role_name = "Virtual Machine Contributor"
+    contributor_role, *other = list(
+        authorization_client.role_definitions.list(
+            resource_group.id, filter="roleName eq '{}'".format(role_name)
+        )
+    )
+    assert not other
+    role_assignment: RoleAssignment = authorization_client.role_assignments.create(
+        resource_group.id,
+        uuid.uuid4(),  # Role assignment random name
+        {"role_definition_id": contributor_role.id, "principal_id": vm.identity.principal_id},
+    )
+
+    # XXX: this is only for authentication as vm.
+    # This service Microsoft.OSTCExtensions.VMAccessForLinux looks like authenticating vm in azure AD.
+    budget = 15 * 60
+    start = monotonic()
+    step = 20
+    iteration = monotonic()
+    while (monotonic() - start) < budget:
+        sleep(step - (monotonic() - iteration))
+        vm: VirtualMachine = compute_client.virtual_machines.get(
+            group_name, "virtual_machine_name", expand="instanceView"
+        )
+        iteration = monotonic()
+        extension_handlers = vm.instance_view.vm_agent.extension_handlers
+        types = list(map(attrgetter("type"), extension_handlers))
+        try:
+            index = types.index("Microsoft.OSTCExtensions.VMAccessForLinux")
+        except ValueError:
+            continue
+
+        if extension_handlers[index].status.code != "ProvisioningState/succeeded":
+            continue
+
+        break
 
     port_range_from: int = 3000
     port_range_to: int = 4000
@@ -432,7 +464,6 @@ def _launch_instance(
     sysctl_port_range_to = port_range_to - 1
     runner_port_range_from = port_range_from
     runner_port_range_to = sysctl_port_range_from - 1
-
     result: RunCommandResult = compute_client.virtual_machines.begin_run_command(
         group_name,
         vm.name,
@@ -440,6 +471,7 @@ def _launch_instance(
             command_id="RunShellScript",
             script=[
                 "sudo -s",
+                "set -o xtrace",
                 'sysctl -w net.ipv4.ip_local_port_range="${SYSCTL_PORT_RANGE_FROM} ${SYSCTL_PORT_RANGE_TO}"',
                 "[ -d /root/.dstack/ ] || mkdir /root/.dstack/",
                 'echo "$DSTACK_CONFIG" > /root/.dstack/config.yaml',
@@ -489,6 +521,7 @@ def _get_instance_status(
 
     if not codes:
         return RequestStatus.TERMINATED
+
     elif len(codes) == 1:
         state = codes[0].split("/")[1]
         # Original documentation uses capitalize words https://learn.microsoft.com/en-us/azure/virtual-machines/states-billing#power-states-and-billing
@@ -513,11 +546,10 @@ def _terminate_instance(
     items: List[GenericResourceExpanded] = list(
         resource_client.resources.list_by_resource_group(resource_group_name)
     )
-    # XXX: it is expected to be the only one object.
-    scope = storage_account_id
+    resource_group: ResourceGroup = resource_client.resource_groups.get(resource_group_name)
     role_assignments: List[RoleAssignment] = list(
-        authorization_client.role_assignments.list_for_scope(scope)
-    )
+        authorization_client.role_assignments.list_for_scope(storage_account_id)
+    ) + list(authorization_client.role_assignments.list_for_scope(resource_group.id))
     for resource in filter(attrgetter("identity"), items):
         keyvault_client.vaults.list()
         keyvault_client.vaults.update_access_policy(
@@ -539,20 +571,9 @@ def _terminate_instance(
             ),
         )
 
-        # XXX: it is expected to be the only one object.
         for role_assignment in filter(
             lambda r: r.principal_id == resource.identity.principal_id, role_assignments
         ):
             authorization_client.role_assignments.delete_by_id(role_assignment.id)
 
-    pollers: Set[LROPoller] = set(
-        map(resource_client.resources.begin_delete_by_id, map(attrgetter("id")))
-    )
-    while not pollers:
-        done = set(filter(methodcaller("done"), pollers))
-        pollers -= done
-
-    items: List[GenericResourceExpanded] = list(
-        resource_client.resources.list_by_resource_group(resource_group_name)
-    )
-    assert not items, list(map(methodcaller("as_dict"), items))
+    resource_client.resource_groups.begin_delete(resource_group_name).result()
