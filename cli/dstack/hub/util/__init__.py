@@ -22,7 +22,7 @@ def hub2info(hub: Hub) -> HubInfo:
         members.append(
             Member(
                 user_name=member.user_name,
-                hub_role=member.hub_role,
+                hub_role=member.hub_role.name,
             )
         )
     backend = None

@@ -40,8 +40,8 @@ class HUBConfig(BackendConfig):
             path.parent.mkdir(parents=True)
         unparse_url = urlparse(url=self.url)
         new_path = unparse_url.path
-        if not new_path.endswith("/api/hub/"):
-            new_path = "/api/hub" + new_path
+        if not new_path.endswith("/api/project/"):
+            new_path = "/api/project" + new_path
 
         new_url = urlunparse(
             (

@@ -6,7 +6,7 @@ from fastapi import APIRouter, Depends, HTTPException, status
 from fastapi.security import HTTPBearer
 from fastapi.security.http import HTTPAuthorizationCredentials
 
-from dstack.hub.models import HubDelete, User, UserInfo, UserPatch
+from dstack.hub.models import DeleteUsers, HubDelete, User, UserInfo, UserPatch
 from dstack.hub.repository.role import RoleManager
 from dstack.hub.repository.user import UserManager
 from dstack.hub.security.scope import Scope
@@ -34,7 +34,7 @@ async def users_create(body: User) -> User:
 
 
 @router.delete("", dependencies=[Depends(Scope("users:get:read"))])
-async def users_delete(body: HubDelete):
+async def users_delete(body: DeleteUsers):
     for user_name in body.users:
         user = await UserManager.get_user_by_name(name=user_name)
         if user is None:
