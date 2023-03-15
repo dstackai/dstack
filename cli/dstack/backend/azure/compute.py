@@ -4,10 +4,12 @@ import string
 import uuid
 from operator import attrgetter
 from shlex import quote
-from time import monotonic, sleep
-from typing import List, Optional
+from threading import Event, Thread
+from time import monotonic
+from typing import List, Optional, Tuple
 
 from azure.core.credentials import TokenCredential
+from azure.core.exceptions import HttpResponseError, ResourceNotFoundError
 from azure.mgmt.authorization import AuthorizationManagementClient
 from azure.mgmt.authorization.v2022_04_01.models import RoleAssignment
 from azure.mgmt.compute import ComputeManagementClient
@@ -29,6 +31,7 @@ from azure.mgmt.compute.v2022_11_01.models import (
     StorageAccountTypes,
     StorageProfile,
     VirtualMachine,
+    VirtualMachineExtension,
     VirtualMachineIdentity,
 )
 from azure.mgmt.keyvault import KeyVaultManagementClient
@@ -115,11 +118,16 @@ class AzureCompute(Compute):
         )
         self._storage_account_id = storage_account_data.id
         self.backend_config = backend_config
+        self._launch_runner_stopped = None
+        self._launch_runner = None
 
     def cancel_spot_request(self, request_id: str):
         raise NotImplementedError
 
     def terminate_instance(self, request_id: str):
+        # XXX: thread would be for another request_id.
+        if self._launch_runner is not None:
+            self.clean_launch_runner()
         _terminate_instance(
             resource_client=self._resource_client,
             authorization_client=self._authorization_client,
@@ -138,7 +146,7 @@ class AzureCompute(Compute):
         return choose_instance_type(instance_types=instance_types, requirements=job.requirements)
 
     def run_instance(self, job: Job, instance_type: InstanceType) -> str:
-        return _launch_instance(
+        group_name, ip_address = _launch_instance(
             compute_client=self._compute_client,
             resource_client=self._resource_client,
             network_client=self._network_client,
@@ -152,8 +160,35 @@ class AzureCompute(Compute):
             secret_vault_resource_group=self._secret_vault_resource_group,
             secret_vault_name=self._secret_vault_name,
             storage_account_id=self._storage_account_id,
-            backend_config=self.backend_config,
         )
+        # XXX: this conflicts with hub.
+        if self._launch_runner is not None:
+            if self._launch_runner.is_alive():
+                raise RuntimeError("There is alive runner.")
+            self.clean_launch_runner()
+        self._launch_runner_stopped = Event()
+        self._launch_runner = Thread(
+            name="launch_runner",
+            target=_launch_runner,
+            kwargs=dict(
+                compute_client=self._compute_client,
+                instance_type=instance_type,
+                runner_id=job.runner_id,
+                backend_config=self.backend_config,
+                group_name=group_name,
+                ip_address=ip_address,
+                stopped=self._launch_runner_stopped,
+            ),
+        )
+        self._launch_runner.start()
+        return group_name
+
+    def clean_launch_runner(self):
+        self._launch_runner_stopped.set()
+        if self._launch_runner.is_alive():
+            self._launch_runner.join(5 * 60)
+        self._launch_runner_stopped = None
+        self._launch_runner = None
 
     def get_request_head(self, job: Job, request_id: Optional[str]) -> RequestHead:
         if request_id is None:
@@ -172,6 +207,10 @@ class AzureCompute(Compute):
             status=instance_status,
             message=None,
         )
+
+    def __del__(self):
+        if self._launch_runner is not None:
+            self.clean_launch_runner()
 
 
 def _get_image_published(
@@ -224,6 +263,97 @@ def make_name(value: str) -> str:
     return value
 
 
+def _launch_runner(
+    compute_client: ComputeManagementClient,
+    instance_type: InstanceType,
+    runner_id: str,
+    backend_config: AzureConfig,
+    group_name: str,
+    ip_address: str,
+    stopped: Event,
+):
+    # XXX: this is only for authentication as vm.
+    # This service Microsoft.OSTCExtensions.VMAccessForLinux looks like authenticating vm in azure AD.
+    budget = 15 * 60
+    start = monotonic()
+    step = 20
+    iteration = monotonic()
+    extension_handlers = None
+    while (monotonic() - start) < budget or stopped.is_set():
+        sleep_for = step - (monotonic() - iteration)
+        if sleep_for > 0:
+            if stopped.wait(sleep_for):
+                return
+        vm: VirtualMachine = compute_client.virtual_machines.get(
+            group_name, "virtual_machine_name", expand="instanceView"
+        )
+        iteration = monotonic()
+        extension_handlers = vm.instance_view.vm_agent.extension_handlers
+        types = list(map(attrgetter("type"), extension_handlers))
+        try:
+            index = types.index("Microsoft.OSTCExtensions.VMAccessForLinux")
+        except ValueError:
+            continue
+
+        if extension_handlers[index].status.code != "ProvisioningState/succeeded":
+            continue
+
+        break
+
+    if stopped.is_set():
+        return
+
+    port_range_from: int = 3000
+    port_range_to: int = 4000
+    sysctl_port_range_from = int((port_range_to - port_range_from) / 2) + port_range_from
+    sysctl_port_range_to = port_range_to - 1
+    runner_port_range_from = port_range_from
+    runner_port_range_to = sysctl_port_range_from - 1
+    result: RunCommandResult = compute_client.virtual_machines.begin_run_command(
+        group_name,
+        vm.name,
+        parameters=RunCommandInput(
+            command_id="RunShellScript",
+            script=[
+                "sudo -s",
+                "set -o xtrace",
+                'sysctl -w net.ipv4.ip_local_port_range="${SYSCTL_PORT_RANGE_FROM} ${SYSCTL_PORT_RANGE_TO}"',
+                "[ -d /root/.dstack/ ] || mkdir /root/.dstack/",
+                'echo "$DSTACK_CONFIG" > /root/.dstack/config.yaml',
+                'echo "$RUNNER_HEAD_CONFIG" > /root/.dstack/runner.yaml',
+                'echo "hostname: $PUBLIC_IP" >> /root/.dstack/runner.yaml',
+                "HOME=/root nohup dstack-runner --log-level 6 start --http-port 4000 &",
+            ],
+            parameters=[
+                RunCommandInputParameter(name="PUBLIC_IP", value=quote(ip_address)),
+                RunCommandInputParameter(
+                    name="SYSCTL_PORT_RANGE_FROM", value=quote(str(sysctl_port_range_from))
+                ),
+                RunCommandInputParameter(
+                    name="SYSCTL_PORT_RANGE_TO", value=quote(str(sysctl_port_range_to))
+                ),
+                RunCommandInputParameter(
+                    name="RUNNER_HEAD_CONFIG",
+                    value=quote(
+                        _serialize_runner_yaml(
+                            runner_id,
+                            instance_type.resources,
+                            runner_port_range_from,
+                            runner_port_range_to,
+                        )
+                    ),
+                ),
+                RunCommandInputParameter(
+                    name="DSTACK_CONFIG", value=quote(backend_config.serialize_yaml())
+                ),
+            ],
+        ),
+    ).result()
+
+
+VMAccessForLinux_buggy = frozenset("1.5.14".split(" "))
+
+
 def _launch_instance(
     compute_client: ComputeManagementClient,
     resource_client: ResourceManagementClient,
@@ -238,8 +368,7 @@ def _launch_instance(
     secret_vault_resource_group: str,
     secret_vault_name: str,
     storage_account_id: str,
-    backend_config: AzureConfig,
-) -> str:
+) -> Tuple[str, str]:
     image = _get_image(compute_client, len(instance_type.resources.gpus) > 0)
 
     # https://learn.microsoft.com/en-us/rest/api/resources/resource-groups/create-or-update?tabs=HTTP#uri-parameters
@@ -291,17 +420,6 @@ def _launch_instance(
             NetworkSecurityGroup(
                 location=location,
                 security_rules=[
-                    SecurityRule(
-                        name="ssh_access",
-                        protocol=SecurityRuleProtocol.TCP,
-                        source_address_prefix="Internet",
-                        source_port_range="*",
-                        destination_address_prefix="*",
-                        destination_port_range="22",
-                        access=SecurityRuleAccess.ALLOW,
-                        priority=100,
-                        direction=SecurityRuleDirection.INBOUND,
-                    ),
                     SecurityRule(
                         name="runner_service",
                         protocol=SecurityRuleProtocol.TCP,
@@ -389,6 +507,38 @@ def _launch_instance(
         ),
     ).result()
 
+    vmaccess_versions = compute_client.virtual_machine_extension_images.list_versions(
+        location=location, publisher_name="Microsoft.OSTCExtensions", type="VMAccessForLinux"
+    )
+    vmaccess_versions.sort(key=lambda v: tuple(map(int, v.name.split("."))))
+    vmaccess_fresh_version = vmaccess_versions[-1]
+    if vmaccess_fresh_version.name in VMAccessForLinux_buggy:
+        type_handler_version = ".".join(vmaccess_fresh_version.name.split(".")[:2])
+        attempts = 3
+        while attempts > 0:
+            poller = compute_client.virtual_machine_extensions.begin_create_or_update(
+                group_name,
+                "virtual_machine_name",
+                vm_extension_name="VMAccessForLinux",
+                extension_parameters=VirtualMachineExtension(
+                    location=location,
+                    publisher="Microsoft.OSTCExtensions",
+                    type_properties_type="VMAccessForLinux",
+                    type_handler_version=type_handler_version,
+                    auto_upgrade_minor_version=False,
+                    enable_automatic_upgrade=False,
+                ),
+            )
+            attempts -= 1
+            try:
+                result = poller.result()
+            except HttpResponseError as e:
+                if e.error and e.error.code == "VMExtensionHandlerNonTransientError":
+                    continue
+                raise
+            if result.provisioning_state == "Succeeded":
+                break
+
     keyvault_client.vaults.update_access_policy(
         secret_vault_resource_group,
         secret_vault_name,
@@ -434,86 +584,19 @@ def _launch_instance(
         {"role_definition_id": contributor_role.id, "principal_id": vm.identity.principal_id},
     )
 
-    # XXX: this is only for authentication as vm.
-    # This service Microsoft.OSTCExtensions.VMAccessForLinux looks like authenticating vm in azure AD.
-    budget = 15 * 60
-    start = monotonic()
-    step = 20
-    iteration = monotonic()
-    while (monotonic() - start) < budget:
-        sleep(step - (monotonic() - iteration))
-        vm: VirtualMachine = compute_client.virtual_machines.get(
-            group_name, "virtual_machine_name", expand="instanceView"
-        )
-        iteration = monotonic()
-        extension_handlers = vm.instance_view.vm_agent.extension_handlers
-        types = list(map(attrgetter("type"), extension_handlers))
-        try:
-            index = types.index("Microsoft.OSTCExtensions.VMAccessForLinux")
-        except ValueError:
-            continue
-
-        if extension_handlers[index].status.code != "ProvisioningState/succeeded":
-            continue
-
-        break
-
-    port_range_from: int = 3000
-    port_range_to: int = 4000
-    sysctl_port_range_from = int((port_range_to - port_range_from) / 2) + port_range_from
-    sysctl_port_range_to = port_range_to - 1
-    runner_port_range_from = port_range_from
-    runner_port_range_to = sysctl_port_range_from - 1
-    result: RunCommandResult = compute_client.virtual_machines.begin_run_command(
-        group_name,
-        vm.name,
-        parameters=RunCommandInput(
-            command_id="RunShellScript",
-            script=[
-                "sudo -s",
-                "set -o xtrace",
-                'sysctl -w net.ipv4.ip_local_port_range="${SYSCTL_PORT_RANGE_FROM} ${SYSCTL_PORT_RANGE_TO}"',
-                "[ -d /root/.dstack/ ] || mkdir /root/.dstack/",
-                'echo "$DSTACK_CONFIG" > /root/.dstack/config.yaml',
-                'echo "$RUNNER_HEAD_CONFIG" > /root/.dstack/runner.yaml',
-                'echo "hostname: $PUBLIC_IP" >> /root/.dstack/runner.yaml',
-                "HOME=/root nohup dstack-runner --log-level 6 start --http-port 4000 &",
-            ],
-            parameters=[
-                RunCommandInputParameter(name="PUBLIC_IP", value=quote(ip_address.ip_address)),
-                RunCommandInputParameter(
-                    name="SYSCTL_PORT_RANGE_FROM", value=quote(str(sysctl_port_range_from))
-                ),
-                RunCommandInputParameter(
-                    name="SYSCTL_PORT_RANGE_TO", value=quote(str(sysctl_port_range_to))
-                ),
-                RunCommandInputParameter(
-                    name="RUNNER_HEAD_CONFIG",
-                    value=quote(
-                        _serialize_runner_yaml(
-                            runner_id,
-                            instance_type.resources,
-                            runner_port_range_from,
-                            runner_port_range_to,
-                        )
-                    ),
-                ),
-                RunCommandInputParameter(
-                    name="DSTACK_CONFIG", value=quote(backend_config.serialize_yaml())
-                ),
-            ],
-        ),
-    ).result()
-
-    return group_name
+    return group_name, ip_address.ip_address
 
 
 def _get_instance_status(
     compute_client: ComputeManagementClient, group_name: str
 ) -> RequestStatus:
-    vm: VirtualMachine = compute_client.virtual_machines.get(
-        group_name, "virtual_machine_name", expand="instanceView"
-    )
+    try:
+        vm: VirtualMachine = compute_client.virtual_machines.get(
+            group_name, "virtual_machine_name", expand="instanceView"
+        )
+    except ResourceNotFoundError:
+        return RequestStatus.TERMINATED
+
     # https://learn.microsoft.com/en-us/azure/virtual-machines/states-billing
     statuses: List[InstanceViewStatus] = vm.instance_view.statuses
     codes = list(filter(lambda c: c.startswith("PowerState/"), map(attrgetter("code"), statuses)))

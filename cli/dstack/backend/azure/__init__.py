@@ -2,23 +2,24 @@ from pathlib import Path
 from typing import Generator, List, Optional
 
 from azure.identity import DefaultAzureCredential
-from azure.mgmt.subscription import SubscriptionClient
 
 from dstack.backend.azure.compute import AzureCompute
 from dstack.backend.azure.config import AzureConfig, AzureConfigurator
 from dstack.backend.azure.secrets import AzureSecretsManager
 from dstack.backend.azure.storage import AzureStorage
 from dstack.backend.base import CloudBackend
+from dstack.backend.base import artifacts as base_artifacts
 from dstack.backend.base import jobs as base_jobs
 from dstack.backend.base import repos as base_repos
 from dstack.backend.base import runs as base_runs
+from dstack.backend.base import secrets as base_secrets
+from dstack.backend.base import tags as base_tags
 from dstack.core.artifact import Artifact
 from dstack.core.error import ConfigError
 from dstack.core.job import Job, JobHead
 from dstack.core.log_event import LogEvent
 from dstack.core.repo import RepoAddress, RepoCredentials, RepoData
 from dstack.core.run import RunHead
-from dstack.core.runners import Runner
 from dstack.core.secret import Secret
 from dstack.core.tag import TagHead
 
@@ -41,7 +42,6 @@ class AzureBackend(CloudBackend):
         # https://learn.microsoft.com/en-us/azure/storage/blobs/assign-azure-role-data-access?tabs=portal
         self._storage = AzureStorage(
             credential=credential,
-            subscription_id=self.config.subscription_id,
             account_url=self.config.storage_url,
             container_name=self.config.storage_container,
         )
@@ -76,9 +76,16 @@ class AzureBackend(CloudBackend):
         repo_address: RepoAddress,
         run_name: str,
         output_dir: Optional[str],
-        output_job_dirs: bool = True,
+        files_path: Optional[str] = None,
     ):
-        raise NotImplementedError
+        artifacts = self.list_run_artifact_files(repo_address=repo_address, run_name=run_name)
+        base_artifacts.download_run_artifact_files(
+            storage=self._storage,
+            repo_address=repo_address,
+            artifacts=artifacts,
+            output_dir=output_dir,
+            files_path=files_path,
+        )
 
     def upload_job_artifact_files(
         self,
@@ -88,7 +95,14 @@ class AzureBackend(CloudBackend):
         artifact_path: str,
         local_path: Path,
     ):
-        raise NotImplementedError
+        base_artifacts.upload_job_artifact_files(
+            storage=self._storage,
+            repo_address=repo_address,
+            job_id=job_id,
+            artifact_name=artifact_name,
+            artifact_path=artifact_path,
+            local_path=local_path,
+        )
 
     def configure(self):
         raise NotImplementedError
@@ -100,10 +114,10 @@ class AzureBackend(CloudBackend):
         base_jobs.create_job(self._storage, job)
 
     def get_job(self, repo_address: RepoAddress, job_id: str) -> Optional[Job]:
-        raise NotImplementedError
+        return base_jobs.get_job(self._storage, repo_address, job_id)
 
     def list_jobs(self, repo_address: RepoAddress, run_name: str) -> List[Job]:
-        raise NotImplementedError
+        return base_jobs.list_jobs(self._storage, repo_address, run_name)
 
     def run_job(self, job: Job):
         base_jobs.run_job(self._storage, self._compute, job)
@@ -117,7 +131,7 @@ class AzureBackend(CloudBackend):
         return base_jobs.list_job_heads(self._storage, repo_address, run_name)
 
     def delete_job_head(self, repo_address: RepoAddress, job_id: str):
-        raise NotImplementedError
+        base_jobs.delete_job_head(self._storage, repo_address, job_id)
 
     def list_run_heads(
         self,
@@ -139,18 +153,14 @@ class AzureBackend(CloudBackend):
     ) -> Generator[LogEvent, None, None]:
         raise NotImplementedError
 
-    def list_run_artifact_files(
-        self, repo_address: RepoAddress, run_name: str
-    ) -> Generator[Artifact, None, None]:
-        # TODO: add a flag for non-recursive listing.
-        # Backends may implement this via list_run_artifact_files_and_folders()
-        raise NotImplementedError
+    def list_run_artifact_files(self, repo_address: RepoAddress, run_name: str) -> List[Artifact]:
+        return base_artifacts.list_run_artifact_files(self._storage, repo_address, run_name)
 
     def list_tag_heads(self, repo_address: RepoAddress) -> List[TagHead]:
-        raise NotImplementedError
+        return base_tags.list_tag_heads(self._storage, repo_address)
 
     def get_tag_head(self, repo_address: RepoAddress, tag_name: str) -> Optional[TagHead]:
-        raise NotImplementedError
+        return base_tags.get_tag_head(self._storage, repo_address, tag_name)
 
     def add_tag_from_run(
         self,
@@ -159,13 +169,25 @@ class AzureBackend(CloudBackend):
         run_name: str,
         run_jobs: Optional[List[Job]],
     ):
-        raise NotImplementedError
+        base_tags.create_tag_from_run(
+            self._storage,
+            repo_address,
+            tag_name,
+            run_name,
+            run_jobs,
+        )
 
     def add_tag_from_local_dirs(self, repo_data: RepoData, tag_name: str, local_dirs: List[str]):
-        raise NotImplementedError
+        base_tags.create_tag_from_local_dirs(
+            self._storage,
+            repo_data,
+            tag_name,
+            local_dirs,
+            self.type,
+        )
 
     def delete_tag_head(self, repo_address: RepoAddress, tag_head: TagHead):
-        raise NotImplementedError
+        base_tags.delete_tag(self._storage, repo_address, tag_head)
 
     def update_repo_last_run_at(self, repo_address: RepoAddress, last_run_at: int):
         base_repos.update_repo_last_run_at(
@@ -178,22 +200,37 @@ class AzureBackend(CloudBackend):
         return base_repos.get_repo_credentials(self._secrets_manager, repo_address)
 
     def list_secret_names(self, repo_address: RepoAddress) -> List[str]:
-        raise NotImplementedError
+        return base_secrets.list_secret_names(self._storage, repo_address)
 
     def get_secret(self, repo_address: RepoAddress, secret_name: str) -> Optional[Secret]:
-        raise NotImplementedError
+        return base_secrets.get_secret(self._secrets_manager, repo_address, secret_name)
 
     def add_secret(self, repo_address: RepoAddress, secret: Secret):
-        raise NotImplementedError
+        base_secrets.add_secret(
+            self._storage,
+            self._secrets_manager,
+            repo_address,
+            secret,
+        )
 
     def update_secret(self, repo_address: RepoAddress, secret: Secret):
-        raise NotImplementedError
+        base_secrets.update_secret(
+            self._storage,
+            self._secrets_manager,
+            repo_address,
+            secret,
+        )
 
     def delete_secret(self, repo_address: RepoAddress, secret_name: str):
-        raise NotImplementedError
+        base_secrets.delete_secret(
+            self._storage,
+            self._secrets_manager,
+            repo_address,
+            secret_name,
+        )
 
     def get_signed_download_url(self, object_key: str) -> str:
-        raise NotImplementedError
+        return self._storage.get_signed_download_url(object_key)
 
     def get_signed_upload_url(self, object_key: str) -> str:
-        raise NotImplementedError
+        return self._storage.get_signed_upload_url(object_key)

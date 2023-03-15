@@ -13,7 +13,6 @@ class AzureStorage(CloudStorage):
         self,
         account_url: str,
         credential: TokenCredential,
-        subscription_id: str,
         container_name: str,
     ):
         self._blob_service_client = BlobServiceClient(
