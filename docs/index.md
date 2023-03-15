@@ -10,7 +10,7 @@ hide:
 
 `dstack` is the most easy way to define ML workflows as code and run them either locally or remotely on any cloud.
 
-[Get started](installation.md){ class="md-go-to-action primary" } [Join our Slack](https://join.slack.com/t/dstackai/shared_invite/zt-xdnsytie-D4qU9BvJP8vkbkHXdi6clQ){ class="md-go-to-action secondary slack" }
+[Join our Slack](https://join.slack.com/t/dstackai/shared_invite/zt-xdnsytie-D4qU9BvJP8vkbkHXdi6clQ){ class="md-go-to-action primary slack" }
 
 ### Highlighted features
 
@@ -20,7 +20,7 @@ hide:
 * Save data, checkpoints, environments as artifacts and reuse them across workflows
 * No need to use custom Docker images or Kubernetes
 
-### Get started with dstack in 30 min
+### Get started
 
 Having your first ML workflows up and running will take less than 30 min.
 
