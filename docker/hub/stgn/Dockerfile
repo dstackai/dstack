@@ -15,4 +15,4 @@ RUN pip3 install -i https://test.pypi.org/simple/ --extra-index-url https://pypi
 
 EXPOSE 3000
 
-ENTRYPOINT ["dstack", "hub", "start", "--server.address=0.0.0.0"]
+ENTRYPOINT ["dstack", "hub", "start", "--host", "0.0.0.0"]
