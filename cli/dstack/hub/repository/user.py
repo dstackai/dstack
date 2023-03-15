@@ -21,7 +21,7 @@ class UserManager:
         admin_user = User(
             name="admin",
             token=os.getenv("DSTACK_HUB_ADMIN_TOKEN") or str(uuid.uuid4()),
-            hub_role=role,
+            project_role=role,
         )
         await UserManager.save(admin_user, external_session=_session)
         if external_session is None:
@@ -35,7 +35,7 @@ class UserManager:
         else:
             _session = Database.Session()
         query = await _session.execute(
-            select(User).where(User.name == name).options(selectinload(User.hub_role))
+            select(User).where(User.name == name).options(selectinload(User.project_role))
         )
         user = query.scalars().unique().first()
         if external_session is None:
@@ -51,7 +51,7 @@ class UserManager:
         else:
             _session = Database.Session()
         query = await _session.execute(
-            select(User).where(User.token == token).options(selectinload(User.hub_role))
+            select(User).where(User.token == token).options(selectinload(User.project_role))
         )
         user = query.scalars().unique().first()
         if external_session is None:
@@ -66,7 +66,7 @@ class UserManager:
             _session = external_session
         else:
             _session = Database.Session()
-        query = await _session.execute(select(User).options(selectinload(User.hub_role)))
+        query = await _session.execute(select(User).options(selectinload(User.project_role)))
         users = query.scalars().unique().all()
         if external_session is None:
             await _session.close()
@@ -111,7 +111,7 @@ class UserManager:
         else:
             _session = Database.Session()
         role = await RoleManager.create(name=role, external_session=_session)
-        admin_user = User(name=name, token=str(uuid.uuid4()), hub_role=role)
+        admin_user = User(name=name, token=str(uuid.uuid4()), project_role=role)
         await UserManager.save(admin_user, external_session=_session)
         if external_session is None:
             await _session.close()
