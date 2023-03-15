@@ -72,6 +72,7 @@ class BashProvider(Provider):
             JobSpec(
                 image_name=self.image_name,
                 commands=self._commands(),
+                entrypoint=["/bin/bash", "-i", "-c"],
                 working_dir=self.working_dir,
                 artifact_specs=self.artifact_specs,
                 port_count=self.ports,

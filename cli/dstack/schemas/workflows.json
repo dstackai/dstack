@@ -221,6 +221,10 @@
         "commands": {
           "$ref": "#/definitions/commands"
         },
+        "entrypoint": {
+          "description": "The Docker entrypoint",
+          "type": "string"
+        },
         "setup": {
           "$ref": "#/definitions/setup"
         },

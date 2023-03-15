@@ -98,12 +98,14 @@ func (r *Engine) Create(ctx context.Context, spec *Spec, logs io.Writer) (*Docke
 	log.Trace(ctx, "End pull image")
 
 	log.Trace(ctx, "Creating docker container", "image:", spec.Image)
-	log.Trace(ctx, "container params: ", "mounts: ", spec.Mounts)
-	log.Trace(ctx, "Container command: ", "cmd: ", spec.Commands)
+	log.Trace(ctx, "Container params ", "mounts", spec.Mounts)
+	log.Trace(ctx, "Container command ", "cmd", spec.Commands)
+	log.Trace(ctx, "Container entrypoint ", "entrypoint", spec.Entrypoint)
 
 	config := &container.Config{
 		Image:        spec.Image,
 		Cmd:          spec.Commands,
+		Entrypoint:   spec.Entrypoint,
 		Tty:          true,
 		WorkingDir:   spec.WorkDir,
 		Env:          spec.Env,
@@ -283,13 +285,7 @@ func ShellCommands(commands []string) []string {
 		return []string{}
 	}
 	arg := strings.Join(commands, " && ")
-	shell := []string{
-		"/bin/bash",
-		"-i",
-		"-c",
-		arg,
-	}
-	return shell
+	return []string{arg}
 }
 
 func BytesToMiB(bytesCount int64) uint64 {

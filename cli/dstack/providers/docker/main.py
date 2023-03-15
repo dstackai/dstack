@@ -13,6 +13,7 @@ class DockerProvider(Provider):
         self.image_name = None
         self.setup = None
         self.commands = None
+        self.entrypoint = None
         self.artifact_specs = None
         self.env = None
         self.working_dir = None
@@ -31,6 +32,7 @@ class DockerProvider(Provider):
         self.image_name = self.provider_data["image"]
         self.setup = self._get_list_data("setup") or self._get_list_data("before_run")
         self.commands = self._get_list_data("commands")
+        self.entrypoint = self._get_entrypoint()
         self.artifact_specs = self._artifact_specs()
         self.env = self.provider_data.get("env")
         self.working_dir = self.provider_data.get("working_dir")
@@ -76,6 +78,7 @@ class DockerProvider(Provider):
             JobSpec(
                 image_name=self.image_name,
                 commands=commands,
+                entrypoint=self.entrypoint,
                 env=self.env,
                 working_dir=self.working_dir,
                 artifact_specs=self.artifact_specs,

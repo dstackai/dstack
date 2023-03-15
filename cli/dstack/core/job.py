@@ -166,6 +166,7 @@ class Job(JobHead):
     submitted_at: int
     image_name: str
     commands: Optional[List[str]]
+    entrypoint: Optional[List[str]]
     env: Optional[Dict[str, str]]
     working_dir: Optional[str]
     artifact_specs: Optional[List[ArtifactSpec]]
@@ -212,6 +213,11 @@ class Job(JobHead):
             if self.commands
             else None
         )
+        entrypoint = (
+            ("[" + ", ".join(map(lambda a: _quoted(str(a)), self.entrypoint)) + "]")
+            if self.commands
+            else None
+        )
         artifact_specs = (
             ("[" + ", ".join(map(lambda a: _quoted(str(a)), self.artifact_specs)) + "]")
             if self.artifact_specs
@@ -237,6 +243,7 @@ class Job(JobHead):
             f"submitted_at={self.submitted_at}, "
             f'image_name="{self.image_name}", '
             f"commands={commands}, "
+            f"entrypoint={entrypoint}, "
             f"env={self.env}, "
             f"working_dir={_quoted(self.working_dir)}, "
             f"port_count={self.port_count}, "
@@ -290,6 +297,7 @@ class Job(JobHead):
             "submitted_at": self.submitted_at,
             "image_name": self.image_name,
             "commands": self.commands or [],
+            "entrypoint": self.entrypoint,
             "env": self.env or {},
             "working_dir": self.working_dir or "",
             "artifacts": artifacts,
@@ -431,6 +439,7 @@ class Job(JobHead):
 class JobSpec(JobRef):
     image_name: str
     commands: Optional[List[str]] = None
+    entrypoint: Optional[List[str]] = None
     env: Optional[Dict[str, str]] = None
     working_dir: Optional[str] = None
     artifact_specs: Optional[List[ArtifactSpec]] = None
