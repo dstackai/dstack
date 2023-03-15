@@ -1,0 +1,28 @@
+name: Build Hub Docker for STGN
+
+on: [workflow_dispatch]
+
+jobs:
+  hub-docker-master:
+    defaults:
+      run:
+        working-directory: docker/hub/stgn
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v3
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v2
+      - name: Login to DockerHub
+        uses: docker/login-action@v2
+        with:
+          username: ${{ secrets.DOCKERHUB_USERNAME }}
+          password: ${{ secrets.DOCKERHUB_TOKEN }}
+      - name: Set up QEMU
+        uses: docker/setup-qemu-action@v2
+      - name: Build and upload to DockerHub
+        run: |
+          docker buildx build --platform linux/arm64/v8 --push --build-arg PYTHON=$VERSION --tag dstackai/dstack-hub-stgn-arm64:latest -f Dockerfile .
+          docker buildx build --platform linux/amd64 --push --build-arg PYTHON=latest --tag dstackai/dstack-hub-stgn-amd64:latest -f Dockerfile .
+          docker manifest create dstackai/dstack-hub --amend dstackai/dstack-hub-stgn-arm64:latest --amend dstackai/dstack-hub-stgn-amd64
+          docker manifest push dstackai/dstack-hub-stgn:latest
