@@ -11,7 +11,7 @@ from dstack.hub.routers.cache import get_backend
 from dstack.hub.routers.util import get_hub
 from dstack.hub.security.scope import Scope
 
-router = APIRouter(prefix="/api/hub", tags=["runs"])
+router = APIRouter(prefix="/api/project", tags=["runs"])
 
 security = HTTPBearer()
 

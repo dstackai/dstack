@@ -49,12 +49,13 @@ class Member(Base, Database.Base):
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
     hub_name: Mapped[str] = mapped_column(ForeignKey("hubs.name"))
+    hub: Mapped["Hub"] = relationship()
 
     user_name: Mapped[str] = mapped_column(ForeignKey("users.name"))
     user: Mapped[User] = relationship()
 
     role_id: Mapped[int] = mapped_column(ForeignKey("roles.id"))
-    hub_role: Mapped[Role] = relationship()
+    hub_role: Mapped[Role] = relationship(lazy="selectin")
 
     def __repr__(self) -> str:
         return super().__repr__()
@@ -67,7 +68,7 @@ class Hub(Base, Database.Base):
     backend: Mapped[str] = mapped_column(String(30))
     config: Mapped[str] = mapped_column(String(300))
     auth: Mapped[str] = mapped_column(String(300))
-    members: Mapped[List[Member]] = relationship(lazy="selectin")
+    members: Mapped[List[Member]] = relationship(back_populates="hub", lazy="selectin")
 
     def __repr__(self) -> str:
         return super().__repr__()

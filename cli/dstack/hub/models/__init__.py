@@ -113,7 +113,7 @@ class LinkUpload(BaseModel):
 
 
 class HubDelete(BaseModel):
-    hub_names: List[str] = []
+    hubs: List[str] = []
 
 
 class HubElementValue(BaseModel):
@@ -138,3 +138,11 @@ class AWSHubValues(BaseModel):
 
 class UserPatch(BaseModel):
     global_role: str
+
+
+class AddMembers(BaseModel):
+    members: List[Member] = []
+
+
+class DeleteUsers(BaseModel):
+    users: List[str] = []
