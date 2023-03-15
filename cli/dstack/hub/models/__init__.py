@@ -13,7 +13,7 @@ class User(BaseModel):
     global_role: str
 
 
-class Hub(BaseModel):
+class Project(BaseModel):
     name: str
     backend: str
     config: str
@@ -21,7 +21,7 @@ class Hub(BaseModel):
 
 class Member(BaseModel):
     user_name: str
-    hub_role: str
+    project_role: str
 
 
 class AWSConfig(BaseModel):
@@ -40,8 +40,8 @@ class AWSBackend(AWSConfig, AWSAuth):
     type: str = "aws"
 
 
-class HubInfo(BaseModel):
-    hub_name: str
+class ProjectInfo(BaseModel):
+    project_name: str
     backend: AWSBackend
     members: List[Member] = []
 
@@ -112,11 +112,11 @@ class LinkUpload(BaseModel):
     object_key: str
 
 
-class HubDelete(BaseModel):
-    hubs: List[str] = []
+class ProjectDelete(BaseModel):
+    projects: List[str] = []
 
 
-class HubElementValue(BaseModel):
+class ProjectElementValue(BaseModel):
     name: Optional[str]
     created: Optional[str]
     region: Optional[str]
@@ -124,16 +124,16 @@ class HubElementValue(BaseModel):
     label: Optional[str]
 
 
-class HubElement(BaseModel):
+class ProjectElement(BaseModel):
     selected: str
-    values: List[HubElementValue] = []
+    values: List[ProjectElementValue] = []
 
 
-class AWSHubValues(BaseModel):
+class AWSProjectValues(BaseModel):
     type: str = "aws"
-    region_name: Optional[HubElement]
-    s3_bucket_name: Optional[HubElement]
-    ec2_subnet_id: Optional[HubElement]
+    region_name: Optional[ProjectElement]
+    s3_bucket_name: Optional[ProjectElement]
+    ec2_subnet_id: Optional[ProjectElement]
 
 
 class UserPatch(BaseModel):

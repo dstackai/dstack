@@ -50,7 +50,6 @@ logger.setLevel(logging.DEBUG)
 app = FastAPI(docs_url="/api/docs")
 app.include_router(users.router)
 app.include_router(hub.router)
-app.include_router(hub.router_project)
 app.include_router(runs.router)
 app.include_router(jobs.router)
 app.include_router(runners.router)
@@ -81,10 +80,7 @@ async def app_logging(request: Request, call_next):
     path = request.url.path
     if request.query_params:
         path += f"?{request.query_params}"
-    request_dict = {
-        "method": request.method,
-        "path": path,
-    }
+    request_dict = {"method": request.method, "path": path, "headers": request.headers.__dict__}
     """
     try:
         body = await request.json()

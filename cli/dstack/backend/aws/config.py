@@ -14,7 +14,7 @@ from rich.prompt import Confirm, Prompt
 from dstack.cli.common import _is_termios_available, ask_choice
 from dstack.core.config import BackendConfig, Configurator, get_config_path
 from dstack.core.error import ConfigError, HubError
-from dstack.hub.models import AWSHubValues, HubElement, HubElementValue
+from dstack.hub.models import AWSProjectValues, ProjectElement, ProjectElementValue
 
 regions = [
     ("US East, N. Virginia", "us-east-1"),
@@ -156,41 +156,41 @@ class AWSConfigurator(Configurator):
             sts.get_caller_identity()
         except botocore.exceptions.ClientError as ex:
             raise HubError("Credentials are not valid")
-        hub_values = AWSHubValues()
-        hub_values.region_name = HubElement(selected=config.region_name)
+        project_values = AWSProjectValues()
+        project_values.region_name = ProjectElement(selected=config.region_name)
         for r in regions:
-            hub_values.region_name.values.append(HubElementValue(value=r[1], label=r[0]))
+            project_values.region_name.values.append(ProjectElementValue(value=r[1], label=r[0]))
         # Step 2: get bucket list
         try:
             _s3 = session.client("s3")
             response = _s3.list_buckets()
-            hub_values.s3_bucket_name = HubElement(selected=config.bucket_name)
+            project_values.s3_bucket_name = ProjectElement(selected=config.bucket_name)
             for bucket in response["Buckets"]:
-                hub_values.s3_bucket_name.values.append(
-                    HubElementValue(
+                project_values.s3_bucket_name.values.append(
+                    ProjectElementValue(
                         name=bucket["Name"],
                         created=bucket["CreationDate"].strftime("%d.%m.%Y %H:%M:%S"),
                         region=config.region_name,
                     )
                 )
         except Exception as ex:
-            return hub_values
+            return project_values
         # Step 3: get subnet_id list
         try:
             _ec2 = session.client("ec2")
             response = _ec2.describe_subnets()
-            hub_values.ec2_subnet_id = HubElement(selected=config.subnet_id)
+            project_values.ec2_subnet_id = ProjectElement(selected=config.subnet_id)
             for subnet in response["Subnets"]:
-                hub_values.ec2_subnet_id.values.append(
-                    HubElementValue(
+                project_values.ec2_subnet_id.values.append(
+                    ProjectElementValue(
                         value=subnet["SubnetId"],
                         label=subnet["SubnetId"],
                     )
                 )
         except Exception as ex:
-            return hub_values
+            return project_values
 
-        return hub_values
+        return project_values
 
     def configure_cli(self):
         self.config = AWSConfig()
