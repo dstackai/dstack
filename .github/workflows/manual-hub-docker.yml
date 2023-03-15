@@ -22,7 +22,7 @@ jobs:
         uses: docker/setup-qemu-action@v2
       - name: Build and upload to DockerHub
         run: |
-          docker buildx build --platform linux/arm64/v8 --push --build-arg PYTHON=$VERSION --tag dstackai/dstack-hub-stgn-arm64:latest -f Dockerfile .
+          docker buildx build --platform linux/arm64/v8 --push --tag dstackai/dstack-hub-stgn-arm64:latest -f Dockerfile .
           docker buildx build --platform linux/amd64 --push --build-arg PYTHON=latest --tag dstackai/dstack-hub-stgn-amd64:latest -f Dockerfile .
           docker manifest create dstackai/dstack-hub --amend dstackai/dstack-hub-stgn-arm64:latest --amend dstackai/dstack-hub-stgn-amd64
           docker manifest push dstackai/dstack-hub-stgn:latest
