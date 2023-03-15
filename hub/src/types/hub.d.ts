@@ -1,6 +1,6 @@
 declare type THubBackendType = 'aws' | 'gcp' | 'azure';
 
-declare type THubBackend = { type: THubBackendType } & THubBackendAWSWithTitles
+declare type THubBackend = { type: THubBackendType } & THubBackendAWSWithTitles & THubBackendGCP
 declare interface IHub {
     hub_name: string,
     backend: THubBackend,
@@ -36,6 +36,16 @@ declare interface THubBackendAWS {
     region_name: string,
     s3_bucket_name: string,
     ec2_subnet_id: string | null,
+}
+
+declare interface THubBackendGCP {
+    project: string,
+    region: string,
+    zone: string,
+    bucket: string,
+    vpc: string,
+    subnet: string,
+    credentials_file: string,
 }
 
 declare interface THubBackendAWSWithTitles extends THubBackendAWS {

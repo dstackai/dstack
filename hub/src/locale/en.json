@@ -67,7 +67,16 @@
         "secret_key_id": "Secret key ID",
         "region_name":  "Region",
         "s3_bucket_name": "Bucket",
-        "ec2_subnet_id":  "Subnet ID"
+        "ec2_subnet_id": "Subnet ID"
+      },
+      "gcp": {
+        "project": "Project",
+        "region": "Region",
+        "zone": "Zone",
+        "bucket": "Bucket",
+        "vpc":  "VPC",
+        "subnet": "Subnet",
+        "credentials_file": "Credentials"
       },
       "members": {
         "section_title": "Members",

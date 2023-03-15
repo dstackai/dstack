@@ -4,10 +4,11 @@ import { Container, Header, FormUI, SpaceBetween, Button, FormInput, FormField, 
 import { useForm, FormProvider, DefaultValues } from 'react-hook-form';
 import { IProps, TBackendOption } from './types';
 import { AWSBackend } from './AWS';
+import { GCPBackend } from './GCP';
 
 import styles from './styles.module.scss';
-import { isRequestFormErrors, isRequestFormFieldError } from '../../../libs/isErrorWithMessage';
-import { FormFieldError } from '../../../libs/types';
+import { isRequestFormErrors, isRequestFormFieldError } from 'libs';
+import { FormFieldError } from 'libs/types';
 import { FieldPath } from 'react-hook-form/dist/types/path';
 
 export const HubForm: React.FC<IProps> = ({ initialValues, onCancel, loading, onSubmit: onSubmitProp }) => {
@@ -48,12 +49,12 @@ export const HubForm: React.FC<IProps> = ({ initialValues, onCancel, loading, on
             description: t('projects.backend_type.aws_description'),
             disabled: loading,
         },
-        // {
-        //     label: t('projects.backend_type.gcp'),
-        //     value: 'gcp',
-        //     description: t('projects.backend_type.gcp_description'),
-        //     disabled: true,
-        // },
+        {
+            label: t('projects.backend_type.gcp'),
+            value: 'gcp',
+            description: t('projects.backend_type.gcp_description'),
+            disabled: loading,
+        },
         // {
         //     label: t('projects.backend_type.azure'),
         //     value: 'azure',
@@ -83,6 +84,9 @@ export const HubForm: React.FC<IProps> = ({ initialValues, onCancel, loading, on
         switch (backendType) {
             case 'aws': {
                 return <AWSBackend loading={loading} />;
+            }
+            case 'gcp': {
+                return <GCPBackend loading={loading} />;
             }
             default:
                 return null;
