@@ -27,3 +27,5 @@ jobs:
           docker buildx build --platform linux/amd64 --push --provenance=false --tag dstackai/dstack-hub-stgn:$VERSION-amd64 -f Dockerfile .
           docker manifest create dstackai/dstack-hub-stgn:$VERSION --amend dstackai/dstack-hub-stgn:$VERSION-arm64 --amend dstackai/dstack-hub-stgn:$VERSION-amd64
           docker manifest push dstackai/dstack-hub-stgn:$VERSION
+          docker manifest create dstackai/dstack-hub-stgn:latest --amend dstackai/dstack-hub-stgn:$VERSION-arm64 --amend dstackai/dstack-hub-stgn:$VERSION-amd64
+          docker manifest push dstackai/dstack-hub-stgn:latest
