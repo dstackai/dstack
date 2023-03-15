@@ -24,5 +24,5 @@ jobs:
         run: |
           docker buildx build --platform linux/arm64/v8 --push --tag dstackai/dstack-hub-stgn-arm64 -f Dockerfile .
           docker buildx build --platform linux/amd64 --push --tag dstackai/dstack-hub-stgn-amd64 -f Dockerfile .
-          docker manifest create dstackai/dstack-hub --amend dstackai/dstack-hub-stgn-arm64 --amend dstackai/dstack-hub-stgn-amd64
+          docker manifest create dstackai/dstack-hub-stgn --amend dstackai/dstack-hub-stgn-arm64 --amend dstackai/dstack-hub-stgn-amd64
           docker manifest push dstackai/dstack-hub-stgn
