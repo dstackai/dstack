@@ -43,7 +43,8 @@ The following properties are required:
 
 The following properties are optional:
 
-- `entrypoint` - (Optional) The entrypoint string to override image entrypoint
+- `commands` - (Optional) The list of bash commands. If any - entrypoint is overridden with `/bin/sh -i -c`
+- `entrypoint` - (Optional) The entrypoint string to override the image entrypoint
 - `version` - (Optional) The major version of Python
 - `environment` - (Optional) The list of environment variables 
 - [`artifacts`](#artifacts) - (Optional) The list of output artifacts
