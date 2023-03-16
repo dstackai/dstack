@@ -54,7 +54,7 @@ class LocalBackend(Backend):
     def list_jobs(self, repo_address: RepoAddress, run_name: str) -> List[Job]:
         return base_jobs.list_jobs(self._storage, repo_address, run_name)
 
-    def run_job(self, job: Job, failed_to_start_job_new_status: JobStatus = JobStatus.FAILED):
+    def run_job(self, job: Job, failed_to_start_job_new_status: JobStatus):
         base_jobs.run_job(self._storage, self._compute, job, failed_to_start_job_new_status)
 
     def stop_job(self, repo_address: RepoAddress, job_id: str, abort: bool):
@@ -73,10 +73,15 @@ class LocalBackend(Backend):
         repo_address: RepoAddress,
         run_name: Optional[str] = None,
         include_request_heads: bool = True,
+        interrupted_job_new_status: JobStatus = JobStatus.FAILED,
     ) -> List[RunHead]:
         job_heads = self.list_job_heads(repo_address, run_name)
         return base_runs.get_run_heads(
-            self._storage, self._compute, job_heads, include_request_heads
+            self._storage,
+            self._compute,
+            job_heads,
+            include_request_heads,
+            interrupted_job_new_status,
         )
 
     def poll_logs(

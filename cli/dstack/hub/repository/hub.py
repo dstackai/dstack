@@ -36,6 +36,10 @@ class HubManager:
         return hub
 
     @staticmethod
+    async def list_hubs(external_session=None) -> List[Hub]:
+        pass
+
+    @staticmethod
     async def save(hub: Hub, external_session=None):
         _session = session
         if external_session is not None:

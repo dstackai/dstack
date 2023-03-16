@@ -23,7 +23,7 @@ from dstack.core.artifact import Artifact
 from dstack.core.error import ConfigError
 from dstack.core.job import Job, JobHead, JobStatus
 from dstack.core.log_event import LogEvent
-from dstack.core.repo import LocalRepoData, RepoAddress, RepoCredentials
+from dstack.core.repo import LocalRepoData, RepoAddress, RepoCredentials, RepoHead
 from dstack.core.run import RunHead
 from dstack.core.secret import Secret
 from dstack.core.tag import TagHead
@@ -98,7 +98,7 @@ class GCPBackend(CloudBackend):
     def list_jobs(self, repo_address: RepoAddress, run_name: str) -> List[Job]:
         return base_jobs.list_jobs(self._storage, repo_address, run_name)
 
-    def run_job(self, job: Job, failed_to_start_job_new_status: JobStatus = JobStatus.FAILED):
+    def run_job(self, job: Job, failed_to_start_job_new_status: JobStatus):
         base_jobs.run_job(self._storage, self._compute, job, failed_to_start_job_new_status)
 
     def stop_job(self, repo_address: RepoAddress, job_id: str, abort: bool):
@@ -117,10 +117,15 @@ class GCPBackend(CloudBackend):
         repo_address: RepoAddress,
         run_name: Optional[str] = None,
         include_request_heads: bool = True,
+        interrupted_job_new_status: JobStatus = JobStatus.FAILED,
     ) -> List[RunHead]:
         job_heads = self.list_job_heads(repo_address, run_name)
         return base_runs.get_run_heads(
-            self._storage, self._compute, job_heads, include_request_heads
+            self._storage,
+            self._compute,
+            job_heads,
+            include_request_heads,
+            interrupted_job_new_status,
         )
 
     def poll_logs(
@@ -206,6 +211,9 @@ class GCPBackend(CloudBackend):
 
     def delete_tag_head(self, repo_address: RepoAddress, tag_head: TagHead):
         base_tags.delete_tag(self._storage, repo_address, tag_head)
+
+    def list_repo_heads(self) -> List[RepoHead]:
+        return base_repos.list_repo_heads(self._storage)
 
     def update_repo_last_run_at(self, repo_address: RepoAddress, last_run_at: int):
         base_repos.update_repo_last_run_at(

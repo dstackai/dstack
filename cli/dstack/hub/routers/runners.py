@@ -3,8 +3,7 @@ from typing import List, Union
 from fastapi import APIRouter, Depends
 from fastapi.security import HTTPBearer
 
-from dstack.core.job import Job
-from dstack.core.repo import RepoAddress
+from dstack.core.job import Job, JobStatus
 from dstack.hub.models import StopRunners
 from dstack.hub.routers.cache import get_backend
 from dstack.hub.routers.util import get_hub
@@ -19,7 +18,7 @@ security = HTTPBearer()
 async def run_runners(hub_name: str, job: Job):
     hub = await get_hub(hub_name=hub_name)
     backend = get_backend(hub)
-    backend.run_job(job=job)
+    backend.run_job(job=job, failed_to_start_job_new_status=JobStatus.PENDING)
 
 
 @router.post("/{hub_name}/runners/stop", dependencies=[Depends(Scope("runners:stop:write"))])

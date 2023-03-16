@@ -64,7 +64,7 @@ class HubBackend(RemoteBackend):
     def list_jobs(self, repo_address: RepoAddress, run_name: str) -> List[Job]:
         return self._hub_client().list_jobs(repo_address=repo_address, run_name=run_name)
 
-    def run_job(self, job: Job, failed_to_start_job_new_status: JobStatus = JobStatus.FAILED):
+    def run_job(self, job: Job, failed_to_start_job_new_status: JobStatus):
         self._hub_client().run_job(job=job)
 
     def stop_job(self, repo_address: RepoAddress, job_id: str, abort: bool):
@@ -83,6 +83,7 @@ class HubBackend(RemoteBackend):
         repo_address: RepoAddress,
         run_name: Optional[str] = None,
         include_request_heads: bool = True,
+        interrupted_job_new_status: JobStatus = JobStatus.FAILED,
     ) -> List[RunHead]:
         return self._hub_client().list_run_heads(
             repo_address=repo_address,

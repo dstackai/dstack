@@ -6,6 +6,7 @@ from fastapi import FastAPI
 from starlette.responses import HTMLResponse, JSONResponse
 from starlette.staticfiles import StaticFiles
 
+from dstack.hub.background import start_background_tasks
 from dstack.hub.db.migrate import migrate
 from dstack.hub.db.models import User
 from dstack.hub.repository.user import UserManager
@@ -41,7 +42,7 @@ app.include_router(link.router)
 async def startup_event():
     await migrate()
     admin_user = await update_admin_user()
-
+    start_background_tasks()
     url = f"http://{os.getenv('DSTACK_HUB_HOST')}:{os.getenv('DSTACK_HUB_PORT')}?token={admin_user.token}"
     print(f"The hub is available at {url}")
 

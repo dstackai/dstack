@@ -10,6 +10,7 @@ from dstack.core.job import Job, JobHead, JobStatus
 from dstack.core.repo import RepoAddress
 from dstack.core.request import RequestStatus
 from dstack.core.runners import Runner
+from dstack.utils.common import get_milliseconds_since_epoch
 
 
 def create_job(
@@ -240,6 +241,12 @@ def stop_job(
             ):
                 job.status = new_status
                 update_job(storage, job)
+
+
+def update_job_submission(job: Job):
+    job.status = JobStatus.SUBMITTED
+    job.submission_num += 1
+    job.submitted_at = get_milliseconds_since_epoch()
 
 
 def _get_jobs_dir(repo_address: RepoAddress) -> str:
