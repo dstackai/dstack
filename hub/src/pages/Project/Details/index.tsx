@@ -70,7 +70,7 @@ export const ProjectDetails: React.FC = () => {
             });
     };
 
-    const cliCommand = `dstack config hub --url ${location.origin} --project ${paramProjectName}`;
+    const cliCommand = `dstack config hub --url ${location.origin} --project ${paramProjectName} --token ${currentUserToken}`;
 
     const onCopyCliCommand = async () => {
         try {
