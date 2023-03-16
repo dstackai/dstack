@@ -98,8 +98,9 @@ func (r *Engine) Create(ctx context.Context, spec *Spec, logs io.Writer) (*Docke
 	log.Trace(ctx, "End pull image")
 
 	log.Trace(ctx, "Creating docker container", "image:", spec.Image)
-	log.Trace(ctx, "container params: ", "mounts: ", spec.Mounts)
-	log.Trace(ctx, "Container command: ", "cmd: ", spec.Commands)
+	log.Trace(ctx, "Container params ", "mounts", spec.Mounts)
+	log.Trace(ctx, "Container command ", "cmd", spec.Commands)
+	log.Trace(ctx, "Container entrypoint ", "entrypoint", spec.Entrypoint)
 
 	config := &container.Config{
 		Image:        spec.Image,
@@ -111,6 +112,9 @@ func (r *Engine) Create(ctx context.Context, spec *Spec, logs io.Writer) (*Docke
 		Labels:       spec.Labels,
 		AttachStdout: true,
 		AttachStdin:  true,
+	}
+	if spec.Entrypoint != nil {
+		config.Entrypoint = *spec.Entrypoint
 	}
 	var networkMode container.NetworkMode = "default"
 	if supportNetworkModeHost() {
@@ -283,13 +287,7 @@ func ShellCommands(commands []string) []string {
 		return []string{}
 	}
 	arg := strings.Join(commands, " && ")
-	shell := []string{
-		"/bin/bash",
-		"-i",
-		"-c",
-		arg,
-	}
-	return shell
+	return []string{arg}
 }
 
 func BytesToMiB(bytesCount int64) uint64 {

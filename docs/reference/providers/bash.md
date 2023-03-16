@@ -41,7 +41,6 @@ The following properties are required:
 
 The following properties are optional:
 
-- `setup` - (Optional) The list of shell commands to run before running the main commands
 - `python` - (Optional) The major version of Python
 - `env` - (Optional) The list of environment variables 
 - [`artifacts`](#artifacts) - (Optional) The list of output artifacts
