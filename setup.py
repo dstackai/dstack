@@ -83,6 +83,7 @@ setup(
         "google-cloud-secret-manager>=2.0.0",
         "google-cloud-logging>=2.0.0",
         "aiosqlite",
+        "apscheduler",
     ],
     classifiers=[
         "Development Status :: 2 - Pre-Alpha",
