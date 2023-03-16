@@ -1,13 +1,12 @@
 import React from 'react';
 import { useTranslation } from 'react-i18next';
-import { Container, Header, FormUI, SpaceBetween, Button, FormInput, FormField, FormTiles } from 'components';
+import { Container, Header, FormUI, SpaceBetween, Button, FormInput, FormRadioButtons } from 'components';
 import { useForm, FormProvider, DefaultValues } from 'react-hook-form';
 import { IProps, TBackendOption } from './types';
 import { AWSBackend } from './AWS';
 import { isRequestFormErrors, isRequestFormFieldError } from 'libs/isErrorWithMessage';
 import { FormFieldError } from 'libs/types';
 import { FieldPath } from 'react-hook-form/dist/types/path';
-import styles from './styles.module.scss';
 
 export const ProjectForm: React.FC<IProps> = ({ initialValues, onCancel, loading, onSubmit: onSubmitProp }) => {
     const { t } = useTranslation();
@@ -51,13 +50,13 @@ export const ProjectForm: React.FC<IProps> = ({ initialValues, onCancel, loading
         //     label: t('projects.backend_type.gcp'),
         //     value: 'gcp',
         //     description: t('projects.backend_type.gcp_description'),
-        //     disabled: true,
+        //     disabled: loading,
         // },
         // {
         //     label: t('projects.backend_type.azure'),
         //     value: 'azure',
         //     description: t('projects.backend_type.azure_description'),
-        //     disabled: true,
+        //     disabled: loading,
         // },
     ];
 
@@ -127,12 +126,14 @@ export const ProjectForm: React.FC<IProps> = ({ initialValues, onCancel, loading
                         )}
 
                         <Container header={<Header variant="h2">{t('projects.edit.backend')}</Header>}>
-                            <FormField label={t('projects.edit.backend_type')} />
-
                             <SpaceBetween size="l">
-                                <div className={styles.backendTypeTiles}>
-                                    <FormTiles control={control} name="backend.type" items={backendOptions} />
-                                </div>
+                                <FormRadioButtons
+                                    label={t('projects.edit.backend_type')}
+                                    control={control}
+                                    name="backend.type"
+                                    items={backendOptions}
+                                />
+
                                 {renderBackendFields()}
                             </SpaceBetween>
                         </Container>
