@@ -17,6 +17,7 @@ workflows:
   - name: hello-docker
     provider: docker
     image: ubuntu
+    entrypoint: /bin/bash -i -c
     commands:
       - mkdir -p output
       - echo 'Hello, world!' > output/hello.txt
@@ -38,10 +39,11 @@ dstack run hello-docker
 
 The following properties are required:
 
-- `file` - (Required) The Python file to run
+- `image` - (Required) The Docker image name
 
 The following properties are optional:
 
+- `entrypoint` - (Optional) The entrypoint string to override image entrypoint
 - `setup` - (Optional) The list of shell commands to run before running the Docker image
 - `version` - (Optional) The major version of Python
 - `environment` - (Optional) The list of environment variables 
