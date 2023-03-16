@@ -45,7 +45,7 @@ handler.setFormatter(
 )
 logger.addHandler(handler)
 logger.addFilter(filter_add_request_id)
-logger.setLevel(logging.DEBUG)
+logger.setLevel(logging.ERROR)
 
 app = FastAPI(docs_url="/api/docs")
 app.include_router(users.router)
@@ -65,6 +65,12 @@ app.include_router(link.router)
 async def startup_event():
     await migrate()
     admin_user = await update_admin_user()
+    log_level = os.getenv("DSTACK_HUB_LOG_LEVEL")
+    if log_level != "":
+        try:
+            logger.setLevel(log_level.upper())
+        except:
+            pass
 
     url = f"http://{os.getenv('DSTACK_HUB_HOST')}:{os.getenv('DSTACK_HUB_PORT')}?token={admin_user.token}"
     print(f"The hub is available at {url}")
