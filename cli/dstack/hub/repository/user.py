@@ -17,7 +17,7 @@ class UserManager:
             _session = external_session
         else:
             _session = Database.Session()
-        role = await RoleManager.create(name="admin", external_session=_session)
+        role = await RoleManager.get_or_create(name="admin", external_session=_session)
         admin_user = User(
             name="admin",
             token=os.getenv("DSTACK_HUB_ADMIN_TOKEN") or str(uuid.uuid4()),
@@ -110,7 +110,7 @@ class UserManager:
             _session = external_session
         else:
             _session = Database.Session()
-        role = await RoleManager.create(name=role, external_session=_session)
+        role = await RoleManager.get_or_create(name=role, external_session=_session)
         admin_user = User(name=name, token=str(uuid.uuid4()), project_role=role)
         await UserManager.save(admin_user, external_session=_session)
         if external_session is None:

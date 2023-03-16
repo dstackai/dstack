@@ -11,7 +11,7 @@ from dstack.hub.db.models import Role, User
 
 class RoleManager:
     @staticmethod
-    async def create(name: str, external_session=None) -> Role:
+    async def get_or_create(name: str, external_session=None) -> Role:
         if external_session is not None:
             _session = external_session
         else:
