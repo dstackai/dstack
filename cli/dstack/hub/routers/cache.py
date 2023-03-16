@@ -4,35 +4,35 @@ from fastapi import HTTPException, status
 
 from dstack.api.backend import dict_backends
 from dstack.backend.base import CloudBackend
-from dstack.hub.db.models import Hub
+from dstack.hub.db.models import Project
 
 cache = {}
 
 
-def get_backend(hub: Hub) -> CloudBackend:
+def get_backend(project: Project) -> CloudBackend:
     global cache
-    if cache.get(hub.name) is None:
-        if hub.config == "":
+    if cache.get(project.name) is None:
+        if project.config == "":
             raise HTTPException(
                 status_code=status.HTTP_409_CONFLICT,
-                detail=f"Empty config for hub = {hub.name}",
+                detail=f"Empty config for project = {project.name}",
             )
-        backend = dict_backends(all_backend=True).get(hub.backend)
+        backend = dict_backends(all_backend=True).get(project.backend)
         if backend is None:
             raise HTTPException(
                 status_code=status.HTTP_409_CONFLICT,
-                detail=f"Backend not found for {hub.backend}",
+                detail=f"Backend not found for {project.backend}",
             )
         configurator = backend.get_configurator()
         if configurator is None:
             raise HTTPException(
                 status_code=status.HTTP_409_CONFLICT,
-                detail=f"Configurator not found for {hub.backend}",
+                detail=f"Configurator not found for {project.backend}",
             )
-        json_data = json.loads(str(hub.config))
+        json_data = json.loads(str(project.config))
         config = configurator.get_config(json_data)
-        if hub.auth is not None:
-            config.credentials = json.loads(str(hub.auth))
+        if project.auth is not None:
+            config.credentials = json.loads(str(project.auth))
         backend.__init__(backend_config=config)
-        cache[hub.name] = backend
-    return cache.get(hub.name)
+        cache[project.name] = backend
+    return cache.get(project.name)
