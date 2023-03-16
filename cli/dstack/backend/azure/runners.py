@@ -2,17 +2,10 @@ from typing import List, Optional, Tuple
 
 from azure.mgmt.compute import ComputeManagementClient
 
+from dstack.backend.base.compute import _matches_requirements
 from dstack.core.instance import InstanceType
 from dstack.core.job import Requirements
 from dstack.core.runners import Gpu, Resources
-
-
-def _key_for_instance(i1: InstanceType) -> Tuple:
-    return (
-        sum(map(lambda g: g.memory_mib, i1.resources.gpus or [])),
-        i1.resources.cpus,
-        i1.resources.memory_mib,
-    )
 
 
 def _get_instance_types(client: ComputeManagementClient, location: str) -> List[InstanceType]:
@@ -49,12 +42,25 @@ def _get_instance_types(client: ComputeManagementClient, location: str) -> List[
     return instance_types
 
 
+def _key_for_instance(i1: InstanceType) -> Tuple:
+    return (
+        sum(map(lambda g: g.memory_mib, i1.resources.gpus or [])),
+        i1.resources.cpus,
+        i1.resources.memory_mib,
+    )
+
+
+def _sort_instance_types(instance_types: List[InstanceType]) -> List[InstanceType]:
+    return sorted(instance_types, key=_key_for_instance)
+
+
 # XXX: make this function common (base) for aws too. This is copy from aws.
 def _get_instance_type(
     instance_types: List[InstanceType], requirements: Optional[Requirements]
 ) -> Optional[InstanceType]:
+    instance_types = _sort_instance_types(instance_types)
     instance_type = next(
-        filter(lambda i: _matches(i.resources, requirements), instance_types),
+        filter(lambda i: _matches_requirements(i.resources, requirements), instance_types),
         None,
     )
     if instance_type is None:
