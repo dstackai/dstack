@@ -32,28 +32,29 @@ export const ProjectAdd: React.FC = () => {
     const onSubmitHandler = async (data: IProject): Promise<IProject> => {
         const request = createProject(data).unwrap();
 
-        try {
-            const data = await request;
+        request
+            .then((data) => {
+                pushNotification({
+                    type: 'success',
+                    content: t('projects.create.success_notification'),
+                });
 
-            pushNotification({
-                type: 'success',
-                content: t('projects.create.success_notification'),
+                navigate(ROUTES.PROJECT.DETAILS.FORMAT(data.project_name));
+            })
+            .catch((error) => {
+                console.log(error);
+                if (isRequestErrorWithDetail(error.data)) {
+                    pushNotification({
+                        type: 'error',
+                        content: `${t('projects.create.error_notification')}: ${error.data.detail}`,
+                    });
+                } else {
+                    pushNotification({
+                        type: 'error',
+                        content: t('projects.create.error_notification'),
+                    });
+                }
             });
-
-            navigate(ROUTES.PROJECT.DETAILS.FORMAT(data.project_name));
-        } catch (e) {
-            if (isRequestErrorWithDetail(e)) {
-                pushNotification({
-                    type: 'error',
-                    content: `${t('projects.create.error_notification')}: ${e.detail}`,
-                });
-            } else {
-                pushNotification({
-                    type: 'error',
-                    content: t('projects.create.error_notification'),
-                });
-            }
-        }
 
         return request;
     };

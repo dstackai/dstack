@@ -1,3 +1,4 @@
+export { default as Alert } from '@cloudscape-design/components/alert';
 export { default as Button } from '@cloudscape-design/components/button';
 export { default as AppLayout } from '@cloudscape-design/components/app-layout';
 export { default as SideNavigation } from '@cloudscape-design/components/side-navigation';

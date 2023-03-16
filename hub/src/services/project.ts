@@ -73,8 +73,8 @@ export const projectApi = createApi({
                     projects: projectNames,
                 },
             }),
-            invalidatesTags: (result, error, params) =>
-                params.map((projectName) => ({ type: 'Projects' as const, id: projectName })),
+
+            invalidatesTags: () => ['Projects'],
         }),
 
         backendValues: builder.mutation<IProjectAwsBackendValues, Partial<TProjectBackend>>({

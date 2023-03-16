@@ -7,22 +7,21 @@ import { useBackendValuesMutation } from 'services/project';
 import { IProps } from './types';
 import styles from './styles.module.scss';
 
-export const AWSBackend: React.FC<IProps> = ({ loading: loadingProp }) => {
+export const AWSBackend: React.FC<IProps> = ({ loading }) => {
     const { t } = useTranslation();
     const { control, getValues, setValue, setError, clearErrors, watch } = useFormContext();
+    const [valuesData, setValuesData] = useState<IProjectAwsBackendValues | undefined>();
     const [regions, setRegions] = useState<FormSelectOptions>([]);
     const [buckets, setBuckets] = useState<TAwsBucket[]>([]);
     const [subnets, setSubnets] = useState<FormSelectOptions>([]);
 
-    const [getBackendValues, { data: valuesData, isLoading: isLoadingValues }] = useBackendValuesMutation();
+    const [getBackendValues, { isLoading: isLoadingValues }] = useBackendValuesMutation();
 
     const requestRef = useRef<null | ReturnType<typeof getBackendValues>>(null);
 
     useEffect(() => {
         changeFormHandler().catch(console.log);
     }, []);
-
-    const loading = loadingProp;
 
     const backendAccessKeyValue = watch('backend.access_key');
     const backendSecretKeyValue = watch('backend.secret_key');
@@ -44,6 +43,8 @@ export const AWSBackend: React.FC<IProps> = ({ loading: loadingProp }) => {
             requestRef.current = request;
 
             const response = await request.unwrap();
+
+            setValuesData(response);
 
             if (response.region_name.values.length) {
                 setRegions(response.region_name.values);
@@ -106,6 +107,7 @@ export const AWSBackend: React.FC<IProps> = ({ loading: loadingProp }) => {
         <SpaceBetween size="l">
             <FormInput
                 label={t('projects.edit.aws.access_key_id')}
+                description={t('projects.edit.aws.access_key_id_description')}
                 control={control}
                 name="backend.access_key"
                 onChange={onChangeCredentialField}
@@ -116,6 +118,7 @@ export const AWSBackend: React.FC<IProps> = ({ loading: loadingProp }) => {
 
             <FormInput
                 label={t('projects.edit.aws.secret_key_id')}
+                description={t('projects.edit.aws.secret_key_id_description')}
                 control={control}
                 name="backend.secret_key"
                 onChange={onChangeCredentialField}
@@ -126,35 +129,39 @@ export const AWSBackend: React.FC<IProps> = ({ loading: loadingProp }) => {
 
             <FormSelect
                 label={t('projects.edit.aws.region_name')}
+                description={t('projects.edit.aws.region_name_description')}
+                placeholder={t('projects.edit.aws.region_name_placeholder')}
                 control={control}
                 name="backend.region_name"
                 disabled={disabledFields}
                 onChange={onChangeSelectField}
                 options={regions}
                 rules={{ required: t('validation.required') }}
-                statusType={isLoadingValues ? 'loading' : undefined}
                 secondaryControl={renderSpinner()}
             />
 
             <FormS3BucketSelector
                 label={t('projects.edit.aws.s3_bucket_name')}
+                description={t('projects.edit.aws.s3_bucket_name_description')}
                 control={control}
                 name="backend.s3_bucket_name"
                 selectableItemsTypes={['buckets']}
                 disabled={disabledFields}
                 // onChange={debouncedChangeFormHandler}
+                rules={{ required: t('validation.required') }}
                 buckets={buckets}
                 secondaryControl={renderSpinner()}
             />
 
             <FormSelect
                 label={t('projects.edit.aws.ec2_subnet_id')}
+                description={t('projects.edit.aws.ec2_subnet_id_description')}
+                placeholder={t('projects.edit.aws.ec2_subnet_id_placeholder')}
                 control={control}
                 name="backend.ec2_subnet_id"
                 disabled={disabledFields}
                 onChange={onChangeSelectField}
                 options={subnets}
-                statusType={isLoadingValues ? 'loading' : undefined}
                 secondaryControl={renderSpinner()}
             />
         </SpaceBetween>
