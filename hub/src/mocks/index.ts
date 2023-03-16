@@ -4,7 +4,7 @@ import { matchPath } from 'react-router';
 import { API } from 'api';
 
 import user from './user';
-import hub from './hub';
+import project from './project';
 
 type MockItem = {
     success: unknown;
@@ -58,41 +58,41 @@ const mocksMap: MocksMap = {
     },
 
     // hubs
-    [API.HUBS.LIST()]: {
+    [API.PROJECTS.LIST()]: {
         GET: {
-            success: hub.list.success,
+            success: project.list.success,
             failed: { status: 403 },
         },
     },
-    [API.HUBS.DETAILS(':name')]: {
+    [API.PROJECTS.DETAILS(':name')]: {
         GET: {
-            success: hub.list.success[0],
+            success: project.list.success[0],
             failed: { status: 403 },
         },
         PATCH: {
-            success: hub.list.success[0],
+            success: project.list.success[0],
             failed: { status: 403 },
         },
     },
-    [API.HUBS.MEMBERS(':name')]: {
+    [API.PROJECTS.MEMBERS(':name')]: {
         POST: {
-            success: hub.list.success[0].members,
+            success: project.list.success[0].members,
             failed: { status: 403 },
         },
     },
-    [API.HUBS.BASE()]: {
+    [API.PROJECTS.BASE()]: {
         DELETE: {
             success: {},
             failed: { status: 403 },
         },
         POST: {
-            success: hub.list.success[0],
+            success: project.list.success[0],
             failed: { status: 403 },
         },
     },
-    [API.HUBS.BACKEND_VALUES()]: {
+    [API.PROJECTS.BACKEND_VALUES()]: {
         POST: {
-            success: hub.backendValues.success,
+            success: project.backendValues.success,
             failed: { status: 400 },
         },
     },

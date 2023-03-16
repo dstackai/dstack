@@ -6,13 +6,13 @@ import { TRoleSelectOption } from 'pages/User/Form/types';
 import { Header, Button, FormSelect, Table, ListEmptyMessage, Link, Pagination } from 'components';
 import { ROUTES } from 'routes';
 import { useCollection } from 'hooks';
-import { IProps, THubMemberWithIndex, TFormValues } from './types';
+import { IProps, TProjectMemberWithIndex, TFormValues } from './types';
 import { UserAutosuggest } from './UsersAutosuggest';
 import styles from './styles.module.scss';
 
-export const HubMembers: React.FC<IProps> = ({ initialValues, loading, onChange }) => {
+export const ProjectMembers: React.FC<IProps> = ({ initialValues, loading, onChange }) => {
     const { t } = useTranslation();
-    const [selectedItems, setSelectedItems] = useState<THubMemberWithIndex[]>([]);
+    const [selectedItems, setSelectedItems] = useState<TProjectMemberWithIndex[]>([]);
 
     const { handleSubmit, control, getValues } = useForm<TFormValues>({
         defaultValues: { members: initialValues ?? [] },
@@ -25,7 +25,7 @@ export const HubMembers: React.FC<IProps> = ({ initialValues, loading, onChange 
 
     const onChangeHandler = () => onChange(getValues('members'));
 
-    const fieldsWithIndex = fields.map<THubMemberWithIndex>((field, index) => ({ ...field, index }));
+    const fieldsWithIndex = fields.map<TProjectMemberWithIndex>((field, index) => ({ ...field, index }));
 
     const { items, paginationProps } = useCollection(fieldsWithIndex, {
         filtering: {
@@ -49,7 +49,7 @@ export const HubMembers: React.FC<IProps> = ({ initialValues, loading, onChange 
     const addMember = (user_name: string) => {
         append({
             user_name,
-            hub_role: 'read',
+            project_role: 'read',
         });
 
         onChangeHandler();
@@ -65,7 +65,7 @@ export const HubMembers: React.FC<IProps> = ({ initialValues, loading, onChange 
         {
             id: 'name',
             header: t('projects.edit.members.name'),
-            cell: (item: IHubMember) => (
+            cell: (item: IProjectMember) => (
                 <Link target="_blank" href={ROUTES.USER.DETAILS.FORMAT(item.user_name)}>
                     {item.user_name}
                 </Link>
@@ -74,12 +74,12 @@ export const HubMembers: React.FC<IProps> = ({ initialValues, loading, onChange 
         {
             id: 'global_role',
             header: t('projects.edit.members.role'),
-            cell: (field: IHubMember & { index: number }) => (
+            cell: (field: IProjectMember & { index: number }) => (
                 <div className={styles.role}>
                     <div className={styles.roleFieldWrapper}>
                         <FormSelect
                             control={control}
-                            name={`members.${field.index}.hub_role`}
+                            name={`members.${field.index}.project_role`}
                             options={roleSelectOptions}
                             disabled={loading}
                             expandToViewport

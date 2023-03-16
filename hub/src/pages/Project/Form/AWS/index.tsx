@@ -3,7 +3,7 @@ import { SpaceBetween, FormInput, FormSelect, FormSelectOptions, FormS3BucketSel
 import { useTranslation } from 'react-i18next';
 import { useFormContext } from 'react-hook-form';
 import { debounce } from 'lodash';
-import { useBackendValuesMutation } from 'services/hub';
+import { useBackendValuesMutation } from 'services/project';
 import { IProps } from './types';
 import styles from './styles.module.scss';
 

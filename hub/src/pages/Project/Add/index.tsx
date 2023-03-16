@@ -5,14 +5,14 @@ import { useNavigate } from 'react-router-dom';
 import { useBreadcrumbs, useNotifications } from 'hooks';
 import { ROUTES } from 'routes';
 import { isRequestErrorWithDetail } from 'libs';
-import { useCreateHubMutation } from 'services/hub';
-import { HubForm } from '../Form';
+import { useCreateProjectMutation } from 'services/project';
+import { ProjectForm } from '../Form';
 
-export const HubAdd: React.FC = () => {
+export const ProjectAdd: React.FC = () => {
     const { t } = useTranslation();
     const navigate = useNavigate();
     const [pushNotification] = useNotifications();
-    const [createHub, { isLoading }] = useCreateHubMutation();
+    const [createProject, { isLoading }] = useCreateProjectMutation();
 
     useBreadcrumbs([
         {
@@ -29,8 +29,8 @@ export const HubAdd: React.FC = () => {
         navigate(ROUTES.PROJECT.LIST);
     };
 
-    const onSubmitHandler = async (hubData: IHub): Promise<IHub> => {
-        const request = createHub(hubData).unwrap();
+    const onSubmitHandler = async (data: IProject): Promise<IProject> => {
+        const request = createProject(data).unwrap();
 
         try {
             const data = await request;
@@ -40,7 +40,7 @@ export const HubAdd: React.FC = () => {
                 content: t('projects.create.success_notification'),
             });
 
-            navigate(ROUTES.PROJECT.DETAILS.FORMAT(data.hub_name));
+            navigate(ROUTES.PROJECT.DETAILS.FORMAT(data.project_name));
         } catch (e) {
             if (isRequestErrorWithDetail(e)) {
                 pushNotification({
@@ -60,7 +60,7 @@ export const HubAdd: React.FC = () => {
 
     return (
         <ContentLayout header={<Header variant="awsui-h1-sticky">{t('projects.create.page_title')}</Header>}>
-            <HubForm onSubmit={onSubmitHandler} loading={isLoading} onCancel={onCancelHandler} />
+            <ProjectForm onSubmit={onSubmitHandler} loading={isLoading} onCancel={onCancelHandler} />
         </ContentLayout>
     );
 };

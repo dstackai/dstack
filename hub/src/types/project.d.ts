@@ -1,10 +1,10 @@
-declare type THubBackendType = 'aws' | 'gcp' | 'azure';
+declare type TProjectBackendType = 'aws' | 'gcp' | 'azure';
 
-declare type THubBackend = { type: THubBackendType } & THubBackendAWSWithTitles
-declare interface IHub {
-    hub_name: string,
-    backend: THubBackend,
-    members: IHubMember[]
+declare type TProjectBackend = { type: TProjectBackendType } & TProjectBackendAWSWithTitles
+declare interface IProject {
+    project_name: string,
+    backend: TProjectBackend,
+    members: IProjectMember[]
 }
 
 declare type TAwsBucket = {
@@ -13,7 +13,7 @@ declare type TAwsBucket = {
     region?: string;
 }
 
-declare interface IHubAwsBackendValues {
+declare interface IProjectAwsBackendValues {
         region_name: {
             selected?: string,
             values: { value: string, label: string}[]
@@ -28,9 +28,9 @@ declare interface IHubAwsBackendValues {
         },
 }
 
-declare type IHubBackendValues = { type: THubBackendType } & IHubAwsBackendValues
+declare type IProjectBackendValues = { type: TProjectBackendType } & IProjectAwsBackendValues
 
-declare interface THubBackendAWS {
+declare interface TProjectBackendAWS {
     access_key: string,
     secret_key: string,
     region_name: string,
@@ -38,13 +38,13 @@ declare interface THubBackendAWS {
     ec2_subnet_id: string | null,
 }
 
-declare interface THubBackendAWSWithTitles extends THubBackendAWS {
+declare interface TProjectBackendAWSWithTitles extends TProjectBackendAWS {
     region_name_title: string,
 }
 
-declare interface IHubMember {
+declare interface IProjectMember {
     user_name: string,
-    hub_role: THubRole,
+    project_role: TProjectRole,
 }
 
-declare type THubRole = 'read' | 'run' | 'admin'
+declare type TProjectRole = 'read' | 'run' | 'admin'

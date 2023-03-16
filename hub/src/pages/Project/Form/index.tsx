@@ -4,17 +4,16 @@ import { Container, Header, FormUI, SpaceBetween, Button, FormInput, FormField, 
 import { useForm, FormProvider, DefaultValues } from 'react-hook-form';
 import { IProps, TBackendOption } from './types';
 import { AWSBackend } from './AWS';
-
-import styles from './styles.module.scss';
-import { isRequestFormErrors, isRequestFormFieldError } from '../../../libs/isErrorWithMessage';
-import { FormFieldError } from '../../../libs/types';
+import { isRequestFormErrors, isRequestFormFieldError } from 'libs/isErrorWithMessage';
+import { FormFieldError } from 'libs/types';
 import { FieldPath } from 'react-hook-form/dist/types/path';
+import styles from './styles.module.scss';
 
-export const HubForm: React.FC<IProps> = ({ initialValues, onCancel, loading, onSubmit: onSubmitProp }) => {
+export const ProjectForm: React.FC<IProps> = ({ initialValues, onCancel, loading, onSubmit: onSubmitProp }) => {
     const { t } = useTranslation();
     const isEditing = !!initialValues;
 
-    const getDefaultValues = (): DefaultValues<IHub> => {
+    const getDefaultValues = (): DefaultValues<IProject> => {
         if (initialValues) {
             return {
                 ...initialValues,
@@ -33,7 +32,7 @@ export const HubForm: React.FC<IProps> = ({ initialValues, onCancel, loading, on
         };
     };
 
-    const formMethods = useForm<IHub>({
+    const formMethods = useForm<IProject>({
         defaultValues: getDefaultValues(),
     });
 
@@ -62,7 +61,7 @@ export const HubForm: React.FC<IProps> = ({ initialValues, onCancel, loading, on
         // },
     ];
 
-    const onSubmit = (data: IHub) => {
+    const onSubmit = (data: IProject) => {
         if (data.backend.ec2_subnet_id === '') data.backend.ec2_subnet_id = null;
 
         clearErrors();
@@ -73,7 +72,7 @@ export const HubForm: React.FC<IProps> = ({ initialValues, onCancel, loading, on
             error.data.detail.forEach((item: FormFieldError) => {
                 if (isRequestFormFieldError(item)) {
                     const [_, ...fieldName] = item.loc;
-                    setError(fieldName.join('.') as FieldPath<IHub>, { type: 'custom', message: item.msg });
+                    setError(fieldName.join('.') as FieldPath<IProject>, { type: 'custom', message: item.msg });
                 }
             });
         });
@@ -112,9 +111,16 @@ export const HubForm: React.FC<IProps> = ({ initialValues, onCancel, loading, on
                                     <FormInput
                                         label={t('projects.edit.project_name')}
                                         control={control}
-                                        name="hub_name"
+                                        name="project_name"
                                         disabled={loading}
-                                        rules={{ required: t('validation.required') }}
+                                        rules={{
+                                            required: t('validation.required'),
+
+                                            pattern: {
+                                                value: /^[a-zA-Z0-9-_]+$/,
+                                                message: t('projects.edit.validation.user_name_format'),
+                                            },
+                                        }}
                                     />
                                 </SpaceBetween>
                             </Container>

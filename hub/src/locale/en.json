@@ -75,7 +75,10 @@
         "role": "Project role"
       },
       "error_notification": "Update project error",
-      "success_notification": "Project updating is successful"
+      "success_notification": "Project updating is successful",
+      "validation": {
+        "user_name_format": "Only letters, numbers, - or _"
+      }
     },
     "create": {
       "page_title": "Create project",

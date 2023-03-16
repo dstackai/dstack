@@ -15,18 +15,18 @@ import { useAppSelector, useBreadcrumbs, useCollection, useNotifications } from 
 import { ROUTES } from 'routes';
 import { useTranslation } from 'react-i18next';
 import { selectUserData } from 'App/slice';
-import { useDeleteHubsMutation, useGetHubsQuery } from 'services/hub';
-import { getHubRoleByUserName } from '../utils';
+import { useDeleteProjectsMutation, useGetProjectsQuery } from 'services/project';
+import { getProjectRoleByUserName } from '../utils';
 
-export const HubList: React.FC = () => {
+export const ProjectList: React.FC = () => {
     const { t } = useTranslation();
     const [showDeleteConfirm, setShowConfirmDelete] = useState(false);
     const userData = useAppSelector(selectUserData);
     const userName = userData?.user_name ?? '';
     const userGlobalRole = userData?.global_role ?? '';
-    const { isLoading, data } = useGetHubsQuery();
+    const { isLoading, data } = useGetProjectsQuery();
     const navigate = useNavigate();
-    const [deleteHubs, { isLoading: isDeleting }] = useDeleteHubsMutation();
+    const [deleteProjects, { isLoading: isDeleting }] = useDeleteProjectsMutation();
     const [pushNotification] = useNotifications();
 
     useBreadcrumbs([
@@ -40,14 +40,14 @@ export const HubList: React.FC = () => {
         setShowConfirmDelete((val) => !val);
     };
 
-    const addHubHandler = () => {
+    const addProjectHandler = () => {
         navigate(ROUTES.PROJECT.ADD);
     };
 
     const renderEmptyMessage = (): React.ReactNode => {
         return (
             <ListEmptyMessage title={t('projects.empty_message_title')} message={t('projects.empty_message_text')}>
-                <Button onClick={addHubHandler}>{t('common.add')}</Button>
+                <Button onClick={addProjectHandler}>{t('common.add')}</Button>
             </ListEmptyMessage>
         );
     };
@@ -69,9 +69,9 @@ export const HubList: React.FC = () => {
         selection: {},
     });
 
-    const deleteSelectedHubsHandler = () => {
+    const deleteSelectedProjectsHandler = () => {
         if (collectionProps.selectedItems?.length) {
-            deleteHubs(collectionProps.selectedItems.map((hub) => hub.hub_name))
+            deleteProjects(collectionProps.selectedItems.map((project) => project.project_name))
                 .unwrap()
                 .then(() => actions.setSelectedItems([]))
                 .catch((error) => {
@@ -85,9 +85,9 @@ export const HubList: React.FC = () => {
         setShowConfirmDelete(false);
     };
 
-    const editSelectedHubHandler = () => {
+    const editSelectedProjectHandler = () => {
         if (collectionProps.selectedItems?.length === 1)
-            navigate(ROUTES.PROJECT.EDIT_BACKEND.FORMAT(collectionProps.selectedItems[0].hub_name));
+            navigate(ROUTES.PROJECT.EDIT_BACKEND.FORMAT(collectionProps.selectedItems[0].project_name));
     };
 
     const renderCounter = () => {
@@ -109,7 +109,7 @@ export const HubList: React.FC = () => {
 
         return (
             collectionProps.selectedItems?.some(
-                (item) => getHubRoleByUserName(item, userName) !== 'admin' && userGlobalRole !== 'admin',
+                (item) => getProjectRoleByUserName(item, userName) !== 'admin' && userGlobalRole !== 'admin',
             ) ?? false
         );
     }, [isDeleting, userName, userGlobalRole, collectionProps.selectedItems]);
@@ -119,7 +119,7 @@ export const HubList: React.FC = () => {
 
         return (
             collectionProps.selectedItems?.some(
-                (item) => getHubRoleByUserName(item, userName) !== 'admin' && userGlobalRole !== 'admin',
+                (item) => getProjectRoleByUserName(item, userName) !== 'admin' && userGlobalRole !== 'admin',
             ) ?? false
         );
     }, [isDeleting, userName, userGlobalRole, collectionProps.selectedItems]);
@@ -130,9 +130,9 @@ export const HubList: React.FC = () => {
                 {...collectionProps}
                 variant="full-page"
                 cardDefinition={{
-                    header: (hub) => (
-                        <NavigateLink fontSize="heading-m" href={ROUTES.PROJECT.DETAILS.FORMAT(hub.hub_name)}>
-                            {hub.hub_name}
+                    header: (project) => (
+                        <NavigateLink fontSize="heading-m" href={ROUTES.PROJECT.DETAILS.FORMAT(project.project_name)}>
+                            {project.project_name}
                         </NavigateLink>
                     ),
 
@@ -140,17 +140,17 @@ export const HubList: React.FC = () => {
                         {
                             id: 'type',
                             header: t('projects.card.backend'),
-                            content: (hub) => t(`projects.backend_type.${hub.backend.type}`),
+                            content: (project) => t(`projects.backend_type.${project.backend.type}`),
                         },
                         {
                             id: 'region',
                             header: t('projects.card.region'),
-                            content: (hub) => hub.backend.region_name_title,
+                            content: (project) => project.backend.region_name_title,
                         },
                         {
                             id: 'bucket',
                             header: t('projects.card.bucket'),
-                            content: (hub) => `${hub.backend.s3_bucket_name}`,
+                            content: (project) => `${project.backend.s3_bucket_name}`,
                         },
                     ],
                 }}
@@ -165,7 +165,7 @@ export const HubList: React.FC = () => {
                         counter={renderCounter()}
                         actions={
                             <SpaceBetween size="xs" direction="horizontal">
-                                <Button onClick={editSelectedHubHandler} disabled={isDisabledEdit}>
+                                <Button onClick={editSelectedProjectHandler} disabled={isDisabledEdit}>
                                     {t('common.edit')}
                                 </Button>
 
@@ -173,7 +173,7 @@ export const HubList: React.FC = () => {
                                     {t('common.delete')}
                                 </Button>
 
-                                <Button onClick={addHubHandler}>{t('common.add')}</Button>
+                                <Button onClick={addProjectHandler}>{t('common.add')}</Button>
                             </SpaceBetween>
                         }
                     >
@@ -194,7 +194,7 @@ export const HubList: React.FC = () => {
             <ConfirmationDialog
                 visible={showDeleteConfirm}
                 onDiscard={toggleDeleteConfirm}
-                onConfirm={deleteSelectedHubsHandler}
+                onConfirm={deleteSelectedProjectsHandler}
             />
         </>
     );

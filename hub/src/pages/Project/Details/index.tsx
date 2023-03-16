@@ -19,30 +19,30 @@ import {
     Popover,
 } from 'components';
 import { selectAuthToken, selectUserData } from 'App/slice';
-import { useGetHubQuery, useDeleteHubsMutation, useUpdateHubMembersMutation } from 'services/hub';
-import { HubMembers } from '../Members';
+import { useGetProjectQuery, useDeleteProjectsMutation, useUpdateProjectMembersMutation } from 'services/project';
+import { ProjectMembers } from '../Members';
 import styles from './styles.module.scss';
-import { getHubRoleByUserName } from '../utils';
+import { getProjectRoleByUserName } from '../utils';
 
-export const HubDetails: React.FC = () => {
+export const ProjectDetails: React.FC = () => {
     const { t } = useTranslation();
     const [showDeleteConfirm, setShowConfirmDelete] = useState(false);
     const params = useParams();
     const userData = useAppSelector(selectUserData);
     const userName = userData?.user_name ?? '';
     const userGlobalRole = userData?.global_role ?? '';
-    const paramHubName = params.name ?? '';
+    const paramProjectName = params.name ?? '';
     const navigate = useNavigate();
-    const { data, isLoading } = useGetHubQuery({ name: paramHubName });
-    const [deleteHubs, { isLoading: isDeleting }] = useDeleteHubsMutation();
-    const [updateHubMembers] = useUpdateHubMembersMutation();
+    const { data, isLoading } = useGetProjectQuery({ name: paramProjectName });
+    const [deleteProjects, { isLoading: isDeleting }] = useDeleteProjectsMutation();
+    const [updateProjectMembers] = useUpdateProjectMembersMutation();
     const currentUserToken = useAppSelector(selectAuthToken);
     const [pushNotification] = useNotifications();
 
-    if (data) console.log(isDeleting, !data, getHubRoleByUserName(data, userName) !== 'admin', userGlobalRole !== 'admin');
+    if (data) console.log(isDeleting, !data, getProjectRoleByUserName(data, userName) !== 'admin', userGlobalRole !== 'admin');
 
     const isDisabledButtons = useMemo<boolean>(() => {
-        return isDeleting || !data || (getHubRoleByUserName(data, userName) !== 'admin' && userGlobalRole !== 'admin');
+        return isDeleting || !data || (getProjectRoleByUserName(data, userName) !== 'admin' && userGlobalRole !== 'admin');
     }, [data, userName, userGlobalRole]);
 
     useBreadcrumbs([
@@ -51,14 +51,14 @@ export const HubDetails: React.FC = () => {
             href: ROUTES.PROJECT.LIST,
         },
         {
-            text: paramHubName,
-            href: ROUTES.PROJECT.DETAILS.FORMAT(paramHubName),
+            text: paramProjectName,
+            href: ROUTES.PROJECT.DETAILS.FORMAT(paramProjectName),
         },
     ]);
 
-    const changeMembersHandler = (members: IHubMember[]) => {
-        updateHubMembers({
-            hub_name: paramHubName,
+    const changeMembersHandler = (members: IProjectMember[]) => {
+        updateProjectMembers({
+            project_name: paramProjectName,
             members,
         })
             .unwrap()
@@ -70,7 +70,7 @@ export const HubDetails: React.FC = () => {
             });
     };
 
-    const cliCommand = `dstack config hub --url ${location.origin}/${paramHubName} --token ${currentUserToken}`;
+    const cliCommand = `dstack config hub --url ${location.origin} --project ${paramProjectName}`;
 
     const onCopyCliCommand = async () => {
         try {
@@ -89,7 +89,7 @@ export const HubDetails: React.FC = () => {
     const deleteUserHandler = () => {
         if (!data) return;
 
-        deleteHubs([paramHubName])
+        deleteProjects([paramProjectName])
             .unwrap()
             .then(() => navigate(ROUTES.PROJECT.LIST))
             .catch((error) => {
@@ -103,7 +103,7 @@ export const HubDetails: React.FC = () => {
     };
 
     const editUserHandler = () => {
-        navigate(ROUTES.PROJECT.EDIT_BACKEND.FORMAT(paramHubName));
+        navigate(ROUTES.PROJECT.EDIT_BACKEND.FORMAT(paramProjectName));
     };
 
     const renderAwsSettingsSection = (): React.ReactNode => {
@@ -138,7 +138,11 @@ export const HubDetails: React.FC = () => {
         <>
             <ContentLayout
                 header={
-                    <DetailsHeader title={paramHubName} deleteAction={toggleDeleteConfirm} deleteDisabled={isDisabledButtons} />
+                    <DetailsHeader
+                        title={paramProjectName}
+                        deleteAction={toggleDeleteConfirm}
+                        deleteDisabled={isDisabledButtons}
+                    />
                 }
             >
                 {isLoading && !data && (
@@ -194,7 +198,7 @@ export const HubDetails: React.FC = () => {
                         >
                             <SpaceBetween size="s">
                                 <Box variant="p" color="text-body-secondary">
-                                    Use the code snippet below to configure your CLI to use this hub as a remote
+                                    Use the code snippet below to configure your CLI to use this project as a remote
                                 </Box>
 
                                 <div className={styles.code}>
@@ -205,7 +209,7 @@ export const HubDetails: React.FC = () => {
                             </SpaceBetween>
                         </Container>
 
-                        <HubMembers onChange={debouncedMembersHandler} initialValues={data.members} />
+                        <ProjectMembers onChange={debouncedMembersHandler} initialValues={data.members} />
                     </SpaceBetween>
                 )}
             </ContentLayout>

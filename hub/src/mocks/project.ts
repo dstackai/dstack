@@ -1,20 +1,20 @@
-const listSuccess: IHub[] = new Array(50).fill({}).map((i, index) => ({
-    hub_name: `hub_${index}`,
+const listSuccess: IProject[] = new Array(50).fill({}).map((i, index) => ({
+    project_name: `project_${index}`,
     backend: {
         type: 'aws',
-        access_key: `hub_${index}_access_key`,
-        secret_key: `hub_${index}_secret_key`,
-        region_name: `hub_${index}_region_name`,
-        region_name_title: `Hub ${index} Region`,
-        s3_bucket_name: `hub_${index}_s3_bucket_name`,
+        access_key: `project_${index}_access_key`,
+        secret_key: `project_${index}_secret_key`,
+        region_name: `project_${index}_region_name`,
+        region_name_title: `Project ${index} Region`,
+        s3_bucket_name: `project_${index}_s3_bucket_name`,
         ec2_subnet_id: null,
     },
 
     members: ['test_user', 'old_user', 'new_user'].map((userName) => ({
         user_name: userName,
-        hub_role: (function () {
+        project_role: (function () {
             const val = Math.random();
-            let permission: THubRole = 'read';
+            let permission: TProjectRole = 'read';
 
             switch (true) {
                 case val > 0.65 || index < 4:
@@ -33,7 +33,7 @@ const listSuccess: IHub[] = new Array(50).fill({}).map((i, index) => ({
     })),
 }));
 
-const backendValuesSuccess: IHubBackendValues = {
+const backendValuesSuccess: IProjectBackendValues = {
     type: 'aws',
     region_name: {
         selected: 'region_1',
