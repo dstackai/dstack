@@ -44,7 +44,6 @@ The following properties are required:
 The following properties are optional:
 
 - `entrypoint` - (Optional) The entrypoint string to override image entrypoint
-- `setup` - (Optional) The list of shell commands to run before running the Docker image
 - `version` - (Optional) The major version of Python
 - `environment` - (Optional) The list of environment variables 
 - [`artifacts`](#artifacts) - (Optional) The list of output artifacts

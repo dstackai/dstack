@@ -11,7 +11,6 @@ class DockerProvider(Provider):
     def __init__(self):
         super().__init__("docker")
         self.image_name = None
-        self.setup = None
         self.commands = None
         self.entrypoint = None
         self.artifact_specs = None
@@ -30,7 +29,6 @@ class DockerProvider(Provider):
     ):
         super().load(backend, provider_args, workflow_name, provider_data, run_name)
         self.image_name = self.provider_data["image"]
-        self.setup = self._get_list_data("setup") or self._get_list_data("before_run")
         self.commands = self._get_list_data("commands")
         self.entrypoint = self._get_entrypoint()
         self.artifact_specs = self._artifact_specs()
@@ -71,8 +69,6 @@ class DockerProvider(Provider):
                     )
                 )
         commands = []
-        if self.setup:
-            commands.extend(self.setup)
         commands.extend(self.commands or [])
         return [
             JobSpec(
