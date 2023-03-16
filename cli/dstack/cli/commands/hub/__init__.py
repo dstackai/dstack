@@ -18,6 +18,7 @@ class HubCommand(BasicCommand):
     def hub_start(self, args: Namespace):
         os.environ["DSTACK_HUB_HOST"] = args.host
         os.environ["DSTACK_HUB_PORT"] = str(args.port)
+        os.environ["DSTACK_HUB_LOG_LEVEL"] = args.log_level
         if args.token:
             os.environ["DSTACK_HUB_ADMIN_TOKEN"] = args.token
         uvicorn.run(
@@ -49,6 +50,14 @@ class HubCommand(BasicCommand):
             type=int,
             help="Bind socket to this port. Default: 3000.",
             default=3000,
+        )
+        hub_parser.add_argument(
+            "-l",
+            "--log-level",
+            metavar="LOG-LEVEL",
+            type=str,
+            help="",
+            default="ERROR",
         )
         hub_parser.add_argument("--token", metavar="TOKEN", type=str, help="The admin user token")
         hub_parser.set_defaults(func=self.hub_start)
