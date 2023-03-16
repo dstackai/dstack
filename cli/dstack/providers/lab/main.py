@@ -56,6 +56,7 @@ class LabProvider(Provider):
             JobSpec(
                 image_name=self.image_name,
                 commands=self._commands(),
+                entrypoint=["/bin/bash", "-i", "-c"],
                 env=env,
                 working_dir=self.working_dir,
                 artifact_specs=self.artifact_specs,

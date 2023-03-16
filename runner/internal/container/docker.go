@@ -34,6 +34,7 @@ type Spec struct {
 	Image           string
 	WorkDir         string
 	Commands        []string
+	Entrypoint      *[]string
 	Env             []string
 	Labels          map[string]string
 	Mounts          []mount.Mount

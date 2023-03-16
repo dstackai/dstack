@@ -440,6 +440,7 @@ func (ex *Executor) processJob(ctx context.Context, stoppedCh chan struct{}) err
 		Image:        job.Image,
 		WorkDir:      path.Join("/workflow", job.WorkingDir),
 		Commands:     container.ShellCommands(job.Commands),
+		Entrypoint:   job.Entrypoint,
 		Env:          ex.environment(ctx),
 		Mounts:       uniqueMount(bindings),
 		ExposedPorts: ex.pm.ExposedPorts(ex.portID),

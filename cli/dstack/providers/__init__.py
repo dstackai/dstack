@@ -1,4 +1,5 @@
 import importlib
+import shlex
 import sys
 import time
 from abc import abstractmethod
@@ -245,6 +246,7 @@ class Provider:
                 submitted_at=submitted_at,
                 image_name=job_spec.image_name,
                 commands=job_spec.commands,
+                entrypoint=job_spec.entrypoint,
                 env=job_spec.env,
                 working_dir=job_spec.working_dir,
                 artifact_specs=job_spec.artifact_specs,
@@ -386,6 +388,12 @@ class Provider:
             return v.split("\n")
         else:
             return v
+
+    def _get_entrypoint(self) -> Optional[List[str]]:
+        v = self.provider_data.get("entrypoint")
+        if isinstance(v, str):
+            return shlex.split(v)
+        return v
 
     def _resources(self) -> Requirements:
         resources = Requirements()

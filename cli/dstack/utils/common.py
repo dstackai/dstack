@@ -99,3 +99,9 @@ def removeprefix(s: str, prefix: str) -> str:
     if s.startswith(prefix):
         return s[len(prefix) :]
     return s
+
+
+def format_list(items: Optional[list], *, formatter=str) -> Optional[str]:
+    if items is None:
+        return None
+    return "[{}]".format(", ".join(formatter(item) for item in items))

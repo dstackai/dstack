@@ -175,9 +175,6 @@
         "commands": {
           "$ref": "#/definitions/commands"
         },
-        "setup": {
-          "$ref": "#/definitions/setup"
-        },
         "env": {
           "$ref": "#/definitions/env"
         },
@@ -221,14 +218,12 @@
         "commands": {
           "$ref": "#/definitions/commands"
         },
-        "setup": {
-          "$ref": "#/definitions/setup"
+        "entrypoint": {
+          "description": "The Docker entrypoint",
+          "type": "string"
         },
         "env": {
           "$ref": "#/definitions/env"
-        },
-        "python": {
-          "$ref": "#/definitions/python"
         },
         "image": {
           "description": "The name of the Docker image to run",
