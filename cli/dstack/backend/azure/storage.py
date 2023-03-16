@@ -1,11 +1,12 @@
-from typing import Callable, Dict, List, Optional
+from typing import Callable, Dict, Iterator, List, Optional
 
 from azure.core.credentials import TokenCredential
 from azure.core.exceptions import ResourceNotFoundError
-from azure.storage.blob import BlobServiceClient, ContentSettings
+from azure.storage.blob import BlobProperties, BlobServiceClient, ContainerClient, ContentSettings
 
 from dstack.backend.base.storage import CloudStorage
 from dstack.core.storage import StorageFile
+from dstack.utils.common import removeprefix
 
 
 class AzureStorage(CloudStorage):
@@ -18,7 +19,7 @@ class AzureStorage(CloudStorage):
         self._blob_service_client = BlobServiceClient(
             account_url=account_url, credential=credential
         )
-        self._container_client = self._blob_service_client.get_container_client(
+        self._container_client: ContainerClient = self._blob_service_client.get_container_client(
             container=container_name
         )
         self._container_name = container_name
@@ -30,7 +31,18 @@ class AzureStorage(CloudStorage):
         raise NotImplementedError
 
     def list_files(self, dirpath: str) -> List[StorageFile]:
-        raise NotImplementedError
+        prefix = dirpath
+        blobs: Iterator[BlobProperties] = self._container_client.list_blobs(
+            name_starts_with=prefix
+        )
+        files = []
+        for blob in blobs:
+            file = StorageFile(
+                filepath=removeprefix(blob.name, prefix),
+                filesize_in_bytes=blob.size,
+            )
+            files.append(file)
+        return files
 
     def list_objects(self, keys_prefix: str) -> List[str]:
         blobs_list = self._container_client.list_blobs(name_starts_with=keys_prefix)
