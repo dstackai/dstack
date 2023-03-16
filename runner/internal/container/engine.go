@@ -105,7 +105,6 @@ func (r *Engine) Create(ctx context.Context, spec *Spec, logs io.Writer) (*Docke
 	config := &container.Config{
 		Image:        spec.Image,
 		Cmd:          spec.Commands,
-		Entrypoint:   spec.Entrypoint,
 		Tty:          true,
 		WorkingDir:   spec.WorkDir,
 		Env:          spec.Env,
@@ -113,6 +112,9 @@ func (r *Engine) Create(ctx context.Context, spec *Spec, logs io.Writer) (*Docke
 		Labels:       spec.Labels,
 		AttachStdout: true,
 		AttachStdin:  true,
+	}
+	if spec.Entrypoint != nil {
+		config.Entrypoint = *spec.Entrypoint
 	}
 	var networkMode container.NetworkMode = "default"
 	if supportNetworkModeHost() {

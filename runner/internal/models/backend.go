@@ -18,7 +18,7 @@ type Job struct {
 	Apps         []App             `yaml:"apps"`
 	Artifacts    []Artifact        `yaml:"artifacts"`
 	Commands     []string          `yaml:"commands"`
-	Entrypoint   []string          `yaml:"entrypoint,omitempty"`
+	Entrypoint   *[]string         `yaml:"entrypoint"`
 	Environment  map[string]string `yaml:"env"`
 	HostName     string            `yaml:"host_name"`
 	Image        string            `yaml:"image_name"`

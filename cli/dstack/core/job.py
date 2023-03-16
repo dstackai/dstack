@@ -8,7 +8,7 @@ from dstack.core.app import AppSpec
 from dstack.core.artifact import ArtifactSpec
 from dstack.core.dependents import DepSpec
 from dstack.core.repo import RepoAddress, RepoData
-from dstack.utils.common import _quoted
+from dstack.utils.common import _quoted, format_list
 
 
 class GpusRequirements(BaseModel):
@@ -208,31 +208,11 @@ class Job(JobHead):
         self.job_id = job_id
 
     def __str__(self) -> str:
-        commands = (
-            ("[" + ", ".join(map(lambda a: _quoted(str(a)), self.commands)) + "]")
-            if self.commands
-            else None
-        )
-        entrypoint = (
-            ("[" + ", ".join(map(lambda a: _quoted(str(a)), self.entrypoint)) + "]")
-            if self.commands
-            else None
-        )
-        artifact_specs = (
-            ("[" + ", ".join(map(lambda a: _quoted(str(a)), self.artifact_specs)) + "]")
-            if self.artifact_specs
-            else None
-        )
-        app_specs = (
-            ("[" + ", ".join(map(lambda a: str(a), self.app_specs)) + "]")
-            if self.app_specs
-            else None
-        )
-        dep_specs = (
-            ("[" + ", ".join(map(lambda d: str(d), self.dep_specs)) + "]")
-            if self.dep_specs
-            else None
-        )
+        commands = format_list(self.commands, formatter=lambda a: _quoted(str(a)))
+        entrypoint = format_list(self.entrypoint, formatter=lambda a: _quoted(str(a)))
+        artifact_specs = format_list(self.artifact_specs)
+        app_specs = format_list(self.app_specs)
+        dep_specs = format_list(self.dep_specs)
         return (
             f'Job(job_id="{self.job_id}", repo_data={self.repo_data}, '
             f'run_name="{self.run_name}", workflow_name={_quoted(self.workflow_name)}, '
@@ -419,6 +399,7 @@ class Job(JobHead):
             submitted_at=job_data["submitted_at"],
             image_name=job_data["image_name"],
             commands=job_data.get("commands") or None,
+            entrypoint=job_data.get("entrypoint") or None,
             env=job_data["env"] or None,
             working_dir=job_data.get("working_dir") or None,
             artifact_specs=artifact_specs,
@@ -455,24 +436,14 @@ class JobSpec(JobRef):
         self.job_id = job_id
 
     def __str__(self) -> str:
-        commands = (
-            ("[" + ", ".join(map(lambda a: _quoted(str(a)), self.commands)) + "]")
-            if self.commands
-            else None
-        )
-        artifact_specs = (
-            ("[" + ", ".join(map(lambda a: str(a), self.artifact_specs)) + "]")
-            if self.artifact_specs
-            else None
-        )
-        app_specs = (
-            ("[" + ", ".join(map(lambda a: str(a), self.app_specs)) + "]")
-            if self.app_specs
-            else None
-        )
+        commands = format_list(self.commands, formatter=lambda a: _quoted(str(a)))
+        entrypoint = format_list(self.entrypoint, formatter=lambda a: _quoted(str(a)))
+        artifact_specs = format_list(self.artifact_specs)
+        app_specs = format_list(self.app_specs)
         return (
             f'JobSpec(job_id="{self.job_id}", image_name="{self.image_name}", '
             f"commands={commands}, "
+            f"entrypoint={entrypoint}, "
             f"env={self.env}, "
             f"working_dir={_quoted(self.working_dir)}, "
             f"port_count={self.port_count}, "
