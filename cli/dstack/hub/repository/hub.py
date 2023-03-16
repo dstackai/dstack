@@ -89,7 +89,7 @@ class ProjectManager:
             _session = external_session
         else:
             _session = Database.Session()
-        role = await RoleManager.get_by_name(name=member.project_role, external_session=_session)
+        role = await RoleManager.get_or_create(name=member.project_role, external_session=_session)
         _session.add(
             MemberDB(project_name=project.name, user_name=member.user_name, role_id=role.id)
         )
