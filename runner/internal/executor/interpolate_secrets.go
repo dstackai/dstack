@@ -28,7 +28,7 @@ func (si *SecretsInterpolator) Interpolate(ctx context.Context, value string) (s
 			return "", errors.New("unescaped $ sign")
 		} else if s[dollar+1] == '$' {
 			sb.WriteRune('$')
-			start = start + 2
+			start = dollar + 2
 		} else if s[dollar+1] == '{' {
 			end := IndexRuneSlice(s, '}', dollar+2)
 			if end == -1 {
