@@ -446,10 +446,17 @@ func (ex *Executor) processJob(ctx context.Context, stoppedCh chan struct{}) err
 	interpolator := SecretsInterpolator{
 		Secrets: secrets,
 	}
-	registryAuthBase64 := makeRegistryAuthBase64(interpolator.interpolate(ctx, job.RegistryAuth.Username), interpolator.interpolate(ctx, job.RegistryAuth.Password))
+	username, err := interpolator.Interpolate(ctx, job.RegistryAuth.Username)
+	if err != nil {
+		log.Error(ctx, "Failed interpolating registry_auth.username", "err", err, "username", job.RegistryAuth.Username)
+	}
+	password, err := interpolator.Interpolate(ctx, job.RegistryAuth.Password)
+	if err != nil {
+		log.Error(ctx, "Failed interpolating registry_auth.password", "err", err, "password", job.RegistryAuth.Password)
+	}
 	spec := &container.Spec{
 		Image:              job.Image,
-		RegistryAuthBase64: registryAuthBase64,
+		RegistryAuthBase64: makeRegistryAuthBase64(username, password),
 		WorkDir:            path.Join("/workflow", job.WorkingDir),
 		Commands:           container.ShellCommands(job.Commands),
 		Entrypoint:         job.Entrypoint,
