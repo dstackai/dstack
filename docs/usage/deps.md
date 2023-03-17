@@ -8,22 +8,26 @@ a workflow or tag name.
 
 ## Workflows
 
-The workflow below uses the output artifacts of the most recent run of the `hello-txt` workflow:
+Let's create the following workflow YAML file:
 
-=== "`.dstack/workflows/deps.yaml`"
+<div editor-title=".dstack/workflows/deps.yaml"> 
 
-    ```yaml
-    workflows:
-      - name: cat-txt-2
-        provider: bash
-        deps:
-          - workflow: hello-txt
-        commands:
-          - cat output/hello.txt
-    ```
+```yaml
+workflows:
+  - name: cat-txt-2
+    provider: bash
+    deps:
+      - workflow: hello-txt
+    commands:
+      - cat output/hello.txt
+```
+
+</div>
+
+If we run it, it will print the contents of the output artifacts of the last run of the `hello-txt` workflow.
 
 !!! info "NOTE:"
-    Make sure to run the `hello-txt` workflow beforehand.
+    Make sure to run the [`hello-txt`](artifacts.md) workflow beforehand.
 
 ## Tags
 
@@ -35,26 +39,32 @@ Say, you ran the [`hello-txt`](artifacts.md) workflow, and want to reuse its art
 
 Once the [`hello-txt`](artifacts.md) workflow is finished, you can add a tag to it:
 
-```shell hl_lines="1"
-dstack tags add txt-file grumpy-zebra-2
+<div class="termy">
+
+```shell
+$ dstack tags add txt-file grumpy-zebra-2
 ```
+
+</div>
 
 The `txt-file` here is the name of the tag, and `grumpy-zebra-2` is the run name of the 
 [`hello-txt`](artifacts.md) workflow. 
 
 Let's reuse the `txt-file` tag from another workflow:
 
-=== "`.dstack/workflows/deps.yaml`"
+<div editor-title=".dstack/workflows/deps.yaml"> 
 
-    ```yaml
-    workflows:
-      - name: cat-txt
-        provider: bash
-        deps:
-          - tag: txt-file
-        commands:
-          - cat output/hello.txt
-    ```
+```yaml
+workflows:
+  - name: cat-txt
+    provider: bash
+    deps:
+      - tag: txt-file
+    commands:
+      - cat output/hello.txt
+```
+
+</div>
 
 !!! info "NOTE:"
     Tags are only supported for remote runs. If you want to use a tag for a local run, you must first push the 
@@ -65,14 +75,14 @@ Let's reuse the `txt-file` tag from another workflow:
 
 ## External repos
 
-By default, dstack looks up tags and workflows within the same repo.
+By default, `dstack` looks up tags and workflows within the same repo.
 
 If you want to refer to a tag or a workflow from another repo, 
 you have to prepend the name (of the tag or the workflow) with the repo name.
 
 The workflow below uses a tag from the `dstackai/dstack` repo:
 
-=== "`.dstack/workflows/deps.yaml`"
+<div editor-title=".dstack/workflows/deps.yaml"> 
 
     ```yaml
     workflows:
@@ -83,6 +93,8 @@ The workflow below uses a tag from the `dstackai/dstack` repo:
         commands:
           - cat output/hello.txt
     ```
+
+</div>
 
 !!! info "NOTE:"
     Make sure to run the `hello-txt` workflow in the `dstackai/dstack` repo beforehand.

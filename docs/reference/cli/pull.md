@@ -5,11 +5,19 @@ to the configured cloud account) to the local cache (`~/.dstack/artifacts`).
 
 ## Usage
 
+<div class="termy">
+
 ```shell
-dstack pull (RUN | :TAG)
+$ dstack pull --help
+Usage: dstack pull [-h] (RUN | :TAG)
+
+Positional Arguments:
+  (RUN | :TAG)  A name of a run or a tag
 ```
 
-### Arguments reference
+</div>
+
+## Arguments reference
 
 One of the following arguments is required:
 

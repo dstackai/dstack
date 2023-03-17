@@ -10,7 +10,7 @@ Docker image that has Conda and the CUDA driver pre-installed.
 
 ## Usage example 
 
-Inside the `.dstack/workflows` directory within your project, create the following `docker-example.yaml` file:
+<div editor-title=".dstack/workflows/docker-example.yaml">
 
 ```yaml
 workflows:
@@ -29,11 +29,17 @@ workflows:
         count: 1
 ```
 
+</div>
+
 To run this workflow, use the following command:
 
+<div class="termy">
+
 ```shell
-dstack run hello-docker
+$ dstack run hello-docker
 ```
+
+</div>
 
 ## Properties reference
 

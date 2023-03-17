@@ -8,7 +8,7 @@ If GPU is requested, the provider pre-installs the CUDA driver too.
 
 ## Usage example 
 
-Inside the `.dstack/workflows` directory within your project, create the following `notebook-example.yaml` file:
+<div editor-title=".dstack/workflows/notebook-example.yaml">
 
 ```yaml
 workflows:
@@ -19,11 +19,17 @@ workflows:
       gpu: 1
 ```
 
+</div>
+
 To run this workflow, use the following command:
 
+<div class="termy">
+
 ```shell
-dstack run ide-notebook
+$ dstack run ide-notebook
 ```
+
+</div>
 
 ## Properties reference
 

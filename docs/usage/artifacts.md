@@ -5,25 +5,31 @@
 
 ## Define artifacts
 
-The workflow below creates the `output/hello.txt` file and saves it as an artifact:
+Create the following workflow YAML file:
 
-=== "`.dstack/workflows/artifacts.yaml`"
+<div editor-title=".dstack/workflows/artifacts.yaml"> 
 
-    ```yaml
-    workflows:
-      - name: hello-txt
-        provider: bash
-        commands:
-          - echo "Hello world" > output/hello.txt
-        artifacts:
-          - path: ./output
-    ```
+```yaml
+workflows:
+  - name: hello-txt
+    provider: bash
+    commands:
+      - echo "Hello world" > output/hello.txt
+    artifacts:
+      - path: ./output
+```
+
+</div>
 
 Run it locally using `dstack run`:
 
-```shell hl_lines="1"
-dstack run hello-txt
+<div class="termy">
+
+```shell
+$ dstack run hello-txt
 ```
+
+</div>
 
 !!! info "NOTE:"
     Artifacts are saved at the end of the workflow.
@@ -35,13 +41,11 @@ To see artifacts of a run, you can use the
 [`dstack ls`](../reference/cli/ls.md) command followed
 by the name of the run.
 
-```shell hl_lines="1"
+<div class="termy">
+
+```shell
 dstack ls grumpy-zebra-1
-```
 
-It will list all saved files inside artifacts along with their size:
-
-```shell hl_lines="1"
 PATH  FILE                                  SIZE
 data  MNIST/raw/t10k-images-idx3-ubyte      7.5MiB
       MNIST/raw/t10k-images-idx3-ubyte.gz   1.6MiB
@@ -51,7 +55,11 @@ data  MNIST/raw/t10k-images-idx3-ubyte      7.5MiB
       MNIST/raw/train-images-idx3-ubyte.gz  9.5MiB
       MNIST/raw/train-labels-idx1-ubyte     58.6KiB
       MNIST/raw/train-labels-idx1-ubyte.gz  28.2KiB
+      
+$ 
 ```
+
+</div>
 
 ## Push artifacts
 
@@ -60,9 +68,13 @@ that run locally too.
 
 If you'd like to reuse the artifacts outside your machine, you must push these artifacts using the `dstack push` command:
 
-```shell hl_lines="1"
-dstack push grumpy-zebra-1
+<div class="termy">
+
+```shell
+$ dstack push grumpy-zebra-1
 ```
+
+</div>
 
 !!! info "NOTE:"
     If you run a workflow remotely, artifacts are pushed automatically, and it's typically a lot faster
@@ -73,37 +85,47 @@ dstack push grumpy-zebra-1
 If you run your workflow remotely, and want to save artifacts in real time (as you write files to the disk), 
 you can set the `mount` property to `true` for a particular artifact.
 
-The workflow below creates files in `output` and save them as artifacts in real-time:
+Let's create the following bash script:
 
-=== "`.dstack/workflows/resources.yaml`"
+<div editor-title="artifacts/hello.sh"> 
 
-    ```yaml
-    workflows:
-      - name: hello-sh
-        provider: bash
-        commands:
-          - bash artifacts/hello.sh
-        artifacts:
-          - path: ./output
-            mount: true
-    ```
+```shell
+for i in {000..100}
+do
+    sleep 1
+    echo $i > "output/${i}.txt"
+    echo "Wrote output/${i}.txt"
+done
+```
 
-=== "`artifacts/hello.sh`"
+</div>
 
-    ```shell
-    for i in {000..100}
-    do
-        sleep 1
-        echo $i > "output/${i}.txt"
-        echo "Wrote output/${i}.txt"
-    done
-    ```
+Now, create the following workflow YAML file:
+
+<div editor-title=".dstack/workflows/resources.yaml"> 
+
+```yaml
+workflows:
+  - name: hello-sh
+    provider: bash
+    commands:
+      - bash artifacts/hello.sh
+    artifacts:
+      - path: ./output
+        mount: true
+```
+
+</div>
 
 Go ahead and run this workflow remotely:
 
+<div class="termy">
+
 ```shell
-dstack run hello-sh --remote
+$ dstack run hello-sh --remote
 ```
+
+</div>
 
 !!! info "NOTE:"
     Every read or write operation within the mounted artifact directory will create

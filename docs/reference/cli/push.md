@@ -5,11 +5,19 @@ to the configured cloud account).
 
 ## Usage
 
+<div class="termy">
+
 ```shell
-dstack push (RUN | :TAG)
+$ dstack push --help
+Usage: dstack push [-h] (RUN | :TAG)
+
+Positional Arguments:
+  (RUN | :TAG)  A name of a run or a tag
 ```
 
-### Arguments reference
+</div>
+
+## Arguments reference
 
 One of the following arguments is required:
 

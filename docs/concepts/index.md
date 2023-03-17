@@ -19,7 +19,9 @@ Remotes facilitate collaboration as they allow multiple team members to access t
 Workflows can be scripts for data preparation or model training, web apps like Streamlit or Gradio, or development
 environments like JupyterLab or VS Code.
 
-Here's an example from the [Quick start](https://docs.dstack.ai/quick-start).
+Here's an example from the [Quick start](https://docs.dstack.ai/quick-start):
+
+<div editor-title=".dstack/workflows/mnist.yaml"> 
 
 ```yaml
 workflows:
@@ -42,6 +44,8 @@ workflows:
       - path: ./lightning_logs
 ```
 
+</div>
+
 YAML-defined workflows eliminate the need to modify code in your scripts, giving you the freedom to choose frameworks,
 experiment trackers, and cloud providers.
 
@@ -63,7 +67,37 @@ When running a workflow remotely, the artifacts are pushed to the remote automat
 The dstack CLI provides various functionalities such as running workflows, accessing logs, artifacts, and stopping
 runs, among others.
 
- ![](../assets/dstack-cli.png){ width="800" }
+<div class="termy">
+
+```shell
+$ dstack
+
+Usage: dstack [-v] [-h] COMMAND ...
+
+Positional Arguments:
+  COMMAND
+    config       Configure the remote backend
+    cp           Copy artifact files to a local target path
+    init         Authorize dstack to access the current Git repo
+    logs         Show logs
+    ls           List artifacts
+    ps           List runs
+    pull         Pull artifacts of a remote run
+    push         Push artifacts of a local run
+    rm           Remove run(s)
+    run          Run a workflow
+    secrets      Manage secrets
+    stop         Stop run(s)
+    tags         Manage tags
+
+Optional Arguments:
+  -v, --version  Show dstack version
+  -h, --help     Show this help message and exit
+
+Run dstack COMMAND --help for more information on a particular command
+```
+
+</div>
  
 ## Why dstack?
 

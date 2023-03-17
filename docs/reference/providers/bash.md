@@ -8,7 +8,7 @@ If GPU is requested, the provider pre-installs the CUDA driver too.
 
 ## Usage example
 
-Inside the `.dstack/workflows` directory within your project, create the following `bash-example.yaml` file:
+<div editor-title=".dstack/workflows/bash-example.yaml"> 
 
 ```yaml
 workflows:
@@ -27,11 +27,17 @@ workflows:
       gpu: 1
 ```
 
+</div>
+
 To run this workflow, use the following command:
 
+<div class="termy">
+
 ```shell
-dstack run train
+$ dstack run train
 ```
+
+</div>
 
 ## Properties reference
 
@@ -91,6 +97,8 @@ If you'd like your workflow to expose ports, you have to specify the `ports` pro
 of ports to expose. Actual ports will be assigned on startup and passed to the workflow via the environment
 variables `PORT_<number>`.
 
+<div editor-title=".dstack/workflows/app-example.yaml">
+
 ```yaml
 workflows:
   - name: app
@@ -100,3 +108,5 @@ workflows:
       - pip install -r requirements.txt
       - gunicorn main:app --bind 0.0.0.0:$PORT_0
 ```
+
+</div>

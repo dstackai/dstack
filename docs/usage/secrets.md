@@ -13,27 +13,31 @@ Go to the settings of your Weight & Biases user and copy your API token.
 
 Use the `dstack secrets add` command to add it as a secret:
 
-```shell hl_lines="1"
-dstack secrets add WANDB_API_KEY acd0a9d1ebe3a4e4854d2f6a7cef85b5257f8183
+<div class="termy">
+
+```shell
+$ dstack secrets add WANDB_API_KEY acd0a9d1ebe3a4e4854d2f6a7cef85b5257f8183
 ```
+
+</div>
 
 Now, when you run any workflow, your API token will be passed to the workflow 
 via the `WANDB_API_KEY` environment variable:
 
-=== "`.dstack/workflows/secrets.yaml`"
+<div editor-title=".dstack/workflows/secrets.yaml"> 
 
-    ```yaml
-    workflows:
-      - name: hello
-        provider: bash
-        commands:
-          - conda install wandb
-          - wandb login
-    ```
+```yaml
+workflows:
+  - name: hello
+    provider: bash
+    commands:
+      - conda install wandb
+      - wandb login
+```
+
+</div>
 
 Secrets can be managed via the [`dstack secrets`](../reference/cli/secrets.md#dstack-secrets-add) command.
 
 !!! info "NOTE:"
     Secrets are currently only supported by remote workflows.
-
-[//]: # (TODO: Align secrets with local and remote workflows)

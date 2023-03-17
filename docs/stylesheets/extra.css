@@ -299,7 +299,7 @@
 }
 
 .md-nav__item {
-    /*color: #3c4257;*/
+    color: rgba(0,0,0,0.87);
     font-weight: 400;
     font-size: 0.7rem;
 }
@@ -309,7 +309,7 @@
 }
 
 .md-typeset pre > code, .md-typeset code {
-    -webkit-font-smoothing: auto;
+    /*-webkit-font-smoothing: auto;*/
 }
 
 .md-typeset :not(pre) > code {
@@ -330,13 +330,34 @@
 }
 
 .md-typeset pre > code {
-    border-radius: 6px;
+    background-color: rgb(30, 35, 45);
+    padding: 65px 25px 35px;
+    border-radius: 4px;
+    font-size: 15px;
+
+    /*border-radius: 6px;*/
     /*border-top: 1px solid #dce0e6;*/
     /*background-color: rgba(0,0,0,.87);*/
-    padding: 15px 20px;
-    font-size: .85em;
+    /*padding: 15px 20px;*/
+    /*font-size: .85em;*/
 }
 
+.md-typeset pre > code:before {
+     content: '';
+    position: absolute;
+    top: 15px;
+    left: 15px;
+    display: inline-block;
+    width: 12px;
+    height: 12px;
+    border-radius: 50%;
+    /* A little hack to display the window buttons in one pseudo element. */
+    background: #d9515d;
+    /*-webkit-box-shadow: 25px 0 0 #f4c025, 50px 0 0 #3ec930;*/
+    /*        box-shadow: 25px 0 0 #f4c025, 50px 0 0 #3ec930;*/
+    -webkit-box-shadow: 20px 0 0 #f4c025, 40px 0 0 #3ec930;
+            box-shadow: 20px 0 0 #f4c025, 40px 0 0 #3ec930;
+}
 
 @media screen and (min-width: 60em) {
     [data-md-color-primary=white] .md-search__form {
@@ -353,6 +374,28 @@
 
 .md-search__input {
     font-size: .7rem;
+}
+
+.md-code__button:after {
+    width: 1em;
+    height: 1em;
+}
+
+.md-code__nav .md-code__button {
+    color: #a2a2a2;
+}
+
+.md-code__nav:hover .md-code__button {
+    color: #eee;
+}
+
+pre:hover .md-code__nav,
+code .md-code__nav:hover {
+    background: transparent;
+}
+
+code .md-code__nav:hover .md-code__button {
+    color: var(--md-accent-fg-color);
 }
 
 .md-clipboard {
@@ -416,10 +459,11 @@
     --md-primary-fg-color: #8a2be2;
     --md-accent-fg-color: #8a2be2;
     --md-typeset-a-color: #8a2be2;
-    --md-code-hl-function-color: #962ece;
-    --md-code-hl-keyword-color: #962ece;
-    --md-code-hl-string-color: #31a05e;
-    --md-code-fg-color: rgba(0, 0, 0, 0.95);
+    --md-code-hl-function-color: #b77bd8;
+    --md-code-hl-keyword-color: #b77bd8;
+    --md-code-hl-string-color: #66c08a;
+    --md-code-fg-color: #eee;
+    /*--md-code-fg-color: rgba(0, 0, 0, 0.95);*/
     --md-code-hl-comment-color: #757585;
     --md-code-hl-number-color: #d9548c;
     --md-code-hl-operator-color: #5b6369;
@@ -434,7 +478,8 @@
 }
 
 .md-typeset .highlight :where(.l) {
-    color: var(--md-code-fg-color) !important;
+    color: #eee !important;
+    /*color: var(--md-code-fg-color) !important;*/
 }
 
 .md-typeset .highlight .hll {
@@ -480,6 +525,10 @@ body {
         font-size: 0.8rem;
         font-weight: 800;
         line-height: 1rem;
+    }
+
+    .md-nav__item--section>.md-nav__link[for] {
+        color: rgba(0,0,0,0.87);
     }
 
     .md-search__form > * {
@@ -700,7 +749,7 @@ html .md-footer-meta.md-typeset a:is(:focus,:hover) {
 .md-typeset .highlight :is(.nd,.ni,.nl,.nt),
 .md-typeset .highlight :is(.k,.kd,.kn,.kp,.kr,.kt),
 .md-typeset .highlight :is(.nc,.ne,.nf,.nn) {
-    font-weight: 500;
+    font-weight: 100;
 }
 
 .md-typeset .tabbed-labels>label > code {
@@ -1065,4 +1114,13 @@ a.md-go-to-action.secondary {
 
 .md-post__content h2 a {
     color: rgba(0,0,0,0.87);
+}
+
+div[editor-title] code .editor-title {
+    position: absolute;
+    color: #a2a2a2;
+    top: 10px;
+    left: 0;
+    width: 100%;
+    text-align: center;
 }

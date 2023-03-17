@@ -5,9 +5,21 @@ Not needed for public repos.
 
 ## Usage
 
+<div class="termy">
+
 ```shell
-dstack init [-t OAUTH_TOKEN | -i SSH_PRIVATE_KEY]
+$ dstack init --help
+Usage: dstack init [-h] [-t OAUTH_TOKEN] [-i SSH_PRIVATE_KEY]
+
+Optional Arguments:
+  -h, --help            Show this help message and exit
+  -t, --token OAUTH_TOKEN
+                        An authentication token for Git
+  -i, --identity SSH_PRIVATE_KEY
+                        A path to the private SSH key file
 ```
+
+</div>
 
 !!! info "NOTE:"
     The credentials are stored in the encrypted cloud storage (e.g. for AWS, it's Secrets Manager).

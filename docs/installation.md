@@ -2,9 +2,13 @@
 
 Use `pip` to install `dstack`:
 
-```shell hl_lines="1"
-pip install dstack --upgrade
+<div class="termy">
+
+```shell
+$ pip install dstack --upgrade
 ```
+
+</div>
 
 !!! info "NOTE:"
     By default, workflows run locally. To run workflows locally, it is required to have either Docker or [NVIDIA Docker](https://github.com/NVIDIA/nvidia-docker) 
@@ -15,7 +19,17 @@ pip install dstack --upgrade
 To run workflows remotely (e.g. in a configured cloud account),
 configure a remote using the `dstack config` command.
 
-![dstack config](assets/dstack-config.png){ width="800" }
+<div class="termy">
+
+```shell
+$ dstack config
+? Choose backend. Use arrows to move, type to filter
+> [aws]
+  [gcp]
+  [hub]
+```
+
+</div>
 
 [//]: # (If you intend to collaborate in a team and would like to manage cloud credentials, users and other settings )
 [//]: # (via a user interface, it is recommended to choose `hub`.)
@@ -27,20 +41,14 @@ configure a remote using the `dstack config` command.
 [//]: # (If you intend to work alone and wish to run workflows directly in the cloud without any intermediate, )
 [//]: # (feel free to choose `aws` or `gcp`.)
 
-If you intend to run remote workflows directly in the cloud, feel free to choose `aws` or `gcp`.
-
-!!! info "NOTE:"
-    Choosing the `aws` and `gcp` remotes, with the `dstack config` CLI command requires you to have local
-    cloud credentials to be configured on your local machine.
-    Refer to [AWS](#aws) and 
-    [GCP](#gcp) correspondingly for the details.
+If you intend to run remote workflows directly in the cloud using local cloud credentials, 
+feel free to choose `aws` or `gcp`. Refer to [AWS](#aws) and [GCP](#gcp) correspondingly for the details.
 
 If you would like to manage cloud credentials, users and other settings centrally
-via a user interface, it is recommended to choose `hub`.
+via a user interface, it is recommended to choose `hub`. 
 
-!!! info "NOTE:"
-    The `hub` remote is currently in an experimental phase. If you are interested in trying it out, please contact us 
-    via [Slack](https://join.slack.com/t/dstackai/shared_invite/zt-xdnsytie-D4qU9BvJP8vkbkHXdi6clQ).
+The `hub` remote is currently in an experimental phase. If you are interested in trying it out, please contact us 
+via [Slack](https://join.slack.com/t/dstackai/shared_invite/zt-xdnsytie-D4qU9BvJP8vkbkHXdi6clQ).
 
 [//]: # (## Hub)
 
@@ -76,7 +84,7 @@ via a user interface, it is recommended to choose `hub`.
 [//]: # (Run the Hub application:)
 
 [//]: # ()
-[//]: # (```shell hl_lines="1")
+[//]: # (```shell)
 
 [//]: # (dstack hub start)
 
@@ -138,7 +146,7 @@ via a user interface, it is recommended to choose `hub`.
 [//]: # (The command includes the URL of the created hub accompanied with the personal access token of the user: )
 
 [//]: # ()
-[//]: # (```shell hl_lines="1")
+[//]: # (```shell)
 
 [//]: # (dstack config hub --url http://localhost:3000/my-new-hub --token 8a019f6d-e01f-41e3-9e54-e3369f3deda0 )
 
@@ -307,16 +315,24 @@ the permissions to perform actions on `s3`, `logs`, `secretsmanager`, `ec2`, and
 
 ### 3. Configure the CLI
 
-Once the AWS credentials are configured on your local machine, you can configure the CLI:
+Once the AWS credentials are configured on your local machine, you can configure the CLI using the `dstack config` command.
 
-```shell hl_lines="1"
-dstack config
+This command will ask you to choose an AWS profile, an AWS region (must be the same for the S3 bucket), 
+and the name of the S3 bucket.
+
+<div class="termy">
+
+```shell
+$ dstack config
+
+? Choose backend: aws
+? AWS profile: default
+? Choose AWS region: eu-west-1
+? Choose S3 bucket: dstack-142421590066-eu-west-1
+? Choose EC2 subnet: no preference
 ```
 
-This command will ask you to choose an AWS profile (to take the AWS credentials from),
-an AWS region (must be the same for the S3 bucket), and the name of the S3 bucket.
-
-![dstack config](assets/dstack-config-aws.png)
+</div>
 
 That's it! You've configured AWS as a remote.
 
@@ -361,15 +377,24 @@ to your local machine (e.g. to `~/Downloads/my-awesome-project-d7735ca1dd53.json
 
 ### 5. Configure the CLI
 
-Once the service account key JSON file is on your machine, you can configure the CLI:
+Once the service account key JSON file is on your machine, you can configure the CLI using the `dstack config` command.
 
-```shell hl_lines="1"
-dstack config
+The command will ask you for a path to a service account key file, GCP region and zone, and storage bucket name.
+
+<div class="termy">
+
+```shell
+$ dstack config
+
+? Choose backend: gcp
+? Enter path to credentials file: ~/Downloads/dstack-d7735ca1dd53.json
+? Choose GCP geographic area: North America
+? Choose GCP region: us-west1
+? Choose GCP zone: us-west1-b
+? Choose storage bucket: dstack-dstack-us-west1
+? Choose VPC subnet: no preference
 ```
 
-The command will ask you for a path to the a service account key, GCP region and zone, and storage bucket name. For
-example:
-
-![dstack config](assets/dstack-config-gcp.png)
+</div>
 
 That's it! You've configured GCP as a remote.
