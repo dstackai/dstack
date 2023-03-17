@@ -245,6 +245,7 @@ class Provider:
                 status=JobStatus.SUBMITTED,
                 submitted_at=submitted_at,
                 image_name=job_spec.image_name,
+                registry_auth=job_spec.registry_auth,
                 commands=job_spec.commands,
                 entrypoint=job_spec.entrypoint,
                 env=job_spec.env,

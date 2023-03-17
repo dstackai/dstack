@@ -146,6 +146,17 @@ class JobHead(JobRef):
         )
 
 
+class RegistryCredentials(BaseModel):
+    username: Optional[str] = None
+    password: Optional[str] = None
+
+    def __str__(self) -> str:
+        return f"RegistryCredentials(username={self.username}, password={self.password})"
+
+    def serialize(self) -> Dict[str, Any]:
+        return self.dict(exclude_none=True)
+
+
 def check_dict(element: Any, field: str):
     if type(element) == dict:
         return element.get(field)
@@ -165,6 +176,7 @@ class Job(JobHead):
     status: JobStatus
     submitted_at: int
     image_name: str
+    registry_auth: Optional[RegistryCredentials]
     commands: Optional[List[str]]
     entrypoint: Optional[List[str]]
     env: Optional[Dict[str, str]]
@@ -222,6 +234,7 @@ class Job(JobHead):
             f"status=JobStatus.{self.status.name}, "
             f"submitted_at={self.submitted_at}, "
             f'image_name="{self.image_name}", '
+            f'registry_auth="{self.registry_auth}", '
             f"commands={commands}, "
             f"entrypoint={entrypoint}, "
             f"env={self.env}, "
@@ -276,6 +289,7 @@ class Job(JobHead):
             "status": self.status.value,
             "submitted_at": self.submitted_at,
             "image_name": self.image_name,
+            "registry_auth": self.registry_auth.serialize() if self.registry_auth else {},
             "commands": self.commands or [],
             "entrypoint": self.entrypoint,
             "env": self.env or {},
@@ -398,6 +412,7 @@ class Job(JobHead):
             status=JobStatus(job_data["status"]),
             submitted_at=job_data["submitted_at"],
             image_name=job_data["image_name"],
+            registry_auth=RegistryCredentials(**job_data.get("registry_auth", {})),
             commands=job_data.get("commands") or None,
             entrypoint=job_data.get("entrypoint") or None,
             env=job_data["env"] or None,
@@ -419,6 +434,7 @@ class Job(JobHead):
 
 class JobSpec(JobRef):
     image_name: str
+    registry_auth: Optional[RegistryCredentials] = None
     commands: Optional[List[str]] = None
     entrypoint: Optional[List[str]] = None
     env: Optional[Dict[str, str]] = None
@@ -442,6 +458,7 @@ class JobSpec(JobRef):
         app_specs = format_list(self.app_specs)
         return (
             f'JobSpec(job_id="{self.job_id}", image_name="{self.image_name}", '
+            f"registry_auth={self.registry_auth}, "
             f"commands={commands}, "
             f"entrypoint={entrypoint}, "
             f"env={self.env}, "

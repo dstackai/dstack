@@ -149,6 +149,21 @@
       "type": "string",
       "minLength": 1
     },
+    "registry_auth": {
+      "description": "Credentials for pulling private container",
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "username": {
+          "description": "Username",
+          "type": "string"
+        },
+        "password": {
+          "description": "Password or access token",
+          "type": "string"
+        }
+      }
+    },
     "bash": {
       "type": "object",
       "required": [
@@ -229,6 +244,9 @@
           "description": "The name of the Docker image to run",
           "type": "string",
           "minLength": 1
+        },
+        "registry_auth": {
+          "$ref": "#/definitions/registry_auth"
         },
         "working_dir": {
           "$ref": "#/definitions/working_dir"

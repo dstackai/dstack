@@ -2,8 +2,11 @@ package executor
 
 import (
 	"context"
+	"encoding/base64"
+	"encoding/json"
 	"errors"
 	"fmt"
+	"github.com/docker/docker/api/types"
 	"io"
 	"os"
 	"path"
@@ -436,16 +439,25 @@ func (ex *Executor) processJob(ctx context.Context, stoppedCh chan struct{}) err
 		bindings = append(bindings, art...)
 	}
 	logger := ex.backend.CreateLogger(ctx, fmt.Sprintf("/dstack/jobs/%s/%s/%s/%s", ex.backend.Bucket(ctx), job.RepoHostNameWithPort(), job.RepoUserName, job.RepoName), job.RunName)
+	secrets, err := ex.backend.Secrets(ctx)
+	if err != nil {
+		log.Error(ctx, "Fail fetching secrets", "err", err)
+	}
+	interpolator := SecretsInterpolator{
+		Secrets: secrets,
+	}
+	registryAuthBase64 := makeRegistryAuthBase64(interpolator.interpolate(ctx, job.RegistryAuth.Username), interpolator.interpolate(ctx, job.RegistryAuth.Password))
 	spec := &container.Spec{
-		Image:        job.Image,
-		WorkDir:      path.Join("/workflow", job.WorkingDir),
-		Commands:     container.ShellCommands(job.Commands),
-		Entrypoint:   job.Entrypoint,
-		Env:          ex.environment(ctx),
-		Mounts:       uniqueMount(bindings),
-		ExposedPorts: ex.pm.ExposedPorts(ex.portID),
-		BindingPorts: ex.pm.BindPorts(ex.portID),
-		ShmSize:      resource.ShmSize,
+		Image:              job.Image,
+		RegistryAuthBase64: registryAuthBase64,
+		WorkDir:            path.Join("/workflow", job.WorkingDir),
+		Commands:           container.ShellCommands(job.Commands),
+		Entrypoint:         job.Entrypoint,
+		Env:                ex.environment(ctx),
+		Mounts:             uniqueMount(bindings),
+		ExposedPorts:       ex.pm.ExposedPorts(ex.portID),
+		BindingPorts:       ex.pm.BindPorts(ex.portID),
+		ShmSize:            resource.ShmSize,
 	}
 	logGroup := fmt.Sprintf("/jobs/%s/%s/%s", job.RepoHostNameWithPort(), job.RepoUserName, job.RepoName)
 	fileLog, err := createLocalLog(filepath.Join(ex.configDir, "logs", logGroup), job.RunName)
@@ -527,4 +539,19 @@ func createLocalLog(dir, fileName string) (*os.File, error) {
 		return nil, gerrors.Wrap(err)
 	}
 	return fileLog, nil
+}
+
+func makeRegistryAuthBase64(username string, password string) string {
+	if username == "" && password == "" {
+		return ""
+	}
+	authConfig := types.AuthConfig{
+		Username: username,
+		Password: password,
+	}
+	encodedJSON, err := json.Marshal(authConfig)
+	if err != nil {
+		panic(err)
+	}
+	return base64.URLEncoding.EncodeToString(encodedJSON)
 }
