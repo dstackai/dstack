@@ -37,4 +37,5 @@ class TestValidateInterpolation(unittest.TestCase):
     def test_missed(self):
         self.assertListEqual(interpolation.validate("$VAR_NAME", ["VAR_NAME"]), [])
         self.assertListEqual(interpolation.validate("$VAR_NAME and $VAR_NAME", ["VAR_NAME"]), [])
+        self.assertListEqual(interpolation.validate("$VAR_NAME and $VAR_NAME", []), ["VAR_NAME"])
         self.assertListEqual(interpolation.validate("$VAR_NAME and $FOO", ["VAR_NAME"]), ["FOO"])
