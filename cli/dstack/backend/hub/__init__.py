@@ -37,6 +37,7 @@ class HubBackend(RemoteBackend):
         if self._client is None:
             self._client = HubClient(
                 url=self.backend_config.url,
+                project=self.backend_config.project,
                 token=self.backend_config.token,
             )
         return self._client
