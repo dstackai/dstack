@@ -46,5 +46,5 @@ class Configurator(ABC):
         pass
 
     @abstractmethod
-    def parse_args(self, args: list = []):
+    def register_parser(self, parser):
         pass

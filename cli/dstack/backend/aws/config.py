@@ -136,7 +136,7 @@ class AWSConfigurator(Configurator):
     def get_config(self, data: Dict) -> Optional[BackendConfig]:
         return AWSConfig.deserialize(data=data)
 
-    def parse_args(self, args: list = []):
+    def register_parser(self, parser):
         pass
 
     def configure_hub(self, data: Dict):
