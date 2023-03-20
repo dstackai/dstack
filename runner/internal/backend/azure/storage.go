@@ -5,15 +5,16 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"github.com/Azure/azure-sdk-for-go/sdk/azcore"
-	"github.com/Azure/azure-sdk-for-go/sdk/storage/azblob"
-	"github.com/Azure/azure-sdk-for-go/sdk/storage/azblob/container"
-	"github.com/dstackai/dstack/runner/internal/gerrors"
 	"io/fs"
 	"os"
 	"path"
 	"path/filepath"
 	"strings"
+
+	"github.com/Azure/azure-sdk-for-go/sdk/azcore"
+	"github.com/Azure/azure-sdk-for-go/sdk/storage/azblob"
+	"github.com/Azure/azure-sdk-for-go/sdk/storage/azblob/container"
+	"github.com/dstackai/dstack/runner/internal/gerrors"
 )
 
 var ErrTagNotFound = errors.New("tag not found")
@@ -77,6 +78,9 @@ func (azstorage AzureStorage) ListFile(ctx context.Context, prefix string) ([]st
 }
 
 func (azstorage AzureStorage) RenameFile(ctx context.Context, oldKey, newKey string) error {
+	if oldKey == newKey {
+		return nil
+	}
 	source := azstorage.containerClient.NewBlobClient(oldKey)
 	_, err := azstorage.containerClient.NewBlobClient(newKey).CopyFromURL(ctx, source.URL(), nil)
 	if err != nil {
