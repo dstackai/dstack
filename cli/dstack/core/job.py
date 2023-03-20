@@ -4,7 +4,6 @@ from typing import Any, Dict, List, Optional
 
 from pydantic import BaseModel, validator
 
-from dstack.core import interpolation
 from dstack.core.app import AppSpec
 from dstack.core.artifact import ArtifactSpec
 from dstack.core.dependents import DepSpec
@@ -150,12 +149,6 @@ class JobHead(JobRef):
 class RegistryAuth(BaseModel):
     username: Optional[str] = None
     password: Optional[str] = None
-
-    @validator("username", "password")
-    def validate_interpolation(cls, v: str):
-        if v is not None:
-            interpolation.validate(v)  # We can't pass known secrets here
-        return v
 
     def __str__(self) -> str:
         return f"RegistryCredentials(username={self.username}, password={self.password})"

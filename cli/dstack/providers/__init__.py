@@ -22,6 +22,7 @@ from dstack.core.job import (
 )
 from dstack.core.repo import RepoAddress, RepoData
 from dstack.utils.common import _quoted
+from dstack.utils.jinjamock import JinjaMock
 
 DEFAULT_CPU = 2
 DEFAULT_MEM = "8GB"
@@ -114,7 +115,9 @@ class Provider:
                 self.args = args
 
         run = Run(self.run_name, Args(self.provider_data.get("run_args") or []))
-        self.provider_data = self._inject_context_recursively(self.provider_data, run=run)
+        self.provider_data = self._inject_context_recursively(
+            self.provider_data, run=run, secrets=JinjaMock("secrets")
+        )
 
     @staticmethod
     def _inject_context_recursively(obj: Any, **kwargs: Any) -> Any:
