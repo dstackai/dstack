@@ -415,9 +415,12 @@ def _get_subnet_resource(region: str, subnet: str) -> str:
 def _get_labels(bucket: str, job: Job) -> Dict[str, str]:
     labels = {
         "owner": "dstack",
-        "dstack_bucket": bucket,
-        "dstack_repo": job.repo_address.path("-").replace(".", "-"),
     }
+    if gcp_utils.is_valid_label_value(bucket):
+        labels["dstack_bucket"] = bucket
+    dstack_repo = job.repo_address.path("-").lower().replace(".", "-")
+    if gcp_utils.is_valid_label_value(dstack_repo):
+        labels["dstack_repo"] = dstack_repo
     if job.local_repo_user_name is not None:
         dstack_user_name = job.local_repo_user_name.lower().replace(" ", "_")
         if gcp_utils.is_valid_label_value(dstack_user_name):
