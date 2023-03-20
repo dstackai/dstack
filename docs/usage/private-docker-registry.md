@@ -12,8 +12,8 @@ workflows:
     provider: docker
     image: ghcr.io/my-organization/top-secret-image:v1
     registry_auth:
-      username: $GHCR_USER
-      password: $GHCR_TOKEN
+      username: ${{ secrets.GHCR_USER }}
+      password: ${{ secrets.GHCR_TOKEN }}
 ```
 
 </div>
@@ -23,8 +23,7 @@ workflows:
 
 ## Interpolation syntax
 
-* `$VAR_NAME` — substitute `VAR_NAME` secret
-* `${VAR_NAME}` — substitute `VAR_NAME` secret
+* `${{ secrets.VAR_NAME }}` — substitute `VAR_NAME` secret
 * `$$` — escaped single `$`
 
 If a secret doesn't exist, an empty string will be substituted.

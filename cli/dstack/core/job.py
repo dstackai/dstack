@@ -2,7 +2,7 @@ from abc import abstractmethod
 from enum import Enum
 from typing import Any, Dict, List, Optional
 
-from pydantic import BaseModel, validator
+from pydantic import BaseModel
 
 from dstack.core.app import AppSpec
 from dstack.core.artifact import ArtifactSpec

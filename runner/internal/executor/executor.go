@@ -443,9 +443,8 @@ func (ex *Executor) processJob(ctx context.Context, stoppedCh chan struct{}) err
 	if err != nil {
 		log.Error(ctx, "Fail fetching secrets", "err", err)
 	}
-	interpolator := SecretsInterpolator{
-		Secrets: secrets,
-	}
+	var interpolator VariablesInterpolator
+	interpolator.Add("secrets", secrets)
 	username, err := interpolator.Interpolate(ctx, job.RegistryAuth.Username)
 	if err != nil {
 		log.Error(ctx, "Failed interpolating registry_auth.username", "err", err, "username", job.RegistryAuth.Username)
