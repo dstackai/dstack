@@ -56,6 +56,7 @@ The following properties are optional:
 - [`artifacts`](#artifacts) - (Optional) The list of output artifacts
 - [`resources`](#resources) - (Optional) The hardware resources required by the workflow
 - `working_dir` - (Optional) The path to the working directory
+- `registry_auth` - (Optional) Username and password for a [private docker registry](../../usage/private-docker-registry.md)
 
 ### artifacts
 
