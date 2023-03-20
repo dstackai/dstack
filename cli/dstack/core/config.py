@@ -38,7 +38,7 @@ class Configurator(ABC):
         pass
 
     @abstractmethod
-    def configure_hub(self, data: Dict):
+    async def configure_hub(self, data: Dict):
         pass
 
     @abstractmethod

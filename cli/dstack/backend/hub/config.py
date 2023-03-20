@@ -63,7 +63,7 @@ class HubConfigurator(Configurator):
     def get_backend_client(self, config: Any):
         pass
 
-    def configure_hub(self, config: Any):
+    async def configure_hub(self, config: Any):
         pass
 
     def configure_cli(self) -> HUBConfig:

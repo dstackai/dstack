@@ -210,7 +210,7 @@ class GCPConfigurator(Configurator):
         config.save()
         print(f"[grey58]OK[/]")
 
-    def configure_hub(self, data: Dict):
+    async def configure_hub(self, data: Dict):
         pass
 
     def configure_cli(self):

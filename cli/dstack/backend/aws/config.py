@@ -1,7 +1,9 @@
+import asyncio
 import json
 import os
 import re
 from argparse import Namespace
+from functools import partial
 from pathlib import Path
 from typing import Dict, Optional
 
@@ -33,6 +35,8 @@ regions = [
 ]
 
 _DEFAULT_REGION_NAME = "us-east-1"
+
+cache = {}
 
 
 class AWSConfig(BackendConfig):
@@ -165,8 +169,43 @@ class AWSConfigurator(Configurator):
         config.save()
         print(f"[grey58]OK[/]")
 
-    def configure_hub(self, data: Dict):
+    def _get_buckets(self, session, region):
+        values = []
+        try:
+            _s3 = session.client("s3")
+            response = _s3.list_buckets()
+            for bucket in response["Buckets"]:
+                values.append(
+                    ProjectElementValue(
+                        name=bucket["Name"],
+                        created=bucket["CreationDate"].strftime("%d.%m.%Y %H:%M:%S"),
+                        region=region,
+                    )
+                )
+        except Exception as ex:
+            pass
+        return values
+
+    def _get_subnet(self, session):
+        values = []
+        try:
+            _ec2 = session.client("ec2")
+            response = _ec2.describe_subnets()
+            for subnet in response["Subnets"]:
+                values.append(
+                    ProjectElementValue(
+                        value=subnet["SubnetId"],
+                        label=subnet["SubnetId"],
+                    )
+                )
+        except Exception as ex:
+            pass
+        return values
+
+    async def configure_hub(self, data: Dict):
         # Step 1: create client and check access
+        global cache
+        loop = asyncio.get_event_loop()
         config = AWSConfig.deserialize(data=data)
 
         access_key = data.get("access_key") or ""
@@ -187,35 +226,15 @@ class AWSConfigurator(Configurator):
         for r in regions:
             project_values.region_name.values.append(ProjectElementValue(value=r[1], label=r[0]))
         # Step 2: get bucket list
-        try:
-            _s3 = session.client("s3")
-            response = _s3.list_buckets()
-            project_values.s3_bucket_name = ProjectElement(selected=config.bucket_name)
-            for bucket in response["Buckets"]:
-                project_values.s3_bucket_name.values.append(
-                    ProjectElementValue(
-                        name=bucket["Name"],
-                        created=bucket["CreationDate"].strftime("%d.%m.%Y %H:%M:%S"),
-                        region=config.region_name,
-                    )
-                )
-        except Exception as ex:
-            return project_values
+        project_values.s3_bucket_name = ProjectElement(selected=config.bucket_name)
+        project_values.s3_bucket_name.values = await loop.run_in_executor(
+            None, partial(self._get_buckets, session=session, region=config.region_name)
+        )
         # Step 3: get subnet_id list
-        try:
-            _ec2 = session.client("ec2")
-            response = _ec2.describe_subnets()
-            project_values.ec2_subnet_id = ProjectElement(selected=config.subnet_id)
-            for subnet in response["Subnets"]:
-                project_values.ec2_subnet_id.values.append(
-                    ProjectElementValue(
-                        value=subnet["SubnetId"],
-                        label=subnet["SubnetId"],
-                    )
-                )
-        except Exception as ex:
-            return project_values
-
+        project_values.ec2_subnet_id = ProjectElement(selected=config.subnet_id)
+        project_values.ec2_subnet_id.values = await loop.run_in_executor(
+            None, partial(self._get_subnet, session=session)
+        )
         return project_values
 
     def configure_cli(self):
