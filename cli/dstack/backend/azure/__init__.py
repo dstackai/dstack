@@ -71,41 +71,8 @@ class AzureBackend(CloudBackend):
             repo_credentials,
         )
 
-    def download_run_artifact_files(
-        self,
-        repo_address: RepoAddress,
-        run_name: str,
-        output_dir: Optional[str],
-        files_path: Optional[str] = None,
-    ):
-        artifacts = self.list_run_artifact_files(repo_address=repo_address, run_name=run_name)
-        base_artifacts.download_run_artifact_files(
-            storage=self._storage,
-            repo_address=repo_address,
-            artifacts=artifacts,
-            output_dir=output_dir,
-            files_path=files_path,
-        )
-
-    def upload_job_artifact_files(
-        self,
-        repo_address: RepoAddress,
-        job_id: str,
-        artifact_name: str,
-        artifact_path: str,
-        local_path: Path,
-    ):
-        base_artifacts.upload_job_artifact_files(
-            storage=self._storage,
-            repo_address=repo_address,
-            job_id=job_id,
-            artifact_name=artifact_name,
-            artifact_path=artifact_path,
-            local_path=local_path,
-        )
-
     def configure(self):
-        raise NotImplementedError
+        pass
 
     def create_run(self, repo_address: RepoAddress) -> str:
         return base_runs.create_run(self._storage, repo_address, self.type)
@@ -151,10 +118,43 @@ class AzureBackend(CloudBackend):
         start_time: int,
         attached: bool,
     ) -> Generator[LogEvent, None, None]:
-        raise NotImplementedError
+        raise NotImplementedError()
 
     def list_run_artifact_files(self, repo_address: RepoAddress, run_name: str) -> List[Artifact]:
         return base_artifacts.list_run_artifact_files(self._storage, repo_address, run_name)
+
+    def download_run_artifact_files(
+        self,
+        repo_address: RepoAddress,
+        run_name: str,
+        output_dir: Optional[str],
+        files_path: Optional[str] = None,
+    ):
+        artifacts = self.list_run_artifact_files(repo_address=repo_address, run_name=run_name)
+        base_artifacts.download_run_artifact_files(
+            storage=self._storage,
+            repo_address=repo_address,
+            artifacts=artifacts,
+            output_dir=output_dir,
+            files_path=files_path,
+        )
+
+    def upload_job_artifact_files(
+        self,
+        repo_address: RepoAddress,
+        job_id: str,
+        artifact_name: str,
+        artifact_path: str,
+        local_path: Path,
+    ):
+        base_artifacts.upload_job_artifact_files(
+            storage=self._storage,
+            repo_address=repo_address,
+            job_id=job_id,
+            artifact_name=artifact_name,
+            artifact_path=artifact_path,
+            local_path=local_path,
+        )
 
     def list_tag_heads(self, repo_address: RepoAddress) -> List[TagHead]:
         return base_tags.list_tag_heads(self._storage, repo_address)
