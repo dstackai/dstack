@@ -110,24 +110,9 @@ class HubConfigurator(Configurator):
     def register_parser(self, parser):
 
         hub_parser = parser.add_parser("hub", help="", formatter_class=RichHelpFormatter)
-        hub_parser.add_argument(
-            "url",
-            metavar="URL",
-            type=str,
-            help="",
-        )
-        hub_parser.add_argument(
-            "project",
-            metavar="PROJECT",
-            type=str,
-            help="",
-        )
-        hub_parser.add_argument(
-            "token",
-            metavar="TOKEN",
-            type=str,
-            help="",
-        )
+        hub_parser.add_argument("--url", type=str, help="", required=True)
+        hub_parser.add_argument("--project", type=str, help="", required=True)
+        hub_parser.add_argument("--token", type=str, help="", required=True)
         hub_parser.set_defaults(func=self._command)
 
     def _command(self, args: Namespace):

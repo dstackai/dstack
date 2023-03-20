@@ -1,6 +1,7 @@
 import json
 import os
 import re
+from argparse import Namespace
 from pathlib import Path
 from typing import Dict, Optional
 
@@ -10,6 +11,7 @@ import yaml
 from botocore.client import BaseClient
 from rich import print
 from rich.prompt import Confirm, Prompt
+from rich_argparse import RichHelpFormatter
 
 from dstack.cli.common import _is_termios_available, ask_choice
 from dstack.core.config import BackendConfig, Configurator, get_config_path
@@ -137,7 +139,31 @@ class AWSConfigurator(Configurator):
         return AWSConfig.deserialize(data=data)
 
     def register_parser(self, parser):
-        pass
+        aws_parser = parser.add_parser("aws", help="", formatter_class=RichHelpFormatter)
+        aws_parser.add_argument("--bucket", type=str, help="", required=True)
+        aws_parser.add_argument("--region", type=str, help="", required=True)
+        aws_parser.add_argument(
+            "--profile",
+            type=str,
+            help="",
+        )
+        aws_parser.add_argument(
+            "--subnet-id",
+            type=str,
+            help="",
+        )
+        aws_parser.set_defaults(func=self._command)
+
+    def _command(self, args: Namespace):
+        config = AWSConfig()
+        config.bucket_name = args.bucket
+        config.region_name = args.region
+        if args.profile is not None:
+            config.profile_name = args.profile
+        if args.subnet_id is not None:
+            config.subnet_id = args.subnet_id
+        config.save()
+        print(f"[grey58]OK[/]")
 
     def configure_hub(self, data: Dict):
         # Step 1: create client and check access
