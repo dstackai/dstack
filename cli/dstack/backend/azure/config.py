@@ -144,11 +144,15 @@ class AzureConfig(BackendConfig, metaclass=ModelMeta):
         self.tenant_id = tenant_id
         self.location = location
         self.secret_url = secret_url
-        # XXX: it is possible to find resource group, because Key Vault has unique name. It would take much time for
-        # round-trip request to Azure.
+        self.secret_vault = secret_url.host.split(".", 1)[0]
         self.secret_resource_group = secret_resource_group
         self.storage_url = storage_url
+        self.storage_account = storage_url.host.split(".", 1)[0]
         self.storage_container = storage_container
+        self.resource_group = "dstackResourceGroup"
+        self.network = "dstackNetwork"
+        self.subnet = "default"
+        self.managed_identity = "dstackManagedIdentity"
 
     def save(self, path: Path = get_config_path()):
         with open(path, "w+") as f:

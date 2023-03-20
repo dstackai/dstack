@@ -18,7 +18,7 @@ from dstack.core.artifact import Artifact
 from dstack.core.error import ConfigError
 from dstack.core.job import Job, JobHead
 from dstack.core.log_event import LogEvent
-from dstack.core.repo import RepoAddress, RepoCredentials, RepoData
+from dstack.core.repo import LocalRepoData, RepoAddress, RepoCredentials
 from dstack.core.run import RunHead
 from dstack.core.secret import Secret
 from dstack.core.tag import TagHead
@@ -47,13 +47,7 @@ class AzureBackend(CloudBackend):
         )
         self._compute = AzureCompute(
             credential=credential,
-            subscription_id=self.config.subscription_id,
-            tenant_id=self.config.tenant_id,
-            location=self.config.location,
-            secret_vault_name=self.config.secret_url.host.split(".", 1)[0],
-            secret_vault_resource_group=self.config.secret_resource_group,
-            storage_account_name=self._storage.get_account_name(),
-            backend_config=self.config,
+            azure_config=self.config,
         )
         self._loaded = True
 
@@ -177,7 +171,9 @@ class AzureBackend(CloudBackend):
             run_jobs,
         )
 
-    def add_tag_from_local_dirs(self, repo_data: RepoData, tag_name: str, local_dirs: List[str]):
+    def add_tag_from_local_dirs(
+        self, repo_data: LocalRepoData, tag_name: str, local_dirs: List[str]
+    ):
         base_tags.create_tag_from_local_dirs(
             self._storage,
             repo_data,
