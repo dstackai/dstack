@@ -286,8 +286,21 @@ func ShellCommands(commands []string) []string {
 	if len(commands) == 0 {
 		return []string{}
 	}
-	arg := strings.Join(commands, " && ")
-	return []string{arg}
+	var sb strings.Builder
+	for i, cmd := range commands {
+		cmd := strings.TrimSpace(cmd)
+		if i > 0 {
+			sb.WriteString(" && ")
+		}
+		if strings.HasSuffix(cmd, "&") {
+			sb.WriteString("{ ")
+			sb.WriteString(cmd)
+			sb.WriteString(" }")
+		} else {
+			sb.WriteString(cmd)
+		}
+	}
+	return []string{sb.String()}
 }
 
 func BytesToMiB(bytesCount int64) uint64 {

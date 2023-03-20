@@ -110,3 +110,20 @@ workflows:
 ```
 
 </div>
+
+### Run task in a background
+
+<div editor-title=".dstack/workflows/ping-background.yaml">
+
+```yaml
+workflows:
+  - name: ping-background
+    provider: bash
+    commands:
+      - apt update && apt -y install iputils-ping
+      - ping -c8 8.8.8.8 &
+      - echo "wait!"
+      - sleep 10
+```
+
+</div>
