@@ -2,8 +2,9 @@ from abc import abstractmethod
 from enum import Enum
 from typing import Any, Dict, List, Optional
 
-from pydantic import BaseModel
+from pydantic import BaseModel, validator
 
+from dstack.core import interpolation
 from dstack.core.app import AppSpec
 from dstack.core.artifact import ArtifactSpec
 from dstack.core.dependents import DepSpec
@@ -146,9 +147,15 @@ class JobHead(JobRef):
         )
 
 
-class RegistryCredentials(BaseModel):
+class RegistryAuth(BaseModel):
     username: Optional[str] = None
     password: Optional[str] = None
+
+    @validator("username", "password")
+    def validate_interpolation(cls, v: str):
+        if v is not None:
+            interpolation.validate(v)  # We can't pass known secrets here
+        return v
 
     def __str__(self) -> str:
         return f"RegistryCredentials(username={self.username}, password={self.password})"
@@ -176,7 +183,7 @@ class Job(JobHead):
     status: JobStatus
     submitted_at: int
     image_name: str
-    registry_auth: Optional[RegistryCredentials]
+    registry_auth: Optional[RegistryAuth]
     commands: Optional[List[str]]
     entrypoint: Optional[List[str]]
     env: Optional[Dict[str, str]]
@@ -412,7 +419,7 @@ class Job(JobHead):
             status=JobStatus(job_data["status"]),
             submitted_at=job_data["submitted_at"],
             image_name=job_data["image_name"],
-            registry_auth=RegistryCredentials(**job_data.get("registry_auth", {})),
+            registry_auth=RegistryAuth(**job_data.get("registry_auth", {})),
             commands=job_data.get("commands") or None,
             entrypoint=job_data.get("entrypoint") or None,
             env=job_data["env"] or None,
@@ -434,7 +441,7 @@ class Job(JobHead):
 
 class JobSpec(JobRef):
     image_name: str
-    registry_auth: Optional[RegistryCredentials] = None
+    registry_auth: Optional[RegistryAuth] = None
     commands: Optional[List[str]] = None
     entrypoint: Optional[List[str]] = None
     env: Optional[Dict[str, str]] = None
