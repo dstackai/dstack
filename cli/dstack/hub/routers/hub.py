@@ -31,7 +31,7 @@ async def backend_configurator(req: Request, type_backend: str = Query(alias="ty
     request_args = dict(req.query_params)
     configurator = backend.get_configurator()
     try:
-        result = configurator.configure_hub(request_args)
+        result = await configurator.configure_hub(request_args)
     except HubError as ex:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
