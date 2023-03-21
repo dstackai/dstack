@@ -128,7 +128,41 @@ class AzureCompute(Compute):
         raise NotImplementedError()
 
     def terminate_instance(self, request_id: str):
+        _terminate_instance(
+            compute_client=self._compute_client,
+            resource_group=self.azure_config.resource_group,
+            instance_name=request_id,
+        )
         pass
+        _terminate_instance(
+            compute_client=self._compute_client,
+            resource_group=self.azure_config.resource_group,
+            instance_name=request_id,
+        )
+        pass
+        _terminate_instance(
+            compute_client=self._compute_client,
+            resource_group=self.azure_config.resource_group,
+            instance_name=request_id,
+        )
+        pass
+        _terminate_instance(
+            compute_client=self._compute_client,
+            resource_group=self.azure_config.resource_group,
+            instance_name=request_id,
+        )
+        pass
+        _terminate_instance(
+            compute_client=self._compute_client,
+            resource_group=self.azure_config.resource_group,
+            instance_name=request_id,
+        )
+        pass
+        _terminate_instance(
+            compute_client=self._compute_client,
+            resource_group=self.azure_config.resource_group,
+            instance_name=request_id,
+        )
 
 
 def _get_storage_account_id(
@@ -362,5 +396,87 @@ def _get_instance_status(
     raise RuntimeError(f"unhandled state {codes!r}", codes)
 
 
+def _terminate_instance(
+    compute_client: ComputeManagementClient,
+    resource_group: str,
+    instance_name: str,
+):
+    compute_client.virtual_machines.begin_delete(
+        resource_group_name=resource_group,
+        vm_name=instance_name,
+    )
+
+
 def _terminate_instance():
     pass
+
+
+def _terminate_instance(
+    compute_client: ComputeManagementClient,
+    resource_group: str,
+    instance_name: str,
+):
+    compute_client.virtual_machines.begin_delete(
+        resource_group_name=resource_group,
+        vm_name=instance_name,
+    )
+
+
+def _terminate_instance():
+    pass
+
+
+def _terminate_instance(
+    compute_client: ComputeManagementClient,
+    resource_group: str,
+    instance_name: str,
+):
+    compute_client.virtual_machines.begin_delete(
+        resource_group_name=resource_group,
+        vm_name=instance_name,
+    )
+
+
+def _terminate_instance():
+    pass
+
+
+def _terminate_instance(
+    compute_client: ComputeManagementClient,
+    resource_group: str,
+    instance_name: str,
+):
+    compute_client.virtual_machines.begin_delete(
+        resource_group_name=resource_group,
+        vm_name=instance_name,
+    )
+
+
+def _terminate_instance():
+    pass
+
+
+def _terminate_instance(
+    compute_client: ComputeManagementClient,
+    resource_group: str,
+    instance_name: str,
+):
+    compute_client.virtual_machines.begin_delete(
+        resource_group_name=resource_group,
+        vm_name=instance_name,
+    )
+
+
+def _terminate_instance():
+    pass
+
+
+def _terminate_instance(
+    compute_client: ComputeManagementClient,
+    resource_group: str,
+    instance_name: str,
+):
+    compute_client.virtual_machines.begin_delete(
+        resource_group_name=resource_group,
+        vm_name=instance_name,
+    )
