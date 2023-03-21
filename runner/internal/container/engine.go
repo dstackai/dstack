@@ -90,7 +90,7 @@ type DockerRuntime struct {
 
 func (r *Engine) Create(ctx context.Context, spec *Spec, logs io.Writer) (*DockerRuntime, error) {
 	log.Trace(ctx, "Start pull image")
-	err := r.pullImageIfAbsent(ctx, spec.Image)
+	err := r.pullImageIfAbsent(ctx, spec.Image, spec.RegistryAuthBase64)
 	if err != nil {
 		log.Error(ctx, fmt.Sprintf("failed to download docker image: %s", err))
 		return nil, gerrors.Newf("failed to download docker image: %s", err)
@@ -253,7 +253,7 @@ func (r *DockerRuntime) Stop(ctx context.Context) error {
 	return nil
 }
 
-func (r *Engine) pullImageIfAbsent(ctx context.Context, image string) error {
+func (r *Engine) pullImageIfAbsent(ctx context.Context, image string, registryAuthBase64 string) error {
 	if image == "" {
 		return gerrors.New("given image value is empty")
 	}
@@ -268,8 +268,9 @@ func (r *Engine) pullImageIfAbsent(ctx context.Context, image string) error {
 	if len(summaries) != 0 {
 		return nil
 	}
-
-	reader, err := r.client.ImagePull(ctx, image, types.ImagePullOptions{})
+	reader, err := r.client.ImagePull(ctx, image, types.ImagePullOptions{
+		RegistryAuth: registryAuthBase64,
+	})
 	if err != nil {
 		return gerrors.Wrap(err)
 	}

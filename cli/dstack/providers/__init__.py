@@ -7,8 +7,6 @@ from argparse import ArgumentParser, Namespace
 from pkgutil import iter_modules
 from typing import Any, Dict, List, Optional, Union
 
-from jinja2 import Template
-
 from dstack.api.repo import load_repo_data
 from dstack.backend.base import Backend
 from dstack.core.job import (
@@ -22,6 +20,7 @@ from dstack.core.job import (
 )
 from dstack.core.repo import RepoAddress, RepoData
 from dstack.utils.common import _quoted
+from dstack.utils.interpolator import VariablesInterpolator
 
 DEFAULT_CPU = 2
 DEFAULT_MEM = "8GB"
@@ -91,42 +90,30 @@ class Provider:
         return python_version
 
     def _inject_context(self):
-        class Args:
-            def __init__(self, args: List[str]) -> None:
-                super().__init__()
-                self.args = args
+        args = []
+        for arg in self.provider_data.get("run_args", []):
+            if " " in arg:
+                arg = '"%s"' % arg.replace('"', '\\"')
+            args.append(arg)
 
-            def __str__(self):
-                _str = ""
-                for arg in self.args:
-                    if _str:
-                        _str += " "
-                    if " " in arg:
-                        _str += '"' + arg.replace('"', '\\"') + '"'
-                    else:
-                        _str += arg
-                return _str
-
-        class Run:
-            def __init__(self, name: str, args: Args) -> None:
-                super().__init__()
-                self.name = name
-                self.args = args
-
-        run = Run(self.run_name, Args(self.provider_data.get("run_args") or []))
-        self.provider_data = self._inject_context_recursively(self.provider_data, run=run)
+        self.provider_data = self._inject_context_recursively(
+            VariablesInterpolator(
+                {"run": {"name": self.run_name, "args": " ".join(args)}}, skip=["secrets"]
+            ),
+            self.provider_data,
+        )
 
     @staticmethod
-    def _inject_context_recursively(obj: Any, **kwargs: Any) -> Any:
+    def _inject_context_recursively(interpolator: VariablesInterpolator, obj: Any) -> Any:
         if isinstance(obj, str):
-            return Template(obj, variable_start_string="${{").render(**kwargs)
+            return interpolator.interpolate(obj)
         elif isinstance(obj, dict):
             d = {}
             for k in obj:
-                d[k] = Provider._inject_context_recursively(obj[k], **kwargs)
+                d[k] = Provider._inject_context_recursively(interpolator, obj[k])
             return d
         elif isinstance(obj, list):
-            return [Provider._inject_context_recursively(item, **kwargs) for item in obj]
+            return [Provider._inject_context_recursively(interpolator, item) for item in obj]
         else:
             return obj
 
@@ -245,6 +232,7 @@ class Provider:
                 status=JobStatus.SUBMITTED,
                 submitted_at=submitted_at,
                 image_name=job_spec.image_name,
+                registry_auth=job_spec.registry_auth,
                 commands=job_spec.commands,
                 entrypoint=job_spec.entrypoint,
                 env=job_spec.env,
