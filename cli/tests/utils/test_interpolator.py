@@ -19,6 +19,9 @@ class TestVariablesInterpolator(unittest.TestCase):
     def test_escaped_dollar(self):
         self.assertEqual("${{ENV}}", get_interpolator().interpolate("$${{ENV}}"))
 
+    def test_escaped_dollar_middle(self):
+        self.assertEqual("echo ${{ENV}}", get_interpolator().interpolate("echo $${{ENV}}"))
+
     def test_args(self):
         self.assertEqual("qwerty", get_interpolator().interpolate("${{ run.args }}"))
 

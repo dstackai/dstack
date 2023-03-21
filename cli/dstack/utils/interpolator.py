@@ -31,8 +31,8 @@ class VariablesInterpolator:
                 tokens.append(s[start:])
                 break
             if s[dollar + 1] == "$":  # escaped $$
-                tokens.append("$")
-                start += 2
+                tokens.append(s[start : dollar + 1])
+                start = dollar + 2
                 continue
 
             opening = s.find(Pattern.opening, start)
