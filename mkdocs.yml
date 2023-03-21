@@ -138,7 +138,6 @@ nav:
         - Apps: usage/apps.md
         - Secrets: usage/secrets.md
         - Args: usage/args.md
-        - Private Docker Registry: usage/private-docker-registry.md
       - Tutorials:
           - Stable Diffusion: tutorials/stable-diffusion.md
           - Weights & Biases: tutorials/wandb.md

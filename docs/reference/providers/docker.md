@@ -49,14 +49,14 @@ The following properties are required:
 
 The following properties are optional:
 
-- `commands` - (Optional) The list of bash commands. If any - entrypoint is overridden with `/bin/sh -i -c`
+- `commands` - (Optional) The list of bash commands. If provided, the default image entrypoint is overridden
 - `entrypoint` - (Optional) The entrypoint string to override the image entrypoint
 - `version` - (Optional) The major version of Python
 - `environment` - (Optional) The list of environment variables 
 - [`artifacts`](#artifacts) - (Optional) The list of output artifacts
 - [`resources`](#resources) - (Optional) The hardware resources required by the workflow
 - `working_dir` - (Optional) The path to the working directory
-- `registry_auth` - (Optional) Username and password for a [private docker registry](../../usage/private-docker-registry.md)
+- [`registry_auth`](#registry_auth) - (Optional) The private Docker registry credentials
 
 ### artifacts
 
@@ -93,3 +93,33 @@ The number of GPUs, their name and memory
 - `count` - (Optional) The number of GPUs
 - `memory` (Optional) The size of GPU memory, e.g. `"16GB"`
 - `name` (Optional) The name of the GPU model (e.g. `"K80"`, `"V100"`, etc)
+
+### registry_auth
+
+The private Docker registry credentials
+
+- `username` - The Docker registry username
+- `password` - The Docker registry password
+
+## More examples
+
+### Private Docker registry
+
+Below is an example of how to pass credentials to use an image from a private Docker registry:
+
+<div editor-title=".dstack/workflows/private-registry.yaml">
+
+```yaml
+workflows:
+  - name: private-registry
+    provider: docker
+    image: ghcr.io/my-organization/top-secret-image:v1
+    registry_auth:
+      username: ${{ secrets.GHCR_USER }}
+      password: ${{ secrets.GHCR_TOKEN }}
+```
+
+</div>
+
+!!! info "NOTE:"
+    The `GHCR_USER` and `GHCR_TOKEN` secrets should be previously added via the [secrets](../../usage/secrets.md) command.

@@ -3,7 +3,12 @@
 !!! info "NOTE:"
     The source code for the examples below can be found on [GitHub](https://github.com/dstackai/dstack-examples).
 
-Secrets can be used to access passwords and tokens securely from remote workflows (without hard-coding them in the code).
+Secrets can be used to pass passwords and tokens securely to workflows without hard-coding them in the code.
+
+Secrets can be added via the [`dstack secrets`](../reference/cli/secrets.md) command and accessed from the workflow
+via environment variables. 
+
+[//]: # (or in the YAML via `${{ secrets.SECRET_NAME }}` markup.)
 
 ## Example
 

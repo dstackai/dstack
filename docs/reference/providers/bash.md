@@ -111,19 +111,29 @@ workflows:
 
 </div>
 
-### Run task in a background
+### Background processes
+
+Similar to the regular `bash` shell, the `bash` provider permits the execution of background processes. This can be achieved
+by appending `&` to the respective command.
+
+Here's an example:
 
 <div editor-title=".dstack/workflows/ping-background.yaml">
 
 ```yaml
 workflows:
-  - name: ping-background
+  - name: train-with-tensorboard
     provider: bash
+    ports: 1
     commands:
-      - apt update && apt -y install iputils-ping
-      - ping -c8 8.8.8.8 &
-      - echo "wait!"
-      - sleep 10
+      - pip install torchvision pytorch-lightning tensorboard
+      - tensorboard --port $PORT_0 --host 0.0.0.0 --logdir lightning_logs &
+      - python train.py
+    artifacts:
+      - path: lightning_logs
 ```
 
 </div>
+
+This example will run the `tensorboard` application in the background, enabling browsing of the logs of the training
+job while it is in progress.
