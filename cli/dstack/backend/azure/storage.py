@@ -71,7 +71,7 @@ class AzureStorage(CloudStorage):
     def put_object(self, key: str, content: str, metadata: Optional[Dict] = None):
         blob_client = self._container_client.get_blob_client(key)
         blob_client.upload_blob(
-            data=content.encode("utf-8"),
+            data=content.encode(),
             content_settings=ContentSettings(content_type="text/plain", content_encoding="utf-8"),
             overwrite=True,
             metadata=metadata,

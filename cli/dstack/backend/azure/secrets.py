@@ -1,4 +1,4 @@
-import re
+import base64
 from typing import Optional
 
 from azure.core.credentials import TokenCredential
@@ -15,69 +15,54 @@ class AzureSecretsManager(SecretsManager):
         self.secrets_client = SecretClient(vault_url=vault_url, credential=credential)
 
     def get_secret(self, repo_address: RepoAddress, secret_name: str) -> Optional[Secret]:
-        raise NotImplementedError(repo_address, secret_name)
+        secret_value = self._get_secret_value(_get_secret_key(repo_address, secret_name))
+        if secret_value is None:
+            return None
+        return Secret(secret_name=secret_name, secret_value=secret_value)
 
     def add_secret(self, repo_address: RepoAddress, secret: Secret):
-        raise NotImplementedError(repo_address, secret)
+        secret_key = _get_secret_key(repo_address, secret.secret_name)
+        self._set_secret_value(secret_key, secret.secret_value)
 
     def update_secret(self, repo_address: RepoAddress, secret: Secret):
-        raise NotImplementedError(repo_address, secret)
+        secret_key = _get_secret_key(repo_address, secret.secret_name)
+        self._set_secret_value(secret_key, secret.secret_value)
 
     def delete_secret(self, repo_address: RepoAddress, secret_name: str):
-        raise NotImplementedError(repo_address, secret_name)
+        secret_key = _get_secret_key(repo_address, secret_name)
+        self.secrets_client.begin_delete_secret(secret_key).result()
 
     def get_credentials(self, repo_address: RepoAddress) -> Optional[str]:
         return self._get_secret_value(_get_credentials_key(repo_address))
 
     def add_credentials(self, repo_address: RepoAddress, data: str):
-        credentials_key = _get_credentials_key(repo_address)
-        self._set_secret_value(credentials_key, data)
+        self.update_credentials(repo_address, data)
 
     def update_credentials(self, repo_address: RepoAddress, data: str):
-        raise NotImplementedError(repo_address, data)
+        credentials_key = _get_credentials_key(repo_address)
+        self._set_secret_value(credentials_key, data)
 
     def _get_secret_value(self, secret_key: str) -> Optional[str]:
         try:
             secret = self.secrets_client.get_secret(secret_key)
         except ResourceNotFoundError:
-            return
+            return None
         return secret.value
 
     def _set_secret_value(self, secret_key: str, value: str):
         self.secrets_client.set_secret(secret_key, value)
 
 
-# Azure allows only that characters set (by https://learn.microsoft.com/en-us/rest/api/keyvault/secrets/set-secret/set-secret?tabs=HTTP#uri-parameters ).
-key_pattern = re.compile(r"([0-9a-zA-Z-]+)")
-
-
-def _encode(key: str) -> str:
-    """
-    Punycode would be great choice to keep full original characters from the key in output ascii string.
-    But it includes full range of ascii, which is more than the restriction. The procedure is substitute only forbidden
-    ascii characters with "-". All other characters are handled by punycode.
-    """
-    result = []
-    is_out_of_range = True
-    for chunk in key_pattern.split(key):
-        if is_out_of_range:
-            for c in chunk:
-                if ord(c) < 128:
-                    result.append("-")
-                else:
-                    result.append(c)
-        else:
-            result.append(chunk)
-        is_out_of_range = not is_out_of_range
-
-    return "".join(result).encode("punycode").decode("ascii")
-
-
 def _get_secret_key(repo_address: RepoAddress, secret_name: str) -> str:
-    key = f"dstack-secrets-{repo_address.path()}-{secret_name}"
-    return _encode(key)
+    repo_part = repo_address.path("-").replace(".", "-")
+    return _encode_key(f"dstack-secrets-{repo_part}-", secret_name)
 
 
 def _get_credentials_key(repo_address: RepoAddress) -> str:
-    key = f"dstack-credentials-{repo_address.path()}"
-    return _encode(key)
+    repo_part = repo_address.path("-").replace(".", "-")
+    return f"dstack-credentials-{repo_part}"
+
+
+def _encode_key(key_prefix: str, key_suffix: str) -> str:
+    key_suffix = base64.b32encode(key_suffix.encode()).decode().replace("=", "-")
+    return f"{key_prefix}{key_suffix}"

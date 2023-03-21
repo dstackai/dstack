@@ -2,17 +2,16 @@ package azure
 
 import (
 	"context"
+	"encoding/base32"
 	"encoding/json"
 	"errors"
 	"fmt"
-	"regexp"
 	"strings"
 
 	"github.com/Azure/azure-sdk-for-go/sdk/azidentity"
 	"github.com/Azure/azure-sdk-for-go/sdk/keyvault/azsecrets"
 	"github.com/dstackai/dstack/runner/internal/gerrors"
 	"github.com/dstackai/dstack/runner/internal/models"
-	"gitlab.com/golang-commonmark/puny"
 )
 
 var ErrSecretNotFound = errors.New("secret not found")
@@ -46,7 +45,6 @@ func (azsecret AzureSecretManager) FetchCredentials(ctx context.Context, repoDat
 }
 
 func (azsecret AzureSecretManager) getSecretValue(ctx context.Context, key string) (*string, error) {
-	//azsecret.secretClient.
 	response, err := azsecret.secretClient.GetSecret(ctx, key, "", nil)
 	if err != nil {
 		return nil, gerrors.Wrap(err)
@@ -63,59 +61,21 @@ func (azsecret AzureSecretManager) FetchSecret(ctx context.Context, repoData *mo
 	return azsecret.getSecretValue(ctx, key)
 }
 
-var keyPattern = regexp.MustCompile(`([0-9a-zA-Z-]+)`)
-
-func splitPythonLike(pattern *regexp.Regexp, s string) []string {
-	var result []string
-	offset := 0
-	allowed := pattern.FindAllStringIndex(s, -1)
-	for _, valid := range allowed {
-		result = append(result, s[offset:valid[0]], s[valid[0]:valid[1]])
-		offset = valid[1]
-	}
-	if offset != len(s) {
-		result = append(result, s[offset:])
-	}
-	return result
-}
-
-// mirrored from dstack.backend.azure.secrets._encode
-func encode(key string) string {
-	var result []string
-	isOutOfRange := true
-	for _, chunk := range splitPythonLike(keyPattern, key) {
-		if isOutOfRange {
-			for _, c := range chunk {
-				if c < 128 {
-					result = append(result, "-")
-				} else {
-					result = append(result, fmt.Sprintf("%c", c))
-				}
-			}
-		} else {
-			result = append(result, chunk)
-		}
-		isOutOfRange = !isOutOfRange
-	}
-	return strings.Join(result, "")
-}
-
 func getSecretKey(repoData *models.RepoData, name string) (string, error) {
-	// XXX: sync default value for sep with python's cli implementation.
-	key := fmt.Sprintf("dstack-secrets-%s-%s", repoData.RepoDataPath("/"), name)
-	value, err := puny.Encode(encode(key))
-	if err != nil {
-		return "", err
-	}
-	return value, nil
+	repo_part := strings.ReplaceAll(repoData.RepoDataPath("-"), ".", "-")
+	key_prefix := fmt.Sprintf("dstack-secrets-%s", repo_part)
+	return encodeKey(key_prefix, name), nil
 }
 
 func getCredentialKey(repoData *models.RepoData) (string, error) {
-	// XXX: sync default value for sep with python's cli implementation.
-	key := fmt.Sprintf("dstack-credentials-%s", repoData.RepoDataPath("/"))
-	value, err := puny.Encode(encode(key))
-	if err != nil {
-		return "", err
-	}
-	return value, nil
+	repo_part := strings.ReplaceAll(repoData.RepoDataPath("-"), ".", "-")
+	return fmt.Sprintf("dstack-credentials-%s", repo_part), nil
+}
+
+func encodeKey(key_prefix, key_suffix string) string {
+	data := []byte(key_suffix)
+	dst := make([]byte, base32.StdEncoding.EncodedLen(len(data)))
+	base32.StdEncoding.Encode(dst, data)
+	key := fmt.Sprintf("%s%s", key_prefix, strings.ReplaceAll(string(dst), "=", "-"))
+	return key
 }
