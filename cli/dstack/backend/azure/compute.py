@@ -1,3 +1,4 @@
+import base64
 import re
 from operator import attrgetter
 from typing import List, Optional, Tuple
@@ -101,6 +102,7 @@ class AzureCompute(Compute):
             image=_get_image(self._compute_client, len(instance_type.resources.gpus) > 0),
             vm_size=instance_type.instance_name,
             instance_name=_get_instance_name(job),
+            user_data=_get_user_data_script(self.azure_config, job, instance_type),
         )
         return vm.name
 
@@ -219,10 +221,34 @@ def _create_network_security_group(
                     priority=101,
                     direction=SecurityRuleDirection.INBOUND,
                 ),
+                SecurityRule(
+                    name="runner_ssh",
+                    protocol=SecurityRuleProtocol.TCP,
+                    source_address_prefix="Internet",
+                    source_port_range="*",
+                    destination_address_prefix="*",
+                    destination_port_range="22",
+                    access=SecurityRuleAccess.ALLOW,
+                    priority=100,
+                    direction=SecurityRuleDirection.INBOUND,
+                ),
             ],
         ),
     ).result()
     return security_group_name
+
+
+def _get_user_data_script(azure_config: AzureConfig, job: Job, instance_type: InstanceType) -> str:
+    config_content = azure_config.serialize_yaml().replace("\n", "\\n")
+    runner_content = _serialize_runner_yaml(job.runner_id, instance_type.resources, 3000, 4000)
+    return f"""#!/bin/sh
+mkdir -p /root/.dstack/
+echo '{config_content}' > /root/.dstack/config.yaml
+echo '{runner_content}' > /root/.dstack/runner.yaml
+EXTERNAL_IP=`curl -H "Metadata: true" "http://169.254.169.254/metadata/instance/network/interface/0/ipv4/ipAddress/0/publicIpAddress?api-version=2021-12-13&format=text"`
+echo "hostname: $EXTERNAL_IP" >> /root/.dstack/runner.yaml
+HOME=/root nohup dstack-runner --log-level 6 start --http-port 4000
+"""
 
 
 def _launch_instance(
@@ -237,6 +263,7 @@ def _launch_instance(
     image: str,
     vm_size: str,
     instance_name: str,
+    user_data: str,
 ) -> VirtualMachine:
     vm: VirtualMachine = compute_client.virtual_machines.begin_create_or_update(
         resource_group,
@@ -298,6 +325,7 @@ def _launch_instance(
                     ): UserAssignedIdentitiesValue()
                 },
             ),
+            user_data=base64.b64encode(user_data.encode()).decode(),
         ),
     ).result()
     return vm
