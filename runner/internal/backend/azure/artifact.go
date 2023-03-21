@@ -3,12 +3,13 @@ package azure
 import (
 	"context"
 	"errors"
-	"github.com/docker/docker/api/types/mount"
-	"github.com/dstackai/dstack/runner/internal/gerrors"
-	"github.com/dstackai/dstack/runner/internal/log"
 	"os"
 	"path"
 	"path/filepath"
+
+	"github.com/docker/docker/api/types/mount"
+	"github.com/dstackai/dstack/runner/internal/gerrors"
+	"github.com/dstackai/dstack/runner/internal/log"
 )
 
 type AzureArtifacter struct {

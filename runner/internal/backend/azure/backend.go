@@ -4,6 +4,11 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"io"
+	"os"
+	"path"
+	"strings"
+
 	"github.com/Azure/azure-sdk-for-go/sdk/azidentity"
 	"github.com/dstackai/dstack/runner/consts"
 	"github.com/dstackai/dstack/runner/internal/artifacts"
@@ -13,14 +18,11 @@ import (
 	"github.com/dstackai/dstack/runner/internal/log"
 	"github.com/dstackai/dstack/runner/internal/models"
 	"gopkg.in/yaml.v2"
-	"io"
-	"os"
-	"path"
-	"strings"
 )
 
 type AzureConfig struct {
 	SubscriptionId   string `yaml:"subscription_id"`
+	ResourceGroup    string `yaml:"resource_group"`
 	SecretUrl        string `yaml:"secret_url"`
 	StorageUrl       string `yaml:"storage_url"`
 	StorageContainer string `yaml:"storage_container"`
@@ -69,7 +71,7 @@ func New(config AzureConfig) *AzureBackend {
 		fmt.Printf("Initialization key vault service failure: %+v", err)
 		return nil
 	}
-	compute, err := NewAzureCompute(credential, config.SubscriptionId)
+	compute, err := NewAzureCompute(credential, config.SubscriptionId, config.ResourceGroup)
 	if err != nil {
 		fmt.Printf("Initialization compute service failure: %+v", err)
 		return nil
@@ -107,8 +109,8 @@ func (azbackend *AzureBackend) Job(ctx context.Context) *models.Job {
 }
 
 func (azbackend *AzureBackend) MasterJob(ctx context.Context) *models.Job {
-	//TODO implement me
-	panic("implement me")
+	//TODO
+	return nil
 }
 
 func (azbackend *AzureBackend) Requirements(ctx context.Context) models.Requirements {
@@ -134,10 +136,9 @@ func (azbackend *AzureBackend) UpdateState(ctx context.Context) error {
 		return gerrors.Wrap(err)
 	}
 	if len(files) > 1 {
-		return fmt.Errorf("Unexpected blob listing result %s [%d]", strings.Join(files, ","), len(files))
+		return fmt.Errorf("unexpected blob listing result %s [%d]", strings.Join(files, ","), len(files))
 	}
 	jobHeadFilepath := azbackend.state.Job.JobHeadFilepath()
-	// XXX: this is a clone from gcp/backend.go which uses for-loop and return nil for empty files.
 	if len(files) == 1 {
 		file := files[0]
 		log.Trace(ctx, "Renaming file job", "From", file, "To", jobHeadFilepath)
@@ -207,7 +208,6 @@ func (azbackend *AzureBackend) Secrets(ctx context.Context) (map[string]string, 
 			if errors.Is(err, ErrSecretNotFound) {
 				continue
 			}
-			fmt.Errorf("FetchSecret: %+v", err)
 			return nil, gerrors.Wrap(err)
 		}
 		secrets[secretName] = *secretValue

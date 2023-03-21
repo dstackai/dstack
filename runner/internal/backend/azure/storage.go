@@ -22,8 +22,7 @@ var ErrTagNotFound = errors.New("tag not found")
 type AzureStorage struct {
 	storageClient   *azblob.Client
 	containerClient *container.Client
-	// containerClient doesn't know own name. Store it separately.
-	container string
+	container       string
 }
 
 func NewAzureStorage(credential azcore.TokenCredential, url string, container string) (*AzureStorage, error) {
