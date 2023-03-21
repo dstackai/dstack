@@ -21,7 +21,7 @@ const App: React.FC = () => {
         data: userData,
         error: getUserError,
     } = useGetUserDataQuery(undefined, {
-        skip: !isAuthenticated,
+        skip: !isAuthenticated || !!urlToken,
     });
 
     useEffect(() => {
