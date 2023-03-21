@@ -1,3 +1,4 @@
+import os
 from typing import Callable, Dict, Iterator, List, Optional
 
 from azure.core.credentials import TokenCredential
@@ -25,10 +26,15 @@ class AzureStorage(CloudStorage):
         self._container_name = container_name
 
     def upload_file(self, source_path: str, dest_path: str, callback: Callable[[int], None]):
-        raise NotImplementedError
+        with open(source_path, "rb") as f:
+            self._container_client.upload_blob(dest_path, f, overwrite=True)
+        callback(os.path.getsize(source_path))
 
     def download_file(self, source_path: str, dest_path: str, callback: Callable[[int], None]):
-        raise NotImplementedError
+        downloader = self._container_client.download_blob(source_path)
+        with open(dest_path, "wb+") as f:
+            downloader.readinto(f)
+        callback(os.path.getsize(dest_path))
 
     def list_files(self, dirpath: str) -> List[StorageFile]:
         prefix = dirpath
@@ -60,7 +66,7 @@ class AzureStorage(CloudStorage):
         try:
             return blob_client.download_blob().read()
         except ResourceNotFoundError:
-            return
+            return None
 
     def put_object(self, key: str, content: str, metadata: Optional[Dict] = None):
         blob_client = self._container_client.get_blob_client(key)
@@ -76,6 +82,3 @@ class AzureStorage(CloudStorage):
 
     def get_signed_upload_url(self, key: str) -> str:
         raise NotImplementedError
-
-    def get_account_name(self) -> str:
-        return self._blob_service_client.account_name
