@@ -134,6 +134,7 @@ class GCPBackend(CloudBackend):
             storage=self._storage,
             repo_address=repo_address,
             run_name=job_heads[0].run_name,
+            start_time=start_time,
         )
 
     def list_run_artifact_files(self, repo_address: RepoAddress, run_name: str) -> List[Artifact]:

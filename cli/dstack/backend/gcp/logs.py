@@ -1,4 +1,5 @@
 import time
+from datetime import datetime
 from typing import Generator, Optional
 
 from google.cloud import logging
@@ -27,15 +28,17 @@ class GCPLogging:
         storage: Storage,
         repo_address: RepoAddress,
         run_name: str,
+        start_time: int,
     ) -> Generator[LogEvent, None, None]:
         log_name = _get_log_name(self.bucket_name, repo_address, run_name)
+        timestamp = datetime.fromtimestamp(start_time / 1000).strftime("%Y-%m-%dT%H:%M:%S.%fZ")
         logger = self.logging_client.logger(log_name)
         # Hack: It takes some time for logs to become available after runner writes them.
         # So we try reading logs multiple times.
         # The proper solution would be for the runner to ensure logs availability before marking job as Done.
         found_log = False
         for _ in range(POLL_LOGS_ATTEMPTS):
-            log_entries = logger.list_entries()
+            log_entries = logger.list_entries(filter_=f'timestamp>="{timestamp}"')
             for log_entry in log_entries:
                 found_log = True
                 yield _log_entry_to_log_event(storage, repo_address, log_entry)
