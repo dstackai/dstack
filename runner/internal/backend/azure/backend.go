@@ -179,7 +179,15 @@ func (azbackend *AzureBackend) GetArtifact(ctx context.Context, runName, localPa
 }
 
 func (azbackend *AzureBackend) CreateLogger(ctx context.Context, logGroup, logName string) io.Writer {
-	logger := NewAzureLogging()
+	// TODO read logging settings from config or get dynamically
+	loggingClient := NewAzureLoggingClient(
+		azbackend.credential,
+		"https://dstackdce-hbt8.germanywestcentral-1.ingest.monitor.azure.com",
+		"dcr-7a6b0e1c540a442b9f11865b61741fe7",
+		"Custom-dstackLogTable_CL",
+	)
+	logger := NewAzureLogger(loggingClient, azbackend.state.Job.JobID, logGroup, logName)
+	logger.Launch(ctx)
 	return logger
 }
 
@@ -189,7 +197,7 @@ func (azbackend *AzureBackend) ListSubDir(ctx context.Context, dir string) ([]st
 
 func (azbackend *AzureBackend) Bucket(ctx context.Context) string {
 	log.Trace(ctx, "Getting bucket")
-	return "AZURE.bucket"
+	return azbackend.config.ResourceGroup
 }
 
 func (azbackend *AzureBackend) Secrets(ctx context.Context) (map[string]string, error) {

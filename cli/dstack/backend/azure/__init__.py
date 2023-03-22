@@ -5,6 +5,7 @@ from azure.identity import DefaultAzureCredential
 
 from dstack.backend.azure.compute import AzureCompute
 from dstack.backend.azure.config import AzureConfig, AzureConfigurator
+from dstack.backend.azure.logs import AzureLogging
 from dstack.backend.azure.secrets import AzureSecretsManager
 from dstack.backend.azure.storage import AzureStorage
 from dstack.backend.base import CloudBackend
@@ -48,6 +49,11 @@ class AzureBackend(CloudBackend):
         self._compute = AzureCompute(
             credential=credential,
             azure_config=self.config,
+        )
+        self._logging = AzureLogging(
+            credential=credential,
+            resource_group=self.config.resource_group,
+            workspace_id="184b1264-b5e1-489a-8426-654eca432b0c",
         )
         self._loaded = True
 
@@ -112,7 +118,12 @@ class AzureBackend(CloudBackend):
         start_time: int,
         attached: bool,
     ) -> Generator[LogEvent, None, None]:
-        raise NotImplementedError()
+        yield from self._logging.poll_logs(
+            storage=self._storage,
+            repo_address=repo_address,
+            run_name=job_heads[0].run_name,
+            start_time=start_time,
+        )
 
     def list_run_artifact_files(self, repo_address: RepoAddress, run_name: str) -> List[Artifact]:
         return base_artifacts.list_run_artifact_files(self._storage, repo_address, run_name)

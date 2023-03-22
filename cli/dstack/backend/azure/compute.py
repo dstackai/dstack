@@ -1,7 +1,7 @@
 import base64
 import re
 from operator import attrgetter
-from typing import List, Optional, Tuple
+from typing import List, Optional
 
 from azure.core.credentials import TokenCredential
 from azure.core.exceptions import HttpResponseError, ResourceNotFoundError
@@ -14,7 +14,6 @@ from azure.mgmt.compute.models import (
     ImageReference,
     InstanceViewStatus,
     ManagedDiskParameters,
-    NetworkInterfaceReference,
     NetworkProfile,
     OSDisk,
     OSProfile,

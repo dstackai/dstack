@@ -135,21 +135,20 @@ class AzureConfig(BackendConfig, metaclass=ModelMeta):
         subscription_id: str,
         tenant_id: str,
         location: str,
+        resource_group: str,
         secret_url: stricturl(allowed_schemes={"https"}),
-        secret_resource_group: str,
         storage_url: stricturl(allowed_schemes={"https"}),
         storage_container: str,
     ):
         self.subscription_id = subscription_id
         self.tenant_id = tenant_id
         self.location = location
+        self.resource_group = resource_group
         self.secret_url = secret_url
         self.secret_vault = secret_url.host.split(".", 1)[0]
-        self.secret_resource_group = secret_resource_group
         self.storage_url = storage_url
         self.storage_account = storage_url.host.split(".", 1)[0]
         self.storage_container = storage_container
-        self.resource_group = "dstackResourceGroup"
         self.network = "dstackNetwork"
         self.subnet = "default"
         self.managed_identity = "dstackManagedIdentity"
