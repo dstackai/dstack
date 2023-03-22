@@ -40,25 +40,24 @@ func (azsecret AzureSecretManager) FetchCredentials(ctx context.Context, repoDat
 	if err != nil {
 		return nil, gerrors.Wrap(err)
 	}
-	json.Unmarshal([]byte(*data), creds)
+	json.Unmarshal([]byte(data), &creds)
 	return &creds, nil
 }
 
-func (azsecret AzureSecretManager) getSecretValue(ctx context.Context, key string) (*string, error) {
-	response, err := azsecret.secretClient.GetSecret(ctx, key, "", nil)
-	if err != nil {
-		return nil, gerrors.Wrap(err)
-	}
-	value := strings.Clone(*response.Value)
-	return &value, nil
-}
-
-func (azsecret AzureSecretManager) FetchSecret(ctx context.Context, repoData *models.RepoData, name string) (*string, error) {
+func (azsecret AzureSecretManager) FetchSecret(ctx context.Context, repoData *models.RepoData, name string) (string, error) {
 	key, err := getSecretKey(repoData, name)
 	if err != nil {
-		return nil, gerrors.Wrap(err)
+		return "", gerrors.Wrap(err)
 	}
 	return azsecret.getSecretValue(ctx, key)
+}
+
+func (azsecret AzureSecretManager) getSecretValue(ctx context.Context, key string) (string, error) {
+	response, err := azsecret.secretClient.GetSecret(ctx, key, "", nil)
+	if err != nil {
+		return "", gerrors.Wrap(err)
+	}
+	return *response.Value, nil
 }
 
 func getSecretKey(repoData *models.RepoData, name string) (string, error) {

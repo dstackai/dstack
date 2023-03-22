@@ -184,8 +184,7 @@ func (azbackend *AzureBackend) CreateLogger(ctx context.Context, logGroup, logNa
 }
 
 func (azbackend *AzureBackend) ListSubDir(ctx context.Context, dir string) ([]string, error) {
-	//TODO implement me
-	panic("implement me")
+	return azbackend.storage.ListFile(ctx, dir)
 }
 
 func (azbackend *AzureBackend) Bucket(ctx context.Context) string {
@@ -210,7 +209,7 @@ func (azbackend *AzureBackend) Secrets(ctx context.Context) (map[string]string, 
 			}
 			return nil, gerrors.Wrap(err)
 		}
-		secrets[secretName] = *secretValue
+		secrets[secretName] = secretValue
 	}
 	return secrets, nil
 }
@@ -226,6 +225,15 @@ func (azbackend *AzureBackend) GitCredentials(ctx context.Context) *models.GitCr
 }
 
 func (azbackend *AzureBackend) GetJobByPath(ctx context.Context, path string) (*models.Job, error) {
-	//TODO implement me
-	panic("implement me")
+	log.Trace(ctx, "Fetching job by path", "Path", path)
+	content, err := azbackend.storage.GetFile(ctx, path)
+	if err != nil {
+		return nil, gerrors.Wrap(err)
+	}
+	job := new(models.Job)
+	err = yaml.Unmarshal(content, &job)
+	if err != nil {
+		return nil, gerrors.Wrap(err)
+	}
+	return job, nil
 }
