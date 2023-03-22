@@ -1,6 +1,6 @@
 import time
 from datetime import datetime
-from typing import Generator, Optional
+from typing import Dict, Generator, Optional
 
 from google.cloud import logging
 from google.oauth2 import service_account
@@ -8,6 +8,7 @@ from google.oauth2 import service_account
 from dstack.backend.base import jobs
 from dstack.backend.base.logs import fix_urls
 from dstack.backend.base.storage import Storage
+from dstack.core.job import Job
 from dstack.core.log_event import LogEvent, LogEventSource
 from dstack.core.repo import RepoAddress
 
@@ -33,6 +34,7 @@ class GCPLogging:
         log_name = _get_log_name(self.bucket_name, repo_address, run_name)
         timestamp = datetime.fromtimestamp(start_time / 1000).strftime("%Y-%m-%dT%H:%M:%S.%fZ")
         logger = self.logging_client.logger(log_name)
+        jobs_cache = {}
         # Hack: It takes some time for logs to become available after runner writes them.
         # So we try reading logs multiple times.
         # The proper solution would be for the runner to ensure logs availability before marking job as Done.
@@ -41,7 +43,7 @@ class GCPLogging:
             log_entries = logger.list_entries(filter_=f'timestamp>="{timestamp}"')
             for log_entry in log_entries:
                 found_log = True
-                yield _log_entry_to_log_event(storage, repo_address, log_entry)
+                yield _log_entry_to_log_event(storage, repo_address, log_entry, jobs_cache)
             if found_log:
                 break
             time.sleep(POLL_LOGS_WAIT_TIME)
@@ -55,10 +57,14 @@ def _log_entry_to_log_event(
     storage: Storage,
     repo_address: RepoAddress,
     log_entry: logging.LogEntry,
+    jobs_cache: Dict[str, Job],
 ) -> LogEvent:
     job_id = log_entry.payload["job_id"]
     log = log_entry.payload["log"]
-    job = jobs.get_job(storage, repo_address, job_id)
+    job = jobs_cache.get(job_id)
+    if job is None:
+        job = jobs.get_job(storage, repo_address, job_id)
+        jobs_cache[job_id] = job
     log = fix_urls(log.encode(), job).decode()
     timestamp = int(log_entry.timestamp.timestamp())
     return LogEvent(

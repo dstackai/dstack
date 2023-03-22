@@ -21,6 +21,7 @@ def render_log_message(
     storage: Storage,
     event: Dict[str, Any],
     repo_address: RepoAddress,
+    jobs_cache: Dict[str, Job],
 ) -> LogEvent:
     if isinstance(event, str):
         event = json.loads(event)
@@ -29,7 +30,10 @@ def render_log_message(
         message = json.loads(message)
     job_id = message["job_id"]
     log = message["log"]
-    job = jobs.get_job(storage, repo_address, job_id)
+    job = jobs_cache.get(job_id)
+    if job is None:
+        job = jobs.get_job(storage, repo_address, job_id)
+        jobs_cache[job_id] = job
     log = fix_urls(log.encode(), job).decode()
     return LogEvent(
         event_id=event["eventId"],
