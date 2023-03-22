@@ -54,7 +54,9 @@ def fix_urls(log: bytes, job: Job) -> bytes:
     return log
 
 
-def _fix_url_for_app(log: bytes, job: Job, app_spec: AppSpec) -> bytes:
+def _fix_url_for_app(
+    log: bytes, job: Job, app_spec: AppSpec
+) -> bytes:  # todo ssh tunneling, ports mapping
     port = job.ports[app_spec.port_index]
     url_pattern = f"http://(localhost|0.0.0.0|127.0.0.1|{job.host_name}):{port}\S*".encode()
     match = re.search(url_pattern, log)

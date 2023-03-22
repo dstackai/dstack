@@ -97,6 +97,7 @@ class GCPCompute(Compute):
                 bucket=self.gcp_config.bucket_name,
                 job=job,
             ),
+            ssh_key_pub=job.ssh_key_pub,
         )
         return instance.name
 
@@ -443,6 +444,7 @@ def _launch_instance(
     interruptible: bool,
     accelerators: List[compute_v1.AcceleratorConfig],
     labels: Dict[str, str],
+    ssh_key_pub: str,
 ) -> compute_v1.Instance:
     try:
         _create_firewall_rules(
@@ -474,6 +476,7 @@ def _launch_instance(
         spot=interruptible,
         accelerators=accelerators,
         labels=labels,
+        ssh_key_pub=ssh_key_pub,
     )
     return instance
 
@@ -522,6 +525,7 @@ def _create_instance(
     zone: str,
     instance_name: str,
     disks: List[compute_v1.AttachedDisk],
+    ssh_key_pub: str,
     machine_type: str = "n1-standard-1",
     network_link: str = "global/networks/default",
     subnetwork_link: str = None,
@@ -618,10 +622,10 @@ def _create_instance(
     if delete_protection:
         instance.deletion_protection = True
 
+    metadata_items = [compute_v1.Items(key="ssh-keys", value=f"root:{ssh_key_pub}")]
     if user_data_script is not None:
-        instance.metadata = compute_v1.Metadata(
-            items=[compute_v1.Items(key="user-data", value=user_data_script)]
-        )
+        metadata_items.append(compute_v1.Items(key="user-data", value=user_data_script))
+    instance.metadata = compute_v1.Metadata(items=metadata_items)
 
     if service_account is not None:
         instance.service_accounts = [
@@ -670,18 +674,14 @@ def _create_firewall_rules(
     firewall_rule.name = f"dstack-runner-allow-incoming-" + network.replace("/", "-")
     firewall_rule.direction = "INGRESS"
 
-    allowed_ports_tcp = compute_v1.Allowed()
-    allowed_ports_tcp.I_p_protocol = "tcp"
-    allowed_ports_tcp.ports = ["3000-4000"]
+    allowed_ssh_port = compute_v1.Allowed()
+    allowed_ssh_port.I_p_protocol = "tcp"
+    allowed_ssh_port.ports = ["22"]
 
-    allowed_ports_udp = compute_v1.Allowed()
-    allowed_ports_udp.I_p_protocol = "udp"
-    allowed_ports_udp.ports = ["3000-4000"]
-
-    firewall_rule.allowed = [allowed_ports_tcp, allowed_ports_udp]
+    firewall_rule.allowed = [allowed_ssh_port]
     firewall_rule.source_ranges = ["0.0.0.0/0"]
     firewall_rule.network = network
-    firewall_rule.description = "Allowing TCP/UDP traffic on ports 3000-4000 from Internet."
+    firewall_rule.description = "Allowing only SSH connections from Internet."
 
     firewall_rule.target_tags = [DSTACK_INSTANCE_TAG]
 

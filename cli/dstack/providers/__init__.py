@@ -57,6 +57,7 @@ class Provider:
         self.run_as_provider: Optional[bool] = None
         self.run_name: Optional[str] = None
         self.dep_specs: Optional[List[DepSpec]] = None
+        self.ssh_key_pub: Optional[str] = None
         self.loaded = False
 
     def __str__(self) -> str:
@@ -124,7 +125,7 @@ class Provider:
         workflow_name: Optional[str],
         provider_data: Dict[str, Any],
         run_name: str,
-    ):
+    ):  # todo: read ssh key
         self.provider_args = provider_args
         self.workflow_name = workflow_name
         self.provider_data = provider_data
@@ -133,6 +134,7 @@ class Provider:
         self.parse_args()
         self._inject_context()
         self.dep_specs = self._dep_specs(backend)
+        self.ssh_key_pub = self.provider_data.get("ssh_key_pub")
         self.loaded = True
 
     @abstractmethod
@@ -248,6 +250,7 @@ class Provider:
                 runner_id=None,
                 request_id=None,
                 tag_name=tag_name,
+                ssh_key_pub=self.ssh_key_pub,
             )
             backend.submit_job(job)
             jobs.append(job)

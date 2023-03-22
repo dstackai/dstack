@@ -23,9 +23,10 @@ from dstack.api.run import list_runs_with_merged_backends
 from dstack.backend.base import Backend
 from dstack.backend.base.logs import fix_urls
 from dstack.cli.commands import BasicCommand
+from dstack.cli.commands.run.ssh_tunnel import allocate_local_ports, run_ssh_tunnel
 from dstack.cli.common import console, print_runs
 from dstack.core.error import check_backend, check_config, check_git
-from dstack.core.job import JobHead, JobStatus
+from dstack.core.job import Job, JobHead, JobStatus
 from dstack.core.repo import RepoAddress
 from dstack.core.request import RequestStatus
 from dstack.utils.common import since
@@ -62,6 +63,22 @@ def _load_workflows():
     return workflows
 
 
+def _resolve_ssh_key_path(path: Path) -> Path:
+    if path.suffix != ".pub":
+        path = path.with_suffix(path.suffix + ".pub")
+    return path.expanduser().resolve()
+
+
+def _read_ssh_key_pub(path: Path, required: bool) -> Optional[str]:
+    try:
+        key = path.read_text().strip("\n")
+        assert "PRIVATE KEY" not in key
+        return key
+    except FileNotFoundError:
+        if required:
+            raise
+
+
 def parse_run_args(
     args: Namespace,
 ) -> Tuple[str, List[str], Optional[str], Dict[str, Any]]:
@@ -83,12 +100,14 @@ def parse_run_args(
 
         provider_name = args.workflow_or_provider
 
+    workflow_data["ssh_key_pub"] = _read_ssh_key_pub(
+        _resolve_ssh_key_path(args.identity_file), required=args.remote is not None
+    )
+
     return provider_name, provider_args, workflow_name, workflow_data
 
 
-def poll_logs_ws(backend: Backend, repo_address: RepoAddress, job_head: JobHead):
-    job = backend.get_job(repo_address, job_head.job_id)
-
+def poll_logs_ws(backend: Backend, repo_address: RepoAddress, job: Job):
     def on_message(ws: WebSocketApp, message):
         message = fix_urls(message, job)
         sys.stdout.buffer.write(message)
@@ -96,7 +115,7 @@ def poll_logs_ws(backend: Backend, repo_address: RepoAddress, job_head: JobHead)
 
     def on_error(_: WebSocketApp, err: Exception):
         if isinstance(err, KeyboardInterrupt):
-            run_name = job_head.run_name
+            run_name = job.run_name
             if Confirm.ask(f"\n [red]Abort the run '{run_name}'?[/]"):
                 backend.stop_jobs(repo_address, run_name, abort=True)
                 console.print(f"[grey58]OK[/]")
@@ -110,7 +129,7 @@ def poll_logs_ws(backend: Backend, repo_address: RepoAddress, job_head: JobHead)
     def on_close(_: WebSocketApp, close_status_code, close_msg):
         pass
 
-    url = f"ws://{job.host_name}:{job.env['WS_LOGS_PORT']}/logsws"
+    url = f"ws://127.0.0.1:{job.env['WS_LOGS_PORT']}/logsws"
     cursor.hide()
     _ws = websocket.WebSocketApp(
         url,
@@ -124,7 +143,7 @@ def poll_logs_ws(backend: Backend, repo_address: RepoAddress, job_head: JobHead)
 
     try:
         while True:
-            _job_head = backend.get_job(repo_address, job_head.job_id)
+            _job_head = backend.get_job(repo_address, job.job_id)
             run = backend.list_run_heads(repo_address, _job_head.run_name)[0]
             if run.status.is_finished():
                 break
@@ -135,7 +154,7 @@ def poll_logs_ws(backend: Backend, repo_address: RepoAddress, job_head: JobHead)
             console.print(f"[grey58]OK[/]")
 
 
-def poll_run(repo_address: RepoAddress, job_heads: List[JobHead], backend: Backend):
+def poll_run(repo_address: RepoAddress, job_heads: List[JobHead], backend: Backend, ssh_key: Path):
     run_name = job_heads[0].run_name
     try:
         console.print()
@@ -181,8 +200,12 @@ def poll_run(repo_address: RepoAddress, job_heads: List[JobHead], backend: Backe
         console.print()
         console.print("[grey58]To interrupt, press Ctrl+C.[/]")
         console.print()
+
+        jobs = [backend.get_job(repo_address, job_head.job_id) for job_head in job_heads]
+        ports = allocate_local_ports(jobs)
+        run_ssh_tunnel(ssh_key, jobs[0].host_name, ports)  # todo: cleanup (stop tunnel)
         if len(job_heads) == 1 and run and run.status == JobStatus.RUNNING:
-            poll_logs_ws(backend, repo_address, job_heads[0])
+            poll_logs_ws(backend, repo_address, jobs[0])
         else:
             poll_logs(
                 backend,
@@ -239,6 +262,14 @@ class RunCommand(BasicCommand):
             action="store_true",
         )
         self._parser.add_argument(
+            "-i",
+            metavar="IDENTITY_FILE",
+            help="A path to ssh identity file",
+            type=Path,
+            default=Path("~/.ssh/id_rsa"),
+            dest="identity_file",
+        )
+        self._parser.add_argument(
             "args",
             metavar="ARGS",
             nargs=argparse.ZERO_OR_MORE,
@@ -292,7 +323,8 @@ class RunCommand(BasicCommand):
                 )
                 print_runs(list_runs_with_merged_backends([backend], run_name=run_name))
                 if not args.detach:
-                    poll_run(repo_data, jobs, backend)
+                    ssh_key_private = _resolve_ssh_key_path(args.identity_file).with_suffix("")
+                    poll_run(repo_data, jobs, backend, ssh_key_private)
             else:
                 sys.exit(f"Call `dstack init` first")
         except ValidationError as e:

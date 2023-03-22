@@ -192,6 +192,7 @@ class Job(JobHead):
     runner_id: Optional[str]
     request_id: Optional[str]
     tag_name: Optional[str]
+    ssh_key_pub: Optional[str]
 
     def __init__(self, **data: Any):
         # TODO Ugly style
@@ -225,6 +226,7 @@ class Job(JobHead):
         artifact_specs = format_list(self.artifact_specs)
         app_specs = format_list(self.app_specs)
         dep_specs = format_list(self.dep_specs)
+        ssk_key_pub = f"...{self.ssh_key_pub[-16:]}" if self.ssh_key_pub else None
         return (
             f'Job(job_id="{self.job_id}", repo_data={self.repo_data}, '
             f'run_name="{self.run_name}", workflow_name={_quoted(self.workflow_name)}, '
@@ -249,7 +251,8 @@ class Job(JobHead):
             f"app_specs={app_specs}, "
             f"runner_id={_quoted(self.runner_id)}, "
             f"request_id={_quoted(self.request_id)}, "
-            f"tag_name={_quoted(self.tag_name)})"
+            f"tag_name={_quoted(self.tag_name)}"
+            f"ssh_key_pub={_quoted(ssk_key_pub)})"
         )
 
     def serialize(self) -> dict:
@@ -315,6 +318,7 @@ class Job(JobHead):
             "runner_id": self.runner_id or "",
             "request_id": self.request_id or "",
             "tag_name": self.tag_name or "",
+            "ssh_key_pub": self.ssh_key_pub or "",
         }
         return job_data
 
@@ -428,6 +432,7 @@ class Job(JobHead):
             runner_id=job_data.get("runner_id") or None,
             request_id=job_data.get("request_id") or None,
             tag_name=job_data.get("tag_name") or None,
+            ssh_key_pub=job_data.get("ssh_key_pub") or None,
         )
         return job
 
