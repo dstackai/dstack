@@ -98,7 +98,7 @@ class AzureCompute(Compute):
             network=self.azure_config.network,
             subnet=self.azure_config.subnet,
             managed_identity=self.azure_config.managed_identity,
-            image=_get_image(self._compute_client, len(instance_type.resources.gpus) > 0),
+            image_id=_get_image_id(self._compute_client, len(instance_type.resources.gpus) > 0),
             vm_size=instance_type.instance_name,
             instance_name=_get_instance_name(job),
             user_data=_get_user_data_script(self.azure_config, job, instance_type),
@@ -127,36 +127,6 @@ class AzureCompute(Compute):
         raise NotImplementedError()
 
     def terminate_instance(self, request_id: str):
-        _terminate_instance(
-            compute_client=self._compute_client,
-            resource_group=self.azure_config.resource_group,
-            instance_name=request_id,
-        )
-        pass
-        _terminate_instance(
-            compute_client=self._compute_client,
-            resource_group=self.azure_config.resource_group,
-            instance_name=request_id,
-        )
-        pass
-        _terminate_instance(
-            compute_client=self._compute_client,
-            resource_group=self.azure_config.resource_group,
-            instance_name=request_id,
-        )
-        pass
-        _terminate_instance(
-            compute_client=self._compute_client,
-            resource_group=self.azure_config.resource_group,
-            instance_name=request_id,
-        )
-        pass
-        _terminate_instance(
-            compute_client=self._compute_client,
-            resource_group=self.azure_config.resource_group,
-            instance_name=request_id,
-        )
-        pass
         _terminate_instance(
             compute_client=self._compute_client,
             resource_group=self.azure_config.resource_group,
@@ -191,30 +161,34 @@ def _get_instance_name(job: Job) -> str:
     return f"dstack-{job.run_name}"
 
 
-def _get_image_published(
+def _get_prod_image_id(
     compute_client: ComputeManagementClient,
+    location: str,
     cuda: bool,
-    _version: Optional[str] = _get_default_ami_image_version(),
-):
-    # Check https://dev.to/holger/azure-sdk-for-python-retrieve-vm-image-details-30do
-    # compute_client.virtual_machine_images.list
-    raise NotImplementedError(
-        "Querying for published image is not implemented by missing any image."
+    version: Optional[str] = _get_default_ami_image_version(),
+) -> str:
+    images = compute_client.virtual_machine_images.list(
+        location=location,
+        publisher_name="dstackai",
+        offer="dstack-1",
+        skus=f"dstack-{'cuda' if cuda else 'nocuda'}",
     )
+    return images[0].id
 
 
-def _get_image_stage(
+def _get_stage_image_id(
     compute_client: ComputeManagementClient,
+    location: str,
     cuda: bool,
-    _version: Optional[str] = _get_default_ami_image_version(),
-) -> Image:
+    version: Optional[str] = _get_default_ami_image_version(),
+) -> str:
     pattern_value = []
     pattern_value.append("stgn")
     pattern_value.append("dstack")
     if cuda:
         pattern_value.append(re.escape("cuda-11.1"))
-    if _version:
-        pattern_value.append(re.escape(_version))
+    if version:
+        pattern_value.append(re.escape(version))
     else:
         pattern_value.append(".*")
     pattern = re.compile(rf"^{re.escape('-').join(pattern_value)}$")
@@ -226,9 +200,9 @@ def _get_image_stage(
     return recent_images[0]
 
 
-_get_image = _get_image_published
+_get_image_id = _get_prod_image_id
 if not version.__is_release__:
-    _get_image = _get_image_stage
+    _get_image_id = _get_stage_image_id
 
 
 def _create_network_security_group(
@@ -293,7 +267,7 @@ def _launch_instance(
     network: str,
     subnet: str,
     managed_identity: str,
-    image: str,
+    image_id: str,
     vm_size: str,
     instance_name: str,
     user_data: str,
@@ -305,7 +279,7 @@ def _launch_instance(
             location=location,
             hardware_profile=HardwareProfile(vm_size=vm_size),
             storage_profile=StorageProfile(
-                image_reference=ImageReference(id=image.id),
+                image_reference=ImageReference(id=image_id),
                 os_disk=OSDisk(
                     create_option=DiskCreateOptionTypes.FROM_IMAGE,
                     managed_disk=ManagedDiskParameters(
@@ -393,81 +367,6 @@ def _get_instance_status(
             return RequestStatus.TERMINATED
 
     raise RuntimeError(f"unhandled state {codes!r}", codes)
-
-
-def _terminate_instance(
-    compute_client: ComputeManagementClient,
-    resource_group: str,
-    instance_name: str,
-):
-    compute_client.virtual_machines.begin_delete(
-        resource_group_name=resource_group,
-        vm_name=instance_name,
-    )
-
-
-def _terminate_instance():
-    pass
-
-
-def _terminate_instance(
-    compute_client: ComputeManagementClient,
-    resource_group: str,
-    instance_name: str,
-):
-    compute_client.virtual_machines.begin_delete(
-        resource_group_name=resource_group,
-        vm_name=instance_name,
-    )
-
-
-def _terminate_instance():
-    pass
-
-
-def _terminate_instance(
-    compute_client: ComputeManagementClient,
-    resource_group: str,
-    instance_name: str,
-):
-    compute_client.virtual_machines.begin_delete(
-        resource_group_name=resource_group,
-        vm_name=instance_name,
-    )
-
-
-def _terminate_instance():
-    pass
-
-
-def _terminate_instance(
-    compute_client: ComputeManagementClient,
-    resource_group: str,
-    instance_name: str,
-):
-    compute_client.virtual_machines.begin_delete(
-        resource_group_name=resource_group,
-        vm_name=instance_name,
-    )
-
-
-def _terminate_instance():
-    pass
-
-
-def _terminate_instance(
-    compute_client: ComputeManagementClient,
-    resource_group: str,
-    instance_name: str,
-):
-    compute_client.virtual_machines.begin_delete(
-        resource_group_name=resource_group,
-        vm_name=instance_name,
-    )
-
-
-def _terminate_instance():
-    pass
 
 
 def _terminate_instance(
