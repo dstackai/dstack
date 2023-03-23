@@ -129,7 +129,7 @@ def poll_logs_ws(backend: Backend, repo_address: RepoAddress, job: Job, ports: D
     def on_close(_: WebSocketApp, close_status_code, close_msg):
         pass
 
-    local_ws_logs_port = ports[int(job.env["WS_LOGS_PORT"])]
+    local_ws_logs_port = ports.get(int(job.env["WS_LOGS_PORT"]), int(job.env["WS_LOGS_PORT"]))
     url = f"ws://127.0.0.1:{local_ws_logs_port}/logsws"
     cursor.hide()
     _ws = websocket.WebSocketApp(
@@ -203,8 +203,12 @@ def poll_run(repo_address: RepoAddress, job_heads: List[JobHead], backend: Backe
         console.print()
 
         jobs = [backend.get_job(repo_address, job_head.job_id) for job_head in job_heads]
-        ports = allocate_local_ports(jobs)
-        run_ssh_tunnel(ssh_key, jobs[0].host_name, ports)  # todo: cleanup explicitly (stop tunnel)
+        ports = {}
+        if backend.name != "local":
+            ports = allocate_local_ports(jobs)
+            run_ssh_tunnel(
+                ssh_key, jobs[0].host_name, ports
+            )  # todo: cleanup explicitly (stop tunnel)
         if len(job_heads) == 1 and run and run.status == JobStatus.RUNNING:
             poll_logs_ws(backend, repo_address, jobs[0], ports)
         else:
