@@ -49,6 +49,7 @@ class AWSCompute(Compute):
             local_repo_user_name=job.local_repo_user_name,
             local_repo_user_email=job.local_repo_user_email,
             repo_address=job.repo_address,
+            ssh_key_pub=job.ssh_key_pub,
         )
 
     def terminate_instance(self, request_id: str):
