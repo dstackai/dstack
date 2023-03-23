@@ -107,9 +107,9 @@ def parse_run_args(
     return provider_name, provider_args, workflow_name, workflow_data
 
 
-def poll_logs_ws(backend: Backend, repo_address: RepoAddress, job: Job):
+def poll_logs_ws(backend: Backend, repo_address: RepoAddress, job: Job, ports: Dict[int, int]):
     def on_message(ws: WebSocketApp, message):
-        message = fix_urls(message, job)
+        message = fix_urls(message, job, ports, hostname="127.0.0.1")
         sys.stdout.buffer.write(message)
         sys.stdout.buffer.flush()
 
@@ -129,7 +129,8 @@ def poll_logs_ws(backend: Backend, repo_address: RepoAddress, job: Job):
     def on_close(_: WebSocketApp, close_status_code, close_msg):
         pass
 
-    url = f"ws://127.0.0.1:{job.env['WS_LOGS_PORT']}/logsws"
+    local_ws_logs_port = ports[int(job.env["WS_LOGS_PORT"])]
+    url = f"ws://127.0.0.1:{local_ws_logs_port}/logsws"
     cursor.hide()
     _ws = websocket.WebSocketApp(
         url,
@@ -203,9 +204,9 @@ def poll_run(repo_address: RepoAddress, job_heads: List[JobHead], backend: Backe
 
         jobs = [backend.get_job(repo_address, job_head.job_id) for job_head in job_heads]
         ports = allocate_local_ports(jobs)
-        run_ssh_tunnel(ssh_key, jobs[0].host_name, ports)  # todo: cleanup (stop tunnel)
+        run_ssh_tunnel(ssh_key, jobs[0].host_name, ports)  # todo: cleanup explicitly (stop tunnel)
         if len(job_heads) == 1 and run and run.status == JobStatus.RUNNING:
-            poll_logs_ws(backend, repo_address, jobs[0])
+            poll_logs_ws(backend, repo_address, jobs[0], ports)
         else:
             poll_logs(
                 backend,

@@ -1,11 +1,10 @@
 import json
 import re
 import urllib.parse
-from typing import Any, Dict, List
+from typing import Any, Dict, Optional
 
 from dstack.backend.base import jobs
 from dstack.backend.base.storage import Storage
-from dstack.core.app import AppSpec
 from dstack.core.job import Job
 from dstack.core.log_event import LogEvent, LogEventSource
 from dstack.core.repo import RepoAddress
@@ -34,7 +33,7 @@ def render_log_message(
     if job is None:
         job = jobs.get_job(storage, repo_address, job_id)
         jobs_cache[job_id] = job
-    log = fix_urls(log.encode(), job).decode()
+    log = fix_urls(log.encode(), job, {}).decode()
     return LogEvent(
         event_id=event["eventId"],
         timestamp=event["timestamp"],
@@ -46,30 +45,28 @@ def render_log_message(
     )
 
 
-def fix_urls(log: bytes, job: Job) -> bytes:
+def fix_urls(log: bytes, job: Job, ports: Dict[int, int], hostname: Optional[str] = None) -> bytes:
     if not (job.host_name and job.ports and job.app_specs):
         return log
-    for app_spec in job.app_specs:
-        log = _fix_url_for_app(log, job, app_spec)
-    return log
 
+    hostname = hostname or job.host_name
+    app_specs = {job.ports[app_spec.port_index]: app_spec for app_spec in job.app_specs}
+    ports_re = "|".join(str(port) for port in job.ports)
+    url_pattern = (
+        rf"http://(?:localhost|0.0.0.0|127.0.0.1|{job.host_name}):({ports_re})\S*".encode()
+    )
 
-def _fix_url_for_app(
-    log: bytes, job: Job, app_spec: AppSpec
-) -> bytes:  # todo ssh tunneling, ports mapping
-    port = job.ports[app_spec.port_index]
-    url_pattern = f"http://(localhost|0.0.0.0|127.0.0.1|{job.host_name}):{port}\S*".encode()
-    match = re.search(url_pattern, log)
-    if match is None:
-        return log
-    url = match.group(0)
-    parsed_url = urllib.parse.urlparse(url)
-    qs = urllib.parse.parse_qs(parsed_url.query)
-    qs = {k: v[0] for k, v in qs.items()}
-    if app_spec.url_query_params is not None:
-        for k, v in app_spec.url_query_params.items():
-            qs[k.encode()] = v.encode()
-    new_url = parsed_url._replace(
-        netloc=f"{job.host_name}:{port}".encode(), query=urllib.parse.urlencode(qs).encode()
-    ).geturl()
-    return log.replace(url, new_url)
+    def replace_url(match: re.Match) -> bytes:
+        remote_port = int(match.group(1))
+        local_port = ports.get(remote_port, remote_port)
+        app_spec = app_specs[remote_port]
+        url = urllib.parse.urlparse(match.group(0))
+        qs = {k: v[0] for k, v in urllib.parse.parse_qs(url.query).items()}
+        if app_spec.url_query_params is not None:
+            qs.update({k.encode(): v.encode() for k, v in app_spec.url_query_params.items()})
+        url = url._replace(
+            netloc=f"{hostname}:{local_port}".encode(), query=urllib.parse.urlencode(qs).encode()
+        )
+        return url.geturl()
+
+    return re.sub(url_pattern, replace_url, log)

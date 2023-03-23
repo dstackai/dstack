@@ -1,19 +1,28 @@
+import socket
 import subprocess
+from contextlib import closing
 from pathlib import Path
 from typing import Dict, List, Union
 
 from dstack.core.job import Job
 
 
+def get_free_port() -> int:
+    with closing(socket.socket(socket.AF_INET, socket.SOCK_STREAM)) as s:
+        s.bind(("", 0))
+        s.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
+        return s.getsockname()[1]
+
+
 def allocate_local_ports(jobs: List[Job]) -> Dict[int, int]:
     ports = {}
-    for job in jobs:  # todo: allocate local ports
-        ws_logs_port = job.env.get("WS_LOGS_PORT")
+    for job in jobs:
+        ws_logs_port = int(job.env.get("WS_LOGS_PORT"))
         if ws_logs_port:
-            ports[ws_logs_port] = ws_logs_port
+            ports[ws_logs_port] = get_free_port()
         for app_spec in job.app_specs:
             port = job.ports[app_spec.port_index]
-            ports[port] = port
+            ports[port] = get_free_port()
     return ports
 
 
