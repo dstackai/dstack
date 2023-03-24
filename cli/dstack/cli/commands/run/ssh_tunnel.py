@@ -47,5 +47,8 @@ def make_ssh_tunnel_args(ssh_key: Path, hostname: str, ports: Dict[int, int]) ->
 
 def run_ssh_tunnel(ssh_key: Path, hostname: str, ports: Dict[int, int]):
     args = make_ssh_tunnel_args(ssh_key, hostname, ports)
-    console.print(*(arg.replace(" ", "\\ ") for arg in args))
+    ports_mapping = ", ".join(
+        f"{local_port}->{remote_port}" for remote_port, local_port in ports.items()
+    )
+    console.print(f"Opening SSH tunnel to {hostname}, ports mapping: {ports_mapping}")
     subprocess.run(args, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
