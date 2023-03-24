@@ -65,7 +65,7 @@ def _log_entry_to_log_event(
     if job is None:
         job = jobs.get_job(storage, repo_address, job_id)
         jobs_cache[job_id] = job
-    log = fix_urls(log.encode(), job).decode()
+    log = fix_urls(log.encode(), job, {}).decode()
     timestamp = int(log_entry.timestamp.timestamp())
     return LogEvent(
         event_id=log_entry.insert_id,
