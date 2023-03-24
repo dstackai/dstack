@@ -81,11 +81,7 @@ def get_repo_credentials(
     if credentials_value is None:
         return None
     credentials_data = json.loads(credentials_value)
-    return RepoCredentials(
-        protocol=RepoProtocol(credentials_data["protocol"]),
-        private_key=credentials_data.get("private_key"),
-        oauth_token=credentials_data.get("oauth_token"),
-    )
+    return RepoCredentials(**credentials_data)
 
 
 def save_repo_credentials(
@@ -101,6 +97,8 @@ def save_repo_credentials(
             credentials_data["private_key"] = repo_credentials.private_key
         else:
             raise Exception("No private key is specified")
+    if repo_credentials.ssh_key_path:
+        credentials_data["ssh_key_path"] = repo_credentials.ssh_key_path
 
     credentials_value = secrets_manager.get_credentials(repo_address)
     if credentials_value is not None:
