@@ -11,7 +11,6 @@ class BashProvider(Provider):
     def __init__(self):
         super().__init__("bash")
         self.file = None
-        self.setup = None
         self.python = None
         self.env = None
         self.artifact_specs = None
@@ -30,7 +29,6 @@ class BashProvider(Provider):
         run_name: str,
     ):
         super().load(backend, provider_args, workflow_name, provider_data, run_name)
-        self.setup = self._get_list_data("setup") or self._get_list_data("before_run")
         self.python = self._safe_python_version("python")
         self.commands = self._get_list_data("commands")
         self.env = self._env()
@@ -72,6 +70,7 @@ class BashProvider(Provider):
             JobSpec(
                 image_name=self.image_name,
                 commands=self._commands(),
+                entrypoint=["/bin/bash", "-i", "-c"],
                 working_dir=self.working_dir,
                 artifact_specs=self.artifact_specs,
                 port_count=self.ports,
@@ -90,8 +89,6 @@ class BashProvider(Provider):
         commands = []
         if self.env:
             self._extend_commands_with_env(commands, self.env)
-        if self.setup:
-            commands.extend(self.setup)
         commands.extend(self.commands)
         return commands
 

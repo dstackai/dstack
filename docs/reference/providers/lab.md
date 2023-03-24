@@ -8,7 +8,7 @@ If GPU is requested, the provider pre-installs the CUDA driver too.
 
 ## Usage example
 
-Inside the `.dstack/workflows` directory within your project, create the following `lab-example.yaml` file:
+<div editor-title=".dstack/workflows/lab-example.yaml">
 
 ```yaml
 workflows:
@@ -21,11 +21,17 @@ workflows:
       gpu: 1
 ```
 
+</div>
+
 To run this workflow, use the following command:
 
+<div class="termy">
+
 ```shell
-dstack run ide-lab
+$ dstack run ide-lab
 ```
+
+</div>
 
 ## Properties reference
 

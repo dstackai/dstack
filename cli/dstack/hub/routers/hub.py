@@ -5,19 +5,19 @@ from fastapi.security import HTTPBearer
 
 from dstack.api.backend import dict_backends
 from dstack.core.error import HubError
-from dstack.hub.db.models import Hub as HubDB
-from dstack.hub.models import AWSAuth, AWSBackend, AWSConfig, Hub, HubDelete, HubInfo
-from dstack.hub.repository.hub import HubManager
-from dstack.hub.routers.util import get_hub
+from dstack.hub.models import AWSAuth, AWSConfig, Member, ProjectDelete, ProjectInfo
+from dstack.hub.repository.hub import ProjectManager
+from dstack.hub.routers.util import get_project
 from dstack.hub.security.scope import Scope
-from dstack.hub.util import info2hub
+from dstack.hub.util import info2project
 
-router = APIRouter(prefix="/api/hubs", tags=["hub"])
+router = APIRouter(prefix="/api/projects", tags=["project"])
+
 
 security = HTTPBearer()
 
 
-@router.post("/backends/values")
+@router.post("/backends/values", deprecated=True)
 async def backend_configurator(req: Request, type_backend: str = Query(alias="type")):
     if type_backend.lower() != "aws":
         raise HTTPException(
@@ -31,7 +31,7 @@ async def backend_configurator(req: Request, type_backend: str = Query(alias="ty
     request_args = dict(req.query_params)
     configurator = backend.get_configurator()
     try:
-        result = configurator.configure_hub(request_args)
+        result = await configurator.configure_hub(request_args)
     except HubError as ex:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
@@ -42,51 +42,70 @@ async def backend_configurator(req: Request, type_backend: str = Query(alias="ty
     return result
 
 
-@router.post("", dependencies=[Depends(Scope("hub:hubs:write"))], response_model=HubInfo)
-async def hub_create(body: HubInfo) -> HubInfo:
-    hub = await HubManager.get(name=body.hub_name)
-    if hub is not None:
-        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Hub is exists")
-    await HubManager.save(info2hub(body))
+@router.get(
+    "/list",
+    dependencies=[Depends(Scope("project:list:read"))],
+    response_model=List[ProjectInfo],
+    deprecated=True,
+)
+async def list_project() -> List[ProjectInfo]:
+    return await ProjectManager.list_info()
+
+
+@router.post(
+    "",
+    dependencies=[Depends(Scope("project:projects:write"))],
+    response_model=ProjectInfo,
+    deprecated=True,
+)
+async def project_create(body: ProjectInfo) -> ProjectInfo:
+    project = await ProjectManager.get(name=body.project_name)
+    if project is not None:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Project is exists")
+    await ProjectManager.save(info2project(body))
     return body
 
 
-@router.delete("", dependencies=[Depends(Scope("hub:list:write"))])
-async def delete_hub(body: HubDelete):
-    for hub_name in body.hub_names:
-        hub = await get_hub(hub_name=hub_name)
-        await HubManager.remove(hub)
+@router.delete("", dependencies=[Depends(Scope("project:delete:write"))], deprecated=True)
+async def delete_project(body: ProjectDelete):
+    for project_name in body.projects:
+        project = await get_project(project_name=project_name)
+        await ProjectManager.remove(project)
 
 
-@router.get("/list", dependencies=[Depends(Scope("hub:list:read"))], response_model=List[HubInfo])
-async def list_hub() -> List[HubInfo]:
-    return await HubManager.list_info()
+@router.post(
+    "/{project_name}/members",
+    dependencies=[Depends(Scope("project:members:write"))],
+    deprecated=True,
+)
+async def project_members(project_name: str, body: List[Member] = Body()):
+    project = await get_project(project_name=project_name)
+    await ProjectManager.clear_member(project=project)
+    for member in body:
+        await ProjectManager.add_member(project=project, member=member)
 
 
-@router.get("/{hub_name}", dependencies=[Depends(Scope("hub:list:read"))])
-async def info_hub(hub_name: str) -> HubInfo:
-    hub = await HubManager.get_info(name=hub_name)
-    if hub is None:
+@router.get("/{project_name}", dependencies=[Depends(Scope("project:list:read"))], deprecated=True)
+async def info_project(project_name: str) -> ProjectInfo:
+    project = await ProjectManager.get_info(name=project_name)
+    if project is None:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
-            detail=f"Hub not found",
+            detail=f"Project not found",
         )
-    return hub
+    return project
 
 
-@router.patch("/{hub_name}", dependencies=[Depends(Scope("hub:patch:write"))])
-async def info_hub(hub_name: str, payload: dict = Body()) -> HubInfo:
-    hub = await HubManager.get(name=hub_name)
-    if hub is None:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail=f"Hub not found",
-        )
+@router.patch(
+    "/{project_name}", dependencies=[Depends(Scope("project:patch:write"))], deprecated=True
+)
+async def patch_project(project_name: str, payload: dict = Body()) -> ProjectInfo:
+    project = await get_project(project_name=project_name)
     if payload.get("backend") is not None and payload.get("backend").get("type") == "aws":
         if payload.get("backend").get("s3_bucket_name") is not None:
             bucket = payload.get("backend").get("s3_bucket_name").replace("s3://", "")
             payload["backend"]["s3_bucket_name"] = bucket
-        hub.auth = AWSAuth().parse_obj(payload.get("backend")).json()
-        hub.config = AWSConfig().parse_obj(payload.get("backend")).json()
-    await HubManager.save(hub)
-    return await HubManager.get_info(name=hub_name)
+        project.auth = AWSAuth().parse_obj(payload.get("backend")).json()
+        project.config = AWSConfig().parse_obj(payload.get("backend")).json()
+    await ProjectManager.save(project)
+    return await ProjectManager.get_info(name=project_name)

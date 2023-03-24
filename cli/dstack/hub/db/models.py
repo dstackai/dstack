@@ -14,11 +14,11 @@ class Base:
         return f"{src}({attr_string})"
 
 
-association_table_user_hub = Table(
-    "user_hub",
+association_table_user_project = Table(
+    "user_project",
     Database.Base.metadata,
     Column("users_name", ForeignKey("users.name")),
-    Column("hub_name", ForeignKey("hubs.name")),
+    Column("project_name", ForeignKey("projects.name")),
 )
 
 
@@ -38,7 +38,7 @@ class User(Base, Database.Base):
     name: Mapped[str] = mapped_column(String(30), primary_key=True)
     token: Mapped[str] = mapped_column(String(200))
     role_id: Mapped[int] = mapped_column(ForeignKey("roles.id"))
-    hub_role: Mapped[Role] = relationship()
+    project_role: Mapped[Role] = relationship(lazy="selectin")
 
     def __repr__(self) -> str:
         return super().__repr__()
@@ -48,26 +48,27 @@ class Member(Base, Database.Base):
     __tablename__ = "members"
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
-    hub_name: Mapped[str] = mapped_column(ForeignKey("hubs.name"))
+    project_name: Mapped[str] = mapped_column(ForeignKey("projects.name"))
+    project: Mapped["Project"] = relationship()
 
     user_name: Mapped[str] = mapped_column(ForeignKey("users.name"))
     user: Mapped[User] = relationship()
 
     role_id: Mapped[int] = mapped_column(ForeignKey("roles.id"))
-    hub_role: Mapped[Role] = relationship()
+    project_role: Mapped[Role] = relationship(lazy="selectin")
 
     def __repr__(self) -> str:
         return super().__repr__()
 
 
-class Hub(Base, Database.Base):
-    __tablename__ = "hubs"
+class Project(Base, Database.Base):
+    __tablename__ = "projects"
 
     name: Mapped[str] = mapped_column(String(30), primary_key=True)
     backend: Mapped[str] = mapped_column(String(30))
     config: Mapped[str] = mapped_column(String(300))
     auth: Mapped[str] = mapped_column(String(300))
-    members: Mapped[List[Member]] = relationship(lazy="selectin")
+    members: Mapped[List[Member]] = relationship(back_populates="project", lazy="selectin")
 
     def __repr__(self) -> str:
         return super().__repr__()

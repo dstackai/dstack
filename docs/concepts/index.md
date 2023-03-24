@@ -19,9 +19,11 @@ Remotes facilitate collaboration as they allow multiple team members to access t
 Workflows can be scripts for data preparation or model training, web apps like Streamlit or Gradio, or development
 environments like JupyterLab or VS Code.
 
-Here's an example from the [Quick start](https://docs.dstack.ai/quick-start).
+Here's an example from the [Quick start](https://docs.dstack.ai/quick-start):
 
-```yaml
+<div editor-title=".dstack/workflows/mnist.yaml"> 
+
+```yaml hl_lines="8 13 18"
 workflows:
   - name: mnist-data
     provider: bash
@@ -42,6 +44,8 @@ workflows:
       - path: ./lightning_logs
 ```
 
+</div>
+
 YAML-defined workflows eliminate the need to modify code in your scripts, giving you the freedom to choose frameworks,
 experiment trackers, and cloud providers.
 
@@ -50,20 +54,51 @@ experiment trackers, and cloud providers.
 
 ## Artifacts
 
-Artifacts enable you to save any files produced by a workflow for later reuse in other workflows. They may include data,
-model checkpoints, or even a pre-configured Conda environment.
+When running a workflow locally, the artifacts are stored in `~/.dstack/artifacts` and can only be reused from workflows
+that also run locally. To reuse the artifacts remotely, you must push them using the [`dstack push`](../reference/cli/push.md) command.
 
-When running a workflow locally, the artifacts are saved locally. To push the artifacts of a local to a configured remote,
-use the `dstack push` command.
+When running a workflow remotely, the resulting artifacts are automatically stored remotely. If you want to access the
+artifacts of a remote workflow locally, you can use the [`dstack pull`](../reference/cli/pull.md) command.
 
-When running a workflow remotely, the artifacts are pushed to the remote automatically.
+To conveniently refer to the artifacts of a particular run, you can assign a tag to it using
+the [`dstack tags`](../reference/cli/tags.md) command.
 
 ## CLI
 
 The dstack CLI provides various functionalities such as running workflows, accessing logs, artifacts, and stopping
 runs, among others.
 
- ![](../assets/dstack-cli.png){ width="800" }
+<div class="termy">
+
+```shell
+$ dstack
+
+Usage: dstack [-v] [-h] COMMAND ...
+
+Positional Arguments:
+  COMMAND
+    config       Configure the remote backend
+    cp           Copy artifact files to a local target path
+    init         Authorize dstack to access the current Git repo
+    logs         Show logs
+    ls           List artifacts
+    ps           List runs
+    pull         Pull artifacts of a remote run
+    push         Push artifacts of a local run
+    rm           Remove run(s)
+    run          Run a workflow
+    secrets      Manage secrets
+    stop         Stop run(s)
+    tags         Manage tags
+
+Optional Arguments:
+  -v, --version  Show dstack version
+  -h, --help     Show this help message and exit
+
+Run dstack COMMAND --help for more information on a particular command
+```
+
+</div>
  
 ## Why dstack?
 

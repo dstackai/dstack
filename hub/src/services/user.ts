@@ -48,7 +48,7 @@ export const userApi = createApi({
                 body: user,
             }),
 
-            invalidatesTags: (result) => [{ type: 'User' as const, id: result?.user_name }],
+            invalidatesTags: (result) => [{ type: 'User' as const, id: result?.user_name }, 'User'],
         }),
 
         updateUser: builder.mutation<IUser, Partial<IUser> & Pick<IUser, 'user_name'>>({
@@ -79,8 +79,7 @@ export const userApi = createApi({
                 },
             }),
 
-            invalidatesTags: (result, error, userNames) =>
-                userNames.map((userName) => ({ type: 'User' as const, id: userName })),
+            invalidatesTags: ['User'],
         }),
     }),
 });

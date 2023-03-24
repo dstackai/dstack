@@ -1,4 +1,5 @@
 import os
+from argparse import Namespace
 from pathlib import Path
 from typing import Dict, Optional, Tuple
 
@@ -6,6 +7,7 @@ import yaml
 from google.cloud import compute_v1, exceptions, storage
 from google.oauth2 import service_account
 from rich.prompt import Confirm, Prompt
+from rich_argparse import RichHelpFormatter
 from simple_term_menu import TerminalMenu
 
 from dstack.cli.common import ask_choice, console
@@ -13,7 +15,6 @@ from dstack.core.config import BackendConfig, Configurator, get_config_path
 from dstack.core.error import ConfigError
 
 DEFAULT_GEOGRAPHIC_AREA = "North America"
-
 
 GCP_LOCATIONS = [
     {
@@ -187,10 +188,29 @@ class GCPConfigurator(Configurator):
     def get_config(self, data: Dict) -> BackendConfig:
         return GCPConfig.deserialize(data=data)
 
-    def parse_args(self, args: list = []):
-        pass
+    def register_parser(self, parser):
+        aws_parser = parser.add_parser("gcp", help="", formatter_class=RichHelpFormatter)
+        aws_parser.add_argument("--bucket", type=str, help="", required=True)
+        aws_parser.add_argument("--project", type=str, help="", required=True)
+        aws_parser.add_argument("--region", type=str, help="", required=True)
+        aws_parser.add_argument("--zone", type=str, help="", required=True)
+        aws_parser.add_argument("--vpc", type=str, help="", required=True)
+        aws_parser.add_argument("--subnet", type=str, help="", required=True)
+        aws_parser.set_defaults(func=self._command)
 
-    def configure_hub(self, data: Dict):
+    def _command(self, args: Namespace):
+        config = GCPConfig(
+            project_id=args.project,
+            region=args.region,
+            zone=args.zone,
+            bucket_name=args.bucket,
+            subnet=args.subnet,
+            vpc=args.vpc,
+        )
+        config.save()
+        print(f"[grey58]OK[/]")
+
+    async def configure_hub(self, data: Dict):
         pass
 
     def configure_cli(self):

@@ -15,10 +15,10 @@ from dstack.core.job import JobHead
 from dstack.core.repo import RepoAddress
 from dstack.hub.models import PollLogs
 from dstack.hub.routers.cache import get_backend
-from dstack.hub.routers.util import get_hub
+from dstack.hub.routers.util import get_project
 from dstack.hub.security.scope import Scope
 
-router = APIRouter(prefix="/api/hub", tags=["logs"])
+router = APIRouter(prefix="/api/project", tags=["logs"])
 
 security = HTTPBearer()
 
@@ -77,13 +77,13 @@ class JSONStreamingResponse(Response):
 
 
 @router.get(
-    "/{hub_name}/logs/poll",
+    "/{project_name}/logs/poll",
     dependencies=[Depends(Scope("logs:poll:read"))],
     response_class=JSONStreamingResponse,
 )
-async def poll_logs(hub_name: str, body: PollLogs):
-    hub = await get_hub(hub_name=hub_name)
-    backend = get_backend(hub)
+async def poll_logs(project_name: str, body: PollLogs):
+    project = await get_project(project_name=project_name)
+    backend = get_backend(project)
     return JSONStreamingResponse(
         content=backend.poll_logs(
             repo_address=body.repo_address,

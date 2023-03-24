@@ -10,6 +10,8 @@ a pretrained Stable Diffusion model.
 
 Here is the list of Python libraries that we will utilize:
 
+<div editor-title="stable_diffusion/requirements.txt"> 
+
 ```txt
 diffusers
 transformers
@@ -18,6 +20,8 @@ ftfy
 accelerate
 safetensors
 ```
+
+</div>
 
 !!! info "NOTE:"
     We're using the [`safetensors`](https://github.com/huggingface/safetensors) library because it implements a new simple format for storing tensors safely (as opposed
@@ -28,21 +32,31 @@ the `stable_diffusion/requirements.txt` file.
 
 You can also install these libraries locally:
 
+<div class="termy">
+
 ```shell
-pip install -r stable_diffusion/requirements.txt
+$ pip install -r stable_diffusion/requirements.txt
 ```
+
+</div>
 
 Also, because we'll use `dstack` CLI, let's install it locally:
 
+<div class="termy">
+
 ```shell
-pip install dstack -U
+$ pip install dstack -U
 ```
+
+</div>
 
 ## Download the pre-trained model
 
 In our tutorial, we'll use the [`runwayml/stable-diffusion-v1-5`](https://huggingface.co/runwayml/stable-diffusion-v1-5) model (pretrained by Runway).
 
-Let's create the following `stable_diffusion/stable_diffusion.py` file:
+Let's create the following Python file:
+
+<div editor-title="stable_diffusion/stable_diffusion.py"> 
 
 ```python
 import shutil
@@ -56,6 +70,8 @@ def main():
     shutil.copytree(cache_folder, "./models/runwayml/stable-diffusion-v1-5", dirs_exist_ok=True)
 ```
 
+</div>
+
 !!! info "NOTE:"
     By default, `diffusers` downloads the model to its own [cache folder](https://huggingface.co/docs/datasets/cache) built using symlinks.
     Since `dstack` [doesn't support symlinks](https://github.com/dstackai/dstack/issues/180) in artifacts, we're copying the model files to the local `models` folder. 
@@ -63,7 +79,9 @@ def main():
 In order to run a script via `dstack`, the script must be defined as a workflow via a YAML file
 under `.dstack/workflows`.
 
-Let's define the following `.dstack/workflows/stable_diffusion.yaml` file:
+Let's define the following workflow YAML file:
+
+<div editor-title=".dstack/workflows/stable_diffusion.yaml"> 
 
 ```yaml
 workflows:
@@ -78,20 +96,31 @@ workflows:
       memory: 16GB
 ```
 
+</div>
+
 Now, the workflow can be run anywhere via the `dstack` CLI.
 
 !!! info "NOTE:"
     Before you run a workflow via `dstack`, make sure your project has a remote Git branch configured,
     and invoke the `dstack init` command which will ensure that `dstack` may access the repository:
+
+    <div class="termy">
+
     ```shell
-    dstack init
+    $ dstack init
     ```
+
+    </div>
 
 Here's how to run a `dstack` workflow locally:
 
+<div class="termy">
+
 ```shell
-dstack run stable-diffusion
+$ dstack run stable-diffusion
 ```
+
+</div>
 
 Once you run it, `dstack` will run the script, and save the `models` folder as an artifact.
 After that, you can reuse it in other workflows.
@@ -102,6 +131,8 @@ Sometimes, before you can run a workflow, you may want to run code interactively
 e.g. via an IDE or a notebook.
 
 Look at the following example:
+
+<div editor-title=".dstack/workflows/stable_diffusion.yaml"> 
 
 ```yaml
 workflows:
@@ -115,20 +146,26 @@ workflows:
       memory: 16GB
 ```
 
+</div>
+
 As you see, the `code-stable` workflow refers the `stable-diffusion` workflow as a dependency.
 
 If you run it, `dstack` will run a VS Code application with the code, pretrained model,
 and Python environment:
 
+<div class="termy">
+
 ```shell 
-dstack run code-stable
+$ dstack run code-stable
 ```
+
+</div>
 
 ## Generate images
 
-Let's write a script that generates images using a pre-trained model and given prompts.
+Let's write a script that generates images using a pre-trained model and given prompts:
 
-Here's an example of the `stable_diffusion/prompt_stable.py` file:
+<div editor-title="stable_diffusion/prompt_stable.py"> 
 
 ```python
 import argparse
@@ -153,10 +190,14 @@ if __name__ == '__main__':
         images[i].save(output / f"{i}.png")
 ```
 
+</div>
+
 The script loads the model from the local `models` folder, generates images and saves them to the 
 local `output` folder.
 
-To be able to run it via `dstack`, let's define it in `.dstack/workflows/stable_diffusion.yaml`:
+Let's define it in our workflow YAML file:
+
+<div editor-title=".dstack/workflows/stable_diffusion.yaml"> 
 
 ```yaml
 workflows:
@@ -173,14 +214,20 @@ workflows:
       memory: 16GB
 ```
 
+</div>
+
 !!! info "NOTE:"
     The `dstack run` command allows to pass arguments to the workflow via `${{ run.args }}`.
 
 Let's run the workflow locally:
 
+<div class="termy">
+
 ```shell
-dstack run prompt-stable -P "cats in hats" 
+$ dstack run prompt-stable -P "cats in hats" 
 ```
+
+</div>
 
 The output artifacts of local runs are stored under `~/.dstack/artifacts`.
 
@@ -196,19 +243,21 @@ For instance, you can set up your AWS account as a `remote` to execute workflows
 
 To configure a `remote`, run the following command:
 
-```shell
-dstack config
-```
-
-This command prompts you to select an AWS profile for credentials, an AWS region for workflow execution, and an S3
-bucket to store remote artifacts.
+<div class="termy">
 
 ```shell
-AWS profile: default
-AWS region: eu-west-1
-S3 bucket: dstack-142421590066-eu-west-1
-EC2 subnet: none
+$ dstack config
+
+? Choose backend: aws
+? AWS profile: default
+? Choose AWS region: eu-west-1
+? Choose S3 bucket: dstack-142421590066-eu-west-1
+? Choose EC2 subnet: no preference
+
+$ 
 ```
+
+</div>
 
 ## Run workflows remotely
 
@@ -217,9 +266,13 @@ to run workflows remotely.
 
 Let's first run the `stable-diffusion` workflow:
 
+<div class="termy">
+
 ```shell
-dstack run stable-diffusion --remote
+$ dstack run stable-diffusion --remote
 ```
+
+</div>
 
 !!! info "NOTE:"
     When you run a remote workflow, `dstack` automatically creates resources in the configured cloud,
@@ -227,9 +280,13 @@ dstack run stable-diffusion --remote
 
 Now, you can run the `prompt-stable` remotely as well:
 
+<div class="termy">
+
 ```shell
 dstack run prompt-stable --remote --gpu-name V100 -P "cats in hats"
 ```
+
+</div>
 
 !!! info "NOTE:"
     You can configure the required resources to run the workflows either via the `resources` property in YAML

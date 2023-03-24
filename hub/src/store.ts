@@ -2,21 +2,21 @@ import { configureStore } from '@reduxjs/toolkit';
 import appReducer from 'App/slice';
 import notificationsReducer from 'components/Notifications/slice';
 import { userApi } from 'services/user';
-import { hubApi } from 'services/hub';
+import { projectApi } from 'services/project';
 
 export const store = configureStore({
     reducer: {
         app: appReducer,
         notifications: notificationsReducer,
         [userApi.reducerPath]: userApi.reducer,
-        [hubApi.reducerPath]: hubApi.reducer,
+        [projectApi.reducerPath]: projectApi.reducer,
     },
 
     middleware: (getDefaultMiddleware) =>
         getDefaultMiddleware({
             serializableCheck: false,
         })
-            .concat(hubApi.middleware)
+            .concat(projectApi.middleware)
             .concat(userApi.middleware),
 });
 

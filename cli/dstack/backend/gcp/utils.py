@@ -50,5 +50,5 @@ def wait_for_extended_operation(
 def is_valid_label_value(value: str) -> bool:
     if len(value) > 63:
         return False
-    m = re.match(r"^[\w\d_-]+$", value)
+    m = re.match(r"^[a-z\d_-]+$", value)
     return m is not None

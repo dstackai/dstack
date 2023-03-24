@@ -25,11 +25,8 @@ from dstack.hub.models import (
 )
 
 
-def _url(url: str, additional_path: str, query: dict = {}):
+def _url(url: str, project: str, additional_path: str, query: dict = {}):
     unparse_url = urlparse(url=url)
-    new_path = unparse_url.path
-    if new_path.endswith("/"):
-        new_path = new_path[: len(new_path) - 1]
     if additional_path.startswith("/"):
         additional_path = additional_path[1:]
 
@@ -37,7 +34,7 @@ def _url(url: str, additional_path: str, query: dict = {}):
         (
             unparse_url.scheme,
             unparse_url.netloc,
-            f"{new_path}/{additional_path}",
+            f"/api/project/{project}/{additional_path}",
             None,
             urlencode(query=query),
             unparse_url.fragment,
@@ -47,13 +44,14 @@ def _url(url: str, additional_path: str, query: dict = {}):
 
 
 class HubClient:
-    def __init__(self, url: str, token: str):
+    def __init__(self, url: str, project: str, token: str):
         self.url = url
         self.token = token
+        self.project = project
 
     @staticmethod
-    def validate(url: str, token: str) -> bool:
-        url = _url(url=url, additional_path="/info")
+    def validate(url: str, project: str, token: str) -> bool:
+        url = _url(url=url, project=project, additional_path="/info")
         try:
             resp = requests.get(url=url, headers=HubClient._auth(token=token))
             if resp.ok:
@@ -81,6 +79,7 @@ class HubClient:
     def get_repos_credentials(self, repo_address: RepoAddress) -> Optional[RepoCredentials]:
         url = _url(
             url=self.url,
+            project=self.project,
             additional_path=f"/repos/credentials",
         )
         try:
@@ -102,6 +101,7 @@ class HubClient:
     def save_repos_credentials(self, repo_address: RepoAddress, repo_credentials: RepoCredentials):
         url = _url(
             url=self.url,
+            project=self.project,
             additional_path=f"/repos/credentials",
         )
         try:
@@ -125,6 +125,7 @@ class HubClient:
     def create_run(self, repo_address: RepoAddress) -> str:
         url = _url(
             url=self.url,
+            project=self.project,
             additional_path=f"/runs/create",
         )
         try:
@@ -141,6 +142,7 @@ class HubClient:
     def create_job(self, job: Job):
         url = _url(
             url=self.url,
+            project=self.project,
             additional_path=f"/jobs/create",
         )
         try:
@@ -157,6 +159,7 @@ class HubClient:
     def run_job(self, job: Job):
         url = _url(
             url=self.url,
+            project=self.project,
             additional_path=f"/runners/run",
         )
         try:
@@ -173,6 +176,7 @@ class HubClient:
     def stop_job(self, repo_address: RepoAddress, job_id: str, abort: bool):
         url = _url(
             url=self.url,
+            project=self.project,
             additional_path=f"/runners/stop",
         )
         try:
@@ -197,6 +201,7 @@ class HubClient:
     def get_tag_head(self, repo_address: RepoAddress, tag_name: str) -> Optional[TagHead]:
         url = _url(
             url=self.url,
+            project=self.project,
             additional_path=f"/tags/{tag_name}",
         )
         try:
@@ -213,6 +218,7 @@ class HubClient:
     def list_tag_heads(self, repo_address: RepoAddress) -> Optional[List[TagHead]]:
         url = _url(
             url=self.url,
+            project=self.project,
             additional_path=f"/tags/list/heads",
         )
         try:
@@ -236,6 +242,7 @@ class HubClient:
     ):
         url = _url(
             url=self.url,
+            project=self.project,
             additional_path=f"/tags/add/run",
         )
         try:
@@ -266,6 +273,7 @@ class HubClient:
     ):
         url = _url(
             url=self.url,
+            project=self.project,
             additional_path=f"/tags/add/path",
         )
         try:
@@ -290,6 +298,7 @@ class HubClient:
     def delete_tag_head(self, repo_address: RepoAddress, tag_head: TagHead):
         url = _url(
             url=self.url,
+            project=self.project,
             additional_path=f"/tags/{tag_head.tag_name}/delete",
         )
         try:
@@ -306,6 +315,7 @@ class HubClient:
     def update_repo_last_run_at(self, repo_address: RepoAddress, last_run_at: int):
         url = _url(
             url=self.url,
+            project=self.project,
             additional_path=f"/repos/update",
         )
         try:
@@ -332,7 +342,9 @@ class HubClient:
         query = {}
         if not (run_name is None):
             query["run_name"] = run_name
-        url = _url(url=self.url, additional_path=f"/jobs/list/heads", query=query)
+        url = _url(
+            url=self.url, project=self.project, additional_path=f"/jobs/list/heads", query=query
+        )
         try:
             resp = requests.get(url=url, headers=self._headers(), data=repo_address.json())
             if resp.ok:
@@ -353,6 +365,7 @@ class HubClient:
     ) -> List[RunHead]:
         url = _url(
             url=self.url,
+            project=self.project,
             additional_path=f"/runs/list",
         )
         try:
@@ -378,6 +391,7 @@ class HubClient:
     def get_job(self, repo_address: RepoAddress, job_id: str) -> Optional[Job]:
         url = _url(
             url=self.url,
+            project=self.project,
             additional_path=f"/jobs/get",
         )
         try:
@@ -402,6 +416,7 @@ class HubClient:
     def list_secret_names(self, repo_address: RepoAddress) -> List[str]:
         url = _url(
             url=self.url,
+            project=self.project,
             additional_path=f"/secrets/list",
         )
         try:
@@ -423,6 +438,7 @@ class HubClient:
     def get_secret(self, repo_address: RepoAddress, secret_name: str) -> Optional[Secret]:
         url = _url(
             url=self.url,
+            project=self.project,
             additional_path=f"/secrets/get/{secret_name}",
         )
         try:
@@ -444,6 +460,7 @@ class HubClient:
     def add_secret(self, repo_address: RepoAddress, secret: Secret):
         url = _url(
             url=self.url,
+            project=self.project,
             additional_path=f"/secrets/add",
         )
         try:
@@ -467,6 +484,7 @@ class HubClient:
     def update_secret(self, repo_address: RepoAddress, secret: Secret):
         url = _url(
             url=self.url,
+            project=self.project,
             additional_path=f"/secrets/update",
         )
         try:
@@ -490,6 +508,7 @@ class HubClient:
     def delete_secret(self, repo_address: RepoAddress, secret_name: str):
         url = _url(
             url=self.url,
+            project=self.project,
             additional_path=f"/secrets/delete/{secret_name}",
         )
         try:
@@ -510,6 +529,7 @@ class HubClient:
     def list_jobs(self, repo_address: RepoAddress, run_name: str) -> List[Job]:
         url = _url(
             url=self.url,
+            project=self.project,
             additional_path=f"/jobs/list",
         )
         try:
@@ -531,6 +551,7 @@ class HubClient:
     def list_run_artifact_files(self, repo_address: RepoAddress, run_name: str) -> List[Artifact]:
         url = _url(
             url=self.url,
+            project=self.project,
             additional_path=f"/artifacts/list",
         )
         try:
@@ -552,6 +573,7 @@ class HubClient:
     def delete_job_head(self, repo_address: RepoAddress, job_id: str):
         url = _url(
             url=self.url,
+            project=self.project,
             additional_path=f"/jobs/delete",
         )
         try:
@@ -578,6 +600,7 @@ class HubClient:
     ) -> Generator[LogEvent, None, None]:
         url = _url(
             url=self.url,
+            project=self.project,
             additional_path=f"/logs/poll",
         )
         try:
@@ -617,6 +640,7 @@ class HubClient:
     def upload_file(self, dest_path: str) -> Optional[str]:
         url = _url(
             url=self.url,
+            project=self.project,
             additional_path=f"/link/upload",
         )
         try:
@@ -637,6 +661,7 @@ class HubClient:
     def download_file(self, dest_path: str) -> Optional[str]:
         url = _url(
             url=self.url,
+            project=self.project,
             additional_path=f"/link/download",
         )
         try:

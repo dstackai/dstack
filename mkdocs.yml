@@ -41,6 +41,7 @@ theme:
   #          icon: material/weather-sunny
   #          name: Switch to light mode
   features:
+    - navigation.path
     - content.code.copy
     - content.action.edit
     #    - navigation.indexes
@@ -96,8 +97,10 @@ markdown_extensions:
 # Customization
 extra_css:
   - stylesheets/extra.css
+  - stylesheets/termynal.css
 extra_javascript:
   - javascripts/extra.js
+  - javascripts/termynal.js
 extra:
   homepage: /
   generator: false
@@ -118,34 +121,33 @@ extra:
 
 # Page tree
 nav:
-  - Guide:
+  - Guides:
       - Get started:
           - Overview: index.md
           - Installation: installation.md
           - Quick start: quick-start.md
           - Concepts: concepts/index.md
-          - Troubleshooting: troubleshooting.md
       - Usage:
-          - Basics:
-            - Hello world: basics/hello-world.md
-            - Artifacts: basics/artifacts.md
-            - Deps: basics/deps.md
-            - Resources: basics/resources.md
-            - Environment variables: basics/environment-variables.md
-            - Args: basics/args.md
-            - Apps: basics/apps.md
-            - Python: basics/python.md
-            - Conda: basics/conda.md
-            - Dev environments: basics/dev-environments.md
-            - Secrets: basics/secrets.md
-          - Examples: https://github.com/dstackai/dstack-examples
-      - Integrations:
-          - Experiment trackers:
-              - Weights & Biases: integrations/experiments/wandb.md
+        - Hello world: usage/hello-world.md
+        - Python: usage/python.md
+        - Conda: usage/conda.md
+        - Artifacts: usage/artifacts.md
+        - Deps: usage/deps.md
+        - Resources: usage/resources.md
+        - Environment variables: usage/environment-variables.md
+        - Providers: usage/providers.md
+        - Apps: usage/apps.md
+        - Secrets: usage/secrets.md
+        - Args: usage/args.md
       - Tutorials:
           - Stable Diffusion: tutorials/stable-diffusion.md
-      - What's new:
-          - Changelog: https://github.com/dstackai/dstack/releases
+          - Experiment tracking:
+            - TensorBoard: tutorials/tensorboard.md
+            - Weights & Biases: tutorials/wandb.md
+      - Support:
+          - Troubleshooting: troubleshooting.md
+          - Slack: https://join.slack.com/t/dstackai/shared_invite/zt-xdnsytie-D4qU9BvJP8vkbkHXdi6clQ
+#          - Changelog: https://github.com/dstackai/dstack/releases
 #          - Newsletter: https://dstack.curated.co/
   - Reference:
       - Providers:

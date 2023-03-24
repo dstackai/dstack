@@ -11,11 +11,27 @@ The command provisions the required compute resources (in a configured cloud), f
 
 ## Usage
 
+<div class="termy">
+
 ```shell
-dstack run [-h] WORKFLOW [-d] [-r] [-t TAG] [OPTIONS ...] [ARGS ...]
+$ dstack run --help
+Usage: dstack run [-h] [--remote] [-t TAG] [-d] [WORKFLOW] [ARGS ...]
+
+Positional Arguments:
+  WORKFLOW              A workflow name
+  ARGS                  Override provider arguments
+  
+  
+Optional Arguments:
+  --remote              Run the workflow remotely
+  -t, --tag TAG         A tag name. Warning, if the tag exists, it will be overridden.
+  -d, --detach          Do not poll for status update and logs
+  -i IDENTITY_FILE      A path to ssh identity file
 ```
 
-### Arguments reference
+</div>
+
+## Arguments reference
 
 The following arguments are required:
 
@@ -24,15 +40,16 @@ The following arguments are required:
 
 The following arguments are optional:
 
-- `-t TAG`, `--tag TAG` - (Optional) A tag name. Warning, if the tag exists, it will be overridden.
-- `-r`, `--remote`, - (Optional) Run the workflow in the cloud.
-  or [NVIDIA Docker](https://github.com/NVIDIA/nvidia-docker) to be installed locally.
--  `-d`, `--detach` - (Optional) Run the workflow in the detached mode. Means, the `run` command doesn't
-  poll for logs and workflow status, but exits immediately. 
+- `-t TAG`, `--tag TAG` – (Optional) A tag name. Warning, if the tag exists, it will be overridden.
+- `-r`, `--remote` – (Optional) Run the workflow in the cloud.
+- `-d`, `--detach` – (Optional) Run the workflow in the detached mode. Means, the `run` command doesn't
+  poll for logs and workflow status, but exits immediately.
+- `-i IDENTITY_FILE` – (Optional) A path to ssh identity file. Used to establish ssh tunnel with a remote
+  runner. Default to `~/.ssh/id_rsa`
 - `OPTIONS` – (Optional) Use `OPTIONS` to override workflow parameters defined in the workflow YAML file
-- `ARGS` – (Optional) Use `ARGS` to [pass arguments](../../basics/args.md) to the workflow
+- `ARGS` – (Optional) Use `ARGS` to [pass arguments](../../usage/args.md) to the workflow
   (can be accessed via `${{ run.args }}` from the workflow YAML file).
--  `-h`, `--help` - (Optional) Shows help for the `dstack run` command. Combine it with the name of the workflow
+-  `-h`, `--help` – (Optional) Shows help for the `dstack run` command. Combine it with the name of the workflow
    to see how to override workflow parameters defined in the workflow YAML file
 
 !!! info "NOTE:"

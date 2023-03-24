@@ -1,12 +1,11 @@
-import sys
 from argparse import Namespace
 
-from rich import print
 from rich.prompt import Confirm
 
 from dstack.api.backend import list_backends
 from dstack.api.repo import load_repo_data
 from dstack.cli.commands import BasicCommand
+from dstack.cli.common import console
 from dstack.core.error import check_config, check_git
 
 
@@ -49,6 +48,9 @@ class StopCommand(BasicCommand):
     @check_config
     @check_git
     def _command(self, args: Namespace):
+        if not args.run_name and not args.all:
+            console.print("Specify a run name or use --all to stop all workflows")
+            exit(1)
         if (
             args.run_name
             and (
@@ -56,15 +58,14 @@ class StopCommand(BasicCommand):
             )
         ) or (args.all and (args.yes or Confirm.ask(f"[red]{_verb(args.abort)} all runs?[/]"))):
             repo_data = load_repo_data()
+            found_run = False
             for backend in list_backends():
                 job_heads = backend.list_job_heads(repo_data, args.run_name)
-                if job_heads:
-                    for job_head in job_heads:
-                        if job_head.status.is_unfinished():
-                            backend.stop_job(repo_data, job_head.job_id, args.abort)
-                    print(f"[grey58]OK[/]")
-                    return
-            sys.exit(f"Cannot find the run '{args.run_name}'")
-        else:
-            if not args.run_name and not args.all:
-                sys.exit("Specify a run name or use --all to stop all workflows")
+                found_run = len(job_heads) > 0
+                for job_head in job_heads:
+                    if job_head.status.is_unfinished():
+                        backend.stop_job(repo_data, job_head.job_id, args.abort)
+            if args.run_name and not found_run:
+                console.print(f"Cannot find the run '{args.run_name}'")
+                exit(1)
+            console.print(f"[grey58]OK[/]")

@@ -1,3 +1,4 @@
+export { default as Alert } from '@cloudscape-design/components/alert';
 export { default as Button } from '@cloudscape-design/components/button';
 export { default as AppLayout } from '@cloudscape-design/components/app-layout';
 export { default as SideNavigation } from '@cloudscape-design/components/side-navigation';
@@ -32,6 +33,7 @@ export { DetailsHeader } from './DetailsHeader';
 export { Loader } from './Loader';
 export { FormInput } from './form/Input';
 export { FormSelect } from './form/Select';
+export { FormRadioButtons } from './form/RadioButtons';
 export type { FormSelectOptions } from './form/Select/types';
 export { FormS3BucketSelector } from './form/S3BucketSelector';
 export { FormTiles } from './form/Tiles';

@@ -6,7 +6,7 @@ from fastapi import APIRouter, Depends, HTTPException, status
 from fastapi.security import HTTPBearer
 from fastapi.security.http import HTTPAuthorizationCredentials
 
-from dstack.hub.models import HubDelete, User, UserInfo, UserPatch
+from dstack.hub.models import DeleteUsers, ProjectDelete, User, UserInfo, UserPatch
 from dstack.hub.repository.role import RoleManager
 from dstack.hub.repository.user import UserManager
 from dstack.hub.security.scope import Scope
@@ -29,12 +29,12 @@ async def users_create(body: User) -> User:
     return User(
         user_name=user.name,
         token=user.token,
-        global_role=user.hub_role.name,
+        global_role=user.project_role.name,
     )
 
 
 @router.delete("", dependencies=[Depends(Scope("users:get:read"))])
-async def users_delete(body: HubDelete):
+async def users_delete(body: DeleteUsers):
     for user_name in body.users:
         user = await UserManager.get_user_by_name(name=user_name)
         if user is None:
@@ -45,21 +45,21 @@ async def users_delete(body: HubDelete):
 @router.get("/info", response_model=UserInfo, dependencies=[Depends(Scope("users:info:read"))])
 async def users_info(authorization: HTTPAuthorizationCredentials = Depends(security)) -> UserInfo:
     user = await UserManager.get_user_by_token(authorization.credentials)
-    return UserInfo(user_name=user.name, global_role=user.hub_role.name)
+    return UserInfo(user_name=user.name, global_role=user.project_role.name)
 
 
 @router.get("/list", response_model=List[User], dependencies=[Depends(Scope("users:list:read"))])
 async def users_list() -> List[User]:
     users = await UserManager.get_user_list()
-    hub_users = []
+    project_users = []
     for user in users:
-        hub_user = User(
+        project_user = User(
             user_name=user.name,
             token=user.token,
-            global_role=user.hub_role.name,
+            global_role=user.project_role.name,
         )
-        hub_users.append(hub_user)
-    return hub_users
+        project_users.append(project_user)
+    return project_users
 
 
 @router.post(
@@ -74,7 +74,7 @@ async def users_get(user_name: str) -> User:
     return User(
         user_name=user.name,
         token=user.token,
-        global_role=user.hub_role.name,
+        global_role=user.project_role.name,
     )
 
 
@@ -91,7 +91,7 @@ async def users_patch(user_name: str, body: UserPatch) -> User:
     return User(
         user_name=user.name,
         token=user.token,
-        global_role=user.hub_role.name,
+        global_role=user.project_role.name,
     )
 
 
@@ -101,5 +101,5 @@ async def users_get(user_name: str) -> User:
     return User(
         user_name=user.name,
         token=user.token,
-        global_role=user.hub_role.name,
+        global_role=user.project_role.name,
     )

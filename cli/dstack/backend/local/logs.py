@@ -86,9 +86,10 @@ def poll_logs(
     start_time: int,
     attached: bool,
 ) -> Generator[LogEvent, None, None]:
+    jobs_cache = {}
     try:
         # Read log_file
         for event in events_loop(storage, compute, repo_address, job_heads):
-            yield render_log_message(storage, event, repo_address)
+            yield render_log_message(storage, event, repo_address, jobs_cache)
     except Exception as e:
         raise e

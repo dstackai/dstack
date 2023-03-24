@@ -64,9 +64,17 @@
         "access_key": "Access key",
         "secret_key": "Secret key",
         "access_key_id": "Access key ID",
+        "access_key_id_description": "Access key ID description",
         "secret_key_id": "Secret key ID",
+        "secret_key_id_description": "Secret key ID description",
         "region_name":  "Region",
+        "region_name_description":  "Region description",
+        "region_name_placeholder": "Select a region",
         "s3_bucket_name": "Bucket",
+        "s3_bucket_name_description": "Bucket description",
+        "ec2_subnet_id": "Subnet ID",
+        "ec2_subnet_id_description": "Subnet ID description",
+        "ec2_subnet_id_placeholder":  "Select subnet"
         "ec2_subnet_id": "Subnet ID"
       },
       "gcp": {
@@ -84,7 +92,10 @@
         "role": "Project role"
       },
       "error_notification": "Update project error",
-      "success_notification": "Project updating is successful"
+      "success_notification": "Project updating is successful",
+      "validation": {
+        "user_name_format": "Only letters, numbers, - or _"
+      }
     },
     "create": {
       "page_title": "Create project",

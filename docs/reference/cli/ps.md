@@ -4,11 +4,23 @@ This command shows status of runs within the current Git repo.
 
 ## Usage
 
+<div class="termy">
+
 ```shell
-dstack ps [-a | RUN] [-w]
+$ dstack ps --help
+Usage: dstack ps [-h] [-a] [-w] [RUN]
+
+Positional Arguments:
+  RUN          A name of a run
+
+Optional Arguments:
+  -a, --all    Show all runs. By default, it only shows unfinished runs or the last finished.
+  -w, --watch  Watch statuses of runs in realtime
 ```
 
-### Arguments reference
+</div>
+
+## Arguments reference
 
 The following arguments are optional and mutually exclusive:
 
