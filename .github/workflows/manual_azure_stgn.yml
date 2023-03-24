@@ -15,7 +15,7 @@ jobs:
       VERSION: ${{ github.run_number }}
     strategy:
       matrix:
-        variants: [ azure-image, azure-image-cuda ]
+        variant: [ azure-image, azure-image-cuda ]
         include:
           - variant: azure-image
             image_prefix: stgn-dstack-nocuda
@@ -36,7 +36,7 @@ jobs:
           cp -R ami/packer/* .
       - name: Run packer
         run: |
-          ./packer build -var build_id=$VERSION ${{ matrix.variants }}.json
+          ./packer build -var build_id=$VERSION ${{ matrix.variant }}.json
       - name: Publish azure image
         run: |
           IMAGE_DEFINITION=${{ matrix.image_prefix }}
