@@ -31,7 +31,7 @@ via the `WANDB_API_KEY` environment variable:
 
 <div editor-title=".dstack/workflows/secrets.yaml"> 
 
-```yaml
+```yaml hl_lines="5 6"
 workflows:
   - name: hello
     provider: bash

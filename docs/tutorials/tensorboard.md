@@ -7,7 +7,7 @@ With `dstack`, you can enjoy TensorBoard's benefits and version all metrics,
 while conveniently running training locally or remotely via the CLI.
 
 !!! info "NOTE:"
-    The source code for this tutorial can be located in [`github.com/dstack-examples`](https://github.com/dstackai/dstack-examples/).
+    The source code for this tutorial can be located in [`github.com/dstack-examples`](https://github.com/dstackai/dstack-examples/blob/main/tutorials/tensorboard/train.py).
 
 ## Define a workflow
 
@@ -16,7 +16,7 @@ workflow YAML file.
 
 Create the following `.dstack/workflows/tensorboard.yaml` file:
 
-```yaml
+```yaml hl_lines="7 10"
 workflows:
   - name: train-tensorboard
     provider: bash
@@ -50,7 +50,7 @@ lightning_logs folder.
     
     Our first step will be to define a `LightningDataModule`.
     
-    ```python
+    ```python hl_lines="16 24-25"
     class MNISTDataModule(pl.LightningDataModule):
         def __init__(self, data_dir: Path = Path("data"), batch_size: int = 32, num_workers: int = os.cpu_count()):
             super().__init__()
@@ -86,7 +86,7 @@ lightning_logs folder.
     
     We can now define the `LightningModule`.
     
-    ```python
+    ```python hl_lines="32-41"
     class LitMNIST(pl.LightningModule):
         def __init__(self, hidden_size=64, learning_rate=2e-4):
             super().__init__()
@@ -141,7 +141,7 @@ lightning_logs folder.
     
     Finally, let's define the `main` function that puts everything together.
     
-    ```python
+    ```python hl_lines="5-6 11"
     def main():
         dm = MNISTDataModule()
         model = LitMNIST()
@@ -277,3 +277,15 @@ a tracking server.
 You can conveniently run workflows locally or remotely (in a configured cloud account), while keeping the
 logs accessible at any moment by the team. 
 This allows for scaling up ML experiments without a complicated setup.
+
+### Get started
+
+Are you interested in trying `dstack`? You can get your first ML workflows up and running in less than 30 minutes.
+
+<div class="grid cards" markdown>
+- [**1. Installation** 
+   Install and configure the `dstack` CLI in no time.](../installation.md)
+
+- [**2. Quick start**
+   Try `dstack` by following a simple step-by-step tutorial.](../quick-start.md)
+</div>

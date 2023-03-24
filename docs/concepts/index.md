@@ -23,7 +23,7 @@ Here's an example from the [Quick start](https://docs.dstack.ai/quick-start):
 
 <div editor-title=".dstack/workflows/mnist.yaml"> 
 
-```yaml
+```yaml hl_lines="8 13 18"
 workflows:
   - name: mnist-data
     provider: bash

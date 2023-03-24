@@ -475,7 +475,7 @@ code .md-code__nav:hover .md-code__button {
     --md-default-fg-color--lighter: rgb(159, 172, 190);
     --md-default-fg-color--lightest: #f6f9fc;
     --md-footer-fg-color--light: var(--md-default-fg-color);
-    --md-code-hl-color--light: rgba(66, 135, 255, 0.12);
+    --md-code-hl-color--light: rgba(197, 173, 255, 0.12);
 }
 
 .md-typeset .highlight :where(.l) {
@@ -484,12 +484,9 @@ code .md-code__nav:hover .md-code__button {
 }
 
 .md-typeset .highlight .hll {
-    /*background-color: inherit;*/
-    /*font-weight: 500;*/
-    /*MKDocs Insiders fix*/
-    /*box-shadow: none;*/
-    margin: 0 -1.65858em;
-    padding: 0 1.65858em;
+    box-shadow: 3px 0px 0px 0.1px var(--md-primary-fg-color) inset;
+    margin: 0 -1.8em;
+    padding: 0 1.8em;
 }
 
 body {

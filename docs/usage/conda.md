@@ -37,7 +37,7 @@ Now, define a workflow YAML file:
 
 <div editor-title=".dstack/workflows/conda.yaml"> 
 
-```yaml
+```yaml hl_lines="5 6"
 workflows:
   - name: hello-conda
     provider: bash
@@ -50,9 +50,13 @@ workflows:
 
 Run it locally using the `dstack run` command:
 
+<div class="termy">
+
 ```shell
-dstack run hello-conda
+$ dstack run hello-conda
 ```
+
+</div>
 
 ## Conda environments
 
@@ -77,7 +81,7 @@ Now, create the following workflow YAML file:
 
 <div editor-title=".dstack/workflows/conda.yaml">
 
-```yaml
+```yaml hl_lines="5 7 12 14"
 workflows:
   - name: setup-conda
     provider: bash
@@ -120,8 +124,6 @@ conda environments:
 base                     /opt/anaconda3
 workflow                 /opt/conda/envs/workflow
 myenv                *   /opt/conda/envs/myenv
-
-$ 
 ```
 
 </div>

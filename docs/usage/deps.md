@@ -12,7 +12,7 @@ Let's create the following workflow YAML file:
 
 <div editor-title=".dstack/workflows/deps.yaml"> 
 
-```yaml
+```yaml hl_lines="5 7"
 workflows:
   - name: cat-txt-2
     provider: bash
@@ -54,7 +54,7 @@ Let's reuse the `txt-file` tag from another workflow:
 
 <div editor-title=".dstack/workflows/deps.yaml"> 
 
-```yaml
+```yaml hl_lines="5 7"
 workflows:
   - name: cat-txt
     provider: bash
@@ -84,7 +84,7 @@ The workflow below uses a tag from the `dstackai/dstack` repo:
 
 <div editor-title=".dstack/workflows/deps.yaml"> 
 
-    ```yaml
+    ```yaml hl_lines="5 7"
     workflows:
       - name: cat-txt-3
         provider: bash

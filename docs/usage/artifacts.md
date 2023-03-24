@@ -9,7 +9,7 @@ Create the following workflow YAML file:
 
 <div editor-title=".dstack/workflows/artifacts.yaml"> 
 
-```yaml
+```yaml hl_lines="5 7"
 workflows:
   - name: hello-txt
     provider: bash
@@ -140,7 +140,7 @@ Now, create the following workflow YAML file:
 
 <div editor-title=".dstack/workflows/resources.yaml"> 
 
-```yaml
+```yaml hl_lines="5 7 8 9"
 workflows:
   - name: hello-sh
     provider: bash

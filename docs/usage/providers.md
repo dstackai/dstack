@@ -18,7 +18,7 @@ The `bash` provider is the most common. It allows to run arbitrary bash commands
 
 <div editor-title=".dstack/workflows/providers.yaml"> 
 
-```yaml
+```yaml hl_lines="3 5"
 workflows:
   - name: hello
     provider: bash
@@ -63,7 +63,7 @@ The `docker` provider allows to run a user Docker image.
 
 <div editor-title=".dstack/workflows/providers.yaml">
 
-```yaml
+```yaml hl_lines="3 4 6"
 workflows:
   - name: hello-docker
     provider: docker
@@ -103,7 +103,7 @@ The `code` provider runs a VS Code application.
 
 <div editor-title=".dstack/workflows/providers.yaml">
 
-```yaml
+```yaml hl_lines="3"
 workflows:
   - name: ide-code
     provider: code

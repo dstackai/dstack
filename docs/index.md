@@ -8,6 +8,7 @@ hide:
 
 Welcome to `dstack`'s documentation! Here you can learn what it is, how it works, and how to get started.
 
+
 ## What is dstack?
 
 `dstack` is an open-source tool that enables defining ML workflows as code, running them easily on any cloud while saving
@@ -24,7 +25,7 @@ Define ML workflows, their output artifacts, hardware requirements, and dependen
 
 <div editor-title=".dstack/workflows/mnist.yaml"> 
 
-```yaml
+```yaml hl_lines="8 13 18"
 workflows:
   - name: mnist-data
     provider: bash

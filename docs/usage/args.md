@@ -23,7 +23,7 @@ Then, define the following workflow YAML file:
 
 <div editor-title=".dstack/workflows/args.yaml"> 
 
-```yaml
+```yaml hl_lines="5"
 workflows:
   - name: hello-args
     provider: bash

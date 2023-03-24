@@ -7,7 +7,7 @@ Create the following workflow YAML file:
 
 <div editor-title=".dstack/workflows/hello.yaml"> 
 
-```yaml
+```yaml hl_lines="5"
 workflows:
   - name: hello
     provider: bash

@@ -18,7 +18,7 @@ Then, create a workflow YAML file:
 
 <div editor-title=".dstack/workflows/python.yaml">
 
-```yaml
+```yaml  hl_lines="5"
 workflows:
   - name: hello-py
     provider: bash
@@ -81,7 +81,7 @@ Now, create the following workflow YAML file:
 
 <div editor-title=".dstack/workflows/python.yaml"> 
 
-```yaml
+```yaml  hl_lines="5 6"
 workflows:
   - name: hello-pandas
     provider: bash
@@ -109,7 +109,7 @@ You can override the major Python version using the `python` property:
 
 <div editor-title=".dstack/workflows/python-version.yaml">
 
-```yaml
+```yaml  hl_lines="6"
 workflows:
   - name: python-version
     provider: bash

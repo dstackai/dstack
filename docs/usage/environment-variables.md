@@ -7,7 +7,7 @@ The workflow below sets environment variables:
 
 <div editor-title=".dstack/workflows/envs.yaml"> 
 
-```yaml
+```yaml hl_lines="5 6 7"
 workflows:
   - name: hello-env
     provider: bash

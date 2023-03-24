@@ -15,7 +15,7 @@ If you run the following workflow remotely, `dstack` will automatically provisio
 
 <div editor-title=".dstack/workflows/resources.yaml">
 
-```yaml
+```yaml hl_lines="7 8 9"
 workflows:
   - name: gpu-v100
     provider: bash
@@ -51,7 +51,7 @@ If you run the following workflow remotely, `dstack` will automatically provisio
 
 <div editor-title=".dstack/workflows/resources.yaml"> 
 
-```yaml
+```yaml hl_lines="7"
 workflows:
   - name: mem-64gb
     provider: bash
@@ -82,7 +82,7 @@ The workflow below uses `16GB` of shared memory:
 
 <div editor-title=".dstack/workflows/resources.yaml"> 
 
-```yaml
+```yaml hl_lines="7"
 workflows:
   - name: shm-size
     provider: bash
@@ -114,7 +114,7 @@ If you run the following workflow remotely, `dstack` will automatically provisio
 
 <div editor-title=".dstack/workflows/resources.yaml"> 
 
-```yaml
+```yaml hl_lines="7 8"
 workflows:
   - name: gpu-i
     provider: bash
@@ -142,7 +142,7 @@ This workflow will run remotely by default:
 
 <div editor-title=".dstack/workflows/resources.yaml"> 
 
-```yaml
+```yaml hl_lines="7"
 workflows:
   - name: local-hello
     provider: bash

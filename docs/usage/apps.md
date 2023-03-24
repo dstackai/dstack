@@ -30,7 +30,7 @@ Now, define the following workflow YAML file:
 
 <div editor-title=".dstack/workflows/apps.yaml"> 
 
-```yaml
+```yaml hl_lines="4 7"
 workflows:
   - name: hello-fastapi
     provider: bash
