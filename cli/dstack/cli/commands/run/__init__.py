@@ -298,7 +298,7 @@ class RunCommand(BasicCommand):
             repo_credentials = backend.get_repo_credentials(repo_data)
             if not repo_credentials:
                 sys.exit(f"Call `dstack init` first")
-            if backend != "local":
+            if backend != "local" and not args.detach:
                 if not repo_credentials.ssh_key_path:
                     console.print(
                         "[error]Can't attach to remote: run `dstack init` to set SSH keypair[/error]"
