@@ -1,6 +1,6 @@
 name: Manual Azure build for STGN
 
-on: [workflow_dispatch]
+on: [workflow_dispatch, push]
 
 jobs:
   azure-image-build:
@@ -12,19 +12,34 @@ jobs:
       AZURE_CLIENT_SECRET: ${{ secrets.AZURE_CLIENT_SECRET }}
       AZURE_TENANT_ID: ${{ secrets.AZURE_TENANT_ID }}
       AZURE_SUBSCRIPTION_ID: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
+      VERSION: ${{ github.run_number }}
     strategy:
       matrix:
-        variants: [ azure-without-cuda, azure-cuda ]
+        variants: [ azure-image, azure-image-cuda ]
+        include:
+          - variant: azure-image
+            image_prefix: stgn-dstack-nocuda
+          - variant: azure-image-cuda
+            image_prefix: stgn-dstack-cuda
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v3
-      - name: Download packer
+      - uses: Azure/login@v1
+        name: Log in to az
+        with:
+          creds: '{"clientId":"${{ secrets.AZURE_CLIENT_ID }}","clientSecret":"${{ secrets.AZURE_CLIENT_SECRET }}","subscriptionId":"${{ secrets.AZURE_SUBSCRIPTION_ID }}","tenantId":"${{ secrets.AZURE_TENANT_ID }}"}'
+      # - name: Download packer
+      #   run: |
+      #     wget https://releases.hashicorp.com/packer/1.8.0/packer_1.8.0_linux_amd64.zip
+      #     unzip packer_1.8.0_linux_amd64.zip
+      #     chmod +x packer
+      #     cp -R ami/packer/* .
+      # - name: Run packer
+      #   run: |
+      #     ./packer build -var build_id=$VERSION ${{ matrix.variants }}.json
+      - name: Publish azure image
         run: |
-          wget https://releases.hashicorp.com/packer/1.8.0/packer_1.8.0_linux_amd64.zip
-          unzip packer_1.8.0_linux_amd64.zip
-          chmod +x packer
-          cp -R ami/packer/* .
-      - name: Run packer
-        run: |
-          VERSION=${{ github.run_number }}
-          ./packer build -var build_id=$VERSION ${{ matrix.variants }}.json
+          IMAGE_DEFINITION=${{ matrix.image_prefix }}
+          IMAGE_VERSION=0.0.1
+          IMAGE_NAME=${{ matrix.image_prefix }}-1678525331
+          ../scripts/publish_azure_image.sh $IMAGE_DEFINITION $IMAGE_VERSION $IMAGE_NAME
