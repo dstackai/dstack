@@ -1,6 +1,5 @@
 from argparse import Namespace
 
-from rich import print
 from rich.prompt import Confirm
 
 from dstack.api.backend import list_backends
@@ -69,4 +68,4 @@ class StopCommand(BasicCommand):
             if args.run_name and not found_run:
                 console.print(f"Cannot find the run '{args.run_name}'")
                 exit(1)
-            print(f"[grey58]OK[/]")
+            console.print(f"[grey58]OK[/]")
