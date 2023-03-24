@@ -333,7 +333,7 @@
     background-color: rgb(30, 35, 45);
     padding: 65px 25px 35px;
     border-radius: 4px;
-    font-size: 15px;
+    font-size: 14px;
 
     /*border-radius: 6px;*/
     /*border-top: 1px solid #dce0e6;*/
@@ -459,9 +459,9 @@ code .md-code__nav:hover .md-code__button {
     --md-primary-fg-color: #8a2be2;
     --md-accent-fg-color: #8a2be2;
     --md-typeset-a-color: #8a2be2;
-    --md-code-hl-function-color: #b77bd8;
-    --md-code-hl-keyword-color: #b77bd8;
-    --md-code-hl-string-color: #66c08a;
+    --md-code-hl-function-color: #ca98e6;
+    --md-code-hl-keyword-color: #ca98e6;
+    --md-code-hl-string-color: #8fdbae;
     --md-code-fg-color: #eee;
     /*--md-code-fg-color: rgba(0, 0, 0, 0.95);*/
     --md-code-hl-comment-color: #757585;
@@ -475,18 +475,21 @@ code .md-code__nav:hover .md-code__button {
     --md-default-fg-color--lighter: rgb(159, 172, 190);
     --md-default-fg-color--lightest: #f6f9fc;
     --md-footer-fg-color--light: var(--md-default-fg-color);
+    --md-code-hl-color--light: rgba(66, 135, 255, 0.12);
 }
 
 .md-typeset .highlight :where(.l) {
-    color: #eee !important;
+    /*color: #eee !important;*/
     /*color: var(--md-code-fg-color) !important;*/
 }
 
 .md-typeset .highlight .hll {
-    background-color: inherit;
-    font-weight: 500;
+    /*background-color: inherit;*/
+    /*font-weight: 500;*/
     /*MKDocs Insiders fix*/
-    box-shadow: none;
+    /*box-shadow: none;*/
+    margin: 0 -1.65858em;
+    padding: 0 1.65858em;
 }
 
 body {
@@ -591,12 +594,20 @@ body {
 }
 
 .md-nav__item .md-nav__link--active {
-    color: var(--md-typeset-a-color);
+    /*color: var(--md-typeset-a-color);*/
+    /*border-left: 2px solid var(--md-typeset-a-color);
+    color: inherit;
+    font-weight: 700;*/
+}
+
+.md-path__link {
+    color: var(--md-default-fg-color);
+    ont-size: 0.7rem;
 }
 
 @media screen and (min-width: 76.1875em) {
     .md-nav__item--section>.md-nav>.md-nav__list>li.md-nav__item:not(.md-nav__item--nested):not(.md-nav__item--active) {
-        padding-left: 1.0rem;
+        padding-left: 0.4rem;
         /*margin-left: -4px;*/
         /*color: inherit;*/
     }
@@ -604,7 +615,7 @@ body {
         overflow: inherit;
     }
     .md-nav__item--section>.md-nav>.md-nav__list>.md-nav__item {
-        padding-left: 1.0rem;
+        padding-left: 0.4rem;
     }
     /*MKDocs Insiders fix*/
     /*.md-sidebar--primary a.md-nav__link--active::before {*/
@@ -646,7 +657,7 @@ html .md-footer-meta.md-typeset a:is(:focus,:hover) {
 @media screen and (max-width: 76.1875em) {
     .md-sidebar--primary .md-nav__link {
         padding: inherit;
-        margin: 10px 15px;
+        margin: 5px 5px;
     }
 
     .md-sidebar--primary .md-nav__item .md-nav__link--active {
@@ -706,7 +717,7 @@ html .md-footer-meta.md-typeset a:is(:focus,:hover) {
 
 @media screen and (min-width: 76.25em) {
     [dir=ltr] .md-sidebar--primary:not([hidden]) ~ .md-content > .md-content__inner {
-        margin-left: 2.4rem;
+        margin-left: 1.2rem;
     }
 }
 

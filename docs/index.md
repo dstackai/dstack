@@ -1,7 +1,7 @@
 ---
 title: Easy-to-run ML workflows on any cloud
-#hide:
-#  - footer
+hide:
+  - path
 ---
 
 # Easy-to-run ML workflows on any cloud

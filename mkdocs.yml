@@ -41,6 +41,7 @@ theme:
   #          icon: material/weather-sunny
   #          name: Switch to light mode
   features:
+    - navigation.path
     - content.code.copy
     - content.action.edit
     #    - navigation.indexes
@@ -140,7 +141,9 @@ nav:
         - Args: usage/args.md
       - Tutorials:
           - Stable Diffusion: tutorials/stable-diffusion.md
-          - Weights & Biases: tutorials/wandb.md
+          - Experiment tracking:
+            - TensorBoard: tutorials/tensorboard.md
+            - Weights & Biases: tutorials/wandb.md
       - Support:
           - Troubleshooting: troubleshooting.md
           - Slack: https://join.slack.com/t/dstackai/shared_invite/zt-xdnsytie-D4qU9BvJP8vkbkHXdi6clQ
