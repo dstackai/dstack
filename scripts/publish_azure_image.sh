@@ -40,7 +40,7 @@ function create_image_version() {
         --gallery-name $gallery_name \
         --gallery-image-definition $image_definition \
         --gallery-image-version $image_version \
-        --target-regions "germanywestcentral" "westcentralus" \
+        --target-regions "australiacentral" "australiacentral2" "australiaeast" "australiasoutheast" "brazilsouth" "brazilsoutheast" "canadacentral" "canadaeast" "centralindia" "centralus" "centraluseuap" "eastasia" "eastus" "eastus2" "eastus2euap" "eastusstg" "francecentral" "francesouth" "germanynorth" "germanywestcentral" "japaneast" "japanwest" "jioindiacentral" "jioindiawest" "koreacentral" "koreasouth" "northcentralus" "northeurope" "norwayeast" "norwaywest" "qatarcentral" "southafricanorth" "southafricawest" "southcentralus" "southeastasia" "southindia" "swedencentral" "switzerlandnorth" "switzerlandwest" "uaecentral" "uaenorth" "uksouth" "ukwest" "westcentralus" "westeurope" "westindia" "westus" "westus2" "westus3" \
         --replica-count 1 \
         --managed-image "/subscriptions/${subscription_id}/resourceGroups/packer/providers/Microsoft.Compute/images/${image_name}"
 }
