@@ -209,6 +209,7 @@ def poll_run(repo_address: RepoAddress, job_heads: List[JobHead], backend: Backe
             run_ssh_tunnel(
                 ssh_key, jobs[0].host_name, ports
             )  # todo: cleanup explicitly (stop tunnel)
+        run = backend.list_run_heads(repo_address, run_name)[0]
         if len(job_heads) == 1 and run and run.status == JobStatus.RUNNING:
             poll_logs_ws(backend, repo_address, jobs[0], ports)
         else:
