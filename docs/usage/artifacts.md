@@ -44,7 +44,7 @@ by the name of the run.
 <div class="termy">
 
 ```shell
-dstack ls grumpy-zebra-1
+$ dstack ls grumpy-zebra-1
 
 PATH  FILE                                  SIZE
 data  MNIST/raw/t10k-images-idx3-ubyte      7.5MiB
@@ -54,9 +54,7 @@ data  MNIST/raw/t10k-images-idx3-ubyte      7.5MiB
       MNIST/raw/train-images-idx3-ubyte     44.9MiB
       MNIST/raw/train-images-idx3-ubyte.gz  9.5MiB
       MNIST/raw/train-labels-idx1-ubyte     58.6KiB
-      MNIST/raw/train-labels-idx1-ubyte.gz  28.2KiB
-      
-$ 
+      MNIST/raw/train-labels-idx1-ubyte.gz  28.2KiB    
 ```
 
 </div>
@@ -66,7 +64,8 @@ $
 When you run a workflow locally, artifacts are stored in `~/.dstack/artifacts` and can be reused only from the workflows
 that run locally too.
 
-If you'd like to reuse the artifacts outside your machine, you must push these artifacts using the `dstack push` command:
+If you'd like to reuse the artifacts outside your machine, you must push these artifacts using the 
+[`dstack push`](../reference/cli/push.md) command:
 
 <div class="termy">
 
@@ -79,6 +78,43 @@ $ dstack push grumpy-zebra-1
 !!! info "NOTE:"
     If you run a workflow remotely, artifacts are pushed automatically, and it's typically a lot faster
     than pushing artifacts of a local run.
+
+## Pull artifacts
+
+When running a workflow remotely, such as when using `--remote` with the `dstack run` command, the resulting artifacts are
+stored remotely. 
+
+If you wish to access these artifacts locally, you can use the [`dstack pull`](../reference/cli/pull.md) command.
+
+<div class="termy">
+
+```shell
+$ dstack pull grumpy-zebra-1
+```
+
+</div>
+
+This command downloads the artifacts to `~/.dstack/artifacts` and enables their reuse in your other local workflows.
+
+## Add tags
+
+If you wish to reuse the artifacts of a specific run, you can assign a tag (via the [`dstack tags`](../reference/cli/tags.md) command) 
+to it and use the tag to reference the artifacts. 
+
+Here's how to add a tag to a run:
+
+<div class="termy">
+
+```shell
+$ dstack tags add grumpy-zebra-1 awesome-tag
+```
+
+</div>
+
+Even if you delete the `grumpy-zebra-1` run, you can still access its artifacts using the `awesome-tag` tag name. 
+
+You can reference a tag through the [`dstack push`](../reference/cli/push.md),
+[`dstack pull`](../reference/cli/pull.md), [`dstack ls`](../reference/cli/ls.md), and through [Deps](deps.md#tags)."
 
 ## Real-time artifacts
 

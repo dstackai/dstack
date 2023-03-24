@@ -34,8 +34,6 @@ Provisioning... It may take up to a minute. ✓
 To interrupt, press Ctrl+C.
 
 Hello, world!
-
-$
 ```
 
 </div>
@@ -62,8 +60,6 @@ Provisioning... It may take up to a minute. ✓
 To interrupt, press Ctrl+C.
 
 Hello, world!
-
-$
 ```
 
 </div>

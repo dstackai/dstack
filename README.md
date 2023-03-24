@@ -153,7 +153,6 @@ To interrupt, press Ctrl+C.
 GPU available: True, used: True
 
 Epoch 1: [00:03<00:00, 280.17it/s, loss=1.35, v_num=0]
-$ 
 ```
 
 Upon running a workflow remotely, `dstack` automatically creates resources in the configured cloud account and destroys them

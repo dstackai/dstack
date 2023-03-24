@@ -54,13 +54,14 @@ experiment trackers, and cloud providers.
 
 ## Artifacts
 
-Artifacts enable you to save any files produced by a workflow for later reuse in other workflows. They may include data,
-model checkpoints, or even a pre-configured Conda environment.
+When running a workflow locally, the artifacts are stored in `~/.dstack/artifacts` and can only be reused from workflows
+that also run locally. To reuse the artifacts remotely, you must push them using the [`dstack push`](../reference/cli/push.md) command.
 
-When running a workflow locally, the artifacts are saved locally. To push the artifacts of a local to a configured remote,
-use the `dstack push` command.
+When running a workflow remotely, the resulting artifacts are automatically stored remotely. If you want to access the
+artifacts of a remote workflow locally, you can use the [`dstack pull`](../reference/cli/pull.md) command.
 
-When running a workflow remotely, the artifacts are pushed to the remote automatically.
+To conveniently refer to the artifacts of a particular run, you can assign a tag to it using
+the [`dstack tags`](../reference/cli/tags.md) command.
 
 ## CLI
 
