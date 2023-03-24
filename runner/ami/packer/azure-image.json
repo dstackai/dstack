@@ -19,7 +19,7 @@
     "tenant_id": "{{user `azure_tenant_id`}}",
     "subscription_id": "{{user `azure_subscription_id`}}",
     "managed_image_resource_group_name": "packer",
-    "managed_image_name": "{{user `build_prefix`}}dstack-{{user `build_id`}}",
+    "managed_image_name": "{{user `build_prefix`}}dstack-nocuda-{{user `build_id`}}",
     "os_type": "Linux",
     "image_publisher": "Canonical",
     "image_offer": "UbuntuServer",
