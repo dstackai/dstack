@@ -811,7 +811,11 @@ html .md-footer-meta.md-typeset a:is(:focus,:hover) {
     margin: 0;
     padding: 1rem 1.4rem;
     border-radius: 6px;
-    border: rgba(0,0,0,0.6) 0.5px solid;
+    border: rgba(0,0,0,0.6) 1px solid;
+}
+
+.md-typeset .grid.cards>ol>li:focus-within,.md-typeset .grid.cards>ol>li:hover,.md-typeset .grid.cards>ul>li:focus-within,.md-typeset .grid.cards>ul>li:hover,.md-typeset .grid>.card:focus-within,.md-typeset .grid>.card:hover {
+    box-shadow: none;
 }
 
 .md-typeset .grid.cards>:-webkit-any(ul,ol)>li, .md-typeset .grid>.card {

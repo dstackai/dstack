@@ -16,7 +16,7 @@ workflow YAML file.
 
 Create the following `.dstack/workflows/tensorboard.yaml` file:
 
-```yaml hl_lines="7 10"
+```yaml hl_lines="4 7 10"
 workflows:
   - name: train-tensorboard
     provider: bash
