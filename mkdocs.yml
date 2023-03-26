@@ -65,9 +65,9 @@ plugins:
         text: "#FFFFFF"
       cards_font: Roboto
   - search
-#  - redirects:
-#      redirect_maps:
-#        'index.md': 'quickstart/index.md'
+  - redirects:
+      redirect_maps:
+        'integrations/experiments/wandb.md': 'tutorials/wandb.md'
 
 # Extensions
 markdown_extensions:
