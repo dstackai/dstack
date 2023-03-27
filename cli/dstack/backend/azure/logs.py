@@ -13,6 +13,9 @@ from dstack.core.job import Job
 from dstack.core.log_event import LogEvent
 from dstack.core.repo import RepoAddress
 
+LOGS_TABLE_NAME = "dstack_logs_CL"
+
+
 POLL_LOGS_ATTEMPTS = 10
 POLL_LOGS_WAIT_TIME = 2
 
@@ -26,7 +29,7 @@ class AzureLogging:
     ):
         self.resource_group = resource_group
         self.workspace_id = workspace_id
-        self.logs_table = "dstackLogTable_CL"
+        self.logs_table = LOGS_TABLE_NAME
         self.logs_query_client = LogsQueryClient(credential=credential)
 
     def poll_logs(

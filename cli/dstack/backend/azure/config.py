@@ -2,10 +2,35 @@ import json
 import re
 from inspect import signature
 from pathlib import Path
-from typing import Dict, List
+from typing import Dict, List, Optional, Tuple
 
 import yaml
+from azure.core.credentials import TokenCredential
 from azure.identity import DefaultAzureCredential
+from azure.mgmt.keyvault import KeyVaultManagementClient
+from azure.mgmt.keyvault.models import (
+    AccessPolicyEntry,
+    Permissions,
+    SecretPermissions,
+    Sku,
+    Vault,
+    VaultCreateOrUpdateParameters,
+    VaultProperties,
+)
+from azure.mgmt.loganalytics import LogAnalyticsManagementClient
+from azure.mgmt.loganalytics.models import Column, ColumnTypeEnum, Schema, Table, Workspace
+from azure.mgmt.monitor import MonitorManagementClient
+from azure.mgmt.monitor.models import (
+    DataCollectionEndpointResource,
+    DataCollectionRuleDestinations,
+    DataCollectionRuleResource,
+    DataFlow,
+    LogAnalyticsDestination,
+)
+from azure.mgmt.msi import ManagedServiceIdentityClient
+from azure.mgmt.msi.models import Identity
+from azure.mgmt.storage import StorageManagementClient
+from azure.mgmt.storage.models import BlobContainer
 from azure.mgmt.subscription import SubscriptionClient
 from azure.mgmt.subscription.models import Subscription, TenantIdDescription
 from pydantic.error_wrappers import ValidationError
@@ -16,6 +41,7 @@ from pydantic.tools import parse_obj_as
 from pydantic.types import constr
 from rich.prompt import Prompt
 
+from dstack.backend.azure import utils as azure_utils
 from dstack.cli.common import ask_choice, console
 from dstack.core.config import BackendConfig, Configurator, get_config_path
 from dstack.core.error import ConfigError
@@ -105,40 +131,19 @@ locations = [
 ]
 
 
-class ModelMeta(type(BackendConfig)):
-    def __new__(mcs, name, bases, namespace, **kwargs):
-        init = signature(namespace["__init__"])
-        parameters = iter(init.parameters.items())
-        # skip self.
-        next(parameters)
-        fields = {
-            name: (
-                parameter.annotation,
-                parameter.default if parameter.default is not parameter.empty else ...,
-            )
-            for name, parameter in parameters
-        }
-        Config = create_model(
-            f"{name}Model",
-            __config__=type("Config", (), {"orm_mode": True}),
-            **{"backend": (str, Field(default=namespace["NAME"])), **fields},
-        )
-        new_namespace = {**namespace, "__model__": Config}
-        return super().__new__(mcs, name, bases, new_namespace, **kwargs)
-
-
-class AzureConfig(BackendConfig, metaclass=ModelMeta):
+class AzureConfig(BackendConfig):
     NAME = "azure"
 
     def __init__(
         self,
-        subscription_id: str,
         tenant_id: str,
+        subscription_id: str,
         location: str,
         resource_group: str,
-        secret_url: stricturl(allowed_schemes={"https"}),
-        storage_url: stricturl(allowed_schemes={"https"}),
-        storage_container: str,
+        storage_account: str,
+        secret_url: str,
+        network: str,
+        subnet: str,
     ):
         self.subscription_id = subscription_id
         self.tenant_id = tenant_id
@@ -146,23 +151,51 @@ class AzureConfig(BackendConfig, metaclass=ModelMeta):
         self.resource_group = resource_group
         self.secret_url = secret_url
         self.secret_vault = secret_url.host.split(".", 1)[0]
-        self.storage_url = storage_url
-        self.storage_account = storage_url.host.split(".", 1)[0]
-        self.storage_container = storage_container
+        self.storage_account = storage_account
         self.network = "dstackNetwork"
         self.subnet = "default"
         self.managed_identity = "dstackManagedIdentity"
 
-    def save(self, path: Path = get_config_path()):
-        with open(path, "w+") as f:
-            f.write(self.serialize_yaml())
+    def serialize(self) -> Dict:
+        res = {
+            "backend": "azure",
+            "tenant_id": self.tenant_id,
+            "subscription_id": self.subscription_id,
+            "location": self.location,
+            "storage_account": self.storage_account,
+            "network": self.network,
+            "subnet": self.subnet,
+        }
+        return res
 
     def serialize_yaml(self) -> str:
         return yaml.dump(self.serialize())
 
-    def serialize(self) -> Dict:
-        # XXX: this is a suboptimal way.
-        return json.loads(self.__class__.__model__.from_orm(self).json())
+    @classmethod
+    def deserialize(cls, data: Dict) -> "AzureConfig":
+        if data.get("backend") != "azure":
+            raise ConfigError(f"Not an Azure config")
+
+        try:
+            tenant_id = data["tenant_id"]
+            subscription_id = data["subscription_id"]
+            location = data["location"]
+            resource_group = data["resource_group"]
+            storage_account = data["storage_account"]
+            network = data["network"]
+            subnet = data["subnet"]
+        except KeyError:
+            raise ConfigError("Cannot load config")
+
+        return cls(
+            tenant_id=tenant_id,
+            subscription_id=subscription_id,
+            location=location,
+            resource_group=resource_group,
+            storage_account=storage_account,
+            network=network,
+            subnet=subnet,
+        )
 
     @classmethod
     def deserialize_yaml(cls, yaml_content: str) -> "AzureConfig":
@@ -172,29 +205,21 @@ class AzureConfig(BackendConfig, metaclass=ModelMeta):
         return cls.deserialize(content)
 
     @classmethod
-    def load(cls, path: Path = get_config_path()):
+    def load(cls, path: Path = get_config_path()) -> "AzureConfig":
         if not path.exists():
             raise ConfigError("No config found")
         with open(path) as f:
             return cls.deserialize_yaml(f.read())
 
-    @classmethod
-    def deserialize(cls, data: Dict) -> "AzureConfig":
-        try:
-            config = cls.__model__(**data)
-        except ValidationError as e:
-            raise ConfigError(f"Parsing config data failed with {e!r}.")
-        if config.backend != cls.NAME:
-            raise ConfigError(f"It's not Azure config. It's {config.backend!r}.")
-        return cls(**config.dict(exclude={"backend"}))
+    def save(self, path: Path = get_config_path()):
+        with open(path, "w+") as f:
+            f.write(self.serialize_yaml())
 
 
 omitted = object()
 
 
 class AzureConfigurator(Configurator):
-    # XXX: duplicate name from AzureBackend.
-    # XXX: duplicate name from AzureConfig.
     NAME = "azure"
 
     def parse_args(self, args: List = []):
@@ -207,160 +232,316 @@ class AzureConfigurator(Configurator):
         pass
 
     def configure_cli(self):
-        defaults = {}
-        try:
-            # XXX: signature of Configurator.load requires to return whole valid config.
-            # Which forbids to do recover some data and to use it as defaults.
-            config = AzureConfig.load()
-        except ConfigError:
-            pass
+        tenant_id = None
+        subscription_id = None
+        location = None
+        storage_account = None
 
-        else:
-            defaults = AzureConfig.__model__.from_orm(config).dict()
+        # try:
+        #     config = AzureConfig.load()
+        # except ConfigError:
+        #     config = None
 
-        subscription_id = self._ask_subscription_id(defaults.get("subscription_id", omitted))
-        tenant_id = self._ask_tenant_id(defaults.get("tenant_id", omitted))
-        location = self._ask_location(defaults.get("location", omitted))
-        secret_url = self._ask_secret_url(defaults.get("secret_url", omitted))
-        secret_resource_group = self._ask_secret_resource_group(
-            defaults.get("secret_resource_group", omitted)
-        )
-        storage_url = self._ask_storage_url(defaults.get("storage_url", omitted))
-        storage_container = self._ask_storage_container(defaults.get("storage_container", omitted))
+        self.credential = DefaultAzureCredential()
 
-        config = AzureConfig.deserialize(
-            data={
-                "subscription_id": subscription_id,
-                "tenant_id": tenant_id,
-                "location": location,
-                "secret_url": secret_url,
-                "secret_resource_group": secret_resource_group,
-                "storage_url": storage_url,
-                "storage_container": storage_container,
-            }
+        self.tenant_id = self._ask_tenant_id(tenant_id)
+        self.subscription_id = self._ask_subscription_id(subscription_id)
+
+        self.location = self._ask_location(location)
+        storage_account = self._ask_storage_account(storage_account)
+
+        config = AzureConfig(
+            tenant_id=self.tenant_id,
+            subscription_id=self.subscription_id,
+            location=self.location,
+            # resource_group=
         )
         config.save()
         console.print(f"[grey58]OK[/]")
 
-    def _ask_subscription_id(self, default):
-        credential = DefaultAzureCredential()
-        subscription_client = SubscriptionClient(credential)
-        labels = []
-        values = []
-        subscription: Subscription
-        for subscription in subscription_client.subscriptions.list():
-            labels.append(f"{subscription.display_name} {subscription.subscription_id}")
-            values.append(subscription.subscription_id)
-        if default is omitted:
-            default = None
-        value = ask_choice("Choose Azure subscription", labels, values, selected_value=default)
-        return value
-
-    def _ask_tenant_id(self, default):
-        credential = DefaultAzureCredential()
-        subscription_client = SubscriptionClient(credential)
+    def _ask_tenant_id(self, default_tenant_id: Optional[str]) -> str:
+        subscription_client = SubscriptionClient(credential=self.credential)
         labels = []
         values = []
         tenant: TenantIdDescription
         for tenant in subscription_client.tenants.list():
             labels.append(tenant.tenant_id)
             values.append(tenant.tenant_id)
-        if default is omitted:
-            default = None
-        value = ask_choice("Choose Azure Tenant", labels, values, selected_value=default)
+        value = ask_choice("Choose Azure tenant", labels, values, selected_value=default_tenant_id)
         return value
 
-    def _ask_location(self, default):
-        if default is omitted:
-            default = None
+    def _ask_subscription_id(self, default_subscription_id: Optional[str]) -> str:
+        subscription_client = SubscriptionClient(credential=self.credential)
+        labels = []
+        values = []
+        subscription: Subscription
+        for subscription in subscription_client.subscriptions.list():
+            labels.append(f"{subscription.display_name} {subscription.subscription_id}")
+            values.append(subscription.subscription_id)
+        value = ask_choice(
+            "Choose Azure subscription", labels, values, selected_value=default_subscription_id
+        )
+        return value
+
+    def _ask_location(self, default_location: Optional[str]) -> str:
         value = ask_choice(
             "Choose Azure location",
             [f"{l[0]} [{l[1]}]" for l in locations],
             [l[1] for l in locations],
-            selected_value=default,
+            selected_value=default_location,
         )
         return value
 
-    def _ask_secret_url(self, default):
-        kwargs = {"default": default} if default is not omitted else {}
-        type_ = AzureConfig.__model__.__fields__["secret_url"].type_
-        while True:
-            secret_url = Prompt.ask(
-                "[sea_green3 bold]?[/sea_green3 bold] [bold]Enter Key Vault url[/bold]",
-                **kwargs,
-            )
-            try:
-                secret_url_parsed = parse_obj_as(type_, secret_url)
-            except ValidationError as e:
-                console.print(f"Url is not valid. Errors:")
-                for error in e.errors():
-                    console.print(f" - {error['msg']}")
-                continue
-            vault_name, suffix = secret_url_parsed.host.split(".", 1)
-            if suffix not in vault_dns_suffixes:
-                console.print(
-                    f"Suffix {suffix!r} should be from list {', '.join(sorted(vault_dns_suffixes))}."
-                )
-                continue
+    def _ask_storage_account(self, default_storage_account: Optional[str]) -> Tuple[str, str]:
+        storage_account_name = Prompt.ask(
+            "[sea_green3 bold]?[/sea_green3 bold] [bold]Enter Storage Account name[/bold]",
+            default=default_storage_account,
+        )
+        client = StorageManagementClient(
+            credential=self.credential, subscription_id=self.subscription_id
+        )
+        for sa in client.storage_accounts.list():
+            if sa.name == storage_account_name:
+                if sa.location != self.location:
+                    console.print(
+                        f"[red bold]✗[/red bold] Storage account location is {sa.location}. "
+                        f"But you chose {self.location} as location. "
+                        f"Please specify a storage account located in {self.location}."
+                    )
+                resource_group = _get_resource_group_from_resource_id(sa.id)
+                return sa.name, resource_group
 
-            return secret_url_parsed
 
-    def _ask_secret_resource_group(self, default):
-        kwargs = {"default": default} if default is not omitted else {}
-        type_ = group_name_validator
-        while True:
-            secret_resource_group = Prompt.ask(
-                "[sea_green3 bold]?[/sea_green3 bold] [bold]Enter Key Vault's resource group[/bold]",
-                **kwargs,
-            )
-            try:
-                secret_resource_group_parsed = parse_obj_as(type_, secret_resource_group)
-            except ValidationError as e:
-                console.print(f"Resource group's name is not valid. Errors:")
-                for error in e.errors():
-                    console.print(f" - {error['msg']}")
-                continue
+def _get_resource_group_from_resource_id(resource_id: str) -> str:
+    return resource_id.split("/")[4]
 
-            return secret_resource_group_parsed
 
-    def _ask_storage_url(self, default):
-        kwargs = {"default": default} if default is not omitted else {}
-        type_ = AzureConfig.__model__.__fields__["storage_url"].type_
-        while True:
-            secret_url = Prompt.ask(
-                "[sea_green3 bold]?[/sea_green3 bold] [bold]Enter Blob Storage url[/bold]",
-                **kwargs,
-            )
-            try:
-                storage_url_parsed = parse_obj_as(type_, secret_url)
-            except ValidationError as e:
-                console.print(f"Url is not valid. Errors:")
-                for error in e.errors():
-                    console.print(f" - {error['msg']}")
-                continue
-            vault_name, suffix = storage_url_parsed.host.split(".", 1)
-            if suffix not in blob_dns_suffixes:
-                console.print(
-                    f"Suffix {suffix!r} should be from list {', '.join(sorted(blob_dns_suffixes))}."
-                )
-                continue
+def _create_storage_container(
+    credential: TokenCredential,
+    subscription_id: str,
+    resource_group: str,
+    storage_account: str,
+    name: str,
+) -> str:
+    client = StorageManagementClient(credential=credential, subscription_id=subscription_id)
+    container: BlobContainer = client.blob_containers.create(
+        resource_group_name=resource_group,
+        account_name=storage_account,
+        container_name=name,
+        blob_container=BlobContainer(),
+    )
+    return container.name
 
-            return storage_url_parsed
 
-    def _ask_storage_container(self, default):
-        kwargs = {"default": default} if default is not omitted else {}
-        type_ = AzureConfig.__model__.__fields__["storage_container"].type_
-        while True:
-            secret_url = Prompt.ask(
-                "[sea_green3 bold]?[/sea_green3 bold] [bold]Enter Blob Storage container[/bold]",
-                **kwargs,
-            )
-            try:
-                storage_container = parse_obj_as(type_, secret_url)
-            except ValidationError as e:
-                console.print(f"Url is not valid. Errors:")
-                for error in e.errors():
-                    console.print(f" - {error['msg']}")
-                continue
+def _create_managed_identity(
+    credential: TokenCredential,
+    subscription_id: str,
+    resource_group: str,
+    name: str,
+    location: str,
+) -> str:
+    client = ManagedServiceIdentityClient(credential=credential, subscription_id=subscription_id)
+    identity: Identity = client.user_assigned_identities.create_or_update(
+        resource_group_name=resource_group,
+        resource_name=name,
+        parameters=Identity(
+            location=location,
+        ),
+    )
+    return identity.principal_id
 
-            return storage_container
+
+def _create_key_vault(
+    credential: TokenCredential,
+    tenant_id: str,
+    subscription_id: str,
+    resource_group: str,
+    name: str,
+    location: str,
+    runner_principal_id: str,
+) -> str:
+    client = KeyVaultManagementClient(subscription_id=subscription_id, credential=credential)
+    vault: Vault = client.vaults.begin_create_or_update(
+        resource_group_name=resource_group,
+        vault_name=name,
+        parameters=VaultCreateOrUpdateParameters(
+            location=location,
+            properties=VaultProperties(
+                tenant_id=tenant_id,
+                sku=Sku(
+                    family="A",
+                    name="standard",
+                ),
+                access_policies=[
+                    AccessPolicyEntry(
+                        tenant_id=tenant_id,
+                        object_id=runner_principal_id,
+                        permissions=Permissions(
+                            secrets=[SecretPermissions.GET, SecretPermissions.LIST]
+                        ),
+                    )
+                ],
+            ),
+        ),
+    ).result()
+    return vault.properties.vault_uri
+
+
+class LogsManager:
+    def __init__(self, credential: TokenCredential, subscription_id: str):
+        self.log_analytics_client = LogAnalyticsManagementClient(
+            credential=credential, subscription_id=subscription_id
+        )
+        self.monitor_client = MonitorManagementClient(
+            credential=credential, subscription_id=subscription_id
+        )
+
+    def create_workspace(
+        self,
+        resource_group: str,
+        name: str,
+        location: str,
+    ) -> str:
+        workspace: Workspace = self.log_analytics_client.workspaces.begin_create_or_update(
+            resource_group_name=resource_group,
+            workspace_name=name,
+            parameters=Workspace(
+                location=location,
+            ),
+        ).result()
+        return workspace.id
+
+    def create_logs_table(
+        self,
+        resource_group: str,
+        workspace_name: str,
+        name: str,
+    ) -> str:
+        table = self.log_analytics_client.tables.begin_create_or_update(
+            resource_group_name=resource_group,
+            workspace_name=workspace_name,
+            table_name=name,
+            parameters=Table(
+                schema=Schema(
+                    name=name,
+                    columns=[
+                        Column(name="LogName", type=ColumnTypeEnum.STRING),
+                        Column(name="JsonPayload", type=ColumnTypeEnum.STRING),
+                        Column(name="TimeGenerated", type=ColumnTypeEnum.DATE_TIME),
+                    ],
+                ),
+            ),
+        ).result()
+        return table.name
+
+    def create_data_collection_endpoint(
+        self,
+        resource_group: str,
+        name: str,
+        location: str,
+    ) -> str:
+        dce: DataCollectionEndpointResource = self.monitor_client.data_collection_endpoints.create(
+            resource_group_name=resource_group,
+            data_collection_endpoint_name=name,
+            body=DataCollectionEndpointResource(
+                location=location,
+                # SDK needs description to form correct API request
+                description="dstack logs dce",
+            ),
+        )
+        return dce.id
+
+    def create_data_collection_rule(
+        self,
+        resource_group: str,
+        workspace_resource_id: str,
+        workspace_id: str,
+        name: str,
+        location: str,
+        logs_table: str,
+        data_collection_endpoint_id: str,
+    ) -> str:
+        dcr: DataCollectionRuleResource = self.monitor_client.data_collection_rules.create(
+            resource_group_name=resource_group,
+            data_collection_rule_name=name,
+            body=DataCollectionRuleResource(
+                location=location,
+                data_collection_endpoint_id=data_collection_endpoint_id,
+                destinations=DataCollectionRuleDestinations(
+                    log_analytics=[
+                        LogAnalyticsDestination(
+                            workspace_resource_id=workspace_resource_id,
+                            name=workspace_id,
+                        )
+                    ]
+                ),
+                data_flows=[
+                    DataFlow(
+                        streams=[f"Custom-{logs_table}"],
+                        destinations=[workspace_id],
+                    )
+                ],
+            ),
+        )
+        return dcr.id
+
+
+if __name__ == "__main__":
+    # principal_id = _create_managed_identity(
+    #     credential=DefaultAzureCredential(),
+    #     subscription_id="86e20cc3-8f2f-4258-a416-85ca989d01e8",
+    #     resource_group="dstack-2f61531ea0e7-eastus",
+    #     name="dstack-2f61531ea0e7-eastus-runner-identity",
+    #     location="eastus"
+    # )
+    # print(principal_id)
+    # url = _create_key_vault(
+    #     credential=DefaultAzureCredential(),
+    #     tenant_id="87f4458a-488e-4d2f-987e-2f61531ea0e7",
+    #     subscription_id="86e20cc3-8f2f-4258-a416-85ca989d01e8",
+    #     resource_group="dstack-2f61531ea0e7-eastus",
+    #     name="dstack-2f61531ea0e7",
+    #     location="eastus",
+    #     runner_principal_id=principal_id,
+    # )
+    # print(url)
+    # container_name = _create_storage_container(
+    #     credential=DefaultAzureCredential(),
+    #     subscription_id="86e20cc3-8f2f-4258-a416-85ca989d01e8",
+    #     resource_group="dstack-2f61531ea0e7-eastus",
+    #     storage_account="dstackteststorageaccount",
+    #     name="dstack-2f61531ea0e7-container",
+    # )
+    # print(container_name)
+    logs_manager = LogsManager(
+        credential=DefaultAzureCredential(),
+        subscription_id="86e20cc3-8f2f-4258-a416-85ca989d01e8",
+    )
+    # workspace_resource_id = logs_manager.create_workspace(
+    #     resource_group="dstack-2f61531ea0e7-eastus",
+    #     name="dstack-2f61531ea0e7-eastus-workspace",
+    #     location="eastus",
+    # )
+    # print(workspace_resource_id)
+    # table = logs_manager.create_logs_table(
+    #     resource_group="dstack-2f61531ea0e7-eastus",
+    #     workspace_name="dstack-2f61531ea0e7-eastus-workspace",
+    #     name="dstack_logs_CL"
+    # )
+    # print(table)
+    # dce_id = logs_manager.create_data_collection_endpoint(
+    #     resource_group="dstack-2f61531ea0e7-eastus",
+    #     name="dstack-2f61531ea0e7-dce",
+    #     location="eastus"
+    # )
+    # print(dce_id)
+    dcr_id = logs_manager.create_data_collection_rule(
+        resource_group="dstack-2f61531ea0e7-eastus",
+        workspace_resource_id="/subscriptions/86e20cc3-8f2f-4258-a416-85ca989d01e8/resourceGroups/dstack-2f61531ea0e7-eastus/providers/Microsoft.OperationalInsights/workspaces/dstack-2f61531ea0e7-eastus-workspace",
+        workspace_id="170b91d8-b41e-4248-9e98-19ee0fbbc865",
+        name="dstack-2f61531ea0e7-dcr",
+        location="eastus",
+        logs_table="dstack_logs_CL",
+        data_collection_endpoint_id="/subscriptions/86e20cc3-8f2f-4258-a416-85ca989d01e8/resourceGroups/dstack-2f61531ea0e7-eastus/providers/Microsoft.Insights/dataCollectionEndpoints/dstack-2f61531ea0e7-dce",
+    )
+    print(dcr_id)

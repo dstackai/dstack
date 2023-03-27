@@ -42,6 +42,7 @@ from azure.mgmt.resource import ResourceManagementClient
 from dstack import version
 from dstack.backend.aws.runners import _get_default_ami_image_version, _serialize_runner_yaml
 from dstack.backend.azure import runners
+from dstack.backend.azure import utils as azure_utils
 from dstack.backend.azure.config import AzureConfig
 from dstack.backend.base.compute import Compute, choose_instance_type
 from dstack.core.instance import InstanceType
@@ -71,7 +72,7 @@ class AzureCompute(Compute):
         self._keyvault_client = KeyVaultManagementClient(
             credential=credential, subscription_id=self.azure_config.subscription_id
         )
-        self._storage_account_id = _get_storage_account_id(
+        self._storage_account_id = azure_utils.get_storage_account_id(
             self.azure_config.subscription_id,
             self.azure_config.resource_group,
             self.azure_config.storage_account,
@@ -132,28 +133,6 @@ class AzureCompute(Compute):
             resource_group=self.azure_config.resource_group,
             instance_name=request_id,
         )
-
-
-def _get_storage_account_id(
-    subscription_id: str, resource_group: str, storage_account: str
-) -> str:
-    return f"/subscriptions/{subscription_id}/resourceGroups/{resource_group}/providers/Microsoft.Storage/storageAccounts/{storage_account}"
-
-
-def _get_managed_identity_id(
-    subscription_id: str, resource_group: str, managed_identity: str
-) -> str:
-    return f"/subscriptions/{subscription_id}/resourceGroups/{resource_group}/providers/Microsoft.ManagedIdentity/userAssignedIdentities/{managed_identity}"
-
-
-def _get_network_security_group_id(
-    subscription_id: str, resource_group: str, network_security_group: str
-) -> str:
-    return f"/subscriptions/{subscription_id}/resourceGroups/{resource_group}/providers/Microsoft.Network/networkSecurityGroups/{network_security_group}"
-
-
-def _get_subnet_id(subscription_id: str, resource_group: str, network: str, subnet: str) -> str:
-    return f"/subscriptions/{subscription_id}/resourceGroups/{resource_group}/providers/Microsoft.Network/virtualNetworks/{network}/subnets/{subnet}"
 
 
 def _get_instance_name(job: Job) -> str:
@@ -299,7 +278,7 @@ def _launch_instance(
                     VirtualMachineNetworkInterfaceConfiguration(
                         name="nic_config",
                         network_security_group=SubResource(
-                            id=_get_network_security_group_id(
+                            id=azure_utils.get_network_security_group_id(
                                 subscription_id,
                                 resource_group,
                                 network_security_group,
@@ -309,7 +288,7 @@ def _launch_instance(
                             VirtualMachineNetworkInterfaceIPConfiguration(
                                 name="ip_config",
                                 subnet=SubResource(
-                                    id=_get_subnet_id(
+                                    id=azure_utils.get_subnet_id(
                                         subscription_id,
                                         resource_group,
                                         network,
@@ -327,7 +306,7 @@ def _launch_instance(
             identity=VirtualMachineIdentity(
                 type=ResourceIdentityType.USER_ASSIGNED,
                 user_assigned_identities={
-                    _get_managed_identity_id(
+                    azure_utils.get_managed_identity_id(
                         subscription_id, resource_group, managed_identity
                     ): UserAssignedIdentitiesValue()
                 },
