@@ -1,5 +1,5 @@
 import os
-from argparse import Namespace
+from argparse import SUPPRESS, Namespace
 
 import uvicorn
 from rich_argparse import RichHelpFormatter
@@ -15,7 +15,7 @@ class HubCommand(BasicCommand):
     def __init__(self, parser):
         super(HubCommand, self).__init__(parser)
 
-    def hub_start(self, args: Namespace):
+    def _hub_start(self, args: Namespace):
         os.environ["DSTACK_HUB_HOST"] = args.host
         os.environ["DSTACK_HUB_PORT"] = str(args.port)
         os.environ["DSTACK_HUB_LOG_LEVEL"] = args.log_level
@@ -60,4 +60,4 @@ class HubCommand(BasicCommand):
             default="ERROR",
         )
         hub_parser.add_argument("--token", metavar="TOKEN", type=str, help="The admin user token")
-        hub_parser.set_defaults(func=self.hub_start)
+        hub_parser.set_defaults(func=self._hub_start)
