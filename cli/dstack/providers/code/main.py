@@ -87,6 +87,7 @@ class CodeProvider(Provider):
             self._extend_commands_with_env(commands, self.env)
         commands.extend(
             [
+                "pip install ipykernel",
                 "mkdir -p /tmp",
                 'if [ $(uname -m) = "aarch64" ]; then arch="arm64"; else arch="x64"; fi',
                 f"wget -q https://github.com/gitpod-io/openvscode-server/releases/download/"
