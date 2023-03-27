@@ -184,18 +184,24 @@ def poll_run(
                         task, description="Provisioning... It may take up to a minute."
                     )
                     request_errors_printed = False
-        console.print("Provisioning... It may take up to a minute. [green]✓[/]")
-        console.print()
-        console.print("[grey58]To interrupt, press Ctrl+C.[/]")
-        console.print()
 
         jobs = [backend.get_job(repo_address, job_head.job_id) for job_head in job_heads]
         ports = {}
         if backend.name != "local":
+            console.print("Starting SSH tunnel... It may take a while.")
             ports = allocate_local_ports(jobs)
-            run_ssh_tunnel(
+            if run_ssh_tunnel(
                 ssh_key, jobs[0].host_name, ports
-            )  # todo: cleanup explicitly (stop tunnel)
+            ):  # todo: cleanup explicitly (stop tunnel)
+                console.print("SSH tunnel [green]✓[/]")
+            else:
+                console.print("SSH tunnel [red]✗[/]")
+        else:
+            console.print("Provisioning... It may take up to a minute. [green]✓[/]")
+        console.print()
+        console.print("[grey58]To interrupt, press Ctrl+C.[/]")
+        console.print()
+
         run = backend.list_run_heads(repo_address, run_name)[0]
         if len(job_heads) == 1 and run and run.status == JobStatus.RUNNING:
             poll_logs_ws(backend, repo_address, jobs[0], ports)
