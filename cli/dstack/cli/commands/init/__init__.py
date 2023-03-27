@@ -60,4 +60,7 @@ class InitCommand(BasicCommand):
         repo_credentials.ssh_key_path = get_ssh_keypair(args.ssh_identity_file)
         for backend in list_backends():
             backend.save_repo_credentials(local_repo_data, repo_credentials)
-        console.print(f"[grey58]OK[/]")
+            if backend.name != "local" and repo_credentials.ssh_key_path is None:
+                console.print(f"[red]Missing SSH keypair (backend: {backend.name})[/]")
+            else:
+                console.print(f"[grey58]OK (backend: {backend.name})[/]")
