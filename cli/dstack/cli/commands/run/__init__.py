@@ -190,12 +190,10 @@ def poll_run(
         if backend.name != "local":
             console.print("Starting SSH tunnel... It may take a while.")
             ports = allocate_local_ports(jobs)
-            if run_ssh_tunnel(
+            if not run_ssh_tunnel(
                 ssh_key, jobs[0].host_name, ports
             ):  # todo: cleanup explicitly (stop tunnel)
-                console.print("SSH tunnel [green]✓[/]")
-            else:
-                console.print("SSH tunnel [red]✗[/]")
+                console.print("[warning]Warning: failed to start SSH tunnel[/warning] [red]✗[/]")
         else:
             console.print("Provisioning... It may take up to a minute. [green]✓[/]")
         console.print()
@@ -306,9 +304,7 @@ class RunCommand(BasicCommand):
                 sys.exit(f"Call `dstack init` first")
             if backend != "local" and not args.detach:
                 if not repo_credentials.ssh_key_path:
-                    console.print(
-                        "[error]Can't attach to remote: run `dstack init` to set SSH keypair[/error]"
-                    )
+                    console.print("Call `dstack init` first")
                     exit(1)
                 else:
                     workflow_data["ssh_key_pub"] = _read_ssh_key_pub(repo_credentials.ssh_key_path)
