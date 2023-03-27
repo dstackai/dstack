@@ -204,7 +204,6 @@ class AWSConfigurator(Configurator):
 
     async def configure_hub(self, data: Dict):
         # Step 1: create client and check access
-        global cache
         loop = asyncio.get_event_loop()
         config = AWSConfig.deserialize(data=data)
 

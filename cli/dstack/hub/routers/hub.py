@@ -18,20 +18,18 @@ security = HTTPBearer()
 
 
 @router.post("/backends/values", deprecated=True)
-async def backend_configurator(req: Request, type_backend: str = Query(alias="type")):
-    if type_backend.lower() != "aws":
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST, detail=f"{type_backend} not support"
-        )
+async def backend_configurator(body: dict = Body()):
+    type_backend = body.get("type_backend")
+    if type_backend is None:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=f"unknown backend")
     backend = dict_backends(all_backend=True).get(type_backend.lower())
     if backend is None:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST, detail=f"{type_backend} not support"
         )
-    request_args = dict(req.query_params)
     configurator = backend.get_configurator()
     try:
-        result = await configurator.configure_hub(request_args)
+        result = await configurator.configure_hub(body)
     except HubError as ex:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
@@ -40,6 +38,22 @@ async def backend_configurator(req: Request, type_backend: str = Query(alias="ty
     except Exception as exx:
         raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR)
     return result
+
+
+@router.get(
+    "{project_name}/info",
+    dependencies=[Depends(Scope("project:info:read"))],
+    response_model=List[ProjectInfo],
+    deprecated=True,
+)
+async def info_project(project_name: str) -> List[ProjectInfo]:
+    project = get_project(project_name=project_name)
+    if project is None:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=f"Project not found",
+        )
+    return project
 
 
 @router.get(
