@@ -238,6 +238,7 @@ the permissions to perform actions on `s3`, `logs`, `secretsmanager`, `ec2`, and
             "secretsmanager:UpdateSecret",
             "secretsmanager:GetSecretValue",
             "secretsmanager:CreateSecret",
+            "secretsmanager:PutSecretValue",
             "secretsmanager:PutResourcePolicy",
             "secretsmanager:TagResource",
             "secretsmanager:DeleteSecret"
