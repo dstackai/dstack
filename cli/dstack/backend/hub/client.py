@@ -86,11 +86,7 @@ class HubClient:
             resp = requests.get(url=url, headers=self._headers(), data=repo_address.json())
             if resp.ok:
                 json_data = resp.json()
-                return RepoCredentials(
-                    protocol=json_data["protocol"],
-                    private_key=json_data["private_key"],
-                    oauth_token=json_data["oauth_token"],
-                )
+                return RepoCredentials(**json_data)
             if resp.status_code == 401:
                 print("Unauthorized. Please set correct token")
                 return None
