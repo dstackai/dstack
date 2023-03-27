@@ -59,14 +59,13 @@ class RepoCredentials(BaseModel):
     protocol: RepoProtocol
     private_key: Union[str, None]
     oauth_token: Union[str, None]
-
-    def __init__(self, **data: Any) -> None:
-        super().__init__(**data)
+    ssh_key_path: Optional[str] = None
 
     def __str__(self) -> str:
         return (
             f"RepoCredentials(protocol=RepoProtocol.{self.protocol.name}, "
             f"private_key_length={len(self.private_key) if self.private_key else None}, "
+            f"ssh_key_path={self.ssh_key_path}, "
             f"oauth_token={_quoted_masked(self.oauth_token)})"
         )
 

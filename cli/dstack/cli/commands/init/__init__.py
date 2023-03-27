@@ -1,11 +1,23 @@
 from argparse import Namespace
-
-from rich import print
+from pathlib import Path
+from typing import Optional
 
 from dstack.api.backend import list_backends
 from dstack.api.repo import load_repo_data
 from dstack.cli.commands import BasicCommand
+from dstack.cli.common import console
 from dstack.core.error import check_config, check_git
+
+
+def get_ssh_keypair(key_path: Optional[str], default: str = "~/.ssh/id_rsa") -> Optional[str]:
+    """Returns path to the private key if keypair exists"""
+    key_path = Path(key_path or default).expanduser().resolve()
+    pub_key = (
+        key_path if key_path.suffix == ".pub" else key_path.with_suffix(key_path.suffix + ".pub")
+    )
+    private_key = pub_key.with_suffix("")
+    if pub_key.exists() and private_key.exists():
+        return str(private_key)
 
 
 class InitCommand(BasicCommand):
@@ -25,19 +37,34 @@ class InitCommand(BasicCommand):
             dest="gh_token",
         )
         self._parser.add_argument(
-            "-i",
-            "--identity",
+            "--git-identity",
             metavar="SSH_PRIVATE_KEY",
-            help="A path to the private SSH key file",
+            help="A path to the private SSH key file for non-public repositories",
             type=str,
-            dest="identity_file",
+            dest="git_identity_file",
+        )
+        self._parser.add_argument(
+            "--ssh-identity",
+            metavar="SSH_PRIVATE_KEY",
+            help="A path to the private SSH key file for SSH tunneling",
+            type=str,
+            dest="ssh_identity_file",
         )
 
     @check_config
     @check_git
     def _command(self, args: Namespace):
-        local_repo_data = load_repo_data(args.gh_token, args.identity_file)
+        local_repo_data = load_repo_data(args.gh_token, args.git_identity_file)
         local_repo_data.ls_remote()
+        repo_credentials = local_repo_data.repo_credentials()
+        repo_credentials.ssh_key_path = get_ssh_keypair(args.ssh_identity_file)
         for backend in list_backends():
-            backend.save_repo_credentials(local_repo_data, local_repo_data.repo_credentials())
-        print(f"[grey58]OK[/]")
+            backend.save_repo_credentials(local_repo_data, repo_credentials)
+            if backend.name != "local" and repo_credentials.ssh_key_path is None:
+                console.print(f"[red]FAILED[/] [gray58](backend: {backend.name})[/]")
+                console.print(
+                    f"  [gray58]Make sure `{args.ssh_identity_file or '~/.ssh/id_rsa'}` exists "
+                    "or call `dstack init --ssh-identity PATH`[/]"
+                )
+            else:
+                console.print(f"[green]OK[/] [gray58](backend: {backend.name})[/]")

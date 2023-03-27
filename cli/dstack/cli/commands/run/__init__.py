@@ -63,20 +63,9 @@ def _load_workflows():
     return workflows
 
 
-def _resolve_ssh_key_path(path: Path) -> Path:
-    if path.suffix != ".pub":
-        path = path.with_suffix(path.suffix + ".pub")
-    return path.expanduser().resolve()
-
-
-def _read_ssh_key_pub(path: Path, required: bool) -> Optional[str]:
-    try:
-        key = path.read_text().strip("\n")
-        assert "PRIVATE KEY" not in key
-        return key
-    except FileNotFoundError:
-        if required:
-            raise
+def _read_ssh_key_pub(key_path: str) -> str:
+    path = Path(key_path)
+    return path.with_suffix(path.suffix + ".pub").read_text().strip("\n")
 
 
 def parse_run_args(
@@ -99,10 +88,6 @@ def parse_run_args(
             sys.exit(f"No workflow or provider '{args.workflow_or_provider}' is found")
 
         provider_name = args.workflow_or_provider
-
-    workflow_data["ssh_key_pub"] = _read_ssh_key_pub(
-        _resolve_ssh_key_path(args.identity_file), required=args.remote is not None
-    )
 
     return provider_name, provider_args, workflow_name, workflow_data
 
@@ -155,7 +140,9 @@ def poll_logs_ws(backend: Backend, repo_address: RepoAddress, job: Job, ports: D
             console.print(f"[grey58]OK[/]")
 
 
-def poll_run(repo_address: RepoAddress, job_heads: List[JobHead], backend: Backend, ssh_key: Path):
+def poll_run(
+    repo_address: RepoAddress, job_heads: List[JobHead], backend: Backend, ssh_key: Optional[str]
+):
     run_name = job_heads[0].run_name
     try:
         console.print()
@@ -268,14 +255,6 @@ class RunCommand(BasicCommand):
             action="store_true",
         )
         self._parser.add_argument(
-            "-i",
-            metavar="IDENTITY_FILE",
-            help="A path to ssh identity file",
-            type=Path,
-            default=Path("~/.ssh/id_rsa"),
-            dest="identity_file",
-        )
-        self._parser.add_argument(
             "args",
             metavar="ARGS",
             nargs=argparse.ZERO_OR_MORE,
@@ -316,23 +295,29 @@ class RunCommand(BasicCommand):
                 provider.help(workflow_name)
                 sys.exit()
 
-            if backend.get_repo_credentials(repo_data):
-                run_name = backend.create_run(repo_data)
-                provider.load(backend, provider_args, workflow_name, workflow_data, run_name)
-                if args.tag_name:
-                    tag_head = backend.get_tag_head(repo_data, args.tag_name)
-                    if tag_head:
-                        backend.delete_tag_head(repo_data, tag_head)
-                jobs = provider.submit_jobs(backend, args.tag_name)
-                backend.update_repo_last_run_at(
-                    repo_data, last_run_at=int(round(time.time() * 1000))
-                )
-                print_runs(list_runs_with_merged_backends([backend], run_name=run_name))
-                if not args.detach:
-                    ssh_key_private = _resolve_ssh_key_path(args.identity_file).with_suffix("")
-                    poll_run(repo_data, jobs, backend, ssh_key_private)
-            else:
+            repo_credentials = backend.get_repo_credentials(repo_data)
+            if not repo_credentials:
                 sys.exit(f"Call `dstack init` first")
+            if backend != "local" and not args.detach:
+                if not repo_credentials.ssh_key_path:
+                    console.print(
+                        "[error]Can't attach to remote: run `dstack init` to set SSH keypair[/error]"
+                    )
+                    exit(1)
+                else:
+                    workflow_data["ssh_key_pub"] = _read_ssh_key_pub(repo_credentials.ssh_key_path)
+
+            run_name = backend.create_run(repo_data)
+            provider.load(backend, provider_args, workflow_name, workflow_data, run_name)
+            if args.tag_name:
+                tag_head = backend.get_tag_head(repo_data, args.tag_name)
+                if tag_head:
+                    backend.delete_tag_head(repo_data, tag_head)
+            jobs = provider.submit_jobs(backend, args.tag_name)
+            backend.update_repo_last_run_at(repo_data, last_run_at=int(round(time.time() * 1000)))
+            print_runs(list_runs_with_merged_backends([backend], run_name=run_name))
+            if not args.detach:
+                poll_run(repo_data, jobs, backend, ssh_key=repo_credentials.ssh_key_path)
         except ValidationError as e:
             sys.exit(
                 f"There a syntax error in one of the files inside the {os.getcwd()}/.dstack/workflows directory:\n\n{e}"
