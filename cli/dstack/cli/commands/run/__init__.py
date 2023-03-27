@@ -201,11 +201,14 @@ def poll_run(repo_address: RepoAddress, job_heads: List[JobHead], backend: Backe
         jobs = [backend.get_job(repo_address, job_head.job_id) for job_head in job_heads]
         ports = {}
         if backend.name != "local":
-            console.print("Provisioning... Starting SSH tunnel.")
+            console.print("Starting SSH tunnel... It may take a while.")
             ports = allocate_local_ports(jobs)
-            run_ssh_tunnel(
+            if run_ssh_tunnel(
                 ssh_key, jobs[0].host_name, ports
-            )  # todo: cleanup explicitly (stop tunnel)
+            ):  # todo: cleanup explicitly (stop tunnel)
+                console.print("SSH tunnel [green]✓[/]")
+            else:
+                console.print("SSH tunnel [red]✗[/]")
         else:
             console.print("Provisioning... It may take up to a minute. [green]✓[/]")
         console.print()

@@ -4,7 +4,6 @@ from contextlib import closing
 from pathlib import Path
 from typing import Dict, List
 
-from dstack.cli.common import console
 from dstack.core.job import Job
 
 
@@ -45,6 +44,8 @@ def make_ssh_tunnel_args(ssh_key: Path, hostname: str, ports: Dict[int, int]) ->
     return args
 
 
-def run_ssh_tunnel(ssh_key: Path, hostname: str, ports: Dict[int, int]):
+def run_ssh_tunnel(ssh_key: Path, hostname: str, ports: Dict[int, int]) -> bool:
     args = make_ssh_tunnel_args(ssh_key, hostname, ports)
-    subprocess.run(args, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+    return (
+        subprocess.run(args, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL).returncode == 0
+    )
