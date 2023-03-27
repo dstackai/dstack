@@ -1,7 +1,7 @@
 import socket
 import subprocess
 from contextlib import closing
-from pathlib import Path
+from os import PathLike
 from typing import Dict, List
 
 from dstack.core.job import Job
@@ -26,7 +26,7 @@ def allocate_local_ports(jobs: List[Job]) -> Dict[int, int]:
     return ports
 
 
-def make_ssh_tunnel_args(ssh_key: Path, hostname: str, ports: Dict[int, int]) -> List[str]:
+def make_ssh_tunnel_args(ssh_key: PathLike, hostname: str, ports: Dict[int, int]) -> List[str]:
     args = [
         "ssh",
         "-o",
@@ -44,7 +44,7 @@ def make_ssh_tunnel_args(ssh_key: Path, hostname: str, ports: Dict[int, int]) ->
     return args
 
 
-def run_ssh_tunnel(ssh_key: Path, hostname: str, ports: Dict[int, int]) -> bool:
+def run_ssh_tunnel(ssh_key: PathLike, hostname: str, ports: Dict[int, int]) -> bool:
     args = make_ssh_tunnel_args(ssh_key, hostname, ports)
     return (
         subprocess.run(args, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL).returncode == 0
