@@ -52,9 +52,7 @@ def fix_urls(log: bytes, job: Job, ports: Dict[int, int], hostname: Optional[str
     hostname = hostname or job.host_name
     app_specs = {job.ports[app_spec.port_index]: app_spec for app_spec in job.app_specs}
     ports_re = "|".join(str(port) for port in job.ports)
-    url_pattern = (
-        rf"http://(?:localhost|0.0.0.0|127.0.0.1|{job.host_name}):({ports_re})\S*".encode()
-    )
+    url_pattern = rf"http://(?:localhost|0.0.0.0|127.0.0.1|{job.host_name}):({ports_re})\b([-a-zA-Z0-9()@:%_\+.~#?&//=]*)".encode()
 
     def replace_url(match: re.Match) -> bytes:
         remote_port = int(match.group(1))

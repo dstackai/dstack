@@ -86,3 +86,9 @@ class TestFixUrls(unittest.TestCase):
                 log, job, {4000: 5000, 3001: 3002, 3002: 3003, 3003: 3001}, hostname=localhost
             ),
         )
+
+    def test_fastapi(self):
+        log = b"\x1b[32mINFO\x1b[0m:     Uvicorn running on \x1b[1mhttp://0.0.0.0:3615\x1b[0m (Press CTRL+C to quit)"
+        expected = b"\x1b[32mINFO\x1b[0m:     Uvicorn running on \x1b[1mhttp://127.0.0.1:53615\x1b[0m (Press CTRL+C to quit)"
+        job = JobMock("0.0.0.0", [3615], [AppSpec(port_index=0, app_name="fastapi")])
+        self.assertEqual(expected, fix_urls(log, job, {3615: 53615}, hostname=localhost))
