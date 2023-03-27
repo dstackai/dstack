@@ -178,7 +178,9 @@ jobs:
     defaults:
       run:
         working-directory: runner
-    needs: [ runner-upload-master ]
+    needs:
+      - runner-upload-master
+      - cli-upload-tag
     env:
       AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
       AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
@@ -203,7 +205,9 @@ jobs:
     defaults:
       run:
         working-directory: runner
-    needs: [ runner-upload-master ]
+    needs:
+      - runner-upload-master
+      - cli-upload-tag
     strategy:
       matrix:
         variant: [ gcp-image, gcp-image-cuda ]
