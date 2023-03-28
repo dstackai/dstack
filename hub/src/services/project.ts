@@ -81,7 +81,7 @@ export const projectApi = createApi({
             query: (data) => ({
                 url: API.PROJECTS.BACKEND_VALUES(),
                 method: 'POST',
-                params: data,
+                body: data,
             }),
         }),
     }),
