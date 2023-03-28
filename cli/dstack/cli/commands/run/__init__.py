@@ -208,7 +208,7 @@ def poll_run(
             ssh_port = jobs[0].ports[-1]
             ssh_port = ports.get(ssh_port, ssh_port)
             ssh_key_escaped = ssh_key.replace(" ", "\\ ")
-            console.print("SSH would be available in a minute, run command below to connect:")
+            console.print("To connect via SSH, use:")
             console.print(f"  ssh -i {ssh_key_escaped} root@localhost -p {ssh_port}")
             console.print()
 

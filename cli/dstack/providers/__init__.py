@@ -136,7 +136,7 @@ class Provider:
         self._inject_context()
         self.dep_specs = self._dep_specs(backend)
         self.ssh_key_pub = self.provider_data.get("ssh_key_pub")
-        self.openssh_server = self.provider_data.get("openssh_server", False)
+        self.openssh_server = self.provider_data.get("ssh", False)
         self.loaded = True
 
     @abstractmethod
@@ -447,7 +447,6 @@ class Provider:
             [
                 f'echo "{ssh_pub_key}" >> ~/.ssh/authorized_keys',
                 f"/usr/sbin/sshd -p $PORT_{port_idx}",
-                f'echo "SSH server is ready"',
             ]
         )
 

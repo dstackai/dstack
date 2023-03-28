@@ -164,7 +164,7 @@
         }
       }
     },
-    "openssh_server": {
+    "ssh": {
       "description": "Run openssh server in the container",
       "type": "boolean",
       "default": false
@@ -210,8 +210,8 @@
         "resources": {
           "$ref": "#/definitions/resources"
         },
-        "openssh_server": {
-          "$ref": "#/definitions/openssh_server"
+        "ssh": {
+          "$ref": "#/definitions/ssh"
         }
       }
     },
@@ -314,8 +314,8 @@
         "resources": {
           "$ref": "#/definitions/resources"
         },
-        "openssh_server": {
-          "$ref": "#/definitions/openssh_server"
+        "ssh": {
+          "$ref": "#/definitions/ssh"
         }
       }
     },
@@ -354,8 +354,8 @@
         "resources": {
           "$ref": "#/definitions/resources"
         },
-        "openssh_server": {
-          "$ref": "#/definitions/openssh_server"
+        "ssh": {
+          "$ref": "#/definitions/ssh"
         }
       }
     },
@@ -394,8 +394,8 @@
         "resources": {
           "$ref": "#/definitions/resources"
         },
-        "openssh_server": {
-          "$ref": "#/definitions/openssh_server"
+        "ssh": {
+          "$ref": "#/definitions/ssh"
         }
       }
     }
