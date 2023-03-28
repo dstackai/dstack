@@ -36,7 +36,13 @@ setup(
     packages=find_packages("cli"),
     package_data={
         "dstack.schemas": ["*.json"],
-        "dstack.hub": ["statics/*", "statics/**/*", "statics/**/**/*"],
+        "dstack.hub": [
+            "migration/*",
+            "migration/**/*",
+            "statics/*",
+            "statics/**/*",
+            "statics/**/**/*",
+        ],
     },
     include_package_data=True,
     scripts=[],
