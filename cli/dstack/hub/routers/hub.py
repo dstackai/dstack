@@ -19,7 +19,7 @@ security = HTTPBearer()
 
 @router.post("/backends/values", deprecated=True)
 async def backend_configurator(body: dict = Body()):
-    type_backend = body.get("type_backend")
+    type_backend = body.get("type")
     if type_backend is None:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=f"unknown backend")
     backend = dict_backends(all_backend=True).get(type_backend.lower())
