@@ -4,17 +4,16 @@ from datetime import datetime, timedelta, timezone
 from typing import Dict, Generator
 
 from azure.core.credentials import TokenCredential
+from azure.mgmt.loganalytics import LogAnalyticsManagementClient
 from azure.monitor.query import LogsQueryClient, LogsTable
 
+from dstack.backend.azure.utils import DSTACK_LOGS_TABLE_NAME, get_logs_workspace_name
 from dstack.backend.base import jobs as base_jobs
 from dstack.backend.base.logs import fix_urls
 from dstack.backend.base.storage import Storage
 from dstack.core.job import Job
 from dstack.core.log_event import LogEvent
 from dstack.core.repo import RepoAddress
-
-LOGS_TABLE_NAME = "dstack_logs_CL"
-
 
 POLL_LOGS_ATTEMPTS = 10
 POLL_LOGS_WAIT_TIME = 2
@@ -24,13 +23,18 @@ class AzureLogging:
     def __init__(
         self,
         credential: TokenCredential,
+        subscription_id: str,
         resource_group: str,
-        workspace_id: str,
+        storage_account: str,
     ):
-        self.resource_group = resource_group
-        self.workspace_id = workspace_id
-        self.logs_table = LOGS_TABLE_NAME
+        self.log_analytics_client = LogAnalyticsManagementClient(
+            credential=credential, subscription_id=subscription_id
+        )
         self.logs_query_client = LogsQueryClient(credential=credential)
+        self.resource_group = resource_group
+        self.logs_table = DSTACK_LOGS_TABLE_NAME
+        self.workspace_name = get_logs_workspace_name(storage_account)
+        self.workspace_id = self._get_workspace_id()
 
     def poll_logs(
         self,
@@ -52,6 +56,13 @@ class AzureLogging:
             if found_logs:
                 break
             time.sleep(POLL_LOGS_WAIT_TIME)
+
+    def _get_workspace_id(self) -> str:
+        workspace = self.log_analytics_client.workspaces.get(
+            resource_group_name=self.resource_group,
+            workspace_name=self.workspace_name,
+        )
+        return workspace.id
 
     def _query_logs(
         self,

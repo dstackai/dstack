@@ -5,6 +5,7 @@ from azure.core.credentials import TokenCredential
 from azure.core.exceptions import ResourceNotFoundError
 from azure.storage.blob import BlobProperties, BlobServiceClient, ContainerClient, ContentSettings
 
+from dstack.backend.azure.utils import DSTACK_CONTAINER_NAME, get_blob_storage_account_url
 from dstack.backend.base.storage import CloudStorage
 from dstack.core.storage import StorageFile
 from dstack.utils.common import removeprefix
@@ -13,17 +14,16 @@ from dstack.utils.common import removeprefix
 class AzureStorage(CloudStorage):
     def __init__(
         self,
-        account_url: str,
         credential: TokenCredential,
-        container_name: str,
+        storage_account: str,
     ):
         self._blob_service_client = BlobServiceClient(
-            account_url=account_url, credential=credential
+            credential=credential,
+            account_url=get_blob_storage_account_url(storage_account),
         )
         self._container_client: ContainerClient = self._blob_service_client.get_container_client(
-            container=container_name
+            container=DSTACK_CONTAINER_NAME
         )
-        self._container_name = container_name
 
     def upload_file(self, source_path: str, dest_path: str, callback: Callable[[int], None]):
         with open(source_path, "rb") as f:

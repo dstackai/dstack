@@ -29,22 +29,18 @@ class AzureBackend(CloudBackend):
     def __init__(self, backend_config: Optional[AzureConfig] = None):
         if backend_config is None:
             try:
-                backend_config = AzureConfig.load()
+                self.config = AzureConfig.load()
             except ConfigError:
                 return
-
-        self.config = backend_config
 
         credential = DefaultAzureCredential()
         self._secrets_manager = AzureSecretsManager(
             credential=credential,
-            vault_url=self.config.secret_url,
+            vault_url=self.config.vault_url,
         )
-        # https://learn.microsoft.com/en-us/azure/storage/blobs/assign-azure-role-data-access?tabs=portal
         self._storage = AzureStorage(
             credential=credential,
-            account_url=self.config.storage_url,
-            container_name=self.config.storage_container,
+            storage_account=self.config.storage_account,
         )
         self._compute = AzureCompute(
             credential=credential,
@@ -52,8 +48,9 @@ class AzureBackend(CloudBackend):
         )
         self._logging = AzureLogging(
             credential=credential,
+            subscription_id=self.config.subscription_id,
             resource_group=self.config.resource_group,
-            workspace_id="184b1264-b5e1-489a-8426-654eca432b0c",
+            storage_account=self.config.storage_account,
         )
         self._loaded = True
 

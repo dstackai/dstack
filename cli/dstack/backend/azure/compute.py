@@ -4,13 +4,12 @@ from operator import attrgetter
 from typing import List, Optional
 
 from azure.core.credentials import TokenCredential
-from azure.core.exceptions import HttpResponseError, ResourceNotFoundError
+from azure.core.exceptions import ResourceNotFoundError
 from azure.mgmt.authorization import AuthorizationManagementClient
 from azure.mgmt.compute import ComputeManagementClient
 from azure.mgmt.compute.models import (
     DiskCreateOptionTypes,
     HardwareProfile,
-    Image,
     ImageReference,
     InstanceViewStatus,
     ManagedDiskParameters,
@@ -30,13 +29,6 @@ from azure.mgmt.compute.models import (
 )
 from azure.mgmt.keyvault import KeyVaultManagementClient
 from azure.mgmt.network import NetworkManagementClient
-from azure.mgmt.network.models import (
-    NetworkSecurityGroup,
-    SecurityRule,
-    SecurityRuleAccess,
-    SecurityRuleDirection,
-    SecurityRuleProtocol,
-)
 from azure.mgmt.resource import ResourceManagementClient
 
 from dstack import version
@@ -85,21 +77,22 @@ class AzureCompute(Compute):
         return choose_instance_type(instance_types=instance_types, requirements=job.requirements)
 
     def run_instance(self, job: Job, instance_type: InstanceType) -> str:
-        network_secutiry_group = _create_network_security_group(
-            network_client=self._network_client,
-            location=self.azure_config.location,
-            resource_group=self.azure_config.resource_group,
-        )
         vm = _launch_instance(
             compute_client=self._compute_client,
             subscription_id=self.azure_config.subscription_id,
             location=self.azure_config.location,
             resource_group=self.azure_config.resource_group,
-            network_security_group=network_secutiry_group,
+            network_security_group=azure_utils.DSTACK_NETWORK_SECURITY_GROUP,
             network=self.azure_config.network,
             subnet=self.azure_config.subnet,
-            managed_identity=self.azure_config.managed_identity,
-            image_id=_get_image_id(self._compute_client, len(instance_type.resources.gpus) > 0),
+            managed_identity=azure_utils.get_runner_managed_identity_name(
+                self.azure_config.storage_account
+            ),
+            image_id=_get_image_id(
+                self._compute_client,
+                self.azure_config.location,
+                len(instance_type.resources.gpus) > 0,
+            ),
             vm_size=instance_type.instance_name,
             instance_name=_get_instance_name(job),
             user_data=_get_user_data_script(self.azure_config, job, instance_type),
@@ -176,52 +169,12 @@ def _get_stage_image_id(
     recent_images = sorted(images, key=attrgetter("name"), reverse=True)
     if not recent_images:
         raise Exception(f"Can't find an Azure image pattern={pattern.pattern!r}")
-    return recent_images[0]
+    return recent_images[0].id
 
 
 _get_image_id = _get_prod_image_id
 if not version.__is_release__:
     _get_image_id = _get_stage_image_id
-
-
-def _create_network_security_group(
-    network_client: NetworkManagementClient,
-    location: str,
-    resource_group: str,
-) -> str:
-    security_group_name = "dstackSecurityGroup"
-    network_client.network_security_groups.begin_create_or_update(
-        resource_group,
-        security_group_name,
-        NetworkSecurityGroup(
-            location=location,
-            security_rules=[
-                SecurityRule(
-                    name="runner_service",
-                    protocol=SecurityRuleProtocol.TCP,
-                    source_address_prefix="Internet",
-                    source_port_range="*",
-                    destination_address_prefix="*",
-                    destination_port_range="3000-4000",
-                    access=SecurityRuleAccess.ALLOW,
-                    priority=101,
-                    direction=SecurityRuleDirection.INBOUND,
-                ),
-                SecurityRule(
-                    name="runner_ssh",
-                    protocol=SecurityRuleProtocol.TCP,
-                    source_address_prefix="Internet",
-                    source_port_range="*",
-                    destination_address_prefix="*",
-                    destination_port_range="22",
-                    access=SecurityRuleAccess.ALLOW,
-                    priority=100,
-                    direction=SecurityRuleDirection.INBOUND,
-                ),
-            ],
-        ),
-    ).result()
-    return security_group_name
 
 
 def _get_user_data_script(azure_config: AzureConfig, job: Job, instance_type: InstanceType) -> str:
@@ -267,6 +220,7 @@ def _launch_instance(
                     disk_size_gb=100,
                 ),
             ),
+            # TODO remove pass auth
             os_profile=OSProfile(
                 computer_name="computername",
                 admin_username="dstack_run",

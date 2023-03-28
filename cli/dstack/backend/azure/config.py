@@ -1,22 +1,14 @@
-import json
-import re
-from inspect import signature
 from pathlib import Path
 from typing import Dict, List, Optional, Tuple
+from uuid import UUID, uuid5
 
 import yaml
 from azure.core.credentials import TokenCredential
 from azure.identity import DefaultAzureCredential
+from azure.mgmt.authorization import AuthorizationManagementClient
+from azure.mgmt.authorization.models import RoleAssignmentCreateParameters
 from azure.mgmt.keyvault import KeyVaultManagementClient
-from azure.mgmt.keyvault.models import (
-    AccessPolicyEntry,
-    Permissions,
-    SecretPermissions,
-    Sku,
-    Vault,
-    VaultCreateOrUpdateParameters,
-    VaultProperties,
-)
+from azure.mgmt.keyvault.models import Sku, Vault, VaultCreateOrUpdateParameters, VaultProperties
 from azure.mgmt.loganalytics import LogAnalyticsManagementClient
 from azure.mgmt.loganalytics.models import Column, ColumnTypeEnum, Schema, Table, Workspace
 from azure.mgmt.monitor import MonitorManagementClient
@@ -29,90 +21,27 @@ from azure.mgmt.monitor.models import (
 )
 from azure.mgmt.msi import ManagedServiceIdentityClient
 from azure.mgmt.msi.models import Identity
+from azure.mgmt.network import NetworkManagementClient
+from azure.mgmt.network.models import (
+    AddressSpace,
+    NetworkSecurityGroup,
+    SecurityRule,
+    SecurityRuleAccess,
+    SecurityRuleDirection,
+    SecurityRuleProtocol,
+    Subnet,
+    VirtualNetwork,
+)
 from azure.mgmt.storage import StorageManagementClient
 from azure.mgmt.storage.models import BlobContainer
 from azure.mgmt.subscription import SubscriptionClient
 from azure.mgmt.subscription.models import Subscription, TenantIdDescription
-from pydantic.error_wrappers import ValidationError
-from pydantic.fields import Field
-from pydantic.main import create_model
-from pydantic.networks import stricturl
-from pydantic.tools import parse_obj_as
-from pydantic.types import constr
 from rich.prompt import Prompt
 
 from dstack.backend.azure import utils as azure_utils
 from dstack.cli.common import ask_choice, console
 from dstack.core.config import BackendConfig, Configurator, get_config_path
 from dstack.core.error import ConfigError
-
-# https://learn.microsoft.com/en-us/rest/api/resources/resource-groups/create-or-update?tabs=HTTP#uri-parameters
-# The name of the resource group to create or update.
-# Can include
-# alphanumeric,
-# underscore,
-# parentheses,
-# hyphen,
-# period (except at end),
-# and Unicode characters that match the allowed characters.
-# ^[-\w\._\(\)]+$
-group_name_validator = constr(
-    regex=r"^[-\w\._\(\)]+[-\w_\(\)]$|^[-\w\._\(\)]$",
-    min_length=1,
-    max_length=90,
-)
-
-# XXX: Where is full inclusive description of requirements for url of Key Vault?
-# This page says about "DNS Name":
-# https://learn.microsoft.com/en-us/python/api/azure-keyvault-secrets/azure.keyvault.secrets.secretclient?view=azure-python#parameters
-# This page says about "vaults" without any context:
-# https://learn.microsoft.com/en-us/azure/azure-resource-manager/management/resource-name-rules#microsoftkeyvault
-# This page says about stop-words:
-# https://learn.microsoft.com/en-us/azure/azure-resource-manager/troubleshooting/error-reserved-resource-name
-# This page says vault name is part of url:
-# https://learn.microsoft.com/en-us/azure/key-vault/general/about-keys-secrets-certificates#vault-name-and-object-name
-# For Vaults: https://{vault-name}.vault.azure.net/{object-type}/{object-name}/{object-version}
-# Vault name and Managed HSM pool name must be a 3-24 character string, containing only 0-9, a-z, A-Z, and -.
-# Length:
-# 3-24
-# Valid Characters:
-# - Alphanumerics and hyphens.
-# - Start with letter. End with letter or digit. Can't contain consecutive hyphens.
-vault_name_pattern = re.compile(r"^[a-z](?:-[0-9a-z]|[0-9a-z])$")
-vault_name_min_length = 3
-vault_name_max_length = 24
-
-# https://learn.microsoft.com/en-us/azure/key-vault/general/about-keys-secrets-certificates#dns-suffixes-for-base-url
-vault_dns_suffixes = frozenset(
-    ("vault.azure.net", "vault.azure.cn", "vault.usgovcloudapi.net", "vault.microsoftazure.de")
-)
-
-
-# https://learn.microsoft.com/en-us/azure/storage/common/storage-account-overview#storage-account-name
-# Storage account names must be between 3 and 24 characters in length and may contain numbers and lowercase letters only.
-# It is ok for digit as first character.
-storage_account_name_pattern = re.compile(r"^[a-z][0-9a-z]$")
-storage_account_name_min_length = 3
-storage_account_name_max_length = 24
-
-# https://learn.microsoft.com/en-us/rest/api/storageservices/Naming-and-Referencing-Containers--Blobs--and-Metadata#resource-uri-syntax
-# There are different storage types https://learn.microsoft.com/en-us/azure/storage/common/storage-account-overview#standard-endpoints
-blob_dns_suffixes = frozenset(("blob.core.windows.net",))
-
-# https://learn.microsoft.com/en-us/rest/api/storageservices/naming-and-referencing-containers--blobs--and-metadata#container-names
-# - Container names must start or end with a letter or number, and can contain only letters, numbers, and the dash (-) character.
-# - Every dash (-) character must be immediately preceded and followed by a letter or number; consecutive dashes are not permitted in container names.
-# - All letters in a container name must be lowercase.
-# - Container names must be from 3 through 63 characters long.
-container_name_pattern = r"^[0-9a-z](?:-[0-9a-z]|[0-9a-z])$"
-container_account_name_min_length = 3
-container_account_name_max_length = 63
-container_validator = constr(
-    regex=container_name_pattern,
-    min_length=container_account_name_min_length,
-    max_length=container_account_name_max_length,
-)
-
 
 # XXX: It is based on approximate match with dstack.backend.aws.config.regions.
 locations = [
@@ -141,7 +70,7 @@ class AzureConfig(BackendConfig):
         location: str,
         resource_group: str,
         storage_account: str,
-        secret_url: str,
+        vault_url: str,
         network: str,
         subnet: str,
     ):
@@ -149,12 +78,10 @@ class AzureConfig(BackendConfig):
         self.tenant_id = tenant_id
         self.location = location
         self.resource_group = resource_group
-        self.secret_url = secret_url
-        self.secret_vault = secret_url.host.split(".", 1)[0]
         self.storage_account = storage_account
-        self.network = "dstackNetwork"
-        self.subnet = "default"
-        self.managed_identity = "dstackManagedIdentity"
+        self.vault_url = vault_url
+        self.network = network
+        self.subnet = subnet
 
     def serialize(self) -> Dict:
         res = {
@@ -162,7 +89,9 @@ class AzureConfig(BackendConfig):
             "tenant_id": self.tenant_id,
             "subscription_id": self.subscription_id,
             "location": self.location,
+            "resource_group": self.resource_group,
             "storage_account": self.storage_account,
+            "vault_url": self.vault_url,
             "network": self.network,
             "subnet": self.subnet,
         }
@@ -182,9 +111,10 @@ class AzureConfig(BackendConfig):
             location = data["location"]
             resource_group = data["resource_group"]
             storage_account = data["storage_account"]
+            vault_url = data["vault_url"]
             network = data["network"]
             subnet = data["subnet"]
-        except KeyError:
+        except KeyError as e:
             raise ConfigError("Cannot load config")
 
         return cls(
@@ -193,6 +123,7 @@ class AzureConfig(BackendConfig):
             location=location,
             resource_group=resource_group,
             storage_account=storage_account,
+            vault_url=vault_url,
             network=network,
             subnet=subnet,
         )
@@ -216,9 +147,6 @@ class AzureConfig(BackendConfig):
             f.write(self.serialize_yaml())
 
 
-omitted = object()
-
-
 class AzureConfigurator(Configurator):
     NAME = "azure"
 
@@ -237,24 +165,40 @@ class AzureConfigurator(Configurator):
         location = None
         storage_account = None
 
-        # try:
-        #     config = AzureConfig.load()
-        # except ConfigError:
-        #     config = None
+        try:
+            config = AzureConfig.load()
+        except ConfigError:
+            pass
+        else:
+            tenant_id = config.tenant_id
+            subscription_id = config.subscription_id
+            location = config.location
+            storage_account = config.storage_account
 
         self.credential = DefaultAzureCredential()
 
         self.tenant_id = self._ask_tenant_id(tenant_id)
         self.subscription_id = self._ask_subscription_id(subscription_id)
-
         self.location = self._ask_location(location)
-        storage_account = self._ask_storage_account(storage_account)
+        self.storage_account, self.resource_group = self._ask_storage_account(storage_account)
+
+        console.print("Configuring Azure resources...")
+        self._create_storage_container()
+        self.vault_url = self._create_key_vault()
+        self.runner_principal_id = self._create_runner_managed_identity()
+        self._grant_roles_to_runner_managed_identity()
+        self.network, self.subnet = self._create_network_resources()
+        self._create_logs_resources()
 
         config = AzureConfig(
             tenant_id=self.tenant_id,
             subscription_id=self.subscription_id,
             location=self.location,
-            # resource_group=
+            resource_group=self.resource_group,
+            storage_account=self.storage_account,
+            vault_url=self.vault_url,
+            network=self.network,
+            subnet=self.subnet,
         )
         config.save()
         console.print(f"[grey58]OK[/]")
@@ -276,7 +220,9 @@ class AzureConfigurator(Configurator):
         values = []
         subscription: Subscription
         for subscription in subscription_client.subscriptions.list():
-            labels.append(f"{subscription.display_name} {subscription.subscription_id}")
+            if subscription.state != "Enabled":
+                continue
+            labels.append(f"{subscription.display_name} ({subscription.subscription_id})")
             values.append(subscription.subscription_id)
         value = ask_choice(
             "Choose Azure subscription", labels, values, selected_value=default_subscription_id
@@ -293,6 +239,7 @@ class AzureConfigurator(Configurator):
         return value
 
     def _ask_storage_account(self, default_storage_account: Optional[str]) -> Tuple[str, str]:
+        # TODO show choice
         storage_account_name = Prompt.ask(
             "[sea_green3 bold]?[/sea_green3 bold] [bold]Enter Storage Account name[/bold]",
             default=default_storage_account,
@@ -301,19 +248,118 @@ class AzureConfigurator(Configurator):
             credential=self.credential, subscription_id=self.subscription_id
         )
         for sa in client.storage_accounts.list():
-            if sa.name == storage_account_name:
-                if sa.location != self.location:
-                    console.print(
-                        f"[red bold]✗[/red bold] Storage account location is {sa.location}. "
-                        f"But you chose {self.location} as location. "
-                        f"Please specify a storage account located in {self.location}."
-                    )
-                resource_group = _get_resource_group_from_resource_id(sa.id)
-                return sa.name, resource_group
+            if sa.provisioning_state != "Succeeded" or sa.name != storage_account_name:
+                continue
+            if sa.location != self.location:
+                console.print(
+                    f"[red bold]✗[/red bold] Storage account location is {sa.location}."
+                    f" But you chose {self.location} as location."
+                    f" Please specify a storage account located in {self.location}."
+                )
+                return self._ask_storage_account(default_storage_account)
+            console.print(f"[sea_green3 bold]✓[/sea_green3 bold] [grey74]{sa.name}[/grey74]")
+            resource_group = azure_utils.get_resource_group_from_resource_id(sa.id)
+            return sa.name, resource_group
+        console.print(
+            f"[red bold]✗[/red bold] Storage account '{storage_account_name}' does not exist."
+        )
+        return self._ask_storage_account(default_storage_account)
 
+    def _create_storage_container(self) -> str:
+        return _create_storage_container(
+            credential=self.credential,
+            subscription_id=self.subscription_id,
+            resource_group=self.resource_group,
+            storage_account=self.storage_account,
+            name=azure_utils.DSTACK_CONTAINER_NAME,
+        )
 
-def _get_resource_group_from_resource_id(resource_id: str) -> str:
-    return resource_id.split("/")[4]
+    def _create_key_vault(self) -> str:
+        return _create_key_vault(
+            credential=self.credential,
+            tenant_id=self.tenant_id,
+            subscription_id=self.subscription_id,
+            resource_group=self.resource_group,
+            location=self.location,
+            name=azure_utils.get_key_vault_name(self.storage_account),
+        )
+
+    def _create_runner_managed_identity(self) -> str:
+        return _create_managed_identity(
+            credential=self.credential,
+            subscription_id=self.subscription_id,
+            resource_group=self.resource_group,
+            location=self.location,
+            name=azure_utils.get_runner_managed_identity_name(self.storage_account),
+        )
+
+    def _grant_roles_to_runner_managed_identity(self) -> str:
+        roles_manager = RolesManager(
+            credential=self.credential, subscription_id=self.subscription_id
+        )
+        roles_manager.grant_storage_contributor_role(
+            resource_group=self.resource_group,
+            storage_account=self.storage_account,
+            principal_id=self.runner_principal_id,
+        )
+        roles_manager.grant_vm_contributor_role(
+            resource_group=self.resource_group,
+            principal_id=self.runner_principal_id,
+        )
+        roles_manager.grant_secrets_user_role(
+            resource_group=self.resource_group,
+            key_vault=azure_utils.get_key_vault_name(self.storage_account),
+            principal_id=self.runner_principal_id,
+        )
+
+    def _create_network_resources(self) -> Tuple[str, str]:
+        network_manager = NetworkManager(
+            credential=self.credential, subscription_id=self.subscription_id
+        )
+        network = network_manager.create_virtual_network(
+            resource_group=self.resource_group,
+            location=self.location,
+            name=azure_utils.get_default_network_name(self.storage_account),
+        )
+        subnet = network_manager.create_subnet(
+            resource_group=self.resource_group,
+            network=network,
+            name=azure_utils.get_default_subnet_name(self.storage_account),
+        )
+        network_manager.create_network_security_group(
+            resource_group=self.resource_group,
+            location=self.location,
+        )
+        return network, subnet
+
+    def _create_logs_resources(self):
+        logs_manager = LogsManager(
+            credential=self.credential, subscription_id=self.subscription_id
+        )
+        workspace_name = azure_utils.get_logs_workspace_name(self.storage_account)
+        workspace_resource_id = logs_manager.create_workspace(
+            resource_group=self.resource_group,
+            location=self.location,
+            name=workspace_name,
+        )
+        table_name = logs_manager.create_logs_table(
+            resource_group=self.resource_group,
+            workspace_name=workspace_name,
+            name=azure_utils.DSTACK_LOGS_TABLE_NAME,
+        )
+        dce_id = logs_manager.create_data_collection_endpoint(
+            resource_group=self.resource_group,
+            location=self.location,
+            name=azure_utils.get_data_collection_endpoint_name(self.storage_account),
+        )
+        logs_manager.create_data_collection_rule(
+            resource_group=self.resource_group,
+            workspace_resource_id=workspace_resource_id,
+            location=self.location,
+            logs_table=table_name,
+            data_collection_endpoint_id=dce_id,
+            name=azure_utils.get_data_collection_rule_name(self.storage_account),
+        )
 
 
 def _create_storage_container(
@@ -331,6 +377,33 @@ def _create_storage_container(
         blob_container=BlobContainer(),
     )
     return container.name
+
+
+def _create_key_vault(
+    credential: TokenCredential,
+    tenant_id: str,
+    subscription_id: str,
+    resource_group: str,
+    name: str,
+    location: str,
+) -> str:
+    client = KeyVaultManagementClient(subscription_id=subscription_id, credential=credential)
+    vault: Vault = client.vaults.begin_create_or_update(
+        resource_group_name=resource_group,
+        vault_name=name,
+        parameters=VaultCreateOrUpdateParameters(
+            location=location,
+            properties=VaultProperties(
+                tenant_id=tenant_id,
+                sku=Sku(
+                    family="A",
+                    name="standard",
+                ),
+                enable_rbac_authorization=True,
+            ),
+        ),
+    ).result()
+    return vault.properties.vault_uri
 
 
 def _create_managed_identity(
@@ -351,40 +424,139 @@ def _create_managed_identity(
     return identity.principal_id
 
 
-def _create_key_vault(
-    credential: TokenCredential,
-    tenant_id: str,
-    subscription_id: str,
-    resource_group: str,
-    name: str,
-    location: str,
-    runner_principal_id: str,
-) -> str:
-    client = KeyVaultManagementClient(subscription_id=subscription_id, credential=credential)
-    vault: Vault = client.vaults.begin_create_or_update(
-        resource_group_name=resource_group,
-        vault_name=name,
-        parameters=VaultCreateOrUpdateParameters(
-            location=location,
-            properties=VaultProperties(
-                tenant_id=tenant_id,
-                sku=Sku(
-                    family="A",
-                    name="standard",
-                ),
-                access_policies=[
-                    AccessPolicyEntry(
-                        tenant_id=tenant_id,
-                        object_id=runner_principal_id,
-                        permissions=Permissions(
-                            secrets=[SecretPermissions.GET, SecretPermissions.LIST]
-                        ),
-                    )
+class RolesManager:
+    def __init__(self, credential: TokenCredential, subscription_id: str):
+        self.subscription_id = subscription_id
+        self.authorization_client = AuthorizationManagementClient(
+            credential=credential, subscription_id=subscription_id
+        )
+
+    def grant_storage_contributor_role(
+        self,
+        resource_group: str,
+        storage_account: str,
+        principal_id: str,
+    ):
+        self.authorization_client.role_assignments.create(
+            scope=azure_utils.get_storage_account_id(
+                subscription_id=self.subscription_id,
+                resource_group=resource_group,
+                storage_account=storage_account,
+            ),
+            role_assignment_name=uuid5(UUID(principal_id), "Storage contributor"),
+            parameters=RoleAssignmentCreateParameters(
+                # https://learn.microsoft.com/en-us/azure/role-based-access-control/built-in-roles#storage-blob-data-contributor
+                role_definition_id=f"/subscriptions/{self.subscription_id}/providers/Microsoft.Authorization/roleDefinitions/ba92f5b4-2d11-453d-a403-e96b0029c9fe",
+                principal_id=principal_id,
+                principal_type="ServicePrincipal",
+            ),
+        )
+
+    def grant_vm_contributor_role(
+        self,
+        resource_group: str,
+        principal_id: str,
+    ):
+        self.authorization_client.role_assignments.create(
+            scope=azure_utils.get_resource_group_id(self.subscription_id, resource_group),
+            role_assignment_name=uuid5(UUID(principal_id), "VM contributor"),
+            parameters=RoleAssignmentCreateParameters(
+                # https://learn.microsoft.com/en-us/azure/role-based-access-control/built-in-roles#virtual-machine-contributor
+                role_definition_id=f"/subscriptions/{self.subscription_id}/providers/Microsoft.Authorization/roleDefinitions/9980e02c-c2be-4d73-94e8-173b1dc7cf3c",
+                principal_id=principal_id,
+                principal_type="ServicePrincipal",
+            ),
+        )
+
+    def grant_secrets_user_role(
+        self,
+        resource_group: str,
+        key_vault: str,
+        principal_id: str,
+    ):
+        self.authorization_client.role_assignments.create(
+            scope=azure_utils.get_key_vault_id(self.subscription_id, resource_group, key_vault),
+            role_assignment_name=uuid5(UUID(principal_id), "Secrets user"),
+            parameters=RoleAssignmentCreateParameters(
+                # https://learn.microsoft.com/en-us/azure/role-based-access-control/built-in-roles#key-vault-secrets-user
+                role_definition_id=f"/subscriptions/{self.subscription_id}/providers/Microsoft.Authorization/roleDefinitions/4633458b-17de-408a-b874-0445c86b69e6",
+                principal_id=principal_id,
+                principal_type="ServicePrincipal",
+            ),
+        )
+
+
+class NetworkManager:
+    def __init__(self, credential: TokenCredential, subscription_id: str):
+        self.network_client = NetworkManagementClient(
+            credential=credential, subscription_id=subscription_id
+        )
+
+    def create_virtual_network(
+        self,
+        resource_group: str,
+        name: str,
+        location: str,
+    ):
+        network: VirtualNetwork = self.network_client.virtual_networks.begin_create_or_update(
+            resource_group_name=resource_group,
+            virtual_network_name=name,
+            parameters=VirtualNetwork(
+                location=location, address_space=AddressSpace(address_prefixes=["10.0.0.0/16"])
+            ),
+        ).result()
+        return network.name
+
+    def create_subnet(
+        self,
+        resource_group: str,
+        network: str,
+        name: str,
+    ):
+        subnet: Subnet = self.network_client.subnets.begin_create_or_update(
+            resource_group_name=resource_group,
+            virtual_network_name=network,
+            subnet_name=name,
+            subnet_parameters=Subnet(address_prefix="10.0.0.0/20"),
+        ).result()
+        return subnet.name
+
+    def create_network_security_group(
+        self,
+        resource_group: str,
+        location: str,
+    ):
+        self.network_client.network_security_groups.begin_create_or_update(
+            resource_group_name=resource_group,
+            network_security_group_name=azure_utils.DSTACK_NETWORK_SECURITY_GROUP,
+            parameters=NetworkSecurityGroup(
+                location=location,
+                security_rules=[
+                    SecurityRule(
+                        name="runner_service",
+                        protocol=SecurityRuleProtocol.TCP,
+                        source_address_prefix="Internet",
+                        source_port_range="*",
+                        destination_address_prefix="*",
+                        destination_port_range="3000-4000",
+                        access=SecurityRuleAccess.ALLOW,
+                        priority=101,
+                        direction=SecurityRuleDirection.INBOUND,
+                    ),
+                    SecurityRule(
+                        name="runner_ssh",
+                        protocol=SecurityRuleProtocol.TCP,
+                        source_address_prefix="Internet",
+                        source_port_range="*",
+                        destination_address_prefix="*",
+                        destination_port_range="22",
+                        access=SecurityRuleAccess.ALLOW,
+                        priority=100,
+                        direction=SecurityRuleDirection.INBOUND,
+                    ),
                 ],
             ),
-        ),
-    ).result()
-    return vault.properties.vault_uri
+        ).result()
 
 
 class LogsManager:
@@ -455,7 +627,6 @@ class LogsManager:
         self,
         resource_group: str,
         workspace_resource_id: str,
-        workspace_id: str,
         name: str,
         location: str,
         logs_table: str,
@@ -471,14 +642,14 @@ class LogsManager:
                     log_analytics=[
                         LogAnalyticsDestination(
                             workspace_resource_id=workspace_resource_id,
-                            name=workspace_id,
+                            name="dstack_logs",
                         )
                     ]
                 ),
                 data_flows=[
                     DataFlow(
                         streams=[f"Custom-{logs_table}"],
-                        destinations=[workspace_id],
+                        destinations=["dstack_logs"],
                     )
                 ],
             ),
@@ -487,6 +658,16 @@ class LogsManager:
 
 
 if __name__ == "__main__":
+    # network_manager = NetworkManager(
+    #     credential=DefaultAzureCredential(),
+    #     subscription_id="86e20cc3-8f2f-4258-a416-85ca989d01e8",
+    # )
+    # network_manager.create_virtual_network(
+    #     resource_group="dstack-2f61531ea0e7-eastus",
+    #     name="dstack-2f61531ea0e7-eastus-",
+    #     location="eastus"
+    # )
+    pass
     # principal_id = _create_managed_identity(
     #     credential=DefaultAzureCredential(),
     #     subscription_id="86e20cc3-8f2f-4258-a416-85ca989d01e8",
@@ -509,14 +690,14 @@ if __name__ == "__main__":
     #     credential=DefaultAzureCredential(),
     #     subscription_id="86e20cc3-8f2f-4258-a416-85ca989d01e8",
     #     resource_group="dstack-2f61531ea0e7-eastus",
-    #     storage_account="dstackteststorageaccount",
+    #     storage_account="dstack2f61531ea0e7",
     #     name="dstack-2f61531ea0e7-container",
     # )
     # print(container_name)
-    logs_manager = LogsManager(
-        credential=DefaultAzureCredential(),
-        subscription_id="86e20cc3-8f2f-4258-a416-85ca989d01e8",
-    )
+    # logs_manager = LogsManager(
+    #     credential=DefaultAzureCredential(),
+    #     subscription_id="86e20cc3-8f2f-4258-a416-85ca989d01e8",
+    # )
     # workspace_resource_id = logs_manager.create_workspace(
     #     resource_group="dstack-2f61531ea0e7-eastus",
     #     name="dstack-2f61531ea0e7-eastus-workspace",
@@ -535,13 +716,13 @@ if __name__ == "__main__":
     #     location="eastus"
     # )
     # print(dce_id)
-    dcr_id = logs_manager.create_data_collection_rule(
-        resource_group="dstack-2f61531ea0e7-eastus",
-        workspace_resource_id="/subscriptions/86e20cc3-8f2f-4258-a416-85ca989d01e8/resourceGroups/dstack-2f61531ea0e7-eastus/providers/Microsoft.OperationalInsights/workspaces/dstack-2f61531ea0e7-eastus-workspace",
-        workspace_id="170b91d8-b41e-4248-9e98-19ee0fbbc865",
-        name="dstack-2f61531ea0e7-dcr",
-        location="eastus",
-        logs_table="dstack_logs_CL",
-        data_collection_endpoint_id="/subscriptions/86e20cc3-8f2f-4258-a416-85ca989d01e8/resourceGroups/dstack-2f61531ea0e7-eastus/providers/Microsoft.Insights/dataCollectionEndpoints/dstack-2f61531ea0e7-dce",
-    )
-    print(dcr_id)
+    # dcr_id = logs_manager.create_data_collection_rule(
+    #     resource_group="dstack-2f61531ea0e7-eastus",
+    #     workspace_resource_id="/subscriptions/86e20cc3-8f2f-4258-a416-85ca989d01e8/resourceGroups/dstack-2f61531ea0e7-eastus/providers/Microsoft.OperationalInsights/workspaces/dstack-2f61531ea0e7-eastus-workspace",
+    #     workspace_id="170b91d8-b41e-4248-9e98-19ee0fbbc865",
+    #     name="dstack-2f61531ea0e7-dcr",
+    #     location="eastus",
+    #     logs_table="dstack_logs_CL",
+    #     data_collection_endpoint_id="/subscriptions/86e20cc3-8f2f-4258-a416-85ca989d01e8/resourceGroups/dstack-2f61531ea0e7-eastus/providers/Microsoft.Insights/dataCollectionEndpoints/dstack-2f61531ea0e7-dce",
+    # )
+    # print(dcr_id)
