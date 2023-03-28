@@ -122,6 +122,8 @@ class ProjectElementValue(BaseModel):
     region: Optional[str]
     value: Optional[str]
     label: Optional[str]
+    vpc: Optional[str]
+    subnet: Optional[str]
 
 
 class ProjectElement(BaseModel):
@@ -134,6 +136,16 @@ class AWSProjectValues(BaseModel):
     region_name: Optional[ProjectElement]
     s3_bucket_name: Optional[ProjectElement]
     ec2_subnet_id: Optional[ProjectElement]
+
+
+class GCPProjectValues(BaseModel):
+    type: str = "gcp"
+    area: Optional[ProjectElement]
+    region: Optional[ProjectElement]
+    zone: Optional[ProjectElement]
+    bucket_name: Optional[ProjectElement]
+    bucket_name: Optional[ProjectElement]
+    vpc_subnet: Optional[ProjectElement]
 
 
 class UserPatch(BaseModel):
