@@ -445,14 +445,7 @@ class Provider:
     def _extend_commands_with_openssh_server(commands: List[str], ssh_pub_key: str, port_idx: int):
         commands.extend(
             [
-                "apt update -q",
-                "apt install -q -y openssh-server",
-                "mkdir ~/.ssh",
                 f'echo "{ssh_pub_key}" >> ~/.ssh/authorized_keys',
-                "chmod 700 ~/.ssh",
-                "chmod 600 ~/.ssh/authorized_keys",
-                'sed -i "s/.*PasswordAuthentication.*/PasswordAuthentication no/g" /etc/ssh/sshd_config',
-                "mkdir /run/sshd",
                 f"/usr/sbin/sshd -p $PORT_{port_idx}",
                 f'echo "SSH server is ready"',
             ]
