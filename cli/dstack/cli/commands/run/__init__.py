@@ -192,7 +192,7 @@ def poll_run(
         jobs = [backend.get_job(repo_address, job_head.job_id) for job_head in job_heads]
         ports = {}
         if backend.name != "local":
-            console.print("Starting SSH tunnel... It may take a while.")
+            console.print("Starting SSH tunnel...")
             ports = allocate_local_ports(jobs)
             if not run_ssh_tunnel(
                 ssh_key, jobs[0].host_name, ports
