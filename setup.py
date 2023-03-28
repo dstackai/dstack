@@ -37,8 +37,6 @@ setup(
     package_data={
         "dstack.schemas": ["*.json"],
         "dstack.hub": [
-            "migration/*",
-            "migration/**/*",
             "statics/*",
             "statics/**/*",
             "statics/**/**/*",
