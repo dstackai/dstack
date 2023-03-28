@@ -139,7 +139,7 @@ $
 When you run a workflow remotely, `dstack` automatically creates resources in the configured cloud account
 and then destroys them once the workflow is complete.
 
-### Ports
+#### Ports
 
 When a workflow uses ports to host interactive dev environments or applications, the `dstack run` command automatically
 forwards these ports to your local machine, allowing you to access them. 
