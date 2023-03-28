@@ -7,7 +7,7 @@ This document outlines the best practices for troubleshooting issues when using 
 Have a questions about `dstack` or need help with using it yourself or with your team? Drop us a message 
 in our [Slack channel](https://join.slack.com/t/dstackai/shared_invite/zt-xdnsytie-D4qU9BvJP8vkbkHXdi6clQ).
 
-[Join our Slack](https://join.slack.com/t/dstackai/shared_invite/zt-xdnsytie-D4qU9BvJP8vkbkHXdi6clQ){ class="md-go-to-action primary slack" }
+[Join Slack](https://join.slack.com/t/dstackai/shared_invite/zt-xdnsytie-D4qU9BvJP8vkbkHXdi6clQ){ class="md-go-to-action primary slack" }
 
 ## Something doesn't work?
 

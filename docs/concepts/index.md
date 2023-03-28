@@ -8,11 +8,14 @@ By default, workflows run locally. To run workflows remotely, you need to first 
 config` command. Once a remote is configured, use the `--remote` flag with the `dstack run` command to run a workflow in
 the remote.
 
-!!! info "NOTE:"
-    When running a workflow remotely, `dstack` automatically creates and
-    destroys cloud instances based on resource requirements and cost strategy, such as using spot instances.
+When running a workflow remotely, `dstack` automatically creates and
+destroys cloud instances based on resource requirements and cost strategy, such as using spot instances.
 
-Remotes facilitate collaboration as they allow multiple team members to access the same runs.
+You can request the necessary hardware resources either through arguments in the `dstack run` command (such
+as `--gpu` and `--gpu-name`) or via [YAML](reference/providers/bash.md#resources).
+
+!!! info "NOTE:"
+    Remotes facilitate collaboration as they allow multiple team members to access the same runs.
 
 ## Workflows
 
@@ -23,7 +26,7 @@ Here's an example from the [Quick start](https://docs.dstack.ai/quick-start):
 
 <div editor-title=".dstack/workflows/mnist.yaml"> 
 
-```yaml hl_lines="8 13 18"
+```yaml
 workflows:
   - name: mnist-data
     provider: bash
@@ -51,6 +54,15 @@ experiment trackers, and cloud providers.
 
 !!! info "NOTE:"
     Workflows run in containers with pre-configured Conda environments, and CUDA drivers.
+
+`dstack` supports multiple [providers](usage/providers.md) that enable you to set up environment, run scripts, launch
+interactive dev environments and apps, and perform many other tasks.
+
+## Ports
+
+When a workflow uses ports to host interactive dev environments or applications, the `dstack run` command automatically
+forwards these ports to your local machine, allowing you to access them. 
+Refer to [Providers](usage/providers.md) and [Apps](usage/apps.md) for the details.
 
 ## Artifacts
 
@@ -99,11 +111,3 @@ Run dstack COMMAND --help for more information on a particular command
 ```
 
 </div>
- 
-## Why dstack?
-
-`dstack` enables you to define ML workflows declaratively and run them effortlessly
-from your preferred IDE either locally or remotely on any cloud.
-
-Unlike end-to-end MLOps platforms, `dstack` is lightweight, developer-friendly, and designed to facilitate collaboration
-without imposing any particular approach.

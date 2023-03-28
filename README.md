@@ -9,7 +9,7 @@
 </h1>
 
 <h4 align="center">
-Easy-to-run ML workflows on any cloud
+A better way to run ML workflows
 </h4>
 
 <p align="center">
@@ -32,9 +32,9 @@ Define ML workflows as code and run via CLI. Use any cloud. Collaborate within t
 
 ## What is dstack?
 
-`dstack` is an open-source tool that enables defining ML workflows as code, running them easily on any cloud while saving
-artifacts for reuse. It offers freedom to use any ML frameworks, cloud vendors, or third-party tools without requiring
-code changes.
+`dstack` allows you to define machine learning workflows as code and run them on any cloud. 
+
+It helps you set up a reproducible environment, reuse artifacts, and launch interactive development environments and apps.
 
 ## Installation
 

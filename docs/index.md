@@ -1,31 +1,29 @@
 ---
-title: Easy-to-run ML workflows on any cloud
+title: A better way to run ML workflows
 hide:
   - path
 ---
 
-# Easy-to-run ML workflows on any cloud
+# A better way to run ML workflows
 
 Welcome to `dstack`'s documentation! Here you can learn what it is, how it works, and how to get started.
 
 
 ## What is dstack?
 
-`dstack` is an open-source tool that enables defining ML workflows as code, running them easily on any cloud while saving
-artifacts for reuse. It offers freedom to use any ML frameworks, cloud vendors, or third-party tools without requiring
-code changes.
+`dstack` allows you to define machine learning workflows as code and run them on any cloud. 
 
-[Get started](installation.md){ class="md-go-to-action primary" } [Join our Slack](https://join.slack.com/t/dstackai/shared_invite/zt-xdnsytie-D4qU9BvJP8vkbkHXdi6clQ){ class="md-go-to-action secondary slack" }
+It helps you set up a reproducible environment, reuse artifacts, and launch interactive development environments and apps.
 
-## How does it work?
+[Get started](installation.md){ class="md-go-to-action primary" } [Join Slack](https://join.slack.com/t/dstackai/shared_invite/zt-xdnsytie-D4qU9BvJP8vkbkHXdi6clQ){ class="md-go-to-action secondary slack" }
 
-### Define workflows
+## Define workflows
 
 Define ML workflows, their output artifacts, hardware requirements, and dependencies via YAML.
 
 <div editor-title=".dstack/workflows/mnist.yaml"> 
 
-```yaml hl_lines="8 13 18"
+```yaml
 workflows:
   - name: mnist-data
     provider: bash
@@ -48,14 +46,18 @@ workflows:
 
 </div>
 
-YAML eliminates the need to modify code in your scripts, giving you the freedom to choose frameworks,
-experiment trackers, and cloud providers.
+With YAML, you can avoid making changes to your scripts and have the freedom to use any frameworks, experiment trackers,
+or cloud providers.
 
-### Run workflows
+### Providers
+
+`dstack` supports multiple [providers](usage/providers.md) that enable you to set up environment, run scripts, launch interactive dev environments and apps, and perform many other tasks.
+
+## Run workflows
 
 Once a workflow is defined, you can use the `dstack run` command to run it either locally or remotely. 
 
-#### Run locally
+### Run locally
 
 By default, workflows run locally on your machine:
 
@@ -81,7 +83,7 @@ $
 
 The artifacts from local workflows are also stored and can be reused in other local workflows.
 
-#### Run remotely
+### Run remotelly
 
 To run a workflow remotely (e.g. in a configured cloud account), add the `--remote` flag to the `dstack run` command:
 
@@ -107,8 +109,10 @@ $
 
 The output artifacts from remote workflows are also stored remotely and can be reused by other remote workflows.
 
-The necessary hardware resources can be configured either via YAML or through arguments in the `dstack run` command, such
-as `--gpu` and `--gpu-name`.
+#### Resources
+
+You can request the necessary hardware resources either through arguments in the `dstack run` command (such
+as `--gpu` and `--gpu-name`) or via [YAML](reference/providers/bash.md#resources).
 
 <div class="termy">
 
@@ -132,10 +136,17 @@ $
 
 </div>
 
-Upon running a workflow remotely, `dstack` automatically creates resources in the configured cloud account and destroys them
-once the workflow is complete.
+When you run a workflow remotely, `dstack` automatically creates resources in the configured cloud account
+and then destroys them once the workflow is complete.
 
-!!! info "NOTE:"
-    For questions or feedback, reach us through
-    our [community Slack channel](https://join.slack.com/t/dstackai/shared_invite/zt-xdnsytie-D4qU9BvJP8vkbkHXdi6clQ)
-    or [GitHub](https://github.com/dstackai/dstack).
+### Ports
+
+When a workflow uses ports to host interactive dev environments or applications, the `dstack run` command automatically
+forwards these ports to your local machine, allowing you to access them. 
+Refer to [Providers](usage/providers.md) and [Apps](usage/apps.md) for the details.
+
+## Community
+
+Join our community by connecting with
+us on our [Slack channel](https://join.slack.com/t/dstackai/shared_invite/zt-xdnsytie-D4qU9BvJP8vkbkHXdi6clQ)
+and [GitHub](https://github.com/dstackai/dstack) repository.
