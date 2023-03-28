@@ -53,6 +53,17 @@ class CodeProvider(Provider):
         env = {}
         connection_token = uuid.uuid4().hex
         env["CONNECTION_TOKEN"] = connection_token
+        apps = [
+            AppSpec(
+                port_index=0,
+                app_name="code",
+                url_query_params={
+                    "tkn": connection_token,
+                },
+            )
+        ]
+        if self.openssh_server:
+            apps.append(AppSpec(port_index=len(apps), app_name="openssh-server"))
         return [
             JobSpec(
                 image_name=self.image_name,
@@ -61,17 +72,9 @@ class CodeProvider(Provider):
                 env=env,
                 working_dir=self.working_dir,
                 artifact_specs=self.artifact_specs,
-                port_count=1,
+                port_count=len(apps),
                 requirements=self.resources,
-                app_specs=[
-                    AppSpec(
-                        port_index=0,
-                        app_name="code",
-                        url_query_params={
-                            "tkn": connection_token,
-                        },
-                    )
-                ],
+                app_specs=apps,
             )
         ]
 
@@ -85,6 +88,8 @@ class CodeProvider(Provider):
         commands = []
         if self.env:
             self._extend_commands_with_env(commands, self.env)
+        if self.openssh_server:
+            self._extend_commands_with_openssh_server(commands, self.ssh_key_pub, 1)
         commands.extend(
             [
                 "pip install ipykernel",

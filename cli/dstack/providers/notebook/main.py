@@ -52,6 +52,15 @@ class NotebookProvider(Provider):
         env = {}
         token = uuid.uuid4().hex
         env["TOKEN"] = token
+        apps = [
+            AppSpec(
+                port_index=0,
+                app_name="notebook",
+                url_query_params={"token": token},
+            )
+        ]
+        if self.openssh_server:
+            apps.append(AppSpec(port_index=len(apps), app_name="openssh-server"))
         return [
             JobSpec(
                 image_name=self.image_name,
@@ -60,15 +69,9 @@ class NotebookProvider(Provider):
                 env=env,
                 working_dir=self.working_dir,
                 artifact_specs=self.artifact_specs,
-                port_count=1,
+                port_count=len(apps),
                 requirements=self.resources,
-                app_specs=[
-                    AppSpec(
-                        port_index=0,
-                        app_name="notebook",
-                        url_query_params={"token": token},
-                    )
-                ],
+                app_specs=apps,
             )
         ]
 
@@ -82,6 +85,8 @@ class NotebookProvider(Provider):
         commands = []
         if self.env:
             self._extend_commands_with_env(commands, self.env)
+        if self.openssh_server:
+            self._extend_commands_with_openssh_server(commands, self.ssh_key_pub, 1)
         commands.extend(
             [
                 "conda install psutil -y",

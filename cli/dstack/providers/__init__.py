@@ -58,6 +58,7 @@ class Provider:
         self.run_name: Optional[str] = None
         self.dep_specs: Optional[List[DepSpec]] = None
         self.ssh_key_pub: Optional[str] = None
+        self.openssh_server: bool = False
         self.loaded = False
 
     def __str__(self) -> str:
@@ -125,7 +126,7 @@ class Provider:
         workflow_name: Optional[str],
         provider_data: Dict[str, Any],
         run_name: str,
-    ):  # todo: read ssh key
+    ):
         self.provider_args = provider_args
         self.workflow_name = workflow_name
         self.provider_data = provider_data
@@ -135,6 +136,7 @@ class Provider:
         self._inject_context()
         self.dep_specs = self._dep_specs(backend)
         self.ssh_key_pub = self.provider_data.get("ssh_key_pub")
+        self.openssh_server = self.provider_data.get("openssh_server", False)
         self.loaded = True
 
     @abstractmethod
@@ -438,6 +440,23 @@ class Provider:
     @staticmethod
     def _extend_commands_with_env(commands, env):
         commands.extend([f"export {e}={env[e] if env.get(e) else ''}" for e in env])
+
+    @staticmethod
+    def _extend_commands_with_openssh_server(commands: List[str], ssh_pub_key: str, port_idx: int):
+        commands.extend(
+            [
+                "apt update -q",
+                "apt install -q -y openssh-server",
+                "mkdir ~/.ssh",
+                f'echo "{ssh_pub_key}" >> ~/.ssh/authorized_keys',
+                "chmod 700 ~/.ssh",
+                "chmod 600 ~/.ssh/authorized_keys",
+                'sed -i "s/.*PasswordAuthentication.*/PasswordAuthentication no/g" /etc/ssh/sshd_config',
+                "mkdir /run/sshd",
+                f"/usr/sbin/sshd -p $PORT_{port_idx}",
+                f'echo "SSH server is ready"',
+            ]
+        )
 
 
 def get_provider_names() -> List[str]:

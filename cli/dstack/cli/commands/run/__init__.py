@@ -141,7 +141,11 @@ def poll_logs_ws(backend: Backend, repo_address: RepoAddress, job: Job, ports: D
 
 
 def poll_run(
-    repo_address: RepoAddress, job_heads: List[JobHead], backend: Backend, ssh_key: Optional[str]
+    repo_address: RepoAddress,
+    job_heads: List[JobHead],
+    backend: Backend,
+    ssh_key: Optional[str],
+    openssh_server: bool,
 ):
     run_name = job_heads[0].run_name
     try:
@@ -199,6 +203,14 @@ def poll_run(
         console.print()
         console.print("[grey58]To interrupt, press Ctrl+C.[/]")
         console.print()
+
+        if openssh_server:
+            ssh_port = jobs[0].ports[-1]
+            ssh_port = ports.get(ssh_port, ssh_port)
+            ssh_key_escaped = ssh_key.replace(" ", "\\ ")
+            console.print("SSH would be available in a minute, run command below to connect:")
+            console.print(f"  ssh -i {ssh_key_escaped} root@localhost -p {ssh_port}")
+            console.print()
 
         run = backend.list_run_heads(repo_address, run_name)[0]
         if len(job_heads) == 1 and run and run.status == JobStatus.RUNNING:
@@ -319,7 +331,13 @@ class RunCommand(BasicCommand):
             backend.update_repo_last_run_at(repo_data, last_run_at=int(round(time.time() * 1000)))
             print_runs(list_runs_with_merged_backends([backend], run_name=run_name))
             if not args.detach:
-                poll_run(repo_data, jobs, backend, ssh_key=repo_credentials.ssh_key_path)
+                poll_run(
+                    repo_data,
+                    jobs,
+                    backend,
+                    ssh_key=repo_credentials.ssh_key_path,
+                    openssh_server=provider.openssh_server,
+                )
         except ValidationError as e:
             sys.exit(
                 f"There a syntax error in one of the files inside the {os.getcwd()}/.dstack/workflows directory:\n\n{e}"

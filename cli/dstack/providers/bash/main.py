@@ -56,16 +56,16 @@ class BashProvider(Provider):
             self.provider_data["ports"] = args.ports
 
     def create_job_specs(self) -> List[JobSpec]:
-        apps = None
-        if self.ports:
-            apps = []
-            for i in range(self.ports):
-                apps.append(
-                    AppSpec(
-                        port_index=i,
-                        app_name="bash" + (str(i) if self.ports > 1 else ""),
-                    )
+        apps = []
+        for i in range(self.ports or 0):
+            apps.append(
+                AppSpec(
+                    port_index=i,
+                    app_name="bash" + (str(i) if self.ports > 1 else ""),
                 )
+            )
+        if self.openssh_server:
+            apps.append(AppSpec(port_index=len(apps), app_name="openssh-server"))
         return [
             JobSpec(
                 image_name=self.image_name,
@@ -73,7 +73,7 @@ class BashProvider(Provider):
                 entrypoint=["/bin/bash", "-i", "-c"],
                 working_dir=self.working_dir,
                 artifact_specs=self.artifact_specs,
-                port_count=self.ports,
+                port_count=len(apps),
                 requirements=self.resources,
                 app_specs=apps,
             )
@@ -89,6 +89,8 @@ class BashProvider(Provider):
         commands = []
         if self.env:
             self._extend_commands_with_env(commands, self.env)
+        if self.openssh_server:
+            self._extend_commands_with_openssh_server(commands, self.ssh_key_pub, self.ports or 0)
         commands.extend(self.commands)
         return commands
 

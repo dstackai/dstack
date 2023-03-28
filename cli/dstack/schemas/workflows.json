@@ -164,6 +164,11 @@
         }
       }
     },
+    "openssh_server": {
+      "description": "Run openssh server in the container",
+      "type": "boolean",
+      "default": false
+    },
     "bash": {
       "type": "object",
       "required": [
@@ -204,6 +209,9 @@
         },
         "resources": {
           "$ref": "#/definitions/resources"
+        },
+        "openssh_server": {
+          "$ref": "#/definitions/openssh_server"
         }
       }
     },
@@ -305,6 +313,9 @@
         },
         "resources": {
           "$ref": "#/definitions/resources"
+        },
+        "openssh_server": {
+          "$ref": "#/definitions/openssh_server"
         }
       }
     },
@@ -342,6 +353,9 @@
         },
         "resources": {
           "$ref": "#/definitions/resources"
+        },
+        "openssh_server": {
+          "$ref": "#/definitions/openssh_server"
         }
       }
     },
@@ -379,6 +393,9 @@
         },
         "resources": {
           "$ref": "#/definitions/resources"
+        },
+        "openssh_server": {
+          "$ref": "#/definitions/openssh_server"
         }
       }
     }
