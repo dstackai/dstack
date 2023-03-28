@@ -27,7 +27,6 @@ export const ProjectForm: React.FC<IProps> = ({ initialValues, onCancel, loading
         return {
             backend: {
                 type: 'aws',
-                ec2_subnet_id: '',
             },
         };
     };
@@ -62,7 +61,7 @@ export const ProjectForm: React.FC<IProps> = ({ initialValues, onCancel, loading
     ];
 
     const onSubmit = (data: IProject) => {
-        if (data.backend.ec2_subnet_id === '') data.backend.ec2_subnet_id = null;
+        if (data.backend.type === 'aws' && data.backend.ec2_subnet_id === '') data.backend.ec2_subnet_id = null;
 
         clearErrors();
 
