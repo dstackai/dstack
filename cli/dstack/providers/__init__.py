@@ -132,11 +132,11 @@ class Provider:
         self.provider_data = provider_data
         self.run_as_provider = not workflow_name
         self.run_name = run_name
+        self.openssh_server = self.provider_data.get("ssh", False)
         self.parse_args()
         self._inject_context()
         self.dep_specs = self._dep_specs(backend)
         self.ssh_key_pub = self.provider_data.get("ssh_key_pub")
-        self.openssh_server = self.provider_data.get("ssh", False)
         self.loaded = True
 
     @abstractmethod

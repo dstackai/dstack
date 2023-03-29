@@ -41,6 +41,7 @@ class BashProvider(Provider):
     def _create_parser(self, workflow_name: Optional[str]) -> Optional[ArgumentParser]:
         parser = ArgumentParser(prog="dstack run " + (workflow_name or self.provider_name))
         self._add_base_args(parser)
+        parser.add_argument("--ssh", action="store_true", dest="openssh_server")
         parser.add_argument("-p", "--ports", metavar="PORT_COUNT", type=int)
         if not workflow_name:
             parser.add_argument("-c", "--command", type=str)
@@ -54,6 +55,8 @@ class BashProvider(Provider):
             self.provider_data["commands"] = [args.command]
         if args.ports:
             self.provider_data["ports"] = args.ports
+        if args.openssh_server:
+            self.openssh_server = True
 
     def create_job_specs(self) -> List[JobSpec]:
         apps = []
