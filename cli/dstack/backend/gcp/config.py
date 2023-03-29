@@ -219,7 +219,7 @@ class GCPConfigurator(Configurator):
         storage_client = storage.Client(credentials=credentials)
         buckets = storage_client.list_buckets()
         for bucket in buckets:
-            element.values.append(ProjectElementValue(name=bucket.name))
+            element.values.append(ProjectElementValue(value=bucket.name))
         return element
 
     def _get_hub_geographic_area(self, default_area: Optional[str]):
@@ -228,7 +228,7 @@ class GCPConfigurator(Configurator):
         area_names = sorted([l["name"] for l in GCP_LOCATIONS])
         element = ProjectElement(selected=default_area)
         for area_name in area_names:
-            element.values.append(ProjectElementValue(name=area_name))
+            element.values.append(ProjectElementValue(value=area_name))
         return element
 
     def _get_hub_region(
@@ -243,7 +243,7 @@ class GCPConfigurator(Configurator):
         )
         element = ProjectElement(selected=default_region)
         for region_name in region_names:
-            element.values.append(ProjectElementValue(name=region_name))
+            element.values.append(ProjectElementValue(value=region_name))
 
         return element, {r.name: r for r in regions}
 
@@ -258,7 +258,7 @@ class GCPConfigurator(Configurator):
             default_zone = zone_names[0]
         element = ProjectElement(selected=default_zone)
         for zone_name in zone_names:
-            element.values.append(ProjectElementValue(name=zone_name))
+            element.values.append(ProjectElementValue(value=zone_name))
 
         return element
 
