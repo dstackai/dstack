@@ -36,13 +36,30 @@ class AWSAuth(BaseModel):
     secret_key: str = ""
 
 
+class GCPConfig(BaseModel):
+    area: str = ""
+    region: str = ""
+    zone: str = ""
+    bucket_name: Optional[str] = ""
+    vpc: str = ""
+    subnet: str = ""
+
+
+class GCPAuth(BaseModel):
+    credentials: str = ""
+
+
 class AWSBackend(AWSConfig, AWSAuth):
     type: str = "aws"
 
 
+class GCPBackend(GCPConfig, GCPAuth):
+    type: str = "gcp"
+
+
 class ProjectInfo(BaseModel):
     project_name: str
-    backend: AWSBackend
+    backend: Union[AWSBackend, GCPBackend]
     members: List[Member] = []
 
 
@@ -127,7 +144,7 @@ class ProjectElementValue(BaseModel):
 
 
 class ProjectElement(BaseModel):
-    selected: str
+    selected: Optional[str]
     values: List[ProjectElementValue] = []
 
 

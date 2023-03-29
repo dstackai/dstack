@@ -1,7 +1,16 @@
 import json
 
 from dstack.hub.db.models import Project
-from dstack.hub.models import AWSAuth, AWSBackend, AWSConfig, Member, ProjectInfo
+from dstack.hub.models import (
+    AWSAuth,
+    AWSBackend,
+    AWSConfig,
+    GCPAuth,
+    GCPBackend,
+    GCPConfig,
+    Member,
+    ProjectInfo,
+)
 
 
 def info2project(project_info: ProjectInfo) -> Project:
@@ -15,6 +24,10 @@ def info2project(project_info: ProjectInfo) -> Project:
         )
         project.config = AWSConfig().parse_obj(project_info.backend).json()
         project.auth = AWSAuth().parse_obj(project_info.backend).json()
+    if project_info.backend.type == "gcp":
+        project.config = GCPConfig().parse_obj(project_info.backend).json()
+        if project_info.backend.credentials != "":
+            project.auth = GCPAuth().parse_obj(project_info.backend).json()
     return project
 
 
@@ -30,7 +43,22 @@ def project2info(project: Project) -> ProjectInfo:
     backend = None
     if project.backend == "aws":
         backend = _aws(project)
+    if project.backend == "gcp":
+        backend = _gcp(project)
     return ProjectInfo(project_name=project.name, backend=backend, members=members)
+
+
+def _gcp(project) -> GCPConfig:
+    backend = GCPBackend(type="gcp")
+    if project.config is not None:
+        json_config = json.loads(str(project.config))
+        backend.area = json_config.get("area") or ""
+        backend.region = json_config.get("region") or ""
+        backend.zone = json_config.get("zone") or ""
+        backend.bucket_name = json_config.get("bucket_name") or ""
+        backend.vpc = json_config.get("vpc") or ""
+        backend.subnet = json_config.get("subnet") or ""
+    return backend
 
 
 def _aws(project) -> AWSBackend:
