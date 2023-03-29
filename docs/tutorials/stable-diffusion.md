@@ -59,22 +59,13 @@ Let's create the following Python file:
 <div editor-title="stable_diffusion/stable_diffusion.py"> 
 
 ```python
-import shutil
+from huggingface_hub import snapshot_download
 
-from diffusers import StableDiffusionPipeline
-
-
-def main():
-    _, cache_folder = StableDiffusionPipeline.from_pretrained("runwayml/stable-diffusion-v1-5",
-                                                              return_cached_folder=True)
-    shutil.copytree(cache_folder, "./models/runwayml/stable-diffusion-v1-5", dirs_exist_ok=True)
+if __name__ == '__main__':
+    snapshot_download("runwayml/stable-diffusion-v1-5", local_dir="./models/runwayml/stable-diffusion-v1-5")
 ```
 
 </div>
-
-!!! info "NOTE:"
-    By default, `diffusers` downloads the model to its own [cache folder](https://huggingface.co/docs/datasets/cache) built using symlinks.
-    Since `dstack` [doesn't support symlinks](https://github.com/dstackai/dstack/issues/180) in artifacts, we're copying the model files to the local `models` folder. 
 
 In order to run a script via `dstack`, the script must be defined as a workflow via a YAML file
 under `.dstack/workflows`.

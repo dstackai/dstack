@@ -6,7 +6,9 @@ from dstack.api.backend import list_backends
 from dstack.api.repo import load_repo_data
 from dstack.cli.commands import BasicCommand
 from dstack.cli.common import console
+from dstack.cli.config import BaseConfig
 from dstack.core.error import check_config, check_git
+from dstack.core.userconfig import RepoUserConfig
 
 
 def get_ssh_keypair(key_path: Optional[str], default: str = "~/.ssh/id_rsa") -> Optional[str]:
@@ -57,11 +59,19 @@ class InitCommand(BasicCommand):
         local_repo_data = load_repo_data(args.gh_token, args.git_identity_file)
         local_repo_data.ls_remote()
         repo_credentials = local_repo_data.repo_credentials()
-        repo_credentials.ssh_key_path = get_ssh_keypair(args.ssh_identity_file)
+
+        config = BaseConfig()
+        repo_user_config = RepoUserConfig(ssh_key_path=get_ssh_keypair(args.ssh_identity_file))
+        config.write(
+            config.repos / f"{local_repo_data.path(delimiter='.')}.yaml",
+            repo_user_config,
+            mkdir=True,
+        )
+
         for backend in list_backends():
             backend.save_repo_credentials(local_repo_data, repo_credentials)
-            if backend.name != "local" and repo_credentials.ssh_key_path is None:
-                console.print(f"[red]FAILED[/] [gray58](backend: {backend.name})[/]")
+            if backend.name != "local" and repo_user_config.ssh_key_path is None:
+                console.print(f"[yellow]WARNING[/] [gray58](backend: {backend.name})[/]")
                 console.print(
                     f"  [gray58]Make sure `{args.ssh_identity_file or '~/.ssh/id_rsa'}` exists "
                     "or call `dstack init --ssh-identity PATH`[/]"

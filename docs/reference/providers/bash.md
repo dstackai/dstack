@@ -51,6 +51,7 @@ The following properties are optional:
 - `env` - (Optional) The list of environment variables 
 - [`artifacts`](#artifacts) - (Optional) The list of output artifacts
 - [`resources`](#resources) - (Optional) The hardware resources required by the workflow
+- [`ports`](#ports) - (Optional) The number of ports to expose
 - `working_dir` - (Optional) The path to the working directory
 - `ssh` - (Optional) Runs SSH server in the container if `true`
 
@@ -111,6 +112,9 @@ workflows:
 ```
 
 </div>
+
+When running a workflow remotely, the `dstack run` command automatically forwards the defined ports from the remote machine to your local machine.
+This allows you to securely access applications running remotely from your local machine.
 
 ### Background processes
 

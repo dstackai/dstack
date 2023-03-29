@@ -43,17 +43,14 @@ Provisioning... It may take up to a minute. ✓
 To interrupt, press Ctrl+C.
 
 Hello, world!
-
-$ 
 ```
 
 </div>
 
-!!! info "NOTE:"
-    The `bash` provider allows to use `pip`, `conda`, and `python` executables from the commands.
-    See [Python](python.md) and [Conda](conda.md) for more details.
+The `bash` provider allows to use `pip`, `conda`, and `python` executables from the commands.
+See [Python](python.md) and [Conda](conda.md) for more details.
 
-    Also, the `bash` provider allows to expose ports. See [Apps](apps.md) for more details.
+Also, the `bash` provider allows to expose ports. See [Apps](apps.md) for more details.
 
 For more details, check the [reference](../reference/providers/bash.md).
 
@@ -89,8 +86,6 @@ Provisioning... It may take up to a minute. ✓
 To interrupt, press Ctrl+C.
 
 Hello, world!
-
-$ 
 ```
 
 </div>
@@ -134,9 +129,9 @@ If you click the URL, it will open the VS Code application in the browser:
 
 ![](../assets/dstack_code_dark.png)
 
-For more details, check the [reference](../reference/providers/code.md).
+This is a great option if you'd like to run code interactively using a code editor and a terminal.
 
-This is a great option if you'd like to run code interactively using a code editor and a terminal. 
+For more details, check the [reference](../reference/providers/code.md).
 
 !!! info "NOTE:"
     The `code` provider allows to use `pip`, `conda`, and `python` executables from the commands.
@@ -144,7 +139,7 @@ This is a great option if you'd like to run code interactively using a code edit
 
 ## lab
 
-Similar to `code`, `labs` allows to run a JupyterLabs application.
+Similar to `code`, `labs` allows to run a JupyterLab application.
 
 For more details, check the [reference](../reference/providers/lab.md).
 

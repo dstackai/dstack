@@ -9,7 +9,7 @@
 </h1>
 
 <h4 align="center">
-Easy-to-run ML workflows on any cloud
+A better way to run ML workflows
 </h4>
 
 <p align="center">
@@ -20,9 +20,9 @@ Define ML workflows as code and run via CLI. Use any cloud. Collaborate within t
 
 <p align="center">
 <a href="https://docs.dstack.ai" target="_blank"><b>Docs</b></a> • 
+<a href="https://docs.dstack.ai/installation"><b>Installation</b></a> • 
 <a href="https://docs.dstack.ai/quick-start"><b>Quick start</b></a> • 
-<a href="https://docs.dstack.ai/usage/hello-world" target="_blank"><b>Usage</b></a> • 
-<a href="https://join.slack.com/t/dstackai/shared_invite/zt-xdnsytie-D4qU9BvJP8vkbkHXdi6clQ" target="_blank"><b>Slack</b></a> 
+<a href="https://docs.dstack.ai/usage/hello-world" target="_blank"><b>Usage</b></a> 
 </p>
 
 [![Last commit](https://img.shields.io/github/last-commit/dstackai/dstack)](https://github.com/dstackai/dstack/commits/)
@@ -32,9 +32,9 @@ Define ML workflows as code and run via CLI. Use any cloud. Collaborate within t
 
 ## What is dstack?
 
-`dstack` is an open-source tool that enables defining ML workflows as code, running them easily on any cloud while saving
-artifacts for reuse. It offers freedom to use any ML frameworks, cloud vendors, or third-party tools without requiring
-code changes.
+`dstack` allows you to define machine learning workflows as code and run them on any cloud. 
+
+It helps you set up a reproducible environment, reuse artifacts, and launch interactive development environments and apps.
 
 ## Installation
 
@@ -94,6 +94,11 @@ workflows:
 
 YAML eliminates the need to modify code in your scripts, giving you the freedom to choose frameworks,
 experiment trackers, and cloud providers.
+
+### Providers
+
+`dstack` supports multiple [providers](https://docs.dstack.ai/usage/providers.md) that enable you to set up environment,
+run scripts, launch interactive dev environments and apps, and perform many other tasks.
 
 ## Run workflows
 
@@ -157,6 +162,12 @@ Epoch 1: [00:03<00:00, 280.17it/s, loss=1.35, v_num=0]
 
 Upon running a workflow remotely, `dstack` automatically creates resources in the configured cloud account and destroys them
 once the workflow is complete.
+
+#### Ports
+
+When a workflow uses ports to host interactive dev environments or applications, the `dstack run` command automatically
+forwards these ports to your local machine, allowing you to access them. 
+Refer to [Providers](usage/providers.md) and [Apps](usage/apps.md) for the details.
 
 ## More information
 

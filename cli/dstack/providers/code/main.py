@@ -92,7 +92,7 @@ class CodeProvider(Provider):
             self._extend_commands_with_openssh_server(commands, self.ssh_key_pub, 1)
         commands.extend(
             [
-                "pip install ipykernel",
+                "pip install ipykernel -q",
                 "mkdir -p /tmp",
                 'if [ $(uname -m) = "aarch64" ]; then arch="arm64"; else arch="x64"; fi',
                 f"wget -q https://github.com/gitpod-io/openvscode-server/releases/download/"

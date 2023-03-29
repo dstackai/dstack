@@ -25,10 +25,12 @@ from dstack.backend.base.logs import fix_urls
 from dstack.cli.commands import BasicCommand
 from dstack.cli.commands.run.ssh_tunnel import allocate_local_ports, run_ssh_tunnel
 from dstack.cli.common import console, print_runs
+from dstack.cli.config import BaseConfig
 from dstack.core.error import check_backend, check_config, check_git
 from dstack.core.job import Job, JobHead, JobStatus
 from dstack.core.repo import RepoAddress
 from dstack.core.request import RequestStatus
+from dstack.core.userconfig import RepoUserConfig
 from dstack.utils.common import since
 
 __all__ = "RunCommand"
@@ -285,6 +287,7 @@ class RunCommand(BasicCommand):
             self._parser.print_help()
             exit(1)
         try:
+            config = BaseConfig()
             repo_data = load_repo_data()
             backend = get_local_backend()
             if args.remote is not None:
@@ -312,14 +315,19 @@ class RunCommand(BasicCommand):
                 sys.exit()
 
             repo_credentials = backend.get_repo_credentials(repo_data)
+            repo_user_config = config.read(
+                config.repos / f"{repo_data.path(delimiter='.')}.yaml",
+                RepoUserConfig,
+                non_empty=False,
+            )
             if not repo_credentials:
                 sys.exit(f"Call `dstack init` first")
-            if backend != "local" and not args.detach:
-                if not repo_credentials.ssh_key_path:
+            if backend.name != "local" and not args.detach:
+                if not repo_user_config.ssh_key_path:
                     console.print("Call `dstack init` first")
                     exit(1)
                 else:
-                    workflow_data["ssh_key_pub"] = _read_ssh_key_pub(repo_credentials.ssh_key_path)
+                    workflow_data["ssh_key_pub"] = _read_ssh_key_pub(repo_user_config.ssh_key_path)
 
             run_name = backend.create_run(repo_data)
             provider.load(backend, provider_args, workflow_name, workflow_data, run_name)
@@ -335,7 +343,7 @@ class RunCommand(BasicCommand):
                     repo_data,
                     jobs,
                     backend,
-                    ssh_key=repo_credentials.ssh_key_path,
+                    ssh_key=repo_user_config.ssh_key_path,
                     openssh_server=provider.openssh_server,
                 )
         except ValidationError as e:
