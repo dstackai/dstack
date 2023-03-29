@@ -243,7 +243,7 @@ class GCPConfigurator(Configurator):
         )
         element = ProjectElement(selected=default_region)
         for region_name in region_names:
-            element.values.append(ProjectElementValue(name=region_name.name))
+            element.values.append(ProjectElementValue(name=region_name))
 
         return element, {r.name: r for r in regions}
 
@@ -263,7 +263,12 @@ class GCPConfigurator(Configurator):
         return element
 
     def _get_hub_vpc_subnet(
-        self, credentials, project_id, default_vpc: Optional[str], default_subnet: Optional[str]
+        self,
+        credentials,
+        project_id,
+        region,
+        default_vpc: Optional[str],
+        default_subnet: Optional[str],
     ):
         networks_client = compute_v1.NetworksClient(credentials=credentials)
         list_networks_request = compute_v1.ListNetworksRequest(project=project_id)
@@ -272,7 +277,7 @@ class GCPConfigurator(Configurator):
         for network in networks:
             for subnet in network.subnetworks:
                 subnet_region = self._get_subnet_region(subnet)
-                if subnet_region != self.region:
+                if subnet_region != region:
                     continue
                 element.values.append(
                     ProjectElementValue(
@@ -289,27 +294,26 @@ class GCPConfigurator(Configurator):
             try:
                 with os.fdopen(fd, "w") as tmp:
                     tmp.write(data.get("credentials"))
-                    try:
-                        credentials = service_account.Credentials.from_service_account_file(
-                            tmp_path
-                        )
-                        storage_client = storage.Client(credentials=credentials)
-                        storage_client.list_buckets(max_results=1)
-                    except Exception as e:
-                        raise HubError("Credentials are not valid")
-                    project_values = GCPProjectValues()
-                    project_values.bucket_name = await loop.run_in_executor(
-                        None,
-                        partial(
-                            self._get_hub_buckets,
-                            credentials=credentials,
-                            default=data.get("bucket_name"),
-                        ),
-                    )
-                    default_area = self._get_region_geographic_area(data.get("region"))
-                    project_values.area = await loop.run_in_executor(
-                        None, partial(self._get_hub_geographic_area, default_area=default_area)
-                    )
+                try:
+                    credentials = service_account.Credentials.from_service_account_file(tmp_path)
+                    storage_client = storage.Client(credentials=credentials)
+                    storage_client.list_buckets(max_results=1)
+                except Exception as e:
+                    raise HubError("Credentials are not valid")
+                project_values = GCPProjectValues()
+                project_values.bucket_name = await loop.run_in_executor(
+                    None,
+                    partial(
+                        self._get_hub_buckets,
+                        credentials=credentials,
+                        default=data.get("bucket_name"),
+                    ),
+                )
+                default_area = self._get_region_geographic_area(data.get("region"))
+                project_values.area = await loop.run_in_executor(
+                    None, partial(self._get_hub_geographic_area, default_area=default_area)
+                )
+                if data.get("area") is not None:
                     location = self._get_location(data.get("area"))
                     project_values.region, regions = await loop.run_in_executor(
                         None,
@@ -334,17 +338,19 @@ class GCPConfigurator(Configurator):
                                 default_zone=data.get("zone"),
                             ),
                         )
-                    project_values.vpc_subnet = await loop.run_in_executor(
-                        None,
-                        partial(
-                            self._get_hub_region,
-                            credentials=credentials,
-                            project_id=credentials.project_id,
-                            default_vpc=data.get("vpc"),
-                            default_subnet=data.get("subnet"),
-                        ),
-                    )
-                    return project_values
+
+                        project_values.vpc_subnet = await loop.run_in_executor(
+                            None,
+                            partial(
+                                self._get_hub_vpc_subnet,
+                                credentials=credentials,
+                                project_id=credentials.project_id,
+                                region=data.get("region"),
+                                default_vpc=data.get("vpc"),
+                                default_subnet=data.get("subnet"),
+                            ),
+                        )
+                return project_values
             finally:
                 os.remove(path=tmp_path)
         else:
