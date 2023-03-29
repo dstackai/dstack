@@ -13,7 +13,7 @@ RUN apt-get update --fix-missing && \
     dpkg-reconfigure --frontend noninteractive tzdata && \
     apt-get install -y bzip2 ca-certificates curl gcc git libglib2.0-0 libsm6 libxext6 libxrender1 mercurial openssh-server subversion wget && \
     sed -i "s/.*PasswordAuthentication.*/PasswordAuthentication no/g" /etc/ssh/sshd_config && mkdir /run/sshd && \
-    mkdir ~/.ssh && chmod 700 ~/.ssh && touch ~/.ssh/authorized_keys && chmod 600 ~/.ssh/authorized_keys
+    mkdir ~/.ssh && chmod 700 ~/.ssh && touch ~/.ssh/authorized_keys && chmod 600 ~/.ssh/authorized_keys && rm /etc/ssh/ssh_host_*
 
 RUN wget -O Miniforge3.sh "https://github.com/conda-forge/miniforge/releases/latest/download/Miniforge3-$(uname)-$(uname -m).sh" && \
     bash Miniforge3.sh -b -p "/opt/conda" && \
