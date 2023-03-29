@@ -1,6 +1,6 @@
 name: Manual Azure build for STGN
 
-on: [workflow_dispatch]
+on: [workflow_dispatch, push]
 
 jobs:
   azure-image-build:
