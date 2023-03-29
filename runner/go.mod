@@ -4,7 +4,9 @@ go 1.19
 
 require (
 	github.com/Azure/azure-sdk-for-go/sdk/azcore v1.4.0
-	github.com/Azure/azure-sdk-for-go/sdk/azidentity v1.2.1
+	github.com/Azure/azure-sdk-for-go/sdk/azidentity v1.2.2
+	github.com/Azure/azure-sdk-for-go/sdk/keyvault/azsecrets v0.11.0
+	github.com/Azure/azure-sdk-for-go/sdk/resourcemanager/compute/armcompute/v4 v4.1.0
 	github.com/Azure/azure-sdk-for-go/sdk/storage/azblob v1.0.0
 	github.com/aws/aws-sdk-go v1.38.7
 	github.com/aws/aws-sdk-go-v2 v1.16.14
@@ -31,10 +33,16 @@ require (
 	cloud.google.com/go/iam v0.8.0 // indirect
 	cloud.google.com/go/longrunning v0.3.0 // indirect
 	github.com/Azure/azure-sdk-for-go/sdk/internal v1.2.0 // indirect
-	github.com/Azure/azure-sdk-for-go/sdk/keyvault/azsecrets v0.11.0 // indirect
 	github.com/Azure/azure-sdk-for-go/sdk/keyvault/internal v0.7.0 // indirect
-	github.com/Azure/azure-sdk-for-go/sdk/resourcemanager/compute/armcompute/v4 v4.1.0 // indirect
-	github.com/AzureAD/microsoft-authentication-library-for-go v0.8.1 // indirect
+	github.com/Azure/go-autorest v14.2.0+incompatible // indirect
+	github.com/Azure/go-autorest/autorest v0.11.1 // indirect
+	github.com/Azure/go-autorest/autorest/adal v0.9.5 // indirect
+	github.com/Azure/go-autorest/autorest/date v0.3.0 // indirect
+	github.com/Azure/go-autorest/autorest/to v0.4.0 // indirect
+	github.com/Azure/go-autorest/autorest/validation v0.3.1 // indirect
+	github.com/Azure/go-autorest/logger v0.2.0 // indirect
+	github.com/Azure/go-autorest/tracing v0.6.0 // indirect
+	github.com/AzureAD/microsoft-authentication-library-for-go v0.9.0 // indirect
 	github.com/Microsoft/go-winio v0.4.17 // indirect
 	github.com/ProtonMail/go-crypto v0.0.0-20210428141323-04723f9f07d7 // indirect
 	github.com/acomagu/bufpipe v1.0.3 // indirect
@@ -52,6 +60,7 @@ require (
 	github.com/docker/go-units v0.4.0 // indirect
 	github.com/dustin/go-humanize v1.0.0 // indirect
 	github.com/emirpasic/gods v1.12.0 // indirect
+	github.com/form3tech-oss/jwt-go v3.2.2+incompatible // indirect
 	github.com/go-git/gcfg v1.5.0 // indirect
 	github.com/go-git/go-billy/v5 v5.3.1 // indirect
 	github.com/gogo/protobuf v1.3.2 // indirect
@@ -110,6 +119,8 @@ require (
 	cloud.google.com/go/logging v1.6.1
 	cloud.google.com/go/secretmanager v1.10.0
 	cloud.google.com/go/storage v1.29.0
+	github.com/Azure/azure-sdk-for-go v68.0.0+incompatible
+	github.com/Azure/azure-sdk-for-go/sdk/resourcemanager/monitor/armmonitor v0.9.0
 	github.com/aws/aws-sdk-go-v2/feature/ec2/imds v1.12.15
 	github.com/aws/aws-sdk-go-v2/internal/configsources v1.1.21 // indirect
 	github.com/aws/aws-sdk-go-v2/internal/endpoints/v2 v2.4.15 // indirect

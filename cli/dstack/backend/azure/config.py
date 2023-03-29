@@ -13,11 +13,13 @@ from azure.mgmt.loganalytics import LogAnalyticsManagementClient
 from azure.mgmt.loganalytics.models import Column, ColumnTypeEnum, Schema, Table, Workspace
 from azure.mgmt.monitor import MonitorManagementClient
 from azure.mgmt.monitor.models import (
+    ColumnDefinition,
     DataCollectionEndpointResource,
     DataCollectionRuleDestinations,
     DataCollectionRuleResource,
     DataFlow,
     LogAnalyticsDestination,
+    StreamDeclaration,
 )
 from azure.mgmt.msi import ManagedServiceIdentityClient
 from azure.mgmt.msi.models import Identity
@@ -186,9 +188,9 @@ class AzureConfigurator(Configurator):
         self._create_storage_container()
         self.vault_url = self._create_key_vault()
         self.runner_principal_id = self._create_runner_managed_identity()
-        self._grant_roles_to_runner_managed_identity()
         self.network, self.subnet = self._create_network_resources()
         self._create_logs_resources()
+        self._grant_roles_to_runner_managed_identity()
 
         config = AzureConfig(
             tenant_id=self.tenant_id,
@@ -309,6 +311,11 @@ class AzureConfigurator(Configurator):
         roles_manager.grant_secrets_user_role(
             resource_group=self.resource_group,
             key_vault=azure_utils.get_key_vault_name(self.storage_account),
+            principal_id=self.runner_principal_id,
+        )
+        roles_manager.grant_monitoring_publisher_role(
+            resource_group=self.resource_group,
+            dcr_name=azure_utils.get_data_collection_rule_name(self.storage_account),
             principal_id=self.runner_principal_id,
         )
 
@@ -485,6 +492,25 @@ class RolesManager:
             ),
         )
 
+    def grant_monitoring_publisher_role(
+        self,
+        resource_group: str,
+        dcr_name: str,
+        principal_id: str,
+    ):
+        self.authorization_client.role_assignments.create(
+            scope=azure_utils.get_data_collection_rule_id(
+                self.subscription_id, resource_group, dcr_name
+            ),
+            role_assignment_name=uuid5(UUID(principal_id), "Monitoring publisher"),
+            parameters=RoleAssignmentCreateParameters(
+                # https://learn.microsoft.com/en-us/azure/role-based-access-control/built-in-roles#monitoring-metrics-publisher
+                role_definition_id=f"/subscriptions/{self.subscription_id}/providers/Microsoft.Authorization/roleDefinitions/3913510d-42f4-4e42-8a64-420c390055eb",
+                principal_id=principal_id,
+                principal_type="ServicePrincipal",
+            ),
+        )
+
 
 class NetworkManager:
     def __init__(self, credential: TokenCredential, subscription_id: str):
@@ -598,7 +624,7 @@ class LogsManager:
                     name=name,
                     columns=[
                         Column(name="LogName", type=ColumnTypeEnum.STRING),
-                        Column(name="JsonPayload", type=ColumnTypeEnum.STRING),
+                        Column(name="JsonPayload", type=ColumnTypeEnum.DYNAMIC),
                         Column(name="TimeGenerated", type=ColumnTypeEnum.DATE_TIME),
                     ],
                 ),
@@ -632,6 +658,7 @@ class LogsManager:
         logs_table: str,
         data_collection_endpoint_id: str,
     ) -> str:
+        stream_name = f"Custom-{logs_table}"
         dcr: DataCollectionRuleResource = self.monitor_client.data_collection_rules.create(
             resource_group_name=resource_group,
             data_collection_rule_name=name,
@@ -648,81 +675,27 @@ class LogsManager:
                 ),
                 data_flows=[
                     DataFlow(
-                        streams=[f"Custom-{logs_table}"],
+                        streams=[stream_name],
                         destinations=["dstack_logs"],
+                        output_stream=stream_name,
+                        transform_kql="source",
                     )
                 ],
+                stream_declarations={
+                    stream_name: StreamDeclaration(
+                        columns=[
+                            ColumnDefinition(
+                                name="LogName",
+                                type="string",
+                            ),
+                            ColumnDefinition(
+                                name="JsonPayload",
+                                type="dynamic",
+                            ),
+                            ColumnDefinition(name="TimeGenerated", type="datetime"),
+                        ]
+                    )
+                },
             ),
         )
         return dcr.id
-
-
-if __name__ == "__main__":
-    # network_manager = NetworkManager(
-    #     credential=DefaultAzureCredential(),
-    #     subscription_id="86e20cc3-8f2f-4258-a416-85ca989d01e8",
-    # )
-    # network_manager.create_virtual_network(
-    #     resource_group="dstack-2f61531ea0e7-eastus",
-    #     name="dstack-2f61531ea0e7-eastus-",
-    #     location="eastus"
-    # )
-    pass
-    # principal_id = _create_managed_identity(
-    #     credential=DefaultAzureCredential(),
-    #     subscription_id="86e20cc3-8f2f-4258-a416-85ca989d01e8",
-    #     resource_group="dstack-2f61531ea0e7-eastus",
-    #     name="dstack-2f61531ea0e7-eastus-runner-identity",
-    #     location="eastus"
-    # )
-    # print(principal_id)
-    # url = _create_key_vault(
-    #     credential=DefaultAzureCredential(),
-    #     tenant_id="87f4458a-488e-4d2f-987e-2f61531ea0e7",
-    #     subscription_id="86e20cc3-8f2f-4258-a416-85ca989d01e8",
-    #     resource_group="dstack-2f61531ea0e7-eastus",
-    #     name="dstack-2f61531ea0e7",
-    #     location="eastus",
-    #     runner_principal_id=principal_id,
-    # )
-    # print(url)
-    # container_name = _create_storage_container(
-    #     credential=DefaultAzureCredential(),
-    #     subscription_id="86e20cc3-8f2f-4258-a416-85ca989d01e8",
-    #     resource_group="dstack-2f61531ea0e7-eastus",
-    #     storage_account="dstack2f61531ea0e7",
-    #     name="dstack-2f61531ea0e7-container",
-    # )
-    # print(container_name)
-    # logs_manager = LogsManager(
-    #     credential=DefaultAzureCredential(),
-    #     subscription_id="86e20cc3-8f2f-4258-a416-85ca989d01e8",
-    # )
-    # workspace_resource_id = logs_manager.create_workspace(
-    #     resource_group="dstack-2f61531ea0e7-eastus",
-    #     name="dstack-2f61531ea0e7-eastus-workspace",
-    #     location="eastus",
-    # )
-    # print(workspace_resource_id)
-    # table = logs_manager.create_logs_table(
-    #     resource_group="dstack-2f61531ea0e7-eastus",
-    #     workspace_name="dstack-2f61531ea0e7-eastus-workspace",
-    #     name="dstack_logs_CL"
-    # )
-    # print(table)
-    # dce_id = logs_manager.create_data_collection_endpoint(
-    #     resource_group="dstack-2f61531ea0e7-eastus",
-    #     name="dstack-2f61531ea0e7-dce",
-    #     location="eastus"
-    # )
-    # print(dce_id)
-    # dcr_id = logs_manager.create_data_collection_rule(
-    #     resource_group="dstack-2f61531ea0e7-eastus",
-    #     workspace_resource_id="/subscriptions/86e20cc3-8f2f-4258-a416-85ca989d01e8/resourceGroups/dstack-2f61531ea0e7-eastus/providers/Microsoft.OperationalInsights/workspaces/dstack-2f61531ea0e7-eastus-workspace",
-    #     workspace_id="170b91d8-b41e-4248-9e98-19ee0fbbc865",
-    #     name="dstack-2f61531ea0e7-dcr",
-    #     location="eastus",
-    #     logs_table="dstack_logs_CL",
-    #     data_collection_endpoint_id="/subscriptions/86e20cc3-8f2f-4258-a416-85ca989d01e8/resourceGroups/dstack-2f61531ea0e7-eastus/providers/Microsoft.Insights/dataCollectionEndpoints/dstack-2f61531ea0e7-dce",
-    # )
-    # print(dcr_id)

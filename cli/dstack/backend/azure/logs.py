@@ -62,7 +62,7 @@ class AzureLogging:
             resource_group_name=self.resource_group,
             workspace_name=self.workspace_name,
         )
-        return workspace.id
+        return workspace.customer_id
 
     def _query_logs(
         self,

@@ -17,6 +17,8 @@ import (
 	"github.com/dstackai/dstack/runner/internal/gerrors"
 )
 
+const DSTACK_CONTAINER_NAME = "dstack-container"
+
 var ErrTagNotFound = errors.New("tag not found")
 
 type AzureStorage struct {
@@ -25,17 +27,17 @@ type AzureStorage struct {
 	container       string
 }
 
-func NewAzureStorage(credential azcore.TokenCredential, url string, container string) (*AzureStorage, error) {
-	storageClient, err := azblob.NewClient(url, credential, nil)
+func NewAzureStorage(credential azcore.TokenCredential, account string) (*AzureStorage, error) {
+	storageClient, err := azblob.NewClient(getBlobStorageAccountUrl(account), credential, nil)
 	if err != nil {
 		fmt.Printf("Initialization blob service failure: %+v", err)
 		return nil, err
 	}
-	containerClient := storageClient.ServiceClient().NewContainerClient(container)
+	containerClient := storageClient.ServiceClient().NewContainerClient(DSTACK_CONTAINER_NAME)
 	return &AzureStorage{
 		storageClient:   storageClient,
 		containerClient: containerClient,
-		container:       container,
+		container:       DSTACK_CONTAINER_NAME,
 	}, nil
 }
 
@@ -142,6 +144,10 @@ func (azstorage AzureStorage) UploadDir(ctx context.Context, src string, dst str
 		return gerrors.Wrap(azstorage.uploadFile(ctx, filePath, key))
 	})
 	return gerrors.Wrap(err)
+}
+
+func getBlobStorageAccountUrl(account string) string {
+	return fmt.Sprintf("https://%s.blob.core.windows.net", account)
 }
 
 func (azstorage AzureStorage) uploadFile(ctx context.Context, src string, key string) error {

@@ -21,11 +21,10 @@ import (
 )
 
 type AzureConfig struct {
-	SubscriptionId   string `yaml:"subscription_id"`
-	ResourceGroup    string `yaml:"resource_group"`
-	SecretUrl        string `yaml:"secret_url"`
-	StorageUrl       string `yaml:"storage_url"`
-	StorageContainer string `yaml:"storage_container"`
+	SubscriptionId string `yaml:"subscription_id"`
+	ResourceGroup  string `yaml:"resource_group"`
+	StorageAccount string `yaml:"storage_account"`
+	VaultUrl       string `yaml:"vault_url"`
 }
 
 type AzureBackend struct {
@@ -61,12 +60,12 @@ func New(config AzureConfig) *AzureBackend {
 		fmt.Printf("Authentication failure: %+v", err)
 		return nil
 	}
-	storage, err := NewAzureStorage(credential, config.StorageUrl, config.StorageContainer)
+	storage, err := NewAzureStorage(credential, config.StorageAccount)
 	if err != nil {
 		fmt.Printf("Initialization blob service failure: %+v", err)
 		return nil
 	}
-	secretManager, err := NewAzureSecretManager(credential, config.SecretUrl)
+	secretManager, err := NewAzureSecretManager(credential, config.VaultUrl)
 	if err != nil {
 		fmt.Printf("Initialization key vault service failure: %+v", err)
 		return nil
@@ -181,10 +180,11 @@ func (azbackend *AzureBackend) GetArtifact(ctx context.Context, runName, localPa
 func (azbackend *AzureBackend) CreateLogger(ctx context.Context, logGroup, logName string) io.Writer {
 	// TODO read logging settings from config or get dynamically
 	loggingClient := NewAzureLoggingClient(
+		ctx,
 		azbackend.credential,
-		"https://dstackdce-hbt8.germanywestcentral-1.ingest.monitor.azure.com",
-		"dcr-7a6b0e1c540a442b9f11865b61741fe7",
-		"Custom-dstackLogTable_CL",
+		azbackend.config.SubscriptionId,
+		azbackend.config.ResourceGroup,
+		azbackend.config.StorageAccount,
 	)
 	logger := NewAzureLogger(loggingClient, azbackend.state.Job.JobID, logGroup, logName)
 	logger.Launch(ctx)
