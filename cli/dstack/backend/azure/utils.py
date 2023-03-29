@@ -35,6 +35,12 @@ def get_data_collection_rule_id(subscription_id: str, resource_group: str, dcr_n
     return f"/subscriptions/{subscription_id}/resourceGroups/{resource_group}/providers/Microsoft.Insights/dataCollectionRules/{dcr_name}"
 
 
+def get_data_collection_endpoint_id(
+    subscription_id: str, resource_group: str, dce_name: str
+) -> str:
+    return f"/subscriptions/{subscription_id}/resourceGroups/{resource_group}/providers/Microsoft.Insights/dataCollectionEndpoints/{dce_name}"
+
+
 def get_resource_group_from_resource_id(resource_id: str) -> str:
     return resource_id.split("/")[4]
 

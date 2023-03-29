@@ -2,29 +2,70 @@ package azure
 
 import (
 	"context"
+	"strings"
 
 	"github.com/Azure/azure-sdk-for-go/sdk/azidentity"
 	"github.com/Azure/azure-sdk-for-go/sdk/resourcemanager/compute/armcompute/v4"
+	"github.com/Azure/azure-sdk-for-go/sdk/resourcemanager/network/armnetwork/v2"
 	"github.com/dstackai/dstack/runner/internal/gerrors"
 )
 
 type AzureCompute struct {
-	client        armcompute.VirtualMachinesClient
-	resourceGroup string
+	computeClient    armcompute.VirtualMachinesClient
+	interfacesClient armnetwork.InterfacesClient
+	ipAddressClient  armnetwork.PublicIPAddressesClient
+	resourceGroup    string
 }
 
 func NewAzureCompute(credential *azidentity.DefaultAzureCredential, subscriptionId, resourceGroup string) (*AzureCompute, error) {
-	client, err := armcompute.NewVirtualMachinesClient(subscriptionId, credential, nil)
+	computeClient, err := armcompute.NewVirtualMachinesClient(subscriptionId, credential, nil)
 	if err != nil {
 		return nil, gerrors.Wrap(err)
 	}
-	return &AzureCompute{client: *client, resourceGroup: resourceGroup}, nil
+	interfacesClient, err := armnetwork.NewInterfacesClient(subscriptionId, credential, nil)
+	if err != nil {
+		return nil, gerrors.Wrap(err)
+	}
+	ipAddressClient, err := armnetwork.NewPublicIPAddressesClient(subscriptionId, credential, nil)
+	if err != nil {
+		return nil, gerrors.Wrap(err)
+	}
+	return &AzureCompute{
+		computeClient:    *computeClient,
+		interfacesClient: *interfacesClient,
+		ipAddressClient:  *ipAddressClient,
+		resourceGroup:    resourceGroup,
+	}, nil
+}
+
+func (azcompute AzureCompute) GetInstancePublicIP(ctx context.Context, requestID string) (string, error) {
+	resp, err := azcompute.computeClient.Get(ctx, azcompute.resourceGroup, requestID, nil)
+	if err != nil {
+		return "", gerrors.Wrap(err)
+	}
+	interfaceID := *resp.VirtualMachine.Properties.NetworkProfile.NetworkInterfaces[0].ID
+	interfaceName := getNetworkInterfaceName(interfaceID)
+	networkInterface, err := azcompute.interfacesClient.Get(ctx, azcompute.resourceGroup, interfaceName, nil)
+	if err != nil {
+		return "", gerrors.Wrap(err)
+	}
+	ipAddressName := *networkInterface.Properties.IPConfigurations[0].Properties.PublicIPAddress.Name
+	ipAddress, err := azcompute.ipAddressClient.Get(ctx, azcompute.resourceGroup, ipAddressName, nil)
+	if err != nil {
+		return "", gerrors.Wrap(err)
+	}
+	return *ipAddress.Properties.IPAddress, nil
 }
 
 func (azcompute AzureCompute) TerminateInstance(ctx context.Context, requestID string) error {
-	_, err := azcompute.client.BeginDelete(ctx, azcompute.resourceGroup, requestID, nil)
+	_, err := azcompute.computeClient.BeginDelete(ctx, azcompute.resourceGroup, requestID, nil)
 	if err != nil {
 		return err
 	}
 	return nil
+}
+
+func getNetworkInterfaceName(networkInterfaceID string) string {
+	parts := strings.Split(networkInterfaceID, "/")
+	return parts[len(parts)-1]
 }

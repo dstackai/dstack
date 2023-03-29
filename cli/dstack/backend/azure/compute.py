@@ -40,6 +40,7 @@ from dstack.backend.base.compute import Compute, choose_instance_type
 from dstack.core.instance import InstanceType
 from dstack.core.job import Job
 from dstack.core.request import RequestHead, RequestStatus
+from dstack.utils.common import removeprefix
 
 
 class AzureCompute(Compute):
@@ -154,22 +155,16 @@ def _get_stage_image_id(
     cuda: bool,
     version: Optional[str] = _get_default_ami_image_version(),
 ) -> str:
-    pattern_value = []
-    pattern_value.append("stgn")
-    pattern_value.append("dstack")
+    images = compute_client.images.list()
+    image_prefix = "stgn-dstack"
     if cuda:
-        pattern_value.append(re.escape("cuda-11.1"))
-    if version:
-        pattern_value.append(re.escape(version))
+        image_prefix += "-cuda-"
     else:
-        pattern_value.append(".*")
-    pattern = re.compile(rf"^{re.escape('-').join(pattern_value)}$")
-    images = filter(lambda i: pattern.match(i.name), compute_client.images.list())
-    # XXX: the idea is to return most recent, but Azure does not have creation date attribute for images.
-    recent_images = sorted(images, key=attrgetter("name"), reverse=True)
-    if not recent_images:
-        raise Exception(f"Can't find an Azure image pattern={pattern.pattern!r}")
-    return recent_images[0].id
+        image_prefix += "-nocuda-"
+
+    images = [im for im in images if im.name.startswith(image_prefix)]
+    sorted_images = sorted(images, key=lambda im: int(removeprefix(im.name, image_prefix)))
+    return sorted_images[-1].id
 
 
 _get_image_id = _get_prod_image_id

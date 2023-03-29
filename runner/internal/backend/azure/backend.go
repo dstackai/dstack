@@ -98,6 +98,11 @@ func (azbackend *AzureBackend) Init(ctx context.Context, ID string) error {
 	if azbackend.state == nil {
 		return gerrors.New("State is empty. Data not loading")
 	}
+	ip, err := azbackend.compute.GetInstancePublicIP(ctx, azbackend.state.RequestID)
+	if err != nil {
+		return gerrors.Wrap(err)
+	}
+	azbackend.state.Job.HostName = ip
 	return nil
 }
 

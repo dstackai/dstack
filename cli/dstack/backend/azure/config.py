@@ -295,30 +295,6 @@ class AzureConfigurator(Configurator):
             name=azure_utils.get_runner_managed_identity_name(self.storage_account),
         )
 
-    def _grant_roles_to_runner_managed_identity(self) -> str:
-        roles_manager = RolesManager(
-            credential=self.credential, subscription_id=self.subscription_id
-        )
-        roles_manager.grant_storage_contributor_role(
-            resource_group=self.resource_group,
-            storage_account=self.storage_account,
-            principal_id=self.runner_principal_id,
-        )
-        roles_manager.grant_vm_contributor_role(
-            resource_group=self.resource_group,
-            principal_id=self.runner_principal_id,
-        )
-        roles_manager.grant_secrets_user_role(
-            resource_group=self.resource_group,
-            key_vault=azure_utils.get_key_vault_name(self.storage_account),
-            principal_id=self.runner_principal_id,
-        )
-        roles_manager.grant_monitoring_publisher_role(
-            resource_group=self.resource_group,
-            dcr_name=azure_utils.get_data_collection_rule_name(self.storage_account),
-            principal_id=self.runner_principal_id,
-        )
-
     def _create_network_resources(self) -> Tuple[str, str]:
         network_manager = NetworkManager(
             credential=self.credential, subscription_id=self.subscription_id
@@ -366,6 +342,35 @@ class AzureConfigurator(Configurator):
             logs_table=table_name,
             data_collection_endpoint_id=dce_id,
             name=azure_utils.get_data_collection_rule_name(self.storage_account),
+        )
+
+    def _grant_roles_to_runner_managed_identity(self) -> str:
+        roles_manager = RolesManager(
+            credential=self.credential, subscription_id=self.subscription_id
+        )
+        roles_manager.grant_storage_contributor_role(
+            resource_group=self.resource_group,
+            storage_account=self.storage_account,
+            principal_id=self.runner_principal_id,
+        )
+        roles_manager.grant_vm_contributor_role(
+            resource_group=self.resource_group,
+            principal_id=self.runner_principal_id,
+        )
+        roles_manager.grant_secrets_user_role(
+            resource_group=self.resource_group,
+            key_vault=azure_utils.get_key_vault_name(self.storage_account),
+            principal_id=self.runner_principal_id,
+        )
+        roles_manager.grant_monitoring_publisher_role(
+            resource_group=self.resource_group,
+            dcr_name=azure_utils.get_data_collection_rule_name(self.storage_account),
+            principal_id=self.runner_principal_id,
+        )
+        # We grant Monitoring reader to runner so that it can get info about DCE and DCR
+        roles_manager.grant_monitoring_reader_role(
+            resource_group=self.resource_group,
+            principal_id=self.runner_principal_id,
         )
 
 
@@ -429,87 +434,6 @@ def _create_managed_identity(
         ),
     )
     return identity.principal_id
-
-
-class RolesManager:
-    def __init__(self, credential: TokenCredential, subscription_id: str):
-        self.subscription_id = subscription_id
-        self.authorization_client = AuthorizationManagementClient(
-            credential=credential, subscription_id=subscription_id
-        )
-
-    def grant_storage_contributor_role(
-        self,
-        resource_group: str,
-        storage_account: str,
-        principal_id: str,
-    ):
-        self.authorization_client.role_assignments.create(
-            scope=azure_utils.get_storage_account_id(
-                subscription_id=self.subscription_id,
-                resource_group=resource_group,
-                storage_account=storage_account,
-            ),
-            role_assignment_name=uuid5(UUID(principal_id), "Storage contributor"),
-            parameters=RoleAssignmentCreateParameters(
-                # https://learn.microsoft.com/en-us/azure/role-based-access-control/built-in-roles#storage-blob-data-contributor
-                role_definition_id=f"/subscriptions/{self.subscription_id}/providers/Microsoft.Authorization/roleDefinitions/ba92f5b4-2d11-453d-a403-e96b0029c9fe",
-                principal_id=principal_id,
-                principal_type="ServicePrincipal",
-            ),
-        )
-
-    def grant_vm_contributor_role(
-        self,
-        resource_group: str,
-        principal_id: str,
-    ):
-        self.authorization_client.role_assignments.create(
-            scope=azure_utils.get_resource_group_id(self.subscription_id, resource_group),
-            role_assignment_name=uuid5(UUID(principal_id), "VM contributor"),
-            parameters=RoleAssignmentCreateParameters(
-                # https://learn.microsoft.com/en-us/azure/role-based-access-control/built-in-roles#virtual-machine-contributor
-                role_definition_id=f"/subscriptions/{self.subscription_id}/providers/Microsoft.Authorization/roleDefinitions/9980e02c-c2be-4d73-94e8-173b1dc7cf3c",
-                principal_id=principal_id,
-                principal_type="ServicePrincipal",
-            ),
-        )
-
-    def grant_secrets_user_role(
-        self,
-        resource_group: str,
-        key_vault: str,
-        principal_id: str,
-    ):
-        self.authorization_client.role_assignments.create(
-            scope=azure_utils.get_key_vault_id(self.subscription_id, resource_group, key_vault),
-            role_assignment_name=uuid5(UUID(principal_id), "Secrets user"),
-            parameters=RoleAssignmentCreateParameters(
-                # https://learn.microsoft.com/en-us/azure/role-based-access-control/built-in-roles#key-vault-secrets-user
-                role_definition_id=f"/subscriptions/{self.subscription_id}/providers/Microsoft.Authorization/roleDefinitions/4633458b-17de-408a-b874-0445c86b69e6",
-                principal_id=principal_id,
-                principal_type="ServicePrincipal",
-            ),
-        )
-
-    def grant_monitoring_publisher_role(
-        self,
-        resource_group: str,
-        dcr_name: str,
-        principal_id: str,
-    ):
-        self.authorization_client.role_assignments.create(
-            scope=azure_utils.get_data_collection_rule_id(
-                self.subscription_id, resource_group, dcr_name
-            ),
-            role_assignment_name=uuid5(UUID(principal_id), "Monitoring publisher"),
-            parameters=RoleAssignmentCreateParameters(
-                # https://learn.microsoft.com/en-us/azure/role-based-access-control/built-in-roles#monitoring-metrics-publisher
-                role_definition_id=f"/subscriptions/{self.subscription_id}/providers/Microsoft.Authorization/roleDefinitions/3913510d-42f4-4e42-8a64-420c390055eb",
-                principal_id=principal_id,
-                principal_type="ServicePrincipal",
-            ),
-        )
 
 
 class NetworkManager:
@@ -699,3 +623,100 @@ class LogsManager:
             ),
         )
         return dcr.id
+
+
+class RolesManager:
+    def __init__(self, credential: TokenCredential, subscription_id: str):
+        self.subscription_id = subscription_id
+        self.authorization_client = AuthorizationManagementClient(
+            credential=credential, subscription_id=subscription_id
+        )
+
+    def grant_storage_contributor_role(
+        self,
+        resource_group: str,
+        storage_account: str,
+        principal_id: str,
+    ):
+        self.authorization_client.role_assignments.create(
+            scope=azure_utils.get_storage_account_id(
+                subscription_id=self.subscription_id,
+                resource_group=resource_group,
+                storage_account=storage_account,
+            ),
+            role_assignment_name=uuid5(UUID(principal_id), "Storage contributor"),
+            parameters=RoleAssignmentCreateParameters(
+                # https://learn.microsoft.com/en-us/azure/role-based-access-control/built-in-roles#storage-blob-data-contributor
+                role_definition_id=f"/subscriptions/{self.subscription_id}/providers/Microsoft.Authorization/roleDefinitions/ba92f5b4-2d11-453d-a403-e96b0029c9fe",
+                principal_id=principal_id,
+                principal_type="ServicePrincipal",
+            ),
+        )
+
+    def grant_vm_contributor_role(
+        self,
+        resource_group: str,
+        principal_id: str,
+    ):
+        self.authorization_client.role_assignments.create(
+            scope=azure_utils.get_resource_group_id(self.subscription_id, resource_group),
+            role_assignment_name=uuid5(UUID(principal_id), "VM contributor"),
+            parameters=RoleAssignmentCreateParameters(
+                # https://learn.microsoft.com/en-us/azure/role-based-access-control/built-in-roles#virtual-machine-contributor
+                role_definition_id=f"/subscriptions/{self.subscription_id}/providers/Microsoft.Authorization/roleDefinitions/9980e02c-c2be-4d73-94e8-173b1dc7cf3c",
+                principal_id=principal_id,
+                principal_type="ServicePrincipal",
+            ),
+        )
+
+    def grant_secrets_user_role(
+        self,
+        resource_group: str,
+        key_vault: str,
+        principal_id: str,
+    ):
+        self.authorization_client.role_assignments.create(
+            scope=azure_utils.get_key_vault_id(self.subscription_id, resource_group, key_vault),
+            role_assignment_name=uuid5(UUID(principal_id), "Secrets user"),
+            parameters=RoleAssignmentCreateParameters(
+                # https://learn.microsoft.com/en-us/azure/role-based-access-control/built-in-roles#key-vault-secrets-user
+                role_definition_id=f"/subscriptions/{self.subscription_id}/providers/Microsoft.Authorization/roleDefinitions/4633458b-17de-408a-b874-0445c86b69e6",
+                principal_id=principal_id,
+                principal_type="ServicePrincipal",
+            ),
+        )
+
+    def grant_monitoring_publisher_role(
+        self,
+        resource_group: str,
+        dcr_name: str,
+        principal_id: str,
+    ):
+        self.authorization_client.role_assignments.create(
+            scope=azure_utils.get_data_collection_rule_id(
+                self.subscription_id, resource_group, dcr_name
+            ),
+            role_assignment_name=uuid5(UUID(principal_id), "Monitoring publisher"),
+            parameters=RoleAssignmentCreateParameters(
+                # https://learn.microsoft.com/en-us/azure/role-based-access-control/built-in-roles#monitoring-metrics-publisher
+                role_definition_id=f"/subscriptions/{self.subscription_id}/providers/Microsoft.Authorization/roleDefinitions/3913510d-42f4-4e42-8a64-420c390055eb",
+                principal_id=principal_id,
+                principal_type="ServicePrincipal",
+            ),
+        )
+
+    def grant_monitoring_reader_role(
+        self,
+        resource_group: str,
+        principal_id: str,
+    ):
+        self.authorization_client.role_assignments.create(
+            scope=azure_utils.get_resource_group_id(self.subscription_id, resource_group),
+            role_assignment_name=uuid5(UUID(principal_id), "Monitoring reader"),
+            parameters=RoleAssignmentCreateParameters(
+                # https://learn.microsoft.com/en-us/azure/role-based-access-control/built-in-roles#monitoring-reader
+                role_definition_id=f"/subscriptions/{self.subscription_id}/providers/Microsoft.Authorization/roleDefinitions/43d0d8ad-25c7-4714-9337-8ba259a9fe05",
+                principal_id=principal_id,
+                principal_type="ServicePrincipal",
+            ),
+        )
