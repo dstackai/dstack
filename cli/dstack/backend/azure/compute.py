@@ -179,8 +179,6 @@ def _get_user_data_script(azure_config: AzureConfig, job: Job, instance_type: In
 mkdir -p /root/.dstack/
 echo '{config_content}' > /root/.dstack/config.yaml
 echo '{runner_content}' > /root/.dstack/runner.yaml
-EXTERNAL_IP=`curl -H "Metadata: true" "http://169.254.169.254/metadata/instance/network/interface/0/ipv4/ipAddress/0/publicIpAddress?api-version=2021-12-13&format=text"`
-echo "hostname: $EXTERNAL_IP" >> /root/.dstack/runner.yaml
 HOME=/root nohup dstack-runner --log-level 6 start --http-port 4000
 """
 
