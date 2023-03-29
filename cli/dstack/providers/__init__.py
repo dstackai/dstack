@@ -446,7 +446,7 @@ class Provider:
         commands.extend(
             [
                 f'echo "{ssh_pub_key}" >> ~/.ssh/authorized_keys',
-                "ssh-keygen -A",
+                "ssh-keygen -A > /dev/null",
                 f"/usr/sbin/sshd -p $PORT_{port_idx}",
             ]
         )
