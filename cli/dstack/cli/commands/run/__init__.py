@@ -302,7 +302,7 @@ class RunCommand(BasicCommand):
             repo_credentials = backend.get_repo_credentials(repo_data)
             if not repo_credentials:
                 sys.exit(f"Call `dstack init` first")
-            if backend != "local" and not args.detach:
+            if backend.name != "local" and not args.detach:
                 if not repo_credentials.ssh_key_path:
                     console.print("Call `dstack init` first")
                     exit(1)
