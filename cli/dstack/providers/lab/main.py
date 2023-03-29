@@ -2,6 +2,7 @@ import uuid
 from argparse import ArgumentParser
 from typing import Any, Dict, List, Optional
 
+from dstack import version
 from dstack.backend.base import Backend
 from dstack.core.app import AppSpec
 from dstack.core.job import JobSpec
@@ -81,8 +82,8 @@ class LabProvider(Provider):
 
     def _image_name(self) -> str:
         cuda_is_required = self.resources and self.resources.gpus
-        cuda_image_name = f"dstackai/miniforge:{self.python}-cuda-11.1"
-        cpu_image_name = f"dstackai/miniforge:{self.python}"
+        cuda_image_name = f"dstackai/miniforge:py{self.python}-{version.miniforge_image}-cuda-11.1"
+        cpu_image_name = f"dstackai/miniforge:py{self.python}-{version.miniforge_image}"
         return cuda_image_name if cuda_is_required else cpu_image_name
 
     def _commands(self):
