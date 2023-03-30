@@ -329,6 +329,7 @@ class RunCommand(BasicCommand):
                     or "--ssh" in provider_args
                 ):
                     console.print("Call `dstack init` first")
+                    console.print("  [gray58]No valid SSH identity[/]")
                     exit(1)
             else:
                 workflow_data["ssh_key_pub"] = _read_ssh_key_pub(repo_user_config.ssh_key_path)
