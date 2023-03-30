@@ -1,5 +1,7 @@
 import base64
-import re
+import os
+import random
+import string
 from operator import attrgetter
 from typing import List, Optional
 
@@ -213,11 +215,10 @@ def _launch_instance(
                     disk_size_gb=100,
                 ),
             ),
-            # TODO remove pass auth
             os_profile=OSProfile(
-                computer_name="computername",
-                admin_username="dstack_run",
-                admin_password="1234*(&^&*!@Y#HIND)",
+                computer_name="runnervm",
+                admin_username="ubuntu",
+                admin_password=os.getenv("DSTACK_AZURE_VM_PASSWORD", _generate_vm_password()),
             ),
             network_profile=NetworkProfile(
                 network_api_version=NetworkManagementClient.DEFAULT_API_VERSION,
@@ -262,6 +263,17 @@ def _launch_instance(
         ),
     ).result()
     return vm
+
+
+def _generate_vm_password() -> str:
+    chars = [
+        random.choice(string.ascii_lowercase),
+        random.choice(string.ascii_uppercase),
+        random.choice(string.digits),
+        random.choice(string.punctuation),
+    ] + [random.choice(string.ascii_letters) for _ in range(16)]
+    random.shuffle(chars)
+    return "".join(chars)
 
 
 def _get_instance_status(
