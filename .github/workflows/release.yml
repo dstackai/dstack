@@ -82,6 +82,7 @@ jobs:
           VERSION=${GITHUB_REF#refs/tags/}
           echo "__version__ = \"$VERSION\"" > cli/dstack/version.py
           echo "__is_release__ = True" >> cli/dstack/version.py
+          echo "miniforge_image = \"${{ env.IMAGE_VERSION }}\"" >> cli/dstack/version.py
           cp README.md cli
           python setup.py sdist bdist_wheel
           python -m twine upload --repository pypi --username ${{ secrets.PYPI_USERNAME }} --password ${{ secrets.PYPI_PASSWORD }} dist/*
