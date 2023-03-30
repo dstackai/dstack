@@ -58,6 +58,7 @@ class Provider:
         self.run_name: Optional[str] = None
         self.dep_specs: Optional[List[DepSpec]] = None
         self.ssh_key_pub: Optional[str] = None
+        self.openssh_server: bool = False
         self.loaded = False
 
     def __str__(self) -> str:
@@ -125,12 +126,13 @@ class Provider:
         workflow_name: Optional[str],
         provider_data: Dict[str, Any],
         run_name: str,
-    ):  # todo: read ssh key
+    ):
         self.provider_args = provider_args
         self.workflow_name = workflow_name
         self.provider_data = provider_data
         self.run_as_provider = not workflow_name
         self.run_name = run_name
+        self.openssh_server = self.provider_data.get("ssh", False)
         self.parse_args()
         self._inject_context()
         self.dep_specs = self._dep_specs(backend)
@@ -438,6 +440,16 @@ class Provider:
     @staticmethod
     def _extend_commands_with_env(commands, env):
         commands.extend([f"export {e}={env[e] if env.get(e) else ''}" for e in env])
+
+    @staticmethod
+    def _extend_commands_with_openssh_server(commands: List[str], ssh_pub_key: str, port_idx: int):
+        commands.extend(
+            [
+                f'echo "{ssh_pub_key}" >> ~/.ssh/authorized_keys',
+                "ssh-keygen -A > /dev/null",
+                f"/usr/sbin/sshd -p $PORT_{port_idx}",
+            ]
+        )
 
 
 def get_provider_names() -> List[str]:

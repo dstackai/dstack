@@ -70,11 +70,11 @@ class InitCommand(BasicCommand):
 
         for backend in list_backends():
             backend.save_repo_credentials(local_repo_data, repo_credentials)
-            if backend.name != "local" and repo_user_config.ssh_key_path is None:
-                console.print(f"[yellow]WARNING[/] [gray58](backend: {backend.name})[/]")
-                console.print(
-                    f"  [gray58]Make sure `{args.ssh_identity_file or '~/.ssh/id_rsa'}` exists "
-                    "or call `dstack init --ssh-identity PATH`[/]"
-                )
-            else:
-                console.print(f"[green]OK[/] [gray58](backend: {backend.name})[/]")
+            status = (
+                "[yellow]WARNING[/]" if repo_user_config.ssh_key_path is None else "[green]OK[/]"
+            )
+            console.print(f"{status} [gray58](backend: {backend.name})[/]")
+        if repo_user_config.ssh_key_path is None:
+            console.print(
+                f"[red]SSH is not enabled. To enable it, make sure `{args.ssh_identity_file or '~/.ssh/id_rsa'}` exists or call `dstack init --ssh-identity PATH`[/]"
+            )
