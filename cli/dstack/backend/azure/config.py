@@ -5,7 +5,8 @@ from uuid import UUID, uuid5
 import yaml
 from azure.core.credentials import TokenCredential
 from azure.core.exceptions import HttpResponseError
-from azure.identity import DefaultAzureCredential
+from azure.graphrbac import GraphRbacManagementClient
+from azure.identity import ClientSecretCredential, DefaultAzureCredential
 from azure.mgmt.authorization import AuthorizationManagementClient
 from azure.mgmt.authorization.models import RoleAssignmentCreateParameters
 from azure.mgmt.keyvault import KeyVaultManagementClient
@@ -46,6 +47,7 @@ from azure.mgmt.subscription.models import Subscription, TenantIdDescription
 from rich.prompt import Confirm, Prompt
 
 from dstack.backend.azure import utils as azure_utils
+from dstack.backend.azure.azure_identity_credential_adapter import AzureIdentityCredentialAdapter
 from dstack.cli.common import ask_choice, console
 from dstack.core.config import BackendConfig, Configurator, get_config_path
 from dstack.core.error import ConfigError
@@ -196,6 +198,7 @@ class AzureConfigurator(Configurator):
         self.network, self.subnet = self._create_network_resources()
         self._create_logs_resources()
         self._grant_roles_to_runner_managed_identity()
+        self._grant_roles_to_logged_in_user()
 
         config = AzureConfig(
             tenant_id=self.tenant_id,
@@ -403,6 +406,25 @@ class AzureConfigurator(Configurator):
         roles_manager.grant_monitoring_reader_role(
             resource_group=self.resource_group,
             principal_id=self.runner_principal_id,
+        )
+
+    def _grant_roles_to_logged_in_user(self):
+        users_manager = UsersManager(credential=self.credential, tenant_id=self.tenant_id)
+        roles_manager = RolesManager(
+            credential=self.credential, subscription_id=self.subscription_id
+        )
+        principal_id = users_manager.get_logged_in_user_principal_id()
+        roles_manager.grant_storage_contributor_role(
+            resource_group=self.resource_group,
+            storage_account=self.storage_account,
+            principal_id=principal_id,
+            principal_type="User",
+        )
+        roles_manager.grant_key_vault_administrator_role(
+            resource_group=self.resource_group,
+            key_vault=azure_utils.get_key_vault_name(self.storage_account),
+            principal_id=principal_id,
+            principal_type="User",
         )
 
 
@@ -703,6 +725,17 @@ class LogsManager:
         return dcr.id
 
 
+class UsersManager:
+    def __init__(self, credential: TokenCredential, tenant_id: str):
+        self.graph_client = GraphRbacManagementClient(
+            credentials=AzureIdentityCredentialAdapter(credential), tenant_id=tenant_id
+        )
+
+    def get_logged_in_user_principal_id(self) -> str:
+        user = self.graph_client.signed_in_user.get()
+        return user.object_id
+
+
 class RolesManager:
     def __init__(self, credential: TokenCredential, subscription_id: str):
         self.subscription_id = subscription_id
@@ -715,6 +748,7 @@ class RolesManager:
         resource_group: str,
         storage_account: str,
         principal_id: str,
+        principal_type: str = "ServicePrincipal",
     ):
         self.authorization_client.role_assignments.create(
             scope=azure_utils.get_storage_account_id(
@@ -722,12 +756,14 @@ class RolesManager:
                 resource_group=resource_group,
                 storage_account=storage_account,
             ),
-            role_assignment_name=uuid5(UUID(principal_id), "Storage contributor"),
+            role_assignment_name=uuid5(
+                UUID(principal_id), f"Storage {storage_account} contributor"
+            ),
             parameters=RoleAssignmentCreateParameters(
                 # https://learn.microsoft.com/en-us/azure/role-based-access-control/built-in-roles#storage-blob-data-contributor
                 role_definition_id=f"/subscriptions/{self.subscription_id}/providers/Microsoft.Authorization/roleDefinitions/ba92f5b4-2d11-453d-a403-e96b0029c9fe",
                 principal_id=principal_id,
-                principal_type="ServicePrincipal",
+                principal_type=principal_type,
             ),
         )
 
@@ -735,15 +771,16 @@ class RolesManager:
         self,
         resource_group: str,
         principal_id: str,
+        principal_type: str = "ServicePrincipal",
     ):
         self.authorization_client.role_assignments.create(
             scope=azure_utils.get_resource_group_id(self.subscription_id, resource_group),
-            role_assignment_name=uuid5(UUID(principal_id), "VM contributor"),
+            role_assignment_name=uuid5(UUID(principal_id), f"VM {resource_group} contributor"),
             parameters=RoleAssignmentCreateParameters(
                 # https://learn.microsoft.com/en-us/azure/role-based-access-control/built-in-roles#virtual-machine-contributor
                 role_definition_id=f"/subscriptions/{self.subscription_id}/providers/Microsoft.Authorization/roleDefinitions/9980e02c-c2be-4d73-94e8-173b1dc7cf3c",
                 principal_id=principal_id,
-                principal_type="ServicePrincipal",
+                principal_type=principal_type,
             ),
         )
 
@@ -752,15 +789,16 @@ class RolesManager:
         resource_group: str,
         key_vault: str,
         principal_id: str,
+        principal_type: str = "ServicePrincipal",
     ):
         self.authorization_client.role_assignments.create(
             scope=azure_utils.get_key_vault_id(self.subscription_id, resource_group, key_vault),
-            role_assignment_name=uuid5(UUID(principal_id), "Secrets user"),
+            role_assignment_name=uuid5(UUID(principal_id), f"Secrets {key_vault} user"),
             parameters=RoleAssignmentCreateParameters(
                 # https://learn.microsoft.com/en-us/azure/role-based-access-control/built-in-roles#key-vault-secrets-user
                 role_definition_id=f"/subscriptions/{self.subscription_id}/providers/Microsoft.Authorization/roleDefinitions/4633458b-17de-408a-b874-0445c86b69e6",
                 principal_id=principal_id,
-                principal_type="ServicePrincipal",
+                principal_type=principal_type,
             ),
         )
 
@@ -769,17 +807,18 @@ class RolesManager:
         resource_group: str,
         dcr_name: str,
         principal_id: str,
+        principal_type: str = "ServicePrincipal",
     ):
         self.authorization_client.role_assignments.create(
             scope=azure_utils.get_data_collection_rule_id(
                 self.subscription_id, resource_group, dcr_name
             ),
-            role_assignment_name=uuid5(UUID(principal_id), "Monitoring publisher"),
+            role_assignment_name=uuid5(UUID(principal_id), f"Monitoring {dcr_name} publisher"),
             parameters=RoleAssignmentCreateParameters(
                 # https://learn.microsoft.com/en-us/azure/role-based-access-control/built-in-roles#monitoring-metrics-publisher
                 role_definition_id=f"/subscriptions/{self.subscription_id}/providers/Microsoft.Authorization/roleDefinitions/3913510d-42f4-4e42-8a64-420c390055eb",
                 principal_id=principal_id,
-                principal_type="ServicePrincipal",
+                principal_type=principal_type,
             ),
         )
 
@@ -787,14 +826,35 @@ class RolesManager:
         self,
         resource_group: str,
         principal_id: str,
+        principal_type: str = "ServicePrincipal",
     ):
         self.authorization_client.role_assignments.create(
             scope=azure_utils.get_resource_group_id(self.subscription_id, resource_group),
-            role_assignment_name=uuid5(UUID(principal_id), "Monitoring reader"),
+            role_assignment_name=uuid5(UUID(principal_id), f"Monitoring {resource_group} reader"),
             parameters=RoleAssignmentCreateParameters(
                 # https://learn.microsoft.com/en-us/azure/role-based-access-control/built-in-roles#monitoring-reader
                 role_definition_id=f"/subscriptions/{self.subscription_id}/providers/Microsoft.Authorization/roleDefinitions/43d0d8ad-25c7-4714-9337-8ba259a9fe05",
                 principal_id=principal_id,
-                principal_type="ServicePrincipal",
+                principal_type=principal_type,
+            ),
+        )
+
+    def grant_key_vault_administrator_role(
+        self,
+        resource_group: str,
+        key_vault: str,
+        principal_id: str,
+        principal_type: str = "ServicePrincipal",
+    ):
+        self.authorization_client.role_assignments.create(
+            scope=azure_utils.get_key_vault_id(self.subscription_id, resource_group, key_vault),
+            role_assignment_name=uuid5(
+                UUID(principal_id), f"Key vault {resource_group} administrator"
+            ),
+            parameters=RoleAssignmentCreateParameters(
+                # https://learn.microsoft.com/en-us/azure/role-based-access-control/built-in-roles#key-vault-administrator
+                role_definition_id=f"/subscriptions/{self.subscription_id}/providers/Microsoft.Authorization/roleDefinitions/00482a5a-887f-4fb3-b363-3b7fe8e74483",
+                principal_id=principal_id,
+                principal_type=principal_type,
             ),
         )
