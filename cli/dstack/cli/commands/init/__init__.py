@@ -76,6 +76,5 @@ class InitCommand(BasicCommand):
             console.print(f"{status} [gray58](backend: {backend.name})[/]")
         if repo_user_config.ssh_key_path is None:
             console.print(
-                f"  [gray58]Make sure `{args.ssh_identity_file or '~/.ssh/id_rsa'}` exists "
-                "or call `dstack init --ssh-identity PATH`[/]"
+                f"[red]SSH is not enabled. To enable it, make sure `{args.ssh_identity_file or '~/.ssh/id_rsa'}` exists or call `dstack init --ssh-identity PATH`[/]"
             )
