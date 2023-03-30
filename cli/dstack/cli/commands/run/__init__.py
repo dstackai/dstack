@@ -323,8 +323,10 @@ class RunCommand(BasicCommand):
             if not repo_credentials:
                 sys.exit(f"Call `dstack init` first")
             if not repo_user_config.ssh_key_path:
-                if (backend.name != "local" and not args.detach) or workflow_data.get(
-                    "ssh", False
+                if (
+                    (backend.name != "local" and not args.detach)
+                    or workflow_data.get("ssh", False)
+                    or "--ssh" in provider_args
                 ):
                     console.print("Call `dstack init` first")
                     exit(1)
