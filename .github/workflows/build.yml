@@ -109,7 +109,7 @@ jobs:
           echo "miniforge_image = \"${{ env.IMAGE_VERSION }}\"" >> cli/dstack/version.py
           cp README.md cli
           python setup.py sdist bdist_wheel
-          python -m twine upload --repository testpypi --username ${{ secrets.TESTPYPI_USERNAME }} --password ${{ secrets.TESTPYPI_PASSWORD }} --skip-existing dist/*
+          python -m twine upload --repository testpypi --username ${{ secrets.TESTPYPI_USERNAME }} --password ${{ secrets.TESTPYPI_PASSWORD }} dist/*
 
   update-get-dstack-master:
     runs-on: ubuntu-latest
