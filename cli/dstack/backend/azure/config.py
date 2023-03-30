@@ -4,6 +4,7 @@ from uuid import UUID, uuid5
 
 import yaml
 from azure.core.credentials import TokenCredential
+from azure.core.exceptions import HttpResponseError
 from azure.identity import DefaultAzureCredential
 from azure.mgmt.authorization import AuthorizationManagementClient
 from azure.mgmt.authorization.models import RoleAssignmentCreateParameters
@@ -34,11 +35,15 @@ from azure.mgmt.network.models import (
     Subnet,
     VirtualNetwork,
 )
+from azure.mgmt.resource import ResourceManagementClient
+from azure.mgmt.resource.resources.models import ResourceGroup
 from azure.mgmt.storage import StorageManagementClient
 from azure.mgmt.storage.models import BlobContainer
+from azure.mgmt.storage.models import Sku as StorageSku
+from azure.mgmt.storage.models import StorageAccount, StorageAccountCreateParameters
 from azure.mgmt.subscription import SubscriptionClient
 from azure.mgmt.subscription.models import Subscription, TenantIdDescription
-from rich.prompt import Prompt
+from rich.prompt import Confirm, Prompt
 
 from dstack.backend.azure import utils as azure_utils
 from dstack.cli.common import ask_choice, console
@@ -241,7 +246,8 @@ class AzureConfigurator(Configurator):
         return value
 
     def _ask_storage_account(self, default_storage_account: Optional[str]) -> Tuple[str, str]:
-        # TODO show choice
+        if default_storage_account is None:
+            default_storage_account = _get_default_storage_account(self.subscription_id)
         storage_account_name = Prompt.ask(
             "[sea_green3 bold]?[/sea_green3 bold] [bold]Enter Storage Account name[/bold]",
             default=default_storage_account,
@@ -262,15 +268,41 @@ class AzureConfigurator(Configurator):
             console.print(f"[sea_green3 bold]✓[/sea_green3 bold] [grey74]{sa.name}[/grey74]")
             resource_group = azure_utils.get_resource_group_from_resource_id(sa.id)
             return sa.name, resource_group
-        console.print(
-            f"[red bold]✗[/red bold] Storage account '{storage_account_name}' does not exist."
+        if Confirm.ask(
+            f"[sea_green3 bold]?[/sea_green3 bold] "
+            f"[red bold]The storage account doesn't exist. Create it?[/red bold]",
+            default="y",
+        ):
+            return self._create_storage_account(storage_account_name)
+        else:
+            return self._ask_storage_account(default_storage_account)
+
+    def _create_storage_account(self, name: str) -> str:
+        resource_manager = ResourceManager(
+            credential=self.credential, subscription_id=self.subscription_id
         )
-        return self._ask_storage_account(default_storage_account)
+        storage_manager = StorageManager(
+            credential=self.credential, subscription_id=self.subscription_id
+        )
+        try:
+            resource_group = resource_manager.create_resource_group(
+                name=name, location=self.location
+            )
+            storage_account = storage_manager.create_storage_account(
+                resource_group=resource_group,
+                name=name,
+                location=self.location,
+            )
+        except HttpResponseError as e:
+            print(e.message)
+            return self._ask_storage_account(name)
+        return storage_account, resource_group
 
     def _create_storage_container(self) -> str:
-        return _create_storage_container(
-            credential=self.credential,
-            subscription_id=self.subscription_id,
+        storage_manager = StorageManager(
+            credential=self.credential, subscription_id=self.subscription_id
+        )
+        return storage_manager.create_storage_container(
             resource_group=self.resource_group,
             storage_account=self.storage_account,
             name=azure_utils.DSTACK_CONTAINER_NAME,
@@ -374,21 +406,67 @@ class AzureConfigurator(Configurator):
         )
 
 
-def _create_storage_container(
-    credential: TokenCredential,
-    subscription_id: str,
-    resource_group: str,
-    storage_account: str,
-    name: str,
-) -> str:
-    client = StorageManagementClient(credential=credential, subscription_id=subscription_id)
-    container: BlobContainer = client.blob_containers.create(
-        resource_group_name=resource_group,
-        account_name=storage_account,
-        container_name=name,
-        blob_container=BlobContainer(),
-    )
-    return container.name
+def _get_default_storage_account(subscription_id: str) -> str:
+    return "dstack" + subscription_id.rsplit("-")[-1]
+
+
+class ResourceManager:
+    def __init__(self, credential: TokenCredential, subscription_id: str):
+        self.resource_client = ResourceManagementClient(
+            credential=credential, subscription_id=subscription_id
+        )
+
+    def create_resource_group(
+        self,
+        name: str,
+        location: str,
+    ) -> str:
+        resource_group: ResourceGroup = self.resource_client.resource_groups.create_or_update(
+            resource_group_name=name,
+            parameters=ResourceGroup(
+                location=location,
+            ),
+        )
+        return resource_group.name
+
+
+class StorageManager:
+    def __init__(self, credential: TokenCredential, subscription_id: str):
+        self.storage_client = StorageManagementClient(
+            credential=credential, subscription_id=subscription_id
+        )
+
+    def create_storage_account(
+        self,
+        resource_group: str,
+        name: str,
+        location: str,
+    ):
+        storage_account: StorageAccount = self.storage_client.storage_accounts.begin_create(
+            resource_group_name=resource_group,
+            account_name=name,
+            parameters=StorageAccountCreateParameters(
+                sku=StorageSku(name="Standard_LRS"),
+                kind="BlobStorage",
+                location=location,
+                access_tier="Hot",
+            ),
+        ).result()
+        return storage_account.name
+
+    def create_storage_container(
+        self,
+        resource_group: str,
+        storage_account: str,
+        name: str,
+    ) -> str:
+        container: BlobContainer = self.storage_client.blob_containers.create(
+            resource_group_name=resource_group,
+            account_name=storage_account,
+            container_name=name,
+            blob_container=BlobContainer(),
+        )
+        return container.name
 
 
 def _create_key_vault(
