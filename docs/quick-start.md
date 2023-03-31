@@ -9,35 +9,47 @@ This tutorial will guide you through using `dstack` locally and remotely, step b
 
 Use `pip` to install `dstack`:
 
-```shell hl_lines="1"
-pip install dstack --upgrade
+<div class="termy">
+
+```shell
+$ pip install dstack --upgrade
 ```
+
+</div>
 
 ## 2. Create a repo
 
 To use `dstack`, your project must be managed by Git and have at least one remote branch configured.
 Your repository can be hosted on GitHub, GitLab, BitBucket, or any other platform.
 
-!!! info "NOTE:"
+??? info "Set up a remote branch"
     If you haven't set up a remote branch in your repo yet, here's how you can do it:
+
+    <div class="termy">
     
     ```shell
-    echo "# Quick start" >> README.md
-    git init
-    git add README.md
-    git commit -m "first commit"
-    git branch -M main
-    git remote add origin "<your remote repo URL>"
-    git push -u origin main
+    $ echo "# Quick start" >> README.md
+    $ git init
+    $ git add README.md
+    $ git commit -m "first commit"
+    $ git branch -M main
+    $ git remote add origin "<your remote repo URL>"
+    $ git push -u origin main
     ```
+
+    </div>
 
 ### Init the repo
 
 Once you've set up a remote branch in your repo, go ahead and run this command:
 
-```shell hl_lines="1"
-dstack init
+<div class="termy">
+
+```shell
+$ dstack init
 ```
+
+</div>
 
 It will set up the repo to work with `dstack`.
 
@@ -49,7 +61,9 @@ Let us begin by creating a Python script that will prepare the data for our trai
 
 ### Create a Python script
 
-Let us create the following `tutorials/mnist/mnist_data.py` script: 
+Let us create the following Python script:
+
+<div editor-title="tutorials/mnist/mnist_data.py"> 
 
 ```python
 from torchvision.datasets import MNIST
@@ -61,6 +75,8 @@ if __name__ == '__main__':
     MNIST("./data", train=False, download=True)
 ```
 
+</div>
+
 This script downloads the MNIST dataset and saves it locally to the `data` folder.
 
 To run the script via `dstack`, it must be defined as a workflow in a YAML file in the
@@ -68,7 +84,9 @@ To run the script via `dstack`, it must be defined as a workflow in a YAML file 
 
 ### Create a workflow YAML file
 
-Create the file `.dstack/workflows/mnist.yaml` and define the `mnist-data` workflow like this:
+Define the `mnist-data` workflow by creating the following YAML file:
+
+<div editor-title=".dstack/workflows/mnist.yaml"> 
 
 ```yaml
 workflows:
@@ -81,42 +99,45 @@ workflows:
       - path: ./data
 ```
 
-### Run the workflow locally
-
-Now you can run the defined workflow using the `dstack run` command:
-
-```shell hl_lines="1"
-dstack run mnist-data
-```
+</div>
 
 !!! info "NOTE:"
     In order for the files to be available in a workflow, they have to be tracked by Git.
     To ensure Git tracks the files, run:
-    ```shell hl_lines="1"
-    git add .dstack tutorials
+
+    <div class="termy">
+
+    ```shell
+    $ git add .dstack tutorials
     ```
+
+    </div>
 
     After that, `dstack` will keep track of the file changes automatically, so you don't have to run `git add` on every change.
 
-As the workflow is running, you will see its output:
+### Run the workflow locally
 
-```shell hl_lines="1"
-RUN             WORKFLOW    SUBMITTED  OWNER           STATUS     TAG  BACKEND
-grumpy-zebra-1  mnist-data  now        peterschmidt85  Submitted       local
+Now you can run the defined workflow using the `dstack run` command:
+
+<div class="termy">
+
+```shell
+$ dstack run mnist-data
+
+RUN             WORKFLOW    SUBMITTED  STATUS     TAG  BACKEND
+zebra-1         mnist-data  now        Submitted       local
 
 Provisioning... It may take up to a minute. ✓
 
 To interrupt, press Ctrl+C.
 
 Downloading http://yann.lecun.com/exdb/mnist/train-images-idx3-ubyte.gz
-Extracting /workflow/data/MNIST/raw/train-images-idx3-ubyte.gz
+---> 100%
 
-Downloading http://yann.lecun.com/exdb/mnist/train-labels-idx1-ubyte.gz
-Extracting /workflow/data/MNIST/raw/train-images-idx1-ubyte.gz
-
-Downloading http://yann.lecun.com/exdb/mnist/train-labels-idx2-ubyte.gz
-Extracting /workflow/data/MNIST/raw/train-images-idx2-ubyte.gz
+$
 ```
+
+</div>
 
 !!! info "NOTE:"
     By default, `dstack` runs workflows locally, which requires having either Docker or [NVIDIA Docker](https://github.com/NVIDIA/nvidia-docker) 
@@ -131,17 +152,18 @@ Extracting /workflow/data/MNIST/raw/train-images-idx2-ubyte.gz
 
 To check the status of recent runs, use the [`dstack ps`](reference/cli/ps.md) command:
 
-```shell hl_lines="1"
-dstack ps
+<div class="termy">
+
+```shell
+$ dstack ps
+
+RUN      WORKFLOW    SUBMITTED  STATUS     TAG  BACKEND
+zebra-1  mnist-data  now        Submitted       local
 ```
 
-This command displays either the currently running workflows or the last completed run:
+</div>
 
-```shell hl_lines="1"
-RUN             WORKFLOW    SUBMITTED  OWNER           STATUS     TAG  BACKEND
-grumpy-zebra-1  mnist-data  now        peterschmidt85  Submitted       local
-```
-
+This command displays either the currently running workflows or the last completed run.
 To see all runs, use the `dstack ps -a` command.
 
 ### List artifacts
@@ -150,13 +172,11 @@ Once a run is finished, its artifacts are saved and can be reused.
 
 You can list artifacts of any run using the [`dstack ls`](reference/cli/ls.md) command:
 
-```shell hl_lines="1"
-dstack ls grumpy-zebra-1
-```
+<div class="termy">
 
-This will display all the files and their sizes:
+```shell
+$ dstack ls zebra-1
 
-```shell hl_lines="1"
 PATH  FILE                                  SIZE
 data  MNIST/raw/t10k-images-idx3-ubyte      7.5MiB
       MNIST/raw/t10k-images-idx3-ubyte.gz   1.6MiB
@@ -168,13 +188,19 @@ data  MNIST/raw/t10k-images-idx3-ubyte      7.5MiB
       MNIST/raw/train-labels-idx1-ubyte.gz  28.2KiB
 ```
 
+</div>
+
+This will display all the files and their sizes.
+
 ## 4. Train a model
 
 Now, that the data is prepared, let's create a Python script to train a model.
 
 ### Create a Python script
 
-Let us create the following `tutorials/mnist/train_mnist.py` script:
+Let us create the following training script:
+
+<div editor-title="tutorials/mnist/train_mnist.py"> 
 
 ```python
 import torch
@@ -225,11 +251,15 @@ if __name__ == "__main__":
     trainer.fit(mnist_model, train_loader)
 ```
 
+</div>
+
 This script trains a model using the MNIST dataset from the local `data` folder.
 
 ### Update the workflow YAML file
 
-Update the `.dstack/workflows/mnist.yaml` file to add the `train-mnist` workflow:
+Ddd the `train-mnist` workflow to the workflow YAML file:
+
+<div editor-title=".dstack/workflows/mnist.yaml"> 
 
 ```yaml
 workflows:
@@ -252,6 +282,8 @@ workflows:
       - path: ./lightning_logs
 ```
 
+</div>
+
 To reuse data across workflows, we made the `train-mnist` workflow dependent on the `mnist-data` workflow.
 When we run `train-mnist`, `dstack` will automatically put the data from the last `mnist-data` run in the `data` folder.
 
@@ -259,28 +291,25 @@ When we run `train-mnist`, `dstack` will automatically put the data from the las
 
 Now you can run the defined workflow using the `dstack run` command:
 
-```shell hl_lines="1"
-dstack run train-mnist
-```
+<div class="termy">
 
-As the workflow is running, you will see its output:
+```shell
+$ dstack run train-mnist
 
-```shell hl_lines="1"
-RUN            WORKFLOW     SUBMITTED  OWNER           STATUS     TAG 
-wet-mangust-2  train-mnist  now        peterschmidt85  Submitted  
+RUN        WORKFLOW     SUBMITTED  STATUS     TAG 
+mangust-2  train-mnist  now        Submitted  
 
 Povisioning... It may take up to a minute. ✓
 
 To interrupt, press Ctrl+C.
 
-Epoch 2: 100%|██████████████| 1876/1876 [00:17<00:00, 107.85it/s, loss=0.0944, v_num=0, val_loss=0.108, val_acc=0.968]
-`Trainer.fit` stopped: `max_epochs=3` reached. 
-Testing DataLoader 0: 100%|██████████████| 313/313 [00:00<00:00, 589.34it/s]
+Epoch 1: [00:03<00:00, 280.17it/s, loss=1.35, v_num=0]
+---> 100%
 
-Test metric   DataLoader 0
-val_acc       0.965399980545044
-val_loss      0.10975822806358337
+$
 ```
+
+</div>
 
 ## 5. Configure the remote
 
@@ -294,12 +323,16 @@ See [Installation](installation.md#configure-a-remote) to learn more about suppo
 
 ## 6. Push artifacts
 
-To reuse the artifacts of the `mnist-data` workflow outside of your machine, you can use the `dstack push` command to
+To reuse the artifacts of the `mnist-data` workflow outside your machine, you can use the `dstack push` command to
 upload them to the configured remote (e.g. the cloud).
 
-```shell hl_lines="1"
-dstack push grumpy-zebra-1
+<div class="termy">
+
+```shell
+$ dstack push zebra-1
 ```
+
+</div>
 
 !!! info "NOTE:"
     When you run a workflow remotely, its artifacts are pushed automatically, and it is much faster 
@@ -315,15 +348,19 @@ dstack push grumpy-zebra-1
 
     Either follow the previous step of pushing the artifacts, or run the `mnist-data` workflow remotely:
 
-    ```shell hl_lines="1"
+    ```shell
     dstack run mnist-data --remote
     ```
 
 Now we can run the `train-mnist` workflow remotely (e.g. in the configured cloud):
 
-```shell hl_lines="1"
-dstack run train-mnist --remote
+<div class="termy">
+
+```shell
+$ dstack run train-mnist --remote
 ```
+
+</div>
 
 When you run a workflow remotely, `dstack` automatically creates the necessary infrastructure within the
 configured cloud account, runs the workflow, and stores the artifacts and destroys the
@@ -331,6 +368,6 @@ infrastructure upon completion.
 
 !!! info "NOTE:"
     You can specify hardware resource requirements (like GPU, memory, interruptible instances, etc.) 
-    for each remote workflow using [`resources`](basics/resources.md).
+    for each remote workflow using [`resources`](usage/resources.md).
 
 And that's a wrap! If you need to refer to it, the source code for this tutorial can be found in our GitHub [repo](https://github.com/dstackai/dstack-examples).

@@ -36,7 +36,11 @@ setup(
     packages=find_packages("cli"),
     package_data={
         "dstack.schemas": ["*.json"],
-        "dstack.hub": ["statics/*", "statics/**/*", "statics/**/**/*"],
+        "dstack.hub": [
+            "statics/*",
+            "statics/**/*",
+            "statics/**/**/*",
+        ],
     },
     include_package_data=True,
     scripts=[],
@@ -68,7 +72,7 @@ setup(
         "starlette",
         "uvicorn",
         "pydantic",
-        "sqlalchemy[asyncio]",
+        "sqlalchemy[asyncio]>=2.0.0",
         "websocket-client",
         "cursor",
         "simple-term-menu",
@@ -83,6 +87,7 @@ setup(
         "google-cloud-secret-manager>=2.0.0",
         "google-cloud-logging>=2.0.0",
         "aiosqlite",
+        "alembic>=1.10.2",
     ],
     classifiers=[
         "Development Status :: 2 - Pre-Alpha",

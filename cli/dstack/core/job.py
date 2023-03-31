@@ -146,6 +146,17 @@ class JobHead(JobRef):
         )
 
 
+class RegistryAuth(BaseModel):
+    username: Optional[str] = None
+    password: Optional[str] = None
+
+    def __str__(self) -> str:
+        return f"RegistryCredentials(username={self.username}, password={self.password})"
+
+    def serialize(self) -> Dict[str, Any]:
+        return self.dict(exclude_none=True)
+
+
 def check_dict(element: Any, field: str):
     if type(element) == dict:
         return element.get(field)
@@ -165,6 +176,7 @@ class Job(JobHead):
     status: JobStatus
     submitted_at: int
     image_name: str
+    registry_auth: Optional[RegistryAuth]
     commands: Optional[List[str]]
     entrypoint: Optional[List[str]]
     env: Optional[Dict[str, str]]
@@ -180,6 +192,7 @@ class Job(JobHead):
     runner_id: Optional[str]
     request_id: Optional[str]
     tag_name: Optional[str]
+    ssh_key_pub: Optional[str]
 
     def __init__(self, **data: Any):
         # TODO Ugly style
@@ -213,6 +226,7 @@ class Job(JobHead):
         artifact_specs = format_list(self.artifact_specs)
         app_specs = format_list(self.app_specs)
         dep_specs = format_list(self.dep_specs)
+        ssk_key_pub = f"...{self.ssh_key_pub[-16:]}" if self.ssh_key_pub else None
         return (
             f'Job(job_id="{self.job_id}", repo_data={self.repo_data}, '
             f'run_name="{self.run_name}", workflow_name={_quoted(self.workflow_name)}, '
@@ -222,6 +236,7 @@ class Job(JobHead):
             f"status=JobStatus.{self.status.name}, "
             f"submitted_at={self.submitted_at}, "
             f'image_name="{self.image_name}", '
+            f'registry_auth="{self.registry_auth}", '
             f"commands={commands}, "
             f"entrypoint={entrypoint}, "
             f"env={self.env}, "
@@ -236,7 +251,8 @@ class Job(JobHead):
             f"app_specs={app_specs}, "
             f"runner_id={_quoted(self.runner_id)}, "
             f"request_id={_quoted(self.request_id)}, "
-            f"tag_name={_quoted(self.tag_name)})"
+            f"tag_name={_quoted(self.tag_name)}"
+            f"ssh_key_pub={_quoted(ssk_key_pub)})"
         )
 
     def serialize(self) -> dict:
@@ -276,6 +292,7 @@ class Job(JobHead):
             "status": self.status.value,
             "submitted_at": self.submitted_at,
             "image_name": self.image_name,
+            "registry_auth": self.registry_auth.serialize() if self.registry_auth else {},
             "commands": self.commands or [],
             "entrypoint": self.entrypoint,
             "env": self.env or {},
@@ -301,6 +318,7 @@ class Job(JobHead):
             "runner_id": self.runner_id or "",
             "request_id": self.request_id or "",
             "tag_name": self.tag_name or "",
+            "ssh_key_pub": self.ssh_key_pub or "",
         }
         return job_data
 
@@ -398,6 +416,7 @@ class Job(JobHead):
             status=JobStatus(job_data["status"]),
             submitted_at=job_data["submitted_at"],
             image_name=job_data["image_name"],
+            registry_auth=RegistryAuth(**job_data.get("registry_auth", {})),
             commands=job_data.get("commands") or None,
             entrypoint=job_data.get("entrypoint") or None,
             env=job_data["env"] or None,
@@ -413,12 +432,14 @@ class Job(JobHead):
             runner_id=job_data.get("runner_id") or None,
             request_id=job_data.get("request_id") or None,
             tag_name=job_data.get("tag_name") or None,
+            ssh_key_pub=job_data.get("ssh_key_pub") or None,
         )
         return job
 
 
 class JobSpec(JobRef):
     image_name: str
+    registry_auth: Optional[RegistryAuth] = None
     commands: Optional[List[str]] = None
     entrypoint: Optional[List[str]] = None
     env: Optional[Dict[str, str]] = None
@@ -442,6 +463,7 @@ class JobSpec(JobRef):
         app_specs = format_list(self.app_specs)
         return (
             f'JobSpec(job_id="{self.job_id}", image_name="{self.image_name}", '
+            f"registry_auth={self.registry_auth}, "
             f"commands={commands}, "
             f"entrypoint={entrypoint}, "
             f"env={self.env}, "

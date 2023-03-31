@@ -149,6 +149,26 @@
       "type": "string",
       "minLength": 1
     },
+    "registry_auth": {
+      "description": "Credentials for pulling private container",
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "username": {
+          "description": "Username",
+          "type": "string"
+        },
+        "password": {
+          "description": "Password or access token",
+          "type": "string"
+        }
+      }
+    },
+    "ssh": {
+      "description": "Run openssh server in the container",
+      "type": "boolean",
+      "default": false
+    },
     "bash": {
       "type": "object",
       "required": [
@@ -189,6 +209,9 @@
         },
         "resources": {
           "$ref": "#/definitions/resources"
+        },
+        "ssh": {
+          "$ref": "#/definitions/ssh"
         }
       }
     },
@@ -229,6 +252,9 @@
           "description": "The name of the Docker image to run",
           "type": "string",
           "minLength": 1
+        },
+        "registry_auth": {
+          "$ref": "#/definitions/registry_auth"
         },
         "working_dir": {
           "$ref": "#/definitions/working_dir"
@@ -287,6 +313,9 @@
         },
         "resources": {
           "$ref": "#/definitions/resources"
+        },
+        "ssh": {
+          "$ref": "#/definitions/ssh"
         }
       }
     },
@@ -324,6 +353,9 @@
         },
         "resources": {
           "$ref": "#/definitions/resources"
+        },
+        "ssh": {
+          "$ref": "#/definitions/ssh"
         }
       }
     },
@@ -361,6 +393,9 @@
         },
         "resources": {
           "$ref": "#/definitions/resources"
+        },
+        "ssh": {
+          "$ref": "#/definitions/ssh"
         }
       }
     }

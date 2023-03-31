@@ -8,7 +8,7 @@ If GPU is requested, the provider pre-installs the CUDA driver too.
 
 ## Usage example
 
-Inside the `.dstack/workflows` directory within your project, create the following `bash-example.yaml` file:
+<div editor-title=".dstack/workflows/bash-example.yaml"> 
 
 ```yaml
 workflows:
@@ -27,11 +27,17 @@ workflows:
       gpu: 1
 ```
 
+</div>
+
 To run this workflow, use the following command:
 
+<div class="termy">
+
 ```shell
-dstack run train
+$ dstack run train
 ```
+
+</div>
 
 ## Properties reference
 
@@ -45,7 +51,9 @@ The following properties are optional:
 - `env` - (Optional) The list of environment variables 
 - [`artifacts`](#artifacts) - (Optional) The list of output artifacts
 - [`resources`](#resources) - (Optional) The hardware resources required by the workflow
+- [`ports`](#ports) - (Optional) The number of ports to expose
 - `working_dir` - (Optional) The path to the working directory
+- `ssh` - (Optional) Runs SSH server in the container if `true`
 
 ### artifacts
 
@@ -91,6 +99,8 @@ If you'd like your workflow to expose ports, you have to specify the `ports` pro
 of ports to expose. Actual ports will be assigned on startup and passed to the workflow via the environment
 variables `PORT_<number>`.
 
+<div editor-title=".dstack/workflows/app-example.yaml">
+
 ```yaml
 workflows:
   - name: app
@@ -100,3 +110,35 @@ workflows:
       - pip install -r requirements.txt
       - gunicorn main:app --bind 0.0.0.0:$PORT_0
 ```
+
+</div>
+
+When running a workflow remotely, the `dstack run` command automatically forwards the defined ports from the remote machine to your local machine.
+This allows you to securely access applications running remotely from your local machine.
+
+### Background processes
+
+Similar to the regular `bash` shell, the `bash` provider permits the execution of background processes. This can be achieved
+by appending `&` to the respective command.
+
+Here's an example:
+
+<div editor-title=".dstack/workflows/ping-background.yaml">
+
+```yaml
+workflows:
+  - name: train-with-tensorboard
+    provider: bash
+    ports: 1
+    commands:
+      - pip install torchvision pytorch-lightning tensorboard
+      - tensorboard --port $PORT_0 --host 0.0.0.0 --logdir lightning_logs &
+      - python train.py
+    artifacts:
+      - path: lightning_logs
+```
+
+</div>
+
+This example will run the `tensorboard` application in the background, enabling browsing of the logs of the training
+job while it is in progress.

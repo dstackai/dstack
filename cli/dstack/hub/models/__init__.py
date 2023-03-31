@@ -36,13 +36,30 @@ class AWSAuth(BaseModel):
     secret_key: str = ""
 
 
+class GCPConfig(BaseModel):
+    area: str = ""
+    region: str = ""
+    zone: str = ""
+    bucket_name: Optional[str] = ""
+    vpc: str = ""
+    subnet: str = ""
+
+
+class GCPAuth(BaseModel):
+    credentials: str = ""
+
+
 class AWSBackend(AWSConfig, AWSAuth):
     type: str = "aws"
 
 
+class GCPBackend(GCPConfig, GCPAuth):
+    type: str = "gcp"
+
+
 class ProjectInfo(BaseModel):
     project_name: str
-    backend: AWSBackend
+    backend: Union[AWSBackend, GCPBackend]
     members: List[Member] = []
 
 
@@ -122,10 +139,12 @@ class ProjectElementValue(BaseModel):
     region: Optional[str]
     value: Optional[str]
     label: Optional[str]
+    vpc: Optional[str]
+    subnet: Optional[str]
 
 
 class ProjectElement(BaseModel):
-    selected: str
+    selected: Optional[str]
     values: List[ProjectElementValue] = []
 
 
@@ -134,6 +153,16 @@ class AWSProjectValues(BaseModel):
     region_name: Optional[ProjectElement]
     s3_bucket_name: Optional[ProjectElement]
     ec2_subnet_id: Optional[ProjectElement]
+
+
+class GCPProjectValues(BaseModel):
+    type: str = "gcp"
+    area: Optional[ProjectElement]
+    region: Optional[ProjectElement]
+    zone: Optional[ProjectElement]
+    bucket_name: Optional[ProjectElement]
+    bucket_name: Optional[ProjectElement]
+    vpc_subnet: Optional[ProjectElement]
 
 
 class UserPatch(BaseModel):

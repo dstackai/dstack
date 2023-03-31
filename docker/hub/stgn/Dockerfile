@@ -9,10 +9,17 @@ RUN apt-get update && apt-get install -y \
     git \
     && rm -rf /var/lib/apt/lists/*
 
-RUN pip3 install --upgrade setuptools wheel
-RUN pip3 install --upgrade fastapi
-RUN pip3 install -i https://test.pypi.org/simple/ --extra-index-url https://pypi.org/simple dstack -U
+RUN pip3 install --upgrade setuptools wheel && \
+    pip3 install --upgrade fastapi  && \
+    pip3 install -i https://test.pypi.org/simple/ --extra-index-url https://pypi.org/simple dstack -U
+
+RUN if [ $(uname -m) = "aarch64" ]; then ARCH="arm64"; else ARCH="amd64"; fi && \
+    curl https://github.com/benbjohnson/litestream/releases/download/v0.3.9/litestream-v0.3.9-linux-$ARCH.deb -O -L && \
+    dpkg -i litestream-v0.3.9-linux-$ARCH.deb
 
 EXPOSE 3000
 
-ENTRYPOINT ["dstack", "hub", "start", "--host", "0.0.0.0"]
+ADD ./entry-point.sh /
+RUN chmod 777 /entry-point.sh
+
+ENTRYPOINT ["/bin/bash", "/entry-point.sh"]

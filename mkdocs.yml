@@ -11,7 +11,7 @@ repo_name: dstackai/dstack
 edit_uri: edit/master/docs/
 
 #Copyright
-copyright: Built with ❤️ by dstack
+copyright: Built with <img alt="❤️" class="twemoji" src="https://cdnjs.cloudflare.com/ajax/libs/twemoji/14.0.2/svg/2764.svg">️ by <a href="https://github.com/dstackai" target="__blank">dstack</a>
 
 # Configuration
 theme:
@@ -41,6 +41,7 @@ theme:
   #          icon: material/weather-sunny
   #          name: Switch to light mode
   features:
+    - navigation.path
     - content.code.copy
     - content.action.edit
     #    - navigation.indexes
@@ -64,9 +65,9 @@ plugins:
         text: "#FFFFFF"
       cards_font: Roboto
   - search
-#  - redirects:
-#      redirect_maps:
-#        'index.md': 'quickstart/index.md'
+  - redirects:
+      redirect_maps:
+        'integrations/experiments/wandb.md': 'tutorials/wandb.md'
 
 # Extensions
 markdown_extensions:
@@ -96,8 +97,10 @@ markdown_extensions:
 # Customization
 extra_css:
   - stylesheets/extra.css
+  - stylesheets/termynal.css
 extra_javascript:
   - javascripts/extra.js
+  - javascripts/termynal.js
 extra:
   homepage: /
   generator: false
@@ -105,47 +108,46 @@ extra:
     provider: google
     property: G-JX21114P7B
   social:
-    - icon: fontawesome/brands/github
+    - icon: /custom/colored/github
       link: https://github.com/dstackai/dstack
     #    - icon: fontawesome/brands/python
     #      link: https://pypi.org/project/dstack/
-    - icon: fontawesome/brands/slack
+    - icon: /custom/colored/slack
       link: https://join.slack.com/t/dstackai/shared_invite/zt-xdnsytie-D4qU9BvJP8vkbkHXdi6clQ
 #    - icon: material/rss
 #      link: https://dstack.curated.co/
-    - icon: fontawesome/brands/twitter
+    - icon: /custom/colored/twitter
       link: https://twitter.com/dstackai
 
 # Page tree
 nav:
-  - Guide:
+  - Guides:
       - Get started:
           - Overview: index.md
           - Installation: installation.md
           - Quick start: quick-start.md
           - Concepts: concepts/index.md
-          - Troubleshooting: troubleshooting.md
       - Usage:
-          - Basics:
-            - Hello world: basics/hello-world.md
-            - Artifacts: basics/artifacts.md
-            - Deps: basics/deps.md
-            - Resources: basics/resources.md
-            - Environment variables: basics/environment-variables.md
-            - Args: basics/args.md
-            - Apps: basics/apps.md
-            - Python: basics/python.md
-            - Conda: basics/conda.md
-            - Dev environments: basics/dev-environments.md
-            - Secrets: basics/secrets.md
-          - Examples: https://github.com/dstackai/dstack-examples
-      - Integrations:
-          - Experiment trackers:
-              - Weights & Biases: integrations/experiments/wandb.md
+        - Hello world: usage/hello-world.md
+        - Python: usage/python.md
+        - Conda: usage/conda.md
+        - Artifacts: usage/artifacts.md
+        - Deps: usage/deps.md
+        - Resources: usage/resources.md
+        - Environment variables: usage/environment-variables.md
+        - Providers: usage/providers.md
+        - Apps: usage/apps.md
+        - Secrets: usage/secrets.md
+        - Args: usage/args.md
       - Tutorials:
           - Stable Diffusion: tutorials/stable-diffusion.md
-      - What's new:
-          - Changelog: https://github.com/dstackai/dstack/releases
+          - Experiment tracking:
+            - TensorBoard: tutorials/tensorboard.md
+            - Weights & Biases: tutorials/wandb.md
+      - Support:
+          - Troubleshooting: troubleshooting.md
+          - Slack: https://join.slack.com/t/dstackai/shared_invite/zt-xdnsytie-D4qU9BvJP8vkbkHXdi6clQ
+#          - Changelog: https://github.com/dstackai/dstack/releases
 #          - Newsletter: https://dstack.curated.co/
   - Reference:
       - Providers:

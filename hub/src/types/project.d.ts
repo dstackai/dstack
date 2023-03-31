@@ -1,6 +1,6 @@
 declare type TProjectBackendType = 'aws' | 'gcp' | 'azure';
 
-declare type TProjectBackend = { type: TProjectBackendType } & TProjectBackendAWSWithTitles
+declare type TProjectBackend = { type: TProjectBackendType } & TProjectBackendAWSWithTitles  & TProjectBackendGCP
 declare interface IProject {
     project_name: string,
     backend: TProjectBackend,
@@ -36,6 +36,16 @@ declare interface TProjectBackendAWS {
     region_name: string,
     s3_bucket_name: string,
     ec2_subnet_id: string | null,
+}
+
+declare interface TProjectBackendGCP {
+    credentials: string,
+    area: string,
+    region: string,
+    zone: string,
+    bucket_name: string,
+    vpc: string,
+    subnet: string,
 }
 
 declare interface TProjectBackendAWSWithTitles extends TProjectBackendAWS {

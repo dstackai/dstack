@@ -31,18 +31,19 @@ type Docker struct {
 }
 
 type Spec struct {
-	Image           string
-	WorkDir         string
-	Commands        []string
-	Entrypoint      *[]string
-	Env             []string
-	Labels          map[string]string
-	Mounts          []mount.Mount
-	ExposedPorts    nat.PortSet
-	BindingPorts    nat.PortMap
-	ShmSize         int64
-	LocalPortsRange string
-	Runtime         string
+	Image              string
+	RegistryAuthBase64 string
+	WorkDir            string
+	Commands           []string
+	Entrypoint         *[]string
+	Env                []string
+	Labels             map[string]string
+	Mounts             []mount.Mount
+	ExposedPorts       nat.PortSet
+	BindingPorts       nat.PortMap
+	ShmSize            int64
+	LocalPortsRange    string
+	Runtime            string
 }
 
 var _ = Container((*Docker)(nil))

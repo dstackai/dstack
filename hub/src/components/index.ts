@@ -39,3 +39,4 @@ export { FormS3BucketSelector } from './form/S3BucketSelector';
 export { FormTiles } from './form/Tiles';
 export { Notifications } from './Notifications';
 export { ConfirmationDialog } from './ConfirmationDialog';
+export { FileUploader } from './FileUploader';

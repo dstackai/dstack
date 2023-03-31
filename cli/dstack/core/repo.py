@@ -60,9 +60,6 @@ class RepoCredentials(BaseModel):
     private_key: Union[str, None]
     oauth_token: Union[str, None]
 
-    def __init__(self, **data: Any) -> None:
-        super().__init__(**data)
-
     def __str__(self) -> str:
         return (
             f"RepoCredentials(protocol=RepoProtocol.{self.protocol.name}, "

@@ -49,6 +49,8 @@ type Job struct {
 	//Variables    map[string]interface{} `yaml:"variables"`
 	WorkflowName string `yaml:"workflow_name"`
 	WorkingDir   string `yaml:"working_dir"`
+
+	RegistryAuth RegistryAuth `yaml:"registry_auth"`
 }
 
 type Dep struct {
@@ -105,6 +107,11 @@ type RepoData struct {
 	RepoHost     string
 	RepoUserName string
 	RepoName     string
+}
+
+type RegistryAuth struct {
+	Username string `yaml:"username,omitempty"`
+	Password string `yaml:"password,omitempty"`
 }
 
 func (j *Job) RepoHostNameWithPort() string {

@@ -6,9 +6,13 @@ The `tags list` command lists tags.
 
 ### Usage
 
+<div class="termy">
+
 ```shell
-dstack tags list
+$ dstack tags list
 ```
+
+</div>
 
 ## dstack tags add
 
@@ -21,9 +25,23 @@ There are two ways of creating a tag:
 
 ### Usage
 
+<div class="termy">
+
 ```shell
-dstack tags add TAG (-r RUN | -a PATH ...)
+$ dstack tags add --help
+Usage: dstack tags add [-h] [-a PATH] [-r] [-y] TAG [RUN]
+
+Positional Arguments:
+  TAG                   The name of the tag
+  RUN                   A name of a run
+
+Optional Arguments:
+  -a, --artifact PATH   A path to local directory to upload as an artifact
+  -r, --remote          Upload artifact to remote
+  -y, --yes             Don't ask for confirmation
 ```
+
+</div>
 
 ### Arguments reference
 
@@ -40,15 +58,23 @@ One of the following arguments is also required:
 
 Tag the finished run `wet-mangust-1` with the `some_tag_1` tag:
 
+<div class="termy">
+
 ```shell
-dstack tags add some_tag_1 wet-mangust-1
+$ dstack tags add some_tag_1 wet-mangust-1
 ```
+
+</div>
 
 Uploading two local folders `./output1` and `./output2` to create the `some_tag_2` tag:
 
+<div class="termy">
+
 ```shell
-dstack tags add some_tag_2 -a ./output1 -a ./output2
+$ dstack tags add some_tag_2 -a ./output1 -a ./output2
 ```
+
+</div>
 
 !!! info "NOTE:"
     To list or download the artifacts of a tag, use the `dstack artifacts list :TAG` and 
@@ -60,9 +86,20 @@ The `tags delete` command deletes a given tag.
 
 ### Usage
 
+<div class="termy">
+
 ```shell
-dstack tags delete [-y] TAG
+$ dstack tags delete --help
+Usage: dstack tags delete [-h] [-y] TAG_NAME
+
+Positional Arguments:
+  TAG_NAME    The name of the tag
+
+Optional Arguments:
+  -y, --yes   Don't ask for confirmation
 ```
+
+</div>
 
 ### Arguments reference
 

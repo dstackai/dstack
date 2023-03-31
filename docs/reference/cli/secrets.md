@@ -4,11 +4,15 @@
 
 The `secrets list` command lists the names of global secrets.
 
-## Usage
+### Usage
+
+<div class="termy">
 
 ```shell
-dstack secrets list
+$ dstack secrets list
 ```
+
+</div>
 
 ## dstack secrets add
 
@@ -25,7 +29,15 @@ The `secrets add` command adds a new secret.
 ### Usage
 
 ```shell
-dstack secrets add [-y] NAME [VALUE]
+$ dstack secrets add --help
+Usage: dstack secrets add [-h] [-y] NAME [VALUE]
+
+Positional Arguments:
+  NAME        The name of the secret
+  VALUE       The value of the secret
+
+Optional Arguments:
+  -y, --yes   Don't ask for confirmation
 ```
 
 ### Arguments reference
@@ -44,11 +56,19 @@ The following arguments are optional:
 
 ### Usage
 
+<div class="termy">
+
 ```shell
-dstack secrets delete [-y] NAME
+$ dstack secrets delete --help
+usage: dstack secrets delete [-h] NAME
+
+positional arguments:
+  NAME        The name of the secret
 ```
 
-#### Arguments reference
+</div>
+
+### Arguments reference
 
 The following arguments are required:
 

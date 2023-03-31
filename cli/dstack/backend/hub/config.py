@@ -1,4 +1,5 @@
 import os
+from argparse import Namespace
 from pathlib import Path
 from typing import Any, Dict
 from urllib.parse import urlparse, urlunparse
@@ -6,6 +7,7 @@ from urllib.parse import urlparse, urlunparse
 import yaml
 from rich import print
 from rich.prompt import Prompt
+from rich_argparse import RichHelpFormatter
 
 from dstack.backend.hub.client import HubClient
 from dstack.core.config import BackendConfig, Configurator, get_config_path
@@ -61,21 +63,8 @@ class HubConfigurator(Configurator):
     def get_backend_client(self, config: Any):
         pass
 
-    def configure_hub(self, config: Any):
+    async def configure_hub(self, config: Any):
         pass
-
-    def parse_args(self, args: list = []):
-        if len(args) % 2 != 0:
-            raise ConfigError("Arguments must be even")
-        config = HUBConfig()
-        for idx in range(0, len(args), 2):
-            arg = str(args[idx])
-            if arg.startswith("--"):
-                arg = arg[2:]
-            if hasattr(config, arg):
-                setattr(config, arg, args[idx + 1])
-        config.save()
-        print(f"[grey58]OK[/]")
 
     def configure_cli(self) -> HUBConfig:
         config = HUBConfig()
@@ -117,3 +106,19 @@ class HubConfigurator(Configurator):
             default_project=project,
             default_token=token,
         )
+
+    def register_parser(self, parser):
+
+        hub_parser = parser.add_parser("hub", help="", formatter_class=RichHelpFormatter)
+        hub_parser.add_argument("--url", type=str, help="", required=True)
+        hub_parser.add_argument("--project", type=str, help="", required=True)
+        hub_parser.add_argument("--token", type=str, help="", required=True)
+        hub_parser.set_defaults(func=self._command)
+
+    def _command(self, args: Namespace):
+        config = HUBConfig()
+        config.url = args.url
+        config.project = args.project
+        config.token = args.token
+        config.save()
+        print(f"[grey58]OK[/]")

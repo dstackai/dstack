@@ -4,9 +4,19 @@ The `cp` command copies artifact files to a local target path.
 
 ## Usage
 
+<div class="termy">
+
 ```shell
-dstack cp (RUN | :TAG) SOURCE TARGET
+$ dstack cp --help
+Usage: dstack cp [-h] (RUN | :TAG) SOURCE TARGET
+
+Positional Arguments:
+  (RUN | :TAG)  A name of a run or a tag
+  SOURCE        A path of an artifact file or directory
+  TARGET        A local path to download artifact file or directory into
 ```
+
+</div>
 
 ### Arguments reference
 

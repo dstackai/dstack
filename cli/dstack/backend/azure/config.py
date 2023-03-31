@@ -162,7 +162,7 @@ class AzureConfig(BackendConfig):
 class AzureConfigurator(Configurator):
     NAME = "azure"
 
-    def parse_args(self, args: List = []):
+    def register_parser(self, parser):
         pass
 
     def get_config(self, data: Dict) -> BackendConfig:

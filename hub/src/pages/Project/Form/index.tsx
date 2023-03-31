@@ -4,6 +4,7 @@ import { Container, Header, FormUI, SpaceBetween, Button, FormInput, FormRadioBu
 import { useForm, FormProvider, DefaultValues } from 'react-hook-form';
 import { IProps, TBackendOption } from './types';
 import { AWSBackend } from './AWS';
+import { GCPBackend } from './GCP';
 import { isRequestFormErrors, isRequestFormFieldError } from 'libs/isErrorWithMessage';
 import { FormFieldError } from 'libs/types';
 import { FieldPath } from 'react-hook-form/dist/types/path';
@@ -26,7 +27,6 @@ export const ProjectForm: React.FC<IProps> = ({ initialValues, onCancel, loading
         return {
             backend: {
                 type: 'aws',
-                ec2_subnet_id: '',
             },
         };
     };
@@ -46,12 +46,12 @@ export const ProjectForm: React.FC<IProps> = ({ initialValues, onCancel, loading
             description: t('projects.backend_type.aws_description'),
             disabled: loading,
         },
-        // {
-        //     label: t('projects.backend_type.gcp'),
-        //     value: 'gcp',
-        //     description: t('projects.backend_type.gcp_description'),
-        //     disabled: loading,
-        // },
+        {
+            label: t('projects.backend_type.gcp'),
+            value: 'gcp',
+            description: t('projects.backend_type.gcp_description'),
+            disabled: loading,
+        },
         // {
         //     label: t('projects.backend_type.azure'),
         //     value: 'azure',
@@ -61,7 +61,7 @@ export const ProjectForm: React.FC<IProps> = ({ initialValues, onCancel, loading
     ];
 
     const onSubmit = (data: IProject) => {
-        if (data.backend.ec2_subnet_id === '') data.backend.ec2_subnet_id = null;
+        if (data.backend.type === 'aws' && data.backend.ec2_subnet_id === '') data.backend.ec2_subnet_id = null;
 
         clearErrors();
 
@@ -81,6 +81,9 @@ export const ProjectForm: React.FC<IProps> = ({ initialValues, onCancel, loading
         switch (backendType) {
             case 'aws': {
                 return <AWSBackend loading={loading} />;
+            }
+            case 'gcp': {
+                return <GCPBackend loading={loading} />;
             }
             default:
                 return null;

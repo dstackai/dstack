@@ -11,6 +11,7 @@ class DockerProvider(Provider):
     def __init__(self):
         super().__init__("docker")
         self.image_name = None
+        self.registry_auth = None
         self.commands = None
         self.entrypoint = None
         self.artifact_specs = None
@@ -29,6 +30,7 @@ class DockerProvider(Provider):
     ):
         super().load(backend, provider_args, workflow_name, provider_data, run_name)
         self.image_name = self.provider_data["image"]
+        self.registry_auth = self.provider_data.get("registry_auth")
         self.commands = self._get_list_data("commands")
         self.entrypoint = self._get_entrypoint()
         if self.commands and self.entrypoint is None:  # commands not empty
@@ -78,6 +80,7 @@ class DockerProvider(Provider):
         return [
             JobSpec(
                 image_name=self.image_name,
+                registry_auth=self.registry_auth,
                 commands=commands,
                 entrypoint=self.entrypoint,
                 env=self.env,

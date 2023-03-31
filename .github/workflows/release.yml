@@ -5,6 +5,9 @@ on:
     tags:
       - '*'
 
+env:
+  IMAGE_VERSION: "0.1"
+
 jobs:
   cli-test-tag:
     runs-on: ${{ matrix.os }}
@@ -67,6 +70,7 @@ jobs:
           name: hub-dist
       - name: Copy hub dist
         run: |
+          mkdir -p cli/dstack/hub/statics
           cp -a hub-dist/** cli/dstack/hub/statics
       - name: Install dependencies
         run: |
@@ -78,6 +82,7 @@ jobs:
           VERSION=${GITHUB_REF#refs/tags/}
           echo "__version__ = \"$VERSION\"" > cli/dstack/version.py
           echo "__is_release__ = True" >> cli/dstack/version.py
+          echo "miniforge_image = \"${{ env.IMAGE_VERSION }}\"" >> cli/dstack/version.py
           cp README.md cli
           python setup.py sdist bdist_wheel
           python -m twine upload --repository pypi --username ${{ secrets.PYPI_USERNAME }} --password ${{ secrets.PYPI_PASSWORD }} dist/*
@@ -177,7 +182,9 @@ jobs:
     defaults:
       run:
         working-directory: runner
-    needs: [ runner-upload-master ]
+    needs:
+      - runner-upload-master
+      - cli-upload-tag
     env:
       AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
       AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
@@ -196,13 +203,15 @@ jobs:
       - name: Run packer
         run: |
           VERSION=${GITHUB_REF#refs/tags/}
-          ./packer build -var build_id=$VERSION -var build_prefix='' -var-file=prod-var.json ${{ matrix.variants }}.json
+          ./packer build -var build_id=$VERSION -var build_prefix='' -var image_version=${{ env.IMAGE_VERSION }} -var-file=prod-var.json ${{ matrix.variants }}.json
   
   gcp-images-build:
     defaults:
       run:
         working-directory: runner
-    needs: [ runner-upload-master ]
+    needs:
+      - runner-upload-master
+      - cli-upload-tag
     strategy:
       matrix:
         variant: [ gcp-image, gcp-image-cuda ]
@@ -235,7 +244,7 @@ jobs:
         run: |
           VERSION=${GITHUB_REF#refs/tags/}
           VERSION=${VERSION//./-}
-          ./packer build -var build_id=$VERSION -var build_prefix='' -var dstack_stage=PROD ${{ matrix.variant }}.json
+          ./packer build -var build_id=$VERSION -var build_prefix='' -var dstack_stage=PROD -var image_version=${{ env.IMAGE_VERSION }} ${{ matrix.variant }}.json
       - name: Publish image
         run: |
           VERSION=${GITHUB_REF#refs/tags/}

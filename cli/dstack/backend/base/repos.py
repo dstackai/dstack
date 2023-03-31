@@ -81,11 +81,7 @@ def get_repo_credentials(
     if credentials_value is None:
         return None
     credentials_data = json.loads(credentials_value)
-    return RepoCredentials(
-        protocol=RepoProtocol(credentials_data["protocol"]),
-        private_key=credentials_data.get("private_key"),
-        oauth_token=credentials_data.get("oauth_token"),
-    )
+    return RepoCredentials(**credentials_data)
 
 
 def save_repo_credentials(
