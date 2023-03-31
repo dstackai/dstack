@@ -258,6 +258,7 @@ def _launch_instance(
                         storage_account_type=StorageAccountTypes.STANDARD_SSD_LRS
                     ),
                     disk_size_gb=100,
+                    delete_option="Delete",
                 ),
             ),
             os_profile=OSProfile(
