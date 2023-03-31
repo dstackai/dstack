@@ -45,7 +45,7 @@ function create_image_version() {
         --gallery-image-version "0.0.1" \
         --target-regions "australiaeast" "brazilsouth" "canadacentral" "centralindia" "centralus" "eastasia" "eastus" "eastus2" "francecentral" "germanywestcentral" "japaneast" "koreacentral" "northeurope" "norwayeast" "qatarcentral" "southafricanorth" "southcentralus" "southeastasia" "swedencentral" "switzerlandnorth" "uaenorth" "uksouth" "westeurope" "westus2" "westus3" \
         --replica-count 1 \
-        --managed-image "/subscriptions/${subscription_id}/resourceGroups/packer/providers/Microsoft.Compute/images/${image_name}"
+        --managed-image "/subscriptions/${subscription_id}/resourceGroups/${resource_group}/providers/Microsoft.Compute/images/${image_name}"
 }
 
 get_image_definition > /dev/null || create_image_definition
