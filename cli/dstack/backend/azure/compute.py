@@ -104,6 +104,7 @@ class AzureCompute(Compute):
             instance_name=_get_instance_name(job),
             user_data=_get_user_data_script(self.azure_config, job, instance_type),
             ssh_pub_key=job.ssh_key_pub,
+            spot=instance_type.resources.interruptible,
         )
         return vm.name
 
@@ -126,7 +127,7 @@ class AzureCompute(Compute):
         )
 
     def cancel_spot_request(self, request_id: str):
-        raise NotImplementedError()
+        self.terminate_instance(request_id)
 
     def terminate_instance(self, request_id: str):
         _terminate_instance(
@@ -248,6 +249,7 @@ def _launch_instance(
     instance_name: str,
     user_data: str,
     ssh_pub_key: str,
+    spot: bool,
 ) -> VirtualMachine:
     vm: VirtualMachine = compute_client.virtual_machines.begin_create_or_update(
         resource_group,
@@ -312,6 +314,8 @@ def _launch_instance(
                     )
                 ],
             ),
+            priority="Spot" if spot else "Regular",
+            eviction_policy="Delete" if spot else None,
             identity=VirtualMachineIdentity(
                 type=ResourceIdentityType.USER_ASSIGNED,
                 user_assigned_identities={
@@ -342,6 +346,7 @@ def _get_instance_status(
     resource_group: str,
     instance_name: str,
 ) -> RequestStatus:
+    # TODO detect when instance was deleted due to no capacity to support job resubmission
     try:
         vm: VirtualMachine = compute_client.virtual_machines.get(
             resource_group, instance_name, expand="instanceView"

@@ -183,7 +183,6 @@ func (azbackend *AzureBackend) GetArtifact(ctx context.Context, runName, localPa
 }
 
 func (azbackend *AzureBackend) CreateLogger(ctx context.Context, logGroup, logName string) io.Writer {
-	// TODO read logging settings from config or get dynamically
 	loggingClient := NewAzureLoggingClient(
 		ctx,
 		azbackend.credential,
