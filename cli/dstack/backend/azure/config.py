@@ -52,20 +52,23 @@ from dstack.cli.common import ask_choice, console
 from dstack.core.config import BackendConfig, Configurator, get_config_path
 from dstack.core.error import ConfigError
 
-# XXX: It is based on approximate match with dstack.backend.aws.config.regions.
 locations = [
+    ("(US) Central US", "centralus"),
     ("(US) East US, Virginia", "eastus"),
     ("(US) East US 2, Virginia", "eastus2"),
     ("(US) South Central US, Texas", "southcentralus"),
     ("(US) West US 2, Washington", "westus2"),
     ("(US) West US 3, Phoenix", "westus3"),
-    ("(Asia Pacific) Southeast Asia, Singapore", "southeastasia"),
     ("(Canada) Canada Central, Toronto", "canadacentral"),
+    ("(Europe) France Central, Paris", "francecentral"),
     ("(Europe) Germany West Central, Frankfurt", "germanywestcentral"),
     ("(Europe) North Europe, Ireland", "northeurope"),
-    ("(Europe) UK South, London", "uksouth"),
-    ("(Europe) France Central, Paris", "francecentral"),
     ("(Europe) Sweden Central, Gävle", "swedencentral"),
+    ("(Europe) UK South, London", "uksouth"),
+    ("(Europe) West Europe", "westeurope"),
+    ("(Asia Pacific) Southeast Asia, Singapore", "southeastasia"),
+    ("(Asia Pacific) East Asia", "eastasia"),
+    ("(South America) Brazil South", "brazilsouth"),
 ]
 
 
