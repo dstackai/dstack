@@ -9,6 +9,7 @@ from typing import Any, Dict, List, Optional, Union
 
 from dstack.api.repo import load_repo_data
 from dstack.backend.base import Backend
+from dstack.core.cache import CacheSpec
 from dstack.core.job import (
     ArtifactSpec,
     DepSpec,
@@ -57,6 +58,7 @@ class Provider:
         self.run_as_provider: Optional[bool] = None
         self.run_name: Optional[str] = None
         self.dep_specs: Optional[List[DepSpec]] = None
+        self.cache_specs: List[CacheSpec] = []
         self.ssh_key_pub: Optional[str] = None
         self.openssh_server: bool = False
         self.loaded = False
@@ -136,6 +138,7 @@ class Provider:
         self.parse_args()
         self._inject_context()
         self.dep_specs = self._dep_specs(backend)
+        self.cache_specs = self._cache_specs()
         self.ssh_key_pub = self.provider_data.get("ssh_key_pub")
         self.loaded = True
 
@@ -239,6 +242,7 @@ class Provider:
                 env=job_spec.env,
                 working_dir=job_spec.working_dir,
                 artifact_specs=job_spec.artifact_specs,
+                cache_specs=self.cache_specs,
                 port_count=job_spec.port_count,
                 ports=None,
                 host_name=None,
@@ -271,6 +275,12 @@ class Provider:
             return [self._parse_artifact_spec(a) for a in self.provider_data["artifacts"]]
         else:
             return None
+
+    def _cache_specs(self) -> List[CacheSpec]:
+        return [
+            CacheSpec(**item) if isinstance(item, dict) else CacheSpec(path=item)
+            for item in self.provider_data.get("cache", [])
+        ]
 
     @staticmethod
     def _parse_artifact_spec(artifact: Union[dict, str]) -> ArtifactSpec:
