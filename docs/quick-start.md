@@ -3,7 +3,7 @@
 This tutorial will guide you through using `dstack` locally and remotely, step by step.
 
 !!! info "NOTE:"
-    The source code for this tutorial can be located in [`github.com/dstack-examples`](https://github.com/dstackai/dstack-examples).
+    The source code of this tutorial is available in the [Playground](playground.md).  
 
 ## 1. Install the CLI
 
@@ -368,6 +368,4 @@ infrastructure upon completion.
 
 !!! info "NOTE:"
     You can specify hardware resource requirements (like GPU, memory, interruptible instances, etc.) 
-    for each remote workflow using [`resources`](usage/resources.md).
-
-And that's a wrap! If you need to refer to it, the source code for this tutorial can be found in our GitHub [repo](https://github.com/dstackai/dstack-examples).
+    for each remote workflow using [`resources`](usage/remotes.md#resources).

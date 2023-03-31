@@ -1,7 +1,7 @@
 # Conda
 
 !!! info "NOTE:"
-    The source code for the examples below can be found on [GitHub](https://github.com/dstackai/dstack-examples).
+    The source code of this example is available in the [Playground](../playground.md). 
 
 ## Conda packages
 
@@ -9,7 +9,7 @@ You can use `conda` within workflows install Conda packages (under the hood, it 
 
 Create the following Python script:
 
-<div editor-title="python/hello_pandas.py"> 
+<div editor-title="usage/python/hello_pandas.py"> 
 
 ```python
 import pandas as pd
@@ -37,7 +37,7 @@ Now, define a workflow YAML file:
 
 <div editor-title=".dstack/workflows/conda.yaml"> 
 
-```yaml hl_lines="5 6"
+```yaml
 workflows:
   - name: hello-conda
     provider: bash
@@ -65,7 +65,7 @@ save them as artifact, and reuse from other workflows via `deps` and `conda acti
 
 Say you have the following Conda environment YAML file:
 
-<div editor-title="python/hello.py"> 
+<div editor-title="usage/python/hello.py"> 
 
 ```yaml
 name: myenv
@@ -81,7 +81,7 @@ Now, create the following workflow YAML file:
 
 <div editor-title=".dstack/workflows/conda.yaml">
 
-```yaml hl_lines="5 7 12 14"
+```yaml
 workflows:
   - name: setup-conda
     provider: bash

@@ -1,14 +1,14 @@
 # Providers
 
 !!! info "NOTE:"
-    The source code for the examples below can be found on [GitHub](https://github.com/dstackai/dstack-examples).
+    The source code of this example is available in the [Playground](../playground.md). 
 
 Each workflow in the YAML file has to specify the `provider` property. This property
 defines the behaviour of the workflow and what parameters can be provided in the YAML file.
 
 !!! info "NOTE:"
     While each provider is unique, common functionalities such
-    as [Artifacts](artifacts.md), [Deps](deps.md), [Resources](resources.md),
+    as [Artifacts](artifacts.md), [Deps](deps.md), [Resources](remotes.md#resources),
     [Environment variables](environment-variables.md), [Secrets](secrets.md), and [Args](args.md) are supported by most
     providers.
 

@@ -41,7 +41,7 @@ theme:
   #          icon: material/weather-sunny
   #          name: Switch to light mode
   features:
-    - navigation.path
+#    - navigation.path
     - content.code.copy
     - content.action.edit
     #    - navigation.indexes
@@ -68,6 +68,7 @@ plugins:
   - redirects:
       redirect_maps:
         'integrations/experiments/wandb.md': 'tutorials/wandb.md'
+  - typeset
 
 # Extensions
 markdown_extensions:
@@ -126,50 +127,50 @@ nav:
           - Overview: index.md
           - Installation: installation.md
           - Quick start: quick-start.md
-          - Concepts: concepts/index.md
+          - "Playground <img height='100%' style='vertical-align: top; height: 18px;' src='https://cdnjs.cloudflare.com/ajax/libs/twemoji/14.0.2/svg/1f3ae.svg'/>": playground.md
       - Usage:
         - Hello world: usage/hello-world.md
         - Python: usage/python.md
         - Conda: usage/conda.md
         - Artifacts: usage/artifacts.md
         - Deps: usage/deps.md
-        - Resources: usage/resources.md
-        - Environment variables: usage/environment-variables.md
+        - Remotes: usage/remotes.md
+#        - Environment variables: usage/environment-variables.md
         - Providers: usage/providers.md
         - Apps: usage/apps.md
         - Secrets: usage/secrets.md
         - Args: usage/args.md
       - Tutorials:
+          - TensorBoard: tutorials/tensorboard.md
           - Stable Diffusion: tutorials/stable-diffusion.md
-          - Experiment tracking:
-            - TensorBoard: tutorials/tensorboard.md
-            - Weights & Biases: tutorials/wandb.md
+          - Weights & Biases: tutorials/wandb.md
       - Support:
           - Troubleshooting: troubleshooting.md
           - Slack: https://join.slack.com/t/dstackai/shared_invite/zt-xdnsytie-D4qU9BvJP8vkbkHXdi6clQ
 #          - Changelog: https://github.com/dstackai/dstack/releases
 #          - Newsletter: https://dstack.curated.co/
   - Reference:
-      - Providers:
-          - bash: reference/providers/bash.md
-          - code: reference/providers/code.md
-          - lab: reference/providers/lab.md
-          - notebook: reference/providers/notebook.md
-          - docker: reference/providers/docker.md
-      - CLI:
-          - dstack run: reference/cli/run.md
-          - dstack ps: reference/cli/ps.md
-          - dstack logs: reference/cli/logs.md
-          - dstack stop: reference/cli/stop.md
-          - dstack rm: reference/cli/rm.md
-          - dstack tags: reference/cli/tags.md
-          - dstack pull: reference/cli/pull.md
-          - dstack push: reference/cli/push.md
-          - dstack ls: reference/cli/ls.md
-          - dstack cp: reference/cli/cp.md
-          - dstack init: reference/cli/init.md
-          - dstack config: reference/cli/config.md
-          - dstack secrets: reference/cli/secrets.md
+      - Reference:
+        - Providers:
+            - bash: reference/providers/bash.md
+            - code: reference/providers/code.md
+            - lab: reference/providers/lab.md
+            - notebook: reference/providers/notebook.md
+            - docker: reference/providers/docker.md
+        - CLI:
+            - dstack run: reference/cli/run.md
+            - dstack ps: reference/cli/ps.md
+            - dstack logs: reference/cli/logs.md
+            - dstack stop: reference/cli/stop.md
+            - dstack rm: reference/cli/rm.md
+            - dstack tags: reference/cli/tags.md
+            - dstack pull: reference/cli/pull.md
+            - dstack push: reference/cli/push.md
+            - dstack ls: reference/cli/ls.md
+            - dstack cp: reference/cli/cp.md
+            - dstack init: reference/cli/init.md
+            - dstack config: reference/cli/config.md
+            - dstack secrets: reference/cli/secrets.md
   - Blog:
     - blog/index.md
   - Slack: https://join.slack.com/t/dstackai/shared_invite/zt-xdnsytie-D4qU9BvJP8vkbkHXdi6clQ

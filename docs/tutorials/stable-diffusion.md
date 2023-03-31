@@ -1,10 +1,10 @@
-# Stable Diffusion with Diffusers
+# Stable Diffusion
 
 This tutorial will demonstrate how to use the [`diffusers`](https://github.com/huggingface/diffusers) library to generate images using 
 a pretrained Stable Diffusion model.
 
 !!! info "NOTE:"
-    The source code for this tutorial can be located in [`github.com/dstack-examples`](https://github.com/dstackai/dstack-examples/).
+    The source code of this tutorial is available in the [Playground](../playground.md).
 
 ## Requirements
 

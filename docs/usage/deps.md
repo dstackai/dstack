@@ -1,7 +1,7 @@
 # Deps
 
 !!! info "NOTE:"
-    The source code for the examples below can be found on [GitHub](https://github.com/dstackai/dstack-examples).
+    The source code of this example is available in the [Playground](../playground.md). 
 
 By using `deps` workflows can reuse artifacts from other workflows. There are two methods for doing this: by specifying
 a workflow or tag name.
@@ -12,7 +12,7 @@ Let's create the following workflow YAML file:
 
 <div editor-title=".dstack/workflows/deps.yaml"> 
 
-```yaml hl_lines="5 7"
+```yaml
 workflows:
   - name: cat-txt-2
     provider: bash
@@ -80,7 +80,7 @@ By default, `dstack` looks up tags and workflows within the same repo.
 If you want to refer to a tag or a workflow from another repo, 
 you have to prepend the name (of the tag or the workflow) with the repo name.
 
-The workflow below uses a tag from the `dstackai/dstack` repo:
+The workflow below uses a tag from the `dstackai/dstack-playground` repo:
 
 <div editor-title=".dstack/workflows/deps.yaml"> 
 
@@ -89,7 +89,7 @@ The workflow below uses a tag from the `dstackai/dstack` repo:
       - name: cat-txt-3
         provider: bash
         deps:
-          - workflow: dstackai/dstack/txt-file
+          - workflow: dstackai/dstack-playground/txt-file
         commands:
           - cat output/hello.txt
     ```

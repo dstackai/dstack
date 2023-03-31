@@ -1,7 +1,7 @@
 # Secrets
 
 !!! info "NOTE:"
-    The source code for the examples below can be found on [GitHub](https://github.com/dstackai/dstack-examples).
+    The source code of this example is available in the [Playground](../playground.md). 
 
 Secrets can be used to pass passwords and tokens securely to workflows without hard-coding them in the code.
 

@@ -1,11 +1,11 @@
 # Python
 
 !!! info "NOTE:"
-    The source code for the examples below can be found on [GitHub](https://github.com/dstackai/dstack-examples).
+    The source code of this example is available in the [Playground](../playground.md). 
 
 Create the following Python script:
 
-<div editor-title="python/hello.py"> 
+<div editor-title="usage/python/hello.py"> 
 
 ```python
 if __name__ == '__main__':
@@ -18,12 +18,12 @@ Then, create a workflow YAML file:
 
 <div editor-title=".dstack/workflows/python.yaml">
 
-```yaml  hl_lines="5"
+```yaml
 workflows:
   - name: hello-py
     provider: bash
     commands:
-      - python python/hello.py
+      - python usage/python/hello.py
 ```
 
 </div>
@@ -53,7 +53,7 @@ You can use `pip` within workflows install Python packages.
 
 Let's create the following Python script:
 
-<div editor-title="python/hello_pandas.py"> 
+<div editor-title="usage/python/hello_pandas.py"> 
 
 ```python
 import pandas as pd
@@ -81,13 +81,13 @@ Now, create the following workflow YAML file:
 
 <div editor-title=".dstack/workflows/python.yaml"> 
 
-```yaml  hl_lines="5 6"
+```yaml
 workflows:
   - name: hello-pandas
     provider: bash
     commands:
       - pip install pandas
-      - python python/hello_pandas.py
+      - python usage/python/hello_pandas.py
 ```
 
 </div>
@@ -109,7 +109,7 @@ You can override the major Python version using the `python` property:
 
 <div editor-title=".dstack/workflows/python-version.yaml">
 
-```yaml  hl_lines="6"
+```yaml
 workflows:
   - name: python-version
     provider: bash

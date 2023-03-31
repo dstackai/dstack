@@ -1,14 +1,14 @@
 # Args
 
 !!! info "NOTE:"
-    The source code for the examples below can be found on [GitHub](https://github.com/dstackai/dstack-examples).
+    The source code of this example is available in the [Playground](../playground.md). 
 
 If you pass any arguments to the `dstack run` command, they can be accessed from the workflow YAML file via
 the `${{ run.args }}` expression. 
 
 Create the following Python script:
 
-<div editor-title="args/hello-arg.py">
+<div editor-title="usage/args/hello_args.py">
 
 ```python
 import sys
@@ -23,12 +23,12 @@ Then, define the following workflow YAML file:
 
 <div editor-title=".dstack/workflows/args.yaml"> 
 
-```yaml hl_lines="5"
+```yaml
 workflows:
   - name: hello-args
     provider: bash
     commands:
-      - python args/hello-arg.py ${{ run.args }}
+      - python usage/args/hello_args.py ${{ run.args }}
 ```
  
 </div>
@@ -38,7 +38,7 @@ Run it locally using `dstack run` and passing `"Hello, world!"` as an argument:
 <div class="termy">
 
 ```shell
-$ dstack run hello-arg "Hello, world!"
+$ dstack run hello-args "Hello, world!"
 ```
 
 </div>

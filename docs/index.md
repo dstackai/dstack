@@ -6,18 +6,15 @@ hide:
 
 # A better way to run ML workflows
 
-Welcome to `dstack`'s documentation! Here you can learn what it is, how it works, and how to get started.
-
-
 ## What is dstack?
 
-`dstack` allows you to define machine learning workflows as code and run them on any cloud. 
+`dstack` is an open-source tool that enables you to define data and machine learning workflows as code and easily execute them
+wherever you choose, whether it be on a local machine or on any cloud platform. It also tracks artifacts and allows for
+collaboration.
 
-It helps you set up a reproducible environment, reuse artifacts, and launch interactive development environments and apps.
+[Installation](installation.md){ class="md-go-to-action primary" } [Playground](playground.md){ class="md-go-to-action secondary" }
 
-[Get started](installation.md){ class="md-go-to-action primary" } [Join Slack](https://join.slack.com/t/dstackai/shared_invite/zt-xdnsytie-D4qU9BvJP8vkbkHXdi6clQ){ class="md-go-to-action secondary slack" }
-
-## Define workflows
+## How it works?
 
 Define ML workflows, their output artifacts, hardware requirements, and dependencies via YAML.
 
@@ -46,18 +43,7 @@ workflows:
 
 </div>
 
-With YAML, you can avoid making changes to your scripts and have the freedom to use any frameworks, experiment trackers,
-or cloud providers.
-
-### Providers
-
-`dstack` supports multiple [providers](usage/providers.md) that enable you to set up environment, run scripts, launch interactive dev environments and apps, and perform many other tasks.
-
-## Run workflows
-
 Once a workflow is defined, you can use the `dstack run` command to run it either locally or remotely. 
-
-### Run locally
 
 By default, workflows run locally on your machine:
 
@@ -75,44 +61,11 @@ To interrupt, press Ctrl+C.
 
 Downloading http://yann.lecun.com/exdb/mnist/train-images-idx3-ubyte.gz
 ---> 100%
-
-$ 
 ```
 
 </div>
-
-The artifacts from local workflows are also stored and can be reused in other local workflows.
-
-### Run remotelly
 
 To run a workflow remotely (e.g. in a configured cloud account), add the `--remote` flag to the `dstack run` command:
-
-<div class="termy">
-
-```shell
-$ dstack run mnist-data --remote
-
-RUN        WORKFLOW    SUBMITTED  STATUS     TAG  BACKENDS
-mangust-1  mnist-data  now        Submitted       aws
-
-Provisioning... It may take up to a minute. ✓
-
-To interrupt, press Ctrl+C.
-
-Downloading http://yann.lecun.com/exdb/mnist/train-images-idx3-ubyte.gz
----> 100%
-
-$ 
-```
-
-</div>
-
-The output artifacts from remote workflows are also stored remotely and can be reused by other remote workflows.
-
-#### Resources
-
-You can request the necessary hardware resources either through arguments in the `dstack run` command (such
-as `--gpu` and `--gpu-name`) or via [YAML](reference/providers/bash.md#resources).
 
 <div class="termy">
 
@@ -130,20 +83,12 @@ GPU available: True, used: True
 
 Epoch 1: [00:03<00:00, 280.17it/s, loss=1.35, v_num=0]
 ---> 100%
-
-$ 
 ```
 
 </div>
 
 When you run a workflow remotely, `dstack` automatically creates resources in the configured cloud account
 and then destroys them once the workflow is complete.
-
-#### Ports
-
-When a workflow uses ports to host interactive dev environments or applications, the `dstack run` command automatically
-forwards these ports to your local machine, allowing you to access them. 
-Refer to [Providers](usage/providers.md) and [Apps](usage/apps.md) for the details.
 
 ## Community
 

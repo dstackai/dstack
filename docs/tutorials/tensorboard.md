@@ -7,7 +7,7 @@ With `dstack`, you can enjoy TensorBoard's benefits and version all metrics,
 while conveniently running training locally or remotely via the CLI.
 
 !!! info "NOTE:"
-    The source code for this tutorial can be located in [`github.com/dstack-examples`](https://github.com/dstackai/dstack-examples/blob/main/tutorials/tensorboard/train.py).
+    The source code of this tutorial is available in the [Playground](../playground.md).
 
 ## Define a workflow
 
@@ -202,7 +202,7 @@ later.
 <div class="termy">
 
 ```shell
-$ tensorboard --logdir=~/.dstack/artifacts/github.com/dstack-examples/snake-1,train-tensorboard,0/lightning_logs
+$ tensorboard --logdir=~/.dstack/artifacts/github.com/dstack-playground/snake-1,train-tensorboard,0/lightning_logs
 ```
 
 </div>
@@ -216,7 +216,7 @@ $ tensorboard --logdir=~/.dstack/artifacts/github.com/dstack-examples/snake-1,tr
 One of the great features of `dstack` is the ability to run workflows remotely (e.g., in a pre-configured cloud
 account). 
 
-This allows you to request any [Resources](../usage/resources.md) required (including GPUs and memory), or to utilize spot instances. 
+This allows you to request any [Resources](../usage/remotes.md#resources) required (including GPUs and memory), or to utilize spot instances. 
 The creation and deletion of cloud instances is handled by `dstack` automatically.
 
 To run a workflow remotely, add the `--remote` flag to the `dstack run` command.
@@ -264,7 +264,7 @@ You can then access the logs locally by running the `tensorboard` CLI.
 <div class="termy">
 
 ```shell
-$ tensorboard --logdir=~/.dstack/artifacts/github.com/dstack-examples/mangust-1,train-tensorboard,0/lightning_logs
+$ tensorboard --logdir=~/.dstack/artifacts/github.com/dstack-playground/mangust-1,train-tensorboard,0/lightning_logs
 ```
 
 </div>

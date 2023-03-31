@@ -12,7 +12,7 @@ When running a workflow remotely, `dstack` automatically creates and
 destroys cloud instances based on resource requirements and cost strategy, such as using spot instances.
 
 You can request the necessary hardware resources either through arguments in the `dstack run` command (such
-as `--gpu` and `--gpu-name`) or via [YAML](reference/providers/bash.md#resources).
+as `--gpu` and `--gpu-name`) or via [YAML](../reference/providers/bash.md#resources).
 
 !!! info "NOTE:"
     Remotes facilitate collaboration as they allow multiple team members to access the same runs.
@@ -55,14 +55,14 @@ experiment trackers, and cloud providers.
 !!! info "NOTE:"
     Workflows run in containers with pre-configured Conda environments, and CUDA drivers.
 
-`dstack` supports multiple [providers](usage/providers.md) that enable you to set up environment, run scripts, launch
+`dstack` supports multiple [providers](../usage/providers.md) that enable you to set up environment, run scripts, launch
 interactive dev environments and apps, and perform many other tasks.
 
 ## Ports
 
 When a workflow uses ports to host interactive dev environments or applications, the `dstack run` command automatically
 forwards these ports to your local machine, allowing you to access them. 
-Refer to [Providers](usage/providers.md) and [Apps](usage/apps.md) for the details.
+Refer to [Providers](../usage/providers.md) and [Apps](../usage/apps.md) for the details.
 
 ## Artifacts
 
