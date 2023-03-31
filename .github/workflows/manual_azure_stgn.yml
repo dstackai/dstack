@@ -44,4 +44,4 @@ jobs:
         run: |
           IMAGE_DEFINITION=${{ matrix.image_prefix }}-$VERSION
           IMAGE_NAME=${{ matrix.image_prefix }}-$VERSION
-          ../scripts/publish_azure_image.sh $IMAGE_DEFINITION $VERSION $IMAGE_NAME
+          ../scripts/publish_azure_image.sh $IMAGE_DEFINITION $IMAGE_NAME

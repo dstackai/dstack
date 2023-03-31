@@ -1,8 +1,7 @@
 #/bin/bash
 
 image_definition=$1
-image_version=$2
-image_name=$3
+image_name=$2
 subscription_id=$AZURE_SUBSCRIPTION_ID
 
 if [ -z "$subscription_id" ]; then
@@ -30,8 +29,8 @@ function create_image_definition() {
         --gallery-name $gallery_name \
         --gallery-image-definition $image_definition \
         --publisher dstackai \
-        --offer dstack-1 \
-        --sku $image_version \
+        --offer dstack \
+        --sku $image_definition \
         --os-type Linux \
         --os-state generalized
 }
