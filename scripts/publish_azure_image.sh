@@ -20,6 +20,9 @@ function get_image_definition {
         --gallery-image-definition $image_definition 
 }
 
+# We create a separate image definition for each dstack version since
+# gallery-image-version can't be in one-to-one correspondance with dstack versions
+# (it has to follow semver, e.g. no rc)
 function create_image_definition() {
     echo Creating image definition...
     az sig image-definition create \
@@ -28,7 +31,7 @@ function create_image_definition() {
         --gallery-image-definition $image_definition \
         --publisher dstackai \
         --offer dstack-1 \
-        --sku $image_definition \
+        --sku $image_version \
         --os-type Linux \
         --os-state generalized
 }
@@ -39,7 +42,7 @@ function create_image_version() {
         --resource-group $resource_group \
         --gallery-name $gallery_name \
         --gallery-image-definition $image_definition \
-        --gallery-image-version $image_version \
+        --gallery-image-version "0.0.1" \
         --target-regions "australiaeast" "brazilsouth" "canadacentral" "centralindia" "centralus" "eastasia" "eastus" "eastus2" "francecentral" "germanywestcentral" "japaneast" "koreacentral" "northeurope" "norwayeast" "qatarcentral" "southafricanorth" "southcentralus" "southeastasia" "swedencentral" "switzerlandnorth" "uaenorth" "uksouth" "westeurope" "westus2" "westus3" \
         --replica-count 1 \
         --managed-image "/subscriptions/${subscription_id}/resourceGroups/packer/providers/Microsoft.Compute/images/${image_name}"

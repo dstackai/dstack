@@ -37,9 +37,8 @@ jobs:
       - name: Run packer
         run: |
           ./packer build -var build_id=$VERSION ${{ matrix.variant }}.json
-      # - name: Publish azure image
-      #   run: |
-      #     IMAGE_DEFINITION=${{ matrix.image_prefix }}
-      #     IMAGE_VERSION=0.0.1
-      #     IMAGE_NAME=${{ matrix.image_prefix }}-$VERSION
-      #     ../scripts/publish_azure_image.sh $IMAGE_DEFINITION $IMAGE_VERSION $IMAGE_NAME
+      - name: Publish azure image
+        run: |
+          IMAGE_DEFINITION=${{ matrix.image_prefix }}-$VERSION
+          IMAGE_NAME=${{ matrix.image_prefix }}-$VERSION
+          ../scripts/publish_azure_image.sh $IMAGE_DEFINITION $VERSION $IMAGE_NAME
