@@ -10,8 +10,8 @@ echo AZURE_SUBSCRIPTION_ID is not specified
 exit 1
 fi
 
-resource_group=dstack-resources-germanywestcentral
-gallery_name=dstack_gallery_germanywestcentral
+resource_group=dstack-resources-westeurope
+gallery_name=dstack_gallery_westeurope
 
 function get_image_definition {
     az sig image-definition show \
