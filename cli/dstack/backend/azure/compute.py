@@ -1,9 +1,10 @@
 import base64
 import os
 import random
+import re
 import string
 from operator import attrgetter
-from typing import List, Optional
+from typing import List, Optional, Tuple
 
 from azure.core.credentials import TokenCredential
 from azure.core.exceptions import ResourceNotFoundError
@@ -35,13 +36,13 @@ from azure.mgmt.resource import ResourceManagementClient
 
 from dstack import version
 from dstack.backend.aws.runners import _get_default_ami_image_version, _serialize_runner_yaml
-from dstack.backend.azure import runners
 from dstack.backend.azure import utils as azure_utils
 from dstack.backend.azure.config import AzureConfig
 from dstack.backend.base.compute import Compute, choose_instance_type
 from dstack.core.instance import InstanceType
 from dstack.core.job import Job
 from dstack.core.request import RequestHead, RequestStatus
+from dstack.core.runners import Gpu, Resources
 from dstack.utils.common import removeprefix
 
 
@@ -74,7 +75,7 @@ class AzureCompute(Compute):
         )
 
     def get_instance_type(self, job: Job) -> Optional[InstanceType]:
-        instance_types = runners._get_instance_types(
+        instance_types = _get_instance_types(
             client=self._compute_client, location=self.azure_config.location
         )
         return choose_instance_type(instance_types=instance_types, requirements=job.requirements)
@@ -129,6 +130,50 @@ class AzureCompute(Compute):
             resource_group=self.azure_config.resource_group,
             instance_name=request_id,
         )
+
+
+def _get_instance_types(client: ComputeManagementClient, location: str) -> List[InstanceType]:
+    instance_types = []
+    vm_series_pattern = re.compile(
+        r"^(Standard_D\d+s_v3|Standard_E\d+(-\d*)?s_v4|Standard_NC\d+|Standard_NC\d+s_v3|Standard_NC\d+ads_A100_v4|Standard_NC\d+as_T4_v3)$"
+    )
+    # Only location filter is supported currently in azure API.
+    # See: https://learn.microsoft.com/en-us/python/api/azure-mgmt-compute/azure.mgmt.compute.v2021_07_01.operations.resourceskusoperations?view=azure-python#azure-mgmt-compute-v2021-07-01-operations-resourceskusoperations-list
+    resources = client.resource_skus.list(filter=f"location eq '{location}'")
+    for resource in resources:
+        if resource.resource_type != "virtualMachines" or len(resource.restrictions) > 0:
+            continue
+        if re.match(vm_series_pattern, resource.name) is None:
+            continue
+        capabilities = {pair.name: pair.value for pair in resource.capabilities}
+        gpus = []
+        if "GPUs" in capabilities:
+            gpu_name, gpu_memory = _get_gpu_name_memory(resource.name)
+            gpus = [Gpu(name=gpu_name, memory_mib=gpu_memory)] * int(capabilities["GPUs"])
+        instance_types.append(
+            InstanceType(
+                instance_name=resource.name,
+                resources=Resources(
+                    cpus=capabilities["vCPUs"],
+                    memory_mib=int(float(capabilities["MemoryGB"]) * 1024),
+                    gpus=gpus,
+                    interruptible=False,
+                    local=False,
+                ),
+            )
+        )
+    return instance_types
+
+
+def _get_gpu_name_memory(vm_name: str) -> Tuple[int, str]:
+    if re.match(r"^Standard_NC\d+ads_A100_v4$", vm_name):
+        return "A100", 80 * 1024
+    if re.match(r"^Standard_NC\d+as_T4_v3$", vm_name):
+        return "T4", 16 * 1024
+    if re.match(r"^Standard_NC\d+s_v3$", vm_name):
+        return "V100", 16 * 1024
+    if re.match(r"^Standard_NC\d+$", vm_name):
+        return "K80", 12 * 1024
 
 
 def _get_instance_name(job: Job) -> str:
