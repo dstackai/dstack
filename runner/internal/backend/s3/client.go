@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"context"
 	"errors"
+	"fmt"
 	"io"
 	"strings"
 
@@ -71,9 +72,12 @@ func (c *ClientS3) PutFile(ctx context.Context, bucket, key string, file []byte)
 }
 
 func (c *ClientS3) RenameFile(ctx context.Context, bucket, oldKey, newKey string) error {
+	if oldKey == newKey {
+		return nil
+	}
 	_, err := c.cli.CopyObject(ctx, &s3.CopyObjectInput{
 		Bucket:     aws.String(bucket),
-		CopySource: aws.String(oldKey),
+		CopySource: aws.String(fmt.Sprintf("%s/%s", bucket, oldKey)),
 		Key:        aws.String(newKey),
 	})
 	if err != nil {
