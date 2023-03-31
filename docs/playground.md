@@ -2,10 +2,10 @@
 
 The playground is a [repository](https://github.com/dstackai/dstack-playground) that contains a collection of examples demonstrating how to use `dstack`.
 
-The easiest method to interact with it is by opening the repository in GitPod, which will automatically install `dstack`
+The easiest method to interact with it is by opening the repository in Gitpod, which will automatically install `dstack`
 and set up the environment.
 
-[Open in Gitpod](installation.md){ class="md-go-to-action primary gitpod" }
+[Open in Gitpod](https://gitpod.io/#github.com/dstackai/dstack-playground){ class="md-go-to-action primary gitpod" }
 
 If you'd like to run the examples on your own machine, follow these instructions:
 
