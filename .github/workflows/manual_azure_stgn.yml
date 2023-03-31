@@ -2,6 +2,9 @@ name: Manual Azure build for STGN
 
 on: [workflow_dispatch]
 
+env:
+  DOCKER_IMAGE_VERSION: "0.1"
+
 jobs:
   azure-image-build:
     defaults:
@@ -36,7 +39,7 @@ jobs:
           cp -R ami/packer/* .
       - name: Run packer
         run: |
-          ./packer build -var build_id=$VERSION ${{ matrix.variant }}.json
+          ./packer build -var build_id=$VERSION -var image_version=${{ env.DOCKER_IMAGE_VERSION }} ${{ matrix.variant }}.json
       - name: Publish azure image
         run: |
           IMAGE_DEFINITION=${{ matrix.image_prefix }}-$VERSION
