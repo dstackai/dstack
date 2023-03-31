@@ -30,18 +30,19 @@ import (
 )
 
 type Executor struct {
-	backend       backend.Backend
-	configDir     string
-	config        *Config
-	engine        *container.Engine
-	artifactsIn   []artifacts.Artifacter
-	artifactsOut  []artifacts.Artifacter
-	artifactsFUSE []artifacts.Artifacter
-	repo          *repo.Manager
-	pm            ports.Manager
-	portID        string
-	streamLogs    *stream.Server
-	stoppedCh     chan struct{}
+	backend        backend.Backend
+	configDir      string
+	config         *Config
+	engine         *container.Engine
+	cacheArtifacts []artifacts.Artifacter
+	artifactsIn    []artifacts.Artifacter
+	artifactsOut   []artifacts.Artifacter
+	artifactsFUSE  []artifacts.Artifacter
+	repo           *repo.Manager
+	pm             ports.Manager
+	portID         string
+	streamLogs     *stream.Server
+	stoppedCh      chan struct{}
 }
 
 func New(b backend.Backend) *Executor {
@@ -109,6 +110,7 @@ func (ex *Executor) Init(ctx context.Context, configDir string) error {
 			}
 		}
 	}
+
 	cloudLog := ex.backend.CreateLogger(ctx, fmt.Sprintf("/dstack/runners/%s", ex.backend.Bucket(ctx)), job.RunnerID)
 	log.SetCloudLogger(cloudLog)
 	return nil
@@ -221,6 +223,10 @@ func (ex *Executor) runJob(ctx context.Context, erCh chan error, stoppedCh chan 
 	}
 	log.Trace(jctx, "Dependency processing")
 
+	if err = ex.processCache(jctx); err != nil {
+		erCh <- gerrors.Wrap(err)
+		return
+	}
 	if err = ex.processDeps(jctx); err != nil {
 		erCh <- gerrors.Wrap(err)
 		return
@@ -233,7 +239,7 @@ func (ex *Executor) runJob(ctx context.Context, erCh chan error, stoppedCh chan 
 				return
 			}
 		}
-		if len(ex.artifactsIn) > 0 {
+		if len(ex.artifactsIn) > 0 || len(ex.cacheArtifacts) > 0 {
 			log.Trace(jctx, "Start downloading artifacts")
 			job.Status = states.Downloading
 			err = ex.backend.UpdateState(jctx)
@@ -248,6 +254,9 @@ func (ex *Executor) runJob(ctx context.Context, erCh chan error, stoppedCh chan 
 					return
 				}
 			}
+			for _, artifact := range ex.cacheArtifacts {
+				err = artifact.BeforeRun(jctx)
+			}
 		}
 		log.Trace(jctx, "Running job")
 		job.Status = states.Running
@@ -261,7 +270,7 @@ func (ex *Executor) runJob(ctx context.Context, erCh chan error, stoppedCh chan 
 			erCh <- gerrors.Wrap(err)
 			return
 		}
-		if len(ex.artifactsOut) > 0 {
+		if len(ex.artifactsOut) > 0 || len(ex.cacheArtifacts) > 0 {
 			log.Trace(jctx, "Start uploading artifacts")
 			job.Status = states.Uploading
 			err = ex.backend.UpdateState(jctx)
@@ -270,6 +279,13 @@ func (ex *Executor) runJob(ctx context.Context, erCh chan error, stoppedCh chan 
 				return
 			}
 			for _, artifact := range ex.artifactsOut {
+				err = artifact.AfterRun(jctx)
+				if err != nil {
+					erCh <- gerrors.Wrap(err)
+					return
+				}
+			}
+			for _, artifact := range ex.cacheArtifacts {
 				err = artifact.AfterRun(jctx)
 				if err != nil {
 					erCh <- gerrors.Wrap(err)
@@ -361,6 +377,17 @@ func (ex *Executor) processDeps(ctx context.Context) error {
 	return nil
 }
 
+func (ex *Executor) processCache(ctx context.Context) error {
+	job := ex.backend.Job(ctx)
+	for _, cache := range job.Cache {
+		cacheArt := ex.backend.GetArtifact(ctx, job.RunName, cache.Path, path.Join("cache", job.RepoHostNameWithPort(), job.RepoUserName, job.RepoName, job.LocalRepoUserEmail, job.WorkflowName, cache.Path), false)
+		if cacheArt != nil {
+			ex.cacheArtifacts = append(ex.cacheArtifacts, cacheArt)
+		}
+	}
+	return nil
+}
+
 func (ex *Executor) environment(ctx context.Context) []string {
 	log.Trace(ctx, "Start generate env")
 	job := ex.backend.Job(ctx)
@@ -432,6 +459,13 @@ func (ex *Executor) processJob(ctx context.Context, stoppedCh chan struct{}) err
 		bindings = append(bindings, art...)
 	}
 	for _, artifact := range ex.artifactsOut {
+		art, err := artifact.DockerBindings(path.Join("/workflow", job.WorkingDir))
+		if err != nil {
+			return gerrors.Wrap(err)
+		}
+		bindings = append(bindings, art...)
+	}
+	for _, artifact := range ex.cacheArtifacts {
 		art, err := artifact.DockerBindings(path.Join("/workflow", job.WorkingDir))
 		if err != nil {
 			return gerrors.Wrap(err)
