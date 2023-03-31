@@ -15,11 +15,14 @@ from azure.mgmt.compute.models import (
     HardwareProfile,
     ImageReference,
     InstanceViewStatus,
+    LinuxConfiguration,
     ManagedDiskParameters,
     NetworkProfile,
     OSDisk,
     OSProfile,
     ResourceIdentityType,
+    SshConfiguration,
+    SshPublicKey,
     StorageAccountTypes,
     StorageProfile,
     SubResource,
@@ -100,6 +103,7 @@ class AzureCompute(Compute):
             vm_size=instance_type.instance_name,
             instance_name=_get_instance_name(job),
             user_data=_get_user_data_script(self.azure_config, job, instance_type),
+            ssh_pub_key=job.ssh_key_pub,
         )
         return vm.name
 
@@ -243,6 +247,7 @@ def _launch_instance(
     vm_size: str,
     instance_name: str,
     user_data: str,
+    ssh_pub_key: str,
 ) -> VirtualMachine:
     vm: VirtualMachine = compute_client.virtual_machines.begin_create_or_update(
         resource_group,
@@ -265,6 +270,16 @@ def _launch_instance(
                 computer_name="runnervm",
                 admin_username="ubuntu",
                 admin_password=os.getenv("DSTACK_AZURE_VM_PASSWORD", _generate_vm_password()),
+                linux_configuration=LinuxConfiguration(
+                    ssh=SshConfiguration(
+                        public_keys=[
+                            SshPublicKey(
+                                path="/home/ubuntu/.ssh/authorized_keys",
+                                key_data=ssh_pub_key,
+                            )
+                        ]
+                    )
+                ),
             ),
             network_profile=NetworkProfile(
                 network_api_version=NetworkManagementClient.DEFAULT_API_VERSION,
