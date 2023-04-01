@@ -4,15 +4,11 @@ hide:
   - path
 ---
 
-# A better way to run ML workflows
+# The easiest way to run ML workflows
 
-## What is dstack?
+`dstack` is an open-source tool makes it very easy to run ML workflows anywhere (whether it be on a local machine or on any cloud platform).
 
-`dstack` is an open-source tool that enables you to define data and machine learning workflows as code and easily execute them
-wherever you choose, whether it be on a local machine or on any cloud platform. It also tracks artifacts and allows for
-collaboration.
-
-[Installation](installation.md){ class="md-go-to-action primary" } [Playground](playground.md){ class="md-go-to-action secondary" }
+[Quick start](quick-start.md){ class="md-go-to-action primary" } [:video_game: Playground](playground.md){ class="md-go-to-action secondary" }
 
 ## How it works?
 
@@ -26,7 +22,7 @@ workflows:
     provider: bash
     commands:
       - pip install torchvision
-      - python tutorials/mnist/mnist_data.py
+      - python examples/mnist/mnist_data.py
     artifacts:
       - path: ./data
 
@@ -36,7 +32,7 @@ workflows:
       - workflow: mnist-data
     commands:
       - pip install torchvision pytorch-lightning tensorboard
-      - python tutorials/mnist/train_mnist.py
+      - python examples/mnist/train_mnist.py
     artifacts:
       - path: ./lightning_logs
 ```
@@ -89,9 +85,3 @@ Epoch 1: [00:03<00:00, 280.17it/s, loss=1.35, v_num=0]
 
 When you run a workflow remotely, `dstack` automatically creates resources in the configured cloud account
 and then destroys them once the workflow is complete.
-
-## Community
-
-Join our community by connecting with
-us on our [Slack channel](https://join.slack.com/t/dstackai/shared_invite/zt-xdnsytie-D4qU9BvJP8vkbkHXdi6clQ)
-and [GitHub](https://github.com/dstackai/dstack) repository.

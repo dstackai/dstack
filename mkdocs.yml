@@ -67,7 +67,10 @@ plugins:
   - search
   - redirects:
       redirect_maps:
-        'integrations/experiments/wandb.md': 'tutorials/wandb.md'
+        'integrations/experiments/wandb.md': 'examples/wandb.md'
+        'tutorials/wandb.md': 'examples/wandb.md'
+        'tutorials/tensorboard.md': 'examples/tensorboard.md'
+        'tutorials/stable-diffusion.md': 'examples/stable-diffusion.md'
   - typeset
 
 # Extensions
@@ -140,15 +143,20 @@ nav:
         - Apps: usage/apps.md
         - Secrets: usage/secrets.md
         - Args: usage/args.md
-      - Tutorials:
-          - TensorBoard: tutorials/tensorboard.md
-          - Stable Diffusion: tutorials/stable-diffusion.md
-          - Weights & Biases: tutorials/wandb.md
+      - What's next?:
+          - Examples: examples/tensorboard.md
+          - Reference: reference/providers/bash.md
       - Support:
           - Troubleshooting: troubleshooting.md
           - Slack: https://join.slack.com/t/dstackai/shared_invite/zt-xdnsytie-D4qU9BvJP8vkbkHXdi6clQ
 #          - Changelog: https://github.com/dstackai/dstack/releases
 #          - Newsletter: https://dstack.curated.co/
+  - Examples:
+      - Experiment trackers:
+        - TensorBoard: examples/tensorboard.md
+        - Weights & Biases: examples/wandb.md
+      - Hugging Face:
+        - Stable Diffusion: examples/stable-diffusion.md
   - Reference:
       - Reference:
         - Providers:

@@ -9,20 +9,22 @@
 </h1>
 
 <h4 align="center">
-A better way to run ML workflows
+The easiest way to run ML workflows
 </h4>
 
 <p align="center">
 Define ML workflows as code and run via CLI. Use any cloud. Collaborate within teams. 
 </p>
 
-[![Slack](https://img.shields.io/badge/slack-join%20community-blueviolet?logo=slack&style=for-the-badge)](https://join.slack.com/t/dstackai/shared_invite/zt-xdnsytie-D4qU9BvJP8vkbkHXdi6clQ)
+[![Slack](https://img.shields.io/badge/slack-join%20chat-blueviolet?logo=slack&style=for-the-badge)](https://join.slack.com/t/dstackai/shared_invite/zt-xdnsytie-D4qU9BvJP8vkbkHXdi6clQ)
 
 <p align="center">
 <a href="https://docs.dstack.ai" target="_blank"><b>Docs</b></a> • 
 <a href="https://docs.dstack.ai/installation"><b>Installation</b></a> • 
 <a href="https://docs.dstack.ai/quick-start"><b>Quick start</b></a> • 
-<a href="https://docs.dstack.ai/usage/hello-world" target="_blank"><b>Usage</b></a> 
+<a href="https://docs.dstack.ai/playground" target="_blank"><b>Playground</b></a> •   
+<a href="https://docs.dstack.ai/usage/hello-world" target="_blank"><b>Usage</b></a>  • 
+<a href="https://docs.dstack.ai/examples/tensorboard" target="_blank"><b>Examples</b></a>
 </p>
 
 [![Last commit](https://img.shields.io/github/last-commit/dstackai/dstack)](https://github.com/dstackai/dstack/commits/)
@@ -32,9 +34,7 @@ Define ML workflows as code and run via CLI. Use any cloud. Collaborate within t
 
 ## What is dstack?
 
-`dstack` allows you to define machine learning workflows as code and run them on any cloud. 
-
-It helps you set up a reproducible environment, reuse artifacts, and launch interactive development environments and apps.
+`dstack` is an open-source tool makes it very easy to run ML workflows anywhere (whether it be on a local machine or on any cloud platform). collaboration.
 
 ## Installation
 
@@ -176,7 +176,9 @@ For additional information and examples, see the following links:
 * [Docs](https://docs.dstack.ai/)
 * [Installation](https://docs.dstack.ai/installation)
 * [Quick start](https://docs.dstack.ai/quick-start)
+* [Playground](https://githib.com/dstackai/dstack-playground)
 * [Usage](https://docs.dstack.ai/usage/hello-world)
+* [Examples](https://docs.dstack.ai/examples/tensorboard)
  
 ##  Licence
 

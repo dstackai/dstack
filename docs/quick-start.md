@@ -1,9 +1,9 @@
 # Quick start
 
-This tutorial will guide you through using `dstack` locally and remotely, step by step.
+This example will guide you through using `dstack` locally and remotely, step by step.
 
 !!! info "NOTE:"
-    The source code of this tutorial is available in the [Playground](playground.md).  
+    The source code of this example is available in the [Playground](playground.md).  
 
 ## 1. Install the CLI
 
@@ -63,7 +63,7 @@ Let us begin by creating a Python script that will prepare the data for our trai
 
 Let us create the following Python script:
 
-<div editor-title="tutorials/mnist/mnist_data.py"> 
+<div editor-title="examples/mnist/mnist_data.py"> 
 
 ```python
 from torchvision.datasets import MNIST
@@ -94,7 +94,7 @@ workflows:
     provider: bash
     commands:
       - pip install torchvision
-      - python tutorials/mnist/mnist_data.py
+      - python examples/mnist/mnist_data.py
     artifacts:
       - path: ./data
 ```
@@ -200,7 +200,7 @@ Now, that the data is prepared, let's create a Python script to train a model.
 
 Let us create the following training script:
 
-<div editor-title="tutorials/mnist/train_mnist.py"> 
+<div editor-title="examples/mnist/train_mnist.py"> 
 
 ```python
 import torch
@@ -267,7 +267,7 @@ workflows:
     provider: bash
     commands:
       - pip install torchvision
-      - python tutorials/mnist/mnist_data.py
+      - python examples/mnist/mnist_data.py
     artifacts:
       - path: ./data
         
@@ -277,7 +277,7 @@ workflows:
       - workflow: mnist-data 
     commands:
       - pip install torchvision pytorch-lightning tensorboard
-      - python tutorials/mnist/train_mnist.py
+      - python examples/mnist/train_mnist.py
     artifacts:
       - path: ./lightning_logs
 ```

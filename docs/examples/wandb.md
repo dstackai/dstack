@@ -65,7 +65,7 @@ from your Python script.
 
 First, create a run with [`wandb.init()`](https://docs.wandb.ai/ref/python/run):
 
-<div editor-title="tutorials/wandb/main.py"> 
+<div editor-title="examples/wandb/main.py"> 
 
 ```python
 import os
@@ -100,7 +100,7 @@ workflows:
     provider: bash
     commands:
       - pip install wandb
-      - python tutorials/wandb/main.py
+      - python examples/wandb/main.py
 ```
 
 </div>
