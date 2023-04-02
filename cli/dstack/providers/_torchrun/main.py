@@ -5,9 +5,7 @@ from typing import Any, Dict, List, Optional
 from rich_argparse import RichHelpFormatter
 
 from dstack.backend.base import Backend
-from dstack.core.job import GpusRequirements
-from dstack.core.job import JobSpec
-from dstack.core.job import Requirements
+from dstack.core.job import GpusRequirements, JobSpec, Requirements
 from dstack.providers import Provider
 
 

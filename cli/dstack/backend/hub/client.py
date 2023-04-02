@@ -20,9 +20,9 @@ from dstack.hub.models import (
     PollLogs,
     ReposUpdate,
     RunsList,
+    SaveRepoCredentials,
     SecretAddUpdate,
     StopRunners,
-    SaveRepoCredentials,
 )
 
 
