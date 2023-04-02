@@ -7,7 +7,7 @@ import requests
 from dstack.core.artifact import Artifact
 from dstack.core.job import Job, JobHead
 from dstack.core.log_event import LogEvent
-from dstack.core.repo import LocalRepoData, RepoAddress, RepoCredentials, RepoHead
+from dstack.core.repo import LocalRepoData, RepoAddress, RepoCredentials
 from dstack.core.run import RunHead
 from dstack.core.secret import Secret
 from dstack.core.tag import TagHead
@@ -22,6 +22,7 @@ from dstack.hub.models import (
     RunsList,
     SecretAddUpdate,
     StopRunners,
+    SaveRepoCredentials,
 )
 
 
@@ -57,7 +58,7 @@ class HubClient:
             if resp.ok:
                 print(resp.json())
                 return True
-            if resp.status_code == 401:
+            elif resp.status_code == 401:
                 print("Unauthorized. Please set correct token")
                 return False
         except requests.ConnectionError:
@@ -87,9 +88,11 @@ class HubClient:
             if resp.ok:
                 json_data = resp.json()
                 return RepoCredentials(**json_data)
-            if resp.status_code == 401:
+            elif resp.status_code == 401:
                 print("Unauthorized. Please set correct token")
                 return None
+            else:
+                resp.raise_for_status()
         except requests.ConnectionError:
             print(f"{self.url} connection refused")
         return None
@@ -104,16 +107,18 @@ class HubClient:
             resp = requests.post(
                 url=url,
                 headers=self._headers(),
-                data={
-                    "repo_address": repo_address.json(),
-                    "repo_credentials": repo_credentials.json(),
-                },
+                data=SaveRepoCredentials(
+                    repo_address=repo_address,
+                    repo_credentials=repo_credentials,
+                ).json(),
             )
             if resp.ok:
                 return None
-            if resp.status_code == 401:
+            elif resp.status_code == 401:
                 print("Unauthorized. Please set correct token")
                 return None
+            else:
+                resp.raise_for_status()
         except requests.ConnectionError:
             print(f"{self.url} connection refused")
         return None
@@ -128,9 +133,11 @@ class HubClient:
             resp = requests.post(url=url, headers=self._headers(), data=repo_address.json())
             if resp.ok:
                 return resp.text
-            if resp.status_code == 401:
+            elif resp.status_code == 401:
                 print("Unauthorized. Please set correct token")
                 return ""
+            else:
+                resp.raise_for_status()
         except requests.ConnectionError:
             print(f"{self.url} connection refused")
         return ""
@@ -145,9 +152,11 @@ class HubClient:
             resp = requests.post(url=url, headers=self._headers(), data=job.json())
             if resp.ok:
                 return None
-            if resp.status_code == 401:
+            elif resp.status_code == 401:
                 print("Unauthorized. Please set correct token")
                 return None
+            else:
+                resp.raise_for_status()
         except requests.ConnectionError:
             print(f"{self.url} connection refused")
         return None
@@ -162,9 +171,11 @@ class HubClient:
             resp = requests.post(url=url, headers=self._headers(), data=job.json())
             if resp.ok:
                 return None
-            if resp.status_code == 401:
+            elif resp.status_code == 401:
                 print("Unauthorized. Please set correct token")
                 return None
+            else:
+                resp.raise_for_status()
         except requests.ConnectionError:
             print(f"{self.url} connection refused")
         return None
@@ -187,9 +198,11 @@ class HubClient:
             )
             if resp.ok:
                 return None
-            if resp.status_code == 401:
+            elif resp.status_code == 401:
                 print("Unauthorized. Please set correct token")
                 return None
+            else:
+                resp.raise_for_status()
         except requests.ConnectionError:
             print(f"{self.url} connection refused")
         return None
@@ -204,9 +217,11 @@ class HubClient:
             resp = requests.get(url=url, headers=self._headers(), data=repo_address.json())
             if resp.ok:
                 return TagHead.parse_obj(resp.json())
-            if resp.status_code == 401:
+            elif resp.status_code == 401:
                 print("Unauthorized. Please set correct token")
                 return None
+            else:
+                resp.raise_for_status()
         except requests.ConnectionError:
             print(f"{self.url} connection refused")
         return None
@@ -222,9 +237,11 @@ class HubClient:
             if resp.ok:
                 body = resp.json()
                 return [TagHead.parse_obj(tag) for tag in body]
-            if resp.status_code == 401:
+            elif resp.status_code == 401:
                 print("Unauthorized. Please set correct token")
                 return None
+            else:
+                resp.raise_for_status()
         except requests.ConnectionError:
             print(f"{self.url} connection refused")
         return None
@@ -254,9 +271,11 @@ class HubClient:
             )
             if resp.ok:
                 return None
-            if resp.status_code == 401:
+            elif resp.status_code == 401:
                 print("Unauthorized. Please set correct token")
                 return None
+            else:
+                resp.raise_for_status()
         except requests.ConnectionError:
             print(f"{self.url} connection refused")
         return None
@@ -284,9 +303,11 @@ class HubClient:
             )
             if resp.ok:
                 return None
-            if resp.status_code == 401:
+            elif resp.status_code == 401:
                 print("Unauthorized. Please set correct token")
                 return None
+            else:
+                resp.raise_for_status()
         except requests.ConnectionError:
             print(f"{self.url} connection refused")
         return None
@@ -301,9 +322,11 @@ class HubClient:
             resp = requests.post(url=url, headers=self._headers(), data=repo_address.json())
             if resp.ok:
                 return None
-            if resp.status_code == 401:
+            elif resp.status_code == 401:
                 print("Unauthorized. Please set correct token")
                 return None
+            else:
+                resp.raise_for_status()
         except requests.ConnectionError:
             print(f"{self.url} connection refused")
         return None
@@ -325,9 +348,11 @@ class HubClient:
             )
             if resp.ok:
                 return None
-            if resp.status_code == 401:
+            elif resp.status_code == 401:
                 print("Unauthorized. Please set correct token")
                 return None
+            else:
+                resp.raise_for_status()
         except requests.ConnectionError:
             print(f"{self.url} connection refused")
         return None
@@ -346,9 +371,11 @@ class HubClient:
             if resp.ok:
                 body = resp.json()
                 return [JobHead.parse_obj(job) for job in body]
-            if resp.status_code == 401:
+            elif resp.status_code == 401:
                 print("Unauthorized. Please set correct token")
                 return None
+            else:
+                resp.raise_for_status()
         except requests.ConnectionError:
             print(f"{self.url} connection refused")
         return None
@@ -377,9 +404,11 @@ class HubClient:
             if resp.ok:
                 body = resp.json()
                 return [RunHead.parse_obj(run) for run in body]
-            if resp.status_code == 401:
+            elif resp.status_code == 401:
                 print("Unauthorized. Please set correct token")
                 return []
+            else:
+                resp.raise_for_status()
         except requests.ConnectionError:
             print(f"{self.url} connection refused")
         return []
@@ -402,9 +431,11 @@ class HubClient:
             if resp.ok:
                 json_data = resp.json()
                 return Job.parse_obj(json_data)
-            if resp.status_code == 401:
+            elif resp.status_code == 401:
                 print("Unauthorized. Please set correct token")
                 return None
+            else:
+                resp.raise_for_status()
         except requests.ConnectionError:
             print(f"{self.url} connection refused")
         return None
@@ -424,9 +455,11 @@ class HubClient:
             if resp.ok:
                 json_data = resp.json()
                 return json_data
-            if resp.status_code == 401:
+            elif resp.status_code == 401:
                 print("Unauthorized. Please set correct token")
                 return []
+            else:
+                resp.raise_for_status()
         except requests.ConnectionError:
             print(f"{self.url} connection refused")
         return []
@@ -446,9 +479,11 @@ class HubClient:
             if resp.ok:
                 json_data = resp.json()
                 return Secret.parse_obj(json_data)
-            if resp.status_code == 401:
+            elif resp.status_code == 401:
                 print("Unauthorized. Please set correct token")
                 return None
+            else:
+                resp.raise_for_status()
         except requests.ConnectionError:
             print(f"{self.url} connection refused")
         return None
@@ -470,9 +505,11 @@ class HubClient:
             )
             if resp.ok:
                 return None
-            if resp.status_code == 401:
+            elif resp.status_code == 401:
                 print("Unauthorized. Please set correct token")
                 return None
+            else:
+                resp.raise_for_status()
         except requests.ConnectionError:
             print(f"{self.url} connection refused")
         return None
@@ -494,9 +531,11 @@ class HubClient:
             )
             if resp.ok:
                 return None
-            if resp.status_code == 401:
+            elif resp.status_code == 401:
                 print("Unauthorized. Please set correct token")
                 return None
+            else:
+                resp.raise_for_status()
         except requests.ConnectionError:
             print(f"{self.url} connection refused")
         return None
@@ -515,9 +554,11 @@ class HubClient:
             )
             if resp.ok:
                 return None
-            if resp.status_code == 401:
+            elif resp.status_code == 401:
                 print("Unauthorized. Please set correct token")
                 return None
+            else:
+                resp.raise_for_status()
         except requests.ConnectionError:
             print(f"{self.url} connection refused")
         return None
@@ -537,9 +578,11 @@ class HubClient:
             if resp.ok:
                 job_data = resp.json()
                 return [Job.parse_obj(job) for job in job_data]
-            if resp.status_code == 401:
+            elif resp.status_code == 401:
                 print("Unauthorized. Please set correct token")
                 return []
+            else:
+                resp.raise_for_status()
         except requests.ConnectionError:
             print(f"{self.url} connection refused")
         return []
@@ -559,9 +602,11 @@ class HubClient:
             if resp.ok:
                 artifact_data = resp.json()
                 return [Artifact.parse_obj(artifact) for artifact in artifact_data]
-            if resp.status_code == 401:
+            elif resp.status_code == 401:
                 print("Unauthorized. Please set correct token")
                 return []
+            else:
+                resp.raise_for_status()
         except requests.ConnectionError:
             print(f"{self.url} connection refused")
         return []
@@ -580,9 +625,11 @@ class HubClient:
             )
             if resp.ok:
                 return None
-            if resp.status_code == 401:
+            elif resp.status_code == 401:
                 print("Unauthorized. Please set correct token")
                 return None
+            else:
+                resp.raise_for_status()
         except requests.ConnectionError:
             print(f"{self.url} connection refused")
         return None
@@ -626,9 +673,11 @@ class HubClient:
                             json_data = json.loads(_body)
                             _body = bytearray()
                             yield LogEvent.parse_obj(json_data)
-            if resp.status_code == 401:
+            elif resp.status_code == 401:
                 print("Unauthorized. Please set correct token")
                 return None
+            else:
+                resp.raise_for_status()
         except requests.ConnectionError:
             print(f"{self.url} connection refused")
         return None
@@ -647,9 +696,11 @@ class HubClient:
             )
             if resp.ok:
                 return resp.text
-            if resp.status_code == 401:
+            elif resp.status_code == 401:
                 print("Unauthorized. Please set correct token")
                 return None
+            else:
+                resp.raise_for_status()
         except requests.ConnectionError:
             print(f"{self.url} connection refused")
         return None
@@ -668,9 +719,11 @@ class HubClient:
             )
             if resp.ok:
                 return resp.text
-            if resp.status_code == 401:
+            elif resp.status_code == 401:
                 print("Unauthorized. Please set correct token")
                 return None
+            else:
+                resp.raise_for_status()
         except requests.ConnectionError:
             print(f"{self.url} connection refused")
         return None

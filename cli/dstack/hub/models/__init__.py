@@ -1,9 +1,9 @@
-from typing import Dict, List, Optional, Union
+from typing import List, Optional, Union
 
 from pydantic import BaseModel
 
 from dstack.core.job import Job, JobHead
-from dstack.core.repo import LocalRepoData, RepoAddress
+from dstack.core.repo import LocalRepoData, RepoAddress, RepoCredentials
 from dstack.core.secret import Secret
 
 
@@ -85,6 +85,11 @@ class StopRunners(BaseModel):
     repo_address: RepoAddress
     job_id: str
     abort: bool
+
+
+class SaveRepoCredentials(BaseModel):
+    repo_address: RepoAddress
+    repo_credentials: RepoCredentials
 
 
 class ReposUpdate(BaseModel):
