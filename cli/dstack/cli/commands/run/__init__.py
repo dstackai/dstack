@@ -118,7 +118,9 @@ def poll_logs_ws(backend: Backend, repo_address: RepoAddress, job: Job, ports: D
 
     local_ws_logs_port = ports.get(int(job.env["WS_LOGS_PORT"]), int(job.env["WS_LOGS_PORT"]))
     url = f"ws://127.0.0.1:{local_ws_logs_port}/logsws"
-    cursor.hide()
+    atty = sys.stdout.isatty()
+    if atty:
+        cursor.hide()
     _ws = websocket.WebSocketApp(
         url,
         on_message=on_message,
@@ -127,7 +129,8 @@ def poll_logs_ws(backend: Backend, repo_address: RepoAddress, job: Job, ports: D
         on_close=on_close,
     )
     _ws.run_forever()
-    cursor.show()
+    if atty:
+        cursor.show()
 
     try:
         while True:
