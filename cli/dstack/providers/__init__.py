@@ -161,7 +161,6 @@ class Provider:
         parser.add_argument("-w", "--working-dir", metavar="PATH", type=str)
         group = parser.add_mutually_exclusive_group()
         group.add_argument("-i", "--interruptible", action="store_true")
-        group.add_argument("-l", "--local", action="store_true")
         parser.add_argument("--cpu", metavar="NUM", type=int)
         parser.add_argument("--memory", metavar="SIZE", type=str)
         parser.add_argument("--gpu", metavar="NUM", type=int)
@@ -208,8 +207,6 @@ class Provider:
             resources["shm_size"] = args.shm_size
         if args.interruptible:
             resources["interruptible"] = True
-        if args.local:
-            resources["local"] = True
         if unknown_args:
             self.provider_data["run_args"] = unknown_args
 
@@ -433,8 +430,6 @@ class Provider:
             resources.shm_size_mib = _str_to_mib(self.provider_data["resources"]["shm_size"])
         if self.provider_data["resources"].get("interruptible"):
             resources.interruptible = self.provider_data["resources"]["interruptible"]
-        if self.provider_data["resources"].get("local"):
-            resources.local = self.provider_data["resources"]["local"]
         return resources
 
     @staticmethod

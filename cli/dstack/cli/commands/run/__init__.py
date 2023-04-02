@@ -240,15 +240,17 @@ class RunCommand(BasicCommand):
         super(RunCommand, self).__init__(parser)
 
     def register(self):
-        workflow_help = "A name of the workflow"
         workflows = _load_workflows()
-        if len(workflows) > 0:
-            workflow_help = "{" + ",".join(w["name"] for w in workflows if w.get("name")) + "}"
+        workflow_names = [w["name"] for w in workflows if w.get("name")]
+        provider_names = providers.get_provider_names()
+        workflow_or_provider_names = workflow_names + provider_names
+        workflow_help = "{" + ",".join(workflow_or_provider_names) + "}"
         self._parser.add_argument(
             "workflow_or_provider",
-            metavar="WORKFLOW",
+            metavar="WORKFLOW | PROVIDER",
             type=str,
             help=workflow_help,
+            choices=workflow_or_provider_names,
             nargs="?",
         )
         self._parser.add_argument(
@@ -276,7 +278,7 @@ class RunCommand(BasicCommand):
             "args",
             metavar="ARGS",
             nargs=argparse.ZERO_OR_MORE,
-            help="Override provider arguments",
+            help="Override workflow or provider arguments",
         )
 
     @check_config

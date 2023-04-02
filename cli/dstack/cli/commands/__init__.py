@@ -1,3 +1,4 @@
+import argparse
 from argparse import Namespace, _SubParsersAction
 
 from rich_argparse import RichHelpFormatter
@@ -20,7 +21,8 @@ class BasicCommand(object):
         self._parser.add_argument(
             "-h",
             "--help",
-            action="help",
+            action="store_true" if self.name == "run" else "help",
+            default=argparse.SUPPRESS,
             help="Show this help message and exit",
         )
         self._parser.set_defaults(func=self.__command)

@@ -1,13 +1,13 @@
 # Environment variables
 
 !!! info "NOTE:"
-    The source code of this example is available in the [Playground](../playground.md).
+The source code of this example is available in the [Playground](../playground.md).
 
 The workflow below sets environment variables:
 
 <div editor-title=".dstack/workflows/envs.yaml"> 
 
-```yaml hl_lines="5 6 7"
+```yaml
 workflows:
   - name: hello-env
     provider: bash

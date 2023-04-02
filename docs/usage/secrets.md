@@ -1,20 +1,20 @@
 # Secrets
 
 !!! info "NOTE:"
-    The source code of this example is available in the [Playground](../playground.md). 
+The source code of this example is available in the [Playground](../playground.md).
 
 Secrets can be used to pass passwords and tokens securely to workflows without hard-coding them in the code.
 
 Secrets can be added via the [`dstack secrets`](../reference/cli/secrets.md) command and accessed from the workflow
-via environment variables. 
+via environment variables.
 
 [//]: # (or in the YAML via `${{ secrets.SECRET_NAME }}` markup.)
 
 ## Example
 
-Here's an example of how to use your Weight & Biases API token in your workflows. 
+Here's an example of how to use your Weight & Biases API token in your workflows.
 
-Go to the settings of your Weight & Biases user and copy your API token. 
+Go to the settings of your Weight & Biases user and copy your API token.
 
 Use the `dstack secrets add` command to add it as a secret:
 
@@ -26,12 +26,12 @@ $ dstack secrets add WANDB_API_KEY acd0a9d1ebe3a4e4854d2f6a7cef85b5257f8183
 
 </div>
 
-Now, when you run any workflow, your API token will be passed to the workflow 
+Now, when you run any workflow, your API token will be passed to the workflow
 via the `WANDB_API_KEY` environment variable:
 
 <div editor-title=".dstack/workflows/secrets.yaml"> 
 
-```yaml hl_lines="5 6"
+```yaml
 workflows:
   - name: hello
     provider: bash
@@ -45,4 +45,4 @@ workflows:
 Secrets can be managed via the [`dstack secrets`](../reference/cli/secrets.md#dstack-secrets-add) command.
 
 !!! info "NOTE:"
-    Secrets are currently only supported by remote workflows.
+Secrets are currently only supported by remote workflows.
