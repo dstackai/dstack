@@ -11,6 +11,7 @@ from dstack.backend.aws.secrets import AWSSecretsManager
 from dstack.backend.aws.storage import AWSStorage
 from dstack.backend.base import CloudBackend
 from dstack.backend.base import artifacts as base_artifacts
+from dstack.backend.base import cache as base_cache
 from dstack.backend.base import jobs as base_jobs
 from dstack.backend.base import repos as base_repos
 from dstack.backend.base import runs as base_runs
@@ -291,3 +292,6 @@ class AwsBackend(CloudBackend):
 
     def get_configurator(self):
         return AWSConfigurator()
+
+    def delete_workflow_cache(self, repo_address: RepoAddress, username: str, workflow_name: str):
+        base_cache.delete_workflow_cache(self._storage, repo_address, username, workflow_name)

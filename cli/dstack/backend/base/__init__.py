@@ -209,6 +209,10 @@ class Backend(ABC):
     def get_configurator(self):
         pass
 
+    @abstractmethod
+    def delete_workflow_cache(self, repo_address: RepoAddress, username: str, workflow_name: str):
+        pass
+
 
 class RemoteBackend(Backend):
     def __init__(self, backend_config: Optional[BackendConfig] = None, custom_client: Any = None):

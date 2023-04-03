@@ -208,3 +208,6 @@ class HubBackend(RemoteBackend):
 
     def get_configurator(self):
         return HubConfigurator()
+
+    def delete_workflow_cache(self, repo_address: RepoAddress, username: str, workflow_name: str):
+        raise NotImplementedError()

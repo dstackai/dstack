@@ -43,6 +43,10 @@ class Storage(ABC):
         """
         pass
 
+    def delete_prefix(self, keys_prefix: str):
+        for key in self.list_objects(keys_prefix):
+            self.delete_object(key)
+
 
 class CloudStorage(Storage):
     @abstractmethod
