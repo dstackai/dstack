@@ -23,8 +23,6 @@ import (
 	"gopkg.in/yaml.v3"
 )
 
-var _ backend.Backend = (*S3)(nil)
-
 type S3 struct {
 	region    string
 	bucket    string
@@ -285,6 +283,7 @@ func (s *S3) ListSubDir(ctx context.Context, dir string) ([]string, error) {
 	}
 	return listDir, nil
 }
+
 func (s *S3) GetJobByPath(ctx context.Context, path string) (*models.Job, error) {
 	log.Trace(ctx, "Fetching job by path", "Path", path)
 	if s == nil {
@@ -309,6 +308,7 @@ func (s *S3) Bucket(ctx context.Context) string {
 	}
 	return s.bucket
 }
+
 func (s *S3) Secrets(ctx context.Context) (map[string]string, error) {
 	log.Trace(ctx, "Getting secrets")
 	if s == nil {
@@ -333,6 +333,7 @@ func (s *S3) Secrets(ctx context.Context) (map[string]string, error) {
 	}
 	return s.cliSecret.fetchSecret(ctx, s.bucket, secrets)
 }
+
 func (s *S3) GitCredentials(ctx context.Context) *models.GitCredentials {
 	log.Trace(ctx, "Getting credentials")
 	if s == nil {

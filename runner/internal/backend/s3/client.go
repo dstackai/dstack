@@ -114,6 +114,7 @@ func (c *ClientS3) ListFile(ctx context.Context, bucket, prefix string) ([]strin
 	}
 	return resp, nil
 }
+
 func (c *ClientS3) ListDir(ctx context.Context, bucket, prefix string) ([]string, error) {
 	resp := make([]string, 0)
 	pager := s3.NewListObjectsV2Paginator(c.cli, &s3.ListObjectsV2Input{
