@@ -23,8 +23,6 @@ import (
 	"gopkg.in/yaml.v3"
 )
 
-var _ backend.Backend = (*S3)(nil)
-
 type S3 struct {
 	region    string
 	bucket    string
@@ -124,60 +122,33 @@ func (s *S3) UpdateState(ctx context.Context) error {
 		log.Trace(ctx, "State not exist")
 		return gerrors.Wrap(backend.ErrLoadStateFile)
 	}
-	log.Trace(ctx, "Fetching list jobs", "Repo username", s.state.Job.RepoUserName, "Repo name", s.state.Job.RepoName, "Job ID", s.state.Job.JobID)
-	listForDelete, err := s.cliS3.ListFile(ctx, s.bucket, fmt.Sprintf("jobs/%s/%s/%s/l;%s;", s.state.Job.RepoHostNameWithPort(), s.state.Job.RepoUserName, s.state.Job.RepoName, s.state.Job.JobID))
-	if err != nil {
-		return gerrors.Wrap(err)
-	}
-	for _, fileForDelete := range listForDelete {
-		log.Trace(ctx, "Deleting file job", "Bucket", s.bucket, "Path", fileForDelete)
-		err = s.cliS3.DeleteFile(ctx, s.bucket, fileForDelete)
-		if err != nil {
-			return gerrors.Wrap(err)
-		}
-	}
 	log.Trace(ctx, "Marshaling job")
 	theFile, err := yaml.Marshal(&s.state.Job)
 	if err != nil {
 		return gerrors.Wrap(err)
 	}
-	pathJob := fmt.Sprintf("jobs/%s/%s/%s/%s.yaml", s.state.Job.RepoHostNameWithPort(), s.state.Job.RepoUserName, s.state.Job.RepoName, s.state.Job.JobID)
-	log.Trace(ctx, "Write to file job", "Path", pathJob)
-	err = s.cliS3.PutFile(ctx, s.bucket, pathJob, theFile)
+	jobFilepath := s.state.Job.JobFilepath()
+	log.Trace(ctx, "Write to file job", "Path", jobFilepath)
+	err = s.cliS3.PutFile(ctx, s.bucket, jobFilepath, theFile)
 	if err != nil {
 		return gerrors.Wrap(err)
 	}
-
-	bufApp := make([]string, 0, len(s.state.Job.Apps))
-	for _, app := range s.state.Job.Apps {
-		bufApp = append(bufApp, app.Name)
-	}
-	appString := strings.Join(bufApp, ",")
-
-	artifactSlice := make([]string, 0)
-	for _, art := range s.state.Job.Artifacts {
-		artifactSlice = append(artifactSlice, art.Path)
-	}
-
-	pathLockJob := fmt.Sprintf("jobs/%s/%s/%s/l;%s;%s;%s;%d;%s;%s;%s;%s",
-		s.state.Job.RepoHostNameWithPort(),
-		s.state.Job.RepoUserName,
-		s.state.Job.RepoName,
-		s.state.Job.JobID,
-		s.state.Job.ProviderName,
-		s.state.Job.LocalRepoUserName,
-		s.state.Job.SubmittedAt,
-		s.state.Job.Status,
-		strings.Join(artifactSlice, ","),
-		appString,
-		s.state.Job.TagName)
-	log.Trace(ctx, "Write to file lock job", "Path", pathLockJob)
-	err = s.cliS3.PutFile(ctx, s.bucket, pathLockJob, []byte{})
+	log.Trace(ctx, "Fetching list jobs", "Repo username", s.state.Job.RepoUserName, "Repo name", s.state.Job.RepoName, "Job ID", s.state.Job.JobID)
+	files, err := s.cliS3.ListFile(ctx, s.bucket, s.state.Job.JobHeadFilepathPrefix())
 	if err != nil {
 		return gerrors.Wrap(err)
+	}
+	jobHeadFilepath := s.state.Job.JobHeadFilepath()
+	for _, file := range files[:1] {
+		log.Trace(ctx, "Renaming file job", "From", file, "To", jobHeadFilepath)
+		err = s.cliS3.RenameFile(ctx, s.bucket, file, jobHeadFilepath)
+		if err != nil {
+			return gerrors.Wrap(err)
+		}
 	}
 	return nil
 }
+
 func (s *S3) CheckStop(ctx context.Context) (bool, error) {
 	if s == nil {
 		return false, gerrors.New("Backend is nil")
@@ -312,6 +283,7 @@ func (s *S3) ListSubDir(ctx context.Context, dir string) ([]string, error) {
 	}
 	return listDir, nil
 }
+
 func (s *S3) GetJobByPath(ctx context.Context, path string) (*models.Job, error) {
 	log.Trace(ctx, "Fetching job by path", "Path", path)
 	if s == nil {
@@ -336,6 +308,7 @@ func (s *S3) Bucket(ctx context.Context) string {
 	}
 	return s.bucket
 }
+
 func (s *S3) Secrets(ctx context.Context) (map[string]string, error) {
 	log.Trace(ctx, "Getting secrets")
 	if s == nil {
@@ -360,6 +333,7 @@ func (s *S3) Secrets(ctx context.Context) (map[string]string, error) {
 	}
 	return s.cliSecret.fetchSecret(ctx, s.bucket, secrets)
 }
+
 func (s *S3) GitCredentials(ctx context.Context) *models.GitCredentials {
 	log.Trace(ctx, "Getting credentials")
 	if s == nil {
