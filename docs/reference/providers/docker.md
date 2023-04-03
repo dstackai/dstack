@@ -58,6 +58,7 @@ The following properties are optional:
 - [`ports`](#ports) - (Optional) The number of ports to expose
 - `working_dir` - (Optional) The path to the working directory
 - [`registry_auth`](#registry_auth) - (Optional) The private Docker registry credentials
+- `cache` - (Optional) The list of directories to cache between runs
 
 ### artifacts
 

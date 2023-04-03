@@ -173,6 +173,7 @@ nav:
               - dstack init: reference/cli/init.md
               - dstack config: reference/cli/config.md
               - dstack secrets: reference/cli/secrets.md
+              - dstack prune: reference/cli/prune.md
           - YAML:
               - bash: reference/providers/bash.md
               - code: reference/providers/code.md

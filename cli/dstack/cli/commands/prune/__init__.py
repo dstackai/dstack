@@ -22,7 +22,9 @@ class PruneCommand(BasicCommand):
         subparsers = self._parser.add_subparsers(title="entities", dest="entity", required=True)
 
         cache_cmd = subparsers.add_parser("cache", help="Workflow cache")
-        cache_cmd.add_argument("workflow", metavar="WORKFLOW")
+        cache_cmd.add_argument(
+            "workflow", metavar="WORKFLOW", help="A workflow name to prune cache"
+        )
         cache_cmd.set_defaults(prune_action=self.prune_cache)
 
     @check_config
