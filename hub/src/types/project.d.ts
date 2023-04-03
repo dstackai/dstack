@@ -28,7 +28,30 @@ declare interface IProjectAwsBackendValues {
         },
 }
 
-declare type IProjectBackendValues = { type: TProjectBackendType } & IProjectAwsBackendValues
+declare interface IProjectGCPBackendValues {
+    area: {
+        selected?: string,
+        values: { value: string, label: string}[]
+    },
+    bucket_name: null | {
+        selected?: string,
+        values: { value: string, label: string}[]
+    },
+    region: null | {
+        selected?: string,
+        values: { value: string, label: string}[]
+    },
+    vpc_subnet: null | {
+        selected?: string,
+        values: { value: string, label: string}[]
+    },
+    zone: null | {
+        selected?: string,
+        values: { value: string, label: string}[]
+    },
+}
+
+declare type IProjectBackendValues = { type: TProjectBackendType } & IProjectAwsBackendValues & IProjectGCPBackendValues
 
 declare interface TProjectBackendAWS {
     access_key: string,
@@ -44,8 +67,7 @@ declare interface TProjectBackendGCP {
     region: string,
     zone: string,
     bucket_name: string,
-    vpc: string,
-    subnet: string,
+    vpc_subnet: string,
 }
 
 declare interface TProjectBackendAWSWithTitles extends TProjectBackendAWS {
