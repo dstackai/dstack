@@ -19,9 +19,9 @@ class PruneCommand(BasicCommand):
 
     def register(self):
         self._parser: argparse.ArgumentParser
-        subparsers = self._parser.add_subparsers(required=True)
+        subparsers = self._parser.add_subparsers(title="entities", dest="entity", required=True)
 
-        cache_cmd = subparsers.add_parser("cache")
+        cache_cmd = subparsers.add_parser("cache", help="Workflow cache")
         cache_cmd.add_argument("workflow", metavar="WORKFLOW")
         cache_cmd.set_defaults(prune_action=self.prune_cache)
 
