@@ -379,8 +379,12 @@ func (ex *Executor) processDeps(ctx context.Context) error {
 
 func (ex *Executor) processCache(ctx context.Context) error {
 	job := ex.backend.Job(ctx)
+	username := job.LocalRepoUserEmail
+	if len(username) == 0 {
+		username = "default"
+	}
 	for _, cache := range job.Cache {
-		cacheArt := ex.backend.GetArtifact(ctx, job.RunName, cache.Path, path.Join("cache", job.RepoHostNameWithPort(), job.RepoUserName, job.RepoName, job.LocalRepoUserEmail, job.WorkflowName, cache.Path), false)
+		cacheArt := ex.backend.GetArtifact(ctx, job.RunName, cache.Path, path.Join("cache", job.RepoHostNameWithPort(), job.RepoUserName, job.RepoName, username, job.WorkflowName, cache.Path), false)
 		if cacheArt != nil {
 			ex.cacheArtifacts = append(ex.cacheArtifacts, cacheArt)
 		}
