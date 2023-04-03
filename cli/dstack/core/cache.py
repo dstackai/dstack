@@ -5,5 +5,8 @@ class CacheSpec(BaseModel):
     path: str
 
     @validator("path")
-    def remove_dot_relative(cls, v: str) -> str:
-        return v.lstrip("./")
+    def remove_rel_prefix(cls, v: str) -> str:
+        rel_prefix = "./"
+        while v.startswith(rel_prefix):
+            v = v[len(rel_prefix) :]
+        return v
