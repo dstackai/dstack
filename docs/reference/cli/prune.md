@@ -1,6 +1,6 @@
 # dstack prune cache
 
-The `cp` command prunes the cache of a specific workflow.
+The `prune` command prunes the cache of a specific workflow.
 
 ## Usage
 
@@ -8,6 +8,7 @@ The `cp` command prunes the cache of a specific workflow.
 
 ```shell
 $ dstack prune cache --help
+
 Usage: dstack prune cache [-h] WORKFLOW
 
 Positional Arguments:
@@ -18,4 +19,6 @@ Positional Arguments:
 
 ### Arguments reference
 
-- `WORKFLOW` — A workflow name to prune cache
+The following arguments are required:
+
+- `WORKFLOW` — (Required) A workflow name to prune cache

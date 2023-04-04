@@ -54,7 +54,7 @@ The following properties are optional:
 - [`ports`](#ports) - (Optional) The number of ports to expose
 - `working_dir` - (Optional) The path to the working directory
 - `ssh` - (Optional) Runs SSH server in the container if `true`
-- `cache` - (Optional) The list of directories to cache between runs
+- [`cache`](#cache) - (Optional) The list of directories to cache between runs
 
 ### artifacts
 
@@ -91,6 +91,12 @@ The number of GPUs, their name and memory
 - `count` - (Optional) The number of GPUs
 - `memory` (Optional) The size of GPU memory, e.g. `"16GB"`
 - `name` (Optional) The name of the GPU model (e.g. `"K80"`, `"V100"`, etc)
+
+### cache
+
+The list of directories to cache between runs
+
+- `path` – (Required) The relative path of the folder that must be cached
 
 ## More examples
 
