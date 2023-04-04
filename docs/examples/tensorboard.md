@@ -1,6 +1,6 @@
 # TensorBoard 
 
-This example demonstrates how to track experiment metrics using TensorBoard.
+This example demonstrates how to use TensorBoard with `dstack` to track experiment metrics.
 
 !!! info "NOTE:"
     The source code of this example is available in the [Playground](../playground.md).
@@ -213,7 +213,7 @@ $ tensorboard --logdir=~/.dstack/artifacts/github.com/dstack-playground/snake-1,
 One of the great features of `dstack` is the ability to run workflows remotely (e.g., in a pre-configured cloud
 account). 
 
-This allows you to request any [Resources](../usage/remotes.md#resources) required (including GPUs and memory), or to utilize spot instances. 
+This allows you to request any [Resources](../usage/remote.md#resources) required (including GPUs and memory), or to utilize spot instances. 
 The creation and deletion of cloud instances is handled by `dstack` automatically.
 
 To run a workflow remotely, add the `--remote` flag to the `dstack run` command.

@@ -137,7 +137,7 @@ nav:
           - Conda: usage/conda.md
           - Artifacts: usage/artifacts.md
           - Deps: usage/deps.md
-          - Remotes: usage/remotes.md
+          - Remote: usage/remote.md
           #        - Environment variables: usage/environment-variables.md
           - Providers: usage/providers.md
           - Apps: usage/apps.md
@@ -157,6 +157,8 @@ nav:
           - Weights & Biases: examples/wandb.md
       - Hugging Face:
           - Stable Diffusion: examples/stable-diffusion.md
+      - CI/CD:
+          - GitHub Actions: examples/github-actions.md
   - Reference:
       - Reference:
           - CLI:

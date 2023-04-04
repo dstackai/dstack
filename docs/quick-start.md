@@ -368,4 +368,4 @@ infrastructure upon completion.
 
 !!! info "NOTE:"
     You can specify hardware resource requirements (like GPU, memory, interruptible instances, etc.) 
-    for each remote workflow using [`resources`](usage/remotes.md#resources).
+    for each remote workflow using [`resources`](usage/remote.md#resources).
