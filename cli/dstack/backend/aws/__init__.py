@@ -1,5 +1,5 @@
 from pathlib import Path
-from typing import Any, Dict, Generator, List, Optional
+from typing import Generator, List, Optional
 
 import boto3
 from botocore.client import BaseClient
@@ -17,7 +17,6 @@ from dstack.backend.base import runs as base_runs
 from dstack.backend.base import secrets as base_secrets
 from dstack.backend.base import tags as base_tags
 from dstack.core.artifact import Artifact
-from dstack.core.config import BackendConfig
 from dstack.core.error import ConfigError
 from dstack.core.job import Job, JobHead
 from dstack.core.log_event import LogEvent

@@ -2,18 +2,19 @@ import json
 
 from dstack.hub.db.models import Project
 from dstack.hub.models import (
-    AWSAuth,
-    AWSBackend,
-    AWSConfig,
-    GCPAuth,
-    GCPBackend,
-    GCPConfig,
+    AWSProjectConfig,
+    AWSProjectConfigWithCreds,
+    AWSProjectCreds,
+    GCPProjectConfig,
+    GCPProjectConfigWithCreds,
+    GCPProjectCreds,
     Member,
     ProjectInfo,
 )
 
 
 def info2project(project_info: ProjectInfo) -> Project:
+    project_info.backend = project_info.backend.__root__
     project = Project(
         name=project_info.project_name,
         backend=project_info.backend.type,
@@ -22,12 +23,11 @@ def info2project(project_info: ProjectInfo) -> Project:
         project_info.backend.s3_bucket_name = project_info.backend.s3_bucket_name.replace(
             "s3://", ""
         )
-        project.config = AWSConfig().parse_obj(project_info.backend).json()
-        project.auth = AWSAuth().parse_obj(project_info.backend).json()
+        project.config = AWSProjectConfig.parse_obj(project_info.backend).json()
+        project.auth = AWSProjectCreds.parse_obj(project_info.backend).json()
     if project_info.backend.type == "gcp":
-        project.config = GCPConfig().parse_obj(project_info.backend).json()
-        if project_info.backend.credentials != "":
-            project.auth = GCPAuth().parse_obj(project_info.backend).json()
+        project.config = GCPProjectConfig.parse_obj(project_info.backend).json()
+        project.auth = GCPProjectCreds.parse_obj(project_info.backend).json()
     return project
 
 
@@ -48,33 +48,42 @@ def project2info(project: Project) -> ProjectInfo:
     return ProjectInfo(project_name=project.name, backend=backend, members=members)
 
 
-def _gcp(project) -> GCPConfig:
-    backend = GCPBackend(type="gcp")
-    if project.config is not None:
-        json_config = json.loads(str(project.config))
-        backend.area = json_config.get("area") or ""
-        backend.region = json_config.get("region") or ""
-        backend.zone = json_config.get("zone") or ""
-        backend.bucket_name = json_config.get("bucket_name") or ""
-        backend.vpc = json_config.get("vpc") or ""
-        backend.subnet = json_config.get("subnet") or ""
-    return backend
+def _aws(project: Project) -> AWSProjectConfigWithCreds:
+    json_auth = json.loads(project.auth)
+    json_config = json.loads(project.config)
+    access_key = json_auth["access_key"]
+    secret_key = json_auth["secret_key"]
+    region_name = json_config["region_name"]
+    s3_bucket_name = json_config["s3_bucket_name"]
+    ec2_subnet_id = json_config["ec2_subnet_id"]
+    return AWSProjectConfigWithCreds(
+        access_key=access_key,
+        secret_key=secret_key,
+        region_name=region_name,
+        region_name_title=region_name,
+        s3_bucket_name=s3_bucket_name,
+        ec2_subnet_id=ec2_subnet_id,
+    )
 
 
-def _aws(project) -> AWSBackend:
-    backend = AWSBackend(type="aws")
-    if project.auth is not None:
-        json_auth = json.loads(str(project.auth))
-        backend.access_key = json_auth.get("access_key") or ""
-        backend.secret_key = json_auth.get("secret_key") or ""
-    if project.config is not None:
-        json_config = json.loads(str(project.config))
-        backend.region_name = json_config.get("region_name") or ""
-        backend.region_name_title = json_config.get("region_name") or ""
-        backend.s3_bucket_name = (
-            json_config.get("bucket_name") or json_config.get("s3_bucket_name") or ""
-        )
-        backend.ec2_subnet_id = (
-            json_config.get("subnet_id") or json_config.get("ec2_subnet_id") or ""
-        )
-    return backend
+def _gcp(project: Project) -> GCPProjectConfigWithCreds:
+    json_auth = json.loads(project.auth)
+    json_config = json.loads(project.config)
+    credentials = json_auth["credentials"]
+    credentials_filename = json_auth["credentials_filename"]
+    area = json_config["area"]
+    region = json_config["region"]
+    zone = json_config["zone"]
+    bucket_name = json_config["bucket_name"]
+    vpc = json_config["vpc"]
+    subnet = json_config["subnet"]
+    return GCPProjectConfigWithCreds(
+        credentials=credentials,
+        credentials_filename=credentials_filename,
+        area=area,
+        region=region,
+        zone=zone,
+        bucket_name=bucket_name,
+        vpc=vpc,
+        subnet=subnet,
+    )

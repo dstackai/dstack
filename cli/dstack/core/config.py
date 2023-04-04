@@ -1,8 +1,8 @@
 from abc import ABC, abstractmethod
 from pathlib import Path
-from typing import Dict, Optional
+from typing import Any, Dict, Optional
 
-import yaml
+from dstack.hub.models import ProjectValues
 
 
 def get_config_path():
@@ -38,7 +38,7 @@ class Configurator(ABC):
         pass
 
     @abstractmethod
-    async def configure_hub(self, data: Dict):
+    def configure_hub(self, data: Dict) -> ProjectValues:
         pass
 
     @abstractmethod

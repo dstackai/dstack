@@ -1,6 +1,6 @@
-from typing import List, Optional, Union
+from typing import List, Literal, Optional, Union
 
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 
 from dstack.core.job import Job, JobHead
 from dstack.core.repo import LocalRepoData, RepoAddress, RepoCredentials
@@ -24,42 +24,51 @@ class Member(BaseModel):
     project_role: str
 
 
-class AWSConfig(BaseModel):
-    region_name: str = ""
-    region_name_title: str = ""
-    s3_bucket_name: str = ""
-    ec2_subnet_id: Optional[str] = ""
+class AWSProjectConfig(BaseModel):
+    type: Literal["aws"] = "aws"
+    region_name: Optional[str]
+    region_name_title: Optional[str]
+    s3_bucket_name: Optional[str]
+    ec2_subnet_id: Optional[str]
 
 
-class AWSAuth(BaseModel):
-    access_key: str = ""
-    secret_key: str = ""
+class AWSProjectCreds(BaseModel):
+    access_key: str
+    secret_key: str
 
 
-class GCPConfig(BaseModel):
-    area: str = ""
-    region: str = ""
-    zone: str = ""
-    bucket_name: Optional[str] = ""
-    vpc: str = ""
-    subnet: str = ""
+class AWSProjectConfigWithCreds(AWSProjectConfig, AWSProjectCreds):
+    pass
 
 
-class GCPAuth(BaseModel):
-    credentials: str = ""
+class GCPProjectConfig(BaseModel):
+    type: Literal["gcp"] = "gcp"
+    area: Optional[str]
+    region: Optional[str]
+    zone: Optional[str]
+    bucket_name: Optional[str]
+    vpc: Optional[str]
+    subnet: Optional[str]
 
 
-class AWSBackend(AWSConfig, AWSAuth):
-    type: str = "aws"
+class GCPProjectCreds(BaseModel):
+    credentials_filename: str
+    credentials: str
 
 
-class GCPBackend(GCPConfig, GCPAuth):
-    type: str = "gcp"
+class GCPProjectConfigWithCreds(GCPProjectConfig, GCPProjectCreds):
+    pass
+
+
+class ProjectConfigWithCreds(BaseModel):
+    __root__: Union[AWSProjectConfigWithCreds, GCPProjectConfigWithCreds] = Field(
+        ..., discriminator="type"
+    )
 
 
 class ProjectInfo(BaseModel):
     project_name: str
-    backend: Union[AWSBackend, GCPBackend]
+    backend: ProjectConfigWithCreds
     members: List[Member] = []
 
 
@@ -139,13 +148,8 @@ class ProjectDelete(BaseModel):
 
 
 class ProjectElementValue(BaseModel):
-    name: Optional[str]
-    created: Optional[str]
-    region: Optional[str]
-    value: Optional[str]
-    label: Optional[str]
-    vpc: Optional[str]
-    subnet: Optional[str]
+    value: str
+    label: str
 
 
 class ProjectElement(BaseModel):
@@ -153,21 +157,52 @@ class ProjectElement(BaseModel):
     values: List[ProjectElementValue] = []
 
 
+class AWSBucketProjectElementValue(BaseModel):
+    name: str
+    created: str
+    region: str
+
+
+class AWSBucketProjectElementValue(BaseModel):
+    name: str
+    created: str
+    region: str
+
+
+class AWSBucketProjectElement(BaseModel):
+    selected: Optional[str]
+    values: List[AWSBucketProjectElementValue] = []
+
+
 class AWSProjectValues(BaseModel):
-    type: str = "aws"
+    type: Literal["aws"] = "aws"
     region_name: Optional[ProjectElement]
-    s3_bucket_name: Optional[ProjectElement]
+    s3_bucket_name: Optional[AWSBucketProjectElement]
     ec2_subnet_id: Optional[ProjectElement]
 
 
+class GCPVPCSubnetProjectElementValue(BaseModel):
+    label: Optional[str]
+    vpc: Optional[str]
+    subnet: Optional[str]
+
+
+class GCPVPCSubnetProjectElement(BaseModel):
+    selected: Optional[str]
+    values: List[GCPVPCSubnetProjectElementValue] = []
+
+
 class GCPProjectValues(BaseModel):
-    type: str = "gcp"
+    type: Literal["gcp"] = "gcp"
     area: Optional[ProjectElement]
     region: Optional[ProjectElement]
     zone: Optional[ProjectElement]
     bucket_name: Optional[ProjectElement]
-    bucket_name: Optional[ProjectElement]
-    vpc_subnet: Optional[ProjectElement]
+    vpc_subnet: Optional[GCPVPCSubnetProjectElement]
+
+
+class ProjectValues(BaseModel):
+    __root__: Union[AWSProjectValues, GCPProjectValues] = Field(..., discriminator="type")
 
 
 class UserPatch(BaseModel):

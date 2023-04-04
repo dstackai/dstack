@@ -5,7 +5,7 @@ from pathlib import Path
 from typing import Any, Generator, List, Optional
 
 from dstack.core.artifact import Artifact
-from dstack.core.config import BackendConfig
+from dstack.core.config import BackendConfig, Configurator
 from dstack.core.job import Job, JobHead
 from dstack.core.log_event import LogEvent
 from dstack.core.repo import LocalRepoData, RepoAddress, RepoCredentials
@@ -206,7 +206,7 @@ class Backend(ABC):
         pass
 
     @abstractmethod
-    def get_configurator(self):
+    def get_configurator(self) -> Configurator:
         pass
 
 

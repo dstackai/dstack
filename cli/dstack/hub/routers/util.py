@@ -9,6 +9,6 @@ async def get_project(project_name: str) -> Project:
     if hub is None:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
-            detail=f"Hub not found",
+            detail="Project not found",
         )
     return hub
