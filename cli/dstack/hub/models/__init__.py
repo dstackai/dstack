@@ -25,11 +25,19 @@ class Member(BaseModel):
     project_role: str
 
 
-class AWSProjectConfig(BaseModel):
+class AWSProjectConfigPartial(BaseModel):
     type: Literal["aws"] = "aws"
     region_name: Optional[str]
     region_name_title: Optional[str]
     s3_bucket_name: Optional[str]
+    ec2_subnet_id: Optional[str]
+
+
+class AWSProjectConfig(BaseModel):
+    type: Literal["aws"] = "aws"
+    region_name: str
+    region_name_title: Optional[str]
+    s3_bucket_name: str
     ec2_subnet_id: Optional[str]
 
 
@@ -38,11 +46,15 @@ class AWSProjectCreds(BaseModel):
     secret_key: str
 
 
+class AWSProjectConfigWithCredsPartial(AWSProjectConfigPartial, AWSProjectCreds):
+    pass
+
+
 class AWSProjectConfigWithCreds(AWSProjectConfig, AWSProjectCreds):
     pass
 
 
-class GCPProjectConfig(BaseModel):
+class GCPProjectConfigPartial(BaseModel):
     type: Literal["gcp"] = "gcp"
     area: Optional[str]
     region: Optional[str]
@@ -52,19 +64,41 @@ class GCPProjectConfig(BaseModel):
     subnet: Optional[str]
 
 
+class GCPProjectConfig(BaseModel):
+    type: Literal["gcp"] = "gcp"
+    area: str
+    region: str
+    zone: str
+    bucket_name: str
+    vpc: str
+    subnet: str
+
+
 class GCPProjectCreds(BaseModel):
     credentials_filename: str
     credentials: str
+
+
+class GCPProjectConfigWithCredsPartial(GCPProjectConfigPartial, GCPProjectCreds):
+    pass
 
 
 class GCPProjectConfigWithCreds(GCPProjectConfig, GCPProjectCreds):
     pass
 
 
+AnyProjectConfigWithCredsPartial = Union[
+    AWSProjectConfigWithCredsPartial, GCPProjectConfigWithCredsPartial
+]
+AnyProjectConfigWithCreds = Union[AWSProjectConfigWithCreds, GCPProjectConfigWithCreds]
+
+
+class ProjectConfigWithCredsPartial(BaseModel):
+    __root__: AnyProjectConfigWithCredsPartial = Field(..., discriminator="type")
+
+
 class ProjectConfigWithCreds(BaseModel):
-    __root__: Union[AWSProjectConfigWithCreds, GCPProjectConfigWithCreds] = Field(
-        ..., discriminator="type"
-    )
+    __root__: AnyProjectConfigWithCreds = Field(..., discriminator="type")
 
 
 class ProjectInfo(BaseModel):

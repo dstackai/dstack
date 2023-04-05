@@ -1,11 +1,12 @@
 import os
 from pathlib import Path
+from typing import Optional
 
 from sqlalchemy import event
 from sqlalchemy.engine.interfaces import DBAPIConnection
 from sqlalchemy.ext.asyncio import AsyncSession, create_async_engine
 from sqlalchemy.ext.declarative import declarative_base
-from sqlalchemy.orm import sessionmaker
+from sqlalchemy.orm import Session, sessionmaker
 from sqlalchemy.pool import ConnectionPoolEntry
 
 data_path = os.getenv("DSTACK_HUB_DATA") or Path.home() / ".dstack" / "hub" / "data"
@@ -26,3 +27,9 @@ def set_sqlite_pragma(dbapi_connection: DBAPIConnection, _: ConnectionPoolEntry)
     cursor = dbapi_connection.cursor()
     cursor.execute("PRAGMA journal_mode=WAL")
     cursor.close()
+
+
+def get_or_make_session(session: Optional[Session]) -> Session:
+    if session is not None:
+        return session
+    return Database.Session()
