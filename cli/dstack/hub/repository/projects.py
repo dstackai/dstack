@@ -1,5 +1,5 @@
 import json
-from typing import List
+from typing import List, Optional
 
 from sqlalchemy import delete, select, update
 from sqlalchemy.orm import Session, selectinload
@@ -22,8 +22,12 @@ from dstack.hub.repository.role import RoleManager
 
 class ProjectManager:
     @staticmethod
-    async def get_project_info(name: str, external_session: Session = None) -> ProjectInfo:
+    async def get_project_info(
+        name: str, external_session: Session = None
+    ) -> Optional[ProjectInfo]:
         project = await ProjectManager.get(name, external_session=external_session)
+        if project is None:
+            return None
         return _project2info(project=project)
 
     @staticmethod
@@ -49,7 +53,7 @@ class ProjectManager:
         return projects_info
 
     @staticmethod
-    async def get(name: str, external_session=None) -> Project:
+    async def get(name: str, external_session=None) -> Optional[Project]:
         session = get_or_make_session(external_session)
         query = await session.execute(
             select(Project).options(selectinload(Project.members)).where(Project.name == name)
