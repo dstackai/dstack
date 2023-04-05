@@ -191,6 +191,7 @@ class AWSConfigurator(Configurator):
         except botocore.exceptions.ClientError:
             raise HubError("Credentials are not valid")
 
+        # TODO validate config values
         project_values = AWSProjectValues()
         project_values.region_name = self._get_hub_regions(default_region=config.region_name)
         project_values.s3_bucket_name = self._get_hub_buckets(

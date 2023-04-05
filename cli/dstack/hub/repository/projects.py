@@ -5,7 +5,8 @@ from sqlalchemy import delete, select, update
 from sqlalchemy.orm import Session, selectinload
 
 from dstack.hub.db import get_or_make_session
-from dstack.hub.db.models import Member, Project
+from dstack.hub.db.models import Member as MemberDB
+from dstack.hub.db.models import Project
 from dstack.hub.models import (
     AWSProjectConfig,
     AWSProjectConfigWithCreds,
@@ -94,7 +95,9 @@ class ProjectManager:
     async def add_member(project: Project, member: Member, external_session=None):
         session = get_or_make_session(external_session)
         role = await RoleManager.get_or_create(name=member.project_role, external_session=session)
-        session.add(Member(project_name=project.name, user_name=member.user_name, role_id=role.id))
+        session.add(
+            MemberDB(project_name=project.name, user_name=member.user_name, role_id=role.id)
+        )
         await session.commit()
         if external_session is None:
             await session.close()
@@ -102,7 +105,7 @@ class ProjectManager:
     @staticmethod
     async def clear_member(project: Project, external_session=None):
         session = get_or_make_session(external_session)
-        await session.execute(delete(Member).where(Member.project_name == project.name))
+        await session.execute(delete(MemberDB).where(MemberDB.project_name == project.name))
         await session.commit()
         if external_session is None:
             await session.close()
