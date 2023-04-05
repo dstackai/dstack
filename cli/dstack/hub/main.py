@@ -26,6 +26,7 @@ from dstack.hub.routers import (
     secrets,
     tags,
     users,
+    workflows,
 )
 
 _REQUEST_ID_ = "X-DSTACK-REQUEST-ID"
@@ -59,6 +60,7 @@ app.include_router(artifacts.router)
 app.include_router(tags.router)
 app.include_router(repos.router)
 app.include_router(link.router)
+app.include_router(workflows.router)
 
 
 @app.on_event("startup")

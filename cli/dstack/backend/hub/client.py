@@ -23,6 +23,7 @@ from dstack.hub.models import (
     SaveRepoCredentials,
     SecretAddUpdate,
     StopRunners,
+    UserRepoAddress,
 )
 
 
@@ -727,3 +728,25 @@ class HubClient:
         except requests.ConnectionError:
             print(f"{self.url} connection refused")
         return None
+
+    def delete_workflow_cache(self, repo_address: RepoAddress, username: str, workflow_name: str):
+        url = _url(
+            url=self.url,
+            project=self.project,
+            additional_path=f"/workflows/{workflow_name}/cache/delete",
+        )
+        try:
+            resp = requests.post(
+                url=url,
+                headers=self._headers(),
+                data=UserRepoAddress(username=username, repo_address=repo_address).json(),
+            )
+            if resp.ok:
+                return
+            elif resp.status_code == 401:
+                print("Unauthorized. Please set correct token")
+                return
+            else:
+                resp.raise_for_status()
+        except requests.ConnectionError:
+            print(f"{self.url} connection refused")

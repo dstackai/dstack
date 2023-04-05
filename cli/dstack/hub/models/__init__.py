@@ -180,3 +180,8 @@ class AddMembers(BaseModel):
 
 class DeleteUsers(BaseModel):
     users: List[str] = []
+
+
+class UserRepoAddress(BaseModel):
+    username: str  # fixme: use auth username
+    repo_address: RepoAddress
