@@ -13,7 +13,7 @@ from simple_term_menu import TerminalMenu
 
 from dstack.cli.common import ask_choice, console
 from dstack.core.config import BackendConfig, Configurator, get_config_path
-from dstack.core.error import ConfigError, HubError
+from dstack.core.error import ConfigError, HubConfigError
 from dstack.hub.models import (
     GCPProjectValues,
     GCPVPCSubnetProjectElement,
@@ -227,7 +227,7 @@ class GCPConfigurator(Configurator):
             storage_client = storage.Client(credentials=self.credentials)
             storage_client.list_buckets(max_results=1)
         except Exception:
-            raise HubError("Credentials are not valid")
+            raise HubConfigError("Credentials are not valid", code="invalid_credentials")
         project_values = GCPProjectValues()
         project_values.area = self._get_hub_geographic_area(data.get("area"))
         if data.get("area") is not None:
@@ -258,7 +258,7 @@ class GCPConfigurator(Configurator):
             default_area = DEFAULT_GEOGRAPHIC_AREA
         area_names = sorted([l["name"] for l in GCP_LOCATIONS])
         if default_area not in area_names:
-            raise HubError(f"Invalid GCP area {default_area}")
+            raise HubConfigError(f"Invalid GCP area {default_area}")
         element = ProjectElement(selected=default_area)
         for area_name in area_names:
             element.values.append(ProjectElementValue(value=area_name, label=area_name))
@@ -274,7 +274,7 @@ class GCPConfigurator(Configurator):
             key=lambda name: (name != location["default_region"], name),
         )
         if default_region is not None and default_region not in region_names:
-            raise HubError(f"Invalid GCP region {default_region} in area {location['name']}")
+            raise HubConfigError(f"Invalid GCP region {default_region} in area {location['name']}")
         element = ProjectElement(selected=default_region)
         for region_name in region_names:
             element.values.append(ProjectElementValue(value=region_name, label=region_name))
@@ -288,7 +288,7 @@ class GCPConfigurator(Configurator):
             key=lambda name: (name != location["default_zone"], name),
         )
         if default_zone is not None and default_zone not in zone_names:
-            raise HubError(f"Invalid GCP zone {default_zone} in region {region.name}")
+            raise HubConfigError(f"Invalid GCP zone {default_zone} in region {region.name}")
         element = ProjectElement(selected=default_zone)
         for zone_name in zone_names:
             element.values.append(ProjectElementValue(value=zone_name, label=zone_name))
@@ -301,7 +301,9 @@ class GCPConfigurator(Configurator):
         buckets = storage_client.list_buckets()
         bucket_names = [bucket.name for bucket in buckets if bucket.location.lower() == region]
         if default_bucket is not None and default_bucket not in bucket_names:
-            raise HubError(f"Invalid bucket {bucket_name} for region {region}")
+            raise HubConfigError(
+                f"Invalid bucket {bucket_name} for region {region}", code="invalid_bucket"
+            )
         element = ProjectElement(selected=default_bucket)
         for bucket_name in bucket_names:
             element.values.append(ProjectElementValue(value=bucket_name, label=bucket_name))
@@ -328,7 +330,7 @@ class GCPConfigurator(Configurator):
                     continue
                 vpc_subnet_list.append((network.name, self._get_subnet_name(subnet)))
         if (default_vpc, default_subnet) not in vpc_subnet_list:
-            raise HubError(f"Invalid VPC subnet {default_vpc, default_subnet}")
+            raise HubConfigError(f"Invalid VPC subnet {default_vpc, default_subnet}")
         if (default_vpc, default_subnet) != no_preference_vpc_subnet:
             selected = f"{default_subnet} ({default_vpc})"
         else:

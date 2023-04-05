@@ -5,7 +5,7 @@ from fastapi import APIRouter, Body, Depends, HTTPException, status
 
 from dstack.api.backend import dict_backends
 from dstack.backend.base import Backend
-from dstack.core.error import HubError
+from dstack.core.error import HubConfigError
 from dstack.hub.models import (
     Member,
     ProjectConfigWithCredsPartial,
@@ -14,7 +14,7 @@ from dstack.hub.models import (
     ProjectValues,
 )
 from dstack.hub.repository.projects import ProjectManager
-from dstack.hub.routers.util import get_project
+from dstack.hub.routers.util import error_detail, get_project
 from dstack.hub.security.scope import Scope
 
 router = APIRouter(prefix="/api/projects", tags=["project"])
@@ -30,10 +30,10 @@ async def get_backend_config_values(
         result = await asyncio.get_running_loop().run_in_executor(
             None, configurator.configure_hub, config.__root__.dict()
         )
-    except HubError as ex:
+    except HubConfigError as e:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
-            detail=ex.message,
+            detail=error_detail(e.message, e.code),
         )
     return result
 
@@ -53,17 +53,19 @@ async def list_project() -> List[ProjectInfo]:
 async def create_project(project_info: ProjectInfo) -> ProjectInfo:
     project = await ProjectManager.get(name=project_info.project_name)
     if project is not None:
-        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Project exists")
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST, detail=error_detail("Project exists")
+        )
     backend = _get_backend(project_info.backend.__root__.type)
     configurator = backend.get_configurator()
     try:
         await asyncio.get_running_loop().run_in_executor(
             None, configurator.configure_hub, project_info.backend.__root__.dict()
         )
-    except HubError as ex:
+    except HubConfigError as e:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
-            detail=ex.message,
+            detail=error_detail(e.message, e.code),
         )
     await ProjectManager.create_project_from_info(project_info)
     return project_info
@@ -92,7 +94,7 @@ async def get_project_info(project_name: str) -> ProjectInfo:
     if project is None:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
-            detail=f"Project not found",
+            detail=error_detail("Project not found"),
         )
     return project
 
@@ -105,10 +107,10 @@ async def update_project(project_name: str, project_info: ProjectInfo = Body()) 
         await asyncio.get_running_loop().run_in_executor(
             None, configurator.configure_hub, project_info.backend.__root__.dict()
         )
-    except HubError as ex:
+    except HubConfigError as e:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
-            detail=ex.message,
+            detail=error_detail(e.message, e.code),
         )
     await ProjectManager.update_project_from_info(project_info)
     return project_info
@@ -118,6 +120,7 @@ def _get_backend(backend_type: str) -> Backend:
     backend = dict_backends(all_backend=True).get(backend_type)
     if backend is None:
         raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST, detail=f"Unknown backend {backend_type}"
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=error_detail(f"Unknown backend {backend_type}"),
         )
     return backend

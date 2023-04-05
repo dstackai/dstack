@@ -5,6 +5,7 @@ from fastapi import HTTPException, status
 from dstack.api.backend import dict_backends
 from dstack.backend.base import CloudBackend
 from dstack.hub.db.models import Project
+from dstack.hub.routers.util import error_detail
 
 cache = {}
 
@@ -15,19 +16,19 @@ def get_backend(project: Project) -> CloudBackend:
         if project.config == "":
             raise HTTPException(
                 status_code=status.HTTP_409_CONFLICT,
-                detail=f"Empty config for project = {project.name}",
+                detail=error_detail(f"Empty config for project {project.name}"),
             )
         backend = dict_backends(all_backend=True).get(project.backend)
         if backend is None:
             raise HTTPException(
                 status_code=status.HTTP_409_CONFLICT,
-                detail=f"Backend not found for {project.backend}",
+                detail=error_detail(f"Backend not found for {project.backend}"),
             )
         configurator = backend.get_configurator()
         if configurator is None:
             raise HTTPException(
                 status_code=status.HTTP_409_CONFLICT,
-                detail=f"Configurator not found for {project.backend}",
+                detail=error_detail(f"Configurator not found for {project.backend}"),
             )
         json_data = json.loads(str(project.config))
         config = configurator.get_config(json_data)

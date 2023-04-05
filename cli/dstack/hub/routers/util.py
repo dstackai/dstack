@@ -1,3 +1,5 @@
+from typing import Dict, Optional
+
 from fastapi import HTTPException, status
 
 from dstack.hub.models import Project
@@ -9,6 +11,13 @@ async def get_project(project_name: str) -> Project:
     if hub is None:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
-            detail="Project not found",
+            detail=error_detail("Project not found"),
         )
     return hub
+
+
+def error_detail(msg: str, code: Optional[str] = None) -> Dict:
+    return {
+        "msg": msg,
+        "code": code,
+    }

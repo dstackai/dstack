@@ -16,7 +16,7 @@ from rich_argparse import RichHelpFormatter
 
 from dstack.cli.common import _is_termios_available, ask_choice
 from dstack.core.config import BackendConfig, Configurator, get_config_path
-from dstack.core.error import ConfigError, HubError
+from dstack.core.error import ConfigError, HubConfigError
 from dstack.hub.models import (
     AWSBucketProjectElement,
     AWSBucketProjectElementValue,
@@ -178,7 +178,7 @@ class AWSConfigurator(Configurator):
         config = AWSConfig.deserialize(data=data)
 
         if config.region_name is not None and config.region_name not in {r[1] for r in regions}:
-            raise HubError(f"Invalid AWS region {config.region_name}")
+            raise HubConfigError(f"Invalid AWS region {config.region_name}")
 
         try:
             session = Session(
@@ -189,7 +189,7 @@ class AWSConfigurator(Configurator):
             sts = session.client("sts")
             sts.get_caller_identity()
         except botocore.exceptions.ClientError:
-            raise HubError("Credentials are not valid")
+            raise HubConfigError("Credentials are not valid", code="invalid_credentials")
 
         # TODO validate config values
         project_values = AWSProjectValues()
@@ -232,14 +232,18 @@ class AWSConfigurator(Configurator):
             response = s3_client.head_bucket(Bucket=bucket_name)
             bucket_region = response["ResponseMetadata"]["HTTPHeaders"]["x-amz-bucket-region"]
             if bucket_region.lower() != region:
-                raise HubError("The bucket belongs to another AWS region.")
+                raise HubConfigError(
+                    "The bucket belongs to another AWS region", code="invalid_bucket"
+                )
         except botocore.exceptions.ClientError as e:
             if (
                 hasattr(e, "response")
                 and e.response.get("Error")
                 and e.response["Error"].get("Code") in ["404", "403"]
             ):
-                raise HubError(f"The bucket {bucket_name} does not exist")
+                raise HubConfigError(
+                    f"The bucket {bucket_name} does not exist", code="invalid_bucket"
+                )
             raise e
 
     def _get_hub_subnet(self, session: Session, default_subnet: Optional[str]) -> ProjectElement:
