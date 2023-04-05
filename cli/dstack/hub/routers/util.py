@@ -1,7 +1,7 @@
 from fastapi import HTTPException, status
 
 from dstack.hub.models import Project
-from dstack.hub.repository.hub import ProjectManager
+from dstack.hub.repository.projects import ProjectManager
 
 
 async def get_project(project_name: str) -> Project:
