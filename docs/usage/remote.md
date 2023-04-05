@@ -1,7 +1,7 @@
-# Remotes
+# Remote
 
 !!! info "NOTE:"
-The source code of this example is available in the [Playground](../playground.md).
+    The source code of this example is available in the [Playground](../playground.md).
 
 By default, workflows run locally. To run workflows remotely, you need to first configure a remote using the [`dstack
 config`](../reference/cli/config.md) command.
@@ -15,8 +15,8 @@ $ dstack config
 </div>
 
 !!! info "NOTE:"
-To use AWS or GCP as a remote, the corresponding cloud credentials must be
-configured locally.
+    To use AWS or GCP as a remote, the corresponding cloud credentials must be
+    configured locally.
 
 Once a remote is configured, use the `--remote` flag with the `dstack run` command to run a workflow in
 the remote.
@@ -66,10 +66,10 @@ $ dstack run gpu-v100 --remote
 </div>
 
 !!! info "NOTE:"
-If you want to use GPU with your AWS account, make sure to have the
-corresponding [service quota](https://docs.aws.amazon.com/AWSEC2/latest/UserGuide/ec2-resource-limits.html) approved
-by the AWS support team beforehand.
-The approval typically takes a few business days.
+    If you want to use GPU with your AWS account, make sure to have the
+    corresponding [service quota](https://docs.aws.amazon.com/AWSEC2/latest/UserGuide/ec2-resource-limits.html) approved
+    by the AWS support team beforehand.
+    The approval typically takes a few business days.
 
 ### Memory
 
@@ -154,10 +154,10 @@ workflows:
 </div>
 
 !!! info "NOTE:"
-If you want to use interruptible instances with your AWS account, make sure to have the
-corresponding [service quota](https://docs.aws.amazon.com/AWSEC2/latest/UserGuide/ec2-resource-limits.html) approved
-by the AWS support team beforehand.
-The approval typically takes a few business days.
+    If you want to use interruptible instances with your AWS account, make sure to have the
+    corresponding [service quota](https://docs.aws.amazon.com/AWSEC2/latest/UserGuide/ec2-resource-limits.html) approved
+    by the AWS support team beforehand.
+    The approval typically takes a few business days.
 
 ## Remote by default
 
@@ -207,5 +207,5 @@ $ dstack run hello --remote --gpu 4 --interruptible
 </div>
 
 !!! info "NOTE:"
-To see all supported arguments (that can be used to override resources),
-use the `dstack run WORKFLOW --help` command.
+    To see all supported arguments (that can be used to override resources),
+    use the `dstack run WORKFLOW --help` command.

@@ -28,4 +28,5 @@ google-cloud-secret-manager
 google-cloud-logging
 aiosqlite
 packaging
-alembic>=1.10.2
+alembic
+typing-extensions

@@ -1,5 +1,5 @@
 import os
-from argparse import SUPPRESS, Namespace
+from argparse import Namespace
 
 import uvicorn
 from rich_argparse import RichHelpFormatter
@@ -31,16 +31,23 @@ class HubCommand(BasicCommand):
 
     def register(self):
         subparsers = self._parser.add_subparsers()
-
         hub_parser = subparsers.add_parser(
-            "start", help="Start a hub server", formatter_class=RichHelpFormatter
+            "start",
+            help="Start a hub server",
+            formatter_class=RichHelpFormatter,
+            add_help=False,
         )
-
+        hub_parser.add_argument(
+            "-h",
+            "--help",
+            action="help",
+            help="Show this help message and exit",
+        )
         hub_parser.add_argument(
             "--host",
             metavar="HOST",
             type=str,
-            help="Bind socket to this host.  Default: 127.0.0.1",
+            help="Bind socket to this host. Defaults to 127.0.0.1",
             default="127.0.0.1",
         )
         hub_parser.add_argument(
@@ -48,7 +55,7 @@ class HubCommand(BasicCommand):
             "--port",
             metavar="PORT",
             type=int,
-            help="Bind socket to this port. Default: 3000.",
+            help="Bind socket to this port. Defaults to 3000.",
             default=3000,
         )
         hub_parser.add_argument(
@@ -61,3 +68,6 @@ class HubCommand(BasicCommand):
         )
         hub_parser.add_argument("--token", metavar="TOKEN", type=str, help="The admin user token")
         hub_parser.set_defaults(func=self._hub_start)
+
+    def _command(self, args: Namespace):
+        self._parser.print_help()

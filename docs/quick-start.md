@@ -244,5 +244,10 @@ Epoch 1: [00:03<00:00, 280.17it/s, loss=1.35, v_num=0]
 
 </div>
 
-`dstack` automatically creates infrastructure, runs workflows, stores artifacts, and destroys infrastructure when run remotely.
-    
+When you run a workflow remotely, `dstack` automatically creates the necessary infrastructure within the
+configured cloud account, runs the workflow, and stores the artifacts and destroys the
+infrastructure upon completion.
+
+!!! info "NOTE:"
+    You can specify hardware resource requirements (like GPU, memory, interruptible instances, etc.) 
+    for each remote workflow using [`resources`](usage/remote.md#resources).

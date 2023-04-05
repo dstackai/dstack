@@ -16,10 +16,10 @@ from dstack.hub.db.models import User
 from dstack.hub.repository.user import UserManager
 from dstack.hub.routers import (
     artifacts,
-    hub,
     jobs,
     link,
     logs,
+    projects,
     repos,
     runners,
     runs,
@@ -50,7 +50,7 @@ logger.setLevel(logging.ERROR)
 
 app = FastAPI(docs_url="/api/docs")
 app.include_router(users.router)
-app.include_router(hub.router)
+app.include_router(projects.router)
 app.include_router(runs.router)
 app.include_router(jobs.router)
 app.include_router(runners.router)

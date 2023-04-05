@@ -1,8 +1,7 @@
 import os
 from argparse import Namespace
 from pathlib import Path
-from typing import Any
-from urllib.parse import urlparse, urlunparse
+from typing import Any, Tuple
 
 import yaml
 from rich import print
@@ -63,7 +62,7 @@ class HubConfigurator(Configurator):
     def get_backend_client(self, config: Any):
         pass
 
-    async def configure_hub(self, config: Any):
+    def configure_hub(self, config: Any):
         pass
 
     def configure_cli(self) -> HUBConfig:
@@ -86,7 +85,7 @@ class HubConfigurator(Configurator):
 
     def ask_new_param(
         self, default_url: str, default_project: str, default_token: str
-    ) -> (str, str, str):
+    ) -> Tuple[str, str, str]:
         url = Prompt.ask(
             "[sea_green3 bold]?[/sea_green3 bold] [bold]Enter HUB URL[/bold]",
             default=default_url,
@@ -108,7 +107,6 @@ class HubConfigurator(Configurator):
         )
 
     def register_parser(self, parser):
-
         hub_parser = parser.add_parser("hub", help="", formatter_class=RichHelpFormatter)
         hub_parser.add_argument("--url", type=str, help="", required=True)
         hub_parser.add_argument("--project", type=str, help="", required=True)
