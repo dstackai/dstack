@@ -72,8 +72,7 @@ async def create_project(project_info: ProjectInfo) -> ProjectInfo:
 @router.delete("", dependencies=[Depends(Scope("project:delete:write"))])
 async def delete_project(body: ProjectDelete):
     for project_name in body.projects:
-        project = await get_project(project_name=project_name)
-        await ProjectManager.delete(project)
+        await ProjectManager.delete(project_name)
 
 
 @router.post(
