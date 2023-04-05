@@ -62,6 +62,7 @@ class Provider:
         self.ssh_key_pub: Optional[str] = None
         self.openssh_server: bool = False
         self.loaded = False
+        self.home_dir: Optional[str] = None
 
     def __str__(self) -> str:
         return (
@@ -270,32 +271,37 @@ class Provider:
         else:
             return None
 
+    def _validate_local_path(self, path: str) -> str:
+        if path == "~" or path.startswith("~/"):
+            if not self.home_dir:
+                raise KeyError("home_dir is not defined, local path can't start with ~")
+            home = self.home_dir.rstrip("/")
+            path = home if path == "~" else f"{home}/{path[len('~/'):]}"
+        while path.startswith("./"):
+            path = path[len("./") :]
+        if not path.startswith("/"):
+            pass  # todo: use self.working_dir
+        return path
+
     def _artifact_specs(self) -> Optional[List[ArtifactSpec]]:
-        if self.provider_data.get("artifacts"):
-            return [self._parse_artifact_spec(a) for a in self.provider_data["artifacts"]]
-        else:
-            return None
+        artifact_specs = []
+        for item in self.provider_data.get("artifacts", []):
+            if isinstance(item, str):
+                item = {"artifact_path": item}
+            else:
+                item["artifact_path"] = item.pop("path")
+            item["artifact_path"] = self._validate_local_path(item["artifact_path"])
+            artifact_specs.append(ArtifactSpec(**item))
+        return artifact_specs or None
 
     def _cache_specs(self) -> List[CacheSpec]:
-        return [
-            CacheSpec(**item) if isinstance(item, dict) else CacheSpec(path=item)
-            for item in self.provider_data.get("cache", [])
-        ]
-
-    @staticmethod
-    def _parse_artifact_spec(artifact: Union[dict, str]) -> ArtifactSpec:
-        def remove_prefix(text: str, prefix: str) -> str:
-            if text.startswith(prefix):
-                return text[len(prefix) :]
-            return text
-
-        if isinstance(artifact, str):
-            return ArtifactSpec(artifact_path=remove_prefix(artifact, "./"), mount=False)
-        else:
-            return ArtifactSpec(
-                artifact_path=remove_prefix(artifact["path"], "./"),
-                mount=artifact.get("mount") is True,
-            )
+        cache_specs = []
+        for item in self.provider_data.get("cache", []):
+            if isinstance(item, str):
+                item = {"path": item}
+            item["path"] = self._validate_local_path(item["path"])
+            cache_specs.append(CacheSpec(**item))
+        return cache_specs
 
     @staticmethod
     def _parse_dep_spec(dep: Union[dict, str], backend: Backend, repo_data: RepoData) -> DepSpec:

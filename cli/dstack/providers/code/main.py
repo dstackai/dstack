@@ -23,6 +23,7 @@ class CodeProvider(Provider):
         self.working_dir = None
         self.resources = None
         self.image_name = None
+        self.home_dir = "/root"
 
     def load(
         self,
