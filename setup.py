@@ -88,6 +88,7 @@ setup(
         "google-cloud-logging>=2.0.0",
         "aiosqlite",
         "alembic>=1.10.2",
+        "typing-extensions>=4.0.0",
     ],
     classifiers=[
         "Development Status :: 2 - Pre-Alpha",

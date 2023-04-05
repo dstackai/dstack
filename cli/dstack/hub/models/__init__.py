@@ -1,6 +1,7 @@
-from typing import List, Literal, Optional, Union
+from typing import List, Optional, Union
 
 from pydantic import BaseModel, Field
+from typing_extensions import Literal
 
 from dstack.core.job import Job, JobHead
 from dstack.core.repo import LocalRepoData, RepoAddress, RepoCredentials
