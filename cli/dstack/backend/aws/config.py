@@ -192,27 +192,29 @@ class AWSConfigurator(Configurator):
             raise HubError("Credentials are not valid")
 
         project_values = AWSProjectValues()
-        project_values.region_name = self._get_regions(default_region=config.region_name)
-        project_values.s3_bucket_name = self._get_buckets(
+        project_values.region_name = self._get_hub_regions(default_region=config.region_name)
+        project_values.s3_bucket_name = self._get_hub_buckets(
             session=session, region=config.region_name, default_bucket=config.bucket_name
         )
-        project_values.ec2_subnet_id = self._get_subnet(
+        project_values.ec2_subnet_id = self._get_hub_subnet(
             session=session, default_subnet=config.subnet_id
         )
         return project_values
 
-    def _get_regions(self, default_region: Optional[str]) -> ProjectElement:
+    def _get_hub_regions(self, default_region: Optional[str]) -> ProjectElement:
         element = ProjectElement(selected=default_region)
         for r in regions:
             element.values.append(ProjectElementValue(value=r[1], label=r[0]))
         return element
 
-    def _get_buckets(
+    def _get_hub_buckets(
         self, session: Session, region: str, default_bucket: Optional[str]
     ) -> AWSBucketProjectElement:
+        if default_bucket is not None:
+            self._validate_hub_bucket(session=session, region=region, bucket_name=default_bucket)
         element = AWSBucketProjectElement(selected=default_bucket)
-        _s3 = session.client("s3")
-        response = _s3.list_buckets()
+        s3_client = session.client("s3")
+        response = s3_client.list_buckets()
         for bucket in response["Buckets"]:
             element.values.append(
                 AWSBucketProjectElementValue(
@@ -223,7 +225,23 @@ class AWSConfigurator(Configurator):
             )
         return element
 
-    def _get_subnet(self, session: Session, default_subnet: Optional[str]) -> ProjectElement:
+    def _validate_hub_bucket(self, session: Session, region: str, bucket_name: str):
+        s3_client = session.client("s3")
+        try:
+            response = s3_client.head_bucket(Bucket=bucket_name)
+            bucket_region = response["ResponseMetadata"]["HTTPHeaders"]["x-amz-bucket-region"]
+            if bucket_region.lower() != region:
+                raise HubError("The bucket belongs to another AWS region.")
+        except botocore.exceptions.ClientError as e:
+            if (
+                hasattr(e, "response")
+                and e.response.get("Error")
+                and e.response["Error"].get("Code") in ["404", "403"]
+            ):
+                raise HubError(f"The bucket {bucket_name} does not exist")
+            raise e
+
+    def _get_hub_subnet(self, session: Session, default_subnet: Optional[str]) -> ProjectElement:
         element = ProjectElement(selected=default_subnet)
         _ec2 = session.client("ec2")
         response = _ec2.describe_subnets()
