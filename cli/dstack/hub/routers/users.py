@@ -6,9 +6,10 @@ from fastapi import APIRouter, Depends, HTTPException, status
 from fastapi.security import HTTPBearer
 from fastapi.security.http import HTTPAuthorizationCredentials
 
-from dstack.hub.models import DeleteUsers, ProjectDelete, User, UserInfo, UserPatch
+from dstack.hub.models import DeleteUsers, User, UserInfo, UserPatch
 from dstack.hub.repository.role import RoleManager
 from dstack.hub.repository.user import UserManager
+from dstack.hub.routers.util import error_detail
 from dstack.hub.security.scope import Scope
 
 router = APIRouter(prefix="/api/users", tags=["users"])
@@ -20,11 +21,13 @@ security = HTTPBearer()
 async def users_create(body: User) -> User:
     if not re.match(r"^[a-zA-Z0-9]([_-](?![_-])|[a-zA-Z0-9]){1,18}[a-zA-Z0-9]$", body.user_name):
         raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST, detail="Username is incorrect"
+            status_code=status.HTTP_400_BAD_REQUEST, detail=error_detail("Username is incorrect")
         )
     user = await UserManager.get_user_by_name(name=body.user_name)
     if user is not None:
-        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="User exists")
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST, detail=error_detail("User exists")
+        )
     user = await UserManager.create(name=body.user_name, role=body.global_role)
     return User(
         user_name=user.name,
@@ -38,7 +41,9 @@ async def users_delete(body: DeleteUsers):
     for user_name in body.users:
         user = await UserManager.get_user_by_name(name=user_name)
         if user is None:
-            raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="User not exists")
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST, detail=error_detail("User not exists")
+            )
         await UserManager.remove(user)
 
 
@@ -82,7 +87,9 @@ async def users_get(user_name: str) -> User:
 async def users_patch(user_name: str, body: UserPatch) -> User:
     user = await UserManager.get_user_by_name(name=user_name)
     if user is None:
-        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="User not exists")
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST, detail=error_detail("User not exists")
+        )
     role = await RoleManager.get_by_name(name=body.global_role)
     if role is None:
         role = await RoleManager.create(name=body.global_role)  # TODO Replace with Exception

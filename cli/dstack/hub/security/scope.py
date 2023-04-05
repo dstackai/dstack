@@ -4,6 +4,7 @@ from fastapi.security.http import HTTPAuthorizationCredentials
 from starlette.requests import Request
 
 from dstack.hub.repository.user import UserManager
+from dstack.hub.routers.util import error_detail
 
 
 class Scope:
@@ -19,11 +20,11 @@ class Scope:
         if user is None:
             raise HTTPException(
                 status_code=status.HTTP_401_UNAUTHORIZED,
-                detail=f"Token is invalid",
+                detail=error_detail("Token is invalid"),
             )
         access = await UserManager.scope(user=user, scope=self._scope)
         if not access:
             raise HTTPException(
                 status_code=status.HTTP_403_FORBIDDEN,
-                detail=f"Access denied",
+                detail=error_detail("Access denied"),
             )

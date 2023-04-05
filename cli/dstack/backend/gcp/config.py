@@ -13,7 +13,7 @@ from simple_term_menu import TerminalMenu
 
 from dstack.cli.common import ask_choice, console
 from dstack.core.config import BackendConfig, Configurator, get_config_path
-from dstack.core.error import ConfigError, HubError
+from dstack.core.error import ConfigError, HubConfigError
 from dstack.hub.models import (
     GCPProjectValues,
     GCPVPCSubnetProjectElement,
@@ -221,23 +221,18 @@ class GCPConfigurator(Configurator):
     def configure_hub(self, data: Dict) -> GCPProjectValues:
         try:
             service_account_info = json.loads(data.get("credentials"))
-            credentials = service_account.Credentials.from_service_account_info(
+            self.credentials = service_account.Credentials.from_service_account_info(
                 info=service_account_info
             )
-            storage_client = storage.Client(credentials=credentials)
+            storage_client = storage.Client(credentials=self.credentials)
             storage_client.list_buckets(max_results=1)
         except Exception:
-            raise HubError("Credentials are not valid")
+            raise HubConfigError("Credentials are not valid", code="invalid_credentials")
         project_values = GCPProjectValues()
-        project_values.bucket_name = self._get_hub_buckets(
-            credentials=credentials, default=data.get("bucket_name")
-        )
         project_values.area = self._get_hub_geographic_area(data.get("area"))
         if data.get("area") is not None:
             location = self._get_location(data.get("area"))
             project_values.region, regions = self._get_hub_region(
-                credentials=credentials,
-                project_id=credentials.project_id,
                 location=location,
                 default_region=data.get("region"),
             )
@@ -247,9 +242,11 @@ class GCPConfigurator(Configurator):
                     region=regions.get(data.get("region")),
                     default_zone=data.get("zone"),
                 )
+                project_values.bucket_name = self._get_hub_buckets(
+                    region=data.get("region"),
+                    default_bucket=data.get("bucket_name"),
+                )
                 project_values.vpc_subnet = self._get_hub_vpc_subnet(
-                    credentials=credentials,
-                    project_id=credentials.project_id,
                     region=data.get("region"),
                     default_vpc=data.get("vpc"),
                     default_subnet=data.get("subnet"),
@@ -261,24 +258,23 @@ class GCPConfigurator(Configurator):
             default_area = DEFAULT_GEOGRAPHIC_AREA
         area_names = sorted([l["name"] for l in GCP_LOCATIONS])
         if default_area not in area_names:
-            raise HubError(f"Invalid GCP area {default_area}")
+            raise HubConfigError(f"Invalid GCP area {default_area}")
         element = ProjectElement(selected=default_area)
         for area_name in area_names:
             element.values.append(ProjectElementValue(value=area_name, label=area_name))
         return element
 
     def _get_hub_region(
-        self, credentials, project_id, location: Dict, default_region: Optional[str]
+        self, location: Dict, default_region: Optional[str]
     ) -> Tuple[ProjectElement, Dict]:
-        regions_client = compute_v1.RegionsClient(credentials=credentials)
-        list_regions_request = compute_v1.ListRegionsRequest(project=project_id)
-        regions = regions_client.list(list_regions_request)
+        regions_client = compute_v1.RegionsClient(credentials=self.credentials)
+        regions = regions_client.list(project=self.credentials.project_id)
         region_names = sorted(
             [r.name for r in regions if r.name in location["regions"]],
             key=lambda name: (name != location["default_region"], name),
         )
         if default_region is not None and default_region not in region_names:
-            raise HubError(f"Invalid GCP region {default_region} in area {location['name']}")
+            raise HubConfigError(f"Invalid GCP region {default_region} in area {location['name']}")
         element = ProjectElement(selected=default_region)
         for region_name in region_names:
             element.values.append(ProjectElementValue(value=region_name, label=region_name))
@@ -292,25 +288,30 @@ class GCPConfigurator(Configurator):
             key=lambda name: (name != location["default_zone"], name),
         )
         if default_zone is not None and default_zone not in zone_names:
-            raise HubError(f"Invalid GCP zone {default_zone} in region {region.name}")
+            raise HubConfigError(f"Invalid GCP zone {default_zone} in region {region.name}")
         element = ProjectElement(selected=default_zone)
         for zone_name in zone_names:
             element.values.append(ProjectElementValue(value=zone_name, label=zone_name))
         return element
 
-    def _get_hub_buckets(self, credentials, default: Optional[str] = None) -> ProjectElement:
-        element = ProjectElement(selected=default)
-        storage_client = storage.Client(credentials=credentials)
+    def _get_hub_buckets(
+        self, region: str, default_bucket: Optional[str] = None
+    ) -> ProjectElement:
+        storage_client = storage.Client(credentials=self.credentials)
         buckets = storage_client.list_buckets()
-        for bucket in buckets:
-            element.values.append(ProjectElementValue(value=bucket.name, label=bucket.name))
+        bucket_names = [bucket.name for bucket in buckets if bucket.location.lower() == region]
+        if default_bucket is not None and default_bucket not in bucket_names:
+            raise HubConfigError(
+                f"Invalid bucket {bucket_name} for region {region}", code="invalid_bucket"
+            )
+        element = ProjectElement(selected=default_bucket)
+        for bucket_name in bucket_names:
+            element.values.append(ProjectElementValue(value=bucket_name, label=bucket_name))
         return element
 
     def _get_hub_vpc_subnet(
         self,
-        credentials,
-        project_id,
-        region,
+        region: str,
         default_vpc: Optional[str],
         default_subnet: Optional[str],
     ) -> GCPVPCSubnetProjectElement:
@@ -318,22 +319,34 @@ class GCPConfigurator(Configurator):
             default_vpc = "default"
         if default_subnet is None:
             default_subnet = "default"
-        networks_client = compute_v1.NetworksClient(credentials=credentials)
-        list_networks_request = compute_v1.ListNetworksRequest(project=project_id)
-        networks = networks_client.list(list_networks_request)
-        element = GCPVPCSubnetProjectElement(selected=f"({default_vpc},{default_subnet})")
+        no_preference_vpc_subnet = ("default", "default")
+        networks_client = compute_v1.NetworksClient(credentials=self.credentials)
+        networks = networks_client.list(project=self.credentials.project_id)
+        vpc_subnet_list = []
         for network in networks:
             for subnet in network.subnetworks:
                 subnet_region = self._get_subnet_region(subnet)
                 if subnet_region != region:
                     continue
-                element.values.append(
-                    GCPVPCSubnetProjectElementValue(
-                        vpc=network.name,
-                        subnet=self._get_subnet_name(subnet),
-                        label=f"({network.name},{self._get_subnet_name(subnet)})",
-                    )
+                vpc_subnet_list.append((network.name, self._get_subnet_name(subnet)))
+        if (default_vpc, default_subnet) not in vpc_subnet_list:
+            raise HubConfigError(f"Invalid VPC subnet {default_vpc, default_subnet}")
+        if (default_vpc, default_subnet) != no_preference_vpc_subnet:
+            selected = f"{default_subnet} ({default_vpc})"
+        else:
+            selected = f"No preference (default)"
+        vpc_subnet_list = sorted(vpc_subnet_list, key=lambda t: t != no_preference_vpc_subnet)
+        element = GCPVPCSubnetProjectElement(selected=selected)
+        for vpc, subnet in vpc_subnet_list:
+            element.values.append(
+                GCPVPCSubnetProjectElementValue(
+                    vpc=vpc,
+                    subnet=subnet,
+                    label=f"{subnet} ({vpc})"
+                    if (subnet, vpc) != no_preference_vpc_subnet
+                    else f"No preference (default)",
                 )
+            )
         return element
 
     def configure_cli(self):

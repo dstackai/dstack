@@ -11,8 +11,6 @@ from starlette.types import Receive
 from starlette.types import Scope as StarletteScope
 from starlette.types import Send
 
-from dstack.core.job import JobHead
-from dstack.core.repo import RepoAddress
 from dstack.hub.models import PollLogs
 from dstack.hub.routers.cache import get_backend
 from dstack.hub.routers.util import get_project

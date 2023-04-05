@@ -10,9 +10,10 @@ class ConfigError(Exception):
         self.message = message
 
 
-class HubError(Exception):
-    def __init__(self, message: Optional[str] = None):
+class HubConfigError(ConfigError):
+    def __init__(self, message: str = "", code: str = "invalid_config"):
         self.message = message
+        self.code = code
 
 
 class BackendError(Exception):
