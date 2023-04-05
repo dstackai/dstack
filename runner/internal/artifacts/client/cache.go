@@ -302,9 +302,12 @@ func (c *Copier) Download(ctx context.Context, bucket, remote, local string) {
 	}
 }
 func (c *Copier) Upload(ctx context.Context, bucket, remote, local string) {
+	log.Trace(ctx, "statUpload", "local", local)
 	c.statUpload(local)
 	errorFound := atomic.NewBool(false)
+	log.Trace(ctx, "walkFiles to upload", "local", local)
 	for file := range walkFiles(local) {
+		log.Trace(ctx, "Acquire thread to upload", "file", file)
 		c.threads.acquire(1)
 		go func(file *fileJob) {
 			defer c.threads.release(1)
@@ -341,7 +344,9 @@ func (c *Copier) Upload(ctx context.Context, bucket, remote, local string) {
 			c.updateBars(file.info.Size())
 		}(file)
 	}
+	log.Trace(ctx, "Acquire MAX_THREADS after upload")
 	c.threads.acquire(MAX_THREADS)
+	log.Trace(ctx, "MAX_THREADS acquired after upload")
 	if !errorFound.Load() {
 		log.Info(ctx, "Lock directory")
 		theFile, err := os.Create(filepath.Join(local, consts.FILE_LOCK_FULL_DOWNLOAD))
