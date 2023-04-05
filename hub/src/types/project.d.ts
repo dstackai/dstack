@@ -62,7 +62,8 @@ declare interface TProjectBackendAWS {
 }
 
 declare interface TProjectBackendGCP {
-    credentials: string,
+    credentials?: string,
+    credentials_filename?: string,
     area: string,
     region: string,
     zone: string,

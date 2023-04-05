@@ -6,6 +6,7 @@ import { debounce } from 'lodash';
 import { useBackendValuesMutation } from 'services/project';
 import { IProps } from './types';
 import styles from './styles.module.scss';
+import { isRequestErrorWithDetail } from '../../../../libs';
 
 export const AWSBackend: React.FC<IProps> = ({ loading }) => {
     const { t } = useTranslation();
@@ -73,11 +74,11 @@ export const AWSBackend: React.FC<IProps> = ({ loading }) => {
             console.log('fetch backends values error:', errorResponse);
             // eslint-disable-next-line @typescript-eslint/ban-ts-comment
             // @ts-ignore
-            const detailsError = errorResponse?.data?.detail;
+            const errorRequestData = errorResponse?.data;
 
-            if (detailsError) {
-                setError('backend.access_key', { type: 'custom', message: detailsError as string });
-                setError('backend.secret_key', { type: 'custom', message: detailsError as string });
+            if (isRequestErrorWithDetail(errorRequestData)) {
+                setError('backend.access_key', { type: 'custom', message: errorRequestData.detail });
+                setError('backend.secret_key', { type: 'custom', message: errorRequestData.detail });
             }
         }
     };

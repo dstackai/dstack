@@ -1,16 +1,16 @@
-import React, { useRef, useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useFormContext } from 'react-hook-form';
 import { IProps } from './types';
 import { FormSelect, SpaceBetween, FileUploader, FormSelectOptions, Spinner } from 'components';
 import { useBackendValuesMutation } from 'services/project';
 import styles from './styles.module.scss';
+import { isRequestErrorWithDetail } from '../../../../libs';
 
 export const GCPBackend: React.FC<IProps> = ({ loading }) => {
     const { t } = useTranslation();
     const {
         control,
-        register,
         setValue,
         getValues,
         setError,
@@ -32,6 +32,10 @@ export const GCPBackend: React.FC<IProps> = ({ loading }) => {
 
     const disabledFields = loading || !backendCredentials || !valuesData;
 
+    useEffect(() => {
+        console.log(getValues('backend'));
+    });
+
     const changeFormHandler = async () => {
         const backendFormValues = getValues('backend');
 
@@ -45,7 +49,6 @@ export const GCPBackend: React.FC<IProps> = ({ loading }) => {
             const request = getBackendValues(backendFormValues);
             requestRef.current = request;
             const response = await request.unwrap();
-            console.log(response);
 
             setValuesData(response);
 
@@ -92,10 +95,10 @@ export const GCPBackend: React.FC<IProps> = ({ loading }) => {
             console.log('fetch backends values error:', errorResponse);
             // eslint-disable-next-line @typescript-eslint/ban-ts-comment
             // @ts-ignore
-            const detailsError = errorResponse?.data?.detail;
+            const errorRequestData = errorResponse?.data;
 
-            if (detailsError) {
-                setError('backend.credentials', { type: 'custom', message: detailsError as string });
+            if (isRequestErrorWithDetail(errorRequestData)) {
+                setError('backend.credentials', { type: 'custom', message: errorRequestData.detail });
             }
         }
     };
@@ -116,8 +119,6 @@ export const GCPBackend: React.FC<IProps> = ({ loading }) => {
 
     return (
         <>
-            <input type="hidden" {...register('backend.credentials')} />
-
             <SpaceBetween size="l">
                 <FileUploader
                     fileInputId="gcp-credentials"
@@ -132,16 +133,19 @@ export const GCPBackend: React.FC<IProps> = ({ loading }) => {
                         if (uploadedFiles.length) {
                             setFiles([...uploadedFiles]);
 
+                            const [file] = uploadedFiles;
+
                             const reader = new FileReader();
                             reader.onload = function () {
                                 const text = reader.result;
                                 if (text) {
                                     setValue('backend.credentials', text);
+                                    setValue('backend.credentials_filename', file.name);
                                     onChangeFormFields();
                                 }
                             };
 
-                            reader.readAsText(uploadedFiles[0]);
+                            reader.readAsText(file);
                         }
                     }}
                 />
