@@ -1,16 +1,16 @@
 # Providers
 
 !!! info "NOTE:"
-The source code of this example is available in the [Playground](../playground.md).
+    The source code of this example is available in the [Playground](../playground.md).
 
 Each workflow in the YAML file has to specify the `provider` property. This property
 defines the behaviour of the workflow and what parameters can be provided in the YAML file.
 
 !!! info "NOTE:"
-While each provider is unique, common functionalities such
-as [Artifacts](artifacts.md), [Deps](deps.md), [Resources](remotes.md#resources),
-[Environment variables](environment-variables.md), [Secrets](secrets.md), and [Args](args.md) are supported by most
-providers.
+    While each provider is unique, common functionalities such
+    as [Artifacts](artifacts.md), [Deps](deps.md), [Resources](remote.md#resources),
+    [Environment variables](environment-variables.md), [Secrets](secrets.md), and [Args](args.md) are supported by most
+    providers.
 
 ## bash
 
@@ -134,8 +134,8 @@ This is a great option if you'd like to run code interactively using a code edit
 For more details, check the [reference](../reference/providers/code.md).
 
 !!! info "NOTE:"
-The `code` provider allows to use `pip`, `conda`, and `python` executables from the commands.
-See [Python](python.md) for more details.
+    The `code` provider allows to use `pip`, `conda`, and `python` executables from the commands.
+    See [Python](python.md) for more details.
 
 ## lab
 

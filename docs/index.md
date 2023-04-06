@@ -1,16 +1,16 @@
 ---
-title: A better way to run ML workflows
+title: Universal ML workflows as code
 hide:
   - path
 ---
 
-# The easiest way to run ML workflows
+# Universal ML workflows as code
 
 `dstack` is an open-source tool makes it very easy to run ML workflows anywhere (whether it be on a local machine or on any cloud platform).
 
 [Quick start](quick-start.md){ class="md-go-to-action primary" } [:video_game: Playground](playground.md){ class="md-go-to-action secondary" }
 
-## How it works?
+## Define workflows
 
 Define ML workflows, their output artifacts, hardware requirements, and dependencies via YAML.
 
@@ -32,7 +32,7 @@ workflows:
 
 </div>
 
-### Run locally
+## Run locally
 
 Once a workflow is defined, you can use the `dstack run` command to run it. 
 
@@ -58,7 +58,7 @@ Epoch 1: [00:03<00:00, 280.17it/s, loss=1.35, v_num=0]
 
 </div>
 
-### Run remotely
+## Run remotely
 
 To run a workflow remotely (e.g. in a configured cloud account), add the `--remote` flag to the `dstack run` command:
 
@@ -82,5 +82,10 @@ Epoch 1: [00:03<00:00, 280.17it/s, loss=1.35, v_num=0]
 
 </div>
 
-`dstack` automatically creates cloud resources in the configured account and destroys them when the remote workflow is
-done.
+Upon running a workflow remotely, `dstack` automatically creates resources in the configured cloud account and destroys them
+once the workflow is complete.
+
+## Providers
+
+`dstack` supports multiple [providers](usage/providers.md) that enable you to set up environment,
+run scripts, launch interactive dev environments and apps, and perform many other tasks.

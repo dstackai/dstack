@@ -217,13 +217,13 @@ lightning_logs/  version_0/        local
 To run workflows remotely (e.g. in a configured cloud account), you can configure a remote using
 the [`dstack config`](reference/cli/config.md) command.
 
-See [Installation](installation.md#configure-a-remote) to learn more about supported remote types and how to configure them.
+See [Setup](setup/index.md#configure-a-remote) to learn more about supported remote types and how to configure them.
 
 ## 7. Run remotely
 
 Use the `--remote` flag with `dstack run` to run the workflow remotely.
 
-When running remotely, you can utilize the [`resources`](usage/remotes.md#resources) feature to request hardware resources like GPUs, memory, or interruptible instances.
+When running remotely, you can utilize the [`resources`](usage/remote.md#resources) feature to request hardware resources like GPUs, memory, or interruptible instances.
 
 <div class="termy">
 

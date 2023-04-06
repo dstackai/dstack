@@ -9,7 +9,7 @@
 </h1>
 
 <h4 align="center">
-The easiest way to run ML workflows
+Universal ML workflows as code
 </h4>
 
 <p align="center">
@@ -20,9 +20,9 @@ Define ML workflows as code and run via CLI. Use any cloud. Collaborate within t
 
 <p align="center">
 <a href="https://docs.dstack.ai" target="_blank"><b>Docs</b></a> • 
-<a href="https://docs.dstack.ai/installation"><b>Installation</b></a> • 
 <a href="https://docs.dstack.ai/quick-start"><b>Quick start</b></a> • 
 <a href="https://docs.dstack.ai/playground" target="_blank"><b>Playground</b></a> •   
+<a href="https://docs.dstack.ai/setup"><b>Setup</b></a> • 
 <a href="https://docs.dstack.ai/usage/hello-world" target="_blank"><b>Usage</b></a>  • 
 <a href="https://docs.dstack.ai/examples/tensorboard" target="_blank"><b>Examples</b></a>
 </p>
@@ -34,7 +34,7 @@ Define ML workflows as code and run via CLI. Use any cloud. Collaborate within t
 
 ## What is dstack?
 
-`dstack` is an open-source tool makes it very easy to run ML workflows anywhere (whether it be on a local machine or on any cloud platform). collaboration.
+`dstack` is an open-source tool makes it very easy to run ML workflows anywhere (whether it be on a local machine or on any cloud platform).
 
 ## Installation
 
@@ -131,7 +131,7 @@ once the workflow is complete.
 
 ### Providers
 
-`dstack` supports multiple [providers](https://docs.dstack.ai/usage/providers.md) that enable you to set up environment,
+`dstack` supports multiple [providers](https://docs.dstack.ai/usage/providers) that enable you to set up environment,
 run scripts, launch interactive dev environments and apps, and perform many other tasks.
 
 ## More information
@@ -139,9 +139,9 @@ run scripts, launch interactive dev environments and apps, and perform many othe
 For additional information and examples, see the following links:
 
 * [Docs](https://docs.dstack.ai/)
-* [Installation](https://docs.dstack.ai/installation)
 * [Quick start](https://docs.dstack.ai/quick-start)
 * [Playground](https://github.com/dstackai/dstack-playground)
+* [Setup](https://docs.dstack.ai/setup)
 * [Usage](https://docs.dstack.ai/usage/hello-world)
 * [Examples](https://docs.dstack.ai/examples/tensorboard)
  
