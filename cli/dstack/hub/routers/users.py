@@ -1,14 +1,14 @@
 import re
 import uuid
-from typing import Dict, List
+from typing import List
 
 from fastapi import APIRouter, Depends, HTTPException, status
 from fastapi.security import HTTPBearer
 from fastapi.security.http import HTTPAuthorizationCredentials
 
 from dstack.hub.models import DeleteUsers, User, UserInfo, UserPatch
-from dstack.hub.repository.role import RoleManager
-from dstack.hub.repository.user import UserManager
+from dstack.hub.repository.roles import RoleManager
+from dstack.hub.repository.users import UserManager
 from dstack.hub.routers.util import error_detail
 from dstack.hub.security.scope import Scope
 
