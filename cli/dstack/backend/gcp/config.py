@@ -227,7 +227,9 @@ class GCPConfigurator(Configurator):
             storage_client = storage.Client(credentials=self.credentials)
             storage_client.list_buckets(max_results=1)
         except Exception:
-            raise HubConfigError("Credentials are not valid", code="invalid_credentials")
+            raise HubConfigError(
+                "Credentials are not valid", code="invalid_credentials", fields=["credentials"]
+            )
         project_values = GCPProjectValues()
         project_values.area = self._get_hub_geographic_area(data.get("area"))
         if data.get("area") is not None:
@@ -302,7 +304,9 @@ class GCPConfigurator(Configurator):
         bucket_names = [bucket.name for bucket in buckets if bucket.location.lower() == region]
         if default_bucket is not None and default_bucket not in bucket_names:
             raise HubConfigError(
-                f"Invalid bucket {bucket_name} for region {region}", code="invalid_bucket"
+                f"Invalid bucket {bucket_name} for region {region}",
+                code="invalid_bucket",
+                fields=["bucket_name"],
             )
         element = ProjectElement(selected=default_bucket)
         for bucket_name in bucket_names:
