@@ -22,15 +22,22 @@ type Manager struct {
 
 func NewManager(ctx context.Context, url, branch, hash string) *Manager {
 	ctx = log.AppendArgsCtx(ctx, "url", url, "branch", branch, "hash", hash)
+	referenceName := plumbing.NewBranchReferenceName(branch)
+	var cho git.CheckoutOptions
+	if hash != "" {
+		cho = git.CheckoutOptions{Hash: plumbing.NewHash(hash)}
+	} else {
+		cho = git.CheckoutOptions{Branch: referenceName}
+	}
 	m := &Manager{
 		ctx: ctx,
 		clo: git.CloneOptions{
 			URL:               url,
 			RecurseSubmodules: git.DefaultSubmoduleRecursionDepth,
-			ReferenceName:     plumbing.NewBranchReferenceName(branch),
+			ReferenceName:     referenceName,
 			SingleBranch:      true,
 		},
-		cho: git.CheckoutOptions{Hash: plumbing.NewHash(hash)},
+		cho: cho,
 	}
 
 	return m

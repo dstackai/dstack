@@ -69,8 +69,8 @@ class RepoCredentials(BaseModel):
 
 
 class RepoData(RepoAddress):
-    repo_branch: str
-    repo_hash: str
+    repo_branch: Optional[str]
+    repo_hash: Optional[str]
     repo_diff: Union[str, None]
 
     def __init__(self, **data: Any) -> None:
@@ -82,8 +82,8 @@ class RepoData(RepoAddress):
             f'repo_port={_quoted(self.repo_port)}", '
             f'repo_user_name="{self.repo_user_name}", '
             f'repo_name="{self.repo_name}", '
-            f'repo_branch="{self.repo_branch}", '
-            f'repo_hash="{self.repo_hash}", '
+            f'repo_branch="{_quoted(self.repo_branch)}", '
+            f'repo_hash="{_quoted(self.repo_hash)}", '
             f"repo_diff_length={len(self.repo_diff) if self.repo_diff else None})"
         )
 
@@ -104,8 +104,8 @@ class LocalRepoData(RepoData):
             f'repo_port={_quoted(self.repo_port)}", '
             f'repo_user_name="{self.repo_user_name}", '
             f'repo_name="{self.repo_name}", '
-            f'repo_branch="{self.repo_branch}", '
-            f'repo_hash="{self.repo_hash}", '
+            f'repo_branch="{_quoted(self.repo_branch)}", '
+            f'repo_hash="{_quoted(self.repo_hash)}", '
             f"repo_diff_length={len(self.repo_diff) if self.repo_diff else None}, "
             f"protocol=RepoProtocol.{self.protocol.name}, "
             f"identity_file={_quoted(self.identity_file)}, "
