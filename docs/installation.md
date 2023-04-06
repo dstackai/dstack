@@ -26,7 +26,6 @@ $ dstack config
 ? Choose backend. Use arrows to move, type to filter
 > [aws]
   [gcp]
-  [hub]
 ```
 
 </div>
@@ -44,11 +43,8 @@ $ dstack config
 If you intend to run remote workflows directly in the cloud using local cloud credentials, 
 feel free to choose `aws` or `gcp`. Refer to [AWS](#aws) and [GCP](#gcp) correspondingly for the details.
 
-If you would like to manage cloud credentials, users and other settings centrally
-via a user interface, it is recommended to choose `hub`. 
-
-The `hub` remote is currently in an experimental phase. If you are interested in trying it out, please contact us 
-via [Slack](https://join.slack.com/t/dstackai/shared_invite/zt-xdnsytie-D4qU9BvJP8vkbkHXdi6clQ).
+[//]: # (If you would like to manage cloud credentials, users and other settings centrally)
+[//]: # (via a user interface, it is recommended to choose `hub`. )
 
 [//]: # (## Hub)
 

@@ -134,7 +134,7 @@ nav:
       - Usage:
           - Hello world: usage/hello-world.md
           - Python: usage/python.md
-          - Conda: usage/conda.md
+          - Cache: usage/cache.md
           - Artifacts: usage/artifacts.md
           - Deps: usage/deps.md
           - Remote: usage/remote.md
@@ -175,6 +175,7 @@ nav:
               - dstack init: reference/cli/init.md
               - dstack config: reference/cli/config.md
               - dstack secrets: reference/cli/secrets.md
+              - dstack prune: reference/cli/prune.md
           - YAML:
               - bash: reference/providers/bash.md
               - code: reference/providers/code.md

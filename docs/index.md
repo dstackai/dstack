@@ -18,48 +18,47 @@ Define ML workflows, their output artifacts, hardware requirements, and dependen
 
 ```yaml
 workflows:
-  - name: mnist-data
-    provider: bash
-    commands:
-      - pip install torchvision
-      - python examples/mnist/mnist_data.py
-    artifacts:
-      - path: ./data
-
   - name: train-mnist
     provider: bash
-    deps:
-      - workflow: mnist-data
     commands:
       - pip install torchvision pytorch-lightning tensorboard
       - python examples/mnist/train_mnist.py
     artifacts:
       - path: ./lightning_logs
+    cache:
+      - path: ./data
+      - path: ~/.cache/pip
 ```
 
 </div>
 
-Once a workflow is defined, you can use the `dstack run` command to run it either locally or remotely. 
+### Run locally
+
+Once a workflow is defined, you can use the `dstack run` command to run it. 
 
 By default, workflows run locally on your machine:
 
 <div class="termy">
 
 ```shell
-$ dstack run mnist-data
+$ dstack run train-mnist
 
-RUN        WORKFLOW    SUBMITTED  STATUS     TAG  BACKENDS
-penguin-1  mnist-data  now        Submitted       local
+RUN        WORKFLOW     SUBMITTED  STATUS     TAG  BACKENDS
+penguin-1  train-mnist  now        Submitted       local
 
 Provisioning... It may take up to a minute. ✓
 
 To interrupt, press Ctrl+C.
 
-Downloading http://yann.lecun.com/exdb/mnist/train-images-idx3-ubyte.gz
+GPU available: False, used: False
+
+Epoch 1: [00:03<00:00, 280.17it/s, loss=1.35, v_num=0]
 ---> 100%
 ```
 
 </div>
+
+### Run remotely
 
 To run a workflow remotely (e.g. in a configured cloud account), add the `--remote` flag to the `dstack run` command:
 
@@ -83,5 +82,5 @@ Epoch 1: [00:03<00:00, 280.17it/s, loss=1.35, v_num=0]
 
 </div>
 
-When you run a workflow remotely, `dstack` automatically creates resources in the configured cloud account
-and then destroys them once the workflow is complete.
+`dstack` automatically creates cloud resources in the configured account and destroys them when the remote workflow is
+done.
