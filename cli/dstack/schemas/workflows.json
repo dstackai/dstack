@@ -61,6 +61,30 @@
         }
       }
     },
+    "cache": {
+      "description": "The directories to be cached between workflow runs",
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "oneOf": [
+          {
+            "type": "string"
+          },
+          {
+            "type": "object",
+            "additionalProperties": false,
+            "properties": {
+              "path": {
+                "type": "string"
+              }
+            },
+            "required": [
+              "path"
+            ]
+          }
+        ]
+      }
+    },
     "python": {
       "description": "The major version of Python",
       "anyOf": [
@@ -212,6 +236,9 @@
         },
         "ssh": {
           "$ref": "#/definitions/ssh"
+        },
+        "cache": {
+          "$ref": "#/definitions/cache"
         }
       }
     },
@@ -264,6 +291,9 @@
         },
         "resources": {
           "$ref": "#/definitions/resources"
+        },
+        "cache": {
+          "$ref": "#/definitions/cache"
         }
       }
     },
@@ -316,6 +346,9 @@
         },
         "ssh": {
           "$ref": "#/definitions/ssh"
+        },
+        "cache": {
+          "$ref": "#/definitions/cache"
         }
       }
     },
@@ -356,6 +389,9 @@
         },
         "ssh": {
           "$ref": "#/definitions/ssh"
+        },
+        "cache": {
+          "$ref": "#/definitions/cache"
         }
       }
     },
@@ -396,6 +432,9 @@
         },
         "ssh": {
           "$ref": "#/definitions/ssh"
+        },
+        "cache": {
+          "$ref": "#/definitions/cache"
         }
       }
     }

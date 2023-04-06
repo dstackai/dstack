@@ -48,7 +48,7 @@ Hello, world!
 </div>
 
 The `bash` provider allows to use `pip`, `conda`, and `python` executables from the commands.
-See [Python](python.md) and [Conda](conda.md) for more details.
+See [Python](python.md) for more details.
 
 Also, the `bash` provider allows to expose ports. See [Apps](apps.md) for more details.
 
@@ -135,7 +135,7 @@ For more details, check the [reference](../reference/providers/code.md).
 
 !!! info "NOTE:"
 The `code` provider allows to use `pip`, `conda`, and `python` executables from the commands.
-See [Python](python.md) and [Conda](conda.md) for more details.
+See [Python](python.md) for more details.
 
 ## lab
 
