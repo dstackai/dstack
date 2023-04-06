@@ -3,7 +3,7 @@ from fastapi.security import HTTPBearer
 from fastapi.security.http import HTTPAuthorizationCredentials
 from starlette.requests import Request
 
-from dstack.hub.repository.user import UserManager
+from dstack.hub.repository.users import UserManager
 from dstack.hub.routers.util import error_detail
 
 

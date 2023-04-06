@@ -31,10 +31,7 @@ async def get_backend_config_values(
             None, configurator.configure_hub, config.__root__.dict()
         )
     except HubConfigError as e:
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail=error_detail(e.message, e.code),
-        )
+        _error_response_on_config_error(e, path_to_config=[])
     return result
 
 
@@ -54,7 +51,12 @@ async def create_project(project_info: ProjectInfo) -> ProjectInfo:
     project = await ProjectManager.get(name=project_info.project_name)
     if project is not None:
         raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST, detail=error_detail("Project exists")
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=[
+                error_detail(
+                    "Project exists", code="project_name_not_unique", loc=["project_name"]
+                )
+            ],
         )
     backend = _get_backend(project_info.backend.__root__.type)
     configurator = backend.get_configurator()
@@ -63,10 +65,7 @@ async def create_project(project_info: ProjectInfo) -> ProjectInfo:
             None, configurator.configure_hub, project_info.backend.__root__.dict()
         )
     except HubConfigError as e:
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail=error_detail(e.message, e.code),
-        )
+        _error_response_on_config_error(e, path_to_config=["backend"])
     await ProjectManager.create_project_from_info(project_info)
     return project_info
 
@@ -108,10 +107,7 @@ async def update_project(project_name: str, project_info: ProjectInfo = Body()) 
             None, configurator.configure_hub, project_info.backend.__root__.dict()
         )
     except HubConfigError as e:
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail=error_detail(e.message, e.code),
-        )
+        _error_response_on_config_error(e, path_to_config=["backend"])
     await ProjectManager.update_project_from_info(project_info)
     return project_info
 
@@ -124,3 +120,18 @@ def _get_backend(backend_type: str) -> Backend:
             detail=error_detail(f"Unknown backend {backend_type}"),
         )
     return backend
+
+
+def _error_response_on_config_error(e: HubConfigError, path_to_config: List[str]):
+    if len(e.fields) > 0:
+        error_details = [
+            error_detail(e.message, code=e.code, loc=path_to_config + [f]) for f in e.fields
+        ]
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=error_details,
+        )
+    raise HTTPException(
+        status_code=status.HTTP_400_BAD_REQUEST,
+        detail=[error_detail(e.message, code=e.code)],
+    )

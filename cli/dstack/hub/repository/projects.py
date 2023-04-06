@@ -2,9 +2,10 @@ import json
 from typing import List, Optional
 
 from sqlalchemy import delete, select, update
-from sqlalchemy.orm import Session, selectinload
+from sqlalchemy.ext.asyncio import AsyncSession
+from sqlalchemy.orm import selectinload
 
-from dstack.hub.db import get_or_make_session
+from dstack.hub.db import reuse_or_make_session
 from dstack.hub.db.models import Member as MemberDB
 from dstack.hub.db.models import Project
 from dstack.hub.models import (
@@ -17,63 +18,61 @@ from dstack.hub.models import (
     Member,
     ProjectInfo,
 )
-from dstack.hub.repository.role import RoleManager
+from dstack.hub.repository.roles import RoleManager
 
 
 class ProjectManager:
     @staticmethod
     async def get_project_info(
-        name: str, external_session: Session = None
+        name: str, session: Optional[AsyncSession] = None
     ) -> Optional[ProjectInfo]:
-        project = await ProjectManager.get(name, external_session=external_session)
+        project = await ProjectManager.get(name, session=session)
         if project is None:
             return None
         return _project2info(project=project)
 
     @staticmethod
-    async def create_project_from_info(project_info: ProjectInfo, external_session=None):
+    async def create_project_from_info(
+        project_info: ProjectInfo, session: Optional[AsyncSession] = None
+    ):
         project = _info2project(project_info)
-        await ProjectManager.create(project, external_session=external_session)
+        await ProjectManager.create(project, session=session)
 
     @staticmethod
-    async def update_project_from_info(project_info: ProjectInfo, external_session=None):
+    async def update_project_from_info(
+        project_info: ProjectInfo, session: Optional[AsyncSession] = None
+    ):
         project = _info2project(project_info)
-        await ProjectManager.update(project, external_session=external_session)
+        await ProjectManager.update(project, session=session)
 
     @staticmethod
-    async def list_project_info(external_session=None) -> List[ProjectInfo]:
-        session = get_or_make_session(external_session)
+    @reuse_or_make_session
+    async def list_project_info(session: Optional[AsyncSession] = None) -> List[ProjectInfo]:
         query = await session.execute(select(Project).options(selectinload(Project.members)))
         projects = query.scalars().unique().all()
         projects_info = []
         for project in projects:
             projects_info.append(_project2info(project=project))
-        if external_session is None:
-            await session.close()
         return projects_info
 
     @staticmethod
-    async def get(name: str, external_session=None) -> Optional[Project]:
-        session = get_or_make_session(external_session)
+    @reuse_or_make_session
+    async def get(name: str, session: Optional[AsyncSession] = None) -> Optional[Project]:
         query = await session.execute(
             select(Project).options(selectinload(Project.members)).where(Project.name == name)
         )
         project = query.scalars().unique().first()
-        if external_session is None:
-            await session.close()
         return project
 
     @staticmethod
-    async def create(project: Project, external_session=None):
-        session = get_or_make_session(external_session)
+    @reuse_or_make_session
+    async def create(project: Project, session: Optional[AsyncSession] = None):
         session.add(project)
         await session.commit()
-        if external_session is None:
-            await session.close()
 
     @staticmethod
-    async def update(project: Project, external_session=None):
-        session = get_or_make_session(external_session)
+    @reuse_or_make_session
+    async def update(project: Project, session: Optional[AsyncSession] = None):
         await session.execute(
             update(Project)
             .where(Project.name == project.name)
@@ -84,35 +83,27 @@ class ProjectManager:
             )
         )
         await session.commit()
-        if external_session is None:
-            await session.close()
 
     @staticmethod
-    async def delete(project_name: str, external_session=None):
-        session = get_or_make_session(external_session)
+    @reuse_or_make_session
+    async def delete(project_name: str, session: Optional[AsyncSession] = None):
         await session.execute(delete(Project).where(Project.name == project_name))
         await session.commit()
-        if external_session is None:
-            await session.close()
 
     @staticmethod
-    async def add_member(project: Project, member: Member, external_session=None):
-        session = get_or_make_session(external_session)
-        role = await RoleManager.get_or_create(name=member.project_role, external_session=session)
+    @reuse_or_make_session
+    async def add_member(project: Project, member: Member, session: Optional[AsyncSession] = None):
+        role = await RoleManager.get_or_create(name=member.project_role, session=session)
         session.add(
             MemberDB(project_name=project.name, user_name=member.user_name, role_id=role.id)
         )
         await session.commit()
-        if external_session is None:
-            await session.close()
 
     @staticmethod
-    async def clear_member(project: Project, external_session=None):
-        session = get_or_make_session(external_session)
+    @reuse_or_make_session
+    async def clear_member(project: Project, session: Optional[AsyncSession] = None):
         await session.execute(delete(MemberDB).where(MemberDB.project_name == project.name))
         await session.commit()
-        if external_session is None:
-            await session.close()
 
 
 def _info2project(project_info: ProjectInfo) -> Project:

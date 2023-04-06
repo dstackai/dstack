@@ -16,8 +16,9 @@ async def get_project(project_name: str) -> Project:
     return hub
 
 
-def error_detail(msg: str, code: Optional[str] = None) -> Dict:
+def error_detail(msg: str, code: Optional[str] = None, **kwargs) -> Dict:
     return {
         "msg": msg,
         "code": code,
+        **kwargs,
     }

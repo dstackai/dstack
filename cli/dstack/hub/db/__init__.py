@@ -6,7 +6,7 @@ from sqlalchemy import event
 from sqlalchemy.engine.interfaces import DBAPIConnection
 from sqlalchemy.ext.asyncio import AsyncSession, create_async_engine
 from sqlalchemy.ext.declarative import declarative_base
-from sqlalchemy.orm import Session, sessionmaker
+from sqlalchemy.orm import sessionmaker
 from sqlalchemy.pool import ConnectionPoolEntry
 
 data_path = os.getenv("DSTACK_HUB_DATA") or Path.home() / ".dstack" / "hub" / "data"
@@ -29,7 +29,14 @@ def set_sqlite_pragma(dbapi_connection: DBAPIConnection, _: ConnectionPoolEntry)
     cursor.close()
 
 
-def get_or_make_session(session: Optional[Session]) -> Session:
-    if session is not None:
-        return session
-    return Database.Session()
+def reuse_or_make_session(func):
+    async def new_func(*args, session: Optional[AsyncSession] = None, **kwargs):
+        session_ = session
+        if session_ is None:
+            session_ = Database.Session()
+        res = await func(*args, session=session_, **kwargs)
+        if session is None:
+            await session_.close()
+        return res
+
+    return new_func

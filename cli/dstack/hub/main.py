@@ -13,7 +13,7 @@ from starlette.staticfiles import StaticFiles
 
 from dstack.hub.db.migrate import migrate
 from dstack.hub.db.models import User
-from dstack.hub.repository.user import UserManager
+from dstack.hub.repository.users import UserManager
 from dstack.hub.routers import (
     artifacts,
     jobs,
@@ -123,6 +123,6 @@ app.mount("/", StaticFiles(packages=["dstack.hub"], html=True), name="static")
 @app.exception_handler(404)
 async def custom_http_exception_handler(request, exc):
     if request.url.path.startswith("/api"):
-        return JSONResponse({"message": exc.detail}, status_code=404)
+        return JSONResponse({"detail": exc.detail}, status_code=404)
     else:
         return HTMLResponse(pkg_resources.resource_string(__name__, "statics/index.html"))

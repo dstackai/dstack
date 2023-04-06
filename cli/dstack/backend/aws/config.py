@@ -189,7 +189,11 @@ class AWSConfigurator(Configurator):
             sts = session.client("sts")
             sts.get_caller_identity()
         except botocore.exceptions.ClientError:
-            raise HubConfigError("Credentials are not valid", code="invalid_credentials")
+            raise HubConfigError(
+                "Credentials are not valid",
+                code="invalid_credentials",
+                fields=["access_key", "secret_key"],
+            )
 
         # TODO validate config values
         project_values = AWSProjectValues()
@@ -233,7 +237,9 @@ class AWSConfigurator(Configurator):
             bucket_region = response["ResponseMetadata"]["HTTPHeaders"]["x-amz-bucket-region"]
             if bucket_region.lower() != region:
                 raise HubConfigError(
-                    "The bucket belongs to another AWS region", code="invalid_bucket"
+                    "The bucket belongs to another AWS region",
+                    code="invalid_bucket",
+                    fields=["s3_bucket_name"],
                 )
         except botocore.exceptions.ClientError as e:
             if (
@@ -242,7 +248,9 @@ class AWSConfigurator(Configurator):
                 and e.response["Error"].get("Code") in ["404", "403"]
             ):
                 raise HubConfigError(
-                    f"The bucket {bucket_name} does not exist", code="invalid_bucket"
+                    f"The bucket {bucket_name} does not exist",
+                    code="invalid_bucket",
+                    fields=["s3_bucket_name"],
                 )
             raise e
 

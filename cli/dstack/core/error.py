@@ -1,6 +1,6 @@
 import os
 import sys
-from typing import Optional
+from typing import List, Optional
 
 from git import InvalidGitRepositoryError
 
@@ -11,9 +11,10 @@ class ConfigError(Exception):
 
 
 class HubConfigError(ConfigError):
-    def __init__(self, message: str = "", code: str = "invalid_config"):
+    def __init__(self, message: str = "", code: str = "invalid_config", fields: List[str] = None):
         self.message = message
         self.code = code
+        self.fields = fields if fields is not None else []
 
 
 class BackendError(Exception):
