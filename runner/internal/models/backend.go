@@ -34,6 +34,7 @@ type Job struct {
 	RepoPort           int    `yaml:"repo_port,omitempty"`
 	RepoBranch         string `yaml:"repo_branch"`
 	RepoDiff           string `yaml:"repo_diff"`
+	RepoDiffFilename   string `yaml:"repo_diff_filename,omitempty"`
 	RepoHash           string `yaml:"repo_hash"`
 	RepoName           string `yaml:"repo_name"`
 	RepoUserName       string `yaml:"repo_user_name"`

@@ -170,6 +170,7 @@ def check_dict(element: Any, field: str):
 class Job(JobHead):
     job_id: Optional[str]
     repo_data: RepoData
+    repo_diff_filename: Optional[str] = None
     run_name: str
     workflow_name: Optional[str]
     provider_name: str
@@ -289,7 +290,6 @@ class Job(JobHead):
             "repo_name": self.repo_data.repo_name,
             "repo_branch": self.repo_data.repo_branch or "",
             "repo_hash": self.repo_data.repo_hash or "",
-            "repo_diff": self.repo_data.repo_diff or "",
             "run_name": self.run_name,
             "workflow_name": self.workflow_name or "",
             "provider_name": self.provider_name,
@@ -328,6 +328,10 @@ class Job(JobHead):
             "tag_name": self.tag_name or "",
             "ssh_key_pub": self.ssh_key_pub or "",
         }
+        if self.repo_diff_filename is not None:
+            job_data["repo_diff_filename"] = self.repo_diff_filename
+        else:
+            job_data["repo_diff"] = self.repo_data.repo_diff or ""
         return job_data
 
     @staticmethod
@@ -414,8 +418,9 @@ class Job(JobHead):
                 repo_name=job_data["repo_name"],
                 repo_branch=job_data["repo_branch"] or None,
                 repo_hash=job_data["repo_hash"] or None,
-                repo_diff=job_data["repo_diff"] or None,
+                repo_diff=job_data.get("repo_diff"),
             ),
+            repo_diff_filename=job_data.get("repo_diff_filename"),
             run_name=job_data["run_name"],
             workflow_name=job_data.get("workflow_name") or None,
             provider_name=job_data["provider_name"],

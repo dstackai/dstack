@@ -357,3 +357,11 @@ func (s *S3) GitCredentials(ctx context.Context) *models.GitCredentials {
 	}
 	return s.cliSecret.fetchCredentials(ctx, s.bucket, s.state.Job.RepoHostNameWithPort(), s.state.Job.RepoUserName, s.state.Job.RepoName)
 }
+
+func (s *S3) GetRepoDiff(ctx context.Context, path string) (string, error) {
+	diff, err := s.cliS3.GetFile(ctx, s.bucket, path)
+	if err != nil {
+		return "", gerrors.Wrap(err)
+	}
+	return string(diff), nil
+}

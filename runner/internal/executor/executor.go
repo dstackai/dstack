@@ -355,8 +355,17 @@ func (ex *Executor) prepareGit(ctx context.Context) error {
 		log.Trace(ctx, "GIT checkout error", "err", err, "GIT URL", ex.repo.URL())
 		return gerrors.Wrap(err)
 	}
-	if job.RepoDiff != "" {
-		if err := repo.ApplyDiff(ctx, dir, job.RepoDiff); err != nil {
+
+	repoDiff := job.RepoDiff
+	if job.RepoDiffFilename != "" {
+		var err error
+		repoDiff, err = ex.backend.GetRepoDiff(ctx, job.RepoDiffFilename)
+		if err != nil {
+			return err
+		}
+	}
+	if repoDiff != "" {
+		if err := repo.ApplyDiff(ctx, dir, repoDiff); err != nil {
 			return gerrors.Wrap(err)
 		}
 	}

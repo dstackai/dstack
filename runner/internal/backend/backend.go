@@ -34,6 +34,7 @@ type Backend interface {
 	Secrets(ctx context.Context) (map[string]string, error)
 	GitCredentials(ctx context.Context) *models.GitCredentials
 	GetJobByPath(ctx context.Context, path string) (*models.Job, error)
+	GetRepoDiff(ctx context.Context, path string) (string, error)
 }
 
 type File struct {

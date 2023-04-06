@@ -249,3 +249,11 @@ func (gbackend *GCPBackend) GitCredentials(ctx context.Context) *models.GitCrede
 	}
 	return creds
 }
+
+func (gbackend *GCPBackend) GetRepoDiff(ctx context.Context, path string) (string, error) {
+	diff, err := gbackend.storage.GetFile(ctx, path)
+	if err != nil {
+		return "", gerrors.Wrap(err)
+	}
+	return string(diff), nil
+}

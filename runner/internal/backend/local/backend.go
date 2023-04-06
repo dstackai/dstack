@@ -233,3 +233,11 @@ func (l Local) ListSubDir(ctx context.Context, dir string) ([]string, error) {
 	log.Trace(ctx, "Fetching list sub dir")
 	return l.storage.ListFile(dir)
 }
+
+func (l Local) GetRepoDiff(ctx context.Context, path string) (string, error) {
+	diff, err := l.storage.GetFile(path)
+	if err != nil {
+		return "", gerrors.Wrap(err)
+	}
+	return string(diff), nil
+}
