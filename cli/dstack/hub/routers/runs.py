@@ -2,7 +2,6 @@ from typing import List, Union
 
 from fastapi import APIRouter, Depends
 from fastapi.responses import PlainTextResponse
-from fastapi.security import HTTPBearer
 
 from dstack.core.repo import RepoAddress
 from dstack.core.run import RunHead
@@ -12,8 +11,6 @@ from dstack.hub.routers.util import get_project
 from dstack.hub.security.scope import Scope
 
 router = APIRouter(prefix="/api/project", tags=["runs"])
-
-security = HTTPBearer()
 
 
 @router.post(

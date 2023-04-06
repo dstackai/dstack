@@ -1,7 +1,6 @@
 from typing import List, Optional
 
 from fastapi import APIRouter, Depends
-from fastapi.security import HTTPBearer
 
 from dstack.core.job import Job, JobHead
 from dstack.core.repo import RepoAddress
@@ -11,8 +10,6 @@ from dstack.hub.routers.util import get_project
 from dstack.hub.security.scope import Scope
 
 router = APIRouter(prefix="/api/project", tags=["jobs"])
-
-security = HTTPBearer()
 
 
 @router.post("/{project_name}/jobs/create", dependencies=[Depends(Scope("jobs:create:write"))])

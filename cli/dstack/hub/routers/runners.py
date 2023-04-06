@@ -1,5 +1,4 @@
 from fastapi import APIRouter, Depends
-from fastapi.security import HTTPBearer
 
 from dstack.core.job import Job
 from dstack.hub.models import StopRunners
@@ -8,8 +7,6 @@ from dstack.hub.routers.util import get_project
 from dstack.hub.security.scope import Scope
 
 router = APIRouter(prefix="/api/project", tags=["runners"])
-
-security = HTTPBearer()
 
 
 @router.post("/{project_name}/runners/run", dependencies=[Depends(Scope("runners:run:write"))])

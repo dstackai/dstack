@@ -14,11 +14,23 @@ from dstack.hub.security.scope import Scope
 
 router = APIRouter(prefix="/api/users", tags=["users"])
 
-security = HTTPBearer()
+
+@router.get("/list", response_model=List[User], dependencies=[Depends(Scope("users:list:read"))])
+async def list_users() -> List[User]:
+    users = await UserManager.get_user_list()
+    project_users = []
+    for user in users:
+        project_user = User(
+            user_name=user.name,
+            token=user.token,
+            global_role=user.project_role.name,
+        )
+        project_users.append(project_user)
+    return project_users
 
 
 @router.post("", response_model=User, dependencies=[Depends(Scope("users:info:read"))])
-async def users_create(body: User) -> User:
+async def create_user(body: User) -> User:
     if not re.match(r"^[a-zA-Z0-9]([_-](?![_-])|[a-zA-Z0-9]){1,18}[a-zA-Z0-9]$", body.user_name):
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST, detail=error_detail("Username is incorrect")
@@ -37,7 +49,7 @@ async def users_create(body: User) -> User:
 
 
 @router.delete("", dependencies=[Depends(Scope("users:get:read"))])
-async def users_delete(body: DeleteUsers):
+async def delete_users(body: DeleteUsers):
     for user_name in body.users:
         user = await UserManager.get_user_by_name(name=user_name)
         if user is None:
@@ -48,23 +60,11 @@ async def users_delete(body: DeleteUsers):
 
 
 @router.get("/info", response_model=UserInfo, dependencies=[Depends(Scope("users:info:read"))])
-async def users_info(authorization: HTTPAuthorizationCredentials = Depends(security)) -> UserInfo:
+async def get_my_user_info(
+    authorization: HTTPAuthorizationCredentials = Depends(HTTPBearer()),
+) -> UserInfo:
     user = await UserManager.get_user_by_token(authorization.credentials)
     return UserInfo(user_name=user.name, global_role=user.project_role.name)
-
-
-@router.get("/list", response_model=List[User], dependencies=[Depends(Scope("users:list:read"))])
-async def users_list() -> List[User]:
-    users = await UserManager.get_user_list()
-    project_users = []
-    for user in users:
-        project_user = User(
-            user_name=user.name,
-            token=user.token,
-            global_role=user.project_role.name,
-        )
-        project_users.append(project_user)
-    return project_users
 
 
 @router.post(
@@ -72,7 +72,7 @@ async def users_list() -> List[User]:
     response_model=User,
     dependencies=[Depends(Scope("users:refresh:write"))],
 )
-async def users_get(user_name: str) -> User:
+async def refresh_token(user_name: str) -> User:
     user = await UserManager.get_user_by_name(name=user_name)
     user.token = str(uuid.uuid4())
     await UserManager.save(user)
@@ -84,7 +84,7 @@ async def users_get(user_name: str) -> User:
 
 
 @router.patch("/{user_name}", response_model=User, dependencies=[Depends(Scope("users:get:read"))])
-async def users_patch(user_name: str, body: UserPatch) -> User:
+async def update_user(user_name: str, body: UserPatch) -> User:
     user = await UserManager.get_user_by_name(name=user_name)
     if user is None:
         raise HTTPException(
@@ -103,7 +103,7 @@ async def users_patch(user_name: str, body: UserPatch) -> User:
 
 
 @router.get("/{user_name}", response_model=User, dependencies=[Depends(Scope("users:get:read"))])
-async def users_get(user_name: str) -> User:
+async def get_user(user_name: str) -> User:
     user = await UserManager.get_user_by_name(name=user_name)
     return User(
         user_name=user.name,

@@ -28,9 +28,6 @@ class Role(Base, Database.Base):
     id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
     name: Mapped[str] = mapped_column(String(30))
 
-    def __repr__(self) -> str:
-        return super().__repr__()
-
 
 class User(Base, Database.Base):
     __tablename__ = "users"
@@ -39,9 +36,6 @@ class User(Base, Database.Base):
     token: Mapped[str] = mapped_column(String(200))
     role_id: Mapped[int] = mapped_column(ForeignKey("roles.id"))
     project_role: Mapped[Role] = relationship(lazy="selectin")
-
-    def __repr__(self) -> str:
-        return super().__repr__()
 
 
 class Member(Base, Database.Base):
@@ -57,9 +51,6 @@ class Member(Base, Database.Base):
     role_id: Mapped[int] = mapped_column(ForeignKey("roles.id"))
     project_role: Mapped[Role] = relationship(lazy="selectin")
 
-    def __repr__(self) -> str:
-        return super().__repr__()
-
 
 class Project(Base, Database.Base):
     __tablename__ = "projects"
@@ -70,15 +61,9 @@ class Project(Base, Database.Base):
     auth: Mapped[str] = mapped_column(String(300))
     members: Mapped[List[Member]] = relationship(back_populates="project", lazy="selectin")
 
-    def __repr__(self) -> str:
-        return super().__repr__()
-
 
 class Scope(Base, Database.Base):
     __tablename__ = "scopes"
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
     pattern: Mapped[str] = mapped_column(String(100), nullable=False)
-
-    def __repr__(self) -> str:
-        return super().__repr__()

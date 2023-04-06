@@ -3,7 +3,6 @@ from typing import Any, AsyncIterable, Callable, Coroutine, List, Mapping, Optio
 
 import anyio
 from fastapi import APIRouter, Depends
-from fastapi.security import HTTPBearer
 from starlette.background import BackgroundTask
 from starlette.concurrency import iterate_in_threadpool
 from starlette.responses import Response
@@ -17,8 +16,6 @@ from dstack.hub.routers.util import get_project
 from dstack.hub.security.scope import Scope
 
 router = APIRouter(prefix="/api/project", tags=["logs"])
-
-security = HTTPBearer()
 
 
 class JSONStreamingResponse(Response):

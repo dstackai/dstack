@@ -1,6 +1,5 @@
 from fastapi import APIRouter, Depends
 from fastapi.responses import PlainTextResponse
-from fastapi.security import HTTPBearer
 
 from dstack.hub.models import LinkUpload
 from dstack.hub.routers.cache import get_backend
@@ -8,8 +7,6 @@ from dstack.hub.routers.util import get_project
 from dstack.hub.security.scope import Scope
 
 router = APIRouter(prefix="/api/project", tags=["link"])
-
-security = HTTPBearer()
 
 
 @router.post(

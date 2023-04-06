@@ -1,7 +1,6 @@
 from alembic import command, config
 
 from dstack.hub.db import Database, data_path
-from dstack.hub.db.models import Member, Project, Role, Scope, User, association_table_user_project
 
 alembic_cfg = config.Config()
 alembic_cfg.set_main_option("script_location", "dstack.hub:migration")

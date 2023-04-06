@@ -1,7 +1,6 @@
 from typing import List, Optional
 
 from fastapi import APIRouter, Depends
-from fastapi.security import HTTPBearer
 
 from dstack.core.repo import RepoAddress
 from dstack.core.secret import Secret
@@ -11,8 +10,6 @@ from dstack.hub.routers.util import get_project
 from dstack.hub.security.scope import Scope
 
 router = APIRouter(prefix="/api/project", tags=["secrets"])
-
-security = HTTPBearer()
 
 
 @router.get(
