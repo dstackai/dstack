@@ -144,21 +144,24 @@ class GCPConfig(BackendConfig):
         return yaml.dump(self.serialize())
 
     @classmethod
-    def deserialize(cls, data: Dict) -> Optional["GCPConfig"]:
-        if data.get("backend") != "gcp":
+    def deserialize(
+        cls, config_data: Dict, auth_data: Optional[Dict] = None
+    ) -> Optional["GCPConfig"]:
+        if config_data.get("type") != "gcp":
             raise ConfigError(f"Not a GCP config")
 
         try:
-            project_id = data["project"]
-            region = data["region"]
-            zone = data["zone"]
-            bucket_name = data["bucket"]
-            vpc = data["vpc"]
-            subnet = data["subnet"]
+            credentials = json.loads(auth_data.get("credentials")) if auth_data else None
+            project_id = config_data.get("project") or credentials["project_id"]
+            region = config_data["region"]
+            zone = config_data["zone"]
+            bucket_name = config_data["bucket_name"]
+            vpc = config_data["vpc"]
+            subnet = config_data["subnet"]
         except KeyError:
             raise ConfigError("Cannot load config")
 
-        credentials_file = data.get("credentials_file")
+        credentials_file = config_data.get("credentials_file")
         return cls(
             project_id=project_id,
             region=region,
@@ -167,6 +170,7 @@ class GCPConfig(BackendConfig):
             vpc=vpc,
             subnet=subnet,
             credentials_file=credentials_file,
+            credentials=credentials,
         )
 
     @classmethod
@@ -193,8 +197,8 @@ class GCPConfigurator(Configurator):
     def name(self):
         return "gcp"
 
-    def get_config(self, data: Dict) -> BackendConfig:
-        return GCPConfig.deserialize(data=data)
+    def get_config(self, config_data: Dict, auth_data: Optional[Dict] = None) -> BackendConfig:
+        return GCPConfig.deserialize(config_data, auth_data)
 
     def register_parser(self, parser):
         gcp_parser = parser.add_parser("gcp", help="", formatter_class=RichHelpFormatter)
@@ -218,9 +222,9 @@ class GCPConfigurator(Configurator):
         config.save()
         print(f"[grey58]OK[/]")
 
-    def configure_hub(self, data: Dict) -> GCPProjectValues:
+    def configure_hub(self, config_data: Dict) -> GCPProjectValues:
         try:
-            service_account_info = json.loads(data.get("credentials"))
+            service_account_info = json.loads(config_data.get("credentials"))
             self.credentials = service_account.Credentials.from_service_account_info(
                 info=service_account_info
             )
@@ -231,27 +235,30 @@ class GCPConfigurator(Configurator):
                 "Credentials are not valid", code="invalid_credentials", fields=["credentials"]
             )
         project_values = GCPProjectValues()
-        project_values.area = self._get_hub_geographic_area(data.get("area"))
-        if data.get("area") is not None:
-            location = self._get_location(data.get("area"))
+        project_values.area = self._get_hub_geographic_area(config_data.get("area"))
+        if config_data.get("area") is not None:
+            location = self._get_location(config_data.get("area"))
             project_values.region, regions = self._get_hub_region(
                 location=location,
-                default_region=data.get("region"),
+                default_region=config_data.get("region"),
             )
-            if data.get("region") is not None and regions.get(data.get("region")) is not None:
+            if (
+                config_data.get("region") is not None
+                and regions.get(config_data.get("region")) is not None
+            ):
                 project_values.zone = self._get_hub_zone(
                     location=location,
-                    region=regions.get(data.get("region")),
-                    default_zone=data.get("zone"),
+                    region=regions.get(config_data.get("region")),
+                    default_zone=config_data.get("zone"),
                 )
                 project_values.bucket_name = self._get_hub_buckets(
-                    region=data.get("region"),
-                    default_bucket=data.get("bucket_name"),
+                    region=config_data.get("region"),
+                    default_bucket=config_data.get("bucket_name"),
                 )
                 project_values.vpc_subnet = self._get_hub_vpc_subnet(
-                    region=data.get("region"),
-                    default_vpc=data.get("vpc"),
-                    default_subnet=data.get("subnet"),
+                    region=config_data.get("region"),
+                    default_vpc=config_data.get("vpc"),
+                    default_subnet=config_data.get("subnet"),
                 )
         return project_values
 

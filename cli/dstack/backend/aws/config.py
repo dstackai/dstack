@@ -113,16 +113,21 @@ class AWSConfig(BackendConfig):
         return json.dumps(self.serialize())
 
     @classmethod
-    def deserialize(cls, data: Dict) -> Optional["AWSConfig"]:
-        bucket_name = data.get("bucket_name") or data.get("s3_bucket_name")
-        region_name = data.get("region_name") or _DEFAULT_REGION_NAME
-        profile_name = data.get("profile_name")
-        subnet_id = data.get("subnet_id") or data.get("ec2_subnet_id") or data.get("subnet")
+    def deserialize(cls, config_data: Dict, auth_data: Dict = None) -> Optional["AWSConfig"]:
+        bucket_name = config_data.get("bucket_name") or config_data.get("s3_bucket_name")
+        region_name = config_data.get("region_name") or _DEFAULT_REGION_NAME
+        profile_name = config_data.get("profile_name")
+        subnet_id = (
+            config_data.get("subnet_id")
+            or config_data.get("ec2_subnet_id")
+            or config_data.get("subnet")
+        )
         return cls(
             bucket_name=bucket_name,
             region_name=region_name,
             profile_name=profile_name,
             subnet_id=subnet_id,
+            credentials=auth_data,
         )
 
     @classmethod
@@ -144,8 +149,10 @@ class AWSConfigurator(Configurator):
     NAME = "aws"
     config: AWSConfig
 
-    def get_config(self, data: Dict) -> Optional[BackendConfig]:
-        return AWSConfig.deserialize(data=data)
+    def get_config(
+        self, config_data: Dict, auth_data: Optional[Dict] = None
+    ) -> Optional[BackendConfig]:
+        return AWSConfig.deserialize(config_data, auth_data)
 
     def register_parser(self, parser):
         aws_parser = parser.add_parser("aws", help="", formatter_class=RichHelpFormatter)

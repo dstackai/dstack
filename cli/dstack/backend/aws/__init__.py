@@ -28,7 +28,6 @@ from dstack.core.tag import TagHead
 
 
 class AwsBackend(CloudBackend):
-
     _session: Optional[boto3.Session] = None
     backend_config: AWSConfig
 

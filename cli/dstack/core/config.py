@@ -14,7 +14,6 @@ def get_dstack_dir():
 
 
 class BackendConfig(ABC):
-
     credentials: Optional[Dict] = None
 
     @abstractmethod
@@ -38,11 +37,11 @@ class Configurator(ABC):
         pass
 
     @abstractmethod
-    def configure_hub(self, data: Dict) -> ProjectValues:
+    def configure_hub(self, config_data: Dict) -> ProjectValues:
         pass
 
     @abstractmethod
-    def get_config(self, data: Dict) -> BackendConfig:
+    def get_config(self, config_data: Dict, auth_data: Optional[Dict] = None) -> BackendConfig:
         pass
 
     @abstractmethod

@@ -31,9 +31,8 @@ def get_backend(project: Project) -> CloudBackend:
                 detail=error_detail(f"Configurator not found for {project.backend}"),
             )
         json_data = json.loads(str(project.config))
-        config = configurator.get_config(json_data)
-        if project.auth is not None:
-            config.credentials = json.loads(str(project.auth))
+        auth_data = json.loads(str(project.auth)) if project.auth else None
+        config = configurator.get_config(json_data, auth_data)
         backend.__init__(backend_config=config)
         cache[project.name] = backend
     return cache.get(project.name)

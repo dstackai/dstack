@@ -1,7 +1,7 @@
 import os
 from argparse import Namespace
 from pathlib import Path
-from typing import Any, Tuple
+from typing import Any, Dict, Optional, Tuple
 
 import yaml
 from rich import print
@@ -56,7 +56,7 @@ class HUBConfig(BackendConfig):
 class HubConfigurator(Configurator):
     NAME = "hub"
 
-    def get_config(self, config: Any):
+    def get_config(self, config_data: Any, auth_data: Optional[Dict] = None):
         pass
 
     def get_backend_client(self, config: Any):
