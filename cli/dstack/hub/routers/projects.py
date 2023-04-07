@@ -1,21 +1,28 @@
 import asyncio
-from typing import List
+from typing import List, Tuple
 
 from fastapi import APIRouter, Body, Depends, HTTPException, status
 
 from dstack.api.backend import dict_backends
 from dstack.backend.base import Backend
 from dstack.core.error import HubConfigError
+from dstack.hub.db.models import Project, User
 from dstack.hub.models import (
     Member,
     ProjectConfigWithCredsPartial,
     ProjectDelete,
     ProjectInfo,
+    ProjectInfoWithCreds,
     ProjectValues,
 )
 from dstack.hub.repository.projects import ProjectManager
 from dstack.hub.routers.util import error_detail, get_project
-from dstack.hub.security.scope import Scope
+from dstack.hub.security.permissions import (
+    Authenticated,
+    ProjectAdmin,
+    ProjectMember,
+    ensure_user_project_admin,
+)
 
 router = APIRouter(prefix="/api/projects", tags=["project"])
 
@@ -23,6 +30,7 @@ router = APIRouter(prefix="/api/projects", tags=["project"])
 @router.post("/backends/values")
 async def get_backend_config_values(
     config: ProjectConfigWithCredsPartial = Body(),
+    user: User = Depends(Authenticated()),
 ) -> ProjectValues:
     backend = _get_backend(config.__root__.type)
     configurator = backend.get_configurator()
@@ -37,17 +45,15 @@ async def get_backend_config_values(
 
 @router.get(
     "/list",
-    dependencies=[Depends(Scope("project:list:read"))],
 )
-async def list_project() -> List[ProjectInfo]:
+async def list_projects(user: User = Depends(Authenticated())) -> List[ProjectInfo]:
     return await ProjectManager.list_project_info()
 
 
-@router.post(
-    "",
-    dependencies=[Depends(Scope("project:projects:write"))],
-)
-async def create_project(project_info: ProjectInfo) -> ProjectInfo:
+@router.post("")
+async def create_project(
+    project_info: ProjectInfoWithCreds, user: User = Depends(Authenticated())
+) -> ProjectInfoWithCreds:
     project = await ProjectManager.get(name=project_info.project_name)
     if project is not None:
         raise HTTPException(
@@ -66,40 +72,51 @@ async def create_project(project_info: ProjectInfo) -> ProjectInfo:
         )
     except HubConfigError as e:
         _error_response_on_config_error(e, path_to_config=["backend"])
-    await ProjectManager.create_project_from_info(project_info)
+    await ProjectManager.create_project_from_info(user=user, project_info=project_info)
     return project_info
 
 
-@router.delete("", dependencies=[Depends(Scope("project:delete:write"))])
-async def delete_project(body: ProjectDelete):
+@router.delete("")
+async def delete_projects(body: ProjectDelete, user: User = Depends(Authenticated())):
     for project_name in body.projects:
+        project = await get_project(project_name)
+        await ensure_user_project_admin(user, project)
         await ProjectManager.delete(project_name)
 
 
 @router.post(
     "/{project_name}/members",
-    dependencies=[Depends(Scope("project:members:write"))],
 )
-async def set_project_members(project_name: str, body: List[Member] = Body()):
-    project = await get_project(project_name=project_name)
-    await ProjectManager.clear_member(project=project)
-    for member in body:
-        await ProjectManager.add_member(project=project, member=member)
+async def set_project_members(
+    body: List[Member] = Body(), user_project: Tuple[User, Project] = Depends(ProjectAdmin())
+):
+    _, project = user_project
+    await ProjectManager.set_members(project=project, members=body)
 
 
-@router.get("/{project_name}", dependencies=[Depends(Scope("project:list:read"))])
-async def get_project_info(project_name: str) -> ProjectInfo:
-    project = await ProjectManager.get_project_info(name=project_name)
-    if project is None:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail=error_detail("Project not found"),
-        )
-    return project
+@router.get("/{project_name}/config_info")
+async def get_project_config_info(
+    user_project: Tuple[User, Project] = Depends(ProjectAdmin())
+) -> ProjectInfoWithCreds:
+    _, project = user_project
+    project_info = await ProjectManager.get_project_info_with_creds(project)
+    return project_info
 
 
-@router.patch("/{project_name}", dependencies=[Depends(Scope("project:patch:write"))])
-async def update_project(project_name: str, project_info: ProjectInfo = Body()) -> ProjectInfo:
+@router.get("/{project_name}")
+async def get_project_info(
+    user_project: Tuple[User, Project] = Depends(ProjectMember())
+) -> ProjectInfo:
+    _, project = user_project
+    project_info = await ProjectManager.get_project_info(project)
+    return project_info
+
+
+@router.patch("/{project_name}")
+async def update_project(
+    project_info: ProjectInfoWithCreds = Body(),
+    user_project: Tuple[User, Project] = Depends(ProjectAdmin()),
+) -> ProjectInfoWithCreds:
     backend = _get_backend(project_info.backend.__root__.type)
     configurator = backend.get_configurator()
     try:

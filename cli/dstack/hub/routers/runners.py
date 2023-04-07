@@ -1,25 +1,24 @@
 from fastapi import APIRouter, Depends
-from fastapi.security import HTTPBearer
 
 from dstack.core.job import Job
 from dstack.hub.models import StopRunners
 from dstack.hub.routers.cache import get_backend
 from dstack.hub.routers.util import get_project
-from dstack.hub.security.scope import Scope
+from dstack.hub.security.permissions import ProjectMember
 
-router = APIRouter(prefix="/api/project", tags=["runners"])
+router = APIRouter(
+    prefix="/api/project", tags=["runners"], dependencies=[Depends(ProjectMember())]
+)
 
-security = HTTPBearer()
 
-
-@router.post("/{project_name}/runners/run", dependencies=[Depends(Scope("runners:run:write"))])
+@router.post("/{project_name}/runners/run")
 async def run_runners(project_name: str, job: Job):
     project = await get_project(project_name=project_name)
     backend = get_backend(project)
     backend.run_job(job=job)
 
 
-@router.post("/{project_name}/runners/stop", dependencies=[Depends(Scope("runners:stop:write"))])
+@router.post("/{project_name}/runners/stop")
 async def stop_runners(project_name: str, body: StopRunners):
     project = await get_project(project_name=project_name)
     backend = get_backend(project)

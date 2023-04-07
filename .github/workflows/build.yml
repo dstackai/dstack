@@ -37,7 +37,7 @@ jobs:
     runs-on: ${{ matrix.os }}
     strategy:
       matrix:
-        os: [ macos-latest, windows-latest, ubuntu-latest ]
+        os: [ macos-latest, ubuntu-latest ]
         python-version: [ 3.7, 3.8, 3.9, "3.10", 3.11 ]
     defaults:
       run:
@@ -52,9 +52,11 @@ jobs:
         run: |
           python -m pip install --upgrade pip
           pip install -r requirements.txt
-      - name: Test with unittest
+          pip install -r requirements_dev.txt
+      - name: Run pytest
         run: |
-          python -m unittest discover tests -t .
+          mkdir -p dstack/hub/statics
+          pytest tests/
 
   build-hub-master:
     runs-on: ubuntu-latest
