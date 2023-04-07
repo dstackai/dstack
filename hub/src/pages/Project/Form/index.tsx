@@ -2,15 +2,16 @@ import React from 'react';
 import { useTranslation } from 'react-i18next';
 import { Container, Header, FormUI, SpaceBetween, Button, FormInput, FormRadioButtons } from 'components';
 import { useForm, FormProvider, DefaultValues } from 'react-hook-form';
+import { FieldPath } from 'react-hook-form/dist/types/path';
+import { useNotifications } from 'hooks';
+import { isRequestFormErrors2, isRequestFormFieldError } from 'libs';
 import { IProps, TBackendOption } from './types';
 import { AWSBackend } from './AWS';
 import { GCPBackend } from './GCP';
-import { isRequestFormErrors, isRequestFormFieldError } from 'libs/isErrorWithMessage';
-import { FormFieldError } from 'libs/types';
-import { FieldPath } from 'react-hook-form/dist/types/path';
 
 export const ProjectForm: React.FC<IProps> = ({ initialValues, onCancel, loading, onSubmit: onSubmitProp }) => {
     const { t } = useTranslation();
+    const [pushNotification] = useNotifications();
     const isEditing = !!initialValues;
 
     const getDefaultValues = (): DefaultValues<IProject> => {
@@ -65,15 +66,21 @@ export const ProjectForm: React.FC<IProps> = ({ initialValues, onCancel, loading
 
         clearErrors();
 
-        onSubmitProp(data).catch((error) => {
-            if (!isRequestFormErrors(error.data)) return;
+        onSubmitProp(data).catch((errorResponse) => {
+            const errorRequestData = errorResponse?.data;
 
-            error.data.detail.forEach((item: FormFieldError) => {
-                if (isRequestFormFieldError(item)) {
-                    const [_, ...fieldName] = item.loc;
-                    setError(fieldName.join('.') as FieldPath<IProject>, { type: 'custom', message: item.msg });
-                }
-            });
+            if (isRequestFormErrors2(errorRequestData)) {
+                errorRequestData.detail.forEach((error) => {
+                    if (isRequestFormFieldError(error)) {
+                        setError(error.loc.join('.') as FieldPath<IProject>, { type: 'custom', message: error.msg });
+                    } else {
+                        pushNotification({
+                            type: 'error',
+                            content: t('common.server_error', { error: error.msg }),
+                        });
+                    }
+                });
+            }
         });
     };
 

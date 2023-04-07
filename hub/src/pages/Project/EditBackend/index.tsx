@@ -2,10 +2,9 @@ import React from 'react';
 import { Container, Header, Loader, ContentLayout } from 'components';
 import { useTranslation } from 'react-i18next';
 import { useNavigate, useParams } from 'react-router-dom';
-import { useGetProjectQuery, useUpdateProjectMutation } from 'services/project';
+import { useGetProjectWithConfigInfoQuery, useUpdateProjectMutation } from 'services/project';
 import { useBreadcrumbs, useNotifications } from 'hooks';
 import { ROUTES } from 'routes';
-import { isRequestErrorWithDetail } from 'libs';
 import { ProjectForm } from '../Form';
 
 export const ProjectEditBackend: React.FC = () => {
@@ -14,7 +13,7 @@ export const ProjectEditBackend: React.FC = () => {
     const paramProjectName = params.name ?? '';
     const navigate = useNavigate();
     const [pushNotification] = useNotifications();
-    const { data, isLoading } = useGetProjectQuery({ name: paramProjectName });
+    const { data, isLoading } = useGetProjectWithConfigInfoQuery({ name: paramProjectName });
     const [updateProject, { isLoading: isProjectUpdating }] = useUpdateProjectMutation();
 
     useBreadcrumbs([
@@ -53,17 +52,7 @@ export const ProjectEditBackend: React.FC = () => {
 
             navigate(ROUTES.PROJECT.DETAILS.FORMAT(data.project_name ?? paramProjectName));
         } catch (e) {
-            if (isRequestErrorWithDetail(e)) {
-                pushNotification({
-                    type: 'error',
-                    content: `${t('projects.edit.error_notification')}: ${e.detail}`,
-                });
-            } else {
-                pushNotification({
-                    type: 'error',
-                    content: t('projects.edit.error_notification'),
-                });
-            }
+            console.log(e);
         }
 
         return request;

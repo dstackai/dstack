@@ -35,6 +35,16 @@ export const projectApi = createApi({
             providesTags: (result) => (result ? [{ type: 'Projects' as const, id: result.project_name }] : []),
         }),
 
+        getProjectWithConfigInfo: builder.query<IProject, { name: IProject['project_name'] }>({
+            query: ({ name }) => {
+                return {
+                    url: API.PROJECTS.DETAILS_WITH_CONFIG(name),
+                };
+            },
+
+            providesTags: (result) => (result ? [{ type: 'Projects' as const, id: result.project_name }] : []),
+        }),
+
         createProject: builder.mutation<IProject, IProject>({
             query: (project) => ({
                 url: API.PROJECTS.BASE(),
@@ -77,7 +87,7 @@ export const projectApi = createApi({
             invalidatesTags: () => ['Projects'],
         }),
 
-        backendValues: builder.mutation<IProjectAwsBackendValues, Partial<TProjectBackend>>({
+        backendValues: builder.mutation<IProjectAwsBackendValues & IProjectGCPBackendValues, Partial<TProjectBackend>>({
             query: (data) => ({
                 url: API.PROJECTS.BACKEND_VALUES(),
                 method: 'POST',
@@ -90,6 +100,7 @@ export const projectApi = createApi({
 export const {
     useGetProjectsQuery,
     useGetProjectQuery,
+    useGetProjectWithConfigInfoQuery,
     useCreateProjectMutation,
     useUpdateProjectMutation,
     useUpdateProjectMembersMutation,

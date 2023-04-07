@@ -6,9 +6,12 @@ import { debounce } from 'lodash';
 import { useBackendValuesMutation } from 'services/project';
 import { IProps } from './types';
 import styles from './styles.module.scss';
+import { isRequestFormFieldError, isRequestFormErrors2 } from 'libs';
+import { useNotifications } from 'hooks';
 
 export const AWSBackend: React.FC<IProps> = ({ loading }) => {
     const { t } = useTranslation();
+    const [pushNotification] = useNotifications();
     const { control, getValues, setValue, setError, clearErrors, watch } = useFormContext();
     const [valuesData, setValuesData] = useState<IProjectAwsBackendValues | undefined>();
     const [regions, setRegions] = useState<FormSelectOptions>([]);
@@ -73,11 +76,19 @@ export const AWSBackend: React.FC<IProps> = ({ loading }) => {
             console.log('fetch backends values error:', errorResponse);
             // eslint-disable-next-line @typescript-eslint/ban-ts-comment
             // @ts-ignore
-            const detailsError = errorResponse?.data?.detail;
+            const errorRequestData = errorResponse?.data;
 
-            if (detailsError) {
-                setError('backend.access_key', { type: 'custom', message: detailsError as string });
-                setError('backend.secret_key', { type: 'custom', message: detailsError as string });
+            if (isRequestFormErrors2(errorRequestData)) {
+                errorRequestData.detail.forEach((error) => {
+                    if (isRequestFormFieldError(error)) {
+                        setError(`backend.${error.loc.join('.')}`, { type: 'custom', message: error.msg });
+                    } else {
+                        pushNotification({
+                            type: 'error',
+                            content: t('common.server_error', { error: error?.msg }),
+                        });
+                    }
+                });
             }
         }
     };
