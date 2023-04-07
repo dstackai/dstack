@@ -55,6 +55,7 @@ jobs:
           pip install -r requirements_dev.txt
       - name: Run pytest
         run: |
+          mkdir -p dstack/hub/statics
           pytest tests/
 
   build-hub-master:
