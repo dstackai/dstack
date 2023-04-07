@@ -1,19 +1,15 @@
 from alembic import command, config
 
-from dstack.hub.db import Database, data_path
-
-alembic_cfg = config.Config()
-alembic_cfg.set_main_option("script_location", "dstack.hub:migration")
-alembic_cfg.set_main_option(
-    "sqlalchemy.url", f"sqlite+aiosqlite:///{str(data_path.absolute())}/sqlite.db"
-)
-
-
-def run_alembic_upgrade(connection, cfg):
-    cfg.attributes["connection"] = connection
-    command.upgrade(cfg, "head")
+from dstack.hub.db import db
 
 
 async def migrate():
-    async with Database.engine.begin() as connection:
-        await connection.run_sync(run_alembic_upgrade, alembic_cfg)
+    async with db.engine.begin() as connection:
+        await connection.run_sync(_run_alembic_upgrade)
+
+
+def _run_alembic_upgrade(connection):
+    alembic_cfg = config.Config()
+    alembic_cfg.set_main_option("script_location", "dstack.hub:migration")
+    alembic_cfg.attributes["connection"] = connection
+    command.upgrade(alembic_cfg, "head")

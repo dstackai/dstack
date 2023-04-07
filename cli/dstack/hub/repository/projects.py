@@ -7,7 +7,7 @@ from sqlalchemy.orm import selectinload
 
 from dstack.hub.db import reuse_or_make_session
 from dstack.hub.db.models import Member as MemberDB
-from dstack.hub.db.models import Project
+from dstack.hub.db.models import Project, User
 from dstack.hub.models import (
     AWSProjectConfig,
     AWSProjectConfigWithCreds,
@@ -18,25 +18,24 @@ from dstack.hub.models import (
     Member,
     ProjectInfo,
 )
-from dstack.hub.repository.roles import RoleManager
+from dstack.hub.security.utils import ROLE_ADMIN
 
 
 class ProjectManager:
     @staticmethod
-    async def get_project_info(
-        name: str, session: Optional[AsyncSession] = None
-    ) -> Optional[ProjectInfo]:
-        project = await ProjectManager.get(name, session=session)
-        if project is None:
-            return None
+    async def get_project_info(project: Project) -> Optional[ProjectInfo]:
         return _project2info(project=project)
 
     @staticmethod
+    @reuse_or_make_session
     async def create_project_from_info(
-        project_info: ProjectInfo, session: Optional[AsyncSession] = None
+        user: User, project_info: ProjectInfo, session: Optional[AsyncSession] = None
     ):
         project = _info2project(project_info)
         await ProjectManager.create(project, session=session)
+        await ProjectManager._add_member(
+            project, Member(user_name=user.name, project_role=ROLE_ADMIN)
+        )
 
     @staticmethod
     async def update_project_from_info(
@@ -92,16 +91,42 @@ class ProjectManager:
 
     @staticmethod
     @reuse_or_make_session
-    async def add_member(project: Project, member: Member, session: Optional[AsyncSession] = None):
-        role = await RoleManager.get_or_create(name=member.project_role, session=session)
+    async def get_member(
+        user: User, project: Project, session: Optional[AsyncSession] = None
+    ) -> Optional[MemberDB]:
+        query = await session.execute(
+            select(MemberDB).where(
+                MemberDB.project_name == project.name, MemberDB.user_name == user.name
+            )
+        )
+        return query.scalars().unique().first()
+
+    @staticmethod
+    @reuse_or_make_session
+    async def set_members(
+        project: Project, members: List[Member], session: Optional[AsyncSession] = None
+    ) -> Optional[MemberDB]:
+        await ProjectManager._clear_member(project, session=session)
+        for member in members:
+            await ProjectManager._add_member(project=project, member=member)
+
+    @staticmethod
+    @reuse_or_make_session
+    async def _add_member(
+        project: Project, member: Member, session: Optional[AsyncSession] = None
+    ):
         session.add(
-            MemberDB(project_name=project.name, user_name=member.user_name, role_id=role.id)
+            MemberDB(
+                project_name=project.name,
+                user_name=member.user_name,
+                project_role=member.project_role,
+            )
         )
         await session.commit()
 
     @staticmethod
     @reuse_or_make_session
-    async def clear_member(project: Project, session: Optional[AsyncSession] = None):
+    async def _clear_member(project: Project, session: Optional[AsyncSession] = None):
         await session.execute(delete(MemberDB).where(MemberDB.project_name == project.name))
         await session.commit()
 
@@ -130,7 +155,7 @@ def _project2info(project: Project) -> ProjectInfo:
         members.append(
             Member(
                 user_name=member.user_name,
-                project_role=member.project_role.name,
+                project_role=member.project_role,
             )
         )
     backend = None

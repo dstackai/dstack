@@ -6,12 +6,16 @@ from typing_extensions import Literal
 from dstack.core.job import Job, JobHead
 from dstack.core.repo import LocalRepoData, RepoAddress, RepoCredentials
 from dstack.core.secret import Secret
+from dstack.hub.security.utils import GlobalRole, ProjectRole
 
 
-class User(BaseModel):
+class UserInfo(BaseModel):
     user_name: str
+    global_role: GlobalRole
+
+
+class UserInfoWithToken(UserInfo):
     token: Optional[str]
-    global_role: str
 
 
 class Project(BaseModel):
@@ -22,7 +26,7 @@ class Project(BaseModel):
 
 class Member(BaseModel):
     user_name: str
-    project_role: str
+    project_role: ProjectRole
 
 
 class AWSProjectConfigPartial(BaseModel):
@@ -105,11 +109,6 @@ class ProjectInfo(BaseModel):
     project_name: str
     backend: ProjectConfigWithCreds
     members: List[Member] = []
-
-
-class UserInfo(BaseModel):
-    user_name: str
-    global_role: str
 
 
 class AddTagRun(BaseModel):
@@ -241,7 +240,7 @@ class ProjectValues(BaseModel):
 
 
 class UserPatch(BaseModel):
-    global_role: str
+    global_role: GlobalRole
 
 
 class AddMembers(BaseModel):

@@ -4,14 +4,12 @@ from dstack.core.repo import RepoAddress, RepoCredentials
 from dstack.hub.models import ReposUpdate, SaveRepoCredentials
 from dstack.hub.routers.cache import get_backend
 from dstack.hub.routers.util import get_project
-from dstack.hub.security.scope import Scope
+from dstack.hub.security.permissions import ProjectMember
 
-router = APIRouter(prefix="/api/project", tags=["repos"])
+router = APIRouter(prefix="/api/project", tags=["repos"], dependencies=[Depends(ProjectMember())])
 
 
-@router.post(
-    "/{project_name}/repos/credentials", dependencies=[Depends(Scope("repos:credentials:write"))]
-)
+@router.post("/{project_name}/repos/credentials")
 async def save_repo_credentials(
     project_name: str, save_repo_credentials_body: SaveRepoCredentials
 ):
@@ -25,7 +23,6 @@ async def save_repo_credentials(
 
 @router.get(
     "/{project_name}/repos/credentials",
-    dependencies=[Depends(Scope("repos:credentials:read"))],
 )
 async def get_repo_credentials(project_name: str, repo_address: RepoAddress) -> RepoCredentials:
     project = await get_project(project_name=project_name)
@@ -34,7 +31,7 @@ async def get_repo_credentials(project_name: str, repo_address: RepoAddress) -> 
     return repo_credentials
 
 
-@router.post("/{project_name}/repos/update", dependencies=[Depends(Scope("repos:update:write"))])
+@router.post("/{project_name}/repos/update")
 async def update_repo(project_name: str, body: ReposUpdate):
     project = await get_project(project_name=project_name)
     backend = get_backend(project)

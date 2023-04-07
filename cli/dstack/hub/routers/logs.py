@@ -13,9 +13,9 @@ from starlette.types import Send
 from dstack.hub.models import PollLogs
 from dstack.hub.routers.cache import get_backend
 from dstack.hub.routers.util import get_project
-from dstack.hub.security.scope import Scope
+from dstack.hub.security.permissions import ProjectMember
 
-router = APIRouter(prefix="/api/project", tags=["logs"])
+router = APIRouter(prefix="/api/project", tags=["logs"], dependencies=[Depends(ProjectMember())])
 
 
 class JSONStreamingResponse(Response):
@@ -73,7 +73,6 @@ class JSONStreamingResponse(Response):
 
 @router.get(
     "/{project_name}/logs/poll",
-    dependencies=[Depends(Scope("logs:poll:read"))],
     response_class=JSONStreamingResponse,
 )
 async def poll_logs(project_name: str, body: PollLogs):
