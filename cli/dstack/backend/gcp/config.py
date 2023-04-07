@@ -304,7 +304,7 @@ class GCPConfigurator(Configurator):
         bucket_names = [bucket.name for bucket in buckets if bucket.location.lower() == region]
         if default_bucket is not None and default_bucket not in bucket_names:
             raise HubConfigError(
-                f"Invalid bucket {bucket_name} for region {region}",
+                f"Invalid bucket {default_bucket} for region {region}",
                 code="invalid_bucket",
                 fields=["bucket_name"],
             )

@@ -17,7 +17,7 @@ jobs:
         python-version: [ 3.7, 3.8, 3.9, "3.10", 3.11 ]
     defaults:
       run:
-        working-directory: ./cli
+        working-directory: cli
     steps:
       - uses: actions/checkout@v2
       - name: Set up Python ${{ matrix.python-version }}
@@ -28,9 +28,10 @@ jobs:
         run: |
           python -m pip install --upgrade pip
           pip install -r requirements.txt
-      - name: Test with unittest
+          pip install -r requirements_dev.txt
+      - name: Run pytest
         run: |
-          python -m unittest discover tests -t .
+          pytest tests/
 
   build-hub-tag:
     runs-on: ubuntu-latest
@@ -114,7 +115,6 @@ jobs:
           go vet $(go list ./... | grep -v /vendor/)
           go test -race $(go list ./... | grep -v /vendor/)
 
-
   runner-compile-master:
     defaults:
       run:
@@ -146,6 +146,7 @@ jobs:
         with:
           name: dstack-runner-${{ matrix.goos }}-${{ matrix.goarch }}
           path: runner/dstack-runner-${{ matrix.goos }}-${{ matrix.goarch }}
+
   runner-upload-master:
     defaults:
       run:
@@ -178,6 +179,7 @@ jobs:
           VERSION=${GITHUB_REF#refs/tags/}
           aws s3 cp dstack-runner-${{ matrix.goos }}-${{ matrix.goarch }} "s3://dstack-runner-downloads/$VERSION/binaries/dstack-runner-${{ matrix.goos }}-${{ matrix.platform }}${{ matrix.extension }}" --acl public-read
           aws s3 cp dstack-runner-${{ matrix.goos }}-${{ matrix.goarch }} "s3://dstack-runner-downloads/latest/binaries/dstack-runner-${{ matrix.goos }}-${{ matrix.platform }}${{ matrix.extension }}" --acl public-read
+
   ami-build:
     defaults:
       run:
@@ -204,7 +206,7 @@ jobs:
         run: |
           VERSION=${GITHUB_REF#refs/tags/}
           ./packer build -var build_id=$VERSION -var build_prefix='' -var image_version=${{ env.IMAGE_VERSION }} -var-file=prod-var.json ${{ matrix.variants }}.json
-  
+
   gcp-images-build:
     defaults:
       run:
