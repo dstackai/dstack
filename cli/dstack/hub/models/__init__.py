@@ -91,10 +91,15 @@ class GCPProjectConfigWithCreds(GCPProjectConfig, GCPProjectCreds):
     pass
 
 
+AnyProjectConfig = Union[AWSProjectConfig, GCPProjectConfig]
 AnyProjectConfigWithCredsPartial = Union[
     AWSProjectConfigWithCredsPartial, GCPProjectConfigWithCredsPartial
 ]
 AnyProjectConfigWithCreds = Union[AWSProjectConfigWithCreds, GCPProjectConfigWithCreds]
+
+
+class ProjectConfig(BaseModel):
+    __root__: AnyProjectConfig = Field(..., discriminator="type")
 
 
 class ProjectConfigWithCredsPartial(BaseModel):
@@ -106,6 +111,12 @@ class ProjectConfigWithCreds(BaseModel):
 
 
 class ProjectInfo(BaseModel):
+    project_name: str
+    backend: ProjectConfig
+    members: List[Member] = []
+
+
+class ProjectInfoWithCreds(BaseModel):
     project_name: str
     backend: ProjectConfigWithCreds
     members: List[Member] = []

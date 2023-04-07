@@ -12,6 +12,7 @@ from dstack.hub.models import (
     ProjectConfigWithCredsPartial,
     ProjectDelete,
     ProjectInfo,
+    ProjectInfoWithCreds,
     ProjectValues,
 )
 from dstack.hub.repository.projects import ProjectManager
@@ -51,8 +52,8 @@ async def list_projects(user: User = Depends(Authenticated())) -> List[ProjectIn
 
 @router.post("")
 async def create_project(
-    project_info: ProjectInfo, user: User = Depends(Authenticated())
-) -> ProjectInfo:
+    project_info: ProjectInfoWithCreds, user: User = Depends(Authenticated())
+) -> ProjectInfoWithCreds:
     project = await ProjectManager.get(name=project_info.project_name)
     if project is not None:
         raise HTTPException(
@@ -93,6 +94,15 @@ async def set_project_members(
     await ProjectManager.set_members(project=project, members=body)
 
 
+@router.get("/{project_name}/config_info")
+async def get_project_config_info(
+    user_project: Tuple[User, Project] = Depends(ProjectAdmin())
+) -> ProjectInfoWithCreds:
+    _, project = user_project
+    project_info = await ProjectManager.get_project_info_with_creds(project)
+    return project_info
+
+
 @router.get("/{project_name}")
 async def get_project_info(
     user_project: Tuple[User, Project] = Depends(ProjectMember())
@@ -104,9 +114,9 @@ async def get_project_info(
 
 @router.patch("/{project_name}")
 async def update_project(
-    project_info: ProjectInfo = Body(),
+    project_info: ProjectInfoWithCreds = Body(),
     user_project: Tuple[User, Project] = Depends(ProjectAdmin()),
-) -> ProjectInfo:
+) -> ProjectInfoWithCreds:
     backend = _get_backend(project_info.backend.__root__.type)
     configurator = backend.get_configurator()
     try:
