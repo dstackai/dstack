@@ -256,10 +256,8 @@ class GCPConfigurator(Configurator):
         return project_values
 
     def _get_hub_geographic_area(self, default_area: Optional[str]) -> ProjectElement:
-        if default_area is None:
-            default_area = DEFAULT_GEOGRAPHIC_AREA
         area_names = sorted([l["name"] for l in GCP_LOCATIONS])
-        if default_area not in area_names:
+        if default_area is not None and default_area not in area_names:
             raise HubConfigError(f"Invalid GCP area {default_area}")
         element = ProjectElement(selected=default_area)
         for area_name in area_names:
