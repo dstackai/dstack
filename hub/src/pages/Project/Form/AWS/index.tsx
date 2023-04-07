@@ -6,10 +6,12 @@ import { debounce } from 'lodash';
 import { useBackendValuesMutation } from 'services/project';
 import { IProps } from './types';
 import styles from './styles.module.scss';
-import { isRequestErrorWithDetail } from '../../../../libs';
+import { isRequestFormFieldError, isRequestFormErrors2 } from 'libs';
+import { useNotifications } from 'hooks';
 
 export const AWSBackend: React.FC<IProps> = ({ loading }) => {
     const { t } = useTranslation();
+    const [pushNotification] = useNotifications();
     const { control, getValues, setValue, setError, clearErrors, watch } = useFormContext();
     const [valuesData, setValuesData] = useState<IProjectAwsBackendValues | undefined>();
     const [regions, setRegions] = useState<FormSelectOptions>([]);
@@ -76,9 +78,17 @@ export const AWSBackend: React.FC<IProps> = ({ loading }) => {
             // @ts-ignore
             const errorRequestData = errorResponse?.data;
 
-            if (isRequestErrorWithDetail(errorRequestData)) {
-                setError('backend.access_key', { type: 'custom', message: errorRequestData.detail });
-                setError('backend.secret_key', { type: 'custom', message: errorRequestData.detail });
+            if (isRequestFormErrors2(errorRequestData)) {
+                errorRequestData.detail.forEach((error) => {
+                    if (isRequestFormFieldError(error)) {
+                        setError(`backend.${error.loc.join('.')}`, { type: 'custom', message: error.msg });
+                    } else {
+                        pushNotification({
+                            type: 'error',
+                            content: t('common.server_error', { error: error?.msg }),
+                        });
+                    }
+                });
             }
         }
     };

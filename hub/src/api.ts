@@ -14,6 +14,7 @@ export const API = {
         BASE: () => `${API.BASE()}/projects`,
         LIST: () => `${API.PROJECTS.BASE()}/list`,
         DETAILS: (name: IProject['project_name']) => `${API.PROJECTS.BASE()}/${name}`,
+        DETAILS_WITH_CONFIG: (name: IProject['project_name']) => `${API.PROJECTS.DETAILS(name)}/config_info`,
         MEMBERS: (name: IProject['project_name']) => `${API.PROJECTS.DETAILS(name)}/members`,
         BACKEND_VALUES: () => `${API.PROJECTS.BASE()}/backends/values`,
     },

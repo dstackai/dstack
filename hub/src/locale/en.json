@@ -92,6 +92,9 @@
         "bucket_name": "Bucket name",
         "bucket_name_description": "Bucket description",
         "bucket_name_placeholder": "Bucket placeholder",
+        "vpc": "VPC",
+        "vpc_description": "VPC description",
+        "vpc_placeholder": "VPC placeholder",
         "subnet": "Subnet",
         "subnet_description": "Subnet description",
         "subnet_placeholder": "Subnet placeholder"

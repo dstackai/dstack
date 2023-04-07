@@ -104,7 +104,7 @@ export const ProjectDetails: React.FC = () => {
         navigate(ROUTES.PROJECT.EDIT_BACKEND.FORMAT(paramProjectName));
     };
 
-    const renderAwsSettingsSection = (): React.ReactNode => {
+    const renderAwsBackendDetails = (): React.ReactNode => {
         if (!data) return null;
 
         return (
@@ -130,6 +130,62 @@ export const ProjectDetails: React.FC = () => {
                 </div>
             </ColumnLayout>
         );
+    };
+
+    const renderGCPBackendDetails = (): React.ReactNode => {
+        if (!data) return null;
+
+        return (
+            <ColumnLayout columns={4} variant="text-grid">
+                <div>
+                    <Box variant="awsui-key-label">{t('projects.edit.backend_type')}</Box>
+                    <div>{t(`projects.backend_type.${data.backend.type}`)}</div>
+                </div>
+
+                <div>
+                    <Box variant="awsui-key-label">{t('projects.edit.gcp.area')}</Box>
+                    <div>{data.backend.area}</div>
+                </div>
+
+                <div>
+                    <Box variant="awsui-key-label">{t('projects.edit.gcp.region')}</Box>
+                    <div>{data.backend.region}</div>
+                </div>
+
+                <div>
+                    <Box variant="awsui-key-label">{t('projects.edit.gcp.zone')}</Box>
+                    <div>{data.backend.zone}</div>
+                </div>
+
+                <div>
+                    <Box variant="awsui-key-label">{t('projects.edit.gcp.bucket_name')}</Box>
+                    <div>{data.backend.bucket_name}</div>
+                </div>
+
+                <div>
+                    <Box variant="awsui-key-label">{t('projects.edit.gcp.vpc')}</Box>
+                    <div>{data.backend.vpc}</div>
+                </div>
+
+                <div>
+                    <Box variant="awsui-key-label">{t('projects.edit.gcp.subnet')}</Box>
+                    <div>{data.backend.subnet}</div>
+                </div>
+            </ColumnLayout>
+        );
+    };
+
+    const renderBackendDetails = () => {
+        switch (data?.backend.type) {
+            case 'aws': {
+                return renderAwsBackendDetails();
+            }
+            case 'gcp': {
+                return renderGCPBackendDetails();
+            }
+            default:
+                return null;
+        }
     };
 
     return (
@@ -165,7 +221,7 @@ export const ProjectDetails: React.FC = () => {
                                 </Header>
                             }
                         >
-                            {renderAwsSettingsSection()}
+                            {renderBackendDetails()}
                         </Container>
                         <Container
                             header={

@@ -44,12 +44,17 @@ export const FileEntry: React.FC<IProps> = ({ file, showImage = false, truncateL
             )}
             <SpaceBetween size="xxxs">
                 <Box>{displayFileName}</Box>
-                <Box variant="small">{i18nStrings ? i18nStrings.numberOfBytes(fileSize) : `${fileSize} bytes`}</Box>
-                <Box variant="small">
-                    {i18nStrings
-                        ? i18nStrings.lastModified(lastModifiedDate)
-                        : `Last modified: ${lastModifiedDate.toDateString()}`}
-                </Box>
+
+                {false && (
+                    <>
+                        <Box variant="small">{i18nStrings ? i18nStrings.numberOfBytes(fileSize) : `${fileSize} bytes`}</Box>
+                        <Box variant="small">
+                            {i18nStrings
+                                ? i18nStrings.lastModified(lastModifiedDate)
+                                : `Last modified: ${lastModifiedDate.toDateString()}`}
+                        </Box>
+                    </>
+                )}
             </SpaceBetween>
         </SpaceBetween>
     );

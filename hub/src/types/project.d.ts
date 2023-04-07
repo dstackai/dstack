@@ -28,6 +28,8 @@ declare interface IProjectAwsBackendValues {
         },
 }
 
+declare interface TVPCSubnetValue { label: string, vpc: string, subnet: string}
+
 declare interface IProjectGCPBackendValues {
     area: {
         selected?: string,
@@ -43,7 +45,7 @@ declare interface IProjectGCPBackendValues {
     },
     vpc_subnet: null | {
         selected?: string,
-        values: { value: string, label: string}[]
+        values: TVPCSubnetValue[]
     },
     zone: null | {
         selected?: string,
@@ -68,7 +70,8 @@ declare interface TProjectBackendGCP {
     region: string,
     zone: string,
     bucket_name: string,
-    vpc_subnet: string,
+    vpc: string,
+    subnet: string,
 }
 
 declare interface TProjectBackendAWSWithTitles extends TProjectBackendAWS {
