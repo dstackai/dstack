@@ -285,7 +285,8 @@ func (c *Copier) Download(ctx context.Context, bucket, remote, local string) {
 			c.updateBars(file.Size)
 		}(file)
 	}
-	c.threads.acquire(MAX_THREADS)
+	c.threads.acquire(MAX_THREADS) // act as a barrier
+	c.threads.release(MAX_THREADS)
 	if !errorFound.Load() {
 		log.Info(ctx, "Lock directory")
 		theFile, err := os.Create(filepath.Join(local, consts.FILE_LOCK_FULL_DOWNLOAD))
@@ -341,7 +342,8 @@ func (c *Copier) Upload(ctx context.Context, bucket, remote, local string) {
 			c.updateBars(file.info.Size())
 		}(file)
 	}
-	c.threads.acquire(MAX_THREADS)
+	c.threads.acquire(MAX_THREADS) // act as a barrier
+	c.threads.release(MAX_THREADS)
 	if !errorFound.Load() {
 		log.Info(ctx, "Lock directory")
 		theFile, err := os.Create(filepath.Join(local, consts.FILE_LOCK_FULL_DOWNLOAD))

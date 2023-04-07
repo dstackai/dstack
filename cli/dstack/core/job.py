@@ -6,6 +6,7 @@ from pydantic import BaseModel
 
 from dstack.core.app import AppSpec
 from dstack.core.artifact import ArtifactSpec
+from dstack.core.cache import CacheSpec
 from dstack.core.dependents import DepSpec
 from dstack.core.repo import RepoAddress, RepoData
 from dstack.utils.common import _quoted, format_list
@@ -182,6 +183,7 @@ class Job(JobHead):
     env: Optional[Dict[str, str]]
     working_dir: Optional[str]
     artifact_specs: Optional[List[ArtifactSpec]]
+    cache_specs: List[CacheSpec]
     port_count: Optional[int]
     ports: Optional[List[int]]
     host_name: Optional[str]
@@ -224,6 +226,7 @@ class Job(JobHead):
         commands = format_list(self.commands, formatter=lambda a: _quoted(str(a)))
         entrypoint = format_list(self.entrypoint, formatter=lambda a: _quoted(str(a)))
         artifact_specs = format_list(self.artifact_specs)
+        cache_specs = format_list(self.cache_specs or None)
         app_specs = format_list(self.app_specs)
         dep_specs = format_list(self.dep_specs)
         ssk_key_pub = f"...{self.ssh_key_pub[-16:]}" if self.ssh_key_pub else None
@@ -245,6 +248,7 @@ class Job(JobHead):
             f"ports={self.ports}, "
             f"host_name={_quoted(self.host_name)}, "
             f"artifact_specs={artifact_specs}, "
+            f"cache_specs={cache_specs}, "
             f"requirements={self.requirements}, "
             f"dep_specs={dep_specs}, "
             f"master_job={self.master_job}, "
@@ -281,8 +285,8 @@ class Job(JobHead):
             "repo_port": self.repo_address.repo_port or 0,
             "repo_user_name": self.repo_data.repo_user_name,
             "repo_name": self.repo_data.repo_name,
-            "repo_branch": self.repo_data.repo_branch,
-            "repo_hash": self.repo_data.repo_hash,
+            "repo_branch": self.repo_data.repo_branch or "",
+            "repo_hash": self.repo_data.repo_hash or "",
             "repo_diff": self.repo_data.repo_diff or "",
             "run_name": self.run_name,
             "workflow_name": self.workflow_name or "",
@@ -298,6 +302,7 @@ class Job(JobHead):
             "env": self.env or {},
             "working_dir": self.working_dir or "",
             "artifacts": artifacts,
+            "cache": [item.dict() for item in self.cache_specs],
             "port_count": self.port_count if self.port_count else 0,
             "ports": [str(port) for port in self.ports] if self.ports else [],
             "host_name": self.host_name or "",
@@ -404,8 +409,8 @@ class Job(JobHead):
                 repo_port=job_data.get("repo_port") or None,
                 repo_user_name=job_data["repo_user_name"],
                 repo_name=job_data["repo_name"],
-                repo_branch=job_data["repo_branch"],
-                repo_hash=job_data["repo_hash"],
+                repo_branch=job_data["repo_branch"] or None,
+                repo_hash=job_data["repo_hash"] or None,
                 repo_diff=job_data["repo_diff"] or None,
             ),
             run_name=job_data["run_name"],
@@ -422,6 +427,7 @@ class Job(JobHead):
             env=job_data["env"] or None,
             working_dir=job_data.get("working_dir") or None,
             artifact_specs=artifact_specs,
+            cache_specs=[CacheSpec(**item) for item in job_data.get("cache", [])],
             port_count=job_data.get("port_count") or None,
             ports=job_data.get("ports") or None,
             host_name=job_data.get("host_name") or None,

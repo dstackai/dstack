@@ -57,7 +57,7 @@ jobs:
 </div>
 
 This workflow checks the source code, installs `dstack`, [configures](../reference/cli/config.md) a remote for
-running `dstack` workflows (such as [AWS](../installation.md#aws) or [GCP](../installation.md#gcp)), [initializes](../reference/cli/init.md) `dstack` (needs `~/.ssh/id_rsa` to exist),
+running `dstack` workflows (such as [AWS](../setup/aws.md) or [GCP](../setup/gcp.md)), [initializes](../reference/cli/init.md) `dstack` (needs `~/.ssh/id_rsa` to exist),
 and [runs](../reference/cli/run.md) the workflow.
 
 !!! info "NOTE:"

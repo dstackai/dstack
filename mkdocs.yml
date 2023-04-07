@@ -71,6 +71,7 @@ plugins:
         'tutorials/wandb.md': 'examples/wandb.md'
         'tutorials/tensorboard.md': 'examples/tensorboard.md'
         'tutorials/stable-diffusion.md': 'examples/stable-diffusion.md'
+        'installation.md': 'setup/index.md'
   - typeset
 
 # Extensions
@@ -128,13 +129,16 @@ nav:
   - Guides:
       - Get started:
           - Overview: index.md
-          - Installation: installation.md
           - Quick start: quick-start.md
-          - "Playground <img height='100%' style='vertical-align: top; height: 18px;' src='https://cdnjs.cloudflare.com/ajax/libs/twemoji/14.0.2/svg/1f3ae.svg'/>": playground.md
+          - "Playground <img height='100%' style='height: 18px; margin-bottom: -2px;' src='https://cdnjs.cloudflare.com/ajax/libs/twemoji/14.0.2/svg/1f3ae.svg'/>": playground.md
+          - Setup:
+            - CLI: setup/index.md
+            - AWS: setup/aws.md
+            - GCP: setup/gcp.md
       - Usage:
           - Hello world: usage/hello-world.md
           - Python: usage/python.md
-          - Conda: usage/conda.md
+          - Cache: usage/cache.md
           - Artifacts: usage/artifacts.md
           - Deps: usage/deps.md
           - Remote: usage/remote.md
@@ -175,7 +179,8 @@ nav:
               - dstack init: reference/cli/init.md
               - dstack config: reference/cli/config.md
               - dstack secrets: reference/cli/secrets.md
-          - YAML:
+              - dstack prune: reference/cli/prune.md
+          - Providers:
               - bash: reference/providers/bash.md
               - code: reference/providers/code.md
               - lab: reference/providers/lab.md
