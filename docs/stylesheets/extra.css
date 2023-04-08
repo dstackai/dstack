@@ -1163,3 +1163,11 @@ div[editor-title] code .editor-title {
     width: 100%;
     text-align: center;
 }
+
+.md-status:after, .md-status:hover:after{
+    background: rgba(0,0,0,0.7);
+}
+
+.md-ellipsis {
+    white-space: normal;
+}

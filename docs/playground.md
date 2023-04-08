@@ -1,3 +1,7 @@
+---
+status: new
+---
+
 # Playground
 
 The [`dstackai/dstack-playground`](https://github.com/dstackai/dstack-playground) repository contains a collection of examples demonstrating how to use `dstack`.

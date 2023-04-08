@@ -1,6 +1,10 @@
-# GitHib Actions 
+---
+title: Trigger workflows with GitHib Actions
+---
 
-This example demonstrates how to use GitHub Actions to trigger `dstack` workflows on
+# Trigger workflows with GitHib Actions 
+
+This tutorial demonstrates how to use GitHub Actions to trigger `dstack` workflows on
 commits, manually, scheduled time, or via REST API. 
 
 GitHub Actions handle events, whereas `dstack` assists in provisioning the required cloud resources, executing the

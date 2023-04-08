@@ -1,6 +1,6 @@
-# TensorBoard 
+# Track experiments with TensorBoard 
 
-This example demonstrates how to use TensorBoard with `dstack` to track experiment metrics.
+This tutorial demonstrates how to use TensorBoard with `dstack` to track experiment metrics.
 
 !!! info "NOTE:"
     The source code of this example is available in the [Playground](../playground.md).

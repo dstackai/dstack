@@ -1,6 +1,10 @@
-# Stable Diffusion
+---
+title: Generate images with Stable Diffusion
+---
 
-This example demonstrates how to generate images using a pretrained Stable Diffusion model.
+# Generate images with Stable Diffusion
+
+This tutorial demonstrates how to generate images using a pretrained Stable Diffusion model.
 
 !!! info "NOTE:"
     The source code of this example is available in the [Playground](../playground.md).

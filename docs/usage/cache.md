@@ -1,3 +1,7 @@
+---
+status: new
+---
+
 # Cache
 
 !!! info "NOTE:"

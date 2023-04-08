@@ -1,20 +1,62 @@
 ---
-title: Universal ML workflows as code
+title: Automate your ML workflows
 hide:
   - path
 ---
 
-# Universal ML workflows as code
+# Automate your ML workflows
 
-`dstack` is an open-source tool makes it very easy to run ML workflows anywhere (whether it be on a local machine or on any cloud platform).
+`dstack` is an open-source tool that automates ML workflows, enabling effective management on any cloud platform. It
+empowers your team to explore and prepare data, train, and fine-tune models using their preferred frameworks and dev
+environments without spending time on engineering and infrastructure.
 
-[Quick start](quick-start.md){ class="md-go-to-action primary" } [:video_game: Playground](playground.md){ class="md-go-to-action secondary" }
+[//]: # (`dstack` is designed with simplicity, developer productivity and ease of)
+[//]: # (collaboration in mind.)
 
-## Define workflows
+[//]: # (TODO: Dedicate a section or a page to features)
+
+[Quick start](quick-start.md){ class="md-go-to-action primary" } [Playground](playground.md){ class="md-go-to-action secondary" }
+
+## Get started in minutes
+
+### Install the CLI
+
+Use `pip` to install `dstack`:
+
+<div class="termy">
+
+```shell
+$ pip install dstack
+```
+
+</div>
+
+### Configure a remote
+
+By default, workflows run locally. To run workflows remotely (e.g. in a configured cloud account),
+configure a remote using the `dstack config` command.
+
+<div class="termy">
+
+```shell
+$ dstack config
+? Choose backend. Use arrows to move, type to filter
+> [aws]
+  [gcp]
+  [hub]
+```
+
+</div>
+
+To run remote workflows with local cloud credentials, choose [`aws`](setup/aws.md) or [`gcp`](setup/gcp.md). 
+
+For managing cloud credentials securely and collaborate as a team, select [`hub`](setup/hub.md).
+
+### Define workflows
 
 Define ML workflows, their output artifacts, hardware requirements, and dependencies via YAML.
 
-<div editor-title=".dstack/workflows/mnist.yaml"> 
+<div editor-title=".dstack/workflows/mnist.yaml">
 
 ```yaml
 workflows:
@@ -25,18 +67,13 @@ workflows:
       - python examples/mnist/train_mnist.py
     artifacts:
       - path: ./lightning_logs
-    cache:
-      - path: ./data
-      - path: ~/.cache/pip
 ```
 
 </div>
 
-## Run locally
+### Run locally
 
-Once a workflow is defined, you can use the `dstack run` command to run it. 
-
-By default, workflows run locally on your machine:
+By default, workflows run locally on your machine.
 
 <div class="termy">
 
@@ -58,9 +95,12 @@ Epoch 1: [00:03<00:00, 280.17it/s, loss=1.35, v_num=0]
 
 </div>
 
-## Run remotely
+### Run remotely
 
 To run a workflow remotely (e.g. in a configured cloud account), add the `--remote` flag to the `dstack run` command:
+
+The necessary hardware resources can be configured either via YAML or through arguments in the `dstack run` command, such
+as `--gpu` and `--gpu-name`.
 
 <div class="termy">
 
@@ -82,10 +122,17 @@ Epoch 1: [00:03<00:00, 280.17it/s, loss=1.35, v_num=0]
 
 </div>
 
-Upon running a workflow remotely, `dstack` automatically creates resources in the configured cloud account and destroys them
-once the workflow is complete.
+### Providers
 
-## Providers
+`dstack` supports multiple providers to set up environments, run scripts, and launch interactive development environments and applications.
 
-`dstack` supports multiple [providers](usage/providers.md) that enable you to set up environment,
-run scripts, launch interactive dev environments and apps, and perform many other tasks.
+### Artifacts
+
+`dstack` allows you to save output artifacts and conveniently reuse them across workflows.
+
+### Try it now
+
+Browse multiple examples and tutorial on how to use `dstack`.
+
+[Playground](playground.md){ class="md-go-to-action primary" } [Tutorials](tutorials/tensorboard.md){ class="md-go-to-action secondary" }
+

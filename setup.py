@@ -51,7 +51,7 @@ setup(
     project_urls={
         "Source": "https://github.com/dstackai/dstack",
     },
-    description="Easy-to-run ML workflows on any cloud",
+    description="The hassle-free tool for managing ML workflows on any cloud platform.",
     long_description=get_long_description(),
     long_description_content_type="text/markdown",
     python_requires=">=3.7",

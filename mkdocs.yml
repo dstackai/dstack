@@ -3,7 +3,7 @@ site_name: dstack
 site_url: https://docs.dstack.ai
 site_author: Andrey Cheptsov
 site_description: >-
-  Define ML workflows as code and run via CLI. Use any cloud. Collaborate within teams.
+  The hassle-free tool for managing ML workflows on any cloud platform.
 
 # Repository
 repo_url: https://github.com/dstackai/dstack
@@ -67,10 +67,11 @@ plugins:
   - search
   - redirects:
       redirect_maps:
-        'integrations/experiments/wandb.md': 'examples/wandb.md'
-        'tutorials/wandb.md': 'examples/wandb.md'
-        'tutorials/tensorboard.md': 'examples/tensorboard.md'
-        'tutorials/stable-diffusion.md': 'examples/stable-diffusion.md'
+        'integrations/experiments/wandb.md': 'tutorials/wandb.md'
+        'examples/wandb.md': 'tutorials/wandb.md'
+        'examples/tensorboard.md': 'tutorials/tensorboard.md'
+        'examples/stable-diffusion.md': 'examples/stable-diffusion.md'
+        'examples/github-actions.md': 'tutorials/github-actions.md'
         'installation.md': 'setup/index.md'
   - typeset
 
@@ -123,46 +124,48 @@ extra:
     #      link: https://dstack.curated.co/
     - icon: /custom/colored/twitter
       link: https://twitter.com/dstackai
-
+  status:
+    new: Recently added
 # Page tree
 nav:
   - Guides:
       - Get started:
           - Overview: index.md
           - Quick start: quick-start.md
-          - "Playground <img height='100%' style='height: 18px; margin-bottom: -2px;' src='https://cdnjs.cloudflare.com/ajax/libs/twemoji/14.0.2/svg/1f3ae.svg'/>": playground.md
+          - Playground: playground.md
           - Setup:
             - CLI: setup/index.md
             - AWS: setup/aws.md
             - GCP: setup/gcp.md
+            - Hub: setup/hub.md
       - Usage:
           - Hello world: usage/hello-world.md
           - Python: usage/python.md
-          - Cache: usage/cache.md
           - Artifacts: usage/artifacts.md
           - Deps: usage/deps.md
           - Remote: usage/remote.md
           #        - Environment variables: usage/environment-variables.md
           - Providers: usage/providers.md
+          - Cache: usage/cache.md
           - Apps: usage/apps.md
           - Secrets: usage/secrets.md
           - Args: usage/args.md
       - What's next?:
-          - Examples: examples/tensorboard.md
+          - Tutorials: tutorials/tensorboard.md
           - Reference: reference/providers/bash.md
       - Support:
           - Troubleshooting: troubleshooting.md
           - Slack: https://join.slack.com/t/dstackai/shared_invite/zt-xdnsytie-D4qU9BvJP8vkbkHXdi6clQ
   #          - Changelog: https://github.com/dstackai/dstack/releases
   #          - Newsletter: https://dstack.curated.co/
-  - Examples:
-      - Experiment trackers:
-          - TensorBoard: examples/tensorboard.md
-          - Weights & Biases: examples/wandb.md
-      - Hugging Face:
-          - Stable Diffusion: examples/stable-diffusion.md
+  - Tutorials:
+      - Experiment tracking:
+          - TensorBoard: tutorials/tensorboard.md
+          - Weights & Biases: tutorials/wandb.md
+      - Stable Diffusion:
+          - Generate images: tutorials/stable-diffusion.md
       - CI/CD:
-          - GitHub Actions: examples/github-actions.md
+          - GitHub Actions: tutorials/github-actions.md
   - Reference:
       - Reference:
           - CLI:

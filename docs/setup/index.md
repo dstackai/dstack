@@ -1,11 +1,11 @@
-# Install the CLI
+## Install the CLI
 
 Use `pip` to install `dstack`:
 
 <div class="termy">
 
 ```shell
-$ pip install dstack --upgrade
+$ pip install dstack
 ```
 
 </div>
@@ -26,31 +26,13 @@ $ dstack config
 ? Choose backend. Use arrows to move, type to filter
 > [aws]
   [gcp]
+  [hub]
 ```
 
 </div>
 
-[//]: # (If you intend to collaborate in a team and would like to manage cloud credentials, users and other settings )
-[//]: # (via a user interface, it is recommended to choose `hub`.)
+Choose `hub` if you prefer managing cloud credentials and settings through a user interface while working in a team. 
 
-[//]: # (!!! info "NOTE:")
-[//]: # (    Choosing the `hub` remote with the `dstack config` CLI command requires you to have a Hub application up)
-[//]: # (    and running. Refer to [Hub]&#40;#hub&#41; for the details.)
+For running remote workflows with local cloud credentials, select `aws` or `gcp`.
 
-[//]: # (If you intend to work alone and wish to run workflows directly in the cloud without any intermediate, )
-[//]: # (feel free to choose `aws` or `gcp`.)
-
-If you intend to run remote workflows directly in the cloud using local cloud credentials, 
-feel free to choose `aws` or `gcp`.
-
-[//]: # (If you would like to manage cloud credentials, users and other settings centrally)
-[//]: # (via a user interface, it is recommended to choose `hub`. )
-
-<div class="grid cards" markdown>
-- [**AWS** 
-   Run workflows directly in an AWS account using local credentials.
-  ](aws.md)
-- [**GCP**
-   Run workflows directly in an GCP account using local credentials.
-  ](gcp.md)
-</div>
+Check [AWS](aws.md), [GCP](gcp.md), or [Hub](hub.md) for details.

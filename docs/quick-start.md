@@ -5,7 +5,7 @@ This example shows how to use `dstack` locally and remotely, step-by-step.
 !!! info "NOTE:"
     The source code of this example is available in the [Playground](playground.md).  
 
-## 1. Install the CLI
+## Install the CLI
 
 Use `pip` to install `dstack`:
 
@@ -17,7 +17,7 @@ $ pip install dstack --upgrade
 
 </div>
 
-## 2. Create a repo
+## Create a repo
 
 To use `dstack`, you need at least one remote branch configured in your project hosted on any platform like GitHub,
 GitLab, or BitBucket.
@@ -51,7 +51,7 @@ $ dstack init
 
 </div>
 
-## 3. Create a script
+## Create a script
 
 Let's create the following training script.
 
@@ -108,7 +108,7 @@ if __name__ == "__main__":
 
 </div>
 
-## 4. Define a workflow
+## Define a workflow
 
 Define the corresponding workflow as a YAML file in the `.dstack/workflows` folder within the repo to run it
 via `dstack`.
@@ -138,7 +138,7 @@ runs, the dependencies it has on other workflows, the ports to open, and so on.
     `dstack` uses your local Python version by default to run workflows, but you can override it
     in [YAML](reference/providers/bash.md).
 
-## 5. Run locally
+## Run locally
 
 Before you can run the workflow, make sure the changes are staged in Git.
 
@@ -167,6 +167,7 @@ To interrupt, press Ctrl+C.
 GPU available: False, used: False
 
 Epoch 1: [00:03<00:00, 280.17it/s, loss=1.35, v_num=0]
+---> 100%
 ```
 
 </div>
@@ -212,14 +213,14 @@ lightning_logs/  version_0/        local
     When you run a workflow locally, artifacts are stored in `~/.dstack/artifacts` and can only be reused by workflows that 
     also run locally.
 
-## 6. Configure the remote
+## Configure the remote
 
 To run workflows remotely (e.g. in a configured cloud account), you can configure a remote using
 the [`dstack config`](reference/cli/config.md) command.
 
 See [Setup](setup/index.md#configure-a-remote) to learn more about supported remote types and how to configure them.
 
-## 7. Run remotely
+## Run remotely
 
 Use the `--remote` flag with `dstack run` to run the workflow remotely.
 
@@ -240,6 +241,7 @@ To interrupt, press Ctrl+C.
 GPU available: True, used: True
 
 Epoch 1: [00:03<00:00, 280.17it/s, loss=1.35, v_num=0]
+---> 100%
 ```
 
 </div>

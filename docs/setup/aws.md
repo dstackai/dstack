@@ -1,16 +1,19 @@
 # AWS
 
-## 1. Create an S3 bucket
+`dstack` enables the running remote workflows on AWS. It automatically provisions cloud resources and
+destroys them upon workflow completion. Check out the following instructions to configure `dstack` for use with AWS.
 
-In order to use AWS as a remote, you first have to create an S3 bucket in your AWS account.
+## Create an S3 bucket
+
+In order to use AWS with `dstack`, you first have to create an S3 bucket in your AWS account.
 This bucket will be used to store workflow artifacts and metadata.
 
 !!! info "NOTE:"
     Make sure to create an S3 bucket in the AWS region where you'd like to run your workflows.
 
-## 2. Configure AWS credentials
+## Configure AWS credentials
 
-The next step is to configure AWS credentials on your local machine. The credentials should grant
+The next step is to create AWS credentials. The credentials should grant
 the permissions to perform actions on `s3`, `logs`, `secretsmanager`, `ec2`, and `iam` services.
 
 ??? info "IAM policy template"
@@ -152,25 +155,25 @@ the permissions to perform actions on `s3`, `logs`, `secretsmanager`, `ec2`, and
     }
     ```
 
-## 3. Configure the CLI
+## Configure the CLI
 
-Once the AWS credentials are configured on your local machine, you can configure the CLI using the `dstack config` command.
-
-This command will ask you to choose an AWS profile, an AWS region (must be the same for the S3 bucket), 
-and the name of the S3 bucket.
+In order to configure the CLI, so it runs remote workflows in your AWS account, you have to use 
+the `dstack config` command.
 
 <div class="termy">
 
 ```shell
 $ dstack config
-
-? Choose backend: aws
-? AWS profile: default
-? Choose AWS region: eu-west-1
-? Choose S3 bucket: dstack-142421590066-eu-west-1
-? Choose EC2 subnet: no preference
+? Choose backend. Use arrows to move, type to filter
+> [aws]
+  [gcp]
+  [hub]
 ```
 
 </div>
 
-That's it! You've configured AWS as a remote.
+If you want the CLI to run remote workflows directly in cloud using your local credentials, choose `aws`.
+It will prompt you to select an AWS region (where to run workflows), an S3 bucket, etc.
+
+If you prefer managing cloud credentials and settings through a user interface (e.g. while working in a team),
+select `hub`. Check [Hub](hub.md) for more details.
