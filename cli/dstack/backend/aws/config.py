@@ -181,8 +181,8 @@ class AWSConfigurator(Configurator):
         config.save()
         print(f"[grey58]OK[/]")
 
-    def configure_hub(self, data: Dict) -> AWSProjectValues:
-        config = AWSConfig.deserialize(data=data)
+    def configure_hub(self, config_data: Dict) -> AWSProjectValues:
+        config = AWSConfig.deserialize(config_data)
 
         if config.region_name is not None and config.region_name not in {r[1] for r in regions}:
             raise HubConfigError(f"Invalid AWS region {config.region_name}")
@@ -190,8 +190,8 @@ class AWSConfigurator(Configurator):
         try:
             session = Session(
                 region_name=config.region_name,
-                aws_access_key_id=data.get("access_key"),
-                aws_secret_access_key=data.get("secret_key"),
+                aws_access_key_id=config_data.get("access_key"),
+                aws_secret_access_key=config_data.get("secret_key"),
             )
             sts = session.client("sts")
             sts.get_caller_identity()
