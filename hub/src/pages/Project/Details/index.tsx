@@ -252,7 +252,7 @@ export const ProjectDetails: React.FC = () => {
                         >
                             <SpaceBetween size="s">
                                 <Box variant="p" color="text-body-secondary">
-                                    Use the code snippet below to configure your CLI to use this project as a remote
+                                    Run the command below to configure this project as a remote
                                 </Box>
 
                                 <div className={styles.code}>
