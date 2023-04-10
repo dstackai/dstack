@@ -3,7 +3,6 @@ from typing import Any, AsyncIterable, Callable, Coroutine, List, Mapping, Optio
 
 import anyio
 from fastapi import APIRouter, Depends
-from fastapi.security import HTTPBearer
 from starlette.background import BackgroundTask
 from starlette.concurrency import iterate_in_threadpool
 from starlette.responses import Response
@@ -11,16 +10,12 @@ from starlette.types import Receive
 from starlette.types import Scope as StarletteScope
 from starlette.types import Send
 
-from dstack.core.job import JobHead
-from dstack.core.repo import RepoAddress
 from dstack.hub.models import PollLogs
 from dstack.hub.routers.cache import get_backend
-from dstack.hub.routers.util import get_hub
-from dstack.hub.security.scope import Scope
+from dstack.hub.routers.util import get_project
+from dstack.hub.security.permissions import ProjectMember
 
-router = APIRouter(prefix="/api/hub", tags=["logs"])
-
-security = HTTPBearer()
+router = APIRouter(prefix="/api/project", tags=["logs"], dependencies=[Depends(ProjectMember())])
 
 
 class JSONStreamingResponse(Response):
@@ -76,14 +71,13 @@ class JSONStreamingResponse(Response):
             await self.background()
 
 
-@router.get(
-    "/{hub_name}/logs/poll",
-    dependencies=[Depends(Scope("logs:poll:read"))],
+@router.post(
+    "/{project_name}/logs/poll",
     response_class=JSONStreamingResponse,
 )
-async def poll_logs(hub_name: str, body: PollLogs):
-    hub = await get_hub(hub_name=hub_name)
-    backend = get_backend(hub)
+async def poll_logs(project_name: str, body: PollLogs):
+    project = await get_project(project_name=project_name)
+    backend = get_backend(project)
     return JSONStreamingResponse(
         content=backend.poll_logs(
             repo_address=body.repo_address,

@@ -8,7 +8,7 @@ If GPU is requested, the provider pre-installs the CUDA driver too.
 
 ## Usage example
 
-Inside the `.dstack/workflows` directory within your project, create the following `lab-example.yaml` file:
+<div editor-title=".dstack/workflows/lab-example.yaml">
 
 ```yaml
 workflows:
@@ -21,11 +21,17 @@ workflows:
       gpu: 1
 ```
 
+</div>
+
 To run this workflow, use the following command:
 
+<div class="termy">
+
 ```shell
-dstack run ide-lab
+$ dstack run ide-lab
 ```
+
+</div>
 
 ## Properties reference
 
@@ -37,6 +43,8 @@ The following properties are optional:
 - [`artifacts`](#artifacts) - (Optional) The list of output artifacts
 - [`resources`](#resources) - (Optional) The hardware resources required by the workflow
 - `working_dir` - (Optional) The path to the working directory
+- `ssh` - (Optional) Runs SSH server in the container if `true`
+- [`cache`](#cache) - (Optional) The list of directories to cache between runs
 
 ### artifacts
 
@@ -73,3 +81,9 @@ The number of GPUs, their name and memory
 - `count` - (Optional) The number of GPUs
 - `memory` (Optional) The size of GPU memory, e.g. `"16GB"`
 - `name` (Optional) The name of the GPU model (e.g. `"K80"`, `"V100"`, etc)
+
+### cache
+
+The list of directories to cache between runs
+
+- `path` – (Required) The relative path of the folder that must be cached

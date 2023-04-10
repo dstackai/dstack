@@ -1,6 +1,13 @@
 import React from 'react';
 
-export { default as isErrorWithMessage, isErrorWithError } from './isErrorWithMessage';
+export {
+    default as isErrorWithMessage,
+    isErrorWithError,
+    isRequestErrorWithDetail,
+    isRequestFormErrors,
+    isRequestFormFieldError,
+    isRequestFormErrors2,
+} from './isErrorWithMessage';
 import { formatDistanceToNowStrict, format } from 'date-fns';
 export * from './isValidToken';
 

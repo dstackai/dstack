@@ -1,12 +1,15 @@
-from dstack.hub.db import Database
-from dstack.hub.db.models import Hub, Member, Role, Scope, User, association_table_user_hub
+from alembic import command, config
+
+from dstack.hub.db import db
 
 
 async def migrate():
-    async with Database.engine.begin() as session:
-        await session.run_sync(Hub.metadata.create_all)
-        await session.run_sync(User.metadata.create_all)
-        await session.run_sync(Role.metadata.create_all)
-        await session.run_sync(Scope.metadata.create_all)
-        await session.run_sync(association_table_user_hub.metadata.create_all)
-        await session.run_sync(Member.metadata.create_all)
+    async with db.engine.begin() as connection:
+        await connection.run_sync(_run_alembic_upgrade)
+
+
+def _run_alembic_upgrade(connection):
+    alembic_cfg = config.Config()
+    alembic_cfg.set_main_option("script_location", "dstack.hub:migration")
+    alembic_cfg.attributes["connection"] = connection
+    command.upgrade(alembic_cfg, "head")

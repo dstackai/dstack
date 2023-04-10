@@ -1,4 +1,6 @@
+import json
 import os
+from argparse import Namespace
 from pathlib import Path
 from typing import Dict, Optional, Tuple
 
@@ -6,14 +8,21 @@ import yaml
 from google.cloud import compute_v1, exceptions, storage
 from google.oauth2 import service_account
 from rich.prompt import Confirm, Prompt
+from rich_argparse import RichHelpFormatter
 from simple_term_menu import TerminalMenu
 
 from dstack.cli.common import ask_choice, console
 from dstack.core.config import BackendConfig, Configurator, get_config_path
-from dstack.core.error import ConfigError
+from dstack.core.error import ConfigError, HubConfigError
+from dstack.hub.models import (
+    GCPProjectValues,
+    GCPVPCSubnetProjectElement,
+    GCPVPCSubnetProjectElementValue,
+    ProjectElement,
+    ProjectElementValue,
+)
 
 DEFAULT_GEOGRAPHIC_AREA = "North America"
-
 
 GCP_LOCATIONS = [
     {
@@ -135,21 +144,19 @@ class GCPConfig(BackendConfig):
         return yaml.dump(self.serialize())
 
     @classmethod
-    def deserialize(cls, data: Dict) -> Optional["GCPConfig"]:
-        if data.get("backend") != "gcp":
+    def deserialize(cls, config_data: Dict) -> Optional["GCPConfig"]:
+        if config_data.get("backend") != "gcp":
             raise ConfigError(f"Not a GCP config")
-
         try:
-            project_id = data["project"]
-            region = data["region"]
-            zone = data["zone"]
-            bucket_name = data["bucket"]
-            vpc = data["vpc"]
-            subnet = data["subnet"]
+            project_id = config_data["project"]
+            region = config_data["region"]
+            zone = config_data["zone"]
+            bucket_name = config_data["bucket"]
+            vpc = config_data["vpc"]
+            subnet = config_data["subnet"]
         except KeyError:
             raise ConfigError("Cannot load config")
 
-        credentials_file = data.get("credentials_file")
         return cls(
             project_id=project_id,
             region=region,
@@ -157,7 +164,8 @@ class GCPConfig(BackendConfig):
             bucket_name=bucket_name,
             vpc=vpc,
             subnet=subnet,
-            credentials_file=credentials_file,
+            credentials_file=config_data.get("credentials_file"),
+            credentials=config_data.get("credentials"),
         )
 
     @classmethod
@@ -184,14 +192,178 @@ class GCPConfigurator(Configurator):
     def name(self):
         return "gcp"
 
-    def get_config(self, data: Dict) -> BackendConfig:
-        return GCPConfig.deserialize(data=data)
+    def get_config_from_hub_config_data(self, config_data: Dict, auth_data: Dict) -> BackendConfig:
+        credentials = json.loads(auth_data["credentials"])
+        data = {
+            "backend": "gcp",
+            "credentials": credentials,
+            "project": credentials["project_id"],
+            "region": config_data["region"],
+            "zone": config_data["zone"],
+            "bucket": config_data["bucket_name"],
+            "vpc": config_data["vpc"],
+            "subnet": config_data["subnet"],
+        }
+        return GCPConfig.deserialize(data)
 
-    def parse_args(self, args: list = []):
-        pass
+    def register_parser(self, parser):
+        gcp_parser = parser.add_parser("gcp", help="", formatter_class=RichHelpFormatter)
+        gcp_parser.add_argument("--bucket", type=str, help="", required=True)
+        gcp_parser.add_argument("--project", type=str, help="", required=True)
+        gcp_parser.add_argument("--region", type=str, help="", required=True)
+        gcp_parser.add_argument("--zone", type=str, help="", required=True)
+        gcp_parser.add_argument("--vpc", type=str, help="", required=True)
+        gcp_parser.add_argument("--subnet", type=str, help="", required=True)
+        gcp_parser.set_defaults(func=self._command)
 
-    def configure_hub(self, data: Dict):
-        pass
+    def _command(self, args: Namespace):
+        config = GCPConfig(
+            project_id=args.project,
+            region=args.region,
+            zone=args.zone,
+            bucket_name=args.bucket,
+            subnet=args.subnet,
+            vpc=args.vpc,
+        )
+        config.save()
+        print(f"[grey58]OK[/]")
+
+    def configure_hub(self, config_data: Dict) -> GCPProjectValues:
+        try:
+            service_account_info = json.loads(config_data.get("credentials"))
+            self.credentials = service_account.Credentials.from_service_account_info(
+                info=service_account_info
+            )
+            storage_client = storage.Client(credentials=self.credentials)
+            storage_client.list_buckets(max_results=1)
+        except Exception:
+            raise HubConfigError(
+                "Credentials are not valid", code="invalid_credentials", fields=["credentials"]
+            )
+        project_values = GCPProjectValues()
+        project_values.area = self._get_hub_geographic_area(config_data.get("area"))
+        location = self._get_location(project_values.area.selected)
+        project_values.region, regions = self._get_hub_region(
+            location=location,
+            default_region=config_data.get("region"),
+        )
+        project_values.zone = self._get_hub_zone(
+            location=location,
+            region=regions.get(project_values.region.selected),
+            default_zone=config_data.get("zone"),
+        )
+        project_values.bucket_name = self._get_hub_buckets(
+            region=project_values.region.selected,
+            default_bucket=config_data.get("bucket_name"),
+        )
+        project_values.vpc_subnet = self._get_hub_vpc_subnet(
+            region=project_values.region.selected,
+            default_vpc=config_data.get("vpc"),
+            default_subnet=config_data.get("subnet"),
+        )
+        return project_values
+
+    def _get_hub_geographic_area(self, default_area: Optional[str]) -> ProjectElement:
+        area_names = sorted([l["name"] for l in GCP_LOCATIONS])
+        if default_area is None:
+            default_area = DEFAULT_GEOGRAPHIC_AREA
+        if default_area not in area_names:
+            raise HubConfigError(f"Invalid GCP area {default_area}")
+        element = ProjectElement(selected=default_area)
+        for area_name in area_names:
+            element.values.append(ProjectElementValue(value=area_name, label=area_name))
+        return element
+
+    def _get_hub_region(
+        self, location: Dict, default_region: Optional[str]
+    ) -> Tuple[ProjectElement, Dict]:
+        regions_client = compute_v1.RegionsClient(credentials=self.credentials)
+        regions = regions_client.list(project=self.credentials.project_id)
+        region_names = sorted(
+            [r.name for r in regions if r.name in location["regions"]],
+            key=lambda name: (name != location["default_region"], name),
+        )
+        if default_region is None:
+            default_region = region_names[0]
+        if default_region not in region_names:
+            raise HubConfigError(f"Invalid GCP region {default_region} in area {location['name']}")
+        element = ProjectElement(selected=default_region)
+        for region_name in region_names:
+            element.values.append(ProjectElementValue(value=region_name, label=region_name))
+        return element, {r.name: r for r in regions}
+
+    def _get_hub_zone(
+        self, location: Dict, region: compute_v1.Region, default_zone: Optional[str]
+    ) -> ProjectElement:
+        zone_names = sorted(
+            [self._get_resource_name(z) for z in region.zones],
+            key=lambda name: (name != location["default_zone"], name),
+        )
+        if default_zone is None:
+            default_zone = zone_names[0]
+        if default_zone not in zone_names:
+            raise HubConfigError(f"Invalid GCP zone {default_zone} in region {region.name}")
+        element = ProjectElement(selected=default_zone)
+        for zone_name in zone_names:
+            element.values.append(ProjectElementValue(value=zone_name, label=zone_name))
+        return element
+
+    def _get_hub_buckets(
+        self, region: str, default_bucket: Optional[str] = None
+    ) -> ProjectElement:
+        storage_client = storage.Client(credentials=self.credentials)
+        buckets = storage_client.list_buckets()
+        bucket_names = [bucket.name for bucket in buckets if bucket.location.lower() == region]
+        if default_bucket is not None and default_bucket not in bucket_names:
+            raise HubConfigError(
+                f"Invalid bucket {default_bucket} for region {region}",
+                code="invalid_bucket",
+                fields=["bucket_name"],
+            )
+        element = ProjectElement(selected=default_bucket)
+        for bucket_name in bucket_names:
+            element.values.append(ProjectElementValue(value=bucket_name, label=bucket_name))
+        return element
+
+    def _get_hub_vpc_subnet(
+        self,
+        region: str,
+        default_vpc: Optional[str],
+        default_subnet: Optional[str],
+    ) -> GCPVPCSubnetProjectElement:
+        if default_vpc is None:
+            default_vpc = "default"
+        if default_subnet is None:
+            default_subnet = "default"
+        no_preference_vpc_subnet = ("default", "default")
+        networks_client = compute_v1.NetworksClient(credentials=self.credentials)
+        networks = networks_client.list(project=self.credentials.project_id)
+        vpc_subnet_list = []
+        for network in networks:
+            for subnet in network.subnetworks:
+                subnet_region = self._get_subnet_region(subnet)
+                if subnet_region != region:
+                    continue
+                vpc_subnet_list.append((network.name, self._get_subnet_name(subnet)))
+        if (default_vpc, default_subnet) not in vpc_subnet_list:
+            raise HubConfigError(f"Invalid VPC subnet {default_vpc, default_subnet}")
+        if (default_vpc, default_subnet) != no_preference_vpc_subnet:
+            selected = f"{default_subnet} ({default_vpc})"
+        else:
+            selected = f"No preference (default)"
+        vpc_subnet_list = sorted(vpc_subnet_list, key=lambda t: t != no_preference_vpc_subnet)
+        element = GCPVPCSubnetProjectElement(selected=selected)
+        for vpc, subnet in vpc_subnet_list:
+            element.values.append(
+                GCPVPCSubnetProjectElementValue(
+                    vpc=vpc,
+                    subnet=subnet,
+                    label=f"{subnet} ({vpc})"
+                    if (subnet, vpc) != no_preference_vpc_subnet
+                    else f"No preference (default)",
+                )
+            )
+        return element
 
     def configure_cli(self):
         credentials_file = None

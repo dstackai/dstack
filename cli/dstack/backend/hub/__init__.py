@@ -37,6 +37,7 @@ class HubBackend(RemoteBackend):
         if self._client is None:
             self._client = HubClient(
                 url=self.backend_config.url,
+                project=self.backend_config.project,
                 token=self.backend_config.token,
             )
         return self._client
@@ -208,3 +209,8 @@ class HubBackend(RemoteBackend):
 
     def get_configurator(self):
         return HubConfigurator()
+
+    def delete_workflow_cache(self, repo_address: RepoAddress, username: str, workflow_name: str):
+        self._hub_client().delete_workflow_cache(
+            repo_address=repo_address, username=username, workflow_name=workflow_name
+        )

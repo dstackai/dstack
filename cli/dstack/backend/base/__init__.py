@@ -6,7 +6,7 @@ from typing import Any, Generator, List, Optional
 
 from dstack.backend.base import jobs
 from dstack.core.artifact import Artifact
-from dstack.core.config import BackendConfig
+from dstack.core.config import BackendConfig, Configurator
 from dstack.core.job import Job, JobHead, JobStatus
 from dstack.core.log_event import LogEvent
 from dstack.core.repo import LocalRepoData, RepoAddress, RepoCredentials, RepoHead
@@ -211,7 +211,11 @@ class Backend(ABC):
         pass
 
     @abstractmethod
-    def get_configurator(self):
+    def get_configurator(self) -> Configurator:
+        pass
+
+    @abstractmethod
+    def delete_workflow_cache(self, repo_address: RepoAddress, username: str, workflow_name: str):
         pass
 
 

@@ -36,7 +36,11 @@ setup(
     packages=find_packages("cli"),
     package_data={
         "dstack.schemas": ["*.json"],
-        "dstack.hub": ["statics/*", "statics/**/*", "statics/**/**/*"],
+        "dstack.hub": [
+            "statics/*",
+            "statics/**/*",
+            "statics/**/**/*",
+        ],
     },
     include_package_data=True,
     scripts=[],
@@ -47,7 +51,7 @@ setup(
     project_urls={
         "Source": "https://github.com/dstackai/dstack",
     },
-    description="Easy-to-run ML workflows on any cloud",
+    description="The hassle-free tool for managing ML workflows on any cloud platform.",
     long_description=get_long_description(),
     long_description_content_type="text/markdown",
     python_requires=">=3.7",
@@ -68,7 +72,7 @@ setup(
         "starlette",
         "uvicorn",
         "pydantic",
-        "sqlalchemy[asyncio]",
+        "sqlalchemy[asyncio]>=2.0.0",
         "websocket-client",
         "cursor",
         "simple-term-menu",
@@ -84,6 +88,8 @@ setup(
         "google-cloud-logging>=2.0.0",
         "aiosqlite",
         "apscheduler",
+        "alembic>=1.10.2",
+        "typing-extensions>=4.0.0",
     ],
     classifiers=[
         "Development Status :: 2 - Pre-Alpha",

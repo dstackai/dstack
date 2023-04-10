@@ -102,8 +102,7 @@ def _delete_secret(db_filepath: str, key: str):
 
 
 def _check_db(db_filepath: str):
-    if not Path(db_filepath).exists():
-        Path(db_filepath).parent.mkdir(parents=True)
+    Path(db_filepath).parent.mkdir(exist_ok=True, parents=True)
     if not os.path.exists(db_filepath):
         con = sqlite3.connect(db_filepath)
         cur = con.cursor()

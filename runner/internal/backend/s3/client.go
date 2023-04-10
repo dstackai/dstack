@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"context"
 	"errors"
+	"fmt"
 	"io"
 	"strings"
 
@@ -71,9 +72,12 @@ func (c *ClientS3) PutFile(ctx context.Context, bucket, key string, file []byte)
 }
 
 func (c *ClientS3) RenameFile(ctx context.Context, bucket, oldKey, newKey string) error {
+	if oldKey == newKey {
+		return nil
+	}
 	_, err := c.cli.CopyObject(ctx, &s3.CopyObjectInput{
 		Bucket:     aws.String(bucket),
-		CopySource: aws.String(oldKey),
+		CopySource: aws.String(fmt.Sprintf("%s/%s", bucket, oldKey)),
 		Key:        aws.String(newKey),
 	})
 	if err != nil {
@@ -110,6 +114,7 @@ func (c *ClientS3) ListFile(ctx context.Context, bucket, prefix string) ([]strin
 	}
 	return resp, nil
 }
+
 func (c *ClientS3) ListDir(ctx context.Context, bucket, prefix string) ([]string, error) {
 	resp := make([]string, 0)
 	pager := s3.NewListObjectsV2Paginator(c.cli, &s3.ListObjectsV2Input{

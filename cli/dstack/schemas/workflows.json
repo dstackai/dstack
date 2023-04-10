@@ -61,6 +61,30 @@
         }
       }
     },
+    "cache": {
+      "description": "The directories to be cached between workflow runs",
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "oneOf": [
+          {
+            "type": "string"
+          },
+          {
+            "type": "object",
+            "additionalProperties": false,
+            "properties": {
+              "path": {
+                "type": "string"
+              }
+            },
+            "required": [
+              "path"
+            ]
+          }
+        ]
+      }
+    },
     "python": {
       "description": "The major version of Python",
       "anyOf": [
@@ -149,6 +173,26 @@
       "type": "string",
       "minLength": 1
     },
+    "registry_auth": {
+      "description": "Credentials for pulling private container",
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "username": {
+          "description": "Username",
+          "type": "string"
+        },
+        "password": {
+          "description": "Password or access token",
+          "type": "string"
+        }
+      }
+    },
+    "ssh": {
+      "description": "Run openssh server in the container",
+      "type": "boolean",
+      "default": false
+    },
     "bash": {
       "type": "object",
       "required": [
@@ -175,9 +219,6 @@
         "commands": {
           "$ref": "#/definitions/commands"
         },
-        "setup": {
-          "$ref": "#/definitions/setup"
-        },
         "env": {
           "$ref": "#/definitions/env"
         },
@@ -192,6 +233,12 @@
         },
         "resources": {
           "$ref": "#/definitions/resources"
+        },
+        "ssh": {
+          "$ref": "#/definitions/ssh"
+        },
+        "cache": {
+          "$ref": "#/definitions/cache"
         }
       }
     },
@@ -221,19 +268,20 @@
         "commands": {
           "$ref": "#/definitions/commands"
         },
-        "setup": {
-          "$ref": "#/definitions/setup"
+        "entrypoint": {
+          "description": "The Docker entrypoint",
+          "type": "string"
         },
         "env": {
           "$ref": "#/definitions/env"
-        },
-        "python": {
-          "$ref": "#/definitions/python"
         },
         "image": {
           "description": "The name of the Docker image to run",
           "type": "string",
           "minLength": 1
+        },
+        "registry_auth": {
+          "$ref": "#/definitions/registry_auth"
         },
         "working_dir": {
           "$ref": "#/definitions/working_dir"
@@ -243,6 +291,9 @@
         },
         "resources": {
           "$ref": "#/definitions/resources"
+        },
+        "cache": {
+          "$ref": "#/definitions/cache"
         }
       }
     },
@@ -292,6 +343,12 @@
         },
         "resources": {
           "$ref": "#/definitions/resources"
+        },
+        "ssh": {
+          "$ref": "#/definitions/ssh"
+        },
+        "cache": {
+          "$ref": "#/definitions/cache"
         }
       }
     },
@@ -329,6 +386,12 @@
         },
         "resources": {
           "$ref": "#/definitions/resources"
+        },
+        "ssh": {
+          "$ref": "#/definitions/ssh"
+        },
+        "cache": {
+          "$ref": "#/definitions/cache"
         }
       }
     },
@@ -366,6 +429,12 @@
         },
         "resources": {
           "$ref": "#/definitions/resources"
+        },
+        "ssh": {
+          "$ref": "#/definitions/ssh"
+        },
+        "cache": {
+          "$ref": "#/definitions/cache"
         }
       }
     }

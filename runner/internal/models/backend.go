@@ -17,7 +17,9 @@ type Resource struct {
 type Job struct {
 	Apps         []App             `yaml:"apps"`
 	Artifacts    []Artifact        `yaml:"artifacts"`
+	Cache        []Cache           `yaml:"cache"`
 	Commands     []string          `yaml:"commands"`
+	Entrypoint   *[]string         `yaml:"entrypoint"`
 	Environment  map[string]string `yaml:"env"`
 	HostName     string            `yaml:"host_name"`
 	Image        string            `yaml:"image_name"`
@@ -48,6 +50,8 @@ type Job struct {
 	//Variables    map[string]interface{} `yaml:"variables"`
 	WorkflowName string `yaml:"workflow_name"`
 	WorkingDir   string `yaml:"working_dir"`
+
+	RegistryAuth RegistryAuth `yaml:"registry_auth"`
 }
 
 type Dep struct {
@@ -62,6 +66,10 @@ type Dep struct {
 type Artifact struct {
 	Path  string `yaml:"path,omitempty"`
 	Mount bool   `yaml:"mount,omitempty"`
+}
+
+type Cache struct {
+	Path string `yaml:"path"`
 }
 
 type App struct {
@@ -104,6 +112,11 @@ type RepoData struct {
 	RepoHost     string
 	RepoUserName string
 	RepoName     string
+}
+
+type RegistryAuth struct {
+	Username string `yaml:"username,omitempty"`
+	Password string `yaml:"password,omitempty"`
 }
 
 func (j *Job) RepoHostNameWithPort() string {

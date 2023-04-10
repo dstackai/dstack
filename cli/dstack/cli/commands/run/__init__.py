@@ -23,11 +23,14 @@ from dstack.api.run import list_runs_with_merged_backends
 from dstack.backend.base import Backend
 from dstack.backend.base.logs import fix_urls
 from dstack.cli.commands import BasicCommand
+from dstack.cli.commands.run.ssh_tunnel import allocate_local_ports, run_ssh_tunnel
 from dstack.cli.common import console, print_runs
+from dstack.cli.config import BaseConfig
 from dstack.core.error import check_backend, check_config, check_git
-from dstack.core.job import JobHead, JobStatus
+from dstack.core.job import Job, JobHead, JobStatus
 from dstack.core.repo import RepoAddress
 from dstack.core.request import RequestStatus
+from dstack.core.userconfig import RepoUserConfig
 from dstack.utils.common import since
 
 __all__ = "RunCommand"
@@ -62,6 +65,11 @@ def _load_workflows():
     return workflows
 
 
+def _read_ssh_key_pub(key_path: str) -> str:
+    path = Path(key_path)
+    return path.with_suffix(path.suffix + ".pub").read_text().strip("\n")
+
+
 def parse_run_args(
     args: Namespace,
 ) -> Tuple[str, List[str], Optional[str], Dict[str, Any]]:
@@ -86,17 +94,15 @@ def parse_run_args(
     return provider_name, provider_args, workflow_name, workflow_data
 
 
-def poll_logs_ws(backend: Backend, repo_address: RepoAddress, job_head: JobHead):
-    job = backend.get_job(repo_address, job_head.job_id)
-
+def poll_logs_ws(backend: Backend, repo_address: RepoAddress, job: Job, ports: Dict[int, int]):
     def on_message(ws: WebSocketApp, message):
-        message = fix_urls(message, job)
+        message = fix_urls(message, job, ports, hostname="127.0.0.1")
         sys.stdout.buffer.write(message)
         sys.stdout.buffer.flush()
 
     def on_error(_: WebSocketApp, err: Exception):
         if isinstance(err, KeyboardInterrupt):
-            run_name = job_head.run_name
+            run_name = job.run_name
             if Confirm.ask(f"\n [red]Abort the run '{run_name}'?[/]"):
                 backend.stop_jobs(repo_address, run_name, abort=True)
                 console.print(f"[grey58]OK[/]")
@@ -110,8 +116,11 @@ def poll_logs_ws(backend: Backend, repo_address: RepoAddress, job_head: JobHead)
     def on_close(_: WebSocketApp, close_status_code, close_msg):
         pass
 
-    url = f"ws://{job.host_name}:{job.env['WS_LOGS_PORT']}/logsws"
-    cursor.hide()
+    local_ws_logs_port = ports.get(int(job.env["WS_LOGS_PORT"]), int(job.env["WS_LOGS_PORT"]))
+    url = f"ws://127.0.0.1:{local_ws_logs_port}/logsws"
+    atty = sys.stdout.isatty()
+    if atty:
+        cursor.hide()
     _ws = websocket.WebSocketApp(
         url,
         on_message=on_message,
@@ -120,11 +129,12 @@ def poll_logs_ws(backend: Backend, repo_address: RepoAddress, job_head: JobHead)
         on_close=on_close,
     )
     _ws.run_forever()
-    cursor.show()
+    if atty:
+        cursor.show()
 
     try:
         while True:
-            _job_head = backend.get_job(repo_address, job_head.job_id)
+            _job_head = backend.get_job(repo_address, job.job_id)
             run = backend.list_run_heads(repo_address, _job_head.run_name)[0]
             if run.status.is_finished():
                 break
@@ -135,7 +145,13 @@ def poll_logs_ws(backend: Backend, repo_address: RepoAddress, job_head: JobHead)
             console.print(f"[grey58]OK[/]")
 
 
-def poll_run(repo_address: RepoAddress, job_heads: List[JobHead], backend: Backend):
+def poll_run(
+    repo_address: RepoAddress,
+    job_heads: List[JobHead],
+    backend: Backend,
+    ssh_key: Optional[str],
+    openssh_server: bool,
+):
     run_name = job_heads[0].run_name
     try:
         console.print()
@@ -177,12 +193,33 @@ def poll_run(repo_address: RepoAddress, job_heads: List[JobHead], backend: Backe
                         task, description="Provisioning... It may take up to a minute."
                     )
                     request_errors_printed = False
-        console.print("Provisioning... It may take up to a minute. [green]✓[/]")
+
+        jobs = [backend.get_job(repo_address, job_head.job_id) for job_head in job_heads]
+        ports = {}
+        if backend.name != "local":
+            console.print("Starting SSH tunnel...")
+            ports = allocate_local_ports(jobs)
+            if not run_ssh_tunnel(
+                ssh_key, jobs[0].host_name, ports
+            ):  # todo: cleanup explicitly (stop tunnel)
+                console.print("[warning]Warning: failed to start SSH tunnel[/warning] [red]✗[/]")
+        else:
+            console.print("Provisioning... It may take up to a minute. [green]✓[/]")
         console.print()
         console.print("[grey58]To interrupt, press Ctrl+C.[/]")
         console.print()
+
+        if openssh_server:
+            ssh_port = jobs[0].ports[-1]
+            ssh_port = ports.get(ssh_port, ssh_port)
+            ssh_key_escaped = ssh_key.replace(" ", "\\ ")
+            console.print("To connect via SSH, use:")
+            console.print(f"  ssh -i {ssh_key_escaped} root@localhost -p {ssh_port}")
+            console.print()
+
+        run = backend.list_run_heads(repo_address, run_name)[0]
         if len(job_heads) == 1 and run and run.status == JobStatus.RUNNING:
-            poll_logs_ws(backend, repo_address, job_heads[0])
+            poll_logs_ws(backend, repo_address, jobs[0], ports)
         else:
             poll_logs(
                 backend,
@@ -206,15 +243,17 @@ class RunCommand(BasicCommand):
         super(RunCommand, self).__init__(parser)
 
     def register(self):
-        workflow_help = "A name of the workflow"
         workflows = _load_workflows()
-        if len(workflows) > 0:
-            workflow_help = "{" + ",".join(w["name"] for w in workflows if w.get("name")) + "}"
+        workflow_names = [w["name"] for w in workflows if w.get("name")]
+        provider_names = providers.get_provider_names()
+        workflow_or_provider_names = workflow_names + provider_names
+        workflow_help = "{" + ",".join(workflow_or_provider_names) + "}"
         self._parser.add_argument(
             "workflow_or_provider",
-            metavar="WORKFLOW",
+            metavar="WORKFLOW | PROVIDER",
             type=str,
             help=workflow_help,
+            choices=workflow_or_provider_names,
             nargs="?",
         )
         self._parser.add_argument(
@@ -242,7 +281,7 @@ class RunCommand(BasicCommand):
             "args",
             metavar="ARGS",
             nargs=argparse.ZERO_OR_MORE,
-            help="Override provider arguments",
+            help="Override workflow or provider arguments",
         )
 
     @check_config
@@ -253,6 +292,7 @@ class RunCommand(BasicCommand):
             self._parser.print_help()
             exit(1)
         try:
+            config = BaseConfig()
             repo_data = load_repo_data()
             backend = get_local_backend()
             if args.remote is not None:
@@ -279,29 +319,43 @@ class RunCommand(BasicCommand):
                 provider.help(workflow_name)
                 sys.exit()
 
-            if backend.get_repo_credentials(repo_data):
-                run_name = backend.create_run(repo_data)
-                provider.load(backend, provider_args, workflow_name, workflow_data, run_name)
-                if args.tag_name:
-                    tag_head = backend.get_tag_head(repo_data, args.tag_name)
-                    if tag_head:
-                        backend.delete_tag_head(repo_data, tag_head)
-                jobs = provider.submit_jobs(backend, args.tag_name)
-                backend.update_repo_last_run_at(
-                    repo_data, last_run_at=int(round(time.time() * 1000))
-                )
-                runs_with_merged_backends = list_runs_with_merged_backends(
-                    [backend], run_name=run_name
-                )
-                print_runs(runs_with_merged_backends)
-                run = runs_with_merged_backends[0][0]
-                if run.status == JobStatus.FAILED:
-                    console.print("\nProvisioning failed\n")
-                    exit(1)
-                if not args.detach:
-                    poll_run(repo_data, jobs, backend)
-            else:
+            repo_credentials = backend.get_repo_credentials(repo_data)
+            repo_user_config = config.read(
+                config.repos / f"{repo_data.path(delimiter='.')}.yaml",
+                RepoUserConfig,
+                non_empty=False,
+            )
+            if not repo_credentials:
                 sys.exit(f"Call `dstack init` first")
+            if not repo_user_config.ssh_key_path:
+                if (
+                    (backend.name != "local" and not args.detach)
+                    or workflow_data.get("ssh", False)
+                    or "--ssh" in provider_args
+                ):
+                    console.print("Call `dstack init` first")
+                    console.print("  [gray58]No valid SSH identity[/]")
+                    exit(1)
+            else:
+                workflow_data["ssh_key_pub"] = _read_ssh_key_pub(repo_user_config.ssh_key_path)
+
+            run_name = backend.create_run(repo_data)
+            provider.load(backend, provider_args, workflow_name, workflow_data, run_name)
+            if args.tag_name:
+                tag_head = backend.get_tag_head(repo_data, args.tag_name)
+                if tag_head:
+                    backend.delete_tag_head(repo_data, tag_head)
+            jobs = provider.submit_jobs(backend, args.tag_name)
+            backend.update_repo_last_run_at(repo_data, last_run_at=int(round(time.time() * 1000)))
+            print_runs(list_runs_with_merged_backends([backend], run_name=run_name))
+            if not args.detach:
+                poll_run(
+                    repo_data,
+                    jobs,
+                    backend,
+                    ssh_key=repo_user_config.ssh_key_path,
+                    openssh_server=provider.openssh_server,
+                )
         except ValidationError as e:
             sys.exit(
                 f"There a syntax error in one of the files inside the {os.getcwd()}/.dstack/workflows directory:\n\n{e}"

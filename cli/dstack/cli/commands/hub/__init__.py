@@ -15,9 +15,10 @@ class HubCommand(BasicCommand):
     def __init__(self, parser):
         super(HubCommand, self).__init__(parser)
 
-    def hub_start(self, args: Namespace):
+    def _hub_start(self, args: Namespace):
         os.environ["DSTACK_HUB_HOST"] = args.host
         os.environ["DSTACK_HUB_PORT"] = str(args.port)
+        os.environ["DSTACK_HUB_LOG_LEVEL"] = args.log_level
         if args.token:
             os.environ["DSTACK_HUB_ADMIN_TOKEN"] = args.token
         uvicorn.run(
@@ -30,16 +31,23 @@ class HubCommand(BasicCommand):
 
     def register(self):
         subparsers = self._parser.add_subparsers()
-
         hub_parser = subparsers.add_parser(
-            "start", help="Start a hub server", formatter_class=RichHelpFormatter
+            "start",
+            help="Start a hub server",
+            formatter_class=RichHelpFormatter,
+            add_help=False,
         )
-
+        hub_parser.add_argument(
+            "-h",
+            "--help",
+            action="help",
+            help="Show this help message and exit",
+        )
         hub_parser.add_argument(
             "--host",
             metavar="HOST",
             type=str,
-            help="Bind socket to this host.  Default: 127.0.0.1",
+            help="Bind socket to this host. Defaults to 127.0.0.1",
             default="127.0.0.1",
         )
         hub_parser.add_argument(
@@ -47,8 +55,19 @@ class HubCommand(BasicCommand):
             "--port",
             metavar="PORT",
             type=int,
-            help="Bind socket to this port. Default: 3000.",
+            help="Bind socket to this port. Defaults to 3000.",
             default=3000,
         )
+        hub_parser.add_argument(
+            "-l",
+            "--log-level",
+            metavar="LOG-LEVEL",
+            type=str,
+            help="",
+            default="ERROR",
+        )
         hub_parser.add_argument("--token", metavar="TOKEN", type=str, help="The admin user token")
-        hub_parser.set_defaults(func=self.hub_start)
+        hub_parser.set_defaults(func=self._hub_start)
+
+    def _command(self, args: Namespace):
+        self._parser.print_help()

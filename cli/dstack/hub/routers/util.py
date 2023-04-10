@@ -1,14 +1,24 @@
+from typing import Dict, Optional
+
 from fastapi import HTTPException, status
 
-from dstack.hub.models import Hub
-from dstack.hub.repository.hub import HubManager
+from dstack.hub.models import Project
+from dstack.hub.repository.projects import ProjectManager
 
 
-async def get_hub(hub_name: str) -> Hub:
-    hub = await HubManager.get(name=hub_name)
+async def get_project(project_name: str) -> Project:
+    hub = await ProjectManager.get(name=project_name)
     if hub is None:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
-            detail=f"Hub not found",
+            detail=error_detail("Project not found"),
         )
     return hub
+
+
+def error_detail(msg: str, code: Optional[str] = None, **kwargs) -> Dict:
+    return {
+        "msg": msg,
+        "code": code,
+        **kwargs,
+    }

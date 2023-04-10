@@ -106,21 +106,12 @@ def _get_security_group_id(ec2_client: BaseClient, bucket_name: str, subnet_id: 
         security_group_id = security_group["GroupId"]
         ip_permissions = [
             {
-                "FromPort": 3000,
-                "ToPort": 4000,
+                "FromPort": 22,
+                "ToPort": 22,
                 "IpProtocol": "tcp",
                 "IpRanges": [{"CidrIp": "0.0.0.0/0"}],
             }
         ]
-        if not version.__is_release__:
-            ip_permissions.append(
-                {
-                    "FromPort": 22,
-                    "ToPort": 22,
-                    "IpProtocol": "tcp",
-                    "IpRanges": [{"CidrIp": "0.0.0.0/0"}],
-                }
-            )
         ec2_client.authorize_security_group_ingress(
             GroupId=security_group_id, IpPermissions=ip_permissions
         )
@@ -167,6 +158,7 @@ def _user_data(
     region_name,
     runner_id: str,
     resources: Resources,
+    ssh_key_pub: str,
     port_range_from: int = 3000,
     port_range_to: int = 4000,
 ) -> str:
@@ -189,6 +181,7 @@ echo $'{_serialize_runner_yaml(runner_id, resources, runner_port_range_from, run
 die() {{ status=$1; shift; echo "FATAL: $*"; exit $status; }}
 EC2_PUBLIC_HOSTNAME="`wget -q -O - http://169.254.169.254/latest/meta-data/public-hostname || die \"wget public-hostname has failed: $?\"`"
 echo "hostname: $EC2_PUBLIC_HOSTNAME" >> /root/.dstack/runner.yaml
+mkdir ~/.ssh; chmod 700 ~/.ssh; echo "{ssh_key_pub}" > ~/.ssh/authorized_keys; chmod 600 ~/.ssh/authorized_keys
 HOME=/root nohup dstack-runner --log-level 6 start --http-port 4000 &
 """
     return user_data
@@ -352,6 +345,7 @@ def _run_instance(
     local_repo_user_name: Optional[str],
     local_repo_user_email: Optional[str],
     repo_address: RepoAddress,
+    ssh_key_pub: str,
 ) -> str:
     launch_specification = {}
     if not version.__is_release__:
@@ -403,7 +397,9 @@ def _run_instance(
         IamInstanceProfile={
             "Arn": _get_instance_profile_arn(iam_client, bucket_name),
         },
-        UserData=_user_data(bucket_name, region_name, runner_id, instance_type.resources),
+        UserData=_user_data(
+            bucket_name, region_name, runner_id, instance_type.resources, ssh_key_pub=ssh_key_pub
+        ),
         TagSpecifications=[
             {
                 "ResourceType": "instance",
@@ -431,6 +427,7 @@ def run_instance_retry(
     local_repo_user_name: Optional[str],
     local_repo_user_email: Optional[str],
     repo_address: RepoAddress,
+    ssh_key_pub: str,
     attempts: int = 3,
 ) -> str:
     try:
@@ -445,6 +442,7 @@ def run_instance_retry(
             local_repo_user_name,
             local_repo_user_email,
             repo_address,
+            ssh_key_pub,
         )
     except botocore.exceptions.ClientError as e:
         # FIXME: why retry on "InvalidParameterValue"
@@ -462,6 +460,7 @@ def run_instance_retry(
                     local_repo_user_name,
                     local_repo_user_email,
                     repo_address,
+                    ssh_key_pub,
                     attempts - 1,
                 )
             else:

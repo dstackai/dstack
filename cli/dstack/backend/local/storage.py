@@ -67,6 +67,17 @@ class LocalStorage(Storage):
         shutil.copy2(source_path, full_dest_path)
         callback(os.path.getsize(source_path))
 
+    def delete_prefix(self, keys_prefix: str):
+        if keys_prefix.endswith("/"):
+            shutil.rmtree(Path(self.root_path) / keys_prefix, ignore_errors=True)
+        else:
+            prefix_path = Path(self.root_path) / keys_prefix
+            for file in prefix_path.parent.glob(f"{prefix_path.name}*"):
+                if file.is_dir():
+                    shutil.rmtree(file, ignore_errors=True)
+                else:
+                    file.unlink()
+
 
 def _list_objects(Root: str, Prefix: str, MaxKeys: Optional[int] = None) -> List[str]:
     prefix_path = Path.joinpath(Root, Prefix)

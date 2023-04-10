@@ -2,8 +2,11 @@ package executor
 
 import (
 	"context"
+	"encoding/base64"
+	"encoding/json"
 	"errors"
 	"fmt"
+	"github.com/docker/docker/api/types"
 	"io"
 	"os"
 	"path"
@@ -27,18 +30,19 @@ import (
 )
 
 type Executor struct {
-	backend       backend.Backend
-	configDir     string
-	config        *Config
-	engine        *container.Engine
-	artifactsIn   []artifacts.Artifacter
-	artifactsOut  []artifacts.Artifacter
-	artifactsFUSE []artifacts.Artifacter
-	repo          *repo.Manager
-	pm            ports.Manager
-	portID        string
-	streamLogs    *stream.Server
-	stoppedCh     chan struct{}
+	backend        backend.Backend
+	configDir      string
+	config         *Config
+	engine         *container.Engine
+	cacheArtifacts []artifacts.Artifacter
+	artifactsIn    []artifacts.Artifacter
+	artifactsOut   []artifacts.Artifacter
+	artifactsFUSE  []artifacts.Artifacter
+	repo           *repo.Manager
+	pm             ports.Manager
+	portID         string
+	streamLogs     *stream.Server
+	stoppedCh      chan struct{}
 }
 
 func New(b backend.Backend) *Executor {
@@ -106,6 +110,7 @@ func (ex *Executor) Init(ctx context.Context, configDir string) error {
 			}
 		}
 	}
+
 	cloudLog := ex.backend.CreateLogger(ctx, fmt.Sprintf("/dstack/runners/%s", ex.backend.Bucket(ctx)), job.RunnerID)
 	log.SetCloudLogger(cloudLog)
 	return nil
@@ -227,6 +232,10 @@ func (ex *Executor) runJob(ctx context.Context, erCh chan error, stoppedCh chan 
 	}
 	log.Trace(jctx, "Dependency processing")
 
+	if err = ex.processCache(jctx); err != nil {
+		erCh <- gerrors.Wrap(err)
+		return
+	}
 	if err = ex.processDeps(jctx); err != nil {
 		erCh <- gerrors.Wrap(err)
 		return
@@ -239,7 +248,7 @@ func (ex *Executor) runJob(ctx context.Context, erCh chan error, stoppedCh chan 
 				return
 			}
 		}
-		if len(ex.artifactsIn) > 0 {
+		if len(ex.artifactsIn) > 0 || len(ex.cacheArtifacts) > 0 {
 			log.Trace(jctx, "Start downloading artifacts")
 			job.Status = states.Downloading
 			err = ex.backend.UpdateState(jctx)
@@ -254,6 +263,9 @@ func (ex *Executor) runJob(ctx context.Context, erCh chan error, stoppedCh chan 
 					return
 				}
 			}
+			for _, artifact := range ex.cacheArtifacts {
+				err = artifact.BeforeRun(jctx)
+			}
 		}
 		log.Trace(jctx, "Running job")
 		job.Status = states.Running
@@ -267,7 +279,7 @@ func (ex *Executor) runJob(ctx context.Context, erCh chan error, stoppedCh chan 
 			erCh <- gerrors.Wrap(err)
 			return
 		}
-		if len(ex.artifactsOut) > 0 {
+		if len(ex.artifactsOut) > 0 || len(ex.cacheArtifacts) > 0 {
 			log.Trace(jctx, "Start uploading artifacts")
 			job.Status = states.Uploading
 			err = ex.backend.UpdateState(jctx)
@@ -276,6 +288,13 @@ func (ex *Executor) runJob(ctx context.Context, erCh chan error, stoppedCh chan 
 				return
 			}
 			for _, artifact := range ex.artifactsOut {
+				err = artifact.AfterRun(jctx)
+				if err != nil {
+					erCh <- gerrors.Wrap(err)
+					return
+				}
+			}
+			for _, artifact := range ex.cacheArtifacts {
 				err = artifact.AfterRun(jctx)
 				if err != nil {
 					erCh <- gerrors.Wrap(err)
@@ -367,6 +386,21 @@ func (ex *Executor) processDeps(ctx context.Context) error {
 	return nil
 }
 
+func (ex *Executor) processCache(ctx context.Context) error {
+	job := ex.backend.Job(ctx)
+	username := job.LocalRepoUserEmail
+	if len(username) == 0 {
+		username = "default"
+	}
+	for _, cache := range job.Cache {
+		cacheArt := ex.backend.GetArtifact(ctx, job.RunName, cache.Path, path.Join("cache", job.RepoHostNameWithPort(), job.RepoUserName, job.RepoName, username, job.WorkflowName, cache.Path), false)
+		if cacheArt != nil {
+			ex.cacheArtifacts = append(ex.cacheArtifacts, cacheArt)
+		}
+	}
+	return nil
+}
+
 func (ex *Executor) environment(ctx context.Context) []string {
 	log.Trace(ctx, "Start generate env")
 	job := ex.backend.Job(ctx)
@@ -444,16 +478,39 @@ func (ex *Executor) processJob(ctx context.Context, stoppedCh chan struct{}) err
 		}
 		bindings = append(bindings, art...)
 	}
+	for _, artifact := range ex.cacheArtifacts {
+		art, err := artifact.DockerBindings(path.Join("/workflow", job.WorkingDir))
+		if err != nil {
+			return gerrors.Wrap(err)
+		}
+		bindings = append(bindings, art...)
+	}
 	logger := ex.backend.CreateLogger(ctx, fmt.Sprintf("/dstack/jobs/%s/%s/%s/%s", ex.backend.Bucket(ctx), job.RepoHostNameWithPort(), job.RepoUserName, job.RepoName), job.RunName)
+	secrets, err := ex.backend.Secrets(ctx)
+	if err != nil {
+		log.Error(ctx, "Fail fetching secrets", "err", err)
+	}
+	var interpolator VariablesInterpolator
+	interpolator.Add("secrets", secrets)
+	username, err := interpolator.Interpolate(ctx, job.RegistryAuth.Username)
+	if err != nil {
+		log.Error(ctx, "Failed interpolating registry_auth.username", "err", err, "username", job.RegistryAuth.Username)
+	}
+	password, err := interpolator.Interpolate(ctx, job.RegistryAuth.Password)
+	if err != nil {
+		log.Error(ctx, "Failed interpolating registry_auth.password", "err", err, "password", job.RegistryAuth.Password)
+	}
 	spec := &container.Spec{
-		Image:        job.Image,
-		WorkDir:      path.Join("/workflow", job.WorkingDir),
-		Commands:     container.ShellCommands(job.Commands),
-		Env:          ex.environment(ctx),
-		Mounts:       uniqueMount(bindings),
-		ExposedPorts: ex.pm.ExposedPorts(ex.portID),
-		BindingPorts: ex.pm.BindPorts(ex.portID),
-		ShmSize:      resource.ShmSize,
+		Image:              job.Image,
+		RegistryAuthBase64: makeRegistryAuthBase64(username, password),
+		WorkDir:            path.Join("/workflow", job.WorkingDir),
+		Commands:           container.ShellCommands(job.Commands),
+		Entrypoint:         job.Entrypoint,
+		Env:                ex.environment(ctx),
+		Mounts:             uniqueMount(bindings),
+		ExposedPorts:       ex.pm.ExposedPorts(ex.portID),
+		BindingPorts:       ex.pm.BindPorts(ex.portID),
+		ShmSize:            resource.ShmSize,
 	}
 	logGroup := fmt.Sprintf("/jobs/%s/%s/%s", job.RepoHostNameWithPort(), job.RepoUserName, job.RepoName)
 	fileLog, err := createLocalLog(filepath.Join(ex.configDir, "logs", logGroup), job.RunName)
@@ -535,4 +592,19 @@ func createLocalLog(dir, fileName string) (*os.File, error) {
 		return nil, gerrors.Wrap(err)
 	}
 	return fileLog, nil
+}
+
+func makeRegistryAuthBase64(username string, password string) string {
+	if username == "" && password == "" {
+		return ""
+	}
+	authConfig := types.AuthConfig{
+		Username: username,
+		Password: password,
+	}
+	encodedJSON, err := json.Marshal(authConfig)
+	if err != nil {
+		panic(err)
+	}
+	return base64.URLEncoding.EncodeToString(encodedJSON)
 }

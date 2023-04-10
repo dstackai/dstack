@@ -137,6 +137,7 @@ def poll_logs(
     filter_logs_events_kwargs = _filter_logs_events_kwargs(
         bucket_name, repo_address, run_name, start_time, end_time=None, next_token=None
     )
+    jobs_cache = {}
     try:
         if attached:
             for event in _filter_log_events_loop(
@@ -151,6 +152,7 @@ def poll_logs(
                     storage,
                     event,
                     repo_address,
+                    jobs_cache,
                 )
         else:
             paginator = logs_client.get_paginator("filter_log_events")
@@ -160,6 +162,7 @@ def poll_logs(
                         storage,
                         event,
                         repo_address,
+                        jobs_cache,
                     )
     except Exception as e:
         if (

@@ -5,6 +5,7 @@
 /.cache/
 
 /cli/dstack.egg-info/
+/cli/dstack/hub/statics/
 
 /runner/runner
 

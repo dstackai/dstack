@@ -5,6 +5,7 @@ from dstack.cli.commands.hub import HubCommand
 from dstack.cli.commands.init import InitCommand
 from dstack.cli.commands.logs import LogCommand
 from dstack.cli.commands.ls import LsCommand
+from dstack.cli.commands.prune import PruneCommand
 from dstack.cli.commands.ps import PSCommand
 from dstack.cli.commands.pull import PullCommand
 from dstack.cli.commands.push import PushCommand
@@ -20,6 +21,7 @@ commands_classes = [
     InitCommand,
     LogCommand,
     LsCommand,
+    PruneCommand,
     PSCommand,
     PullCommand,
     PushCommand,

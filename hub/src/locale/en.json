@@ -55,8 +55,10 @@
       "general": "General",
       "edit_backend": "Edit backend",
       "project_name": "Project name",
+      "project_name_description": "Only latin characters, dashes, underscores, and digits",
       "backend": "Backend",
       "backend_type": "Type",
+      "backend_type_description": "Select the compute and storage provider",
       "members_empty_message_title": "No members",
       "members_empty_message_text": "Select project's members",
       "cli": "CLI",
@@ -64,10 +66,40 @@
         "access_key": "Access key",
         "secret_key": "Secret key",
         "access_key_id": "Access key ID",
-        "secret_key_id": "Secret key ID",
+        "access_key_id_description": "Specify the AWS access key ID",
+        "secret_key_id": "Secret access key",
+        "secret_key_id_description": "Specify the AWS secret access key",
         "region_name":  "Region",
+        "region_name_description":  "Select a region to run workflows and store artifacts",
+        "region_name_placeholder": "Not selected",
         "s3_bucket_name": "Bucket",
-        "ec2_subnet_id":  "Subnet ID"
+        "s3_bucket_name_description": "Select an S3 bucket to store artifacts",
+        "ec2_subnet_id_description": "Select a subnet to run workflows in",
+        "ec2_subnet_id_placeholder":  "Not selected",
+        "ec2_subnet_id": "Subnet"
+      },
+      "gcp": {
+        "credentials": "Credentials",
+        "credentials_description": "Credentials description",
+        "credentials_placeholder": "Credentials placeholder",
+        "area": "Area",
+        "area_description": "Select a geographical area to run workflows and store artifacts",
+        "area_placeholder": "Not selected",
+        "region": "Region",
+        "region_description": "Select a region to run workflows and store artifacts",
+        "region_placeholder": "Not selected",
+        "zone": "Zone",
+        "zone_description": "Select a zone to run workflows and store artifacts",
+        "zone_placeholder": "Not selected",
+        "bucket_name": "Bucket",
+        "bucket_name_description": "Select a storage bucket to store artifacts",
+        "bucket_name_placeholder": "Not selected",
+        "vpc": "VPC",
+        "vpc_description": "VPC description",
+        "vpc_placeholder": "VPC placeholder",
+        "subnet": "Subnet",
+        "subnet_description": "Select a subnet to run workflows in",
+        "subnet_placeholder": "Not selected"
       },
       "members": {
         "section_title": "Members",
@@ -75,7 +107,10 @@
         "role": "Project role"
       },
       "error_notification": "Update project error",
-      "success_notification": "Project updating is successful"
+      "success_notification": "Project updating is successful",
+      "validation": {
+        "user_name_format": "Only letters, numbers, - or _"
+      }
     },
     "create": {
       "page_title": "Create project",

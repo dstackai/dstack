@@ -1,19 +1,24 @@
-from typing import Dict, List, Optional, Union
+from typing import List, Optional, Union
 
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
+from typing_extensions import Literal
 
 from dstack.core.job import Job, JobHead
-from dstack.core.repo import LocalRepoData, RepoAddress
+from dstack.core.repo import LocalRepoData, RepoAddress, RepoCredentials
 from dstack.core.secret import Secret
+from dstack.hub.security.utils import GlobalRole, ProjectRole
 
 
-class User(BaseModel):
+class UserInfo(BaseModel):
     user_name: str
+    global_role: GlobalRole
+
+
+class UserInfoWithToken(UserInfo):
     token: Optional[str]
-    global_role: str
 
 
-class Hub(BaseModel):
+class Project(BaseModel):
     name: str
     backend: str
     config: str
@@ -21,40 +26,107 @@ class Hub(BaseModel):
 
 class Member(BaseModel):
     user_name: str
-    hub_role: str
+    project_role: ProjectRole
 
 
-class AWSConfig(BaseModel):
-    region_name: str = ""
-    region_name_title: str = ""
-    s3_bucket_name: str = ""
-    ec2_subnet_id: Optional[str] = ""
+class AWSProjectConfigPartial(BaseModel):
+    type: Literal["aws"] = "aws"
+    region_name: Optional[str]
+    region_name_title: Optional[str]
+    s3_bucket_name: Optional[str]
+    ec2_subnet_id: Optional[str]
 
 
-class AWSAuth(BaseModel):
-    access_key: str = ""
-    secret_key: str = ""
+class AWSProjectConfig(BaseModel):
+    type: Literal["aws"] = "aws"
+    region_name: str
+    region_name_title: Optional[str]
+    s3_bucket_name: str
+    ec2_subnet_id: Optional[str]
 
 
-class AWSBackend(AWSConfig, AWSAuth):
-    type: str = "aws"
+class AWSProjectCreds(BaseModel):
+    access_key: str
+    secret_key: str
 
 
-class HubInfo(BaseModel):
-    hub_name: str
-    backend: AWSBackend
+class AWSProjectConfigWithCredsPartial(AWSProjectConfigPartial, AWSProjectCreds):
+    pass
+
+
+class AWSProjectConfigWithCreds(AWSProjectConfig, AWSProjectCreds):
+    pass
+
+
+class GCPProjectConfigPartial(BaseModel):
+    type: Literal["gcp"] = "gcp"
+    area: Optional[str]
+    region: Optional[str]
+    zone: Optional[str]
+    bucket_name: Optional[str]
+    vpc: Optional[str]
+    subnet: Optional[str]
+
+
+class GCPProjectConfig(BaseModel):
+    type: Literal["gcp"] = "gcp"
+    area: str
+    region: str
+    zone: str
+    bucket_name: str
+    vpc: str
+    subnet: str
+
+
+class GCPProjectCreds(BaseModel):
+    credentials_filename: str
+    credentials: str
+
+
+class GCPProjectConfigWithCredsPartial(GCPProjectConfigPartial, GCPProjectCreds):
+    pass
+
+
+class GCPProjectConfigWithCreds(GCPProjectConfig, GCPProjectCreds):
+    pass
+
+
+AnyProjectConfig = Union[AWSProjectConfig, GCPProjectConfig]
+AnyProjectConfigWithCredsPartial = Union[
+    AWSProjectConfigWithCredsPartial, GCPProjectConfigWithCredsPartial
+]
+AnyProjectConfigWithCreds = Union[AWSProjectConfigWithCreds, GCPProjectConfigWithCreds]
+
+
+class ProjectConfig(BaseModel):
+    __root__: AnyProjectConfig = Field(..., discriminator="type")
+
+
+class ProjectConfigWithCredsPartial(BaseModel):
+    __root__: AnyProjectConfigWithCredsPartial = Field(..., discriminator="type")
+
+
+class ProjectConfigWithCreds(BaseModel):
+    __root__: AnyProjectConfigWithCreds = Field(..., discriminator="type")
+
+
+class ProjectInfo(BaseModel):
+    project_name: str
+    backend: ProjectConfig
     members: List[Member] = []
 
 
-class UserInfo(BaseModel):
-    user_name: str
+class ProjectInfoWithCreds(BaseModel):
+    project_name: str
+    backend: ProjectConfigWithCreds
+    members: List[Member] = []
 
 
 class AddTagRun(BaseModel):
     repo_address: RepoAddress
     tag_name: str
     run_name: str
-    run_jobs: List[Job]
+    run_jobs: Optional[List[Job]]
 
 
 class AddTagPath(BaseModel):
@@ -67,6 +139,11 @@ class StopRunners(BaseModel):
     repo_address: RepoAddress
     job_id: str
     abort: bool
+
+
+class SaveRepoCredentials(BaseModel):
+    repo_address: RepoAddress
+    repo_credentials: RepoCredentials
 
 
 class ReposUpdate(BaseModel):
@@ -111,29 +188,80 @@ class LinkUpload(BaseModel):
     object_key: str
 
 
-class HubDelete(BaseModel):
-    hub_names: List[str] = []
+class ProjectDelete(BaseModel):
+    projects: List[str] = []
 
 
-class HubElementValue(BaseModel):
-    name: Optional[str]
-    created: Optional[str]
-    region: Optional[str]
-    value: Optional[str]
+class ProjectElementValue(BaseModel):
+    value: str
+    label: str
+
+
+class ProjectElement(BaseModel):
+    selected: Optional[str]
+    values: List[ProjectElementValue] = []
+
+
+class AWSBucketProjectElementValue(BaseModel):
+    name: str
+    created: str
+    region: str
+
+
+class AWSBucketProjectElementValue(BaseModel):
+    name: str
+    created: str
+    region: str
+
+
+class AWSBucketProjectElement(BaseModel):
+    selected: Optional[str]
+    values: List[AWSBucketProjectElementValue] = []
+
+
+class AWSProjectValues(BaseModel):
+    type: Literal["aws"] = "aws"
+    region_name: Optional[ProjectElement]
+    s3_bucket_name: Optional[AWSBucketProjectElement]
+    ec2_subnet_id: Optional[ProjectElement]
+
+
+class GCPVPCSubnetProjectElementValue(BaseModel):
     label: Optional[str]
+    vpc: Optional[str]
+    subnet: Optional[str]
 
 
-class HubElement(BaseModel):
-    selected: str
-    values: List[HubElementValue] = []
+class GCPVPCSubnetProjectElement(BaseModel):
+    selected: Optional[str]
+    values: List[GCPVPCSubnetProjectElementValue] = []
 
 
-class AWSHubValues(BaseModel):
-    type: str = "aws"
-    region_name: Optional[HubElement]
-    s3_bucket_name: Optional[HubElement]
-    ec2_subnet_id: Optional[HubElement]
+class GCPProjectValues(BaseModel):
+    type: Literal["gcp"] = "gcp"
+    area: Optional[ProjectElement]
+    region: Optional[ProjectElement]
+    zone: Optional[ProjectElement]
+    bucket_name: Optional[ProjectElement]
+    vpc_subnet: Optional[GCPVPCSubnetProjectElement]
+
+
+class ProjectValues(BaseModel):
+    __root__: Union[AWSProjectValues, GCPProjectValues] = Field(..., discriminator="type")
 
 
 class UserPatch(BaseModel):
-    global_role: str
+    global_role: GlobalRole
+
+
+class AddMembers(BaseModel):
+    members: List[Member] = []
+
+
+class DeleteUsers(BaseModel):
+    users: List[str] = []
+
+
+class UserRepoAddress(BaseModel):
+    username: str  # fixme: use auth username
+    repo_address: RepoAddress

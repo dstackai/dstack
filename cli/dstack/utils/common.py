@@ -104,3 +104,9 @@ def removeprefix(s: str, prefix: str) -> str:
 
 def get_milliseconds_since_epoch() -> int:
     return int(round(time.time() * 1000))
+
+
+def format_list(items: Optional[list], *, formatter=str) -> Optional[str]:
+    if items is None:
+        return None
+    return "[{}]".format(", ".join(formatter(item) for item in items))

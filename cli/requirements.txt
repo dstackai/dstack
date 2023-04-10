@@ -2,7 +2,7 @@ requests
 pyyaml
 gitpython
 boto3
-tqdm==4.64.1
+tqdm
 jsonschema
 botocore
 python-dateutil
@@ -14,7 +14,7 @@ fastapi
 starlette
 uvicorn
 pydantic
-sqlalchemy[asyncio]==2.0.2
+sqlalchemy[asyncio]
 py-cpuinfo
 psutil
 websocket-client
@@ -29,3 +29,5 @@ google-cloud-logging
 aiosqlite
 packaging
 apscheduler
+alembic
+typing-extensions

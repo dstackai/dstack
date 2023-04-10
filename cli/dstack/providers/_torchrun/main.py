@@ -2,7 +2,10 @@ import argparse
 from argparse import ArgumentParser
 from typing import Any, Dict, List, Optional
 
-from dstack.jobs import GpusRequirements, JobSpec, Requirements
+from rich_argparse import RichHelpFormatter
+
+from dstack.backend.base import Backend
+from dstack.core.job import GpusRequirements, JobSpec, Requirements
 from dstack.providers import Provider
 
 
@@ -21,12 +24,13 @@ class TorchrunProvider(Provider):
 
     def load(
         self,
+        backend: Backend,
         provider_args: List[str],
         workflow_name: Optional[str],
         provider_data: Dict[str, Any],
         run_name: str,
     ):
-        super().load(provider_args, workflow_name, provider_data, run_name)
+        super().load(backend, provider_args, workflow_name, provider_data, run_name)
         self.script = self.provider_data.get("script") or self.provider_data.get("file")
         self.setup = self._get_list_data("setup") or self._get_list_data("before_run")
         self.python = self._safe_python_version("python")
@@ -40,7 +44,7 @@ class TorchrunProvider(Provider):
     def _resources(self) -> Optional[Requirements]:
         resources = super()._resources()
         if resources.gpu is None:
-            resources.gpu = GpusRequirements(1)
+            resources.gpu = GpusRequirements(count=1)
         return resources
 
     def _image_name(self) -> str:
@@ -102,7 +106,10 @@ class TorchrunProvider(Provider):
         return job_specs
 
     def _create_parser(self, workflow_name: Optional[str]) -> Optional[ArgumentParser]:
-        parser = ArgumentParser(prog="dstack run " + (workflow_name or self.provider_name))
+        parser = ArgumentParser(
+            prog="dstack run " + (workflow_name or self.provider_name),
+            formatter_class=RichHelpFormatter,
+        )
         self._add_base_args(parser)
         parser.add_argument("--nnodes", type=int, nargs="?")
         if not workflow_name:

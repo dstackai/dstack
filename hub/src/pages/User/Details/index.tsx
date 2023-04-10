@@ -1,9 +1,9 @@
-import React, { useEffect, useState } from 'react';
+import React, { useState } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import { ContentLayout, SpaceBetween, Container, Header, ColumnLayout, Box, Loader, ConfirmationDialog } from 'components';
 import { DetailsHeader } from 'components';
 import { useTranslation } from 'react-i18next';
-import { useBreadcrumbs } from 'hooks';
+import { useBreadcrumbs, useNotifications } from 'hooks';
 import { useDeleteUsersMutation, useGetUserQuery } from 'services/user';
 import { ROUTES } from 'routes';
 import Button from '@cloudscape-design/components/button';
@@ -15,7 +15,8 @@ export const UserDetails: React.FC = () => {
     const paramUserName = params.name ?? '';
     const navigate = useNavigate();
     const { isLoading, data } = useGetUserQuery({ name: paramUserName }, { skip: !params.name });
-    const [deleteUsers, { isLoading: isDeleting, data: deleteData }] = useDeleteUsersMutation();
+    const [deleteUsers, { isLoading: isDeleting }] = useDeleteUsersMutation();
+    const [pushNotification] = useNotifications();
 
     useBreadcrumbs([
         {
@@ -28,17 +29,23 @@ export const UserDetails: React.FC = () => {
         },
     ]);
 
-    useEffect(() => {
-        if (!isDeleting && deleteData) navigate(ROUTES.USER.LIST);
-    }, [isDeleting, deleteData]);
-
     const toggleDeleteConfirm = () => {
         setShowConfirmDelete((val) => !val);
     };
 
     const deleteUserHandler = () => {
         if (!data) return;
-        deleteUsers([paramUserName]);
+
+        deleteUsers([paramUserName])
+            .unwrap()
+            .then(() => navigate(ROUTES.USER.LIST))
+            .catch((error) => {
+                pushNotification({
+                    type: 'error',
+                    content: t('common.server_error', { error: error?.error }),
+                });
+            });
+
         setShowConfirmDelete(false);
     };
 
@@ -75,10 +82,10 @@ export const UserDetails: React.FC = () => {
                         >
                             <ColumnLayout columns={2} variant="text-grid">
                                 <SpaceBetween size="l">
-                                    <div>
-                                        <Box variant="awsui-key-label">{t('users.user_name')}</Box>
-                                        <div>{data.user_name}</div>
-                                    </div>
+                                    {/*<div>*/}
+                                    {/*    <Box variant="awsui-key-label">{t('users.user_name')}</Box>*/}
+                                    {/*    <div>{data.user_name}</div>*/}
+                                    {/*</div>*/}
 
                                     <div>
                                         <Box variant="awsui-key-label">{t('users.global_role')}</Box>

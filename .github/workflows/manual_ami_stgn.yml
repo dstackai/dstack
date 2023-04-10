@@ -2,6 +2,9 @@ name: Manual AMI build for STGN
 
 on: [workflow_dispatch]
 
+env:
+  IMAGE_VERSION: "0.1"
+
 jobs:
   ami-build:
     defaults:
@@ -25,4 +28,4 @@ jobs:
       - name: Run packer
         run: |
           VERSION=${{ github.run_number }}
-          ./packer build -var build_id=$VERSION ${{ matrix.variants }}.json
+          ./packer build -var build_id=$VERSION -var image_version=${{ env.IMAGE_VERSION }} ${{ matrix.variants }}.json

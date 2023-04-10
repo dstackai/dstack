@@ -19,7 +19,6 @@ type ClientSecret struct {
 }
 
 func NewClientSecret(path string) *ClientSecret {
-
 	return &ClientSecret{path: path}
 }
 

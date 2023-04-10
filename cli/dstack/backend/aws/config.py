@@ -1,20 +1,29 @@
 import json
 import os
 import re
+from argparse import Namespace
 from pathlib import Path
 from typing import Dict, Optional
 
 import boto3
 import botocore.exceptions
 import yaml
+from boto3.session import Session
 from botocore.client import BaseClient
 from rich import print
 from rich.prompt import Confirm, Prompt
+from rich_argparse import RichHelpFormatter
 
 from dstack.cli.common import _is_termios_available, ask_choice
 from dstack.core.config import BackendConfig, Configurator, get_config_path
-from dstack.core.error import ConfigError, HubError
-from dstack.hub.models import AWSHubValues, HubElement, HubElementValue
+from dstack.core.error import ConfigError, HubConfigError
+from dstack.hub.models import (
+    AWSBucketProjectElement,
+    AWSBucketProjectElementValue,
+    AWSProjectValues,
+    ProjectElement,
+    ProjectElementValue,
+)
 
 regions = [
     ("US East, N. Virginia", "us-east-1"),
@@ -32,6 +41,8 @@ regions = [
 
 _DEFAULT_REGION_NAME = "us-east-1"
 
+cache = {}
+
 
 class AWSConfig(BackendConfig):
     bucket_name = None
@@ -48,7 +59,7 @@ class AWSConfig(BackendConfig):
         subnet_id: Optional[str] = None,
         credentials: Optional[Dict] = None,
     ):
-        self.bucket_name = bucket_name or os.getenv("DSTACK_AWS_S3_BUCKET") or ""
+        self.bucket_name = bucket_name or os.getenv("DSTACK_AWS_S3_BUCKET")
         self.region_name = (
             region_name
             or os.getenv("DSTACK_AWS_REGION")
@@ -56,9 +67,9 @@ class AWSConfig(BackendConfig):
             or _DEFAULT_REGION_NAME
         )
         self.profile_name = (
-            profile_name or os.getenv("DSTACK_AWS_PROFILE") or os.getenv("AWS_PROFILE") or ""
+            profile_name or os.getenv("DSTACK_AWS_PROFILE") or os.getenv("AWS_PROFILE")
         )
-        self.subnet_id = subnet_id or os.getenv("DSTACK_AWS_EC2_SUBNET") or ""
+        self.subnet_id = subnet_id or os.getenv("DSTACK_AWS_EC2_SUBNET")
         self.credentials = credentials
 
     def load(self, path: Path = get_config_path()):
@@ -102,16 +113,21 @@ class AWSConfig(BackendConfig):
         return json.dumps(self.serialize())
 
     @classmethod
-    def deserialize(cls, data: Dict) -> Optional["AWSConfig"]:
-        bucket_name = data.get("bucket_name") or data.get("s3_bucket_name") or ""
-        region_name = data.get("region_name") or _DEFAULT_REGION_NAME
-        profile_name = data.get("profile_name") or ""
-        subnet_id = data.get("subnet_id") or data.get("ec2_subnet_id") or data.get("subnet") or ""
+    def deserialize(cls, config_data: Dict, auth_data: Dict = None) -> Optional["AWSConfig"]:
+        bucket_name = config_data.get("bucket_name") or config_data.get("s3_bucket_name")
+        region_name = config_data.get("region_name") or _DEFAULT_REGION_NAME
+        profile_name = config_data.get("profile_name")
+        subnet_id = (
+            config_data.get("subnet_id")
+            or config_data.get("ec2_subnet_id")
+            or config_data.get("subnet")
+        )
         return cls(
             bucket_name=bucket_name,
             region_name=region_name,
             profile_name=profile_name,
             subnet_id=subnet_id,
+            credentials=auth_data,
         )
 
     @classmethod
@@ -133,64 +149,128 @@ class AWSConfigurator(Configurator):
     NAME = "aws"
     config: AWSConfig
 
-    def get_config(self, data: Dict) -> Optional[BackendConfig]:
-        return AWSConfig.deserialize(data=data)
+    def get_config_from_hub_config_data(self, config_data: Dict, auth_data: Dict) -> BackendConfig:
+        return AWSConfig.deserialize(config_data, auth_data)
 
-    def parse_args(self, args: list = []):
-        pass
+    def register_parser(self, parser):
+        aws_parser = parser.add_parser("aws", help="", formatter_class=RichHelpFormatter)
+        aws_parser.add_argument("--bucket", type=str, help="", required=True)
+        aws_parser.add_argument("--region", type=str, help="", required=True)
+        aws_parser.add_argument(
+            "--profile",
+            type=str,
+            help="",
+        )
+        aws_parser.add_argument(
+            "--subnet-id",
+            type=str,
+            help="",
+        )
+        aws_parser.set_defaults(func=self._command)
 
-    def configure_hub(self, data: Dict):
-        # Step 1: create client and check access
-        config = AWSConfig.deserialize(data=data)
+    def _command(self, args: Namespace):
+        config = AWSConfig()
+        config.bucket_name = args.bucket
+        config.region_name = args.region
+        if args.profile is not None:
+            config.profile_name = args.profile
+        if args.subnet_id is not None:
+            config.subnet_id = args.subnet_id
+        config.save()
+        print(f"[grey58]OK[/]")
 
-        access_key = data.get("access_key") or ""
-        secret_key = data.get("secret_key") or ""
+    def configure_hub(self, config_data: Dict) -> AWSProjectValues:
+        config = AWSConfig.deserialize(config_data)
+
+        if config.region_name is not None and config.region_name not in {r[1] for r in regions}:
+            raise HubConfigError(f"Invalid AWS region {config.region_name}")
 
         try:
-            session = boto3.session.Session(
+            session = Session(
                 region_name=config.region_name,
-                aws_access_key_id=access_key,
-                aws_secret_access_key=secret_key,
+                aws_access_key_id=config_data.get("access_key"),
+                aws_secret_access_key=config_data.get("secret_key"),
             )
             sts = session.client("sts")
             sts.get_caller_identity()
-        except botocore.exceptions.ClientError as ex:
-            raise HubError("Credentials are not valid")
-        hub_values = AWSHubValues()
-        hub_values.region_name = HubElement(selected=config.region_name)
-        for r in regions:
-            hub_values.region_name.values.append(HubElementValue(value=r[1], label=r[0]))
-        # Step 2: get bucket list
-        try:
-            _s3 = session.client("s3")
-            response = _s3.list_buckets()
-            hub_values.s3_bucket_name = HubElement(selected=config.bucket_name)
-            for bucket in response["Buckets"]:
-                hub_values.s3_bucket_name.values.append(
-                    HubElementValue(
-                        name=bucket["Name"],
-                        created=bucket["CreationDate"].strftime("%d.%m.%Y %H:%M:%S"),
-                        region=config.region_name,
-                    )
-                )
-        except Exception as ex:
-            return hub_values
-        # Step 3: get subnet_id list
-        try:
-            _ec2 = session.client("ec2")
-            response = _ec2.describe_subnets()
-            hub_values.ec2_subnet_id = HubElement(selected=config.subnet_id)
-            for subnet in response["Subnets"]:
-                hub_values.ec2_subnet_id.values.append(
-                    HubElementValue(
-                        value=subnet["SubnetId"],
-                        label=subnet["SubnetId"],
-                    )
-                )
-        except Exception as ex:
-            return hub_values
+        except botocore.exceptions.ClientError:
+            raise HubConfigError(
+                "Credentials are not valid",
+                code="invalid_credentials",
+                fields=["access_key", "secret_key"],
+            )
 
-        return hub_values
+        # TODO validate config values
+        project_values = AWSProjectValues()
+        project_values.region_name = self._get_hub_regions(default_region=config.region_name)
+        project_values.s3_bucket_name = self._get_hub_buckets(
+            session=session, region=config.region_name, default_bucket=config.bucket_name
+        )
+        project_values.ec2_subnet_id = self._get_hub_subnet(
+            session=session, default_subnet=config.subnet_id
+        )
+        return project_values
+
+    def _get_hub_regions(self, default_region: Optional[str]) -> ProjectElement:
+        element = ProjectElement(selected=default_region)
+        for r in regions:
+            element.values.append(ProjectElementValue(value=r[1], label=r[0]))
+        return element
+
+    def _get_hub_buckets(
+        self, session: Session, region: str, default_bucket: Optional[str]
+    ) -> AWSBucketProjectElement:
+        if default_bucket is not None:
+            self._validate_hub_bucket(session=session, region=region, bucket_name=default_bucket)
+        element = AWSBucketProjectElement(selected=default_bucket)
+        s3_client = session.client("s3")
+        response = s3_client.list_buckets()
+        for bucket in response["Buckets"]:
+            element.values.append(
+                AWSBucketProjectElementValue(
+                    name=bucket["Name"],
+                    created=bucket["CreationDate"].strftime("%d.%m.%Y %H:%M:%S"),
+                    region=region,
+                )
+            )
+        return element
+
+    def _validate_hub_bucket(self, session: Session, region: str, bucket_name: str):
+        s3_client = session.client("s3")
+        try:
+            response = s3_client.head_bucket(Bucket=bucket_name)
+            bucket_region = response["ResponseMetadata"]["HTTPHeaders"]["x-amz-bucket-region"]
+            if bucket_region.lower() != region:
+                raise HubConfigError(
+                    "The bucket belongs to another AWS region",
+                    code="invalid_bucket",
+                    fields=["s3_bucket_name"],
+                )
+        except botocore.exceptions.ClientError as e:
+            if (
+                hasattr(e, "response")
+                and e.response.get("Error")
+                and e.response["Error"].get("Code") in ["404", "403"]
+            ):
+                raise HubConfigError(
+                    f"The bucket {bucket_name} does not exist",
+                    code="invalid_bucket",
+                    fields=["s3_bucket_name"],
+                )
+            raise e
+
+    def _get_hub_subnet(self, session: Session, default_subnet: Optional[str]) -> ProjectElement:
+        element = ProjectElement(selected=default_subnet)
+        _ec2 = session.client("ec2")
+        response = _ec2.describe_subnets()
+        for subnet in response["Subnets"]:
+            element.values.append(
+                ProjectElementValue(
+                    value=subnet["SubnetId"],
+                    label=subnet["SubnetId"],
+                )
+            )
+        return element
 
     def configure_cli(self):
         self.config = AWSConfig()

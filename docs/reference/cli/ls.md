@@ -4,9 +4,22 @@ The `ls` command lists the files of the artifacts of a given run or tag.
 
 ## Usage
 
+<div class="termy">
+
 ```shell
-dstack ls [-r] [-t] (RUN | :TAG) [SEARCH_PREFIX]
+$ dstack ls --help
+Usage: dstack ls [-h] [-r] [-t] RUN | :TAG [SEARCH_PREFIX]
+
+Positional Arguments:
+  RUN | :TAG       A name of a run or a tag
+  SEARCH_PREFIX    Show files starting with prefix
+
+Optional Arguments:
+  -r, --recursive  Show all files recursively
+  -t, --total      Show total folder size
 ```
+
+</div>
 
 ### Arguments reference
 

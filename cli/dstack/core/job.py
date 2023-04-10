@@ -6,9 +6,10 @@ from pydantic import BaseModel
 
 from dstack.core.app import AppSpec
 from dstack.core.artifact import ArtifactSpec
+from dstack.core.cache import CacheSpec
 from dstack.core.dependents import DepSpec
 from dstack.core.repo import RepoAddress, RepoData
-from dstack.utils.common import _quoted
+from dstack.utils.common import _quoted, format_list
 
 
 class GpusRequirements(BaseModel):
@@ -147,6 +148,17 @@ class JobHead(JobRef):
         )
 
 
+class RegistryAuth(BaseModel):
+    username: Optional[str] = None
+    password: Optional[str] = None
+
+    def __str__(self) -> str:
+        return f"RegistryCredentials(username={self.username}, password={self.password})"
+
+    def serialize(self) -> Dict[str, Any]:
+        return self.dict(exclude_none=True)
+
+
 def check_dict(element: Any, field: str):
     if type(element) == dict:
         return element.get(field)
@@ -167,10 +179,13 @@ class Job(JobHead):
     submitted_at: int
     submission_num: int = 1
     image_name: str
+    registry_auth: Optional[RegistryAuth]
     commands: Optional[List[str]]
+    entrypoint: Optional[List[str]]
     env: Optional[Dict[str, str]]
     working_dir: Optional[str]
     artifact_specs: Optional[List[ArtifactSpec]]
+    cache_specs: List[CacheSpec]
     port_count: Optional[int]
     ports: Optional[List[int]]
     host_name: Optional[str]
@@ -181,6 +196,7 @@ class Job(JobHead):
     runner_id: Optional[str]
     request_id: Optional[str]
     tag_name: Optional[str]
+    ssh_key_pub: Optional[str]
 
     def __init__(self, **data: Any):
         # TODO Ugly style
@@ -209,26 +225,13 @@ class Job(JobHead):
         self.job_id = job_id
 
     def __str__(self) -> str:
-        commands = (
-            ("[" + ", ".join(map(lambda a: _quoted(str(a)), self.commands)) + "]")
-            if self.commands
-            else None
-        )
-        artifact_specs = (
-            ("[" + ", ".join(map(lambda a: _quoted(str(a)), self.artifact_specs)) + "]")
-            if self.artifact_specs
-            else None
-        )
-        app_specs = (
-            ("[" + ", ".join(map(lambda a: str(a), self.app_specs)) + "]")
-            if self.app_specs
-            else None
-        )
-        dep_specs = (
-            ("[" + ", ".join(map(lambda d: str(d), self.dep_specs)) + "]")
-            if self.dep_specs
-            else None
-        )
+        commands = format_list(self.commands, formatter=lambda a: _quoted(str(a)))
+        entrypoint = format_list(self.entrypoint, formatter=lambda a: _quoted(str(a)))
+        artifact_specs = format_list(self.artifact_specs)
+        cache_specs = format_list(self.cache_specs or None)
+        app_specs = format_list(self.app_specs)
+        dep_specs = format_list(self.dep_specs)
+        ssk_key_pub = f"...{self.ssh_key_pub[-16:]}" if self.ssh_key_pub else None
         return (
             f'Job(job_id="{self.job_id}", repo_data={self.repo_data}, '
             f'run_name="{self.run_name}", workflow_name={_quoted(self.workflow_name)}, '
@@ -238,20 +241,24 @@ class Job(JobHead):
             f"status=JobStatus.{self.status.name}, "
             f"submitted_at={self.submitted_at}, "
             f'image_name="{self.image_name}", '
+            f'registry_auth="{self.registry_auth}", '
             f"commands={commands}, "
+            f"entrypoint={entrypoint}, "
             f"env={self.env}, "
             f"working_dir={_quoted(self.working_dir)}, "
             f"port_count={self.port_count}, "
             f"ports={self.ports}, "
             f"host_name={_quoted(self.host_name)}, "
             f"artifact_specs={artifact_specs}, "
+            f"cache_specs={cache_specs}, "
             f"requirements={self.requirements}, "
             f"dep_specs={dep_specs}, "
             f"master_job={self.master_job}, "
             f"app_specs={app_specs}, "
             f"runner_id={_quoted(self.runner_id)}, "
             f"request_id={_quoted(self.request_id)}, "
-            f"tag_name={_quoted(self.tag_name)})"
+            f"tag_name={_quoted(self.tag_name)}"
+            f"ssh_key_pub={_quoted(ssk_key_pub)})"
         )
 
     def serialize(self) -> dict:
@@ -280,8 +287,8 @@ class Job(JobHead):
             "repo_port": self.repo_address.repo_port or 0,
             "repo_user_name": self.repo_data.repo_user_name,
             "repo_name": self.repo_data.repo_name,
-            "repo_branch": self.repo_data.repo_branch,
-            "repo_hash": self.repo_data.repo_hash,
+            "repo_branch": self.repo_data.repo_branch or "",
+            "repo_hash": self.repo_data.repo_hash or "",
             "repo_diff": self.repo_data.repo_diff or "",
             "run_name": self.run_name,
             "workflow_name": self.workflow_name or "",
@@ -292,10 +299,13 @@ class Job(JobHead):
             "submitted_at": self.submitted_at,
             "submission_num": self.submission_num,
             "image_name": self.image_name,
+            "registry_auth": self.registry_auth.serialize() if self.registry_auth else {},
             "commands": self.commands or [],
+            "entrypoint": self.entrypoint,
             "env": self.env or {},
             "working_dir": self.working_dir or "",
             "artifacts": artifacts,
+            "cache": [item.dict() for item in self.cache_specs],
             "port_count": self.port_count if self.port_count else 0,
             "ports": [str(port) for port in self.ports] if self.ports else [],
             "host_name": self.host_name or "",
@@ -316,6 +326,7 @@ class Job(JobHead):
             "runner_id": self.runner_id or "",
             "request_id": self.request_id or "",
             "tag_name": self.tag_name or "",
+            "ssh_key_pub": self.ssh_key_pub or "",
         }
         return job_data
 
@@ -401,8 +412,8 @@ class Job(JobHead):
                 repo_port=job_data.get("repo_port") or None,
                 repo_user_name=job_data["repo_user_name"],
                 repo_name=job_data["repo_name"],
-                repo_branch=job_data["repo_branch"],
-                repo_hash=job_data["repo_hash"],
+                repo_branch=job_data["repo_branch"] or None,
+                repo_hash=job_data["repo_hash"] or None,
                 repo_diff=job_data["repo_diff"] or None,
             ),
             run_name=job_data["run_name"],
@@ -414,10 +425,13 @@ class Job(JobHead):
             submitted_at=job_data["submitted_at"],
             submission_num=job_data.get("submission_num") or 1,
             image_name=job_data["image_name"],
+            registry_auth=RegistryAuth(**job_data.get("registry_auth", {})),
             commands=job_data.get("commands") or None,
+            entrypoint=job_data.get("entrypoint") or None,
             env=job_data["env"] or None,
             working_dir=job_data.get("working_dir") or None,
             artifact_specs=artifact_specs,
+            cache_specs=[CacheSpec(**item) for item in job_data.get("cache", [])],
             port_count=job_data.get("port_count") or None,
             ports=job_data.get("ports") or None,
             host_name=job_data.get("host_name") or None,
@@ -428,13 +442,16 @@ class Job(JobHead):
             runner_id=job_data.get("runner_id") or None,
             request_id=job_data.get("request_id") or None,
             tag_name=job_data.get("tag_name") or None,
+            ssh_key_pub=job_data.get("ssh_key_pub") or None,
         )
         return job
 
 
 class JobSpec(JobRef):
     image_name: str
+    registry_auth: Optional[RegistryAuth] = None
     commands: Optional[List[str]] = None
+    entrypoint: Optional[List[str]] = None
     env: Optional[Dict[str, str]] = None
     working_dir: Optional[str] = None
     artifact_specs: Optional[List[ArtifactSpec]] = None
@@ -450,24 +467,15 @@ class JobSpec(JobRef):
         self.job_id = job_id
 
     def __str__(self) -> str:
-        commands = (
-            ("[" + ", ".join(map(lambda a: _quoted(str(a)), self.commands)) + "]")
-            if self.commands
-            else None
-        )
-        artifact_specs = (
-            ("[" + ", ".join(map(lambda a: str(a), self.artifact_specs)) + "]")
-            if self.artifact_specs
-            else None
-        )
-        app_specs = (
-            ("[" + ", ".join(map(lambda a: str(a), self.app_specs)) + "]")
-            if self.app_specs
-            else None
-        )
+        commands = format_list(self.commands, formatter=lambda a: _quoted(str(a)))
+        entrypoint = format_list(self.entrypoint, formatter=lambda a: _quoted(str(a)))
+        artifact_specs = format_list(self.artifact_specs)
+        app_specs = format_list(self.app_specs)
         return (
             f'JobSpec(job_id="{self.job_id}", image_name="{self.image_name}", '
+            f"registry_auth={self.registry_auth}, "
             f"commands={commands}, "
+            f"entrypoint={entrypoint}, "
             f"env={self.env}, "
             f"working_dir={_quoted(self.working_dir)}, "
             f"port_count={self.port_count}, "

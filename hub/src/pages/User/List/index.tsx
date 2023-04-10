@@ -98,7 +98,7 @@ export const UserList: React.FC = () => {
     const editSelectedUserHandler = () => {
         const { selectedItems } = collectionProps;
 
-        if (selectedItems?.length) navigate(ROUTES.USER.DETAILS.FORMAT(selectedItems[0].user_name));
+        if (selectedItems?.length) navigate(ROUTES.USER.EDIT.FORMAT(selectedItems[0].user_name));
     };
 
     const getIsTableItemDisabled = () => {
