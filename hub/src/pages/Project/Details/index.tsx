@@ -263,7 +263,11 @@ export const ProjectDetails: React.FC = () => {
                             </SpaceBetween>
                         </Container>
 
-                        <ProjectMembers onChange={debouncedMembersHandler} initialValues={data.members} />
+                        <ProjectMembers
+                            onChange={debouncedMembersHandler}
+                            initialValues={data.members}
+                            readonly={userGlobalRole !== 'admin'}
+                        />
                     </SpaceBetween>
                 )}
             </ContentLayout>
