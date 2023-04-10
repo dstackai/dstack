@@ -17,6 +17,7 @@ type Resource struct {
 type Job struct {
 	Apps         []App             `yaml:"apps"`
 	Artifacts    []Artifact        `yaml:"artifacts"`
+	Cache        []Cache           `yaml:"cache"`
 	Commands     []string          `yaml:"commands"`
 	Entrypoint   *[]string         `yaml:"entrypoint"`
 	Environment  map[string]string `yaml:"env"`
@@ -65,6 +66,10 @@ type Dep struct {
 type Artifact struct {
 	Path  string `yaml:"path,omitempty"`
 	Mount bool   `yaml:"mount,omitempty"`
+}
+
+type Cache struct {
+	Path string `yaml:"path"`
 }
 
 type App struct {

@@ -61,6 +61,30 @@
         }
       }
     },
+    "cache": {
+      "description": "The directories to be cached between workflow runs",
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "oneOf": [
+          {
+            "type": "string"
+          },
+          {
+            "type": "object",
+            "additionalProperties": false,
+            "properties": {
+              "path": {
+                "type": "string"
+              }
+            },
+            "required": [
+              "path"
+            ]
+          }
+        ]
+      }
+    },
     "python": {
       "description": "The major version of Python",
       "anyOf": [
@@ -164,6 +188,11 @@
         }
       }
     },
+    "ssh": {
+      "description": "Run openssh server in the container",
+      "type": "boolean",
+      "default": false
+    },
     "bash": {
       "type": "object",
       "required": [
@@ -204,6 +233,12 @@
         },
         "resources": {
           "$ref": "#/definitions/resources"
+        },
+        "ssh": {
+          "$ref": "#/definitions/ssh"
+        },
+        "cache": {
+          "$ref": "#/definitions/cache"
         }
       }
     },
@@ -256,6 +291,9 @@
         },
         "resources": {
           "$ref": "#/definitions/resources"
+        },
+        "cache": {
+          "$ref": "#/definitions/cache"
         }
       }
     },
@@ -305,6 +343,12 @@
         },
         "resources": {
           "$ref": "#/definitions/resources"
+        },
+        "ssh": {
+          "$ref": "#/definitions/ssh"
+        },
+        "cache": {
+          "$ref": "#/definitions/cache"
         }
       }
     },
@@ -342,6 +386,12 @@
         },
         "resources": {
           "$ref": "#/definitions/resources"
+        },
+        "ssh": {
+          "$ref": "#/definitions/ssh"
+        },
+        "cache": {
+          "$ref": "#/definitions/cache"
         }
       }
     },
@@ -379,6 +429,12 @@
         },
         "resources": {
           "$ref": "#/definitions/resources"
+        },
+        "ssh": {
+          "$ref": "#/definitions/ssh"
+        },
+        "cache": {
+          "$ref": "#/definitions/cache"
         }
       }
     }

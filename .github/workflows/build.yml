@@ -9,6 +9,9 @@ on:
       - 'master'
   workflow_dispatch:
 
+env:
+  IMAGE_VERSION: "0.1"
+
 jobs:
   python-lint:
     runs-on: ubuntu-latest
@@ -34,7 +37,7 @@ jobs:
     runs-on: ${{ matrix.os }}
     strategy:
       matrix:
-        os: [ macos-latest, windows-latest, ubuntu-latest ]
+        os: [ macos-latest, ubuntu-latest ]
         python-version: [ 3.7, 3.8, 3.9, "3.10", 3.11 ]
     defaults:
       run:
@@ -49,9 +52,11 @@ jobs:
         run: |
           python -m pip install --upgrade pip
           pip install -r requirements.txt
-      - name: Test with unittest
+          pip install -r requirements_dev.txt
+      - name: Run pytest
         run: |
-          python -m unittest discover tests -t .
+          mkdir -p dstack/hub/statics
+          pytest tests/
 
   build-hub-master:
     runs-on: ubuntu-latest
@@ -103,6 +108,7 @@ jobs:
           VERSION=$((${{ github.run_number }} + 150))
           echo "__version__ = \"$VERSION\"" > cli/dstack/version.py
           echo "__is_release__ = False" >> cli/dstack/version.py
+          echo "miniforge_image = \"${{ env.IMAGE_VERSION }}\"" >> cli/dstack/version.py
           cp README.md cli
           python setup.py sdist bdist_wheel
           python -m twine upload --repository testpypi --username ${{ secrets.TESTPYPI_USERNAME }} --password ${{ secrets.TESTPYPI_PASSWORD }} dist/*

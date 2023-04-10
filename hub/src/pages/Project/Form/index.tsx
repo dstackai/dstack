@@ -1,6 +1,6 @@
 import React from 'react';
 import { useTranslation } from 'react-i18next';
-import { Container, Header, FormUI, SpaceBetween, Button, FormInput, FormRadioButtons } from 'components';
+import { Container, Header, FormUI, SpaceBetween, Button, FormInput, FormTiles } from 'components';
 import { useForm, FormProvider, DefaultValues } from 'react-hook-form';
 import { FieldPath } from 'react-hook-form/dist/types/path';
 import { useNotifications } from 'hooks';
@@ -8,6 +8,9 @@ import { isRequestFormErrors2, isRequestFormFieldError } from 'libs';
 import { IProps, TBackendOption } from './types';
 import { AWSBackend } from './AWS';
 import { GCPBackend } from './GCP';
+
+import FormField from '@cloudscape-design/components/form-field';
+import { Grid } from '@cloudscape-design/components';
 
 export const ProjectForm: React.FC<IProps> = ({ initialValues, onCancel, loading, onSubmit: onSubmitProp }) => {
     const { t } = useTranslation();
@@ -119,6 +122,7 @@ export const ProjectForm: React.FC<IProps> = ({ initialValues, onCancel, loading
                                 <SpaceBetween size="l">
                                     <FormInput
                                         label={t('projects.edit.project_name')}
+                                        description={t('projects.edit.project_name_description')}
                                         control={control}
                                         name="project_name"
                                         disabled={loading}
@@ -136,13 +140,15 @@ export const ProjectForm: React.FC<IProps> = ({ initialValues, onCancel, loading
                         )}
 
                         <Container header={<Header variant="h2">{t('projects.edit.backend')}</Header>}>
+                            <FormField
+                                label={t('projects.edit.backend_type')}
+                                description={t('projects.edit.backend_type_description')}
+                            />
+
                             <SpaceBetween size="l">
-                                <FormRadioButtons
-                                    label={t('projects.edit.backend_type')}
-                                    control={control}
-                                    name="backend.type"
-                                    items={backendOptions}
-                                />
+                                <Grid gridDefinition={[{ colspan: 8 }]}>
+                                    <FormTiles control={control} name="backend.type" items={backendOptions} />
+                                </Grid>
 
                                 {renderBackendFields()}
                             </SpaceBetween>

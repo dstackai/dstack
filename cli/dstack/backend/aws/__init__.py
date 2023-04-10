@@ -1,5 +1,5 @@
 from pathlib import Path
-from typing import Any, Dict, Generator, List, Optional
+from typing import Generator, List, Optional
 
 import boto3
 from botocore.client import BaseClient
@@ -11,24 +11,23 @@ from dstack.backend.aws.secrets import AWSSecretsManager
 from dstack.backend.aws.storage import AWSStorage
 from dstack.backend.base import CloudBackend
 from dstack.backend.base import artifacts as base_artifacts
+from dstack.backend.base import cache as base_cache
 from dstack.backend.base import jobs as base_jobs
 from dstack.backend.base import repos as base_repos
 from dstack.backend.base import runs as base_runs
 from dstack.backend.base import secrets as base_secrets
 from dstack.backend.base import tags as base_tags
 from dstack.core.artifact import Artifact
-from dstack.core.config import BackendConfig
 from dstack.core.error import ConfigError
-from dstack.core.job import Job, JobHead
+from dstack.core.job import Job, JobHead, JobStatus
 from dstack.core.log_event import LogEvent
-from dstack.core.repo import LocalRepoData, RepoAddress, RepoCredentials
+from dstack.core.repo import LocalRepoData, RepoAddress, RepoCredentials, RepoHead
 from dstack.core.run import RunHead
 from dstack.core.secret import Secret
 from dstack.core.tag import TagHead
 
 
 class AwsBackend(CloudBackend):
-
     _session: Optional[boto3.Session] = None
     backend_config: AWSConfig
 
@@ -122,8 +121,8 @@ class AwsBackend(CloudBackend):
     def list_jobs(self, repo_address: RepoAddress, run_name: str) -> List[Job]:
         return base_jobs.list_jobs(self._storage, repo_address, run_name)
 
-    def run_job(self, job: Job):
-        base_jobs.run_job(self._storage, self._compute, job)
+    def run_job(self, job: Job, failed_to_start_job_new_status: JobStatus):
+        base_jobs.run_job(self._storage, self._compute, job, failed_to_start_job_new_status)
 
     def stop_job(self, repo_address: RepoAddress, job_id: str, abort: bool):
         base_jobs.stop_job(self._storage, self._compute, repo_address, job_id, abort)
@@ -141,10 +140,15 @@ class AwsBackend(CloudBackend):
         repo_address: RepoAddress,
         run_name: Optional[str] = None,
         include_request_heads: bool = True,
+        interrupted_job_new_status: JobStatus = JobStatus.FAILED,
     ) -> List[RunHead]:
         job_heads = self.list_job_heads(repo_address, run_name)
         return base_runs.get_run_heads(
-            self._storage, self._compute, job_heads, include_request_heads
+            self._storage,
+            self._compute,
+            job_heads,
+            include_request_heads,
+            interrupted_job_new_status,
         )
 
     def poll_logs(
@@ -236,6 +240,9 @@ class AwsBackend(CloudBackend):
     def delete_tag_head(self, repo_address: RepoAddress, tag_head: TagHead):
         base_tags.delete_tag(self._storage, repo_address, tag_head)
 
+    def list_repo_heads(self) -> List[RepoHead]:
+        return base_repos.list_repo_heads(self._storage)
+
     def update_repo_last_run_at(self, repo_address: RepoAddress, last_run_at: int):
         base_repos.update_repo_last_run_at(
             self._storage,
@@ -291,3 +298,6 @@ class AwsBackend(CloudBackend):
 
     def get_configurator(self):
         return AWSConfigurator()
+
+    def delete_workflow_cache(self, repo_address: RepoAddress, username: str, workflow_name: str):
+        base_cache.delete_workflow_cache(self._storage, repo_address, username, workflow_name)

@@ -1,7 +1,6 @@
 import importlib
 import shlex
 import sys
-import time
 from abc import abstractmethod
 from argparse import ArgumentParser, Namespace
 from pkgutil import iter_modules
@@ -9,6 +8,7 @@ from typing import Any, Dict, List, Optional, Union
 
 from dstack.api.repo import load_repo_data
 from dstack.backend.base import Backend
+from dstack.core.cache import CacheSpec
 from dstack.core.job import (
     ArtifactSpec,
     DepSpec,
@@ -19,7 +19,7 @@ from dstack.core.job import (
     Requirements,
 )
 from dstack.core.repo import RepoAddress, RepoData
-from dstack.utils.common import _quoted
+from dstack.utils.common import _quoted, get_milliseconds_since_epoch
 from dstack.utils.interpolator import VariablesInterpolator
 
 DEFAULT_CPU = 2
@@ -57,8 +57,11 @@ class Provider:
         self.run_as_provider: Optional[bool] = None
         self.run_name: Optional[str] = None
         self.dep_specs: Optional[List[DepSpec]] = None
+        self.cache_specs: List[CacheSpec] = []
         self.ssh_key_pub: Optional[str] = None
+        self.openssh_server: bool = False
         self.loaded = False
+        self.home_dir: Optional[str] = None
 
     def __str__(self) -> str:
         return (
@@ -125,15 +128,17 @@ class Provider:
         workflow_name: Optional[str],
         provider_data: Dict[str, Any],
         run_name: str,
-    ):  # todo: read ssh key
+    ):
         self.provider_args = provider_args
         self.workflow_name = workflow_name
         self.provider_data = provider_data
         self.run_as_provider = not workflow_name
         self.run_name = run_name
+        self.openssh_server = self.provider_data.get("ssh", False)
         self.parse_args()
         self._inject_context()
         self.dep_specs = self._dep_specs(backend)
+        self.cache_specs = self._cache_specs()
         self.ssh_key_pub = self.provider_data.get("ssh_key_pub")
         self.loaded = True
 
@@ -159,7 +164,6 @@ class Provider:
         parser.add_argument("-w", "--working-dir", metavar="PATH", type=str)
         group = parser.add_mutually_exclusive_group()
         group.add_argument("-i", "--interruptible", action="store_true")
-        group.add_argument("-l", "--local", action="store_true")
         parser.add_argument("--cpu", metavar="NUM", type=int)
         parser.add_argument("--memory", metavar="SIZE", type=str)
         parser.add_argument("--gpu", metavar="NUM", type=int)
@@ -206,8 +210,6 @@ class Provider:
             resources["shm_size"] = args.shm_size
         if args.interruptible:
             resources["interruptible"] = True
-        if args.local:
-            resources["local"] = True
         if unknown_args:
             self.provider_data["run_args"] = unknown_args
 
@@ -222,7 +224,6 @@ class Provider:
         # [TODO] Handle master job
         jobs = []
         for i, job_spec in enumerate(job_specs):
-            submitted_at = int(round(time.time() * 1000))
             job = Job(
                 job_id=f"{self.run_name},{self.workflow_name or ''},{i}",
                 repo_data=repo_data,
@@ -232,7 +233,7 @@ class Provider:
                 local_repo_user_name=repo_data.local_repo_user_name,
                 local_repo_user_email=repo_data.local_repo_user_email,
                 status=JobStatus.SUBMITTED,
-                submitted_at=submitted_at,
+                submitted_at=get_milliseconds_since_epoch(),
                 image_name=job_spec.image_name,
                 registry_auth=job_spec.registry_auth,
                 commands=job_spec.commands,
@@ -240,6 +241,7 @@ class Provider:
                 env=job_spec.env,
                 working_dir=job_spec.working_dir,
                 artifact_specs=job_spec.artifact_specs,
+                cache_specs=self.cache_specs,
                 port_count=job_spec.port_count,
                 ports=None,
                 host_name=None,
@@ -267,26 +269,37 @@ class Provider:
         else:
             return None
 
+    def _validate_local_path(self, path: str) -> str:
+        if path == "~" or path.startswith("~/"):
+            if not self.home_dir:
+                raise KeyError("home_dir is not defined, local path can't start with ~")
+            home = self.home_dir.rstrip("/")
+            path = home if path == "~" else f"{home}/{path[len('~/'):]}"
+        while path.startswith("./"):
+            path = path[len("./") :]
+        if not path.startswith("/"):
+            pass  # todo: use self.working_dir
+        return path
+
     def _artifact_specs(self) -> Optional[List[ArtifactSpec]]:
-        if self.provider_data.get("artifacts"):
-            return [self._parse_artifact_spec(a) for a in self.provider_data["artifacts"]]
-        else:
-            return None
+        artifact_specs = []
+        for item in self.provider_data.get("artifacts", []):
+            if isinstance(item, str):
+                item = {"artifact_path": item}
+            else:
+                item["artifact_path"] = item.pop("path")
+            item["artifact_path"] = self._validate_local_path(item["artifact_path"])
+            artifact_specs.append(ArtifactSpec(**item))
+        return artifact_specs or None
 
-    @staticmethod
-    def _parse_artifact_spec(artifact: Union[dict, str]) -> ArtifactSpec:
-        def remove_prefix(text: str, prefix: str) -> str:
-            if text.startswith(prefix):
-                return text[len(prefix) :]
-            return text
-
-        if isinstance(artifact, str):
-            return ArtifactSpec(artifact_path=remove_prefix(artifact, "./"), mount=False)
-        else:
-            return ArtifactSpec(
-                artifact_path=remove_prefix(artifact["path"], "./"),
-                mount=artifact.get("mount") is True,
-            )
+    def _cache_specs(self) -> List[CacheSpec]:
+        cache_specs = []
+        for item in self.provider_data.get("cache", []):
+            if isinstance(item, str):
+                item = {"path": item}
+            item["path"] = self._validate_local_path(item["path"])
+            cache_specs.append(CacheSpec(**item))
+        return cache_specs
 
     @staticmethod
     def _parse_dep_spec(dep: Union[dict, str], backend: Backend, repo_data: RepoData) -> DepSpec:
@@ -431,13 +444,21 @@ class Provider:
             resources.shm_size_mib = _str_to_mib(self.provider_data["resources"]["shm_size"])
         if self.provider_data["resources"].get("interruptible"):
             resources.interruptible = self.provider_data["resources"]["interruptible"]
-        if self.provider_data["resources"].get("local"):
-            resources.local = self.provider_data["resources"]["local"]
         return resources
 
     @staticmethod
     def _extend_commands_with_env(commands, env):
         commands.extend([f"export {e}={env[e] if env.get(e) else ''}" for e in env])
+
+    @staticmethod
+    def _extend_commands_with_openssh_server(commands: List[str], ssh_pub_key: str, port_idx: int):
+        commands.extend(
+            [
+                f'echo "{ssh_pub_key}" >> ~/.ssh/authorized_keys',
+                "ssh-keygen -A > /dev/null",
+                f"/usr/sbin/sshd -p $PORT_{port_idx}",
+            ]
+        )
 
 
 def get_provider_names() -> List[str]:

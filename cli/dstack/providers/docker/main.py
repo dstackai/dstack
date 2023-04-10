@@ -1,6 +1,8 @@
 from argparse import ArgumentParser
 from typing import Any, Dict, List, Optional
 
+from rich_argparse import RichHelpFormatter
+
 from dstack.backend.base import Backend
 from dstack.core.app import AppSpec
 from dstack.core.job import JobSpec
@@ -42,7 +44,10 @@ class DockerProvider(Provider):
         self.resources = self._resources()
 
     def _create_parser(self, workflow_name: Optional[str]) -> Optional[ArgumentParser]:
-        parser = ArgumentParser(prog="dstack run " + (workflow_name or self.provider_name))
+        parser = ArgumentParser(
+            prog="dstack run " + (workflow_name or self.provider_name),
+            formatter_class=RichHelpFormatter,
+        )
         self._add_base_args(parser)
         parser.add_argument("-p", "--ports", type=int)
         if not workflow_name:

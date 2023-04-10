@@ -7,7 +7,7 @@ from dstack.core.storage import StorageFile
 
 class ArtifactSpec(BaseModel):
     artifact_path: str
-    mount: bool
+    mount: bool = False
 
     def __str__(self) -> str:
         return f'ArtifactSpec(artifact_path="{self.artifact_path}", ' f"mount={self.mount})"

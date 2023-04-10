@@ -1,22 +1,17 @@
-# TensorBoard 
+# Track experiments with TensorBoard 
 
-TensorBoard makes tracking experiment metrics easy. Event logs can be saved locally and visualized through its CLI,
-eliminating the need for a tracking server. 
-
-With `dstack`, you can enjoy TensorBoard's benefits and version all metrics,
-while conveniently running training locally or remotely via the CLI.
+This tutorial demonstrates how to use TensorBoard with `dstack` to track experiment metrics.
 
 !!! info "NOTE:"
-    The source code for this tutorial can be located in [`github.com/dstack-examples`](https://github.com/dstackai/dstack-examples/blob/main/tutorials/tensorboard/train.py).
+    The source code of this example is available in the [Playground](../playground.md).
 
-## Define a workflow
+## 1. Define a workflow file
 
-As we want to run our training script conveniently both locally and remotely through `dstack`, we need to define a
-workflow YAML file.
+Create the following YAML file:
 
-Create the following `.dstack/workflows/tensorboard.yaml` file:
+<div editor-title=".dstack/workflows/tensorboard.yaml"> 
 
-```yaml hl_lines="4 7 10"
+```yaml
 workflows:
   - name: train-tensorboard
     provider: bash
@@ -24,33 +19,35 @@ workflows:
     commands:
       - pip install torchvision pytorch-lightning tensorboard
       - tensorboard --port $PORT_0 --host 0.0.0.0 --logdir ./lightning_logs &
-      - python tutorials/tensorboard/train.py
+      - python examples/tensorboard/train.py
     artifacts:
       - path: ./lightning_logs
 ```
 
-We launch the `tensorboard` application as a background process and direct it to the lightning_logs folder, where
+</div>
+
+1. We launch the `tensorboard` application as a background process and direct it to the `lightning_logs` folder, where
 the training script will write event logs.
 
-Then, we ask `dstack` to provide us with a port, which we then pass to `tensorboard`. This allows us
+2. Then, we ask `dstack` to provide us with a port, which we then pass to `tensorboard`. This allows us
 to access the TensorBoard application while the workflow is running.
 
-Finally, we save the `lightning_logs` folder as an output artifact so that we can access the logs after the workflow has
+3. Finally, we save the `lightning_logs` folder as an output artifact so that we can access the logs after the workflow has
 finished.
 
-## Create a training script
+## 2. Create a training script
 
 TensorBoard is supported by all major training frameworks. Below, you will find the source code for a
-`tutorials/tensorboard/train.py` script that uses PyTorch Lightning to train the model and save the logs to the local
+`examples/tensorboard/train.py` script that uses PyTorch Lightning to train the model and save the logs to the local
 lightning_logs folder.
 
 ??? info "PyTorch Lightning example"
     
-    To begin, we will create the training script `tutorials/tensorboard/train.py`.
+    To begin, we will create the training script `examples/tensorboard/train.py`.
     
     Our first step will be to define a `LightningDataModule`.
     
-    ```python hl_lines="16 24-25"
+    ```python
     class MNISTDataModule(pl.LightningDataModule):
         def __init__(self, data_dir: Path = Path("data"), batch_size: int = 32, num_workers: int = os.cpu_count()):
             super().__init__()
@@ -162,7 +159,7 @@ lightning_logs folder.
     For convenience, we utilize the `TQDMProgressBar` and `EarlyStopping` callbacks. The former provides interactive output,
     while the latter automatically stops training if the target metric no longer improves.
 
-## Run locally
+## 3. Run locally
 
 Now that the code is ready, we can now proceed and run the workflow locally.
 
@@ -202,7 +199,7 @@ later.
 <div class="termy">
 
 ```shell
-$ tensorboard --logdir=~/.dstack/artifacts/github.com/dstack-examples/snake-1,train-tensorboard,0/lightning_logs
+$ tensorboard --logdir=~/.dstack/artifacts/github.com/dstack-playground/snake-1,train-tensorboard,0/lightning_logs
 ```
 
 </div>
@@ -211,12 +208,12 @@ $ tensorboard --logdir=~/.dstack/artifacts/github.com/dstack-examples/snake-1,tr
     If you'd like to reuse the logs outside your machine or share them with your team members,
     you can push the run to the remote via the [`dstack push`](../reference/cli/push.md) command.
 
-## Run remotely
+## 4. Run remotely
 
 One of the great features of `dstack` is the ability to run workflows remotely (e.g., in a pre-configured cloud
 account). 
 
-This allows you to request any [Resources](../usage/resources.md) required (including GPUs and memory), or to utilize spot instances. 
+This allows you to request any [Resources](../usage/remote.md#resources) required (including GPUs and memory), or to utilize spot instances. 
 The creation and deletion of cloud instances is handled by `dstack` automatically.
 
 To run a workflow remotely, add the `--remote` flag to the `dstack run` command.
@@ -264,28 +261,7 @@ You can then access the logs locally by running the `tensorboard` CLI.
 <div class="termy">
 
 ```shell
-$ tensorboard --logdir=~/.dstack/artifacts/github.com/dstack-examples/mangust-1,train-tensorboard,0/lightning_logs
+$ tensorboard --logdir=~/.dstack/artifacts/github.com/dstack-playground/mangust-1,train-tensorboard,0/lightning_logs
 ```
 
-</div>
-
-## Conclusion
-
-As demonstrated, tracking experiments with TensorBoard and `dstack` is simple and does not require hosting
-a tracking server. 
-
-You can conveniently run workflows locally or remotely (in a configured cloud account), while keeping the
-logs accessible at any moment by the team. 
-This allows for scaling up ML experiments without a complicated setup.
-
-### Get started
-
-Are you interested in trying `dstack`? You can get your first ML workflows up and running in less than 30 minutes.
-
-<div class="grid cards" markdown>
-- [**1. Installation** 
-   Install and configure the `dstack` CLI in no time.](../installation.md)
-
-- [**2. Quick start**
-   Try `dstack` by following a simple step-by-step tutorial.](../quick-start.md)
 </div>

@@ -1,5 +1,5 @@
 import re
-from typing import Any, Dict, List, Optional, Tuple
+from typing import Dict, List, Optional
 
 import google.api_core.exceptions
 from google.cloud import compute_v1
@@ -13,7 +13,7 @@ from dstack.backend.gcp.config import GCPConfig
 from dstack.core.instance import InstanceType
 from dstack.core.job import Job, Requirements
 from dstack.core.request import RequestHead, RequestStatus
-from dstack.core.runners import Gpu, Resources, Runner
+from dstack.core.runners import Gpu, Resources
 
 DSTACK_INSTANCE_TAG = "dstack-runner-instance"
 
@@ -42,6 +42,7 @@ class GCPCompute(Compute):
         self.accelerator_types_client = compute_v1.AcceleratorTypesClient(
             credentials=self.credentials
         )
+        self.zone_operations_client = compute_v1.ZoneOperationsClient(credentials=self.credentials)
 
     def get_request_head(self, job: Job, request_id: Optional[str]) -> RequestHead:
         if request_id is None:
@@ -51,7 +52,8 @@ class GCPCompute(Compute):
                 message="request_id is not specified",
             )
         instance_status = _get_instance_status(
-            client=self.instances_client,
+            instances_client=self.instances_client,
+            zone_operations_client=self.zone_operations_client,
             project_id=self.gcp_config.project_id,
             zone=self.gcp_config.zone,
             instance_name=request_id,
@@ -117,7 +119,11 @@ class GCPCompute(Compute):
 
 
 def _get_instance_status(
-    client: compute_v1.InstancesClient, project_id: str, zone: str, instance_name: str
+    instances_client: compute_v1.InstancesClient,
+    zone_operations_client: compute_v1.ZoneOperationsClient,
+    project_id: str,
+    zone: str,
+    instance_name: str,
 ) -> RequestStatus:
     get_instance_request = compute_v1.GetInstanceRequest(
         instance=instance_name,
@@ -125,9 +131,19 @@ def _get_instance_status(
         zone=zone,
     )
     try:
-        instance = client.get(get_instance_request)
+        instance = instances_client.get(get_instance_request)
     except google.api_core.exceptions.NotFound:
         return RequestStatus.TERMINATED
+    if instance.scheduling.provisioning_model == compute_v1.Scheduling.ProvisioningModel.SPOT.name:
+        list_operations_request = compute_v1.ListZoneOperationsRequest(
+            project=project_id,
+            zone=zone,
+            filter=f'(name = "{instance_name}") AND (operationType = "compute.instances.preempted")',
+        )
+        operations = zone_operations_client.list(list_operations_request)
+        if len(list(operations)) > 0:
+            return RequestStatus.NO_CAPACITY
+
     if instance.status in ["PROVISIONING", "STAGING", "RUNNING"]:
         return RequestStatus.RUNNING
     return RequestStatus.TERMINATED

@@ -9,20 +9,22 @@
 </h1>
 
 <h4 align="center">
-Easy-to-run ML workflows on any cloud
+Automate your ML development
 </h4>
 
 <p align="center">
-Define ML workflows as code and run via CLI. Use any cloud. Collaborate within teams. 
+The hassle-free tool for managing ML workflows on any cloud platform. 
 </p>
 
-[![Slack](https://img.shields.io/badge/slack-join%20community-blueviolet?logo=slack&style=for-the-badge)](https://join.slack.com/t/dstackai/shared_invite/zt-xdnsytie-D4qU9BvJP8vkbkHXdi6clQ)
+[![Slack](https://img.shields.io/badge/slack-join%20chat-blueviolet?logo=slack&style=for-the-badge)](https://join.slack.com/t/dstackai/shared_invite/zt-xdnsytie-D4qU9BvJP8vkbkHXdi6clQ)
 
 <p align="center">
 <a href="https://docs.dstack.ai" target="_blank"><b>Docs</b></a> • 
 <a href="https://docs.dstack.ai/quick-start"><b>Quick start</b></a> • 
-<a href="https://docs.dstack.ai/usage/hello-world" target="_blank"><b>Usage</b></a> • 
-<a href="https://join.slack.com/t/dstackai/shared_invite/zt-xdnsytie-D4qU9BvJP8vkbkHXdi6clQ" target="_blank"><b>Slack</b></a> 
+<a href="https://docs.dstack.ai/playground" target="_blank"><b>Playground</b></a> •   
+<a href="https://docs.dstack.ai/setup"><b>Setup</b></a> • 
+<a href="https://docs.dstack.ai/usage/hello-world" target="_blank"><b>Usage</b></a>  • 
+<a href="https://docs.dstack.ai/examples/tensorboard" target="_blank"><b>Examples</b></a>
 </p>
 
 [![Last commit](https://img.shields.io/github/last-commit/dstackai/dstack)](https://github.com/dstackai/dstack/commits/)
@@ -32,21 +34,21 @@ Define ML workflows as code and run via CLI. Use any cloud. Collaborate within t
 
 ## What is dstack?
 
-`dstack` is an open-source tool that enables defining ML workflows as code, running them easily on any cloud while saving
-artifacts for reuse. It offers freedom to use any ML frameworks, cloud vendors, or third-party tools without requiring
-code changes.
+`dstack` is an open-source tool that automates ML workflows, enabling effective management on any cloud platform. It
+empowers your team to explore and prepare data, train, and fine-tune models using their preferred frameworks and dev
+environments without spending time on engineering and infrastructure.
 
-## Installation
+## Install the CLI
 
 Use `pip` to install `dstack`:
 
 ```shell
-pip install dstack --upgrade
+pip install dstack
 ```
 
 ## Configure a remote
 
-To run workflows remotely (e.g. in a configured cloud account),
+By default, workflows run locally. To run workflows remotely (e.g. in a configured cloud account),
 configure a remote using the `dstack config` command.
 
 ```shell
@@ -58,14 +60,10 @@ dstack config
   [hub]
 ```
 
-If you intend to run remote workflows directly in the cloud using local cloud credentials, 
-feel free to choose `aws` or `gcp`. Refer to [AWS](#aws) and [GCP](#gcp) correspondingly for the details.
+To run remote workflows with local cloud credentials, choose [`aws`](https://docs.dstack.ai/setup/aws.md)
+or [`gcp`](https://docs.dstack.ai/setup/gcp.md). 
 
-If you would like to manage cloud credentials, users and other settings centrally
-via a user interface, it is recommended to choose `hub`. 
-
-> The `hub` remote is currently in an experimental phase. If you are interested in trying it out, please contact us 
-> via [Slack](https://join.slack.com/t/dstackai/shared_invite/zt-xdnsytie-D4qU9BvJP8vkbkHXdi6clQ).
+For managing cloud credentials securely and collaborate as a team, select `hub`.
 
 ## Define workflows
 
@@ -73,69 +71,37 @@ Define ML workflows, their output artifacts, hardware requirements, and dependen
 
 ```yaml
 workflows:
-  - name: mnist-data
-    provider: bash
-    commands:
-      - pip install torchvision
-      - python mnist/mnist_data.py
-    artifacts:
-      - path: ./data
-
   - name: train-mnist
     provider: bash
-    deps:
-      - workflow: mnist-data
     commands:
       - pip install torchvision pytorch-lightning tensorboard
-      - python mnist/train_mnist.py
+      - python examples/mnist/train_mnist.py
     artifacts:
       - path: ./lightning_logs
 ```
 
-YAML eliminates the need to modify code in your scripts, giving you the freedom to choose frameworks,
-experiment trackers, and cloud providers.
-
-## Run workflows
-
-Once a workflow is defined, you can use the `dstack run` command to run it either locally or remotely. 
-
-### Run locally
+## Run locally
 
 By default, workflows run locally on your machine.
 
 ```shell
-dstack run mnist-data
+dstack run train-mnist
 
-RUN        WORKFLOW    SUBMITTED  STATUS     TAG  BACKENDS
-penguin-1  mnist-data  now        Submitted       local
+RUN        WORKFLOW     SUBMITTED  STATUS     TAG  BACKENDS
+penguin-1  train-mnist  now        Submitted       local
 
 Provisioning... It may take up to a minute. ✓
 
 To interrupt, press Ctrl+C.
 
-Downloading http://yann.lecun.com/exdb/mnist/train-images-idx3-ubyte.gz
+GPU available: True, used: True
+
+Epoch 1: [00:03<00:00, 280.17it/s, loss=1.35, v_num=0]
 ```
 
-The artifacts from local workflows are also stored and can be reused in other local workflows.
-
-### Run remotely
+## Run remotely
 
 To run a workflow remotely (e.g. in a configured cloud account), add the `--remote` flag to the `dstack run` command:
-
-```shell
-dstack run mnist-data --remote
-
-RUN        WORKFLOW    SUBMITTED  STATUS     TAG  BACKENDS
-mangust-1  mnist-data  now        Submitted       aws
-
-Provisioning... It may take up to a minute. ✓
-
-To interrupt, press Ctrl+C.
-
-Downloading http://yann.lecun.com/exdb/mnist/train-images-idx3-ubyte.gz
-```
-
-The output artifacts from remote workflows are also stored remotely and can be reused by other remote workflows.
 
 The necessary hardware resources can be configured either via YAML or through arguments in the `dstack run` command, such
 as `--gpu` and `--gpu-name`.
@@ -158,14 +124,24 @@ Epoch 1: [00:03<00:00, 280.17it/s, loss=1.35, v_num=0]
 Upon running a workflow remotely, `dstack` automatically creates resources in the configured cloud account and destroys them
 once the workflow is complete.
 
+## Providers
+
+`dstack` supports multiple [providers](https://docs.dstack.ai/usage/providers) to set up environments, run scripts, and launch interactive development environments and applications.
+
+## Artifacts
+
+`dstack` allows you to save output artifacts and conveniently reuse them across workflows.
+
 ## More information
 
 For additional information and examples, see the following links:
 
 * [Docs](https://docs.dstack.ai/)
-* [Installation](https://docs.dstack.ai/installation)
 * [Quick start](https://docs.dstack.ai/quick-start)
+* [Playground](https://github.com/dstackai/dstack-playground)
+* [Setup](https://docs.dstack.ai/setup)
 * [Usage](https://docs.dstack.ai/usage/hello-world)
+* [Examples](https://docs.dstack.ai/examples/tensorboard)
  
 ##  Licence
 

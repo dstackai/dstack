@@ -1,12 +1,15 @@
-# Stable Diffusion with Diffusers
+---
+title: Generate images with Stable Diffusion
+---
 
-This tutorial will demonstrate how to use the [`diffusers`](https://github.com/huggingface/diffusers) library to generate images using 
-a pretrained Stable Diffusion model.
+# Generate images with Stable Diffusion
+
+This tutorial demonstrates how to generate images using a pretrained Stable Diffusion model.
 
 !!! info "NOTE:"
-    The source code for this tutorial can be located in [`github.com/dstack-examples`](https://github.com/dstackai/dstack-examples/).
+    The source code of this example is available in the [Playground](../playground.md).
 
-## Requirements
+## 1. Requirements
 
 Here is the list of Python libraries that we will utilize:
 
@@ -28,14 +31,14 @@ safetensors
     to pickle) and that is still fast (zero-copy).
 
 To ensure our scripts can run smoothly across all environments, let's include them in
-the `stable_diffusion/requirements.txt` file.
+the `examples/stable_diffusion/requirements.txt` file.
 
 You can also install these libraries locally:
 
 <div class="termy">
 
 ```shell
-$ pip install -r stable_diffusion/requirements.txt
+$ pip install -r examples/stable_diffusion/requirements.txt
 ```
 
 </div>
@@ -50,7 +53,7 @@ $ pip install dstack -U
 
 </div>
 
-## Download the pre-trained model
+## 2. Download the pre-trained model
 
 In our tutorial, we'll use the [`runwayml/stable-diffusion-v1-5`](https://huggingface.co/runwayml/stable-diffusion-v1-5) model (pretrained by Runway).
 
@@ -59,22 +62,13 @@ Let's create the following Python file:
 <div editor-title="stable_diffusion/stable_diffusion.py"> 
 
 ```python
-import shutil
+from huggingface_hub import snapshot_download
 
-from diffusers import StableDiffusionPipeline
-
-
-def main():
-    _, cache_folder = StableDiffusionPipeline.from_pretrained("runwayml/stable-diffusion-v1-5",
-                                                              return_cached_folder=True)
-    shutil.copytree(cache_folder, "./models/runwayml/stable-diffusion-v1-5", dirs_exist_ok=True)
+if __name__ == '__main__':
+    snapshot_download("runwayml/stable-diffusion-v1-5", local_dir="./models/runwayml/stable-diffusion-v1-5")
 ```
 
 </div>
-
-!!! info "NOTE:"
-    By default, `diffusers` downloads the model to its own [cache folder](https://huggingface.co/docs/datasets/cache) built using symlinks.
-    Since `dstack` [doesn't support symlinks](https://github.com/dstackai/dstack/issues/180) in artifacts, we're copying the model files to the local `models` folder. 
 
 In order to run a script via `dstack`, the script must be defined as a workflow via a YAML file
 under `.dstack/workflows`.
@@ -88,8 +82,8 @@ workflows:
   - name: stable-diffusion
     provider: bash
     commands:
-      - pip install -r stable_diffusion/requirements.txt
-      - python stable_diffusion/stable_diffusion.py
+      - pip install -r examples/stable_diffusion/requirements.txt
+      - python examples/stable_diffusion/stable_diffusion.py
     artifacts:
       - path: ./models
     resources:
@@ -125,7 +119,7 @@ $ dstack run stable-diffusion
 Once you run it, `dstack` will run the script, and save the `models` folder as an artifact.
 After that, you can reuse it in other workflows.
 
-## Attach an interactive IDE
+## 3. Attach an IDE
 
 Sometimes, before you can run a workflow, you may want to run code interactively,
 e.g. via an IDE or a notebook.
@@ -141,7 +135,7 @@ workflows:
     deps:
       - workflow: stable-diffusion
     setup:
-      - pip install -r stable_diffusion/requirements.txt
+      - pip install -r examples/stable_diffusion/requirements.txt
     resources:
       memory: 16GB
 ```
@@ -161,7 +155,7 @@ $ dstack run code-stable
 
 </div>
 
-## Generate images
+## 4. Generate images
 
 Let's write a script that generates images using a pre-trained model and given prompts:
 
@@ -206,8 +200,8 @@ workflows:
     deps:
       - workflow: stable-diffusion
     commands:
-      - pip install -r stable_diffusion/requirements.txt
-      - python stable_diffusion/prompt_stable.py ${{ run.args }}
+      - pip install -r examples/stable_diffusion/requirements.txt
+      - python examples/stable_diffusion/prompt_stable.py ${{ run.args }}
     artifacts:
       - path: ./output
     resources:
@@ -235,7 +229,7 @@ Here's an example of the `prompt-stable` workflow output:
 
 ![cats in hats](cats-in-hats.png)
 
-## Configure a remote
+## 5. Configure a remote
 
 By default, workflows in `dstack` run locally. However, you have the option to configure a `remote` to run your
 workflows.
@@ -253,13 +247,11 @@ $ dstack config
 ? Choose AWS region: eu-west-1
 ? Choose S3 bucket: dstack-142421590066-eu-west-1
 ? Choose EC2 subnet: no preference
-
-$ 
 ```
 
 </div>
 
-## Run workflows remotely
+## 6. Run workflows remotely
 
 Once a remote is configured, you can use the `--remote` flag with the `dstack run` command
 to run workflows remotely.

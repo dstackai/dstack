@@ -2,6 +2,8 @@ package gcp
 
 import (
 	"context"
+	"io"
+	"net/http"
 	"strings"
 
 	compute "cloud.google.com/go/compute/apiv1"
@@ -44,4 +46,23 @@ func (gcompute *GCPCompute) TerminateInstance(ctx context.Context, instanceID st
 		return gerrors.Wrap(err)
 	}
 	return nil
+}
+
+func (gcompute *GCPCompute) IsInterruptedSpot(ctx context.Context, instanceID string) (bool, error) {
+	log.Trace(ctx, "Checking if spot was interrupted", "ID", instanceID)
+	req, err := http.NewRequest("GET", "http://metadata.google.internal/computeMetadata/v1/instance/preempted", nil)
+	if err != nil {
+		return false, err
+	}
+	req.Header.Add("Metadata-Flavor", "Google")
+	client := http.Client{}
+	resp, err := client.Do(req)
+	if err != nil {
+		return false, err
+	}
+	body, err := io.ReadAll(resp.Body)
+	if err != nil {
+		return false, err
+	}
+	return string(body) == "TRUE", nil
 }

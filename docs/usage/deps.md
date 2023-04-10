@@ -1,7 +1,7 @@
 # Deps
 
 !!! info "NOTE:"
-    The source code for the examples below can be found on [GitHub](https://github.com/dstackai/dstack-examples).
+The source code of this example is available in the [Playground](../playground.md).
 
 By using `deps` workflows can reuse artifacts from other workflows. There are two methods for doing this: by specifying
 a workflow or tag name.
@@ -12,7 +12,7 @@ Let's create the following workflow YAML file:
 
 <div editor-title=".dstack/workflows/deps.yaml"> 
 
-```yaml hl_lines="5 7"
+```yaml
 workflows:
   - name: cat-txt-2
     provider: bash
@@ -27,7 +27,7 @@ workflows:
 If we run it, it will print the contents of the output artifacts of the last run of the `hello-txt` workflow.
 
 !!! info "NOTE:"
-    Make sure to run the [`hello-txt`](artifacts.md) workflow beforehand.
+Make sure to run the [`hello-txt`](artifacts.md) workflow beforehand.
 
 ## Tags
 
@@ -47,14 +47,14 @@ $ dstack tags add txt-file grumpy-zebra-2
 
 </div>
 
-The `txt-file` here is the name of the tag, and `grumpy-zebra-2` is the run name of the 
-[`hello-txt`](artifacts.md) workflow. 
+The `txt-file` here is the name of the tag, and `grumpy-zebra-2` is the run name of the
+[`hello-txt`](artifacts.md) workflow.
 
 Let's reuse the `txt-file` tag from another workflow:
 
 <div editor-title=".dstack/workflows/deps.yaml"> 
 
-```yaml hl_lines="5 7"
+```yaml
 workflows:
   - name: cat-txt
     provider: bash
@@ -67,8 +67,8 @@ workflows:
 </div>
 
 !!! info "NOTE:"
-    Tags are only supported for remote runs. If you want to use a tag for a local run, you must first push the 
-    artifacts of the local run using the `dstack push` command. 
+Tags are only supported for remote runs. If you want to use a tag for a local run, you must first push the
+artifacts of the local run using the `dstack push` command.
 
     You can create also a tag by uploading arbitrary local files. To do this, use the `dstack tags add` command 
     with the `-a PATH` argument, which should point to the local folder containing local files.
@@ -77,19 +77,19 @@ workflows:
 
 By default, `dstack` looks up tags and workflows within the same repo.
 
-If you want to refer to a tag or a workflow from another repo, 
+If you want to refer to a tag or a workflow from another repo,
 you have to prepend the name (of the tag or the workflow) with the repo name.
 
-The workflow below uses a tag from the `dstackai/dstack` repo:
+The workflow below uses a tag from the `dstackai/dstack-playground` repo:
 
 <div editor-title=".dstack/workflows/deps.yaml"> 
 
-    ```yaml hl_lines="5 7"
+    ```yaml
     workflows:
       - name: cat-txt-3
         provider: bash
         deps:
-          - workflow: dstackai/dstack/txt-file
+          - workflow: dstackai/dstack-playground/txt-file
         commands:
           - cat output/hello.txt
     ```
@@ -97,4 +97,4 @@ The workflow below uses a tag from the `dstackai/dstack` repo:
 </div>
 
 !!! info "NOTE:"
-    Make sure to run the `hello-txt` workflow in the `dstackai/dstack` repo beforehand.
+Make sure to run the `hello-txt` workflow in the `dstackai/dstack` repo beforehand.

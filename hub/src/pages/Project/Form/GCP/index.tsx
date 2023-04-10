@@ -201,7 +201,8 @@ export const GCPBackend: React.FC<IProps> = ({ loading }) => {
             <SpaceBetween size="l">
                 <FileUploader
                     fileInputId="gcp-credentials"
-                    text="Choose a file to upload"
+                    text="Choose a file"
+                    description="Upload a service account key JSON file"
                     label={t('projects.edit.gcp.credentials')}
                     accept="application/json"
                     // eslint-disable-next-line @typescript-eslint/ban-ts-comment

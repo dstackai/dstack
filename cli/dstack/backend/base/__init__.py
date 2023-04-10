@@ -4,13 +4,13 @@ from enum import Enum
 from pathlib import Path
 from typing import Any, Generator, List, Optional
 
+from dstack.backend.base import jobs
 from dstack.core.artifact import Artifact
-from dstack.core.config import BackendConfig
-from dstack.core.job import Job, JobHead
+from dstack.core.config import BackendConfig, Configurator
+from dstack.core.job import Job, JobHead, JobStatus
 from dstack.core.log_event import LogEvent
-from dstack.core.repo import LocalRepoData, RepoAddress, RepoCredentials
+from dstack.core.repo import LocalRepoData, RepoAddress, RepoCredentials, RepoHead
 from dstack.core.run import RunHead
-from dstack.core.runners import Runner
 from dstack.core.secret import Secret
 from dstack.core.tag import TagHead
 
@@ -52,9 +52,13 @@ class Backend(ABC):
     def create_job(self, job: Job):
         pass
 
-    def submit_job(self, job: Job):
+    def submit_job(self, job: Job, failed_to_start_job_new_status: JobStatus = JobStatus.FAILED):
         self.create_job(job)
-        self.run_job(job)
+        self.run_job(job, failed_to_start_job_new_status)
+
+    def resubmit_job(self, job: Job, failed_to_start_job_new_status: JobStatus = JobStatus.FAILED):
+        jobs.update_job_submission(job)
+        self.run_job(job, failed_to_start_job_new_status)
 
     @abstractmethod
     def get_job(self, repo_address: RepoAddress, job_id: str) -> Optional[Job]:
@@ -65,7 +69,7 @@ class Backend(ABC):
         pass
 
     @abstractmethod
-    def run_job(self, job: Job) -> Runner:
+    def run_job(self, job: Job, failed_to_start_job_new_status: JobStatus):
         pass
 
     @abstractmethod
@@ -105,6 +109,7 @@ class Backend(ABC):
         repo_address: RepoAddress,
         run_name: Optional[str] = None,
         include_request_heads: bool = True,
+        interrupted_job_new_status: JobStatus = JobStatus.FAILED,
     ) -> List[RunHead]:
         pass
 
@@ -206,7 +211,11 @@ class Backend(ABC):
         pass
 
     @abstractmethod
-    def get_configurator(self):
+    def get_configurator(self) -> Configurator:
+        pass
+
+    @abstractmethod
+    def delete_workflow_cache(self, repo_address: RepoAddress, username: str, workflow_name: str):
         pass
 
 
@@ -220,6 +229,10 @@ class RemoteBackend(Backend):
 
 
 class CloudBackend(RemoteBackend):
+    @abstractmethod
+    def list_repo_heads(self) -> List[RepoHead]:
+        pass
+
     @abstractmethod
     def get_signed_download_url(self, object_key: str) -> str:
         pass

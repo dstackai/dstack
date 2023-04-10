@@ -54,6 +54,7 @@
     },
     {
       "type": "shell",
+      "environment_vars": ["IMAGE_VERSION={{user `image_version`}}"],
       "script": "provisioners/docker-image-without-cuda.sh"
     },
     {

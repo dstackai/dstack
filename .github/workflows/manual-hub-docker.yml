@@ -6,7 +6,7 @@ jobs:
   hub-docker-master:
     defaults:
       run:
-        working-directory: docker/hub/stgn
+        working-directory: docker/hub
     runs-on: ubuntu-latest
     steps:
       - name: Checkout repository
@@ -23,8 +23,8 @@ jobs:
       - name: Build and upload to DockerHub
         run: |
           VERSION=${{ github.run_number }}
-          docker buildx build --platform linux/arm64/v8 --push --provenance=false --tag dstackai/dstack-hub-stgn:$VERSION-arm64 -f Dockerfile .
-          docker buildx build --platform linux/amd64 --push --provenance=false --tag dstackai/dstack-hub-stgn:$VERSION-amd64 -f Dockerfile .
+          docker buildx build --platform linux/arm64/v8 --push --provenance=false --tag dstackai/dstack-hub-stgn:$VERSION-arm64 -f stgn/Dockerfile .
+          docker buildx build --platform linux/amd64 --push --provenance=false --tag dstackai/dstack-hub-stgn:$VERSION-amd64 -f stgn/Dockerfile .
           docker manifest create dstackai/dstack-hub-stgn:$VERSION --amend dstackai/dstack-hub-stgn:$VERSION-arm64 --amend dstackai/dstack-hub-stgn:$VERSION-amd64
           docker manifest push dstackai/dstack-hub-stgn:$VERSION
           docker manifest create dstackai/dstack-hub-stgn:latest --amend dstackai/dstack-hub-stgn:$VERSION-arm64 --amend dstackai/dstack-hub-stgn:$VERSION-amd64

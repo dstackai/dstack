@@ -4,12 +4,13 @@ from typing import List, Optional
 import yaml
 
 from dstack.backend.base import runners
-from dstack.backend.base.compute import Compute
+from dstack.backend.base.compute import Compute, NoCapacityError
 from dstack.backend.base.storage import Storage
 from dstack.core.job import Job, JobHead, JobStatus
 from dstack.core.repo import RepoAddress
 from dstack.core.request import RequestStatus
 from dstack.core.runners import Runner
+from dstack.utils.common import get_milliseconds_since_epoch
 
 
 def create_job(
@@ -144,6 +145,7 @@ def run_job(
     storage: Storage,
     compute: Compute,
     job: Job,
+    failed_to_start_job_new_status: JobStatus,
 ):
     if job.status != JobStatus.SUBMITTED:
         raise Exception("Can't create a request for a job which status is not SUBMITTED")
@@ -164,6 +166,10 @@ def run_job(
         runners.create_runner(storage, runner)
         runner.request_id = compute.run_instance(job, instance_type)
         runners.update_runner(storage, runner)
+    except NoCapacityError:
+        job.status = failed_to_start_job_new_status
+        job.request_id = runner.request_id if runner else None
+        update_job(storage, job)
     except Exception as e:
         job.status = JobStatus.FAILED
         job.request_id = runner.request_id if runner else None
@@ -235,6 +241,12 @@ def stop_job(
             ):
                 job.status = new_status
                 update_job(storage, job)
+
+
+def update_job_submission(job: Job):
+    job.status = JobStatus.SUBMITTED
+    job.submission_num += 1
+    job.submitted_at = get_milliseconds_since_epoch()
 
 
 def _get_jobs_dir(repo_address: RepoAddress) -> str:

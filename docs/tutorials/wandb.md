@@ -1,6 +1,10 @@
-# Weights & Biases
+---
+title: Track experiments with W&B
+---
 
-Using W&B with `dstack` is a straightforward process.
+# Track experiments with W&B
+
+Using `dstack` with Weights & Biases is a straightforward process.
 
 ## 1. Configure the API key
 
@@ -65,7 +69,7 @@ from your Python script.
 
 First, create a run with [`wandb.init()`](https://docs.wandb.ai/ref/python/run):
 
-<div editor-title="tutorials/wandb/main.py"> 
+<div editor-title="examples/wandb/main.py"> 
 
 ```python
 import os
@@ -100,7 +104,7 @@ workflows:
     provider: bash
     commands:
       - pip install wandb
-      - python tutorials/wandb/main.py
+      - python examples/wandb/main.py
 ```
 
 </div>

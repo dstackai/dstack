@@ -11,21 +11,23 @@ from fastapi import FastAPI, Request
 from starlette.responses import HTMLResponse, JSONResponse
 from starlette.staticfiles import StaticFiles
 
+from dstack.hub.background import start_background_tasks
 from dstack.hub.db.migrate import migrate
 from dstack.hub.db.models import User
-from dstack.hub.repository.user import UserManager
+from dstack.hub.repository.users import UserManager
 from dstack.hub.routers import (
     artifacts,
-    hub,
     jobs,
     link,
     logs,
+    projects,
     repos,
     runners,
     runs,
     secrets,
     tags,
     users,
+    workflows,
 )
 
 _REQUEST_ID_ = "X-DSTACK-REQUEST-ID"
@@ -49,7 +51,7 @@ logger.setLevel(logging.ERROR)
 
 app = FastAPI(docs_url="/api/docs")
 app.include_router(users.router)
-app.include_router(hub.router)
+app.include_router(projects.router)
 app.include_router(runs.router)
 app.include_router(jobs.router)
 app.include_router(runners.router)
@@ -59,6 +61,7 @@ app.include_router(artifacts.router)
 app.include_router(tags.router)
 app.include_router(repos.router)
 app.include_router(link.router)
+app.include_router(workflows.router)
 
 
 @app.on_event("startup")
@@ -71,7 +74,7 @@ async def startup_event():
             logger.setLevel(log_level.upper())
         except:
             pass
-
+    start_background_tasks()
     url = f"http://{os.getenv('DSTACK_HUB_HOST')}:{os.getenv('DSTACK_HUB_PORT')}?token={admin_user.token}"
     print(f"The hub is available at {url}")
 
@@ -123,6 +126,6 @@ app.mount("/", StaticFiles(packages=["dstack.hub"], html=True), name="static")
 @app.exception_handler(404)
 async def custom_http_exception_handler(request, exc):
     if request.url.path.startswith("/api"):
-        return JSONResponse({"message": exc.detail}, status_code=404)
+        return JSONResponse({"detail": exc.detail}, status_code=404)
     else:
         return HTMLResponse(pkg_resources.resource_string(__name__, "statics/index.html"))

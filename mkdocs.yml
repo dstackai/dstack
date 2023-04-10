@@ -3,7 +3,7 @@ site_name: dstack
 site_url: https://docs.dstack.ai
 site_author: Andrey Cheptsov
 site_description: >-
-  Define ML workflows as code and run via CLI. Use any cloud. Collaborate within teams.
+  The hassle-free tool for managing ML workflows on any cloud platform.
 
 # Repository
 repo_url: https://github.com/dstackai/dstack
@@ -11,7 +11,7 @@ repo_name: dstackai/dstack
 edit_uri: edit/master/docs/
 
 #Copyright
-copyright: Built with ❤️ by dstack
+copyright: Built with <img alt="❤️" class="twemoji" src="https://cdnjs.cloudflare.com/ajax/libs/twemoji/14.0.2/svg/2764.svg">️ by <a href="https://github.com/dstackai" target="__blank">dstack</a>
 
 # Configuration
 theme:
@@ -41,7 +41,7 @@ theme:
   #          icon: material/weather-sunny
   #          name: Switch to light mode
   features:
-    - navigation.path
+    #    - navigation.path
     - content.code.copy
     - content.action.edit
     #    - navigation.indexes
@@ -65,9 +65,15 @@ plugins:
         text: "#FFFFFF"
       cards_font: Roboto
   - search
-#  - redirects:
-#      redirect_maps:
-#        'index.md': 'quickstart/index.md'
+  - redirects:
+      redirect_maps:
+        'integrations/experiments/wandb.md': 'tutorials/wandb.md'
+        'examples/wandb.md': 'tutorials/wandb.md'
+        'examples/tensorboard.md': 'tutorials/tensorboard.md'
+        'examples/stable-diffusion.md': 'examples/stable-diffusion.md'
+        'examples/github-actions.md': 'tutorials/github-actions.md'
+        'installation.md': 'setup/index.md'
+  - typeset
 
 # Extensions
 markdown_extensions:
@@ -108,70 +114,83 @@ extra:
     provider: google
     property: G-JX21114P7B
   social:
-    - icon: fontawesome/brands/github
+    - icon: /custom/colored/github
       link: https://github.com/dstackai/dstack
     #    - icon: fontawesome/brands/python
     #      link: https://pypi.org/project/dstack/
-    - icon: fontawesome/brands/slack
+    - icon: /custom/colored/slack
       link: https://join.slack.com/t/dstackai/shared_invite/zt-xdnsytie-D4qU9BvJP8vkbkHXdi6clQ
-#    - icon: material/rss
-#      link: https://dstack.curated.co/
-    - icon: fontawesome/brands/twitter
+    #    - icon: material/rss
+    #      link: https://dstack.curated.co/
+    - icon: /custom/colored/twitter
       link: https://twitter.com/dstackai
-
+  status:
+    new: Recently added
 # Page tree
 nav:
   - Guides:
       - Get started:
           - Overview: index.md
-          - Installation: installation.md
           - Quick start: quick-start.md
-          - Concepts: concepts/index.md
+          - Playground: playground.md
+          - Setup:
+            - CLI: setup/index.md
+            - AWS: setup/aws.md
+            - GCP: setup/gcp.md
+            - Hub: setup/hub.md
       - Usage:
-        - Hello world: usage/hello-world.md
-        - Python: usage/python.md
-        - Conda: usage/conda.md
-        - Artifacts: usage/artifacts.md
-        - Deps: usage/deps.md
-        - Resources: usage/resources.md
-        - Environment variables: usage/environment-variables.md
-        - Providers: usage/providers.md
-        - Apps: usage/apps.md
-        - Secrets: usage/secrets.md
-        - Args: usage/args.md
-      - Tutorials:
-          - Stable Diffusion: tutorials/stable-diffusion.md
-          - Experiment tracking:
-            - TensorBoard: tutorials/tensorboard.md
-            - Weights & Biases: tutorials/wandb.md
+          - Hello world: usage/hello-world.md
+          - Python: usage/python.md
+          - Artifacts: usage/artifacts.md
+          - Deps: usage/deps.md
+          - Remote: usage/remote.md
+          #        - Environment variables: usage/environment-variables.md
+          - Providers: usage/providers.md
+          - Cache: usage/cache.md
+          - Apps: usage/apps.md
+          - Secrets: usage/secrets.md
+          - Args: usage/args.md
+      - What's next?:
+          - Tutorials: tutorials/tensorboard.md
+          - Reference: reference/providers/bash.md
       - Support:
           - Troubleshooting: troubleshooting.md
           - Slack: https://join.slack.com/t/dstackai/shared_invite/zt-xdnsytie-D4qU9BvJP8vkbkHXdi6clQ
-#          - Changelog: https://github.com/dstackai/dstack/releases
-#          - Newsletter: https://dstack.curated.co/
+  #          - Changelog: https://github.com/dstackai/dstack/releases
+  #          - Newsletter: https://dstack.curated.co/
+  - Tutorials:
+      - Experiment tracking:
+          - TensorBoard: tutorials/tensorboard.md
+          - Weights & Biases: tutorials/wandb.md
+      - Stable Diffusion:
+          - Generate images: tutorials/stable-diffusion.md
+      - CI/CD:
+          - GitHub Actions: tutorials/github-actions.md
   - Reference:
-      - Providers:
-          - bash: reference/providers/bash.md
-          - code: reference/providers/code.md
-          - lab: reference/providers/lab.md
-          - notebook: reference/providers/notebook.md
-          - docker: reference/providers/docker.md
-      - CLI:
-          - dstack run: reference/cli/run.md
-          - dstack ps: reference/cli/ps.md
-          - dstack logs: reference/cli/logs.md
-          - dstack stop: reference/cli/stop.md
-          - dstack rm: reference/cli/rm.md
-          - dstack tags: reference/cli/tags.md
-          - dstack pull: reference/cli/pull.md
-          - dstack push: reference/cli/push.md
-          - dstack ls: reference/cli/ls.md
-          - dstack cp: reference/cli/cp.md
-          - dstack init: reference/cli/init.md
-          - dstack config: reference/cli/config.md
-          - dstack secrets: reference/cli/secrets.md
+      - Reference:
+          - CLI:
+              - dstack run: reference/cli/run.md
+              - dstack ps: reference/cli/ps.md
+              - dstack logs: reference/cli/logs.md
+              - dstack stop: reference/cli/stop.md
+              - dstack rm: reference/cli/rm.md
+              - dstack tags: reference/cli/tags.md
+              - dstack pull: reference/cli/pull.md
+              - dstack push: reference/cli/push.md
+              - dstack ls: reference/cli/ls.md
+              - dstack cp: reference/cli/cp.md
+              - dstack init: reference/cli/init.md
+              - dstack config: reference/cli/config.md
+              - dstack secrets: reference/cli/secrets.md
+              - dstack prune: reference/cli/prune.md
+          - Providers:
+              - bash: reference/providers/bash.md
+              - code: reference/providers/code.md
+              - lab: reference/providers/lab.md
+              - notebook: reference/providers/notebook.md
+              - docker: reference/providers/docker.md
   - Blog:
-    - blog/index.md
+      - blog/index.md
   - Slack: https://join.slack.com/t/dstackai/shared_invite/zt-xdnsytie-D4qU9BvJP8vkbkHXdi6clQ
   - Twitter: https://twitter.com/dstackai/
 #  - Newsletter: https://dstack.curated.co/

@@ -2,23 +2,20 @@ from typing import List, Union
 
 from fastapi import APIRouter, Depends
 from fastapi.responses import PlainTextResponse
-from fastapi.security import HTTPBearer
 
+from dstack.core.job import JobStatus
 from dstack.core.repo import RepoAddress
 from dstack.core.run import RunHead
 from dstack.hub.models import RunsList
 from dstack.hub.routers.cache import get_backend
 from dstack.hub.routers.util import get_project
-from dstack.hub.security.scope import Scope
+from dstack.hub.security.permissions import ProjectMember
 
-router = APIRouter(prefix="/api/project", tags=["runs"])
-
-security = HTTPBearer()
+router = APIRouter(prefix="/api/project", tags=["runs"], dependencies=[Depends(ProjectMember())])
 
 
 @router.post(
     "/{project_name}/runs/create",
-    dependencies=[Depends(Scope("runs:create:write"))],
     response_model=str,
     response_class=PlainTextResponse,
 )
@@ -29,9 +26,8 @@ async def create_run(project_name: str, repo_address: RepoAddress) -> str:
     return run_name
 
 
-@router.get(
+@router.post(
     "/{project_name}/runs/list",
-    dependencies=[Depends(Scope("runs:create:read"))],
     response_model=List[RunHead],
 )
 async def list_run(project_name: str, body: RunsList):
@@ -41,5 +37,6 @@ async def list_run(project_name: str, body: RunsList):
         repo_address=body.repo_address,
         run_name=body.run_name,
         include_request_heads=body.include_request_heads,
+        interrupted_job_new_status=JobStatus.PENDING,
     )
     return run_name

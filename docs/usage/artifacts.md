@@ -1,7 +1,7 @@
 # Artifacts
 
 !!! info "NOTE:"
-    The source code for the examples below can be found on [GitHub](https://github.com/dstackai/dstack-examples).
+    The source code of this example is available in the [Playground](../playground.md). 
 
 ## Define artifacts
 
@@ -9,7 +9,7 @@ Create the following workflow YAML file:
 
 <div editor-title=".dstack/workflows/artifacts.yaml"> 
 
-```yaml hl_lines="5 7"
+```yaml
 workflows:
   - name: hello-txt
     provider: bash
@@ -44,7 +44,7 @@ by the name of the run.
 <div class="termy">
 
 ```shell
-$ dstack ls grumpy-zebra-1
+$ dstack ls -r grumpy-zebra-1
 
 PATH  FILE                                  SIZE
 data  MNIST/raw/t10k-images-idx3-ubyte      7.5MiB
@@ -123,7 +123,7 @@ you can set the `mount` property to `true` for a particular artifact.
 
 Let's create the following bash script:
 
-<div editor-title="artifacts/hello.sh"> 
+<div editor-title="usage/artifacts/hello.sh"> 
 
 ```shell
 for i in {000..100}
@@ -140,7 +140,7 @@ Now, create the following workflow YAML file:
 
 <div editor-title=".dstack/workflows/resources.yaml"> 
 
-```yaml hl_lines="5 7 8 9"
+```yaml
 workflows:
   - name: hello-sh
     provider: bash
