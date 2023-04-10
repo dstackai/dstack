@@ -1,16 +1,28 @@
 import React, { useState } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
-import { ContentLayout, SpaceBetween, Container, Header, ColumnLayout, Box, Loader, ConfirmationDialog } from 'components';
+import {
+    ContentLayout,
+    SpaceBetween,
+    Container,
+    Header,
+    ColumnLayout,
+    Box,
+    Loader,
+    ConfirmationDialog,
+    Button,
+} from 'components';
 import { DetailsHeader } from 'components';
 import { useTranslation } from 'react-i18next';
-import { useBreadcrumbs, useNotifications } from 'hooks';
+import { useAppSelector, useBreadcrumbs, useNotifications } from 'hooks';
 import { useDeleteUsersMutation, useGetUserQuery } from 'services/user';
+import { selectUserData } from 'App/slice';
 import { ROUTES } from 'routes';
-import Button from '@cloudscape-design/components/button';
 
 export const UserDetails: React.FC = () => {
     const { t } = useTranslation();
     const [showDeleteConfirm, setShowConfirmDelete] = useState(false);
+    const userData = useAppSelector(selectUserData);
+    const userGlobalRole = userData?.global_role ?? '';
     const params = useParams();
     const paramUserName = params.name ?? '';
     const navigate = useNavigate();
@@ -56,7 +68,13 @@ export const UserDetails: React.FC = () => {
     return (
         <>
             <ContentLayout
-                header={<DetailsHeader title={paramUserName} deleteAction={toggleDeleteConfirm} deleteDisabled={isDeleting} />}
+                header={
+                    <DetailsHeader
+                        title={paramUserName}
+                        deleteAction={toggleDeleteConfirm}
+                        deleteDisabled={isDeleting || userGlobalRole !== 'admin'}
+                    />
+                }
             >
                 {isLoading && !data && (
                     <Container>
@@ -71,7 +89,7 @@ export const UserDetails: React.FC = () => {
                                 <Header
                                     variant="h2"
                                     actions={
-                                        <Button onClick={editUserHandler} disabled={isDeleting}>
+                                        <Button onClick={editUserHandler} disabled={isDeleting || userGlobalRole !== 'admin'}>
                                             {t('common.edit')}
                                         </Button>
                                     }

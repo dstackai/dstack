@@ -21,6 +21,8 @@ export const FormS3BucketSelector = <T extends FieldValues>({
     stretch,
     onChange: onChangeProp,
     disabled,
+    prefix = 's3://',
+    i18nStrings,
     ...props
 }: FormS3BucketSelectorProps<T>) => {
     const fetch = async () => Promise.resolve([]);
@@ -40,7 +42,7 @@ export const FormS3BucketSelector = <T extends FieldValues>({
         fetchBuckets: fetchBuckets,
         fetchObjects: fetch,
         fetchVersions: fetch,
-        i18nStrings: getResourceSelectorI18n(),
+        i18nStrings: getResourceSelectorI18n(prefix, i18nStrings),
     };
 
     return (
@@ -49,9 +51,9 @@ export const FormS3BucketSelector = <T extends FieldValues>({
             control={control}
             rules={rules}
             render={({ field: { onChange, value, ...fieldRest }, fieldState: { error } }) => {
-                const resource = { uri: value ? `s3://${value}` : value };
+                const resource = { uri: value ? `${prefix}${value}` : value };
                 const onChangeSelect: S3ResourceSelectorProps['onChange'] = (event) => {
-                    const bucket = event.detail.resource.uri.replace(/^s3:\/\//, '');
+                    const bucket = event.detail.resource.uri.replace(/^s3:\/\//, '').replace(new RegExp(prefix), '');
                     onChange(bucket);
                     onChangeProp && onChangeProp(event);
                 };

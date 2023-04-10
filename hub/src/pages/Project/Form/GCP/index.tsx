@@ -2,7 +2,7 @@ import React, { useEffect, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useFormContext } from 'react-hook-form';
 import { IProps, VPCSubnetOption } from './types';
-import { FormSelect, SpaceBetween, FileUploader, FormSelectOptions, Spinner } from 'components';
+import { FormSelect, SpaceBetween, FileUploader, FormSelectOptions, Spinner, FormS3BucketSelector } from 'components';
 import { useBackendValuesMutation } from 'services/project';
 import { isRequestFormFieldError, isRequestFormErrors2 } from 'libs';
 import { useNotifications } from 'hooks';
@@ -35,7 +35,7 @@ export const GCPBackend: React.FC<IProps> = ({ loading }) => {
     const [areaOptions, setAreaOptions] = useState<FormSelectOptions>([]);
     const [regionOptions, setRegionOptions] = useState<FormSelectOptions>([]);
     const [zoneOptions, setZoneOptions] = useState<FormSelectOptions>([]);
-    const [bucketNameOptions, setBucketNameOptions] = useState<FormSelectOptions>([]);
+    const [bucketNameOptions, setBucketNameOptions] = useState<TAwsBucket[]>([]);
     const [subnetOptions, setSubnetOptions] = useState<VPCSubnetOption[]>([]);
     const requestRef = useRef<null | ReturnType<typeof getBackendValues>>(null);
     const [pushNotification] = useNotifications();
@@ -97,7 +97,11 @@ export const GCPBackend: React.FC<IProps> = ({ loading }) => {
             }
 
             if (response.bucket_name?.values.length) {
-                setBucketNameOptions(response.bucket_name.values);
+                const buckets: TAwsBucket[] = response.bucket_name.values.map((valueItem) => ({
+                    name: valueItem.value,
+                }));
+
+                setBucketNameOptions(buckets);
             }
 
             if (response.bucket_name?.selected !== undefined) {
@@ -269,17 +273,24 @@ export const GCPBackend: React.FC<IProps> = ({ loading }) => {
                     secondaryControl={renderSpinner()}
                 />
 
-                <FormSelect
+                <FormS3BucketSelector
+                    prefix="gs://"
                     label={t('projects.edit.gcp.bucket_name')}
                     description={t('projects.edit.gcp.bucket_name_description')}
-                    placeholder={t('projects.edit.gcp.bucket_name_placeholder')}
                     control={control}
                     name={`backend.${FIELD_NAMES.BUCKET_NAME}`}
-                    options={bucketNameOptions}
-                    onChange={getOnChangeSelectFormField(FIELD_NAMES.BUCKET_NAME)}
+                    selectableItemsTypes={['buckets']}
                     disabled={disabledFields || !bucketNameOptions.length}
+                    onChange={getOnChangeSelectFormField(FIELD_NAMES.BUCKET_NAME)}
                     rules={{ required: t('validation.required') }}
+                    buckets={bucketNameOptions}
                     secondaryControl={renderSpinner()}
+                    i18nStrings={{
+                        inContextBrowseButton: 'Browse Storage bucket',
+                        modalBreadcrumbRootItem: 'Storage buckets',
+                        modalTitle: 'Choose an archive in Storage bucket',
+                        labelBreadcrumbs: 'Storage bucket navigation',
+                    }}
                 />
 
                 <FormSelect
