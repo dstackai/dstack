@@ -237,7 +237,7 @@ export const GCPBackend: React.FC<IProps> = ({ loading }) => {
                     name={`backend.${FIELD_NAMES.AREA}`}
                     options={areaOptions}
                     onChange={getOnChangeSelectFormField(FIELD_NAMES.AREA)}
-                    disabled={disabledFields}
+                    disabled={disabledFields || !areaOptions.length}
                     rules={{ required: t('validation.required') }}
                     secondaryControl={renderSpinner()}
                 />
@@ -250,7 +250,7 @@ export const GCPBackend: React.FC<IProps> = ({ loading }) => {
                     name={`backend.${FIELD_NAMES.REGION}`}
                     options={regionOptions}
                     onChange={getOnChangeSelectFormField(FIELD_NAMES.REGION)}
-                    disabled={disabledFields}
+                    disabled={disabledFields || !regionOptions.length}
                     rules={{ required: t('validation.required') }}
                     secondaryControl={renderSpinner()}
                 />
@@ -263,7 +263,7 @@ export const GCPBackend: React.FC<IProps> = ({ loading }) => {
                     name={`backend.${FIELD_NAMES.ZONE}`}
                     options={zoneOptions}
                     onChange={getOnChangeSelectFormField(FIELD_NAMES.ZONE)}
-                    disabled={disabledFields}
+                    disabled={disabledFields || !zoneOptions.length}
                     rules={{ required: t('validation.required') }}
                     secondaryControl={renderSpinner()}
                 />
@@ -276,7 +276,7 @@ export const GCPBackend: React.FC<IProps> = ({ loading }) => {
                     name={`backend.${FIELD_NAMES.BUCKET_NAME}`}
                     options={bucketNameOptions}
                     onChange={getOnChangeSelectFormField(FIELD_NAMES.BUCKET_NAME)}
-                    disabled={disabledFields}
+                    disabled={disabledFields || !bucketNameOptions.length}
                     rules={{ required: t('validation.required') }}
                     secondaryControl={renderSpinner()}
                 />
@@ -289,7 +289,7 @@ export const GCPBackend: React.FC<IProps> = ({ loading }) => {
                     name={`backend.${FIELD_NAMES.VPC_SUBNET}`}
                     options={subnetOptions}
                     onChange={onChangeVPCSubnet}
-                    disabled={disabledFields}
+                    disabled={disabledFields || !subnetOptions.length}
                     rules={{ required: t('validation.required') }}
                     secondaryControl={renderSpinner()}
                 />
