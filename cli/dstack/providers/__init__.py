@@ -6,7 +6,6 @@ from argparse import ArgumentParser, Namespace
 from pkgutil import iter_modules
 from typing import Any, Dict, List, Optional, Union
 
-from dstack.api.repo import load_repo_data
 from dstack.backend.base import Backend
 from dstack.core.cache import CacheSpec
 from dstack.core.job import (
@@ -18,7 +17,6 @@ from dstack.core.job import (
     JobStatus,
     Requirements,
 )
-from dstack.core.repo import RepoAddress, RepoData
 from dstack.utils.common import _quoted, get_milliseconds_since_epoch
 from dstack.utils.interpolator import VariablesInterpolator
 
