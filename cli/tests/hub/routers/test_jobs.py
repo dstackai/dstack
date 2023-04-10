@@ -11,7 +11,7 @@ class TestGetJob:
     @pytest.mark.asyncio
     async def test_returns_40x_if_not_authenticated(self, test_db):
         project = await create_project()
-        response = client.get(f"/api/project/{project.name}/jobs/get")
+        response = client.post(f"/api/project/{project.name}/jobs/get")
         assert response.status_code in [401, 403]
 
     @pytest.mark.asyncio

@@ -144,24 +144,19 @@ class GCPConfig(BackendConfig):
         return yaml.dump(self.serialize())
 
     @classmethod
-    def deserialize(
-        cls, config_data: Dict, auth_data: Optional[Dict] = None
-    ) -> Optional["GCPConfig"]:
-        if config_data.get("type") != "gcp":
+    def deserialize(cls, config_data: Dict) -> Optional["GCPConfig"]:
+        if config_data.get("backend") != "gcp":
             raise ConfigError(f"Not a GCP config")
-
         try:
-            credentials = json.loads(auth_data.get("credentials")) if auth_data else None
-            project_id = config_data.get("project") or credentials["project_id"]
+            project_id = config_data["project"]
             region = config_data["region"]
             zone = config_data["zone"]
-            bucket_name = config_data["bucket_name"]
+            bucket_name = config_data["bucket"]
             vpc = config_data["vpc"]
             subnet = config_data["subnet"]
         except KeyError:
             raise ConfigError("Cannot load config")
 
-        credentials_file = config_data.get("credentials_file")
         return cls(
             project_id=project_id,
             region=region,
@@ -169,8 +164,8 @@ class GCPConfig(BackendConfig):
             bucket_name=bucket_name,
             vpc=vpc,
             subnet=subnet,
-            credentials_file=credentials_file,
-            credentials=credentials,
+            credentials_file=config_data.get("credentials_file"),
+            credentials=config_data.get("credentials"),
         )
 
     @classmethod
@@ -197,8 +192,19 @@ class GCPConfigurator(Configurator):
     def name(self):
         return "gcp"
 
-    def get_config(self, config_data: Dict, auth_data: Optional[Dict] = None) -> BackendConfig:
-        return GCPConfig.deserialize(config_data, auth_data)
+    def get_config_from_hub_config_data(self, config_data: Dict, auth_data: Dict) -> BackendConfig:
+        credentials = json.loads(auth_data["credentials"])
+        data = {
+            "backend": "gcp",
+            "credentials": credentials,
+            "project": credentials["project_id"],
+            "region": config_data["region"],
+            "zone": config_data["zone"],
+            "bucket": config_data["bucket_name"],
+            "vpc": config_data["vpc"],
+            "subnet": config_data["subnet"],
+        }
+        return GCPConfig.deserialize(data)
 
     def register_parser(self, parser):
         gcp_parser = parser.add_parser("gcp", help="", formatter_class=RichHelpFormatter)
@@ -236,35 +242,32 @@ class GCPConfigurator(Configurator):
             )
         project_values = GCPProjectValues()
         project_values.area = self._get_hub_geographic_area(config_data.get("area"))
-        if config_data.get("area") is not None:
-            location = self._get_location(config_data.get("area"))
-            project_values.region, regions = self._get_hub_region(
-                location=location,
-                default_region=config_data.get("region"),
-            )
-            if (
-                config_data.get("region") is not None
-                and regions.get(config_data.get("region")) is not None
-            ):
-                project_values.zone = self._get_hub_zone(
-                    location=location,
-                    region=regions.get(config_data.get("region")),
-                    default_zone=config_data.get("zone"),
-                )
-                project_values.bucket_name = self._get_hub_buckets(
-                    region=config_data.get("region"),
-                    default_bucket=config_data.get("bucket_name"),
-                )
-                project_values.vpc_subnet = self._get_hub_vpc_subnet(
-                    region=config_data.get("region"),
-                    default_vpc=config_data.get("vpc"),
-                    default_subnet=config_data.get("subnet"),
-                )
+        location = self._get_location(project_values.area.selected)
+        project_values.region, regions = self._get_hub_region(
+            location=location,
+            default_region=config_data.get("region"),
+        )
+        project_values.zone = self._get_hub_zone(
+            location=location,
+            region=regions.get(project_values.region.selected),
+            default_zone=config_data.get("zone"),
+        )
+        project_values.bucket_name = self._get_hub_buckets(
+            region=project_values.region.selected,
+            default_bucket=config_data.get("bucket_name"),
+        )
+        project_values.vpc_subnet = self._get_hub_vpc_subnet(
+            region=project_values.region.selected,
+            default_vpc=config_data.get("vpc"),
+            default_subnet=config_data.get("subnet"),
+        )
         return project_values
 
     def _get_hub_geographic_area(self, default_area: Optional[str]) -> ProjectElement:
         area_names = sorted([l["name"] for l in GCP_LOCATIONS])
-        if default_area is not None and default_area not in area_names:
+        if default_area is None:
+            default_area = DEFAULT_GEOGRAPHIC_AREA
+        if default_area not in area_names:
             raise HubConfigError(f"Invalid GCP area {default_area}")
         element = ProjectElement(selected=default_area)
         for area_name in area_names:
@@ -280,7 +283,9 @@ class GCPConfigurator(Configurator):
             [r.name for r in regions if r.name in location["regions"]],
             key=lambda name: (name != location["default_region"], name),
         )
-        if default_region is not None and default_region not in region_names:
+        if default_region is None:
+            default_region = region_names[0]
+        if default_region not in region_names:
             raise HubConfigError(f"Invalid GCP region {default_region} in area {location['name']}")
         element = ProjectElement(selected=default_region)
         for region_name in region_names:
@@ -294,7 +299,9 @@ class GCPConfigurator(Configurator):
             [self._get_resource_name(z) for z in region.zones],
             key=lambda name: (name != location["default_zone"], name),
         )
-        if default_zone is not None and default_zone not in zone_names:
+        if default_zone is None:
+            default_zone = zone_names[0]
+        if default_zone not in zone_names:
             raise HubConfigError(f"Invalid GCP zone {default_zone} in region {region.name}")
         element = ProjectElement(selected=default_zone)
         for zone_name in zone_names:

@@ -1,15 +1,15 @@
-from fastapi import APIRouter, Depends
+from fastapi import APIRouter, Depends, HTTPException, status
 
 from dstack.core.repo import RepoAddress, RepoCredentials
 from dstack.hub.models import ReposUpdate, SaveRepoCredentials
 from dstack.hub.routers.cache import get_backend
-from dstack.hub.routers.util import get_project
+from dstack.hub.routers.util import error_detail, get_project
 from dstack.hub.security.permissions import ProjectMember
 
 router = APIRouter(prefix="/api/project", tags=["repos"], dependencies=[Depends(ProjectMember())])
 
 
-@router.post("/{project_name}/repos/credentials")
+@router.post("/{project_name}/repos/credentials/save")
 async def save_repo_credentials(
     project_name: str, save_repo_credentials_body: SaveRepoCredentials
 ):
@@ -21,13 +21,18 @@ async def save_repo_credentials(
     )
 
 
-@router.get(
-    "/{project_name}/repos/credentials",
+@router.post(
+    "/{project_name}/repos/credentials/get",
 )
 async def get_repo_credentials(project_name: str, repo_address: RepoAddress) -> RepoCredentials:
     project = await get_project(project_name=project_name)
     backend = get_backend(project)
     repo_credentials = backend.get_repo_credentials(repo_address=repo_address)
+    if repo_credentials is None:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=error_detail("Repo credentials not found"),
+        )
     return repo_credentials
 
 

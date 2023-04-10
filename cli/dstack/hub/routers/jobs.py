@@ -19,23 +19,21 @@ async def create_job(project_name: str, job: Job):
     backend.create_job(job=job)
 
 
-@router.get("/{project_name}/jobs/get")
+@router.post("/{project_name}/jobs/get")
 async def get_job(project_name: str, body: JobsGet) -> Job:
     project = await get_project(project_name=project_name)
     backend = get_backend(project)
     return backend.get_job(repo_address=body.repo_address, job_id=body.job_id)
 
 
-@router.get(
-    "/{project_name}/jobs/list",
-)
+@router.post("/{project_name}/jobs/list")
 async def list_job(project_name: str, body: JobsList) -> List[Job]:
     project = await get_project(project_name=project_name)
     backend = get_backend(project)
     return backend.list_jobs(repo_address=body.repo_address, run_name=body.run_name)
 
 
-@router.get("/{project_name}/jobs/list/heads")
+@router.post("/{project_name}/jobs/list/heads")
 async def list_heads_job(
     project_name: str, repo_address: RepoAddress, run_name: Optional[str] = None
 ) -> List[JobHead]:

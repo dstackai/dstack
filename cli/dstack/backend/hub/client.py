@@ -82,13 +82,15 @@ class HubClient:
         url = _url(
             url=self.url,
             project=self.project,
-            additional_path=f"/repos/credentials",
+            additional_path=f"/repos/credentials/get",
         )
         try:
-            resp = requests.get(url=url, headers=self._headers(), data=repo_address.json())
+            resp = requests.post(url=url, headers=self._headers(), data=repo_address.json())
             if resp.ok:
                 json_data = resp.json()
                 return RepoCredentials(**json_data)
+            elif resp.status_code == 404:
+                return None
             elif resp.status_code == 401:
                 print("Unauthorized. Please set correct token")
                 return None
@@ -102,7 +104,7 @@ class HubClient:
         url = _url(
             url=self.url,
             project=self.project,
-            additional_path=f"/repos/credentials",
+            additional_path=f"/repos/credentials/save",
         )
         try:
             resp = requests.post(
@@ -215,9 +217,11 @@ class HubClient:
             additional_path=f"/tags/{tag_name}",
         )
         try:
-            resp = requests.get(url=url, headers=self._headers(), data=repo_address.json())
+            resp = requests.post(url=url, headers=self._headers(), data=repo_address.json())
             if resp.ok:
                 return TagHead.parse_obj(resp.json())
+            elif resp.status_code == 404:
+                return None
             elif resp.status_code == 401:
                 print("Unauthorized. Please set correct token")
                 return None
@@ -234,7 +238,7 @@ class HubClient:
             additional_path=f"/tags/list/heads",
         )
         try:
-            resp = requests.get(url=url, headers=self._headers(), data=repo_address.json())
+            resp = requests.post(url=url, headers=self._headers(), data=repo_address.json())
             if resp.ok:
                 body = resp.json()
                 return [TagHead.parse_obj(tag) for tag in body]
@@ -368,7 +372,7 @@ class HubClient:
             url=self.url, project=self.project, additional_path=f"/jobs/list/heads", query=query
         )
         try:
-            resp = requests.get(url=url, headers=self._headers(), data=repo_address.json())
+            resp = requests.post(url=url, headers=self._headers(), data=repo_address.json())
             if resp.ok:
                 body = resp.json()
                 return [JobHead.parse_obj(job) for job in body]
@@ -393,7 +397,7 @@ class HubClient:
             additional_path=f"/runs/list",
         )
         try:
-            resp = requests.get(
+            resp = requests.post(
                 url=url,
                 headers=self._headers(),
                 data=RunsList(
@@ -421,7 +425,7 @@ class HubClient:
             additional_path=f"/jobs/get",
         )
         try:
-            resp = requests.get(
+            resp = requests.post(
                 url=url,
                 headers=self._headers(),
                 data=JobsGet(
@@ -448,7 +452,7 @@ class HubClient:
             additional_path=f"/secrets/list",
         )
         try:
-            resp = requests.get(
+            resp = requests.post(
                 url=url,
                 headers=self._headers(),
                 data=repo_address.json(),
@@ -469,10 +473,10 @@ class HubClient:
         url = _url(
             url=self.url,
             project=self.project,
-            additional_path=f"/secrets/get/{secret_name}",
+            additional_path=f"/secrets/{secret_name}/get",
         )
         try:
-            resp = requests.get(
+            resp = requests.post(
                 url=url,
                 headers=self._headers(),
                 data=repo_address.json(),
@@ -480,6 +484,8 @@ class HubClient:
             if resp.ok:
                 json_data = resp.json()
                 return Secret.parse_obj(json_data)
+            elif resp.status_code == 404:
+                return None
             elif resp.status_code == 401:
                 print("Unauthorized. Please set correct token")
                 return None
@@ -545,7 +551,7 @@ class HubClient:
         url = _url(
             url=self.url,
             project=self.project,
-            additional_path=f"/secrets/delete/{secret_name}",
+            additional_path=f"/secrets/{secret_name}/delete",
         )
         try:
             resp = requests.post(
@@ -595,7 +601,7 @@ class HubClient:
             additional_path=f"/artifacts/list",
         )
         try:
-            resp = requests.get(
+            resp = requests.post(
                 url=url,
                 headers=self._headers(),
                 data=JobsList(repo_address=repo_address, run_name=run_name).json(),
@@ -648,7 +654,7 @@ class HubClient:
             additional_path=f"/logs/poll",
         )
         try:
-            resp = requests.get(
+            resp = requests.post(
                 url=url,
                 headers=self._headers(),
                 data=PollLogs(
@@ -713,7 +719,7 @@ class HubClient:
             additional_path=f"/link/download",
         )
         try:
-            resp = requests.get(
+            resp = requests.post(
                 url=url,
                 headers=self._headers(),
                 data=LinkUpload(object_key=dest_path).json(),

@@ -20,7 +20,7 @@ async def link_upload(project_name: str, body: LinkUpload):
     return backend.get_signed_upload_url(object_key=body.object_key)
 
 
-@router.get(
+@router.post(
     "/{project_name}/link/download",
     response_model=str,
     response_class=PlainTextResponse,

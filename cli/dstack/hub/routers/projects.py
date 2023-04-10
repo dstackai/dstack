@@ -16,6 +16,7 @@ from dstack.hub.models import (
     ProjectValues,
 )
 from dstack.hub.repository.projects import ProjectManager
+from dstack.hub.routers.cache import clear_backend_cache
 from dstack.hub.routers.util import error_detail, get_project
 from dstack.hub.security.permissions import (
     Authenticated,
@@ -82,6 +83,7 @@ async def delete_projects(body: ProjectDelete, user: User = Depends(Authenticate
         project = await get_project(project_name)
         await ensure_user_project_admin(user, project)
         await ProjectManager.delete(project_name)
+        clear_backend_cache(project_name)
 
 
 @router.post(
@@ -126,6 +128,7 @@ async def update_project(
     except HubConfigError as e:
         _error_response_on_config_error(e, path_to_config=["backend"])
     await ProjectManager.update_project_from_info(project_info)
+    clear_backend_cache(project_info.project_name)
     return project_info
 
 

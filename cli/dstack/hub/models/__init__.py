@@ -126,7 +126,7 @@ class AddTagRun(BaseModel):
     repo_address: RepoAddress
     tag_name: str
     run_name: str
-    run_jobs: List[Job]
+    run_jobs: Optional[List[Job]]
 
 
 class AddTagPath(BaseModel):

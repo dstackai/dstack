@@ -13,7 +13,7 @@ router = APIRouter(
 )
 
 
-@router.get("/{project_name}/artifacts/list")
+@router.post("/{project_name}/artifacts/list")
 async def list_artifacts(project_name: str, body: ArtifactsList) -> List[Artifact]:
     project = await get_project(project_name=project_name)
     backend = get_backend(project)

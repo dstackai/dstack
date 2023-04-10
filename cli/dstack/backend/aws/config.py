@@ -149,9 +149,7 @@ class AWSConfigurator(Configurator):
     NAME = "aws"
     config: AWSConfig
 
-    def get_config(
-        self, config_data: Dict, auth_data: Optional[Dict] = None
-    ) -> Optional[BackendConfig]:
+    def get_config_from_hub_config_data(self, config_data: Dict, auth_data: Dict) -> BackendConfig:
         return AWSConfig.deserialize(config_data, auth_data)
 
     def register_parser(self, parser):
