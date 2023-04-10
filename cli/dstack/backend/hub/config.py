@@ -56,7 +56,7 @@ class HUBConfig(BackendConfig):
 class HubConfigurator(Configurator):
     NAME = "hub"
 
-    def get_config(self, config_data: Any, auth_data: Optional[Dict] = None):
+    def get_config_from_hub_config_data(self, config_data: Any, auth_data: Dict) -> BackendConfig:
         pass
 
     def get_backend_client(self, config: Any):

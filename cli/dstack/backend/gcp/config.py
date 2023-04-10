@@ -144,24 +144,19 @@ class GCPConfig(BackendConfig):
         return yaml.dump(self.serialize())
 
     @classmethod
-    def deserialize(
-        cls, config_data: Dict, auth_data: Optional[Dict] = None
-    ) -> Optional["GCPConfig"]:
-        if config_data.get("type") != "gcp":
+    def deserialize(cls, config_data: Dict) -> Optional["GCPConfig"]:
+        if config_data.get("backend") != "gcp":
             raise ConfigError(f"Not a GCP config")
-
         try:
-            credentials = json.loads(auth_data.get("credentials")) if auth_data else None
-            project_id = config_data.get("project") or credentials["project_id"]
+            project_id = config_data["project"]
             region = config_data["region"]
             zone = config_data["zone"]
-            bucket_name = config_data["bucket_name"]
+            bucket_name = config_data["bucket"]
             vpc = config_data["vpc"]
             subnet = config_data["subnet"]
         except KeyError:
             raise ConfigError("Cannot load config")
 
-        credentials_file = config_data.get("credentials_file")
         return cls(
             project_id=project_id,
             region=region,
@@ -169,8 +164,8 @@ class GCPConfig(BackendConfig):
             bucket_name=bucket_name,
             vpc=vpc,
             subnet=subnet,
-            credentials_file=credentials_file,
-            credentials=credentials,
+            credentials_file=config_data.get("credentials_file"),
+            credentials=config_data.get("credentials"),
         )
 
     @classmethod
@@ -197,8 +192,19 @@ class GCPConfigurator(Configurator):
     def name(self):
         return "gcp"
 
-    def get_config(self, config_data: Dict, auth_data: Optional[Dict] = None) -> BackendConfig:
-        return GCPConfig.deserialize(config_data, auth_data)
+    def get_config_from_hub_config_data(self, config_data: Dict, auth_data: Dict) -> BackendConfig:
+        credentials = json.loads(auth_data["credentials"])
+        data = {
+            "backend": "gcp",
+            "credentials": credentials,
+            "project": credentials["project_id"],
+            "region": config_data["region"],
+            "zone": config_data["zone"],
+            "bucket": config_data["bucket_name"],
+            "vpc": config_data["vpc"],
+            "subnet": config_data["subnet"],
+        }
+        return GCPConfig.deserialize(data)
 
     def register_parser(self, parser):
         gcp_parser = parser.add_parser("gcp", help="", formatter_class=RichHelpFormatter)

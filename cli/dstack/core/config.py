@@ -41,7 +41,7 @@ class Configurator(ABC):
         pass
 
     @abstractmethod
-    def get_config(self, config_data: Dict, auth_data: Optional[Dict] = None) -> BackendConfig:
+    def get_config_from_hub_config_data(self, config_data: Dict, auth_data: Dict) -> BackendConfig:
         pass
 
     @abstractmethod
