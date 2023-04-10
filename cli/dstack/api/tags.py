@@ -1,15 +1,14 @@
 from collections import defaultdict
-from typing import List, Optional, Tuple, Union
+from typing import List, Tuple
 
 from dstack.backend.base import Backend
-from dstack.core.repo import RepoAddress
 from dstack.core.tag import TagHead
 
 
 def list_tag_heads_with_merged_backends(
-    backends: List[Backend], repo_address: RepoAddress
+    backends: List[Backend],
 ) -> List[Tuple[TagHead, List[Backend]]]:
-    tags = list_tag_heads(backends, repo_address)
+    tags = list_tag_heads(backends)
     tag_run_name_to_tag_map = {(t.tag_name, t.run_name): t for t, _ in tags}
 
     tag_run_name_to_backends_map = defaultdict(list)
@@ -27,10 +26,8 @@ def list_tag_heads_with_merged_backends(
     return tag_heads_with_merged_backends
 
 
-def list_tag_heads(
-    backends: List[Backend], repo_address: RepoAddress
-) -> List[Tuple[TagHead, Backend]]:
+def list_tag_heads(backends: List[Backend]) -> List[Tuple[TagHead, Backend]]:
     tags = []
     for backend in backends:
-        tags += [(t, backend) for t in backend.list_tag_heads(repo_address)]
+        tags += [(t, backend) for t in backend.list_tag_heads()]
     return list(sorted(tags, key=lambda t: -t[0].created_at))

@@ -19,7 +19,7 @@ POLL_LOGS_RATE_SECS = 1
 def render_log_message(
     storage: Storage,
     event: Dict[str, Any],
-    repo_address: RepoAddress,
+    repo_name: str,
     jobs_cache: Dict[str, Job],
 ) -> LogEvent:
     if isinstance(event, str):
@@ -31,7 +31,7 @@ def render_log_message(
     log = message["log"]
     job = jobs_cache.get(job_id)
     if job is None:
-        job = jobs.get_job(storage, repo_address, job_id)
+        job = jobs.get_job(storage, repo_name, job_id)
         jobs_cache[job_id] = job
     log = fix_urls(log.encode(), job, {}).decode()
     return LogEvent(

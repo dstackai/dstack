@@ -16,7 +16,7 @@ router = APIRouter(prefix="/api/project", tags=["link"], dependencies=[Depends(P
 )
 async def link_upload(project_name: str, body: LinkUpload):
     project = await get_project(project_name=project_name)
-    backend = get_backend(project)
+    backend = get_backend(project, repo=None)
     return backend.get_signed_upload_url(object_key=body.object_key)
 
 
@@ -27,5 +27,5 @@ async def link_upload(project_name: str, body: LinkUpload):
 )
 async def link_upload(project_name: str, body: LinkUpload):
     project = await get_project(project_name=project_name)
-    backend = get_backend(project)
+    backend = get_backend(project, repo=None)
     return backend.get_signed_download_url(object_key=body.object_key)

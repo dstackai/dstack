@@ -3,8 +3,9 @@ from argparse import Namespace
 
 from dstack.api.backend import list_backends
 from dstack.api.logs import poll_logs
-from dstack.api.repo import load_repo_data
+from dstack.api.repo import get_repo
 from dstack.cli.commands import BasicCommand
+from dstack.cli.config import config
 from dstack.core.error import check_config, check_git
 from dstack.utils.common import since
 
@@ -41,14 +42,14 @@ class LogCommand(BasicCommand):
     @check_config
     @check_git
     def _command(self, args: Namespace):
-        repo_data = load_repo_data()
+        repo = get_repo(config.repo_user_config)
         anyone = False
-        for backend in list_backends():
+        for backend in list_backends(repo):
             start_time = since(args.since)
-            job_heads = backend.list_job_heads(repo_data, args.run_name)
+            job_heads = backend.list_job_heads(args.run_name)
             if job_heads:
                 anyone = True
-                poll_logs(backend, repo_data, job_heads, start_time, args.attach)
+                poll_logs(backend, job_heads, start_time, args.attach)
 
         if not anyone:
             sys.exit(f"Cannot find the run '{args.run_name}'")

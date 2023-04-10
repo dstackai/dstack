@@ -30,14 +30,16 @@ type Job struct {
 	Deps         []Dep             `yaml:"deps"`
 	ProviderName string            `yaml:"provider_name"`
 
-	RepoHostName       string `yaml:"repo_host_name"`
-	RepoPort           int    `yaml:"repo_port,omitempty"`
-	RepoBranch         string `yaml:"repo_branch"`
+	RepoName           string `yaml:"repo_name"`
+	RepoUsername       string `yaml:"repo_username"`
+	GitHostName        string `yaml:"git_host_name"`
+	GitPort            int    `yaml:"git_port,omitempty"`
+	GitBranch          string `yaml:"git_branch"`
 	RepoDiff           string `yaml:"repo_diff"`
 	RepoDiffFilename   string `yaml:"repo_diff_filename,omitempty"`
-	RepoHash           string `yaml:"repo_hash"`
-	RepoName           string `yaml:"repo_name"`
-	RepoUserName       string `yaml:"repo_user_name"`
+	GitHash            string `yaml:"git_hash"`
+	GitName            string `yaml:"git_name"`
+	GitUserName        string `yaml:"git_user_name"`
 	LocalRepoUserName  string `yaml:"local_repo_user_name,omitempty"`
 	LocalRepoUserEmail string `yaml:"local_repo_user_email,omitempty"`
 
@@ -56,12 +58,9 @@ type Job struct {
 }
 
 type Dep struct {
-	RepoHostName string `yaml:"repo_host_name,omitempty"`
-	RepoPort     int    `yaml:"repo_port,omitempty"`
-	RepoUserName string `yaml:"repo_user_name,omitempty"`
-	RepoName     string `yaml:"repo_name,omitempty"`
-	RunName      string `yaml:"run_name,omitempty"`
-	Mount        bool   `yaml:"mount,omitempty"`
+	RepoName string `yaml:"repo_name,omitempty"`
+	RunName  string `yaml:"run_name,omitempty"`
+	Mount    bool   `yaml:"mount,omitempty"`
 }
 
 type Artifact struct {
@@ -109,38 +108,24 @@ type GitCredentials struct {
 	Passphrase *string `json:"passphrase,omitempty"`
 }
 
-type RepoData struct {
-	RepoHost     string
-	RepoUserName string
-	RepoName     string
-}
-
 type RegistryAuth struct {
 	Username string `yaml:"username,omitempty"`
 	Password string `yaml:"password,omitempty"`
 }
 
 func (j *Job) RepoHostNameWithPort() string {
-	if j.RepoPort == 0 {
-		return j.RepoHostName
+	if j.GitPort == 0 {
+		return j.GitHostName
 	}
-	return fmt.Sprintf("%s:%d", j.RepoHostName, j.RepoPort)
-}
-
-func (j *Job) JobRepoData() *RepoData {
-	return &RepoData{
-		RepoHost:     j.RepoHostNameWithPort(),
-		RepoUserName: j.RepoUserName,
-		RepoName:     j.RepoName,
-	}
+	return fmt.Sprintf("%s:%d", j.GitHostName, j.GitPort)
 }
 
 func (j *Job) JobFilepath() string {
-	return fmt.Sprintf("jobs/%s/%s/%s/%s.yaml", j.RepoHostNameWithPort(), j.RepoUserName, j.RepoName, j.JobID)
+	return fmt.Sprintf("jobs/%s/%s.yaml", j.RepoName, j.JobID)
 }
 
 func (j *Job) JobHeadFilepathPrefix() string {
-	return fmt.Sprintf("jobs/%s/%s/%s/l;%s;", j.RepoHostNameWithPort(), j.RepoUserName, j.RepoName, j.JobID)
+	return fmt.Sprintf("jobs/%s/l;%s;", j.RepoName, j.JobID)
 }
 
 func (j *Job) JobHeadFilepath() string {
@@ -153,13 +138,11 @@ func (j *Job) JobHeadFilepath() string {
 		artifactSlice = append(artifactSlice, art.Path)
 	}
 	return fmt.Sprintf(
-		"jobs/%s/%s/%s/l;%s;%s;%s;%d;%s;%s;%s;%s",
-		j.RepoHostNameWithPort(),
-		j.RepoUserName,
+		"jobs/%s/l;%s;%s;%s;%d;%s;%s;%s;%s",
 		j.RepoName,
 		j.JobID,
 		j.ProviderName,
-		j.LocalRepoUserName,
+		j.RepoUsername,
 		j.SubmittedAt,
 		j.Status,
 		strings.Join(artifactSlice, ","),
@@ -168,17 +151,6 @@ func (j *Job) JobHeadFilepath() string {
 	)
 }
 
-func (d *Dep) RepoHostNameWithPort() string {
-	if d.RepoPort == 0 {
-		return d.RepoHostName
-	}
-	return fmt.Sprintf("%s:%d", d.RepoHostName, d.RepoPort)
-}
-
-func (rd *RepoData) RepoDataPath(sep string) string {
-	return strings.Join([]string{rd.RepoHost, rd.RepoUserName, rd.RepoName}, sep)
-}
-
-func (rd *RepoData) SecretsPrefix() string {
-	return fmt.Sprintf("secrets/%s/%s/%s/l;", rd.RepoHost, rd.RepoUserName, rd.RepoName)
+func (j *Job) SecretsPrefix() string {
+	return fmt.Sprintf("secrets/%s/l;", j.RepoName)
 }

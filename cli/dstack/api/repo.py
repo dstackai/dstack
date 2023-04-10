@@ -4,10 +4,12 @@ from typing import Optional
 
 import giturlparse
 import yaml
+from git import InvalidGitRepositoryError
 from git import Repo as GitRepo
 from paramiko.config import SSHConfig
 
-from dstack.core.repo import LocalRepoData, RepoProtocol
+from dstack.core.repo import LocalRepoData, Repo, RepoProtocol
+from dstack.core.userconfig import RepoUserConfig
 
 
 def load_repo_data(
@@ -71,3 +73,12 @@ def load_repo_data(
         local_repo_user_name=local_repo_user_name,
         local_repo_user_email=local_repo_user_email,
     )
+
+
+def get_repo(repo_user_config: RepoUserConfig) -> Repo:
+    repo = Repo(name=repo_user_config.repo_name, username=repo_user_config.username)
+    try:
+        repo.data = load_repo_data()
+    except InvalidGitRepositoryError:
+        pass
+    return repo

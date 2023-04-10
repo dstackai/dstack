@@ -2,42 +2,44 @@ from abc import ABC, abstractmethod
 from typing import List, Optional
 
 from dstack.backend.base.storage import Storage
-from dstack.core.repo import RepoAddress
 from dstack.core.secret import Secret
 
 
 class SecretsManager(ABC):
+    def __init__(self, repo_name: str):
+        self.repo_name = repo_name
+
     @abstractmethod
-    def get_secret(self, repo_address: RepoAddress, secret_name: str) -> Optional[Secret]:
+    def get_secret(self, secret_name: str) -> Optional[Secret]:
         pass
 
     @abstractmethod
-    def add_secret(self, repo_address: RepoAddress, secret: Secret):
+    def add_secret(self, secret: Secret):
         pass
 
     @abstractmethod
-    def update_secret(self, repo_address: RepoAddress, secret: Secret):
+    def update_secret(self, secret: Secret):
         pass
 
     @abstractmethod
-    def delete_secret(self, repo_address: RepoAddress, secret_name: str):
+    def delete_secret(self, secret_name: str):
         pass
 
     @abstractmethod
-    def get_credentials(self, repo_address: RepoAddress) -> Optional[str]:
+    def get_credentials(self) -> Optional[str]:
         pass
 
     @abstractmethod
-    def add_credentials(self, repo_address: RepoAddress, data: str):
+    def add_credentials(self, data: str):
         pass
 
     @abstractmethod
-    def update_credentials(self, repo_address: RepoAddress, data: str):
+    def update_credentials(self, data: str):
         pass
 
 
-def list_secret_names(storage: Storage, repo_address: RepoAddress) -> List[str]:
-    secret_head_prefix = _get_secret_heads_keys_prefix(repo_address)
+def list_secret_names(storage: Storage, repo_name: str) -> List[str]:
+    secret_head_prefix = _get_secret_heads_keys_prefix(repo_name)
     secret_heads_keys = storage.list_objects(secret_head_prefix)
     secret_names = []
     for secret_head_key in secret_heads_keys:
@@ -48,21 +50,19 @@ def list_secret_names(storage: Storage, repo_address: RepoAddress) -> List[str]:
 
 def get_secret(
     secrets_manager: SecretsManager,
-    repo_address: RepoAddress,
     secret_name: str,
 ) -> Optional[Secret]:
-    return secrets_manager.get_secret(repo_address, secret_name)
+    return secrets_manager.get_secret(secret_name)
 
 
 def add_secret(
     storage: Storage,
     secrets_manager: SecretsManager,
-    repo_address: RepoAddress,
     secret: Secret,
 ):
-    secrets_manager.add_secret(repo_address, secret)
+    secrets_manager.add_secret(secret)
     storage.put_object(
-        key=_get_secret_head_key(repo_address, secret.secret_name),
+        key=_get_secret_head_key(secrets_manager.repo_name, secret.secret_name),
         content="",
     )
 
@@ -70,12 +70,11 @@ def add_secret(
 def update_secret(
     storage: Storage,
     secrets_manager: SecretsManager,
-    repo_address: RepoAddress,
     secret: Secret,
 ):
-    secrets_manager.update_secret(repo_address, secret)
+    secrets_manager.update_secret(secret)
     storage.put_object(
-        key=_get_secret_head_key(repo_address, secret.secret_name),
+        key=_get_secret_head_key(secrets_manager.repo_name, secret.secret_name),
         content="",
     )
 
@@ -83,24 +82,23 @@ def update_secret(
 def delete_secret(
     storage: Storage,
     secrets_manager: SecretsManager,
-    repo_address: RepoAddress,
     secret_name: str,
 ):
-    secrets_manager.delete_secret(repo_address, secret_name)
-    storage.delete_object(_get_secret_head_key(repo_address, secret_name))
+    secrets_manager.delete_secret(secret_name)
+    storage.delete_object(_get_secret_head_key(secrets_manager.repo_name, secret_name))
 
 
-def _get_secret_heads_dir(repo_address: RepoAddress) -> str:
-    return f"secrets/{repo_address.path()}/"
+def _get_secret_heads_dir(repo_name: str) -> str:
+    return f"secrets/{repo_name}/"
 
 
-def _get_secret_heads_keys_prefix(repo_address: RepoAddress) -> str:
-    prefix = _get_secret_heads_dir(repo_address)
+def _get_secret_heads_keys_prefix(repo_name: str) -> str:
+    prefix = _get_secret_heads_dir(repo_name)
     key = f"{prefix}l;"
     return key
 
 
-def _get_secret_head_key(repo_address: RepoAddress, secret_name: str) -> str:
-    prefix = _get_secret_heads_dir(repo_address)
+def _get_secret_head_key(repo_name: str, secret_name: str) -> str:
+    prefix = _get_secret_heads_dir(repo_name)
     key = f"{prefix}l;{secret_name}"
     return key

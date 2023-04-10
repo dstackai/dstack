@@ -4,9 +4,11 @@ from argparse import Namespace
 from rich.live import Live
 
 from dstack.api.backend import list_backends
+from dstack.api.repo import get_repo
 from dstack.api.run import list_runs_with_merged_backends
 from dstack.cli.commands import BasicCommand
 from dstack.cli.common import generate_runs_table, print_runs
+from dstack.cli.config import config
 from dstack.core.error import check_config, check_git
 
 LIVE_PROVISION_INTERVAL_SECS = 2
@@ -42,7 +44,9 @@ class PSCommand(BasicCommand):
     @check_config
     @check_git
     def _command(self, args: Namespace):
-        list_runs = list_runs_with_merged_backends(list_backends(), args.run_name, args.all)
+        repo = get_repo(config.repo_user_config)
+        backends = list_backends(repo)
+        list_runs = list_runs_with_merged_backends(backends, args.run_name, args.all)
         if args.watch:
             try:
                 with Live(
@@ -51,7 +55,7 @@ class PSCommand(BasicCommand):
                     while True:
                         time.sleep(LIVE_PROVISION_INTERVAL_SECS)
                         list_runs = list_runs_with_merged_backends(
-                            list_backends(), args.run_name, args.all
+                            backends, args.run_name, args.all
                         )
                         live.update(generate_runs_table(list_runs))
             except KeyboardInterrupt:

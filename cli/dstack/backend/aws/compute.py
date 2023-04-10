@@ -1,11 +1,11 @@
-from typing import Optional, Tuple
+from typing import Optional
 
 from botocore.client import BaseClient
 
 from dstack.backend.aws import runners
 from dstack.backend.base.compute import Compute
 from dstack.core.instance import InstanceType
-from dstack.core.job import Job, Requirements
+from dstack.core.job import Job
 from dstack.core.request import RequestHead
 
 
@@ -48,7 +48,7 @@ class AWSCompute(Compute):
             instance_type=instance_type,
             local_repo_user_name=job.local_repo_user_name,
             local_repo_user_email=job.local_repo_user_email,
-            repo_address=job.repo_address,
+            repo_address=job.repo.data,
             ssh_key_pub=job.ssh_key_pub,
         )
 

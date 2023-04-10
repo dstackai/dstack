@@ -1,64 +1,68 @@
-from typing import List, Optional
+from typing import Optional
 
 from google.api_core import exceptions
 from google.cloud import secretmanager
 from google.oauth2 import service_account
 
 from dstack.backend.base.secrets import SecretsManager
-from dstack.core.repo import RepoAddress
 from dstack.core.secret import Secret
 
 
 class GCPSecretsManager(SecretsManager):
     def __init__(
-        self, project_id: str, bucket_name: str, credentials: Optional[service_account.Credentials]
+        self,
+        project_id: str,
+        bucket_name: str,
+        credentials: Optional[service_account.Credentials],
+        repo_name: str,
     ):
+        super().__init__(repo_name=repo_name)
         self.project_id = project_id
         self.bucket_name = bucket_name
         self.secrets_client = secretmanager.SecretManagerServiceClient(credentials=credentials)
 
-    def get_secret(self, repo_address: RepoAddress, secret_name: str) -> Optional[Secret]:
+    def get_secret(self, secret_name: str) -> Optional[Secret]:
         secret_value = self._get_secret_value(
-            _get_secret_key(self.bucket_name, repo_address, secret_name)
+            _get_secret_key(self.bucket_name, self.repo_name, secret_name)
         )
         if secret_value is None:
             return None
         return Secret(secret_name=secret_name, secret_value=secret_value)
 
-    def add_secret(self, repo_address: RepoAddress, secret: Secret):
-        secret_key = _get_secret_key(self.bucket_name, repo_address, secret.secret_name)
+    def add_secret(self, secret: Secret):
+        secret_key = _get_secret_key(self.bucket_name, self.repo_name, secret.secret_name)
         self._create_secret(secret_key)
         self._add_secret_version(
             secret_key=secret_key,
             secret_value=secret.secret_value,
         )
 
-    def update_secret(self, repo_address: RepoAddress, secret: Secret):
+    def update_secret(self, secret: Secret):
         self._add_secret_version(
-            secret_key=_get_secret_key(self.bucket_name, repo_address, secret.secret_name),
+            secret_key=_get_secret_key(self.bucket_name, self.repo_name, secret.secret_name),
             secret_value=secret.secret_value,
         )
 
-    def delete_secret(self, repo_address: RepoAddress, secret_name: str):
+    def delete_secret(self, secret_name: str):
         secret_resource = _get_secret_resource(
-            self.project_id, _get_secret_key(self.bucket_name, repo_address, secret_name)
+            self.project_id, _get_secret_key(self.bucket_name, self.repo_name, secret_name)
         )
         self.secrets_client.delete_secret(request={"name": secret_resource})
 
-    def get_credentials(self, repo_address: RepoAddress) -> Optional[str]:
-        return self._get_secret_value(_get_credentials_key(self.bucket_name, repo_address))
+    def get_credentials(self) -> Optional[str]:
+        return self._get_secret_value(_get_credentials_key(self.bucket_name, self.repo_name))
 
-    def add_credentials(self, repo_address: RepoAddress, data: str):
-        credentails_key = _get_credentials_key(self.bucket_name, repo_address)
+    def add_credentials(self, data: str):
+        credentails_key = _get_credentials_key(self.bucket_name, self.repo_name)
         self._create_secret(credentails_key)
         self._add_secret_version(
             secret_key=credentails_key,
             secret_value=data,
         )
 
-    def update_credentials(self, repo_address: RepoAddress, data: str):
+    def update_credentials(self, data: str):
         self._add_secret_version(
-            secret_key=_get_credentials_key(self.bucket_name, repo_address),
+            secret_key=_get_credentials_key(self.bucket_name, self.repo_name),
             secret_value=data,
         )
 
@@ -68,7 +72,7 @@ class GCPSecretsManager(SecretsManager):
             response = self.secrets_client.access_secret_version(name=secret_version_resource)
         except exceptions.NotFound:
             return None
-        return response.payload.data
+        return response.payload.data.decode()
 
     def _create_secret(self, secret_key: str):
         try:
@@ -100,13 +104,13 @@ def _get_secret_version_resource(project_id: str, secret_key: str) -> str:
     return f"{secret_resource}/versions/latest"
 
 
-def _get_secret_key(bucket_name: str, repo_address: RepoAddress, secret_name: str) -> str:
-    key = f"dstack-secrets-{bucket_name}-{repo_address.path(delimiter='-')}-{secret_name}"
+def _get_secret_key(bucket_name: str, repo_name: str, secret_name: str) -> str:
+    key = f"dstack-secrets-{bucket_name}-{repo_name}-{secret_name}"
     key = key.replace(".", "-")
     return key
 
 
-def _get_credentials_key(bucket_name: str, repo_address: RepoAddress) -> str:
-    key = f"dstack-credentials-{bucket_name}-{repo_address.path(delimiter='-')}"
+def _get_credentials_key(bucket_name: str, repo_name: str) -> str:
+    key = f"dstack-credentials-{bucket_name}-{repo_name}"
     key = key.replace(".", "-")
     return key

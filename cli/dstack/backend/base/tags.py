@@ -7,13 +7,13 @@ from dstack.backend.base.storage import Storage
 from dstack.core.artifact import ArtifactHead, ArtifactSpec
 from dstack.core.error import BackendError
 from dstack.core.job import Job, JobStatus
-from dstack.core.repo import LocalRepoData, RepoAddress
+from dstack.core.repo import Repo
 from dstack.core.tag import TagHead
 from dstack.utils.common import get_milliseconds_since_epoch
 
 
-def get_tag_head(storage: Storage, repo_address: RepoAddress, tag_name: str) -> Optional[TagHead]:
-    tag_head_key_prefix = _get_tag_head_filename_prefix(repo_address, tag_name)
+def get_tag_head(storage: Storage, repo_name: str, tag_name: str) -> Optional[TagHead]:
+    tag_head_key_prefix = _get_tag_head_filename_prefix(repo_name, tag_name)
     tag_head_keys = storage.list_objects(keys_prefix=tag_head_key_prefix)
     if len(tag_head_keys) == 0:
         return None
@@ -28,7 +28,7 @@ def get_tag_head(storage: Storage, repo_address: RepoAddress, tag_name: str) -> 
             artifact_heads,
         ) = tuple(t)
         return TagHead(
-            repo_address=repo_address,
+            repo_name=repo_name,
             tag_name=tag_name,
             run_name=run_name,
             workflow_name=workflow_name or None,
@@ -39,8 +39,8 @@ def get_tag_head(storage: Storage, repo_address: RepoAddress, tag_name: str) -> 
         )
 
 
-def list_tag_heads(storage: Storage, repo_address: RepoAddress):
-    tag_heads_keys_prefix = _get_tag_heads_filenames_prefix(repo_address)
+def list_tag_heads(storage: Storage, repo_name: str):
+    tag_heads_keys_prefix = _get_tag_heads_filenames_prefix(repo_name)
     tag_heads_keys = storage.list_objects(tag_heads_keys_prefix)
     tag_heads = []
     for tag_head_key in tag_heads_keys:
@@ -57,7 +57,7 @@ def list_tag_heads(storage: Storage, repo_address: RepoAddress):
             ) = tuple(t)
             tag_heads.append(
                 TagHead(
-                    repo_address=repo_address,
+                    repo_name=repo_name,
                     tag_name=tag_name,
                     run_name=run_name,
                     workflow_name=workflow_name or None,
@@ -72,13 +72,13 @@ def list_tag_heads(storage: Storage, repo_address: RepoAddress):
 
 def delete_tag(
     storage: Storage,
-    repo_address: RepoAddress,
+    repo: Repo,
     tag_head: TagHead,
 ):
     tag_jobs = []
-    job_heads = jobs.list_job_heads(storage, repo_address, tag_head.run_name)
+    job_heads = jobs.list_job_heads(storage, repo, tag_head.run_name)
     for job_head in job_heads:
-        job = jobs.get_job(storage, repo_address, job_head.job_id)
+        job = jobs.get_job(storage, repo.name, job_head.job_id)
         if job is not None:
             tag_jobs.append(job)
     storage.delete_object(_get_tag_head_key(tag_head))
@@ -89,7 +89,7 @@ def delete_tag(
 
 def create_tag_from_run(
     storage: Storage,
-    repo_address: RepoAddress,
+    repo: Repo,
     tag_name: str,
     run_name: str,
     run_jobs: Optional[List[Job]],
@@ -99,9 +99,9 @@ def create_tag_from_run(
     else:
         tag_jobs = []
         job_with_anther_tag = None
-        job_heads = jobs.list_job_heads(storage, repo_address, run_name)
+        job_heads = jobs.list_job_heads(storage, repo, run_name)
         for job_head in job_heads:
-            job = jobs.get_job(storage, repo_address, job_head.job_id)
+            job = jobs.get_job(storage, repo.name, job_head.job_id)
             if job:
                 tag_jobs.append(job)
                 if job.tag_name and job.tag_name != tag_name:
@@ -115,7 +115,7 @@ def create_tag_from_run(
             exit(f"Cannot find the run '{run_name}'")
 
     tag_head = TagHead(
-        repo_address=repo_address,
+        repo_name=repo.name,
         tag_name=tag_name,
         run_name=run_name,
         workflow_name=tag_jobs[0].workflow_name,
@@ -139,7 +139,7 @@ def create_tag_from_run(
 
 def create_tag_from_local_dirs(
     storage: Storage,
-    repo_data: LocalRepoData,
+    repo: Repo,
     tag_name: str,
     local_dirs: List[str],
     backend_type: BackendType,
@@ -154,15 +154,15 @@ def create_tag_from_local_dirs(
         else:
             exit(f"The '{local_dir}' path doesn't refer to an existing directory")
 
-    run_name = runs.create_run(storage, repo_data, backend_type)
+    run_name = runs.create_run(storage, backend_type)
     job = Job(
         job_id=f"{run_name},,0",
-        repo_data=repo_data,
+        repo=repo,
         run_name=run_name,
         workflow_name=None,
         provider_name="bash",
-        local_repo_user_name=repo_data.local_repo_user_name,
-        local_repo_user_email=repo_data.local_repo_user_email,
+        local_repo_user_name=repo.data.local_repo_user_name,
+        local_repo_user_email=repo.data.local_repo_user_email,
         status=JobStatus.DONE,
         submitted_at=get_milliseconds_since_epoch(),
         image_name="scratch",
@@ -170,6 +170,7 @@ def create_tag_from_local_dirs(
         env=None,
         working_dir=None,
         artifact_specs=[ArtifactSpec(artifact_path=a, mount=False) for a in tag_artifacts],
+        cache_specs=[],
         port_count=None,
         ports=None,
         host_name=None,
@@ -185,14 +186,14 @@ def create_tag_from_local_dirs(
     for index, local_path in enumerate(local_paths):
         artifacts.upload_job_artifact_files(
             storage,
-            repo_data,
+            repo.name,
             job.job_id,
             tag_artifacts[index],
             tag_artifacts[index],
             local_path,
         )
     tag_head = TagHead(
-        repo_address=repo_data,
+        repo_name=repo.name,
         tag_name=tag_name,
         run_name=run_name,
         workflow_name=job.workflow_name,
@@ -210,24 +211,24 @@ def create_tag_from_local_dirs(
     storage.put_object(key=tag_head_key, content="")
 
 
-def _get_tags_dir(repo_address: RepoAddress) -> str:
-    return f"tags/{repo_address.path()}/"
+def _get_tags_dir(repo_name: str) -> str:
+    return f"tags/{repo_name}/"
 
 
-def _get_tag_head_filename_prefix(repo_address: RepoAddress, tag_name: str) -> str:
-    prefix = _get_tags_dir(repo_address)
+def _get_tag_head_filename_prefix(repo_name: str, tag_name: str) -> str:
+    prefix = _get_tags_dir(repo_name)
     key = f"{prefix}l;{tag_name};"
     return key
 
 
-def _get_tag_heads_filenames_prefix(repo_address: RepoAddress) -> str:
-    prefix = _get_tags_dir(repo_address)
+def _get_tag_heads_filenames_prefix(repo_name: str) -> str:
+    prefix = _get_tags_dir(repo_name)
     key = f"{prefix}l;"
     return key
 
 
 def _get_tag_head_key(tag_head: TagHead) -> str:
-    prefix = f"tags/{tag_head.repo_address.path()}"
+    prefix = f"tags/{tag_head.repo_name}"
     key = (
         f"{prefix}/l;{tag_head.tag_name};"
         f"{tag_head.run_name};"

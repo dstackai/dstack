@@ -5,8 +5,9 @@ from rich import print
 from rich.prompt import Confirm
 
 from dstack.api.backend import list_backends
-from dstack.api.repo import load_repo_data
+from dstack.api.repo import get_repo
 from dstack.cli.commands import BasicCommand
+from dstack.cli.config import config
 from dstack.core.error import check_config, check_git
 
 
@@ -39,10 +40,10 @@ class RMCommand(BasicCommand):
             args.run_name
             and (args.yes or Confirm.ask(f"[red]Delete the run '{args.run_name}'?[/]"))
         ) or (args.all and (args.yes or Confirm.ask("[red]Delete all runs?[/]"))):
-            repo_data = load_repo_data()
+            repo = get_repo(config.repo_user_config)
             deleted_run = False
-            for backend in list_backends():
-                job_heads = backend.list_job_heads(repo_data, args.run_name)
+            for backend in list_backends(repo):
+                job_heads = backend.list_job_heads(args.run_name)
                 if job_heads:
                     finished_job_heads = []
                     for job_head in job_heads:
@@ -51,7 +52,7 @@ class RMCommand(BasicCommand):
                         elif args.run_name:
                             sys.exit("The run is not finished yet. Stop the run first.")
                     for job_head in finished_job_heads:
-                        backend.delete_job_head(repo_data, job_head.job_id)
+                        backend.delete_job_head(job_head.job_id)
                         deleted_run = True
             if args.run_name and not deleted_run:
                 sys.exit(f"Cannot find the run '{args.run_name}'")

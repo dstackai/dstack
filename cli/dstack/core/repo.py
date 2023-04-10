@@ -1,28 +1,20 @@
 from enum import Enum
-from typing import Any, Optional, Union
+from typing import Optional, Union
 
 import git
-from pydantic import BaseModel
+from pydantic import BaseModel, validator
 
-from dstack.utils.common import _quoted, _quoted_masked
+
+class RepoProtocol(Enum):
+    SSH = "ssh"
+    HTTPS = "https"
 
 
 class RepoAddress(BaseModel):
     repo_host_name: str
-    repo_port: Union[int, None]
+    repo_port: Optional[int]
     repo_user_name: str
     repo_name: str
-
-    def __init__(self, **data: Any) -> None:
-        super().__init__(**data)
-
-    def __str__(self) -> str:
-        return (
-            f'RepoAddress(repo_host_name="{self.repo_host_name}", '
-            f'repo_port={_quoted(self.repo_port)}", '
-            f'repo_user_name="{self.repo_user_name}", '
-            f'repo_name="{self.repo_name}")'
-        )
 
     def path(self, delimiter: str = "/"):
         return (
@@ -33,86 +25,28 @@ class RepoAddress(BaseModel):
 
 
 class RepoHead(RepoAddress):
-    last_run_at: Union[int, None]
+    last_run_at: Optional[int]
     tags_count: int
-
-    def __init__(self, **data: Any) -> None:
-        super().__init__(**data)
-
-    def __str__(self) -> str:
-        return (
-            f'RepoHead(repo_host_name="{self.repo_host_name}", '
-            f'repo_port={_quoted(self.repo_port)}", '
-            f'repo_user_name="{self.repo_user_name}", '
-            f'repo_name="{self.repo_name}", '
-            f'last_run_at="{self.last_run_at}", '
-            f'tags_count="{self.tags_count}")'
-        )
-
-
-class RepoProtocol(Enum):
-    SSH = "ssh"
-    HTTPS = "https"
 
 
 class RepoCredentials(BaseModel):
     protocol: RepoProtocol
-    private_key: Union[str, None]
-    oauth_token: Union[str, None]
-
-    def __str__(self) -> str:
-        return (
-            f"RepoCredentials(protocol=RepoProtocol.{self.protocol.name}, "
-            f"private_key_length={len(self.private_key) if self.private_key else None}, "
-            f"oauth_token={_quoted_masked(self.oauth_token)})"
-        )
+    private_key: Optional[str]
+    oauth_token: Optional[str]
 
 
 class RepoData(RepoAddress):
     repo_branch: Optional[str]
     repo_hash: Optional[str]
-    repo_diff: Union[str, None]
-
-    def __init__(self, **data: Any) -> None:
-        super().__init__(**data)
-
-    def __str__(self) -> str:
-        return (
-            f'RepoData(repo_host_name="{self.repo_host_name}", '
-            f'repo_port={_quoted(self.repo_port)}", '
-            f'repo_user_name="{self.repo_user_name}", '
-            f'repo_name="{self.repo_name}", '
-            f'repo_branch="{_quoted(self.repo_branch)}", '
-            f'repo_hash="{_quoted(self.repo_hash)}", '
-            f"repo_diff_length={len(self.repo_diff) if self.repo_diff else None})"
-        )
+    repo_diff: Optional[str]
 
 
 class LocalRepoData(RepoData):
     protocol: RepoProtocol
-    identity_file: Union[str, None]
-    oauth_token: Union[str, None]
-    local_repo_user_name: Union[str, None]
-    local_repo_user_email: Union[str, None]
-
-    def __init__(self, **data: Any) -> None:
-        super().__init__(**data)
-
-    def __str__(self) -> str:
-        return (
-            f'LocalRepoData(repo_host_name="{self.repo_host_name}", '
-            f'repo_port={_quoted(self.repo_port)}", '
-            f'repo_user_name="{self.repo_user_name}", '
-            f'repo_name="{self.repo_name}", '
-            f'repo_branch="{_quoted(self.repo_branch)}", '
-            f'repo_hash="{_quoted(self.repo_hash)}", '
-            f"repo_diff_length={len(self.repo_diff) if self.repo_diff else None}, "
-            f"protocol=RepoProtocol.{self.protocol.name}, "
-            f"identity_file={_quoted(self.identity_file)}, "
-            f"oauth_token={_quoted_masked(self.oauth_token)},"
-            f'local_repo_user_name="{_quoted(self.local_repo_user_name)}, '
-            f"local_repo_user_email={_quoted(self.local_repo_user_email)})"
-        )
+    identity_file: Optional[str]
+    oauth_token: Optional[str]
+    local_repo_user_name: Optional[str]
+    local_repo_user_email: Optional[str]
 
     def ls_remote(self) -> str:
         if self.protocol == RepoProtocol.HTTPS:
@@ -146,3 +80,18 @@ class LocalRepoData(RepoData):
                 )
         else:
             raise Exception("No identity file is specified")
+
+
+class Repo(BaseModel):
+    name: str
+    username: str
+    data: Optional[Union[RepoData, LocalRepoData]] = None
+
+    @validator("name")
+    def validate_name(cls, name):
+        if "/" in name:
+            raise ValueError("Repo name can't contain `/`")
+        return name
+
+    def __hash__(self):
+        return hash((self.name, self.username))

@@ -12,7 +12,6 @@ from dstack.utils.common import _quoted
 
 
 class RunHead(BaseModel):
-    repo_address: RepoAddress
     run_name: str
     workflow_name: Optional[str]
     provider_name: str

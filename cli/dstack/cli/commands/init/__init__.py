@@ -3,10 +3,10 @@ from pathlib import Path
 from typing import Optional
 
 from dstack.api.backend import list_backends
-from dstack.api.repo import load_repo_data
+from dstack.api.repo import get_repo, load_repo_data
 from dstack.cli.commands import BasicCommand
 from dstack.cli.common import console
-from dstack.cli.config import BaseConfig
+from dstack.cli.config import config
 from dstack.core.error import check_config, check_git
 from dstack.core.userconfig import RepoUserConfig
 
@@ -56,25 +56,26 @@ class InitCommand(BasicCommand):
     @check_config
     @check_git
     def _command(self, args: Namespace):
-        local_repo_data = load_repo_data(args.gh_token, args.git_identity_file)
+        local_repo_data = load_repo_data(args.gh_token, args.git_identity_file)  # todo gitless
         local_repo_data.ls_remote()
         repo_credentials = local_repo_data.repo_credentials()
 
-        config = BaseConfig()
-        repo_user_config = RepoUserConfig(ssh_key_path=get_ssh_keypair(args.ssh_identity_file))
-        config.write(
-            config.repos / f"{local_repo_data.path(delimiter='.')}.yaml",
-            repo_user_config,
-            mkdir=True,
+        config.repo_user_config = RepoUserConfig(
+            repo_name=local_repo_data.path(delimiter="."),
+            username=local_repo_data.local_repo_user_email,
+            ssh_key_path=get_ssh_keypair(args.ssh_identity_file),
         )
+        repo = get_repo(config.repo_user_config)
 
-        for backend in list_backends():
-            backend.save_repo_credentials(local_repo_data, repo_credentials)
+        for backend in list_backends(repo):
+            backend.save_repo_credentials(repo_credentials)
             status = (
-                "[yellow]WARNING[/]" if repo_user_config.ssh_key_path is None else "[green]OK[/]"
+                "[yellow]WARNING[/]"
+                if config.repo_user_config.ssh_key_path is None
+                else "[green]OK[/]"
             )
             console.print(f"{status} [gray58](backend: {backend.name})[/]")
-        if repo_user_config.ssh_key_path is None:
+        if config.repo_user_config.ssh_key_path is None:
             console.print(
                 f"[red]SSH is not enabled. To enable it, make sure `{args.ssh_identity_file or '~/.ssh/id_rsa'}` exists or call `dstack init --ssh-identity PATH`[/]"
             )

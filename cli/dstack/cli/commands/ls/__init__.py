@@ -1,16 +1,15 @@
 from argparse import Namespace
-from collections import defaultdict
 from pathlib import Path
-from typing import Optional
 
 from rich.table import Table
 
 from dstack.api.artifacts import list_artifacts_with_merged_backends
 from dstack.api.backend import list_backends
-from dstack.api.repo import load_repo_data
+from dstack.api.repo import get_repo
 from dstack.api.run import RunNotFoundError, TagNotFoundError, get_tagged_run_name
 from dstack.cli.commands import BasicCommand
 from dstack.cli.common import console
+from dstack.cli.config import config
 from dstack.core.error import check_config, check_git
 from dstack.utils.common import sizeof_fmt
 
@@ -54,13 +53,13 @@ class LsCommand(BasicCommand):
         table.add_column("SIZE", style="dark_sea_green4")
         table.add_column("BACKENDS", style="bold")
 
-        repo_data = load_repo_data()
-        backends = list_backends()
+        repo = get_repo(config.repo_user_config)
+        backends = list_backends(repo)
         run_names = []
         backends_run_name = []
         for backend in backends:
             try:
-                run_name, _ = get_tagged_run_name(repo_data, backend, args.run_name_or_tag_name)
+                run_name, _ = get_tagged_run_name(backend, args.run_name_or_tag_name)
                 run_names.append(run_name)
                 backends_run_name.append(backend)
             except (TagNotFoundError, RunNotFoundError):
@@ -70,9 +69,7 @@ class LsCommand(BasicCommand):
             console.print(f"Cannot find the run or tag '{args.run_name_or_tag_name}'")
             exit(1)
 
-        artifacts = list_artifacts_with_merged_backends(
-            backends_run_name, load_repo_data(), run_names[0]
-        )
+        artifacts = list_artifacts_with_merged_backends(backends_run_name, run_names[0])
 
         for artifact, _ in artifacts:
             artifact.files = sorted(

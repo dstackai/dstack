@@ -51,13 +51,13 @@ func (sm *ClientSecret) fetchCredentials(ctx context.Context, bucket, repoHostna
 		SecretId: aws.String(fmt.Sprintf("/dstack/%s/credentials/%s/%s/%s", bucket, repoHostnameWithPort, repoUserName, repoName)),
 	})
 	if err != nil {
-		log.Error(ctx, "Fetching value credentials S3", "bucket", bucket, "RepoHostnameWithPort", repoHostnameWithPort, "RepoUserName", repoUserName, "RepoName", repoName, "err", err)
+		log.Error(ctx, "Fetching value credentials S3", "bucket", bucket, "RepoHostnameWithPort", repoHostnameWithPort, "GitUserName", repoUserName, "GitName", repoName, "err", err)
 		return nil
 	}
 	cred := new(models.GitCredentials)
 	err = json.Unmarshal([]byte(aws.StringValue(value.SecretString)), &cred)
 	if err != nil {
-		log.Error(ctx, "Unmarshal value credentials S3", "bucket", bucket, "RepoHostnameWithPort", repoHostnameWithPort, "RepoUserName", repoUserName, "RepoName", repoName, "err", err)
+		log.Error(ctx, "Unmarshal value credentials S3", "bucket", bucket, "RepoHostnameWithPort", repoHostnameWithPort, "GitUserName", repoUserName, "GitName", repoName, "err", err)
 		return nil
 	}
 	return cred

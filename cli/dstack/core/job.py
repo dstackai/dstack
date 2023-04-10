@@ -8,7 +8,7 @@ from dstack.core.app import AppSpec
 from dstack.core.artifact import ArtifactSpec
 from dstack.core.cache import CacheSpec
 from dstack.core.dependents import DepSpec
-from dstack.core.repo import RepoAddress, RepoData
+from dstack.core.repo import Repo, RepoAddress, RepoData
 from dstack.utils.common import _quoted, format_list
 
 
@@ -107,7 +107,7 @@ class JobStatus(Enum):
 
 class JobHead(JobRef):
     job_id: str
-    repo_address: RepoAddress
+    repo: Repo
     run_name: str
     workflow_name: Optional[str]
     provider_name: str
@@ -136,7 +136,7 @@ class JobHead(JobRef):
             else None
         )
         return (
-            f'JobHead(job_id="{self.job_id}", repo_address={self.repo_address}, '
+            f'JobHead(job_id="{self.job_id}", repo_address={self.repo.data}, '
             f'run_name="{self.run_name}", workflow_name={_quoted(self.workflow_name)}, '
             f'provider_name="{self.provider_name}", '
             f"local_repo_user_name={_quoted(self.local_repo_user_name)}, "
@@ -169,7 +169,6 @@ def check_dict(element: Any, field: str):
 
 class Job(JobHead):
     job_id: Optional[str]
-    repo_data: RepoData
     repo_diff_filename: Optional[str] = None
     run_name: str
     workflow_name: Optional[str]
@@ -234,7 +233,7 @@ class Job(JobHead):
         dep_specs = format_list(self.dep_specs)
         ssk_key_pub = f"...{self.ssh_key_pub[-16:]}" if self.ssh_key_pub else None
         return (
-            f'Job(job_id="{self.job_id}", repo_data={self.repo_data}, '
+            f'Job(job_id="{self.job_id}", repo={self.repo}, '
             f'run_name="{self.run_name}", workflow_name={_quoted(self.workflow_name)}, '
             f'provider_name="{self.provider_name}", '
             f"local_repo_user_name={_quoted(self.local_repo_user_name)}, "
@@ -268,10 +267,7 @@ class Job(JobHead):
             for dep in self.dep_specs:
                 deps.append(
                     {
-                        "repo_host_name": dep.repo_address.repo_host_name,
-                        "repo_port": dep.repo_address.repo_port or 0,
-                        "repo_user_name": dep.repo_address.repo_user_name,
-                        "repo_name": dep.repo_address.repo_name,
+                        "repo_name": dep.repo_name,
                         "run_name": dep.run_name,
                         "mount": dep.mount,
                     }
@@ -284,12 +280,14 @@ class Job(JobHead):
                 )
         job_data = {
             "job_id": self.job_id,
-            "repo_host_name": self.repo_address.repo_host_name,
-            "repo_port": self.repo_address.repo_port or 0,
-            "repo_user_name": self.repo_data.repo_user_name,
-            "repo_name": self.repo_data.repo_name,
-            "repo_branch": self.repo_data.repo_branch or "",
-            "repo_hash": self.repo_data.repo_hash or "",
+            "repo_name": self.repo.name,
+            "repo_username": self.repo.username,
+            "git_host_name": self.repo.data.repo_host_name,
+            "git_port": self.repo.data.repo_port or 0,
+            "git_user_name": self.repo.data.repo_user_name,
+            "git_name": self.repo.data.repo_name,
+            "git_branch": self.repo.data.repo_branch or "",
+            "git_hash": self.repo.data.repo_hash or "",
             "run_name": self.run_name,
             "workflow_name": self.workflow_name or "",
             "provider_name": self.provider_name,
@@ -331,7 +329,7 @@ class Job(JobHead):
         if self.repo_diff_filename is not None:
             job_data["repo_diff_filename"] = self.repo_diff_filename
         else:
-            job_data["repo_diff"] = self.repo_data.repo_diff or ""
+            job_data["repo_diff"] = self.repo.data.repo_diff or ""
         return job_data
 
     @staticmethod
@@ -343,7 +341,7 @@ class Job(JobHead):
                 memory_mib=_requirements.get("memory_mib") or None,
                 gpus=GpusRequirements(
                     count=_requirements["gpus"].get("count") or None,
-                    memory=_requirements["gpus"].get("memory") or None,
+                    memory_mib=_requirements["gpus"].get("memory") or None,
                     name=_requirements["gpus"].get("name") or None,
                 )
                 if _requirements.get("gpus")
@@ -375,12 +373,7 @@ class Job(JobHead):
         if job_data.get("deps"):
             for dep in job_data["deps"]:
                 dep_spec = DepSpec(
-                    repo_address=RepoAddress(
-                        repo_host_name=dep["repo_host_name"],
-                        repo_port=dep.get("repo_port") or None,
-                        repo_user_name=dep["repo_user_name"],
-                        repo_name=dep["repo_name"],
-                    ),
+                    repo_name=dep["repo_name"],
                     run_name=dep["run_name"],
                     mount=dep.get("mount") is True,
                 )
@@ -411,14 +404,18 @@ class Job(JobHead):
         ) or None
         job = Job(
             job_id=job_data["job_id"],
-            repo_data=RepoData(
-                repo_host_name=job_data["repo_host_name"],
-                repo_port=job_data.get("repo_port") or None,
-                repo_user_name=job_data["repo_user_name"],
-                repo_name=job_data["repo_name"],
-                repo_branch=job_data["repo_branch"] or None,
-                repo_hash=job_data["repo_hash"] or None,
-                repo_diff=job_data.get("repo_diff"),
+            repo=Repo(
+                name=job_data["repo_name"],
+                username=job_data["repo_username"],
+                data=RepoData(
+                    repo_host_name=job_data["git_host_name"],
+                    repo_port=job_data.get("git_port") or None,
+                    repo_user_name=job_data["git_user_name"],
+                    repo_name=job_data["git_name"],
+                    repo_branch=job_data["git_branch"] or None,
+                    repo_hash=job_data["git_hash"] or None,
+                    repo_diff=job_data.get("repo_diff"),
+                ),
             ),
             repo_diff_filename=job_data.get("repo_diff_filename"),
             run_name=job_data["run_name"],

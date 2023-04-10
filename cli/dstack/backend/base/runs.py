@@ -8,7 +8,6 @@ from dstack.backend.base.storage import Storage
 from dstack.core.app import AppHead
 from dstack.core.artifact import ArtifactHead
 from dstack.core.job import JobHead, JobStatus
-from dstack.core.repo import RepoAddress
 from dstack.core.run import (
     RequestStatus,
     RunHead,
@@ -19,7 +18,6 @@ from dstack.core.run import (
 
 def create_run(
     storage: Storage,
-    repo_address: RepoAddress,
     backend_type: BackendType,
 ) -> str:
     if backend_type is BackendType.LOCAL:
@@ -99,7 +97,7 @@ def _create_run(
     if include_request_heads and job_head.status.is_unfinished():
         if request_heads is None:
             request_heads = []
-        job = jobs.get_job(storage, job_head.repo_address, job_head.job_id)
+        job = jobs.get_job(storage, job_head.repo.name, job_head.job_id)
         request_id = job.request_id
         if request_id is None and job.runner_id is not None:
             runner = runners.get_runner(storage, job.runner_id)
@@ -111,7 +109,6 @@ def _create_run(
             job.status = job_head.status = interrupted_job_new_status
             jobs.update_job(storage, job)
     run_head = RunHead(
-        repo_address=job_head.repo_address,
         run_name=job_head.run_name,
         workflow_name=job_head.workflow_name,
         provider_name=job_head.provider_name,
@@ -163,7 +160,7 @@ def _update_run(
         if include_request_heads:
             if run.request_heads is None:
                 run.request_heads = []
-            job = jobs.get_job(storage, job_head.repo_address, job_head.job_id)
+            job = jobs.get_job(storage, job_head.repo.name, job_head.job_id)
             request_id = job.request_id
             if request_id is None and job.runner_id is not None:
                 runner = runners.get_runner(storage, job.runner_id)

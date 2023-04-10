@@ -53,26 +53,26 @@ func (sm *ClientSecret) fetchSecret(_ context.Context, path string, secrets map[
 func (sm *ClientSecret) fetchCredentials(ctx context.Context, repoHostnameWithPort, repoUserName, repoName string) *models.GitCredentials {
 	db, err := sql.Open("sqlite", filepath.Join(sm.path, "repos", "_secrets_"))
 	if err != nil {
-		log.Error(ctx, "Connecting database. Credentials Local", "RepoHostnameWithPort", repoHostnameWithPort, "RepoUserName", repoUserName, "RepoName", repoName, "err", err)
+		log.Error(ctx, "Connecting database. Credentials Local", "RepoHostnameWithPort", repoHostnameWithPort, "GitUserName", repoUserName, "GitName", repoName, "err", err)
 		return nil
 	}
 	defer db.Close()
 	rows, err := db.Query("SELECT secret_string FROM KV WHERE secret_name=?", fmt.Sprintf("/dstack/credentials/%s/%s/%s", repoHostnameWithPort, repoUserName, repoName))
 	if err != nil {
-		log.Error(ctx, "Fetching value credentials Local", "RepoHostnameWithPort", repoHostnameWithPort, "RepoUserName", repoUserName, "RepoName", repoName, "err", err)
+		log.Error(ctx, "Fetching value credentials Local", "RepoHostnameWithPort", repoHostnameWithPort, "GitUserName", repoUserName, "GitName", repoName, "err", err)
 		return nil
 	}
 	if rows.Next() {
 		secretString := ""
 		err = rows.Scan(&secretString)
 		if err != nil {
-			log.Error(ctx, "Scan value credentials Local", "RepoHostnameWithPort", repoHostnameWithPort, "RepoUserName", repoUserName, "RepoName", repoName, "err", err)
+			log.Error(ctx, "Scan value credentials Local", "RepoHostnameWithPort", repoHostnameWithPort, "GitUserName", repoUserName, "GitName", repoName, "err", err)
 			return nil
 		}
 		cred := new(models.GitCredentials)
 		err = json.Unmarshal([]byte(secretString), &cred)
 		if err != nil {
-			log.Error(ctx, "Unmarshal value credentials Local", "RepoHostnameWithPort", repoHostnameWithPort, "RepoUserName", repoUserName, "RepoName", repoName, "err", err)
+			log.Error(ctx, "Unmarshal value credentials Local", "RepoHostnameWithPort", repoHostnameWithPort, "GitUserName", repoUserName, "GitName", repoName, "err", err)
 			return nil
 		}
 		return cred

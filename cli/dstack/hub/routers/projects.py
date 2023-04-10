@@ -3,8 +3,8 @@ from typing import List, Tuple
 
 from fastapi import APIRouter, Body, Depends, HTTPException, status
 
-from dstack.api.backend import dict_backends
-from dstack.backend.base import Backend
+from dstack.api.config import dict_configurator
+from dstack.backend.base import Configurator
 from dstack.core.error import HubConfigError
 from dstack.hub.db.models import Project, User
 from dstack.hub.models import (
@@ -33,8 +33,7 @@ async def get_backend_config_values(
     config: ProjectConfigWithCredsPartial = Body(),
     user: User = Depends(Authenticated()),
 ) -> ProjectValues:
-    backend = _get_backend(config.__root__.type)
-    configurator = backend.get_configurator()
+    configurator = _get_backend_configurator(config.__root__.type)
     try:
         result = await asyncio.get_running_loop().run_in_executor(
             None, configurator.configure_hub, config.__root__.dict()
@@ -65,8 +64,7 @@ async def create_project(
                 )
             ],
         )
-    backend = _get_backend(project_info.backend.__root__.type)
-    configurator = backend.get_configurator()
+    configurator = _get_backend_configurator(project_info.backend.__root__.type)
     try:
         await asyncio.get_running_loop().run_in_executor(
             None, configurator.configure_hub, project_info.backend.__root__.dict()
@@ -119,8 +117,7 @@ async def update_project(
     project_info: ProjectInfoWithCreds = Body(),
     user_project: Tuple[User, Project] = Depends(ProjectAdmin()),
 ) -> ProjectInfoWithCreds:
-    backend = _get_backend(project_info.backend.__root__.type)
-    configurator = backend.get_configurator()
+    configurator = _get_backend_configurator(project_info.backend.__root__.type)
     try:
         await asyncio.get_running_loop().run_in_executor(
             None, configurator.configure_hub, project_info.backend.__root__.dict()
@@ -132,14 +129,14 @@ async def update_project(
     return project_info
 
 
-def _get_backend(backend_type: str) -> Backend:
-    backend = dict_backends(all_backend=True).get(backend_type)
-    if backend is None:
+def _get_backend_configurator(backend_type: str) -> Configurator:
+    configurator = dict_configurator().get(backend_type)
+    if configurator is None:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail=error_detail(f"Unknown backend {backend_type}"),
         )
-    return backend
+    return configurator
 
 
 def _error_response_on_config_error(e: HubConfigError, path_to_config: List[str]):

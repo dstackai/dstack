@@ -1,7 +1,7 @@
 import sys
 from abc import ABC, abstractmethod
 from enum import Enum
-from pathlib import Path
+from os import PathLike
 from typing import Any, Generator, List, Optional
 
 from dstack.backend.base import jobs
@@ -9,7 +9,7 @@ from dstack.core.artifact import Artifact
 from dstack.core.config import BackendConfig, Configurator
 from dstack.core.job import Job, JobHead, JobStatus
 from dstack.core.log_event import LogEvent
-from dstack.core.repo import LocalRepoData, RepoAddress, RepoCredentials, RepoHead
+from dstack.core.repo import Repo, RepoCredentials, RepoHead
 from dstack.core.run import RunHead
 from dstack.core.secret import Secret
 from dstack.core.tag import TagHead
@@ -25,6 +25,9 @@ class BackendType(Enum):
 
 class Backend(ABC):
     _loaded = False
+
+    def __init__(self, repo: Optional[Repo]):
+        self.repo = repo
 
     @property
     @abstractmethod
@@ -45,7 +48,7 @@ class Backend(ABC):
         pass
 
     @abstractmethod
-    def create_run(self, repo_address: RepoAddress) -> str:
+    def create_run(self) -> str:
         pass
 
     @abstractmethod
@@ -61,11 +64,11 @@ class Backend(ABC):
         self.run_job(job, failed_to_start_job_new_status)
 
     @abstractmethod
-    def get_job(self, repo_address: RepoAddress, job_id: str) -> Optional[Job]:
+    def get_job(self, job_id: str) -> Optional[Job]:
         pass
 
     @abstractmethod
-    def list_jobs(self, repo_address: RepoAddress, run_name: str) -> List[Job]:
+    def list_jobs(self, run_name: str) -> List[Job]:
         pass
 
     @abstractmethod
@@ -73,40 +76,37 @@ class Backend(ABC):
         pass
 
     @abstractmethod
-    def stop_job(self, repo_address: RepoAddress, job_id: str, abort: bool):
+    def stop_job(self, job_id: str, abort: bool):
         pass
 
-    def stop_jobs(self, repo_address: RepoAddress, run_name: Optional[str], abort: bool):
-        job_heads = self.list_job_heads(repo_address, run_name)
+    def stop_jobs(self, run_name: Optional[str], abort: bool):
+        job_heads = self.list_job_heads(run_name)
         for job_head in job_heads:
             if job_head.status.is_unfinished():
-                self.stop_job(repo_address, job_head.job_id, abort)
+                self.stop_job(job_head.job_id, abort)
 
     @abstractmethod
-    def list_job_heads(
-        self, repo_address: RepoAddress, run_name: Optional[str] = None
-    ) -> List[JobHead]:
+    def list_job_heads(self, run_name: Optional[str] = None) -> List[JobHead]:
         pass
 
     @abstractmethod
-    def delete_job_head(self, repo_address: RepoAddress, job_id: str):
+    def delete_job_head(self, job_id: str):
         pass
 
-    def delete_job_heads(self, repo_address: RepoAddress, run_name: Optional[str]):
+    def delete_job_heads(self, run_name: Optional[str]):
         job_heads = []
-        for job_head in self.list_job_heads(repo_address, run_name):
+        for job_head in self.list_job_heads(run_name):
             if job_head.status.is_finished():
                 job_heads.append(job_head)
             else:
                 if run_name:
                     sys.exit("The run is not finished yet. Stop the run first.")
         for job_head in job_heads:
-            self.delete_job_head(repo_address, job_head.job_id)
+            self.delete_job_head(job_head.job_id)
 
     @abstractmethod
     def list_run_heads(
         self,
-        repo_address: RepoAddress,
         run_name: Optional[str] = None,
         include_request_heads: bool = True,
         interrupted_job_new_status: JobStatus = JobStatus.FAILED,
@@ -116,7 +116,6 @@ class Backend(ABC):
     @abstractmethod
     def poll_logs(
         self,
-        repo_address: RepoAddress,
         job_heads: List[JobHead],
         start_time: int,
         attached: bool,
@@ -124,7 +123,7 @@ class Backend(ABC):
         pass
 
     @abstractmethod
-    def list_run_artifact_files(self, repo_address: RepoAddress, run_name: str) -> List[Artifact]:
+    def list_run_artifact_files(self, run_name: str) -> List[Artifact]:
         # TODO: add a flag for non-recursive listing.
         # Backends may implement this via list_run_artifact_files_and_folders()
         pass
@@ -132,36 +131,33 @@ class Backend(ABC):
     @abstractmethod
     def download_run_artifact_files(
         self,
-        repo_address: RepoAddress,
         run_name: str,
-        output_dir: Optional[str],
-        files_path: Optional[str] = None,
+        output_dir: Optional[PathLike],
+        files_path: Optional[PathLike] = None,
     ):
         pass
 
     @abstractmethod
     def upload_job_artifact_files(
         self,
-        repo_address: RepoAddress,
         job_id: str,
         artifact_name: str,
-        artifact_path: str,
-        local_path: Path,
+        artifact_path: PathLike,
+        local_path: PathLike,
     ):
         pass
 
     @abstractmethod
-    def list_tag_heads(self, repo_address: RepoAddress) -> List[TagHead]:
+    def list_tag_heads(self) -> List[TagHead]:
         pass
 
     @abstractmethod
-    def get_tag_head(self, repo_address: RepoAddress, tag_name: str) -> Optional[TagHead]:
+    def get_tag_head(self, tag_name: str) -> Optional[TagHead]:
         pass
 
     @abstractmethod
     def add_tag_from_run(
         self,
-        repo_address: RepoAddress,
         tag_name: str,
         run_name: str,
         run_jobs: Optional[List[Job]],
@@ -169,59 +165,60 @@ class Backend(ABC):
         pass
 
     @abstractmethod
-    def add_tag_from_local_dirs(
-        self, repo_data: LocalRepoData, tag_name: str, local_dirs: List[str]
-    ):
+    def add_tag_from_local_dirs(self, tag_name: str, local_dirs: List[str]):
         pass
 
     @abstractmethod
-    def delete_tag_head(self, repo_address: RepoAddress, tag_head: TagHead):
+    def delete_tag_head(self, tag_head: TagHead):
         pass
 
     @abstractmethod
-    def update_repo_last_run_at(self, repo_address: RepoAddress, last_run_at: int):
+    def update_repo_last_run_at(self, last_run_at: int):
         pass
 
     @abstractmethod
-    def get_repo_credentials(self, repo_address: RepoAddress) -> Optional[RepoCredentials]:
+    def get_repo_credentials(self) -> Optional[RepoCredentials]:
         pass
 
     @abstractmethod
-    def save_repo_credentials(self, repo_address: RepoAddress, repo_credentials: RepoCredentials):
+    def save_repo_credentials(self, repo_credentials: RepoCredentials):
         pass
 
     @abstractmethod
-    def list_secret_names(self, repo_address: RepoAddress) -> List[str]:
+    def list_secret_names(self) -> List[str]:
         pass
 
     @abstractmethod
-    def get_secret(self, repo_address: RepoAddress, secret_name: str) -> Optional[Secret]:
+    def get_secret(self, secret_name: str) -> Optional[Secret]:
         pass
 
     @abstractmethod
-    def add_secret(self, repo_address: RepoAddress, secret: Secret):
+    def add_secret(self, secret: Secret):
         pass
 
     @abstractmethod
-    def update_secret(self, repo_address: RepoAddress, secret: Secret):
+    def update_secret(self, secret: Secret):
         pass
 
     @abstractmethod
-    def delete_secret(self, repo_address: RepoAddress, secret_name: str):
+    def delete_secret(self, secret_name: str):
+        pass
+
+    @classmethod
+    @abstractmethod
+    def get_configurator(cls) -> Configurator:
         pass
 
     @abstractmethod
-    def get_configurator(self) -> Configurator:
-        pass
-
-    @abstractmethod
-    def delete_workflow_cache(self, repo_address: RepoAddress, username: str, workflow_name: str):
+    def delete_workflow_cache(self, workflow_name: str):
         pass
 
 
 class RemoteBackend(Backend):
-    def __init__(self, backend_config: Optional[BackendConfig] = None, custom_client: Any = None):
-        pass
+    def __init__(
+        self, repo: Repo, backend_config: Optional[BackendConfig] = None, custom_client: Any = None
+    ):
+        super().__init__(repo=repo)
 
     @property
     def type(self) -> BackendType:

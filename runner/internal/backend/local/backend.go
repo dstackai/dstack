@@ -83,7 +83,7 @@ func (l Local) Job(ctx context.Context) *models.Job {
 }
 
 func (l Local) MasterJob(ctx context.Context) *models.Job {
-	contents, err := l.storage.GetFile(filepath.Join("jobs", l.state.Job.RepoUserName, l.state.Job.RepoName, fmt.Sprintf("%s.yaml", l.state.Job.MasterJobID)))
+	contents, err := l.storage.GetFile(filepath.Join("jobs", l.state.Job.GitUserName, l.state.Job.GitName, fmt.Sprintf("%s.yaml", l.state.Job.MasterJobID)))
 	if err != nil {
 		return nil
 	}
@@ -113,7 +113,7 @@ func (l Local) UpdateState(ctx context.Context) error {
 	if err != nil {
 		return gerrors.Wrap(err)
 	}
-	log.Trace(ctx, "Fetching list jobs", "Repo username", l.state.Job.RepoUserName, "Repo name", l.state.Job.RepoName, "Job ID", l.state.Job.JobID)
+	log.Trace(ctx, "Fetching list jobs", "Repo username", l.state.Job.GitUserName, "Repo name", l.state.Job.GitName, "Job ID", l.state.Job.JobID)
 	files, err := l.storage.ListFile(l.state.Job.JobHeadFilepathPrefix())
 	if err != nil {
 		return gerrors.Wrap(err)
@@ -195,12 +195,12 @@ func (l Local) GetJobByPath(ctx context.Context, path string) (*models.Job, erro
 
 func (l *Local) GitCredentials(ctx context.Context) *models.GitCredentials {
 	log.Trace(ctx, "Getting credentials")
-	return l.cliSecret.fetchCredentials(ctx, l.state.Job.RepoHostNameWithPort(), l.state.Job.RepoUserName, l.state.Job.RepoName)
+	return l.cliSecret.fetchCredentials(ctx, l.state.Job.RepoHostNameWithPort(), l.state.Job.GitUserName, l.state.Job.GitName)
 }
 
 func (l *Local) Secrets(ctx context.Context) (map[string]string, error) {
 	log.Trace(ctx, "Getting secrets")
-	templatePath := fmt.Sprintf("secrets/%s/%s/%s", l.state.Job.RepoHostNameWithPort(), l.state.Job.RepoUserName, l.state.Job.RepoName)
+	templatePath := fmt.Sprintf("secrets/%s", l.state.Job.RepoName)
 	if _, err := os.Stat(filepath.Join(l.path, templatePath)); err != nil {
 		return map[string]string{}, nil
 	}
@@ -215,9 +215,7 @@ func (l *Local) Secrets(ctx context.Context) (map[string]string, error) {
 		}
 		if strings.HasPrefix(file.Name(), "l;") {
 			clearName := strings.ReplaceAll(file.Name(), "l;", "")
-			secrets[clearName] = fmt.Sprintf("%s/%s/%s/%s",
-				l.state.Job.RepoHostNameWithPort(),
-				l.state.Job.RepoUserName,
+			secrets[clearName] = fmt.Sprintf("%s/%s",
 				l.state.Job.RepoName,
 				clearName)
 		}
