@@ -3,7 +3,7 @@ from typing import List, Optional
 from unittest.mock import patch
 
 from dstack.backend.base import Backend
-from dstack.core.repo import LocalRepoData
+from dstack.core.repo import LocalRepoData, Repo
 from dstack.providers.docker.main import DockerProvider
 
 
@@ -24,11 +24,23 @@ def create_provider_data(
     return {"image": "ubuntu:20.04", "commands": commands, "entrypoint": entrypoint}
 
 
-@patch("dstack.providers.load_repo_data", new=load_repo_data)
 class TestEntrypoint(unittest.TestCase):
     @patch.multiple(Backend, __abstractmethods__=set())
     def setUp(self) -> None:
-        self.backend = Backend()
+        self.backend = Backend(
+            repo=Repo(
+                name="foo",
+                username="bar",
+                data=LocalRepoData(
+                    repo_host_name="",
+                    repo_user_name="",
+                    repo_name="",
+                    repo_branch="",
+                    repo_hash="",
+                    protocol="https",
+                ),
+            )
+        )
 
     def test_no_commands(self):
         provider = DockerProvider()

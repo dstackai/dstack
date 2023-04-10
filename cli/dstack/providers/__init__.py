@@ -220,7 +220,6 @@ class Provider:
         if not self.loaded:
             raise Exception("The provider is not loaded")
         job_specs = self.create_job_specs()
-        repo_data = load_repo_data()
         # [TODO] Handle master job
         jobs = []
         for i, job_spec in enumerate(job_specs):
@@ -230,8 +229,8 @@ class Provider:
                 run_name=self.run_name,
                 workflow_name=self.workflow_name or None,
                 provider_name=self.provider_name,
-                local_repo_user_name=repo_data.local_repo_user_name,
-                local_repo_user_email=repo_data.local_repo_user_email,
+                local_repo_user_name=backend.repo.data.local_repo_user_name,
+                local_repo_user_email=backend.repo.data.local_repo_user_email,
                 status=JobStatus.SUBMITTED,
                 submitted_at=get_milliseconds_since_epoch(),
                 image_name=job_spec.image_name,
