@@ -347,7 +347,14 @@ class RunCommand(BasicCommand):
                     backend.delete_tag_head(repo_data, tag_head)
             jobs = provider.submit_jobs(backend, args.tag_name)
             backend.update_repo_last_run_at(repo_data, last_run_at=int(round(time.time() * 1000)))
-            print_runs(list_runs_with_merged_backends([backend], run_name=run_name))
+            runs_with_merged_backends = list_runs_with_merged_backends(
+                [backend], run_name=run_name
+            )
+            print_runs(runs_with_merged_backends)
+            run = runs_with_merged_backends[0][0]
+            if run.status == JobStatus.FAILED:
+                console.print("\nProvisioning failed\n")
+                exit(1)
             if not args.detach:
                 poll_run(
                     repo_data,

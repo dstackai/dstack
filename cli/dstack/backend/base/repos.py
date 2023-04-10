@@ -4,7 +4,6 @@ from typing import List, Optional
 from dstack.backend.base.secrets import SecretsManager
 from dstack.backend.base.storage import Storage
 from dstack.core.repo import RepoAddress, RepoCredentials, RepoHead, RepoProtocol
-from dstack.core.secret import Secret
 
 
 def get_repo_head(storage: Storage, repo_address: RepoAddress) -> Optional[RepoHead]:
@@ -31,27 +30,23 @@ def list_repo_heads(storage: Storage) -> List[RepoHead]:
     for repo_head_key in repo_heads_keys:
         tokens = repo_head_key[len(repo_heads_prefix) :].split(";")
         # Skipt legacy repo heads
-        if len(tokens) == 5:
-            (
-                repo_host_port,
-                repo_user_name,
-                repo_name,
-                last_run_at,
-                tags_count,
-            ) = tuple(tokens)
-            t = repo_host_port.split(":")
-            repo_host_name = t[0]
-            repo_port = t[1] if len(t) > 1 else None
-            repo_heads.append(
-                RepoHead(
-                    repo_host_name=repo_host_name,
-                    repo_port=repo_port,
-                    repo_user_name=repo_user_name,
-                    repo_name=repo_name,
-                    last_run_at=int(last_run_at) if last_run_at else None,
-                    tags_count=int(tags_count),
-                )
+        if len(tokens) != 3:
+            continue
+        repo_str, last_run_at, tags_count = tokens
+        repo_host_port, repo_user_name, repo_name = repo_str.split(",")
+        t = repo_host_port.split(":")
+        repo_host_name = t[0]
+        repo_port = t[1] if len(t) > 1 else None
+        repo_heads.append(
+            RepoHead(
+                repo_host_name=repo_host_name,
+                repo_port=repo_port,
+                repo_user_name=repo_user_name,
+                repo_name=repo_name,
+                last_run_at=int(last_run_at) if last_run_at else None,
+                tags_count=int(tags_count),
             )
+        )
     return repo_heads
 
 

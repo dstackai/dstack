@@ -1,7 +1,6 @@
 import importlib
 import shlex
 import sys
-import time
 from abc import abstractmethod
 from argparse import ArgumentParser, Namespace
 from pkgutil import iter_modules
@@ -20,7 +19,7 @@ from dstack.core.job import (
     Requirements,
 )
 from dstack.core.repo import RepoAddress, RepoData
-from dstack.utils.common import _quoted
+from dstack.utils.common import _quoted, get_milliseconds_since_epoch
 from dstack.utils.interpolator import VariablesInterpolator
 
 DEFAULT_CPU = 2
@@ -225,7 +224,6 @@ class Provider:
         # [TODO] Handle master job
         jobs = []
         for i, job_spec in enumerate(job_specs):
-            submitted_at = int(round(time.time() * 1000))
             job = Job(
                 job_id=f"{self.run_name},{self.workflow_name or ''},{i}",
                 repo_data=repo_data,
@@ -235,7 +233,7 @@ class Provider:
                 local_repo_user_name=repo_data.local_repo_user_name,
                 local_repo_user_email=repo_data.local_repo_user_email,
                 status=JobStatus.SUBMITTED,
-                submitted_at=submitted_at,
+                submitted_at=get_milliseconds_since_epoch(),
                 image_name=job_spec.image_name,
                 registry_auth=job_spec.registry_auth,
                 commands=job_spec.commands,

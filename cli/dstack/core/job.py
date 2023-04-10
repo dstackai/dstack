@@ -86,6 +86,7 @@ class JobRefId(JobRef):
 
 
 class JobStatus(Enum):
+    PENDING = "pending"
     SUBMITTED = "submitted"
     DOWNLOADING = "downloading"
     RUNNING = "running"
@@ -176,6 +177,7 @@ class Job(JobHead):
     local_repo_user_email: Optional[str]
     status: JobStatus
     submitted_at: int
+    submission_num: int = 1
     image_name: str
     registry_auth: Optional[RegistryAuth]
     commands: Optional[List[str]]
@@ -295,6 +297,7 @@ class Job(JobHead):
             "local_repo_user_email": self.local_repo_user_email or "",
             "status": self.status.value,
             "submitted_at": self.submitted_at,
+            "submission_num": self.submission_num,
             "image_name": self.image_name,
             "registry_auth": self.registry_auth.serialize() if self.registry_auth else {},
             "commands": self.commands or [],
@@ -420,6 +423,7 @@ class Job(JobHead):
             local_repo_user_email=job_data.get("local_repo_user_email") or None,
             status=JobStatus(job_data["status"]),
             submitted_at=job_data["submitted_at"],
+            submission_num=job_data.get("submission_num") or 1,
             image_name=job_data["image_name"],
             registry_auth=RegistryAuth(**job_data.get("registry_auth", {})),
             commands=job_data.get("commands") or None,

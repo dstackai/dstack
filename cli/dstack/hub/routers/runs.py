@@ -3,6 +3,7 @@ from typing import List, Union
 from fastapi import APIRouter, Depends
 from fastapi.responses import PlainTextResponse
 
+from dstack.core.job import JobStatus
 from dstack.core.repo import RepoAddress
 from dstack.core.run import RunHead
 from dstack.hub.models import RunsList
@@ -36,5 +37,6 @@ async def list_run(project_name: str, body: RunsList):
         repo_address=body.repo_address,
         run_name=body.run_name,
         include_request_heads=body.include_request_heads,
+        interrupted_job_new_status=JobStatus.PENDING,
     )
     return run_name

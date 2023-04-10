@@ -9,6 +9,7 @@ from dstack.core.error import BackendError
 from dstack.core.job import Job, JobStatus
 from dstack.core.repo import LocalRepoData, RepoAddress
 from dstack.core.tag import TagHead
+from dstack.utils.common import get_milliseconds_since_epoch
 
 
 def get_tag_head(storage: Storage, repo_address: RepoAddress, tag_name: str) -> Optional[TagHead]:
@@ -163,7 +164,7 @@ def create_tag_from_local_dirs(
         local_repo_user_name=repo_data.local_repo_user_name,
         local_repo_user_email=repo_data.local_repo_user_email,
         status=JobStatus.DONE,
-        submitted_at=int(round(time.time() * 1000)),
+        submitted_at=get_milliseconds_since_epoch(),
         image_name="scratch",
         commands=None,
         env=None,

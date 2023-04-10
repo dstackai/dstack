@@ -170,6 +170,13 @@ func (s *S3) CheckStop(ctx context.Context) (bool, error) {
 	return false, nil
 }
 
+func (s *S3) IsInterrupted(ctx context.Context) (bool, error) {
+	if !s.state.Resources.Interruptible {
+		return false, nil
+	}
+	return s.cliEC2.IsInterruptedSpot(ctx, s.state.RequestID)
+}
+
 func (s *S3) Shutdown(ctx context.Context) error {
 	log.Trace(ctx, "Start shutdown")
 	if s == nil {

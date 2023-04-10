@@ -1,6 +1,6 @@
 from fastapi import APIRouter, Depends
 
-from dstack.core.job import Job
+from dstack.core.job import Job, JobStatus
 from dstack.hub.models import StopRunners
 from dstack.hub.routers.cache import get_backend
 from dstack.hub.routers.util import get_project
@@ -15,7 +15,7 @@ router = APIRouter(
 async def run_runners(project_name: str, job: Job):
     project = await get_project(project_name=project_name)
     backend = get_backend(project)
-    backend.run_job(job=job)
+    backend.run_job(job=job, failed_to_start_job_new_status=JobStatus.PENDING)
 
 
 @router.post("/{project_name}/runners/stop")
