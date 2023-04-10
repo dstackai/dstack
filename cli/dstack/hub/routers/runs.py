@@ -25,7 +25,7 @@ async def create_run(project_name: str, repo_address: RepoAddress) -> str:
     return run_name
 
 
-@router.get(
+@router.post(
     "/{project_name}/runs/list",
     response_model=List[RunHead],
 )

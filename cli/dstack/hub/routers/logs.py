@@ -71,7 +71,7 @@ class JSONStreamingResponse(Response):
             await self.background()
 
 
-@router.get(
+@router.post(
     "/{project_name}/logs/poll",
     response_class=JSONStreamingResponse,
 )

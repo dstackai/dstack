@@ -9,7 +9,7 @@ from dstack.hub.security.permissions import ProjectMember
 router = APIRouter(prefix="/api/project", tags=["repos"], dependencies=[Depends(ProjectMember())])
 
 
-@router.post("/{project_name}/repos/credentials")
+@router.post("/{project_name}/repos/credentials/save")
 async def save_repo_credentials(
     project_name: str, save_repo_credentials_body: SaveRepoCredentials
 ):
@@ -21,8 +21,8 @@ async def save_repo_credentials(
     )
 
 
-@router.get(
-    "/{project_name}/repos/credentials",
+@router.post(
+    "/{project_name}/repos/credentials/get",
 )
 async def get_repo_credentials(project_name: str, repo_address: RepoAddress) -> RepoCredentials:
     project = await get_project(project_name=project_name)
