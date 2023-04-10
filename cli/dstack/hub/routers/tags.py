@@ -1,6 +1,6 @@
 from typing import List, Union
 
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, HTTPException, status
 
 from dstack.core.repo import RepoAddress
 from dstack.core.tag import TagHead
@@ -32,7 +32,9 @@ async def get_tag(project_name: str, tag_name: str, repo_address: RepoAddress) -
     backend = get_backend(project)
     tag = backend.get_tag_head(repo_address=repo_address, tag_name=tag_name)
     if tag is None:
-        raise HTTPException(status_code=404, detail=error_detail("Tag not found"))
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND, detail=error_detail("Tag not found")
+        )
     return tag
 
 

@@ -1,6 +1,6 @@
 from typing import List, Optional
 
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, HTTPException, status
 
 from dstack.core.repo import RepoAddress
 from dstack.core.secret import Secret
@@ -41,7 +41,9 @@ async def get_secret(project_name: str, secret_name: str, repo_address: RepoAddr
     backend = get_backend(project)
     secret = backend.get_secret(repo_address=repo_address, secret_name=secret_name)
     if secret is None:
-        raise HTTPException(status_code=404, detail=error_detail("Secret not found"))
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND, detail=error_detail("Secret not found")
+        )
     return secret
 
 

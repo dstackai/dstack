@@ -89,6 +89,8 @@ class HubClient:
             if resp.ok:
                 json_data = resp.json()
                 return RepoCredentials(**json_data)
+            elif resp.status_code == 404:
+                return None
             elif resp.status_code == 401:
                 print("Unauthorized. Please set correct token")
                 return None
