@@ -2,9 +2,8 @@ import asyncio
 from typing import List
 
 from dstack.core.job import JobStatus
-from dstack.hub.db import Database
-from dstack.hub.db.models import Hub
-from dstack.hub.repository.hub import HubManager
+from dstack.hub.db.models import Project
+from dstack.hub.repository.projects import ProjectManager
 from dstack.hub.routers.cache import get_backend
 from dstack.utils.common import get_milliseconds_since_epoch
 
@@ -12,19 +11,18 @@ RESUBMISSION_INTERVAL = 60
 
 
 async def resubmit_jobs():
-    with Database.Session() as session:
-        hubs = await HubManager.list_hubs(external_session=session)
-    await asyncio.get_running_loop().run_in_executor(None, _resubmit_hubs_jobs, hubs)
+    projects = await ProjectManager.list()
+    await asyncio.get_running_loop().run_in_executor(None, _resubmit_projects_jobs, projects)
 
 
-def _resubmit_hubs_jobs(hubs: List[Hub]):
-    for hub in hubs:
-        _resubmit_hub_jobs(hub)
+def _resubmit_projects_jobs(projects: List[Project]):
+    for project in projects:
+        _resubmit_project_jobs(project)
 
 
-def _resubmit_hub_jobs(hub: Hub):
+def _resubmit_project_jobs(project: Project):
     curr_time = get_milliseconds_since_epoch()
-    backend = get_backend(hub)
+    backend = get_backend(project)
     repo_heads = backend.list_repo_heads()
     for repo_head in repo_heads:
         run_heads = backend.list_run_heads(

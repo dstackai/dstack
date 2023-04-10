@@ -70,6 +70,13 @@ class ProjectManager:
 
     @staticmethod
     @reuse_or_make_session
+    async def list(session: Optional[AsyncSession] = None) -> List[Project]:
+        query = await session.execute(select(Project).options(selectinload(Project.members)))
+        projects = query.scalars().unique().all()
+        return projects
+
+    @staticmethod
+    @reuse_or_make_session
     async def create(project: Project, session: Optional[AsyncSession] = None):
         session.add(project)
         await session.commit()
