@@ -92,6 +92,3 @@ class Repo(BaseModel):
         if "/" in name:
             raise ValueError("Repo name can't contain `/`")
         return name
-
-    def __hash__(self):
-        return hash((self.name, self.username))

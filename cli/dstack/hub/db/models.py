@@ -49,6 +49,3 @@ class Project(Base):
     config: Mapped[str] = mapped_column(String(300))
     auth: Mapped[str] = mapped_column(String(300))
     members: Mapped[List[Member]] = relationship(back_populates="project", lazy="selectin")
-
-    def __hash__(self):
-        return hash(self.name)
