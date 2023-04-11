@@ -124,6 +124,24 @@ export const ProjectList: React.FC = () => {
         );
     }, [isDeleting, userName, userGlobalRole, collectionProps.selectedItems]);
 
+    const getProjectRegion = (project: IProject) => {
+        switch (project.backend.type) {
+            case 'aws':
+                return project.backend.region_name_title;
+            case 'gcp':
+                return project.backend.region;
+        }
+    };
+
+    const getProjectBucket = (project: IProject) => {
+        switch (project.backend.type) {
+            case 'aws':
+                return `s3://${project.backend.s3_bucket_name}`;
+            case 'gcp':
+                return `gs://${project.backend.bucket_name}`;
+        }
+    };
+
     return (
         <>
             <Cards
@@ -145,12 +163,12 @@ export const ProjectList: React.FC = () => {
                         {
                             id: 'region',
                             header: t('projects.card.region'),
-                            content: (project) => project.backend.region_name_title,
+                            content: getProjectRegion,
                         },
                         {
                             id: 'bucket',
                             header: t('projects.card.bucket'),
-                            content: (project) => `${project.backend.s3_bucket_name}`,
+                            content: getProjectBucket,
                         },
                     ],
                 }}

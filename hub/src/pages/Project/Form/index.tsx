@@ -1,6 +1,6 @@
 import React from 'react';
 import { useTranslation } from 'react-i18next';
-import { Container, Header, FormUI, SpaceBetween, Button, FormInput, FormTiles } from 'components';
+import { Container, Header, FormUI, SpaceBetween, Button, FormInput, FormTiles, FormField, Grid } from 'components';
 import { useForm, FormProvider, DefaultValues } from 'react-hook-form';
 import { FieldPath } from 'react-hook-form/dist/types/path';
 import { useNotifications } from 'hooks';
@@ -8,8 +8,6 @@ import { isRequestFormErrors2, isRequestFormFieldError } from 'libs';
 import { IProps, TBackendOption } from './types';
 import { AWSBackend } from './AWS';
 import { GCPBackend } from './GCP';
-import FormField from '@cloudscape-design/components/form-field';
-import { Grid } from '@cloudscape-design/components';
 
 export const ProjectForm: React.FC<IProps> = ({ initialValues, onCancel, loading, onSubmit: onSubmitProp }) => {
     const { t } = useTranslation();

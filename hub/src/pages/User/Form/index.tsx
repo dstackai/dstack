@@ -45,7 +45,6 @@ export const UserForm: React.FC<Props> = ({
 
     const roleSelectOptions: TRoleSelectOption[] = [
         { label: t('roles.admin'), value: 'admin' },
-        { label: t('roles.run'), value: 'run' },
         { label: t('roles.read'), value: 'read' },
     ];
 
