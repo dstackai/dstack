@@ -9,7 +9,7 @@
 </h1>
 
 <h4 align="center">
-Automate your ML development
+Automate your ML workflows on any cloud
 </h4>
 
 <p align="center">
@@ -34,8 +34,9 @@ The hassle-free tool for managing ML workflows on any cloud platform.
 
 ## What is dstack?
 
-`dstack` is an open-source tool that automates ML workflows, enabling effective management on any cloud platform. It
-empowers your team to explore and prepare data, train, and fine-tune models using their preferred frameworks and dev
+`dstack` is an open-source tool that automates ML workflows, enabling effective management on any cloud platform. 
+
+It empowers your team to prepare data, train, and fine-tune models using their preferred frameworks and dev
 environments without spending time on engineering and infrastructure.
 
 ## Install the CLI
@@ -60,10 +61,11 @@ dstack config
   [hub]
 ```
 
-To run remote workflows with local cloud credentials, choose [`aws`](https://docs.dstack.ai/setup/aws.md)
-or [`gcp`](https://docs.dstack.ai/setup/gcp.md). 
+Choose [`hub`](https://docs.dstack.ai/setup/hub.md) if you prefer managing cloud credentials and settings through a user
+interface while working in a team.
 
-For managing cloud credentials securely and collaborate as a team, select `hub`.
+For running remote workflows with local cloud credentials, select [`aws`](https://docs.dstack.ai/setup/aws.md)
+or [`gcp`](https://docs.dstack.ai/setup/gcp.md).
 
 ## Define workflows
 
