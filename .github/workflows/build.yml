@@ -37,7 +37,7 @@ jobs:
     runs-on: ${{ matrix.os }}
     strategy:
       matrix:
-        os: [ macos-latest, ubuntu-latest ]
+        os: [ macos-latest, ubuntu-latest, windows-latest ]
         python-version: [ 3.7, 3.8, 3.9, "3.10", 3.11 ]
     defaults:
       run:
@@ -154,7 +154,6 @@ jobs:
           go vet $(go list ./... | grep -v /vendor/)
           go test -race $(go list ./... | grep -v /vendor/)
 
-
   runner-compile-master:
     defaults:
       run:
@@ -186,6 +185,7 @@ jobs:
         with:
           name: dstack-runner-${{ matrix.goos }}-${{ matrix.goarch }}
           path: runner/dstack-runner-${{ matrix.goos }}-${{ matrix.goarch }}
+
   runner-upload-master:
     defaults:
       run:
