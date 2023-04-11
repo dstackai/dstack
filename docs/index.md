@@ -1,13 +1,14 @@
 ---
-title: Automate your ML workflows
+title: Automate your ML workflows on any cloud
 hide:
   - path
 ---
 
-# Automate your ML workflows
+# Automate your ML workflows on any cloud
 
-`dstack` is an open-source tool that automates ML workflows, enabling effective management on any cloud platform. It
-empowers your team to explore and prepare data, train, and fine-tune models using their preferred frameworks and dev
+`dstack` is an open-source tool that automates ML workflows, enabling effective management on any cloud platform. 
+
+It empowers your team to prepare data, train, and fine-tune models using their preferred frameworks and dev
 environments without spending time on engineering and infrastructure.
 
 [//]: # (`dstack` is designed with simplicity, developer productivity and ease of)
@@ -48,9 +49,9 @@ $ dstack config
 
 </div>
 
-To run remote workflows with local cloud credentials, choose [`aws`](setup/aws.md) or [`gcp`](setup/gcp.md). 
+Choose [`hub`](setup/hub.md) if you prefer managing cloud credentials and settings through a user interface while working in a team.
 
-For managing cloud credentials securely and collaborate as a team, select [`hub`](setup/hub.md).
+For running remote workflows with local cloud credentials, select [`aws`](setup/aws.md) or [`gcp`](setup/gcp.md).
 
 ### Define workflows
 
