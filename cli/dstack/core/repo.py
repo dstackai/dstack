@@ -24,11 +24,6 @@ class RepoAddress(BaseModel):
         )
 
 
-class RepoHead(RepoAddress):
-    last_run_at: Optional[int]
-    tags_count: int
-
-
 class RepoCredentials(BaseModel):
     protocol: RepoProtocol
     private_key: Optional[str]
@@ -92,3 +87,9 @@ class Repo(BaseModel):
         if "/" in name:
             raise ValueError("Repo name can't contain `/`")
         return name
+
+
+class RepoHead(BaseModel):
+    name: str
+    last_run_at: Optional[int] = None
+    tags_count: int = 0

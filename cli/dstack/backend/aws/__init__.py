@@ -239,7 +239,7 @@ class AwsBackend(CloudBackend):
     def update_repo_last_run_at(self, last_run_at: int):
         base_repos.update_repo_last_run_at(
             self._storage,
-            self.repo.data,
+            self.repo.name,
             last_run_at,
         )
 
