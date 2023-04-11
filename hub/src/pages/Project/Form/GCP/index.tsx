@@ -305,7 +305,6 @@ export const GCPBackend: React.FC<IProps> = ({ loading }) => {
                     control={control}
                     name={`backend.${FIELD_NAMES.BUCKET_NAME}`}
                     selectableItemsTypes={['buckets']}
-                    onChange={getOnChangeSelectFormField(FIELD_NAMES.BUCKET_NAME)}
                     disabled={getDisabledByFieldName(FIELD_NAMES.BUCKET_NAME)}
                     rules={{ required: t('validation.required') }}
                     buckets={bucketNameOptions}
