@@ -286,10 +286,9 @@ export const GCPBackend: React.FC<IProps> = ({ loading }) => {
                     buckets={bucketNameOptions}
                     secondaryControl={renderSpinner()}
                     i18nStrings={{
-                        inContextBrowseButton: 'Browse Storage bucket',
+                        inContextBrowseButton: 'Choose a bucket',
                         modalBreadcrumbRootItem: 'Storage buckets',
-                        modalTitle: 'Choose an archive in Storage bucket',
-                        labelBreadcrumbs: 'Storage bucket navigation',
+                        modalTitle: 'Choose a storage bucket',
                     }}
                 />
 

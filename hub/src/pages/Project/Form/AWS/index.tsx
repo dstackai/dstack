@@ -162,6 +162,11 @@ export const AWSBackend: React.FC<IProps> = ({ loading }) => {
                 rules={{ required: t('validation.required') }}
                 buckets={buckets}
                 secondaryControl={renderSpinner()}
+                i18nStrings={{
+                    inContextBrowseButton: 'Browse buckets',
+                    modalBreadcrumbRootItem: 'S3 buckets',
+                    modalTitle: 'Choose an S3 bucket',
+                }}
             />
 
             <FormSelect
