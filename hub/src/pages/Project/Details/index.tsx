@@ -159,7 +159,7 @@ export const ProjectDetails: React.FC = () => {
 
                 <div>
                     <Box variant="awsui-key-label">{t('projects.edit.gcp.bucket_name')}</Box>
-                    <div>{data.backend.bucket_name}</div>
+                    <div>gc://{data.backend.bucket_name}</div>
                 </div>
 
                 <div>

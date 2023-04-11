@@ -29,7 +29,7 @@ export const AWSBackend: React.FC<IProps> = ({ loading }) => {
     const backendAccessKeyValue = watch('backend.access_key');
     const backendSecretKeyValue = watch('backend.secret_key');
 
-    const disabledFields = loading || !backendAccessKeyValue || !backendSecretKeyValue || !valuesData;
+    const disabledFields = loading || isLoadingValues || !backendAccessKeyValue || !backendSecretKeyValue || !valuesData;
 
     const changeFormHandler = async () => {
         const backendFormValues = getValues('backend');
