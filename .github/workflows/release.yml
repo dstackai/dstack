@@ -96,19 +96,16 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v3
-
       - name: Set up Go
         uses: actions/setup-go@v3
         with:
           go-version: 1.19
-
       - name: golangci-lint
         uses: golangci/golangci-lint-action@v3
         with:
           version: v1.51.2
           args: --issues-exit-code=0 --timeout=20m
           working-directory: runner
-
       - name: Test
         run: |
           go version
@@ -127,13 +124,16 @@ jobs:
         include:
           - {goos: "linux", goarch: "386", runson: "ubuntu-latest"}
           - {goos: "linux", goarch: "amd64", runson: "ubuntu-latest"}
-#          - {goos: "windows", goarch: "386", runson: "ubuntu-latest"}
           - {goos: "windows", goarch: "amd64", runson: "ubuntu-latest"}
           - {goos: "darwin", goarch: "amd64", runson: "macos-latest"}
           - {goos: "darwin", goarch: "arm64", runson: "macos-latest"}
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v3
+      - name: Set up Go
+        uses: actions/setup-go@v3
+        with:
+          go-version: 1.19
       - name: build
         env:
           GOOS: ${{ matrix.goos }}
@@ -142,7 +142,6 @@ jobs:
         run: |
           VERSION=${GITHUB_REF#refs/tags/}
           go build -ldflags "-X '$REPO_NAME/runner/version.Version=$VERSION' -X '$REPO_NAME/runner/pkg/log.CloudLog=true' -extldflags '-static'" -o dstack-runner-${{ matrix.goos }}-${{ matrix.goarch }}
-
       - uses: actions/upload-artifact@v2
         with:
           name: dstack-runner-${{ matrix.goos }}-${{ matrix.goarch }}
@@ -161,7 +160,6 @@ jobs:
         include:
           - {goos: "linux", goarch: "386", runson: "ubuntu-latest", platform: "x86", extension: ""}
           - {goos: "linux", goarch: "amd64", runson: "ubuntu-latest", platform: "amd64", extension: ""}
-#          - {goos: "windows", goarch: "386", runson: "ubuntu-latest", platform: "x86", extension: ".exe"}
           - {goos: "windows", goarch: "amd64", runson: "ubuntu-latest", platform: "amd64", extension: ".exe"}
           - {goos: "darwin", goarch: "amd64", runson: "macos-latest", platform: "amd64", extension: ""}
           - {goos: "darwin", goarch: "arm64", runson: "macos-latest", platform: "arm64", extension: ""}
