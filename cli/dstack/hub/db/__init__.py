@@ -38,7 +38,8 @@ def override_db(new_db: Database):
 @event.listens_for(db.engine.sync_engine, "connect")
 def set_sqlite_pragma(dbapi_connection: DBAPIConnection, _: ConnectionPoolEntry):
     cursor = dbapi_connection.cursor()
-    cursor.execute("PRAGMA journal_mode=WAL")
+    cursor.execute("PRAGMA journal_mode=WAL;")
+    cursor.execute("PRAGMA foreign_keys=ON;")
     cursor.close()
 
 

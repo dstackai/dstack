@@ -11,7 +11,7 @@ from dstack.core.request import RequestStatus
 from dstack.core.run import RunHead
 from dstack.utils.common import pretty_date
 
-_is_termios_available = find_spec("termios") is not None
+is_termios_available = find_spec("termios") is not None
 
 
 console = Console()
@@ -26,7 +26,7 @@ def ask_choice(
 ) -> str:
     if selected_value not in values:
         selected_value = None
-    if _is_termios_available:
+    if is_termios_available:
         from simple_term_menu import TerminalMenu
 
         console.print(
@@ -51,7 +51,7 @@ def ask_choice(
         console.print(f"[sea_green3 bold]✓[/sea_green3 bold] [grey74]{chosen_menu_label}[/grey74]")
         return values[chosen_menu_index]
     else:
-        if len(values) < 6 and show_choices is None or show_choices is True:
+        if len(values) < 10 and show_choices is None or show_choices is True:
             return Prompt.ask(
                 prompt=f"[sea_green3 bold]?[/sea_green3 bold] [bold]{title}[/bold]",
                 choices=values,

@@ -14,7 +14,7 @@ from rich import print
 from rich.prompt import Confirm, Prompt
 from rich_argparse import RichHelpFormatter
 
-from dstack.cli.common import _is_termios_available, ask_choice
+from dstack.cli.common import ask_choice, is_termios_available
 from dstack.core.config import BackendConfig, Configurator, get_config_path
 from dstack.core.error import ConfigError, HubConfigError
 from dstack.hub.models import (
@@ -398,7 +398,7 @@ class AWSConfigurator(Configurator):
         else:
             bucket_options.append(f"Default [{default_bucket_name}]")
         bucket_options.append("Custom...")
-        if _is_termios_available and len(bucket_options) == 2:
+        if is_termios_available and len(bucket_options) == 2:
             from simple_term_menu import TerminalMenu
 
             print(
