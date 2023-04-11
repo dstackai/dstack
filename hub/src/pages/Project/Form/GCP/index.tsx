@@ -43,7 +43,7 @@ export const GCPBackend: React.FC<IProps> = ({ loading }) => {
     const [getBackendValues, { isLoading: isLoadingValues }] = useBackendValuesMutation();
     const backendCredentials = watch('backend.credentials');
 
-    const disabledFields = loading || !backendCredentials || !valuesData;
+    const disabledFields = loading || isLoadingValues || !backendCredentials || !valuesData;
 
     useEffect(() => {
         changeFormHandler().catch(console.log);
