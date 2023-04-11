@@ -24,9 +24,8 @@ from dstack.backend.base import Backend
 from dstack.backend.base.logs import fix_urls
 from dstack.cli.commands import BasicCommand
 from dstack.cli.commands.run.ssh_tunnel import allocate_local_ports, run_ssh_tunnel
-from dstack.cli.common import console, print_runs
+from dstack.cli.common import check_backend, check_config, check_git, console, print_runs
 from dstack.cli.config import BaseConfig
-from dstack.core.error import check_backend, check_config, check_git
 from dstack.core.job import Job, JobHead, JobStatus
 from dstack.core.repo import RepoAddress
 from dstack.core.request import RequestStatus
