@@ -39,11 +39,10 @@ export const GCPBackend: React.FC<IProps> = ({ loading }) => {
     const [subnetOptions, setSubnetOptions] = useState<VPCSubnetOption[]>([]);
     const requestRef = useRef<null | ReturnType<typeof getBackendValues>>(null);
     const [pushNotification] = useNotifications();
+    const lastUpdatedField = useRef<string | null>(null);
 
     const [getBackendValues, { isLoading: isLoadingValues }] = useBackendValuesMutation();
     const backendCredentials = watch('backend.credentials');
-
-    const disabledFields = loading || isLoadingValues || !backendCredentials || !valuesData;
 
     useEffect(() => {
         changeFormHandler().catch(console.log);
@@ -63,7 +62,7 @@ export const GCPBackend: React.FC<IProps> = ({ loading }) => {
             return;
         }
 
-        clearErrors(`backend.${FIELD_NAMES.CREDENTIALS}`);
+        clearErrors('backend');
 
         try {
             const request = getBackendValues(backendFormValues);
@@ -72,7 +71,9 @@ export const GCPBackend: React.FC<IProps> = ({ loading }) => {
 
             setValuesData(response);
 
-            if (response.area.values.length) {
+            lastUpdatedField.current = null;
+
+            if (response.area.values) {
                 setAreaOptions(response.area.values);
             }
 
@@ -80,7 +81,7 @@ export const GCPBackend: React.FC<IProps> = ({ loading }) => {
                 setValue(`backend.${FIELD_NAMES.AREA}`, response.area.selected);
             }
 
-            if (response.region?.values.length) {
+            if (response.region?.values) {
                 setRegionOptions(response.region.values);
             }
 
@@ -88,7 +89,7 @@ export const GCPBackend: React.FC<IProps> = ({ loading }) => {
                 setValue(`backend.${FIELD_NAMES.REGION}`, response.region.selected);
             }
 
-            if (response.zone?.values.length) {
+            if (response.zone?.values) {
                 setZoneOptions(response.zone.values);
             }
 
@@ -96,7 +97,7 @@ export const GCPBackend: React.FC<IProps> = ({ loading }) => {
                 setValue(`backend.${FIELD_NAMES.ZONE}`, response.zone.selected);
             }
 
-            if (response.bucket_name?.values.length) {
+            if (response.bucket_name?.values) {
                 const buckets: TAwsBucket[] = response.bucket_name.values.map((valueItem) => ({
                     name: valueItem.value,
                 }));
@@ -108,7 +109,7 @@ export const GCPBackend: React.FC<IProps> = ({ loading }) => {
                 setValue(`backend.${FIELD_NAMES.BUCKET_NAME}`, response.bucket_name.selected);
             }
 
-            if (response.vpc_subnet?.values.length) {
+            if (response.vpc_subnet?.values) {
                 // it needs for working form, because options from api doesn't have value property
                 const vpcSubnetOptions: VPCSubnetOption[] = response.vpc_subnet.values.map((i) => ({
                     ...i,
@@ -167,6 +168,7 @@ export const GCPBackend: React.FC<IProps> = ({ loading }) => {
     };
 
     const getOnChangeSelectFormField = (fieldName: string) => () => {
+        lastUpdatedField.current = fieldName;
         clearFieldByQueueFromField(fieldName);
         onChangeFormField();
     };
@@ -189,6 +191,29 @@ export const GCPBackend: React.FC<IProps> = ({ loading }) => {
             vpc: optionItem.vpc,
             subnet: optionItem.subnet,
         });
+    };
+
+    const getDisabledByFieldName = (fieldName: string) => {
+        let disabledField = loading || !backendCredentials || !valuesData;
+
+        disabledField = disabledField || (lastUpdatedField.current !== fieldName && isLoadingValues);
+
+        switch (fieldName) {
+            case FIELD_NAMES.AREA:
+                disabledField = disabledField || !areaOptions.length;
+                break;
+            case FIELD_NAMES.REGION:
+                disabledField = disabledField || !regionOptions.length;
+                break;
+            case FIELD_NAMES.ZONE:
+                disabledField = disabledField || !zoneOptions.length;
+                break;
+            case FIELD_NAMES.VPC_SUBNET:
+                disabledField = disabledField || !subnetOptions.length;
+                break;
+        }
+
+        return disabledField;
     };
 
     const renderSpinner = () => {
@@ -242,7 +267,7 @@ export const GCPBackend: React.FC<IProps> = ({ loading }) => {
                     name={`backend.${FIELD_NAMES.AREA}`}
                     options={areaOptions}
                     onChange={getOnChangeSelectFormField(FIELD_NAMES.AREA)}
-                    disabled={disabledFields || !areaOptions.length}
+                    disabled={getDisabledByFieldName(FIELD_NAMES.AREA)}
                     rules={{ required: t('validation.required') }}
                     secondaryControl={renderSpinner()}
                 />
@@ -255,7 +280,7 @@ export const GCPBackend: React.FC<IProps> = ({ loading }) => {
                     name={`backend.${FIELD_NAMES.REGION}`}
                     options={regionOptions}
                     onChange={getOnChangeSelectFormField(FIELD_NAMES.REGION)}
-                    disabled={disabledFields || !regionOptions.length}
+                    disabled={getDisabledByFieldName(FIELD_NAMES.REGION)}
                     rules={{ required: t('validation.required') }}
                     secondaryControl={renderSpinner()}
                 />
@@ -268,7 +293,7 @@ export const GCPBackend: React.FC<IProps> = ({ loading }) => {
                     name={`backend.${FIELD_NAMES.ZONE}`}
                     options={zoneOptions}
                     onChange={getOnChangeSelectFormField(FIELD_NAMES.ZONE)}
-                    disabled={disabledFields || !zoneOptions.length}
+                    disabled={getDisabledByFieldName(FIELD_NAMES.ZONE)}
                     rules={{ required: t('validation.required') }}
                     secondaryControl={renderSpinner()}
                 />
@@ -280,8 +305,8 @@ export const GCPBackend: React.FC<IProps> = ({ loading }) => {
                     control={control}
                     name={`backend.${FIELD_NAMES.BUCKET_NAME}`}
                     selectableItemsTypes={['buckets']}
-                    disabled={disabledFields || !bucketNameOptions.length}
                     onChange={getOnChangeSelectFormField(FIELD_NAMES.BUCKET_NAME)}
+                    disabled={getDisabledByFieldName(FIELD_NAMES.BUCKET_NAME)}
                     rules={{ required: t('validation.required') }}
                     buckets={bucketNameOptions}
                     secondaryControl={renderSpinner()}
@@ -300,7 +325,7 @@ export const GCPBackend: React.FC<IProps> = ({ loading }) => {
                     name={`backend.${FIELD_NAMES.VPC_SUBNET}`}
                     options={subnetOptions}
                     onChange={onChangeVPCSubnet}
-                    disabled={disabledFields || !subnetOptions.length}
+                    disabled={getDisabledByFieldName(FIELD_NAMES.VPC_SUBNET)}
                     rules={{ required: t('validation.required') }}
                     secondaryControl={renderSpinner()}
                 />

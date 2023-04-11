@@ -1,4 +1,4 @@
-import React, { useMemo } from 'react';
+import React, { useMemo, useRef } from 'react';
 import cn from 'classnames';
 import { Controller, FieldValues } from 'react-hook-form';
 import FormField from '@cloudscape-design/components/form-field';
@@ -26,6 +26,7 @@ export const FormS3BucketSelector = <T extends FieldValues>({
     ...props
 }: FormS3BucketSelectorProps<T>) => {
     const fetch = async () => Promise.resolve([]);
+    const lastValue = useRef<string | null>(null);
 
     const buckets = useMemo<S3ResourceSelectorProps.Bucket[]>(() => {
         return bucketsProp.map((i) => ({
@@ -54,6 +55,10 @@ export const FormS3BucketSelector = <T extends FieldValues>({
                 const resource = { uri: value ? `${prefix}${value}` : value };
                 const onChangeSelect: S3ResourceSelectorProps['onChange'] = (event) => {
                     const bucket = event.detail.resource.uri.replace(/^s3:\/\//, '').replace(new RegExp(prefix), '');
+
+                    if (lastValue.current === bucket) return;
+                    lastValue.current = bucket;
+
                     onChange(bucket);
                     onChangeProp && onChangeProp(event);
                 };
