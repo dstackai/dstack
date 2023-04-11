@@ -162,7 +162,7 @@ func (j *Job) JobHeadFilepathLocal() string {
 		artifactSlice = append(artifactSlice, strings.ReplaceAll(art.Path, "/", "_"))
 	}
 	return fmt.Sprintf(
-		"jobs/%s/%s/%s/l;%s;%s;%s;%d;%s;%s;%s;%s",
+		"jobs/%s/l;%s;%s;%s;%d;%s;%s;%s;%s",
 		j.RepoName,
 		j.JobID,
 		j.ProviderName,
