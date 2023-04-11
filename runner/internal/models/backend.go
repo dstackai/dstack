@@ -167,6 +167,32 @@ func (j *Job) JobHeadFilepath() string {
 	)
 }
 
+func (j *Job) JobHeadFilepathLocal() string {
+	// TODO: we can get rid of this function once we stop putting artifact paths into job heads
+	appsSlice := make([]string, len(j.Apps))
+	for _, app := range j.Apps {
+		appsSlice = append(appsSlice, app.Name)
+	}
+	artifactSlice := make([]string, len(j.Artifacts))
+	for _, art := range j.Artifacts {
+		artifactSlice = append(artifactSlice, strings.ReplaceAll(art.Path, "/", "_"))
+	}
+	return fmt.Sprintf(
+		"jobs/%s/%s/%s/l;%s;%s;%s;%d;%s;%s;%s;%s",
+		j.RepoHostNameWithPort(),
+		j.RepoUserName,
+		j.RepoName,
+		j.JobID,
+		j.ProviderName,
+		j.LocalRepoUserName,
+		j.SubmittedAt,
+		j.Status,
+		strings.Join(artifactSlice, ","),
+		strings.Join(appsSlice, ","),
+		j.TagName,
+	)
+}
+
 func (d *Dep) RepoHostNameWithPort() string {
 	if d.RepoPort == 0 {
 		return d.RepoHostName
