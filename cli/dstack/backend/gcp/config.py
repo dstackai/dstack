@@ -9,9 +9,8 @@ from google.cloud import compute_v1, exceptions, storage
 from google.oauth2 import service_account
 from rich.prompt import Confirm, Prompt
 from rich_argparse import RichHelpFormatter
-from simple_term_menu import TerminalMenu
 
-from dstack.cli.common import ask_choice, console
+from dstack.cli.common import ask_choice, console, is_termios_available
 from dstack.core.config import BackendConfig, Configurator, get_config_path
 from dstack.core.error import ConfigError, HubConfigError
 from dstack.hub.models import (
@@ -486,23 +485,28 @@ class GCPConfigurator(Configurator):
         return zone
 
     def _ask_bucket(self, default_bucket: Optional[str]) -> str:
-        console.print(
-            "[sea_green3 bold]?[/sea_green3 bold] [bold]Choose storage bucket[/bold] "
-            "[gray46]Use arrows to move, type to filter[/gray46]"
-        )
         if default_bucket is None:
             default_bucket = f"dstack-{self.project_id}-{self.region}"
-        bucket_options = [f"Default [{default_bucket}]", "Custom..."]
-        bucket_menu = TerminalMenu(
-            bucket_options,
-            menu_cursor_style=["fg_red", "bold"],
-            menu_highlight_style=["fg_red", "bold"],
-            search_highlight_style=["fg_purple"],
-            raise_error_on_interrupt=True,
-        )
-        bucket_index = bucket_menu.show()
-        bucket_title = bucket_options[bucket_index].replace("[", "\\[")
-        console.print(f"[sea_green3 bold]✓[/sea_green3 bold] [grey74]{bucket_title}[/grey74]")
+        if is_termios_available:
+            from simple_term_menu import TerminalMenu
+
+            console.print(
+                "[sea_green3 bold]?[/sea_green3 bold] [bold]Choose storage bucket[/bold] "
+                "[gray46]Use arrows to move, type to filter[/gray46]"
+            )
+            bucket_options = [f"Default [{default_bucket}]", "Custom..."]
+            bucket_menu = TerminalMenu(
+                bucket_options,
+                menu_cursor_style=["fg_red", "bold"],
+                menu_highlight_style=["fg_red", "bold"],
+                search_highlight_style=["fg_purple"],
+                raise_error_on_interrupt=True,
+            )
+            bucket_index = bucket_menu.show()
+            bucket_title = bucket_options[bucket_index].replace("[", "\\[")
+            console.print(f"[sea_green3 bold]✓[/sea_green3 bold] [grey74]{bucket_title}[/grey74]")
+        else:
+            bucket_index = 1
         if bucket_index == 1:
             return self._ask_bucket_name(default_bucket)
         if self._validate_bucket(default_bucket):
@@ -556,6 +560,8 @@ class GCPConfigurator(Configurator):
         self, default_vpc: Optional[str], default_subnet: Optional[str]
     ) -> Tuple[str, str]:
         no_preference_vpc_subnet = ("default", "default")
+        if default_vpc is None or default_subnet is None:
+            default_vpc, default_subnet = no_preference_vpc_subnet
         networks_client = compute_v1.NetworksClient(credentials=self.credentials)
         list_networks_request = compute_v1.ListNetworksRequest(project=self.project_id)
         networks = networks_client.list(list_networks_request)
@@ -571,19 +577,21 @@ class GCPConfigurator(Configurator):
                         "subnet": self._get_subnet_name(subnet),
                     }
                 )
-        vpc_subnet_values = sorted(
+        vpc_subnets = sorted(
             [(s["vpc"], s["subnet"]) for s in subnets], key=lambda t: t != no_preference_vpc_subnet
         )
+        vpc_subnet_values = [f"{t[0]},{t[1]}" for t in vpc_subnets]
         vpc_subnet_labels = [
             f"{t[1]} [{t[0]}]" if t != no_preference_vpc_subnet else "Default [no preference]"
-            for t in vpc_subnet_values
+            for t in vpc_subnets
         ]
-        vpc, subnet = ask_choice(
+        vpc_subnet = ask_choice(
             "Choose VPC subnet",
             vpc_subnet_labels,
             vpc_subnet_values,
-            (default_vpc, default_subnet),
+            f"{default_vpc},{default_subnet}",
         )
+        vpc, subnet = vpc_subnet.split(",")
         return vpc, subnet
 
     def _get_resource_name(self, resource_path: str) -> str:
