@@ -1,4 +1,3 @@
-from dstack import version
 from dstack.cli.commands.config import ConfigCommand
 from dstack.cli.commands.cp import CpCommand
 from dstack.cli.commands.hub import HubCommand
@@ -30,10 +29,8 @@ commands_classes = [
     SecretCommand,
     StopCommand,
     TAGCommand,
+    HubCommand,
 ]
-
-if not version.__is_release__:
-    commands_classes.append(HubCommand)
 
 
 def cli_initialize(parser):
