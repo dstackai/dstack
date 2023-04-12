@@ -158,7 +158,7 @@ def _runner_filename() -> str:
     linux = uname.system == "Linux"
     arm64 = arch == "arm64" or arch == "aarch64"
     i386 = arch == "i386"
-    amd64 = arch == "x86_64"
+    amd64 = arch in ["x86_64", "AMD64"]
     if darwin and arm64:
         filename = "dstack-runner-darwin-arm64"
     elif darwin and amd64:

@@ -1,5 +1,6 @@
 import os
 import shutil
+import subprocess
 from pathlib import Path
 from typing import Tuple
 from unittest.mock import patch
@@ -31,7 +32,8 @@ def local_runner():
 def dstack_dir(local_runner: Path):
     shutil.copytree(local_runner, DSTACK_DIR)
     yield DSTACK_DIR
-    shutil.rmtree(DSTACK_DIR)
+    # We need sudo to delete directories created by runner
+    subprocess.run(["sudo", "rm", "-r", DSTACK_DIR])
 
 
 @pytest.fixture
