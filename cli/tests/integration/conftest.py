@@ -18,7 +18,7 @@ SSH_DIR = HOME_DIR / ".ssh"
 DSTACK_DIR = TESTS_DIR / ".dstack"
 DSTACK_HOMEDIR_WITH_RUNNER = TESTS_DIR / "dstack-runner"
 TESTS_PUBLIC_DIR = TESTS_DIR / "dstack-tests-public"
-TESTS_PUBLIC_REPO_URL = "https://github.com/r4victor/dstack-tests-public"
+TESTS_PUBLIC_REPO_URL = "https://github.com/dstackai/dstack-tests-public"
 
 
 @pytest.fixture(scope="session")
