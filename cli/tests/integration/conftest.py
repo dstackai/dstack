@@ -44,7 +44,7 @@ def ssh_key():
     shutil.rmtree(SSH_DIR)
 
 
-@pytest.fixture
+@pytest.fixture(scope="session")
 def tests_public_repo():
     Repo.clone_from(TESTS_PUBLIC_REPO_URL, TESTS_PUBLIC_DIR)
     yield TESTS_PUBLIC_DIR
