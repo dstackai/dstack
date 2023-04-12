@@ -8,7 +8,7 @@ from git import InvalidGitRepositoryError
 from git import Repo as GitRepo
 from paramiko.config import SSHConfig
 
-from dstack.core.repo import LocalRepoData, Repo, RepoProtocol
+from dstack.core.repo import LocalRepoData, RepoProtocol, RepoRef
 from dstack.core.userconfig import RepoUserConfig
 
 
@@ -75,8 +75,8 @@ def load_repo_data(
     )
 
 
-def get_repo(repo_user_config: RepoUserConfig) -> Repo:
-    repo = Repo(name=repo_user_config.repo_name, username=repo_user_config.username)
+def get_repo(repo_user_config: RepoUserConfig) -> RepoRef:
+    repo = RepoRef(repo_id=repo_user_config.repo_name, repo_user_id=repo_user_config.username)
     try:
         repo.data = load_repo_data()
     except InvalidGitRepositoryError:

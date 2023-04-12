@@ -327,9 +327,9 @@ class Provider:
     def _tag_dep(backend: Backend, tag_name: str, mount: bool) -> DepSpec:
         tag_head = backend.get_tag_head(tag_name)
         if tag_head:
-            return DepSpec(repo_name=backend.repo.name, run_name=tag_head.run_name, mount=mount)
+            return DepSpec(repo_name=backend.repo.repo_id, run_name=tag_head.run_name, mount=mount)
         else:
-            sys.exit(f"Cannot find the tag '{tag_name}' in the '{backend.repo.name}' repo")
+            sys.exit(f"Cannot find the tag '{tag_name}' in the '{backend.repo.repo_id}' repo")
 
     @staticmethod
     def _workflow_dep(backend: Backend, workflow_name: str, mount: bool) -> DepSpec:
@@ -350,11 +350,11 @@ class Provider:
             None,
         )
         if run_name:
-            return DepSpec(repo_name=backend.repo.name, run_name=run_name, mount=mount)
+            return DepSpec(repo_name=backend.repo.repo_id, run_name=run_name, mount=mount)
         else:
             sys.exit(
                 f"Cannot find any successful workflow with the name '{workflow_name}' "
-                f"in the '{backend.repo.name}' repo"
+                f"in the '{backend.repo.repo_id}' repo"
             )
 
     def _env(self) -> Optional[Dict[str, str]]:

@@ -24,7 +24,7 @@ from dstack.core.artifact import Artifact
 from dstack.core.error import ConfigError
 from dstack.core.job import Job, JobHead, JobStatus
 from dstack.core.log_event import LogEvent
-from dstack.core.repo import Repo, RepoCredentials, RepoHead
+from dstack.core.repo import RepoCredentials, RepoHead, RepoRef
 from dstack.core.run import RunHead
 from dstack.core.secret import Secret
 from dstack.core.tag import TagHead
@@ -33,7 +33,7 @@ warnings.filterwarnings("ignore", message=_CLOUD_SDK_CREDENTIALS_WARNING)
 
 
 class GCPBackend(CloudBackend):
-    def __init__(self, repo: Optional[Repo], backend_config: Optional[GCPConfig] = None):
+    def __init__(self, repo: Optional[RepoRef], backend_config: Optional[GCPConfig] = None):
         super().__init__(backend_config=backend_config, repo=repo)
         if backend_config is None:
             try:
@@ -70,7 +70,7 @@ class GCPBackend(CloudBackend):
             project_id=self.config.project_id,
             bucket_name=self.config.bucket_name,
             credentials=credentials,
-            repo_name=self.repo.name if self.repo else None,
+            repo_name=self.repo.repo_id if self.repo else None,
         )
         self._logging = GCPLogging(
             project_id=self.config.project_id,
@@ -96,10 +96,10 @@ class GCPBackend(CloudBackend):
         base_jobs.create_job(self._storage, job)
 
     def get_job(self, job_id: str) -> Optional[Job]:
-        return base_jobs.get_job(self._storage, self.repo.name, job_id)
+        return base_jobs.get_job(self._storage, self.repo.repo_id, job_id)
 
     def list_jobs(self, run_name: str) -> List[Job]:
-        return base_jobs.list_jobs(self._storage, self.repo.name, run_name)
+        return base_jobs.list_jobs(self._storage, self.repo.repo_id, run_name)
 
     def run_job(self, job: Job, failed_to_start_job_new_status: JobStatus):
         base_jobs.run_job(self._storage, self._compute, job, failed_to_start_job_new_status)
@@ -111,7 +111,7 @@ class GCPBackend(CloudBackend):
         return base_jobs.list_job_heads(self._storage, self.repo, run_name)
 
     def delete_job_head(self, job_id: str):
-        base_jobs.delete_job_head(self._storage, self.repo.name, job_id)
+        base_jobs.delete_job_head(self._storage, self.repo.repo_id, job_id)
 
     def list_run_heads(
         self,
@@ -136,13 +136,13 @@ class GCPBackend(CloudBackend):
     ) -> Generator[LogEvent, None, None]:
         yield from self._logging.poll_logs(
             storage=self._storage,
-            repo_name=self.repo.name,
+            repo_name=self.repo.repo_id,
             run_name=job_heads[0].run_name,
             start_time=start_time,
         )
 
     def list_run_artifact_files(self, run_name: str) -> List[Artifact]:
-        return base_artifacts.list_run_artifact_files(self._storage, self.repo.name, run_name)
+        return base_artifacts.list_run_artifact_files(self._storage, self.repo.repo_id, run_name)
 
     def download_run_artifact_files(
         self,
@@ -153,7 +153,7 @@ class GCPBackend(CloudBackend):
         artifacts = self.list_run_artifact_files(run_name=run_name)
         base_artifacts.download_run_artifact_files(
             storage=self._storage,
-            repo_name=self.repo.name,
+            repo_name=self.repo.repo_id,
             artifacts=artifacts,
             output_dir=output_dir,
             files_path=files_path,
@@ -168,7 +168,7 @@ class GCPBackend(CloudBackend):
     ):
         base_artifacts.upload_job_artifact_files(
             storage=self._storage,
-            repo_name=self.repo.name,
+            repo_name=self.repo.repo_id,
             job_id=job_id,
             artifact_name=artifact_name,
             artifact_path=artifact_path,
@@ -176,10 +176,10 @@ class GCPBackend(CloudBackend):
         )
 
     def list_tag_heads(self) -> List[TagHead]:
-        return base_tags.list_tag_heads(self._storage, self.repo.name)
+        return base_tags.list_tag_heads(self._storage, self.repo.repo_id)
 
     def get_tag_head(self, tag_name: str) -> Optional[TagHead]:
-        return base_tags.get_tag_head(self._storage, self.repo.name, tag_name)
+        return base_tags.get_tag_head(self._storage, self.repo.repo_id, tag_name)
 
     def add_tag_from_run(
         self,
@@ -213,7 +213,7 @@ class GCPBackend(CloudBackend):
     def update_repo_last_run_at(self, last_run_at: int):
         base_repos.update_repo_last_run_at(
             self._storage,
-            self.repo.name,
+            self.repo.repo_id,
             last_run_at,
         )
 
@@ -227,7 +227,7 @@ class GCPBackend(CloudBackend):
         )
 
     def list_secret_names(self) -> List[str]:
-        return base_secrets.list_secret_names(self._storage, self.repo.name)
+        return base_secrets.list_secret_names(self._storage, self.repo.repo_id)
 
     def get_secret(self, secret_name: str) -> Optional[Secret]:
         return base_secrets.get_secret(self._secrets_manager, secret_name)
@@ -265,5 +265,5 @@ class GCPBackend(CloudBackend):
 
     def delete_workflow_cache(self, workflow_name: str):
         base_cache.delete_workflow_cache(
-            self._storage, self.repo.name, self.repo.username, workflow_name
+            self._storage, self.repo.repo_id, self.repo.repo_user_id, workflow_name
         )

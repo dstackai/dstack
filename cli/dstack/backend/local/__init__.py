@@ -18,14 +18,14 @@ from dstack.backend.local.storage import LocalStorage
 from dstack.core.artifact import Artifact
 from dstack.core.job import Job, JobHead, JobStatus
 from dstack.core.log_event import LogEvent
-from dstack.core.repo import Repo, RepoCredentials
+from dstack.core.repo import RepoCredentials, RepoRef
 from dstack.core.run import RunHead
 from dstack.core.secret import Secret
 from dstack.core.tag import TagHead
 
 
 class LocalBackend(Backend):
-    def __init__(self, repo: Repo):
+    def __init__(self, repo: RepoRef):
         super().__init__(repo=repo)
         self.backend_config = LocalConfig()
         self.backend_config.load()
@@ -33,7 +33,7 @@ class LocalBackend(Backend):
         self._storage = LocalStorage(self.backend_config.path)
         self._compute = LocalCompute()
         self._secrets_manager = LocalSecretsManager(
-            self.backend_config.path, repo_name=self.repo.name if self.repo else None
+            self.backend_config.path, repo_name=self.repo.repo_id if self.repo else None
         )
 
     @property
@@ -54,10 +54,10 @@ class LocalBackend(Backend):
         base_jobs.create_job(self._storage, job)
 
     def get_job(self, job_id: str) -> Optional[Job]:
-        return base_jobs.get_job(self._storage, self.repo.name, job_id)
+        return base_jobs.get_job(self._storage, self.repo.repo_id, job_id)
 
     def list_jobs(self, run_name: str) -> List[Job]:
-        return base_jobs.list_jobs(self._storage, self.repo.name, run_name)
+        return base_jobs.list_jobs(self._storage, self.repo.repo_id, run_name)
 
     def run_job(self, job: Job, failed_to_start_job_new_status: JobStatus):
         base_jobs.run_job(self._storage, self._compute, job, failed_to_start_job_new_status)
@@ -69,7 +69,7 @@ class LocalBackend(Backend):
         return base_jobs.list_job_heads(self._storage, self.repo, run_name)
 
     def delete_job_head(self, job_id: str):
-        base_jobs.delete_job_head(self._storage, self.repo.name, job_id)
+        base_jobs.delete_job_head(self._storage, self.repo.repo_id, job_id)
 
     def list_run_heads(
         self,
@@ -93,11 +93,11 @@ class LocalBackend(Backend):
         attached: bool,
     ) -> Generator[LogEvent, None, None]:
         return logs.poll_logs(
-            self._storage, self._compute, self.repo.name, job_heads, start_time, attached
+            self._storage, self._compute, self.repo.repo_id, job_heads, start_time, attached
         )
 
     def list_run_artifact_files(self, run_name: str) -> List[Artifact]:
-        return base_artifacts.list_run_artifact_files(self._storage, self.repo.name, run_name)
+        return base_artifacts.list_run_artifact_files(self._storage, self.repo.repo_id, run_name)
 
     def download_run_artifact_files(
         self,
@@ -108,7 +108,7 @@ class LocalBackend(Backend):
         list_artifacts = self.list_run_artifact_files(run_name)
         base_artifacts.download_run_artifact_files(
             storage=self._storage,
-            repo_name=self.repo.name,
+            repo_name=self.repo.repo_id,
             artifacts=list_artifacts,
             output_dir=output_dir,
             files_path=files_path,
@@ -123,7 +123,7 @@ class LocalBackend(Backend):
     ):
         base_artifacts.upload_job_artifact_files(
             storage=self._storage,
-            repo_name=self.repo.name,
+            repo_name=self.repo.repo_id,
             job_id=job_id,
             artifact_name=artifact_name,
             artifact_path=artifact_path,
@@ -131,10 +131,10 @@ class LocalBackend(Backend):
         )
 
     def list_tag_heads(self) -> List[TagHead]:
-        return base_tags.list_tag_heads(self._storage, self.repo.name)
+        return base_tags.list_tag_heads(self._storage, self.repo.repo_id)
 
     def get_tag_head(self, tag_name: str) -> Optional[TagHead]:
-        return base_tags.get_tag_head(self._storage, self.repo.name, tag_name)
+        return base_tags.get_tag_head(self._storage, self.repo.repo_id, tag_name)
 
     def add_tag_from_run(
         self,
@@ -175,7 +175,7 @@ class LocalBackend(Backend):
         )
 
     def list_secret_names(self) -> List[str]:
-        return base_secrets.list_secret_names(self._storage, self.repo.name)
+        return base_secrets.list_secret_names(self._storage, self.repo.repo_id)
 
     def get_secret(self, secret_name: str) -> Optional[Secret]:
         return base_secrets.get_secret(self._secrets_manager, secret_name)
@@ -202,7 +202,7 @@ class LocalBackend(Backend):
         )
 
     def get_artifacts_path(self) -> Path:
-        return artifacts.get_artifacts_path(self.backend_config.path, self.repo.name)
+        return artifacts.get_artifacts_path(self.backend_config.path, self.repo.repo_id)
 
     @classmethod
     def get_configurator(cls):
@@ -210,5 +210,5 @@ class LocalBackend(Backend):
 
     def delete_workflow_cache(self, workflow_name: str):
         base_cache.delete_workflow_cache(
-            self._storage, self.repo.name, self.repo.username, workflow_name
+            self._storage, self.repo.repo_id, self.repo.repo_user_id, workflow_name
         )

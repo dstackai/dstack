@@ -70,7 +70,7 @@ class CpCommand(BasicCommand):
 
 
 def _copy_artifact_files(backend: Backend, run_name: str, source: str, target: str):
-    tmp_output_dir = get_dstack_dir() / "tmp" / "copied_artifacts" / backend.repo.name
+    tmp_output_dir = get_dstack_dir() / "tmp" / "copied_artifacts" / backend.repo.repo_id
     tmp_output_dir.mkdir(parents=True, exist_ok=True)
     source = _normalize_source(source)
     backend.download_run_artifact_files(

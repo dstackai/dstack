@@ -4,7 +4,7 @@ from pydantic import BaseModel, Field
 from typing_extensions import Literal
 
 from dstack.core.job import Job, JobHead
-from dstack.core.repo import Repo, RepoCredentials
+from dstack.core.repo import RepoCredentials, RepoRef
 from dstack.core.secret import Secret
 from dstack.hub.security.utils import GlobalRole, ProjectRole
 
@@ -123,62 +123,62 @@ class ProjectInfoWithCreds(BaseModel):
 
 
 class AddTagRun(BaseModel):
-    repo: Repo
+    repo: RepoRef
     tag_name: str
     run_name: str
     run_jobs: Optional[List[Job]]
 
 
 class AddTagPath(BaseModel):
-    repo: Repo
+    repo: RepoRef
     tag_name: str
     local_dirs: List[str]
 
 
 class StopRunners(BaseModel):
-    repo: Repo
+    repo: RepoRef
     job_id: str
     abort: bool
 
 
 class SaveRepoCredentials(BaseModel):
-    repo: Repo
+    repo: RepoRef
     repo_credentials: RepoCredentials
 
 
 class ReposUpdate(BaseModel):
-    repo: Repo
+    repo: RepoRef
     last_run_at: int
 
 
 class RunsList(BaseModel):
-    repo: Repo
+    repo: RepoRef
     run_name: Optional[str]
     include_request_heads: Optional[bool]
 
 
 class JobsGet(BaseModel):
-    repo: Repo
+    repo: RepoRef
     job_id: str
 
 
 class JobsList(BaseModel):
-    repo: Repo
+    repo: RepoRef
     run_name: str
 
 
 class ArtifactsList(BaseModel):
-    repo: Repo
+    repo: RepoRef
     run_name: str
 
 
 class SecretAddUpdate(BaseModel):
-    repo: Repo
+    repo: RepoRef
     secret: Secret
 
 
 class PollLogs(BaseModel):
-    repo: Repo
+    repo: RepoRef
     job_heads: List[JobHead]
     start_time: int
     attached: bool

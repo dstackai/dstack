@@ -2,7 +2,7 @@ import asyncio
 from typing import List
 
 from dstack.core.job import JobStatus
-from dstack.core.repo import Repo
+from dstack.core.repo import RepoRef
 from dstack.hub.db.models import Project
 from dstack.hub.repository.projects import ProjectManager
 from dstack.hub.routers.cache import get_backend
@@ -25,7 +25,7 @@ def _resubmit_project_jobs(project: Project):
     curr_time = get_milliseconds_since_epoch()
     unbound_backend = get_backend(project, repo=None)
     for repo_head in unbound_backend.list_repo_heads():
-        backend = get_backend(project, Repo(name=repo_head.name, username="default"))
+        backend = get_backend(project, RepoRef(repo_id=repo_head.name, repo_user_id="default"))
         run_heads = backend.list_run_heads(
             run_name=None,
             include_request_heads=True,

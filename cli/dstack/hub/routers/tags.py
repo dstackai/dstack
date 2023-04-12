@@ -2,7 +2,7 @@ from typing import List
 
 from fastapi import APIRouter, Depends, HTTPException, status
 
-from dstack.core.repo import Repo
+from dstack.core.repo import RepoRef
 from dstack.core.tag import TagHead
 from dstack.hub.models import AddTagPath, AddTagRun
 from dstack.hub.routers.cache import get_backend
@@ -16,7 +16,7 @@ router = APIRouter(prefix="/api/project", tags=["tags"], dependencies=[Depends(P
     "/{project_name}/tags/list/heads",
     response_model=List[TagHead],
 )
-async def list_heads_tags(project_name: str, repo: Repo):
+async def list_heads_tags(project_name: str, repo: RepoRef):
     project = await get_project(project_name=project_name)
     backend = get_backend(project, repo)
     list_tag = backend.list_tag_heads()
@@ -27,7 +27,7 @@ async def list_heads_tags(project_name: str, repo: Repo):
     "/{project_name}/tags/{tag_name}",
     response_model=TagHead,
 )
-async def get_tag(project_name: str, tag_name: str, repo: Repo) -> TagHead:
+async def get_tag(project_name: str, tag_name: str, repo: RepoRef) -> TagHead:
     project = await get_project(project_name=project_name)
     backend = get_backend(project, repo)
     tag = backend.get_tag_head(tag_name=tag_name)
@@ -39,7 +39,7 @@ async def get_tag(project_name: str, tag_name: str, repo: Repo) -> TagHead:
 
 
 @router.post("/{project_name}/tags/{tag_name}/delete")
-async def delete_tag(project_name: str, tag_name: str, repo: Repo):
+async def delete_tag(project_name: str, tag_name: str, repo: RepoRef):
     project = await get_project(project_name=project_name)
     backend = get_backend(project, repo)
     tag = backend.get_tag_head(tag_name=tag_name)

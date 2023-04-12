@@ -7,7 +7,7 @@ import requests
 from dstack.core.artifact import Artifact
 from dstack.core.job import Job, JobHead
 from dstack.core.log_event import LogEvent
-from dstack.core.repo import Repo, RepoCredentials
+from dstack.core.repo import RepoCredentials, RepoRef
 from dstack.core.run import RunHead
 from dstack.core.secret import Secret
 from dstack.core.tag import TagHead
@@ -45,7 +45,7 @@ def _url(url: str, project: str, additional_path: str, query: dict = {}):
 
 
 class HubClient:
-    def __init__(self, url: str, project: str, token: str, repo: Optional[Repo]):
+    def __init__(self, url: str, project: str, token: str, repo: Optional[RepoRef]):
         self.url = url
         self.token = token
         self.project = project

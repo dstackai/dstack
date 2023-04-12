@@ -9,7 +9,7 @@ from dstack.core.artifact import Artifact
 from dstack.core.config import BackendConfig, Configurator
 from dstack.core.job import Job, JobHead, JobStatus
 from dstack.core.log_event import LogEvent
-from dstack.core.repo import Repo, RepoCredentials, RepoHead
+from dstack.core.repo import RepoCredentials, RepoHead, RepoRef
 from dstack.core.run import RunHead
 from dstack.core.secret import Secret
 from dstack.core.tag import TagHead
@@ -26,7 +26,7 @@ class BackendType(Enum):
 class Backend(ABC):
     _loaded = False
 
-    def __init__(self, repo: Optional[Repo]):
+    def __init__(self, repo: Optional[RepoRef]):
         self.repo = repo
 
     @property
@@ -216,7 +216,10 @@ class Backend(ABC):
 
 class RemoteBackend(Backend):
     def __init__(
-        self, repo: Repo, backend_config: Optional[BackendConfig] = None, custom_client: Any = None
+        self,
+        repo: RepoRef,
+        backend_config: Optional[BackendConfig] = None,
+        custom_client: Any = None,
     ):
         super().__init__(repo=repo)
 

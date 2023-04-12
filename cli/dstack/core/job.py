@@ -8,7 +8,7 @@ from dstack.core.app import AppSpec
 from dstack.core.artifact import ArtifactSpec
 from dstack.core.cache import CacheSpec
 from dstack.core.dependents import DepSpec
-from dstack.core.repo import Repo, RepoAddress, RepoData
+from dstack.core.repo import RepoAddress, RepoData, RepoRef
 from dstack.utils.common import _quoted, format_list
 
 
@@ -107,7 +107,7 @@ class JobStatus(Enum):
 
 class JobHead(JobRef):
     job_id: str
-    repo: Repo
+    repo: RepoRef
     run_name: str
     workflow_name: Optional[str]
     provider_name: str
@@ -280,8 +280,8 @@ class Job(JobHead):
                 )
         job_data = {
             "job_id": self.job_id,
-            "repo_name": self.repo.name,
-            "repo_username": self.repo.username,
+            "repo_name": self.repo.repo_id,
+            "repo_username": self.repo.repo_user_id,
             "git_host_name": self.repo.data.repo_host_name,
             "git_port": self.repo.data.repo_port or 0,
             "git_user_name": self.repo.data.repo_user_name,
@@ -404,9 +404,9 @@ class Job(JobHead):
         ) or None
         job = Job(
             job_id=job_data["job_id"],
-            repo=Repo(
-                name=job_data["repo_name"],
-                username=job_data["repo_username"],
+            repo=RepoRef(
+                repo_id=job_data["repo_name"],
+                repo_user_id=job_data["repo_username"],
                 data=RepoData(
                     repo_host_name=job_data["git_host_name"],
                     repo_port=job_data.get("git_port") or None,

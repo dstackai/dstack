@@ -3,7 +3,7 @@ from typing import List, Optional
 from fastapi import APIRouter, Depends
 
 from dstack.core.job import Job, JobHead
-from dstack.core.repo import Repo
+from dstack.core.repo import RepoRef
 from dstack.hub.models import JobsGet, JobsList
 from dstack.hub.routers.cache import get_backend
 from dstack.hub.routers.util import get_project
@@ -35,7 +35,7 @@ async def list_job(project_name: str, body: JobsList) -> List[Job]:
 
 @router.post("/{project_name}/jobs/list/heads")
 async def list_heads_job(
-    project_name: str, repo: Repo, run_name: Optional[str] = None
+    project_name: str, repo: RepoRef, run_name: Optional[str] = None
 ) -> List[JobHead]:
     project = await get_project(project_name=project_name)
     backend = get_backend(project, repo)

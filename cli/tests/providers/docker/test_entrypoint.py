@@ -3,7 +3,7 @@ from typing import List, Optional
 from unittest.mock import patch
 
 from dstack.backend.base import Backend
-from dstack.core.repo import LocalRepoData, Repo
+from dstack.core.repo import LocalRepoData, RepoRef
 from dstack.providers.docker.main import DockerProvider
 
 
@@ -28,9 +28,9 @@ class TestEntrypoint(unittest.TestCase):
     @patch.multiple(Backend, __abstractmethods__=set())
     def setUp(self) -> None:
         self.backend = Backend(
-            repo=Repo(
-                name="foo",
-                username="bar",
+            repo=RepoRef(
+                repo_id="foo",
+                repo_user_id="bar",
                 data=LocalRepoData(
                     repo_host_name="",
                     repo_user_name="",

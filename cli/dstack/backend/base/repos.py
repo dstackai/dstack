@@ -3,7 +3,7 @@ from typing import List, Optional
 
 from dstack.backend.base.secrets import SecretsManager
 from dstack.backend.base.storage import Storage
-from dstack.core.repo import Repo, RepoCredentials, RepoHead, RepoProtocol
+from dstack.core.repo import RepoCredentials, RepoHead, RepoProtocol, RepoRef
 
 
 def get_repo_head(storage: Storage, repo_name: str) -> Optional[RepoHead]:

@@ -97,7 +97,7 @@ def _create_run(
     if include_request_heads and job_head.status.is_unfinished():
         if request_heads is None:
             request_heads = []
-        job = jobs.get_job(storage, job_head.repo.name, job_head.job_id)
+        job = jobs.get_job(storage, job_head.repo.repo_id, job_head.job_id)
         request_id = job.request_id
         if request_id is None and job.runner_id is not None:
             runner = runners.get_runner(storage, job.runner_id)
@@ -160,7 +160,7 @@ def _update_run(
         if include_request_heads:
             if run.request_heads is None:
                 run.request_heads = []
-            job = jobs.get_job(storage, job_head.repo.name, job_head.job_id)
+            job = jobs.get_job(storage, job_head.repo.repo_id, job_head.job_id)
             request_id = job.request_id
             if request_id is None and job.runner_id is not None:
                 runner = runners.get_runner(storage, job.runner_id)

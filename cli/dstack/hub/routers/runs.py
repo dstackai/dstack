@@ -4,7 +4,7 @@ from fastapi import APIRouter, Depends
 from fastapi.responses import PlainTextResponse
 
 from dstack.core.job import JobStatus
-from dstack.core.repo import Repo
+from dstack.core.repo import RepoRef
 from dstack.core.run import RunHead
 from dstack.hub.models import RunsList
 from dstack.hub.routers.cache import get_backend
@@ -19,7 +19,7 @@ router = APIRouter(prefix="/api/project", tags=["runs"], dependencies=[Depends(P
     response_model=str,
     response_class=PlainTextResponse,
 )
-async def create_run(project_name: str, repo: Repo) -> str:
+async def create_run(project_name: str, repo: RepoRef) -> str:
     project = await get_project(project_name=project_name)
     backend = get_backend(project, repo)
     run_name = backend.create_run()

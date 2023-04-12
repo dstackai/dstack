@@ -7,7 +7,7 @@ from dstack.backend.base.storage import Storage
 from dstack.core.artifact import ArtifactHead, ArtifactSpec
 from dstack.core.error import BackendError
 from dstack.core.job import Job, JobStatus
-from dstack.core.repo import Repo
+from dstack.core.repo import RepoRef
 from dstack.core.tag import TagHead
 from dstack.utils.common import get_milliseconds_since_epoch
 
@@ -72,13 +72,13 @@ def list_tag_heads(storage: Storage, repo_name: str):
 
 def delete_tag(
     storage: Storage,
-    repo: Repo,
+    repo: RepoRef,
     tag_head: TagHead,
 ):
     tag_jobs = []
     job_heads = jobs.list_job_heads(storage, repo, tag_head.run_name)
     for job_head in job_heads:
-        job = jobs.get_job(storage, repo.name, job_head.job_id)
+        job = jobs.get_job(storage, repo.repo_id, job_head.job_id)
         if job is not None:
             tag_jobs.append(job)
     storage.delete_object(_get_tag_head_key(tag_head))
@@ -89,7 +89,7 @@ def delete_tag(
 
 def create_tag_from_run(
     storage: Storage,
-    repo: Repo,
+    repo: RepoRef,
     tag_name: str,
     run_name: str,
     run_jobs: Optional[List[Job]],
@@ -101,7 +101,7 @@ def create_tag_from_run(
         job_with_anther_tag = None
         job_heads = jobs.list_job_heads(storage, repo, run_name)
         for job_head in job_heads:
-            job = jobs.get_job(storage, repo.name, job_head.job_id)
+            job = jobs.get_job(storage, repo.repo_id, job_head.job_id)
             if job:
                 tag_jobs.append(job)
                 if job.tag_name and job.tag_name != tag_name:
@@ -115,7 +115,7 @@ def create_tag_from_run(
             exit(f"Cannot find the run '{run_name}'")
 
     tag_head = TagHead(
-        repo_name=repo.name,
+        repo_name=repo.repo_id,
         tag_name=tag_name,
         run_name=run_name,
         workflow_name=tag_jobs[0].workflow_name,
@@ -139,7 +139,7 @@ def create_tag_from_run(
 
 def create_tag_from_local_dirs(
     storage: Storage,
-    repo: Repo,
+    repo: RepoRef,
     tag_name: str,
     local_dirs: List[str],
     backend_type: BackendType,
@@ -186,14 +186,14 @@ def create_tag_from_local_dirs(
     for index, local_path in enumerate(local_paths):
         artifacts.upload_job_artifact_files(
             storage,
-            repo.name,
+            repo.repo_id,
             job.job_id,
             tag_artifacts[index],
             tag_artifacts[index],
             local_path,
         )
     tag_head = TagHead(
-        repo_name=repo.name,
+        repo_name=repo.repo_id,
         tag_name=tag_name,
         run_name=run_name,
         workflow_name=job.workflow_name,

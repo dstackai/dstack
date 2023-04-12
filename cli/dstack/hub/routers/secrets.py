@@ -2,7 +2,7 @@ from typing import List
 
 from fastapi import APIRouter, Depends, HTTPException, status
 
-from dstack.core.repo import Repo
+from dstack.core.repo import RepoRef
 from dstack.core.secret import Secret
 from dstack.hub.models import SecretAddUpdate
 from dstack.hub.routers.cache import get_backend
@@ -15,7 +15,7 @@ router = APIRouter(
 
 
 @router.post("/{project_name}/secrets/list")
-async def list_secrets(project_name: str, repo: Repo) -> List[str]:
+async def list_secrets(project_name: str, repo: RepoRef) -> List[str]:
     project = await get_project(project_name=project_name)
     backend = get_backend(project, repo)
     return backend.list_secret_names()
@@ -36,7 +36,7 @@ async def update_secret(project_name: str, body: SecretAddUpdate):
 
 
 @router.post("/{project_name}/secrets/{secret_name}/get")
-async def get_secret(project_name: str, secret_name: str, repo: Repo) -> Secret:
+async def get_secret(project_name: str, secret_name: str, repo: RepoRef) -> Secret:
     project = await get_project(project_name=project_name)
     backend = get_backend(project, repo)
     secret = backend.get_secret(secret_name=secret_name)
@@ -48,7 +48,7 @@ async def get_secret(project_name: str, secret_name: str, repo: Repo) -> Secret:
 
 
 @router.post("/{project_name}/secrets/{secret_name}/delete")
-async def delete_secret(project_name: str, secret_name: str, repo: Repo):
+async def delete_secret(project_name: str, secret_name: str, repo: RepoRef):
     project = await get_project(project_name=project_name)
     backend = get_backend(project, repo)
     backend.delete_secret(secret_name=secret_name)

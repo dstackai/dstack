@@ -8,7 +8,7 @@ from dstack.backend.base import runners
 from dstack.backend.base.compute import Compute, NoCapacityError
 from dstack.backend.base.storage import Storage
 from dstack.core.job import Job, JobHead, JobStatus
-from dstack.core.repo import Repo
+from dstack.core.repo import RepoRef
 from dstack.core.request import RequestStatus
 from dstack.core.runners import Runner
 from dstack.utils.common import get_milliseconds_since_epoch
@@ -30,7 +30,7 @@ def create_job(
         job.repo.data.repo_diff = None
 
     storage.put_object(
-        key=_get_job_filename(job.repo.name, job.job_id), content=yaml.dump(job.serialize())
+        key=_get_job_filename(job.repo.repo_id, job.job_id), content=yaml.dump(job.serialize())
     )
 
 
@@ -43,13 +43,13 @@ def get_job(storage: Storage, repo_name: str, job_id: str) -> Optional[Job]:
 
 
 def update_job(storage: Storage, job: Job):
-    job_head_key_prefix = _get_job_head_filename_prefix(job.repo.name, job.job_id)
+    job_head_key_prefix = _get_job_head_filename_prefix(job.repo.repo_id, job.job_id)
     job_keys = storage.list_objects(job_head_key_prefix)
     for key in job_keys:
         storage.delete_object(key)
     storage.put_object(key=_get_job_head_filename(job), content="")
     storage.put_object(
-        key=_get_job_filename(job.repo.name, job.job_id), content=yaml.dump(job.serialize())
+        key=_get_job_filename(job.repo.repo_id, job.job_id), content=yaml.dump(job.serialize())
     )
 
 
@@ -64,8 +64,8 @@ def list_jobs(storage: Storage, repo_name: str, run_name: str) -> List[Job]:
     return jobs
 
 
-def list_job_head(storage: Storage, repo: Repo, job_id: str) -> Optional[JobHead]:
-    job_head_key_prefix = _get_job_head_filename_prefix(repo.name, job_id)
+def list_job_head(storage: Storage, repo: RepoRef, job_id: str) -> Optional[JobHead]:
+    job_head_key_prefix = _get_job_head_filename_prefix(repo.repo_id, job_id)
     job_head_keys = storage.list_objects(job_head_key_prefix)
     for job_head_key in job_head_keys:
         t = job_head_key[len(job_head_key_prefix) :].split(";")
@@ -99,14 +99,14 @@ def list_job_head(storage: Storage, repo: Repo, job_id: str) -> Optional[JobHead
 
 def list_job_heads(
     storage: Storage,
-    repo: Repo,
+    repo: RepoRef,
     run_name: Optional[str] = None,
 ) -> List[JobHead]:
-    job_heads_keys_prefix = _get_job_heads_filenames_prefix(repo.name, run_name)
+    job_heads_keys_prefix = _get_job_heads_filenames_prefix(repo.repo_id, run_name)
     job_heads_keys = storage.list_objects(job_heads_keys_prefix)
     job_heads = []
     for job_head_key in job_heads_keys:
-        t = job_head_key[len(_get_jobs_dir(repo.name)) :].split(";")
+        t = job_head_key[len(_get_jobs_dir(repo.repo_id)) :].split(";")
         # Skip legacy format
         if len(t) == 9:
             (
@@ -185,13 +185,13 @@ def run_job(
 def stop_job(
     storage: Storage,
     compute: Compute,
-    repo: Repo,
+    repo: RepoRef,
     job_id: str,
     abort: bool,
 ):
     # TODO: why checking statuses of job_head, job, runner at the same time
     job_head = list_job_head(storage, repo, job_id)
-    job = get_job(storage, repo.name, job_id)
+    job = get_job(storage, repo.repo_id, job_id)
     runner = runners.get_runner(storage, job.runner_id) if job else None
     request_status = (
         compute.get_request_head(
@@ -282,12 +282,12 @@ def _get_job_head_filename_prefix(repo_name: str, job_id: str) -> str:
 
 
 def _get_job_head_filename(job: Job) -> str:
-    prefix = _get_jobs_dir(job.repo.name)
+    prefix = _get_jobs_dir(job.repo.repo_id)
     key = (
         f"{prefix}l;"
         f"{job.job_id};"
         f"{job.provider_name};"
-        f"{job.repo.username};"
+        f"{job.repo.repo_user_id};"
         f"{job.submitted_at};"
         f"{job.status.value};"
         f"{','.join([a.artifact_path.replace('/', '_') for a in (job.artifact_specs or [])])};"

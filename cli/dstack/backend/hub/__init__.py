@@ -11,7 +11,7 @@ from dstack.core.config import BackendConfig
 from dstack.core.error import ConfigError
 from dstack.core.job import Job, JobHead, JobStatus
 from dstack.core.log_event import LogEvent
-from dstack.core.repo import Repo, RepoCredentials
+from dstack.core.repo import RepoCredentials, RepoRef
 from dstack.core.run import RunHead
 from dstack.core.secret import Secret
 from dstack.core.tag import TagHead
@@ -21,7 +21,7 @@ class HubBackend(RemoteBackend):
     _client = None
     _storage = None
 
-    def __init__(self, repo: Optional[Repo], config: Optional[BackendConfig] = None):
+    def __init__(self, repo: Optional[RepoRef], config: Optional[BackendConfig] = None):
         super().__init__(backend_config=config, repo=repo)
         self.backend_config = HUBConfig()
         try:
@@ -114,7 +114,7 @@ class HubBackend(RemoteBackend):
         artifacts = self.list_run_artifact_files(run_name=run_name)
         base_artifacts.download_run_artifact_files(
             storage=self._storage,
-            repo_name=self.repo.name,
+            repo_name=self.repo.repo_id,
             artifacts=artifacts,
             output_dir=output_dir,
             files_path=files_path,
@@ -130,7 +130,7 @@ class HubBackend(RemoteBackend):
         # /{hub_name}/artifacts/upload
         base_artifacts.upload_job_artifact_files(
             storage=self._storage,
-            repo_name=self.repo.name,
+            repo_name=self.repo.repo_id,
             job_id=job_id,
             artifact_name=artifact_name,
             artifact_path=artifact_path,

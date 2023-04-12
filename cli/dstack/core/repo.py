@@ -77,16 +77,17 @@ class LocalRepoData(RepoData):
             raise Exception("No identity file is specified")
 
 
-class Repo(BaseModel):
-    name: str
-    username: str
+class RepoRef(BaseModel):
+    repo_id: str
+    repo_user_id: str
     data: Optional[Union[RepoData, LocalRepoData]] = None
 
-    @validator("name")
-    def validate_name(cls, name):
-        if "/" in name:
-            raise ValueError("Repo name can't contain `/`")
-        return name
+    @validator("repo_id", "repo_user_id")
+    def validate_id(cls, value):
+        for c in "/;":
+            if c in value:
+                raise ValueError(f"id can't contain `{c}`")
+        return value
 
 
 class RepoHead(BaseModel):
