@@ -10,11 +10,11 @@ from dstack.backend.base.storage import Storage
 from dstack.core.artifact import Artifact
 
 
-def list_run_artifact_files(storage: Storage, repo_name: str, run_name: str) -> List[Artifact]:
-    jobs_list = jobs.list_jobs(storage, repo_name, run_name)
+def list_run_artifact_files(storage: Storage, repo_id: str, run_name: str) -> List[Artifact]:
+    jobs_list = jobs.list_jobs(storage, repo_id, run_name)
     artifacts = []
     for job in jobs_list:
-        job_artifacts_dir = _get_job_artifacts_dir(repo_name, job.job_id)
+        job_artifacts_dir = _get_job_artifacts_dir(repo_id, job.job_id)
         if job.artifact_paths is None:
             continue
         for artifact_path in job.artifact_paths:
@@ -34,7 +34,7 @@ def list_run_artifact_files(storage: Storage, repo_name: str, run_name: str) -> 
 
 def download_run_artifact_files(
     storage: Storage,
-    repo_name: str,
+    repo_id: str,
     artifacts: List[Artifact],
     output_dir: Optional[str],
     files_path: Optional[str],
@@ -66,7 +66,7 @@ def download_run_artifact_files(
                 pbar.update(size)
 
             for file in files:
-                artifacts_dir = _get_job_artifacts_dir(repo_name, artifact.job_id)
+                artifacts_dir = _get_job_artifacts_dir(repo_id, artifact.job_id)
                 source_path = os.path.join(artifacts_dir, artifact.path, file.filepath)
                 dest_path = os.path.join(output_dir, artifact.job_id, artifact.path, file.filepath)
                 Path(dest_path).parent.mkdir(parents=True, exist_ok=True)
@@ -75,13 +75,13 @@ def download_run_artifact_files(
 
 def upload_job_artifact_files(
     storage: Storage,
-    repo_name: str,
+    repo_id: str,
     job_id: str,
     artifact_name: str,
     artifact_path: PathLike,
     local_path: PathLike,
 ):
-    artifacts_dir = _get_job_artifacts_dir(repo_name, job_id)
+    artifacts_dir = _get_job_artifacts_dir(repo_id, job_id)
     total_size = 0
     for root, sub_dirs, files in os.walk(local_path):
         for filename in files:
@@ -109,9 +109,9 @@ def upload_job_artifact_files(
                 storage.upload_file(source_path, dest_path, callback)
 
 
-def _get_artifacts_dir(repo_name: str) -> str:
-    return f"artifacts/{repo_name}/"
+def _get_artifacts_dir(repo_id: str) -> str:
+    return f"artifacts/{repo_id}/"
 
 
-def _get_job_artifacts_dir(repo_name: str, job_id: str) -> str:
-    return f"{_get_artifacts_dir(repo_name)}{job_id}/"
+def _get_job_artifacts_dir(repo_id: str, job_id: str) -> str:
+    return f"{_get_artifacts_dir(repo_id)}{job_id}/"

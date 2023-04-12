@@ -1,7 +1,6 @@
 import os.path
 
 from dstack.backend.base.storage import Storage
-from dstack.core.repo import RepoAddress
 
 
 def delete_workflow_cache(storage: Storage, repo_name, username: str, workflow: str):
@@ -10,5 +9,5 @@ def delete_workflow_cache(storage: Storage, repo_name, username: str, workflow: 
     )
 
 
-def _get_cache_dir(repo_name: str, username: str) -> str:
-    return os.path.join("cache", repo_name, username)
+def _get_cache_dir(repo_id: str, username: str) -> str:
+    return os.path.join("cache", repo_id, username)

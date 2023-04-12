@@ -6,7 +6,7 @@ from dstack.core.artifact import ArtifactHead
 
 
 class TagHead(BaseModel):
-    repo_name: str
+    repo_id: str
     tag_name: str
     run_name: str
     workflow_name: Optional[str]
@@ -27,7 +27,7 @@ class TagHead(BaseModel):
     def key(self, add_prefix=True) -> str:
         prefix = ""
         if add_prefix:
-            prefix = f"tags/{self.repo_name}/"
+            prefix = f"tags/{self.repo_id}/"
         key = (
             f"{prefix}l;{self.tag_name};"
             f"{self.run_name};"

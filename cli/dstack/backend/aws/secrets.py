@@ -1,12 +1,11 @@
 import json
-from typing import List, Optional
+from typing import Optional
 
 from botocore.client import BaseClient
 
 from dstack.backend.aws import runners
 from dstack.backend.aws.utils import retry_operation_on_service_errors
 from dstack.backend.base.secrets import SecretsManager
-from dstack.core.repo import RepoAddress
 from dstack.core.secret import Secret
 
 
@@ -17,9 +16,9 @@ class AWSSecretsManager(SecretsManager):
         iam_client: BaseClient,
         sts_client: BaseClient,
         bucket_name: str,
-        repo_name: str,
+        repo_id: str,
     ):
-        super().__init__(repo_name=repo_name)
+        super().__init__(repo_id=repo_id)
         self.secretsmanager_client = secretsmanager_client
         self.iam_client = iam_client
         self.sts_client = sts_client
@@ -165,9 +164,9 @@ def _delete_secret(
     )
 
 
-def _get_secret_key(bucket_name: str, repo_name: str, secret_name: str) -> str:
-    return f"/dstack/{bucket_name}/secrets/{repo_name}/{secret_name}"
+def _get_secret_key(bucket_name: str, repo_id: str, secret_name: str) -> str:
+    return f"/dstack/{bucket_name}/secrets/{repo_id}/{secret_name}"
 
 
-def _get_credentials_key(bucket_name: str, repo_name: str) -> str:
-    return f"/dstack/{bucket_name}/credentials/{repo_name}"
+def _get_credentials_key(bucket_name: str, repo_id: str) -> str:
+    return f"/dstack/{bucket_name}/credentials/{repo_id}"

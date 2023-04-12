@@ -34,8 +34,8 @@ def create_job(
     )
 
 
-def get_job(storage: Storage, repo_name: str, job_id: str) -> Optional[Job]:
-    obj = storage.get_object(_get_job_filename(repo_name, job_id))
+def get_job(storage: Storage, repo_id: str, job_id: str) -> Optional[Job]:
+    obj = storage.get_object(_get_job_filename(repo_id, job_id))
     if obj is None:
         return None
     job = Job.unserialize(yaml.load(obj, yaml.FullLoader))
@@ -53,8 +53,8 @@ def update_job(storage: Storage, job: Job):
     )
 
 
-def list_jobs(storage: Storage, repo_name: str, run_name: str) -> List[Job]:
-    job_key_run_prefix = _get_jobs_filenames_prefix(repo_name, run_name)
+def list_jobs(storage: Storage, repo_id: str, run_name: str) -> List[Job]:
+    job_key_run_prefix = _get_jobs_filenames_prefix(repo_id, run_name)
     jobs_keys = storage.list_objects(job_key_run_prefix)
     jobs = []
     for job_key in jobs_keys:
@@ -139,8 +139,8 @@ def list_job_heads(
     return job_heads
 
 
-def delete_job_head(storage: Storage, repo_name: str, job_id: str):
-    job_head_key_prefix = _get_job_head_filename_prefix(repo_name, job_id)
+def delete_job_head(storage: Storage, repo_id: str, job_id: str):
+    job_head_key_prefix = _get_job_head_filename_prefix(repo_id, job_id)
     job_head_keys = storage.list_objects(job_head_key_prefix)
     for job_head_key in job_head_keys:
         storage.delete_object(job_head_key)
@@ -254,12 +254,12 @@ def update_job_submission(job: Job):
     job.submitted_at = get_milliseconds_since_epoch()
 
 
-def _get_jobs_dir(repo_name: str) -> str:
-    return f"jobs/{repo_name}/"
+def _get_jobs_dir(repo_id: str) -> str:
+    return f"jobs/{repo_id}/"
 
 
-def _get_job_filename(repo_name: str, job_id: str) -> str:
-    return f"{_get_jobs_dir(repo_name)}{job_id}.yaml"
+def _get_job_filename(repo_id: str, job_id: str) -> str:
+    return f"{_get_jobs_dir(repo_id)}{job_id}.yaml"
 
 
 def _get_diff_filename(job_diff: str) -> str:
@@ -267,16 +267,16 @@ def _get_diff_filename(job_diff: str) -> str:
     return f"diffs/{diff_hash}.patch"
 
 
-def _get_jobs_filenames_prefix(repo_name: str, run_name: str) -> str:
-    return f"{_get_jobs_dir(repo_name)}{run_name},"
+def _get_jobs_filenames_prefix(repo_id: str, run_name: str) -> str:
+    return f"{_get_jobs_dir(repo_id)}{run_name},"
 
 
-def _get_job_heads_filenames_prefix(repo_name: str, run_name: Optional[str]) -> str:
-    return f"{_get_jobs_dir(repo_name)}l;{run_name or ''}"
+def _get_job_heads_filenames_prefix(repo_id: str, run_name: Optional[str]) -> str:
+    return f"{_get_jobs_dir(repo_id)}l;{run_name or ''}"
 
 
-def _get_job_head_filename_prefix(repo_name: str, job_id: str) -> str:
-    prefix = _get_jobs_dir(repo_name)
+def _get_job_head_filename_prefix(repo_id: str, job_id: str) -> str:
+    prefix = _get_jobs_dir(repo_id)
     key = f"{prefix}l;{job_id};"
     return key
 

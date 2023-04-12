@@ -12,8 +12,8 @@ from dstack.core.tag import TagHead
 from dstack.utils.common import get_milliseconds_since_epoch
 
 
-def get_tag_head(storage: Storage, repo_name: str, tag_name: str) -> Optional[TagHead]:
-    tag_head_key_prefix = _get_tag_head_filename_prefix(repo_name, tag_name)
+def get_tag_head(storage: Storage, repo_id: str, tag_name: str) -> Optional[TagHead]:
+    tag_head_key_prefix = _get_tag_head_filename_prefix(repo_id, tag_name)
     tag_head_keys = storage.list_objects(keys_prefix=tag_head_key_prefix)
     if len(tag_head_keys) == 0:
         return None
@@ -28,7 +28,7 @@ def get_tag_head(storage: Storage, repo_name: str, tag_name: str) -> Optional[Ta
             artifact_heads,
         ) = tuple(t)
         return TagHead(
-            repo_name=repo_name,
+            repo_id=repo_id,
             tag_name=tag_name,
             run_name=run_name,
             workflow_name=workflow_name or None,
@@ -39,8 +39,8 @@ def get_tag_head(storage: Storage, repo_name: str, tag_name: str) -> Optional[Ta
         )
 
 
-def list_tag_heads(storage: Storage, repo_name: str):
-    tag_heads_keys_prefix = _get_tag_heads_filenames_prefix(repo_name)
+def list_tag_heads(storage: Storage, repo_id: str):
+    tag_heads_keys_prefix = _get_tag_heads_filenames_prefix(repo_id)
     tag_heads_keys = storage.list_objects(tag_heads_keys_prefix)
     tag_heads = []
     for tag_head_key in tag_heads_keys:
@@ -57,7 +57,7 @@ def list_tag_heads(storage: Storage, repo_name: str):
             ) = tuple(t)
             tag_heads.append(
                 TagHead(
-                    repo_name=repo_name,
+                    repo_id=repo_id,
                     tag_name=tag_name,
                     run_name=run_name,
                     workflow_name=workflow_name or None,
@@ -115,7 +115,7 @@ def create_tag_from_run(
             exit(f"Cannot find the run '{run_name}'")
 
     tag_head = TagHead(
-        repo_name=repo.repo_id,
+        repo_id=repo.repo_id,
         tag_name=tag_name,
         run_name=run_name,
         workflow_name=tag_jobs[0].workflow_name,
@@ -193,7 +193,7 @@ def create_tag_from_local_dirs(
             local_path,
         )
     tag_head = TagHead(
-        repo_name=repo.repo_id,
+        repo_id=repo.repo_id,
         tag_name=tag_name,
         run_name=run_name,
         workflow_name=job.workflow_name,
@@ -211,24 +211,24 @@ def create_tag_from_local_dirs(
     storage.put_object(key=tag_head_key, content="")
 
 
-def _get_tags_dir(repo_name: str) -> str:
-    return f"tags/{repo_name}/"
+def _get_tags_dir(repo_id: str) -> str:
+    return f"tags/{repo_id}/"
 
 
-def _get_tag_head_filename_prefix(repo_name: str, tag_name: str) -> str:
-    prefix = _get_tags_dir(repo_name)
+def _get_tag_head_filename_prefix(repo_id: str, tag_name: str) -> str:
+    prefix = _get_tags_dir(repo_id)
     key = f"{prefix}l;{tag_name};"
     return key
 
 
-def _get_tag_heads_filenames_prefix(repo_name: str) -> str:
-    prefix = _get_tags_dir(repo_name)
+def _get_tag_heads_filenames_prefix(repo_id: str) -> str:
+    prefix = _get_tags_dir(repo_id)
     key = f"{prefix}l;"
     return key
 
 
 def _get_tag_head_key(tag_head: TagHead) -> str:
-    prefix = f"tags/{tag_head.repo_name}"
+    prefix = f"tags/{tag_head.repo_id}"
     key = (
         f"{prefix}/l;{tag_head.tag_name};"
         f"{tag_head.run_name};"

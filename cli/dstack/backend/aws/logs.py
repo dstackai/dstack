@@ -37,7 +37,7 @@ def _filter_log_events_loop(
     storage: Storage,
     compute: Compute,
     logs_client: BaseClient,
-    repo_name: str,
+    repo_id: str,
     job_heads: List[JobHead],
     filter_logs_events_kwargs: dict,
 ):
@@ -59,7 +59,7 @@ def _filter_log_events_loop(
             counter = counter + 1
             if counter % CHECK_STATUS_EVERY_N == 0:
                 _job_heads = [
-                    jobs.get_job(storage, repo_name, job_head.job_id) for job_head in job_heads
+                    jobs.get_job(storage, repo_id, job_head.job_id) for job_head in job_heads
                 ]
                 run = next(
                     iter(
@@ -74,8 +74,8 @@ def _filter_log_events_loop(
                     finished_counter += 1
 
 
-def create_log_group_if_not_exists(logs_client: BaseClient, bucket_name: str, repo_name: str):
-    log_group_name = f"/dstack/jobs/{bucket_name}/{repo_name}"
+def create_log_group_if_not_exists(logs_client: BaseClient, bucket_name: str, repo_id: str):
+    log_group_name = f"/dstack/jobs/{bucket_name}/{repo_id}"
     _create_log_group_if_not_exists(logs_client, bucket_name, log_group_name)
 
 
@@ -101,14 +101,14 @@ def create_log_stream(logs_client: BaseClient, log_group_name: str, run_name: st
 
 def _filter_logs_events_kwargs(
     bucket_name: str,
-    repo_name: str,
+    repo_id: str,
     run_name: str,
     start_time: int,
     end_time: Optional[int],
     next_token: Optional[str],
 ):
     filter_logs_events_kwargs = {
-        "logGroupName": f"/dstack/jobs/{bucket_name}/{repo_name}",
+        "logGroupName": f"/dstack/jobs/{bucket_name}/{repo_id}",
         "logStreamNames": [run_name],
         "startTime": start_time,
         "interleaved": True,
@@ -125,14 +125,14 @@ def poll_logs(
     compute: Compute,
     logs_client: BaseClient,
     bucket_name: str,
-    repo_name: str,
+    repo_id: str,
     job_heads: List[JobHead],
     start_time: int,
     attached: bool,
 ) -> Generator[LogEvent, None, None]:
     run_name = job_heads[0].run_name
     filter_logs_events_kwargs = _filter_logs_events_kwargs(
-        bucket_name, repo_name, run_name, start_time, end_time=None, next_token=None
+        bucket_name, repo_id, run_name, start_time, end_time=None, next_token=None
     )
     jobs_cache = {}
     try:
@@ -141,14 +141,14 @@ def poll_logs(
                 storage,
                 compute,
                 logs_client,
-                repo_name,
+                repo_id,
                 job_heads,
                 filter_logs_events_kwargs,
             ):
                 yield render_log_message(
                     storage,
                     event,
-                    repo_name,
+                    repo_id,
                     jobs_cache,
                 )
         else:
@@ -158,7 +158,7 @@ def poll_logs(
                     yield render_log_message(
                         storage,
                         event,
-                        repo_name,
+                        repo_id,
                         jobs_cache,
                     )
     except Exception as e:

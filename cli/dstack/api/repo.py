@@ -76,7 +76,7 @@ def load_repo_data(
 
 
 def get_repo(repo_user_config: RepoUserConfig) -> RepoRef:
-    repo = RepoRef(repo_id=repo_user_config.repo_name, repo_user_id=repo_user_config.username)
+    repo = RepoRef(repo_id=repo_user_config.repo_name, repo_user_id=repo_user_config.repo_user_id)
     try:
         repo.data = load_repo_data()
     except InvalidGitRepositoryError:
