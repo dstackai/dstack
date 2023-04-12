@@ -1,7 +1,6 @@
 name: Run CLI integration tests
 
 on:
-  push:
   workflow_dispatch:
 
 jobs:
