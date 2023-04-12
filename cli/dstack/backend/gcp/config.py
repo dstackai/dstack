@@ -175,13 +175,17 @@ class GCPConfig(BackendConfig):
         return cls.deserialize(content)
 
     @classmethod
-    def load(cls, path: Path = get_config_path()) -> "GCPConfig":
+    def load(cls, path: Optional[Path] = None) -> "GCPConfig":
+        if path is None:
+            path = get_config_path()
         if not path.exists():
             raise ConfigError("No config found")
         with open(path) as f:
             return GCPConfig.deserialize_yaml(f.read())
 
-    def save(self, path: Path = get_config_path()):
+    def save(self, path: Optional[Path] = None):
+        if path is None:
+            path = get_config_path()
         with open(path, "w+") as f:
             f.write(self.serialize_yaml())
 
