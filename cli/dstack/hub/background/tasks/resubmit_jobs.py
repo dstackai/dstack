@@ -25,7 +25,7 @@ def _resubmit_project_jobs(project: Project):
     curr_time = get_milliseconds_since_epoch()
     unbound_backend = get_backend(project, repo=None)
     for repo_head in unbound_backend.list_repo_heads():
-        backend = get_backend(project, RepoRef(repo_id=repo_head.name, repo_user_id="default"))
+        backend = get_backend(project, RepoRef(repo_id=repo_head.repo_id, repo_user_id="default"))
         run_heads = backend.list_run_heads(
             run_name=None,
             include_request_heads=True,

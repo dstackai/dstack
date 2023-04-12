@@ -70,7 +70,7 @@ class GCPBackend(CloudBackend):
             project_id=self.config.project_id,
             bucket_name=self.config.bucket_name,
             credentials=credentials,
-            repo_name=self.repo.repo_id if self.repo else None,
+            repo_id=self.repo.repo_id if self.repo else None,
         )
         self._logging = GCPLogging(
             project_id=self.config.project_id,
@@ -136,7 +136,7 @@ class GCPBackend(CloudBackend):
     ) -> Generator[LogEvent, None, None]:
         yield from self._logging.poll_logs(
             storage=self._storage,
-            repo_name=self.repo.repo_id,
+            repo_id=self.repo.repo_id,
             run_name=job_heads[0].run_name,
             start_time=start_time,
         )
@@ -153,7 +153,7 @@ class GCPBackend(CloudBackend):
         artifacts = self.list_run_artifact_files(run_name=run_name)
         base_artifacts.download_run_artifact_files(
             storage=self._storage,
-            repo_name=self.repo.repo_id,
+            repo_id=self.repo.repo_id,
             artifacts=artifacts,
             output_dir=output_dir,
             files_path=files_path,
@@ -168,7 +168,7 @@ class GCPBackend(CloudBackend):
     ):
         base_artifacts.upload_job_artifact_files(
             storage=self._storage,
-            repo_name=self.repo.repo_id,
+            repo_id=self.repo.repo_id,
             job_id=job_id,
             artifact_name=artifact_name,
             artifact_path=artifact_path,
@@ -213,7 +213,7 @@ class GCPBackend(CloudBackend):
     def update_repo_last_run_at(self, last_run_at: int):
         base_repos.update_repo_last_run_at(
             self._storage,
-            self.repo.repo_id,
+            self.repo,
             last_run_at,
         )
 

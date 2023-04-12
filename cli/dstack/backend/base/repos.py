@@ -6,15 +6,15 @@ from dstack.backend.base.storage import Storage
 from dstack.core.repo import RepoCredentials, RepoHead, RepoProtocol, RepoRef
 
 
-def get_repo_head(storage: Storage, repo_id: str) -> Optional[RepoHead]:
-    repo_head_prefix = _get_repo_head_filename_prefix(repo_id)
+def get_repo_head(storage: Storage, repo_ref: RepoRef) -> Optional[RepoHead]:
+    repo_head_prefix = _get_repo_head_filename_prefix(repo_ref.repo_id)
     repo_heads_keys = storage.list_objects(repo_head_prefix)
     if len(repo_heads_keys) == 0:
         return None
     repo_head_key = repo_heads_keys[0]
     last_run_at, tags_count = repo_head_key[len(repo_head_prefix) :].split(";")
     return RepoHead(
-        name=repo_id,
+        **repo_ref.dict(),
         last_run_at=int(last_run_at) if last_run_at else None,
         tags_count=int(tags_count),
     )
@@ -25,6 +25,7 @@ def list_repo_heads(storage: Storage) -> List[RepoHead]:
     repo_heads_keys = storage.list_objects(repo_heads_prefix)
     repo_heads = []
     for repo_head_key in repo_heads_keys:
+        # todo parse repo_head
         tokens = repo_head_key[len(repo_heads_prefix) :].split(";")
         # Skipt legacy repo heads
         if len(tokens) != 3:
@@ -32,7 +33,8 @@ def list_repo_heads(storage: Storage) -> List[RepoHead]:
         repo_id, last_run_at, tags_count = tokens
         repo_heads.append(
             RepoHead(
-                name=repo_id,
+                repo_id=repo_id,
+                repo_user_id=repo_user_id,
                 last_run_at=int(last_run_at) if last_run_at else None,
                 tags_count=int(tags_count),
             )
@@ -40,10 +42,10 @@ def list_repo_heads(storage: Storage) -> List[RepoHead]:
     return repo_heads
 
 
-def update_repo_last_run_at(storage: Storage, repo_id: str, last_run_at: int):
-    repo_head = get_repo_head(storage, repo_id)
+def update_repo_last_run_at(storage: Storage, repo_ref: RepoRef, last_run_at: int):
+    repo_head = get_repo_head(storage, repo_ref)
     if repo_head is None:
-        repo_head = RepoHead(name=repo_id)
+        repo_head = RepoHead(**repo_ref.dict())
     repo_head.last_run_at = last_run_at
     _create_or_update_repo_head(storage, repo_head)
 
@@ -78,8 +80,8 @@ def save_repo_credentials(secrets_manager: SecretsManager, repo_credentials: Rep
 
 
 def _create_or_update_repo_head(storage: Storage, repo_head: RepoHead):
-    _delete_repo_head(storage=storage, repo_id=repo_head.name)
-    repo_head_prefix = _get_repo_head_filename_prefix(repo_id=repo_head.name)
+    _delete_repo_head(storage=storage, repo_id=repo_head.repo_id)
+    repo_head_prefix = _get_repo_head_filename_prefix(repo_id=repo_head.repo_id)
     repo_head_key = f"{repo_head_prefix}{repo_head.last_run_at or ''};{repo_head.tags_count}"
     storage.put_object(key=repo_head_key, content="")
 

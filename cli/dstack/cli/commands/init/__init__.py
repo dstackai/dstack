@@ -61,7 +61,7 @@ class InitCommand(BasicCommand):
         repo_credentials = local_repo_data.repo_credentials()
 
         config.repo_user_config = RepoUserConfig(
-            repo_name=local_repo_data.path(delimiter="."),
+            repo_id=local_repo_data.path(delimiter="."),
             repo_user_id=local_repo_data.local_repo_user_email,
             ssh_key_path=get_ssh_keypair(args.ssh_identity_file),
         )

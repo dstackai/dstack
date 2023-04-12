@@ -90,7 +90,6 @@ class RepoRef(BaseModel):
         return value
 
 
-class RepoHead(BaseModel):
-    name: str
+class RepoHead(RepoRef):
     last_run_at: Optional[int] = None
     tags_count: int = 0

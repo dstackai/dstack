@@ -33,7 +33,7 @@ class LocalBackend(Backend):
         self._storage = LocalStorage(self.backend_config.path)
         self._compute = LocalCompute()
         self._secrets_manager = LocalSecretsManager(
-            self.backend_config.path, repo_name=self.repo.repo_id if self.repo else None
+            self.backend_config.path, repo_id=self.repo.repo_id if self.repo else None
         )
 
     @property
@@ -108,7 +108,7 @@ class LocalBackend(Backend):
         list_artifacts = self.list_run_artifact_files(run_name)
         base_artifacts.download_run_artifact_files(
             storage=self._storage,
-            repo_name=self.repo.repo_id,
+            repo_id=self.repo.repo_id,
             artifacts=list_artifacts,
             output_dir=output_dir,
             files_path=files_path,
@@ -123,7 +123,7 @@ class LocalBackend(Backend):
     ):
         base_artifacts.upload_job_artifact_files(
             storage=self._storage,
-            repo_name=self.repo.repo_id,
+            repo_id=self.repo.repo_id,
             job_id=job_id,
             artifact_name=artifact_name,
             artifact_path=artifact_path,
@@ -163,7 +163,7 @@ class LocalBackend(Backend):
         base_tags.delete_tag(self._storage, self.repo, tag_head)
 
     def update_repo_last_run_at(self, last_run_at: int):
-        base_repos.update_repo_last_run_at(self._storage, self.repo.data, last_run_at)
+        base_repos.update_repo_last_run_at(self._storage, self.repo, last_run_at)
 
     def get_repo_credentials(self) -> Optional[RepoCredentials]:
         return base_repos.get_repo_credentials(self._secrets_manager)

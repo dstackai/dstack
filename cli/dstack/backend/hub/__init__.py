@@ -114,7 +114,7 @@ class HubBackend(RemoteBackend):
         artifacts = self.list_run_artifact_files(run_name=run_name)
         base_artifacts.download_run_artifact_files(
             storage=self._storage,
-            repo_name=self.repo.repo_id,
+            repo_id=self.repo.repo_id,
             artifacts=artifacts,
             output_dir=output_dir,
             files_path=files_path,
@@ -130,7 +130,7 @@ class HubBackend(RemoteBackend):
         # /{hub_name}/artifacts/upload
         base_artifacts.upload_job_artifact_files(
             storage=self._storage,
-            repo_name=self.repo.repo_id,
+            repo_id=self.repo.repo_id,
             job_id=job_id,
             artifact_name=artifact_name,
             artifact_path=artifact_path,

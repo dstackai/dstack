@@ -71,7 +71,7 @@ class AwsBackend(CloudBackend):
             iam_client=self._iam_client(),
             sts_client=self._sts_client(),
             bucket_name=self.backend_config.bucket_name,
-            repo_name=self.repo.repo_id if self.repo else None,
+            repo_id=self.repo.repo_id if self.repo else None,
         )
 
     def _s3_client(self) -> BaseClient:
@@ -179,7 +179,7 @@ class AwsBackend(CloudBackend):
         artifacts = self.list_run_artifact_files(run_name=run_name)
         base_artifacts.download_run_artifact_files(
             storage=self._storage,
-            repo_name=self.repo.repo_id,
+            repo_id=self.repo.repo_id,
             artifacts=artifacts,
             output_dir=output_dir,
             files_path=files_path,
@@ -194,7 +194,7 @@ class AwsBackend(CloudBackend):
     ):
         base_artifacts.upload_job_artifact_files(
             storage=self._storage,
-            repo_name=self.repo.repo_id,
+            repo_id=self.repo.repo_id,
             job_id=job_id,
             artifact_name=artifact_name,
             artifact_path=artifact_path,
@@ -239,7 +239,7 @@ class AwsBackend(CloudBackend):
     def update_repo_last_run_at(self, last_run_at: int):
         base_repos.update_repo_last_run_at(
             self._storage,
-            self.repo.repo_id,
+            self.repo,
             last_run_at,
         )
 

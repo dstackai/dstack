@@ -373,7 +373,7 @@ class Job(JobHead):
         if job_data.get("deps"):
             for dep in job_data["deps"]:
                 dep_spec = DepSpec(
-                    repo_name=dep["repo_name"],
+                    repo_id=dep["repo_name"],
                     run_name=dep["run_name"],
                     mount=dep.get("mount") is True,
                 )
