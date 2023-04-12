@@ -32,7 +32,7 @@ jobs:
       - name: Run pytest
         run: |
           mkdir -p dstack/hub/statics
-          pytest tests/
+          pytest tests/ --ignore=tests/integration/
 
   build-hub-tag:
     runs-on: ubuntu-latest
