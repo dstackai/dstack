@@ -169,7 +169,7 @@ def _runner_filename() -> str:
         filename = "dstack-runner-linux-amd64"
     elif windows and i386:
         filename = "dstack-runner-windows-x86.exe"
-    elif linux and amd64:
+    elif windows and amd64:
         filename = "dstack-runner-windows-amd64.exe"
     else:
         raise Exception(f"Unsupported platform: {uname}")
