@@ -124,9 +124,6 @@ workflows:
       - python examples/mnist/train_mnist.py
     artifacts:
       - path: ./lightning_logs
-    cache:
-      - path: ./data
-      - path: ~/.cache/pip 
 ```
 
 </div>
