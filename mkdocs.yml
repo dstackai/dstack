@@ -83,6 +83,11 @@ markdown_extensions:
       options:
         custom_icons:
           - overrides/.icons
+  - pymdownx.superfences:
+      custom_fences:
+        - name: mermaid
+          class: mermaid
+          format: !!python/name:pymdownx.superfences.fence_code_format
   - attr_list
   - def_list
   - admonition
