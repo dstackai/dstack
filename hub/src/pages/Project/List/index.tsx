@@ -136,9 +136,9 @@ export const ProjectList: React.FC = () => {
     const getProjectBucket = (project: IProject) => {
         switch (project.backend.type) {
             case 'aws':
-                return `s3://${project.backend.s3_bucket_name}`;
+                return `${project.backend.s3_bucket_name}`;
             case 'gcp':
-                return `gs://${project.backend.bucket_name}`;
+                return `${project.backend.bucket_name}`;
         }
     };
 
