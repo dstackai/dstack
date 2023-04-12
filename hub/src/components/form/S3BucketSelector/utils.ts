@@ -4,7 +4,7 @@ export const getResourceSelectorI18n = (
     prefix: string,
     params?: Partial<S3ResourceSelectorProps['i18nStrings']>,
 ): S3ResourceSelectorProps['i18nStrings'] => ({
-    inContextInputPlaceholder: `${prefix}my-bucket-name`,
+    inContextInputPlaceholder: 'my-bucket-name',
     inContextSelectPlaceholder: '',
     inContextBrowseButton: 'Browse S3',
     inContextViewButton: 'View',

@@ -46,6 +46,14 @@ To enable multiple users to work on the same project, create those users and add
 
 ## Configure the CLI
 
+!!! info "NOTE:"
+    Hub is an experimental feature. To use it with the dstack CLI, ensure that you install the pre-release version of the
+    CLI:
+
+    ```shell
+    pip install dstack --pre
+    ```
+
 After creating the project, copy the `dstack config` command from the user interface and execute it in your
 terminal to configure the project as a remote.
 
