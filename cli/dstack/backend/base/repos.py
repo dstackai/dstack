@@ -7,7 +7,7 @@ from dstack.core.repo import RepoCredentials, RepoHead, RepoProtocol, RepoRef
 
 
 def get_repo_head(storage: Storage, repo_ref: RepoRef) -> Optional[RepoHead]:
-    repo_head_prefix = _get_repo_head_filename_prefix(repo_ref.repo_id)
+    repo_head_prefix = _get_repo_head_filename_prefix(repo_ref)
     repo_heads_keys = storage.list_objects(repo_head_prefix)
     if len(repo_heads_keys) == 0:
         return None
@@ -25,12 +25,11 @@ def list_repo_heads(storage: Storage) -> List[RepoHead]:
     repo_heads_keys = storage.list_objects(repo_heads_prefix)
     repo_heads = []
     for repo_head_key in repo_heads_keys:
-        # todo parse repo_head
         tokens = repo_head_key[len(repo_heads_prefix) :].split(";")
         # Skipt legacy repo heads
-        if len(tokens) != 3:
+        if len(tokens) != 4:
             continue
-        repo_id, last_run_at, tags_count = tokens
+        repo_id, repo_user_id, last_run_at, tags_count = tokens
         repo_heads.append(
             RepoHead(
                 repo_id=repo_id,
@@ -50,8 +49,8 @@ def update_repo_last_run_at(storage: Storage, repo_ref: RepoRef, last_run_at: in
     _create_or_update_repo_head(storage, repo_head)
 
 
-def delete_repo(storage: Storage, repo_id: str):
-    _delete_repo_head(storage, repo_id)
+def delete_repo(storage: Storage, repo_ref: RepoRef):
+    _delete_repo_head(storage, repo_ref)
 
 
 def get_repo_credentials(secrets_manager: SecretsManager) -> Optional[RepoCredentials]:
@@ -80,14 +79,14 @@ def save_repo_credentials(secrets_manager: SecretsManager, repo_credentials: Rep
 
 
 def _create_or_update_repo_head(storage: Storage, repo_head: RepoHead):
-    _delete_repo_head(storage=storage, repo_id=repo_head.repo_id)
-    repo_head_prefix = _get_repo_head_filename_prefix(repo_id=repo_head.repo_id)
+    _delete_repo_head(storage=storage, repo_ref=repo_head)
+    repo_head_prefix = _get_repo_head_filename_prefix(repo_ref=repo_head)
     repo_head_key = f"{repo_head_prefix}{repo_head.last_run_at or ''};{repo_head.tags_count}"
     storage.put_object(key=repo_head_key, content="")
 
 
-def _delete_repo_head(storage: Storage, repo_id: str):
-    repo_head_prefix = _get_repo_head_filename_prefix(repo_id)
+def _delete_repo_head(storage: Storage, repo_ref: RepoRef):
+    repo_head_prefix = _get_repo_head_filename_prefix(repo_ref)
     repo_heads_keys = storage.list_objects(repo_head_prefix)
     for repo_head_key in repo_heads_keys:
         storage.delete_object(repo_head_key)
@@ -97,5 +96,5 @@ def _get_repo_heads_prefix() -> str:
     return "repos/l;"
 
 
-def _get_repo_head_filename_prefix(repo_id: str) -> str:
-    return f"{_get_repo_heads_prefix()}{repo_id};"
+def _get_repo_head_filename_prefix(repo_ref: RepoRef) -> str:
+    return f"{_get_repo_heads_prefix()}{repo_ref.repo_id};{repo_ref.repo_user_id};"
