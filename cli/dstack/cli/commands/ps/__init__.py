@@ -6,8 +6,7 @@ from rich.live import Live
 from dstack.api.backend import list_backends
 from dstack.api.run import list_runs_with_merged_backends
 from dstack.cli.commands import BasicCommand
-from dstack.cli.common import generate_runs_table, print_runs
-from dstack.core.error import check_config, check_git
+from dstack.cli.common import check_config, check_git, generate_runs_table, print_runs
 
 LIVE_PROVISION_INTERVAL_SECS = 2
 

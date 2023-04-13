@@ -5,7 +5,7 @@ from dstack.api.backend import list_backends
 from dstack.api.logs import poll_logs
 from dstack.api.repo import load_repo_data
 from dstack.cli.commands import BasicCommand
-from dstack.core.error import check_config, check_git
+from dstack.cli.common import check_config, check_git
 from dstack.utils.common import since
 
 

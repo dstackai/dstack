@@ -1,7 +1,5 @@
 from argparse import Namespace
-from collections import defaultdict
 from pathlib import Path
-from typing import Optional
 
 from rich.table import Table
 
@@ -10,8 +8,7 @@ from dstack.api.backend import list_backends
 from dstack.api.repo import load_repo_data
 from dstack.api.run import RunNotFoundError, TagNotFoundError, get_tagged_run_name
 from dstack.cli.commands import BasicCommand
-from dstack.cli.common import console
-from dstack.core.error import check_config, check_git
+from dstack.cli.common import check_config, check_git, console
 from dstack.utils.common import sizeof_fmt
 
 
