@@ -1,4 +1,3 @@
-import os
 from argparse import Namespace
 from pathlib import Path
 
@@ -6,8 +5,8 @@ from dstack.api.backend import get_current_remote_backend, get_local_backend
 from dstack.api.repo import load_repo_data
 from dstack.api.run import RunNotFoundError, TagNotFoundError, get_tagged_run_name
 from dstack.cli.commands import BasicCommand
-from dstack.cli.common import console
-from dstack.core.error import BackendError, check_config, check_git
+from dstack.cli.common import check_config, check_git, console
+from dstack.core.error import BackendError
 
 
 class PushCommand(BasicCommand):

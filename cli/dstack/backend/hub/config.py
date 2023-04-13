@@ -22,7 +22,9 @@ class HUBConfig(BackendConfig):
         self.project = os.getenv("DSTACK_HUB_PROJECT") or None
         self.token = os.getenv("DSTACK_HUB_TOKEN") or None
 
-    def load(self, path: Path = get_config_path()):
+    def load(self, path: Optional[Path] = None):
+        if path is None:
+            path = get_config_path()
         if path.exists():
             with path.open() as f:
                 config_data = yaml.load(f, Loader=yaml.FullLoader)
@@ -40,7 +42,9 @@ class HUBConfig(BackendConfig):
         else:
             raise ConfigError()
 
-    def save(self, path: Path = get_config_path()):
+    def save(self, path: Optional[Path] = None):
+        if path is None:
+            path = get_config_path()
         if not path.parent.exists():
             path.parent.mkdir(parents=True)
         with path.open("w") as f:

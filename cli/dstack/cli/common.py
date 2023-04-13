@@ -1,11 +1,14 @@
+import os
 from importlib.util import find_spec
 from typing import List, Optional, Tuple
 
+from git import InvalidGitRepositoryError
 from rich.console import Console
 from rich.prompt import Prompt
 from rich.table import Table
 
 from dstack.backend.base import Backend
+from dstack.core.error import BackendError, ConfigError
 from dstack.core.job import JobStatus
 from dstack.core.request import RequestStatus
 from dstack.core.run import RunHead
@@ -134,3 +137,36 @@ def _status_color(run: RunHead, val: str, run_column: bool, status_column: bool)
     else:
         color = _status_colors.get(run.status)
     return f"[{'bold ' if run_column else ''}{color}]{val}[/]" if color is not None else val
+
+
+def check_config(func):
+    def decorator(*args, **kwargs):
+        try:
+            func(*args, **kwargs)
+        except ConfigError:
+            console.print(f"Call 'dstack config' first")
+            exit(1)
+
+    return decorator
+
+
+def check_git(func):
+    def decorator(*args, **kwargs):
+        try:
+            func(*args, **kwargs)
+        except InvalidGitRepositoryError:
+            console.print(f"{os.getcwd()} is not a Git repo")
+            exit(1)
+
+    return decorator
+
+
+def check_backend(func):
+    def decorator(*args, **kwargs):
+        try:
+            func(*args, **kwargs)
+        except BackendError as e:
+            console.print(e.message)
+            exit(1)
+
+    return decorator

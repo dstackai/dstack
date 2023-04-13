@@ -44,7 +44,7 @@ def main():
 
     if len(sys.argv) < 2:
         parser.print_help()
-        exit(1)
+        exit(0)
     args, unknown = parser.parse_known_args()
     args.unknown = unknown
     args.func(args)

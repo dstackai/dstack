@@ -72,7 +72,9 @@ class AWSConfig(BackendConfig):
         self.subnet_id = subnet_id or os.getenv("DSTACK_AWS_EC2_SUBNET")
         self.credentials = credentials
 
-    def load(self, path: Path = get_config_path()):
+    def load(self, path: Optional[Path] = None):
+        if path is None:
+            path = get_config_path()
         if path.exists():
             with path.open() as f:
                 config_data = yaml.load(f, Loader=yaml.FullLoader)
@@ -87,7 +89,9 @@ class AWSConfig(BackendConfig):
         else:
             raise ConfigError()
 
-    def save(self, path: Path = get_config_path()):
+    def save(self, path: Optional[Path] = None):
+        if path is None:
+            path = get_config_path()
         if not path.parent.exists():
             path.parent.mkdir(parents=True)
         with path.open("w+") as f:
