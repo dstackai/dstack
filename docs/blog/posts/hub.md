@@ -48,18 +48,30 @@ sequenceDiagram
   end
 ```
 
-In addition to authentication and credential storage, Hub comes with a built-in workflow scheduler. For example, 
-it is capable of monitoring the availability of spot instances and automatically resubmitting jobs.
+#### Workflow scheduler
+
+Hub not only includes basic features like authentication and credential storage, but also has built-in workflow
+scheduling capabilities. It can monitor spot instance availability and resubmit jobs automatically. Soon, we'll
+introduce more features such as scheduled workflows, an API to run workflows programmatically, 
+usage tracking, etc.
 
 ## Why does it matter?
 
-Developing models is no longer reserved exclusively for tech giants. 
-Smaller companies and ML engineers alike seek easy-to-use tools to automate ML workflows.
-They want developer-friendly options that can be used with their preferred IDEs and frameworks and don't tie them to a
-particular vendor.
+#### Developer experience
 
-Finally, `dstack` intentionally does not rely on Kubernetes, making it flexible enough to support cloud providers without public
-Kubernetes support, while still planning to add Kubernetes as a possible integration.
+As you start developing models more regularly, you'll encounter the challenge of automating your ML workflows to reduce
+time spent on infrastructure and manual work.
+
+While many cloud vendors offer tools to automate ML workflows, they do so through opinionated UIs and APIs, leading to a
+suboptimal developer experience and vendor lock-in.
+
+In contrast, `dstack` aims to provide a non-opinionated and developer-friendly interface that can work across any 
+vendor.
+
+#### No hard dependency on Kubernetes
+
+Although `dstack` intends to provide support for Kubernetes, it intentionally avoids having a hard dependency on it. This
+design enables `dstack` to support cloud providers that don't integrate with Kubernetes.
 
 ## Try it now
 
@@ -74,13 +86,13 @@ For more details, visit the [Hub](../../setup/hub.md) documentation.
 
 ## What's next?
 
-#### Python SDK and REST API
+#### Programmatic API
 
 Currently, the only way to run or manage workflows is through the `dstack` CLI. There are scenarios when you'd prefer to run
-workflows other ways, e.g. from code or programmatically via API. To support these scenarios, we plan to release soon
+workflows other ways, e.g. from Python code or programmatically via API. To support these scenarios, we plan to release soon
 Python SDK and REST API.
 
-#### More workflow scheduler capabilities
+#### Workflow scheduler
 
 The built-in scheduler currently monitors spot instance availability and automatically resubmits jobs. Our plan is to
 enhance this feature and include additional capabilities. Users will be able to track cloud compute usage, and manage
@@ -90,7 +102,7 @@ quotes per team via the user interface.
 
 [//]: # (Furthermore, the user interface will continue to evolve, ultimately providing the same functionality as the CLI.)
 
-#### More cloud backends
+#### More cloud providers
 
 Lastly, and of utmost importance, we plan to extend support to other cloud platforms, not limiting ourselves to AWS,
 GCP, and Azure.
