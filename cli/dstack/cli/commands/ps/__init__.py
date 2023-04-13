@@ -6,7 +6,13 @@ from rich.live import Live
 from dstack.api.backend import list_backends
 from dstack.api.run import list_runs_with_merged_backends
 from dstack.cli.commands import BasicCommand
-from dstack.cli.common import check_config, check_git, generate_runs_table, print_runs
+from dstack.cli.common import (
+    check_backend,
+    check_config,
+    check_git,
+    generate_runs_table,
+    print_runs,
+)
 
 LIVE_PROVISION_INTERVAL_SECS = 2
 
@@ -40,6 +46,7 @@ class PSCommand(BasicCommand):
 
     @check_config
     @check_git
+    @check_backend
     def _command(self, args: Namespace):
         list_runs = list_runs_with_merged_backends(list_backends(), args.run_name, args.all)
         if args.watch:
