@@ -27,6 +27,7 @@ type Server struct {
 	mu     sync.RWMutex
 	port   int
 	closed chan struct{}
+	Done   chan struct{}
 }
 
 func New(port int) *Server {
@@ -36,6 +37,7 @@ func New(port int) *Server {
 		mu:     sync.RWMutex{},
 		port:   port,
 		closed: make(chan struct{}),
+		Done:   make(chan struct{}),
 	}
 	return s
 }
@@ -97,6 +99,7 @@ func (s *Server) getLogs(w http.ResponseWriter, r *http.Request) {
 				_ = connection.WriteMessage(websocket.CloseMessage, nil)
 				_ = connection.Close()
 				s.mu.RUnlock()
+				close(s.Done)
 				return
 			}
 		default:

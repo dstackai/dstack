@@ -112,12 +112,11 @@ func start(logLevel int, httpPort int, configDir string) {
 	if err = ex.Init(ctxSig, configDir); err != nil {
 		log.Error(logCtx, "Failed to init executor", "err", err)
 		cancel()
-
 	}
+
 	// Also temporary logic during transition
 	wg := sync.WaitGroup{}
 	wg.Add(1)
-
 	go func() {
 		if err = ex.Run(ctxSig); err != nil {
 			log.Error(logCtx, "dstack-runner ended with an error: ", "err", err)
@@ -126,8 +125,12 @@ func start(logLevel int, httpPort int, configDir string) {
 	}()
 	wg.Wait()
 
-	cancel()
-	time.Sleep(1 * time.Second) // TODO: ugly hack. Need wait for buf cloudwatch
+	select {
+	case <-streamLogs.Done:
+		log.Trace(logCtx, "Done streaming logs")
+	case <-time.After(time.Second * 30):
+		log.Trace(logCtx, "Timed out streaming logs")
+	}
 }
 
 func check(configDir string) error {
