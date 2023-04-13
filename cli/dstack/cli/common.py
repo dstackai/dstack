@@ -105,6 +105,7 @@ def print_runs(runs_with_backends: List[Tuple[RunHead, List[Backend]]]):
 
 _status_colors = {
     JobStatus.SUBMITTED: "yellow",
+    JobStatus.PENDING: "yellow",
     JobStatus.DOWNLOADING: "yellow",
     JobStatus.RUNNING: "dark_sea_green4",
     JobStatus.UPLOADING: "dark_sea_green4",
