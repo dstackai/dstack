@@ -28,7 +28,10 @@ type GCPStorage struct {
 
 func NewGCPStorage(project, bucketName string) (*GCPStorage, error) {
 	ctx := context.TODO()
-	client, _ := storage.NewClient(ctx)
+	client, err := storage.NewClient(ctx)
+	if err != nil {
+		return nil, gerrors.Wrap(err)
+	}
 	bucket := client.Bucket(bucketName)
 	if bucket == nil {
 		return nil, gerrors.New("Cannot access bucket")

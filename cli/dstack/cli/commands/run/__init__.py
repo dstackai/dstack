@@ -17,7 +17,6 @@ from websocket import WebSocketApp
 
 from dstack import providers
 from dstack.api.backend import get_backend_by_name, get_current_remote_backend, get_local_backend
-from dstack.api.logs import poll_logs
 from dstack.api.repo import load_repo_data
 from dstack.api.run import list_runs_with_merged_backends
 from dstack.backend.base import Backend
@@ -30,7 +29,6 @@ from dstack.core.job import Job, JobHead, JobStatus
 from dstack.core.repo import RepoAddress
 from dstack.core.request import RequestStatus
 from dstack.core.userconfig import RepoUserConfig
-from dstack.utils.common import since
 
 __all__ = "RunCommand"
 
@@ -217,17 +215,8 @@ def poll_run(
             console.print()
 
         run = backend.list_run_heads(repo_address, run_name)[0]
-        if len(job_heads) == 1 and run and run.status == JobStatus.RUNNING:
+        if run.status.is_unfinished() or run.status == JobStatus.DONE:
             poll_logs_ws(backend, repo_address, jobs[0], ports)
-        else:
-            poll_logs(
-                backend,
-                repo_address,
-                job_heads,
-                since("1d"),
-                attach=True,
-                from_run=True,
-            )
     except KeyboardInterrupt:
         if Confirm.ask(f" [red]Abort the run '{run_name}'?[/]"):
             backend.stop_jobs(repo_address, run_name, abort=True)
