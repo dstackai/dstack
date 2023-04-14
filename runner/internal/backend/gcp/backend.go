@@ -114,7 +114,7 @@ func (gbackend *GCPBackend) UpdateState(ctx context.Context) error {
 	if err != nil {
 		return gerrors.Wrap(err)
 	}
-	log.Trace(ctx, "Fetching list jobs", "Repo username", gbackend.state.Job.GitUserName, "Repo name", gbackend.state.Job.GitName, "Job ID", gbackend.state.Job.JobID)
+	log.Trace(ctx, "Fetching list jobs", "Repo username", gbackend.state.Job.RepoUserName, "Repo name", gbackend.state.Job.RepoName, "Job ID", gbackend.state.Job.JobID)
 	files, err := gbackend.storage.ListFile(ctx, gbackend.state.Job.JobHeadFilepathPrefix())
 	if err != nil {
 		return gerrors.Wrap(err)
@@ -229,7 +229,7 @@ func (gbackend *GCPBackend) Secrets(ctx context.Context) (map[string]string, err
 	secrets := make(map[string]string, 0)
 	for _, secretFilename := range secretFilenames {
 		secretName := strings.ReplaceAll(secretFilename, prefix, "")
-		secretValue, err := gbackend.secretManager.FetchSecret(ctx, gbackend.state.Job.RepoName, secretName)
+		secretValue, err := gbackend.secretManager.FetchSecret(ctx, gbackend.state.Job.RepoId, secretName)
 		if err != nil {
 			if errors.Is(err, ErrSecretNotFound) {
 				continue
@@ -243,7 +243,7 @@ func (gbackend *GCPBackend) Secrets(ctx context.Context) (map[string]string, err
 
 func (gbackend *GCPBackend) GitCredentials(ctx context.Context) *models.GitCredentials {
 	log.Trace(ctx, "Getting credentials")
-	creds, err := gbackend.secretManager.FetchCredentials(ctx, gbackend.state.Job.RepoName)
+	creds, err := gbackend.secretManager.FetchCredentials(ctx, gbackend.state.Job.RepoId)
 	if err != nil {
 		return nil
 	}

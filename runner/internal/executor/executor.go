@@ -99,12 +99,12 @@ func (ex *Executor) Init(ctx context.Context, configDir string) error {
 	}
 
 	for _, artifact := range job.Artifacts {
-		artOut := ex.backend.GetArtifact(ctx, job.RunName, artifact.Path, path.Join("artifacts", job.RepoName, job.JobID, artifact.Path), artifact.Mount)
+		artOut := ex.backend.GetArtifact(ctx, job.RunName, artifact.Path, path.Join("artifacts", job.RepoId, job.JobID, artifact.Path), artifact.Mount)
 		if artOut != nil {
 			ex.artifactsOut = append(ex.artifactsOut, artOut)
 		}
 		if artifact.Mount {
-			art := ex.backend.GetArtifact(ctx, job.RunName, artifact.Path, path.Join("artifacts", job.RepoName, job.JobID, artifact.Path), artifact.Mount)
+			art := ex.backend.GetArtifact(ctx, job.RunName, artifact.Path, path.Join("artifacts", job.RepoId, job.JobID, artifact.Path), artifact.Mount)
 			if art != nil {
 				ex.artifactsFUSE = append(ex.artifactsFUSE, art)
 			}
@@ -322,7 +322,7 @@ func (ex *Executor) prepareGit(ctx context.Context) error {
 		}
 
 	}
-	ex.repo = repo.NewManager(ctx, fmt.Sprintf(consts.REPO_HTTPS_URL, job.RepoHostNameWithPort(), job.GitUserName, job.GitName), job.GitBranch, job.GitHash).WithLocalPath(dir)
+	ex.repo = repo.NewManager(ctx, fmt.Sprintf(consts.REPO_HTTPS_URL, job.RepoHostNameWithPort(), job.RepoUserName, job.RepoName), job.RepoBranch, job.RepoHash).WithLocalPath(dir)
 	cred := ex.backend.GitCredentials(ctx)
 	if cred != nil {
 		log.Trace(ctx, "Credentials is not empty")
@@ -344,7 +344,7 @@ func (ex *Executor) prepareGit(ctx context.Context) error {
 			if cred.Passphrase != nil {
 				password = *cred.Passphrase
 			}
-			ex.repo = repo.NewManager(ctx, fmt.Sprintf(consts.REPO_GIT_URL, job.RepoHostNameWithPort(), job.GitUserName, job.GitName), job.GitBranch, job.GitHash).WithLocalPath(dir)
+			ex.repo = repo.NewManager(ctx, fmt.Sprintf(consts.REPO_GIT_URL, job.RepoHostNameWithPort(), job.RepoUserName, job.RepoName), job.RepoBranch, job.RepoHash).WithLocalPath(dir)
 			ex.repo.WithSSHAuth(*cred.PrivateKey, password)
 		default:
 			log.Error(ctx, "Unsupported protocol", "protocol", cred.Protocol)
@@ -375,7 +375,7 @@ func (ex *Executor) prepareGit(ctx context.Context) error {
 func (ex *Executor) processDeps(ctx context.Context) error {
 	job := ex.backend.Job(ctx)
 	for _, dep := range job.Deps {
-		listDir, err := ex.backend.ListSubDir(ctx, fmt.Sprintf("jobs/%s/%s,", dep.RepoName, dep.RunName))
+		listDir, err := ex.backend.ListSubDir(ctx, fmt.Sprintf("jobs/%s/%s,", dep.RepoId, dep.RunName))
 		if err != nil {
 			return gerrors.Wrap(err)
 		}
@@ -385,7 +385,7 @@ func (ex *Executor) processDeps(ctx context.Context) error {
 				return gerrors.Wrap(err)
 			}
 			for _, artifact := range jobDep.Artifacts {
-				artIn := ex.backend.GetArtifact(ctx, jobDep.RunName, artifact.Path, path.Join("artifacts", jobDep.RepoName, jobDep.JobID, artifact.Path), artifact.Mount)
+				artIn := ex.backend.GetArtifact(ctx, jobDep.RunName, artifact.Path, path.Join("artifacts", jobDep.RepoId, jobDep.JobID, artifact.Path), artifact.Mount)
 				if artIn != nil {
 					ex.artifactsIn = append(ex.artifactsIn, artIn)
 				}
@@ -398,7 +398,7 @@ func (ex *Executor) processDeps(ctx context.Context) error {
 func (ex *Executor) processCache(ctx context.Context) error {
 	job := ex.backend.Job(ctx)
 	for _, cache := range job.Cache {
-		cacheArt := ex.backend.GetArtifact(ctx, job.RunName, cache.Path, path.Join("cache", job.RepoName, job.RepoUsername, job.WorkflowName, cache.Path), false)
+		cacheArt := ex.backend.GetArtifact(ctx, job.RunName, cache.Path, path.Join("cache", job.RepoId, job.RepoUserId, job.WorkflowName, cache.Path), false)
 		if cacheArt != nil {
 			ex.cacheArtifacts = append(ex.cacheArtifacts, cacheArt)
 		}
@@ -490,7 +490,7 @@ func (ex *Executor) processJob(ctx context.Context, stoppedCh chan struct{}) err
 		}
 		bindings = append(bindings, art...)
 	}
-	logger := ex.backend.CreateLogger(ctx, fmt.Sprintf("/dstack/jobs/%s/%s", ex.backend.Bucket(ctx), job.RepoName), job.RunName)
+	logger := ex.backend.CreateLogger(ctx, fmt.Sprintf("/dstack/jobs/%s/%s", ex.backend.Bucket(ctx), job.RepoId), job.RunName)
 	secrets, err := ex.backend.Secrets(ctx)
 	if err != nil {
 		log.Error(ctx, "Fail fetching secrets", "err", err)
@@ -517,7 +517,7 @@ func (ex *Executor) processJob(ctx context.Context, stoppedCh chan struct{}) err
 		BindingPorts:       ex.pm.BindPorts(ex.portID),
 		ShmSize:            resource.ShmSize,
 	}
-	logGroup := fmt.Sprintf("/jobs/%s", job.RepoName)
+	logGroup := fmt.Sprintf("/jobs/%s", job.RepoId)
 	fileLog, err := createLocalLog(filepath.Join(ex.configDir, "logs", logGroup), job.RunName)
 	if err != nil {
 		return gerrors.Wrap(err)

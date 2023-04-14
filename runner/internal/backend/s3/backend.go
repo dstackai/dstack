@@ -133,7 +133,7 @@ func (s *S3) UpdateState(ctx context.Context) error {
 	if err != nil {
 		return gerrors.Wrap(err)
 	}
-	log.Trace(ctx, "Fetching list jobs", "Repo username", s.state.Job.GitUserName, "Repo name", s.state.Job.GitName, "Job ID", s.state.Job.JobID)
+	log.Trace(ctx, "Fetching list jobs", "Repo username", s.state.Job.RepoUserName, "Repo name", s.state.Job.RepoName, "Job ID", s.state.Job.JobID)
 	files, err := s.cliS3.ListFile(ctx, s.bucket, s.state.Job.JobHeadFilepathPrefix())
 	if err != nil {
 		return gerrors.Wrap(err)
@@ -242,7 +242,7 @@ func (s *S3) MasterJob(ctx context.Context) *models.Job {
 		log.Trace(ctx, "State not exist")
 		return nil
 	}
-	theFile, err := s.cliS3.GetFile(ctx, s.bucket, fmt.Sprintf("jobs/%s/%s.yaml", s.state.Job.RepoName, s.state.Job.MasterJobID))
+	theFile, err := s.cliS3.GetFile(ctx, s.bucket, fmt.Sprintf("jobs/%s/%s.yaml", s.state.Job.RepoId, s.state.Job.MasterJobID))
 	if err != nil {
 		return nil
 	}
@@ -324,7 +324,7 @@ func (s *S3) Secrets(ctx context.Context) (map[string]string, error) {
 	if s.state == nil {
 		return nil, gerrors.New("State is empty")
 	}
-	templatePath := fmt.Sprintf("secrets/%s/l;", s.state.Job.RepoName)
+	templatePath := fmt.Sprintf("secrets/%s/l;", s.state.Job.RepoId)
 	listSecrets, err := s.cliS3.ListFile(ctx, s.bucket, templatePath)
 	if err != nil {
 		return nil, gerrors.Wrap(err)
@@ -333,7 +333,7 @@ func (s *S3) Secrets(ctx context.Context) (map[string]string, error) {
 	for _, secretPath := range listSecrets {
 		clearName := strings.ReplaceAll(secretPath, templatePath, "")
 		secrets[clearName] = fmt.Sprintf("%s/%s",
-			s.state.Job.RepoName,
+			s.state.Job.RepoId,
 			clearName)
 	}
 	return s.cliSecret.fetchSecret(ctx, s.bucket, secrets)
@@ -353,7 +353,7 @@ func (s *S3) GitCredentials(ctx context.Context) *models.GitCredentials {
 		log.Error(ctx, "Job is empty")
 		return nil
 	}
-	return s.cliSecret.fetchCredentials(ctx, s.bucket, s.state.Job.RepoHostNameWithPort(), s.state.Job.GitUserName, s.state.Job.GitName)
+	return s.cliSecret.fetchCredentials(ctx, s.bucket, s.state.Job.RepoHostNameWithPort(), s.state.Job.RepoUserName, s.state.Job.RepoName)
 }
 
 func (s *S3) GetRepoDiff(ctx context.Context, path string) (string, error) {

@@ -262,7 +262,7 @@ class Job(JobHead):
             for dep in self.dep_specs:
                 deps.append(
                     {
-                        "repo_name": dep.repo_id,
+                        "repo_id": dep.repo_id,
                         "run_name": dep.run_name,
                         "mount": dep.mount,
                     }
@@ -275,8 +275,8 @@ class Job(JobHead):
                 )
         job_data = {
             "job_id": self.job_id,
-            "repo_name": self.repo.repo_id,
-            "repo_username": self.repo.repo_user_id,
+            "repo_id": self.repo.repo_id,
+            "repo_user_id": self.repo.repo_user_id,
             "run_name": self.run_name,
             "workflow_name": self.workflow_name or "",
             "provider_name": self.provider_name,
@@ -314,12 +314,12 @@ class Job(JobHead):
             "ssh_key_pub": self.ssh_key_pub or "",
         }
         if isinstance(self.repo_data, RemoteRepoData):
-            job_data["git_host_name"] = self.repo_data.repo_host_name
-            job_data["git_port"] = self.repo_data.repo_port or 0
-            job_data["git_user_name"] = self.repo_data.repo_user_name
-            job_data["git_name"] = self.repo_data.repo_name
-            job_data["git_branch"] = self.repo_data.repo_branch or ""
-            job_data["git_hash"] = self.repo_data.repo_hash or ""
+            job_data["repo_host_name"] = self.repo_data.repo_host_name
+            job_data["repo_port"] = self.repo_data.repo_port or 0
+            job_data["repo_user_name"] = self.repo_data.repo_user_name
+            job_data["repo_name"] = self.repo_data.repo_name
+            job_data["repo_branch"] = self.repo_data.repo_branch or ""
+            job_data["repo_hash"] = self.repo_data.repo_hash or ""
         job_data["repo_diff_filename"] = self.repo_diff_filename
         return job_data
 
@@ -364,7 +364,7 @@ class Job(JobHead):
         if job_data.get("deps"):
             for dep in job_data["deps"]:
                 dep_spec = DepSpec(
-                    repo_id=dep["repo_name"],
+                    repo_id=dep["repo_id"],
                     run_name=dep["run_name"],
                     mount=dep.get("mount") is True,
                 )
@@ -396,16 +396,16 @@ class Job(JobHead):
         job = Job(
             job_id=job_data["job_id"],
             repo_ref=RepoRef(
-                repo_id=job_data["repo_name"],
-                repo_user_id=job_data["repo_username"],
+                repo_id=job_data["repo_id"],
+                repo_user_id=job_data["repo_user_id"],
             ),
             repo_data=RemoteRepoData(
-                repo_host_name=job_data["git_host_name"],
-                repo_port=job_data.get("git_port") or None,
-                repo_user_name=job_data["git_user_name"],
-                repo_name=job_data["git_name"],
-                repo_branch=job_data["git_branch"] or None,
-                repo_hash=job_data["git_hash"] or None,
+                repo_host_name=job_data["repo_host_name"],
+                repo_port=job_data.get("repo_port") or None,
+                repo_user_name=job_data["repo_user_name"],
+                repo_name=job_data["repo_name"],
+                repo_branch=job_data["repo_branch"] or None,
+                repo_hash=job_data["repo_hash"] or None,
             ),
             repo_diff_filename=job_data.get("repo_diff_filename"),
             run_name=job_data["run_name"],
