@@ -3,6 +3,7 @@ from pathlib import Path
 from typing import Dict, Optional, Type, TypeVar
 
 import yaml
+from git import InvalidGitRepositoryError
 from pydantic import BaseModel
 
 from dstack.core.userconfig import RepoUserConfig
@@ -29,7 +30,10 @@ class ConfigManager:
 
     @property
     def repo_user_config(self) -> RepoUserConfig:
-        return self._cached_read(self.repo_user_config_path(), RepoUserConfig)
+        try:
+            return self._cached_read(self.repo_user_config_path(), RepoUserConfig)
+        except FileNotFoundError:
+            raise InvalidGitRepositoryError()
 
     @repo_user_config.setter
     def repo_user_config(self, value: RepoUserConfig):
