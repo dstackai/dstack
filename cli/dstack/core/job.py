@@ -167,7 +167,7 @@ def check_dict(element: Any, field: str):
 
 class Job(JobHead):
     job_id: Optional[str]
-    repo_data: Union[RepoData] = Field(..., discriminator="repo_type")
+    repo_data: Union[RepoData, RemoteRepoData] = Field(..., discriminator="repo_type")
     repo_diff_filename: Optional[str] = None
     run_name: str
     workflow_name: Optional[str]

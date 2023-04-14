@@ -44,7 +44,7 @@ class RepoHead(RepoRef):
 
 
 class RepoData(BaseModel):
-    pass
+    repo_type: Literal["none"] = "none"
 
 
 class RemoteRepoData(RepoData):
@@ -230,7 +230,7 @@ class RepoSpec(BaseModel):
     """Serializable Repo representation"""
 
     repo_ref: RepoRef
-    repo_data: Union[RemoteRepoData] = Field(..., discriminator="repo_type")
+    repo_data: Union[RepoData, RemoteRepoData] = Field(..., discriminator="repo_type")
 
     @property
     def repo(self) -> Repo:

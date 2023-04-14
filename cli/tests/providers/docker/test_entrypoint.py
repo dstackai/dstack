@@ -3,19 +3,8 @@ from typing import List, Optional
 from unittest.mock import patch
 
 from dstack.backend.base import Backend
-from dstack.core.repo import OldLocalRepoData, Repo
+from dstack.core.repo import RemoteRepo
 from dstack.providers.docker.main import DockerProvider
-
-
-def load_repo_data():
-    return OldLocalRepoData(
-        repo_host_name="",
-        repo_user_name="",
-        repo_name="",
-        repo_branch="",
-        repo_hash="",
-        protocol="https",
-    )
 
 
 def create_provider_data(
@@ -28,18 +17,7 @@ class TestEntrypoint(unittest.TestCase):
     @patch.multiple(Backend, __abstractmethods__=set())
     def setUp(self) -> None:
         self.backend = Backend(
-            repo=Repo(
-                repo_id="foo",
-                repo_user_id="bar",
-                data=OldLocalRepoData(
-                    repo_host_name="",
-                    repo_user_name="",
-                    repo_name="",
-                    repo_branch="",
-                    repo_hash="",
-                    protocol="https",
-                ),
-            )
+            repo=RemoteRepo(repo_url="https://github.com/dstackai/dstack-playground.git")
         )
 
     def test_no_commands(self):

@@ -223,7 +223,8 @@ class Provider:
         for i, job_spec in enumerate(job_specs):
             job = Job(
                 job_id=f"{self.run_name},{self.workflow_name or ''},{i}",
-                repo=backend.repo,
+                repo_ref=backend.repo.repo_ref,
+                repo_data=backend.repo.repo_data,
                 run_name=self.run_name,
                 workflow_name=self.workflow_name or None,
                 provider_name=self.provider_name,
