@@ -23,9 +23,8 @@ from dstack.backend.base import Backend
 from dstack.backend.base.logs import fix_urls
 from dstack.cli.commands import BasicCommand
 from dstack.cli.commands.run.ssh_tunnel import allocate_local_ports, run_ssh_tunnel
-from dstack.cli.common import console, print_runs
+from dstack.cli.common import check_backend, check_config, check_git, console, print_runs
 from dstack.cli.config import config
-from dstack.core.error import check_backend, check_config, check_git
 from dstack.core.job import Job, JobHead, JobStatus
 from dstack.core.repo import RemoteRepo
 from dstack.core.request import RequestStatus
@@ -215,16 +214,8 @@ def poll_run(
             console.print()
 
         run = backend.list_run_heads(run_name)[0]
-        if len(job_heads) == 1 and run and run.status == JobStatus.RUNNING:
+        if run.status.is_unfinished() or run.status == JobStatus.DONE:
             poll_logs_ws(backend, jobs[0], ports)
-        else:
-            poll_logs(
-                backend,
-                job_heads,
-                since("1d"),
-                attach=True,
-                from_run=True,
-            )
     except KeyboardInterrupt:
         if Confirm.ask(f" [red]Abort the run '{run_name}'?[/]"):
             backend.stop_jobs(run_name, abort=True)
@@ -318,7 +309,8 @@ class RunCommand(BasicCommand):
 
             repo_credentials = backend.get_repo_credentials()
             if not repo_credentials:
-                sys.exit(f"Call `dstack init` first")
+                console.print("Call `dstack init` first")
+                exit(1)
             if not config.repo_user_config.ssh_key_path:
                 if (
                     (backend.name != "local" and not args.detach)

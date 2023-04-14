@@ -12,8 +12,9 @@ from dstack.api.backend import list_backends
 from dstack.api.tags import list_tag_heads_with_merged_backends
 from dstack.backend.base import BackendType
 from dstack.cli.commands import BasicCommand
+from dstack.cli.common import check_backend, check_config, check_git
 from dstack.cli.config import config
-from dstack.core.error import BackendError, check_config, check_git
+from dstack.core.error import BackendError
 from dstack.core.repo import RemoteRepo
 from dstack.utils.common import pretty_date
 
@@ -67,6 +68,7 @@ class TAGCommand(BasicCommand):
 
     @check_config
     @check_git
+    @check_backend
     def _command(self, args: Namespace):
         repo = RemoteRepo(repo_ref=config.repo_user_config.repo_ref, local_repo_dir=os.getcwd())
         console = Console()
@@ -91,6 +93,8 @@ class TAGCommand(BasicCommand):
         console.print(table)
 
     @check_config
+    @check_git
+    @check_backend
     def add_tag(self, args: Namespace):
         if args.run_name or args.artifact_paths:
             repo = RemoteRepo(
@@ -137,6 +141,8 @@ class TAGCommand(BasicCommand):
             sys.exit("Specify -r RUN or -a PATH to create a tag")
 
     @check_config
+    @check_git
+    @check_backend
     def delete_tag(self, args: Namespace):
         repo = RemoteRepo(repo_ref=config.repo_user_config.repo_ref, local_repo_dir=os.getcwd())
         tag_heads = []

@@ -10,8 +10,8 @@ from rich_argparse import RichHelpFormatter
 
 from dstack.api.backend import list_backends
 from dstack.cli.commands import BasicCommand
+from dstack.cli.common import check_backend, check_config, check_git
 from dstack.cli.config import config
-from dstack.core.error import check_config, check_git
 from dstack.core.repo import RemoteRepo
 from dstack.core.secret import Secret
 
@@ -68,6 +68,8 @@ class SecretCommand(BasicCommand):
         delete_secrets_parser.set_defaults(func=self.delete_secret)
 
     @check_config
+    @check_git
+    @check_backend
     def add_secret(self, args: Namespace):
         repo = RemoteRepo(repo_ref=config.repo_user_config.repo_ref, local_repo_dir=os.getcwd())
         for backend in list_backends(repo):
@@ -89,6 +91,8 @@ class SecretCommand(BasicCommand):
                 print(f"[grey58]OK (backend: {backend.name})[/]")
 
     @check_config
+    @check_git
+    @check_backend
     def update_secret(self, args: Namespace):
         repo = RemoteRepo(repo_ref=config.repo_user_config.repo_ref, local_repo_dir=os.getcwd())
         anyone = False
@@ -104,6 +108,8 @@ class SecretCommand(BasicCommand):
             sys.exit(f"The secret '{args.secret_name}' doesn't exist")
 
     @check_config
+    @check_git
+    @check_backend
     def delete_secret(self, args: Namespace):
         repo = RemoteRepo(repo_ref=config.repo_user_config.repo_ref, local_repo_dir=os.getcwd())
         anyone = False
@@ -121,6 +127,7 @@ class SecretCommand(BasicCommand):
 
     @check_config
     @check_git
+    @check_backend
     def _command(self, args: Namespace):
         console = Console()
         table = Table(box=None)

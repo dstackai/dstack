@@ -17,11 +17,11 @@ class BackendConfig(ABC):
     credentials: Optional[Dict] = None
 
     @abstractmethod
-    def save(self, path: Path = get_config_path()):
+    def save(self, path: Optional[Path] = None):
         pass
 
     @abstractmethod
-    def load(self, path: Path = get_config_path()):
+    def load(self, path: Optional[Path] = None):
         pass
 
 

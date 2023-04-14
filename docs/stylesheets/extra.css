@@ -469,6 +469,8 @@ code .md-code__nav:hover .md-code__button {
     --md-code-hl-string-color: #8fdbae;
     --md-code-fg-color: #eee;
     /*--md-code-fg-color: rgba(0, 0, 0, 0.95);*/
+    --md-mermaid-label-fg-color: rgba(0, 0, 0, 0.95);
+    --md-mermaid-edge-color: rgba(0, 0, 0, 0.95);
     --md-code-hl-comment-color: #757585;
     --md-code-hl-number-color: #d9548c;
     --md-code-hl-operator-color: #5b6369;
@@ -481,6 +483,10 @@ code .md-code__nav:hover .md-code__button {
     --md-default-fg-color--lightest: #f6f9fc;
     --md-footer-fg-color--light: var(--md-default-fg-color);
     --md-code-hl-color--light: rgba(197, 173, 255, 0.12);
+}
+
+#__mermaid_0 .note {
+    stroke: var(--md-primary-fg-color) !important;
 }
 
 .md-typeset .highlight :where(.l) {
@@ -1135,6 +1141,10 @@ html .md-footer-meta.md-typeset a:is(:focus,:hover) {
     font-size: 1em;
     color: white;
     margin-right: 5px;
+}
+
+.md-post .md-nav__title {
+    font-weight: 500;
 }
 
 a.md-go-to-action.primary {

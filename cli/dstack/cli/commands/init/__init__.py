@@ -4,7 +4,7 @@ from typing import Optional
 
 from dstack.api.backend import list_backends
 from dstack.cli.commands import BasicCommand
-from dstack.cli.common import console
+from dstack.cli.common import check_backend, check_config, check_git, console
 from dstack.cli.config import config
 from dstack.core.error import check_config, check_git
 from dstack.core.repo import RemoteRepo
@@ -55,6 +55,7 @@ class InitCommand(BasicCommand):
 
     @check_config
     @check_git
+    @check_backend
     def _command(self, args: Namespace):
         repo = RemoteRepo(
             local_repo_dir=Path.cwd(),

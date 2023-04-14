@@ -1,6 +1,5 @@
 from typing import Dict, List, Optional
 
-from dstack import version
 from dstack.backend.aws import AwsBackend
 from dstack.backend.base import Backend, BackendType, RemoteBackend
 from dstack.backend.gcp import GCPBackend
@@ -8,9 +7,7 @@ from dstack.backend.hub import HubBackend
 from dstack.backend.local import LocalBackend
 from dstack.core.repo import Repo
 
-backends_classes = [AwsBackend, GCPBackend, LocalBackend]
-if not version.__is_release__:
-    backends_classes.append(HubBackend)
+backends_classes = [HubBackend, AwsBackend, GCPBackend, LocalBackend]
 
 
 def get_all_backends(repo: Optional[Repo]):

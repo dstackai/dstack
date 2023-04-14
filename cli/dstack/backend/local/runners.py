@@ -158,7 +158,7 @@ def _runner_filename() -> str:
     linux = uname.system == "Linux"
     arm64 = arch == "arm64" or arch == "aarch64"
     i386 = arch == "i386"
-    amd64 = arch == "x86_64"
+    amd64 = arch in ["x86_64", "AMD64"]
     if darwin and arm64:
         filename = "dstack-runner-darwin-arm64"
     elif darwin and amd64:
@@ -169,7 +169,7 @@ def _runner_filename() -> str:
         filename = "dstack-runner-linux-amd64"
     elif windows and i386:
         filename = "dstack-runner-windows-x86.exe"
-    elif linux and amd64:
+    elif windows and amd64:
         filename = "dstack-runner-windows-amd64.exe"
     else:
         raise Exception(f"Unsupported platform: {uname}")
