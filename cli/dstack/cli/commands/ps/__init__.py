@@ -15,7 +15,6 @@ from dstack.cli.common import (
     print_runs,
 )
 from dstack.cli.config import config
-from dstack.core.error import check_config, check_git
 from dstack.core.repo import RemoteRepo
 
 LIVE_PROVISION_INTERVAL_SECS = 2

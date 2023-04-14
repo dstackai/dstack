@@ -10,7 +10,6 @@ from dstack.api.run import RunNotFoundError, TagNotFoundError, get_tagged_run_na
 from dstack.cli.commands import BasicCommand
 from dstack.cli.common import check_backend, check_config, check_git, console
 from dstack.cli.config import config
-from dstack.core.error import check_config, check_git
 from dstack.core.repo import RemoteRepo
 from dstack.utils.common import sizeof_fmt
 
