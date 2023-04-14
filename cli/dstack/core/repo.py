@@ -1,13 +1,14 @@
 import os
 from abc import ABC, abstractmethod
 from enum import Enum
-from typing import Literal, Optional, Union
+from typing import Optional, Union
 
 import git
 import giturlparse
 import yaml
 from paramiko.config import SSHConfig
 from pydantic import BaseModel, Field, validator
+from typing_extensions import Literal
 
 from dstack.utils.common import PathLike
 
@@ -188,7 +189,7 @@ class RemoteRepo(Repo):
                     self.identity_file = os.path.expanduser("~/.ssh/id_rsa")
             self.ls_remote()
             if os.path.exists(self.identity_file):
-                with open(self.identity_file, "f") as f:
+                with open(self.identity_file, "r") as f:
                     private_key = f.read()
         elif self.repo_data.repo_protocol == "https":
             if self.oauth_token is None:
