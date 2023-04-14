@@ -1,3 +1,4 @@
+import os
 import sys
 from argparse import Namespace
 
@@ -8,10 +9,10 @@ from rich.table import Table
 from rich_argparse import RichHelpFormatter
 
 from dstack.api.backend import list_backends
-from dstack.api.repo import get_repo
 from dstack.cli.commands import BasicCommand
 from dstack.cli.config import config
 from dstack.core.error import check_config, check_git
+from dstack.core.repo import RemoteRepo
 from dstack.core.secret import Secret
 
 
@@ -68,7 +69,7 @@ class SecretCommand(BasicCommand):
 
     @check_config
     def add_secret(self, args: Namespace):
-        repo = get_repo(config.repo_user_config)
+        repo = RemoteRepo(repo_ref=config.repo_user_config.repo_ref, local_repo_dir=os.getcwd())
         for backend in list_backends(repo):
             if backend.get_secret(args.secret_name):
                 if args.yes or Confirm.ask(
@@ -89,7 +90,7 @@ class SecretCommand(BasicCommand):
 
     @check_config
     def update_secret(self, args: Namespace):
-        repo = get_repo(config.repo_user_config)
+        repo = RemoteRepo(repo_ref=config.repo_user_config.repo_ref, local_repo_dir=os.getcwd())
         anyone = False
         for backend in list_backends(repo):
             if backend.get_secret(args.secret_name):
@@ -104,7 +105,7 @@ class SecretCommand(BasicCommand):
 
     @check_config
     def delete_secret(self, args: Namespace):
-        repo = get_repo(config.repo_user_config)
+        repo = RemoteRepo(repo_ref=config.repo_user_config.repo_ref, local_repo_dir=os.getcwd())
         anyone = False
         for backend in list_backends(repo):
             secret = backend.get_secret(args.secret_name)
@@ -123,7 +124,7 @@ class SecretCommand(BasicCommand):
     def _command(self, args: Namespace):
         console = Console()
         table = Table(box=None)
-        repo = get_repo(config.repo_user_config)
+        repo = RemoteRepo(repo_ref=config.repo_user_config.repo_ref, local_repo_dir=os.getcwd())
         table.add_column("NAME", style="bold", no_wrap=True)
         table.add_column("BACKEND", style="bold", no_wrap=True)
         secrets = {}

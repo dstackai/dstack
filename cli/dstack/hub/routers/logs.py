@@ -1,5 +1,5 @@
 from functools import partial
-from typing import Any, AsyncIterable, Callable, Coroutine, List, Mapping, Optional, Union
+from typing import Any, AsyncIterable, Callable, Coroutine, Mapping, Optional
 
 import anyio
 from fastapi import APIRouter, Depends
@@ -77,7 +77,7 @@ class JSONStreamingResponse(Response):
 )
 async def poll_logs(project_name: str, body: PollLogs):
     project = await get_project(project_name=project_name)
-    backend = get_backend(project, body.repo)
+    backend = get_backend(project, body.repo_spec.repo)
     return JSONStreamingResponse(
         content=backend.poll_logs(
             job_heads=body.job_heads,

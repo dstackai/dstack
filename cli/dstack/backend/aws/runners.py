@@ -10,7 +10,7 @@ from dstack import version
 from dstack.backend.base.compute import NoCapacityError, choose_instance_type
 from dstack.core.instance import InstanceType
 from dstack.core.job import Job, Requirements
-from dstack.core.repo import RepoAddress
+from dstack.core.repo import RepoRef
 from dstack.core.request import RequestHead, RequestStatus
 from dstack.core.runners import Gpu, Resources
 
@@ -342,9 +342,7 @@ def _run_instance(
     subnet_id: Optional[str],
     runner_id: str,
     instance_type: InstanceType,
-    local_repo_user_name: Optional[str],
-    local_repo_user_email: Optional[str],
-    repo_address: RepoAddress,
+    repo_ref: RepoRef,
     ssh_key_pub: str,
 ) -> str:
     launch_specification = {}
@@ -374,12 +372,9 @@ def _run_instance(
     tags = [
         {"Key": "owner", "Value": "dstack"},
         {"Key": "dstack_bucket", "Value": bucket_name},
-        {"Key": "dstack_repo", "Value": repo_address.path()},
+        {"Key": "dstack_repo", "Value": repo_ref.repo_id},
+        {"Key": "dstack_repo_user", "Value": repo_ref.repo_user_id},
     ]
-    if local_repo_user_name:
-        tags.append({"Key": "dstack_user_name", "Value": local_repo_user_name})
-    if local_repo_user_email:
-        tags.append({"Key": "dstack_user_email", "Value": local_repo_user_email})
     response = ec2_client.run_instances(
         BlockDeviceMappings=[
             {
@@ -424,9 +419,7 @@ def run_instance_retry(
     subnet_id: Optional[str],
     runner_id: str,
     instance_type: InstanceType,
-    local_repo_user_name: Optional[str],
-    local_repo_user_email: Optional[str],
-    repo_address: RepoAddress,
+    repo_ref: RepoRef,
     ssh_key_pub: str,
     attempts: int = 3,
 ) -> str:
@@ -439,9 +432,7 @@ def run_instance_retry(
             subnet_id,
             runner_id,
             instance_type,
-            local_repo_user_name,
-            local_repo_user_email,
-            repo_address,
+            repo_ref,
             ssh_key_pub,
         )
     except botocore.exceptions.ClientError as e:
@@ -457,9 +448,7 @@ def run_instance_retry(
                     subnet_id,
                     runner_id,
                     instance_type,
-                    local_repo_user_name,
-                    local_repo_user_email,
-                    repo_address,
+                    repo_ref,
                     ssh_key_pub,
                     attempts - 1,
                 )

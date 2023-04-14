@@ -46,9 +46,7 @@ class AWSCompute(Compute):
             subnet_id=self.subnet_id,
             runner_id=job.runner_id,
             instance_type=instance_type,
-            local_repo_user_name=job.local_repo_user_name,
-            local_repo_user_email=job.local_repo_user_email,
-            repo_address=job.repo.data,
+            repo_ref=job.repo_ref,
             ssh_key_pub=job.ssh_key_pub,
         )
 

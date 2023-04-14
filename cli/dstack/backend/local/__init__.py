@@ -1,4 +1,3 @@
-from os import PathLike
 from pathlib import Path
 from typing import Generator, List, Optional
 
@@ -18,14 +17,15 @@ from dstack.backend.local.storage import LocalStorage
 from dstack.core.artifact import Artifact
 from dstack.core.job import Job, JobHead, JobStatus
 from dstack.core.log_event import LogEvent
-from dstack.core.repo import RepoCredentials, RepoRef
+from dstack.core.repo import Repo, RepoCredentials
 from dstack.core.run import RunHead
 from dstack.core.secret import Secret
 from dstack.core.tag import TagHead
+from dstack.utils.common import PathLike
 
 
 class LocalBackend(Backend):
-    def __init__(self, repo: RepoRef):
+    def __init__(self, repo: Repo):
         super().__init__(repo=repo)
         self.backend_config = LocalConfig()
         self.backend_config.load()
@@ -53,8 +53,8 @@ class LocalBackend(Backend):
     def create_job(self, job: Job):
         base_jobs.create_job(self._storage, job)
 
-    def get_job(self, job_id: str) -> Optional[Job]:
-        return base_jobs.get_job(self._storage, self.repo.repo_id, job_id)
+    def get_job(self, job_id: str, repo_id: Optional[str] = None) -> Optional[Job]:
+        return base_jobs.get_job(self._storage, repo_id or self.repo.repo_id, job_id)
 
     def list_jobs(self, run_name: str) -> List[Job]:
         return base_jobs.list_jobs(self._storage, self.repo.repo_id, run_name)
@@ -63,10 +63,12 @@ class LocalBackend(Backend):
         base_jobs.run_job(self._storage, self._compute, job, failed_to_start_job_new_status)
 
     def stop_job(self, job_id: str, abort: bool):
-        base_jobs.stop_job(self._storage, self._compute, self.repo, job_id, abort)
+        base_jobs.stop_job(self._storage, self._compute, self.repo.repo_id, job_id, abort)
 
-    def list_job_heads(self, run_name: Optional[str] = None) -> List[JobHead]:
-        return base_jobs.list_job_heads(self._storage, self.repo, run_name)
+    def list_job_heads(
+        self, run_name: Optional[str] = None, repo_id: Optional[str] = None
+    ) -> List[JobHead]:
+        return base_jobs.list_job_heads(self._storage, repo_id or self.repo.repo_id, run_name)
 
     def delete_job_head(self, job_id: str):
         base_jobs.delete_job_head(self._storage, self.repo.repo_id, job_id)
@@ -76,8 +78,9 @@ class LocalBackend(Backend):
         run_name: Optional[str] = None,
         include_request_heads: bool = True,
         interrupted_job_new_status: JobStatus = JobStatus.FAILED,
+        repo_id: Optional[str] = None,
     ) -> List[RunHead]:
-        job_heads = self.list_job_heads(run_name)
+        job_heads = self.list_job_heads(run_name, repo_id=repo_id)
         return base_runs.get_run_heads(
             self._storage,
             self._compute,
@@ -144,7 +147,7 @@ class LocalBackend(Backend):
     ):
         base_tags.create_tag_from_run(
             self._storage,
-            self.repo,
+            self.repo.repo_id,
             tag_name,
             run_name,
             run_jobs,
@@ -160,10 +163,10 @@ class LocalBackend(Backend):
         )
 
     def delete_tag_head(self, tag_head: TagHead):
-        base_tags.delete_tag(self._storage, self.repo, tag_head)
+        base_tags.delete_tag(self._storage, self.repo.repo_id, tag_head)
 
     def update_repo_last_run_at(self, last_run_at: int):
-        base_repos.update_repo_last_run_at(self._storage, self.repo, last_run_at)
+        base_repos.update_repo_last_run_at(self._storage, self.repo.repo_ref, last_run_at)
 
     def get_repo_credentials(self) -> Optional[RepoCredentials]:
         return base_repos.get_repo_credentials(self._secrets_manager)

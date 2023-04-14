@@ -18,7 +18,6 @@ from websocket import WebSocketApp
 from dstack import providers
 from dstack.api.backend import get_backend_by_name, get_current_remote_backend, get_local_backend
 from dstack.api.logs import poll_logs
-from dstack.api.repo import get_repo
 from dstack.api.run import list_runs_with_merged_backends
 from dstack.backend.base import Backend
 from dstack.backend.base.logs import fix_urls
@@ -28,6 +27,7 @@ from dstack.cli.common import console, print_runs
 from dstack.cli.config import config
 from dstack.core.error import check_backend, check_config, check_git
 from dstack.core.job import Job, JobHead, JobStatus
+from dstack.core.repo import RemoteRepo
 from dstack.core.request import RequestStatus
 from dstack.utils.common import since
 
@@ -288,7 +288,9 @@ class RunCommand(BasicCommand):
             self._parser.print_help()
             exit(1)
         try:
-            repo = get_repo(config.repo_user_config)
+            repo = RemoteRepo(
+                repo_ref=config.repo_user_config.repo_ref, local_repo_dir=os.getcwd()
+            )
             backend = get_local_backend(repo)
             if args.remote is not None:
                 if len(args.remote) == 0:

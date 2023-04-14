@@ -1,13 +1,14 @@
+import os
 from argparse import Namespace
 
 from rich.prompt import Confirm
 
 from dstack.api.backend import list_backends
-from dstack.api.repo import get_repo
 from dstack.cli.commands import BasicCommand
 from dstack.cli.common import console
 from dstack.cli.config import config
 from dstack.core.error import check_config, check_git
+from dstack.core.repo import RemoteRepo
 
 
 def _verb(abort: bool):
@@ -58,7 +59,9 @@ class StopCommand(BasicCommand):
                 args.yes or Confirm.ask(f"[red]{_verb(args.abort)} the run '{args.run_name}'?[/]")
             )
         ) or (args.all and (args.yes or Confirm.ask(f"[red]{_verb(args.abort)} all runs?[/]"))):
-            repo = get_repo(config.repo_user_config)
+            repo = RemoteRepo(
+                repo_ref=config.repo_user_config.repo_ref, local_repo_dir=os.getcwd()
+            )
             found_run = False
             for backend in list_backends(repo):
                 job_heads = backend.list_job_heads(args.run_name)

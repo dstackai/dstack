@@ -1,9 +1,9 @@
-from typing import Optional, Tuple
+from typing import Optional
 
 from dstack.backend.base.compute import Compute
 from dstack.backend.local import runners
 from dstack.core.instance import InstanceType
-from dstack.core.job import Job, Requirements
+from dstack.core.job import Job
 from dstack.core.request import RequestHead
 
 

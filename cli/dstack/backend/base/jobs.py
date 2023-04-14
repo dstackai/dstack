@@ -22,15 +22,15 @@ def create_job(
     if create_head:
         storage.put_object(key=_get_job_head_filename(job), content="")
 
-    if job.repo.data.repo_diff:
-        job.repo_diff_filename = _get_diff_filename(job.repo.data.repo_diff)
+    if job.repo_data.repo_diff:
+        job.repo_diff_filename = _get_diff_filename(job.repo_data.repo_diff)
         storage.put_object(
-            key=job.repo_diff_filename, content=job.repo.data.repo_diff
+            key=job.repo_diff_filename, content=job.repo_data.repo_diff
         )  # todo: check if exists
-        job.repo.data.repo_diff = None
+        job.repo_data.repo_diff = None
 
     storage.put_object(
-        key=_get_job_filename(job.repo.repo_id, job.job_id), content=yaml.dump(job.serialize())
+        key=_get_job_filename(job.repo_ref.repo_id, job.job_id), content=yaml.dump(job.serialize())
     )
 
 
@@ -43,13 +43,13 @@ def get_job(storage: Storage, repo_id: str, job_id: str) -> Optional[Job]:
 
 
 def update_job(storage: Storage, job: Job):
-    job_head_key_prefix = _get_job_head_filename_prefix(job.repo.repo_id, job.job_id)
+    job_head_key_prefix = _get_job_head_filename_prefix(job.repo_ref.repo_id, job.job_id)
     job_keys = storage.list_objects(job_head_key_prefix)
     for key in job_keys:
         storage.delete_object(key)
     storage.put_object(key=_get_job_head_filename(job), content="")
     storage.put_object(
-        key=_get_job_filename(job.repo.repo_id, job.job_id), content=yaml.dump(job.serialize())
+        key=_get_job_filename(job.repo_ref.repo_id, job.job_id), content=yaml.dump(job.serialize())
     )
 
 
@@ -64,8 +64,8 @@ def list_jobs(storage: Storage, repo_id: str, run_name: str) -> List[Job]:
     return jobs
 
 
-def list_job_head(storage: Storage, repo: RepoRef, job_id: str) -> Optional[JobHead]:
-    job_head_key_prefix = _get_job_head_filename_prefix(repo.repo_id, job_id)
+def list_job_head(storage: Storage, repo_id: str, job_id: str) -> Optional[JobHead]:
+    job_head_key_prefix = _get_job_head_filename_prefix(repo_id, job_id)
     job_head_keys = storage.list_objects(job_head_key_prefix)
     for job_head_key in job_head_keys:
         t = job_head_key[len(job_head_key_prefix) :].split(";")
@@ -73,7 +73,7 @@ def list_job_head(storage: Storage, repo: RepoRef, job_id: str) -> Optional[JobH
         if len(t) == 7:
             (
                 provider_name,
-                local_repo_user_name,
+                repo_user_id,
                 submitted_at,
                 status,
                 artifacts,
@@ -83,11 +83,10 @@ def list_job_head(storage: Storage, repo: RepoRef, job_id: str) -> Optional[JobH
             run_name, workflow_name, job_index = tuple(job_id.split(","))
             return JobHead(
                 job_id=job_id,
-                repo=repo,
+                repo_ref=RepoRef(repo_id=repo_id, repo_user_id=repo_user_id),
                 run_name=run_name,
                 workflow_name=workflow_name or None,
                 provider_name=provider_name,
-                local_repo_user_name=local_repo_user_name or None,
                 status=JobStatus(status),
                 submitted_at=int(submitted_at),
                 artifact_paths=artifacts.split(",") if artifacts else None,
@@ -99,21 +98,21 @@ def list_job_head(storage: Storage, repo: RepoRef, job_id: str) -> Optional[JobH
 
 def list_job_heads(
     storage: Storage,
-    repo: RepoRef,
+    repo_id: str,
     run_name: Optional[str] = None,
 ) -> List[JobHead]:
-    job_heads_keys_prefix = _get_job_heads_filenames_prefix(repo.repo_id, run_name)
+    job_heads_keys_prefix = _get_job_heads_filenames_prefix(repo_id, run_name)
     job_heads_keys = storage.list_objects(job_heads_keys_prefix)
     job_heads = []
     for job_head_key in job_heads_keys:
-        t = job_head_key[len(_get_jobs_dir(repo.repo_id)) :].split(";")
+        t = job_head_key[len(_get_jobs_dir(repo_id)) :].split(";")
         # Skip legacy format
         if len(t) == 9:
             (
                 _,
                 job_id,
                 provider_name,
-                local_repo_user_name,
+                repo_user_id,
                 submitted_at,
                 status,
                 artifacts,
@@ -124,11 +123,10 @@ def list_job_heads(
             job_heads.append(
                 JobHead(
                     job_id=job_id,
-                    repo=repo,
+                    repo_ref=RepoRef(repo_id=repo_id, repo_user_id=repo_user_id),
                     run_name=run_name,
                     workflow_name=workflow_name or None,
                     provider_name=provider_name,
-                    local_repo_user_name=local_repo_user_name,
                     status=JobStatus(status),
                     submitted_at=int(submitted_at),
                     artifact_paths=artifacts.split(",") if artifacts else None,
@@ -185,13 +183,13 @@ def run_job(
 def stop_job(
     storage: Storage,
     compute: Compute,
-    repo: RepoRef,
+    repo_id: str,
     job_id: str,
     abort: bool,
 ):
     # TODO: why checking statuses of job_head, job, runner at the same time
-    job_head = list_job_head(storage, repo, job_id)
-    job = get_job(storage, repo.repo_id, job_id)
+    job_head = list_job_head(storage, repo_id, job_id)
+    job = get_job(storage, repo_id, job_id)
     runner = runners.get_runner(storage, job.runner_id) if job else None
     request_status = (
         compute.get_request_head(
@@ -282,12 +280,12 @@ def _get_job_head_filename_prefix(repo_id: str, job_id: str) -> str:
 
 
 def _get_job_head_filename(job: Job) -> str:
-    prefix = _get_jobs_dir(job.repo.repo_id)
+    prefix = _get_jobs_dir(job.repo_ref.repo_id)
     key = (
         f"{prefix}l;"
         f"{job.job_id};"
         f"{job.provider_name};"
-        f"{job.repo.repo_user_id};"
+        f"{job.repo_ref.repo_user_id};"
         f"{job.submitted_at};"
         f"{job.status.value};"
         f"{','.join([a.artifact_path.replace('/', '_') for a in (job.artifact_specs or [])])};"

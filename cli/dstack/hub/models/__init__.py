@@ -4,7 +4,7 @@ from pydantic import BaseModel, Field
 from typing_extensions import Literal
 
 from dstack.core.job import Job, JobHead
-from dstack.core.repo import RepoCredentials, RepoRef
+from dstack.core.repo import RepoCredentials, RepoSpec
 from dstack.core.secret import Secret
 from dstack.hub.security.utils import GlobalRole, ProjectRole
 
@@ -123,62 +123,62 @@ class ProjectInfoWithCreds(BaseModel):
 
 
 class AddTagRun(BaseModel):
-    repo: RepoRef
+    repo_spec: RepoSpec
     tag_name: str
     run_name: str
     run_jobs: Optional[List[Job]]
 
 
 class AddTagPath(BaseModel):
-    repo: RepoRef
+    repo_spec: RepoSpec
     tag_name: str
     local_dirs: List[str]
 
 
 class StopRunners(BaseModel):
-    repo: RepoRef
+    repo_spec: RepoSpec
     job_id: str
     abort: bool
 
 
 class SaveRepoCredentials(BaseModel):
-    repo: RepoRef
+    repo_spec: RepoSpec
     repo_credentials: RepoCredentials
 
 
 class ReposUpdate(BaseModel):
-    repo: RepoRef
+    repo_spec: RepoSpec
     last_run_at: int
 
 
 class RunsList(BaseModel):
-    repo: RepoRef
+    repo_spec: RepoSpec
     run_name: Optional[str]
     include_request_heads: Optional[bool]
 
 
 class JobsGet(BaseModel):
-    repo: RepoRef
+    repo_spec: RepoSpec
     job_id: str
 
 
 class JobsList(BaseModel):
-    repo: RepoRef
+    repo_spec: RepoSpec
     run_name: str
 
 
 class ArtifactsList(BaseModel):
-    repo: RepoRef
+    repo_spec: RepoSpec
     run_name: str
 
 
 class SecretAddUpdate(BaseModel):
-    repo: RepoRef
+    repo_spec: RepoSpec
     secret: Secret
 
 
 class PollLogs(BaseModel):
-    repo: RepoRef
+    repo_spec: RepoSpec
     job_heads: List[JobHead]
     start_time: int
     attached: bool
@@ -200,12 +200,6 @@ class ProjectElementValue(BaseModel):
 class ProjectElement(BaseModel):
     selected: Optional[str]
     values: List[ProjectElementValue] = []
-
-
-class AWSBucketProjectElementValue(BaseModel):
-    name: str
-    created: str
-    region: str
 
 
 class AWSBucketProjectElementValue(BaseModel):

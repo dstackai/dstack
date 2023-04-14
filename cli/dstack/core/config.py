@@ -1,6 +1,6 @@
 from abc import ABC, abstractmethod
 from pathlib import Path
-from typing import Any, Dict, Optional
+from typing import Dict, Optional
 
 from dstack.hub.models import ProjectValues
 

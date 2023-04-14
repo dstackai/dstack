@@ -11,7 +11,7 @@ from dstack.core.config import BackendConfig
 from dstack.core.error import ConfigError
 from dstack.core.job import Job, JobHead, JobStatus
 from dstack.core.log_event import LogEvent
-from dstack.core.repo import RepoCredentials, RepoRef
+from dstack.core.repo import Repo, RepoCredentials
 from dstack.core.run import RunHead
 from dstack.core.secret import Secret
 from dstack.core.tag import TagHead
@@ -21,7 +21,7 @@ class HubBackend(RemoteBackend):
     _client = None
     _storage = None
 
-    def __init__(self, repo: Optional[RepoRef], config: Optional[BackendConfig] = None):
+    def __init__(self, repo: Optional[Repo], config: Optional[BackendConfig] = None):
         super().__init__(backend_config=config, repo=repo)
         self.backend_config = HUBConfig()
         try:
@@ -58,7 +58,7 @@ class HubBackend(RemoteBackend):
     def create_job(self, job: Job):
         self._hub_client().create_job(job=job)
 
-    def get_job(self, job_id: str) -> Optional[Job]:
+    def get_job(self, job_id: str, repo_id: Optional[str] = None) -> Optional[Job]:
         return self._hub_client().get_job(job_id=job_id)
 
     def list_jobs(self, run_name: str) -> List[Job]:
@@ -70,7 +70,9 @@ class HubBackend(RemoteBackend):
     def stop_job(self, job_id: str, abort: bool):
         self._hub_client().stop_job(job_id=job_id, abort=abort)
 
-    def list_job_heads(self, run_name: Optional[str] = None) -> List[JobHead]:
+    def list_job_heads(
+        self, run_name: Optional[str] = None, repo_id: Optional[str] = None
+    ) -> List[JobHead]:
         return self._hub_client().list_job_heads(run_name=run_name)
 
     def delete_job_head(self, job_id: str):
@@ -81,6 +83,7 @@ class HubBackend(RemoteBackend):
         run_name: Optional[str] = None,
         include_request_heads: bool = True,
         interrupted_job_new_status: JobStatus = JobStatus.FAILED,
+        repo_id: Optional[str] = None,
     ) -> List[RunHead]:
         return self._hub_client().list_run_heads(
             run_name=run_name,

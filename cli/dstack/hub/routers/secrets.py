@@ -2,7 +2,7 @@ from typing import List
 
 from fastapi import APIRouter, Depends, HTTPException, status
 
-from dstack.core.repo import RepoRef
+from dstack.core.repo import RepoSpec
 from dstack.core.secret import Secret
 from dstack.hub.models import SecretAddUpdate
 from dstack.hub.routers.cache import get_backend
@@ -15,30 +15,30 @@ router = APIRouter(
 
 
 @router.post("/{project_name}/secrets/list")
-async def list_secrets(project_name: str, repo: RepoRef) -> List[str]:
+async def list_secrets(project_name: str, repo_spec: RepoSpec) -> List[str]:
     project = await get_project(project_name=project_name)
-    backend = get_backend(project, repo)
+    backend = get_backend(project, repo_spec.repo)
     return backend.list_secret_names()
 
 
 @router.post("/{project_name}/secrets/add")
 async def add_secret(project_name: str, body: SecretAddUpdate):
     project = await get_project(project_name=project_name)
-    backend = get_backend(project, body.repo)
+    backend = get_backend(project, body.repo_spec.repo)
     backend.add_secret(secret=body.secret)
 
 
 @router.post("/{project_name}/secrets/update")
 async def update_secret(project_name: str, body: SecretAddUpdate):
     project = await get_project(project_name=project_name)
-    backend = get_backend(project, body.repo)
+    backend = get_backend(project, body.repo_spec.repo)
     backend.update_secret(secret=body.secret)
 
 
 @router.post("/{project_name}/secrets/{secret_name}/get")
-async def get_secret(project_name: str, secret_name: str, repo: RepoRef) -> Secret:
+async def get_secret(project_name: str, secret_name: str, repo_spec: RepoSpec) -> Secret:
     project = await get_project(project_name=project_name)
-    backend = get_backend(project, repo)
+    backend = get_backend(project, repo_spec.repo)
     secret = backend.get_secret(secret_name=secret_name)
     if secret is None:
         raise HTTPException(
@@ -48,7 +48,7 @@ async def get_secret(project_name: str, secret_name: str, repo: RepoRef) -> Secr
 
 
 @router.post("/{project_name}/secrets/{secret_name}/delete")
-async def delete_secret(project_name: str, secret_name: str, repo: RepoRef):
+async def delete_secret(project_name: str, secret_name: str, repo_spec: RepoSpec):
     project = await get_project(project_name=project_name)
-    backend = get_backend(project, repo)
+    backend = get_backend(project, repo_spec.repo)
     backend.delete_secret(secret_name=secret_name)

@@ -227,8 +227,6 @@ class Provider:
                 run_name=self.run_name,
                 workflow_name=self.workflow_name or None,
                 provider_name=self.provider_name,
-                local_repo_user_name=backend.repo.data.local_repo_user_name,
-                local_repo_user_email=backend.repo.data.local_repo_user_email,
                 status=JobStatus.SUBMITTED,
                 submitted_at=get_milliseconds_since_epoch(),
                 image_name=job_spec.image_name,

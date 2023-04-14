@@ -3,12 +3,12 @@ from typing import List, Optional
 from unittest.mock import patch
 
 from dstack.backend.base import Backend
-from dstack.core.repo import LocalRepoData, RepoRef
+from dstack.core.repo import OldLocalRepoData, Repo
 from dstack.providers.docker.main import DockerProvider
 
 
 def load_repo_data():
-    return LocalRepoData(
+    return OldLocalRepoData(
         repo_host_name="",
         repo_user_name="",
         repo_name="",
@@ -28,10 +28,10 @@ class TestEntrypoint(unittest.TestCase):
     @patch.multiple(Backend, __abstractmethods__=set())
     def setUp(self) -> None:
         self.backend = Backend(
-            repo=RepoRef(
+            repo=Repo(
                 repo_id="foo",
                 repo_user_id="bar",
-                data=LocalRepoData(
+                data=OldLocalRepoData(
                     repo_host_name="",
                     repo_user_name="",
                     repo_name="",

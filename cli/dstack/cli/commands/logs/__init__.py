@@ -1,12 +1,13 @@
+import os
 import sys
 from argparse import Namespace
 
 from dstack.api.backend import list_backends
 from dstack.api.logs import poll_logs
-from dstack.api.repo import get_repo
 from dstack.cli.commands import BasicCommand
 from dstack.cli.config import config
 from dstack.core.error import check_config, check_git
+from dstack.core.repo import RemoteRepo
 from dstack.utils.common import since
 
 
@@ -42,7 +43,7 @@ class LogCommand(BasicCommand):
     @check_config
     @check_git
     def _command(self, args: Namespace):
-        repo = get_repo(config.repo_user_config)
+        repo = RemoteRepo(repo_ref=config.repo_user_config.repo_ref, local_repo_dir=os.getcwd())
         anyone = False
         for backend in list_backends(repo):
             start_time = since(args.since)

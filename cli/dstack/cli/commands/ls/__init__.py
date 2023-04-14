@@ -1,3 +1,4 @@
+import os
 from argparse import Namespace
 from pathlib import Path
 
@@ -5,12 +6,12 @@ from rich.table import Table
 
 from dstack.api.artifacts import list_artifacts_with_merged_backends
 from dstack.api.backend import list_backends
-from dstack.api.repo import get_repo
 from dstack.api.run import RunNotFoundError, TagNotFoundError, get_tagged_run_name
 from dstack.cli.commands import BasicCommand
 from dstack.cli.common import console
 from dstack.cli.config import config
 from dstack.core.error import check_config, check_git
+from dstack.core.repo import RemoteRepo
 from dstack.utils.common import sizeof_fmt
 
 
@@ -53,7 +54,7 @@ class LsCommand(BasicCommand):
         table.add_column("SIZE", style="dark_sea_green4")
         table.add_column("BACKENDS", style="bold")
 
-        repo = get_repo(config.repo_user_config)
+        repo = RemoteRepo(repo_ref=config.repo_user_config.repo_ref, local_repo_dir=os.getcwd())
         backends = list_backends(repo)
         run_names = []
         backends_run_name = []

@@ -27,7 +27,7 @@ class AWSSecretsManager(SecretsManager):
     def get_secret(self, secret_name: str) -> Optional[Secret]:
         value = _get_secret_value(
             secretsmanager_client=self.secretsmanager_client,
-            secret_key=_get_secret_key(self.bucket_name, self.repo_name, secret_name),
+            secret_key=_get_secret_key(self.bucket_name, self.repo_id, secret_name),
         )
         if value is None:
             return None
@@ -39,27 +39,27 @@ class AWSSecretsManager(SecretsManager):
             sts_client=self.sts_client,
             iam_client=self.iam_client,
             bucket_name=self.bucket_name,
-            secret_key=_get_secret_key(self.bucket_name, self.repo_name, secret.secret_name),
+            secret_key=_get_secret_key(self.bucket_name, self.repo_id, secret.secret_name),
             secret_value=secret.secret_value,
         )
 
     def update_secret(self, secret: Secret):
         _update_secret(
             secretsmanager_client=self.secretsmanager_client,
-            secret_key=_get_secret_key(self.bucket_name, self.repo_name, secret.secret_name),
+            secret_key=_get_secret_key(self.bucket_name, self.repo_id, secret.secret_name),
             secret_value=secret.secret_value,
         )
 
     def delete_secret(self, secret_name: str):
         _delete_secret(
             secretsmanager_client=self.secretsmanager_client,
-            secret_key=_get_secret_key(self.bucket_name, self.repo_name, secret_name),
+            secret_key=_get_secret_key(self.bucket_name, self.repo_id, secret_name),
         )
 
     def get_credentials(self) -> Optional[str]:
         return _get_secret_value(
             secretsmanager_client=self.secretsmanager_client,
-            secret_key=_get_credentials_key(self.bucket_name, self.repo_name),
+            secret_key=_get_credentials_key(self.bucket_name, self.repo_id),
         )
 
     def add_credentials(self, data: str):
@@ -68,14 +68,14 @@ class AWSSecretsManager(SecretsManager):
             sts_client=self.sts_client,
             iam_client=self.iam_client,
             bucket_name=self.bucket_name,
-            secret_key=_get_credentials_key(self.bucket_name, self.repo_name),
+            secret_key=_get_credentials_key(self.bucket_name, self.repo_id),
             secret_value=data,
         )
 
     def update_credentials(self, data: str):
         _update_secret(
             secretsmanager_client=self.secretsmanager_client,
-            secret_key=_get_credentials_key(self.bucket_name, self.repo_name),
+            secret_key=_get_credentials_key(self.bucket_name, self.repo_id),
             secret_value=data,
         )
 

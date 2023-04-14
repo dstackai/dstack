@@ -5,9 +5,10 @@ from urllib.parse import urlencode, urlparse, urlunparse
 import requests
 
 from dstack.core.artifact import Artifact
+from dstack.core.error import BackendError
 from dstack.core.job import Job, JobHead
 from dstack.core.log_event import LogEvent
-from dstack.core.repo import RepoCredentials, RepoRef
+from dstack.core.repo import Repo, RepoCredentials
 from dstack.core.run import RunHead
 from dstack.core.secret import Secret
 from dstack.core.tag import TagHead
@@ -26,26 +27,8 @@ from dstack.hub.models import (
 )
 
 
-def _url(url: str, project: str, additional_path: str, query: dict = {}):
-    unparse_url = urlparse(url=url)
-    if additional_path.startswith("/"):
-        additional_path = additional_path[1:]
-
-    new_url = urlunparse(
-        (
-            unparse_url.scheme,
-            unparse_url.netloc,
-            f"/api/project/{project}/{additional_path}",
-            None,
-            urlencode(query=query),
-            unparse_url.fragment,
-        )
-    )
-    return new_url
-
-
 class HubClient:
-    def __init__(self, url: str, project: str, token: str, repo: Optional[RepoRef]):
+    def __init__(self, url: str, project: str, token: str, repo: Repo):
         self.url = url
         self.token = token
         self.project = project
@@ -78,72 +61,22 @@ class HubClient:
         headers["Content-type"] = "application/json"
         return headers
 
-    def get_repos_credentials(self) -> Optional[RepoCredentials]:
-        url = _url(
-            url=self.url,
-            project=self.project,
-            additional_path=f"/repos/credentials/get",
-        )
-        try:
-            resp = requests.post(url=url, headers=self._headers(), data=self.repo.json())
-            if resp.ok:
-                json_data = resp.json()
-                return RepoCredentials(**json_data)
-            elif resp.status_code == 404:
-                return None
-            elif resp.status_code == 401:
-                print("Unauthorized. Please set correct token")
-                return None
-            else:
-                resp.raise_for_status()
-        except requests.ConnectionError:
-            print(f"{self.url} connection refused")
-        return None
-
-    def save_repos_credentials(self, repo_credentials: RepoCredentials):
-        url = _url(
-            url=self.url,
-            project=self.project,
-            additional_path=f"/repos/credentials/save",
-        )
-        try:
-            resp = requests.post(
-                url=url,
-                headers=self._headers(),
-                data=SaveRepoCredentials(
-                    repo=self.repo,
-                    repo_credentials=repo_credentials,
-                ).json(),
-            )
-            if resp.ok:
-                return None
-            elif resp.status_code == 401:
-                print("Unauthorized. Please set correct token")
-                return None
-            else:
-                resp.raise_for_status()
-        except requests.ConnectionError:
-            print(f"{self.url} connection refused")
-        return None
-
     def create_run(self) -> str:
         url = _url(
             url=self.url,
             project=self.project,
             additional_path=f"/runs/create",
         )
-        try:
-            resp = requests.post(url=url, headers=self._headers(), data=self.repo.json())
-            if resp.ok:
-                return resp.text
-            elif resp.status_code == 401:
-                print("Unauthorized. Please set correct token")
-                return ""
-            else:
-                resp.raise_for_status()
-        except requests.ConnectionError:
-            print(f"{self.url} connection refused")
-        return ""
+        resp = _make_hub_request(
+            requests.post,
+            host=self.url,
+            url=url,
+            headers=self._headers(),
+            data=self.repo.repo_spec.json(),
+        )
+        if resp.ok:
+            return resp.text
+        resp.raise_for_status()
 
     def create_job(self, job: Job):
         url = _url(
@@ -151,18 +84,51 @@ class HubClient:
             project=self.project,
             additional_path=f"/jobs/create",
         )
-        try:
-            resp = requests.post(url=url, headers=self._headers(), data=job.json())
-            if resp.ok:
-                return None
-            elif resp.status_code == 401:
-                print("Unauthorized. Please set correct token")
-                return None
-            else:
-                resp.raise_for_status()
-        except requests.ConnectionError:
-            print(f"{self.url} connection refused")
-        return None
+        resp = _make_hub_request(
+            requests.post, host=self.url, url=url, headers=self._headers(), data=job.json()
+        )
+        if resp.ok:
+            return
+        resp.raise_for_status()
+
+    def get_job(self, job_id: str) -> Optional[Job]:
+        url = _url(
+            url=self.url,
+            project=self.project,
+            additional_path=f"/jobs/get",
+        )
+        resp = _make_hub_request(
+            requests.post,
+            host=self.url,
+            url=url,
+            headers=self._headers(),
+            data=JobsGet(
+                repo_spec=self.repo.repo_spec,
+                job_id=job_id,
+            ).json(),
+        )
+        if resp.ok:
+            json_data = resp.json()
+            return Job.parse_obj(json_data)
+        resp.raise_for_status()
+
+    def list_jobs(self, run_name: str) -> List[Job]:
+        url = _url(
+            url=self.url,
+            project=self.project,
+            additional_path=f"/jobs/list",
+        )
+        resp = _make_hub_request(
+            requests.post,
+            host=self.url,
+            url=url,
+            headers=self._headers(),
+            data=JobsList(repo_spec=self.repo.repo_spec, run_name=run_name).json(),
+        )
+        if resp.ok:
+            body = resp.json()
+            return [Job.parse_obj(job) for job in body]
+        resp.raise_for_status()
 
     def run_job(self, job: Job):
         url = _url(
@@ -170,18 +136,12 @@ class HubClient:
             project=self.project,
             additional_path=f"/runners/run",
         )
-        try:
-            resp = requests.post(url=url, headers=self._headers(), data=job.json())
-            if resp.ok:
-                return None
-            elif resp.status_code == 401:
-                print("Unauthorized. Please set correct token")
-                return None
-            else:
-                resp.raise_for_status()
-        except requests.ConnectionError:
-            print(f"{self.url} connection refused")
-        return None
+        resp = _make_hub_request(
+            requests.post, host=self.url, url=url, headers=self._headers(), data=job.json()
+        )
+        if resp.ok:
+            return
+        resp.raise_for_status()
 
     def stop_job(self, job_id: str, abort: bool):
         url = _url(
@@ -189,26 +149,56 @@ class HubClient:
             project=self.project,
             additional_path=f"/runners/stop",
         )
-        try:
-            resp = requests.post(
-                url=url,
-                headers=self._headers(),
-                data=StopRunners(
-                    repo=self.repo,
-                    job_id=job_id,
-                    abort=abort,
-                ).json(),
-            )
-            if resp.ok:
-                return None
-            elif resp.status_code == 401:
-                print("Unauthorized. Please set correct token")
-                return None
-            else:
-                resp.raise_for_status()
-        except requests.ConnectionError:
-            print(f"{self.url} connection refused")
-        return None
+        resp = _make_hub_request(
+            requests.post,
+            host=self.url,
+            url=url,
+            headers=self._headers(),
+            data=StopRunners(
+                repo_spec=self.repo.repo_spec,
+                job_id=job_id,
+                abort=abort,
+            ).json(),
+        )
+        if resp.ok:
+            return
+        resp.raise_for_status()
+
+    def list_job_heads(self, run_name: Optional[str] = None) -> Optional[List[JobHead]]:
+        query = {}
+        if run_name is not None:
+            query["run_name"] = run_name
+        url = _url(
+            url=self.url, project=self.project, additional_path=f"/jobs/list/heads", query=query
+        )
+        resp = _make_hub_request(
+            requests.post,
+            host=self.url,
+            url=url,
+            headers=self._headers(),
+            data=self.repo.repo_spec.json(),
+        )
+        if resp.ok:
+            body = resp.json()
+            return [JobHead.parse_obj(job) for job in body]
+        resp.raise_for_status()
+
+    def delete_job_head(self, job_id: str):
+        url = _url(
+            url=self.url,
+            project=self.project,
+            additional_path=f"/jobs/delete",
+        )
+        resp = _make_hub_request(
+            requests.post,
+            host=self.url,
+            url=url,
+            headers=self._headers(),
+            data=JobsGet(repo_spec=self.repo.repo_spec, job_id=job_id).json(),
+        )
+        if resp.ok:
+            return
+        resp.raise_for_status()
 
     def get_tag_head(self, tag_name: str) -> Optional[TagHead]:
         url = _url(
@@ -216,20 +206,18 @@ class HubClient:
             project=self.project,
             additional_path=f"/tags/{tag_name}",
         )
-        try:
-            resp = requests.post(url=url, headers=self._headers(), data=self.repo.json())
-            if resp.ok:
-                return TagHead.parse_obj(resp.json())
-            elif resp.status_code == 404:
-                return None
-            elif resp.status_code == 401:
-                print("Unauthorized. Please set correct token")
-                return None
-            else:
-                resp.raise_for_status()
-        except requests.ConnectionError:
-            print(f"{self.url} connection refused")
-        return None
+        resp = _make_hub_request(
+            requests.post,
+            host=self.url,
+            url=url,
+            headers=self._headers(),
+            data=self.repo.repo_spec.json(),
+        )
+        if resp.ok:
+            return TagHead.parse_obj(resp.json())
+        elif resp.status_code == 404:
+            return None
+        resp.raise_for_status()
 
     def list_tag_heads(self) -> Optional[List[TagHead]]:
         url = _url(
@@ -237,19 +225,17 @@ class HubClient:
             project=self.project,
             additional_path=f"/tags/list/heads",
         )
-        try:
-            resp = requests.post(url=url, headers=self._headers(), data=self.repo.json())
-            if resp.ok:
-                body = resp.json()
-                return [TagHead.parse_obj(tag) for tag in body]
-            elif resp.status_code == 401:
-                print("Unauthorized. Please set correct token")
-                return None
-            else:
-                resp.raise_for_status()
-        except requests.ConnectionError:
-            print(f"{self.url} connection refused")
-        return None
+        resp = _make_hub_request(
+            requests.post,
+            host=self.url,
+            url=url,
+            headers=self._headers(),
+            data=self.repo.repo_spec.json(),
+        )
+        if resp.ok:
+            body = resp.json()
+            return [TagHead.parse_obj(tag) for tag in body]
+        resp.raise_for_status()
 
     def add_tag_from_run(
         self,
@@ -262,27 +248,21 @@ class HubClient:
             project=self.project,
             additional_path=f"/tags/add/run",
         )
-        try:
-            resp = requests.post(
-                url=url,
-                headers=self._headers(),
-                data=AddTagRun(
-                    repo=self.repo,
-                    tag_name=tag_name,
-                    run_name=run_name,
-                    run_jobs=run_jobs,
-                ).json(),
-            )
-            if resp.ok:
-                return None
-            elif resp.status_code == 401:
-                print("Unauthorized. Please set correct token")
-                return None
-            else:
-                resp.raise_for_status()
-        except requests.ConnectionError:
-            print(f"{self.url} connection refused")
-        return None
+        resp = _make_hub_request(
+            requests.post,
+            host=self.url,
+            url=url,
+            headers=self._headers(),
+            data=AddTagRun(
+                repo_spec=self.repo.repo_spec,
+                tag_name=tag_name,
+                run_name=run_name,
+                run_jobs=run_jobs,
+            ).json(),
+        )
+        if resp.ok:
+            return
+        resp.raise_for_status()
 
     def add_tag_from_local_dirs(
         self,
@@ -294,26 +274,20 @@ class HubClient:
             project=self.project,
             additional_path=f"/tags/add/path",
         )
-        try:
-            resp = requests.post(
-                url=url,
-                headers=self._headers(),
-                data=AddTagPath(
-                    repo=self.repo,
-                    tag_name=tag_name,
-                    local_dirs=local_dirs,
-                ).json(),
-            )
-            if resp.ok:
-                return None
-            elif resp.status_code == 401:
-                print("Unauthorized. Please set correct token")
-                return None
-            else:
-                resp.raise_for_status()
-        except requests.ConnectionError:
-            print(f"{self.url} connection refused")
-        return None
+        resp = _make_hub_request(
+            requests.post,
+            host=self.url,
+            url=url,
+            headers=self._headers(),
+            data=AddTagPath(
+                repo_spec=self.repo.repo_spec,
+                tag_name=tag_name,
+                local_dirs=local_dirs,
+            ).json(),
+        )
+        if resp.ok:
+            return
+        resp.raise_for_status()
 
     def delete_tag_head(self, tag_head: TagHead):
         url = _url(
@@ -321,65 +295,16 @@ class HubClient:
             project=self.project,
             additional_path=f"/tags/{tag_head.tag_name}/delete",
         )
-        try:
-            resp = requests.post(url=url, headers=self._headers(), data=self.repo.json())
-            if resp.ok:
-                return None
-            elif resp.status_code == 401:
-                print("Unauthorized. Please set correct token")
-                return None
-            else:
-                resp.raise_for_status()
-        except requests.ConnectionError:
-            print(f"{self.url} connection refused")
-        return None
-
-    def update_repo_last_run_at(self, last_run_at: int):
-        url = _url(
-            url=self.url,
-            project=self.project,
-            additional_path=f"/repos/update",
+        resp = _make_hub_request(
+            requests.post,
+            host=self.url,
+            url=url,
+            headers=self._headers(),
+            data=self.repo.repo_spec.json(),
         )
-        try:
-            resp = requests.post(
-                url=url,
-                headers=self._headers(),
-                data=ReposUpdate(
-                    repo=self.repo,
-                    last_run_at=last_run_at,
-                ).json(),
-            )
-            if resp.ok:
-                return None
-            elif resp.status_code == 401:
-                print("Unauthorized. Please set correct token")
-                return None
-            else:
-                resp.raise_for_status()
-        except requests.ConnectionError:
-            print(f"{self.url} connection refused")
-        return None
-
-    def list_job_heads(self, run_name: Optional[str] = None) -> Optional[List[JobHead]]:
-        query = {}
-        if not (run_name is None):
-            query["run_name"] = run_name
-        url = _url(
-            url=self.url, project=self.project, additional_path=f"/jobs/list/heads", query=query
-        )
-        try:
-            resp = requests.post(url=url, headers=self._headers(), data=self.repo.json())
-            if resp.ok:
-                body = resp.json()
-                return [JobHead.parse_obj(job) for job in body]
-            elif resp.status_code == 401:
-                print("Unauthorized. Please set correct token")
-                return None
-            else:
-                resp.raise_for_status()
-        except requests.ConnectionError:
-            print(f"{self.url} connection refused")
-        return None
+        if resp.ok:
+            return
+        resp.raise_for_status()
 
     def list_run_heads(
         self,
@@ -391,54 +316,81 @@ class HubClient:
             project=self.project,
             additional_path=f"/runs/list",
         )
-        try:
-            resp = requests.post(
-                url=url,
-                headers=self._headers(),
-                data=RunsList(
-                    repo=self.repo,
-                    run_name=run_name,
-                    include_request_heads=include_request_heads,
-                ).json(),
-            )
-            if resp.ok:
-                body = resp.json()
-                return [RunHead.parse_obj(run) for run in body]
-            elif resp.status_code == 401:
-                print("Unauthorized. Please set correct token")
-                return []
-            else:
-                resp.raise_for_status()
-        except requests.ConnectionError:
-            print(f"{self.url} connection refused")
-        return []
+        resp = _make_hub_request(
+            requests.post,
+            host=self.url,
+            url=url,
+            headers=self._headers(),
+            data=RunsList(
+                repo_spec=self.repo.repo_spec,
+                run_name=run_name,
+                include_request_heads=include_request_heads,
+            ).json(),
+        )
+        if resp.ok:
+            body = resp.json()
+            return [RunHead.parse_obj(run) for run in body]
+        resp.raise_for_status()
 
-    def get_job(self, job_id: str) -> Optional[Job]:
+    def update_repo_last_run_at(self, last_run_at: int):
         url = _url(
             url=self.url,
             project=self.project,
-            additional_path=f"/jobs/get",
+            additional_path=f"/repos/update",
         )
-        try:
-            resp = requests.post(
-                url=url,
-                headers=self._headers(),
-                data=JobsGet(
-                    repo=self.repo,
-                    job_id=job_id,
-                ).json(),
-            )
-            if resp.ok:
-                json_data = resp.json()
-                return Job.parse_obj(json_data)
-            elif resp.status_code == 401:
-                print("Unauthorized. Please set correct token")
-                return None
-            else:
-                resp.raise_for_status()
-        except requests.ConnectionError:
-            print(f"{self.url} connection refused")
-        return None
+        resp = _make_hub_request(
+            requests.post,
+            host=self.url,
+            url=url,
+            headers=self._headers(),
+            data=ReposUpdate(
+                repo_spec=self.repo.repo_spec,
+                last_run_at=last_run_at,
+            ).json(),
+        )
+        if resp.ok:
+            return
+        resp.raise_for_status()
+
+    def get_repos_credentials(self) -> Optional[RepoCredentials]:
+        url = _url(
+            url=self.url,
+            project=self.project,
+            additional_path=f"/repos/credentials/get",
+        )
+        resp = _make_hub_request(
+            requests.post,
+            host=self.url,
+            url=url,
+            headers=self._headers(),
+            data=self.repo.repo_spec.json(),
+        )
+        if resp.ok:
+            json_data = resp.json()
+            return RepoCredentials(**json_data)
+        elif resp.status_code == 404:
+            return None
+        resp.raise_for_status()
+
+    def save_repos_credentials(self, repo_credentials: RepoCredentials):
+        url = _url(
+            url=self.url,
+            project=self.project,
+            additional_path=f"/repos/credentials/save",
+        )
+        resp = _make_hub_request(
+            requests.post,
+            host=self.url,
+            url=url,
+            headers=self._headers(),
+            data=SaveRepoCredentials(
+                repo_spec=self.repo.repo_spec,
+                repo_credentials=repo_credentials,
+            ).json(),
+        )
+        if resp.ok:
+            return resp.text
+        resp.raise_for_status()
 
     def list_secret_names(self) -> List[str]:
         url = _url(
@@ -446,23 +398,16 @@ class HubClient:
             project=self.project,
             additional_path=f"/secrets/list",
         )
-        try:
-            resp = requests.post(
-                url=url,
-                headers=self._headers(),
-                data=self.repo.json(),
-            )
-            if resp.ok:
-                json_data = resp.json()
-                return json_data
-            elif resp.status_code == 401:
-                print("Unauthorized. Please set correct token")
-                return []
-            else:
-                resp.raise_for_status()
-        except requests.ConnectionError:
-            print(f"{self.url} connection refused")
-        return []
+        resp = _make_hub_request(
+            requests.post,
+            host=self.url,
+            url=url,
+            headers=self._headers(),
+            data=self.repo.repo_spec.json(),
+        )
+        if resp.ok:
+            return resp.json()
+        resp.raise_for_status()
 
     def get_secret(self, secret_name: str) -> Optional[Secret]:
         url = _url(
@@ -470,25 +415,19 @@ class HubClient:
             project=self.project,
             additional_path=f"/secrets/{secret_name}/get",
         )
-        try:
-            resp = requests.post(
-                url=url,
-                headers=self._headers(),
-                data=self.repo.json(),
-            )
-            if resp.ok:
-                json_data = resp.json()
-                return Secret.parse_obj(json_data)
-            elif resp.status_code == 404:
-                return None
-            elif resp.status_code == 401:
-                print("Unauthorized. Please set correct token")
-                return None
-            else:
-                resp.raise_for_status()
-        except requests.ConnectionError:
-            print(f"{self.url} connection refused")
-        return None
+        resp = _make_hub_request(
+            requests.post,
+            host=self.url,
+            url=url,
+            headers=self._headers(),
+            data=self.repo.repo_spec.json(),
+        )
+        if resp.ok:
+            json_data = resp.json()
+            return Secret.parse_obj(json_data)
+        elif resp.status_code == 404:
+            return None
+        resp.raise_for_status()
 
     def add_secret(self, secret: Secret):
         url = _url(
@@ -496,25 +435,19 @@ class HubClient:
             project=self.project,
             additional_path=f"/secrets/add",
         )
-        try:
-            resp = requests.post(
-                url=url,
-                headers=self._headers(),
-                data=SecretAddUpdate(
-                    repo=self.repo,
-                    secret=secret,
-                ).json(),
-            )
-            if resp.ok:
-                return None
-            elif resp.status_code == 401:
-                print("Unauthorized. Please set correct token")
-                return None
-            else:
-                resp.raise_for_status()
-        except requests.ConnectionError:
-            print(f"{self.url} connection refused")
-        return None
+        resp = _make_hub_request(
+            requests.post,
+            host=self.url,
+            url=url,
+            headers=self._headers(),
+            data=SecretAddUpdate(
+                repo_spec=self.repo.repo_spec,
+                secret=secret,
+            ).json(),
+        )
+        if resp.ok:
+            return
+        resp.raise_for_status()
 
     def update_secret(self, secret: Secret):
         url = _url(
@@ -522,25 +455,19 @@ class HubClient:
             project=self.project,
             additional_path=f"/secrets/update",
         )
-        try:
-            resp = requests.post(
-                url=url,
-                headers=self._headers(),
-                data=SecretAddUpdate(
-                    repo=self.repo,
-                    secret=secret,
-                ).json(),
-            )
-            if resp.ok:
-                return None
-            elif resp.status_code == 401:
-                print("Unauthorized. Please set correct token")
-                return None
-            else:
-                resp.raise_for_status()
-        except requests.ConnectionError:
-            print(f"{self.url} connection refused")
-        return None
+        resp = _make_hub_request(
+            requests.post,
+            host=self.url,
+            url=url,
+            headers=self._headers(),
+            data=SecretAddUpdate(
+                repo_spec=self.repo.repo_spec,
+                secret=secret,
+            ).json(),
+        )
+        if resp.ok:
+            return
+        resp.raise_for_status()
 
     def delete_secret(self, secret_name: str):
         url = _url(
@@ -548,46 +475,16 @@ class HubClient:
             project=self.project,
             additional_path=f"/secrets/{secret_name}/delete",
         )
-        try:
-            resp = requests.post(
-                url=url,
-                headers=self._headers(),
-                data=self.repo.json(),
-            )
-            if resp.ok:
-                return None
-            elif resp.status_code == 401:
-                print("Unauthorized. Please set correct token")
-                return None
-            else:
-                resp.raise_for_status()
-        except requests.ConnectionError:
-            print(f"{self.url} connection refused")
-        return None
-
-    def list_jobs(self, run_name: str) -> List[Job]:
-        url = _url(
-            url=self.url,
-            project=self.project,
-            additional_path=f"/jobs/list",
+        resp = _make_hub_request(
+            requests.post,
+            host=self.url,
+            url=url,
+            headers=self._headers(),
+            data=self.repo.repo_spec.json(),
         )
-        try:
-            resp = requests.post(
-                url=url,
-                headers=self._headers(),
-                data=JobsList(repo=self.repo, run_name=run_name).json(),
-            )
-            if resp.ok:
-                job_data = resp.json()
-                return [Job.parse_obj(job) for job in job_data]
-            elif resp.status_code == 401:
-                print("Unauthorized. Please set correct token")
-                return []
-            else:
-                resp.raise_for_status()
-        except requests.ConnectionError:
-            print(f"{self.url} connection refused")
-        return []
+        if resp.ok:
+            return
+        resp.raise_for_status()
 
     def list_run_artifact_files(self, run_name: str) -> List[Artifact]:
         url = _url(
@@ -595,46 +492,17 @@ class HubClient:
             project=self.project,
             additional_path=f"/artifacts/list",
         )
-        try:
-            resp = requests.post(
-                url=url,
-                headers=self._headers(),
-                data=JobsList(repo=self.repo, run_name=run_name).json(),
-            )
-            if resp.ok:
-                artifact_data = resp.json()
-                return [Artifact.parse_obj(artifact) for artifact in artifact_data]
-            elif resp.status_code == 401:
-                print("Unauthorized. Please set correct token")
-                return []
-            else:
-                resp.raise_for_status()
-        except requests.ConnectionError:
-            print(f"{self.url} connection refused")
-        return []
-
-    def delete_job_head(self, job_id: str):
-        url = _url(
-            url=self.url,
-            project=self.project,
-            additional_path=f"/jobs/delete",
+        resp = _make_hub_request(
+            requests.post,
+            host=self.url,
+            url=url,
+            headers=self._headers(),
+            data=JobsList(repo_spec=self.repo.repo_spec, run_name=run_name).json(),
         )
-        try:
-            resp = requests.post(
-                url=url,
-                headers=self._headers(),
-                data=JobsGet(repo=self.repo, job_id=job_id).json(),
-            )
-            if resp.ok:
-                return None
-            elif resp.status_code == 401:
-                print("Unauthorized. Please set correct token")
-                return None
-            else:
-                resp.raise_for_status()
-        except requests.ConnectionError:
-            print(f"{self.url} connection refused")
-        return None
+        if resp.ok:
+            artifact_data = resp.json()
+            return [Artifact.parse_obj(artifact) for artifact in artifact_data]
+        resp.raise_for_status()
 
     def poll_logs(
         self,
@@ -647,41 +515,33 @@ class HubClient:
             project=self.project,
             additional_path=f"/logs/poll",
         )
-        try:
-            resp = requests.post(
-                url=url,
-                headers=self._headers(),
-                data=PollLogs(
-                    repo=self.repo,
-                    job_heads=job_heads,
-                    start_time=start_time,
-                    attached=attached,
-                ).json(),
-                stream=True,
-            )
-            if resp.ok:
-                _braces = 0
-                _body = bytearray()
-                for chunk in resp.iter_content(chunk_size=128):
-                    for b in chunk:
-                        if b == 123:
-                            _braces += 1
-                        elif b == 125:
-                            _braces -= 1
-                        _body.append(b)
-
-                        if _braces == 0:
-                            json_data = json.loads(_body)
-                            _body = bytearray()
-                            yield LogEvent.parse_obj(json_data)
-            elif resp.status_code == 401:
-                print("Unauthorized. Please set correct token")
-                return None
-            else:
-                resp.raise_for_status()
-        except requests.ConnectionError:
-            print(f"{self.url} connection refused")
-        return None
+        resp = _make_hub_request(
+            requests.post,
+            host=self.url,
+            url=url,
+            headers=self._headers(),
+            data=PollLogs(
+                repo_spec=self.repo.repo_spec,
+                job_heads=job_heads,
+                start_time=start_time,
+                attached=attached,
+            ).json(),
+        )
+        if resp.ok:
+            _braces = 0
+            _body = bytearray()
+            for chunk in resp.iter_content(chunk_size=128):
+                for b in chunk:
+                    if b == 123:
+                        _braces += 1
+                    elif b == 125:
+                        _braces -= 1
+                    _body.append(b)
+                    if _braces == 0:
+                        json_data = json.loads(_body)
+                        _body = bytearray()
+                        yield LogEvent.parse_obj(json_data)
+        resp.raise_for_status()
 
     def upload_file(self, dest_path: str) -> Optional[str]:
         url = _url(
@@ -689,22 +549,16 @@ class HubClient:
             project=self.project,
             additional_path=f"/link/upload",
         )
-        try:
-            resp = requests.post(
-                url=url,
-                headers=self._headers(),
-                data=LinkUpload(object_key=dest_path).json(),
-            )
-            if resp.ok:
-                return resp.text
-            elif resp.status_code == 401:
-                print("Unauthorized. Please set correct token")
-                return None
-            else:
-                resp.raise_for_status()
-        except requests.ConnectionError:
-            print(f"{self.url} connection refused")
-        return None
+        resp = _make_hub_request(
+            requests.post,
+            host=self.url,
+            url=url,
+            headers=self._headers(),
+            data=LinkUpload(object_key=dest_path).json(),
+        )
+        if resp.ok:
+            return resp.text
+        resp.raise_for_status()
 
     def download_file(self, dest_path: str) -> Optional[str]:
         url = _url(
@@ -712,22 +566,16 @@ class HubClient:
             project=self.project,
             additional_path=f"/link/download",
         )
-        try:
-            resp = requests.post(
-                url=url,
-                headers=self._headers(),
-                data=LinkUpload(object_key=dest_path).json(),
-            )
-            if resp.ok:
-                return resp.text
-            elif resp.status_code == 401:
-                print("Unauthorized. Please set correct token")
-                return None
-            else:
-                resp.raise_for_status()
-        except requests.ConnectionError:
-            print(f"{self.url} connection refused")
-        return None
+        resp = _make_hub_request(
+            requests.post,
+            host=self.url,
+            url=url,
+            headers=self._headers(),
+            data=LinkUpload(object_key=dest_path).json(),
+        )
+        if resp.ok:
+            return resp.text
+        resp.raise_for_status()
 
     def delete_workflow_cache(self, workflow_name: str):
         url = _url(
@@ -735,18 +583,41 @@ class HubClient:
             project=self.project,
             additional_path=f"/workflows/{workflow_name}/cache/delete",
         )
-        try:
-            resp = requests.post(
-                url=url,
-                headers=self._headers(),
-                data=self.repo.json(),
-            )
-            if resp.ok:
-                return
-            elif resp.status_code == 401:
-                print("Unauthorized. Please set correct token")
-                return
-            else:
-                resp.raise_for_status()
-        except requests.ConnectionError:
-            print(f"{self.url} connection refused")
+        resp = _make_hub_request(
+            requests.post,
+            host=self.url,
+            url=url,
+            headers=self._headers(),
+            data=self.repo.repo_spec.json(),
+        )
+        if resp.ok:
+            return
+        resp.raise_for_status()
+
+
+def _url(url: str, project: str, additional_path: str, query: Optional[dict] = None):
+    query = {} if query is None else query
+    unparse_url = urlparse(url=url)
+    if additional_path.startswith("/"):
+        additional_path = additional_path[1:]
+    new_url = urlunparse(
+        (
+            unparse_url.scheme,
+            unparse_url.netloc,
+            f"/api/project/{project}/{additional_path}",
+            None,
+            urlencode(query=query),
+            unparse_url.fragment,
+        )
+    )
+    return new_url
+
+
+def _make_hub_request(request_func, host, *args, **kwargs) -> requests.Response:
+    try:
+        resp: requests.Response = request_func(*args, **kwargs)
+        if resp.status_code == 401:
+            raise BackendError(f"Invalid hub token")
+        return resp
+    except requests.ConnectionError:
+        raise BackendError(f"Cannot connect to hub at {host}")

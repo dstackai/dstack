@@ -7,7 +7,7 @@ from dstack.backend.base.storage import Storage
 from dstack.core.artifact import ArtifactHead, ArtifactSpec
 from dstack.core.error import BackendError
 from dstack.core.job import Job, JobStatus
-from dstack.core.repo import RepoRef
+from dstack.core.repo import Repo
 from dstack.core.tag import TagHead
 from dstack.utils.common import get_milliseconds_since_epoch
 
@@ -23,7 +23,7 @@ def get_tag_head(storage: Storage, repo_id: str, tag_name: str) -> Optional[TagH
             run_name,
             workflow_name,
             provider_name,
-            local_repo_user_name,
+            repo_user_id,
             created_at,
             artifact_heads,
         ) = tuple(t)
@@ -33,7 +33,7 @@ def get_tag_head(storage: Storage, repo_id: str, tag_name: str) -> Optional[TagH
             run_name=run_name,
             workflow_name=workflow_name or None,
             provider_name=provider_name or None,
-            local_repo_user_name=local_repo_user_name or None,
+            repo_user_id=repo_user_id or None,
             created_at=int(created_at),
             artifact_heads=_unserialize_artifact_heads(artifact_heads),
         )
@@ -51,7 +51,7 @@ def list_tag_heads(storage: Storage, repo_id: str):
                 run_name,
                 workflow_name,
                 provider_name,
-                local_repo_user_name,
+                repo_user_id,
                 created_at,
                 artifact_heads,
             ) = tuple(t)
@@ -62,7 +62,7 @@ def list_tag_heads(storage: Storage, repo_id: str):
                     run_name=run_name,
                     workflow_name=workflow_name or None,
                     provider_name=provider_name or None,
-                    local_repo_user_name=local_repo_user_name or None,
+                    repo_user_id=repo_user_id or None,
                     created_at=int(created_at),
                     artifact_heads=_unserialize_artifact_heads(artifact_heads),
                 )
@@ -72,16 +72,16 @@ def list_tag_heads(storage: Storage, repo_id: str):
 
 def delete_tag(
     storage: Storage,
-    repo: RepoRef,
+    repo_id: str,
     tag_head: TagHead,
 ):
     tag_jobs = []
-    job_heads = jobs.list_job_heads(storage, repo, tag_head.run_name)
+    job_heads = jobs.list_job_heads(storage, repo_id, tag_head.run_name)
     for job_head in job_heads:
-        job = jobs.get_job(storage, repo.repo_id, job_head.job_id)
+        job = jobs.get_job(storage, repo_id, job_head.job_id)
         if job is not None:
             tag_jobs.append(job)
-    storage.delete_object(_get_tag_head_key(tag_head))
+    storage.delete_object(tag_head.key())
     for job in tag_jobs:
         job.tag_name = None
         jobs.update_job(storage, job)
@@ -89,7 +89,7 @@ def delete_tag(
 
 def create_tag_from_run(
     storage: Storage,
-    repo: RepoRef,
+    repo_id: str,
     tag_name: str,
     run_name: str,
     run_jobs: Optional[List[Job]],
@@ -99,9 +99,9 @@ def create_tag_from_run(
     else:
         tag_jobs = []
         job_with_anther_tag = None
-        job_heads = jobs.list_job_heads(storage, repo, run_name)
+        job_heads = jobs.list_job_heads(storage, repo_id, run_name)
         for job_head in job_heads:
-            job = jobs.get_job(storage, repo.repo_id, job_head.job_id)
+            job = jobs.get_job(storage, repo_id, job_head.job_id)
             if job:
                 tag_jobs.append(job)
                 if job.tag_name and job.tag_name != tag_name:
@@ -115,12 +115,12 @@ def create_tag_from_run(
             exit(f"Cannot find the run '{run_name}'")
 
     tag_head = TagHead(
-        repo_id=repo.repo_id,
+        repo_id=repo_id,
         tag_name=tag_name,
         run_name=run_name,
         workflow_name=tag_jobs[0].workflow_name,
         provider_name=tag_jobs[0].provider_name,
-        local_repo_user_name=tag_jobs[0].local_repo_user_name,
+        repo_user_id=tag_jobs[0].repo_ref.repo_user_id,
         created_at=int(round(time.time() * 1000)),
         artifact_heads=[
             ArtifactHead(job_id=run_job.job_id, artifact_path=artifact_spec.artifact_path)
@@ -129,7 +129,7 @@ def create_tag_from_run(
         ]
         or None,
     )
-    storage.put_object(key=_get_tag_head_key(tag_head), content="")
+    storage.put_object(key=tag_head.key(), content="")
 
     if not run_jobs:
         for job in tag_jobs:
@@ -139,7 +139,7 @@ def create_tag_from_run(
 
 def create_tag_from_local_dirs(
     storage: Storage,
-    repo: RepoRef,
+    repo: Repo,
     tag_name: str,
     local_dirs: List[str],
     backend_type: BackendType,
@@ -157,12 +157,10 @@ def create_tag_from_local_dirs(
     run_name = runs.create_run(storage, backend_type)
     job = Job(
         job_id=f"{run_name},,0",
-        repo=repo,
+        repo=repo.repo_data,  # todo
         run_name=run_name,
         workflow_name=None,
         provider_name="bash",
-        local_repo_user_name=repo.data.local_repo_user_name,
-        local_repo_user_email=repo.data.local_repo_user_email,
         status=JobStatus.DONE,
         submitted_at=get_milliseconds_since_epoch(),
         image_name="scratch",
@@ -198,7 +196,7 @@ def create_tag_from_local_dirs(
         run_name=run_name,
         workflow_name=job.workflow_name,
         provider_name=job.provider_name,
-        local_repo_user_name=job.local_repo_user_name,
+        repo_user_id=repo.repo_user_id,
         created_at=job.submitted_at,
         artifact_heads=[
             ArtifactHead(job_id=job.job_id, artifact_path=a.artifact_path)
@@ -207,8 +205,7 @@ def create_tag_from_local_dirs(
         if job.artifact_specs
         else None,
     )
-    tag_head_key = _get_tag_head_key(tag_head)
-    storage.put_object(key=tag_head_key, content="")
+    storage.put_object(key=tag_head.key(), content="")
 
 
 def _get_tags_dir(repo_id: str) -> str:
@@ -224,20 +221,6 @@ def _get_tag_head_filename_prefix(repo_id: str, tag_name: str) -> str:
 def _get_tag_heads_filenames_prefix(repo_id: str) -> str:
     prefix = _get_tags_dir(repo_id)
     key = f"{prefix}l;"
-    return key
-
-
-def _get_tag_head_key(tag_head: TagHead) -> str:
-    prefix = f"tags/{tag_head.repo_id}"
-    key = (
-        f"{prefix}/l;{tag_head.tag_name};"
-        f"{tag_head.run_name};"
-        f"{tag_head.workflow_name or ''};"
-        f"{tag_head.provider_name or ''};"
-        f"{tag_head.local_repo_user_name or ''};"
-        f"{tag_head.created_at};"
-        f"{_serialize_artifact_heads(tag_head)}"
-    )
     return key
 
 

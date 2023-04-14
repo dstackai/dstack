@@ -3,11 +3,11 @@ from pathlib import Path
 from typing import Optional
 
 from dstack.api.backend import list_backends
-from dstack.api.repo import get_repo, load_repo_data
 from dstack.cli.commands import BasicCommand
 from dstack.cli.common import console
 from dstack.cli.config import config
 from dstack.core.error import check_config, check_git
+from dstack.core.repo import RemoteRepo
 from dstack.core.userconfig import RepoUserConfig
 
 
@@ -56,16 +56,18 @@ class InitCommand(BasicCommand):
     @check_config
     @check_git
     def _command(self, args: Namespace):
-        local_repo_data = load_repo_data(args.gh_token, args.git_identity_file)  # todo gitless
-        local_repo_data.ls_remote()
-        repo_credentials = local_repo_data.repo_credentials()
+        repo = RemoteRepo(
+            local_repo_dir=Path.cwd(),
+            identity_file=args.git_identity_file,
+            oauth_token=args.gh_token,
+        )
+        repo_credentials = repo.get_repo_credentials()
 
         config.repo_user_config = RepoUserConfig(
-            repo_id=local_repo_data.path(delimiter="."),
-            repo_user_id=local_repo_data.local_repo_user_email,
+            repo_id=repo.repo_ref.repo_id,
+            repo_user_id=repo.repo_ref.repo_user_id,
             ssh_key_path=get_ssh_keypair(args.ssh_identity_file),
         )
-        repo = get_repo(config.repo_user_config)
 
         for backend in list_backends(repo):
             backend.save_repo_credentials(repo_credentials)

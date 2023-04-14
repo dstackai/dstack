@@ -3,13 +3,13 @@ from typing import Optional
 
 from dstack.api.backend import dict_backends
 from dstack.backend.base import CloudBackend
-from dstack.core.repo import RepoRef
+from dstack.core.repo import Repo
 from dstack.hub.db.models import Project
 
 cache = {}
 
 
-def get_backend(project: Project, repo: Optional[RepoRef]) -> CloudBackend:
+def get_backend(project: Project, repo: Optional[Repo]) -> CloudBackend:
     key = project.name if repo is None else (project.name, repo.repo_id, repo.repo_user_id)
     if cache.get(key) is not None:
         return cache[key]

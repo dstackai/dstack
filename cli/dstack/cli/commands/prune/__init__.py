@@ -1,14 +1,14 @@
 import argparse
+import os
 from typing import List
 
 from dstack.api.backend import list_backends
-from dstack.api.repo import get_repo
 from dstack.backend.base import Backend
 from dstack.cli.commands import BasicCommand
 from dstack.cli.common import console
 from dstack.cli.config import config
 from dstack.core.error import check_config, check_git
-from dstack.core.repo import LocalRepoData
+from dstack.core.repo import RemoteRepo
 
 
 class PruneCommand(BasicCommand):
@@ -31,7 +31,7 @@ class PruneCommand(BasicCommand):
     @check_config
     @check_git
     def _command(self, args: argparse.Namespace):
-        repo = get_repo(config.repo_user_config)
+        repo = RemoteRepo(repo_ref=config.repo_user_config.repo_ref, local_repo_dir=os.getcwd())
         backends = list_backends(repo)
         args.prune_action(args, backends)
 

@@ -1,7 +1,6 @@
 import sys
 from abc import ABC, abstractmethod
 from enum import Enum
-from os import PathLike
 from typing import Any, Generator, List, Optional
 
 from dstack.backend.base import jobs
@@ -9,10 +8,11 @@ from dstack.core.artifact import Artifact
 from dstack.core.config import BackendConfig, Configurator
 from dstack.core.job import Job, JobHead, JobStatus
 from dstack.core.log_event import LogEvent
-from dstack.core.repo import RepoCredentials, RepoHead, RepoRef
+from dstack.core.repo import Repo, RepoCredentials, RepoHead
 from dstack.core.run import RunHead
 from dstack.core.secret import Secret
 from dstack.core.tag import TagHead
+from dstack.utils.common import PathLike
 
 
 class BackendType(Enum):
@@ -26,7 +26,7 @@ class BackendType(Enum):
 class Backend(ABC):
     _loaded = False
 
-    def __init__(self, repo: Optional[RepoRef]):
+    def __init__(self, repo: Optional[Repo]):
         self.repo = repo
 
     @property
@@ -64,7 +64,7 @@ class Backend(ABC):
         self.run_job(job, failed_to_start_job_new_status)
 
     @abstractmethod
-    def get_job(self, job_id: str) -> Optional[Job]:
+    def get_job(self, job_id: str, repo_id: Optional[str] = None) -> Optional[Job]:
         pass
 
     @abstractmethod
@@ -86,7 +86,9 @@ class Backend(ABC):
                 self.stop_job(job_head.job_id, abort)
 
     @abstractmethod
-    def list_job_heads(self, run_name: Optional[str] = None) -> List[JobHead]:
+    def list_job_heads(
+        self, run_name: Optional[str] = None, repo_id: Optional[str] = None
+    ) -> List[JobHead]:
         pass
 
     @abstractmethod
@@ -110,6 +112,7 @@ class Backend(ABC):
         run_name: Optional[str] = None,
         include_request_heads: bool = True,
         interrupted_job_new_status: JobStatus = JobStatus.FAILED,
+        repo_id: Optional[str] = None,
     ) -> List[RunHead]:
         pass
 
@@ -217,7 +220,7 @@ class Backend(ABC):
 class RemoteBackend(Backend):
     def __init__(
         self,
-        repo: RepoRef,
+        repo: Repo,
         backend_config: Optional[BackendConfig] = None,
         custom_client: Any = None,
     ):

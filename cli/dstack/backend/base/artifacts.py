@@ -1,5 +1,4 @@
 import os
-from os import PathLike
 from pathlib import Path
 from typing import List, Optional
 
@@ -8,6 +7,7 @@ from tqdm import tqdm
 from dstack.backend.base import jobs
 from dstack.backend.base.storage import Storage
 from dstack.core.artifact import Artifact
+from dstack.utils.common import PathLike
 
 
 def list_run_artifact_files(storage: Storage, repo_id: str, run_name: str) -> List[Artifact]:

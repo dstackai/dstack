@@ -1,4 +1,3 @@
-from os import PathLike
 from typing import Generator, List, Optional
 
 import boto3
@@ -21,10 +20,11 @@ from dstack.core.artifact import Artifact
 from dstack.core.error import ConfigError
 from dstack.core.job import Job, JobHead, JobStatus
 from dstack.core.log_event import LogEvent
-from dstack.core.repo import RepoCredentials, RepoHead, RepoRef
+from dstack.core.repo import Repo, RepoCredentials, RepoHead, RepoRef
 from dstack.core.run import RunHead
 from dstack.core.secret import Secret
 from dstack.core.tag import TagHead
+from dstack.utils.common import PathLike
 
 
 class AwsBackend(CloudBackend):
@@ -35,7 +35,7 @@ class AwsBackend(CloudBackend):
     def name(self):
         return "aws"
 
-    def __init__(self, repo: Optional[RepoRef], backend_config: Optional[AWSConfig] = None):
+    def __init__(self, repo: Optional[Repo], backend_config: Optional[AWSConfig] = None):
         super().__init__(backend_config=backend_config, repo=repo)
         if backend_config is None:
             self.backend_config = AWSConfig()
@@ -117,8 +117,8 @@ class AwsBackend(CloudBackend):
     def create_job(self, job: Job):
         base_jobs.create_job(self._storage, job)
 
-    def get_job(self, job_id: str) -> Optional[Job]:
-        return base_jobs.get_job(self._storage, self.repo.repo_id, job_id)
+    def get_job(self, job_id: str, repo_id: Optional[str] = None) -> Optional[Job]:
+        return base_jobs.get_job(self._storage, repo_id or self.repo.repo_id, job_id)
 
     def list_jobs(self, run_name: str) -> List[Job]:
         return base_jobs.list_jobs(self._storage, self.repo.repo_id, run_name)
@@ -127,10 +127,12 @@ class AwsBackend(CloudBackend):
         base_jobs.run_job(self._storage, self._compute, job, failed_to_start_job_new_status)
 
     def stop_job(self, job_id: str, abort: bool):
-        base_jobs.stop_job(self._storage, self._compute, self.repo, job_id, abort)
+        base_jobs.stop_job(self._storage, self._compute, self.repo.repo_id, job_id, abort)
 
-    def list_job_heads(self, run_name: Optional[str] = None) -> List[JobHead]:
-        return base_jobs.list_job_heads(self._storage, self.repo, run_name)
+    def list_job_heads(
+        self, run_name: Optional[str] = None, repo_id: Optional[str] = None
+    ) -> List[JobHead]:
+        return base_jobs.list_job_heads(self._storage, repo_id or self.repo.repo_id, run_name)
 
     def delete_job_head(self, job_id: str):
         base_jobs.delete_job_head(self._storage, self.repo.repo_id, job_id)
@@ -140,8 +142,9 @@ class AwsBackend(CloudBackend):
         run_name: Optional[str] = None,
         include_request_heads: bool = True,
         interrupted_job_new_status: JobStatus = JobStatus.FAILED,
+        repo_id: Optional[str] = None,
     ) -> List[RunHead]:
-        job_heads = self.list_job_heads(run_name)
+        job_heads = self.list_job_heads(run_name, repo_id=repo_id)
         return base_runs.get_run_heads(
             self._storage,
             self._compute,
@@ -215,7 +218,7 @@ class AwsBackend(CloudBackend):
     ):
         base_tags.create_tag_from_run(
             self._storage,
-            self.repo,
+            self.repo.repo_id,
             tag_name,
             run_name,
             run_jobs,
@@ -231,7 +234,7 @@ class AwsBackend(CloudBackend):
         )
 
     def delete_tag_head(self, tag_head: TagHead):
-        base_tags.delete_tag(self._storage, self.repo, tag_head)
+        base_tags.delete_tag(self._storage, self.repo.repo_id, tag_head)
 
     def list_repo_heads(self) -> List[RepoHead]:
         return base_repos.list_repo_heads(self._storage)
@@ -239,7 +242,7 @@ class AwsBackend(CloudBackend):
     def update_repo_last_run_at(self, last_run_at: int):
         base_repos.update_repo_last_run_at(
             self._storage,
-            self.repo,
+            self.repo.repo_ref,
             last_run_at,
         )
 

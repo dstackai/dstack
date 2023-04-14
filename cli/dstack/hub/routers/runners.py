@@ -21,5 +21,5 @@ async def run_runners(project_name: str, job: Job):
 @router.post("/{project_name}/runners/stop")
 async def stop_runners(project_name: str, body: StopRunners):
     project = await get_project(project_name=project_name)
-    backend = get_backend(project, body.repo)
+    backend = get_backend(project, body.repo_spec.repo)
     backend.stop_job(job_id=body.job_id, abort=body.abort)

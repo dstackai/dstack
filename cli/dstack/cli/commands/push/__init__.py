@@ -1,13 +1,14 @@
+import os
 from argparse import Namespace
 from pathlib import Path
 
 from dstack.api.backend import get_current_remote_backend, get_local_backend
-from dstack.api.repo import get_repo
 from dstack.api.run import RunNotFoundError, TagNotFoundError, get_tagged_run_name
 from dstack.cli.commands import BasicCommand
 from dstack.cli.common import console
 from dstack.cli.config import config
 from dstack.core.error import BackendError, check_config, check_git
+from dstack.core.repo import RemoteRepo
 
 
 class PushCommand(BasicCommand):
@@ -28,7 +29,7 @@ class PushCommand(BasicCommand):
     @check_config
     @check_git
     def _command(self, args: Namespace):
-        repo = get_repo(config.repo_user_config)
+        repo = RemoteRepo(repo_ref=config.repo_user_config.repo_ref, local_repo_dir=os.getcwd())
         local_backend = get_local_backend(repo)
         remote_backend = get_current_remote_backend(repo)
         if remote_backend is None:

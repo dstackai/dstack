@@ -1,3 +1,4 @@
+import os
 import sys
 from argparse import Namespace
 
@@ -5,10 +6,10 @@ from rich import print
 from rich.prompt import Confirm
 
 from dstack.api.backend import list_backends
-from dstack.api.repo import get_repo
 from dstack.cli.commands import BasicCommand
 from dstack.cli.config import config
 from dstack.core.error import check_config, check_git
+from dstack.core.repo import RemoteRepo
 
 
 class RMCommand(BasicCommand):
@@ -40,7 +41,9 @@ class RMCommand(BasicCommand):
             args.run_name
             and (args.yes or Confirm.ask(f"[red]Delete the run '{args.run_name}'?[/]"))
         ) or (args.all and (args.yes or Confirm.ask("[red]Delete all runs?[/]"))):
-            repo = get_repo(config.repo_user_config)
+            repo = RemoteRepo(
+                repo_ref=config.repo_user_config.repo_ref, local_repo_dir=os.getcwd()
+            )
             deleted_run = False
             for backend in list_backends(repo):
                 job_heads = backend.list_job_heads(args.run_name)
