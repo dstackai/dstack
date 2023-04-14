@@ -5,7 +5,7 @@ from typing import Optional
 from dstack.api.backend import list_backends
 from dstack.api.repo import load_repo_data
 from dstack.cli.commands import BasicCommand
-from dstack.cli.common import check_config, check_git, console
+from dstack.cli.common import check_backend, check_config, check_git, console
 from dstack.cli.config import BaseConfig
 from dstack.core.userconfig import RepoUserConfig
 
@@ -54,6 +54,7 @@ class InitCommand(BasicCommand):
 
     @check_config
     @check_git
+    @check_backend
     def _command(self, args: Namespace):
         local_repo_data = load_repo_data(args.gh_token, args.git_identity_file)
         local_repo_data.ls_remote()

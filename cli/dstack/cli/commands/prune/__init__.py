@@ -5,7 +5,7 @@ from dstack.api.backend import list_backends
 from dstack.api.repo import load_repo_data
 from dstack.backend.base import Backend
 from dstack.cli.commands import BasicCommand
-from dstack.cli.common import check_config, check_git, console
+from dstack.cli.common import check_backend, check_config, check_git, console
 from dstack.core.repo import LocalRepoData
 
 
@@ -28,6 +28,7 @@ class PruneCommand(BasicCommand):
 
     @check_config
     @check_git
+    @check_backend
     def _command(self, args: argparse.Namespace):
         repo_data = load_repo_data()
         backends = list_backends()

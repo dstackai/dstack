@@ -7,7 +7,7 @@ from rich.prompt import Confirm
 from dstack.api.backend import list_backends
 from dstack.api.repo import load_repo_data
 from dstack.cli.commands import BasicCommand
-from dstack.cli.common import check_config, check_git
+from dstack.cli.common import check_backend, check_config, check_git
 
 
 class RMCommand(BasicCommand):
@@ -34,6 +34,7 @@ class RMCommand(BasicCommand):
 
     @check_config
     @check_git
+    @check_backend
     def _command(self, args: Namespace):
         if (
             args.run_name

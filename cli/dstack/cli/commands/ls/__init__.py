@@ -8,7 +8,7 @@ from dstack.api.backend import list_backends
 from dstack.api.repo import load_repo_data
 from dstack.api.run import RunNotFoundError, TagNotFoundError, get_tagged_run_name
 from dstack.cli.commands import BasicCommand
-from dstack.cli.common import check_config, check_git, console
+from dstack.cli.common import check_backend, check_config, check_git, console
 from dstack.utils.common import sizeof_fmt
 
 
@@ -44,6 +44,7 @@ class LsCommand(BasicCommand):
 
     @check_config
     @check_git
+    @check_backend
     def _command(self, args: Namespace):
         table = Table(box=None)
         table.add_column("ARTIFACT", style="bold", no_wrap=True)
