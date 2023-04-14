@@ -26,8 +26,15 @@ func (lstorage *LocalStorage) GetFile(path string) ([]byte, error) {
 }
 
 func (lstorage *LocalStorage) PutFile(path string, contents []byte) error {
-	fullpath := filepath.Join(lstorage.basepath, path)
-	err := os.WriteFile(fullpath, contents, 0644)
+	tmpfile, err := os.CreateTemp(filepath.Join(lstorage.basepath, "tmp"), "job")
+	if err != nil {
+		return gerrors.Wrap(err)
+	}
+	_, err = tmpfile.Write(contents)
+	if err != nil {
+		return gerrors.Wrap(err)
+	}
+	err = os.Rename(tmpfile.Name(), filepath.Join(lstorage.basepath, path))
 	if err != nil {
 		return gerrors.Wrap(err)
 	}
@@ -38,7 +45,7 @@ func (lstorage *LocalStorage) RenameFile(oldKey, newKey string) error {
 	if oldKey == newKey {
 		return nil
 	}
-	tmpfile, err := os.CreateTemp(filepath.Join(lstorage.basepath, "tmp"), "job")
+	tmpfile, err := os.CreateTemp(filepath.Join(lstorage.basepath, "tmp"), "jobhead")
 	if err != nil {
 		return gerrors.Wrap(err)
 	}
