@@ -42,6 +42,7 @@ The following properties are optional:
 - `environment` - (Optional) The list of environment variables 
 - [`artifacts`](#artifacts) - (Optional) The list of output artifacts
 - [`resources`](#resources) - (Optional) The hardware resources required by the workflow
+- [`ports`](#ports) - (Optional) The number of ports to expose
 - `working_dir` - (Optional) The path to the working directory
 - `ssh` - (Optional) Runs SSH server in the container if `true`
 - [`cache`](#cache) - (Optional) The list of directories to cache between runs
@@ -87,3 +88,26 @@ The number of GPUs, their name and memory
 The list of directories to cache between runs
 
 - `path` – (Required) The relative path of the folder that must be cached
+
+### Ports
+
+If you'd like your workflow to expose additional ports, you have to specify the `ports` property with the number
+of ports to expose. Actual ports will be assigned on startup and passed to the workflow via the environment
+variables `PORT_<number>`.
+
+<div editor-title=".dstack/workflows/code-example.yaml">
+
+```yaml
+workflows:
+  - name: app
+    provider: code
+    ports: 1
+    setup: 
+      - pip install -r requirements.txt
+      - gunicorn main:app --bind 0.0.0.0:$PORT_0
+```
+
+</div>
+
+When running a workflow remotely, the `dstack run` command automatically forwards the defined ports from the remote machine to your local machine.
+This allows you to securely access applications running remotely from your local machine.
