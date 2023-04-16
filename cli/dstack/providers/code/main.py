@@ -112,11 +112,15 @@ class CodeProvider(Provider):
             self._extend_commands_with_env(commands, self.env)
         if self.openssh_server:
             self._extend_commands_with_openssh_server(commands, self.ssh_key_pub, 1)
-        commands.append("_PORT=$PORT_0")
+        commands.append("export _PORT=$PORT_0")
         if self.ports:
             for i in range(self.ports):
-                commands.append(f"PORT_{i}=$PORT_{i + 1}")
+                commands.append(f"export PORT_{i}=$PORT_{i + 1}")
                 commands.append(f"echo 'export PORT_{i}=\"$PORT_{i + 1}\"' >> ~/.bashrc")
+                commands.append(
+                    f'echo "The port \$PORT_{i} is mapped to http://0.0.0.0:$PORT_{i}"'
+                )
+            commands.append("echo")
         commands.extend(
             [
                 "pip install ipykernel -q",
