@@ -326,7 +326,7 @@ class Provider:
     def _tag_dep(backend: Backend, tag_name: str, mount: bool) -> DepSpec:
         tag_head = backend.get_tag_head(tag_name)
         if tag_head:
-            return DepSpec(repo_id=backend.repo.repo_id, run_name=tag_head.run_name, mount=mount)
+            return DepSpec(repo_ref=backend.repo.repo_ref, run_name=tag_head.run_name, mount=mount)
         else:
             sys.exit(f"Cannot find the tag '{tag_name}' in the '{backend.repo.repo_id}' repo")
 
@@ -349,7 +349,7 @@ class Provider:
             None,
         )
         if run_name:
-            return DepSpec(repo_id=backend.repo.repo_id, run_name=run_name, mount=mount)
+            return DepSpec(repo_ref=backend.repo.repo_ref, run_name=run_name, mount=mount)
         else:
             sys.exit(
                 f"Cannot find any successful workflow with the name '{workflow_name}' "

@@ -262,7 +262,8 @@ class Job(JobHead):
             for dep in self.dep_specs:
                 deps.append(
                     {
-                        "repo_id": dep.repo_id,
+                        "repo_id": dep.repo_ref.repo_id,
+                        "repo_user_id": dep.repo_ref.repo_user_id,
                         "run_name": dep.run_name,
                         "mount": dep.mount,
                     }
@@ -364,7 +365,7 @@ class Job(JobHead):
         if job_data.get("deps"):
             for dep in job_data["deps"]:
                 dep_spec = DepSpec(
-                    repo_id=dep["repo_id"],
+                    repo_ref=RepoRef(repo_id=dep["repo_id"], repo_user_id=dep["repo_user_id"]),
                     run_name=dep["run_name"],
                     mount=dep.get("mount") is True,
                 )

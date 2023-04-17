@@ -56,9 +56,10 @@ type Job struct {
 }
 
 type Dep struct {
-	RepoId  string `yaml:"repo_id,omitempty"`
-	RunName string `yaml:"run_name,omitempty"`
-	Mount   bool   `yaml:"mount,omitempty"`
+	RepoId     string `yaml:"repo_id,omitempty"`
+	RepoUserId string `yaml:"repo_user_id,omitempty"`
+	RunName    string `yaml:"run_name,omitempty"`
+	Mount      bool   `yaml:"mount,omitempty"`
 }
 
 type Artifact struct {
