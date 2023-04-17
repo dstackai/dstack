@@ -167,8 +167,9 @@ nav:
       - Experiment tracking:
           - TensorBoard: tutorials/tensorboard.md
           - Weights & Biases: tutorials/wandb.md
-      - Stable Diffusion:
-          - Generate images: tutorials/stable-diffusion.md
+      - LLMs:
+          - Stable Diffusion: tutorials/stable-diffusion.md
+          - Dolly: tutorials/dolly.md
       - CI/CD:
           - GitHub Actions: tutorials/github-actions.md
   - Reference:

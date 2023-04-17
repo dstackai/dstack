@@ -117,9 +117,7 @@ class CodeProvider(Provider):
             for i in range(self.ports):
                 commands.append(f"export PORT_{i}=$PORT_{i + 1}")
                 commands.append(f"echo 'export PORT_{i}=\"$PORT_{i + 1}\"' >> ~/.bashrc")
-                commands.append(
-                    f'echo "The port \$PORT_{i} is mapped to http://0.0.0.0:$PORT_{i}"'
-                )
+                commands.append(f'echo "The PORT_{i} port is mapped to http://0.0.0.0:$PORT_{i}"')
             commands.append("echo")
         commands.extend(
             [

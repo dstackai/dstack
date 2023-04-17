@@ -11,7 +11,7 @@ GitHub Actions handle events, whereas `dstack` assists in provisioning the requi
 workflow, and managing artifacts.
 
 !!! info "NOTE:"
-    The source code of this example is available in the [Playground](../playground.md).
+    The source code of this tutorial is available in the [Playground](../playground.md).
 
 ## 1. Prerequisites
 
