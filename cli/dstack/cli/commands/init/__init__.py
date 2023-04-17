@@ -2,6 +2,8 @@ from argparse import Namespace
 from pathlib import Path
 from typing import Optional
 
+import giturlparse
+
 from dstack.api.backend import list_backends
 from dstack.api.repos import get_local_repo_credentials, test_repo_credentials
 from dstack.cli.commands import BasicCommand
@@ -59,7 +61,9 @@ class InitCommand(BasicCommand):
     def _command(self, args: Namespace):
         repo = RemoteRepo(local_repo_dir=Path.cwd())
         repo_credentials = get_local_repo_credentials(
-            repo.repo_data, identity_file=args.git_identity_file, oauth_token=args.gh_token
+            giturlparse.parse(repo.repo_url).resource,  # hostname before mapping from SSH config
+            identity_file=args.git_identity_file,
+            oauth_token=args.gh_token,
         )
         test_repo_credentials(repo.repo_data, repo_credentials)
 

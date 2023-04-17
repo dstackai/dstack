@@ -200,7 +200,7 @@ class Backend(ABC):
                 credentials = self._credentials
             else:
                 if isinstance(self.repo, RemoteRepo):
-                    credentials = get_local_repo_credentials(self.repo.repo_data)
+                    credentials = get_local_repo_credentials(self.repo.repo_data.repo_host_name)
             self.save_repo_credentials(credentials)
         return credentials
 

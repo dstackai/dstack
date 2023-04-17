@@ -10,36 +10,50 @@ from dstack.utils.common import PathLike
 from dstack.utils.ssh import get_host_config
 
 gh_config_path = os.path.expanduser("~/.config/gh/hosts.yml")
+default_ssh_key = os.path.expanduser("~/.ssh/id_rsa")
+
+
+def read_ssh_key(path: PathLike) -> str:
+    try:
+        with open(path, "r") as f:
+            return f.read()
+    except FileNotFoundError:
+        raise  # todo custom exception
 
 
 def get_local_repo_credentials(
-    repo_data: RemoteRepoData,
+    hostname: str,
     identity_file: Optional[PathLike] = None,
     oauth_token: Optional[str] = None,
 ) -> RemoteRepoCredentials:
-    private_key = None
-    if repo_data.repo_protocol == "ssh":
-        if identity_file is None:
-            host_config = get_host_config(repo_data.repo_host_name)
-            identities = host_config.get("identityfile")
-            if identities:
-                identity_file = os.path.expanduser(identities[0])
-            else:
-                identity_file = os.path.expanduser("~/.ssh/id_rsa")
-            # TODO: Detect and pass private key too ?
-        if os.path.exists(identity_file):
-            with open(identity_file, "r") as f:
-                private_key = f.read()
-    elif repo_data.repo_protocol == "https":
-        if oauth_token is None:
-            if os.path.exists(gh_config_path):
-                with open(gh_config_path, "r") as f:
-                    gh_hosts = yaml.load(f, Loader=yaml.FullLoader)
-                oauth_token = gh_hosts.get(repo_data.repo_host_name, {}).get("oauth_token")
+    # user provided ssh key
+    if identity_file is not None:
+        return RemoteRepoCredentials(
+            protocol=RepoProtocol.SSH, private_key=read_ssh_key(identity_file), oauth_token=None
+        )
+    # user provided oauth token
+    if oauth_token is not None:
+        return RemoteRepoCredentials(
+            protocol=RepoProtocol.HTTPS, oauth_token=oauth_token, private_key=None
+        )
+    # key from ssh config
+    identities = get_host_config(hostname).get("identityfile")
+    if identities:
+        return RemoteRepoCredentials(
+            protocol=RepoProtocol.SSH, private_key=read_ssh_key(identities[0]), oauth_token=None
+        )
+    # token from gh config
+    if os.path.exists(gh_config_path):
+        with open(gh_config_path, "r") as f:
+            gh_hosts = yaml.load(f, Loader=yaml.FullLoader)
+        oauth_token = gh_hosts.get(hostname, {}).get("oauth_token")
+        if oauth_token:
+            return RemoteRepoCredentials(
+                protocol=RepoProtocol.HTTPS, oauth_token=oauth_token, private_key=None
+            )
+    # default user key
     return RemoteRepoCredentials(
-        protocol=RepoProtocol[repo_data.repo_protocol.upper()],
-        private_key=private_key,
-        oauth_token=oauth_token,
+        protocol=RepoProtocol.SSH, private_key=read_ssh_key(default_ssh_key), oauth_token=None
     )
 
 

@@ -53,7 +53,6 @@ class RemoteRepoData(RepoData):
     repo_branch: Optional[str] = None
     repo_hash: Optional[str] = None
     repo_diff: Optional[str] = None
-    repo_protocol: Optional[str] = None
 
     @staticmethod
     def from_url(url: str, parse_ssh_config: bool = True):
@@ -63,7 +62,6 @@ class RemoteRepoData(RepoData):
             repo_port=url.port,
             repo_user_name=url.owner,
             repo_name=url.name,
-            repo_protocol=url.protocol,
         )
         if parse_ssh_config and url.protocol == "ssh":
             host_config = get_host_config(data.repo_host_name)
