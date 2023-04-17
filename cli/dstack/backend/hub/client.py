@@ -623,6 +623,11 @@ def _make_hub_request(request_func, host, *args, **kwargs) -> requests.Response:
         resp: requests.Response = request_func(*args, **kwargs)
         if resp.status_code == 401:
             raise BackendError(f"Invalid hub token")
+        elif resp.status_code == 500:
+            url = kwargs.get("url")
+            raise BackendError(
+                f"Got 500 Server Error from hub: {url}. Check hub logs for details."
+            )
         return resp
     except requests.ConnectionError:
         raise BackendError(f"Cannot connect to hub at {host}")
