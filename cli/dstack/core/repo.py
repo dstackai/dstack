@@ -17,7 +17,7 @@ class RepoProtocol(Enum):
     HTTPS = "https"
 
 
-class RepoCredentials(BaseModel):
+class RemoteRepoCredentials(BaseModel):
     protocol: RepoProtocol
     private_key: Optional[str]
     oauth_token: Optional[str]
@@ -101,7 +101,7 @@ class Repo(ABC):
         return RepoSpec(repo_ref=self.repo_ref, repo_data=self.repo_data)
 
     @abstractmethod
-    def get_workflows(self, credentials: Optional[RepoCredentials] = None) -> list:
+    def get_workflows(self, credentials: Optional[RemoteRepoCredentials] = None) -> list:
         pass
 
     @abstractmethod
@@ -153,7 +153,7 @@ class RemoteRepo(Repo):
             repo_ref = RepoRef(repo_id=repo_data.path(), repo_user_id=repo_user_id)
         super().__init__(repo_ref, repo_data)
 
-    def get_workflows(self, credentials: Optional[RepoCredentials] = None) -> list:
+    def get_workflows(self, credentials: Optional[RemoteRepoCredentials] = None) -> list:
         raise NotImplementedError()
 
     def get_repo_diff(self) -> Optional[str]:

@@ -3,7 +3,7 @@ from typing import List, Optional
 
 from dstack.backend.base.secrets import SecretsManager
 from dstack.backend.base.storage import Storage
-from dstack.core.repo import RepoCredentials, RepoHead, RepoProtocol, RepoRef
+from dstack.core.repo import RemoteRepoCredentials, RepoHead, RepoProtocol, RepoRef
 
 
 def get_repo_head(storage: Storage, repo_ref: RepoRef) -> Optional[RepoHead]:
@@ -53,15 +53,17 @@ def delete_repo(storage: Storage, repo_ref: RepoRef):
     _delete_repo_head(storage, repo_ref)
 
 
-def get_repo_credentials(secrets_manager: SecretsManager) -> Optional[RepoCredentials]:
+def get_repo_credentials(secrets_manager: SecretsManager) -> Optional[RemoteRepoCredentials]:
     credentials_value = secrets_manager.get_credentials()
     if credentials_value is None:
         return None
     credentials_data = json.loads(credentials_value)
-    return RepoCredentials(**credentials_data)
+    return RemoteRepoCredentials(**credentials_data)
 
 
-def save_repo_credentials(secrets_manager: SecretsManager, repo_credentials: RepoCredentials):
+def save_repo_credentials(
+    secrets_manager: SecretsManager, repo_credentials: RemoteRepoCredentials
+):
     credentials_data = {"protocol": repo_credentials.protocol.value}
     if repo_credentials.protocol == RepoProtocol.HTTPS and repo_credentials.oauth_token:
         credentials_data["oauth_token"] = repo_credentials.oauth_token

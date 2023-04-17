@@ -17,7 +17,7 @@ from dstack.backend.local.storage import LocalStorage
 from dstack.core.artifact import Artifact
 from dstack.core.job import Job, JobHead, JobStatus
 from dstack.core.log_event import LogEvent
-from dstack.core.repo import Repo, RepoCredentials, RepoRef
+from dstack.core.repo import RemoteRepoCredentials, Repo, RepoRef
 from dstack.core.run import RunHead
 from dstack.core.secret import Secret
 from dstack.core.tag import TagHead
@@ -170,10 +170,10 @@ class LocalBackend(Backend):
     def update_repo_last_run_at(self, last_run_at: int):
         base_repos.update_repo_last_run_at(self._storage, self.repo.repo_ref, last_run_at)
 
-    def _get_repo_credentials(self) -> Optional[RepoCredentials]:
+    def _get_repo_credentials(self) -> Optional[RemoteRepoCredentials]:
         return base_repos.get_repo_credentials(self._secrets_manager)
 
-    def save_repo_credentials(self, repo_credentials: RepoCredentials):
+    def save_repo_credentials(self, repo_credentials: RemoteRepoCredentials):
         base_repos.save_repo_credentials(
             self._secrets_manager,
             repo_credentials,

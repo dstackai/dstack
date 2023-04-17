@@ -1,6 +1,6 @@
 from fastapi import APIRouter, Depends, HTTPException, status
 
-from dstack.core.repo import RepoCredentials, RepoSpec
+from dstack.core.repo import RemoteRepoCredentials, RepoSpec
 from dstack.hub.models import ReposUpdate, SaveRepoCredentials
 from dstack.hub.routers.cache import get_backend
 from dstack.hub.routers.util import error_detail, get_project
@@ -21,7 +21,7 @@ async def save_repo_credentials(
 @router.post(
     "/{project_name}/repos/credentials/get",
 )
-async def get_repo_credentials(project_name: str, repo_spec: RepoSpec) -> RepoCredentials:
+async def get_repo_credentials(project_name: str, repo_spec: RepoSpec) -> RemoteRepoCredentials:
     project = await get_project(project_name=project_name)
     backend = get_backend(project, repo_spec.repo)
     repo_credentials = backend._get_repo_credentials()

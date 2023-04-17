@@ -20,7 +20,7 @@ from dstack.core.artifact import Artifact
 from dstack.core.error import ConfigError
 from dstack.core.job import Job, JobHead, JobStatus
 from dstack.core.log_event import LogEvent
-from dstack.core.repo import Repo, RepoCredentials, RepoHead, RepoRef
+from dstack.core.repo import RemoteRepoCredentials, Repo, RepoHead, RepoRef
 from dstack.core.run import RunHead
 from dstack.core.secret import Secret
 from dstack.core.tag import TagHead
@@ -39,7 +39,7 @@ class AwsBackend(CloudBackend):
         self,
         backend_config: Optional[AWSConfig] = None,
         repo: Optional[Repo] = None,
-        credentials: Optional[RepoCredentials] = None,
+        credentials: Optional[RemoteRepoCredentials] = None,
         auto_init: bool = False,
     ):
         super().__init__(
@@ -256,10 +256,10 @@ class AwsBackend(CloudBackend):
             last_run_at,
         )
 
-    def _get_repo_credentials(self) -> Optional[RepoCredentials]:
+    def _get_repo_credentials(self) -> Optional[RemoteRepoCredentials]:
         return base_repos.get_repo_credentials(self._secrets_manager)
 
-    def save_repo_credentials(self, repo_credentials: RepoCredentials):
+    def save_repo_credentials(self, repo_credentials: RemoteRepoCredentials):
         base_repos.save_repo_credentials(
             self._secrets_manager,
             repo_credentials,

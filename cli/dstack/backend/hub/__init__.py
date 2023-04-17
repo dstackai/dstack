@@ -11,7 +11,7 @@ from dstack.core.config import BackendConfig
 from dstack.core.error import ConfigError
 from dstack.core.job import Job, JobHead, JobStatus
 from dstack.core.log_event import LogEvent
-from dstack.core.repo import Repo, RepoCredentials, RepoRef
+from dstack.core.repo import RemoteRepoCredentials, Repo, RepoRef
 from dstack.core.run import RunHead
 from dstack.core.secret import Secret
 from dstack.core.tag import TagHead
@@ -25,7 +25,7 @@ class HubBackend(RemoteBackend):
         self,
         config: Optional[BackendConfig] = None,
         repo: Optional[Repo] = None,
-        credentials: Optional[RepoCredentials] = None,
+        credentials: Optional[RemoteRepoCredentials] = None,
         auto_init: bool = False,
     ):
         super().__init__(
@@ -176,10 +176,10 @@ class HubBackend(RemoteBackend):
         # /{hub_name}/repos/update
         return self._hub_client().update_repo_last_run_at(last_run_at=last_run_at)
 
-    def _get_repo_credentials(self) -> Optional[RepoCredentials]:
+    def _get_repo_credentials(self) -> Optional[RemoteRepoCredentials]:
         return self._hub_client().get_repos_credentials()
 
-    def save_repo_credentials(self, repo_credentials: RepoCredentials):
+    def save_repo_credentials(self, repo_credentials: RemoteRepoCredentials):
         self._hub_client().save_repos_credentials(repo_credentials=repo_credentials)
 
     def list_secret_names(self) -> List[str]:

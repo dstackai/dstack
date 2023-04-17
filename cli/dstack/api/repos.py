@@ -5,7 +5,7 @@ from typing import Optional
 import git
 import yaml
 
-from dstack.core.repo import RemoteRepoData, RepoCredentials, RepoProtocol
+from dstack.core.repo import RemoteRepoCredentials, RemoteRepoData, RepoProtocol
 from dstack.utils.common import PathLike
 from dstack.utils.ssh import get_host_config
 
@@ -16,7 +16,7 @@ def get_local_repo_credentials(
     repo_data: RemoteRepoData,
     identity_file: Optional[PathLike] = None,
     oauth_token: Optional[str] = None,
-) -> RepoCredentials:
+) -> RemoteRepoCredentials:
     private_key = None
     if repo_data.repo_protocol == "ssh":
         if identity_file is None:
@@ -36,14 +36,14 @@ def get_local_repo_credentials(
                 with open(gh_config_path, "r") as f:
                     gh_hosts = yaml.load(f, Loader=yaml.FullLoader)
                 oauth_token = gh_hosts.get(repo_data.repo_host_name, {}).get("oauth_token")
-    return RepoCredentials(
+    return RemoteRepoCredentials(
         protocol=RepoProtocol[repo_data.repo_protocol.upper()],
         private_key=private_key,
         oauth_token=oauth_token,
     )
 
 
-def test_repo_credentials(repo_data: RemoteRepoData, repo_credentials: RepoCredentials):
+def test_repo_credentials(repo_data: RemoteRepoData, repo_credentials: RemoteRepoCredentials):
     if repo_credentials.protocol == RepoProtocol.HTTPS:
         return git.cmd.Git().ls_remote(
             f"https://"

@@ -9,7 +9,7 @@ from dstack.core.artifact import Artifact
 from dstack.core.config import BackendConfig, Configurator
 from dstack.core.job import Job, JobHead, JobStatus
 from dstack.core.log_event import LogEvent
-from dstack.core.repo import RemoteRepo, Repo, RepoCredentials, RepoHead, RepoRef
+from dstack.core.repo import RemoteRepo, RemoteRepoCredentials, Repo, RepoHead, RepoRef
 from dstack.core.run import RunHead
 from dstack.core.secret import Secret
 from dstack.core.tag import TagHead
@@ -30,7 +30,7 @@ class Backend(ABC):
     def __init__(
         self,
         repo: Optional[Repo],
-        credentials: Optional[RepoCredentials] = None,
+        credentials: Optional[RemoteRepoCredentials] = None,
         auto_init: bool = False,
     ):
         self.repo = repo
@@ -188,10 +188,10 @@ class Backend(ABC):
         pass
 
     @abstractmethod
-    def _get_repo_credentials(self) -> Optional[RepoCredentials]:
+    def _get_repo_credentials(self) -> Optional[RemoteRepoCredentials]:
         pass
 
-    def get_repo_credentials(self) -> Optional[RepoCredentials]:
+    def get_repo_credentials(self) -> Optional[RemoteRepoCredentials]:
         credentials = self._get_repo_credentials()
         if credentials is None:
             if not self._auto_init:
@@ -205,7 +205,7 @@ class Backend(ABC):
         return credentials
 
     @abstractmethod
-    def save_repo_credentials(self, repo_credentials: RepoCredentials):
+    def save_repo_credentials(self, repo_credentials: RemoteRepoCredentials):
         pass
 
     @abstractmethod
@@ -244,7 +244,7 @@ class RemoteBackend(Backend):
         backend_config: Optional[BackendConfig] = None,
         repo: Optional[Repo] = None,
         custom_client: Any = None,
-        credentials: Optional[RepoCredentials] = None,
+        credentials: Optional[RemoteRepoCredentials] = None,
         auto_init: bool = False,
     ):
         super().__init__(repo=repo, credentials=credentials, auto_init=auto_init)

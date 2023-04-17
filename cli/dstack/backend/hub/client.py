@@ -8,7 +8,7 @@ from dstack.core.artifact import Artifact
 from dstack.core.error import BackendError
 from dstack.core.job import Job, JobHead
 from dstack.core.log_event import LogEvent
-from dstack.core.repo import Repo, RepoCredentials
+from dstack.core.repo import RemoteRepoCredentials, Repo
 from dstack.core.run import RunHead
 from dstack.core.secret import Secret
 from dstack.core.tag import TagHead
@@ -352,7 +352,7 @@ class HubClient:
             return
         resp.raise_for_status()
 
-    def get_repos_credentials(self) -> Optional[RepoCredentials]:
+    def get_repos_credentials(self) -> Optional[RemoteRepoCredentials]:
         url = _url(
             url=self.url,
             project=self.project,
@@ -367,12 +367,12 @@ class HubClient:
         )
         if resp.ok:
             json_data = resp.json()
-            return RepoCredentials(**json_data)
+            return RemoteRepoCredentials(**json_data)
         elif resp.status_code == 404:
             return None
         resp.raise_for_status()
 
-    def save_repos_credentials(self, repo_credentials: RepoCredentials):
+    def save_repos_credentials(self, repo_credentials: RemoteRepoCredentials):
         url = _url(
             url=self.url,
             project=self.project,

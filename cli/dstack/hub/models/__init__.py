@@ -4,7 +4,7 @@ from pydantic import BaseModel, Field
 from typing_extensions import Literal
 
 from dstack.core.job import Job, JobHead
-from dstack.core.repo import RepoCredentials, RepoSpec
+from dstack.core.repo import RemoteRepoCredentials, RepoSpec
 from dstack.core.secret import Secret
 from dstack.hub.security.utils import GlobalRole, ProjectRole
 
@@ -143,7 +143,7 @@ class StopRunners(BaseModel):
 
 class SaveRepoCredentials(BaseModel):
     repo_spec: RepoSpec
-    repo_credentials: RepoCredentials
+    repo_credentials: RemoteRepoCredentials
 
 
 class ReposUpdate(BaseModel):
