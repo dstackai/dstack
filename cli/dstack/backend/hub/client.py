@@ -5,7 +5,7 @@ from urllib.parse import urlencode, urlparse, urlunparse
 import requests
 
 from dstack.core.artifact import Artifact
-from dstack.core.error import BackendError
+from dstack.core.error import BackendError, NoMatchingInstanceError
 from dstack.core.job import Job, JobHead
 from dstack.core.log_event import LogEvent
 from dstack.core.repo import LocalRepoData, RepoAddress, RepoCredentials
@@ -141,6 +141,10 @@ class HubClient:
         )
         if resp.ok:
             return
+        elif resp.status_code == 400:
+            body = resp.json()
+            if body["detail"]["code"] == NoMatchingInstanceError.code:
+                raise BackendError(body["detail"]["msg"])
         resp.raise_for_status()
 
     def stop_job(self, repo_address: RepoAddress, job_id: str, abort: bool):

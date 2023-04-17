@@ -21,9 +21,27 @@ DSTACK_INSTANCE_TAG = "dstack-runner-instance"
 _supported_accelerators = [
     {"accelerator_name": "nvidia-a100-80gb", "gpu_name": "A100", "memory_mb": 1024 * 80},
     {"accelerator_name": "nvidia-tesla-a100", "gpu_name": "A100", "memory_mb": 1024 * 40},
-    {"accelerator_name": "nvidia-tesla-v100", "gpu_name": "V100", "memory_mb": 1024 * 16},
-    {"accelerator_name": "nvidia-tesla-p100", "gpu_name": "P100", "memory_mb": 1024 * 16},
-    {"accelerator_name": "nvidia-tesla-k80", "gpu_name": "K80", "memory_mb": 1024 * 12},
+    {
+        "accelerator_name": "nvidia-tesla-v100",
+        "gpu_name": "V100",
+        "memory_mb": 1024 * 16,
+        "max_vcpu": 12,
+        "max_ram_mb": 1024 * 78,
+    },
+    {
+        "accelerator_name": "nvidia-tesla-p100",
+        "gpu_name": "P100",
+        "memory_mb": 1024 * 16,
+        "max_vcpu": 16,
+        "max_ram_mb": 1024 * 104,
+    },
+    {
+        "accelerator_name": "nvidia-tesla-k80",
+        "gpu_name": "K80",
+        "memory_mb": 1024 * 12,
+        "max_vcpu": 8,
+        "max_ram_mb": 1024 * 52,
+    },
 ]
 
 
@@ -317,6 +335,13 @@ def _add_gpus_to_instance_type(
     )
     for at in accelerator_types:
         for gpu_count in range(1, at.maximum_cards_per_instance):
+            max_vcpu = _get_max_vcpu_per_accelerator(at.name) * gpu_count
+            max_ram_mb = _get_max_ram_per_accelerator(at.name) * gpu_count
+            if (
+                max_vcpu < instance_type.resources.cpus
+                or max_ram_mb < instance_type.resources.memory_mib
+            ):
+                continue
             instance_types.append(
                 InstanceType(
                     instance_name=instance_type.instance_name,
@@ -364,6 +389,18 @@ def _gpu_to_accelerator_name(gpu: Gpu) -> str:
     for acc in _supported_accelerators:
         if acc["gpu_name"] == gpu.name and acc["memory_mb"] == gpu.memory_mib:
             return acc["accelerator_name"]
+
+
+def _get_max_vcpu_per_accelerator(accelerator_name: str) -> int:
+    for acc in _supported_accelerators:
+        if acc["accelerator_name"] == accelerator_name:
+            return acc["max_vcpu"]
+
+
+def _get_max_ram_per_accelerator(accelerator_name: str) -> int:
+    for acc in _supported_accelerators:
+        if acc["accelerator_name"] == accelerator_name:
+            return acc["max_ram_mb"]
 
 
 def _get_image_name(
