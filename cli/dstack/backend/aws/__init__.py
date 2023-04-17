@@ -37,8 +37,8 @@ class AwsBackend(CloudBackend):
 
     def __init__(
         self,
-        repo: Optional[Repo],
         backend_config: Optional[AWSConfig] = None,
+        repo: Optional[Repo] = None,
         credentials: Optional[RepoCredentials] = None,
         auto_init: bool = False,
     ):

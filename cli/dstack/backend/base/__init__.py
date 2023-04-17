@@ -241,8 +241,8 @@ class Backend(ABC):
 class RemoteBackend(Backend):
     def __init__(
         self,
-        repo: Repo,
         backend_config: Optional[BackendConfig] = None,
+        repo: Optional[Repo] = None,
         custom_client: Any = None,
         credentials: Optional[RepoCredentials] = None,
         auto_init: bool = False,

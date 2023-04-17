@@ -35,8 +35,8 @@ warnings.filterwarnings("ignore", message=_CLOUD_SDK_CREDENTIALS_WARNING)
 class GCPBackend(CloudBackend):
     def __init__(
         self,
-        repo: Optional[Repo],
         backend_config: Optional[GCPConfig] = None,
+        repo: Optional[Repo] = None,
         credentials: Optional[RepoCredentials] = None,
         auto_init: bool = False,
     ):

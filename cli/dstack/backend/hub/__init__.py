@@ -23,8 +23,8 @@ class HubBackend(RemoteBackend):
 
     def __init__(
         self,
-        repo: Optional[Repo],
         config: Optional[BackendConfig] = None,
+        repo: Optional[Repo] = None,
         credentials: Optional[RepoCredentials] = None,
         auto_init: bool = False,
     ):
