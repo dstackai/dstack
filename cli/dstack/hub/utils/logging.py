@@ -17,5 +17,5 @@ def configure_root_logger():
 
 def get_logger(name: str) -> logging.Logger:
     logger = logging.getLogger(name)
-    logger.setLevel(os.getenv("DSTACK_HUB_LOG_LEVEL").upper())
+    logger.setLevel(os.getenv("DSTACK_HUB_LOG_LEVEL", "ERROR").upper())
     return logger
