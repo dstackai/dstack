@@ -109,7 +109,7 @@ class Repo(ABC):
         return RepoSpec(repo_ref=self.repo_ref, repo_data=self.repo_data)
 
     @abstractmethod
-    def get_workflows(self) -> list:
+    def get_workflows(self) -> list:  # todo pass credentials
         pass
 
     @abstractmethod
@@ -172,7 +172,7 @@ class RemoteRepo(Repo):
     def get_workflows(self) -> list:
         raise NotImplementedError()
 
-    def get_repo_credentials(self) -> Optional[RepoCredentials]:
+    def get_repo_credentials(self) -> Optional[RepoCredentials]:  # todo move to backend
         private_key = None
         if self.repo_data.repo_protocol == "ssh":
             if self.identity_file is None:
@@ -209,7 +209,7 @@ class RemoteRepo(Repo):
     def get_repo_diff(self) -> Optional[str]:
         return self.repo_data.repo_diff
 
-    def ls_remote(self) -> str:
+    def ls_remote(self) -> str:  # todo move to backend
         if self.repo_data.repo_protocol == "https":
             return git.cmd.Git().ls_remote(
                 f"https://"

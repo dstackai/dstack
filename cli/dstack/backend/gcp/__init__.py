@@ -23,7 +23,7 @@ from dstack.core.artifact import Artifact
 from dstack.core.error import ConfigError
 from dstack.core.job import Job, JobHead, JobStatus
 from dstack.core.log_event import LogEvent
-from dstack.core.repo import Repo, RepoCredentials, RepoHead
+from dstack.core.repo import Repo, RepoCredentials, RepoHead, RepoRef
 from dstack.core.run import RunHead
 from dstack.core.secret import Secret
 from dstack.core.tag import TagHead
@@ -95,8 +95,9 @@ class GCPBackend(CloudBackend):
             exit(1)
         base_jobs.create_job(self._storage, job)
 
-    def get_job(self, job_id: str, repo_id: Optional[str] = None) -> Optional[Job]:
-        return base_jobs.get_job(self._storage, repo_id or self.repo.repo_id, job_id)
+    def get_job(self, job_id: str, repo_ref: Optional[RepoRef] = None) -> Optional[Job]:
+        repo_ref = repo_ref or self.repo.repo_ref
+        return base_jobs.get_job(self._storage, repo_ref.repo_id, job_id)
 
     def list_jobs(self, run_name: str) -> List[Job]:
         return base_jobs.list_jobs(self._storage, self.repo.repo_id, run_name)
@@ -108,9 +109,10 @@ class GCPBackend(CloudBackend):
         base_jobs.stop_job(self._storage, self._compute, self.repo.repo_id, job_id, abort)
 
     def list_job_heads(
-        self, run_name: Optional[str] = None, repo_id: Optional[str] = None
+        self, run_name: Optional[str] = None, repo_ref: Optional[RepoRef] = None
     ) -> List[JobHead]:
-        return base_jobs.list_job_heads(self._storage, repo_id or self.repo.repo_id, run_name)
+        repo_ref = repo_ref or self.repo.repo_ref
+        return base_jobs.list_job_heads(self._storage, repo_ref.repo_id, run_name)
 
     def delete_job_head(self, job_id: str):
         base_jobs.delete_job_head(self._storage, self.repo.repo_id, job_id)
@@ -120,9 +122,9 @@ class GCPBackend(CloudBackend):
         run_name: Optional[str] = None,
         include_request_heads: bool = True,
         interrupted_job_new_status: JobStatus = JobStatus.FAILED,
-        repo_id: Optional[str] = None,
+        repo_ref: Optional[RepoRef] = None,
     ) -> List[RunHead]:
-        job_heads = self.list_job_heads(run_name, repo_id=repo_id)
+        job_heads = self.list_job_heads(run_name, repo_ref=repo_ref)
         return base_runs.get_run_heads(
             self._storage,
             self._compute,

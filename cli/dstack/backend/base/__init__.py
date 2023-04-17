@@ -8,7 +8,7 @@ from dstack.core.artifact import Artifact
 from dstack.core.config import BackendConfig, Configurator
 from dstack.core.job import Job, JobHead, JobStatus
 from dstack.core.log_event import LogEvent
-from dstack.core.repo import Repo, RepoCredentials, RepoHead
+from dstack.core.repo import Repo, RepoCredentials, RepoHead, RepoRef
 from dstack.core.run import RunHead
 from dstack.core.secret import Secret
 from dstack.core.tag import TagHead
@@ -64,7 +64,7 @@ class Backend(ABC):
         self.run_job(job, failed_to_start_job_new_status)
 
     @abstractmethod
-    def get_job(self, job_id: str, repo_id: Optional[str] = None) -> Optional[Job]:
+    def get_job(self, job_id: str, repo_ref: Optional[RepoRef] = None) -> Optional[Job]:
         pass
 
     @abstractmethod
@@ -87,7 +87,7 @@ class Backend(ABC):
 
     @abstractmethod
     def list_job_heads(
-        self, run_name: Optional[str] = None, repo_id: Optional[str] = None
+        self, run_name: Optional[str] = None, repo_ref: Optional[RepoRef] = None
     ) -> List[JobHead]:
         pass
 
@@ -112,7 +112,7 @@ class Backend(ABC):
         run_name: Optional[str] = None,
         include_request_heads: bool = True,
         interrupted_job_new_status: JobStatus = JobStatus.FAILED,
-        repo_id: Optional[str] = None,
+        repo_ref: Optional[RepoRef] = None,
     ) -> List[RunHead]:
         pass
 
