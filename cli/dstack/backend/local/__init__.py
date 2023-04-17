@@ -170,7 +170,7 @@ class LocalBackend(Backend):
     def update_repo_last_run_at(self, last_run_at: int):
         base_repos.update_repo_last_run_at(self._storage, self.repo.repo_ref, last_run_at)
 
-    def get_repo_credentials(self) -> Optional[RepoCredentials]:
+    def _get_repo_credentials(self) -> Optional[RepoCredentials]:
         return base_repos.get_repo_credentials(self._secrets_manager)
 
     def save_repo_credentials(self, repo_credentials: RepoCredentials):

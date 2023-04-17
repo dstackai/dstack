@@ -35,8 +35,16 @@ class AwsBackend(CloudBackend):
     def name(self):
         return "aws"
 
-    def __init__(self, repo: Optional[Repo], backend_config: Optional[AWSConfig] = None):
-        super().__init__(backend_config=backend_config, repo=repo)
+    def __init__(
+        self,
+        repo: Optional[Repo],
+        backend_config: Optional[AWSConfig] = None,
+        credentials: Optional[RepoCredentials] = None,
+        auto_init: bool = False,
+    ):
+        super().__init__(
+            backend_config=backend_config, repo=repo, credentials=credentials, auto_init=auto_init
+        )
         if backend_config is None:
             self.backend_config = AWSConfig()
             try:
@@ -248,7 +256,7 @@ class AwsBackend(CloudBackend):
             last_run_at,
         )
 
-    def get_repo_credentials(self) -> Optional[RepoCredentials]:
+    def _get_repo_credentials(self) -> Optional[RepoCredentials]:
         return base_repos.get_repo_credentials(self._secrets_manager)
 
     def save_repo_credentials(self, repo_credentials: RepoCredentials):

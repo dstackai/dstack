@@ -3,12 +3,13 @@ from abc import ABC, abstractmethod
 from enum import Enum
 from typing import Any, Generator, List, Optional
 
+from dstack.api.repos import get_local_repo_credentials
 from dstack.backend.base import jobs
 from dstack.core.artifact import Artifact
 from dstack.core.config import BackendConfig, Configurator
 from dstack.core.job import Job, JobHead, JobStatus
 from dstack.core.log_event import LogEvent
-from dstack.core.repo import Repo, RepoCredentials, RepoHead, RepoRef
+from dstack.core.repo import RemoteRepo, Repo, RepoCredentials, RepoHead, RepoRef
 from dstack.core.run import RunHead
 from dstack.core.secret import Secret
 from dstack.core.tag import TagHead
@@ -26,8 +27,15 @@ class BackendType(Enum):
 class Backend(ABC):
     _loaded = False
 
-    def __init__(self, repo: Optional[Repo]):
+    def __init__(
+        self,
+        repo: Optional[Repo],
+        credentials: Optional[RepoCredentials] = None,
+        auto_init: bool = False,
+    ):
         self.repo = repo
+        self._credentials = credentials
+        self._auto_init = auto_init
 
     @property
     @abstractmethod
@@ -180,8 +188,21 @@ class Backend(ABC):
         pass
 
     @abstractmethod
-    def get_repo_credentials(self) -> Optional[RepoCredentials]:
+    def _get_repo_credentials(self) -> Optional[RepoCredentials]:
         pass
+
+    def get_repo_credentials(self) -> Optional[RepoCredentials]:
+        credentials = self._get_repo_credentials()
+        if credentials is None:
+            if not self._auto_init:
+                return None  # todo raise?
+            elif self._credentials is not None:
+                credentials = self._credentials
+            else:
+                if isinstance(self.repo, RemoteRepo):
+                    credentials = get_local_repo_credentials(self.repo.repo_data)
+            self.save_repo_credentials(credentials)
+        return credentials
 
     @abstractmethod
     def save_repo_credentials(self, repo_credentials: RepoCredentials):
@@ -223,8 +244,10 @@ class RemoteBackend(Backend):
         repo: Repo,
         backend_config: Optional[BackendConfig] = None,
         custom_client: Any = None,
+        credentials: Optional[RepoCredentials] = None,
+        auto_init: bool = False,
     ):
-        super().__init__(repo=repo)
+        super().__init__(repo=repo, credentials=credentials, auto_init=auto_init)
 
     @property
     def type(self) -> BackendType:

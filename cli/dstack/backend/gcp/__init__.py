@@ -33,8 +33,16 @@ warnings.filterwarnings("ignore", message=_CLOUD_SDK_CREDENTIALS_WARNING)
 
 
 class GCPBackend(CloudBackend):
-    def __init__(self, repo: Optional[Repo], backend_config: Optional[GCPConfig] = None):
-        super().__init__(backend_config=backend_config, repo=repo)
+    def __init__(
+        self,
+        repo: Optional[Repo],
+        backend_config: Optional[GCPConfig] = None,
+        credentials: Optional[RepoCredentials] = None,
+        auto_init: bool = False,
+    ):
+        super().__init__(
+            backend_config=backend_config, repo=repo, credentials=credentials, auto_init=auto_init
+        )
         if backend_config is None:
             try:
                 backend_config = GCPConfig.load()
@@ -222,7 +230,7 @@ class GCPBackend(CloudBackend):
             last_run_at,
         )
 
-    def get_repo_credentials(self) -> Optional[RepoCredentials]:
+    def _get_repo_credentials(self) -> Optional[RepoCredentials]:
         return base_repos.get_repo_credentials(self._secrets_manager)
 
     def save_repo_credentials(self, repo_credentials: RepoCredentials):

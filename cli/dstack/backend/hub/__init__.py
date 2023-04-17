@@ -21,8 +21,16 @@ class HubBackend(RemoteBackend):
     _client = None
     _storage = None
 
-    def __init__(self, repo: Optional[Repo], config: Optional[BackendConfig] = None):
-        super().__init__(backend_config=config, repo=repo)
+    def __init__(
+        self,
+        repo: Optional[Repo],
+        config: Optional[BackendConfig] = None,
+        credentials: Optional[RepoCredentials] = None,
+        auto_init: bool = False,
+    ):
+        super().__init__(
+            backend_config=config, repo=repo, credentials=credentials, auto_init=auto_init
+        )
         self.backend_config = HUBConfig()
         try:
             self.backend_config.load()
@@ -168,7 +176,7 @@ class HubBackend(RemoteBackend):
         # /{hub_name}/repos/update
         return self._hub_client().update_repo_last_run_at(last_run_at=last_run_at)
 
-    def get_repo_credentials(self) -> Optional[RepoCredentials]:
+    def _get_repo_credentials(self) -> Optional[RepoCredentials]:
         return self._hub_client().get_repos_credentials()
 
     def save_repo_credentials(self, repo_credentials: RepoCredentials):

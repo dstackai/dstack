@@ -3,6 +3,7 @@ from pathlib import Path
 from typing import Optional
 
 from dstack.api.backend import list_backends
+from dstack.api.repos import get_local_repo_credentials, test_repo_credentials
 from dstack.cli.commands import BasicCommand
 from dstack.cli.common import check_backend, check_config, check_git, console
 from dstack.cli.config import config
@@ -56,12 +57,11 @@ class InitCommand(BasicCommand):
     @check_git
     @check_backend
     def _command(self, args: Namespace):
-        repo = RemoteRepo(
-            local_repo_dir=Path.cwd(),
-            identity_file=args.git_identity_file,
-            oauth_token=args.gh_token,
+        repo = RemoteRepo(local_repo_dir=Path.cwd())
+        repo_credentials = get_local_repo_credentials(
+            repo.repo_data, identity_file=args.git_identity_file, oauth_token=args.gh_token
         )
-        repo_credentials = repo.get_repo_credentials()
+        test_repo_credentials(repo.repo_data, repo_credentials)
 
         config.repo_user_config = RepoUserConfig(
             repo_id=repo.repo_ref.repo_id,

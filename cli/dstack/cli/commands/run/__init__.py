@@ -305,7 +305,7 @@ class RunCommand(BasicCommand):
                 provider.help(workflow_name)
                 sys.exit()
 
-            repo_credentials = backend.get_repo_credentials()
+            repo_credentials = backend._get_repo_credentials()
             if not repo_credentials:
                 console.print("Call `dstack init` first")
                 exit(1)
