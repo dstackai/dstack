@@ -52,9 +52,12 @@ def get_local_repo_credentials(
                 protocol=RepoProtocol.HTTPS, oauth_token=oauth_token, private_key=None
             )
     # default user key
-    return RemoteRepoCredentials(
-        protocol=RepoProtocol.SSH, private_key=read_ssh_key(default_ssh_key), oauth_token=None
-    )
+    if os.path.exists(default_ssh_key):
+        return RemoteRepoCredentials(
+            protocol=RepoProtocol.SSH, private_key=read_ssh_key(default_ssh_key), oauth_token=None
+        )
+    # no auth
+    return RemoteRepoCredentials(protocol=RepoProtocol.HTTPS, oauth_token=None, private_key=None)
 
 
 def test_repo_credentials(repo_data: RemoteRepoData, repo_credentials: RemoteRepoCredentials):
