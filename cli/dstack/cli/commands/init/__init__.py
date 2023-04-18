@@ -5,7 +5,7 @@ from typing import Optional
 import giturlparse
 
 from dstack.api.backend import list_backends
-from dstack.api.repos import get_local_repo_credentials, test_repo_credentials
+from dstack.api.repos import get_local_repo_credentials
 from dstack.cli.commands import BasicCommand
 from dstack.cli.common import check_backend, check_config, check_git, check_init, console
 from dstack.cli.config import config
@@ -62,11 +62,11 @@ class InitCommand(BasicCommand):
     def _command(self, args: Namespace):
         repo = RemoteRepo(local_repo_dir=Path.cwd())
         repo_credentials = get_local_repo_credentials(
-            giturlparse.parse(repo.repo_url).resource,  # hostname before mapping from SSH config
+            repo_data=repo.repo_data,
             identity_file=args.git_identity_file,
             oauth_token=args.gh_token,
+            original_hostname=giturlparse.parse(repo.repo_url).resource,
         )
-        test_repo_credentials(repo.repo_data, repo_credentials)
 
         config.save_repo_user_config(
             RepoUserConfig(
