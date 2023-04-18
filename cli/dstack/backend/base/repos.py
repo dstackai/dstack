@@ -99,4 +99,4 @@ def _get_repo_heads_prefix() -> str:
 
 
 def _get_repo_head_filename_prefix(repo_ref: RepoRef) -> str:
-    return f"{_get_repo_heads_prefix()}{repo_ref.repo_id};{repo_ref.repo_user_id};"
+    return f"{_get_repo_heads_prefix()}{repo_ref.repo_id};{repo_ref.repo_user_id};"  # todo more info about repo

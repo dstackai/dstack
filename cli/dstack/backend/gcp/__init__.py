@@ -277,6 +277,4 @@ class GCPBackend(CloudBackend):
         return GCPConfigurator()
 
     def delete_workflow_cache(self, workflow_name: str):
-        base_cache.delete_workflow_cache(
-            self._storage, self.repo.repo_id, self.repo.repo_user_id, workflow_name
-        )
+        base_cache.delete_workflow_cache(self._storage, self.repo.repo_ref, workflow_name)
