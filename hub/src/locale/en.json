@@ -146,7 +146,9 @@
       "validation": {
         "user_name_format": "Only letters, numbers, - or _"
       }
-    }
+    },
+
+    "token_copied": "Token copied"
   },
   "validation": {
     "required": "This is required field"

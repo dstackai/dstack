@@ -24,6 +24,7 @@ import { useDeleteProjectsMutation, useGetProjectQuery, useUpdateProjectMembersM
 
 import { selectAuthToken, selectUserData } from 'App/slice';
 
+import { copyToClipboard } from '../../../libs';
 import { ProjectMembers } from '../Members';
 import { getProjectRoleByUserName } from '../utils';
 
@@ -75,12 +76,8 @@ export const ProjectDetails: React.FC = () => {
 
     const cliCommand = `dstack config hub --url ${location.origin} --project ${paramProjectName} --token ${currentUserToken}`;
 
-    const onCopyCliCommand = async () => {
-        try {
-            await navigator.clipboard.writeText(cliCommand);
-        } catch (err) {
-            console.error('Failed to copy: ', err);
-        }
+    const onCopyCliCommand = () => {
+        copyToClipboard(cliCommand);
     };
 
     const debouncedMembersHandler = useCallback(debounce(changeMembersHandler, 1000), []);
@@ -228,6 +225,7 @@ export const ProjectDetails: React.FC = () => {
                         >
                             {renderBackendDetails()}
                         </Container>
+
                         <Container
                             header={
                                 <Header

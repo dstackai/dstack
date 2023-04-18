@@ -84,10 +84,6 @@ const AppLayout: React.FC<{ children: React.ReactNode }> = ({ children }) => {
                 notifications={<Notifications />}
                 navigation={
                     <SideNavigation
-                        // header={{
-                        //     text: t('navigation.settings'),
-                        //     href: ROUTES.BASE,
-                        // }}
                         activeHref={activeHref}
                         items={[
                             {
