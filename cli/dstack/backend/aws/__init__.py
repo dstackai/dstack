@@ -117,7 +117,7 @@ class AwsBackend(CloudBackend):
         )
 
     def create_run(self) -> str:
-        logs.create_log_group_if_not_exists(
+        logs.create_log_groups_if_not_exist(
             self._logs_client(), self.backend_config.bucket_name, self.repo.repo_id
         )
         return base_runs.create_run(self._storage, self.type)
