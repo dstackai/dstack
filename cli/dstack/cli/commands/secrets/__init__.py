@@ -73,13 +73,13 @@ class SecretCommand(BasicCommand):
     @check_init
     def add_secret(self, args: Namespace):
         repo = RemoteRepo(repo_ref=config.repo_user_config.repo_ref, local_repo_dir=os.getcwd())
+        secret_value = args.secret_value or Prompt.ask("Value", password=True)
         for backend in list_backends(repo):
             if backend.get_secret(args.secret_name):
                 if args.yes or Confirm.ask(
                     f"[red]The secret '{args.secret_name}' (backend: {backend.name}) already exists. "
                     f"Do you want to override it?[/]"
                 ):
-                    secret_value = args.secret_value or Prompt.ask("Value", password=True)
                     backend.update_secret(
                         Secret(secret_name=args.secret_name, secret_value=secret_value)
                     )
@@ -87,7 +87,6 @@ class SecretCommand(BasicCommand):
                 else:
                     return
             else:
-                secret_value = args.secret_value or Prompt.ask("Value", password=True)
                 backend.add_secret(Secret(secret_name=args.secret_name, secret_value=secret_value))
                 print(f"[grey58]OK (backend: {backend.name})[/]")
 
@@ -97,16 +96,16 @@ class SecretCommand(BasicCommand):
     @check_init
     def update_secret(self, args: Namespace):
         repo = RemoteRepo(repo_ref=config.repo_user_config.repo_ref, local_repo_dir=os.getcwd())
-        anyone = False
+        secret_value = None
         for backend in list_backends(repo):
             if backend.get_secret(args.secret_name):
-                anyone = True
-                secret_value = args.secret_value or Prompt.ask("Value", password=True)
+                if secret_value is None:
+                    secret_value = args.secret_value or Prompt.ask("Value", password=True)
                 backend.update_secret(
                     Secret(secret_name=args.secret_name, secret_value=secret_value)
                 )
                 print(f"[grey58]OK (backend: {backend.name})[/]")
-        if not anyone:
+        if secret_value is None:
             sys.exit(f"The secret '{args.secret_name}' doesn't exist")
 
     @check_config
