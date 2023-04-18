@@ -1,6 +1,6 @@
 import React from 'react';
-import Link, { LinkProps } from '@cloudscape-design/components/link';
 import { useNavigate } from 'react-router-dom';
+import Link, { LinkProps } from '@cloudscape-design/components/link';
 export const NavigateLink: React.FC<LinkProps> = ({ onFollow, ...props }) => {
     const navigate = useNavigate();
     const onFollowHandler: LinkProps['onFollow'] = (event) => {

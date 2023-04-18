@@ -1,21 +1,25 @@
 import React, { useMemo, useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import { useNavigate } from 'react-router-dom';
+
 import {
-    Cards,
-    Header,
-    SpaceBetween,
     Button,
-    NavigateLink,
-    TextFilter,
-    Pagination,
-    ListEmptyMessage,
+    Cards,
     ConfirmationDialog,
+    Header,
+    ListEmptyMessage,
+    NavigateLink,
+    Pagination,
+    SpaceBetween,
+    TextFilter,
 } from 'components';
+
 import { useAppSelector, useBreadcrumbs, useCollection, useNotifications } from 'hooks';
 import { ROUTES } from 'routes';
-import { useTranslation } from 'react-i18next';
-import { selectUserData } from 'App/slice';
 import { useDeleteProjectsMutation, useGetProjectsQuery } from 'services/project';
+
+import { selectUserData } from 'App/slice';
+
 import { getProjectRoleByUserName } from '../utils';
 
 export const ProjectList: React.FC = () => {

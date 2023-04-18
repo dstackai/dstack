@@ -1,20 +1,22 @@
 import React from 'react';
-import { useTranslation } from 'react-i18next';
 import { useForm } from 'react-hook-form';
+import { useTranslation } from 'react-i18next';
+
 import {
     Box,
-    Container,
-    Header,
-    FormUI,
-    SpaceBetween,
     Button,
+    ColumnLayout,
+    Container,
+    FormField,
     FormInput,
     FormSelect,
+    FormUI,
+    Header,
     Popover,
+    SpaceBetween,
     StatusIndicator,
-    ColumnLayout,
-    FormField,
 } from 'components';
+
 import { TRoleSelectOption } from './types';
 
 export interface Props {

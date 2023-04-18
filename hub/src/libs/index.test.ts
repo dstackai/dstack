@@ -1,15 +1,15 @@
 import {
-    isErrorWithMessage,
     arrayToRecordByKeyName,
     compareSimpleObject,
+    formatBytes,
     getDateAgoSting,
-    MINUTE,
-    getYesterdayTimeStamp,
     getDateFewDaysAgo,
     getUid,
-    mibToBytes,
-    formatBytes,
+    getYesterdayTimeStamp,
+    isErrorWithMessage,
     maskText,
+    mibToBytes,
+    MINUTE,
 } from './index';
 
 describe('test libs', () => {

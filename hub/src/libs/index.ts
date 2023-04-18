@@ -8,7 +8,7 @@ export {
     isRequestFormFieldError,
     isRequestFormErrors2,
 } from './isErrorWithMessage';
-import { formatDistanceToNowStrict, format } from 'date-fns';
+import { format, formatDistanceToNowStrict } from 'date-fns';
 export * from './isValidToken';
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any

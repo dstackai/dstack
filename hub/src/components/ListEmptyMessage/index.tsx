@@ -1,5 +1,6 @@
 import React from 'react';
 import Box from '@cloudscape-design/components/box';
+
 import { IProps } from './types';
 
 export const ListEmptyMessage: React.FC<IProps> = ({ title, message, children }) => {

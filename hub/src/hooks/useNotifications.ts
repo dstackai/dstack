@@ -1,7 +1,9 @@
-import useAppDispatch from './useAppDispatch';
-import { Notification } from 'components/Notifications/types';
 import { push, remove } from 'components/Notifications/slice';
+import { Notification } from 'components/Notifications/types';
+
 import { getUid } from 'libs';
+
+import useAppDispatch from './useAppDispatch';
 
 const NOTIFICATION_LIFE_TIME = 6000;
 

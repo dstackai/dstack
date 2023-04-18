@@ -1,11 +1,11 @@
-import React, { useState, useCallback, useMemo } from 'react';
+import React, { useCallback, useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useNavigate, useParams } from 'react-router-dom';
 import { debounce } from 'lodash';
-import { useAppSelector, useBreadcrumbs, useNotifications } from 'hooks';
-import { ROUTES } from 'routes';
+
 import {
     Box,
+    Button,
     ColumnLayout,
     ConfirmationDialog,
     Container,
@@ -13,16 +13,21 @@ import {
     DetailsHeader,
     Header,
     Loader,
-    SpaceBetween,
-    Button,
-    StatusIndicator,
     Popover,
+    SpaceBetween,
+    StatusIndicator,
 } from 'components';
+
+import { useAppSelector, useBreadcrumbs, useNotifications } from 'hooks';
+import { ROUTES } from 'routes';
+import { useDeleteProjectsMutation, useGetProjectQuery, useUpdateProjectMembersMutation } from 'services/project';
+
 import { selectAuthToken, selectUserData } from 'App/slice';
-import { useGetProjectQuery, useDeleteProjectsMutation, useUpdateProjectMembersMutation } from 'services/project';
+
 import { ProjectMembers } from '../Members';
-import styles from './styles.module.scss';
 import { getProjectRoleByUserName } from '../utils';
+
+import styles from './styles.module.scss';
 
 export const ProjectDetails: React.FC = () => {
     const { t } = useTranslation();

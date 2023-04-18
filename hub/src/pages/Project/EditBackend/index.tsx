@@ -1,10 +1,13 @@
 import React from 'react';
-import { Container, Header, Loader, ContentLayout } from 'components';
 import { useTranslation } from 'react-i18next';
 import { useNavigate, useParams } from 'react-router-dom';
-import { useGetProjectWithConfigInfoQuery, useUpdateProjectMutation } from 'services/project';
+
+import { Container, ContentLayout, Header, Loader } from 'components';
+
 import { useBreadcrumbs, useNotifications } from 'hooks';
 import { ROUTES } from 'routes';
+import { useGetProjectWithConfigInfoQuery, useUpdateProjectMutation } from 'services/project';
+
 import { ProjectForm } from '../Form';
 
 export const ProjectEditBackend: React.FC = () => {

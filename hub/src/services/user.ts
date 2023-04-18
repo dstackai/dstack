@@ -1,7 +1,8 @@
-import { createApi } from '@reduxjs/toolkit/query/react';
-import { fetchBaseQuery } from 'libs/fetchBaseQuery';
-import fetchBaseQueryHeaders from 'libs/fetchBaseQueryHeaders';
 import { API } from 'api';
+import { createApi } from '@reduxjs/toolkit/query/react';
+import { fetchBaseQuery } from '@reduxjs/toolkit/query/react';
+
+import fetchBaseQueryHeaders from 'libs/fetchBaseQueryHeaders';
 
 export const userApi = createApi({
     reducerPath: 'userApi',

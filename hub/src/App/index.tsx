@@ -1,12 +1,15 @@
 import React, { useEffect, useState } from 'react';
-import { useSearchParams, Outlet } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
-import { useGetUserDataQuery } from 'services/user';
-import { useAppDispatch, useAppSelector } from 'hooks';
-import { selectAuthToken, setAuthData, setUserData } from './slice';
-import { AuthErrorMessage } from './AuthErrorMessage';
+import { Outlet, useSearchParams } from 'react-router-dom';
+
 import AppLayout from 'layouts/AppLayout';
+
+import { useAppDispatch, useAppSelector } from 'hooks';
+import { useGetUserDataQuery } from 'services/user';
+
+import { AuthErrorMessage } from './AuthErrorMessage';
 import { Loading } from './Loading';
+import { selectAuthToken, setAuthData, setUserData } from './slice';
 
 const App: React.FC = () => {
     const { t } = useTranslation();

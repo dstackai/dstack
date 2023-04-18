@@ -1,5 +1,6 @@
-import { createSlice, PayloadAction } from '@reduxjs/toolkit';
 import type { RootState } from 'store';
+import { createSlice, PayloadAction } from '@reduxjs/toolkit';
+
 import { AUTH_DATA_STORAGE_KEY } from './constants';
 
 interface AppState {

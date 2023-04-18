@@ -1,12 +1,16 @@
 import React from 'react';
 import { createPortal } from 'react-dom';
-import { SideNavigationProps } from '@cloudscape-design/components/side-navigation';
-import { useNavigate, useLocation } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
-import { AppLayout as GenericAppLayout, SideNavigation, TopNavigation, BreadcrumbGroup, Notifications } from 'components';
-import { ROUTES } from 'routes';
+import { useLocation, useNavigate } from 'react-router-dom';
+import { SideNavigationProps } from '@cloudscape-design/components/side-navigation';
+
+import { AppLayout as GenericAppLayout, BreadcrumbGroup, Notifications, SideNavigation, TopNavigation } from 'components';
+
 import { useAppSelector } from 'hooks';
+import { ROUTES } from 'routes';
+
 import { selectBreadcrumbs, selectUserName } from 'App/slice';
+
 import logo from 'assets/images/logo.svg';
 import styles from './index.module.scss';
 

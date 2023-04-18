@@ -1,13 +1,18 @@
 import React, { useState } from 'react';
+import { useFieldArray, useForm } from 'react-hook-form';
 import { useTranslation } from 'react-i18next';
-import { useForm, useFieldArray } from 'react-hook-form';
+
+import { Button, FormSelect, Header, Link, ListEmptyMessage, Pagination, Table } from 'components';
+
+import { useCollection } from 'hooks';
+import { ROUTES } from 'routes';
+
+import { UserAutosuggest } from './UsersAutosuggest';
+
+import { IProps, TFormValues, TProjectMemberWithIndex } from './types';
 //TODO move type to special file
 import { TRoleSelectOption } from 'pages/User/Form/types';
-import { Header, Button, FormSelect, Table, ListEmptyMessage, Link, Pagination } from 'components';
-import { ROUTES } from 'routes';
-import { useCollection } from 'hooks';
-import { IProps, TProjectMemberWithIndex, TFormValues } from './types';
-import { UserAutosuggest } from './UsersAutosuggest';
+
 import styles from './styles.module.scss';
 
 export const ProjectMembers: React.FC<IProps> = ({ initialValues, loading, onChange, readonly }) => {
