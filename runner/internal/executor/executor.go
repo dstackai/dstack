@@ -486,6 +486,7 @@ func (ex *Executor) processJob(ctx context.Context, stoppedCh chan struct{}) err
 		}
 		bindings = append(bindings, art...)
 	}
+	createMountDirs(bindings)
 	logger := ex.backend.CreateLogger(ctx, fmt.Sprintf("/dstack/jobs/%s/%s/%s/%s", ex.backend.Bucket(ctx), job.RepoHostNameWithPort(), job.RepoUserName, job.RepoName), job.RunName)
 	secrets, err := ex.backend.Secrets(ctx)
 	if err != nil {
@@ -568,6 +569,16 @@ func (ex *Executor) Shutdown(ctx context.Context) {
 		log.Error(ctx, "Shutdown", "err", err)
 		return
 	}
+}
+
+func createMountDirs(mounts []mount.Mount) error {
+	for _, mount := range mounts {
+		err := os.MkdirAll(mount.Source, 0755)
+		if err != nil {
+			return gerrors.Wrap(err)
+		}
+	}
+	return nil
 }
 
 func uniqueMount(m []mount.Mount) []mount.Mount {
