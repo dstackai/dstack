@@ -1,0 +1,16 @@
+name: Test docker mkdir
+
+on:
+  push:
+
+jobs:
+  test-docker-mkdir:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Test
+        run: |
+          whoami
+          docker run -v ${PWD}/my_dir:/my_dir --user $UID ubuntu bash -c 'mkdir -p /my_dir/dir2'
+          ls -l
+          ls -l my_dir
+          rm -r my_dir
