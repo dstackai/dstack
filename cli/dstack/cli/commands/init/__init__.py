@@ -7,7 +7,7 @@ import giturlparse
 from dstack.api.backend import list_backends
 from dstack.api.repos import get_local_repo_credentials, test_repo_credentials
 from dstack.cli.commands import BasicCommand
-from dstack.cli.common import check_backend, check_config, check_git, console
+from dstack.cli.common import check_backend, check_config, check_git, check_init, console
 from dstack.cli.config import config
 from dstack.core.repo import RemoteRepo
 from dstack.core.userconfig import RepoUserConfig
@@ -58,6 +58,7 @@ class InitCommand(BasicCommand):
     @check_config
     @check_git
     @check_backend
+    @check_init
     def _command(self, args: Namespace):
         repo = RemoteRepo(local_repo_dir=Path.cwd())
         repo_credentials = get_local_repo_credentials(
@@ -67,10 +68,12 @@ class InitCommand(BasicCommand):
         )
         test_repo_credentials(repo.repo_data, repo_credentials)
 
-        config.repo_user_config = RepoUserConfig(
-            repo_id=repo.repo_ref.repo_id,
-            repo_user_id=repo.repo_ref.repo_user_id,
-            ssh_key_path=get_ssh_keypair(args.ssh_identity_file),
+        config.save_repo_user_config(
+            RepoUserConfig(
+                repo_id=repo.repo_ref.repo_id,
+                repo_user_id=repo.repo_ref.repo_user_id,
+                ssh_key_path=get_ssh_keypair(args.ssh_identity_file),
+            )
         )
 
         for backend in list_backends(repo):

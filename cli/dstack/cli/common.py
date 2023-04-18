@@ -8,7 +8,7 @@ from rich.prompt import Prompt
 from rich.table import Table
 
 from dstack.backend.base import Backend
-from dstack.core.error import BackendError, ConfigError
+from dstack.core.error import BackendError, ConfigError, NotInitializedError
 from dstack.core.job import JobStatus
 from dstack.core.request import RequestStatus
 from dstack.core.run import RunHead
@@ -168,6 +168,17 @@ def check_backend(func):
             func(*args, **kwargs)
         except BackendError as e:
             console.print(e.message)
+            exit(1)
+
+    return decorator
+
+
+def check_init(func):
+    def decorator(*args, **kwargs):
+        try:
+            func(*args, **kwargs)
+        except NotInitializedError:
+            console.print(f"Call `dstack init` first")
             exit(1)
 
     return decorator

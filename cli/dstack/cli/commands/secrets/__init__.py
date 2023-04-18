@@ -10,7 +10,7 @@ from rich_argparse import RichHelpFormatter
 
 from dstack.api.backend import list_backends
 from dstack.cli.commands import BasicCommand
-from dstack.cli.common import check_backend, check_config, check_git
+from dstack.cli.common import check_backend, check_config, check_git, check_init
 from dstack.cli.config import config
 from dstack.core.repo import RemoteRepo
 from dstack.core.secret import Secret
@@ -70,6 +70,7 @@ class SecretCommand(BasicCommand):
     @check_config
     @check_git
     @check_backend
+    @check_init
     def add_secret(self, args: Namespace):
         repo = RemoteRepo(repo_ref=config.repo_user_config.repo_ref, local_repo_dir=os.getcwd())
         for backend in list_backends(repo):
@@ -93,6 +94,7 @@ class SecretCommand(BasicCommand):
     @check_config
     @check_git
     @check_backend
+    @check_init
     def update_secret(self, args: Namespace):
         repo = RemoteRepo(repo_ref=config.repo_user_config.repo_ref, local_repo_dir=os.getcwd())
         anyone = False
@@ -110,6 +112,7 @@ class SecretCommand(BasicCommand):
     @check_config
     @check_git
     @check_backend
+    @check_init
     def delete_secret(self, args: Namespace):
         repo = RemoteRepo(repo_ref=config.repo_user_config.repo_ref, local_repo_dir=os.getcwd())
         anyone = False
@@ -128,6 +131,7 @@ class SecretCommand(BasicCommand):
     @check_config
     @check_git
     @check_backend
+    @check_init
     def _command(self, args: Namespace):
         console = Console()
         table = Table(box=None)

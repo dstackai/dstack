@@ -21,3 +21,7 @@ class BackendError(Exception):
 class SecretError(Exception):
     def __init__(self, message: Optional[str] = None):
         self.message = message
+
+
+class NotInitializedError(Exception):
+    pass

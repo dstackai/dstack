@@ -3,9 +3,9 @@ from pathlib import Path
 from typing import Dict, Optional, Type, TypeVar
 
 import yaml
-from git import InvalidGitRepositoryError
 from pydantic import BaseModel
 
+from dstack.core.error import NotInitializedError
 from dstack.core.userconfig import RepoUserConfig
 
 Model = TypeVar("Model", bound=BaseModel)
@@ -33,10 +33,9 @@ class ConfigManager:
         try:
             return self._cached_read(self.repo_user_config_path(), RepoUserConfig)
         except FileNotFoundError:
-            raise InvalidGitRepositoryError()
+            raise NotInitializedError("No repo user config found")
 
-    @repo_user_config.setter
-    def repo_user_config(self, value: RepoUserConfig):
+    def save_repo_user_config(self, value: RepoUserConfig):
         self._cached_write(self.repo_user_config_path(), value, mkdir=True)
 
     @staticmethod

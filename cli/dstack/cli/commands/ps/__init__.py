@@ -11,6 +11,7 @@ from dstack.cli.common import (
     check_backend,
     check_config,
     check_git,
+    check_init,
     generate_runs_table,
     print_runs,
 )
@@ -50,6 +51,7 @@ class PSCommand(BasicCommand):
     @check_config
     @check_git
     @check_backend
+    @check_init
     def _command(self, args: Namespace):
         repo = RemoteRepo(repo_ref=config.repo_user_config.repo_ref, local_repo_dir=os.getcwd())
         backends = list_backends(repo)

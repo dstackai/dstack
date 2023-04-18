@@ -4,7 +4,7 @@ from argparse import Namespace
 from dstack.api.backend import get_current_remote_backend, get_local_backend
 from dstack.api.run import RunNotFoundError, TagNotFoundError, get_tagged_run_name
 from dstack.cli.commands import BasicCommand
-from dstack.cli.common import check_backend, check_config, check_git, console
+from dstack.cli.common import check_backend, check_config, check_git, check_init, console
 from dstack.cli.config import config
 from dstack.core.error import BackendError
 from dstack.core.repo import RemoteRepo
@@ -28,6 +28,7 @@ class PullCommand(BasicCommand):
     @check_config
     @check_git
     @check_backend
+    @check_init
     def _command(self, args: Namespace):
         repo = RemoteRepo(repo_ref=config.repo_user_config.repo_ref, local_repo_dir=os.getcwd())
         remote_backend = get_current_remote_backend(repo)

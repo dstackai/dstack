@@ -22,7 +22,14 @@ from dstack.backend.base import Backend
 from dstack.backend.base.logs import fix_urls
 from dstack.cli.commands import BasicCommand
 from dstack.cli.commands.run.ssh_tunnel import allocate_local_ports, run_ssh_tunnel
-from dstack.cli.common import check_backend, check_config, check_git, console, print_runs
+from dstack.cli.common import (
+    check_backend,
+    check_config,
+    check_git,
+    check_init,
+    console,
+    print_runs,
+)
 from dstack.cli.config import config
 from dstack.core.job import Job, JobHead, JobStatus
 from dstack.core.repo import RemoteRepo
@@ -272,6 +279,7 @@ class RunCommand(BasicCommand):
     @check_config
     @check_git
     @check_backend
+    @check_init
     def _command(self, args: Namespace):
         if not args.workflow_or_provider:
             self._parser.print_help()
