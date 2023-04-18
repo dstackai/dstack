@@ -34,13 +34,13 @@ func NewGCPSecretManager(project, bucket string) *GCPSecretManager {
 	}
 }
 
-func (sm *GCPSecretManager) FetchSecret(ctx context.Context, repoData *models.RepoData, name string) (string, error) {
-	key := getSecretKey(sm.bucket, repoData, name)
+func (sm *GCPSecretManager) FetchSecret(ctx context.Context, repoName string, name string) (string, error) {
+	key := getSecretKey(sm.bucket, repoName, name)
 	return sm.getSecretValue(ctx, key)
 }
 
-func (sm *GCPSecretManager) FetchCredentials(ctx context.Context, repoData *models.RepoData) (*models.GitCredentials, error) {
-	key := getCreadentialsKey(sm.bucket, repoData)
+func (sm *GCPSecretManager) FetchCredentials(ctx context.Context, repoName string) (*models.GitCredentials, error) {
+	key := getCredentialsKey(sm.bucket, repoName)
 	creds := new(models.GitCredentials)
 	data, err := sm.getSecretValue(ctx, key)
 	if err != nil {
@@ -66,14 +66,12 @@ func (sm *GCPSecretManager) getSecretValue(ctx context.Context, key string) (str
 	return string(version.Payload.GetData()), nil
 }
 
-func getSecretKey(bucket string, repoData *models.RepoData, name string) string {
-	repoPath := repoData.RepoDataPath("-")
-	repoPath = strings.ReplaceAll(repoPath, ".", "-")
-	return fmt.Sprintf("dstack-secrets-%s-%s-%s", bucket, repoPath, name)
+func getSecretKey(bucket string, repoName string, name string) string {
+	repoName = strings.ReplaceAll(repoName, ".", "-")
+	return fmt.Sprintf("dstack-secrets-%s-%s-%s", bucket, repoName, name)
 }
 
-func getCreadentialsKey(bucket string, repoData *models.RepoData) string {
-	repoPath := repoData.RepoDataPath("-")
-	repoPath = strings.ReplaceAll(repoPath, ".", "-")
-	return fmt.Sprintf("dstack-credentials-%s-%s", bucket, repoPath)
+func getCredentialsKey(bucket string, repoName string) string {
+	repoName = strings.ReplaceAll(repoName, ".", "-")
+	return fmt.Sprintf("dstack-credentials-%s-%s", bucket, repoName)
 }

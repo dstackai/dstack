@@ -1,12 +1,13 @@
 import argparse
+import os
 from typing import List
 
 from dstack.api.backend import list_backends
-from dstack.api.repo import load_repo_data
 from dstack.backend.base import Backend
 from dstack.cli.commands import BasicCommand
-from dstack.cli.common import check_backend, check_config, check_git, console
-from dstack.core.repo import LocalRepoData
+from dstack.cli.common import check_backend, check_config, check_git, check_init, console
+from dstack.cli.config import config
+from dstack.core.repo import RemoteRepo
 
 
 class PruneCommand(BasicCommand):
@@ -29,15 +30,14 @@ class PruneCommand(BasicCommand):
     @check_config
     @check_git
     @check_backend
+    @check_init
     def _command(self, args: argparse.Namespace):
-        repo_data = load_repo_data()
-        backends = list_backends()
-        args.prune_action(args, backends, repo_data)
+        repo = RemoteRepo(repo_ref=config.repo_user_config.repo_ref, local_repo_dir=os.getcwd())
+        backends = list_backends(repo)
+        args.prune_action(args, backends)
 
     @staticmethod
-    def prune_cache(args: argparse.Namespace, backends: List[Backend], repo_data: LocalRepoData):
+    def prune_cache(args: argparse.Namespace, backends: List[Backend]):
         for backend in backends:
-            backend.delete_workflow_cache(
-                repo_data, repo_data.local_repo_user_email or "default", args.workflow
-            )
+            backend.delete_workflow_cache(args.workflow)
             console.print(f"[gray58]Cache pruned (backend: {backend.name})[/]")

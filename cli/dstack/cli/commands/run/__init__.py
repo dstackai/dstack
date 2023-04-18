@@ -17,18 +17,23 @@ from websocket import WebSocketApp
 
 from dstack import providers
 from dstack.api.backend import get_backend_by_name, get_current_remote_backend, get_local_backend
-from dstack.api.repo import load_repo_data
 from dstack.api.run import list_runs_with_merged_backends
 from dstack.backend.base import Backend
 from dstack.backend.base.logs import fix_urls
 from dstack.cli.commands import BasicCommand
 from dstack.cli.commands.run.ssh_tunnel import allocate_local_ports, run_ssh_tunnel
-from dstack.cli.common import check_backend, check_config, check_git, console, print_runs
-from dstack.cli.config import BaseConfig
+from dstack.cli.common import (
+    check_backend,
+    check_config,
+    check_git,
+    check_init,
+    console,
+    print_runs,
+)
+from dstack.cli.config import config
 from dstack.core.job import Job, JobHead, JobStatus
-from dstack.core.repo import RepoAddress
+from dstack.core.repo import RemoteRepo
 from dstack.core.request import RequestStatus
-from dstack.core.userconfig import RepoUserConfig
 
 __all__ = "RunCommand"
 
@@ -91,7 +96,7 @@ def parse_run_args(
     return provider_name, provider_args, workflow_name, workflow_data
 
 
-def poll_logs_ws(backend: Backend, repo_address: RepoAddress, job: Job, ports: Dict[int, int]):
+def poll_logs_ws(backend: Backend, job: Job, ports: Dict[int, int]):
     def on_message(ws: WebSocketApp, message):
         message = fix_urls(message, job, ports, hostname="127.0.0.1")
         sys.stdout.buffer.write(message)
@@ -101,7 +106,7 @@ def poll_logs_ws(backend: Backend, repo_address: RepoAddress, job: Job, ports: D
         if isinstance(err, KeyboardInterrupt):
             run_name = job.run_name
             if Confirm.ask(f"\n [red]Abort the run '{run_name}'?[/]"):
-                backend.stop_jobs(repo_address, run_name, abort=True)
+                backend.stop_jobs(run_name, abort=True)
                 console.print(f"[grey58]OK[/]")
             exit()
         else:
@@ -131,19 +136,18 @@ def poll_logs_ws(backend: Backend, repo_address: RepoAddress, job: Job, ports: D
 
     try:
         while True:
-            _job_head = backend.get_job(repo_address, job.job_id)
-            run = backend.list_run_heads(repo_address, _job_head.run_name)[0]
+            _job_head = backend.get_job(job.job_id)
+            run = backend.list_run_heads(_job_head.run_name)[0]
             if run.status.is_finished():
                 break
             time.sleep(POLL_FINISHED_STATE_RATE_SECS)
     except KeyboardInterrupt:
         if Confirm.ask(f"\n [red]Abort the run '{job.run_name}'?[/]"):
-            backend.stop_jobs(repo_address, job.run_name, abort=True)
+            backend.stop_jobs(job.run_name, abort=True)
             console.print(f"[grey58]OK[/]")
 
 
 def poll_run(
-    repo_address: RepoAddress,
     job_heads: List[JobHead],
     backend: Backend,
     ssh_key: Optional[str],
@@ -162,7 +166,7 @@ def poll_run(
             task = progress.add_task("Provisioning... It may take up to a minute.", total=None)
             while True:
                 time.sleep(POLL_PROVISION_RATE_SECS)
-                run_heads = backend.list_run_heads(repo_address, run_name)
+                run_heads = backend.list_run_heads(run_name)
                 if len(run_heads) == 0:
                     continue
                 run = run_heads[0]
@@ -191,7 +195,7 @@ def poll_run(
                     )
                     request_errors_printed = False
 
-        jobs = [backend.get_job(repo_address, job_head.job_id) for job_head in job_heads]
+        jobs = [backend.get_job(job_head.job_id) for job_head in job_heads]
         ports = {}
         if backend.name != "local":
             console.print("Starting SSH tunnel...")
@@ -214,12 +218,12 @@ def poll_run(
             console.print(f"  ssh -i {ssh_key_escaped} root@localhost -p {ssh_port}")
             console.print()
 
-        run = backend.list_run_heads(repo_address, run_name)[0]
+        run = backend.list_run_heads(run_name)[0]
         if run.status.is_unfinished() or run.status == JobStatus.DONE:
-            poll_logs_ws(backend, repo_address, jobs[0], ports)
+            poll_logs_ws(backend, jobs[0], ports)
     except KeyboardInterrupt:
         if Confirm.ask(f" [red]Abort the run '{run_name}'?[/]"):
-            backend.stop_jobs(repo_address, run_name, abort=True)
+            backend.stop_jobs(run_name, abort=True)
             console.print(f"[grey58]OK[/]")
 
 
@@ -275,22 +279,24 @@ class RunCommand(BasicCommand):
     @check_config
     @check_git
     @check_backend
+    @check_init
     def _command(self, args: Namespace):
         if not args.workflow_or_provider:
             self._parser.print_help()
             exit(1)
         try:
-            config = BaseConfig()
-            repo_data = load_repo_data()
-            backend = get_local_backend()
+            repo = RemoteRepo(
+                repo_ref=config.repo_user_config.repo_ref, local_repo_dir=os.getcwd()
+            )
+            backend = get_local_backend(repo)
             if args.remote is not None:
                 if len(args.remote) == 0:
-                    remote_backend = get_current_remote_backend()
+                    remote_backend = get_current_remote_backend(repo)
                     if remote_backend is None:
                         console.print(f"No remote configured. Run `dstack config`.")
                         exit(1)
                 else:
-                    remote_backend = get_backend_by_name(args.remote[0])
+                    remote_backend = get_backend_by_name(repo, args.remote[0])
                     if remote_backend is None:
                         console.print(f"Backend '{args.remote[0]}' is not configured")
                         exit(1)
@@ -307,16 +313,11 @@ class RunCommand(BasicCommand):
                 provider.help(workflow_name)
                 sys.exit()
 
-            repo_credentials = backend.get_repo_credentials(repo_data)
-            repo_user_config = config.read(
-                config.repos / f"{repo_data.path(delimiter='.')}.yaml",
-                RepoUserConfig,
-                non_empty=False,
-            )
+            repo_credentials = backend._get_repo_credentials()
             if not repo_credentials:
                 console.print("Call `dstack init` first")
                 exit(1)
-            if not repo_user_config.ssh_key_path:
+            if not config.repo_user_config.ssh_key_path:
                 if (
                     (backend.name != "local" and not args.detach)
                     or workflow_data.get("ssh", False)
@@ -326,16 +327,18 @@ class RunCommand(BasicCommand):
                     console.print("  [gray58]No valid SSH identity[/]")
                     exit(1)
             else:
-                workflow_data["ssh_key_pub"] = _read_ssh_key_pub(repo_user_config.ssh_key_path)
+                workflow_data["ssh_key_pub"] = _read_ssh_key_pub(
+                    config.repo_user_config.ssh_key_path
+                )
 
-            run_name = backend.create_run(repo_data)
+            run_name = backend.create_run()
             provider.load(backend, provider_args, workflow_name, workflow_data, run_name)
             if args.tag_name:
-                tag_head = backend.get_tag_head(repo_data, args.tag_name)
+                tag_head = backend.get_tag_head(args.tag_name)
                 if tag_head:
-                    backend.delete_tag_head(repo_data, tag_head)
+                    backend.delete_tag_head(tag_head)
             jobs = provider.submit_jobs(backend, args.tag_name)
-            backend.update_repo_last_run_at(repo_data, last_run_at=int(round(time.time() * 1000)))
+            backend.update_repo_last_run_at(last_run_at=int(round(time.time() * 1000)))
             runs_with_merged_backends = list_runs_with_merged_backends(
                 [backend], run_name=run_name
             )
@@ -346,10 +349,9 @@ class RunCommand(BasicCommand):
                 exit(1)
             if not args.detach:
                 poll_run(
-                    repo_data,
                     jobs,
                     backend,
-                    ssh_key=repo_user_config.ssh_key_path,
+                    ssh_key=config.repo_user_config.ssh_key_path,
                     openssh_server=provider.openssh_server,
                 )
         except ValidationError as e:

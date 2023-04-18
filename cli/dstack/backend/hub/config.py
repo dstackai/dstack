@@ -27,7 +27,7 @@ class HUBConfig(BackendConfig):
             path = get_config_path()
         if path.exists():
             with path.open() as f:
-                config_data = yaml.load(f, Loader=yaml.FullLoader)
+                config_data = yaml.load(f, Loader=yaml.FullLoader) or {}
                 if config_data.get("backend") != self.NAME:
                     raise ConfigError(f"It's not HUB config")
                 if config_data.get("url") is None:
@@ -79,13 +79,14 @@ class HubConfigurator(Configurator):
         default_token = config.token
         default_project = config.project
 
-        config.url, config.token = self.ask_new_param(
+        config.url, _, config.token = self.ask_new_param(
             default_url=default_url,
             default_project=default_project,
             default_token=default_token,
         )
         config.save()
         print(f"[grey58]OK[/]")
+        return config
 
     def ask_new_param(
         self, default_url: str, default_project: str, default_token: str

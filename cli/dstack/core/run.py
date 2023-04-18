@@ -5,18 +5,16 @@ from pydantic import BaseModel
 from dstack.core.app import AppHead
 from dstack.core.artifact import ArtifactHead
 from dstack.core.job import JobStatus
-from dstack.core.repo import RepoAddress
 from dstack.core.request import RequestHead, RequestStatus
 from dstack.utils import random_names
 from dstack.utils.common import _quoted
 
 
 class RunHead(BaseModel):
-    repo_address: RepoAddress
     run_name: str
     workflow_name: Optional[str]
     provider_name: str
-    local_repo_user_name: Optional[str]
+    repo_user_id: Optional[str]
     artifact_heads: Optional[List[ArtifactHead]]
     status: JobStatus
     submitted_at: int
@@ -41,11 +39,10 @@ class RunHead(BaseModel):
             else None
         )
         return (
-            f"Run(repo_address={self.repo_address}, "
-            f'run_name="{self.run_name}", '
+            f'Run(run_name="{self.run_name}", '
             f"workflow_name={_quoted(self.workflow_name)}, "
             f'provider_name="{self.provider_name}", '
-            f"local_repo_user_name={_quoted(self.local_repo_user_name)}, "
+            f"repo_user_id={_quoted(self.repo_user_id)}, "
             f"status=JobStatus.{self.status.name}, "
             f"submitted_at={self.submitted_at}, "
             f"artifact_heads={artifact_heads}, "

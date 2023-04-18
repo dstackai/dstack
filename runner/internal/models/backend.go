@@ -30,15 +30,16 @@ type Job struct {
 	Deps         []Dep             `yaml:"deps"`
 	ProviderName string            `yaml:"provider_name"`
 
-	RepoHostName       string `yaml:"repo_host_name"`
-	RepoPort           int    `yaml:"repo_port,omitempty"`
-	RepoBranch         string `yaml:"repo_branch"`
-	RepoDiff           string `yaml:"repo_diff"`
-	RepoHash           string `yaml:"repo_hash"`
-	RepoName           string `yaml:"repo_name"`
-	RepoUserName       string `yaml:"repo_user_name"`
-	LocalRepoUserName  string `yaml:"local_repo_user_name,omitempty"`
-	LocalRepoUserEmail string `yaml:"local_repo_user_email,omitempty"`
+	RepoId           string `yaml:"repo_id"`
+	RepoUserId       string `yaml:"repo_user_id"`
+	RepoHostName     string `yaml:"repo_host_name"`
+	RepoPort         int    `yaml:"repo_port,omitempty"`
+	RepoBranch       string `yaml:"repo_branch"`
+	RepoDiff         string `yaml:"repo_diff"`
+	RepoDiffFilename string `yaml:"repo_diff_filename,omitempty"`
+	RepoHash         string `yaml:"repo_hash"`
+	RepoName         string `yaml:"repo_name"`
+	RepoUserName     string `yaml:"repo_user_name"`
 
 	RequestID    string       `yaml:"request_id"`
 	Requirements Requirements `yaml:"requirements"`
@@ -55,12 +56,10 @@ type Job struct {
 }
 
 type Dep struct {
-	RepoHostName string `yaml:"repo_host_name,omitempty"`
-	RepoPort     int    `yaml:"repo_port,omitempty"`
-	RepoUserName string `yaml:"repo_user_name,omitempty"`
-	RepoName     string `yaml:"repo_name,omitempty"`
-	RunName      string `yaml:"run_name,omitempty"`
-	Mount        bool   `yaml:"mount,omitempty"`
+	RepoId     string `yaml:"repo_id,omitempty"`
+	RepoUserId string `yaml:"repo_user_id,omitempty"`
+	RunName    string `yaml:"run_name,omitempty"`
+	Mount      bool   `yaml:"mount,omitempty"`
 }
 
 type Artifact struct {
@@ -108,12 +107,6 @@ type GitCredentials struct {
 	Passphrase *string `json:"passphrase,omitempty"`
 }
 
-type RepoData struct {
-	RepoHost     string
-	RepoUserName string
-	RepoName     string
-}
-
 type RegistryAuth struct {
 	Username string `yaml:"username,omitempty"`
 	Password string `yaml:"password,omitempty"`
@@ -126,20 +119,12 @@ func (j *Job) RepoHostNameWithPort() string {
 	return fmt.Sprintf("%s:%d", j.RepoHostName, j.RepoPort)
 }
 
-func (j *Job) JobRepoData() *RepoData {
-	return &RepoData{
-		RepoHost:     j.RepoHostNameWithPort(),
-		RepoUserName: j.RepoUserName,
-		RepoName:     j.RepoName,
-	}
-}
-
 func (j *Job) JobFilepath() string {
-	return fmt.Sprintf("jobs/%s/%s/%s/%s.yaml", j.RepoHostNameWithPort(), j.RepoUserName, j.RepoName, j.JobID)
+	return fmt.Sprintf("jobs/%s/%s.yaml", j.RepoId, j.JobID)
 }
 
 func (j *Job) JobHeadFilepathPrefix() string {
-	return fmt.Sprintf("jobs/%s/%s/%s/l;%s;", j.RepoHostNameWithPort(), j.RepoUserName, j.RepoName, j.JobID)
+	return fmt.Sprintf("jobs/%s/l;%s;", j.RepoId, j.JobID)
 }
 
 func (j *Job) JobHeadFilepath() string {
@@ -152,13 +137,11 @@ func (j *Job) JobHeadFilepath() string {
 		artifactSlice = append(artifactSlice, art.Path)
 	}
 	return fmt.Sprintf(
-		"jobs/%s/%s/%s/l;%s;%s;%s;%d;%s;%s;%s;%s",
-		j.RepoHostNameWithPort(),
-		j.RepoUserName,
-		j.RepoName,
+		"jobs/%s/l;%s;%s;%s;%d;%s;%s;%s;%s",
+		j.RepoId,
 		j.JobID,
 		j.ProviderName,
-		j.LocalRepoUserName,
+		j.RepoUserId,
 		j.SubmittedAt,
 		j.Status,
 		strings.Join(artifactSlice, ","),
@@ -178,13 +161,11 @@ func (j *Job) JobHeadFilepathLocal() string {
 		artifactSlice = append(artifactSlice, strings.ReplaceAll(art.Path, "/", "_"))
 	}
 	return fmt.Sprintf(
-		"jobs/%s/%s/%s/l;%s;%s;%s;%d;%s;%s;%s;%s",
-		j.RepoHostNameWithPort(),
-		j.RepoUserName,
-		j.RepoName,
+		"jobs/%s/l;%s;%s;%s;%d;%s;%s;%s;%s",
+		j.RepoId,
 		j.JobID,
 		j.ProviderName,
-		j.LocalRepoUserName,
+		j.RepoUserId,
 		j.SubmittedAt,
 		j.Status,
 		strings.Join(artifactSlice, ","),
@@ -193,17 +174,6 @@ func (j *Job) JobHeadFilepathLocal() string {
 	)
 }
 
-func (d *Dep) RepoHostNameWithPort() string {
-	if d.RepoPort == 0 {
-		return d.RepoHostName
-	}
-	return fmt.Sprintf("%s:%d", d.RepoHostName, d.RepoPort)
-}
-
-func (rd *RepoData) RepoDataPath(sep string) string {
-	return strings.Join([]string{rd.RepoHost, rd.RepoUserName, rd.RepoName}, sep)
-}
-
-func (rd *RepoData) SecretsPrefix() string {
-	return fmt.Sprintf("secrets/%s/%s/%s/l;", rd.RepoHost, rd.RepoUserName, rd.RepoName)
+func (j *Job) SecretsPrefix() string {
+	return fmt.Sprintf("secrets/%s/l;", j.RepoId)
 }

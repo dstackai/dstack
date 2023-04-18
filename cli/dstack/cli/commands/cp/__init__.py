@@ -1,16 +1,17 @@
 import os
 import shutil
+import sys
 from argparse import Namespace
 from pathlib import Path
 
 from dstack.api.backend import list_backends
-from dstack.api.repo import load_repo_data
 from dstack.api.run import RunNotFoundError, TagNotFoundError, get_tagged_run_name
 from dstack.backend.base import Backend
 from dstack.cli.commands import BasicCommand
-from dstack.cli.common import check_backend, check_config, check_git, console
+from dstack.cli.common import check_backend, check_config, check_git, check_init, console
+from dstack.cli.config import config
 from dstack.core.config import get_dstack_dir
-from dstack.core.repo import RepoAddress
+from dstack.core.repo import RemoteRepo
 
 
 class CpCommand(BasicCommand):
@@ -43,14 +44,15 @@ class CpCommand(BasicCommand):
     @check_config
     @check_git
     @check_backend
+    @check_init
     def _command(self, args: Namespace):
-        repo_data = load_repo_data()
-        backends = list_backends()
+        repo = RemoteRepo(repo_ref=config.repo_user_config.repo_ref, local_repo_dir=os.getcwd())
+        backends = list_backends(repo)
         run_name = None
         backend = None
         for backend in backends:
             try:
-                run_name, _ = get_tagged_run_name(repo_data, backend, args.run_name_or_tag_name)
+                run_name, _ = get_tagged_run_name(backend, args.run_name_or_tag_name)
                 break
             except (TagNotFoundError, RunNotFoundError):
                 pass
@@ -61,7 +63,6 @@ class CpCommand(BasicCommand):
 
         _copy_artifact_files(
             backend=backend,
-            repo_address=repo_data,
             run_name=run_name,
             source=args.source,
             target=args.target,
@@ -69,14 +70,11 @@ class CpCommand(BasicCommand):
         console.print("Artifact files copied")
 
 
-def _copy_artifact_files(
-    backend: Backend, repo_address: RepoAddress, run_name: str, source: str, target: str
-):
-    tmp_output_dir = get_dstack_dir() / "tmp" / "copied_artifacts" / repo_address.path()
+def _copy_artifact_files(backend: Backend, run_name: str, source: str, target: str):
+    tmp_output_dir = get_dstack_dir() / "tmp" / "copied_artifacts" / backend.repo.repo_id
     tmp_output_dir.mkdir(parents=True, exist_ok=True)
     source = _normalize_source(source)
     backend.download_run_artifact_files(
-        repo_address=repo_address,
         run_name=run_name,
         output_dir=tmp_output_dir,
         files_path=source,
@@ -98,7 +96,12 @@ def _copy_artifact_files(
             console.print(f"Local target path '{target}' exists and is not a directory")
             shutil.rmtree(tmp_job_output_dir)
             exit(1)
-        shutil.copytree(source_full_path, target, dirs_exist_ok=True)
+        if sys.version_info[1] >= 8:
+            shutil.copytree(source_full_path, target, dirs_exist_ok=True)
+        else:  # todo: drop along with 3.7
+            import distutils.dir_util
+
+            distutils.dir_util.copy_tree(source_full_path, target)
     else:
         if not target_path.exists():
             if target.endswith("/"):

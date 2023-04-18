@@ -8,7 +8,7 @@ from rich.prompt import Prompt
 from rich.table import Table
 
 from dstack.backend.base import Backend
-from dstack.core.error import BackendError, ConfigError
+from dstack.core.error import BackendError, ConfigError, NotInitializedError
 from dstack.core.job import JobStatus
 from dstack.core.request import RequestStatus
 from dstack.core.run import RunHead
@@ -90,7 +90,7 @@ def generate_runs_table(runs_with_backends: List[Tuple[RunHead, List[Backend]]])
             _status_color(run, run.run_name, True, False),
             _status_color(run, run.workflow_name or run.provider_name, False, False),
             _status_color(run, submitted_at, False, False),
-            _status_color(run, run.local_repo_user_name or "", False, False),
+            _status_color(run, run.repo_user_id or "", False, False),
             pretty_print_status(run),
             _status_color(run, run.tag_name or "", False, False),
             _status_color(run, ", ".join(b.name for b in backends), False, False),
@@ -168,6 +168,17 @@ def check_backend(func):
             func(*args, **kwargs)
         except BackendError as e:
             console.print(e.message)
+            exit(1)
+
+    return decorator
+
+
+def check_init(func):
+    def decorator(*args, **kwargs):
+        try:
+            func(*args, **kwargs)
+        except NotInitializedError:
+            console.print(f"Call `dstack init` first")
             exit(1)
 
     return decorator

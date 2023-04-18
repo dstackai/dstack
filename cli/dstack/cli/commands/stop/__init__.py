@@ -1,11 +1,13 @@
+import os
 from argparse import Namespace
 
 from rich.prompt import Confirm
 
 from dstack.api.backend import list_backends
-from dstack.api.repo import load_repo_data
 from dstack.cli.commands import BasicCommand
-from dstack.cli.common import check_backend, check_config, check_git, console
+from dstack.cli.common import check_backend, check_config, check_git, check_init, console
+from dstack.cli.config import config
+from dstack.core.repo import RemoteRepo
 
 
 def _verb(abort: bool):
@@ -47,6 +49,7 @@ class StopCommand(BasicCommand):
     @check_config
     @check_git
     @check_backend
+    @check_init
     def _command(self, args: Namespace):
         if not args.run_name and not args.all:
             console.print("Specify a run name or use --all to stop all workflows")
@@ -57,14 +60,16 @@ class StopCommand(BasicCommand):
                 args.yes or Confirm.ask(f"[red]{_verb(args.abort)} the run '{args.run_name}'?[/]")
             )
         ) or (args.all and (args.yes or Confirm.ask(f"[red]{_verb(args.abort)} all runs?[/]"))):
-            repo_data = load_repo_data()
+            repo = RemoteRepo(
+                repo_ref=config.repo_user_config.repo_ref, local_repo_dir=os.getcwd()
+            )
             found_run = False
-            for backend in list_backends():
-                job_heads = backend.list_job_heads(repo_data, args.run_name)
+            for backend in list_backends(repo):
+                job_heads = backend.list_job_heads(args.run_name)
                 found_run = len(job_heads) > 0
                 for job_head in job_heads:
                     if job_head.status.is_unfinished():
-                        backend.stop_job(repo_data, job_head.job_id, args.abort)
+                        backend.stop_job(job_head.job_id, args.abort)
             if args.run_name and not found_run:
                 console.print(f"Cannot find the run '{args.run_name}'")
                 exit(1)

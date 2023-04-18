@@ -1,10 +1,10 @@
-from typing import List, Union
+from typing import List
 
 from fastapi import APIRouter, Depends
 from fastapi.responses import PlainTextResponse
 
 from dstack.core.job import JobStatus
-from dstack.core.repo import RepoAddress
+from dstack.core.repo import RepoSpec
 from dstack.core.run import RunHead
 from dstack.hub.models import RunsList
 from dstack.hub.routers.cache import get_backend
@@ -19,10 +19,10 @@ router = APIRouter(prefix="/api/project", tags=["runs"], dependencies=[Depends(P
     response_model=str,
     response_class=PlainTextResponse,
 )
-async def create_run(project_name: str, repo_address: RepoAddress) -> str:
+async def create_run(project_name: str, repo_spec: RepoSpec) -> str:
     project = await get_project(project_name=project_name)
-    backend = get_backend(project)
-    run_name = backend.create_run(repo_address=repo_address)
+    backend = get_backend(project, repo_spec.repo)
+    run_name = backend.create_run()
     return run_name
 
 
@@ -32,9 +32,8 @@ async def create_run(project_name: str, repo_address: RepoAddress) -> str:
 )
 async def list_run(project_name: str, body: RunsList):
     project = await get_project(project_name=project_name)
-    backend = get_backend(project)
+    backend = get_backend(project, body.repo_spec.repo)
     run_name = backend.list_run_heads(
-        repo_address=body.repo_address,
         run_name=body.run_name,
         include_request_heads=body.include_request_heads,
         interrupted_job_new_status=JobStatus.PENDING,

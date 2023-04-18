@@ -1,14 +1,14 @@
 from abc import abstractmethod
 from enum import Enum
-from typing import Any, Dict, List, Optional
+from typing import Any, Dict, List, Optional, Union
 
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 
 from dstack.core.app import AppSpec
 from dstack.core.artifact import ArtifactSpec
 from dstack.core.cache import CacheSpec
 from dstack.core.dependents import DepSpec
-from dstack.core.repo import RepoAddress, RepoData
+from dstack.core.repo import RemoteRepo, RemoteRepoData, Repo, RepoData, RepoRef
 from dstack.utils.common import _quoted, format_list
 
 
@@ -107,11 +107,10 @@ class JobStatus(Enum):
 
 class JobHead(JobRef):
     job_id: str
-    repo_address: RepoAddress
+    repo_ref: RepoRef
     run_name: str
     workflow_name: Optional[str]
     provider_name: str
-    local_repo_user_name: Optional[str]
     status: JobStatus
     submitted_at: int
     artifact_paths: Optional[List[str]]
@@ -136,10 +135,9 @@ class JobHead(JobRef):
             else None
         )
         return (
-            f'JobHead(job_id="{self.job_id}", repo_address={self.repo_address}, '
+            f'JobHead(job_id="{self.job_id}", repo_ref={self.repo_ref}, '
             f'run_name="{self.run_name}", workflow_name={_quoted(self.workflow_name)}, '
             f'provider_name="{self.provider_name}", '
-            f"local_repo_user_name={_quoted(self.local_repo_user_name)}, "
             f"status=JobStatus.{self.status.name}, "
             f"submitted_at={self.submitted_at}, "
             f"artifact_paths={artifact_paths}, "
@@ -169,12 +167,11 @@ def check_dict(element: Any, field: str):
 
 class Job(JobHead):
     job_id: Optional[str]
-    repo_data: RepoData
+    repo_data: Union[RepoData, RemoteRepoData] = Field(..., discriminator="repo_type")
+    repo_diff_filename: Optional[str] = None
     run_name: str
     workflow_name: Optional[str]
     provider_name: str
-    local_repo_user_name: Optional[str]
-    local_repo_user_email: Optional[str]
     status: JobStatus
     submitted_at: int
     submission_num: int = 1
@@ -233,11 +230,9 @@ class Job(JobHead):
         dep_specs = format_list(self.dep_specs)
         ssk_key_pub = f"...{self.ssh_key_pub[-16:]}" if self.ssh_key_pub else None
         return (
-            f'Job(job_id="{self.job_id}", repo_data={self.repo_data}, '
+            f'Job(job_id="{self.job_id}", repo={self.repo}, '
             f'run_name="{self.run_name}", workflow_name={_quoted(self.workflow_name)}, '
             f'provider_name="{self.provider_name}", '
-            f"local_repo_user_name={_quoted(self.local_repo_user_name)}, "
-            f"local_repo_user_email={_quoted(self.local_repo_user_email)}, "
             f"status=JobStatus.{self.status.name}, "
             f"submitted_at={self.submitted_at}, "
             f'image_name="{self.image_name}", '
@@ -267,10 +262,8 @@ class Job(JobHead):
             for dep in self.dep_specs:
                 deps.append(
                     {
-                        "repo_host_name": dep.repo_address.repo_host_name,
-                        "repo_port": dep.repo_address.repo_port or 0,
-                        "repo_user_name": dep.repo_address.repo_user_name,
-                        "repo_name": dep.repo_address.repo_name,
+                        "repo_id": dep.repo_ref.repo_id,
+                        "repo_user_id": dep.repo_ref.repo_user_id,
                         "run_name": dep.run_name,
                         "mount": dep.mount,
                     }
@@ -283,18 +276,11 @@ class Job(JobHead):
                 )
         job_data = {
             "job_id": self.job_id,
-            "repo_host_name": self.repo_address.repo_host_name,
-            "repo_port": self.repo_address.repo_port or 0,
-            "repo_user_name": self.repo_data.repo_user_name,
-            "repo_name": self.repo_data.repo_name,
-            "repo_branch": self.repo_data.repo_branch or "",
-            "repo_hash": self.repo_data.repo_hash or "",
-            "repo_diff": self.repo_data.repo_diff or "",
+            "repo_id": self.repo.repo_id,
+            "repo_user_id": self.repo.repo_user_id,
             "run_name": self.run_name,
             "workflow_name": self.workflow_name or "",
             "provider_name": self.provider_name,
-            "local_repo_user_name": self.local_repo_user_name or "",
-            "local_repo_user_email": self.local_repo_user_email or "",
             "status": self.status.value,
             "submitted_at": self.submitted_at,
             "submission_num": self.submission_num,
@@ -328,6 +314,14 @@ class Job(JobHead):
             "tag_name": self.tag_name or "",
             "ssh_key_pub": self.ssh_key_pub or "",
         }
+        if isinstance(self.repo_data, RemoteRepoData):
+            job_data["repo_host_name"] = self.repo_data.repo_host_name
+            job_data["repo_port"] = self.repo_data.repo_port or 0
+            job_data["repo_user_name"] = self.repo_data.repo_user_name
+            job_data["repo_name"] = self.repo_data.repo_name
+            job_data["repo_branch"] = self.repo_data.repo_branch or ""
+            job_data["repo_hash"] = self.repo_data.repo_hash or ""
+        job_data["repo_diff_filename"] = self.repo_diff_filename
         return job_data
 
     @staticmethod
@@ -339,7 +333,7 @@ class Job(JobHead):
                 memory_mib=_requirements.get("memory_mib") or None,
                 gpus=GpusRequirements(
                     count=_requirements["gpus"].get("count") or None,
-                    memory=_requirements["gpus"].get("memory") or None,
+                    memory_mib=_requirements["gpus"].get("memory") or None,
                     name=_requirements["gpus"].get("name") or None,
                 )
                 if _requirements.get("gpus")
@@ -371,12 +365,7 @@ class Job(JobHead):
         if job_data.get("deps"):
             for dep in job_data["deps"]:
                 dep_spec = DepSpec(
-                    repo_address=RepoAddress(
-                        repo_host_name=dep["repo_host_name"],
-                        repo_port=dep.get("repo_port") or None,
-                        repo_user_name=dep["repo_user_name"],
-                        repo_name=dep["repo_name"],
-                    ),
+                    repo_ref=RepoRef(repo_id=dep["repo_id"], repo_user_id=dep["repo_user_id"]),
                     run_name=dep["run_name"],
                     mount=dep.get("mount") is True,
                 )
@@ -407,20 +396,22 @@ class Job(JobHead):
         ) or None
         job = Job(
             job_id=job_data["job_id"],
-            repo_data=RepoData(
+            repo_ref=RepoRef(
+                repo_id=job_data["repo_id"],
+                repo_user_id=job_data["repo_user_id"],
+            ),
+            repo_data=RemoteRepoData(
                 repo_host_name=job_data["repo_host_name"],
                 repo_port=job_data.get("repo_port") or None,
                 repo_user_name=job_data["repo_user_name"],
                 repo_name=job_data["repo_name"],
                 repo_branch=job_data["repo_branch"] or None,
                 repo_hash=job_data["repo_hash"] or None,
-                repo_diff=job_data["repo_diff"] or None,
             ),
+            repo_diff_filename=job_data.get("repo_diff_filename"),
             run_name=job_data["run_name"],
             workflow_name=job_data.get("workflow_name") or None,
             provider_name=job_data["provider_name"],
-            local_repo_user_name=job_data.get("local_repo_user_name"),
-            local_repo_user_email=job_data.get("local_repo_user_email") or None,
             status=JobStatus(job_data["status"]),
             submitted_at=job_data["submitted_at"],
             submission_num=job_data.get("submission_num") or 1,
@@ -445,6 +436,11 @@ class Job(JobHead):
             ssh_key_pub=job_data.get("ssh_key_pub") or None,
         )
         return job
+
+    @property
+    def repo(self) -> Repo:
+        if isinstance(self.repo_data, RemoteRepoData):
+            return RemoteRepo(repo_ref=self.repo_ref, repo_data=self.repo_data)
 
 
 class JobSpec(JobRef):

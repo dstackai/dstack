@@ -1,53 +1,15 @@
+import os
+from abc import ABC, abstractmethod
 from enum import Enum
-from typing import Any, Optional, Union
+from typing import Optional, Union
 
 import git
-from pydantic import BaseModel
+import giturlparse
+from pydantic import BaseModel, Field, validator
+from typing_extensions import Literal
 
-from dstack.utils.common import _quoted, _quoted_masked
-
-
-class RepoAddress(BaseModel):
-    repo_host_name: str
-    repo_port: Union[int, None]
-    repo_user_name: str
-    repo_name: str
-
-    def __init__(self, **data: Any) -> None:
-        super().__init__(**data)
-
-    def __str__(self) -> str:
-        return (
-            f'RepoAddress(repo_host_name="{self.repo_host_name}", '
-            f'repo_port={_quoted(self.repo_port)}", '
-            f'repo_user_name="{self.repo_user_name}", '
-            f'repo_name="{self.repo_name}")'
-        )
-
-    def path(self, delimiter: str = "/"):
-        return (
-            f"{self.repo_host_name}"
-            f"{(':' + str(self.repo_port)) if self.repo_port else ''}{delimiter}"
-            f"{self.repo_user_name}{delimiter}{self.repo_name}"
-        )
-
-
-class RepoHead(RepoAddress):
-    last_run_at: Union[int, None]
-    tags_count: int
-
-    def __init__(self, **data: Any) -> None:
-        super().__init__(**data)
-
-    def __str__(self) -> str:
-        return (
-            f'RepoHead(repo_host_name="{self.repo_host_name}", '
-            f'repo_port={_quoted(self.repo_port)}", '
-            f'repo_user_name="{self.repo_user_name}", '
-            f'repo_name="{self.repo_name}", '
-            f'last_run_at="{self.last_run_at}", '
-            f'tags_count="{self.tags_count}")'
-        )
+from dstack.utils.common import PathLike
+from dstack.utils.ssh import get_host_config
 
 
 class RepoProtocol(Enum):
@@ -55,94 +17,155 @@ class RepoProtocol(Enum):
     HTTPS = "https"
 
 
-class RepoCredentials(BaseModel):
+class RemoteRepoCredentials(BaseModel):
     protocol: RepoProtocol
-    private_key: Union[str, None]
-    oauth_token: Union[str, None]
+    private_key: Optional[str]
+    oauth_token: Optional[str]
 
-    def __str__(self) -> str:
-        return (
-            f"RepoCredentials(protocol=RepoProtocol.{self.protocol.name}, "
-            f"private_key_length={len(self.private_key) if self.private_key else None}, "
-            f"oauth_token={_quoted_masked(self.oauth_token)})"
+
+class RepoRef(BaseModel):
+    repo_id: str
+    repo_user_id: str
+
+    @validator("repo_id", "repo_user_id")
+    def validate_id(cls, value):
+        for c in "/;":
+            if c in value:
+                raise ValueError(f"id can't contain `{c}`")
+        return value
+
+
+class RepoHead(RepoRef):
+    last_run_at: Optional[int] = None
+    tags_count: int = 0
+
+
+class RepoData(BaseModel):
+    repo_type: Literal["none"] = "none"
+
+
+class RemoteRepoData(RepoData):
+    repo_type: Literal["remote"] = "remote"
+    repo_host_name: str
+    repo_port: Optional[int]
+    repo_user_name: str
+    repo_name: str
+    repo_branch: Optional[str] = None
+    repo_hash: Optional[str] = None
+    repo_diff: Optional[str] = None
+
+    @staticmethod
+    def from_url(url: str, parse_ssh_config: bool = True):
+        url = giturlparse.parse(url)
+        data = RemoteRepoData(
+            repo_host_name=url.resource,
+            repo_port=url.port,
+            repo_user_name=url.owner,
+            repo_name=url.name,
+        )
+        if parse_ssh_config and url.protocol == "ssh":
+            host_config = get_host_config(data.repo_host_name)
+            data.repo_host_name = host_config.get("hostname", data.repo_host_name)
+            data.repo_port = host_config.get("port", data.repo_port)
+        return data
+
+    def path(self, sep: str = ".") -> str:
+        return sep.join(
+            [
+                self.repo_host_name
+                if self.repo_port is None
+                else f"{self.repo_host_name}:{self.repo_port}",
+                self.repo_user_name,
+                self.repo_name,
+            ]
         )
 
 
-class RepoData(RepoAddress):
-    repo_branch: Optional[str]
-    repo_hash: Optional[str]
-    repo_diff: Union[str, None]
+class Repo(ABC):
+    def __init__(self, repo_ref: RepoRef, repo_data: RepoData):
+        self.repo_ref = repo_ref
+        self.repo_data = repo_data
 
-    def __init__(self, **data: Any) -> None:
-        super().__init__(**data)
+    @property
+    def repo_id(self) -> str:
+        return self.repo_ref.repo_id
 
-    def __str__(self) -> str:
-        return (
-            f'RepoData(repo_host_name="{self.repo_host_name}", '
-            f'repo_port={_quoted(self.repo_port)}", '
-            f'repo_user_name="{self.repo_user_name}", '
-            f'repo_name="{self.repo_name}", '
-            f'repo_branch="{_quoted(self.repo_branch)}", '
-            f'repo_hash="{_quoted(self.repo_hash)}", '
-            f"repo_diff_length={len(self.repo_diff) if self.repo_diff else None})"
-        )
+    @property
+    def repo_user_id(self) -> str:
+        return self.repo_ref.repo_user_id
+
+    @property
+    def repo_spec(self) -> "RepoSpec":
+        return RepoSpec(repo_ref=self.repo_ref, repo_data=self.repo_data)
+
+    @abstractmethod
+    def get_workflows(self, credentials: Optional[RemoteRepoCredentials] = None) -> list:
+        pass
+
+    @abstractmethod
+    def get_repo_diff(self) -> Optional[str]:
+        pass
 
 
-class LocalRepoData(RepoData):
-    protocol: RepoProtocol
-    identity_file: Union[str, None]
-    oauth_token: Union[str, None]
-    local_repo_user_name: Union[str, None]
-    local_repo_user_email: Union[str, None]
+class RemoteRepo(Repo):
+    """Represents both local git repository with configured remote and just remote repository"""
 
-    def __init__(self, **data: Any) -> None:
-        super().__init__(**data)
+    repo_data: RemoteRepoData
 
-    def __str__(self) -> str:
-        return (
-            f'LocalRepoData(repo_host_name="{self.repo_host_name}", '
-            f'repo_port={_quoted(self.repo_port)}", '
-            f'repo_user_name="{self.repo_user_name}", '
-            f'repo_name="{self.repo_name}", '
-            f'repo_branch="{_quoted(self.repo_branch)}", '
-            f'repo_hash="{_quoted(self.repo_hash)}", '
-            f"repo_diff_length={len(self.repo_diff) if self.repo_diff else None}, "
-            f"protocol=RepoProtocol.{self.protocol.name}, "
-            f"identity_file={_quoted(self.identity_file)}, "
-            f"oauth_token={_quoted_masked(self.oauth_token)},"
-            f'local_repo_user_name="{_quoted(self.local_repo_user_name)}, '
-            f"local_repo_user_email={_quoted(self.local_repo_user_email)})"
-        )
+    def __init__(
+        self,
+        *,
+        repo_ref: Optional[RepoRef] = None,
+        local_repo_dir: Optional[PathLike] = None,
+        repo_url: Optional[str] = None,
+        repo_data: Optional[RemoteRepoData] = None,
+    ):
+        """
+        >>> RemoteRepo(local_repo_dir=os.getcwd())
+        >>> RemoteRepo(repo_ref=RepoRef(repo_id="playground", repo_user_id="bob"), repo_url="https://github.com/dstackai/dstack-playground.git")
+        """
 
-    def ls_remote(self) -> str:
-        if self.protocol == RepoProtocol.HTTPS:
-            return git.cmd.Git().ls_remote(
-                f"https://"
-                f"{(self.oauth_token + '@') if self.oauth_token else ''}"
-                f"{self.path()}.git"
-            )
-        else:
-            if self.identity_file:
-                git_ssh_command = (
-                    f"ssh -o IdentitiesOnly=yes -F /dev/null -o IdentityFile={self.identity_file}"
-                )
-                if self.repo_port:
-                    url = f"ssh@{self.path()}.git"
-                else:
-                    url = f"git@{self.repo_host_name}:{self.repo_user_name}/{self.repo_name}.git"
-                return git.cmd.Git().ls_remote(url, env=dict(GIT_SSH_COMMAND=git_ssh_command))
-            else:
-                raise Exception("No identity file is specified")
+        self.local_repo_dir = local_repo_dir
+        self.repo_url = repo_url
 
-    def repo_credentials(self) -> RepoCredentials:
-        if self.protocol == RepoProtocol.HTTPS:
-            return RepoCredentials(
-                protocol=self.protocol, private_key=None, oauth_token=self.oauth_token
-            )
-        elif self.identity_file:
-            with open(self.identity_file, "r") as f:
-                return RepoCredentials(
-                    protocol=self.protocol, private_key=f.read(), oauth_token=None
-                )
-        else:
-            raise Exception("No identity file is specified")
+        repo_user_id = "default"
+        if self.local_repo_dir is not None:
+            repo = git.Repo(self.local_repo_dir)
+            tracking_branch = repo.active_branch.tracking_branch()
+            if tracking_branch is None:
+                raise ValueError("No remote branch is configured")
+            self.repo_url = repo.remote(tracking_branch.remote_name).url
+            repo_data = RemoteRepoData.from_url(self.repo_url, parse_ssh_config=True)
+            repo_data.repo_branch = tracking_branch.remote_head
+            repo_data.repo_hash = tracking_branch.commit.hexsha
+            repo_data.repo_diff = repo.git.diff(
+                repo_data.repo_hash
+            )  # TODO: Doesn't support unstaged changes
+            repo_user_id = repo.config_reader().get_value("user", "email", "") or repo_user_id
+        elif self.repo_url is not None:
+            repo_data = RemoteRepoData.from_url(self.repo_url, parse_ssh_config=True)
+        elif repo_data is None:
+            raise ValueError("No remote repo data provided")
+
+        if repo_ref is None:
+            repo_ref = RepoRef(repo_id=repo_data.path(), repo_user_id=repo_user_id)
+        super().__init__(repo_ref, repo_data)
+
+    def get_workflows(self, credentials: Optional[RemoteRepoCredentials] = None) -> list:
+        raise NotImplementedError()
+
+    def get_repo_diff(self) -> Optional[str]:
+        return self.repo_data.repo_diff
+
+
+class RepoSpec(BaseModel):
+    """Serializable Repo representation"""
+
+    repo_ref: RepoRef
+    repo_data: Union[RepoData, RemoteRepoData] = Field(..., discriminator="repo_type")
+
+    @property
+    def repo(self) -> Repo:
+        """Constructs Repo implementation from `repo_data`"""
+        if isinstance(self.repo_data, RemoteRepoData):
+            return RemoteRepo(repo_ref=self.repo_ref, repo_data=self.repo_data)

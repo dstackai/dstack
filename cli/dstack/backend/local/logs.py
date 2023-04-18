@@ -1,7 +1,7 @@
 import os.path
 import time
 from pathlib import Path
-from typing import Any, Dict, Generator, List, Optional, Tuple
+from typing import Generator, List
 
 from pygtail import Pygtail
 
@@ -11,7 +11,6 @@ from dstack.backend.base.logs import render_log_message
 from dstack.backend.base.storage import Storage
 from dstack.core.job import JobHead
 from dstack.core.log_event import LogEvent
-from dstack.core.repo import RepoAddress
 
 WAIT_N_ONCE_FINISHED = 1
 
@@ -20,14 +19,12 @@ CHECK_STATUS_EVERY_N = 3
 POLL_LOGS_RATE_SECS = 1
 
 
-def events_loop(
-    storage: Storage, compute: Compute, repo_address: RepoAddress, job_heads: List[JobHead]
-):
+def events_loop(storage: Storage, compute: Compute, repo_id: str, job_heads: List[JobHead]):
     counter = 0
     finished_counter = 0
     tails = {}
 
-    _jobs = [jobs.get_job(storage, repo_address, job_head.job_id) for job_head in job_heads]
+    _jobs = [jobs.get_job(storage, repo_id, job_head.job_id) for job_head in job_heads]
     for _job in _jobs:
         path_dir = (
             Path.home()
@@ -38,7 +35,7 @@ def events_loop(
             / _job.runner_id
             / "logs"
             / "jobs"
-            / repo_address.path()
+            / repo_id
         )  # TODO Hardcode
         file_log = f"{_job.run_name}.log"  # TODO Hardcode
         if not path_dir.exists():
@@ -51,9 +48,7 @@ def events_loop(
 
     while True:
         if counter % CHECK_STATUS_EVERY_N == 0:
-            _jobs = [
-                jobs.get_job(storage, repo_address, job_head.job_id) for job_head in job_heads
-            ]
+            _jobs = [jobs.get_job(storage, repo_id, job_head.job_id) for job_head in job_heads]
 
             for _job in _jobs:
                 for line_log in tails[_job.job_id]:
@@ -81,7 +76,7 @@ def events_loop(
 def poll_logs(
     storage: Storage,
     compute: Compute,
-    repo_address: RepoAddress,
+    repo_id: str,
     job_heads: List[JobHead],
     start_time: int,
     attached: bool,
@@ -89,7 +84,7 @@ def poll_logs(
     jobs_cache = {}
     try:
         # Read log_file
-        for event in events_loop(storage, compute, repo_address, job_heads):
-            yield render_log_message(storage, event, repo_address, jobs_cache)
+        for event in events_loop(storage, compute, repo_id, job_heads):
+            yield render_log_message(storage, event, repo_id, jobs_cache)
     except Exception as e:
         raise e

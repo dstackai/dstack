@@ -1,3 +1,4 @@
+import os
 import sys
 from argparse import Namespace
 
@@ -5,9 +6,10 @@ from rich import print
 from rich.prompt import Confirm
 
 from dstack.api.backend import list_backends
-from dstack.api.repo import load_repo_data
 from dstack.cli.commands import BasicCommand
-from dstack.cli.common import check_backend, check_config, check_git
+from dstack.cli.common import check_backend, check_config, check_git, check_init
+from dstack.cli.config import config
+from dstack.core.repo import RemoteRepo
 
 
 class RMCommand(BasicCommand):
@@ -35,15 +37,18 @@ class RMCommand(BasicCommand):
     @check_config
     @check_git
     @check_backend
+    @check_init
     def _command(self, args: Namespace):
         if (
             args.run_name
             and (args.yes or Confirm.ask(f"[red]Delete the run '{args.run_name}'?[/]"))
         ) or (args.all and (args.yes or Confirm.ask("[red]Delete all runs?[/]"))):
-            repo_data = load_repo_data()
+            repo = RemoteRepo(
+                repo_ref=config.repo_user_config.repo_ref, local_repo_dir=os.getcwd()
+            )
             deleted_run = False
-            for backend in list_backends():
-                job_heads = backend.list_job_heads(repo_data, args.run_name)
+            for backend in list_backends(repo):
+                job_heads = backend.list_job_heads(args.run_name)
                 if job_heads:
                     finished_job_heads = []
                     for job_head in job_heads:
@@ -52,7 +57,7 @@ class RMCommand(BasicCommand):
                         elif args.run_name:
                             sys.exit("The run is not finished yet. Stop the run first.")
                     for job_head in finished_job_heads:
-                        backend.delete_job_head(repo_data, job_head.job_id)
+                        backend.delete_job_head(job_head.job_id)
                         deleted_run = True
             if args.run_name and not deleted_run:
                 sys.exit(f"Cannot find the run '{args.run_name}'")

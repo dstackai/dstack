@@ -8,7 +8,7 @@ from dstack.core.artifact import Artifact
 from dstack.core.error import BackendError, NoMatchingInstanceError
 from dstack.core.job import Job, JobHead
 from dstack.core.log_event import LogEvent
-from dstack.core.repo import LocalRepoData, RepoAddress, RepoCredentials
+from dstack.core.repo import RemoteRepoCredentials, Repo
 from dstack.core.run import RunHead
 from dstack.core.secret import Secret
 from dstack.core.tag import TagHead
@@ -24,15 +24,15 @@ from dstack.hub.models import (
     SaveRepoCredentials,
     SecretAddUpdate,
     StopRunners,
-    UserRepoAddress,
 )
 
 
 class HubClient:
-    def __init__(self, url: str, project: str, token: str):
+    def __init__(self, url: str, project: str, token: str, repo: Repo):
         self.url = url
         self.token = token
         self.project = project
+        self.repo = repo
 
     @staticmethod
     def validate(url: str, project: str, token: str) -> bool:
@@ -61,7 +61,7 @@ class HubClient:
         headers["Content-type"] = "application/json"
         return headers
 
-    def create_run(self, repo_address: RepoAddress) -> str:
+    def create_run(self) -> str:
         url = _url(
             url=self.url,
             project=self.project,
@@ -72,7 +72,7 @@ class HubClient:
             host=self.url,
             url=url,
             headers=self._headers(),
-            data=repo_address.json(),
+            data=self.repo.repo_spec.json(),
         )
         if resp.ok:
             return resp.text
@@ -91,7 +91,7 @@ class HubClient:
             return
         resp.raise_for_status()
 
-    def get_job(self, repo_address: RepoAddress, job_id: str) -> Optional[Job]:
+    def get_job(self, job_id: str) -> Optional[Job]:
         url = _url(
             url=self.url,
             project=self.project,
@@ -103,7 +103,7 @@ class HubClient:
             url=url,
             headers=self._headers(),
             data=JobsGet(
-                repo_address=repo_address,
+                repo_spec=self.repo.repo_spec,
                 job_id=job_id,
             ).json(),
         )
@@ -112,7 +112,7 @@ class HubClient:
             return Job.parse_obj(json_data)
         resp.raise_for_status()
 
-    def list_jobs(self, repo_address: RepoAddress, run_name: str) -> List[Job]:
+    def list_jobs(self, run_name: str) -> List[Job]:
         url = _url(
             url=self.url,
             project=self.project,
@@ -123,7 +123,7 @@ class HubClient:
             host=self.url,
             url=url,
             headers=self._headers(),
-            data=JobsList(repo_address=repo_address, run_name=run_name).json(),
+            data=JobsList(repo_spec=self.repo.repo_spec, run_name=run_name).json(),
         )
         if resp.ok:
             body = resp.json()
@@ -147,7 +147,7 @@ class HubClient:
                 raise BackendError(body["detail"]["msg"])
         resp.raise_for_status()
 
-    def stop_job(self, repo_address: RepoAddress, job_id: str, abort: bool):
+    def stop_job(self, job_id: str, abort: bool):
         url = _url(
             url=self.url,
             project=self.project,
@@ -159,7 +159,7 @@ class HubClient:
             url=url,
             headers=self._headers(),
             data=StopRunners(
-                repo_address=repo_address,
+                repo_spec=self.repo.repo_spec,
                 job_id=job_id,
                 abort=abort,
             ).json(),
@@ -168,9 +168,7 @@ class HubClient:
             return
         resp.raise_for_status()
 
-    def list_job_heads(
-        self, repo_address: RepoAddress, run_name: Optional[str] = None
-    ) -> Optional[List[JobHead]]:
+    def list_job_heads(self, run_name: Optional[str] = None) -> Optional[List[JobHead]]:
         query = {}
         if run_name is not None:
             query["run_name"] = run_name
@@ -182,14 +180,14 @@ class HubClient:
             host=self.url,
             url=url,
             headers=self._headers(),
-            data=repo_address.json(),
+            data=self.repo.repo_spec.json(),
         )
         if resp.ok:
             body = resp.json()
             return [JobHead.parse_obj(job) for job in body]
         resp.raise_for_status()
 
-    def delete_job_head(self, repo_address: RepoAddress, job_id: str):
+    def delete_job_head(self, job_id: str):
         url = _url(
             url=self.url,
             project=self.project,
@@ -200,13 +198,13 @@ class HubClient:
             host=self.url,
             url=url,
             headers=self._headers(),
-            data=JobsGet(repo_address=repo_address, job_id=job_id).json(),
+            data=JobsGet(repo_spec=self.repo.repo_spec, job_id=job_id).json(),
         )
         if resp.ok:
             return
         resp.raise_for_status()
 
-    def get_tag_head(self, repo_address: RepoAddress, tag_name: str) -> Optional[TagHead]:
+    def get_tag_head(self, tag_name: str) -> Optional[TagHead]:
         url = _url(
             url=self.url,
             project=self.project,
@@ -217,7 +215,7 @@ class HubClient:
             host=self.url,
             url=url,
             headers=self._headers(),
-            data=repo_address.json(),
+            data=self.repo.repo_spec.json(),
         )
         if resp.ok:
             return TagHead.parse_obj(resp.json())
@@ -225,7 +223,7 @@ class HubClient:
             return None
         resp.raise_for_status()
 
-    def list_tag_heads(self, repo_address: RepoAddress) -> Optional[List[TagHead]]:
+    def list_tag_heads(self) -> Optional[List[TagHead]]:
         url = _url(
             url=self.url,
             project=self.project,
@@ -236,7 +234,7 @@ class HubClient:
             host=self.url,
             url=url,
             headers=self._headers(),
-            data=repo_address.json(),
+            data=self.repo.repo_spec.json(),
         )
         if resp.ok:
             body = resp.json()
@@ -245,7 +243,6 @@ class HubClient:
 
     def add_tag_from_run(
         self,
-        repo_address: RepoAddress,
         tag_name: str,
         run_name: str,
         run_jobs: Optional[List[Job]],
@@ -261,7 +258,7 @@ class HubClient:
             url=url,
             headers=self._headers(),
             data=AddTagRun(
-                repo_address=repo_address,
+                repo_spec=self.repo.repo_spec,
                 tag_name=tag_name,
                 run_name=run_name,
                 run_jobs=run_jobs,
@@ -273,7 +270,6 @@ class HubClient:
 
     def add_tag_from_local_dirs(
         self,
-        repo_data: LocalRepoData,
         tag_name: str,
         local_dirs: List[str],
     ):
@@ -288,7 +284,7 @@ class HubClient:
             url=url,
             headers=self._headers(),
             data=AddTagPath(
-                repo_data=repo_data,
+                repo_spec=self.repo.repo_spec,
                 tag_name=tag_name,
                 local_dirs=local_dirs,
             ).json(),
@@ -297,7 +293,7 @@ class HubClient:
             return
         resp.raise_for_status()
 
-    def delete_tag_head(self, repo_address: RepoAddress, tag_head: TagHead):
+    def delete_tag_head(self, tag_head: TagHead):
         url = _url(
             url=self.url,
             project=self.project,
@@ -308,7 +304,7 @@ class HubClient:
             host=self.url,
             url=url,
             headers=self._headers(),
-            data=repo_address.json(),
+            data=self.repo.repo_spec.json(),
         )
         if resp.ok:
             return
@@ -316,7 +312,6 @@ class HubClient:
 
     def list_run_heads(
         self,
-        repo_address: RepoAddress,
         run_name: Optional[str] = None,
         include_request_heads: bool = True,
     ) -> List[RunHead]:
@@ -331,7 +326,7 @@ class HubClient:
             url=url,
             headers=self._headers(),
             data=RunsList(
-                repo_address=repo_address,
+                repo_spec=self.repo.repo_spec,
                 run_name=run_name,
                 include_request_heads=include_request_heads,
             ).json(),
@@ -341,7 +336,7 @@ class HubClient:
             return [RunHead.parse_obj(run) for run in body]
         resp.raise_for_status()
 
-    def update_repo_last_run_at(self, repo_address: RepoAddress, last_run_at: int):
+    def update_repo_last_run_at(self, last_run_at: int):
         url = _url(
             url=self.url,
             project=self.project,
@@ -353,7 +348,7 @@ class HubClient:
             url=url,
             headers=self._headers(),
             data=ReposUpdate(
-                repo_address=repo_address,
+                repo_spec=self.repo.repo_spec,
                 last_run_at=last_run_at,
             ).json(),
         )
@@ -361,7 +356,7 @@ class HubClient:
             return
         resp.raise_for_status()
 
-    def get_repos_credentials(self, repo_address: RepoAddress) -> Optional[RepoCredentials]:
+    def get_repos_credentials(self) -> Optional[RemoteRepoCredentials]:
         url = _url(
             url=self.url,
             project=self.project,
@@ -372,16 +367,16 @@ class HubClient:
             host=self.url,
             url=url,
             headers=self._headers(),
-            data=repo_address.json(),
+            data=self.repo.repo_spec.json(),
         )
         if resp.ok:
             json_data = resp.json()
-            return RepoCredentials(**json_data)
+            return RemoteRepoCredentials(**json_data)
         elif resp.status_code == 404:
             return None
         resp.raise_for_status()
 
-    def save_repos_credentials(self, repo_address: RepoAddress, repo_credentials: RepoCredentials):
+    def save_repos_credentials(self, repo_credentials: RemoteRepoCredentials):
         url = _url(
             url=self.url,
             project=self.project,
@@ -393,7 +388,7 @@ class HubClient:
             url=url,
             headers=self._headers(),
             data=SaveRepoCredentials(
-                repo_address=repo_address,
+                repo_spec=self.repo.repo_spec,
                 repo_credentials=repo_credentials,
             ).json(),
         )
@@ -401,7 +396,7 @@ class HubClient:
             return resp.text
         resp.raise_for_status()
 
-    def list_secret_names(self, repo_address: RepoAddress) -> List[str]:
+    def list_secret_names(self) -> List[str]:
         url = _url(
             url=self.url,
             project=self.project,
@@ -412,13 +407,13 @@ class HubClient:
             host=self.url,
             url=url,
             headers=self._headers(),
-            data=repo_address.json(),
+            data=self.repo.repo_spec.json(),
         )
         if resp.ok:
             return resp.json()
         resp.raise_for_status()
 
-    def get_secret(self, repo_address: RepoAddress, secret_name: str) -> Optional[Secret]:
+    def get_secret(self, secret_name: str) -> Optional[Secret]:
         url = _url(
             url=self.url,
             project=self.project,
@@ -429,7 +424,7 @@ class HubClient:
             host=self.url,
             url=url,
             headers=self._headers(),
-            data=repo_address.json(),
+            data=self.repo.repo_spec.json(),
         )
         if resp.ok:
             json_data = resp.json()
@@ -438,7 +433,7 @@ class HubClient:
             return None
         resp.raise_for_status()
 
-    def add_secret(self, repo_address: RepoAddress, secret: Secret):
+    def add_secret(self, secret: Secret):
         url = _url(
             url=self.url,
             project=self.project,
@@ -450,7 +445,7 @@ class HubClient:
             url=url,
             headers=self._headers(),
             data=SecretAddUpdate(
-                repo_address=repo_address,
+                repo_spec=self.repo.repo_spec,
                 secret=secret,
             ).json(),
         )
@@ -458,7 +453,7 @@ class HubClient:
             return
         resp.raise_for_status()
 
-    def update_secret(self, repo_address: RepoAddress, secret: Secret):
+    def update_secret(self, secret: Secret):
         url = _url(
             url=self.url,
             project=self.project,
@@ -470,7 +465,7 @@ class HubClient:
             url=url,
             headers=self._headers(),
             data=SecretAddUpdate(
-                repo_address=repo_address,
+                repo_spec=self.repo.repo_spec,
                 secret=secret,
             ).json(),
         )
@@ -478,7 +473,7 @@ class HubClient:
             return
         resp.raise_for_status()
 
-    def delete_secret(self, repo_address: RepoAddress, secret_name: str):
+    def delete_secret(self, secret_name: str):
         url = _url(
             url=self.url,
             project=self.project,
@@ -489,13 +484,13 @@ class HubClient:
             host=self.url,
             url=url,
             headers=self._headers(),
-            data=repo_address.json(),
+            data=self.repo.repo_spec.json(),
         )
         if resp.ok:
             return
         resp.raise_for_status()
 
-    def list_run_artifact_files(self, repo_address: RepoAddress, run_name: str) -> List[Artifact]:
+    def list_run_artifact_files(self, run_name: str) -> List[Artifact]:
         url = _url(
             url=self.url,
             project=self.project,
@@ -506,7 +501,7 @@ class HubClient:
             host=self.url,
             url=url,
             headers=self._headers(),
-            data=JobsList(repo_address=repo_address, run_name=run_name).json(),
+            data=JobsList(repo_spec=self.repo.repo_spec, run_name=run_name).json(),
         )
         if resp.ok:
             artifact_data = resp.json()
@@ -515,7 +510,6 @@ class HubClient:
 
     def poll_logs(
         self,
-        repo_address: RepoAddress,
         job_heads: List[JobHead],
         start_time: int,
         attached: bool,
@@ -531,7 +525,7 @@ class HubClient:
             url=url,
             headers=self._headers(),
             data=PollLogs(
-                repo_address=repo_address,
+                repo_spec=self.repo.repo_spec,
                 job_heads=job_heads,
                 start_time=start_time,
                 attached=attached,
@@ -587,7 +581,7 @@ class HubClient:
             return resp.text
         resp.raise_for_status()
 
-    def delete_workflow_cache(self, repo_address: RepoAddress, username: str, workflow_name: str):
+    def delete_workflow_cache(self, workflow_name: str):
         url = _url(
             url=self.url,
             project=self.project,
@@ -598,14 +592,15 @@ class HubClient:
             host=self.url,
             url=url,
             headers=self._headers(),
-            data=UserRepoAddress(username=username, repo_address=repo_address).json(),
+            data=self.repo.repo_spec.json(),
         )
         if resp.ok:
             return
         resp.raise_for_status()
 
 
-def _url(url: str, project: str, additional_path: str, query: dict = {}):
+def _url(url: str, project: str, additional_path: str, query: Optional[dict] = None):
+    query = {} if query is None else query
     unparse_url = urlparse(url=url)
     if additional_path.startswith("/"):
         additional_path = additional_path[1:]

@@ -1,9 +1,12 @@
+import os
 import re
 import time
 from datetime import datetime, timedelta
-from typing import Any, Optional
+from typing import Any, Optional, Union
 
 from botocore.utils import datetime2timestamp, parse_timestamp
+
+PathLike = Union[str, os.PathLike]
 
 
 def _quoted(s: Optional[str]) -> str:

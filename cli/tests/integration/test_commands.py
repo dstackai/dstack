@@ -34,7 +34,7 @@ class TestRun:
     def test_cannot_run_outside_of_git_repo(self, capsys: CaptureFixture):
         exit_code = run_dstack_cli(["run", "bash"])
         assert exit_code == 1
-        assert "is not a Git repo" in capsys.readouterr().out
+        assert "Call `dstack init` first" in capsys.readouterr().out
 
     def test_asks_for_init_to_run(
         self, capsys: CaptureFixture, dstack_dir: Path, tests_public_repo: Path

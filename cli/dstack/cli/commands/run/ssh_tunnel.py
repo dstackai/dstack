@@ -1,10 +1,10 @@
 import socket
 import subprocess
 from contextlib import closing
-from os import PathLike
 from typing import Dict, List
 
 from dstack.core.job import Job
+from dstack.utils.common import PathLike
 
 
 def get_free_port() -> int:

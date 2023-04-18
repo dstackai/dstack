@@ -1,8 +1,8 @@
-from typing import List, Union
+from typing import List
 
 from fastapi import APIRouter, Depends, HTTPException, status
 
-from dstack.core.repo import RepoAddress
+from dstack.core.repo import RepoSpec
 from dstack.core.tag import TagHead
 from dstack.hub.models import AddTagPath, AddTagRun
 from dstack.hub.routers.cache import get_backend
@@ -16,10 +16,10 @@ router = APIRouter(prefix="/api/project", tags=["tags"], dependencies=[Depends(P
     "/{project_name}/tags/list/heads",
     response_model=List[TagHead],
 )
-async def list_heads_tags(project_name: str, repo_address: RepoAddress):
+async def list_heads_tags(project_name: str, repo_spec: RepoSpec):
     project = await get_project(project_name=project_name)
-    backend = get_backend(project)
-    list_tag = backend.list_tag_heads(repo_address=repo_address)
+    backend = get_backend(project, repo_spec.repo)
+    list_tag = backend.list_tag_heads()
     return list_tag
 
 
@@ -27,10 +27,10 @@ async def list_heads_tags(project_name: str, repo_address: RepoAddress):
     "/{project_name}/tags/{tag_name}",
     response_model=TagHead,
 )
-async def get_tag(project_name: str, tag_name: str, repo_address: RepoAddress) -> TagHead:
+async def get_tag(project_name: str, tag_name: str, repo_spec: RepoSpec) -> TagHead:
     project = await get_project(project_name=project_name)
-    backend = get_backend(project)
-    tag = backend.get_tag_head(repo_address=repo_address, tag_name=tag_name)
+    backend = get_backend(project, repo_spec.repo)
+    tag = backend.get_tag_head(tag_name=tag_name)
     if tag is None:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND, detail=error_detail("Tag not found")
@@ -39,19 +39,18 @@ async def get_tag(project_name: str, tag_name: str, repo_address: RepoAddress) -
 
 
 @router.post("/{project_name}/tags/{tag_name}/delete")
-async def delete_tag(project_name: str, tag_name: str, repo_address: RepoAddress):
+async def delete_tag(project_name: str, tag_name: str, repo_spec: RepoSpec):
     project = await get_project(project_name=project_name)
-    backend = get_backend(project)
-    tag = backend.get_tag_head(repo_address=repo_address, tag_name=tag_name)
-    backend.delete_tag_head(repo_address=repo_address, tag_head=tag)
+    backend = get_backend(project, repo_spec.repo)
+    tag = backend.get_tag_head(tag_name=tag_name)
+    backend.delete_tag_head(tag_head=tag)
 
 
 @router.post("/{project_name}/tags/add/run")
 async def add_tag_from_run(project_name: str, body: AddTagRun):
     project = await get_project(project_name=project_name)
-    backend = get_backend(project)
+    backend = get_backend(project, body.repo_spec.repo)
     backend.add_tag_from_run(
-        repo_address=body.repo_address,
         tag_name=body.tag_name,
         run_name=body.run_name,
         run_jobs=body.run_jobs,
@@ -61,7 +60,5 @@ async def add_tag_from_run(project_name: str, body: AddTagRun):
 @router.post("/{project_name}/tags/add/path")
 async def add_tag_from_path(project_name: str, body: AddTagPath):
     project = await get_project(project_name=project_name)
-    backend = get_backend(project)
-    backend.add_tag_from_local_dirs(
-        repo_data=body.repo_data, tag_name=body.tag_name, local_dirs=body.local_dirs
-    )
+    backend = get_backend(project, body.repo_spec.repo)
+    backend.add_tag_from_local_dirs(tag_name=body.tag_name, local_dirs=body.local_dirs)

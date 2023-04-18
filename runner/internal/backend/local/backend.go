@@ -200,7 +200,7 @@ func (l *Local) GitCredentials(ctx context.Context) *models.GitCredentials {
 
 func (l *Local) Secrets(ctx context.Context) (map[string]string, error) {
 	log.Trace(ctx, "Getting secrets")
-	templatePath := fmt.Sprintf("secrets/%s/%s/%s", l.state.Job.RepoHostNameWithPort(), l.state.Job.RepoUserName, l.state.Job.RepoName)
+	templatePath := fmt.Sprintf("secrets/%s", l.state.Job.RepoId)
 	if _, err := os.Stat(filepath.Join(l.path, templatePath)); err != nil {
 		return map[string]string{}, nil
 	}
@@ -215,10 +215,8 @@ func (l *Local) Secrets(ctx context.Context) (map[string]string, error) {
 		}
 		if strings.HasPrefix(file.Name(), "l;") {
 			clearName := strings.ReplaceAll(file.Name(), "l;", "")
-			secrets[clearName] = fmt.Sprintf("%s/%s/%s/%s",
-				l.state.Job.RepoHostNameWithPort(),
-				l.state.Job.RepoUserName,
-				l.state.Job.RepoName,
+			secrets[clearName] = fmt.Sprintf("%s/%s",
+				l.state.Job.RepoId,
 				clearName)
 		}
 	}
@@ -232,4 +230,12 @@ func (l Local) Bucket(ctx context.Context) string {
 func (l Local) ListSubDir(ctx context.Context, dir string) ([]string, error) {
 	log.Trace(ctx, "Fetching list sub dir")
 	return l.storage.ListFile(dir)
+}
+
+func (l Local) GetRepoDiff(ctx context.Context, path string) (string, error) {
+	diff, err := l.storage.GetFile(path)
+	if err != nil {
+		return "", gerrors.Wrap(err)
+	}
+	return string(diff), nil
 }

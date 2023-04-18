@@ -1,11 +1,13 @@
+import os
 from argparse import Namespace
 
 from dstack.api.backend import get_current_remote_backend, get_local_backend
-from dstack.api.repo import load_repo_data
 from dstack.api.run import RunNotFoundError, TagNotFoundError, get_tagged_run_name
 from dstack.cli.commands import BasicCommand
-from dstack.cli.common import check_backend, check_config, check_git, console
+from dstack.cli.common import check_backend, check_config, check_git, check_init, console
+from dstack.cli.config import config
 from dstack.core.error import BackendError
+from dstack.core.repo import RemoteRepo
 
 
 class PullCommand(BasicCommand):
@@ -26,16 +28,15 @@ class PullCommand(BasicCommand):
     @check_config
     @check_git
     @check_backend
+    @check_init
     def _command(self, args: Namespace):
-        repo_data = load_repo_data()
-        remote_backend = get_current_remote_backend()
+        repo = RemoteRepo(repo_ref=config.repo_user_config.repo_ref, local_repo_dir=os.getcwd())
+        remote_backend = get_current_remote_backend(repo)
         if remote_backend is None:
             console.print(f"No remote backend configured. Run `dstack config`.")
             exit(1)
         try:
-            run_name, tag_head = get_tagged_run_name(
-                repo_data, remote_backend, args.run_name_or_tag_name
-            )
+            run_name, tag_head = get_tagged_run_name(remote_backend, args.run_name_or_tag_name)
         except TagNotFoundError as e:
             console.print(f"Cannot find the remote tag '{args.run_name_or_tag_name}'")
             exit(1)
@@ -43,13 +44,12 @@ class PullCommand(BasicCommand):
             console.print(f"Cannot find the remote run '{args.run_name_or_tag_name}'")
             exit(1)
 
-        local_backend = get_local_backend()
-        jobs = remote_backend.list_jobs(repo_data, run_name)
+        local_backend = get_local_backend(repo)
+        jobs = remote_backend.list_jobs(run_name)
 
         if tag_head is not None:
             try:
                 local_backend.add_tag_from_run(
-                    repo_address=repo_data,
                     tag_name=tag_head.tag_name,
                     run_name=tag_head.run_name,
                     run_jobs=jobs,
@@ -59,9 +59,8 @@ class PullCommand(BasicCommand):
                 exit(1)
 
         remote_backend.download_run_artifact_files(
-            repo_address=repo_data,
             run_name=run_name,
-            output_dir=local_backend.get_artifacts_path(repo_data),
+            output_dir=local_backend.get_artifacts_path(),
         )
 
         for job in jobs:

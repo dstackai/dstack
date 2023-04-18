@@ -1,9 +1,7 @@
 from collections import defaultdict
 from typing import List, Optional, Tuple
 
-from dstack.api.repo import load_repo_data
 from dstack.backend.base import Backend
-from dstack.core.repo import RepoData
 from dstack.core.run import RunHead
 from dstack.core.tag import TagHead
 
@@ -40,18 +38,15 @@ def list_runs_with_merged_backends(
 def list_runs(
     backends: List[Backend], run_name: str = "", all: bool = False
 ) -> List[Tuple[RunHead, Backend]]:
-    repo_data = load_repo_data()
     runs = []
     for backend in backends:
-        runs += [(run, backend) for run in _get_runs(repo_data, backend, run_name, all)]
+        runs += [(run, backend) for run in _get_runs(backend, run_name, all)]
     return list(sorted(runs, key=lambda r: -r[0].submitted_at))
 
 
-def _get_runs(
-    repo_data: RepoData, backend: Backend, run_name: str = "", all: bool = False
-) -> List[RunHead]:
+def _get_runs(backend: Backend, run_name: str = "", all: bool = False) -> List[RunHead]:
     runs = []
-    runs_backend = backend.list_run_heads(repo_data, run_name)
+    runs_backend = backend.list_run_heads(run_name)
     for run in runs_backend:
         runs.append(run)
     if not all:
@@ -63,17 +58,17 @@ def _get_runs(
     return runs
 
 
-def get_tagged_run_name(repo_data, backend, run_name_or_tag_name) -> Tuple[str, Optional[TagHead]]:
+def get_tagged_run_name(backend, run_name_or_tag_name) -> Tuple[str, Optional[TagHead]]:
     if run_name_or_tag_name.startswith(":"):
         tag_name = run_name_or_tag_name[1:]
-        tag_head = backend.get_tag_head(repo_data, tag_name)
+        tag_head = backend.get_tag_head(tag_name)
         if tag_head is not None:
             return tag_head.run_name, tag_head
         else:
             raise TagNotFoundError()
     else:
         run_name = run_name_or_tag_name
-        job_heads = backend.list_job_heads(repo_data, run_name)
+        job_heads = backend.list_job_heads(run_name)
         if job_heads:
             return run_name, None
         else:

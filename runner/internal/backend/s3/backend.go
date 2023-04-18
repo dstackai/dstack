@@ -242,7 +242,7 @@ func (s *S3) MasterJob(ctx context.Context) *models.Job {
 		log.Trace(ctx, "State not exist")
 		return nil
 	}
-	theFile, err := s.cliS3.GetFile(ctx, s.bucket, fmt.Sprintf("jobs/%s/%s/%s/%s.yaml", s.state.Job.RepoHostNameWithPort(), s.state.Job.RepoUserName, s.state.Job.RepoName, s.state.Job.MasterJobID))
+	theFile, err := s.cliS3.GetFile(ctx, s.bucket, fmt.Sprintf("jobs/%s/%s.yaml", s.state.Job.RepoId, s.state.Job.MasterJobID))
 	if err != nil {
 		return nil
 	}
@@ -324,7 +324,7 @@ func (s *S3) Secrets(ctx context.Context) (map[string]string, error) {
 	if s.state == nil {
 		return nil, gerrors.New("State is empty")
 	}
-	templatePath := fmt.Sprintf("secrets/%s/%s/%s/l;", s.state.Job.RepoHostNameWithPort(), s.state.Job.RepoUserName, s.state.Job.RepoName)
+	templatePath := fmt.Sprintf("secrets/%s/l;", s.state.Job.RepoId)
 	listSecrets, err := s.cliS3.ListFile(ctx, s.bucket, templatePath)
 	if err != nil {
 		return nil, gerrors.Wrap(err)
@@ -332,10 +332,8 @@ func (s *S3) Secrets(ctx context.Context) (map[string]string, error) {
 	secrets := make(map[string]string, 0)
 	for _, secretPath := range listSecrets {
 		clearName := strings.ReplaceAll(secretPath, templatePath, "")
-		secrets[clearName] = fmt.Sprintf("%s/%s/%s/%s",
-			s.state.Job.RepoHostNameWithPort(),
-			s.state.Job.RepoUserName,
-			s.state.Job.RepoName,
+		secrets[clearName] = fmt.Sprintf("%s/%s",
+			s.state.Job.RepoId,
 			clearName)
 	}
 	return s.cliSecret.fetchSecret(ctx, s.bucket, secrets)
@@ -356,4 +354,12 @@ func (s *S3) GitCredentials(ctx context.Context) *models.GitCredentials {
 		return nil
 	}
 	return s.cliSecret.fetchCredentials(ctx, s.bucket, s.state.Job.RepoHostNameWithPort(), s.state.Job.RepoUserName, s.state.Job.RepoName)
+}
+
+func (s *S3) GetRepoDiff(ctx context.Context, path string) (string, error) {
+	diff, err := s.cliS3.GetFile(ctx, s.bucket, path)
+	if err != nil {
+		return "", gerrors.Wrap(err)
+	}
+	return string(diff), nil
 }

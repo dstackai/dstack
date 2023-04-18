@@ -16,7 +16,7 @@ class LocalConfig(BackendConfig):
             path = get_config_path()
         if path.exists():
             with path.open() as f:
-                config_data = yaml.load(f, Loader=yaml.FullLoader)
+                config_data = yaml.load(f, Loader=yaml.FullLoader) or {}
                 self.path = config_data.get("path") or get_dstack_dir()
 
     def save(self, path: Optional[Path] = None):

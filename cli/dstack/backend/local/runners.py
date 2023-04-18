@@ -4,7 +4,7 @@ import shutil
 import signal
 import subprocess
 from pathlib import Path
-from typing import List, Optional, Tuple
+from typing import Optional
 
 import cpuinfo
 import psutil
@@ -16,7 +16,7 @@ from tqdm import tqdm
 from dstack import version
 from dstack.core.job import Job
 from dstack.core.request import RequestHead, RequestStatus
-from dstack.core.runners import Gpu, Resources, Runner
+from dstack.core.runners import Gpu, Resources
 
 
 def start_runner_process(runner_id: str) -> str:
@@ -108,7 +108,7 @@ def _runner_bucket() -> str:
         return "dstack-runner-downloads-stgn"
 
 
-def _get_runner_config_dir(runner_id: str, create: Optional[bool] = None) -> str:
+def _get_runner_config_dir(runner_id: str, create: Optional[bool] = None) -> Path:
     runner_config_dir_path = Path(
         os.path.join(_config_directory_path(), "tmp", "runner", "configs", runner_id)
     )

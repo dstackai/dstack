@@ -1,3 +1,4 @@
+import os
 import sys
 from argparse import Namespace
 
@@ -8,12 +9,13 @@ from rich.table import Table
 from rich_argparse import RichHelpFormatter
 
 from dstack.api.backend import list_backends
-from dstack.api.repo import load_repo_data
 from dstack.api.tags import list_tag_heads_with_merged_backends
 from dstack.backend.base import BackendType
 from dstack.cli.commands import BasicCommand
-from dstack.cli.common import check_backend, check_config, check_git
+from dstack.cli.common import check_backend, check_config, check_git, check_init
+from dstack.cli.config import config
 from dstack.core.error import BackendError
+from dstack.core.repo import RemoteRepo
 from dstack.utils.common import pretty_date
 
 
@@ -67,8 +69,9 @@ class TAGCommand(BasicCommand):
     @check_config
     @check_git
     @check_backend
+    @check_init
     def _command(self, args: Namespace):
-        repo_data = load_repo_data()
+        repo = RemoteRepo(repo_ref=config.repo_user_config.repo_ref, local_repo_dir=os.getcwd())
         console = Console()
         table = Table(box=None)
         table.add_column("TAG", style="bold", no_wrap=True)
@@ -77,7 +80,7 @@ class TAGCommand(BasicCommand):
         table.add_column("OWNER", style="grey58", no_wrap=True, max_width=16)
         table.add_column("BACKENDS", style="bold green", no_wrap=True)
 
-        tag_heads = list_tag_heads_with_merged_backends(list_backends(), repo_data)
+        tag_heads = list_tag_heads_with_merged_backends(list_backends(repo))
 
         for tag_head, backends in tag_heads:
             created_at = pretty_date(round(tag_head.created_at / 1000))
@@ -85,7 +88,7 @@ class TAGCommand(BasicCommand):
                 tag_head.tag_name,
                 created_at,
                 tag_head.run_name,
-                tag_head.local_repo_user_name or "",
+                tag_head.repo_user_id,
                 ", ".join(b.name for b in backends),
             )
         console.print(table)
@@ -93,13 +96,16 @@ class TAGCommand(BasicCommand):
     @check_config
     @check_git
     @check_backend
+    @check_init
     def add_tag(self, args: Namespace):
         if args.run_name or args.artifact_paths:
-            repo_data = load_repo_data()
+            repo = RemoteRepo(
+                repo_ref=config.repo_user_config.repo_ref, local_repo_dir=os.getcwd()
+            )
             added_tag = False
             confirmed_override = False
-            for backend in list_backends():
-                tag_head = backend.get_tag_head(repo_data, args.tag_name)
+            for backend in list_backends(repo):
+                tag_head = backend.get_tag_head(args.tag_name)
                 if tag_head:
                     if not args.yes and not confirmed_override:
                         confirmed_override = Confirm.ask(
@@ -108,15 +114,13 @@ class TAGCommand(BasicCommand):
                         )
                         if not confirmed_override:
                             return
-                    backend.delete_tag_head(repo_data, tag_head)
+                    backend.delete_tag_head(tag_head)
                 if args.run_name is not None:
-                    jobs_heads = backend.list_job_heads(repo_data, args.run_name)
+                    jobs_heads = backend.list_job_heads(args.run_name)
                     if len(jobs_heads) == 0:
                         continue
                     try:
-                        backend.add_tag_from_run(
-                            repo_data, args.tag_name, args.run_name, run_jobs=None
-                        )
+                        backend.add_tag_from_run(args.tag_name, args.run_name, run_jobs=None)
                         added_tag = True
                     except BackendError as e:
                         print(e)
@@ -127,9 +131,7 @@ class TAGCommand(BasicCommand):
                     if args.remote and backend.type is BackendType.LOCAL:
                         continue
                     try:
-                        backend.add_tag_from_local_dirs(
-                            repo_data, args.tag_name, args.artifact_paths
-                        )
+                        backend.add_tag_from_local_dirs(args.tag_name, args.artifact_paths)
                     except BackendError as e:
                         print(e)
                         exit(1)
@@ -143,11 +145,12 @@ class TAGCommand(BasicCommand):
     @check_config
     @check_git
     @check_backend
+    @check_init
     def delete_tag(self, args: Namespace):
-        repo_data = load_repo_data()
+        repo = RemoteRepo(repo_ref=config.repo_user_config.repo_ref, local_repo_dir=os.getcwd())
         tag_heads = []
-        for backend in list_backends():
-            tag_head = backend.get_tag_head(repo_data, args.tag_name)
+        for backend in list_backends(repo):
+            tag_head = backend.get_tag_head(args.tag_name)
             if tag_head is not None:
                 tag_heads.append((backend, tag_head))
 
@@ -156,5 +159,5 @@ class TAGCommand(BasicCommand):
 
         if args.yes or Confirm.ask(f" [red]Delete the tag '{args.tag_name}'?[/]"):
             for backend, tag_head in tag_heads:
-                backend.delete_tag_head(repo_data, tag_head)
+                backend.delete_tag_head(tag_head)
             print(f"[grey58]OK[/]")

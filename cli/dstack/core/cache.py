@@ -1,4 +1,4 @@
-from pydantic import BaseModel, validator
+from pydantic import BaseModel
 
 
 class CacheSpec(BaseModel):

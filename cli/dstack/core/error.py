@@ -20,3 +20,7 @@ class BackendError(Exception):
 
 class NoMatchingInstanceError(BackendError):
     code = "no_matching_instance"
+
+
+class NotInitializedError(Exception):
+    pass

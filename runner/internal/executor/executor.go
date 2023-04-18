@@ -99,12 +99,12 @@ func (ex *Executor) Init(ctx context.Context, configDir string) error {
 	}
 
 	for _, artifact := range job.Artifacts {
-		artOut := ex.backend.GetArtifact(ctx, job.RunName, artifact.Path, path.Join("artifacts", job.RepoHostNameWithPort(), job.RepoUserName, job.RepoName, job.JobID, artifact.Path), artifact.Mount)
+		artOut := ex.backend.GetArtifact(ctx, job.RunName, artifact.Path, path.Join("artifacts", job.RepoId, job.JobID, artifact.Path), artifact.Mount)
 		if artOut != nil {
 			ex.artifactsOut = append(ex.artifactsOut, artOut)
 		}
 		if artifact.Mount {
-			art := ex.backend.GetArtifact(ctx, job.RunName, artifact.Path, path.Join("artifacts", job.RepoHostNameWithPort(), job.RepoUserName, job.RepoName, job.JobID, artifact.Path), artifact.Mount)
+			art := ex.backend.GetArtifact(ctx, job.RunName, artifact.Path, path.Join("artifacts", job.RepoId, job.JobID, artifact.Path), artifact.Mount)
 			if art != nil {
 				ex.artifactsFUSE = append(ex.artifactsFUSE, art)
 			}
@@ -355,8 +355,17 @@ func (ex *Executor) prepareGit(ctx context.Context) error {
 		log.Trace(ctx, "GIT checkout error", "err", err, "GIT URL", ex.repo.URL())
 		return gerrors.Wrap(err)
 	}
-	if job.RepoDiff != "" {
-		if err := repo.ApplyDiff(ctx, dir, job.RepoDiff); err != nil {
+
+	repoDiff := job.RepoDiff
+	if job.RepoDiffFilename != "" {
+		var err error
+		repoDiff, err = ex.backend.GetRepoDiff(ctx, job.RepoDiffFilename)
+		if err != nil {
+			return err
+		}
+	}
+	if repoDiff != "" {
+		if err := repo.ApplyDiff(ctx, dir, repoDiff); err != nil {
 			return gerrors.Wrap(err)
 		}
 	}
@@ -366,7 +375,7 @@ func (ex *Executor) prepareGit(ctx context.Context) error {
 func (ex *Executor) processDeps(ctx context.Context) error {
 	job := ex.backend.Job(ctx)
 	for _, dep := range job.Deps {
-		listDir, err := ex.backend.ListSubDir(ctx, fmt.Sprintf("jobs/%s/%s/%s/%s,", dep.RepoHostNameWithPort(), dep.RepoUserName, dep.RepoName, dep.RunName))
+		listDir, err := ex.backend.ListSubDir(ctx, fmt.Sprintf("jobs/%s/%s,", dep.RepoId, dep.RunName))
 		if err != nil {
 			return gerrors.Wrap(err)
 		}
@@ -376,7 +385,7 @@ func (ex *Executor) processDeps(ctx context.Context) error {
 				return gerrors.Wrap(err)
 			}
 			for _, artifact := range jobDep.Artifacts {
-				artIn := ex.backend.GetArtifact(ctx, jobDep.RunName, artifact.Path, path.Join("artifacts", jobDep.RepoHostNameWithPort(), jobDep.RepoUserName, jobDep.RepoName, jobDep.JobID, artifact.Path), artifact.Mount)
+				artIn := ex.backend.GetArtifact(ctx, jobDep.RunName, artifact.Path, path.Join("artifacts", jobDep.RepoId, jobDep.JobID, artifact.Path), artifact.Mount)
 				if artIn != nil {
 					ex.artifactsIn = append(ex.artifactsIn, artIn)
 				}
@@ -388,12 +397,8 @@ func (ex *Executor) processDeps(ctx context.Context) error {
 
 func (ex *Executor) processCache(ctx context.Context) error {
 	job := ex.backend.Job(ctx)
-	username := job.LocalRepoUserEmail
-	if len(username) == 0 {
-		username = "default"
-	}
 	for _, cache := range job.Cache {
-		cacheArt := ex.backend.GetArtifact(ctx, job.RunName, cache.Path, path.Join("cache", job.RepoHostNameWithPort(), job.RepoUserName, job.RepoName, username, job.WorkflowName, cache.Path), false)
+		cacheArt := ex.backend.GetArtifact(ctx, job.RunName, cache.Path, path.Join("cache", job.RepoId, job.RepoUserId, job.WorkflowName, cache.Path), false)
 		if cacheArt != nil {
 			ex.cacheArtifacts = append(ex.cacheArtifacts, cacheArt)
 		}
@@ -485,7 +490,7 @@ func (ex *Executor) processJob(ctx context.Context, stoppedCh chan struct{}) err
 		}
 		bindings = append(bindings, art...)
 	}
-	logger := ex.backend.CreateLogger(ctx, fmt.Sprintf("/dstack/jobs/%s/%s/%s/%s", ex.backend.Bucket(ctx), job.RepoHostNameWithPort(), job.RepoUserName, job.RepoName), job.RunName)
+	logger := ex.backend.CreateLogger(ctx, fmt.Sprintf("/dstack/jobs/%s/%s", ex.backend.Bucket(ctx), job.RepoId), job.RunName)
 	secrets, err := ex.backend.Secrets(ctx)
 	if err != nil {
 		log.Error(ctx, "Fail fetching secrets", "err", err)
@@ -512,7 +517,7 @@ func (ex *Executor) processJob(ctx context.Context, stoppedCh chan struct{}) err
 		BindingPorts:       ex.pm.BindPorts(ex.portID),
 		ShmSize:            resource.ShmSize,
 	}
-	logGroup := fmt.Sprintf("/jobs/%s/%s/%s", job.RepoHostNameWithPort(), job.RepoUserName, job.RepoName)
+	logGroup := fmt.Sprintf("/jobs/%s", job.RepoId)
 	fileLog, err := createLocalLog(filepath.Join(ex.configDir, "logs", logGroup), job.RunName)
 	if err != nil {
 		return gerrors.Wrap(err)

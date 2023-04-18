@@ -77,7 +77,7 @@ class AWSConfig(BackendConfig):
             path = get_config_path()
         if path.exists():
             with path.open() as f:
-                config_data = yaml.load(f, Loader=yaml.FullLoader)
+                config_data = yaml.load(f, Loader=yaml.FullLoader) or {}
                 if config_data.get("backend") != "aws":
                     raise ConfigError(f"It's not AWS config")
                 if not config_data.get("bucket"):

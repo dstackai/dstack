@@ -119,4 +119,7 @@ def _delete_object(Root: str, Key: str):
         return
     path = os.path.join(Root, Key)
     if os.path.exists(path):
-        os.remove(path)
+        if os.path.isdir(path):
+            shutil.rmtree(path, ignore_errors=True)
+        else:
+            os.remove(path)

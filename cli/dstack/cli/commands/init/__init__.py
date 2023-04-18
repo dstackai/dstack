@@ -2,11 +2,14 @@ from argparse import Namespace
 from pathlib import Path
 from typing import Optional
 
+import giturlparse
+
 from dstack.api.backend import list_backends
-from dstack.api.repo import load_repo_data
+from dstack.api.repos import get_local_repo_credentials
 from dstack.cli.commands import BasicCommand
-from dstack.cli.common import check_backend, check_config, check_git, console
-from dstack.cli.config import BaseConfig
+from dstack.cli.common import check_backend, check_config, check_git, check_init, console
+from dstack.cli.config import config
+from dstack.core.repo import RemoteRepo
 from dstack.core.userconfig import RepoUserConfig
 
 
@@ -55,26 +58,33 @@ class InitCommand(BasicCommand):
     @check_config
     @check_git
     @check_backend
+    @check_init
     def _command(self, args: Namespace):
-        local_repo_data = load_repo_data(args.gh_token, args.git_identity_file)
-        local_repo_data.ls_remote()
-        repo_credentials = local_repo_data.repo_credentials()
-
-        config = BaseConfig()
-        repo_user_config = RepoUserConfig(ssh_key_path=get_ssh_keypair(args.ssh_identity_file))
-        config.write(
-            config.repos / f"{local_repo_data.path(delimiter='.')}.yaml",
-            repo_user_config,
-            mkdir=True,
+        repo = RemoteRepo(local_repo_dir=Path.cwd())
+        repo_credentials = get_local_repo_credentials(
+            repo_data=repo.repo_data,
+            identity_file=args.git_identity_file,
+            oauth_token=args.gh_token,
+            original_hostname=giturlparse.parse(repo.repo_url).resource,
         )
 
-        for backend in list_backends():
-            backend.save_repo_credentials(local_repo_data, repo_credentials)
+        config.save_repo_user_config(
+            RepoUserConfig(
+                repo_id=repo.repo_ref.repo_id,
+                repo_user_id=repo.repo_ref.repo_user_id,
+                ssh_key_path=get_ssh_keypair(args.ssh_identity_file),
+            )
+        )
+
+        for backend in list_backends(repo):
+            backend.save_repo_credentials(repo_credentials)
             status = (
-                "[yellow]WARNING[/]" if repo_user_config.ssh_key_path is None else "[green]OK[/]"
+                "[yellow]WARNING[/]"
+                if config.repo_user_config.ssh_key_path is None
+                else "[green]OK[/]"
             )
             console.print(f"{status} [gray58](backend: {backend.name})[/]")
-        if repo_user_config.ssh_key_path is None:
+        if config.repo_user_config.ssh_key_path is None:
             console.print(
                 f"[red]SSH is not enabled. To enable it, make sure `{args.ssh_identity_file or '~/.ssh/id_rsa'}` exists or call `dstack init --ssh-identity PATH`[/]"
             )
