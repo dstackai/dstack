@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"io"
 	"io/ioutil"
+	"os/user"
 	"runtime"
 	"strings"
 
@@ -102,8 +103,13 @@ func (r *Engine) Create(ctx context.Context, spec *Spec, logs io.Writer) (*Docke
 	log.Trace(ctx, "Container command ", "cmd", spec.Commands)
 	log.Trace(ctx, "Container entrypoint ", "entrypoint", spec.Entrypoint)
 
+	currentUser, err := user.Current()
+	if err != nil {
+		return nil, gerrors.Wrap(err)
+	}
 	config := &container.Config{
 		Image:        spec.Image,
+		User:         currentUser.Uid,
 		Cmd:          spec.Commands,
 		Tty:          true,
 		WorkingDir:   spec.WorkDir,

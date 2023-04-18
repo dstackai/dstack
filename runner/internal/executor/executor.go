@@ -6,13 +6,14 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
-	"github.com/docker/docker/api/types"
 	"io"
 	"os"
 	"path"
 	"path/filepath"
 	"strconv"
 	"time"
+
+	"github.com/docker/docker/api/types"
 
 	"github.com/docker/docker/api/types/mount"
 	"github.com/dstackai/dstack/runner/consts"
