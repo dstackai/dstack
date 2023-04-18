@@ -18,6 +18,5 @@ class BackendError(Exception):
         self.message = message
 
 
-class SecretError(Exception):
-    def __init__(self, message: Optional[str] = None):
-        self.message = message
+class NoMatchingInstanceError(BackendError):
+    code = "no_matching_instance"

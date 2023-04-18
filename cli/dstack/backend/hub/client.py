@@ -5,7 +5,7 @@ from urllib.parse import urlencode, urlparse, urlunparse
 import requests
 
 from dstack.core.artifact import Artifact
-from dstack.core.error import BackendError
+from dstack.core.error import BackendError, NoMatchingInstanceError
 from dstack.core.job import Job, JobHead
 from dstack.core.log_event import LogEvent
 from dstack.core.repo import LocalRepoData, RepoAddress, RepoCredentials
@@ -141,6 +141,10 @@ class HubClient:
         )
         if resp.ok:
             return
+        elif resp.status_code == 400:
+            body = resp.json()
+            if body["detail"]["code"] == NoMatchingInstanceError.code:
+                raise BackendError(body["detail"]["msg"])
         resp.raise_for_status()
 
     def stop_job(self, repo_address: RepoAddress, job_id: str, abort: bool):
@@ -623,6 +627,11 @@ def _make_hub_request(request_func, host, *args, **kwargs) -> requests.Response:
         resp: requests.Response = request_func(*args, **kwargs)
         if resp.status_code == 401:
             raise BackendError(f"Invalid hub token")
+        elif resp.status_code == 500:
+            url = kwargs.get("url")
+            raise BackendError(
+                f"Got 500 Server Error from hub: {url}. Check hub logs for details."
+            )
         return resp
     except requests.ConnectionError:
         raise BackendError(f"Cannot connect to hub at {host}")
