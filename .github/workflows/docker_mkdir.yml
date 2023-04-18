@@ -1,16 +1,20 @@
 name: Test docker mkdir
 
 on:
-  workflow_dispatch:
+  push:
 
 jobs:
   test-docker-mkdir:
     runs-on: ubuntu-latest
     steps:
+      - name: Add user to docker group
+        run: |
+          sudo usermod -aG docker $USER
       - name: Test
         run: |
           whoami
-          docker run -v ${PWD}/my_dir:/my_dir --user $UID ubuntu bash -c 'mkdir -p /my_dir/dir2'
+          mkdir ${PWD}/my_dir
+          docker run -v ${PWD}/my_dir:/my_dir --user $UID ubuntu bash -c 'ls -l /; mkdir -p /my_dir/dir2'
           ls -l
           ls -l my_dir
           rm -r my_dir
