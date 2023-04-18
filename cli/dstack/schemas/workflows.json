@@ -329,6 +329,11 @@
         "setup": {
           "$ref": "#/definitions/setup"
         },
+        "ports": {
+          "description": "The number of ports to expose",
+          "type": "integer",
+          "minimum": 1
+        },
         "env": {
           "$ref": "#/definitions/env"
         },

@@ -7,13 +7,13 @@ title: Generate images with Stable Diffusion
 This tutorial demonstrates how to generate images using a pretrained Stable Diffusion model.
 
 !!! info "NOTE:"
-    The source code of this example is available in the [Playground](../playground.md).
+    The source code of this tutorial is available in the [Playground](../playground.md).
 
 ## 1. Requirements
 
-Here is the list of Python libraries that we will utilize:
+Here is the list of Python libraries that we will use:
 
-<div editor-title="stable_diffusion/requirements.txt"> 
+<div editor-title="tutorials/stable_diffusion/requirements.txt"> 
 
 ```txt
 diffusers
@@ -31,14 +31,14 @@ safetensors
     to pickle) and that is still fast (zero-copy).
 
 To ensure our scripts can run smoothly across all environments, let's include them in
-the `examples/stable_diffusion/requirements.txt` file.
+the `tutorials/stable_diffusion/requirements.txt` file.
 
 You can also install these libraries locally:
 
 <div class="termy">
 
 ```shell
-$ pip install -r examples/stable_diffusion/requirements.txt
+$ pip install -r tutorials/stable_diffusion/requirements.txt
 ```
 
 </div>
@@ -82,8 +82,8 @@ workflows:
   - name: stable-diffusion
     provider: bash
     commands:
-      - pip install -r examples/stable_diffusion/requirements.txt
-      - python examples/stable_diffusion/stable_diffusion.py
+      - pip install -r tutorials/stable_diffusion/requirements.txt
+      - python tutorials/stable_diffusion/stable_diffusion.py
     artifacts:
       - path: ./models
     resources:
@@ -135,7 +135,7 @@ workflows:
     deps:
       - workflow: stable-diffusion
     setup:
-      - pip install -r examples/stable_diffusion/requirements.txt
+      - pip install -r tutorials/stable_diffusion/requirements.txt
     resources:
       memory: 16GB
 ```
@@ -200,8 +200,8 @@ workflows:
     deps:
       - workflow: stable-diffusion
     commands:
-      - pip install -r examples/stable_diffusion/requirements.txt
-      - python examples/stable_diffusion/prompt_stable.py ${{ run.args }}
+      - pip install -r tutorials/stable_diffusion/requirements.txt
+      - python tutorials/stable_diffusion/prompt_stable.py ${{ run.args }}
     artifacts:
       - path: ./output
     resources:
@@ -240,16 +240,21 @@ To configure a `remote`, run the following command:
 <div class="termy">
 
 ```shell
-$ dstack config
+dstack config
 
-? Choose backend: aws
-? AWS profile: default
-? Choose AWS region: eu-west-1
-? Choose S3 bucket: dstack-142421590066-eu-west-1
-? Choose EC2 subnet: no preference
+? Choose backend. Use arrows to move, type to filter
+> [aws]
+  [gcp]
+  [hub]
 ```
 
 </div>
+
+For running remote workflows with local cloud credentials, select [`aws`](https://docs.dstack.ai/setup/aws.md)
+or [`gcp`](https://docs.dstack.ai/setup/gcp.md).
+
+Choose [`hub`](https://docs.dstack.ai/setup/hub.md) if you prefer managing cloud credentials and settings through a user
+interface while working in a team.
 
 ## 6. Run workflows remotely
 

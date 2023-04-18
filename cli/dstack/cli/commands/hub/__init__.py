@@ -45,28 +45,25 @@ class HubCommand(BasicCommand):
         )
         hub_parser.add_argument(
             "--host",
-            metavar="HOST",
             type=str,
             help="Bind socket to this host. Defaults to 127.0.0.1",
-            default="127.0.0.1",
+            default=os.getenv("DSTACK_HUB_HOST", "127.0.0.1"),
         )
         hub_parser.add_argument(
             "-p",
             "--port",
-            metavar="PORT",
             type=int,
             help="Bind socket to this port. Defaults to 3000.",
-            default=3000,
+            default=os.getenv("DSTACK_HUB_PORT", 3000),
         )
         hub_parser.add_argument(
             "-l",
             "--log-level",
-            metavar="LOG-LEVEL",
             type=str,
-            help="",
-            default="ERROR",
+            help="Logging level for hub. Defaults to ERROR.",
+            default=os.getenv("DSTACK_HUB_LOG_LEVEL", "ERROR"),
         )
-        hub_parser.add_argument("--token", metavar="TOKEN", type=str, help="The admin user token")
+        hub_parser.add_argument("--token", type=str, help="The admin user token")
         hub_parser.set_defaults(func=self._hub_start)
 
     def _command(self, args: Namespace):

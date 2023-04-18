@@ -7,6 +7,7 @@ import yaml
 from dstack.backend.base import runners
 from dstack.backend.base.compute import Compute, NoCapacityError
 from dstack.backend.base.storage import Storage
+from dstack.core.error import NoMatchingInstanceError
 from dstack.core.job import Job, JobHead, JobStatus
 from dstack.core.repo import RepoRef
 from dstack.core.request import RequestStatus
@@ -161,7 +162,7 @@ def run_job(
         if instance_type is None:
             job.status = JobStatus.FAILED
             update_job(storage, job)
-            exit(f"No instance type matching requirements.")
+            raise NoMatchingInstanceError("No instance type matching requirements")
 
         runner = Runner(
             runner_id=job.runner_id, request_id=None, resources=instance_type.resources, job=job
