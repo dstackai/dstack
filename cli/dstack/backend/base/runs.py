@@ -7,7 +7,7 @@ from dstack.backend.base.compute import Compute
 from dstack.backend.base.storage import Storage
 from dstack.core.app import AppHead
 from dstack.core.artifact import ArtifactHead
-from dstack.core.job import JobHead, JobStatus
+from dstack.core.job import JobErrorCode, JobHead, JobStatus
 from dstack.core.run import (
     RequestStatus,
     RunHead,
@@ -107,6 +107,8 @@ def _create_run(
         request_heads.append(request_head)
         if request_head.status == RequestStatus.NO_CAPACITY:
             job.status = job_head.status = interrupted_job_new_status
+            if interrupted_job_new_status == JobStatus.FAILED:
+                job.error_code = JobErrorCode.INTERRUPTED_BY_NO_CAPACITY
             jobs.update_job(storage, job)
     run_head = RunHead(
         run_name=job_head.run_name,
@@ -119,6 +121,7 @@ def _create_run(
         tag_name=job_head.tag_name,
         app_heads=app_heads,
         request_heads=request_heads,
+        job_heads=[job_head],
     )
     return run_head
 
@@ -169,5 +172,8 @@ def _update_run(
             run.request_heads.append(request_head)
             if request_head.status == RequestStatus.NO_CAPACITY:
                 job.status = job_head.status = interrupted_job_new_status
+                if interrupted_job_new_status == JobStatus.FAILED:
+                    job.error_code = JobErrorCode.INTERRUPTED_BY_NO_CAPACITY
                 jobs.update_job(storage, job)
         run.status = job_head.status
+    run.job_heads.append(job_head)

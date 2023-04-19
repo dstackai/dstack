@@ -35,6 +35,14 @@ func (f funcEngineOpt) apply(engine *Engine) {
 	f(engine)
 }
 
+type ContainerExitedError struct {
+	ExitCode int
+}
+
+func (e ContainerExitedError) Error() string {
+	return fmt.Sprintf("container exited with non-zero exit code: %d", e.ExitCode)
+}
+
 //nolint:all
 func WithCustomClient(client docker.APIClient) Option {
 	return funcEngineOpt(func(engine *Engine) {
@@ -210,12 +218,11 @@ func (r *DockerRuntime) Wait(ctx context.Context) error {
 		return gerrors.Wrap(err)
 	}
 	if info.State.ExitCode != 0 {
-		return gerrors.Newf("container exited with exit code: %d", info.State.ExitCode)
+		return gerrors.Wrap(ContainerExitedError{info.State.ExitCode})
 	}
 	removeOpts := types.ContainerRemoveOptions{
 		Force: true,
 	}
-
 	err = r.client.ContainerRemove(ctx, r.containerID, removeOpts)
 	if err != nil {
 		return gerrors.Wrap(err)

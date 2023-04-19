@@ -11,6 +11,7 @@ import (
 	"strings"
 
 	"github.com/dstackai/dstack/runner/consts"
+	"github.com/dstackai/dstack/runner/consts/states"
 	"github.com/dstackai/dstack/runner/internal/artifacts"
 	"github.com/dstackai/dstack/runner/internal/artifacts/local"
 	"github.com/dstackai/dstack/runner/internal/backend"
@@ -18,7 +19,6 @@ import (
 	"github.com/dstackai/dstack/runner/internal/gerrors"
 	"github.com/dstackai/dstack/runner/internal/log"
 	"github.com/dstackai/dstack/runner/internal/models"
-	"github.com/dstackai/dstack/runner/internal/states"
 	"gopkg.in/yaml.v3"
 )
 
