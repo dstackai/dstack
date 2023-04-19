@@ -32,8 +32,12 @@ def local_runner():
 def dstack_dir(local_runner: Path):
     shutil.copytree(local_runner, DSTACK_DIR)
     yield DSTACK_DIR
-    # We need sudo to delete directories created by runner
-    subprocess.run(["sudo", "rm", "-r", DSTACK_DIR])
+    # We need sudo to delete directories created by runner on Linux
+    # See https://github.com/dstackai/dstack/issues/335
+    try:
+        shutil.rmtree(DSTACK_DIR)
+    except PermissionError:
+        subprocess.run(["sudo", "rm", "-r", DSTACK_DIR])
 
 
 @pytest.fixture

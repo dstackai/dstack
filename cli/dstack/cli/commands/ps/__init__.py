@@ -42,6 +42,12 @@ class PSCommand(BasicCommand):
             action="store_true",
         )
         self._parser.add_argument(
+            "-v",
+            "--verbose",
+            help="Show more information about runs",
+            action="store_true",
+        )
+        self._parser.add_argument(
             "-w",
             "--watch",
             help="Watch statuses of runs in realtime",
@@ -59,15 +65,16 @@ class PSCommand(BasicCommand):
         if args.watch:
             try:
                 with Live(
-                    generate_runs_table(list_runs), refresh_per_second=REFRESH_RATE_PER_SEC
+                    generate_runs_table(list_runs, verbose=args.verbose),
+                    refresh_per_second=REFRESH_RATE_PER_SEC,
                 ) as live:
                     while True:
                         time.sleep(LIVE_PROVISION_INTERVAL_SECS)
                         list_runs = list_runs_with_merged_backends(
                             backends, args.run_name, args.all
                         )
-                        live.update(generate_runs_table(list_runs))
+                        live.update(generate_runs_table(list_runs, verbose=args.verbose))
             except KeyboardInterrupt:
                 pass
         else:
-            print_runs(list_runs)
+            print_runs(list_runs, verbose=args.verbose)
