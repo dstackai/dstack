@@ -4,12 +4,20 @@ import { useTranslation } from 'react-i18next';
 import { useLocation, useNavigate } from 'react-router-dom';
 import { SideNavigationProps } from '@cloudscape-design/components/side-navigation';
 
-import { AppLayout as GenericAppLayout, BreadcrumbGroup, Notifications, SideNavigation, TopNavigation } from 'components';
+import {
+    AppLayout as GenericAppLayout,
+    AppLayoutProps as GenericAppLayoutProps,
+    BreadcrumbGroup,
+    HelpPanel,
+    Notifications,
+    SideNavigation,
+    TopNavigation,
+} from 'components';
 
-import { useAppSelector } from 'hooks';
+import { useAppDispatch, useAppSelector } from 'hooks';
 import { ROUTES } from 'routes';
 
-import { selectBreadcrumbs, selectUserName } from 'App/slice';
+import { closeHelpPanel, selectBreadcrumbs, selectHelpPanelContent, selectHelpPanelOpen, selectUserName } from 'App/slice';
 
 import logo from 'assets/images/logo.svg';
 import styles from './index.module.scss';
@@ -28,6 +36,9 @@ const AppLayout: React.FC<{ children: React.ReactNode }> = ({ children }) => {
 
     const userName = useAppSelector(selectUserName) ?? '';
     const breadcrumbs = useAppSelector(selectBreadcrumbs);
+    const openHelpPanel = useAppSelector(selectHelpPanelOpen);
+    const helpPanelContent = useAppSelector(selectHelpPanelContent);
+    const dispatch = useAppDispatch();
 
     const onFollowHandler: SideNavigationProps['onFollow'] = (event) => {
         event.preventDefault();
@@ -49,6 +60,10 @@ const AppLayout: React.FC<{ children: React.ReactNode }> = ({ children }) => {
         { type: 'button', href: ROUTES.USER.DETAILS.FORMAT(userName), id: 'profile', text: t('common.profile') },
         { type: 'button', href: ROUTES.LOGOUT, id: 'signout', text: t('common.sign_out') },
     ];
+
+    const onChangeToolHandler: GenericAppLayoutProps['onToolsChange'] = ({ detail: { open } }) => {
+        if (!open) dispatch(closeHelpPanel());
+    };
 
     return (
         <>
@@ -77,9 +92,9 @@ const AppLayout: React.FC<{ children: React.ReactNode }> = ({ children }) => {
 
             <GenericAppLayout
                 headerSelector="#header"
+                contentType="default"
                 content={children}
                 splitPanelOpen
-                toolsHide
                 breadcrumbs={renderBreadcrumbs()}
                 notifications={<Notifications />}
                 navigation={
@@ -98,6 +113,14 @@ const AppLayout: React.FC<{ children: React.ReactNode }> = ({ children }) => {
                         onFollow={onFollowHandler}
                     />
                 }
+                tools={
+                    <HelpPanel header={helpPanelContent.header} footer={helpPanelContent.footer}>
+                        {helpPanelContent.body}
+                    </HelpPanel>
+                }
+                toolsHide={!openHelpPanel}
+                toolsOpen={openHelpPanel}
+                onToolsChange={onChangeToolHandler}
             />
         </>
     );

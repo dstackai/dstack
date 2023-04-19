@@ -2,12 +2,13 @@ import React from 'react';
 import { DefaultValues, FormProvider, useForm } from 'react-hook-form';
 import { useTranslation } from 'react-i18next';
 
-import { Button, Container, FormField, FormInput, FormTiles, FormUI, Grid, Header, SpaceBetween } from 'components';
+import { Button, Container, FormField, FormInput, FormTiles, FormUI, Grid, Header, InfoLink, SpaceBetween } from 'components';
 
-import { useNotifications } from 'hooks';
+import { useHelpPanel, useNotifications } from 'hooks';
 import { isRequestFormErrors2, isRequestFormFieldError } from 'libs';
 
 import { AWSBackend } from './AWS';
+import { PROJECT_NAME_HELP } from './constants';
 import { GCPBackend } from './GCP';
 
 import { IProps, TBackendOption } from './types';
@@ -17,6 +18,7 @@ export const ProjectForm: React.FC<IProps> = ({ initialValues, onCancel, loading
     const { t } = useTranslation();
     const [pushNotification] = useNotifications();
     const isEditing = !!initialValues;
+    const [openHelpPanel] = useHelpPanel();
 
     const getDefaultValues = (): DefaultValues<IProject> => {
         if (initialValues) {
@@ -122,6 +124,7 @@ export const ProjectForm: React.FC<IProps> = ({ initialValues, onCancel, loading
                             <Container header={<Header variant="h2">{t('projects.edit.general')}</Header>}>
                                 <SpaceBetween size="l">
                                     <FormInput
+                                        info={<InfoLink onFollow={() => openHelpPanel(PROJECT_NAME_HELP)} />}
                                         label={t('projects.edit.project_name')}
                                         description={t('projects.edit.project_name_description')}
                                         control={control}
