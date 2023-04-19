@@ -74,9 +74,11 @@ def _filter_log_events_loop(
                     finished_counter += 1
 
 
-def create_log_group_if_not_exists(logs_client: BaseClient, bucket_name: str, repo_id: str):
-    log_group_name = f"/dstack/jobs/{bucket_name}/{repo_id}"
-    _create_log_group_if_not_exists(logs_client, bucket_name, log_group_name)
+def create_log_groups_if_not_exist(logs_client: BaseClient, bucket_name: str, repo_id: str):
+    _create_log_group_if_not_exists(
+        logs_client, bucket_name, f"/dstack/jobs/{bucket_name}/{repo_id}"
+    )
+    _create_log_group_if_not_exists(logs_client, bucket_name, f"/dstack/runners/{bucket_name}")
 
 
 def _create_log_group_if_not_exists(
