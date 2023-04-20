@@ -105,12 +105,14 @@ def _get_repo_head_filename_prefix(repo_ref: RepoRef) -> str:
 
 def _parse_repo_head_filename(repo_head_filepath: str) -> Optional[RepoHead]:
     repo_heads_prefix = _get_repo_heads_prefix()
-    tokens = repo_head_filepath[len(repo_heads_prefix) :].split(";")
-    # Skipt legacy repo heads
-    if len(tokens) != 5:
+    try:
+        repo_type, repo_id, last_run_at, tags_count, repo_info = repo_head_filepath[
+            len(repo_heads_prefix) :
+        ].split(";")
+        repo_host_name, repo_port, repo_user_name, repo_name = repo_info.split(",")
+    except ValueError:
+        # Legacy repo head
         return None
-    repo_type, repo_id, last_run_at, tags_count, repo_info = tokens
-    repo_host_name, repo_port, repo_user_name, repo_name = repo_info.split(",")
     repo_info = RemoteRepoInfo(
         repo_host_name=repo_host_name,
         repo_port=repo_port or None,
