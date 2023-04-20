@@ -1,47 +1,24 @@
 import os
-from abc import ABC, abstractmethod
-from enum import Enum
-from typing import Optional, Union
+import tempfile
+from pathlib import Path
+from typing import Any, Dict, Optional
 
 import git
 import giturlparse
-from pydantic import BaseModel, Field, validator
+from pydantic import BaseModel
 from typing_extensions import Literal
 
+from dstack.core.repo import RepoProtocol
+from dstack.core.repo.base import Repo, RepoData, RepoRef
 from dstack.utils.common import PathLike
-from dstack.utils.ssh import get_host_config
-
-
-class RepoProtocol(Enum):
-    SSH = "ssh"
-    HTTPS = "https"
+from dstack.utils.ssh import get_host_config, make_ssh_command_for_git
+from dstack.utils.workflows import load_workflows
 
 
 class RemoteRepoCredentials(BaseModel):
     protocol: RepoProtocol
     private_key: Optional[str]
     oauth_token: Optional[str]
-
-
-class RepoRef(BaseModel):
-    repo_id: str
-    repo_user_id: str
-
-    @validator("repo_id", "repo_user_id")
-    def validate_id(cls, value):
-        for c in "/;":
-            if c in value:
-                raise ValueError(f"id can't contain `{c}`")
-        return value
-
-
-class RepoHead(RepoRef):
-    last_run_at: Optional[int] = None
-    tags_count: int = 0
-
-
-class RepoData(BaseModel):
-    repo_type: Literal["none"] = "none"
 
 
 class RemoteRepoData(RepoData):
@@ -80,31 +57,14 @@ class RemoteRepoData(RepoData):
             ]
         )
 
-
-class Repo(ABC):
-    def __init__(self, repo_ref: RepoRef, repo_data: RepoData):
-        self.repo_ref = repo_ref
-        self.repo_data = repo_data
-
-    @property
-    def repo_id(self) -> str:
-        return self.repo_ref.repo_id
-
-    @property
-    def repo_user_id(self) -> str:
-        return self.repo_ref.repo_user_id
-
-    @property
-    def repo_spec(self) -> "RepoSpec":
-        return RepoSpec(repo_ref=self.repo_ref, repo_data=self.repo_data)
-
-    @abstractmethod
-    def get_workflows(self, credentials: Optional[RemoteRepoCredentials] = None) -> list:
-        pass
-
-    @abstractmethod
-    def get_repo_diff(self) -> Optional[str]:
-        pass
+    def make_url(self, protocol: RepoProtocol, oauth_token: Optional[str] = None) -> str:
+        if protocol == RepoProtocol.HTTPS:
+            return f"https://{(oauth_token + '@') if oauth_token else ''}{self.path(sep='/')}.git"
+        elif protocol == RepoProtocol.SSH:
+            if self.repo_port:
+                return f"ssh@{self.path(sep='/')}.git"
+            else:
+                return f"git@{self.repo_host_name}:{self.repo_user_name}/{self.repo_name}.git"
 
 
 class RemoteRepo(Repo):
@@ -151,21 +111,40 @@ class RemoteRepo(Repo):
             repo_ref = RepoRef(repo_id=repo_data.path(), repo_user_id=repo_user_id)
         super().__init__(repo_ref, repo_data)
 
-    def get_workflows(self, credentials: Optional[RemoteRepoCredentials] = None) -> list:
-        raise NotImplementedError()
+    def get_workflows(
+        self, credentials: Optional[RemoteRepoCredentials] = None
+    ) -> Dict[str, Dict[str, Any]]:
+        if self.local_repo_dir is not None:
+            local_repo_dir = Path(self.local_repo_dir)
+        elif credentials is None:
+            raise RuntimeError("No credentials for remote only repo")
+        else:
+            temp_dir = tempfile.TemporaryDirectory()  # will be removed by garbage collector
+            local_repo_dir = Path(temp_dir.name)
+            _clone_remote_repo(local_repo_dir, self.repo_data, credentials, depth=1)
+        return load_workflows(local_repo_dir / ".dstack")
 
     def get_repo_diff(self) -> Optional[str]:
         return self.repo_data.repo_diff
 
 
-class RepoSpec(BaseModel):
-    """Serializable Repo representation"""
-
-    repo_ref: RepoRef
-    repo_data: Union[RepoData, RemoteRepoData] = Field(..., discriminator="repo_type")
-
-    @property
-    def repo(self) -> Repo:
-        """Constructs Repo implementation from `repo_data`"""
-        if isinstance(self.repo_data, RemoteRepoData):
-            return RemoteRepo(repo_ref=self.repo_ref, repo_data=self.repo_data)
+def _clone_remote_repo(
+    dst: PathLike, repo_data: RemoteRepoData, repo_credentials: RemoteRepoCredentials, **kwargs
+):
+    env = kwargs.pop("env", {})
+    if repo_credentials.protocol == RepoProtocol.HTTPS:
+        env["GIT_TERMINAL_PROMPT"] = "0"
+    elif repo_credentials.protocol == RepoProtocol.SSH:
+        tmp_identity_file = tempfile.NamedTemporaryFile(
+            "w+b"
+        )  # will be removed by garbage collector
+        tmp_identity_file.write(repo_credentials.private_key.encode())
+        tmp_identity_file.seek(0)
+        env["GIT_SSH_COMMAND"] = make_ssh_command_for_git(tmp_identity_file.name)
+    git.Repo.clone_from(
+        url=repo_data.make_url(repo_credentials.protocol, repo_credentials.oauth_token),
+        to_path=dst,
+        env=env,
+        **kwargs,
+    )
+    # todo checkout branch/hash

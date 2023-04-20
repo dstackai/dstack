@@ -237,6 +237,26 @@ class Backend(ABC):
     def delete_workflow_cache(self, workflow_name: str):
         pass
 
+    def run_workflow(
+        self, workflow_name: str, ssh_pub_key: Optional[str] = None, tag_name: Optional[str] = None
+    ) -> List[Job]:
+        # verify credentials
+        workflow = self.repo.get_workflows(credentials=self.get_repo_credentials()).get(
+            workflow_name
+        )
+        # get provider
+        # override args
+        # create run
+        if tag_name:
+            tag_head = self.get_tag_head(tag_name)
+            if tag_head:
+                self.delete_tag_head(tag_head)
+        # create job
+        # submit job
+        # update repo last run
+        # return job
+        # todo
+
 
 class RemoteBackend(Backend):
     def __init__(
