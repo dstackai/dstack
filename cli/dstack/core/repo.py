@@ -29,6 +29,7 @@ class RemoteRepoInfo(BaseModel):
     repo_name: str
 
 
+# TODO: fix backend methods so that they don't require RepoRef or remove repo_user_id from RepoRef
 class RepoRef(BaseModel):
     repo_type: Literal["remote"] = "remote"
     repo_id: str
