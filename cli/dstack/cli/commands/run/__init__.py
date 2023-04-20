@@ -302,43 +302,21 @@ class RunCommand(BasicCommand):
                         exit(1)
                 backend = remote_backend
 
-            (
-                provider_name,
-                provider_args,
-                workflow_name,
-                workflow_data,
-            ) = parse_run_args(args)
-            provider = providers.load_provider(provider_name)
-            if hasattr(args, "help") and args.help:
-                provider.help(workflow_name)
-                sys.exit()
+            if not config.repo_user_config.ssh_key_path:
+                ssh_pub_key = None
+            else:
+                ssh_pub_key = _read_ssh_key_pub(config.repo_user_config.ssh_key_path)
 
-            repo_credentials = backend._get_repo_credentials()
-            if not repo_credentials:
+            if not backend.get_repo_credentials():
                 console.print("Call `dstack init` first")
                 exit(1)
-            if not config.repo_user_config.ssh_key_path:
-                if (
-                    (backend.name != "local" and not args.detach)
-                    or workflow_data.get("ssh", False)
-                    or "--ssh" in provider_args
-                ):
-                    console.print("Call `dstack init` first")
-                    console.print("  [gray58]No valid SSH identity[/]")
-                    exit(1)
-            else:
-                workflow_data["ssh_key_pub"] = _read_ssh_key_pub(
-                    config.repo_user_config.ssh_key_path
-                )
+            run_name, jobs = backend.run_workflow(
+                args.workflow_or_provider,
+                ssh_pub_key=ssh_pub_key,
+                tag_name=args.tag_name,
+                args=args,
+            )
 
-            run_name = backend.create_run()
-            provider.load(backend, provider_args, workflow_name, workflow_data, run_name)
-            if args.tag_name:
-                tag_head = backend.get_tag_head(args.tag_name)
-                if tag_head:
-                    backend.delete_tag_head(tag_head)
-            jobs = provider.submit_jobs(backend, args.tag_name)
-            backend.update_repo_last_run_at(last_run_at=int(round(time.time() * 1000)))
             runs_with_merged_backends = list_runs_with_merged_backends(
                 [backend], run_name=run_name
             )
@@ -348,11 +326,14 @@ class RunCommand(BasicCommand):
                 console.print("\nProvisioning failed\n")
                 exit(1)
             if not args.detach:
+                openssh_server = any(
+                    spec.app_name == "openssh-server" for spec in jobs[0].app_specs or []
+                )
                 poll_run(
                     jobs,
                     backend,
                     ssh_key=config.repo_user_config.ssh_key_path,
-                    openssh_server=provider.openssh_server,
+                    openssh_server=openssh_server,
                 )
         except ValidationError as e:
             sys.exit(

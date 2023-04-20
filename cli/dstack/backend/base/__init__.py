@@ -1,10 +1,13 @@
+import argparse
 import sys
+import time
 from abc import ABC, abstractmethod
 from enum import Enum
-from typing import Any, Generator, List, Optional
+from typing import Any, Dict, Generator, List, Optional
 
+import dstack.providers as providers
 from dstack.api.repos import get_local_repo_credentials
-from dstack.backend.base import jobs
+from dstack.backend.base import jobs as base_jobs
 from dstack.core.artifact import Artifact
 from dstack.core.config import BackendConfig, Configurator
 from dstack.core.job import Job, JobHead, JobStatus
@@ -68,7 +71,7 @@ class Backend(ABC):
         self.run_job(job, failed_to_start_job_new_status)
 
     def resubmit_job(self, job: Job, failed_to_start_job_new_status: JobStatus = JobStatus.FAILED):
-        jobs.update_job_submission(job)
+        base_jobs.update_job_submission(job)
         self.run_job(job, failed_to_start_job_new_status)
 
     @abstractmethod
@@ -238,24 +241,35 @@ class Backend(ABC):
         pass
 
     def run_workflow(
-        self, workflow_name: str, ssh_pub_key: Optional[str] = None, tag_name: Optional[str] = None
-    ) -> List[Job]:
-        # verify credentials
+        self,
+        workflow_name: str,
+        tag_name: Optional[str] = None,
+        ssh_pub_key: Optional[str] = None,
+        args: Optional[argparse.Namespace] = None,
+    ) -> (str, List[Job]):
+        """Runs workflow or provider by name
+        :return: run_name, jobs
+        """
         workflow = self.repo.get_workflows(credentials=self.get_repo_credentials()).get(
-            workflow_name
+            workflow_name, {}
         )
-        # get provider
-        # override args
-        # create run
+        if workflow:
+            provider = providers.load_provider(workflow["provider"])
+        elif workflow_name in providers.get_provider_names():
+            provider = providers.load_provider(workflow_name)
+            workflow_name = None
+        else:
+            raise NameError(f"No workflow or provider '{workflow_name}' is found")
+
+        run_name = self.create_run()
+        provider.load(self, args, workflow_name, workflow, run_name, ssh_pub_key)
         if tag_name:
             tag_head = self.get_tag_head(tag_name)
             if tag_head:
                 self.delete_tag_head(tag_head)
-        # create job
-        # submit job
-        # update repo last run
-        # return job
-        # todo
+        jobs = provider.submit_jobs(self, tag_name)
+        self.update_repo_last_run_at(last_run_at=int(round(time.time() * 1000)))
+        return run_name, jobs
 
 
 class RemoteBackend(Backend):
