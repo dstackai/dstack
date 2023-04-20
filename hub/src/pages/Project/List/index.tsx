@@ -153,7 +153,10 @@ export const ProjectList: React.FC = () => {
                 variant="full-page"
                 cardDefinition={{
                     header: (project) => (
-                        <NavigateLink fontSize="heading-m" href={ROUTES.PROJECT.DETAILS.FORMAT(project.project_name)}>
+                        <NavigateLink
+                            fontSize="heading-m"
+                            href={ROUTES.PROJECT.DETAILS.REPOSITORIES.FORMAT(project.project_name)}
+                        >
                             {project.project_name}
                         </NavigateLink>
                     ),

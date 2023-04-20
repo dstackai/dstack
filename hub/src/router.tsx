@@ -4,7 +4,14 @@ import { Navigate } from 'react-router-dom';
 
 import App from 'App';
 import { Logout } from 'App/Logout';
-import { ProjectAdd, ProjectDetails, ProjectEditBackend, ProjectList } from 'pages/Project';
+import {
+    ProjectAdd,
+    ProjectDetails,
+    ProjectEditBackend,
+    ProjectList,
+    ProjectRepositories,
+    ProjectSettings,
+} from 'pages/Project';
 import { UserAdd, UserDetails, UserEdit, UserList } from 'pages/User';
 
 import { AuthErrorMessage } from './App/AuthErrorMessage';
@@ -28,6 +35,16 @@ export const router = createBrowserRouter([
             {
                 path: ROUTES.PROJECT.DETAILS.TEMPLATE,
                 element: <ProjectDetails />,
+                children: [
+                    {
+                        path: ROUTES.PROJECT.DETAILS.REPOSITORIES.TEMPLATE,
+                        element: <ProjectRepositories />,
+                    },
+                    {
+                        path: ROUTES.PROJECT.DETAILS.SETTINGS.TEMPLATE,
+                        element: <ProjectSettings />,
+                    },
+                ],
             },
             {
                 path: ROUTES.PROJECT.EDIT_BACKEND.TEMPLATE,

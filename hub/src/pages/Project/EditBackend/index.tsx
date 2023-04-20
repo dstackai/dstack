@@ -26,7 +26,7 @@ export const ProjectEditBackend: React.FC = () => {
         },
         {
             text: paramProjectName,
-            href: ROUTES.PROJECT.DETAILS.FORMAT(paramProjectName),
+            href: ROUTES.PROJECT.DETAILS.REPOSITORIES.FORMAT(paramProjectName),
         },
 
         {
@@ -36,7 +36,7 @@ export const ProjectEditBackend: React.FC = () => {
     ]);
 
     const onCancelHandler = () => {
-        navigate(ROUTES.PROJECT.DETAILS.FORMAT(paramProjectName));
+        navigate(ROUTES.PROJECT.DETAILS.REPOSITORIES.FORMAT(paramProjectName));
     };
 
     const onSubmitHandler = async (data: Partial<IProject>): Promise<IProject> => {
@@ -53,7 +53,7 @@ export const ProjectEditBackend: React.FC = () => {
                 content: t('projects.edit.success_notification'),
             });
 
-            navigate(ROUTES.PROJECT.DETAILS.FORMAT(data.project_name ?? paramProjectName));
+            navigate(ROUTES.PROJECT.DETAILS.REPOSITORIES.FORMAT(data.project_name ?? paramProjectName));
         } catch (e) {
             console.log(e);
         }

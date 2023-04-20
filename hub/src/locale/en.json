@@ -39,6 +39,8 @@
     "nomatch_message_title": "No matches",
     "nomatch_message_text": "We can't find a match.",
     "nomatch_message_button_label": "Clear filter",
+    "repositories": "Repositories",
+    "settings": "Settings",
     "card": {
       "backend": "Backend",
       "region": "Region",

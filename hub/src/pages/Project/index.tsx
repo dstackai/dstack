@@ -1,6 +1,8 @@
 import React from 'react';
 export { ProjectList } from './List';
 export { ProjectDetails } from './Details';
+export { ProjectRepositories } from './Details/Repositories';
+export { ProjectSettings } from './Details/Settings';
 export { ProjectEditBackend } from './EditBackend';
 export { ProjectAdd } from './Add';
 
