@@ -21,12 +21,40 @@ class RemoteRepoCredentials(BaseModel):
     oauth_token: Optional[str]
 
 
-class RemoteRepoData(RepoData):
-    repo_type: Literal["remote"] = "remote"
+class RemoteRepoInfo(BaseModel):
     repo_host_name: str
     repo_port: Optional[int]
     repo_user_name: str
     repo_name: str
+
+
+# TODO: fix backend methods so that they don't require RepoRef or remove repo_user_id from RepoRef
+class RepoRef(BaseModel):
+    repo_type: Literal["remote"] = "remote"
+    repo_id: str
+    repo_user_id: str
+
+    @validator("repo_id", "repo_user_id")
+    def validate_id(cls, value):
+        for c in "/;":
+            if c in value:
+                raise ValueError(f"id can't contain `{c}`")
+        return value
+
+
+class RemoteRepoHead(BaseModel):
+    repo_type: Literal["remote"] = "remote"
+    repo_id: str
+    last_run_at: Optional[int] = None
+    tags_count: int = 0
+    repo_info: RemoteRepoInfo
+
+
+RepoHead = RemoteRepoHead
+
+
+class RemoteRepoData(RepoData, RemoteRepoInfo):
+    repo_type: Literal["remote"] = "remote"
     repo_branch: Optional[str] = None
     repo_hash: Optional[str] = None
     repo_diff: Optional[str] = None
