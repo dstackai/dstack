@@ -15,6 +15,7 @@ from dstack.core.tag import TagHead
 from dstack.hub.models import (
     AddTagPath,
     AddTagRun,
+    JobHeadList,
     JobsGet,
     JobsList,
     LinkUpload,
@@ -103,7 +104,7 @@ class HubClient:
             url=url,
             headers=self._headers(),
             data=JobsGet(
-                repo_spec=self.repo.repo_spec,
+                repo_id=self.repo.repo_id,
                 job_id=job_id,
             ).json(),
         )
@@ -123,7 +124,7 @@ class HubClient:
             host=self.url,
             url=url,
             headers=self._headers(),
-            data=JobsList(repo_spec=self.repo.repo_spec, run_name=run_name).json(),
+            data=JobsList(repo_id=self.repo.repo_id, run_name=run_name).json(),
         )
         if resp.ok:
             body = resp.json()
@@ -169,18 +170,13 @@ class HubClient:
         resp.raise_for_status()
 
     def list_job_heads(self, run_name: Optional[str] = None) -> Optional[List[JobHead]]:
-        query = {}
-        if run_name is not None:
-            query["run_name"] = run_name
-        url = _url(
-            url=self.url, project=self.project, additional_path=f"/jobs/list/heads", query=query
-        )
+        url = _url(url=self.url, project=self.project, additional_path=f"/jobs/list/heads")
         resp = _make_hub_request(
             requests.post,
             host=self.url,
             url=url,
             headers=self._headers(),
-            data=self.repo.repo_spec.json(),
+            data=JobHeadList(repo_id=self.repo.repo_id, run_name=run_name).json(),
         )
         if resp.ok:
             body = resp.json()
@@ -198,7 +194,7 @@ class HubClient:
             host=self.url,
             url=url,
             headers=self._headers(),
-            data=JobsGet(repo_spec=self.repo.repo_spec, job_id=job_id).json(),
+            data=JobsGet(repo_id=self.repo.repo_id, job_id=job_id).json(),
         )
         if resp.ok:
             return
@@ -326,7 +322,7 @@ class HubClient:
             url=url,
             headers=self._headers(),
             data=RunsList(
-                repo_spec=self.repo.repo_spec,
+                repo_id=self.repo.repo_id,
                 run_name=run_name,
                 include_request_heads=include_request_heads,
             ).json(),
@@ -517,7 +513,7 @@ class HubClient:
             host=self.url,
             url=url,
             headers=self._headers(),
-            data=JobsList(repo_spec=self.repo.repo_spec, run_name=run_name).json(),
+            data=JobsList(repo_id=self.repo.repo_id, run_name=run_name).json(),
         )
         if resp.ok:
             artifact_data = resp.json()
@@ -541,7 +537,7 @@ class HubClient:
             url=url,
             headers=self._headers(),
             data=PollLogs(
-                repo_spec=self.repo.repo_spec,
+                repo_id=self.repo.repo_id,
                 job_heads=job_heads,
                 start_time=start_time,
                 attached=attached,

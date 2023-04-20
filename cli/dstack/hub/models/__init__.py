@@ -152,23 +152,28 @@ class ReposUpdate(BaseModel):
 
 
 class RunsList(BaseModel):
-    repo_spec: RepoSpec
+    repo_id: str
     run_name: Optional[str]
     include_request_heads: Optional[bool]
 
 
+class JobHeadList(BaseModel):
+    repo_id: str
+    run_name: Optional[str]
+
+
 class JobsGet(BaseModel):
-    repo_spec: RepoSpec
+    repo_id: str
     job_id: str
 
 
 class JobsList(BaseModel):
-    repo_spec: RepoSpec
+    repo_id: str
     run_name: str
 
 
 class ArtifactsList(BaseModel):
-    repo_spec: RepoSpec
+    repo_id: str
     run_name: str
 
 
@@ -178,7 +183,7 @@ class SecretAddUpdate(BaseModel):
 
 
 class PollLogs(BaseModel):
-    repo_spec: RepoSpec
+    repo_id: str
     job_heads: List[JobHead]
     start_time: int
     attached: bool

@@ -77,11 +77,12 @@ class JSONStreamingResponse(Response):
 )
 async def poll_logs(project_name: str, body: PollLogs):
     project = await get_project(project_name=project_name)
-    backend = get_backend(project, body.repo_spec.repo)
+    backend = get_backend(project)
     return JSONStreamingResponse(
         content=backend.poll_logs(
             job_heads=body.job_heads,
             start_time=body.start_time,
             attached=body.attached,
+            repo_id=body.repo_id,
         ),
     )

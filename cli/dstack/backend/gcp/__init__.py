@@ -23,7 +23,7 @@ from dstack.core.artifact import Artifact
 from dstack.core.error import ConfigError
 from dstack.core.job import Job, JobHead, JobStatus
 from dstack.core.log_event import LogEvent
-from dstack.core.repo import RemoteRepoCredentials, Repo, RepoHead, RepoRef
+from dstack.core.repo import RemoteRepoCredentials, Repo, RepoHead
 from dstack.core.run import RunHead
 from dstack.core.secret import Secret
 from dstack.core.tag import TagHead
@@ -103,9 +103,9 @@ class GCPBackend(CloudBackend):
             exit(1)
         base_jobs.create_job(self._storage, job)
 
-    def get_job(self, job_id: str, repo_ref: Optional[RepoRef] = None) -> Optional[Job]:
-        repo_ref = repo_ref or self.repo.repo_ref
-        return base_jobs.get_job(self._storage, repo_ref.repo_id, job_id)
+    def get_job(self, job_id: str, repo_id: Optional[str] = None) -> Optional[Job]:
+        repo_id = repo_id or self.repo.repo_ref.repo_id
+        return base_jobs.get_job(self._storage, repo_id, job_id)
 
     def list_jobs(self, run_name: str) -> List[Job]:
         return base_jobs.list_jobs(self._storage, self.repo.repo_id, run_name)
@@ -117,22 +117,23 @@ class GCPBackend(CloudBackend):
         base_jobs.stop_job(self._storage, self._compute, self.repo.repo_id, job_id, abort)
 
     def list_job_heads(
-        self, run_name: Optional[str] = None, repo_ref: Optional[RepoRef] = None
+        self, run_name: Optional[str] = None, repo_id: Optional[str] = None
     ) -> List[JobHead]:
-        repo_ref = repo_ref or self.repo.repo_ref
-        return base_jobs.list_job_heads(self._storage, repo_ref.repo_id, run_name)
+        repo_id = repo_id or self.repo.repo_ref.repo_id
+        return base_jobs.list_job_heads(self._storage, repo_id, run_name)
 
-    def delete_job_head(self, job_id: str):
-        base_jobs.delete_job_head(self._storage, self.repo.repo_id, job_id)
+    def delete_job_head(self, job_id: str, repo_id: Optional[str] = None):
+        repo_id = repo_id or self.repo.repo_ref.repo_id
+        base_jobs.delete_job_head(self._storage, repo_id, job_id)
 
     def list_run_heads(
         self,
         run_name: Optional[str] = None,
         include_request_heads: bool = True,
         interrupted_job_new_status: JobStatus = JobStatus.FAILED,
-        repo_ref: Optional[RepoRef] = None,
+        repo_id: Optional[str] = None,
     ) -> List[RunHead]:
-        job_heads = self.list_job_heads(run_name, repo_ref=repo_ref)
+        job_heads = self.list_job_heads(run_name, repo_id=repo_id)
         return base_runs.get_run_heads(
             self._storage,
             self._compute,
@@ -146,16 +147,21 @@ class GCPBackend(CloudBackend):
         job_heads: List[JobHead],
         start_time: int,
         attached: bool,
+        repo_id: Optional[str] = None,
     ) -> Generator[LogEvent, None, None]:
+        repo_id = repo_id or self.repo.repo_ref.repo_id
         yield from self._logging.poll_logs(
             storage=self._storage,
-            repo_id=self.repo.repo_id,
+            repo_id=repo_id,
             run_name=job_heads[0].run_name,
             start_time=start_time,
         )
 
-    def list_run_artifact_files(self, run_name: str) -> List[Artifact]:
-        return base_artifacts.list_run_artifact_files(self._storage, self.repo.repo_id, run_name)
+    def list_run_artifact_files(
+        self, run_name: str, repo_id: Optional[str] = None
+    ) -> List[Artifact]:
+        repo_id = repo_id or self.repo.repo_ref.repo_id
+        return base_artifacts.list_run_artifact_files(self._storage, repo_id, run_name)
 
     def download_run_artifact_files(
         self,

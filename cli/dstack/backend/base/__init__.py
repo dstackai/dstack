@@ -9,7 +9,7 @@ from dstack.core.artifact import Artifact
 from dstack.core.config import BackendConfig, Configurator
 from dstack.core.job import Job, JobHead, JobStatus
 from dstack.core.log_event import LogEvent
-from dstack.core.repo import RemoteRepo, RemoteRepoCredentials, Repo, RepoHead, RepoRef
+from dstack.core.repo import RemoteRepo, RemoteRepoCredentials, Repo, RepoHead
 from dstack.core.run import RunHead
 from dstack.core.secret import Secret
 from dstack.core.tag import TagHead
@@ -72,11 +72,11 @@ class Backend(ABC):
         self.run_job(job, failed_to_start_job_new_status)
 
     @abstractmethod
-    def get_job(self, job_id: str, repo_ref: Optional[RepoRef] = None) -> Optional[Job]:
+    def get_job(self, job_id: str, repo_id: Optional[str] = None) -> Optional[Job]:
         pass
 
     @abstractmethod
-    def list_jobs(self, run_name: str) -> List[Job]:
+    def list_jobs(self, run_name: str, repo_id: Optional[str] = None) -> List[Job]:
         pass
 
     @abstractmethod
@@ -95,12 +95,12 @@ class Backend(ABC):
 
     @abstractmethod
     def list_job_heads(
-        self, run_name: Optional[str] = None, repo_ref: Optional[RepoRef] = None
+        self, run_name: Optional[str] = None, repo_id: Optional[str] = None
     ) -> List[JobHead]:
         pass
 
     @abstractmethod
-    def delete_job_head(self, job_id: str):
+    def delete_job_head(self, job_id: str, repo_id: Optional[str] = None):
         pass
 
     def delete_job_heads(self, run_name: Optional[str]):
@@ -120,7 +120,7 @@ class Backend(ABC):
         run_name: Optional[str] = None,
         include_request_heads: bool = True,
         interrupted_job_new_status: JobStatus = JobStatus.FAILED,
-        repo_ref: Optional[RepoRef] = None,
+        repo_id: Optional[str] = None,
     ) -> List[RunHead]:
         pass
 
@@ -130,11 +130,14 @@ class Backend(ABC):
         job_heads: List[JobHead],
         start_time: int,
         attached: bool,
+        repo_id: Optional[str] = None,
     ) -> Generator[LogEvent, None, None]:
         pass
 
     @abstractmethod
-    def list_run_artifact_files(self, run_name: str) -> List[Artifact]:
+    def list_run_artifact_files(
+        self, run_name: str, repo_id: Optional[str] = None
+    ) -> List[Artifact]:
         # TODO: add a flag for non-recursive listing.
         # Backends may implement this via list_run_artifact_files_and_folders()
         pass
