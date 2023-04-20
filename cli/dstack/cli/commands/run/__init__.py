@@ -29,6 +29,7 @@ from dstack.cli.common import (
     print_runs,
 )
 from dstack.cli.config import config
+from dstack.core.error import NotInitializedError
 from dstack.core.job import Job, JobHead, JobStatus
 from dstack.core.repo import RemoteRepo
 from dstack.core.request import RequestStatus
@@ -253,14 +254,14 @@ class RunCommand(BasicCommand):
                         exit(1)
                 backend = remote_backend
 
+            if not backend.get_repo_credentials():
+                raise NotInitializedError("No credentials")
+
             if not config.repo_user_config.ssh_key_path:
                 ssh_pub_key = None
             else:
                 ssh_pub_key = _read_ssh_key_pub(config.repo_user_config.ssh_key_path)
 
-            if not backend.get_repo_credentials():
-                console.print("Call `dstack init` first")
-                exit(1)
             run_name, jobs = backend.run_workflow(
                 args.workflow_or_provider,
                 ssh_pub_key=ssh_pub_key,
