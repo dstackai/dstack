@@ -4,13 +4,11 @@ import sys
 import time
 from argparse import Namespace
 from pathlib import Path
-from typing import Any, Dict, List, Optional, Tuple
+from typing import Dict, List, Optional
 
-import pkg_resources
 import websocket
-import yaml
 from cursor import cursor
-from jsonschema import ValidationError, validate
+from jsonschema import ValidationError
 from rich.progress import Progress, SpinnerColumn, TextColumn
 from rich.prompt import Confirm
 from websocket import WebSocketApp
@@ -34,6 +32,7 @@ from dstack.cli.config import config
 from dstack.core.job import Job, JobHead, JobStatus
 from dstack.core.repo import RemoteRepo
 from dstack.core.request import RequestStatus
+from dstack.utils.workflows import load_workflows
 
 __all__ = "RunCommand"
 
@@ -42,58 +41,9 @@ POLL_PROVISION_RATE_SECS = 3
 POLL_FINISHED_STATE_RATE_SECS = 1
 
 
-def _load_workflows_from_file(workflows_file: Path) -> List[Any]:
-    workflows_yaml = yaml.load(workflows_file.open(), Loader=yaml.FullLoader)
-    workflows_schema_yaml = pkg_resources.resource_string("dstack.schemas", "workflows.json")
-    validate(workflows_yaml, yaml.load(workflows_schema_yaml, Loader=yaml.FullLoader))
-    return workflows_yaml.get("workflows") or []
-
-
-def _load_workflows():
-    workflows = []
-    root_folder = Path(os.getcwd()) / ".dstack"
-    if root_folder.exists():
-        workflows_file = root_folder / "workflows.yaml"
-        if workflows_file.exists():
-            workflows.extend(_load_workflows_from_file(workflows_file))
-        workflows_dir = root_folder / "workflows"
-        if workflows_dir.is_dir():
-            for workflows_file in os.listdir(workflows_dir):
-                workflows_file_path = workflows_dir / workflows_file
-                if workflows_file_path.name.endswith(".yaml") or workflows_file_path.name.endswith(
-                    ".yml"
-                ):
-                    workflows.extend(_load_workflows_from_file(workflows_file_path))
-    return workflows
-
-
 def _read_ssh_key_pub(key_path: str) -> str:
     path = Path(key_path)
     return path.with_suffix(path.suffix + ".pub").read_text().strip("\n")
-
-
-def parse_run_args(
-    args: Namespace,
-) -> Tuple[str, List[str], Optional[str], Dict[str, Any]]:
-    provider_args = args.args + args.unknown
-    workflow_name = None
-    workflow_data = {}
-
-    workflows = _load_workflows()
-    workflow_names = [w.get("name") for w in workflows]
-    workflow_providers = {w.get("name"): w.get("provider") for w in workflows}
-
-    if args.workflow_or_provider in workflow_names:
-        workflow_name = args.workflow_or_provider
-        workflow_data = next(w for w in workflows if w.get("name") == workflow_name)
-        provider_name = workflow_providers[workflow_name]
-    else:
-        if args.workflow_or_provider not in providers.get_provider_names():
-            sys.exit(f"No workflow or provider '{args.workflow_or_provider}' is found")
-
-        provider_name = args.workflow_or_provider
-
-    return provider_name, provider_args, workflow_name, workflow_data
 
 
 def poll_logs_ws(backend: Backend, job: Job, ports: Dict[int, int]):
@@ -235,8 +185,9 @@ class RunCommand(BasicCommand):
         super(RunCommand, self).__init__(parser)
 
     def register(self):
-        workflows = _load_workflows()
-        workflow_names = [w["name"] for w in workflows if w.get("name")]
+        workflow_names = list(
+            load_workflows(os.path.join(os.getcwd(), ".dstack")).keys()
+        )  # todo use repo
         provider_names = providers.get_provider_names()
         workflow_or_provider_names = workflow_names + provider_names
         workflow_help = "{" + ",".join(workflow_or_provider_names) + "}"
