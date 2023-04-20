@@ -25,8 +25,13 @@ from dstack.utils.common import PathLike
 
 
 class LocalBackend(Backend):
-    def __init__(self, repo: Repo):
-        super().__init__(repo=repo)
+    def __init__(
+        self,
+        repo: Repo,
+        credentials: Optional[RemoteRepoCredentials] = None,
+        auto_init: bool = False,
+    ):
+        super().__init__(repo=repo, credentials=credentials, auto_init=auto_init)
         self.backend_config = LocalConfig()
         self.backend_config.load()
         self._loaded = True
