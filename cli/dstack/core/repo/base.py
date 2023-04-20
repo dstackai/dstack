@@ -11,7 +11,9 @@ class RepoProtocol(Enum):
     HTTPS = "https"
 
 
+# TODO: fix backend methods so that they don't require RepoRef or remove repo_user_id from RepoRef
 class RepoRef(BaseModel):
+    repo_type: Literal["remote"] = "remote"
     repo_id: str
     repo_user_id: str
 
@@ -21,11 +23,6 @@ class RepoRef(BaseModel):
             if c in value:
                 raise ValueError(f"id can't contain `{c}`")
         return value
-
-
-class RepoHead(RepoRef):
-    last_run_at: Optional[int] = None
-    tags_count: int = 0
 
 
 class RepoData(BaseModel):

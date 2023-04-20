@@ -9,7 +9,7 @@ from rich.table import Table
 
 from dstack.backend.base import Backend
 from dstack.core.error import BackendError, ConfigError, NotInitializedError
-from dstack.core.job import JobStatus
+from dstack.core.job import JobErrorCode, JobStatus
 from dstack.core.request import RequestStatus
 from dstack.core.run import RunHead
 from dstack.utils.common import pretty_date
@@ -74,7 +74,14 @@ def ask_choice(
                 return ask_choice(title, labels, values, selected_value, show_choices)
 
 
-def generate_runs_table(runs_with_backends: List[Tuple[RunHead, List[Backend]]]):
+def print_runs(runs_with_backends: List[Tuple[RunHead, List[Backend]]], verbose: bool = False):
+    table = generate_runs_table(runs_with_backends, verbose=verbose)
+    console.print(table)
+
+
+def generate_runs_table(
+    runs_with_backends: List[Tuple[RunHead, List[Backend]]], verbose: bool = False
+):
     table = Table(box=None)
     table.add_column("RUN", style="bold", no_wrap=True)
     table.add_column("WORKFLOW", style="grey58", max_width=16)
@@ -83,24 +90,26 @@ def generate_runs_table(runs_with_backends: List[Tuple[RunHead, List[Backend]]])
     table.add_column("STATUS", no_wrap=True)
     table.add_column("TAG", style="bold yellow", no_wrap=True)
     table.add_column("BACKENDS", style="bold green", no_wrap=True)
+    if verbose:
+        table.add_column("ERROR", no_wrap=True)
 
     for run, backends in runs_with_backends:
         submitted_at = pretty_date(round(run.submitted_at / 1000))
-        table.add_row(
+        row = [
             _status_color(run, run.run_name, True, False),
             _status_color(run, run.workflow_name or run.provider_name, False, False),
             _status_color(run, submitted_at, False, False),
             _status_color(run, run.repo_user_id or "", False, False),
-            pretty_print_status(run),
+            _pretty_print_status(run),
             _status_color(run, run.tag_name or "", False, False),
             _status_color(run, ", ".join(b.name for b in backends), False, False),
-        )
+        ]
+        if verbose:
+            row += [
+                _pretty_print_error_code(run),
+            ]
+        table.add_row(*row)
     return table
-
-
-def print_runs(runs_with_backends: List[Tuple[RunHead, List[Backend]]]):
-    table = generate_runs_table(runs_with_backends)
-    console.print(table)
 
 
 _status_colors = {
@@ -118,15 +127,15 @@ _status_colors = {
 }
 
 
-def pretty_print_status(run: RunHead) -> str:
+def _pretty_print_status(run: RunHead) -> str:
     status_color = _status_colors.get(run.status)
-    status = run.status.value
-    status = status[:1].upper() + status[1:]
+    status = run.status.value.capitalize()
     s = f"[{status_color}]{status}[/]"
-    if run.has_request_status([RequestStatus.TERMINATED]):
-        s += "\n[red]Request(s) terminated[/]"
-    elif run.has_request_status([RequestStatus.NO_CAPACITY]):
-        s += " \n[dark_orange]No capacity[/]"
+    if run.status.is_unfinished() and run.status != JobStatus.PENDING:
+        if run.has_request_status([RequestStatus.TERMINATED]):
+            s += "\n[red]Request(s) terminated[/]"
+        elif run.has_request_status([RequestStatus.NO_CAPACITY]):
+            s += " \n[dark_orange]No capacity[/]"
     return s
 
 
@@ -138,6 +147,18 @@ def _status_color(run: RunHead, val: str, run_column: bool, status_column: bool)
     else:
         color = _status_colors.get(run.status)
     return f"[{'bold ' if run_column else ''}{color}]{val}[/]" if color is not None else val
+
+
+def _pretty_print_error_code(run: RunHead) -> str:
+    if run.status != JobStatus.FAILED:
+        return ""
+    for job_head in run.job_heads:
+        if job_head.error_code is not None:
+            if job_head.error_code == JobErrorCode.CONTAINER_EXITED_WITH_ERROR:
+                return f"[red]Exit code: {job_head.container_exit_code}[/]"
+            else:
+                return f"[red]{job_head.error_code.pretty_repr()}[/]"
+    return ""
 
 
 def check_config(func):

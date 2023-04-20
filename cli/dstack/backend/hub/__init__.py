@@ -11,7 +11,7 @@ from dstack.core.config import BackendConfig
 from dstack.core.error import ConfigError
 from dstack.core.job import Job, JobHead, JobStatus
 from dstack.core.log_event import LogEvent
-from dstack.core.repo import RemoteRepoCredentials, Repo, RepoRef
+from dstack.core.repo import RemoteRepoCredentials, Repo, RepoHead
 from dstack.core.run import RunHead
 from dstack.core.secret import Secret
 from dstack.core.tag import TagHead
@@ -66,10 +66,10 @@ class HubBackend(RemoteBackend):
     def create_job(self, job: Job):
         self._hub_client().create_job(job=job)
 
-    def get_job(self, job_id: str, repo_ref: Optional[RepoRef] = None) -> Optional[Job]:
+    def get_job(self, job_id: str, repo_id: Optional[str] = None) -> Optional[Job]:
         return self._hub_client().get_job(job_id=job_id)
 
-    def list_jobs(self, run_name: str) -> List[Job]:
+    def list_jobs(self, run_name: str, repo_id: Optional[str] = None) -> List[Job]:
         return self._hub_client().list_jobs(run_name=run_name)
 
     def run_job(self, job: Job, failed_to_start_job_new_status: JobStatus):
@@ -79,11 +79,11 @@ class HubBackend(RemoteBackend):
         self._hub_client().stop_job(job_id=job_id, abort=abort)
 
     def list_job_heads(
-        self, run_name: Optional[str] = None, repo_ref: Optional[RepoRef] = None
+        self, run_name: Optional[str] = None, repo_id: Optional[str] = None
     ) -> List[JobHead]:
         return self._hub_client().list_job_heads(run_name=run_name)
 
-    def delete_job_head(self, job_id: str):
+    def delete_job_head(self, job_id: str, repo_id: Optional[str] = None):
         self._hub_client().delete_job_head(job_id=job_id)
 
     def list_run_heads(
@@ -91,7 +91,7 @@ class HubBackend(RemoteBackend):
         run_name: Optional[str] = None,
         include_request_heads: bool = True,
         interrupted_job_new_status: JobStatus = JobStatus.FAILED,
-        repo_ref: Optional[RepoRef] = None,
+        repo_id: Optional[str] = None,
     ) -> List[RunHead]:
         return self._hub_client().list_run_heads(
             run_name=run_name,
@@ -103,6 +103,7 @@ class HubBackend(RemoteBackend):
         job_heads: List[JobHead],
         start_time: int,
         attached: bool,
+        repo_id: Optional[str] = None,
     ) -> Generator[LogEvent, None, None]:
         # /{hub_name}/logs/poll
         return self._hub_client().poll_logs(
@@ -111,7 +112,9 @@ class HubBackend(RemoteBackend):
             attached=attached,
         )
 
-    def list_run_artifact_files(self, run_name: str) -> List[Artifact]:
+    def list_run_artifact_files(
+        self, run_name: str, repo_id: Optional[str] = None
+    ) -> List[Artifact]:
         # /{hub_name}/artifacts/list
         return self._hub_client().list_run_artifact_files(run_name=run_name)
 
@@ -175,6 +178,9 @@ class HubBackend(RemoteBackend):
     def update_repo_last_run_at(self, last_run_at: int):
         # /{hub_name}/repos/update
         return self._hub_client().update_repo_last_run_at(last_run_at=last_run_at)
+
+    def list_repo_heads(self) -> List[RepoHead]:
+        return self._hub_client().list_repo_heads()
 
     def _get_repo_credentials(self) -> Optional[RemoteRepoCredentials]:
         return self._hub_client().get_repos_credentials()

@@ -105,6 +105,18 @@ class JobStatus(Enum):
         return not self.is_finished()
 
 
+class JobErrorCode(Enum):
+    # Set by CLI
+    NO_INSTANCE_MATCHING_REQUIREMENTS = "no_instance_matching_requirements"
+    FAILED_TO_START_DUE_TO_NO_CAPACITY = "failed_to_start_due_to_no_capacity"
+    INTERRUPTED_BY_NO_CAPACITY = "interrupted_by_no_capacity"
+    # Set by runner
+    CONTAINER_EXITED_WITH_ERROR = "container_exited_with_error"
+
+    def pretty_repr(self) -> str:
+        return " ".join(self.value.split("_")).capitalize()
+
+
 class JobHead(JobRef):
     job_id: str
     repo_ref: RepoRef
@@ -112,6 +124,8 @@ class JobHead(JobRef):
     workflow_name: Optional[str]
     provider_name: str
     status: JobStatus
+    error_code: Optional[JobErrorCode]
+    container_exit_code: Optional[int]
     submitted_at: int
     artifact_paths: Optional[List[str]]
     tag_name: Optional[str]
@@ -173,6 +187,8 @@ class Job(JobHead):
     workflow_name: Optional[str]
     provider_name: str
     status: JobStatus
+    error_code: Optional[JobErrorCode]
+    container_exit_code: Optional[int]
     submitted_at: int
     submission_num: int = 1
     image_name: str
@@ -282,6 +298,8 @@ class Job(JobHead):
             "workflow_name": self.workflow_name or "",
             "provider_name": self.provider_name,
             "status": self.status.value,
+            "error_code": self.error_code.value if self.error_code is not None else "",
+            "container_exit_code": self.container_exit_code or "",
             "submitted_at": self.submitted_at,
             "submission_num": self.submission_num,
             "image_name": self.image_name,
@@ -394,6 +412,8 @@ class Job(JobHead):
                 for a in (job_data.get("apps") or [])
             ]
         ) or None
+        error_code = job_data.get("error_code")
+        container_exit_code = job_data.get("container_exit_code")
         job = Job(
             job_id=job_data["job_id"],
             repo_ref=RepoRef(
@@ -413,6 +433,8 @@ class Job(JobHead):
             workflow_name=job_data.get("workflow_name") or None,
             provider_name=job_data["provider_name"],
             status=JobStatus(job_data["status"]),
+            error_code=JobErrorCode(error_code) if error_code else None,
+            container_exit_code=int(container_exit_code) if container_exit_code else None,
             submitted_at=job_data["submitted_at"],
             submission_num=job_data.get("submission_num") or 1,
             image_name=job_data["image_name"],

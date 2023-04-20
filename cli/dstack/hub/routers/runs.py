@@ -32,10 +32,11 @@ async def create_run(project_name: str, repo_spec: RepoSpec) -> str:
 )
 async def list_run(project_name: str, body: RunsList):
     project = await get_project(project_name=project_name)
-    backend = get_backend(project, body.repo_spec.repo)
+    backend = get_backend(project)
     run_name = backend.list_run_heads(
         run_name=body.run_name,
         include_request_heads=body.include_request_heads,
         interrupted_job_new_status=JobStatus.PENDING,
+        repo_id=body.repo_id,
     )
     return run_name

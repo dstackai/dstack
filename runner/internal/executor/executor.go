@@ -6,7 +6,6 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
-	"github.com/docker/docker/api/types"
 	"io"
 	"os"
 	"path"
@@ -14,8 +13,12 @@ import (
 	"strconv"
 	"time"
 
+	"github.com/docker/docker/api/types"
+
 	"github.com/docker/docker/api/types/mount"
 	"github.com/dstackai/dstack/runner/consts"
+	"github.com/dstackai/dstack/runner/consts/errorcodes"
+	"github.com/dstackai/dstack/runner/consts/states"
 	"github.com/dstackai/dstack/runner/internal/artifacts"
 	"github.com/dstackai/dstack/runner/internal/backend"
 	"github.com/dstackai/dstack/runner/internal/common"
@@ -25,7 +28,6 @@ import (
 	"github.com/dstackai/dstack/runner/internal/log"
 	"github.com/dstackai/dstack/runner/internal/ports"
 	"github.com/dstackai/dstack/runner/internal/repo"
-	"github.com/dstackai/dstack/runner/internal/states"
 	"github.com/dstackai/dstack/runner/internal/stream"
 )
 
@@ -176,6 +178,11 @@ func (ex *Executor) Run(ctx context.Context) error {
 				}
 				log.Error(runCtx, "Failed run", "err", errRun)
 				job.Status = states.Failed
+				containerExitedError := &container.ContainerExitedError{}
+				if errors.As(errRun, containerExitedError) {
+					job.ErrorCode = errorcodes.ContainerExitedWithError
+					job.ContainerExitCode = fmt.Sprintf("%d", containerExitedError.ExitCode)
+				}
 			}
 			_ = ex.backend.UpdateState(runCtx)
 			return errRun
@@ -265,6 +272,10 @@ func (ex *Executor) runJob(ctx context.Context, erCh chan error, stoppedCh chan 
 			}
 			for _, artifact := range ex.cacheArtifacts {
 				err = artifact.BeforeRun(jctx)
+				if err != nil {
+					erCh <- gerrors.Wrap(err)
+					return
+				}
 			}
 		}
 		log.Trace(jctx, "Running job")

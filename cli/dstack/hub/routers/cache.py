@@ -9,7 +9,7 @@ from dstack.hub.db.models import Project
 cache = {}
 
 
-def get_backend(project: Project, repo: Optional[Repo]) -> CloudBackend:
+def get_backend(project: Project, repo: Optional[Repo] = None) -> CloudBackend:
     key = project.name if repo is None else (project.name, repo.repo_id, repo.repo_user_id)
     if cache.get(key) is not None:
         return cache[key]

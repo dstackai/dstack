@@ -41,13 +41,15 @@ type Job struct {
 	RepoName         string `yaml:"repo_name"`
 	RepoUserName     string `yaml:"repo_user_name"`
 
-	RequestID    string       `yaml:"request_id"`
-	Requirements Requirements `yaml:"requirements"`
-	RunName      string       `yaml:"run_name"`
-	RunnerID     string       `yaml:"runner_id"`
-	Status       string       `yaml:"status"`
-	SubmittedAt  uint64       `yaml:"submitted_at"`
-	TagName      string       `yaml:"tag_name"`
+	RequestID         string       `yaml:"request_id"`
+	Requirements      Requirements `yaml:"requirements"`
+	RunName           string       `yaml:"run_name"`
+	RunnerID          string       `yaml:"runner_id"`
+	Status            string       `yaml:"status"`
+	ErrorCode         string       `yaml:"error_code,omitempty"`
+	ContainerExitCode string       `yaml:"container_exit_code,omitempty"`
+	SubmittedAt       uint64       `yaml:"submitted_at"`
+	TagName           string       `yaml:"tag_name"`
 	//Variables    map[string]interface{} `yaml:"variables"`
 	WorkflowName string `yaml:"workflow_name"`
 	WorkingDir   string `yaml:"working_dir"`
@@ -143,7 +145,7 @@ func (j *Job) JobHeadFilepath() string {
 		j.ProviderName,
 		j.RepoUserId,
 		j.SubmittedAt,
-		j.Status,
+		strings.Join([]string{j.Status, j.ErrorCode, j.ContainerExitCode}, ","),
 		strings.Join(artifactSlice, ","),
 		strings.Join(appsSlice, ","),
 		j.TagName,
@@ -167,7 +169,7 @@ func (j *Job) JobHeadFilepathLocal() string {
 		j.ProviderName,
 		j.RepoUserId,
 		j.SubmittedAt,
-		j.Status,
+		strings.Join([]string{j.Status, j.ErrorCode, j.ContainerExitCode}, ","),
 		strings.Join(artifactSlice, ","),
 		strings.Join(appsSlice, ","),
 		j.TagName,

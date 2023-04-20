@@ -1,12 +1,21 @@
+from typing import List
+
 from fastapi import APIRouter, Depends, HTTPException, status
 
-from dstack.core.repo import RemoteRepoCredentials, RepoSpec
+from dstack.core.repo import RemoteRepoCredentials, RepoHead, RepoSpec
 from dstack.hub.models import ReposUpdate, SaveRepoCredentials
 from dstack.hub.routers.cache import get_backend
 from dstack.hub.routers.util import error_detail, get_project
 from dstack.hub.security.permissions import ProjectMember
 
 router = APIRouter(prefix="/api/project", tags=["repos"], dependencies=[Depends(ProjectMember())])
+
+
+@router.post("/{project_name}/repos/heads/list")
+async def list_repo_heads(project_name: str) -> List[RepoHead]:
+    project = await get_project(project_name=project_name)
+    backend = get_backend(project)
+    return backend.list_repo_heads()
 
 
 @router.post("/{project_name}/repos/credentials/save")

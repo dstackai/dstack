@@ -17,7 +17,7 @@ from dstack.backend.local.storage import LocalStorage
 from dstack.core.artifact import Artifact
 from dstack.core.job import Job, JobHead, JobStatus
 from dstack.core.log_event import LogEvent
-from dstack.core.repo import RemoteRepoCredentials, Repo, RepoRef
+from dstack.core.repo import RemoteRepoCredentials, Repo, RepoSpec
 from dstack.core.run import RunHead
 from dstack.core.secret import Secret
 from dstack.core.tag import TagHead
@@ -58,12 +58,13 @@ class LocalBackend(Backend):
     def create_job(self, job: Job):
         base_jobs.create_job(self._storage, job)
 
-    def get_job(self, job_id: str, repo_ref: Optional[RepoRef] = None) -> Optional[Job]:
-        repo_ref = repo_ref or self.repo.repo_ref
-        return base_jobs.get_job(self._storage, repo_ref.repo_id, job_id)
+    def get_job(self, job_id: str, repo_id: Optional[str] = None) -> Optional[Job]:
+        repo_id = repo_id or self.repo.repo_ref.repo_id
+        return base_jobs.get_job(self._storage, repo_id, job_id)
 
-    def list_jobs(self, run_name: str) -> List[Job]:
-        return base_jobs.list_jobs(self._storage, self.repo.repo_id, run_name)
+    def list_jobs(self, run_name: str, repo_id: Optional[str] = None) -> List[Job]:
+        repo_id = repo_id or self.repo.repo_ref.repo_id
+        return base_jobs.list_jobs(self._storage, repo_id, run_name)
 
     def run_job(self, job: Job, failed_to_start_job_new_status: JobStatus):
         base_jobs.run_job(self._storage, self._compute, job, failed_to_start_job_new_status)
@@ -72,22 +73,23 @@ class LocalBackend(Backend):
         base_jobs.stop_job(self._storage, self._compute, self.repo.repo_id, job_id, abort)
 
     def list_job_heads(
-        self, run_name: Optional[str] = None, repo_ref: Optional[RepoRef] = None
+        self, run_name: Optional[str] = None, repo_id: Optional[str] = None
     ) -> List[JobHead]:
-        repo_ref = repo_ref or self.repo.repo_ref
-        return base_jobs.list_job_heads(self._storage, repo_ref.repo_id, run_name)
+        repo_id = repo_id or self.repo.repo_ref.repo_id
+        return base_jobs.list_job_heads(self._storage, repo_id, run_name)
 
-    def delete_job_head(self, job_id: str):
-        base_jobs.delete_job_head(self._storage, self.repo.repo_id, job_id)
+    def delete_job_head(self, job_id: str, repo_id: Optional[str] = None):
+        repo_id = repo_id or self.repo.repo_ref.repo_id
+        base_jobs.delete_job_head(self._storage, repo_id, job_id)
 
     def list_run_heads(
         self,
         run_name: Optional[str] = None,
         include_request_heads: bool = True,
         interrupted_job_new_status: JobStatus = JobStatus.FAILED,
-        repo_ref: Optional[RepoRef] = None,
+        repo_id: Optional[str] = None,
     ) -> List[RunHead]:
-        job_heads = self.list_job_heads(run_name, repo_ref=repo_ref)
+        job_heads = self.list_job_heads(run_name, repo_id=repo_id)
         return base_runs.get_run_heads(
             self._storage,
             self._compute,
@@ -101,13 +103,18 @@ class LocalBackend(Backend):
         job_heads: List[JobHead],
         start_time: int,
         attached: bool,
+        repo_id: Optional[str] = None,
     ) -> Generator[LogEvent, None, None]:
+        repo_id = repo_id or self.repo.repo_ref.repo_id
         return logs.poll_logs(
-            self._storage, self._compute, self.repo.repo_id, job_heads, start_time, attached
+            self._storage, self._compute, repo_id, job_heads, start_time, attached
         )
 
-    def list_run_artifact_files(self, run_name: str) -> List[Artifact]:
-        return base_artifacts.list_run_artifact_files(self._storage, self.repo.repo_id, run_name)
+    def list_run_artifact_files(
+        self, run_name: str, repo_id: Optional[str] = None
+    ) -> List[Artifact]:
+        repo_id = repo_id or self.repo.repo_ref.repo_id
+        return base_artifacts.list_run_artifact_files(self._storage, repo_id, run_name)
 
     def download_run_artifact_files(
         self,
@@ -173,7 +180,9 @@ class LocalBackend(Backend):
         base_tags.delete_tag(self._storage, self.repo.repo_id, tag_head)
 
     def update_repo_last_run_at(self, last_run_at: int):
-        base_repos.update_repo_last_run_at(self._storage, self.repo.repo_ref, last_run_at)
+        base_repos.update_repo_last_run_at(
+            self._storage, RepoSpec.from_repo(self.repo), last_run_at
+        )
 
     def _get_repo_credentials(self) -> Optional[RemoteRepoCredentials]:
         return base_repos.get_repo_credentials(self._secrets_manager)
