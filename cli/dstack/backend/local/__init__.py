@@ -168,7 +168,7 @@ class LocalBackend(Backend):
         base_tags.delete_tag(self._storage, self.repo.repo_id, tag_head)
 
     def update_repo_last_run_at(self, last_run_at: int):
-        base_repos.update_repo_last_run_at(self._storage, self.repo.repo_ref, last_run_at)
+        base_repos.update_repo_last_run_at(self._storage, self.repo.repo_spec, last_run_at)
 
     def _get_repo_credentials(self) -> Optional[RemoteRepoCredentials]:
         return base_repos.get_repo_credentials(self._secrets_manager)
