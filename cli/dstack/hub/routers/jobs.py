@@ -1,10 +1,9 @@
-from typing import List, Optional
+from typing import List
 
 from fastapi import APIRouter, Depends
 
 from dstack.core.job import Job, JobHead
-from dstack.core.repo import RepoSpec
-from dstack.hub.models import JobsGet, JobsList
+from dstack.hub.models import JobHeadList, JobsGet, JobsList
 from dstack.hub.routers.cache import get_backend
 from dstack.hub.routers.util import get_project
 from dstack.hub.security.permissions import ProjectMember
@@ -22,28 +21,26 @@ async def create_job(project_name: str, job: Job):
 @router.post("/{project_name}/jobs/get")
 async def get_job(project_name: str, body: JobsGet) -> Job:
     project = await get_project(project_name=project_name)
-    backend = get_backend(project, body.repo_spec.repo)
-    return backend.get_job(job_id=body.job_id)
+    backend = get_backend(project)
+    return backend.get_job(job_id=body.job_id, repo_id=body.repo_id)
 
 
 @router.post("/{project_name}/jobs/list")
 async def list_job(project_name: str, body: JobsList) -> List[Job]:
     project = await get_project(project_name=project_name)
-    backend = get_backend(project, body.repo_spec.repo)
-    return backend.list_jobs(run_name=body.run_name)
+    backend = get_backend(project)
+    return backend.list_jobs(run_name=body.run_name, repo_id=body.repo_id)
 
 
 @router.post("/{project_name}/jobs/list/heads")
-async def list_heads_job(
-    project_name: str, repo_spec: RepoSpec, run_name: Optional[str] = None
-) -> List[JobHead]:
+async def list_job_heads(project_name: str, body: JobHeadList) -> List[JobHead]:
     project = await get_project(project_name=project_name)
-    backend = get_backend(project, repo_spec.repo)
-    return backend.list_job_heads(run_name=run_name)
+    backend = get_backend(project)
+    return backend.list_job_heads(run_name=body.run_name, repo_id=body.repo_id)
 
 
 @router.post("/{project_name}/jobs/delete")
 async def delete_job(project_name: str, body: JobsGet):
     project = await get_project(project_name=project_name)
-    backend = get_backend(project, body.repo_spec.repo)
-    backend.delete_job_head(job_id=body.job_id)
+    backend = get_backend(project)
+    backend.delete_job_head(job_id=body.job_id, repo_id=body.repo_id)

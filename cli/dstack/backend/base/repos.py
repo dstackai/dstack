@@ -13,14 +13,6 @@ from dstack.core.repo import (
 )
 
 
-def get_repo_head(storage: Storage, repo_ref: RepoRef) -> Optional[RepoHead]:
-    repo_head_prefix = _get_repo_head_filename_prefix(repo_ref)
-    repo_heads_keys = storage.list_objects(repo_head_prefix)
-    if len(repo_heads_keys) == 0:
-        return None
-    return _parse_repo_head_filename(repo_heads_keys[0])
-
-
 def list_repo_heads(storage: Storage) -> List[RepoHead]:
     repo_heads_prefix = _get_repo_heads_prefix()
     repo_heads_keys = storage.list_objects(repo_heads_prefix)
@@ -33,7 +25,7 @@ def list_repo_heads(storage: Storage) -> List[RepoHead]:
 
 
 def update_repo_last_run_at(storage: Storage, repo_spec: RepoSpec, last_run_at: int):
-    repo_head = get_repo_head(storage, repo_spec.repo_ref)
+    repo_head = _get_repo_head(storage, repo_spec.repo_ref)
     if repo_head is None:
         repo_head = RepoHead(
             repo_id=repo_spec.repo_ref.repo_id,
@@ -77,6 +69,14 @@ def save_repo_credentials(
         secrets_manager.update_credentials(json.dumps(credentials_data))
     else:
         secrets_manager.add_credentials(json.dumps(credentials_data))
+
+
+def _get_repo_head(storage: Storage, repo_ref: RepoRef) -> Optional[RepoHead]:
+    repo_head_prefix = _get_repo_head_filename_prefix(repo_ref)
+    repo_heads_keys = storage.list_objects(repo_head_prefix)
+    if len(repo_heads_keys) == 0:
+        return None
+    return _parse_repo_head_filename(repo_heads_keys[0])
 
 
 def _create_or_update_repo_head(storage: Storage, repo_head: RepoHead):
