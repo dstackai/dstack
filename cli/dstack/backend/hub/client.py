@@ -8,7 +8,7 @@ from dstack.core.artifact import Artifact
 from dstack.core.error import BackendError, NoMatchingInstanceError
 from dstack.core.job import Job, JobHead
 from dstack.core.log_event import LogEvent
-from dstack.core.repo import RemoteRepoCredentials, Repo
+from dstack.core.repo import RemoteRepoCredentials, Repo, RepoHead
 from dstack.core.run import RunHead
 from dstack.core.secret import Secret
 from dstack.core.tag import TagHead
@@ -354,6 +354,22 @@ class HubClient:
         )
         if resp.ok:
             return
+        resp.raise_for_status()
+
+    def list_repo_heads(self) -> List[RepoHead]:
+        url = _url(
+            url=self.url,
+            project=self.project,
+            additional_path=f"/repos/heads/list",
+        )
+        resp = _make_hub_request(
+            requests.post,
+            host=self.url,
+            url=url,
+            headers=self._headers(),
+        )
+        if resp.ok:
+            return [RepoHead(e) for e in resp.json()]
         resp.raise_for_status()
 
     def get_repos_credentials(self) -> Optional[RemoteRepoCredentials]:

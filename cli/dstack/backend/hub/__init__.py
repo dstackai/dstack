@@ -11,7 +11,7 @@ from dstack.core.config import BackendConfig
 from dstack.core.error import ConfigError
 from dstack.core.job import Job, JobHead, JobStatus
 from dstack.core.log_event import LogEvent
-from dstack.core.repo import RemoteRepoCredentials, Repo, RepoRef
+from dstack.core.repo import RemoteRepoCredentials, Repo, RepoHead, RepoRef
 from dstack.core.run import RunHead
 from dstack.core.secret import Secret
 from dstack.core.tag import TagHead
@@ -175,6 +175,9 @@ class HubBackend(RemoteBackend):
     def update_repo_last_run_at(self, last_run_at: int):
         # /{hub_name}/repos/update
         return self._hub_client().update_repo_last_run_at(last_run_at=last_run_at)
+
+    def list_repo_heads(self) -> List[RepoHead]:
+        return self._hub_client().list_repo_heads()
 
     def _get_repo_credentials(self) -> Optional[RemoteRepoCredentials]:
         return self._hub_client().get_repos_credentials()

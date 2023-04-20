@@ -249,16 +249,16 @@ class RemoteBackend(Backend):
     ):
         super().__init__(repo=repo, credentials=credentials, auto_init=auto_init)
 
+    @abstractmethod
+    def list_repo_heads(self) -> List[RepoHead]:
+        pass
+
     @property
     def type(self) -> BackendType:
         return BackendType.REMOTE
 
 
 class CloudBackend(RemoteBackend):
-    @abstractmethod
-    def list_repo_heads(self) -> List[RepoHead]:
-        pass
-
     @abstractmethod
     def get_signed_download_url(self, object_key: str) -> str:
         pass
