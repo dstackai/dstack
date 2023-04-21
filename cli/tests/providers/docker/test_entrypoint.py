@@ -1,4 +1,5 @@
 import unittest
+from argparse import Namespace
 from typing import List, Optional
 from unittest.mock import patch
 
@@ -13,6 +14,9 @@ def create_provider_data(
     return {"image": "ubuntu:20.04", "commands": commands, "entrypoint": entrypoint}
 
 
+args = Namespace(args=[], unknown=[], detach=True)
+
+
 class TestEntrypoint(unittest.TestCase):
     @patch.multiple(Backend, __abstractmethods__=set())
     def setUp(self) -> None:
@@ -22,7 +26,7 @@ class TestEntrypoint(unittest.TestCase):
 
     def test_no_commands(self):
         provider = DockerProvider()
-        provider.load(self.backend, [], "dummy-workflow", create_provider_data(), "dummy-run-1")
+        provider.load(self.backend, args, "dummy-workflow", create_provider_data(), "dummy-run-1")
         for job in provider.submit_jobs(self.backend, ""):
             data = job.serialize()
             self.assertListEqual(data["commands"], [])
@@ -33,7 +37,7 @@ class TestEntrypoint(unittest.TestCase):
         provider = DockerProvider()
         provider.load(
             self.backend,
-            [],
+            args,
             "dummy-workflow",
             create_provider_data(commands=commands),
             "dummy-run-1",
@@ -47,7 +51,7 @@ class TestEntrypoint(unittest.TestCase):
         provider = DockerProvider()
         provider.load(
             self.backend,
-            [],
+            args,
             "dummy-workflow",
             create_provider_data(entrypoint="/bin/bash -ic"),
             "dummy-run-1",
@@ -62,7 +66,7 @@ class TestEntrypoint(unittest.TestCase):
         provider = DockerProvider()
         provider.load(
             self.backend,
-            [],
+            args,
             "dummy-workflow",
             create_provider_data(commands=commands, entrypoint="/bin/bash -ic"),
             "dummy-run-1",

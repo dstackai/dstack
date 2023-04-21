@@ -21,7 +21,7 @@ from dstack.core.artifact import Artifact
 from dstack.core.error import ConfigError
 from dstack.core.job import Job, JobHead, JobStatus
 from dstack.core.log_event import LogEvent
-from dstack.core.repo import RemoteRepoCredentials, Repo, RepoHead
+from dstack.core.repo import RemoteRepoCredentials, Repo, RepoHead, RepoSpec
 from dstack.core.run import RunHead
 from dstack.core.secret import Secret
 from dstack.core.tag import TagHead
@@ -261,7 +261,7 @@ class AwsBackend(CloudBackend):
     def update_repo_last_run_at(self, last_run_at: int):
         base_repos.update_repo_last_run_at(
             self._storage,
-            self.repo.repo_spec,
+            RepoSpec.from_repo(self.repo),
             last_run_at,
         )
 

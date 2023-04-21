@@ -6,8 +6,9 @@ from argparse import ArgumentParser, Namespace
 from pkgutil import iter_modules
 from typing import Any, Dict, List, Optional, Union
 
-from dstack.backend.base import Backend
+import dstack.backend.base as base_backend
 from dstack.core.cache import CacheSpec
+from dstack.core.error import NotInitializedError
 from dstack.core.job import (
     ArtifactSpec,
     DepSpec,
@@ -121,23 +122,31 @@ class Provider:
 
     def load(
         self,
-        backend: Backend,
-        provider_args: List[str],
+        backend: "base_backend.Backend",
+        args: Optional[Namespace],
         workflow_name: Optional[str],
         provider_data: Dict[str, Any],
         run_name: str,
+        ssh_key_pub: Optional[str] = None,
     ):
-        self.provider_args = provider_args
+        if getattr(args, "help", False):
+            self.help(workflow_name)
+            exit()  # todo: find a better place for this
+
+        self.provider_args = [] if args is None else args.args + args.unknown
         self.workflow_name = workflow_name
         self.provider_data = provider_data
         self.run_as_provider = not workflow_name
         self.run_name = run_name
+        self.ssh_key_pub = ssh_key_pub
         self.openssh_server = self.provider_data.get("ssh", False)
         self.parse_args()
+        if not self.ssh_key_pub:
+            if self.openssh_server or (backend.name != "local" and not args.detach):
+                raise NotInitializedError("No valid SSH identity")
         self._inject_context()
         self.dep_specs = self._dep_specs(backend)
         self.cache_specs = self._cache_specs()
-        self.ssh_key_pub = self.provider_data.get("ssh_key_pub")
         self.loaded = True
 
     @abstractmethod
@@ -214,7 +223,7 @@ class Provider:
     def parse_args(self):
         pass
 
-    def submit_jobs(self, backend: Backend, tag_name: str) -> List[Job]:
+    def submit_jobs(self, backend: "base_backend.Backend", tag_name: str) -> List[Job]:
         if not self.loaded:
             raise Exception("The provider is not loaded")
         job_specs = self.create_job_specs()
@@ -256,7 +265,7 @@ class Provider:
             backend.add_tag_from_run(tag_name, self.run_name, jobs)
         return jobs
 
-    def _dep_specs(self, backend: Backend) -> Optional[List[DepSpec]]:
+    def _dep_specs(self, backend: "base_backend.Backend") -> Optional[List[DepSpec]]:
         if self.provider_data.get("deps"):
             return [self._parse_dep_spec(dep, backend) for dep in self.provider_data["deps"]]
         else:
@@ -295,7 +304,7 @@ class Provider:
         return cache_specs
 
     @staticmethod
-    def _parse_dep_spec(dep: Union[dict, str], backend: Backend) -> DepSpec:
+    def _parse_dep_spec(dep: Union[dict, str], backend: "base_backend.Backend") -> DepSpec:
         if isinstance(dep, str):
             mount = False
             if dep.startswith(":"):
@@ -323,7 +332,7 @@ class Provider:
             sys.exit(f"Invalid dep format: {dep}")
 
     @staticmethod
-    def _tag_dep(backend: Backend, tag_name: str, mount: bool) -> DepSpec:
+    def _tag_dep(backend: "base_backend.Backend", tag_name: str, mount: bool) -> DepSpec:
         tag_head = backend.get_tag_head(tag_name)
         if tag_head:
             return DepSpec(repo_ref=backend.repo.repo_ref, run_name=tag_head.run_name, mount=mount)
@@ -331,7 +340,7 @@ class Provider:
             sys.exit(f"Cannot find the tag '{tag_name}' in the '{backend.repo.repo_id}' repo")
 
     @staticmethod
-    def _workflow_dep(backend: Backend, workflow_name: str, mount: bool) -> DepSpec:
+    def _workflow_dep(backend: "base_backend.Backend", workflow_name: str, mount: bool) -> DepSpec:
         job_heads = sorted(
             backend.list_job_heads(),
             key=lambda j: j.submitted_at,

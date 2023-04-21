@@ -4,13 +4,11 @@ import sys
 import time
 from argparse import Namespace
 from pathlib import Path
-from typing import Any, Dict, List, Optional, Tuple
+from typing import Dict, List, Optional
 
-import pkg_resources
 import websocket
-import yaml
 from cursor import cursor
-from jsonschema import ValidationError, validate
+from jsonschema import ValidationError
 from rich.progress import Progress, SpinnerColumn, TextColumn
 from rich.prompt import Confirm
 from websocket import WebSocketApp
@@ -31,9 +29,11 @@ from dstack.cli.common import (
     print_runs,
 )
 from dstack.cli.config import config
+from dstack.core.error import NameNotFoundError, NotInitializedError
 from dstack.core.job import Job, JobHead, JobStatus
 from dstack.core.repo import RemoteRepo
 from dstack.core.request import RequestStatus
+from dstack.utils.workflows import load_workflows
 
 __all__ = "RunCommand"
 
@@ -42,58 +42,9 @@ POLL_PROVISION_RATE_SECS = 3
 POLL_FINISHED_STATE_RATE_SECS = 1
 
 
-def _load_workflows_from_file(workflows_file: Path) -> List[Any]:
-    workflows_yaml = yaml.load(workflows_file.open(), Loader=yaml.FullLoader)
-    workflows_schema_yaml = pkg_resources.resource_string("dstack.schemas", "workflows.json")
-    validate(workflows_yaml, yaml.load(workflows_schema_yaml, Loader=yaml.FullLoader))
-    return workflows_yaml.get("workflows") or []
-
-
-def _load_workflows():
-    workflows = []
-    root_folder = Path(os.getcwd()) / ".dstack"
-    if root_folder.exists():
-        workflows_file = root_folder / "workflows.yaml"
-        if workflows_file.exists():
-            workflows.extend(_load_workflows_from_file(workflows_file))
-        workflows_dir = root_folder / "workflows"
-        if workflows_dir.is_dir():
-            for workflows_file in os.listdir(workflows_dir):
-                workflows_file_path = workflows_dir / workflows_file
-                if workflows_file_path.name.endswith(".yaml") or workflows_file_path.name.endswith(
-                    ".yml"
-                ):
-                    workflows.extend(_load_workflows_from_file(workflows_file_path))
-    return workflows
-
-
 def _read_ssh_key_pub(key_path: str) -> str:
     path = Path(key_path)
     return path.with_suffix(path.suffix + ".pub").read_text().strip("\n")
-
-
-def parse_run_args(
-    args: Namespace,
-) -> Tuple[str, List[str], Optional[str], Dict[str, Any]]:
-    provider_args = args.args + args.unknown
-    workflow_name = None
-    workflow_data = {}
-
-    workflows = _load_workflows()
-    workflow_names = [w.get("name") for w in workflows]
-    workflow_providers = {w.get("name"): w.get("provider") for w in workflows}
-
-    if args.workflow_or_provider in workflow_names:
-        workflow_name = args.workflow_or_provider
-        workflow_data = next(w for w in workflows if w.get("name") == workflow_name)
-        provider_name = workflow_providers[workflow_name]
-    else:
-        if args.workflow_or_provider not in providers.get_provider_names():
-            sys.exit(f"No workflow or provider '{args.workflow_or_provider}' is found")
-
-        provider_name = args.workflow_or_provider
-
-    return provider_name, provider_args, workflow_name, workflow_data
 
 
 def poll_logs_ws(backend: Backend, job: Job, ports: Dict[int, int]):
@@ -235,8 +186,9 @@ class RunCommand(BasicCommand):
         super(RunCommand, self).__init__(parser)
 
     def register(self):
-        workflows = _load_workflows()
-        workflow_names = [w["name"] for w in workflows if w.get("name")]
+        workflow_names = list(
+            load_workflows(os.path.join(os.getcwd(), ".dstack")).keys()
+        )  # todo use repo
         provider_names = providers.get_provider_names()
         workflow_or_provider_names = workflow_names + provider_names
         workflow_help = "{" + ",".join(workflow_or_provider_names) + "}"
@@ -302,43 +254,29 @@ class RunCommand(BasicCommand):
                         exit(1)
                 backend = remote_backend
 
-            (
-                provider_name,
-                provider_args,
-                workflow_name,
-                workflow_data,
-            ) = parse_run_args(args)
-            provider = providers.load_provider(provider_name)
-            if hasattr(args, "help") and args.help:
-                provider.help(workflow_name)
-                sys.exit()
+            if not backend.get_repo_credentials():
+                raise NotInitializedError("No credentials")
 
-            repo_credentials = backend._get_repo_credentials()
-            if not repo_credentials:
-                console.print("Call `dstack init` first")
-                exit(1)
             if not config.repo_user_config.ssh_key_path:
-                if (
-                    (backend.name != "local" and not args.detach)
-                    or workflow_data.get("ssh", False)
-                    or "--ssh" in provider_args
-                ):
-                    console.print("Call `dstack init` first")
-                    console.print("  [gray58]No valid SSH identity[/]")
-                    exit(1)
+                ssh_pub_key = None
             else:
-                workflow_data["ssh_key_pub"] = _read_ssh_key_pub(
-                    config.repo_user_config.ssh_key_path
+                ssh_pub_key = _read_ssh_key_pub(config.repo_user_config.ssh_key_path)
+
+            try:
+                run_name, jobs = backend.run_workflow(
+                    args.workflow_or_provider,
+                    ssh_pub_key=ssh_pub_key,
+                    tag_name=args.tag_name,
+                    args=args,
+                )
+            except NameNotFoundError:
+                run_name, jobs = backend.run_provider(
+                    args.workflow_or_provider,
+                    ssh_pub_key=ssh_pub_key,
+                    tag_name=args.tag_name,
+                    args=args,
                 )
 
-            run_name = backend.create_run()
-            provider.load(backend, provider_args, workflow_name, workflow_data, run_name)
-            if args.tag_name:
-                tag_head = backend.get_tag_head(args.tag_name)
-                if tag_head:
-                    backend.delete_tag_head(tag_head)
-            jobs = provider.submit_jobs(backend, args.tag_name)
-            backend.update_repo_last_run_at(last_run_at=int(round(time.time() * 1000)))
             runs_with_merged_backends = list_runs_with_merged_backends(
                 [backend], run_name=run_name
             )
@@ -348,11 +286,14 @@ class RunCommand(BasicCommand):
                 console.print("\nProvisioning failed\n")
                 exit(1)
             if not args.detach:
+                openssh_server = any(
+                    spec.app_name == "openssh-server" for spec in jobs[0].app_specs or []
+                )
                 poll_run(
                     jobs,
                     backend,
                     ssh_key=config.repo_user_config.ssh_key_path,
-                    openssh_server=provider.openssh_server,
+                    openssh_server=openssh_server,
                 )
         except ValidationError as e:
             sys.exit(

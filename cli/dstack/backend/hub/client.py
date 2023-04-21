@@ -9,7 +9,7 @@ from dstack.core.artifact import Artifact
 from dstack.core.error import BackendError, NoMatchingInstanceError
 from dstack.core.job import Job, JobHead
 from dstack.core.log_event import LogEvent
-from dstack.core.repo import RemoteRepoCredentials, Repo, RepoHead
+from dstack.core.repo import RemoteRepoCredentials, Repo, RepoHead, RepoSpec
 from dstack.core.run import RunHead
 from dstack.core.secret import Secret
 from dstack.core.tag import TagHead
@@ -74,7 +74,7 @@ class HubClient:
             host=self.url,
             url=url,
             headers=self._headers(),
-            data=self.repo.repo_spec.json(),
+            data=RepoSpec.from_repo(self.repo).json(),
         )
         if resp.ok:
             return resp.text
@@ -161,7 +161,7 @@ class HubClient:
             url=url,
             headers=self._headers(),
             data=StopRunners(
-                repo_spec=self.repo.repo_spec,
+                repo_spec=RepoSpec.from_repo(self.repo),
                 job_id=job_id,
                 abort=abort,
             ).json(),
@@ -212,7 +212,7 @@ class HubClient:
             host=self.url,
             url=url,
             headers=self._headers(),
-            data=self.repo.repo_spec.json(),
+            data=RepoSpec.from_repo(self.repo).json(),
         )
         if resp.ok:
             return TagHead.parse_obj(resp.json())
@@ -231,7 +231,7 @@ class HubClient:
             host=self.url,
             url=url,
             headers=self._headers(),
-            data=self.repo.repo_spec.json(),
+            data=RepoSpec.from_repo(self.repo).json(),
         )
         if resp.ok:
             body = resp.json()
@@ -255,7 +255,7 @@ class HubClient:
             url=url,
             headers=self._headers(),
             data=AddTagRun(
-                repo_spec=self.repo.repo_spec,
+                repo_spec=RepoSpec.from_repo(self.repo),
                 tag_name=tag_name,
                 run_name=run_name,
                 run_jobs=run_jobs,
@@ -281,7 +281,7 @@ class HubClient:
             url=url,
             headers=self._headers(),
             data=AddTagPath(
-                repo_spec=self.repo.repo_spec,
+                repo_spec=RepoSpec.from_repo(self.repo),
                 tag_name=tag_name,
                 local_dirs=local_dirs,
             ).json(),
@@ -301,7 +301,7 @@ class HubClient:
             host=self.url,
             url=url,
             headers=self._headers(),
-            data=self.repo.repo_spec.json(),
+            data=RepoSpec.from_repo(self.repo).json(),
         )
         if resp.ok:
             return
@@ -345,7 +345,7 @@ class HubClient:
             url=url,
             headers=self._headers(),
             data=ReposUpdate(
-                repo_spec=self.repo.repo_spec,
+                repo_spec=RepoSpec.from_repo(self.repo),
                 last_run_at=last_run_at,
             ).json(),
         )
@@ -380,7 +380,7 @@ class HubClient:
             host=self.url,
             url=url,
             headers=self._headers(),
-            data=self.repo.repo_spec.json(),
+            data=RepoSpec.from_repo(self.repo).json(),
         )
         if resp.ok:
             json_data = resp.json()
@@ -401,7 +401,7 @@ class HubClient:
             url=url,
             headers=self._headers(),
             data=SaveRepoCredentials(
-                repo_spec=self.repo.repo_spec,
+                repo_spec=RepoSpec.from_repo(self.repo),
                 repo_credentials=repo_credentials,
             ).json(),
         )
@@ -420,7 +420,7 @@ class HubClient:
             host=self.url,
             url=url,
             headers=self._headers(),
-            data=self.repo.repo_spec.json(),
+            data=RepoSpec.from_repo(self.repo).json(),
         )
         if resp.ok:
             return resp.json()
@@ -437,7 +437,7 @@ class HubClient:
             host=self.url,
             url=url,
             headers=self._headers(),
-            data=self.repo.repo_spec.json(),
+            data=RepoSpec.from_repo(self.repo).json(),
         )
         if resp.ok:
             json_data = resp.json()
@@ -458,7 +458,7 @@ class HubClient:
             url=url,
             headers=self._headers(),
             data=SecretAddUpdate(
-                repo_spec=self.repo.repo_spec,
+                repo_spec=RepoSpec.from_repo(self.repo),
                 secret=secret,
             ).json(),
         )
@@ -478,7 +478,7 @@ class HubClient:
             url=url,
             headers=self._headers(),
             data=SecretAddUpdate(
-                repo_spec=self.repo.repo_spec,
+                repo_spec=RepoSpec.from_repo(self.repo),
                 secret=secret,
             ).json(),
         )
@@ -497,7 +497,7 @@ class HubClient:
             host=self.url,
             url=url,
             headers=self._headers(),
-            data=self.repo.repo_spec.json(),
+            data=RepoSpec.from_repo(self.repo).json(),
         )
         if resp.ok:
             return
@@ -607,7 +607,7 @@ class HubClient:
             host=self.url,
             url=url,
             headers=self._headers(),
-            data=self.repo.repo_spec.json(),
+            data=RepoSpec.from_repo(self.repo).json(),
         )
         if resp.ok:
             return

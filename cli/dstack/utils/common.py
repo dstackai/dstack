@@ -1,8 +1,9 @@
+import copy
 import os
 import re
 import time
 from datetime import datetime, timedelta, timezone
-from typing import Any, Optional, Union
+from typing import Any, Dict, Optional, Union
 
 from botocore.utils import parse_timestamp
 
@@ -130,3 +131,22 @@ def format_list(items: Optional[list], *, formatter=str) -> Optional[str]:
     if items is None:
         return None
     return "[{}]".format(", ".join(formatter(item) for item in items))
+
+
+def merge_workflow_data(
+    data: Dict[str, Any], override: Optional[Dict[str, Any]]
+) -> Dict[str, Any]:
+    override = override or {}
+    result = {}
+    for key in data.keys() | override.keys():
+        if key not in override:
+            result[key] = copy.deepcopy(data[key])
+        elif key not in data:
+            result[key] = copy.deepcopy(override[key])
+        else:
+            a, b = data[key], override[key]
+            if isinstance(a, dict) and isinstance(b, dict):
+                result[key] = merge_workflow_data(a, b)
+            else:
+                result[key] = copy.deepcopy(b)
+    return result

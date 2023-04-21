@@ -1,20 +1,24 @@
+import argparse
 import sys
+import time
 from abc import ABC, abstractmethod
 from datetime import datetime
 from enum import Enum
-from typing import Any, Generator, List, Optional
+from typing import Any, Dict, Generator, List, Optional, Tuple
 
+import dstack.providers as providers
 from dstack.api.repos import get_local_repo_credentials
-from dstack.backend.base import jobs
+from dstack.backend.base import jobs as base_jobs
 from dstack.core.artifact import Artifact
 from dstack.core.config import BackendConfig, Configurator
+from dstack.core.error import NameNotFoundError
 from dstack.core.job import Job, JobHead, JobStatus
 from dstack.core.log_event import LogEvent
 from dstack.core.repo import RemoteRepo, RemoteRepoCredentials, Repo, RepoHead
 from dstack.core.run import RunHead
 from dstack.core.secret import Secret
 from dstack.core.tag import TagHead
-from dstack.utils.common import PathLike
+from dstack.utils.common import PathLike, merge_workflow_data
 
 
 class BackendType(Enum):
@@ -69,7 +73,7 @@ class Backend(ABC):
         self.run_job(job, failed_to_start_job_new_status)
 
     def resubmit_job(self, job: Job, failed_to_start_job_new_status: JobStatus = JobStatus.FAILED):
-        jobs.update_job_submission(job)
+        base_jobs.update_job_submission(job)
         self.run_job(job, failed_to_start_job_new_status)
 
     @abstractmethod
@@ -241,6 +245,68 @@ class Backend(ABC):
     @abstractmethod
     def delete_workflow_cache(self, workflow_name: str):
         pass
+
+    def run_provider(
+        self,
+        provider_name: str,
+        provider_data: Optional[Dict[str, Any]] = None,
+        tag_name: Optional[str] = None,
+        ssh_pub_key: Optional[str] = None,
+        args: Optional[argparse.Namespace] = None,
+    ) -> Tuple[str, List[Job]]:
+        """Runs provider by name
+        :return: run_name, jobs
+        """
+        if provider_name not in providers.get_provider_names():
+            raise NameNotFoundError(f"No provider '{provider_name}' is found")
+        provider = providers.load_provider(provider_name)
+
+        run_name = self.create_run()
+        provider.load(
+            self, args, None, provider_data or {}, run_name, ssh_pub_key
+        )  # todo validate data
+        if tag_name:
+            tag_head = self.get_tag_head(tag_name)
+            if tag_head:
+                self.delete_tag_head(tag_head)
+        jobs = provider.submit_jobs(self, tag_name)
+        self.update_repo_last_run_at(last_run_at=int(round(time.time() * 1000)))
+        return run_name, jobs  # todo return run_head
+
+    def run_workflow(
+        self,
+        workflow_name: str,
+        workflow_data: Optional[Dict[str, Any]] = None,
+        tag_name: Optional[str] = None,
+        ssh_pub_key: Optional[str] = None,
+        args: Optional[argparse.Namespace] = None,
+    ) -> Tuple[str, List[Job]]:
+        """Runs workflow by name
+        :return: run_name, jobs
+        """
+        workflow = self.repo.get_workflows(credentials=self.get_repo_credentials()).get(
+            workflow_name
+        )
+        if workflow is None:
+            raise NameNotFoundError(f"No workflow '{workflow_name}' is found")
+        provider = providers.load_provider(workflow["provider"])
+
+        run_name = self.create_run()
+        provider.load(
+            self,
+            args,
+            workflow_name,
+            merge_workflow_data(workflow, workflow_data),
+            run_name,
+            ssh_pub_key,
+        )
+        if tag_name:
+            tag_head = self.get_tag_head(tag_name)
+            if tag_head:
+                self.delete_tag_head(tag_head)
+        jobs = provider.submit_jobs(self, tag_name)
+        self.update_repo_last_run_at(last_run_at=int(round(time.time() * 1000)))
+        return run_name, jobs  # todo return run_head
 
 
 class RemoteBackend(Backend):

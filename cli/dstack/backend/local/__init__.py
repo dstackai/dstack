@@ -18,7 +18,7 @@ from dstack.backend.local.storage import LocalStorage
 from dstack.core.artifact import Artifact
 from dstack.core.job import Job, JobHead, JobStatus
 from dstack.core.log_event import LogEvent
-from dstack.core.repo import RemoteRepoCredentials, Repo
+from dstack.core.repo import RemoteRepoCredentials, Repo, RepoSpec
 from dstack.core.run import RunHead
 from dstack.core.secret import Secret
 from dstack.core.tag import TagHead
@@ -26,8 +26,13 @@ from dstack.utils.common import PathLike
 
 
 class LocalBackend(Backend):
-    def __init__(self, repo: Repo):
-        super().__init__(repo=repo)
+    def __init__(
+        self,
+        repo: Repo,
+        credentials: Optional[RemoteRepoCredentials] = None,
+        auto_init: bool = False,
+    ):
+        super().__init__(repo=repo, credentials=credentials, auto_init=auto_init)
         self.backend_config = LocalConfig()
         self.backend_config.load()
         self._loaded = True
@@ -177,7 +182,9 @@ class LocalBackend(Backend):
         base_tags.delete_tag(self._storage, self.repo.repo_id, tag_head)
 
     def update_repo_last_run_at(self, last_run_at: int):
-        base_repos.update_repo_last_run_at(self._storage, self.repo.repo_spec, last_run_at)
+        base_repos.update_repo_last_run_at(
+            self._storage, RepoSpec.from_repo(self.repo), last_run_at
+        )
 
     def _get_repo_credentials(self) -> Optional[RemoteRepoCredentials]:
         return base_repos.get_repo_credentials(self._secrets_manager)

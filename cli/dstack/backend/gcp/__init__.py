@@ -24,7 +24,7 @@ from dstack.core.artifact import Artifact
 from dstack.core.error import ConfigError
 from dstack.core.job import Job, JobHead, JobStatus
 from dstack.core.log_event import LogEvent
-from dstack.core.repo import RemoteRepoCredentials, Repo, RepoHead
+from dstack.core.repo import RemoteRepoCredentials, Repo, RepoHead, RepoSpec
 from dstack.core.run import RunHead
 from dstack.core.secret import Secret
 from dstack.core.tag import TagHead
@@ -108,8 +108,9 @@ class GCPBackend(CloudBackend):
         repo_id = repo_id or self.repo.repo_ref.repo_id
         return base_jobs.get_job(self._storage, repo_id, job_id)
 
-    def list_jobs(self, run_name: str) -> List[Job]:
-        return base_jobs.list_jobs(self._storage, self.repo.repo_id, run_name)
+    def list_jobs(self, run_name: str, repo_id: Optional[str] = None) -> List[Job]:
+        repo_id = repo_id or self.repo.repo_ref.repo_id
+        return base_jobs.list_jobs(self._storage, repo_id, run_name)
 
     def run_job(self, job: Job, failed_to_start_job_new_status: JobStatus):
         base_jobs.run_job(self._storage, self._compute, job, failed_to_start_job_new_status)
@@ -236,7 +237,7 @@ class GCPBackend(CloudBackend):
     def update_repo_last_run_at(self, last_run_at: int):
         base_repos.update_repo_last_run_at(
             self._storage,
-            self.repo.repo_spec,
+            RepoSpec.from_repo(self.repo),
             last_run_at,
         )
 
