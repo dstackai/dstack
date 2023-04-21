@@ -1,3 +1,4 @@
+from datetime import datetime
 from typing import Generator, List, Optional
 
 import boto3
@@ -167,21 +168,22 @@ class AwsBackend(CloudBackend):
 
     def poll_logs(
         self,
-        job_heads: List[JobHead],
-        start_time: int,
-        attached: bool,
+        run_name: str,
+        start_time: datetime,
+        end_time: Optional[datetime] = None,
+        descending: bool = False,
         repo_id: Optional[str] = None,
     ) -> Generator[LogEvent, None, None]:
         repo_id = repo_id or self.repo.repo_ref.repo_id
         return logs.poll_logs(
             self._storage,
-            self._compute,
             self._logs_client(),
             self.backend_config.bucket_name,
             repo_id,
-            job_heads,
+            run_name,
             start_time,
-            attached,
+            end_time,
+            descending,
         )
 
     def list_run_artifact_files(

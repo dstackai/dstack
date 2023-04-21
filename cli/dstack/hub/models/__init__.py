@@ -1,3 +1,4 @@
+from datetime import datetime
 from typing import List, Optional, Union
 
 from pydantic import BaseModel, Field
@@ -184,9 +185,12 @@ class SecretAddUpdate(BaseModel):
 
 class PollLogs(BaseModel):
     repo_id: str
-    job_heads: List[JobHead]
-    start_time: int
-    attached: bool
+    run_name: str
+    start_time: Optional[datetime]
+    end_time: Optional[datetime]
+    descending: bool = False
+    prev_event_id: Optional[str]
+    limit: int = Field(100, ge=0, le=1000)
 
 
 class LinkUpload(BaseModel):

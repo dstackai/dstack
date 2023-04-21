@@ -5,7 +5,7 @@ from argparse import Namespace
 from dstack.api.backend import list_backends
 from dstack.api.logs import poll_logs
 from dstack.cli.commands import BasicCommand
-from dstack.cli.common import check_backend, check_config, check_git, check_init
+from dstack.cli.common import check_backend, check_config, check_git, check_init, console
 from dstack.cli.config import config
 from dstack.core.repo import RemoteRepo
 from dstack.utils.common import since
@@ -52,7 +52,9 @@ class LogCommand(BasicCommand):
             job_heads = backend.list_job_heads(args.run_name)
             if job_heads:
                 anyone = True
-                poll_logs(backend, job_heads, start_time, args.attach)
+                poll_logs(backend, run_name=args.run_name, start_time=start_time)
+                return
 
         if not anyone:
-            sys.exit(f"Cannot find the run '{args.run_name}'")
+            console.print(f"Cannot find the run '{args.run_name}'")
+            exit(1)

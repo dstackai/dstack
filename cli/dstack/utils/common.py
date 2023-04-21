@@ -2,10 +2,10 @@ import copy
 import os
 import re
 import time
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 from typing import Any, Dict, Optional, Union
 
-from botocore.utils import datetime2timestamp, parse_timestamp
+from botocore.utils import parse_timestamp
 
 PathLike = Union[str, os.PathLike]
 
@@ -69,7 +69,7 @@ def pretty_date(time: Any = False):
     return str(round(day_diff / 365)) + " years ago"
 
 
-def since(timestamp):
+def since(timestamp: str) -> datetime:
     regex = re.compile(r"(?P<amount>\d+)(?P<unit>s|m|h|d|w)$")
     re_match = regex.match(timestamp)
     if re_match:
@@ -78,7 +78,7 @@ def since(timestamp):
         )
     else:
         datetime_value = parse_timestamp(timestamp)
-    return int(datetime2timestamp(datetime_value) * 1000)
+    return datetime_value
 
 
 def _relative_timestamp_to_datetime(amount, unit):
@@ -89,7 +89,7 @@ def _relative_timestamp_to_datetime(amount, unit):
         "d": 24 * 3600,
         "w": 7 * 24 * 3600,
     }[unit]
-    return datetime.utcnow() + timedelta(seconds=amount * multiplier * -1)
+    return get_current_datetime() + timedelta(seconds=amount * multiplier * -1)
 
 
 def sizeof_fmt(num, suffix="B"):
@@ -106,8 +106,25 @@ def removeprefix(s: str, prefix: str) -> str:
     return s
 
 
+def get_current_datetime() -> datetime:
+    return datetime.now(tz=timezone.utc)
+
+
 def get_milliseconds_since_epoch() -> int:
     return int(round(time.time() * 1000))
+
+
+def timestamps_in_milliseconds_to_datetime(ts: int) -> datetime:
+    seconds = ts // 1000
+    milliseconds = ts % 1000
+    return datetime.fromtimestamp(seconds, tz=timezone.utc).replace(
+        microsecond=milliseconds * 1000
+    )
+
+
+def datetime_to_timestamp_in_milliseconds(dt: datetime) -> int:
+    milliseconds = dt.microsecond // 1000
+    return int(dt.timestamp()) * 1000 + milliseconds
 
 
 def format_list(items: Optional[list], *, formatter=str) -> Optional[str]:

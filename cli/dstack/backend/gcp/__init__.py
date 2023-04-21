@@ -1,5 +1,6 @@
 import os
 import warnings
+from datetime import datetime
 from typing import Generator, List, Optional
 
 from google.auth._default import _CLOUD_SDK_CREDENTIALS_WARNING
@@ -145,17 +146,20 @@ class GCPBackend(CloudBackend):
 
     def poll_logs(
         self,
-        job_heads: List[JobHead],
-        start_time: int,
-        attached: bool,
+        run_name: str,
+        start_time: datetime,
+        end_time: Optional[datetime] = None,
+        descending: bool = False,
         repo_id: Optional[str] = None,
     ) -> Generator[LogEvent, None, None]:
         repo_id = repo_id or self.repo.repo_ref.repo_id
         yield from self._logging.poll_logs(
             storage=self._storage,
             repo_id=repo_id,
-            run_name=job_heads[0].run_name,
+            run_name=run_name,
             start_time=start_time,
+            end_time=end_time,
+            descending=descending,
         )
 
     def list_run_artifact_files(

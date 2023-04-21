@@ -2,6 +2,7 @@ import argparse
 import sys
 import time
 from abc import ABC, abstractmethod
+from datetime import datetime
 from enum import Enum
 from typing import Any, Dict, Generator, List, Optional, Tuple
 
@@ -131,9 +132,10 @@ class Backend(ABC):
     @abstractmethod
     def poll_logs(
         self,
-        job_heads: List[JobHead],
-        start_time: int,
-        attached: bool,
+        run_name: str,
+        start_time: datetime,
+        end_time: Optional[datetime] = None,
+        descending: bool = False,
         repo_id: Optional[str] = None,
     ) -> Generator[LogEvent, None, None]:
         pass

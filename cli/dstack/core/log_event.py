@@ -1,3 +1,4 @@
+from datetime import datetime
 from enum import Enum
 from typing import Optional
 
@@ -14,7 +15,7 @@ class LogEventSource(Enum):
 
 class LogEvent(BaseModel):
     event_id: str
-    timestamp: int
+    timestamp: datetime
     job_id: Optional[str]
     log_message: str
     log_source: LogEventSource
