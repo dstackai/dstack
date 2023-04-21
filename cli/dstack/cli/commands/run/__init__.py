@@ -29,7 +29,7 @@ from dstack.cli.common import (
     print_runs,
 )
 from dstack.cli.config import config
-from dstack.core.error import NotInitializedError
+from dstack.core.error import NameNotFoundError, NotInitializedError
 from dstack.core.job import Job, JobHead, JobStatus
 from dstack.core.repo import RemoteRepo
 from dstack.core.request import RequestStatus
@@ -262,12 +262,20 @@ class RunCommand(BasicCommand):
             else:
                 ssh_pub_key = _read_ssh_key_pub(config.repo_user_config.ssh_key_path)
 
-            run_name, jobs = backend.run_workflow(
-                args.workflow_or_provider,
-                ssh_pub_key=ssh_pub_key,
-                tag_name=args.tag_name,
-                args=args,
-            )
+            try:
+                run_name, jobs = backend.run_workflow(
+                    args.workflow_or_provider,
+                    ssh_pub_key=ssh_pub_key,
+                    tag_name=args.tag_name,
+                    args=args,
+                )
+            except NameNotFoundError:
+                run_name, jobs = backend.run_provider(
+                    args.workflow_or_provider,
+                    ssh_pub_key=ssh_pub_key,
+                    tag_name=args.tag_name,
+                    args=args,
+                )
 
             runs_with_merged_backends = list_runs_with_merged_backends(
                 [backend], run_name=run_name

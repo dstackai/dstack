@@ -24,3 +24,7 @@ class NoMatchingInstanceError(BackendError):
 
 class NotInitializedError(Exception):
     pass
+
+
+class NameNotFoundError(Exception):
+    pass
