@@ -1,5 +1,6 @@
 import os.path
 import time
+from datetime import datetime
 from pathlib import Path
 from typing import Generator, List
 
@@ -55,11 +56,11 @@ def events_loop(storage: Storage, compute: Compute, repo_id: str, job_heads: Lis
                     yield {
                         "message": {
                             "source": "stdout",
-                            "log": line_log.rstrip("\n"),
+                            "log": line_log,
                             "job_id": _job.job_id,
                         },
                         "eventId": _job.runner_id,
-                        "timestamp": time.time(),
+                        "timestamp": datetime.now(),
                     }
 
             run = next(
@@ -77,14 +78,11 @@ def poll_logs(
     storage: Storage,
     compute: Compute,
     repo_id: str,
-    job_heads: List[JobHead],
-    start_time: int,
-    attached: bool,
+    run_name: str,
+    start_time: datetime,
+    end_time: datetime,
 ) -> Generator[LogEvent, None, None]:
+    job_heads = jobs.list_job_heads(storage, repo_id, run_name)
     jobs_cache = {}
-    try:
-        # Read log_file
-        for event in events_loop(storage, compute, repo_id, job_heads):
-            yield render_log_message(storage, event, repo_id, jobs_cache)
-    except Exception as e:
-        raise e
+    for event in events_loop(storage, compute, repo_id, job_heads):
+        yield render_log_message(storage, event, repo_id, jobs_cache)

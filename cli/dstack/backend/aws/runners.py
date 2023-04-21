@@ -460,7 +460,13 @@ def run_instance_retry(
 
 
 def cancel_spot_request(ec2_client: BaseClient, request_id: str):
-    ec2_client.cancel_spot_instance_requests(SpotInstanceRequestIds=[request_id])
+    try:
+        ec2_client.cancel_spot_instance_requests(SpotInstanceRequestIds=[request_id])
+    except botocore.exceptions.ClientError as e:
+        if e.response["Error"]["Code"] == "InvalidSpotInstanceRequestID.NotFound":
+            return
+        else:
+            raise e
     response = ec2_client.describe_instances(
         Filters=[
             {"Name": "spot-instance-request-id", "Values": [request_id]},

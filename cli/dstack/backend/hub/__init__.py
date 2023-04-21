@@ -1,3 +1,4 @@
+from datetime import datetime
 from pathlib import Path
 from typing import Generator, List, Optional
 
@@ -100,16 +101,18 @@ class HubBackend(RemoteBackend):
 
     def poll_logs(
         self,
-        job_heads: List[JobHead],
-        start_time: int,
-        attached: bool,
+        run_name: str,
+        start_time: datetime,
+        end_time: Optional[datetime] = None,
+        descending: bool = False,
         repo_id: Optional[str] = None,
     ) -> Generator[LogEvent, None, None]:
         # /{hub_name}/logs/poll
         return self._hub_client().poll_logs(
-            job_heads=job_heads,
+            run_name=run_name,
             start_time=start_time,
-            attached=attached,
+            end_time=end_time,
+            descending=descending,
         )
 
     def list_run_artifact_files(
