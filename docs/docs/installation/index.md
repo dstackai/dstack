@@ -1,3 +1,9 @@
+---
+title: Installation
+---
+
+# Installation
+
 ## Install the CLI
 
 Use `pip` to install `dstack`:

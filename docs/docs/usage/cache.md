@@ -5,7 +5,7 @@ status: new
 # Cache
 
 !!! info "NOTE:"
-    The source code of this example is available in the [Playground](../playground.md).
+    The source code of this example is available in the <a href="https://github.com/dstackai/dstack-playground#readme" target="__blank">Playground</a>.
 
 With `dstack`, you can cache folders for future runs of the same workflow, saving you from downloading the same data or
 packages repeatedly.

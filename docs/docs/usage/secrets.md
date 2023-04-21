@@ -1,7 +1,8 @@
 # Secrets
 
 !!! info "NOTE:"
-The source code of this example is available in the [Playground](../playground.md).
+    The source code of this example is available in
+    the <a href="https://github.com/dstackai/dstack-playground#readme" target="__blank">Playground</a>.
 
 Secrets can be used to pass passwords and tokens securely to workflows without hard-coding them in the code.
 
@@ -43,6 +44,3 @@ workflows:
 </div>
 
 Secrets can be managed via the [`dstack secrets`](../reference/cli/secrets.md#dstack-secrets-add) command.
-
-!!! info "NOTE:"
-Secrets are currently only supported by remote workflows.

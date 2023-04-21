@@ -3,9 +3,6 @@ date: 2023-04-11
 authors:
   - peterschmidt85
 description: A new tool for teams to manage their ML workflows.
-#links:
-#  - setup/index.md
-#  - setup/hub.md
 ---
 
 # Introducing dstack Hub
@@ -82,7 +79,7 @@ Here's a quick guide to get started with Hub:
 3. Create a project and configure its backend (AWS or GCP)
 4. Configure the CLI to use the project as a remote
 
-For more details, visit the [Hub](../../setup/hub.md) documentation. 
+For more details, visit the [Hub](../../docs/installation/hub.md) documentation. 
 
 ## What's next?
 
@@ -112,8 +109,8 @@ GCP, and Azure.
 You are encouraged to report any bugs, suggest new features, and provide feedback to improve Hub
 through [GitHub issues](https://github.com/dstackai/dstack/issues/new/choose).
 
-If you wish to have `dstack` support additional workflow [providers](../../usage/providers.md) or
-cloud [backends](../../setup/index.md#configure-a-remote),
+If you wish to have `dstack` support additional workflow [providers](../../docs/reference/providers/bash.md) or
+cloud [backends](../../docs/installation/index.md#configure-a-remote),
 and are willing to contribute to the cause, please get in touch with us
 through [Slack](https://join.slack.com/t/dstackai/shared_invite/zt-xdnsytie-D4qU9BvJP8vkbkHXdi6clQ)
 or [Twitter](https://twitter.com/dstackai).

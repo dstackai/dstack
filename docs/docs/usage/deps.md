@@ -1,7 +1,7 @@
 # Deps
 
 !!! info "NOTE:"
-The source code of this example is available in the [Playground](../playground.md).
+    The source code of this example is available in the <a href="https://github.com/dstackai/dstack-playground#readme" target="__blank">Playground</a>.
 
 By using `deps` workflows can reuse artifacts from other workflows. There are two methods for doing this: by specifying
 a workflow or tag name.
@@ -27,7 +27,7 @@ workflows:
 If we run it, it will print the contents of the output artifacts of the last run of the `hello-txt` workflow.
 
 !!! info "NOTE:"
-Make sure to run the [`hello-txt`](artifacts.md) workflow beforehand.
+    Make sure to run the [`hello-txt`](artifacts.md) workflow beforehand.
 
 ## Tags
 
@@ -67,8 +67,8 @@ workflows:
 </div>
 
 !!! info "NOTE:"
-Tags are only supported for remote runs. If you want to use a tag for a local run, you must first push the
-artifacts of the local run using the `dstack push` command.
+    Tags are only supported for remote runs. If you want to use a tag for a local run, you must first push the
+    artifacts of the local run using the `dstack push` command.
 
     You can create also a tag by uploading arbitrary local files. To do this, use the `dstack tags add` command 
     with the `-a PATH` argument, which should point to the local folder containing local files.
@@ -97,4 +97,4 @@ The workflow below uses a tag from the `dstackai/dstack-playground` repo:
 </div>
 
 !!! info "NOTE:"
-Make sure to run the `hello-txt` workflow in the `dstackai/dstack` repo beforehand.
+    Make sure to run the `hello-txt` workflow in the `dstackai/dstack` repo beforehand.

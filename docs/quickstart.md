@@ -1,9 +1,22 @@
-# Quick start
+---
+title: Quickstart
+hide: 
+  - footer
+---
 
-This example shows how to use `dstack` locally and remotely, step-by-step.
+<style>
+.md-sidebar--secondary {
+  order: 0;
+}
+.md-sidebar--primary {
+  order: 2;
+}
+</style>
+
+# Quickstart
 
 !!! info "NOTE:"
-    The source code of this example is available in the [Playground](playground.md).  
+    The source code of this example is available in the <a href="https://github.com/dstackai/dstack-playground#readme" target="__blank">Playground</a>. 
 
 ## Install the CLI
 
@@ -12,7 +25,7 @@ Use `pip` to install `dstack`:
 <div class="termy">
 
 ```shell
-$ pip install dstack --upgrade
+$ pip install dstack
 ```
 
 </div>
@@ -39,9 +52,7 @@ GitLab, or BitBucket.
 
     </div>
 
-### Init the repo
-
-Initialize the working directory before running any additional commands.
+Then, you need to initialize the repo.
 
 <div class="termy">
 
@@ -133,7 +144,7 @@ runs, the dependencies it has on other workflows, the ports to open, and so on.
 
 !!! info "NOTE:"
     `dstack` uses your local Python version by default to run workflows, but you can override it
-    in [YAML](reference/providers/bash.md).
+    in [YAML](docs/reference/providers/bash.md).
 
 ## Run locally
 
@@ -175,7 +186,7 @@ Epoch 1: [00:03<00:00, 280.17it/s, loss=1.35, v_num=0]
 
 ### Check status
 
-Check recent runs status using the [`dstack ps`](reference/cli/ps.md) command.
+Check recent runs status using the [`dstack ps`](docs/reference/cli/ps.md) command.
 
 <div class="termy">
 
@@ -193,7 +204,7 @@ Use `dstack ps -a` to see all runs.
 
 ### List artifacts
 
-To list artifacts from a run, use the [`dstack ls`](reference/cli/ls.md) command.
+To list artifacts from a run, use the [`dstack ls`](docs/reference/cli/ls.md) command.
 
 <div class="termy">
 
@@ -213,15 +224,15 @@ lightning_logs/  version_0/        local
 ## Configure the remote
 
 To run workflows remotely (e.g. in a configured cloud account), you can configure a remote using
-the [`dstack config`](reference/cli/config.md) command.
+the [`dstack config`](docs/reference/cli/config.md) command.
 
-See [Setup](setup/index.md#configure-a-remote) to learn more about supported remote types and how to configure them.
+See [Setup](docs/installation/index.md#configure-a-remote) to learn more about supported remote types and how to configure them.
 
 ## Run remotely
 
 Use the `--remote` flag with `dstack run` to run the workflow remotely.
 
-When running remotely, you can utilize the [`resources`](usage/remote.md#resources) feature to request hardware resources like GPUs, memory, or interruptible instances.
+When running remotely, you can utilize the [`resources`](docs/usage/resources.md) feature to request hardware resources like GPUs, memory, or interruptible instances.
 
 <div class="termy">
 
@@ -249,4 +260,4 @@ infrastructure upon completion.
 
 !!! info "NOTE:"
     You can specify hardware resource requirements (like GPU, memory, interruptible instances, etc.) 
-    for each remote workflow using [`resources`](usage/remote.md#resources).
+    for each remote workflow using [`resources`](docs/usage/resources.md).

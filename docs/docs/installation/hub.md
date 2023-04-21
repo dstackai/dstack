@@ -35,12 +35,12 @@ Once the server is up, visit the URL in the output to login as an administrator.
 After you've logged in as an administrator, you can manage users and projects.
 Go ahead and create a new project.
 
-![](../assets/dstack_hub_create_project.png){ width=800 }
+![](../../assets/dstack_hub_create_project.png){ width=800 }
 
 When creating a project, you must choose the type of backend (such as AWS or GCP), provide cloud credentials, and
 specify additional settings, including the bucket to store artifacts, the region to run workflows, etc.
 
-![](../assets/dstack_hub_view_project.png){ width=800 }
+![](../../assets/dstack_hub_view_project.png){ width=800 }
 
 To enable multiple users to work on the same project, create those users and add them as members of the project.
 

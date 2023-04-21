@@ -1,7 +1,7 @@
 # Apps
 
 !!! info "NOTE:"
-    The source code of this example is available in the [Playground](../playground.md). 
+    The source code of this example is available in the <a href="https://github.com/dstackai/dstack-playground#readme" target="__blank">Playground</a>. 
 
 Both the [`bash`](../reference/providers/bash.md) and [`docker`](../reference/providers/docker.md) providers 
 allow workflows to host applications. To host apps within a workflow, you have to request the number of ports that your apps need. 

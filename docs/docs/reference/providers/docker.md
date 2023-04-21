@@ -57,7 +57,7 @@ The following properties are optional:
 - [`resources`](#resources) - (Optional) The hardware resources required by the workflow
 - [`ports`](#ports) - (Optional) The number of ports to expose
 - `working_dir` - (Optional) The path to the working directory
-- [`registry_auth`](#registry_auth) - (Optional) The private Docker registry credentials
+- [`registry_auth`](#registryauth) - (Optional) The private Docker registry credentials
 - [`cache`](#cache) - (Optional) The list of directories to cache between runs
 
 ### artifacts

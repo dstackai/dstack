@@ -1,40 +1,9 @@
-# Remote
-
-!!! info "NOTE:"
-    The source code of this example is available in the [Playground](../playground.md).
-
-By default, workflows run locally. To run workflows remotely, you need to first configure a remote using the [`dstack
-config`](../reference/cli/config.md) command.
-
-<div class="termy">
-
-```shell
-$ dstack config
-```
-
-</div>
-
-!!! info "NOTE:"
-    To use AWS or GCP as a remote, the corresponding cloud credentials must be
-    configured locally.
-
-Once a remote is configured, use the `--remote` flag with the `dstack run` command to run a workflow in
-the remote.
-
-<div class="termy">
-
-```shell
-$ dstack run hello --remote
-```
-
-</div>
-
-## Resources
+# Resources
 
 When running a workflow remotely, you can specify which [resources](../reference/providers/bash.md#resources) to use,
 such as GPU and memory.
 
-### GPU
+## GPU
 
 If you run the following workflow remotely, `dstack` will automatically provision a machine with one
 `NVIDIA Tesla V100` GPU:
@@ -71,7 +40,7 @@ $ dstack run gpu-v100 --remote
     by the AWS support team beforehand.
     The approval typically takes a few business days.
 
-### Memory
+## Memory
 
 If you run the following workflow remotely, `dstack` will automatically provision a machine with 64GB memory:
 
@@ -99,7 +68,7 @@ $ dstack run mem-64gb --remote
 
 </div>
 
-### Shared memory
+## Shared memory
 
 If your workflow is using parallel communicating processes (e.g. dataloaders in PyTorch),
 you may need to configure the size of the shared memory (`/dev/shm` filesystem) via the `shm_size` property.

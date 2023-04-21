@@ -1,7 +1,7 @@
 # Args
 
 !!! info "NOTE:"
-    The source code of this example is available in the [Playground](../playground.md). 
+    The source code of this example is available in the <a href="https://github.com/dstackai/dstack-playground#readme" target="__blank">Playground</a>. 
 
 If you pass any arguments to the `dstack run` command, they can be accessed from the workflow YAML file via
 the `${{ run.args }}` expression. 

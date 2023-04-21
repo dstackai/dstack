@@ -1,0 +1,42 @@
+.tx-landing {
+  margin: 0 .8rem;
+  color: var(--md-primary-bg-color)
+}
+
+.tx-landing h1 {
+  margin-bottom: 1rem;
+  font-weight: 800;
+  font-size: 2.5em;
+}
+
+@media screen and (max-width: 30em) {
+  .tx-landing h1 {
+    font-size: 1.4rem
+  }
+}
+
+@media screen and (min-width: 60em) {
+  .tx-container {
+    padding-bottom: 4vw;
+  }
+
+  .tx-landing {
+    display: flex;
+    align-items: stretch
+  }
+
+  .tx-landing__content {
+    max-width: 23rem;
+    margin-top: 3rem;
+  }
+
+  .tx-landing__image {
+    order: 1;
+    width: 28rem;
+    transform: translate(5rem, 1rem);
+  }
+}
+
+.tx-landing .md-button {
+  margin-top: .8rem;
+}

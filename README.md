@@ -9,22 +9,20 @@
 </h1>
 
 <h4 align="center">
-Automate your ML workflows on any cloud
+Automate your ML workflows
 </h4>
 
 <p align="center">
-The hassle-free tool for managing ML workflows on any cloud platform. 
+The easiest way to run ML workflows, provision infrastructure, create dev environments, run apps, and manage data. 
 </p>
 
 [![Slack](https://img.shields.io/badge/slack-join%20chat-blueviolet?logo=slack&style=for-the-badge)](https://join.slack.com/t/dstackai/shared_invite/zt-xdnsytie-D4qU9BvJP8vkbkHXdi6clQ)
 
 <p align="center">
-<a href="https://docs.dstack.ai" target="_blank"><b>Docs</b></a> • 
-<a href="https://docs.dstack.ai/quick-start"><b>Quick start</b></a> • 
-<a href="https://docs.dstack.ai/playground" target="_blank"><b>Playground</b></a> •   
-<a href="https://docs.dstack.ai/setup"><b>Setup</b></a> • 
-<a href="https://docs.dstack.ai/usage/hello-world" target="_blank"><b>Usage</b></a>  • 
-<a href="https://docs.dstack.ai/examples/tensorboard" target="_blank"><b>Examples</b></a>
+<a href="https://dstack.ai/quickstart" target="_blank"><b>Quickstart</b></a> • 
+<a href="https://dstack.ai/docs" target="_blank"><b>Docs</b></a> • 
+<a href="https://dstack.ai/tutorials/dolly" target="_blank"><b>Tutorials</b></a> •
+<a href="https://dstack.ai/blog" target="_blank"><b>Blog</b></a>
 </p>
 
 [![Last commit](https://img.shields.io/github/last-commit/dstackai/dstack)](https://github.com/dstackai/dstack/commits/)
@@ -34,10 +32,11 @@ The hassle-free tool for managing ML workflows on any cloud platform.
 
 ## What is dstack?
 
-`dstack` is an open-source tool that automates ML workflows, enabling effective management on any cloud platform. 
+`dstack` is an open-source tool that makes it very easy to run ML workflows, provision
+infrastructure, create dev environments, run apps, manage data, and track compute.
 
-It empowers your team to prepare data, train, and fine-tune models using their preferred frameworks and dev
-environments without spending time on engineering and infrastructure.
+Ideal for processing data, training and fine-tuning models, running apps, and everything
+                    in between the ML development process.
 
 ## Install the CLI
 
@@ -61,11 +60,11 @@ dstack config
   [hub]
 ```
 
-Choose [`hub`](https://docs.dstack.ai/setup/hub.md) if you prefer managing cloud credentials and settings through a user
+Choose [`hub`](https://docs.dstack.ai/installation/hub.md) if you prefer managing cloud credentials and settings through a user
 interface while working in a team.
 
-For running remote workflows with local cloud credentials, select [`aws`](https://docs.dstack.ai/setup/aws.md)
-or [`gcp`](https://docs.dstack.ai/setup/gcp.md).
+For running remote workflows with local cloud credentials, select [`aws`](https://docs.dstack.ai/installation/aws.md)
+or [`gcp`](https://docs.dstack.ai/installation/gcp.md).
 
 ## Define workflows
 
@@ -126,24 +125,14 @@ Epoch 1: [00:03<00:00, 280.17it/s, loss=1.35, v_num=0]
 Upon running a workflow remotely, `dstack` automatically creates resources in the configured cloud account and destroys them
 once the workflow is complete.
 
-## Providers
-
-`dstack` supports multiple [providers](https://docs.dstack.ai/usage/providers) to set up environments, run scripts, and launch interactive development environments and applications.
-
-## Artifacts
-
-`dstack` allows you to save output artifacts and conveniently reuse them across workflows.
-
 ## More information
 
 For additional information and examples, see the following links:
 
-* [Docs](https://docs.dstack.ai/)
-* [Quick start](https://docs.dstack.ai/quick-start)
-* [Playground](https://github.com/dstackai/dstack-playground)
-* [Setup](https://docs.dstack.ai/setup)
-* [Usage](https://docs.dstack.ai/usage/hello-world)
-* [Examples](https://docs.dstack.ai/examples/tensorboard)
+* [Quickstart](https://dstack.ai/docs/quickstart)
+* [Docs](https://dstack.ai/docs)
+* [Tutorials](https://dstack.ai/tutorials/dolly)
+* [Blog](https://dstack.ai/blog)
  
 ##  Licence
 

@@ -1,0 +1,35 @@
+{% extends "base.html" %}
+
+{# block announce %}
+Like dstack? Give us a <img alt="⭐" style="display: inline-block; height: 1.125em; margin-bottom: -2px"
+                            src="https://cdnjs.cloudflare.com/ajax/libs/twemoji/14.0.2/svg/2b50.svg">
+on <img style="display: inline-block; height: 1.15em; margin-bottom: -4px; margin-right: -2px"
+        src="/logo_github79.png"/> <a href="https://github.com/dstackai/dstack" target="_blank">
+    GitHub</a><span style="color: var(--md-code-hl-punctuation-color)">!</span>
+{% endblock #}
+
+{% block content %}
+<section class="tx-container">
+    <div class="md-grid md-typeset">
+        <div class="tx-landing">
+            <div class="tx-landing__content">
+                <h1>Automate your ML workflows</h1>
+                <p>dstack is an open-source tool that makes it very easy to run ML workflows, provision
+                    infrastructure, create dev environments, run apps, manage data, and track compute.</p>
+                <p>Ideal for processing data, training and fine-tuning models, running apps, and everything
+                    in between the ML development process.</p>
+
+                <p><b>Run your ML code with ease while using any frameworks, tools, and cloud providers.</b></p>
+
+                <a href="/quickstart" class="md-button md-button--primary">Quickstart</a>
+
+                <a href="/docs" class="md-button">Learn more</a>
+            </div>
+
+            <div class="tx-landing__image">
+                <img src="hero.svg" style="max-width:800px; width:100%"/>
+            </div>
+        </div>
+    </div>
+</section>
+{% endblock %}

@@ -7,7 +7,7 @@ title: Generate images with Stable Diffusion
 This tutorial demonstrates how to generate images using a pretrained Stable Diffusion model.
 
 !!! info "NOTE:"
-    The source code of this tutorial is available in the [Playground](../playground.md).
+    The source code of this tutorial is available in the <a href="https://github.com/dstackai/dstack-playground#readme" target="__blank">Playground</a>.
 
 ## 1. Requirements
 
@@ -250,10 +250,10 @@ dstack config
 
 </div>
 
-For running remote workflows with local cloud credentials, select [`aws`](https://docs.dstack.ai/setup/aws.md)
-or [`gcp`](https://docs.dstack.ai/setup/gcp.md).
+For running remote workflows with local cloud credentials, select [`aws`](https://docs.dstack.ai/installation/aws.md)
+or [`gcp`](https://dstack.ai/docs/installation/gcp.md).
 
-Choose [`hub`](https://docs.dstack.ai/setup/hub.md) if you prefer managing cloud credentials and settings through a user
+Choose [`hub`](https://dstack.ai/docs/installation/hub.md) if you prefer managing cloud credentials and settings through a user
 interface while working in a team.
 
 ## 6. Run workflows remotely
