@@ -119,6 +119,18 @@
       "page_title": "Create project",
       "error_notification": "Create project error",
       "success_notification": "Project is created"
+    },
+    "repo": {
+      "search_placeholder": "Find repositories",
+      "empty_message_title": "No repositories",
+      "empty_message_text": "No repositories to display.",
+      "nomatch_message_title": "No matches",
+      "nomatch_message_text": "We can't find a match.",
+      "card": {
+        "owner": "Owner",
+        "last_run": "Last run",
+        "tags_count": "Tags count"
+      }
     }
   },
   "users": {

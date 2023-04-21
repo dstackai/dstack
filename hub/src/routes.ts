@@ -13,6 +13,11 @@ export const ROUTES = {
             REPOSITORIES: {
                 TEMPLATE: `/projects/:name/repositories`,
                 FORMAT: (name: string) => buildRoute(ROUTES.PROJECT.DETAILS.REPOSITORIES.TEMPLATE, { name }),
+                DETAILS: {
+                    TEMPLATE: `/projects/:projectName/repositories/:repoName`,
+                    FORMAT: (projectName: string, repoName: string) =>
+                        buildRoute(ROUTES.PROJECT.DETAILS.REPOSITORIES.DETAILS.TEMPLATE, { projectName, repoName }),
+                },
             },
             SETTINGS: {
                 TEMPLATE: `/projects/:name/settings`,
