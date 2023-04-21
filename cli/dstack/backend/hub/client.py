@@ -1,4 +1,5 @@
 import json
+from datetime import datetime
 from typing import Dict, Generator, List, Optional
 from urllib.parse import urlencode, urlparse, urlunparse
 
@@ -522,42 +523,44 @@ class HubClient:
 
     def poll_logs(
         self,
-        job_heads: List[JobHead],
-        start_time: int,
-        attached: bool,
+        run_name: str,
+        start_time: datetime,
+        end_time: Optional[datetime],
+        descending: bool,
     ) -> Generator[LogEvent, None, None]:
         url = _url(
             url=self.url,
             project=self.project,
             additional_path=f"/logs/poll",
         )
-        resp = _make_hub_request(
-            requests.post,
-            host=self.url,
-            url=url,
-            headers=self._headers(),
-            data=PollLogs(
-                repo_id=self.repo.repo_id,
-                job_heads=job_heads,
-                start_time=start_time,
-                attached=attached,
-            ).json(),
-        )
-        if resp.ok:
-            _braces = 0
-            _body = bytearray()
-            for chunk in resp.iter_content(chunk_size=128):
-                for b in chunk:
-                    if b == 123:
-                        _braces += 1
-                    elif b == 125:
-                        _braces -= 1
-                    _body.append(b)
-                    if _braces == 0:
-                        json_data = json.loads(_body)
-                        _body = bytearray()
-                        yield LogEvent.parse_obj(json_data)
-        resp.raise_for_status()
+        prev_event_id = None
+        while True:
+            resp = _make_hub_request(
+                requests.post,
+                host=self.url,
+                url=url,
+                headers=self._headers(),
+                data=PollLogs(
+                    repo_id=self.repo.repo_id,
+                    run_name=run_name,
+                    start_time=start_time.isoformat(),
+                    end_time=end_time.isoformat() if end_time else None,
+                    descending=descending,
+                    prev_event_id=prev_event_id,
+                ).json(),
+            )
+            if not resp.ok:
+                resp.raise_for_status()
+            body = resp.json()
+            logs = [LogEvent.parse_obj(e) for e in body]
+            if len(logs) == 0:
+                return
+            yield from logs
+            if descending:
+                end_time = logs[-1].timestamp
+            else:
+                start_time = logs[-1].timestamp
+            prev_event_id = logs[-1].event_id
 
     def upload_file(self, dest_path: str) -> Optional[str]:
         url = _url(
