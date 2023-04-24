@@ -4,7 +4,7 @@ import { fetchBaseQuery } from '@reduxjs/toolkit/query/react';
 
 import fetchBaseQueryHeaders from 'libs/fetchBaseQueryHeaders';
 
-import { IRepo } from '../types/repo';
+import { ProjectRunsRequestParams } from './project.types';
 
 export const projectApi = createApi({
     reducerPath: 'projectApi',
@@ -12,7 +12,7 @@ export const projectApi = createApi({
         prepareHeaders: fetchBaseQueryHeaders,
     }),
 
-    tagTypes: ['Projects', 'Repos'],
+    tagTypes: ['Projects', 'ProjectRepos', 'ProjectRun'],
 
     endpoints: (builder) => ({
         getProjects: builder.query<IProject[], void>({
@@ -107,7 +107,20 @@ export const projectApi = createApi({
                 };
             },
 
-            providesTags: () => ['Repos'],
+            providesTags: () => ['ProjectRepos'],
+        }),
+
+        //     Repos queries
+        getProjectRuns: builder.query<IRun[], ProjectRunsRequestParams>({
+            query: ({ name, ...body }) => {
+                return {
+                    url: API.PROJECTS.RUNS_LIST(name),
+                    method: 'POST',
+                    body: body,
+                };
+            },
+
+            providesTags: () => ['ProjectRun'],
         }),
     }),
 });
@@ -122,4 +135,5 @@ export const {
     useDeleteProjectsMutation,
     useBackendValuesMutation,
     useGetProjectReposQuery,
+    useGetProjectRunsQuery,
 } = projectApi;

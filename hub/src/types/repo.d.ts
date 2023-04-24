@@ -1,6 +1,6 @@
-export type TRepoType  = 'remote'
+declare type TRepoType  = 'remote'
 
-export interface IRepo {
+declare interface IRepo {
     repo_type: TRepoType,
     repo_id: string,
     last_run_at: number,

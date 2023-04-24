@@ -11,6 +11,7 @@ import {
     ProjectList,
     ProjectRepositories,
     ProjectSettings,
+    RepositoryDetails,
 } from 'pages/Project';
 import { UserAdd, UserDetails, UserEdit, UserList } from 'pages/User';
 
@@ -41,8 +42,16 @@ export const router = createBrowserRouter([
                         element: <ProjectRepositories />,
                     },
                     {
+                        path: ROUTES.PROJECT.DETAILS.REPOSITORIES.DETAILS.TEMPLATE,
+                        element: <RepositoryDetails />,
+                    },
+                    {
                         path: ROUTES.PROJECT.DETAILS.SETTINGS.TEMPLATE,
                         element: <ProjectSettings />,
+                    },
+                    {
+                        path: ROUTES.PROJECT.DETAILS.RUNS.DETAILS.TEMPLATE,
+                        element: <div>Run details</div>,
                     },
                 ],
             },

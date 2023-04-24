@@ -52,7 +52,7 @@ export const ProjectRepositories: React.FC = () => {
         },
         {
             text: t('projects.repositories'),
-            href: ROUTES.PROJECT.DETAILS.SETTINGS.FORMAT(paramProjectName),
+            href: ROUTES.PROJECT.DETAILS.REPOSITORIES.FORMAT(paramProjectName),
         },
     ]);
 

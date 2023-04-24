@@ -16,6 +16,8 @@
     "copied": "Copied",
     "copy": "Copy",
     "info": "Info",
+    "stop": "Stop",
+    "clearFilter": "Clear filter",
     "server_error": "Server error: {{error}}"
   },
 
@@ -40,6 +42,7 @@
     "nomatch_message_text": "We can't find a match.",
     "nomatch_message_button_label": "Clear filter",
     "repositories": "Repositories",
+    "runs": "Runs",
     "settings": "Settings",
     "card": {
       "backend": "Backend",
@@ -131,6 +134,17 @@
         "last_run": "Last run",
         "tags_count": "Tags count"
       }
+    },
+    "run": {
+      "list_page_title": "Runs",
+      "search_placeholder": "Find runs",
+      "empty_message_title": "No runs",
+      "empty_message_text": "No runs to display.",
+      "nomatch_message_title": "No matches",
+      "nomatch_message_text": "We can't find a match.",
+      "run_name": "Run",
+      "workflow_name": "Workflow",
+      "provider_name": "Provider"
     }
   },
   "users": {
@@ -140,7 +154,6 @@
     "empty_message_text": "No members to display.",
     "nomatch_message_title": "No matches",
     "nomatch_message_text": "We can't find a match.",
-    "nomatch_message_button_label": "Clear filter",
     "user_name": "User name",
     "token": "Token",
     "global_role": "Global role",

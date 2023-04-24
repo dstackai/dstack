@@ -21,5 +21,9 @@ export const API = {
         // Repos
         REPOS: (name: IProject['project_name']) => `${API.BASE()}/project/${name}/repos`,
         REPO_LIST: (name: IProject['project_name']) => `${API.PROJECTS.REPOS(name)}/heads/list`,
+
+        // Repos
+        RUNS: (name: IProject['project_name']) => `${API.BASE()}/project/${name}/runs`,
+        RUNS_LIST: (name: IProject['project_name']) => `${API.PROJECTS.RUNS(name)}/list`,
     },
 };

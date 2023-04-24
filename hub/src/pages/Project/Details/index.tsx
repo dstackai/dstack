@@ -78,7 +78,7 @@ export const ProjectDetails: React.FC = () => {
     };
 
     const activeTabId = useMemo(() => {
-        const tab = tabs.find((t) => t.href === pathname);
+        const tab = tabs.find((t) => pathname.indexOf(t.href) === 0);
 
         return tab?.id;
     }, [pathname]);

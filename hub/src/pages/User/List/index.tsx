@@ -71,7 +71,7 @@ export const UserList: React.FC = () => {
     const renderNoMatchMessage = (onClearFilter: () => void): React.ReactNode => {
         return (
             <ListEmptyMessage title={t('users.nomatch_message_title')} message={t('users.nomatch_message_text')}>
-                <Button onClick={onClearFilter}>{t('users.nomatch_message_button_label')}</Button>
+                <Button onClick={onClearFilter}>{t('common.clearFilter')}</Button>
             </ListEmptyMessage>
         );
     };
