@@ -1,4 +1,3 @@
-import os
 import sys
 from argparse import Namespace
 
@@ -9,13 +8,13 @@ from rich.table import Table
 from rich_argparse import RichHelpFormatter
 
 from dstack.api.backend import list_backends
+from dstack.api.repos import load_repo
 from dstack.api.tags import list_tag_heads_with_merged_backends
 from dstack.backend.base import BackendType
 from dstack.cli.commands import BasicCommand
 from dstack.cli.common import check_backend, check_config, check_git, check_init
 from dstack.cli.config import config
 from dstack.core.error import BackendError
-from dstack.core.repo import RemoteRepo
 from dstack.utils.common import pretty_date
 
 
@@ -71,7 +70,7 @@ class TAGCommand(BasicCommand):
     @check_backend
     @check_init
     def _command(self, args: Namespace):
-        repo = RemoteRepo(repo_ref=config.repo_user_config.repo_ref, local_repo_dir=os.getcwd())
+        repo = load_repo(config.repo_user_config)
         console = Console()
         table = Table(box=None)
         table.add_column("TAG", style="bold", no_wrap=True)
@@ -99,9 +98,7 @@ class TAGCommand(BasicCommand):
     @check_init
     def add_tag(self, args: Namespace):
         if args.run_name or args.artifact_paths:
-            repo = RemoteRepo(
-                repo_ref=config.repo_user_config.repo_ref, local_repo_dir=os.getcwd()
-            )
+            repo = load_repo(config.repo_user_config)
             added_tag = False
             confirmed_override = False
             for backend in list_backends(repo):
@@ -147,7 +144,7 @@ class TAGCommand(BasicCommand):
     @check_backend
     @check_init
     def delete_tag(self, args: Namespace):
-        repo = RemoteRepo(repo_ref=config.repo_user_config.repo_ref, local_repo_dir=os.getcwd())
+        repo = load_repo(config.repo_user_config)
         tag_heads = []
         for backend in list_backends(repo):
             tag_head = backend.get_tag_head(args.tag_name)

@@ -1,4 +1,3 @@
-import os
 import sys
 from argparse import Namespace
 
@@ -9,10 +8,10 @@ from rich.table import Table
 from rich_argparse import RichHelpFormatter
 
 from dstack.api.backend import list_backends
+from dstack.api.repos import load_repo
 from dstack.cli.commands import BasicCommand
 from dstack.cli.common import check_backend, check_config, check_git, check_init
 from dstack.cli.config import config
-from dstack.core.repo import RemoteRepo
 from dstack.core.secret import Secret
 
 
@@ -72,7 +71,7 @@ class SecretCommand(BasicCommand):
     @check_backend
     @check_init
     def add_secret(self, args: Namespace):
-        repo = RemoteRepo(repo_ref=config.repo_user_config.repo_ref, local_repo_dir=os.getcwd())
+        repo = load_repo(config.repo_user_config)
         secret_value = args.secret_value or Prompt.ask("Value", password=True)
         for backend in list_backends(repo):
             if backend.get_secret(args.secret_name):
@@ -95,7 +94,7 @@ class SecretCommand(BasicCommand):
     @check_backend
     @check_init
     def update_secret(self, args: Namespace):
-        repo = RemoteRepo(repo_ref=config.repo_user_config.repo_ref, local_repo_dir=os.getcwd())
+        repo = load_repo(config.repo_user_config)
         secret_value = None
         for backend in list_backends(repo):
             if backend.get_secret(args.secret_name):
@@ -113,7 +112,7 @@ class SecretCommand(BasicCommand):
     @check_backend
     @check_init
     def delete_secret(self, args: Namespace):
-        repo = RemoteRepo(repo_ref=config.repo_user_config.repo_ref, local_repo_dir=os.getcwd())
+        repo = load_repo(config.repo_user_config)
         anyone = False
         for backend in list_backends(repo):
             secret = backend.get_secret(args.secret_name)
@@ -134,7 +133,7 @@ class SecretCommand(BasicCommand):
     def _command(self, args: Namespace):
         console = Console()
         table = Table(box=None)
-        repo = RemoteRepo(repo_ref=config.repo_user_config.repo_ref, local_repo_dir=os.getcwd())
+        repo = load_repo(config.repo_user_config)
         table.add_column("NAME", style="bold", no_wrap=True)
         table.add_column("BACKEND", style="bold", no_wrap=True)
         secrets = {}

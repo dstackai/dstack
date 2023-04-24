@@ -5,7 +5,15 @@ import git
 import yaml
 from git.exc import GitCommandError
 
-from dstack.core.repo import RemoteRepoCredentials, RemoteRepoData, RepoProtocol
+from dstack.core.repo import (
+    LocalRepo,
+    RemoteRepo,
+    RemoteRepoCredentials,
+    RemoteRepoData,
+    Repo,
+    RepoProtocol,
+)
+from dstack.core.userconfig import RepoUserConfig
 from dstack.utils.common import PathLike
 from dstack.utils.ssh import get_host_config, make_ssh_command_for_git
 
@@ -91,3 +99,11 @@ def test_remote_repo_credentials(
         )
         # todo: detect if key requires passphrase
         return RemoteRepoCredentials(protocol=protocol, private_key=private_key, oauth_token=None)
+
+
+def load_repo(user_config: RepoUserConfig) -> Repo:
+    if user_config.repo_type == "remote":  # fixme hardcoding
+        return RemoteRepo(repo_ref=user_config.repo_ref, local_repo_dir=os.getcwd())
+    elif user_config.repo_type == "local":
+        return LocalRepo(repo_ref=user_config.repo_ref, repo_dir=os.getcwd())
+    raise TypeError(f"Unknown repo_type: {user_config.repo_type}")

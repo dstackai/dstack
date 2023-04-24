@@ -5,13 +5,13 @@ from argparse import Namespace
 from pathlib import Path
 
 from dstack.api.backend import list_backends
+from dstack.api.repos import load_repo
 from dstack.api.run import RunNotFoundError, TagNotFoundError, get_tagged_run_name
 from dstack.backend.base import Backend
 from dstack.cli.commands import BasicCommand
 from dstack.cli.common import check_backend, check_config, check_git, check_init, console
 from dstack.cli.config import config
 from dstack.core.config import get_dstack_dir
-from dstack.core.repo import RemoteRepo
 
 
 class CpCommand(BasicCommand):
@@ -46,7 +46,7 @@ class CpCommand(BasicCommand):
     @check_backend
     @check_init
     def _command(self, args: Namespace):
-        repo = RemoteRepo(repo_ref=config.repo_user_config.repo_ref, local_repo_dir=os.getcwd())
+        repo = load_repo(config.repo_user_config)
         backends = list_backends(repo)
         run_name = None
         backend = None

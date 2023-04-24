@@ -1,10 +1,10 @@
-import os
 import time
 from argparse import Namespace
 
 from rich.live import Live
 
 from dstack.api.backend import list_backends
+from dstack.api.repos import load_repo
 from dstack.api.run import list_runs_with_merged_backends
 from dstack.cli.commands import BasicCommand
 from dstack.cli.common import (
@@ -16,7 +16,6 @@ from dstack.cli.common import (
     print_runs,
 )
 from dstack.cli.config import config
-from dstack.core.repo import RemoteRepo
 
 LIVE_PROVISION_INTERVAL_SECS = 2
 
@@ -59,7 +58,7 @@ class PSCommand(BasicCommand):
     @check_backend
     @check_init
     def _command(self, args: Namespace):
-        repo = RemoteRepo(repo_ref=config.repo_user_config.repo_ref, local_repo_dir=os.getcwd())
+        repo = load_repo(config.repo_user_config)
         backends = list_backends(repo)
         list_runs = list_runs_with_merged_backends(backends, args.run_name, args.all)
         if args.watch:
