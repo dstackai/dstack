@@ -54,10 +54,14 @@ class LocalRepo(Repo):
 
 
 class TarIgnore:
-    def __init__(self, root_dir: PathLike, ignore_files: List[str] = None):
+    def __init__(
+        self, root_dir: PathLike, ignore_files: List[str] = None, globs: List[str] = None
+    ):
         self.root_dir = Path(root_dir)
-        self.ignore_files = ignore_files or [".gitignore", ".git/info/exclude"]
-        self.ignore_globs: Dict[str, List[str]] = {}
+        self.ignore_files = (
+            ignore_files if ignore_files is not None else [".gitignore", ".git/info/exclude"]
+        )
+        self.ignore_globs: Dict[str, List[str]] = {"": globs or []}
 
     def load_ignore_file(self, path: str, ignore_file: Path):
         if path not in self.ignore_globs:

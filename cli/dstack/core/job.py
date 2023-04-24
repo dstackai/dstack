@@ -2,7 +2,7 @@ from abc import abstractmethod
 from enum import Enum
 from typing import Any, Dict, List, Optional, Union
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, root_validator
 
 from dstack.core.app import AppSpec
 from dstack.core.artifact import ArtifactSpec
@@ -211,66 +211,26 @@ class Job(JobHead):
     tag_name: Optional[str]
     ssh_key_pub: Optional[str]
 
-    def __init__(self, **data: Any):
+    @root_validator(pre=True)
+    def preprocess_data(cls, data):
         # TODO Ugly style
-        if type(data) == dict:
-            if "repo_address" in data:
-                del data["repo_address"]
-            if "artifact_paths" in data:
-                del data["artifact_paths"]
-            if "app_names" in data:
-                del data["app_names"]
-        super().__init__(
-            repo_address=data.get("repo_data"),
-            artifact_paths=[check_dict(a, "artifact_path") for a in data.get("artifact_specs")]
+        data["artifact_paths"] = (
+            [check_dict(a, "artifact_path") for a in data.get("artifact_specs")]
             if data.get("artifact_specs")
-            else None,
-            app_names=[check_dict(a, "app_name") for a in data.get("app_specs")]
-            if data.get("app_specs")
-            else None,
-            **data,
+            else None
         )
+        data["app_names"] = (
+            [check_dict(a, "app_name") for a in data.get("app_specs")]
+            if data.get("app_specs")
+            else None
+        )
+        return data
 
     def get_id(self) -> Optional[str]:
         return self.job_id
 
     def set_id(self, job_id: Optional[str]):
         self.job_id = job_id
-
-    def __str__(self) -> str:
-        commands = format_list(self.commands, formatter=lambda a: _quoted(str(a)))
-        entrypoint = format_list(self.entrypoint, formatter=lambda a: _quoted(str(a)))
-        artifact_specs = format_list(self.artifact_specs)
-        cache_specs = format_list(self.cache_specs or None)
-        app_specs = format_list(self.app_specs)
-        dep_specs = format_list(self.dep_specs)
-        ssk_key_pub = f"...{self.ssh_key_pub[-16:]}" if self.ssh_key_pub else None
-        return (
-            f'Job(job_id="{self.job_id}", repo={self.repo}, '
-            f'run_name="{self.run_name}", workflow_name={_quoted(self.workflow_name)}, '
-            f'provider_name="{self.provider_name}", '
-            f"status=JobStatus.{self.status.name}, "
-            f"submitted_at={self.submitted_at}, "
-            f'image_name="{self.image_name}", '
-            f'registry_auth="{self.registry_auth}", '
-            f"commands={commands}, "
-            f"entrypoint={entrypoint}, "
-            f"env={self.env}, "
-            f"working_dir={_quoted(self.working_dir)}, "
-            f"port_count={self.port_count}, "
-            f"ports={self.ports}, "
-            f"host_name={_quoted(self.host_name)}, "
-            f"artifact_specs={artifact_specs}, "
-            f"cache_specs={cache_specs}, "
-            f"requirements={self.requirements}, "
-            f"dep_specs={dep_specs}, "
-            f"master_job={self.master_job}, "
-            f"app_specs={app_specs}, "
-            f"runner_id={_quoted(self.runner_id)}, "
-            f"request_id={_quoted(self.request_id)}, "
-            f"tag_name={_quoted(self.tag_name)}"
-            f"ssh_key_pub={_quoted(ssk_key_pub)})"
-        )
 
     def serialize(self) -> dict:
         deps = []

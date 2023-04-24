@@ -246,6 +246,17 @@ class Backend(ABC):
     def delete_workflow_cache(self, workflow_name: str):
         pass
 
+    def _exec_provider(
+        self, run_name: str, provider: providers.Provider, tag_name: Optional[str] = None
+    ) -> Tuple[str, List[Job]]:
+        if tag_name:
+            tag_head = self.get_tag_head(tag_name)
+            if tag_head:
+                self.delete_tag_head(tag_head)
+        jobs = provider.submit_jobs(self, tag_name)
+        self.update_repo_last_run_at(last_run_at=int(round(time.time() * 1000)))
+        return run_name, jobs  # todo return run_head
+
     def run_provider(
         self,
         provider_name: str,
@@ -265,13 +276,7 @@ class Backend(ABC):
         provider.load(
             self, args, None, provider_data or {}, run_name, ssh_pub_key
         )  # todo validate data
-        if tag_name:
-            tag_head = self.get_tag_head(tag_name)
-            if tag_head:
-                self.delete_tag_head(tag_head)
-        jobs = provider.submit_jobs(self, tag_name)
-        self.update_repo_last_run_at(last_run_at=int(round(time.time() * 1000)))
-        return run_name, jobs  # todo return run_head
+        return self._exec_provider(run_name, provider, tag_name)
 
     def run_workflow(
         self,
@@ -300,13 +305,7 @@ class Backend(ABC):
             run_name,
             ssh_pub_key,
         )
-        if tag_name:
-            tag_head = self.get_tag_head(tag_name)
-            if tag_head:
-                self.delete_tag_head(tag_head)
-        jobs = provider.submit_jobs(self, tag_name)
-        self.update_repo_last_run_at(last_run_at=int(round(time.time() * 1000)))
-        return run_name, jobs  # todo return run_head
+        return self._exec_provider(run_name, provider, tag_name)
 
 
 class RemoteBackend(Backend):
