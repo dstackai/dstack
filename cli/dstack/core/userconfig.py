@@ -8,6 +8,7 @@ from dstack.core.repo import RepoRef
 class RepoUserConfig(BaseModel):
     repo_id: str
     repo_user_id: str = "default"
+    repo_type: str
     ssh_key_path: Optional[str] = None
 
     @property
