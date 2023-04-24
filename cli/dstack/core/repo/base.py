@@ -29,6 +29,13 @@ class RepoData(BaseModel):
     repo_type: Literal["none"] = "none"
 
 
+class RepoHead(BaseModel):
+    repo_type: Literal["none"] = "none"
+    repo_id: str
+    last_run_at: Optional[int] = None
+    tags_count: int = 0
+
+
 class Repo(ABC):
     def __init__(self, repo_ref: RepoRef, repo_data: RepoData):
         self.repo_ref = repo_ref

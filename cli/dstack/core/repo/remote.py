@@ -9,7 +9,7 @@ from pydantic import BaseModel
 from typing_extensions import Literal
 
 from dstack.core.repo import RepoProtocol
-from dstack.core.repo.base import Repo, RepoData, RepoRef
+from dstack.core.repo.base import Repo, RepoData, RepoHead, RepoRef
 from dstack.utils.common import PathLike
 from dstack.utils.ssh import get_host_config, make_ssh_command_for_git
 from dstack.utils.workflows import load_workflows
@@ -28,11 +28,8 @@ class RemoteRepoInfo(BaseModel):
     repo_name: str
 
 
-class RemoteRepoHead(BaseModel):
+class RemoteRepoHead(RepoHead):
     repo_type: Literal["remote"] = "remote"
-    repo_id: str
-    last_run_at: Optional[int] = None
-    tags_count: int = 0
     repo_info: RemoteRepoInfo
 
 

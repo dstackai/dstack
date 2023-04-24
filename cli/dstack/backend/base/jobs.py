@@ -23,7 +23,7 @@ def create_job(
     if create_head:
         storage.put_object(key=_get_job_head_filename(job), content="")
 
-    if job.repo_data.repo_diff:
+    if job.repo_data.repo_diff:  # fixme
         job.repo_diff_filename = _get_diff_filename(job.repo_data.repo_diff)
         storage.put_object(
             key=job.repo_diff_filename, content=job.repo_data.repo_diff
