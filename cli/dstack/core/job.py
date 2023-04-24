@@ -8,7 +8,15 @@ from dstack.core.app import AppSpec
 from dstack.core.artifact import ArtifactSpec
 from dstack.core.cache import CacheSpec
 from dstack.core.dependents import DepSpec
-from dstack.core.repo import RemoteRepo, RemoteRepoData, Repo, RepoData, RepoRef
+from dstack.core.repo import (
+    LocalRepo,
+    LocalRepoData,
+    RemoteRepo,
+    RemoteRepoData,
+    Repo,
+    RepoData,
+    RepoRef,
+)
 from dstack.utils.common import _quoted, format_list
 
 
@@ -181,7 +189,9 @@ def check_dict(element: Any, field: str):
 
 class Job(JobHead):
     job_id: Optional[str]
-    repo_data: Union[RepoData, RemoteRepoData] = Field(..., discriminator="repo_type")
+    repo_data: Union[RepoData, RemoteRepoData, LocalRepoData] = Field(
+        ..., discriminator="repo_type"
+    )
     repo_diff_filename: Optional[str] = None
     run_name: str
     workflow_name: Optional[str]
@@ -254,6 +264,7 @@ class Job(JobHead):
             "job_id": self.job_id,
             "repo_id": self.repo.repo_id,
             "repo_user_id": self.repo.repo_user_id,
+            "repo_type": self.repo.repo_data.repo_type,
             "run_name": self.run_name,
             "workflow_name": self.workflow_name or "",
             "provider_name": self.provider_name,
@@ -374,20 +385,28 @@ class Job(JobHead):
         ) or None
         error_code = job_data.get("error_code")
         container_exit_code = job_data.get("container_exit_code")
-        job = Job(
-            job_id=job_data["job_id"],
-            repo_ref=RepoRef(
-                repo_id=job_data["repo_id"],
-                repo_user_id=job_data["repo_user_id"],
-            ),
-            repo_data=RemoteRepoData(
+
+        if job_data["repo_type"] == "remote":  # fixme hardcoded
+            repo_data = RemoteRepoData(
                 repo_host_name=job_data["repo_host_name"],
                 repo_port=job_data.get("repo_port") or None,
                 repo_user_name=job_data["repo_user_name"],
                 repo_name=job_data["repo_name"],
                 repo_branch=job_data["repo_branch"] or None,
                 repo_hash=job_data["repo_hash"] or None,
+            )
+        elif job_data["repo_type"] == "local":
+            repo_data = LocalRepoData(repo_dir=job_data.get("repo_dir", ""))  # todo required?
+        else:
+            raise TypeError(f"Unknown repo_type: {job_data['repo_type']}")
+
+        job = Job(
+            job_id=job_data["job_id"],
+            repo_ref=RepoRef(
+                repo_id=job_data["repo_id"],
+                repo_user_id=job_data["repo_user_id"],
             ),
+            repo_data=repo_data,
             repo_diff_filename=job_data.get("repo_diff_filename"),
             run_name=job_data["run_name"],
             workflow_name=job_data.get("workflow_name") or None,
@@ -423,6 +442,8 @@ class Job(JobHead):
     def repo(self) -> Repo:
         if isinstance(self.repo_data, RemoteRepoData):
             return RemoteRepo(repo_ref=self.repo_ref, repo_data=self.repo_data)
+        elif isinstance(self.repo_data, LocalRepoData):
+            return LocalRepo(repo_ref=self.repo_ref, repo_data=self.repo_data)
 
 
 class JobSpec(JobRef):

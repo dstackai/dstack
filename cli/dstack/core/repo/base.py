@@ -29,11 +29,16 @@ class RepoData(BaseModel):
     repo_type: Literal["none"] = "none"
 
 
+class RepoInfo(BaseModel):
+    pass
+
+
 class RepoHead(BaseModel):
     repo_type: Literal["none"] = "none"
     repo_id: str
     last_run_at: Optional[int] = None
     tags_count: int = 0
+    repo_info: RepoInfo
 
 
 class Repo(ABC):

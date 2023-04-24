@@ -30,16 +30,19 @@ type Job struct {
 	Deps         []Dep             `yaml:"deps"`
 	ProviderName string            `yaml:"provider_name"`
 
-	RepoId           string `yaml:"repo_id"`
-	RepoUserId       string `yaml:"repo_user_id"`
-	RepoHostName     string `yaml:"repo_host_name"`
-	RepoPort         int    `yaml:"repo_port,omitempty"`
-	RepoBranch       string `yaml:"repo_branch"`
-	RepoDiff         string `yaml:"repo_diff"`
+	RepoId     string `yaml:"repo_id"`
+	RepoUserId string `yaml:"repo_user_id"`
+	RepoType   string `yaml:"repo_type"`
+
+	RepoHostName string `yaml:"repo_host_name"`
+	RepoPort     int    `yaml:"repo_port,omitempty"`
+	RepoUserName string `yaml:"repo_user_name"`
+	RepoName     string `yaml:"repo_name"`
+	RepoBranch   string `yaml:"repo_branch"`
+	RepoHash     string `yaml:"repo_hash"`
+	RepoDiff     string `yaml:"repo_diff"`
+
 	RepoDiffFilename string `yaml:"repo_diff_filename,omitempty"`
-	RepoHash         string `yaml:"repo_hash"`
-	RepoName         string `yaml:"repo_name"`
-	RepoUserName     string `yaml:"repo_user_name"`
 
 	RequestID         string       `yaml:"request_id"`
 	Requirements      Requirements `yaml:"requirements"`
