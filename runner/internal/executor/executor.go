@@ -231,14 +231,25 @@ func (ex *Executor) runJob(ctx context.Context, erCh chan error, stoppedCh chan 
 			job.HostName = *ex.config.Hostname
 		}
 	}
-	log.Trace(jctx, "Fetching git repository")
 
-	if err = ex.prepareGit(jctx); err != nil {
-		erCh <- gerrors.Wrap(err)
-		return
+	switch job.RepoType {
+	case "remote":
+		log.Trace(jctx, "Fetching git repository")
+		if err = ex.prepareGit(jctx); err != nil {
+			erCh <- gerrors.Wrap(err)
+			return
+		}
+	case "local":
+		log.Trace(jctx, "Fetching tar archive")
+		if err = ex.prepareArchive(jctx); err != nil {
+			erCh <- gerrors.Wrap(err)
+			return
+		}
+	default:
+		log.Error(jctx, "Unknown RepoType", "RepoType", job.RepoType)
 	}
-	log.Trace(jctx, "Dependency processing")
 
+	log.Trace(jctx, "Dependency processing")
 	if err = ex.processCache(jctx); err != nil {
 		erCh <- gerrors.Wrap(err)
 		return
@@ -379,6 +390,20 @@ func (ex *Executor) prepareGit(ctx context.Context) error {
 		if err := repo.ApplyDiff(ctx, dir, repoDiff); err != nil {
 			return gerrors.Wrap(err)
 		}
+	}
+	return nil
+}
+
+func (ex *Executor) prepareArchive(ctx context.Context) error {
+	job := ex.backend.Job(ctx)
+	dir := path.Join(common.HomeDir(), consts.RUNS_PATH, job.RunName, job.JobID)
+	if _, err := os.Stat(dir); err != nil {
+		if err = os.MkdirAll(dir, 0777); err != nil {
+			return gerrors.Wrap(err)
+		}
+	}
+	if err := ex.backend.GetRepoArchive(ctx, job.RepoCodeFilename, dir); err != nil {
+		return gerrors.Wrap(err)
 	}
 	return nil
 }

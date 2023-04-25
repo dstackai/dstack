@@ -3,6 +3,7 @@ package local
 import (
 	"context"
 	"fmt"
+	"github.com/dstackai/dstack/runner/internal/repo"
 	"io"
 	"io/ioutil"
 	"os"
@@ -238,4 +239,12 @@ func (l Local) GetRepoDiff(ctx context.Context, path string) (string, error) {
 		return "", gerrors.Wrap(err)
 	}
 	return string(diff), nil
+}
+
+func (l Local) GetRepoArchive(ctx context.Context, path, dir string) error {
+	src := filepath.Join(l.storage.basepath, path)
+	if err := repo.ExtractArchive(ctx, src, dir); err != nil {
+		return gerrors.Wrap(err)
+	}
+	return nil
 }
