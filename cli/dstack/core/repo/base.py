@@ -13,7 +13,6 @@ class RepoProtocol(Enum):
 
 # TODO: fix backend methods so that they don't require RepoRef or remove repo_user_id from RepoRef
 class RepoRef(BaseModel):
-    repo_type: Literal["remote"] = "remote"
     repo_id: str
     repo_user_id: str
 
@@ -30,15 +29,11 @@ class RepoData(BaseModel):
 
 
 class RepoInfo(BaseModel):
-    pass
-
-
-class RepoHead(BaseModel):
     repo_type: Literal["none"] = "none"
-    repo_id: str
-    last_run_at: Optional[int] = None
-    tags_count: int = 0
-    repo_info: RepoInfo
+
+    @property
+    def head_key(self) -> str:
+        raise NotImplementedError()
 
 
 class Repo(ABC):

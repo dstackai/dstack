@@ -1,6 +1,7 @@
 from typing import Optional
 
 from pydantic import BaseModel
+from typing_extensions import Literal
 
 from dstack.core.repo import RepoRef
 
@@ -8,7 +9,7 @@ from dstack.core.repo import RepoRef
 class RepoUserConfig(BaseModel):
     repo_id: str
     repo_user_id: str = "default"
-    repo_type: str
+    repo_type: Literal["remote", "local"]
     ssh_key_path: Optional[str] = None
 
     @property

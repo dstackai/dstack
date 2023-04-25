@@ -8,7 +8,7 @@ from typing import Any, Dict, List, Optional
 
 from typing_extensions import Literal
 
-from dstack.core.repo.base import Repo, RepoData, RepoHead, RepoRef
+from dstack.core.repo.base import Repo, RepoData, RepoInfo, RepoRef
 from dstack.utils.common import PathLike
 from dstack.utils.workflows import load_workflows
 
@@ -18,9 +18,15 @@ class LocalRepoData(RepoData):
     repo_dir: str
 
 
-class LocalRepoHead(RepoHead):
+class LocalRepoInfo(RepoInfo):
     repo_type: Literal["local"] = "local"
     repo_user_id: str
+    repo_dir: str
+
+    @property
+    def head_key(self) -> str:
+        repo_dir = self.repo_dir.replace("/", ".")  # todo invertible escaping
+        return f"{self.repo_type};{self.repo_user_id},{repo_dir}"
 
 
 class LocalRepo(Repo):
