@@ -7,13 +7,13 @@ import { Button, Header, ListEmptyMessage, NavigateLink, Pagination, SpaceBetwee
 import { useBreadcrumbs } from 'hooks';
 import { useCollection } from 'hooks';
 import { ROUTES } from 'routes';
-import { useGetProjectReposQuery, useGetProjectRunsQuery } from 'services/project';
+import { useGetProjectRunsQuery } from 'services/project';
 
 export const RepositoryDetails: React.FC = () => {
     const { t } = useTranslation();
     const params = useParams();
     const paramProjectName = params.name ?? '';
-    const paramRepoName = params.repoName ?? '';
+    const paramRepoId = params.repoId ?? '';
 
     useBreadcrumbs([
         {
@@ -29,8 +29,8 @@ export const RepositoryDetails: React.FC = () => {
             href: ROUTES.PROJECT.DETAILS.REPOSITORIES.FORMAT(paramProjectName),
         },
         {
-            text: paramRepoName,
-            href: ROUTES.PROJECT.DETAILS.REPOSITORIES.DETAILS.FORMAT(paramProjectName, paramRepoName),
+            text: paramRepoId,
+            href: ROUTES.PROJECT.DETAILS.REPOSITORIES.DETAILS.FORMAT(paramProjectName, paramRepoId),
         },
     ]);
 
@@ -39,7 +39,7 @@ export const RepositoryDetails: React.FC = () => {
             id: 'run_name',
             header: t('projects.run.run_name'),
             cell: (item: IRun) => (
-                <NavigateLink href={ROUTES.PROJECT.DETAILS.RUNS.DETAILS.FORMAT(paramProjectName, paramRepoName, item.run_name)}>
+                <NavigateLink href={ROUTES.PROJECT.DETAILS.RUNS.DETAILS.FORMAT(paramProjectName, paramRepoId, item.run_name)}>
                     {item.run_name}
                 </NavigateLink>
             ),
@@ -56,19 +56,11 @@ export const RepositoryDetails: React.FC = () => {
         },
     ];
 
-    const { data: repoListData, isLoading: reposIsLoading } = useGetProjectReposQuery({ name: paramProjectName });
-
-    const repo: IRepo | undefined = repoListData?.find((repo) => repo.repo_info.repo_name === paramRepoName);
-
-    const { data, isLoading: runsIsLoading } = useGetProjectRunsQuery(
-        {
-            name: paramProjectName,
-            repo_id: repo?.repo_id,
-        },
-        { skip: !repoListData },
-    );
-
-    const isLoading = reposIsLoading || runsIsLoading;
+    const { data, isLoading } = useGetProjectRunsQuery({
+        name: paramProjectName,
+        // TODO remove 'replace' after fix on backend
+        repo_id: paramRepoId.replace(/,/gi, '.'),
+    });
 
     const renderEmptyMessage = (): React.ReactNode => {
         return (

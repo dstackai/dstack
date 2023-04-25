@@ -55,7 +55,9 @@
       "gcp": "GCP",
       "gcp_description": "Google Cloud Platform",
       "azure": "Azure",
-      "azure_description": "Microsoft Azure"
+      "azure_description": "Microsoft Azure",
+      "local": "Local",
+      "local_description": "Local backend"
     },
     "edit": {
       "general": "General",

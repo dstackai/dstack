@@ -1,4 +1,4 @@
-declare type TProjectBackendType = 'aws' | 'gcp' | 'azure';
+declare type TProjectBackendType = 'aws' | 'gcp' | 'azure' | 'local';
 
 declare type TProjectBackend = { type: TProjectBackendType } & TProjectBackendAWSWithTitles  & TProjectBackendGCP
 declare interface IProject {

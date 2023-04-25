@@ -73,7 +73,7 @@ export const ProjectRepositories: React.FC = () => {
                 header: (repo) => (
                     <NavigateLink
                         fontSize="heading-m"
-                        href={ROUTES.PROJECT.DETAILS.REPOSITORIES.DETAILS.FORMAT(paramProjectName, repo.repo_info.repo_name)}
+                        href={ROUTES.PROJECT.DETAILS.REPOSITORIES.DETAILS.FORMAT(paramProjectName, repo.repo_id)}
                     >
                         {repo.repo_info.repo_name}
                     </NavigateLink>
@@ -101,6 +101,7 @@ export const ProjectRepositories: React.FC = () => {
             loading={isLoading}
             loadingText="Loading"
             selectionType="multi"
+            stickyHeader={true}
             header={
                 <Header
                     counter={renderCounter()}

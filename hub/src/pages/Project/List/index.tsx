@@ -134,6 +134,8 @@ export const ProjectList: React.FC = () => {
                 return project.backend.region_name_title;
             case 'gcp':
                 return project.backend.region;
+            case 'local':
+                return '-';
         }
     };
 
@@ -143,6 +145,8 @@ export const ProjectList: React.FC = () => {
                 return `${project.backend.s3_bucket_name}`;
             case 'gcp':
                 return `${project.backend.bucket_name}`;
+            case 'local':
+                return '-';
         }
     };
 

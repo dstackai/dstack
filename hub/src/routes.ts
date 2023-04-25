@@ -14,16 +14,16 @@ export const ROUTES = {
                 TEMPLATE: `/projects/:name/repositories`,
                 FORMAT: (name: string) => buildRoute(ROUTES.PROJECT.DETAILS.REPOSITORIES.TEMPLATE, { name }),
                 DETAILS: {
-                    TEMPLATE: `/projects/:name/repositories/:repoName`,
-                    FORMAT: (name: string, repoName: string) =>
-                        buildRoute(ROUTES.PROJECT.DETAILS.REPOSITORIES.DETAILS.TEMPLATE, { name, repoName }),
+                    TEMPLATE: `/projects/:name/repositories/:repoId`,
+                    FORMAT: (name: string, repoId: string) =>
+                        buildRoute(ROUTES.PROJECT.DETAILS.REPOSITORIES.DETAILS.TEMPLATE, { name, repoId }),
                 },
             },
             RUNS: {
                 DETAILS: {
-                    TEMPLATE: `/projects/:name/repositories/:repoName/runs/:runName`,
-                    FORMAT: (name: string, repoName: string, runName: string) =>
-                        buildRoute(ROUTES.PROJECT.DETAILS.RUNS.DETAILS.TEMPLATE, { name, repoName, runName }),
+                    TEMPLATE: `/projects/:name/repositories/:repoId/runs/:runName`,
+                    FORMAT: (name: string, repoId: string, runName: string) =>
+                        buildRoute(ROUTES.PROJECT.DETAILS.RUNS.DETAILS.TEMPLATE, { name, repoId, runName }),
                 },
             },
             SETTINGS: {

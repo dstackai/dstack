@@ -59,6 +59,12 @@ export const ProjectForm: React.FC<IProps> = ({ initialValues, onCancel, loading
             description: t('projects.backend_type.gcp_description'),
             disabled: loading,
         },
+        {
+            label: t('projects.backend_type.local'),
+            value: 'local',
+            description: t('projects.backend_type.local_description'),
+            disabled: loading,
+        },
         // {
         //     label: t('projects.backend_type.azure'),
         //     value: 'azure',
