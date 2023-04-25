@@ -132,9 +132,6 @@ class RemoteRepo(Repo):
             _clone_remote_repo(local_repo_dir, self.repo_data, credentials, depth=1)
         return load_workflows(local_repo_dir / ".dstack")
 
-    def get_repo_diff(self) -> Optional[str]:
-        return self.repo_data.repo_diff
-
 
 def _clone_remote_repo(
     dst: PathLike, repo_data: RemoteRepoData, repo_credentials: RemoteRepoCredentials, **kwargs

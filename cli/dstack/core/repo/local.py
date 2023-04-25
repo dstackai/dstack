@@ -1,10 +1,9 @@
 import fnmatch
 import getpass
 import tarfile
-import tempfile
 from itertools import zip_longest
 from pathlib import Path
-from typing import Any, Dict, List, Optional
+from typing import Any, BinaryIO, Dict, List, Optional
 
 from typing_extensions import Literal
 
@@ -16,6 +15,10 @@ from dstack.utils.workflows import load_workflows
 class LocalRepoData(RepoData):
     repo_type: Literal["local"] = "local"
     repo_dir: str
+
+    def compress(self, *, name: Optional[PathLike] = None, fileobj: Optional[BinaryIO] = None):
+        with tarfile.TarFile(name=name, mode="w", fileobj=fileobj) as t:
+            t.add(self.repo_dir, arcname="", filter=TarIgnore(self.repo_dir))
 
 
 class LocalRepoInfo(RepoInfo):
@@ -54,9 +57,6 @@ class LocalRepo(Repo):
 
     def get_workflows(self, credentials=None) -> Dict[str, Dict[str, Any]]:
         return load_workflows(Path(self.repo_data.repo_dir) / ".dstack")
-
-    def get_repo_diff(self) -> Optional[str]:
-        pass  # todo
 
 
 class TarIgnore:

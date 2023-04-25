@@ -367,10 +367,10 @@ func (ex *Executor) prepareGit(ctx context.Context) error {
 		return gerrors.Wrap(err)
 	}
 
-	repoDiff := job.RepoDiff
-	if job.RepoDiffFilename != "" {
+	repoDiff := ""
+	if job.RepoCodeFilename != "" {
 		var err error
-		repoDiff, err = ex.backend.GetRepoDiff(ctx, job.RepoDiffFilename)
+		repoDiff, err = ex.backend.GetRepoDiff(ctx, job.RepoCodeFilename)
 		if err != nil {
 			return err
 		}

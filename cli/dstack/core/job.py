@@ -192,7 +192,7 @@ class Job(JobHead):
     repo_data: Union[RepoData, RemoteRepoData, LocalRepoData] = Field(
         ..., discriminator="repo_type"
     )
-    repo_diff_filename: Optional[str] = None
+    repo_code_filename: Optional[str] = None
     run_name: str
     workflow_name: Optional[str]
     provider_name: str
@@ -302,6 +302,7 @@ class Job(JobHead):
             "request_id": self.request_id or "",
             "tag_name": self.tag_name or "",
             "ssh_key_pub": self.ssh_key_pub or "",
+            "repo_code_filename": self.repo_code_filename,
         }
         if isinstance(self.repo_data, RemoteRepoData):
             job_data["repo_host_name"] = self.repo_data.repo_host_name
@@ -310,7 +311,6 @@ class Job(JobHead):
             job_data["repo_name"] = self.repo_data.repo_name
             job_data["repo_branch"] = self.repo_data.repo_branch or ""
             job_data["repo_hash"] = self.repo_data.repo_hash or ""
-        job_data["repo_diff_filename"] = self.repo_diff_filename
         return job_data
 
     @staticmethod
@@ -407,7 +407,7 @@ class Job(JobHead):
                 repo_user_id=job_data["repo_user_id"],
             ),
             repo_data=repo_data,
-            repo_diff_filename=job_data.get("repo_diff_filename"),
+            repo_code_filename=job_data.get("repo_code_filename"),
             run_name=job_data["run_name"],
             workflow_name=job_data.get("workflow_name") or None,
             provider_name=job_data["provider_name"],

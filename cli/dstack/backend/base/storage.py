@@ -47,6 +47,9 @@ class Storage(ABC):
         for key in self.list_objects(keys_prefix):
             self.delete_object(key)
 
+    def key_exists(self, key: str) -> bool:
+        return any(key == obj for obj in self.list_objects(key))  # todo implement natively
+
 
 class CloudStorage(Storage):
     @abstractmethod

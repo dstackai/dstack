@@ -52,7 +52,3 @@ class Repo(ABC):
     @abstractmethod
     def get_workflows(self, credentials=None) -> Dict[str, Dict[str, Any]]:
         pass
-
-    @abstractmethod
-    def get_repo_diff(self) -> Optional[str]:
-        pass

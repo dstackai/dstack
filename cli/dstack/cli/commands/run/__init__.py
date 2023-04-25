@@ -32,6 +32,7 @@ from dstack.cli.common import (
 from dstack.cli.config import config
 from dstack.core.error import NameNotFoundError, NotInitializedError
 from dstack.core.job import Job, JobHead, JobStatus
+from dstack.core.repo import RemoteRepo
 from dstack.core.request import RequestStatus
 from dstack.utils.workflows import load_workflows
 
@@ -252,7 +253,7 @@ class RunCommand(BasicCommand):
                         exit(1)
                 backend = remote_backend
 
-            if not backend.get_repo_credentials():
+            if isinstance(repo, RemoteRepo) and not backend.get_repo_credentials():
                 raise NotInitializedError("No credentials")
 
             if not config.repo_user_config.ssh_key_path:

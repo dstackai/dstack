@@ -40,9 +40,8 @@ type Job struct {
 	RepoName     string `yaml:"repo_name"`
 	RepoBranch   string `yaml:"repo_branch"`
 	RepoHash     string `yaml:"repo_hash"`
-	RepoDiff     string `yaml:"repo_diff"`
 
-	RepoDiffFilename string `yaml:"repo_diff_filename,omitempty"`
+	RepoCodeFilename string `yaml:"repo_code_filename"`
 
 	RequestID         string       `yaml:"request_id"`
 	Requirements      Requirements `yaml:"requirements"`
