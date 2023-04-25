@@ -6,7 +6,6 @@ from argparse import ArgumentParser, Namespace
 from pkgutil import iter_modules
 from typing import Any, Dict, List, Optional, Union
 
-import dstack.backend.base as base_backend
 from dstack.core.cache import CacheSpec
 from dstack.core.error import NotInitializedError
 from dstack.core.job import (
@@ -122,7 +121,7 @@ class Provider:
 
     def load(
         self,
-        backend: "base_backend.Backend",
+        hub_client,
         args: Optional[Namespace],
         workflow_name: Optional[str],
         provider_data: Dict[str, Any],
@@ -142,10 +141,12 @@ class Provider:
         self.openssh_server = self.provider_data.get("ssh", False)
         self.parse_args()
         if not self.ssh_key_pub:
-            if self.openssh_server or (backend.name != "local" and not args.detach):
+            if self.openssh_server or (
+                hub_client.get_project_backend_type() != "local" and not args.detach
+            ):
                 raise NotInitializedError("No valid SSH identity")
         self._inject_context()
-        self.dep_specs = self._dep_specs(backend)
+        self.dep_specs = self._dep_specs(hub_client)
         self.cache_specs = self._cache_specs()
         self.loaded = True
 
@@ -223,7 +224,7 @@ class Provider:
     def parse_args(self):
         pass
 
-    def submit_jobs(self, backend: "base_backend.Backend", tag_name: str) -> List[Job]:
+    def submit_jobs(self, hub_client, tag_name: str) -> List[Job]:
         if not self.loaded:
             raise Exception("The provider is not loaded")
         job_specs = self.create_job_specs()
@@ -232,8 +233,8 @@ class Provider:
         for i, job_spec in enumerate(job_specs):
             job = Job(
                 job_id=f"{self.run_name},{self.workflow_name or ''},{i}",
-                repo_ref=backend.repo.repo_ref,
-                repo_data=backend.repo.repo_data,
+                repo_ref=hub_client.repo.repo_ref,
+                repo_data=hub_client.repo.repo_data,
                 run_name=self.run_name,
                 workflow_name=self.workflow_name or None,
                 provider_name=self.provider_name,
@@ -259,15 +260,15 @@ class Provider:
                 tag_name=tag_name,
                 ssh_key_pub=self.ssh_key_pub,
             )
-            backend.submit_job(job)
+            hub_client.submit_job(job)
             jobs.append(job)
         if tag_name:
-            backend.add_tag_from_run(tag_name, self.run_name, jobs)
+            hub_client.add_tag_from_run(tag_name, self.run_name, jobs)
         return jobs
 
-    def _dep_specs(self, backend: "base_backend.Backend") -> Optional[List[DepSpec]]:
+    def _dep_specs(self, hub_client) -> Optional[List[DepSpec]]:
         if self.provider_data.get("deps"):
-            return [self._parse_dep_spec(dep, backend) for dep in self.provider_data["deps"]]
+            return [self._parse_dep_spec(dep, hub_client) for dep in self.provider_data["deps"]]
         else:
             return None
 
@@ -304,7 +305,7 @@ class Provider:
         return cache_specs
 
     @staticmethod
-    def _parse_dep_spec(dep: Union[dict, str], backend: "base_backend.Backend") -> DepSpec:
+    def _parse_dep_spec(dep: Union[dict, str], hub_client) -> DepSpec:
         if isinstance(dep, str):
             mount = False
             if dep.startswith(":"):
@@ -319,30 +320,32 @@ class Provider:
         t = dep.split("/")
         if len(t) == 1:
             if tag_dep:
-                return Provider._tag_dep(backend, t[0], mount)
+                return Provider._tag_dep(hub_client, t[0], mount)
             else:
-                return Provider._workflow_dep(backend, t[0], mount)
+                return Provider._workflow_dep(hub_client, t[0], mount)
         elif len(t) == 3:
             # This doesn't allow to refer to projects from other repos
             if tag_dep:
-                return Provider._tag_dep(backend, t[2], mount)
+                return Provider._tag_dep(hub_client, t[2], mount)
             else:
-                return Provider._workflow_dep(backend, t[2], mount)
+                return Provider._workflow_dep(hub_client, t[2], mount)
         else:
             sys.exit(f"Invalid dep format: {dep}")
 
     @staticmethod
-    def _tag_dep(backend: "base_backend.Backend", tag_name: str, mount: bool) -> DepSpec:
-        tag_head = backend.get_tag_head(tag_name)
+    def _tag_dep(hub_client, tag_name: str, mount: bool) -> DepSpec:
+        tag_head = hub_client.get_tag_head(tag_name)
         if tag_head:
-            return DepSpec(repo_ref=backend.repo.repo_ref, run_name=tag_head.run_name, mount=mount)
+            return DepSpec(
+                repo_ref=hub_client.repo.repo_ref, run_name=tag_head.run_name, mount=mount
+            )
         else:
-            sys.exit(f"Cannot find the tag '{tag_name}' in the '{backend.repo.repo_id}' repo")
+            sys.exit(f"Cannot find the tag '{tag_name}' in the '{hub_client.repo.repo_id}' repo")
 
     @staticmethod
-    def _workflow_dep(backend: "base_backend.Backend", workflow_name: str, mount: bool) -> DepSpec:
+    def _workflow_dep(hub_client, workflow_name: str, mount: bool) -> DepSpec:
         job_heads = sorted(
-            backend.list_job_heads(),
+            hub_client.list_job_heads(),
             key=lambda j: j.submitted_at,
             reverse=True,
         )
@@ -358,11 +361,11 @@ class Provider:
             None,
         )
         if run_name:
-            return DepSpec(repo_ref=backend.repo.repo_ref, run_name=run_name, mount=mount)
+            return DepSpec(repo_ref=hub_client.repo.repo_ref, run_name=run_name, mount=mount)
         else:
             sys.exit(
                 f"Cannot find any successful workflow with the name '{workflow_name}' "
-                f"in the '{backend.repo.repo_id}' repo"
+                f"in the '{hub_client.repo.repo_id}' repo"
             )
 
     def _env(self) -> Optional[Dict[str, str]]:

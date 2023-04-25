@@ -47,7 +47,10 @@ class HubClient:
         )
         self._storage = HUBStorage(self._api_client)
 
-    def get_project_info(self) -> ProjectInfo:
+    def get_project_backend_type(self) -> str:
+        return self._get_project_info().backend.__root__.type
+
+    def _get_project_info(self) -> ProjectInfo:
         return self._api_client.get_project_info()
 
     def create_run(self) -> str:
