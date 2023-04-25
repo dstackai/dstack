@@ -4,12 +4,12 @@ from typing import Generator, List, Optional
 import boto3
 from botocore.client import BaseClient
 
-from dstack.backend.aws import config, logs
+from dstack.backend.aws import logs
 from dstack.backend.aws.compute import AWSCompute
-from dstack.backend.aws.config import AWSConfig, AWSConfigurator
+from dstack.backend.aws.config import AWSConfig
 from dstack.backend.aws.secrets import AWSSecretsManager
 from dstack.backend.aws.storage import AWSStorage
-from dstack.backend.base import CloudBackend
+from dstack.backend.base import Backend
 from dstack.backend.base import artifacts as base_artifacts
 from dstack.backend.base import cache as base_cache
 from dstack.backend.base import jobs as base_jobs
@@ -18,7 +18,6 @@ from dstack.backend.base import runs as base_runs
 from dstack.backend.base import secrets as base_secrets
 from dstack.backend.base import tags as base_tags
 from dstack.core.artifact import Artifact
-from dstack.core.error import ConfigError
 from dstack.core.job import Job, JobHead, JobStatus
 from dstack.core.log_event import LogEvent
 from dstack.core.repo import RemoteRepoCredentials, Repo, RepoHead, RepoSpec
@@ -28,43 +27,20 @@ from dstack.core.tag import TagHead
 from dstack.utils.common import PathLike
 
 
-class AwsBackend(CloudBackend):
-    _session: Optional[boto3.Session] = None
-    backend_config: AWSConfig
-
-    @property
-    def name(self):
-        return "aws"
+class AwsBackend(Backend):
+    NAME = "aws"
 
     def __init__(
         self,
-        backend_config: Optional[AWSConfig] = None,
+        backend_config: AWSConfig,
         repo: Optional[Repo] = None,
-        credentials: Optional[RemoteRepoCredentials] = None,
-        auto_init: bool = False,
     ):
-        super().__init__(
-            backend_config=backend_config, repo=repo, credentials=credentials, auto_init=auto_init
+        super().__init__(backend_config=backend_config, repo=repo)
+        self._session = boto3.session.Session(
+            region_name=self.backend_config.region_name,
+            aws_access_key_id=self.backend_config.credentials.get("access_key"),
+            aws_secret_access_key=self.backend_config.credentials.get("secret_key"),
         )
-        if backend_config is None:
-            self.backend_config = AWSConfig()
-            try:
-                self.backend_config.load()
-                self._loaded = True
-            except ConfigError:
-                self._loaded = False
-                return
-        else:
-            self.backend_config = backend_config
-            self._loaded = True
-
-        if self.backend_config.credentials is not None:
-            self._session = boto3.session.Session(
-                region_name=self.backend_config.region_name,
-                aws_access_key_id=self.backend_config.credentials.get("access_key"),
-                aws_secret_access_key=self.backend_config.credentials.get("secret_key"),
-            )
-
         self._storage = AWSStorage(
             s3_client=self._s3_client(), bucket_name=self.backend_config.bucket_name
         )
@@ -102,26 +78,13 @@ class AwsBackend(CloudBackend):
         return self._get_client("sts")
 
     def _get_client(self, client_name: str) -> BaseClient:
-        if self._session is None:
-            self._session = boto3.Session(
-                profile_name=self.backend_config.profile_name,
-                region_name=self.backend_config.region_name,
-            )
         return self._session.client(client_name)
-
-    def configure(self):
-        config.configure(
-            self._ec2_client(),
-            self._iam_client(),
-            self.backend_config.bucket_name,
-            self.backend_config.subnet_id,
-        )
 
     def create_run(self) -> str:
         logs.create_log_groups_if_not_exist(
             self._logs_client(), self.backend_config.bucket_name, self.repo.repo_id
         )
-        return base_runs.create_run(self._storage, self.type)
+        return base_runs.create_run(self._storage)
 
     def create_job(self, job: Job):
         base_jobs.create_job(self._storage, job)
@@ -244,13 +207,7 @@ class AwsBackend(CloudBackend):
         )
 
     def add_tag_from_local_dirs(self, tag_name: str, local_dirs: List[str]):
-        base_tags.create_tag_from_local_dirs(
-            self._storage,
-            self.repo,
-            tag_name,
-            local_dirs,
-            self.type,
-        )
+        base_tags.create_tag_from_local_dirs(self._storage, self.repo, tag_name, local_dirs)
 
     def delete_tag_head(self, tag_head: TagHead):
         base_tags.delete_tag(self._storage, self.repo.repo_id, tag_head)
@@ -265,7 +222,7 @@ class AwsBackend(CloudBackend):
             last_run_at,
         )
 
-    def _get_repo_credentials(self) -> Optional[RemoteRepoCredentials]:
+    def get_repo_credentials(self) -> Optional[RemoteRepoCredentials]:
         return base_repos.get_repo_credentials(self._secrets_manager)
 
     def save_repo_credentials(self, repo_credentials: RemoteRepoCredentials):
@@ -306,10 +263,6 @@ class AwsBackend(CloudBackend):
 
     def get_signed_upload_url(self, object_key: str) -> str:
         return self._storage.get_signed_upload_url(object_key)
-
-    @classmethod
-    def get_configurator(cls):
-        return AWSConfigurator()
 
     def delete_workflow_cache(self, workflow_name: str):
         base_cache.delete_workflow_cache(self._storage, self.repo.repo_ref, workflow_name)

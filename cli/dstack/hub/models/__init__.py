@@ -30,6 +30,10 @@ class Member(BaseModel):
     project_role: ProjectRole
 
 
+class LocalProjectConfig(BaseModel):
+    type: Literal["local"] = "local"
+
+
 class AWSProjectConfigPartial(BaseModel):
     type: Literal["aws"] = "aws"
     region_name: Optional[str]
@@ -92,11 +96,13 @@ class GCPProjectConfigWithCreds(GCPProjectConfig, GCPProjectCreds):
     pass
 
 
-AnyProjectConfig = Union[AWSProjectConfig, GCPProjectConfig]
+AnyProjectConfig = Union[LocalProjectConfig, AWSProjectConfig, GCPProjectConfig]
 AnyProjectConfigWithCredsPartial = Union[
-    AWSProjectConfigWithCredsPartial, GCPProjectConfigWithCredsPartial
+    LocalProjectConfig, AWSProjectConfigWithCredsPartial, GCPProjectConfigWithCredsPartial
 ]
-AnyProjectConfigWithCreds = Union[AWSProjectConfigWithCreds, GCPProjectConfigWithCreds]
+AnyProjectConfigWithCreds = Union[
+    LocalProjectConfig, AWSProjectConfigWithCreds, GCPProjectConfigWithCreds
+]
 
 
 class ProjectConfig(BaseModel):
@@ -250,7 +256,7 @@ class GCPProjectValues(BaseModel):
 
 
 class ProjectValues(BaseModel):
-    __root__: Union[AWSProjectValues, GCPProjectValues] = Field(..., discriminator="type")
+    __root__: Union[None, AWSProjectValues, GCPProjectValues] = Field(..., discriminator="type")
 
 
 class UserPatch(BaseModel):

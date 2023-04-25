@@ -6,7 +6,7 @@ from typing import Generator, List, Optional
 from google.auth._default import _CLOUD_SDK_CREDENTIALS_WARNING
 from google.oauth2 import service_account
 
-from dstack.backend.base import CloudBackend
+from dstack.backend.base import Backend
 from dstack.backend.base import artifacts as base_artifacts
 from dstack.backend.base import cache as base_cache
 from dstack.backend.base import jobs as base_jobs
@@ -15,13 +15,12 @@ from dstack.backend.base import runs as base_runs
 from dstack.backend.base import secrets as base_secrets
 from dstack.backend.base import tags as base_tags
 from dstack.backend.gcp.compute import GCPCompute
-from dstack.backend.gcp.config import GCPConfig, GCPConfigurator
+from dstack.backend.gcp.config import GCPConfig
 from dstack.backend.gcp.logs import GCPLogging
 from dstack.backend.gcp.secrets import GCPSecretsManager
-from dstack.backend.gcp.storage import BucketNotFoundError, GCPStorage
+from dstack.backend.gcp.storage import GCPStorage
 from dstack.cli.common import console
 from dstack.core.artifact import Artifact
-from dstack.core.error import ConfigError
 from dstack.core.job import Job, JobHead, JobStatus
 from dstack.core.log_event import LogEvent
 from dstack.core.repo import RemoteRepoCredentials, Repo, RepoHead, RepoSpec
@@ -33,70 +32,38 @@ from dstack.utils.common import PathLike
 warnings.filterwarnings("ignore", message=_CLOUD_SDK_CREDENTIALS_WARNING)
 
 
-class GCPBackend(CloudBackend):
+class GCPBackend(Backend):
+    NAME = "gcp"
+
     def __init__(
         self,
-        backend_config: Optional[GCPConfig] = None,
+        backend_config: GCPConfig,
         repo: Optional[Repo] = None,
-        credentials: Optional[RemoteRepoCredentials] = None,
-        auto_init: bool = False,
     ):
-        super().__init__(
-            backend_config=backend_config, repo=repo, credentials=credentials, auto_init=auto_init
+        super().__init__(backend_config=backend_config, repo=repo)
+        credentials = service_account.Credentials.from_service_account_info(
+            self.backend_config.credentials
         )
-        if backend_config is None:
-            try:
-                backend_config = GCPConfig.load()
-            except ConfigError:
-                return
-
-        self.config = backend_config
-
-        if self.config.credentials is not None:
-            credentials = service_account.Credentials.from_service_account_info(
-                self.config.credentials
-            )
-        elif self.config.credentials_file is not None:
-            credentials = service_account.Credentials.from_service_account_file(
-                self.config.credentials_file
-            )
-        else:
-            credentials_file = os.getenv("GOOGLE_APPLICATION_CREDENTIALS")
-            if credentials_file is None:
-                return
-            credentials = service_account.Credentials.from_service_account_file(credentials_file)
-
-        try:
-            self._storage = GCPStorage(
-                project_id=self.config.project_id,
-                bucket_name=self.config.bucket_name,
-                credentials=credentials,
-            )
-        except BucketNotFoundError:
-            return
-        self._compute = GCPCompute(gcp_config=self.config, credentials=credentials)
+        self._storage = GCPStorage(
+            project_id=self.backend_config.project_id,
+            bucket_name=self.backend_config.bucket_name,
+            credentials=credentials,
+        )
+        self._compute = GCPCompute(gcp_config=self.backend_config, credentials=credentials)
         self._secrets_manager = GCPSecretsManager(
-            project_id=self.config.project_id,
-            bucket_name=self.config.bucket_name,
+            project_id=self.backend_config.project_id,
+            bucket_name=self.backend_config.bucket_name,
             credentials=credentials,
             repo_id=self.repo.repo_id if self.repo else None,
         )
         self._logging = GCPLogging(
-            project_id=self.config.project_id,
-            bucket_name=self.config.bucket_name,
+            project_id=self.backend_config.project_id,
+            bucket_name=self.backend_config.bucket_name,
             credentials=credentials,
         )
-        self._loaded = True
-
-    @property
-    def name(self) -> str:
-        return "gcp"
-
-    def configure(self):
-        pass
 
     def create_run(self) -> str:
-        return base_runs.create_run(self._storage, self.type)
+        return base_runs.create_run(self._storage)
 
     def create_job(self, job: Job):
         if job.artifact_specs and any(art_spec.mount for art_spec in job.artifact_specs):
@@ -225,7 +192,6 @@ class GCPBackend(CloudBackend):
             self.repo,
             tag_name,
             local_dirs,
-            self.type,
         )
 
     def delete_tag_head(self, tag_head: TagHead):
@@ -241,7 +207,7 @@ class GCPBackend(CloudBackend):
             last_run_at,
         )
 
-    def _get_repo_credentials(self) -> Optional[RemoteRepoCredentials]:
+    def get_repo_credentials(self) -> Optional[RemoteRepoCredentials]:
         return base_repos.get_repo_credentials(self._secrets_manager)
 
     def save_repo_credentials(self, repo_credentials: RemoteRepoCredentials):
@@ -282,10 +248,6 @@ class GCPBackend(CloudBackend):
 
     def get_signed_upload_url(self, object_key: str) -> str:
         return self._storage.get_signed_upload_url(object_key)
-
-    @classmethod
-    def get_configurator(cls):
-        return GCPConfigurator()
 
     def delete_workflow_cache(self, workflow_name: str):
         base_cache.delete_workflow_cache(self._storage, self.repo.repo_ref, workflow_name)

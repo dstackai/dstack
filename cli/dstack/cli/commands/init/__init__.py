@@ -4,24 +4,13 @@ from typing import Optional
 
 import giturlparse
 
-from dstack.api.backend import list_backends
+from dstack.api.hub import HubClient
 from dstack.api.repos import get_local_repo_credentials
 from dstack.cli.commands import BasicCommand
 from dstack.cli.common import check_backend, check_config, check_git, check_init, console
 from dstack.cli.config import config
 from dstack.core.repo import RemoteRepo
 from dstack.core.userconfig import RepoUserConfig
-
-
-def get_ssh_keypair(key_path: Optional[str], default: str = "~/.ssh/id_rsa") -> Optional[str]:
-    """Returns path to the private key if keypair exists"""
-    key_path = Path(key_path or default).expanduser().resolve()
-    pub_key = (
-        key_path if key_path.suffix == ".pub" else key_path.with_suffix(key_path.suffix + ".pub")
-    )
-    private_key = pub_key.with_suffix("")
-    if pub_key.exists() and private_key.exists():
-        return str(private_key)
 
 
 class InitCommand(BasicCommand):
@@ -67,7 +56,6 @@ class InitCommand(BasicCommand):
             oauth_token=args.gh_token,
             original_hostname=giturlparse.parse(repo.repo_url).resource,
         )
-
         config.save_repo_user_config(
             RepoUserConfig(
                 repo_id=repo.repo_ref.repo_id,
@@ -75,16 +63,26 @@ class InitCommand(BasicCommand):
                 ssh_key_path=get_ssh_keypair(args.ssh_identity_file),
             )
         )
-
-        for backend in list_backends(repo):
-            backend.save_repo_credentials(repo_credentials)
-            status = (
-                "[yellow]WARNING[/]"
-                if config.repo_user_config.ssh_key_path is None
-                else "[green]OK[/]"
-            )
-            console.print(f"{status} [gray58](backend: {backend.name})[/]")
+        hub_client = HubClient(repo=repo)
+        hub_client.save_repo_credentials(repo_credentials)
+        status = (
+            "[yellow]WARNING[/]"
+            if config.repo_user_config.ssh_key_path is None
+            else "[green]OK[/]"
+        )
+        console.print(f"{status}")
         if config.repo_user_config.ssh_key_path is None:
             console.print(
                 f"[red]SSH is not enabled. To enable it, make sure `{args.ssh_identity_file or '~/.ssh/id_rsa'}` exists or call `dstack init --ssh-identity PATH`[/]"
             )
+
+
+def get_ssh_keypair(key_path: Optional[str], default: str = "~/.ssh/id_rsa") -> Optional[str]:
+    """Returns path to the private key if keypair exists"""
+    key_path = Path(key_path or default).expanduser().resolve()
+    pub_key = (
+        key_path if key_path.suffix == ".pub" else key_path.with_suffix(key_path.suffix + ".pub")
+    )
+    private_key = pub_key.with_suffix("")
+    if pub_key.exists() and private_key.exists():
+        return str(private_key)

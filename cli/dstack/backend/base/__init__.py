@@ -1,64 +1,33 @@
-import argparse
-import sys
-import time
 from abc import ABC, abstractmethod
 from datetime import datetime
-from enum import Enum
-from typing import Any, Dict, Generator, List, Optional, Tuple
+from typing import Generator, List, Optional
 
-import dstack.providers as providers
-from dstack.api.repos import get_local_repo_credentials
 from dstack.backend.base import jobs as base_jobs
 from dstack.core.artifact import Artifact
-from dstack.core.config import BackendConfig, Configurator
-from dstack.core.error import NameNotFoundError
+from dstack.core.config import BackendConfig
 from dstack.core.job import Job, JobHead, JobStatus
 from dstack.core.log_event import LogEvent
-from dstack.core.repo import RemoteRepo, RemoteRepoCredentials, Repo, RepoHead
+from dstack.core.repo import RemoteRepoCredentials, Repo, RepoHead
 from dstack.core.run import RunHead
 from dstack.core.secret import Secret
 from dstack.core.tag import TagHead
-from dstack.utils.common import PathLike, merge_workflow_data
-
-
-class BackendType(Enum):
-    REMOTE = "remote"
-    LOCAL = "local"
-
-    def __str__(self):
-        return str(self.value)
+from dstack.utils.common import PathLike
 
 
 class Backend(ABC):
-    _loaded = False
+    NAME = None
 
     def __init__(
         self,
+        backend_config: BackendConfig,
         repo: Optional[Repo],
-        credentials: Optional[RemoteRepoCredentials] = None,
-        auto_init: bool = False,
     ):
+        self.backend_config = backend_config
         self.repo = repo
-        self._credentials = credentials
-        self._auto_init = auto_init
 
     @property
-    @abstractmethod
     def name(self) -> str:
-        pass
-
-    @property
-    @abstractmethod
-    def type(self) -> BackendType:
-        pass
-
-    @property
-    def loaded(self):
-        return self._loaded
-
-    @abstractmethod
-    def configure(self):
-        pass
+        return self.NAME
 
     @abstractmethod
     def create_run(self) -> str:
@@ -92,12 +61,6 @@ class Backend(ABC):
     def stop_job(self, job_id: str, abort: bool):
         pass
 
-    def stop_jobs(self, run_name: Optional[str], abort: bool):
-        job_heads = self.list_job_heads(run_name)
-        for job_head in job_heads:
-            if job_head.status.is_unfinished():
-                self.stop_job(job_head.job_id, abort)
-
     @abstractmethod
     def list_job_heads(
         self, run_name: Optional[str] = None, repo_id: Optional[str] = None
@@ -107,17 +70,6 @@ class Backend(ABC):
     @abstractmethod
     def delete_job_head(self, job_id: str, repo_id: Optional[str] = None):
         pass
-
-    def delete_job_heads(self, run_name: Optional[str]):
-        job_heads = []
-        for job_head in self.list_job_heads(run_name):
-            if job_head.status.is_finished():
-                job_heads.append(job_head)
-            else:
-                if run_name:
-                    sys.exit("The run is not finished yet. Stop the run first.")
-        for job_head in job_heads:
-            self.delete_job_head(job_head.job_id)
 
     @abstractmethod
     def list_run_heads(
@@ -193,25 +145,16 @@ class Backend(ABC):
         pass
 
     @abstractmethod
+    def list_repo_heads(self) -> List[RepoHead]:
+        pass
+
+    @abstractmethod
     def update_repo_last_run_at(self, last_run_at: int):
         pass
 
     @abstractmethod
-    def _get_repo_credentials(self) -> Optional[RemoteRepoCredentials]:
-        pass
-
     def get_repo_credentials(self) -> Optional[RemoteRepoCredentials]:
-        credentials = self._get_repo_credentials()
-        if credentials is None:
-            if not self._auto_init:
-                return None  # todo raise?
-            elif self._credentials is not None:
-                credentials = self._credentials
-            else:
-                if isinstance(self.repo, RemoteRepo):
-                    credentials = get_local_repo_credentials(self.repo.repo_data)
-            self.save_repo_credentials(credentials)
-        return credentials
+        pass
 
     @abstractmethod
     def save_repo_credentials(self, repo_credentials: RemoteRepoCredentials):
@@ -237,99 +180,10 @@ class Backend(ABC):
     def delete_secret(self, secret_name: str):
         pass
 
-    @classmethod
-    @abstractmethod
-    def get_configurator(cls) -> Configurator:
-        pass
-
     @abstractmethod
     def delete_workflow_cache(self, workflow_name: str):
         pass
 
-    def run_provider(
-        self,
-        provider_name: str,
-        provider_data: Optional[Dict[str, Any]] = None,
-        tag_name: Optional[str] = None,
-        ssh_pub_key: Optional[str] = None,
-        args: Optional[argparse.Namespace] = None,
-    ) -> Tuple[str, List[Job]]:
-        """Runs provider by name
-        :return: run_name, jobs
-        """
-        if provider_name not in providers.get_provider_names():
-            raise NameNotFoundError(f"No provider '{provider_name}' is found")
-        provider = providers.load_provider(provider_name)
-
-        run_name = self.create_run()
-        provider.load(
-            self, args, None, provider_data or {}, run_name, ssh_pub_key
-        )  # todo validate data
-        if tag_name:
-            tag_head = self.get_tag_head(tag_name)
-            if tag_head:
-                self.delete_tag_head(tag_head)
-        jobs = provider.submit_jobs(self, tag_name)
-        self.update_repo_last_run_at(last_run_at=int(round(time.time() * 1000)))
-        return run_name, jobs  # todo return run_head
-
-    def run_workflow(
-        self,
-        workflow_name: str,
-        workflow_data: Optional[Dict[str, Any]] = None,
-        tag_name: Optional[str] = None,
-        ssh_pub_key: Optional[str] = None,
-        args: Optional[argparse.Namespace] = None,
-    ) -> Tuple[str, List[Job]]:
-        """Runs workflow by name
-        :return: run_name, jobs
-        """
-        workflow = self.repo.get_workflows(credentials=self.get_repo_credentials()).get(
-            workflow_name
-        )
-        if workflow is None:
-            raise NameNotFoundError(f"No workflow '{workflow_name}' is found")
-        provider = providers.load_provider(workflow["provider"])
-
-        run_name = self.create_run()
-        provider.load(
-            self,
-            args,
-            workflow_name,
-            merge_workflow_data(workflow, workflow_data),
-            run_name,
-            ssh_pub_key,
-        )
-        if tag_name:
-            tag_head = self.get_tag_head(tag_name)
-            if tag_head:
-                self.delete_tag_head(tag_head)
-        jobs = provider.submit_jobs(self, tag_name)
-        self.update_repo_last_run_at(last_run_at=int(round(time.time() * 1000)))
-        return run_name, jobs  # todo return run_head
-
-
-class RemoteBackend(Backend):
-    def __init__(
-        self,
-        backend_config: Optional[BackendConfig] = None,
-        repo: Optional[Repo] = None,
-        custom_client: Any = None,
-        credentials: Optional[RemoteRepoCredentials] = None,
-        auto_init: bool = False,
-    ):
-        super().__init__(repo=repo, credentials=credentials, auto_init=auto_init)
-
-    @abstractmethod
-    def list_repo_heads(self) -> List[RepoHead]:
-        pass
-
-    @property
-    def type(self) -> BackendType:
-        return BackendType.REMOTE
-
-
-class CloudBackend(RemoteBackend):
     @abstractmethod
     def get_signed_download_url(self, object_key: str) -> str:
         pass

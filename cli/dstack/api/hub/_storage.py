@@ -4,13 +4,13 @@ from typing import Callable, Dict, List, Optional
 
 import requests
 
+from dstack.api.hub._api_client import HubAPIClient
 from dstack.backend.base.storage import SIGNED_URL_EXPIRATION, CloudStorage
-from dstack.backend.hub.client import HubClient
 from dstack.core.storage import StorageFile
 
 
 class HUBStorage(CloudStorage, ABC):
-    def __init__(self, _client: HubClient):
+    def __init__(self, _client: HubAPIClient):
         self._client = _client
 
     def upload_file(self, source_path: str, dest_path: str, callback: Callable[[int], None]):

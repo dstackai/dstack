@@ -33,7 +33,7 @@ async def save_repo_credentials(
 async def get_repo_credentials(project_name: str, repo_spec: RepoSpec) -> RemoteRepoCredentials:
     project = await get_project(project_name=project_name)
     backend = get_backend(project, repo_spec.repo)
-    repo_credentials = backend._get_repo_credentials()
+    repo_credentials = backend.get_repo_credentials()
     if repo_credentials is None:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
