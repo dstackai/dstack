@@ -1,5 +1,6 @@
 import { isArray } from 'lodash';
-import { FormFieldError, FormErrors, RequestErrorWithDetail, FormErrors2 } from './types';
+
+import { FormErrors, FormErrors2, FormFieldError, RequestErrorWithDetail } from './types';
 
 export default function isErrorWithMessage(error: unknown): error is { data: { message: string } } {
     return (

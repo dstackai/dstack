@@ -1,18 +1,24 @@
 import React from 'react';
+import { DefaultValues, FormProvider, useForm } from 'react-hook-form';
 import { useTranslation } from 'react-i18next';
-import { Container, Header, FormUI, SpaceBetween, Button, FormInput, FormTiles, FormField, Grid } from 'components';
-import { useForm, FormProvider, DefaultValues } from 'react-hook-form';
-import { FieldPath } from 'react-hook-form/dist/types/path';
-import { useNotifications } from 'hooks';
+
+import { Button, Container, FormField, FormInput, FormTiles, FormUI, Grid, Header, InfoLink, SpaceBetween } from 'components';
+
+import { useHelpPanel, useNotifications } from 'hooks';
 import { isRequestFormErrors2, isRequestFormFieldError } from 'libs';
-import { IProps, TBackendOption } from './types';
+
 import { AWSBackend } from './AWS';
+import { PROJECT_NAME_HELP } from './constants';
 import { GCPBackend } from './GCP';
+
+import { IProps, TBackendOption } from './types';
+import { FieldPath } from 'react-hook-form/dist/types/path';
 
 export const ProjectForm: React.FC<IProps> = ({ initialValues, onCancel, loading, onSubmit: onSubmitProp }) => {
     const { t } = useTranslation();
     const [pushNotification] = useNotifications();
     const isEditing = !!initialValues;
+    const [openHelpPanel] = useHelpPanel();
 
     const getDefaultValues = (): DefaultValues<IProject> => {
         if (initialValues) {
@@ -51,6 +57,12 @@ export const ProjectForm: React.FC<IProps> = ({ initialValues, onCancel, loading
             label: t('projects.backend_type.gcp'),
             value: 'gcp',
             description: t('projects.backend_type.gcp_description'),
+            disabled: loading,
+        },
+        {
+            label: t('projects.backend_type.local'),
+            value: 'local',
+            description: t('projects.backend_type.local_description'),
             disabled: loading,
         },
         // {
@@ -118,6 +130,7 @@ export const ProjectForm: React.FC<IProps> = ({ initialValues, onCancel, loading
                             <Container header={<Header variant="h2">{t('projects.edit.general')}</Header>}>
                                 <SpaceBetween size="l">
                                     <FormInput
+                                        info={<InfoLink onFollow={() => openHelpPanel(PROJECT_NAME_HELP)} />}
                                         label={t('projects.edit.project_name')}
                                         description={t('projects.edit.project_name_description')}
                                         control={control}

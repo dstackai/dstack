@@ -1,22 +1,25 @@
 import React, { useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import { useNavigate, useParams } from 'react-router-dom';
+
 import {
-    ContentLayout,
-    SpaceBetween,
-    Container,
-    Header,
-    ColumnLayout,
     Box,
-    Loader,
-    ConfirmationDialog,
     Button,
+    ColumnLayout,
+    ConfirmationDialog,
+    Container,
+    ContentLayout,
+    Header,
+    Loader,
+    SpaceBetween,
 } from 'components';
 import { DetailsHeader } from 'components';
-import { useTranslation } from 'react-i18next';
+
 import { useAppSelector, useBreadcrumbs, useNotifications } from 'hooks';
-import { useDeleteUsersMutation, useGetUserQuery } from 'services/user';
-import { selectUserData } from 'App/slice';
 import { ROUTES } from 'routes';
+import { useDeleteUsersMutation, useGetUserQuery } from 'services/user';
+
+import { selectUserData } from 'App/slice';
 
 export const UserDetails: React.FC = () => {
     const { t } = useTranslation();

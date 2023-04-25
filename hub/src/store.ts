@@ -1,8 +1,11 @@
 import { configureStore } from '@reduxjs/toolkit';
-import appReducer from 'App/slice';
+
 import notificationsReducer from 'components/Notifications/slice';
-import { userApi } from 'services/user';
+
 import { projectApi } from 'services/project';
+import { userApi } from 'services/user';
+
+import appReducer from 'App/slice';
 
 export const store = configureStore({
     reducer: {

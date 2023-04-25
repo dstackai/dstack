@@ -17,5 +17,13 @@ export const API = {
         DETAILS_WITH_CONFIG: (name: IProject['project_name']) => `${API.PROJECTS.DETAILS(name)}/config_info`,
         MEMBERS: (name: IProject['project_name']) => `${API.PROJECTS.DETAILS(name)}/members`,
         BACKEND_VALUES: () => `${API.PROJECTS.BASE()}/backends/values`,
+
+        // Repos
+        REPOS: (name: IProject['project_name']) => `${API.BASE()}/project/${name}/repos`,
+        REPO_LIST: (name: IProject['project_name']) => `${API.PROJECTS.REPOS(name)}/heads/list`,
+
+        // Repos
+        RUNS: (name: IProject['project_name']) => `${API.BASE()}/project/${name}/runs`,
+        RUNS_LIST: (name: IProject['project_name']) => `${API.PROJECTS.RUNS(name)}/list`,
     },
 };

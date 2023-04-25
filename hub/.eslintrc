@@ -3,7 +3,8 @@
   "parser": "@typescript-eslint/parser",
   "plugins": [
     "@typescript-eslint",
-    "i18n"
+    "i18n",
+    "simple-import-sort"
   ],
   "extends": [
     "eslint:recommended",
@@ -13,6 +14,21 @@
     "plugin:prettier/recommended"
   ],
   "rules": {
-    "i18n/no-russian-character": 1
+    "i18n/no-russian-character": 1,
+    "simple-import-sort/imports": [
+      "error",
+      {
+        "groups": [
+          ["^react", "lodash", "^\\w", "^@?\\w"],
+          ["^components", "^layouts"],
+          ["^consts", "^hooks", "^libs", "^routes", "^services","^types"],
+          ["^App", "^pages"],
+          ["^\\./(?=.*/)(?!/?$)", "^\\.(?!/?$)", "^\\./?$"],
+          ["./constants/."],
+          ["./definitions/.", "./types"],
+          ["^.+\\.svg", "^.+\\.png$", "^.+\\.jpg", "^.+\\.s?css$"]
+        ]
+      }
+    ]
   }
 }

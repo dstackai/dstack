@@ -1,20 +1,24 @@
 import React from 'react';
-import { useTranslation } from 'react-i18next';
 import { useForm } from 'react-hook-form';
+import { useTranslation } from 'react-i18next';
+
 import {
     Box,
-    Container,
-    Header,
-    FormUI,
-    SpaceBetween,
     Button,
+    ColumnLayout,
+    Container,
+    FormField,
     FormInput,
     FormSelect,
+    FormUI,
+    Header,
     Popover,
+    SpaceBetween,
     StatusIndicator,
-    ColumnLayout,
-    FormField,
 } from 'components';
+
+import { copyToClipboard } from '../../../libs';
+
 import { TRoleSelectOption } from './types';
 
 export interface Props {
@@ -48,12 +52,8 @@ export const UserForm: React.FC<Props> = ({
         { label: t('roles.read'), value: 'read' },
     ];
 
-    const onCopyToken = async () => {
-        try {
-            await navigator.clipboard.writeText(initialValues?.token ?? '');
-        } catch (err) {
-            console.error('Failed to copy: ', err);
-        }
+    const onCopyToken = () => {
+        copyToClipboard(initialValues?.token ?? '');
     };
 
     const onSubmit = (data: IUser) => {

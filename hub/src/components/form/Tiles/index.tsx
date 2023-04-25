@@ -1,8 +1,9 @@
 import React from 'react';
 import { Controller, FieldValues } from 'react-hook-form';
 import Tiles from '@cloudscape-design/components/tiles';
-import { FormTilesProps } from './types';
 import { TilesProps } from '@cloudscape-design/components/tiles';
+
+import { FormTilesProps } from './types';
 
 export const FormTiles = <T extends FieldValues>({ name, control, onChange: onChangeProp, ...props }: FormTilesProps<T>) => {
     return (

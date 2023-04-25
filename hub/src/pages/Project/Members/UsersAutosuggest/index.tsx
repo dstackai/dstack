@@ -1,7 +1,9 @@
 import React, { useMemo, useState } from 'react';
-import { Autosuggest, AutosuggestProps } from 'components';
-import { useGetUserListQuery } from 'services/user';
 import { useTranslation } from 'react-i18next';
+
+import { Autosuggest, AutosuggestProps } from 'components';
+
+import { useGetUserListQuery } from 'services/user';
 
 export interface Props extends Omit<AutosuggestProps, 'value' | 'enteredTextLabel' | 'options'> {
     optionsFilter?: (options: AutosuggestOption[]) => AutosuggestOption[];

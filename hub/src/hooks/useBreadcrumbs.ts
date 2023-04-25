@@ -1,6 +1,8 @@
-import useAppDispatch from './useAppDispatch';
-import { setBreadcrumb } from 'App/slice';
 import { useEffect } from 'react';
+
+import { setBreadcrumb } from 'App/slice';
+
+import useAppDispatch from './useAppDispatch';
 
 export const useBreadcrumbs = (breadcrumbs: TBreadcrumb[]) => {
     const dispatch = useAppDispatch();

@@ -1,5 +1,7 @@
 import React from 'react';
+
 import { AppLayout, Spinner } from 'components';
+
 import styles from './styles.module.scss';
 
 export const Loading: React.FC = () => {
