@@ -1,9 +1,7 @@
 import argparse
 import os
-from typing import List
 
-from dstack.api.backend import list_backends
-from dstack.backend.base import Backend
+from dstack.api.hub import HubClient
 from dstack.cli.commands import BasicCommand
 from dstack.cli.common import check_backend, check_config, check_git, check_init, console
 from dstack.cli.config import config
@@ -33,11 +31,10 @@ class PruneCommand(BasicCommand):
     @check_init
     def _command(self, args: argparse.Namespace):
         repo = RemoteRepo(repo_ref=config.repo_user_config.repo_ref, local_repo_dir=os.getcwd())
-        backends = list_backends(repo)
-        args.prune_action(args, backends)
+        hub_client = HubClient(repo=repo)
+        args.prune_action(args, hub_client)
 
     @staticmethod
-    def prune_cache(args: argparse.Namespace, backends: List[Backend]):
-        for backend in backends:
-            backend.delete_workflow_cache(args.workflow)
-            console.print(f"[gray58]Cache pruned (backend: {backend.name})[/]")
+    def prune_cache(args: argparse.Namespace, hub_client: HubClient):
+        hub_client.delete_workflow_cache(args.workflow)
+        console.print(f"[gray58]Cache pruned[/]")

@@ -1,23 +1,22 @@
 import os
 from argparse import Namespace
 from pathlib import Path
-from typing import Any, Dict, Optional, Tuple
+from typing import Optional, Tuple
 
 import yaml
 from rich import print
 from rich.prompt import Prompt
 from rich_argparse import RichHelpFormatter
 
-from dstack.backend.hub.client import HubClient
-from dstack.core.config import BackendConfig, Configurator, get_config_path
+from dstack.api.hub._api_client import HubAPIClient
+from dstack.core.config import get_config_path
 from dstack.core.error import ConfigError
 
 
-class HUBConfig(BackendConfig):
+class HUBConfig:
     NAME = "hub"
 
     def __init__(self):
-        super().__init__()
         self.url = os.getenv("DSTACK_HUB_URL") or None
         self.project = os.getenv("DSTACK_HUB_PROJECT") or None
         self.token = os.getenv("DSTACK_HUB_TOKEN") or None
@@ -57,18 +56,7 @@ class HUBConfig(BackendConfig):
             yaml.dump(config_data, f)
 
 
-class HubConfigurator(Configurator):
-    NAME = "hub"
-
-    def get_config_from_hub_config_data(self, config_data: Any, auth_data: Dict) -> BackendConfig:
-        pass
-
-    def get_backend_client(self, config: Any):
-        pass
-
-    def configure_hub(self, config: Any):
-        pass
-
+class HubConfigurator:
     def configure_cli(self) -> HUBConfig:
         config = HUBConfig()
         try:
@@ -103,7 +91,7 @@ class HubConfigurator(Configurator):
             "[sea_green3 bold]?[/sea_green3 bold] [bold]Enter HUB token[/bold]",
             default=default_token,
         )
-        if HubClient.validate(url=url, project=project, token=token):
+        if HubAPIClient.validate(url=url, project=project, token=token):
             return url, project, token
         return self.ask_new_param(
             default_url=url,

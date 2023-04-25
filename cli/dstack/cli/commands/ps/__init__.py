@@ -4,8 +4,8 @@ from argparse import Namespace
 
 from rich.live import Live
 
-from dstack.api.backend import list_backends
-from dstack.api.run import list_runs_with_merged_backends
+from dstack.api.hub import HubClient
+from dstack.api.runs import list_runs
 from dstack.cli.commands import BasicCommand
 from dstack.cli.common import (
     check_backend,
@@ -60,21 +60,19 @@ class PSCommand(BasicCommand):
     @check_init
     def _command(self, args: Namespace):
         repo = RemoteRepo(repo_ref=config.repo_user_config.repo_ref, local_repo_dir=os.getcwd())
-        backends = list_backends(repo)
-        list_runs = list_runs_with_merged_backends(backends, args.run_name, args.all)
+        hub_client = HubClient(repo=repo)
+        runs = list_runs(hub_client, run_name=args.run_name, all=args.all)
         if args.watch:
             try:
                 with Live(
-                    generate_runs_table(list_runs, verbose=args.verbose),
+                    generate_runs_table(runs, verbose=args.verbose),
                     refresh_per_second=REFRESH_RATE_PER_SEC,
                 ) as live:
                     while True:
                         time.sleep(LIVE_PROVISION_INTERVAL_SECS)
-                        list_runs = list_runs_with_merged_backends(
-                            backends, args.run_name, args.all
-                        )
-                        live.update(generate_runs_table(list_runs, verbose=args.verbose))
+                        runs = list_runs(hub_client, run_name=args.run_name, all=args.all)
+                        live.update(generate_runs_table(runs, verbose=args.verbose))
             except KeyboardInterrupt:
                 pass
         else:
-            print_runs(list_runs, verbose=args.verbose)
+            print_runs(runs, verbose=args.verbose)

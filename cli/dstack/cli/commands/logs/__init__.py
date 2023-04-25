@@ -2,8 +2,7 @@ import os
 import sys
 from argparse import Namespace
 
-from dstack.api.backend import list_backends
-from dstack.api.logs import poll_logs
+from dstack.api.hub import HubClient
 from dstack.cli.commands import BasicCommand
 from dstack.cli.common import check_backend, check_config, check_git, check_init, console
 from dstack.cli.config import config
@@ -45,16 +44,15 @@ class LogCommand(BasicCommand):
     @check_backend
     @check_init
     def _command(self, args: Namespace):
+        start_time = since(args.since)
         repo = RemoteRepo(repo_ref=config.repo_user_config.repo_ref, local_repo_dir=os.getcwd())
-        anyone = False
-        for backend in list_backends(repo):
-            start_time = since(args.since)
-            job_heads = backend.list_job_heads(args.run_name)
-            if job_heads:
-                anyone = True
-                poll_logs(backend, run_name=args.run_name, start_time=start_time)
-                return
-
-        if not anyone:
+        hub_client = HubClient(repo=repo)
+        job_heads = hub_client.list_job_heads(args.run_name)
+        if len(job_heads) == 0:
             console.print(f"Cannot find the run '{args.run_name}'")
             exit(1)
+        try:
+            for event in hub_client.poll_logs(run_name=args.run_name, start_time=start_time):
+                sys.stdout.write(event.log_message)
+        except KeyboardInterrupt:
+            pass

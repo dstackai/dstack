@@ -1,4 +1,3 @@
-import json
 from datetime import datetime
 from typing import Dict, Generator, List, Optional
 from urllib.parse import urlencode, urlparse, urlunparse
@@ -21,6 +20,7 @@ from dstack.hub.models import (
     JobsList,
     LinkUpload,
     PollLogs,
+    ProjectInfo,
     ReposUpdate,
     RunsList,
     SaveRepoCredentials,
@@ -29,7 +29,7 @@ from dstack.hub.models import (
 )
 
 
-class HubClient:
+class HubAPIClient:
     def __init__(self, url: str, project: str, token: str, repo: Repo):
         self.url = url
         self.token = token
@@ -38,9 +38,9 @@ class HubClient:
 
     @staticmethod
     def validate(url: str, project: str, token: str) -> bool:
-        url = _url(url=url, project=project, additional_path="/info")
+        url = _project_url(url=url, project=project, additional_path="/info")
         try:
-            resp = requests.get(url=url, headers=HubClient._auth(token=token))
+            resp = requests.get(url=url, headers=HubAPIClient._auth(token=token))
             if resp.ok:
                 print(resp.json())
                 return True
@@ -59,12 +59,23 @@ class HubClient:
         return headers
 
     def _headers(self):
-        headers = HubClient._auth(token=self.token)
+        headers = HubAPIClient._auth(token=self.token)
         headers["Content-type"] = "application/json"
         return headers
 
+    def get_project_info(self) -> str:
+        resp = _make_hub_request(
+            requests.get,
+            host=self.url,
+            url=f"{self.url}/api/projects/{self.project}",
+            headers=self._headers(),
+        )
+        if resp.ok:
+            return ProjectInfo.parse_obj(resp.json())
+        resp.raise_for_status()
+
     def create_run(self) -> str:
-        url = _url(
+        url = _project_url(
             url=self.url,
             project=self.project,
             additional_path=f"/runs/create",
@@ -81,7 +92,7 @@ class HubClient:
         resp.raise_for_status()
 
     def create_job(self, job: Job):
-        url = _url(
+        url = _project_url(
             url=self.url,
             project=self.project,
             additional_path=f"/jobs/create",
@@ -94,7 +105,7 @@ class HubClient:
         resp.raise_for_status()
 
     def get_job(self, job_id: str) -> Optional[Job]:
-        url = _url(
+        url = _project_url(
             url=self.url,
             project=self.project,
             additional_path=f"/jobs/get",
@@ -115,7 +126,7 @@ class HubClient:
         resp.raise_for_status()
 
     def list_jobs(self, run_name: str) -> List[Job]:
-        url = _url(
+        url = _project_url(
             url=self.url,
             project=self.project,
             additional_path=f"/jobs/list",
@@ -133,7 +144,7 @@ class HubClient:
         resp.raise_for_status()
 
     def run_job(self, job: Job):
-        url = _url(
+        url = _project_url(
             url=self.url,
             project=self.project,
             additional_path=f"/runners/run",
@@ -150,7 +161,7 @@ class HubClient:
         resp.raise_for_status()
 
     def stop_job(self, job_id: str, abort: bool):
-        url = _url(
+        url = _project_url(
             url=self.url,
             project=self.project,
             additional_path=f"/runners/stop",
@@ -171,7 +182,7 @@ class HubClient:
         resp.raise_for_status()
 
     def list_job_heads(self, run_name: Optional[str] = None) -> Optional[List[JobHead]]:
-        url = _url(url=self.url, project=self.project, additional_path=f"/jobs/list/heads")
+        url = _project_url(url=self.url, project=self.project, additional_path=f"/jobs/list/heads")
         resp = _make_hub_request(
             requests.post,
             host=self.url,
@@ -185,7 +196,7 @@ class HubClient:
         resp.raise_for_status()
 
     def delete_job_head(self, job_id: str):
-        url = _url(
+        url = _project_url(
             url=self.url,
             project=self.project,
             additional_path=f"/jobs/delete",
@@ -202,7 +213,7 @@ class HubClient:
         resp.raise_for_status()
 
     def get_tag_head(self, tag_name: str) -> Optional[TagHead]:
-        url = _url(
+        url = _project_url(
             url=self.url,
             project=self.project,
             additional_path=f"/tags/{tag_name}",
@@ -221,7 +232,7 @@ class HubClient:
         resp.raise_for_status()
 
     def list_tag_heads(self) -> Optional[List[TagHead]]:
-        url = _url(
+        url = _project_url(
             url=self.url,
             project=self.project,
             additional_path=f"/tags/list/heads",
@@ -244,7 +255,7 @@ class HubClient:
         run_name: str,
         run_jobs: Optional[List[Job]],
     ):
-        url = _url(
+        url = _project_url(
             url=self.url,
             project=self.project,
             additional_path=f"/tags/add/run",
@@ -270,7 +281,7 @@ class HubClient:
         tag_name: str,
         local_dirs: List[str],
     ):
-        url = _url(
+        url = _project_url(
             url=self.url,
             project=self.project,
             additional_path=f"/tags/add/path",
@@ -291,7 +302,7 @@ class HubClient:
         resp.raise_for_status()
 
     def delete_tag_head(self, tag_head: TagHead):
-        url = _url(
+        url = _project_url(
             url=self.url,
             project=self.project,
             additional_path=f"/tags/{tag_head.tag_name}/delete",
@@ -312,7 +323,7 @@ class HubClient:
         run_name: Optional[str] = None,
         include_request_heads: bool = True,
     ) -> List[RunHead]:
-        url = _url(
+        url = _project_url(
             url=self.url,
             project=self.project,
             additional_path=f"/runs/list",
@@ -334,7 +345,7 @@ class HubClient:
         resp.raise_for_status()
 
     def update_repo_last_run_at(self, last_run_at: int):
-        url = _url(
+        url = _project_url(
             url=self.url,
             project=self.project,
             additional_path=f"/repos/update",
@@ -354,7 +365,7 @@ class HubClient:
         resp.raise_for_status()
 
     def list_repo_heads(self) -> List[RepoHead]:
-        url = _url(
+        url = _project_url(
             url=self.url,
             project=self.project,
             additional_path=f"/repos/heads/list",
@@ -370,7 +381,7 @@ class HubClient:
         resp.raise_for_status()
 
     def get_repos_credentials(self) -> Optional[RemoteRepoCredentials]:
-        url = _url(
+        url = _project_url(
             url=self.url,
             project=self.project,
             additional_path=f"/repos/credentials/get",
@@ -390,7 +401,7 @@ class HubClient:
         resp.raise_for_status()
 
     def save_repos_credentials(self, repo_credentials: RemoteRepoCredentials):
-        url = _url(
+        url = _project_url(
             url=self.url,
             project=self.project,
             additional_path=f"/repos/credentials/save",
@@ -410,7 +421,7 @@ class HubClient:
         resp.raise_for_status()
 
     def list_secret_names(self) -> List[str]:
-        url = _url(
+        url = _project_url(
             url=self.url,
             project=self.project,
             additional_path=f"/secrets/list",
@@ -427,7 +438,7 @@ class HubClient:
         resp.raise_for_status()
 
     def get_secret(self, secret_name: str) -> Optional[Secret]:
-        url = _url(
+        url = _project_url(
             url=self.url,
             project=self.project,
             additional_path=f"/secrets/{secret_name}/get",
@@ -447,7 +458,7 @@ class HubClient:
         resp.raise_for_status()
 
     def add_secret(self, secret: Secret):
-        url = _url(
+        url = _project_url(
             url=self.url,
             project=self.project,
             additional_path=f"/secrets/add",
@@ -467,7 +478,7 @@ class HubClient:
         resp.raise_for_status()
 
     def update_secret(self, secret: Secret):
-        url = _url(
+        url = _project_url(
             url=self.url,
             project=self.project,
             additional_path=f"/secrets/update",
@@ -487,7 +498,7 @@ class HubClient:
         resp.raise_for_status()
 
     def delete_secret(self, secret_name: str):
-        url = _url(
+        url = _project_url(
             url=self.url,
             project=self.project,
             additional_path=f"/secrets/{secret_name}/delete",
@@ -504,7 +515,7 @@ class HubClient:
         resp.raise_for_status()
 
     def list_run_artifact_files(self, run_name: str) -> List[Artifact]:
-        url = _url(
+        url = _project_url(
             url=self.url,
             project=self.project,
             additional_path=f"/artifacts/list",
@@ -528,7 +539,7 @@ class HubClient:
         end_time: Optional[datetime],
         descending: bool,
     ) -> Generator[LogEvent, None, None]:
-        url = _url(
+        url = _project_url(
             url=self.url,
             project=self.project,
             additional_path=f"/logs/poll",
@@ -563,7 +574,7 @@ class HubClient:
             prev_event_id = logs[-1].event_id
 
     def upload_file(self, dest_path: str) -> Optional[str]:
-        url = _url(
+        url = _project_url(
             url=self.url,
             project=self.project,
             additional_path=f"/link/upload",
@@ -580,7 +591,7 @@ class HubClient:
         resp.raise_for_status()
 
     def download_file(self, dest_path: str) -> Optional[str]:
-        url = _url(
+        url = _project_url(
             url=self.url,
             project=self.project,
             additional_path=f"/link/download",
@@ -597,7 +608,7 @@ class HubClient:
         resp.raise_for_status()
 
     def delete_workflow_cache(self, workflow_name: str):
-        url = _url(
+        url = _project_url(
             url=self.url,
             project=self.project,
             additional_path=f"/workflows/{workflow_name}/cache/delete",
@@ -614,7 +625,7 @@ class HubClient:
         resp.raise_for_status()
 
 
-def _url(url: str, project: str, additional_path: str, query: Optional[dict] = None):
+def _project_url(url: str, project: str, additional_path: str, query: Optional[dict] = None):
     query = {} if query is None else query
     unparse_url = urlparse(url=url)
     if additional_path.startswith("/"):
