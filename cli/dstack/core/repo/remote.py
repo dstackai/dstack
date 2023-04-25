@@ -116,7 +116,7 @@ class RemoteRepo(Repo):
             raise ValueError("No remote repo data provided")
 
         if repo_ref is None:
-            repo_ref = RepoRef(repo_id=repo_data.path(), repo_user_id=repo_user_id)
+            repo_ref = RepoRef(repo_id=repo_data.path(sep=","), repo_user_id=repo_user_id)
         super().__init__(repo_ref, repo_data)
 
     def get_workflows(
