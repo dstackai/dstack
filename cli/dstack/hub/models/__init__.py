@@ -153,6 +153,10 @@ class SaveRepoCredentials(BaseModel):
     repo_credentials: RemoteRepoCredentials
 
 
+class RepoHeadGet(BaseModel):
+    repo_id: str
+
+
 class ReposUpdate(BaseModel):
     repo_spec: RepoSpec
     last_run_at: int
