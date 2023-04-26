@@ -22,8 +22,8 @@ import (
 	"gopkg.in/yaml.v3"
 )
 
-type File struct {
-	Path string `yaml:"path"`
+type LocalConfigFile struct {
+	Namespace string `yaml:"namespace"`
 }
 
 type Local struct {
@@ -34,26 +34,27 @@ type Local struct {
 	cliSecret *ClientSecret
 }
 
+const LOCAL_BACKEND_DIR = "local_backend"
+
 func init() {
-	backend.DefaultBackend = New()
 	backend.RegisterBackend("local", func(ctx context.Context, pathConfig string) (backend.Backend, error) {
-		file := File{}
-		theConfig, err := ioutil.ReadFile(pathConfig)
+		config := LocalConfigFile{}
+		fileContent, err := ioutil.ReadFile(pathConfig)
 		if err != nil {
 			fmt.Println("[ERROR]", err.Error())
 			return nil, err
 		}
-		err = yaml.Unmarshal(theConfig, &file)
+		err = yaml.Unmarshal(fileContent, &config)
 		if err != nil {
 			fmt.Println("[ERROR]", err.Error())
 			return nil, err
 		}
-		return New(), nil
+		return New(config.Namespace), nil
 	})
 }
 
-func New() *Local {
-	path := filepath.Join(common.HomeDir(), consts.DSTACK_DIR_PATH)
+func New(namespace string) *Local {
+	path := filepath.Join(common.HomeDir(), consts.DSTACK_DIR_PATH, LOCAL_BACKEND_DIR, namespace)
 	return &Local{
 		path:      path,
 		storage:   NewLocalStorage(path),
@@ -161,7 +162,7 @@ func (l Local) Shutdown(ctx context.Context) error {
 }
 
 func (l *Local) GetArtifact(ctx context.Context, runName, localPath, remotePath string, _ bool) artifacts.Artifacter {
-	rootPath := path.Join(common.HomeDir(), consts.USER_ARTIFACTS_PATH, runName)
+	rootPath := path.Join(l.GetTMPDir(ctx), consts.USER_ARTIFACTS_DIR, runName)
 	log.Trace(ctx, "Create simple artifact's engine. Local", "Root path", rootPath)
 	art, err := local.NewLocal(l.path, rootPath, localPath, remotePath)
 	if err != nil {
@@ -173,7 +174,7 @@ func (l *Local) GetArtifact(ctx context.Context, runName, localPath, remotePath 
 
 func (l Local) CreateLogger(ctx context.Context, logGroup, logName string) io.Writer {
 	log.Trace(ctx, "Build logger", "LogGroup", logGroup, "LogName", logName)
-	logger, err := NewLogger(logGroup, logName)
+	logger, err := NewLogger(l.path, logGroup, logName)
 	if err != nil {
 		log.Error(ctx, "Failed create logger", "LogGroup", logGroup, "LogName", logName)
 		return nil
@@ -238,4 +239,8 @@ func (l Local) GetRepoDiff(ctx context.Context, path string) (string, error) {
 		return "", gerrors.Wrap(err)
 	}
 	return string(diff), nil
+}
+
+func (l Local) GetTMPDir(ctx context.Context) string {
+	return path.Join(l.path, "tmp")
 }

@@ -16,5 +16,7 @@ class Configurator(ABC):
         pass
 
     @abstractmethod
-    def get_config_from_hub_config_data(self, config_data: Dict, auth_data: Dict) -> BackendConfig:
+    def get_config_from_hub_config_data(
+        self, project_name: str, config_data: Dict, auth_data: Dict
+    ) -> BackendConfig:
         pass

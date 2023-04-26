@@ -35,7 +35,9 @@ class AWSConfigurator(Configurator):
     def name(self):
         return "aws"
 
-    def get_config_from_hub_config_data(self, config_data: Dict, auth_data: Dict) -> BackendConfig:
+    def get_config_from_hub_config_data(
+        self, project_name: str, config_data: Dict, auth_data: Dict
+    ) -> BackendConfig:
         return AWSConfig.deserialize(config_data, auth_data)
 
     def configure_hub(self, config_data: Dict) -> AWSProjectValues:

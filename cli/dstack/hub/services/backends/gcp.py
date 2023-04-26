@@ -104,7 +104,9 @@ class GCPConfigurator(Configurator):
     def name(self):
         return "gcp"
 
-    def get_config_from_hub_config_data(self, config_data: Dict, auth_data: Dict) -> BackendConfig:
+    def get_config_from_hub_config_data(
+        self, project_name: str, config_data: Dict, auth_data: Dict
+    ) -> BackendConfig:
         credentials = json.loads(auth_data["credentials"])
         data = {
             "backend": "gcp",

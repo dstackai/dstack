@@ -22,7 +22,7 @@ def create_run(
 
 def _next_run_name_index(storage: Storage, run_name: str) -> int:
     count = 0
-    key = f"run-names/{run_name}.yaml"
+    key = f"run_names/{run_name}.yaml"
     obj = storage.get_object(key)
     if obj is None:
         storage.put_object(key=key, content=yaml.dump({"count": 1}))

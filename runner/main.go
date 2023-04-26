@@ -23,7 +23,6 @@ import (
 	_ "github.com/dstackai/dstack/runner/internal/backend/gcp"
 	_ "github.com/dstackai/dstack/runner/internal/backend/local"
 	_ "github.com/dstackai/dstack/runner/internal/backend/s3"
-	"github.com/dstackai/dstack/runner/internal/common"
 	"github.com/dstackai/dstack/runner/internal/container"
 	"github.com/dstackai/dstack/runner/internal/executor"
 	"github.com/dstackai/dstack/runner/internal/log"
@@ -77,8 +76,6 @@ func start(logLevel int, httpPort int, configDir string) {
 	logCtx := log.WithLogger(ctx, log.L)
 	log.Info(logCtx, fmt.Sprintf("Log level: %v", log.L.Logger.GetLevel().String()))
 	log.Info(logCtx, "RUNNER START...")
-
-	common.CreateTMPDir()
 
 	pathConfig := filepath.Join(configDir, consts.CONFIG_FILE_NAME)
 
