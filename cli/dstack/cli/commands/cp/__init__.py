@@ -5,12 +5,12 @@ from argparse import Namespace
 from pathlib import Path
 
 from dstack.api.hub import HubClient
+from dstack.api.repos import load_repo
 from dstack.api.runs import RunNotFoundError, TagNotFoundError, get_tagged_run_name
 from dstack.cli.commands import BasicCommand
 from dstack.cli.common import check_backend, check_config, check_git, check_init, console
 from dstack.cli.config import config
 from dstack.core.config import get_dstack_dir
-from dstack.core.repo import RemoteRepo
 
 
 class CpCommand(BasicCommand):
@@ -45,7 +45,7 @@ class CpCommand(BasicCommand):
     @check_backend
     @check_init
     def _command(self, args: Namespace):
-        repo = RemoteRepo(repo_ref=config.repo_user_config.repo_ref, local_repo_dir=os.getcwd())
+        repo = load_repo(config.repo_user_config)
         hub_client = HubClient(repo=repo)
         try:
             run_name, _ = get_tagged_run_name(hub_client, args.run_name_or_tag_name)

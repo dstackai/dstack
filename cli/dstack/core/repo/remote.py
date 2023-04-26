@@ -1,7 +1,7 @@
 import os
 import tempfile
 from pathlib import Path
-from typing import Any, Dict, Optional
+from typing import Any, BinaryIO, Dict, Optional
 
 import git
 import giturlparse
@@ -11,6 +11,7 @@ from typing_extensions import Literal
 from dstack.core.repo import RepoProtocol
 from dstack.core.repo.base import Repo, RepoData, RepoInfo, RepoRef
 from dstack.utils.common import PathLike
+from dstack.utils.fs import get_sha256
 from dstack.utils.ssh import get_host_config, make_ssh_command_for_git
 from dstack.utils.workflows import load_workflows
 
@@ -73,6 +74,10 @@ class RemoteRepoData(RepoData, RemoteRepoInfo):
                 return f"ssh@{self.path(sep='/')}.git"
             else:
                 return f"git@{self.repo_host_name}:{self.repo_user_name}/{self.repo_name}.git"
+
+    def write_code_file(self, fp: BinaryIO) -> str:
+        fp.write(self.repo_diff.encode())
+        return f"code/remote/{get_sha256(fp)}.patch"
 
 
 class RemoteRepo(Repo):

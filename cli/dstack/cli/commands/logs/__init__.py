@@ -1,12 +1,11 @@
-import os
 import sys
 from argparse import Namespace
 
 from dstack.api.hub import HubClient
+from dstack.api.repos import load_repo
 from dstack.cli.commands import BasicCommand
 from dstack.cli.common import check_backend, check_config, check_git, check_init, console
 from dstack.cli.config import config
-from dstack.core.repo import RemoteRepo
 from dstack.utils.common import since
 
 
@@ -45,7 +44,7 @@ class LogCommand(BasicCommand):
     @check_init
     def _command(self, args: Namespace):
         start_time = since(args.since)
-        repo = RemoteRepo(repo_ref=config.repo_user_config.repo_ref, local_repo_dir=os.getcwd())
+        repo = load_repo(config.repo_user_config)
         hub_client = HubClient(repo=repo)
         job_heads = hub_client.list_job_heads(args.run_name)
         if len(job_heads) == 0:

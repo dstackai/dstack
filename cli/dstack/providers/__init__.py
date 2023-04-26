@@ -1,6 +1,7 @@
 import importlib
 import shlex
 import sys
+import tempfile
 from abc import abstractmethod
 from argparse import ArgumentParser, Namespace
 from pkgutil import iter_modules
@@ -228,6 +229,12 @@ class Provider:
         if not self.loaded:
             raise Exception("The provider is not loaded")
         job_specs = self.create_job_specs()
+
+        with tempfile.NamedTemporaryFile("w+b") as f:
+            repo_code_filename = hub_client.repo.repo_data.write_code_file(f)
+            f.seek(0)
+            hub_client._storage.upload_file(f.name, repo_code_filename, lambda _: ...)
+
         # [TODO] Handle master job
         jobs = []
         for i, job_spec in enumerate(job_specs):
@@ -259,6 +266,7 @@ class Provider:
                 request_id=None,
                 tag_name=tag_name,
                 ssh_key_pub=self.ssh_key_pub,
+                repo_code_filename=repo_code_filename,
             )
             hub_client.submit_job(job)
             jobs.append(job)

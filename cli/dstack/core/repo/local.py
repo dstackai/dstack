@@ -9,6 +9,7 @@ from typing_extensions import Literal
 
 from dstack.core.repo.base import Repo, RepoData, RepoInfo, RepoRef
 from dstack.utils.common import PathLike
+from dstack.utils.fs import get_sha256
 from dstack.utils.workflows import load_workflows
 
 
@@ -16,9 +17,10 @@ class LocalRepoData(RepoData):
     repo_type: Literal["local"] = "local"
     repo_dir: str
 
-    def compress(self, *, name: Optional[PathLike] = None, fileobj: Optional[BinaryIO] = None):
-        with tarfile.TarFile(name=name, mode="w", fileobj=fileobj) as t:
-            t.add(self.repo_dir, arcname="", filter=TarIgnore(self.repo_dir))
+    def write_code_file(self, fp: BinaryIO) -> str:
+        with tarfile.TarFile(mode="w", fileobj=fp) as t:
+            t.add(self.repo_dir, arcname="", filter=TarIgnore(self.repo_dir, globs=[".git"]))
+        return f"code/local/{get_sha256(fp)}.tar"
 
 
 class LocalRepoInfo(RepoInfo):

@@ -15,6 +15,7 @@ from websocket import WebSocketApp
 
 from dstack import providers
 from dstack.api.hub import HubClient
+from dstack.api.repos import load_repo
 from dstack.api.runs import list_runs
 from dstack.backend.base.logs import fix_urls
 from dstack.cli.commands import BasicCommand
@@ -30,7 +31,6 @@ from dstack.cli.common import (
 from dstack.cli.config import config
 from dstack.core.error import NameNotFoundError, NotInitializedError
 from dstack.core.job import Job, JobHead, JobStatus
-from dstack.core.repo import RemoteRepo
 from dstack.core.request import RequestStatus
 from dstack.utils.workflows import load_workflows
 
@@ -91,9 +91,7 @@ class RunCommand(BasicCommand):
             self._parser.print_help()
             exit(1)
         try:
-            repo = RemoteRepo(
-                repo_ref=config.repo_user_config.repo_ref, local_repo_dir=os.getcwd()
-            )
+            repo = load_repo(config.repo_user_config)
             hub_client = HubClient(repo=repo)
 
             if not hub_client.get_repo_credentials():

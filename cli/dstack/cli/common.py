@@ -1,6 +1,6 @@
 import os
 from importlib.util import find_spec
-from typing import List, Optional, Tuple
+from typing import List, Optional
 
 from git import InvalidGitRepositoryError
 from rich.console import Console

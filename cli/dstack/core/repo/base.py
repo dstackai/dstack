@@ -1,6 +1,6 @@
 from abc import ABC, abstractmethod
 from enum import Enum
-from typing import Any, Dict, Optional
+from typing import Any, BinaryIO, Dict
 
 from pydantic import BaseModel, validator
 from typing_extensions import Literal
@@ -26,6 +26,12 @@ class RepoRef(BaseModel):
 
 class RepoData(BaseModel):
     repo_type: Literal["none"] = "none"
+
+    def write_code_file(self, fp: BinaryIO) -> str:
+        """
+        :return: repo_code_filename
+        """
+        raise NotImplementedError()
 
 
 class RepoInfo(BaseModel):

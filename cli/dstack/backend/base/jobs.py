@@ -1,7 +1,5 @@
-import hashlib
-import tempfile
 import uuid
-from typing import BinaryIO, List, Optional, Tuple
+from typing import List, Optional, Tuple
 
 import yaml
 
@@ -10,7 +8,7 @@ from dstack.backend.base.compute import Compute, NoCapacityError
 from dstack.backend.base.storage import Storage
 from dstack.core.error import NoMatchingInstanceError
 from dstack.core.job import Job, JobErrorCode, JobHead, JobStatus
-from dstack.core.repo import LocalRepoData, RemoteRepoData, RepoRef
+from dstack.core.repo import RepoRef
 from dstack.core.request import RequestStatus
 from dstack.core.runners import Runner
 from dstack.utils.common import get_milliseconds_since_epoch
@@ -23,23 +21,6 @@ def create_job(
 ):
     if create_head:
         storage.put_object(key=_get_job_head_filename(job), content="")
-
-    if isinstance(job.repo_data, RemoteRepoData):
-        if job.repo_data.repo_diff:
-            job.repo_code_filename = _get_diff_filename(job.repo_data.repo_diff)
-            if not storage.key_exists(job.repo_code_filename):
-                storage.put_object(key=job.repo_code_filename, content=job.repo_data.repo_diff)
-    elif isinstance(job.repo_data, LocalRepoData):
-        # todo consider creating hash of tree stats (filename, size, modify date)
-        with tempfile.NamedTemporaryFile("w+b") as f:
-            job.repo_data.compress(fileobj=f)
-            f.seek(0)
-            job.repo_code_filename = _get_archive_filename(f)
-            if not storage.key_exists(job.repo_code_filename):
-                f.seek(0)
-                storage.upload_file(
-                    source_path=f.name, dest_path=job.repo_code_filename, callback=lambda _: ...
-                )
 
     storage.put_object(
         key=_get_job_filename(job.repo_ref.repo_id, job.job_id), content=yaml.dump(job.serialize())
@@ -273,20 +254,6 @@ def _get_jobs_dir(repo_id: str) -> str:
 
 def _get_job_filename(repo_id: str, job_id: str) -> str:
     return f"{_get_jobs_dir(repo_id)}{job_id}.yaml"
-
-
-def _get_diff_filename(job_diff: str) -> str:
-    diff_hash = hashlib.sha256(job_diff.encode()).hexdigest()
-    return f"diffs/{diff_hash}.patch"
-
-
-def _get_archive_filename(f: BinaryIO, ext: str = ".tar", chunk_size: int = 65536) -> str:
-    sha256 = hashlib.sha256()
-    chunk = f.read(chunk_size)
-    while len(chunk) > 0:
-        sha256.update(chunk)
-        chunk = f.read(chunk_size)
-    return f"archives/{sha256.hexdigest()}{ext}"
 
 
 def _get_jobs_filenames_prefix(repo_id: str, run_name: str) -> str:
