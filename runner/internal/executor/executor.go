@@ -395,7 +395,7 @@ func (ex *Executor) prepareGit(ctx context.Context) error {
 
 func (ex *Executor) prepareArchive(ctx context.Context) error {
 	job := ex.backend.Job(ctx)
-	dir := path.Join(common.HomeDir(), consts.RUNS_PATH, job.RunName, job.JobID)
+	dir := path.Join(ex.backend.GetTMPDir(ctx), consts.RUNS_DIR, job.RunName, job.JobID)
 	if _, err := os.Stat(dir); err != nil {
 		if err = os.MkdirAll(dir, 0777); err != nil {
 			return gerrors.Wrap(err)
