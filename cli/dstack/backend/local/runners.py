@@ -14,14 +14,15 @@ from psutil import NoSuchProcess
 from tqdm import tqdm
 
 from dstack import version
+from dstack.backend.local.config import LocalConfig
 from dstack.core.job import Job
 from dstack.core.request import RequestHead, RequestStatus
 from dstack.core.runners import Gpu, Resources
 
 
-def start_runner_process(runner_id: str) -> str:
+def start_runner_process(backend_config: LocalConfig, runner_id: str) -> str:
     _install_runner_if_necessary()
-    runner_config_dir = _get_runner_config_dir(runner_id)
+    runner_config_dir = _get_runner_config_dir(backend_config, runner_id)
     proc = subprocess.Popen(
         [
             _runner_path(),
@@ -38,9 +39,12 @@ def start_runner_process(runner_id: str) -> str:
     return f"l-{proc.pid}"
 
 
-def check_runner_resources(runner_id: str) -> Resources:
+def check_runner_resources(backend_config: LocalConfig, runner_id: str) -> Resources:
     _install_runner_if_necessary()
-    runner_config_dir = _get_runner_config_dir(runner_id, create=True)
+    runner_config_dir = _get_runner_config_dir(backend_config, runner_id, create=True)
+    backend_config_path = runner_config_dir / "config.yaml"
+    with open(backend_config_path, "w+") as f:
+        f.write(backend_config.serialize_yaml())
     runner_config_path = runner_config_dir / "runner.yaml"
     result = subprocess.run(
         [f"{_runner_path()} --config-dir {runner_config_dir} check"],
@@ -49,7 +53,6 @@ def check_runner_resources(runner_id: str) -> Resources:
         stderr=subprocess.PIPE,
         text=True,
     )
-
     if result.returncode > 0:
         raise Exception(result.stderr)
     _runner_yaml = yaml.load(runner_config_path.open(), yaml.FullLoader)
@@ -108,10 +111,10 @@ def _runner_bucket() -> str:
         return "dstack-runner-downloads-stgn"
 
 
-def _get_runner_config_dir(runner_id: str, create: Optional[bool] = None) -> Path:
-    runner_config_dir_path = Path(
-        os.path.join(_config_directory_path(), "tmp", "runner", "configs", runner_id)
-    )
+def _get_runner_config_dir(
+    backend_config: LocalConfig, runner_id: str, create: Optional[bool] = None
+) -> Path:
+    runner_config_dir_path = backend_config.backend_dir / "tmp" / "runner" / "configs" / runner_id
     if create:
         runner_config_dir_path.mkdir(parents=True, exist_ok=True)
         runner_config_path = runner_config_dir_path / "runner.yaml"

@@ -21,7 +21,6 @@ import (
 	"github.com/dstackai/dstack/runner/consts/states"
 	"github.com/dstackai/dstack/runner/internal/artifacts"
 	"github.com/dstackai/dstack/runner/internal/backend"
-	"github.com/dstackai/dstack/runner/internal/common"
 	"github.com/dstackai/dstack/runner/internal/container"
 	"github.com/dstackai/dstack/runner/internal/environment"
 	"github.com/dstackai/dstack/runner/internal/gerrors"
@@ -337,7 +336,7 @@ func (ex *Executor) runJob(ctx context.Context, erCh chan error, stoppedCh chan 
 
 func (ex *Executor) prepareGit(ctx context.Context) error {
 	job := ex.backend.Job(ctx)
-	dir := path.Join(common.HomeDir(), consts.RUNS_PATH, job.RunName, job.JobID)
+	dir := path.Join(ex.backend.GetTMPDir(ctx), consts.RUNS_DIR, job.RunName, job.JobID)
 	if _, err := os.Stat(dir); err != nil {
 		if err = os.MkdirAll(dir, 0777); err != nil {
 			return gerrors.Wrap(err)
@@ -502,7 +501,7 @@ func (ex *Executor) processJob(ctx context.Context, stoppedCh chan struct{}) err
 	bindings := make([]mount.Mount, 0)
 	bindings = append(bindings, mount.Mount{
 		Type:   mount.TypeBind,
-		Source: path.Join(common.HomeDir(), consts.RUNS_PATH, job.RunName, job.JobID),
+		Source: path.Join(ex.backend.GetTMPDir(ctx), consts.RUNS_DIR, job.RunName, job.JobID),
 		Target: "/workflow",
 	})
 	for _, artifact := range ex.artifactsIn {

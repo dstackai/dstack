@@ -205,7 +205,7 @@ func (s *S3) GetArtifact(ctx context.Context, runName, localPath, remotePath str
 		return nil
 	}
 	if mount {
-		rootPath := path.Join(common.HomeDir(), consts.FUSE_PATH, runName)
+		rootPath := path.Join(s.GetTMPDir(ctx), consts.FUSE_DIR, runName)
 		iamRole := fmt.Sprintf("dstack_role_%s", strings.ReplaceAll(s.bucket, "-", "_"))
 		log.Trace(ctx, "Create FUSE artifact's engine", "Region", s.region, "Root path", rootPath, "IAM Role", iamRole)
 		art, err := s3fs.New(ctx, s.bucket, s.region, iamRole, rootPath, localPath, remotePath)
@@ -215,7 +215,7 @@ func (s *S3) GetArtifact(ctx context.Context, runName, localPath, remotePath str
 		}
 		return art
 	}
-	rootPath := path.Join(common.HomeDir(), consts.USER_ARTIFACTS_PATH, runName)
+	rootPath := path.Join(s.GetTMPDir(ctx), consts.USER_ARTIFACTS_DIR, runName)
 	log.Trace(ctx, "Create simple artifact's engine", "Region", s.region, "Root path", rootPath)
 	art, err := simple.NewSimple(s.bucket, s.region, rootPath, localPath, remotePath)
 	if err != nil {
@@ -391,4 +391,8 @@ func (s *S3) GetRepoArchive(ctx context.Context, path, dir string) error {
 		return gerrors.Wrap(err)
 	}
 	return nil
+}
+
+func (s *S3) GetTMPDir(ctx context.Context) string {
+	return path.Join(common.HomeDir(), consts.TMP_DIR_PATH)
 }

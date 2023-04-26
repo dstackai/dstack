@@ -36,6 +36,7 @@ type Backend interface {
 	GetJobByPath(ctx context.Context, path string) (*models.Job, error)
 	GetRepoDiff(ctx context.Context, path string) (string, error)
 	GetRepoArchive(ctx context.Context, path, dst string) error
+	GetTMPDir(ctx context.Context) string
 }
 
 type File struct {

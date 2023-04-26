@@ -30,18 +30,17 @@ class LocalBackend(Backend):
 
     def __init__(
         self,
-        backend_config: Optional[LocalConfig],
+        backend_config: LocalConfig,
         repo: Optional[Repo],
     ):
         super().__init__(repo=repo, backend_config=backend_config)
         self.backend_config = backend_config
         if self.backend_config is None:
             return
-        self._loaded = True
-        self._storage = LocalStorage(self.backend_config.path)
-        self._compute = LocalCompute()
+        self._storage = LocalStorage(self.backend_config.backend_dir)
+        self._compute = LocalCompute(self.backend_config)
         self._secrets_manager = LocalSecretsManager(
-            self.backend_config.path, repo_id=self.repo.repo_id if self.repo else None
+            self.backend_config.backend_dir, repo_id=self.repo.repo_id if self.repo else None
         )
 
     def create_run(self) -> str:
