@@ -4,15 +4,14 @@ title: Docs
 
 # Welcome to documentation
 
-`dstack` is an open-source tool that makes it easy to run ML workflows, provision infrastructure, create
-dev environments, run apps, manage data, and track usage. 
+`dstack` makes it very easy to define ML workflows and run them on any cloud platform.
 
 So let's get started.
 
 <div class="grid cards" markdown>
 
-- [**Quickstart**
-   Get started with `dstack` and see how it works in just a few minutes.](../quickstart.md)
+- [**Quick start**
+   Get started with `dstack` and see how it works in just a few minutes.](quick-start.md)
 
 - [**Installation**
    Learn in more detail how to install and configure `dstack`](installation/index.md)

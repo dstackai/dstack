@@ -3,7 +3,7 @@ site_name: dstack
 site_url: https://docs.dstack.ai
 site_author: Andrey Cheptsov
 site_description: >-
-  The easiest way to run ML workflows, provision infrastructure, create dev environments, run apps, and manage data.
+  The easiest way to define ML workflows and run them on any cloud platform
 
 # Repository
 repo_url: https://github.com/dstackai/dstack
@@ -66,14 +66,10 @@ plugins:
         text: "#FFFFFF"
       cards_font: Roboto
   - search
-#  - redirects:
-#      redirect_maps:
-#        'integrations/experiments/wandb.md': 'tutorials/wandb.md'
-#        'examples/wandb.md': 'tutorials/wandb.md'
-#        'examples/tensorboard.md': 'tutorials/tensorboard.md'
-#        'examples/stable-diffusion.md': 'examples/stable-diffusion.md'
-#        'examples/github-actions.md': 'tutorials/github-actions.md'
-#        'installation.md': 'setup/index.md'
+  - redirects:
+      redirect_maps:
+        'quickstart.md': 'docs/quick-start.md'
+        'docs/installation/index.md': 'docs/quick-start.md'
   - typeset
 
 # Extensions
@@ -136,16 +132,15 @@ extra:
 # Page tree
 nav:
   - Home: index.md
-  - Quickstart: quickstart.md
-  #  - Features: "#feaures"
   - Docs:
       - Getting started:
           - Overview: docs/index.md
-          - Installation:
-              - CLI: docs/installation/index.md
-              - AWS: docs/installation/aws.md
-              - GCP: docs/installation/gcp.md
-              - Hub: docs/installation/hub.md
+          - Quick start: docs/quick-start.md
+#          - Installation:
+#              - CLI: docs/installation/index.md
+#              - AWS: docs/installation/aws.md
+#              - GCP: docs/installation/gcp.md
+#              - Hub: docs/installation/hub.md
       - User guide:
           - Hello world: docs/usage/hello-world.md
           - Python: docs/usage/python.md
@@ -160,19 +155,20 @@ nav:
       - Reference:
           - CLI:
               - dstack run: docs/reference/cli/run.md
+              - dstack init: docs/reference/cli/init.md
+              - dstack hub: docs/reference/cli/hub.md
+              - dstack config: docs/reference/cli/config.md
               - dstack ps: docs/reference/cli/ps.md
+              - dstack ls: docs/reference/cli/ls.md
               - dstack logs: docs/reference/cli/logs.md
               - dstack stop: docs/reference/cli/stop.md
               - dstack rm: docs/reference/cli/rm.md
-              - dstack tags: docs/reference/cli/tags.md
-              - dstack pull: docs/reference/cli/pull.md
-              - dstack push: docs/reference/cli/push.md
-              - dstack ls: docs/reference/cli/ls.md
               - dstack cp: docs/reference/cli/cp.md
-              - dstack init: docs/reference/cli/init.md
-              - dstack config: docs/reference/cli/config.md
+              - dstack tags: docs/reference/cli/tags.md
               - dstack secrets: docs/reference/cli/secrets.md
               - dstack prune: docs/reference/cli/prune.md
+              - dstack pull: docs/reference/cli/pull.md
+              - dstack push: docs/reference/cli/push.md
           - Providers:
               - bash: docs/reference/providers/bash.md
               - code: docs/reference/providers/code.md
@@ -186,8 +182,8 @@ nav:
       - Experiment tracking:
           - TensorBoard: tutorials/tensorboard.md
           - Weights & Biases: tutorials/wandb.md
-      - CI/CD:
-          - GitHub Actions: tutorials/github-actions.md
+#      - CI/CD:
+#          - GitHub Actions: tutorials/github-actions.md
   #      - Community:
   #          - Troubleshooting: troubleshooting.md
   #          - Slack: https://join.slack.com/t/dstackai/shared_invite/zt-xdnsytie-D4qU9BvJP8vkbkHXdi6clQ

@@ -154,23 +154,10 @@ workflows:
 
 ## 4. Run the workflow
 
-Before we can run our workflow in our cloud account, we need to configure a remote using
-the [`dstack config`](../docs/installation/index.md#configure-a-remote) command:
+!!! info "NOTE:"
+    To run workflows remotely in a configured cloud, we'll need the [Hub application](../docs/quick-start.md#start-the-hub-application).
 
-<div class="termy">
-
-```shell
-$ dstack config
-
-? Choose backend. Use arrows to move, type to filter
-> [aws]
-  [gcp]
-  [hub]
-```
-
-</div>
-
-After configuring the remote, we can use the [`dstack run`](../docs/reference/cli/run.md) command with the `--remote` flag to
+Once the remote is configured, we can use the [`dstack run`](../docs/reference/cli/run.md) command with the `--remote` flag to
 run our workflow in the cloud.
 
 <div class="termy">

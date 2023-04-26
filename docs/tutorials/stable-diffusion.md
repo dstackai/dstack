@@ -119,7 +119,7 @@ $ dstack run stable-diffusion
 Once you run it, `dstack` will run the script, and save the `models` folder as an artifact.
 After that, you can reuse it in other workflows.
 
-## 3. Attach an IDE
+## 3. Create a dev environment
 
 Sometimes, before you can run a workflow, you may want to run code interactively,
 e.g. via an IDE or a notebook.
@@ -155,7 +155,7 @@ $ dstack run code-stable
 
 </div>
 
-## 4. Generate images
+## 4. Run locally
 
 Let's write a script that generates images using a pre-trained model and given prompts:
 
@@ -229,37 +229,13 @@ Here's an example of the `prompt-stable` workflow output:
 
 ![cats in hats](cats-in-hats.png)
 
-## 5. Configure a remote
+## 5. Run remotely
 
-By default, workflows in `dstack` run locally. However, you have the option to configure a `remote` to run your
-workflows.
-For instance, you can set up your AWS account as a `remote` to execute workflows.
+!!! info "NOTE:"
+    To run workflows remotely in a configured cloud, we'll need the [Hub application](../docs/quick-start.md#start-the-hub-application).
 
-To configure a `remote`, run the following command:
-
-<div class="termy">
-
-```shell
-dstack config
-
-? Choose backend. Use arrows to move, type to filter
-> [aws]
-  [gcp]
-  [hub]
-```
-
-</div>
-
-For running remote workflows with local cloud credentials, select [`aws`](https://docs.dstack.ai/installation/aws.md)
-or [`gcp`](https://dstack.ai/docs/installation/gcp.md).
-
-Choose [`hub`](https://dstack.ai/docs/installation/hub.md) if you prefer managing cloud credentials and settings through a user
-interface while working in a team.
-
-## 6. Run workflows remotely
-
-Once a remote is configured, you can use the `--remote` flag with the `dstack run` command
-to run workflows remotely.
+Once the remote is configured, we can use the [`dstack run`](../docs/reference/cli/run.md) command with the `--remote` flag to
+run our workflow in the cloud.
 
 Let's first run the `stable-diffusion` workflow:
 
