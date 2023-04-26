@@ -243,7 +243,7 @@ func (l Local) GetRepoDiff(ctx context.Context, path string) (string, error) {
 }
 
 func (l Local) GetRepoArchive(ctx context.Context, path, dir string) error {
-	src := filepath.Join(l.storage.basepath, path)
+	src := filepath.Join(l.path, path)
 	if err := repo.ExtractArchive(ctx, src, dir); err != nil {
 		return gerrors.Wrap(err)
 	}
