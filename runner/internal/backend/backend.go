@@ -35,6 +35,7 @@ type Backend interface {
 	GitCredentials(ctx context.Context) *models.GitCredentials
 	GetJobByPath(ctx context.Context, path string) (*models.Job, error)
 	GetRepoDiff(ctx context.Context, path string) (string, error)
+	GetTMPDir(ctx context.Context) string
 }
 
 type File struct {

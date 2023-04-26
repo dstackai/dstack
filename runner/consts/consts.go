@@ -6,9 +6,9 @@ const DSTACK_DIR_PATH string = ".dstack"
 const CONFIG_FILE_NAME string = "config.yaml"
 const RUNNER_FILE_NAME string = "runner.yaml"
 const TMP_DIR_PATH = DSTACK_DIR_PATH + "/tmp"
-const USER_ARTIFACTS_PATH = TMP_DIR_PATH + "/artifacts"
-const FUSE_PATH = TMP_DIR_PATH + "/fuse"
-const RUNS_PATH = TMP_DIR_PATH + "/runs"
+const USER_ARTIFACTS_DIR = "artifacts"
+const FUSE_DIR = "fuse"
+const RUNS_DIR = "runs"
 
 const FILE_LOCK_FULL_DOWNLOAD = ".lock.full"
 

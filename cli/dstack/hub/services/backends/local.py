@@ -14,5 +14,7 @@ class LocalConfigurator(Configurator):
     def configure_hub(self, config_data: Dict) -> ProjectValues:
         return None
 
-    def get_config_from_hub_config_data(self, config_data: Dict, auth_data: Dict) -> BackendConfig:
-        return LocalConfig()
+    def get_config_from_hub_config_data(
+        self, project_name: str, config_data: Dict, auth_data: Dict
+    ) -> BackendConfig:
+        return LocalConfig(namespace=project_name)

@@ -18,7 +18,7 @@ def get_backend(project: Project, repo: Optional[Repo] = None) -> Backend:
     configurator = get_configurator(project.backend)
     json_data = json.loads(str(project.config))
     auth_data = json.loads(str(project.auth))
-    config = configurator.get_config_from_hub_config_data(json_data, auth_data)
+    config = configurator.get_config_from_hub_config_data(project.name, json_data, auth_data)
     backend = backend_cls(repo=repo, backend_config=config)
     cache[key] = backend
     return cache[key]

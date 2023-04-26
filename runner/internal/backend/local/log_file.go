@@ -5,8 +5,6 @@ import (
 	"os"
 	"path/filepath"
 
-	"github.com/dstackai/dstack/runner/consts"
-	"github.com/dstackai/dstack/runner/internal/common"
 	"github.com/dstackai/dstack/runner/internal/gerrors"
 	"github.com/sirupsen/logrus"
 )
@@ -19,14 +17,13 @@ func (l *Logger) Write(p []byte) (int, error) {
 	return l.logger.Writer().Write(p)
 }
 
-func NewLogger(logGroup, logName string) (*Logger, error) {
-	//std := logrus.StandardLogger()
-	if _, err := os.Stat(filepath.Join(common.HomeDir(), consts.DSTACK_DIR_PATH, "logs", logGroup)); err != nil {
-		if err = os.MkdirAll(filepath.Join(common.HomeDir(), consts.DSTACK_DIR_PATH, "logs", logGroup), 0777); err != nil {
+func NewLogger(path string, logGroup, logName string) (*Logger, error) {
+	if _, err := os.Stat(filepath.Join(path, "logs", logGroup)); err != nil {
+		if err = os.MkdirAll(filepath.Join(path, "logs", logGroup), 0777); err != nil {
 			return nil, gerrors.Wrap(err)
 		}
 	}
-	f, err := os.OpenFile(filepath.Join(common.HomeDir(), consts.DSTACK_DIR_PATH, "logs", logGroup, fmt.Sprintf("%s.log", logName)), os.O_WRONLY|os.O_CREATE|os.O_APPEND, 0777)
+	f, err := os.OpenFile(filepath.Join(path, "logs", logGroup, fmt.Sprintf("%s.log", logName)), os.O_WRONLY|os.O_CREATE|os.O_APPEND, 0777)
 	if err != nil {
 		return nil, gerrors.Wrap(err)
 	}

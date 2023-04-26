@@ -1,8 +1,5 @@
-import json
 import os
 from typing import Dict, Optional
-
-import yaml
 
 from dstack.core.config import BackendConfig
 
@@ -50,12 +47,6 @@ class AWSConfig(BackendConfig):
             config_data["subnet"] = self.subnet_id
         return config_data
 
-    def serialize_yaml(self) -> str:
-        return yaml.dump(self.serialize())
-
-    def serialize_json(self) -> str:
-        return json.dumps(self.serialize())
-
     @classmethod
     def deserialize(cls, config_data: Dict, auth_data: Dict = None) -> Optional["AWSConfig"]:
         bucket_name = config_data.get("bucket_name") or config_data.get("s3_bucket_name")
@@ -73,17 +64,3 @@ class AWSConfig(BackendConfig):
             subnet_id=subnet_id,
             credentials=auth_data,
         )
-
-    @classmethod
-    def deserialize_yaml(cls, yaml_content: str) -> Optional["AWSConfig"]:
-        content = yaml.load(yaml_content, yaml.FullLoader)
-        if content is None:
-            return None
-        return cls.deserialize(content)
-
-    @classmethod
-    def deserialize_json(cls, json_content: str) -> Optional["AWSConfig"]:
-        content = json.loads(json_content)
-        if content is None:
-            return None
-        return cls.deserialize(content)

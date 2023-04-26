@@ -1,7 +1,5 @@
 from typing import Dict, Optional
 
-import yaml
-
 from dstack.core.config import BackendConfig
 from dstack.core.error import ConfigError
 
@@ -41,9 +39,6 @@ class GCPConfig(BackendConfig):
             res["credentials_file"] = self.credentials_file
         return res
 
-    def serialize_yaml(self) -> str:
-        return yaml.dump(self.serialize())
-
     @classmethod
     def deserialize(cls, config_data: Dict) -> Optional["GCPConfig"]:
         if config_data.get("backend") != "gcp":
@@ -68,10 +63,3 @@ class GCPConfig(BackendConfig):
             credentials_file=config_data.get("credentials_file"),
             credentials=config_data.get("credentials"),
         )
-
-    @classmethod
-    def deserialize_yaml(cls, yaml_content: str) -> "GCPConfig":
-        content = yaml.load(yaml_content, yaml.FullLoader)
-        if content is None:
-            raise ConfigError("Cannot load config")
-        return cls.deserialize(content)
