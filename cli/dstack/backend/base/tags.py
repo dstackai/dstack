@@ -2,7 +2,7 @@ import time
 from pathlib import Path
 from typing import List, Optional
 
-from dstack.backend.base import BackendType, artifacts, jobs, runs
+from dstack.backend.base import artifacts, jobs, runs
 from dstack.backend.base.storage import Storage
 from dstack.core.artifact import ArtifactHead, ArtifactSpec
 from dstack.core.error import BackendError
@@ -142,7 +142,6 @@ def create_tag_from_local_dirs(
     repo: Repo,
     tag_name: str,
     local_dirs: List[str],
-    backend_type: BackendType,
 ):
     local_paths = []
     tag_artifacts = []
@@ -154,7 +153,7 @@ def create_tag_from_local_dirs(
         else:
             exit(f"The '{local_dir}' path doesn't refer to an existing directory")
 
-    run_name = runs.create_run(storage, backend_type)
+    run_name = runs.create_run(storage)
     job = Job(
         job_id=f"{run_name},,0",
         repo_ref=repo.repo_ref,

@@ -2,7 +2,7 @@ from datetime import datetime
 from pathlib import Path
 from typing import Generator, List, Optional
 
-from dstack.backend.base import Backend, BackendType
+from dstack.backend.base import Backend
 from dstack.backend.base import artifacts as base_artifacts
 from dstack.backend.base import cache as base_cache
 from dstack.backend.base import jobs as base_jobs
@@ -18,7 +18,7 @@ from dstack.backend.local.storage import LocalStorage
 from dstack.core.artifact import Artifact
 from dstack.core.job import Job, JobHead, JobStatus
 from dstack.core.log_event import LogEvent
-from dstack.core.repo import RemoteRepoCredentials, Repo, RepoSpec
+from dstack.core.repo import RemoteRepoCredentials, Repo, RepoHead, RepoSpec
 from dstack.core.run import RunHead
 from dstack.core.secret import Secret
 from dstack.core.tag import TagHead
@@ -26,15 +26,17 @@ from dstack.utils.common import PathLike
 
 
 class LocalBackend(Backend):
+    NAME = "local"
+
     def __init__(
         self,
-        repo: Repo,
-        credentials: Optional[RemoteRepoCredentials] = None,
-        auto_init: bool = False,
+        backend_config: Optional[LocalConfig],
+        repo: Optional[Repo],
     ):
-        super().__init__(repo=repo, credentials=credentials, auto_init=auto_init)
-        self.backend_config = LocalConfig()
-        self.backend_config.load()
+        super().__init__(repo=repo, backend_config=backend_config)
+        self.backend_config = backend_config
+        if self.backend_config is None:
+            return
         self._loaded = True
         self._storage = LocalStorage(self.backend_config.path)
         self._compute = LocalCompute()
@@ -42,19 +44,8 @@ class LocalBackend(Backend):
             self.backend_config.path, repo_id=self.repo.repo_id if self.repo else None
         )
 
-    @property
-    def name(self):
-        return "local"
-
-    @property
-    def type(self) -> BackendType:
-        return BackendType.LOCAL
-
-    def configure(self):
-        pass
-
     def create_run(self) -> str:
-        return base_runs.create_run(self._storage, self.type)
+        return base_runs.create_run(self._storage)
 
     def create_job(self, job: Job):
         base_jobs.create_job(self._storage, job)
@@ -175,18 +166,20 @@ class LocalBackend(Backend):
             self.repo,
             tag_name,
             local_dirs,
-            self.type,
         )
 
     def delete_tag_head(self, tag_head: TagHead):
         base_tags.delete_tag(self._storage, self.repo.repo_id, tag_head)
+
+    def list_repo_heads(self) -> List[RepoHead]:
+        return base_repos.list_repo_heads(self._storage)
 
     def update_repo_last_run_at(self, last_run_at: int):
         base_repos.update_repo_last_run_at(
             self._storage, RepoSpec.from_repo(self.repo), last_run_at
         )
 
-    def _get_repo_credentials(self) -> Optional[RemoteRepoCredentials]:
+    def get_repo_credentials(self) -> Optional[RemoteRepoCredentials]:
         return base_repos.get_repo_credentials(self._secrets_manager)
 
     def save_repo_credentials(self, repo_credentials: RemoteRepoCredentials):
@@ -225,9 +218,13 @@ class LocalBackend(Backend):
     def get_artifacts_path(self) -> Path:
         return artifacts.get_artifacts_path(self.backend_config.path, self.repo.repo_id)
 
-    @classmethod
-    def get_configurator(cls):
-        return None
-
     def delete_workflow_cache(self, workflow_name: str):
         base_cache.delete_workflow_cache(self._storage, self.repo.repo_ref, workflow_name)
+
+    def get_signed_download_url(self, object_key: str) -> str:
+        # TODO: implement to support local backend with remote hub
+        raise NotImplementedError()
+
+    def get_signed_upload_url(self, object_key: str) -> str:
+        # TODO: implement to support local backend with remote hub
+        raise NotImplementedError()

@@ -1,7 +1,8 @@
 import React from 'react';
 import { Controller, FieldValues } from 'react-hook-form';
-import InputCSD from '@cloudscape-design/components/input';
 import FormField from '@cloudscape-design/components/form-field';
+import InputCSD from '@cloudscape-design/components/input';
+
 import { FormInputProps } from './types';
 
 export const FormInput = <T extends FieldValues>({

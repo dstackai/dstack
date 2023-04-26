@@ -3,8 +3,6 @@ from typing import List, Tuple
 
 from fastapi import APIRouter, Body, Depends, HTTPException, status
 
-from dstack.api.config import dict_configurator
-from dstack.backend.base import Configurator
 from dstack.core.error import HubConfigError
 from dstack.hub.db.models import Project, User
 from dstack.hub.models import (
@@ -24,6 +22,8 @@ from dstack.hub.security.permissions import (
     ProjectMember,
     ensure_user_project_admin,
 )
+from dstack.hub.services.backends import get_configurator
+from dstack.hub.services.backends.base import Configurator
 
 router = APIRouter(prefix="/api/projects", tags=["project"])
 
@@ -130,7 +130,7 @@ async def update_project(
 
 
 def _get_backend_configurator(backend_type: str) -> Configurator:
-    configurator = dict_configurator().get(backend_type)
+    configurator = get_configurator(backend_type)
     if configurator is None:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,

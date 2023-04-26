@@ -1,21 +1,24 @@
 import React, { useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useNavigate } from 'react-router-dom';
+
 import {
     Button,
-    Table,
+    ConfirmationDialog,
     Header,
+    ListEmptyMessage,
+    NavigateLink,
     Pagination,
     SpaceBetween,
+    Table,
     TextFilter,
-    NavigateLink,
-    ListEmptyMessage,
-    ConfirmationDialog,
 } from 'components';
-import { useDeleteUsersMutation, useGetUserListQuery } from 'services/user';
-import { selectUserData } from 'App/slice';
+
 import { useAppSelector, useBreadcrumbs, useCollection, useNotifications } from 'hooks';
 import { ROUTES } from 'routes';
+import { useDeleteUsersMutation, useGetUserListQuery } from 'services/user';
+
+import { selectUserData } from 'App/slice';
 
 export const UserList: React.FC = () => {
     const { t } = useTranslation();
@@ -68,7 +71,7 @@ export const UserList: React.FC = () => {
     const renderNoMatchMessage = (onClearFilter: () => void): React.ReactNode => {
         return (
             <ListEmptyMessage title={t('users.nomatch_message_title')} message={t('users.nomatch_message_text')}>
-                <Button onClick={onClearFilter}>{t('users.nomatch_message_button_label')}</Button>
+                <Button onClick={onClearFilter}>{t('common.clearFilter')}</Button>
             </ListEmptyMessage>
         );
     };

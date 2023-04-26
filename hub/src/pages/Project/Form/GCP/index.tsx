@@ -1,13 +1,18 @@
 import React, { useEffect, useRef, useState } from 'react';
-import { useTranslation } from 'react-i18next';
 import { useFormContext } from 'react-hook-form';
-import { IProps, VPCSubnetOption } from './types';
-import { FormSelect, SpaceBetween, FileUploader, FormSelectOptions, Spinner, FormS3BucketSelector } from 'components';
-import { useBackendValuesMutation } from 'services/project';
-import { isRequestFormFieldError, isRequestFormErrors2 } from 'libs';
+import { useTranslation } from 'react-i18next';
+
+import { FileUploader, FormS3BucketSelector, FormSelect, FormSelectOptions, SpaceBetween, Spinner } from 'components';
+
 import { useNotifications } from 'hooks';
-import styles from './styles.module.scss';
+import { isRequestFormErrors2, isRequestFormFieldError } from 'libs';
+import { useBackendValuesMutation } from 'services/project';
+
 import { FIELD_NAMES } from './constants';
+
+import { IProps, VPCSubnetOption } from './types';
+
+import styles from './styles.module.scss';
 
 const FIELDS_QUEUE = [
     FIELD_NAMES.CREDENTIALS,

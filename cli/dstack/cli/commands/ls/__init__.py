@@ -1,15 +1,15 @@
+import os
 from argparse import Namespace
 from pathlib import Path
 
 from rich.table import Table
 
-from dstack.api.artifacts import list_artifacts_with_merged_backends
-from dstack.api.backend import list_backends
-from dstack.api.repos import load_repo
-from dstack.api.run import RunNotFoundError, TagNotFoundError, get_tagged_run_name
+from dstack.api.hub import HubClient
+from dstack.api.runs import RunNotFoundError, TagNotFoundError, get_tagged_run_name
 from dstack.cli.commands import BasicCommand
 from dstack.cli.common import check_backend, check_config, check_git, check_init, console
 from dstack.cli.config import config
+from dstack.core.repo import RemoteRepo
 from dstack.utils.common import sizeof_fmt
 
 
@@ -52,27 +52,17 @@ class LsCommand(BasicCommand):
         table.add_column("ARTIFACT", style="bold", no_wrap=True)
         table.add_column("FILE")
         table.add_column("SIZE", style="dark_sea_green4")
-        table.add_column("BACKENDS", style="bold")
 
-        repo = load_repo(config.repo_user_config)
-        backends = list_backends(repo)
-        run_names = []
-        backends_run_name = []
-        for backend in backends:
-            try:
-                run_name, _ = get_tagged_run_name(backend, args.run_name_or_tag_name)
-                run_names.append(run_name)
-                backends_run_name.append(backend)
-            except (TagNotFoundError, RunNotFoundError):
-                pass
-
-        if len(run_names) == 0:
+        repo = RemoteRepo(repo_ref=config.repo_user_config.repo_ref, local_repo_dir=os.getcwd())
+        hub_client = HubClient(repo=repo)
+        try:
+            run_name, _ = get_tagged_run_name(hub_client, args.run_name_or_tag_name)
+        except (TagNotFoundError, RunNotFoundError):
             console.print(f"Cannot find the run or tag '{args.run_name_or_tag_name}'")
             exit(1)
 
-        artifacts = list_artifacts_with_merged_backends(backends_run_name, run_names[0])
-
-        for artifact, _ in artifacts:
+        artifacts = hub_client.list_run_artifact_files(run_name)
+        for artifact in artifacts:
             artifact.files = sorted(
                 [
                     f
@@ -83,17 +73,16 @@ class LsCommand(BasicCommand):
             )
 
         if args.recursive:
-            for artifact, backends in artifacts:
+            for artifact in artifacts:
                 for i, file in enumerate(artifact.files):
                     table.add_row(
                         artifact.name if i == 0 else "",
                         file.filepath,
                         sizeof_fmt(file.filesize_in_bytes),
-                        ", ".join(b.name for b in backends),
                     )
         else:
             entries = {}
-            for artifact, backends in artifacts:
+            for artifact in artifacts:
                 if entries.get(artifact.name) is None:
                     entries[artifact.name] = {}
                 for i, file in enumerate(artifact.files):
@@ -101,7 +90,6 @@ class LsCommand(BasicCommand):
                     if entries[artifact.name].get(entry_name) is None:
                         entries[artifact.name][entry_name] = {"size": 0, "backends": set()}
                     entries[artifact.name][entry_name]["size"] += file.filesize_in_bytes
-                    entries[artifact.name][entry_name]["backends"].update(backends)
 
             for artifact_name, entry_map in entries.items():
                 first_entry = True
@@ -112,10 +100,8 @@ class LsCommand(BasicCommand):
                         sizeof_fmt(entry_dict["size"])
                         if not entry_name.endswith("/") or args.total
                         else "",
-                        ", ".join(b.name for b in entry_dict["backends"]),
                     )
                     first_entry = False
-
         console.print(table)
 
 

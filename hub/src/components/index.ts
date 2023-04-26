@@ -1,6 +1,7 @@
 export { default as Alert } from '@cloudscape-design/components/alert';
 export { default as Button } from '@cloudscape-design/components/button';
 export { default as AppLayout } from '@cloudscape-design/components/app-layout';
+export type { AppLayoutProps } from '@cloudscape-design/components/app-layout';
 export { default as SideNavigation } from '@cloudscape-design/components/side-navigation';
 export { default as TopNavigation } from '@cloudscape-design/components/top-navigation';
 export { default as Box } from '@cloudscape-design/components/box';
@@ -25,6 +26,10 @@ export { default as Popover } from '@cloudscape-design/components/popover';
 export { default as Autosuggest } from '@cloudscape-design/components/autosuggest';
 export type { AutosuggestProps } from '@cloudscape-design/components/autosuggest';
 export { default as Grid } from '@cloudscape-design/components/grid';
+export { default as HelpPanel } from '@cloudscape-design/components/help-panel';
+export type { HelpPanelProps } from '@cloudscape-design/components/help-panel';
+export { default as Tabs } from '@cloudscape-design/components/tabs';
+export type { TabsProps } from '@cloudscape-design/components/tabs';
 
 // custom components
 export { NavigateLink } from './NavigateLink';
@@ -40,3 +45,4 @@ export { FormTiles } from './form/Tiles';
 export { Notifications } from './Notifications';
 export { ConfirmationDialog } from './ConfirmationDialog';
 export { FileUploader } from './FileUploader';
+export { InfoLink } from './InfoLink';

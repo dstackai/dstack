@@ -4,14 +4,13 @@ import sys
 from argparse import Namespace
 from pathlib import Path
 
-from dstack.api.backend import list_backends
-from dstack.api.repos import load_repo
-from dstack.api.run import RunNotFoundError, TagNotFoundError, get_tagged_run_name
-from dstack.backend.base import Backend
+from dstack.api.hub import HubClient
+from dstack.api.runs import RunNotFoundError, TagNotFoundError, get_tagged_run_name
 from dstack.cli.commands import BasicCommand
 from dstack.cli.common import check_backend, check_config, check_git, check_init, console
 from dstack.cli.config import config
 from dstack.core.config import get_dstack_dir
+from dstack.core.repo import RemoteRepo
 
 
 class CpCommand(BasicCommand):
@@ -46,23 +45,15 @@ class CpCommand(BasicCommand):
     @check_backend
     @check_init
     def _command(self, args: Namespace):
-        repo = load_repo(config.repo_user_config)
-        backends = list_backends(repo)
-        run_name = None
-        backend = None
-        for backend in backends:
-            try:
-                run_name, _ = get_tagged_run_name(backend, args.run_name_or_tag_name)
-                break
-            except (TagNotFoundError, RunNotFoundError):
-                pass
-
-        if run_name is None:
+        repo = RemoteRepo(repo_ref=config.repo_user_config.repo_ref, local_repo_dir=os.getcwd())
+        hub_client = HubClient(repo=repo)
+        try:
+            run_name, _ = get_tagged_run_name(hub_client, args.run_name_or_tag_name)
+        except (TagNotFoundError, RunNotFoundError):
             console.print(f"Cannot find the run or tag '{args.run_name_or_tag_name}'")
             exit(1)
-
         _copy_artifact_files(
-            backend=backend,
+            hub_client=hub_client,
             run_name=run_name,
             source=args.source,
             target=args.target,
@@ -70,11 +61,11 @@ class CpCommand(BasicCommand):
         console.print("Artifact files copied")
 
 
-def _copy_artifact_files(backend: Backend, run_name: str, source: str, target: str):
-    tmp_output_dir = get_dstack_dir() / "tmp" / "copied_artifacts" / backend.repo.repo_id
+def _copy_artifact_files(hub_client: HubClient, run_name: str, source: str, target: str):
+    tmp_output_dir = get_dstack_dir() / "tmp" / "copied_artifacts" / hub_client.repo.repo_id
     tmp_output_dir.mkdir(parents=True, exist_ok=True)
     source = _normalize_source(source)
-    backend.download_run_artifact_files(
+    hub_client.download_run_artifact_files(
         run_name=run_name,
         output_dir=tmp_output_dir,
         files_path=source,

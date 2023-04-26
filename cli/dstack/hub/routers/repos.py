@@ -1,9 +1,9 @@
-from typing import List
+from typing import List, Optional
 
 from fastapi import APIRouter, Depends, HTTPException, status
 
 from dstack.core.repo import RemoteRepoCredentials, RepoHead, RepoSpec
-from dstack.hub.models import ReposUpdate, SaveRepoCredentials
+from dstack.hub.models import RepoHeadGet, ReposUpdate, SaveRepoCredentials
 from dstack.hub.routers.cache import get_backend
 from dstack.hub.routers.util import error_detail, get_project
 from dstack.hub.security.permissions import ProjectMember
@@ -16,6 +16,20 @@ async def list_repo_heads(project_name: str) -> List[RepoHead]:
     project = await get_project(project_name=project_name)
     backend = get_backend(project)
     return backend.list_repo_heads()
+
+
+@router.post("/{project_name}/repos/heads/get")
+async def get_repo_head(project_name: str, body: RepoHeadGet) -> RepoHead:
+    project = await get_project(project_name=project_name)
+    backend = get_backend(project)
+    repo_heads = backend.list_repo_heads()
+    for repo_head in repo_heads:
+        if repo_head.repo_id == body.repo_id:
+            return repo_head
+    raise HTTPException(
+        status_code=status.HTTP_404_NOT_FOUND,
+        detail=error_detail("Repo not found"),
+    )
 
 
 @router.post("/{project_name}/repos/credentials/save")
@@ -33,7 +47,7 @@ async def save_repo_credentials(
 async def get_repo_credentials(project_name: str, repo_spec: RepoSpec) -> RemoteRepoCredentials:
     project = await get_project(project_name=project_name)
     backend = get_backend(project, repo_spec.repo)
-    repo_credentials = backend._get_repo_credentials()
+    repo_credentials = backend.get_repo_credentials()
     if repo_credentials is None:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,

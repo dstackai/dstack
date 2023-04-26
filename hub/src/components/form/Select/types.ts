@@ -1,6 +1,6 @@
 import { ControllerProps, FieldValues } from 'react-hook-form';
-import { SelectProps } from '@cloudscape-design/components/select';
 import { FormFieldProps } from '@cloudscape-design/components/form-field';
+import { SelectProps } from '@cloudscape-design/components/select';
 
 export type FormSelectOption = SelectProps.Option;
 export type FormSelectOptions = ReadonlyArray<FormSelectOption>;

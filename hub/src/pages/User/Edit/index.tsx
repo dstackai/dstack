@@ -2,11 +2,14 @@ import React, { useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useNavigate, useParams } from 'react-router-dom';
 import { pick } from 'lodash';
+
+import { Box, ConfirmationDialog, Container, ContentLayout, Header, Loader } from 'components';
+
 import { useBreadcrumbs, useNotifications } from 'hooks';
-import { ConfirmationDialog, Container, ContentLayout, Header, Loader, Box } from 'components';
-import { UserForm } from '../Form';
 import { ROUTES } from 'routes';
 import { useGetUserQuery, useRefreshTokenMutation, useUpdateUserMutation } from 'services/user';
+
+import { UserForm } from '../Form';
 
 export const UserEdit: React.FC = () => {
     const { t } = useTranslation();

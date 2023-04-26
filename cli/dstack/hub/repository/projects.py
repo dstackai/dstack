@@ -15,6 +15,7 @@ from dstack.hub.models import (
     GCPProjectConfig,
     GCPProjectConfigWithCreds,
     GCPProjectCreds,
+    LocalProjectConfig,
     Member,
     ProjectInfo,
     ProjectInfoWithCreds,
@@ -149,13 +150,16 @@ def _info2project(project_info: ProjectInfoWithCreds) -> Project:
         name=project_info.project_name,
         backend=project_info.backend.type,
     )
-    if project_info.backend.type == "aws":
+    if project_info.backend.type == "local":
+        project.config = "{}"
+        project.auth = "{}"
+    elif project_info.backend.type == "aws":
         project_info.backend.s3_bucket_name = project_info.backend.s3_bucket_name.replace(
             "s3://", ""
         )
         project.config = AWSProjectConfig.parse_obj(project_info.backend).json()
         project.auth = AWSProjectCreds.parse_obj(project_info.backend).json()
-    if project_info.backend.type == "gcp":
+    elif project_info.backend.type == "gcp":
         project.config = GCPProjectConfig.parse_obj(project_info.backend).json()
         project.auth = GCPProjectCreds.parse_obj(project_info.backend).json()
     return project
@@ -172,7 +176,8 @@ def _project2info(
                 project_role=member.project_role,
             )
         )
-    backend = None
+    if project.backend == "local":
+        backend = LocalProjectConfig()
     if project.backend == "aws":
         backend = _aws(project, include_creds=include_creds)
     if project.backend == "gcp":

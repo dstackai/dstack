@@ -1,11 +1,14 @@
 import React, { useMemo, useRef } from 'react';
-import cn from 'classnames';
 import { Controller, FieldValues } from 'react-hook-form';
+import cn from 'classnames';
 import FormField from '@cloudscape-design/components/form-field';
 import S3ResourceSelector from '@cloudscape-design/components/s3-resource-selector';
 import { S3ResourceSelectorProps } from '@cloudscape-design/components/s3-resource-selector';
-import { FormS3BucketSelectorProps } from './types';
+
 import { getResourceSelectorI18n } from './utils';
+
+import { FormS3BucketSelectorProps } from './types';
+
 import styles from './styles.module.scss';
 
 export const FormS3BucketSelector = <T extends FieldValues>({

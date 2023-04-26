@@ -1,21 +1,25 @@
 import React, { useMemo, useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import { useNavigate } from 'react-router-dom';
+
 import {
-    Cards,
-    Header,
-    SpaceBetween,
     Button,
-    NavigateLink,
-    TextFilter,
-    Pagination,
-    ListEmptyMessage,
+    Cards,
     ConfirmationDialog,
+    Header,
+    ListEmptyMessage,
+    NavigateLink,
+    Pagination,
+    SpaceBetween,
+    TextFilter,
 } from 'components';
+
 import { useAppSelector, useBreadcrumbs, useCollection, useNotifications } from 'hooks';
 import { ROUTES } from 'routes';
-import { useTranslation } from 'react-i18next';
-import { selectUserData } from 'App/slice';
 import { useDeleteProjectsMutation, useGetProjectsQuery } from 'services/project';
+
+import { selectUserData } from 'App/slice';
+
 import { getProjectRoleByUserName } from '../utils';
 
 export const ProjectList: React.FC = () => {
@@ -130,6 +134,8 @@ export const ProjectList: React.FC = () => {
                 return project.backend.region_name_title;
             case 'gcp':
                 return project.backend.region;
+            case 'local':
+                return '-';
         }
     };
 
@@ -139,6 +145,8 @@ export const ProjectList: React.FC = () => {
                 return `${project.backend.s3_bucket_name}`;
             case 'gcp':
                 return `${project.backend.bucket_name}`;
+            case 'local':
+                return '-';
         }
     };
 
@@ -149,7 +157,10 @@ export const ProjectList: React.FC = () => {
                 variant="full-page"
                 cardDefinition={{
                     header: (project) => (
-                        <NavigateLink fontSize="heading-m" href={ROUTES.PROJECT.DETAILS.FORMAT(project.project_name)}>
+                        <NavigateLink
+                            fontSize="heading-m"
+                            href={ROUTES.PROJECT.DETAILS.REPOSITORIES.FORMAT(project.project_name)}
+                        >
                             {project.project_name}
                         </NavigateLink>
                     ),

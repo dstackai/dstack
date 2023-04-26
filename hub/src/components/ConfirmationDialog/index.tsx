@@ -1,11 +1,11 @@
 import React from 'react';
-import { IProps } from './types';
-
-import Modal from '@cloudscape-design/components/modal';
+import { useTranslation } from 'react-i18next';
 import Box from '@cloudscape-design/components/box';
 import Button from '@cloudscape-design/components/button';
+import Modal from '@cloudscape-design/components/modal';
 import SpaceBetween from '@cloudscape-design/components/space-between';
-import { useTranslation } from 'react-i18next';
+
+import { IProps } from './types';
 
 export const ConfirmationDialog: React.FC<IProps> = ({
     title: titleProp,

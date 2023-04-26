@@ -2,6 +2,7 @@ import React from 'react';
 import Box from '@cloudscape-design/components/box';
 import Button from '@cloudscape-design/components/button';
 import FormField from '@cloudscape-design/components/form-field';
+
 import { FileEntry } from './FileEntry';
 import { Token } from './Token';
 

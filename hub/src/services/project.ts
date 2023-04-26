@@ -1,7 +1,10 @@
-import { createApi } from '@reduxjs/toolkit/query/react';
-import { fetchBaseQuery } from 'libs/fetchBaseQuery';
-import fetchBaseQueryHeaders from 'libs/fetchBaseQueryHeaders';
 import { API } from 'api';
+import { createApi } from '@reduxjs/toolkit/query/react';
+import { fetchBaseQuery } from '@reduxjs/toolkit/query/react';
+
+import fetchBaseQueryHeaders from 'libs/fetchBaseQueryHeaders';
+
+import { ProjectRunsRequestParams } from './project.types';
 
 export const projectApi = createApi({
     reducerPath: 'projectApi',
@@ -9,7 +12,7 @@ export const projectApi = createApi({
         prepareHeaders: fetchBaseQueryHeaders,
     }),
 
-    tagTypes: ['Projects'],
+    tagTypes: ['Projects', 'ProjectRepos', 'ProjectRun'],
 
     endpoints: (builder) => ({
         getProjects: builder.query<IProject[], void>({
@@ -94,6 +97,31 @@ export const projectApi = createApi({
                 body: data,
             }),
         }),
+
+        //     Repos queries
+        getProjectRepos: builder.query<IRepo[], { name: IProject['project_name'] }>({
+            query: ({ name }) => {
+                return {
+                    url: API.PROJECTS.REPO_LIST(name),
+                    method: 'POST',
+                };
+            },
+
+            providesTags: () => ['ProjectRepos'],
+        }),
+
+        //     Repos queries
+        getProjectRuns: builder.query<IRun[], ProjectRunsRequestParams>({
+            query: ({ name, ...body }) => {
+                return {
+                    url: API.PROJECTS.RUNS_LIST(name),
+                    method: 'POST',
+                    body: body,
+                };
+            },
+
+            providesTags: () => ['ProjectRun'],
+        }),
     }),
 });
 
@@ -106,4 +134,6 @@ export const {
     useUpdateProjectMembersMutation,
     useDeleteProjectsMutation,
     useBackendValuesMutation,
+    useGetProjectReposQuery,
+    useGetProjectRunsQuery,
 } = projectApi;
