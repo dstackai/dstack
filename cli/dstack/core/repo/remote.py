@@ -76,7 +76,8 @@ class RemoteRepoData(RepoData, RemoteRepoInfo):
                 return f"git@{self.repo_host_name}:{self.repo_user_name}/{self.repo_name}.git"
 
     def write_code_file(self, fp: BinaryIO) -> str:
-        fp.write(self.repo_diff.encode())
+        if self.repo_diff is not None:
+            fp.write(self.repo_diff.encode())
         return f"code/remote/{get_sha256(fp)}.patch"
 
 
