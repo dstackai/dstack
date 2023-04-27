@@ -273,3 +273,7 @@ class AddMembers(BaseModel):
 
 class DeleteUsers(BaseModel):
     users: List[str] = []
+
+
+class FileObject(BaseModel):
+    object_key: str
