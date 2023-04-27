@@ -31,4 +31,3 @@ packaging
 apscheduler
 alembic
 typing-extensions
-python-multipart

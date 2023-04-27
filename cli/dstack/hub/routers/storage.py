@@ -1,8 +1,6 @@
-import asyncio
-import shutil
 from pathlib import Path
 
-from fastapi import APIRouter, Depends, HTTPException, Query, UploadFile, status
+from fastapi import APIRouter, Depends, HTTPException, Query, Request, status
 from fastapi.security.http import HTTPAuthorizationCredentials
 from typing_extensions import Annotated
 
@@ -25,7 +23,7 @@ router = APIRouter(
 
 
 @router.put("/{project_name}/storage/upload", response_model=FileObject)
-async def put_file(project_name: str, key: Annotated[str, Query()], file: UploadFile):
+async def put_file(project_name: str, key: Annotated[str, Query()], request: Request):
     project = await get_project(project_name=project_name)
     backend = get_backend(project, repo=None)
     if not isinstance(backend, LocalBackend):
@@ -48,5 +46,6 @@ async def put_file(project_name: str, key: Annotated[str, Query()], file: Upload
         )
     target_path.parent.mkdir(parents=True, exist_ok=True)
     with target_path.open("wb") as f:
-        await asyncio.get_running_loop().run_in_executor(None, shutil.copyfileobj, file.file, f)
+        async for chunk in request.stream():
+            f.write(chunk)
     return FileObject(object_key=str(object_key))
