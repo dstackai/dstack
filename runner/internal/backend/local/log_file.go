@@ -1,7 +1,9 @@
 package local
 
 import (
+	"encoding/json"
 	"fmt"
+	"io"
 	"os"
 	"path/filepath"
 
@@ -10,14 +12,20 @@ import (
 )
 
 type Logger struct {
-	logger *logrus.Entry
+	jobID       string
+	logger      *logrus.Entry
+	writer      *io.PipeWriter
+	logsWritten int
 }
 
-func (l *Logger) Write(p []byte) (int, error) {
-	return l.logger.Writer().Write(p)
+type LogMesage struct {
+	JobID   string `json:"job_id"`
+	EventID int    `json:"event_id"`
+	Log     string `json:"log"`
+	Source  string `json:"source"`
 }
 
-func NewLogger(path string, logGroup, logName string) (*Logger, error) {
+func NewLogger(jobID, path, logGroup, logName string) (*Logger, error) {
 	if _, err := os.Stat(filepath.Join(path, "logs", logGroup)); err != nil {
 		if err = os.MkdirAll(filepath.Join(path, "logs", logGroup), 0777); err != nil {
 			return nil, gerrors.Wrap(err)
@@ -28,7 +36,33 @@ func NewLogger(path string, logGroup, logName string) (*Logger, error) {
 		return nil, gerrors.Wrap(err)
 	}
 	logger := logrus.New()
+	logger.SetFormatter(&logrus.TextFormatter{
+		FullTimestamp:   true,
+		TimestampFormat: "2006-01-02T15:04:05.999999Z07:00",
+	})
 	logger.SetOutput(f)
-	l := Logger{logger: logrus.NewEntry(logger)}
+	logEntry := logrus.NewEntry(logger)
+	logWriter := logEntry.Writer()
+	l := Logger{jobID: jobID, logger: logEntry, writer: logWriter}
 	return &l, nil
+}
+
+func (l *Logger) Write(p []byte) (int, error) {
+	msg := LogMesage{
+		JobID:   l.jobID,
+		EventID: l.logsWritten,
+		Log:     string(p),
+		Source:  "stdout",
+	}
+	msgBytes, err := json.Marshal(msg)
+	if err != nil {
+		return 0, gerrors.Wrap(err)
+	}
+	msgBytes = append(msgBytes, '\n')
+	_, err = l.writer.Write(msgBytes)
+	if err != nil {
+		return 0, gerrors.Wrap(err)
+	}
+	l.logsWritten += 1
+	return len(p), nil
 }
