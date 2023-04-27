@@ -386,7 +386,7 @@ class Job(JobHead):
         error_code = job_data.get("error_code")
         container_exit_code = job_data.get("container_exit_code")
 
-        if job_data["repo_type"] == "remote":  # fixme hardcoded
+        if job_data["repo_type"] == "remote":
             repo_data = RemoteRepoData(
                 repo_host_name=job_data["repo_host_name"],
                 repo_port=job_data.get("repo_port") or None,
@@ -396,7 +396,7 @@ class Job(JobHead):
                 repo_hash=job_data["repo_hash"] or None,
             )
         elif job_data["repo_type"] == "local":
-            repo_data = LocalRepoData(repo_dir=job_data.get("repo_dir", ""))  # todo required?
+            repo_data = LocalRepoData(repo_dir=job_data.get("repo_dir", ""))
         else:
             raise TypeError(f"Unknown repo_type: {job_data['repo_type']}")
 

@@ -9,6 +9,7 @@ from typing_extensions import Literal
 
 from dstack.core.repo.base import Repo, RepoData, RepoInfo, RepoRef
 from dstack.utils.common import PathLike
+from dstack.utils.escape import Escaper
 from dstack.utils.fs import get_sha256
 from dstack.utils.workflows import load_workflows
 
@@ -30,7 +31,7 @@ class LocalRepoInfo(RepoInfo):
 
     @property
     def head_key(self) -> str:
-        repo_dir = self.repo_dir.replace("/", ".")  # todo invertible escaping
+        repo_dir = Escaper({"/": "."}, escape_char="~").escape(self.repo_dir)
         return f"{self.repo_type};{self.repo_user_id},{repo_dir}"
 
 
@@ -76,10 +77,24 @@ class TarIgnore:
             self.ignore_globs[path] = []
         with ignore_file.open("r") as f:
             for line in f:
-                line = line.rstrip("\n").rstrip("/")  # todo rstrip w.r.t. escaped spaces
+                line = self.rstrip(line.rstrip("\n")).rstrip("/")
+                line = line.replace("\\ ", " ")
                 if line.startswith("#") or not line:
                     continue
                 self.ignore_globs[path].append(line)
+
+    @staticmethod
+    def rstrip(value: str) -> str:
+        end = len(value) - 1
+        while end >= 0:
+            if not value[end].isspace():
+                break
+            if end > 0 and value[end - 1] == "\\":
+                break  # escaped space
+            end -= 1
+        else:
+            return ""
+        return value[: end + 1]
 
     @staticmethod
     def fnmatch(name: str, pattern: str, sep="/") -> bool:

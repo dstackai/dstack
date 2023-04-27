@@ -77,8 +77,6 @@ def get_local_repo_credentials(
         except GitCommandError:
             pass
 
-    # todo raise?
-
 
 def test_remote_repo_credentials(
     repo_data: RemoteRepoData,
@@ -102,7 +100,7 @@ def test_remote_repo_credentials(
 
 
 def load_repo(user_config: RepoUserConfig) -> Repo:
-    if user_config.repo_type == "remote":  # fixme hardcoding
+    if user_config.repo_type == "remote":
         return RemoteRepo(repo_ref=user_config.repo_ref, local_repo_dir=os.getcwd())
     elif user_config.repo_type == "local":
         return LocalRepo(repo_ref=user_config.repo_ref, repo_dir=os.getcwd())
