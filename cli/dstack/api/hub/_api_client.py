@@ -30,26 +30,11 @@ from dstack.hub.models import (
 
 
 class HubAPIClient:
-    def __init__(self, url: str, project: str, token: str, repo: Repo):
+    def __init__(self, url: str, project: str, token: str, repo: Optional[Repo]):
         self.url = url
         self.token = token
         self.project = project
         self.repo = repo
-
-    @staticmethod
-    def validate(url: str, project: str, token: str) -> bool:
-        url = _project_url(url=url, project=project, additional_path="/info")
-        try:
-            resp = requests.get(url=url, headers=HubAPIClient._auth(token=token))
-            if resp.ok:
-                print(resp.json())
-                return True
-            elif resp.status_code == 401:
-                print("Unauthorized. Please set correct token")
-                return False
-        except requests.ConnectionError:
-            print(f"{url} connection refused")
-        return False
 
     @staticmethod
     def _auth(token: str) -> Dict[str, str]:

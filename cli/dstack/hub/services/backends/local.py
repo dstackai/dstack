@@ -1,7 +1,7 @@
 from typing import Dict
 
+from dstack.backend.base.config import BackendConfig
 from dstack.backend.local.config import LocalConfig
-from dstack.core.config import BackendConfig
 from dstack.hub.models import ProjectValues
 from dstack.hub.services.backends.base import Configurator
 

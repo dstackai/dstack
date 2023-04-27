@@ -1,16 +1,21 @@
+import os
 from os import PathLike
 from pathlib import Path
-from typing import Dict, Optional, Type, TypeVar
+from typing import Dict, List, Optional, Type, TypeVar
 
 import yaml
-from pydantic import BaseModel
+from pydantic import BaseModel, ValidationError
 
-from dstack.core.error import NotInitializedError
+from dstack.api.hub import HubClient, HubClientConfig
+from dstack.core.error import ConfigError, NotInitializedError
+from dstack.core.repo.remote import RemoteRepo
 from dstack.core.userconfig import RepoUserConfig
+from dstack.utils.common import get_dstack_dir
 
 Model = TypeVar("Model", bound=BaseModel)
 
 
+# TODO: Move ConfigManager functionality to CLIConfigManager
 class ConfigManager:
     def __init__(self, home: PathLike = "~/.dstack"):
         self.home = Path(home).expanduser().resolve()
@@ -69,3 +74,75 @@ class ConfigManager:
 
 
 config = ConfigManager()
+
+
+class CLIProjectConfig(BaseModel):
+    name: str
+    url: str
+    token: str
+    default: Optional[bool]
+
+
+class CLIConfig(BaseModel):
+    projects: List[CLIProjectConfig] = []
+
+
+class CLIConfigManager:
+    def __init__(self):
+        self.dstack_dir = get_dstack_dir()
+        self.config_filepath = self.dstack_dir / "config.yaml"
+        with open(self.config_filepath, "r") as f:
+            config = yaml.load(f.read(), yaml.FullLoader)
+            try:
+                self.config = CLIConfig.parse_obj(config)
+            except ValidationError:
+                self.config = CLIConfig()
+
+    def save(self):
+        with open(self.config_filepath, "w+") as f:
+            f.write(yaml.dump(self.config.dict()))
+
+    def configure_project(self, name: str, url: str, token: str, default: bool):
+        if default:
+            for project in self.config.projects:
+                project.default = False
+        for project in self.config.projects:
+            if project.name == name:
+                project.url = url
+                project.token = token
+                project.default = default or project.default
+                return
+        self.config.projects.append(
+            CLIProjectConfig(name=name, url=url, token=token, default=default)
+        )
+        if len(self.config.projects) == 1:
+            self.config.projects[0].default = True
+
+    def get_project_config(self, name: str) -> Optional[CLIProjectConfig]:
+        for project in self.config.projects:
+            if project.name == name:
+                return project
+        return None
+
+    def get_default_project_config(self) -> Optional[CLIProjectConfig]:
+        for project in self.config.projects:
+            if project.default:
+                return project
+        return None
+
+
+def get_hub_client(project_name: Optional[str] = None) -> HubClient:
+    cli_config_manager = CLIConfigManager()
+    project_config = cli_config_manager.get_default_project_config()
+    if project_name is not None:
+        project_config = cli_config_manager.get_project_config(project_name)
+        if project_config is None:
+            raise ConfigError(f"Project '{project_name}' not configured. Call `dstack config`.")
+    else:
+        project_config = cli_config_manager.get_default_project_config()
+        if project_config is None:
+            raise ConfigError(f"No default project configured. Call `dstack config`.")
+    repo = RemoteRepo(repo_ref=config.repo_user_config.repo_ref, local_repo_dir=os.getcwd())
+    hub_client_config = HubClientConfig(url=project_config.url, token=project_config.token)
+    hub_client = HubClient(config=hub_client_config, project=project_config.name, repo=repo)
+    return hub_client
