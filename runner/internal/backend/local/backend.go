@@ -197,7 +197,7 @@ func (l Local) GetJobByPath(ctx context.Context, path string) (*models.Job, erro
 
 func (l *Local) GitCredentials(ctx context.Context) *models.GitCredentials {
 	log.Trace(ctx, "Getting credentials")
-	return l.cliSecret.fetchCredentials(ctx, l.state.Job.RepoHostNameWithPort(), l.state.Job.RepoUserName, l.state.Job.RepoName)
+	return l.cliSecret.fetchCredentials(ctx, l.state.Job.RepoId)
 }
 
 func (l *Local) Secrets(ctx context.Context) (map[string]string, error) {
