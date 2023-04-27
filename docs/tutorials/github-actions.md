@@ -2,6 +2,8 @@
 title: Trigger workflows with GitHub Actions
 ---
 
+[//]: # (TODO: This tutorial must be reworked as the updated `dstack config` won't allow to configure `aws` and `gcp` directly)
+
 # Trigger workflows with GitHub Actions 
 
 This tutorial demonstrates how to use GitHub Actions to trigger `dstack` workflows on

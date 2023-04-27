@@ -24,9 +24,10 @@ func init() {
 	cloudMu = sync.Mutex{}
 	cloudBuffer = make([]string, 0)
 	L.Logger.SetFormatter(&logrus.TextFormatter{
-		DisableQuote:   true,
-		FullTimestamp:  true,
-		DisableSorting: true,
+		DisableQuote:    true,
+		FullTimestamp:   true,
+		DisableSorting:  true,
+		TimestampFormat: "2006-01-02T15:04:05.999999Z07:00",
 	})
 }
 

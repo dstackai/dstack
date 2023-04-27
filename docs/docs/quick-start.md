@@ -1,22 +1,7 @@
----
-title: Quickstart
-hide: 
-  - footer
----
+# Quick start
 
-<style>
-.md-sidebar--secondary {
-  order: 0;
-}
-.md-sidebar--primary {
-  order: 2;
-}
-</style>
-
-# Quickstart
-
-!!! info "NOTE:"
-    The source code of this example is available in the <a href="https://github.com/dstackai/dstack-playground#readme" target="__blank">Playground</a>. 
+[//]: # (!!! info "NOTE:")
+[//]: # (    The source code of this example is available in the <a href="https://github.com/dstackai/dstack-playground#readme" target="__blank">Playground</a>. )
 
 ## Install the CLI
 
@@ -62,7 +47,7 @@ $ dstack init
 
 </div>
 
-## Create a script
+### Create a script
 
 Let's create the following training script.
 
@@ -119,7 +104,7 @@ if __name__ == "__main__":
 
 </div>
 
-## Define a workflow
+### Define a workflow
 
 Define the corresponding workflow as a YAML file in the `.dstack/workflows` folder within the repo to run it
 via `dstack`.
@@ -144,21 +129,23 @@ runs, the dependencies it has on other workflows, the ports to open, and so on.
 
 !!! info "NOTE:"
     `dstack` uses your local Python version by default to run workflows, but you can override it
-    in [YAML](docs/reference/providers/bash.md).
+    in [YAML](reference/providers/bash.md).
 
 ## Run locally
 
-Before you can run the workflow, make sure the changes are staged in Git.
+Note, before you can run the workflow, make sure the local changes are staged in Git.
 
-<div class="termy">
-
-```shell
-$ git add --all
-```
-
-</div>
-
-You can now run the workflow locally.
+??? info "Stage the local changes"
+    
+    You can stage all local changes by running this command:
+    
+    <div class="termy">
+    
+    ```shell
+    $ git add -A
+    ```
+    
+    </div>
 
 <div class="termy">
 
@@ -184,55 +171,58 @@ Epoch 1: [00:03<00:00, 280.17it/s, loss=1.35, v_num=0]
     To run workflows locally, you need to have either Docker or [NVIDIA Docker](https://github.com/NVIDIA/nvidia-docker) 
     installed on your machine.
 
-### Check status
+## Configure the Hub
 
-Check recent runs status using the [`dstack ps`](docs/reference/cli/ps.md) command.
+To run workflows remotely in a configured cloud, you will need the Hub application, which can be installed either on a
+dedicated server for team work or directly on your local machine.
 
-<div class="termy">
+### Start the Hub application
 
-```shell
-$ dstack ps
-
-RUN      WORKFLOW     SUBMITTED  STATUS     TAG  BACKEND
-zebra-1  train-mnist  now        Submitted       local
-```
-
-</div>
-
-This command displays either the currently running workflows or the last completed run.
-Use `dstack ps -a` to see all runs.
-
-### List artifacts
-
-To list artifacts from a run, use the [`dstack ls`](docs/reference/cli/ls.md) command.
+To start the Hub application, use this command:
 
 <div class="termy">
 
 ```shell
-$ dstack ls zebra-1
+$ dstack hub start
 
-PATH             FILE        SIZE  BACKENDS
-lightning_logs/  version_0/        local
+The hub is available at http://127.0.0.1:3000?token=b934d226-e24a-4eab-a284-eb92b353b10f
 ```
 
 </div>
 
-!!! info "NOTE:"
-    When you run a workflow locally, artifacts are stored in `~/.dstack/artifacts` and can only be reused by workflows that 
-    also run locally.
+To login as an administrator, visit the URL in the output.
 
-## Configure the remote
+### Create a project
 
-To run workflows remotely (e.g. in a configured cloud account), you can configure a remote using
-the [`dstack config`](docs/reference/cli/config.md) command.
+Go ahead and create a new project.
 
-See [Setup](docs/installation/index.md#configure-a-remote) to learn more about supported remote types and how to configure them.
+![](../assets/dstack_hub_create_project.png){ width=800 }
+
+Choose a backend type (such as AWS or GCP), provide cloud credentials, and specify settings like
+artifact storage bucket and the region where to run workflows.
+
+![](../assets/dstack_hub_view_project.png){ width=800 }
+
+### Configure the CLI
+
+Copy the CLI command from the project settings and execute it in your terminal to configure the project as a remote.
+
+<div class="termy">
+
+```shell
+$ dstack config hub --url http://127.0.0.1:3000 \
+  --project my-awesome-project \
+  --token b934d226-e24a-4eab-a284-eb92b353b10f
+```
+
+</div>
+
+Now, you can run workflows remotely in the created project.
 
 ## Run remotely
 
-Use the `--remote` flag with `dstack run` to run the workflow remotely.
-
-When running remotely, you can utilize the [`resources`](docs/usage/resources.md) feature to request hardware resources like GPUs, memory, or interruptible instances.
+To run a workflow remotely, use the `--remote` flag with `dstack run` and
+request hardware [`resources`](usage/resources.md) (like GPU, memory, interruptible instances, etc.) that you need.
 
 <div class="termy">
 
@@ -254,10 +244,9 @@ Epoch 1: [00:03<00:00, 280.17it/s, loss=1.35, v_num=0]
 
 </div>
 
-When you run a workflow remotely, `dstack` automatically creates the necessary infrastructure within the
-configured cloud account, runs the workflow, and stores the artifacts and destroys the
-infrastructure upon completion.
+The command will automatically provision the required cloud resources in the corresponding cloud upon workflow 
+startup and tear them down upon completion.
 
 !!! info "NOTE:"
-    You can specify hardware resource requirements (like GPU, memory, interruptible instances, etc.) 
-    for each remote workflow using [`resources`](docs/usage/resources.md).
+    As long as the Hub application is running, you don't have to worry about tearing down the cloud resources. 
+    Hub will take care of it automatically.

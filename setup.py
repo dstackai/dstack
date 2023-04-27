@@ -51,8 +51,7 @@ setup(
     project_urls={
         "Source": "https://github.com/dstackai/dstack",
     },
-    description="The easiest way to run ML workflows, provision infrastructure, create dev environments, run apps, "
-    "and manage data.",
+    description="The easiest way to define ML workflows and run them on any cloud platform",
     long_description=get_long_description(),
     long_description_content_type="text/markdown",
     python_requires=">=3.7",
@@ -91,6 +90,7 @@ setup(
         "apscheduler",
         "alembic>=1.10.2",
         "typing-extensions>=4.0.0",
+        "file-read-backwards>=3.0.0",
     ],
     classifiers=[
         "Development Status :: 2 - Pre-Alpha",

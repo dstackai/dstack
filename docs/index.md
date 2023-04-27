@@ -1,8 +1,8 @@
 ---
 template: home.html
-title: Automate your ML workflows
+title: ML workflows as code
 hide:
    - navigation
    - toc
-   - footer
+#   - footer
 ---
