@@ -1,6 +1,8 @@
-from fastapi import APIRouter, Depends
+from fastapi import APIRouter, Depends, Request, Security
 from fastapi.responses import PlainTextResponse
+from fastapi.security.http import HTTPAuthorizationCredentials, HTTPBearer
 
+from dstack.backend.local import LocalBackend
 from dstack.hub.models import LinkUpload
 from dstack.hub.routers.cache import get_backend
 from dstack.hub.routers.util import get_project
@@ -14,9 +16,21 @@ router = APIRouter(prefix="/api/project", tags=["link"], dependencies=[Depends(P
     response_model=str,
     response_class=PlainTextResponse,
 )
-async def link_upload(project_name: str, body: LinkUpload):
+async def link_upload(
+    project_name: str,
+    body: LinkUpload,
+    request: Request,
+    token: HTTPAuthorizationCredentials = Security(HTTPBearer()),
+):
     project = await get_project(project_name=project_name)
     backend = get_backend(project, repo=None)
+    if isinstance(backend, LocalBackend):
+        return str(
+            request.url_for("put_file", project_name=project_name).replace_query_params(
+                key=body.object_key,
+                token=token.credentials,
+            )
+        )
     return backend.get_signed_upload_url(object_key=body.object_key)
 
 
