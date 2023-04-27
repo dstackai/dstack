@@ -99,7 +99,7 @@ class LocalBackend(Backend):
     ) -> Generator[LogEvent, None, None]:
         repo_id = repo_id or self.repo.repo_ref.repo_id
         return logs.poll_logs(
-            self._storage, self._compute, repo_id, run_name, start_time, end_time
+            self.backend_config, self._storage, repo_id, run_name, start_time, end_time, descending
         )
 
     def list_run_artifact_files(
