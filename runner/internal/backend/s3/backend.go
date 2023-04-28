@@ -356,7 +356,7 @@ func (s *S3) GitCredentials(ctx context.Context) *models.GitCredentials {
 		log.Error(ctx, "Job is empty")
 		return nil
 	}
-	return s.cliSecret.fetchCredentials(ctx, s.bucket, s.state.Job.RepoHostNameWithPort(), s.state.Job.RepoUserName, s.state.Job.RepoName)
+	return s.cliSecret.fetchCredentials(ctx, s.bucket, s.state.Job.RepoId)
 }
 
 func (s *S3) GetRepoDiff(ctx context.Context, path string) (string, error) {
