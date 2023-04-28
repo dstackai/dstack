@@ -1,7 +1,8 @@
+from datetime import datetime
 from pathlib import Path
 from typing import Generator, List, Optional
 
-from dstack.backend.base import Backend, BackendType
+from dstack.backend.base import Backend
 from dstack.backend.base import artifacts as base_artifacts
 from dstack.backend.base import cache as base_cache
 from dstack.backend.base import jobs as base_jobs
@@ -17,7 +18,7 @@ from dstack.backend.local.storage import LocalStorage
 from dstack.core.artifact import Artifact
 from dstack.core.job import Job, JobHead, JobStatus
 from dstack.core.log_event import LogEvent
-from dstack.core.repo import RemoteRepoCredentials, Repo, RepoRef
+from dstack.core.repo import RemoteRepoCredentials, Repo, RepoHead, RepoSpec
 from dstack.core.run import RunHead
 from dstack.core.secret import Secret
 from dstack.core.tag import TagHead
@@ -25,40 +26,36 @@ from dstack.utils.common import PathLike
 
 
 class LocalBackend(Backend):
-    def __init__(self, repo: Repo):
-        super().__init__(repo=repo)
-        self.backend_config = LocalConfig()
-        self.backend_config.load()
-        self._loaded = True
-        self._storage = LocalStorage(self.backend_config.path)
-        self._compute = LocalCompute()
+    NAME = "local"
+
+    def __init__(
+        self,
+        backend_config: LocalConfig,
+        repo: Optional[Repo],
+    ):
+        super().__init__(repo=repo, backend_config=backend_config)
+        self.backend_config = backend_config
+        if self.backend_config is None:
+            return
+        self._storage = LocalStorage(self.backend_config.backend_dir)
+        self._compute = LocalCompute(self.backend_config)
         self._secrets_manager = LocalSecretsManager(
-            self.backend_config.path, repo_id=self.repo.repo_id if self.repo else None
+            self.backend_config.backend_dir, repo_id=self.repo.repo_id if self.repo else None
         )
 
-    @property
-    def name(self):
-        return "local"
-
-    @property
-    def type(self) -> BackendType:
-        return BackendType.LOCAL
-
-    def configure(self):
-        pass
-
     def create_run(self) -> str:
-        return base_runs.create_run(self._storage, self.type)
+        return base_runs.create_run(self._storage)
 
     def create_job(self, job: Job):
         base_jobs.create_job(self._storage, job)
 
-    def get_job(self, job_id: str, repo_ref: Optional[RepoRef] = None) -> Optional[Job]:
-        repo_ref = repo_ref or self.repo.repo_ref
-        return base_jobs.get_job(self._storage, repo_ref.repo_id, job_id)
+    def get_job(self, job_id: str, repo_id: Optional[str] = None) -> Optional[Job]:
+        repo_id = repo_id or self.repo.repo_ref.repo_id
+        return base_jobs.get_job(self._storage, repo_id, job_id)
 
-    def list_jobs(self, run_name: str) -> List[Job]:
-        return base_jobs.list_jobs(self._storage, self.repo.repo_id, run_name)
+    def list_jobs(self, run_name: str, repo_id: Optional[str] = None) -> List[Job]:
+        repo_id = repo_id or self.repo.repo_ref.repo_id
+        return base_jobs.list_jobs(self._storage, repo_id, run_name)
 
     def run_job(self, job: Job, failed_to_start_job_new_status: JobStatus):
         base_jobs.run_job(self._storage, self._compute, job, failed_to_start_job_new_status)
@@ -67,22 +64,23 @@ class LocalBackend(Backend):
         base_jobs.stop_job(self._storage, self._compute, self.repo.repo_id, job_id, abort)
 
     def list_job_heads(
-        self, run_name: Optional[str] = None, repo_ref: Optional[RepoRef] = None
+        self, run_name: Optional[str] = None, repo_id: Optional[str] = None
     ) -> List[JobHead]:
-        repo_ref = repo_ref or self.repo.repo_ref
-        return base_jobs.list_job_heads(self._storage, repo_ref.repo_id, run_name)
+        repo_id = repo_id or self.repo.repo_ref.repo_id
+        return base_jobs.list_job_heads(self._storage, repo_id, run_name)
 
-    def delete_job_head(self, job_id: str):
-        base_jobs.delete_job_head(self._storage, self.repo.repo_id, job_id)
+    def delete_job_head(self, job_id: str, repo_id: Optional[str] = None):
+        repo_id = repo_id or self.repo.repo_ref.repo_id
+        base_jobs.delete_job_head(self._storage, repo_id, job_id)
 
     def list_run_heads(
         self,
         run_name: Optional[str] = None,
         include_request_heads: bool = True,
         interrupted_job_new_status: JobStatus = JobStatus.FAILED,
-        repo_ref: Optional[RepoRef] = None,
+        repo_id: Optional[str] = None,
     ) -> List[RunHead]:
-        job_heads = self.list_job_heads(run_name, repo_ref=repo_ref)
+        job_heads = self.list_job_heads(run_name, repo_id=repo_id)
         return base_runs.get_run_heads(
             self._storage,
             self._compute,
@@ -93,16 +91,22 @@ class LocalBackend(Backend):
 
     def poll_logs(
         self,
-        job_heads: List[JobHead],
-        start_time: int,
-        attached: bool,
+        run_name: str,
+        start_time: datetime,
+        end_time: Optional[datetime] = None,
+        descending: bool = False,
+        repo_id: Optional[str] = None,
     ) -> Generator[LogEvent, None, None]:
+        repo_id = repo_id or self.repo.repo_ref.repo_id
         return logs.poll_logs(
-            self._storage, self._compute, self.repo.repo_id, job_heads, start_time, attached
+            self.backend_config, self._storage, repo_id, run_name, start_time, end_time, descending
         )
 
-    def list_run_artifact_files(self, run_name: str) -> List[Artifact]:
-        return base_artifacts.list_run_artifact_files(self._storage, self.repo.repo_id, run_name)
+    def list_run_artifact_files(
+        self, run_name: str, repo_id: Optional[str] = None
+    ) -> List[Artifact]:
+        repo_id = repo_id or self.repo.repo_ref.repo_id
+        return base_artifacts.list_run_artifact_files(self._storage, repo_id, run_name)
 
     def download_run_artifact_files(
         self,
@@ -161,16 +165,20 @@ class LocalBackend(Backend):
             self.repo,
             tag_name,
             local_dirs,
-            self.type,
         )
 
     def delete_tag_head(self, tag_head: TagHead):
         base_tags.delete_tag(self._storage, self.repo.repo_id, tag_head)
 
-    def update_repo_last_run_at(self, last_run_at: int):
-        base_repos.update_repo_last_run_at(self._storage, self.repo.repo_ref, last_run_at)
+    def list_repo_heads(self) -> List[RepoHead]:
+        return base_repos.list_repo_heads(self._storage)
 
-    def _get_repo_credentials(self) -> Optional[RemoteRepoCredentials]:
+    def update_repo_last_run_at(self, last_run_at: int):
+        base_repos.update_repo_last_run_at(
+            self._storage, RepoSpec.from_repo(self.repo), last_run_at
+        )
+
+    def get_repo_credentials(self) -> Optional[RemoteRepoCredentials]:
         return base_repos.get_repo_credentials(self._secrets_manager)
 
     def save_repo_credentials(self, repo_credentials: RemoteRepoCredentials):
@@ -209,9 +217,13 @@ class LocalBackend(Backend):
     def get_artifacts_path(self) -> Path:
         return artifacts.get_artifacts_path(self.backend_config.path, self.repo.repo_id)
 
-    @classmethod
-    def get_configurator(cls):
-        return None
-
     def delete_workflow_cache(self, workflow_name: str):
         base_cache.delete_workflow_cache(self._storage, self.repo.repo_ref, workflow_name)
+
+    def get_signed_download_url(self, object_key: str) -> str:
+        # Implemented by Hub
+        raise NotImplementedError()
+
+    def get_signed_upload_url(self, object_key: str) -> str:
+        # Implemented by Hub
+        raise NotImplementedError()

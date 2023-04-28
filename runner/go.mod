@@ -33,6 +33,7 @@ require (
 	github.com/aws/aws-sdk-go-v2/service/cloudwatchlogs v1.15.7
 	github.com/aws/aws-sdk-go-v2/service/ec2 v1.53.0
 	github.com/aws/aws-sdk-go-v2/service/secretsmanager v1.15.18
+	github.com/codeclysm/extract/v3 v3.1.0 // indirect
 	github.com/containerd/containerd v1.5.2 // indirect
 	github.com/gorilla/mux v1.8.0 // indirect
 	github.com/gorilla/websocket v1.5.0

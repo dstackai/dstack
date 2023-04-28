@@ -67,16 +67,16 @@ export const FormS3BucketSelector = <T extends FieldValues>({
                 };
 
                 return (
-                    <div className={cn(styles.bucketSelector, { disabled })}>
-                        <FormField
-                            description={description}
-                            label={label}
-                            info={info}
-                            stretch={stretch}
-                            constraintText={constraintText}
-                            secondaryControl={secondaryControl}
-                            errorText={error?.message}
-                        >
+                    <FormField
+                        description={description}
+                        label={label}
+                        info={info}
+                        stretch={stretch}
+                        constraintText={constraintText}
+                        secondaryControl={secondaryControl}
+                        errorText={error?.message}
+                    >
+                        <div className={cn(styles.bucketSelector, { disabled })}>
                             <S3ResourceSelector
                                 resource={resource}
                                 onChange={onChangeSelect}
@@ -85,8 +85,8 @@ export const FormS3BucketSelector = <T extends FieldValues>({
                                 {...customProps}
                                 invalid={!!error}
                             />
-                        </FormField>
-                    </div>
+                        </div>
+                    </FormField>
                 );
             }}
         />

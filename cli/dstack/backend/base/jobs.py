@@ -1,6 +1,5 @@
-import hashlib
 import uuid
-from typing import List, Optional
+from typing import List, Optional, Tuple
 
 import yaml
 
@@ -8,7 +7,7 @@ from dstack.backend.base import runners
 from dstack.backend.base.compute import Compute, NoCapacityError
 from dstack.backend.base.storage import Storage
 from dstack.core.error import NoMatchingInstanceError
-from dstack.core.job import Job, JobHead, JobStatus
+from dstack.core.job import Job, JobErrorCode, JobHead, JobStatus
 from dstack.core.repo import RepoRef
 from dstack.core.request import RequestStatus
 from dstack.core.runners import Runner
@@ -22,13 +21,6 @@ def create_job(
 ):
     if create_head:
         storage.put_object(key=_get_job_head_filename(job), content="")
-
-    if job.repo_data.repo_diff:
-        job.repo_diff_filename = _get_diff_filename(job.repo_data.repo_diff)
-        storage.put_object(
-            key=job.repo_diff_filename, content=job.repo_data.repo_diff
-        )  # todo: check if exists
-        job.repo_data.repo_diff = None
 
     storage.put_object(
         key=_get_job_filename(job.repo_ref.repo_id, job.job_id), content=yaml.dump(job.serialize())
@@ -70,30 +62,31 @@ def list_job_head(storage: Storage, repo_id: str, job_id: str) -> Optional[JobHe
     job_head_keys = storage.list_objects(job_head_key_prefix)
     for job_head_key in job_head_keys:
         t = job_head_key[len(job_head_key_prefix) :].split(";")
-        # Skip legacy format
-        if len(t) == 7:
-            (
-                provider_name,
-                repo_user_id,
-                submitted_at,
-                status,
-                artifacts,
-                app_names,
-                tag_name,
-            ) = tuple(t)
-            run_name, workflow_name, job_index = tuple(job_id.split(","))
-            return JobHead(
-                job_id=job_id,
-                repo_ref=RepoRef(repo_id=repo_id, repo_user_id=repo_user_id),
-                run_name=run_name,
-                workflow_name=workflow_name or None,
-                provider_name=provider_name,
-                status=JobStatus(status),
-                submitted_at=int(submitted_at),
-                artifact_paths=artifacts.split(",") if artifacts else None,
-                tag_name=tag_name or None,
-                app_names=app_names.split(",") or None,
-            )
+        (
+            provider_name,
+            repo_user_id,
+            submitted_at,
+            status_info,
+            artifacts,
+            app_names,
+            tag_name,
+        ) = tuple(t)
+        run_name, workflow_name, job_index = tuple(job_id.split(","))
+        status, error_code, container_exit_code = _parse_job_status_info(status_info)
+        return JobHead(
+            job_id=job_id,
+            repo_ref=RepoRef(repo_id=repo_id, repo_user_id=repo_user_id),
+            run_name=run_name,
+            workflow_name=workflow_name or None,
+            provider_name=provider_name,
+            status=JobStatus(status),
+            error_code=JobErrorCode(error_code) if error_code else None,
+            container_exit_code=int(container_exit_code) if container_exit_code else None,
+            submitted_at=int(submitted_at),
+            artifact_paths=artifacts.split(",") if artifacts else None,
+            tag_name=tag_name or None,
+            app_names=app_names.split(",") or None,
+        )
     return None
 
 
@@ -107,34 +100,35 @@ def list_job_heads(
     job_heads = []
     for job_head_key in job_heads_keys:
         t = job_head_key[len(_get_jobs_dir(repo_id)) :].split(";")
-        # Skip legacy format
-        if len(t) == 9:
-            (
-                _,
-                job_id,
-                provider_name,
-                repo_user_id,
-                submitted_at,
-                status,
-                artifacts,
-                app_names,
-                tag_name,
-            ) = tuple(t)
-            run_name, workflow_name, job_index = tuple(job_id.split(","))
-            job_heads.append(
-                JobHead(
-                    job_id=job_id,
-                    repo_ref=RepoRef(repo_id=repo_id, repo_user_id=repo_user_id),
-                    run_name=run_name,
-                    workflow_name=workflow_name or None,
-                    provider_name=provider_name,
-                    status=JobStatus(status),
-                    submitted_at=int(submitted_at),
-                    artifact_paths=artifacts.split(",") if artifacts else None,
-                    tag_name=tag_name or None,
-                    app_names=app_names.split(",") or None,
-                )
+        (
+            _,
+            job_id,
+            provider_name,
+            repo_user_id,
+            submitted_at,
+            status_info,
+            artifacts,
+            app_names,
+            tag_name,
+        ) = tuple(t)
+        run_name, workflow_name, job_index = tuple(job_id.split(","))
+        status, error_code, container_exit_code = _parse_job_status_info(status_info)
+        job_heads.append(
+            JobHead(
+                job_id=job_id,
+                repo_ref=RepoRef(repo_id=repo_id, repo_user_id=repo_user_id),
+                run_name=run_name,
+                workflow_name=workflow_name or None,
+                provider_name=provider_name,
+                status=JobStatus(status),
+                error_code=JobErrorCode(error_code) if error_code else None,
+                container_exit_code=int(container_exit_code) if container_exit_code else None,
+                submitted_at=int(submitted_at),
+                artifact_paths=artifacts.split(",") if artifacts else None,
+                tag_name=tag_name or None,
+                app_names=app_names.split(",") or None,
             )
+        )
     return job_heads
 
 
@@ -161,9 +155,9 @@ def run_job(
         instance_type = compute.get_instance_type(job)
         if instance_type is None:
             job.status = JobStatus.FAILED
+            job.error_code = JobErrorCode.NO_INSTANCE_MATCHING_REQUIREMENTS
             update_job(storage, job)
             raise NoMatchingInstanceError("No instance type matching requirements")
-
         runner = Runner(
             runner_id=job.runner_id, request_id=None, resources=instance_type.resources, job=job
         )
@@ -172,6 +166,7 @@ def run_job(
         runners.update_runner(storage, runner)
     except NoCapacityError:
         job.status = failed_to_start_job_new_status
+        job.error_code = JobErrorCode.FAILED_TO_START_DUE_TO_NO_CAPACITY
         job.request_id = runner.request_id if runner else None
         update_job(storage, job)
     except Exception as e:
@@ -261,11 +256,6 @@ def _get_job_filename(repo_id: str, job_id: str) -> str:
     return f"{_get_jobs_dir(repo_id)}{job_id}.yaml"
 
 
-def _get_diff_filename(job_diff: str) -> str:
-    diff_hash = hashlib.sha256(job_diff.encode()).hexdigest()
-    return f"diffs/{diff_hash}.patch"
-
-
 def _get_jobs_filenames_prefix(repo_id: str, run_name: str) -> str:
     return f"{_get_jobs_dir(repo_id)}{run_name},"
 
@@ -288,9 +278,15 @@ def _get_job_head_filename(job: Job) -> str:
         f"{job.provider_name};"
         f"{job.repo_ref.repo_user_id};"
         f"{job.submitted_at};"
-        f"{job.status.value};"
+        f"{job.status.value},{job.error_code.value if job.error_code else ''},{job.container_exit_code or ''};"
         f"{','.join([a.artifact_path.replace('/', '_') for a in (job.artifact_specs or [])])};"
         f"{','.join([a.app_name for a in (job.app_specs or [])])};"
         f"{job.tag_name or ''}"
     )
     return key
+
+
+def _parse_job_status_info(status_info: str) -> Tuple[str, str, str]:
+    if len(status_info.split(",")) == 3:
+        return status_info.split(",")
+    return status_info, "", ""

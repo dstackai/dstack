@@ -2,28 +2,19 @@ from typing import List
 
 import yaml
 
-from dstack.backend.base import BackendType, jobs, runners
+from dstack.backend.base import jobs, runners
 from dstack.backend.base.compute import Compute
 from dstack.backend.base.storage import Storage
 from dstack.core.app import AppHead
 from dstack.core.artifact import ArtifactHead
-from dstack.core.job import JobHead, JobStatus
-from dstack.core.run import (
-    RequestStatus,
-    RunHead,
-    generate_local_run_name_prefix,
-    generate_remote_run_name_prefix,
-)
+from dstack.core.job import JobErrorCode, JobHead, JobStatus
+from dstack.core.run import RequestStatus, RunHead, generate_remote_run_name_prefix
 
 
 def create_run(
     storage: Storage,
-    backend_type: BackendType,
 ) -> str:
-    if backend_type is BackendType.LOCAL:
-        name = generate_local_run_name_prefix()
-    else:
-        name = generate_remote_run_name_prefix()
+    name = generate_remote_run_name_prefix()
     run_name_index = _next_run_name_index(storage, name)
     run_name = f"{name}-{run_name_index}"
     return run_name
@@ -31,7 +22,7 @@ def create_run(
 
 def _next_run_name_index(storage: Storage, run_name: str) -> int:
     count = 0
-    key = f"run-names/{run_name}.yaml"
+    key = f"run_names/{run_name}.yaml"
     obj = storage.get_object(key)
     if obj is None:
         storage.put_object(key=key, content=yaml.dump({"count": 1}))
@@ -107,6 +98,8 @@ def _create_run(
         request_heads.append(request_head)
         if request_head.status == RequestStatus.NO_CAPACITY:
             job.status = job_head.status = interrupted_job_new_status
+            if interrupted_job_new_status == JobStatus.FAILED:
+                job.error_code = JobErrorCode.INTERRUPTED_BY_NO_CAPACITY
             jobs.update_job(storage, job)
     run_head = RunHead(
         run_name=job_head.run_name,
@@ -119,6 +112,7 @@ def _create_run(
         tag_name=job_head.tag_name,
         app_heads=app_heads,
         request_heads=request_heads,
+        job_heads=[job_head],
     )
     return run_head
 
@@ -169,5 +163,8 @@ def _update_run(
             run.request_heads.append(request_head)
             if request_head.status == RequestStatus.NO_CAPACITY:
                 job.status = job_head.status = interrupted_job_new_status
+                if interrupted_job_new_status == JobStatus.FAILED:
+                    job.error_code = JobErrorCode.INTERRUPTED_BY_NO_CAPACITY
                 jobs.update_job(storage, job)
         run.status = job_head.status
+    run.job_heads.append(job_head)

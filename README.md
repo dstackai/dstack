@@ -9,22 +9,20 @@
 </h1>
 
 <h4 align="center">
-Automate your ML workflows on any cloud
+ML workflows as code
 </h4>
 
 <p align="center">
-The hassle-free tool for managing ML workflows on any cloud platform. 
+The easiest way to define ML workflows and run them on any cloud platform 
 </p>
 
 [![Slack](https://img.shields.io/badge/slack-join%20chat-blueviolet?logo=slack&style=for-the-badge)](https://join.slack.com/t/dstackai/shared_invite/zt-xdnsytie-D4qU9BvJP8vkbkHXdi6clQ)
 
 <p align="center">
-<a href="https://docs.dstack.ai" target="_blank"><b>Docs</b></a> • 
-<a href="https://docs.dstack.ai/quick-start"><b>Quick start</b></a> • 
-<a href="https://docs.dstack.ai/playground" target="_blank"><b>Playground</b></a> •   
-<a href="https://docs.dstack.ai/setup"><b>Setup</b></a> • 
-<a href="https://docs.dstack.ai/usage/hello-world" target="_blank"><b>Usage</b></a>  • 
-<a href="https://docs.dstack.ai/examples/tensorboard" target="_blank"><b>Examples</b></a>
+<a href="https://dstack.ai/docs/quick-start" target="_blank"><b>Quick start</b></a> • 
+<a href="https://dstack.ai/docs" target="_blank"><b>Docs</b></a> • 
+<a href="https://dstack.ai/tutorials/dolly" target="_blank"><b>Tutorials</b></a> •
+<a href="https://dstack.ai/blog" target="_blank"><b>Blog</b></a>
 </p>
 
 [![Last commit](https://img.shields.io/github/last-commit/dstackai/dstack)](https://github.com/dstackai/dstack/commits/)
@@ -34,10 +32,11 @@ The hassle-free tool for managing ML workflows on any cloud platform.
 
 ## What is dstack?
 
-`dstack` is an open-source tool that automates ML workflows, enabling effective management on any cloud platform. 
+`dstack` makes it very easy to define ML workflows
+and run them on any cloud platform. It provisions infrastructure,
+manages data, and monitors usage for you.
 
-It empowers your team to prepare data, train, and fine-tune models using their preferred frameworks and dev
-environments without spending time on engineering and infrastructure.
+Ideal for processing data, training models, running apps, and any other ML development tasks.
 
 ## Install the CLI
 
@@ -46,26 +45,6 @@ Use `pip` to install `dstack`:
 ```shell
 pip install dstack
 ```
-
-## Configure a remote
-
-By default, workflows run locally. To run workflows remotely (e.g. in a configured cloud account),
-configure a remote using the `dstack config` command.
-
-```shell
-dstack config
-
-? Choose backend. Use arrows to move, type to filter
-> [aws]
-  [gcp]
-  [hub]
-```
-
-Choose [`hub`](https://docs.dstack.ai/setup/hub.md) if you prefer managing cloud credentials and settings through a user
-interface while working in a team.
-
-For running remote workflows with local cloud credentials, select [`aws`](https://docs.dstack.ai/setup/aws.md)
-or [`gcp`](https://docs.dstack.ai/setup/gcp.md).
 
 ## Define workflows
 
@@ -103,10 +82,52 @@ Epoch 1: [00:03<00:00, 280.17it/s, loss=1.35, v_num=0]
 
 ## Run remotely
 
-To run a workflow remotely (e.g. in a configured cloud account), add the `--remote` flag to the `dstack run` command:
+To run workflows remotely in a configured cloud, you will need the Hub application, which can be installed either on a
+dedicated server for team work or directly on your local machine.
 
-The necessary hardware resources can be configured either via YAML or through arguments in the `dstack run` command, such
-as `--gpu` and `--gpu-name`.
+### Start the Hub application
+
+To start the Hub application, use this command:
+
+<div class="termy">
+
+```shell
+$ dstack hub start
+
+The hub is available at http://127.0.0.1:3000?token=b934d226-e24a-4eab-a284-eb92b353b10f
+```
+
+</div>
+
+To login as an administrator, visit the URL in the output.
+
+### Create a project
+
+Go ahead and create a new project.
+
+<img src="https://dstack.ai/assets/dstack_hub_create_project.png" width="800px"/>
+
+Choose a backend type (such as AWS or GCP), provide cloud credentials, and specify settings like
+artifact storage bucket and the region where to run workflows.
+
+<img src="https://dstack.ai/assets/dstack_hub_view_project.png" width="800px"/>
+
+### Configure the CLI
+
+Copy the CLI command from the project settings and execute it in your terminal to configure the project as a remote.
+
+<div class="termy">
+
+```shell
+$ dstack config hub --url http://127.0.0.1:3000 \
+  --project my-awesome-project \
+  --token b934d226-e24a-4eab-a284-eb92b353b10f
+```
+
+</div>
+
+Now, you can run workflows remotely in the created project by adding the `--remote` flag to the `dstack run` command
+and request hardware [`resources`](usage/resources.md) (like GPU, memory, interruptible instances, etc.) that you need.
 
 ```shell
 dstack run train-mnist --remote --gpu 1
@@ -123,27 +144,17 @@ GPU available: True, used: True
 Epoch 1: [00:03<00:00, 280.17it/s, loss=1.35, v_num=0]
 ```
 
-Upon running a workflow remotely, `dstack` automatically creates resources in the configured cloud account and destroys them
-once the workflow is complete.
-
-## Providers
-
-`dstack` supports multiple [providers](https://docs.dstack.ai/usage/providers) to set up environments, run scripts, and launch interactive development environments and applications.
-
-## Artifacts
-
-`dstack` allows you to save output artifacts and conveniently reuse them across workflows.
+The command will automatically provision the required cloud resources in the corresponding cloud upon workflow 
+startup and tear them down upon completion.
 
 ## More information
 
 For additional information and examples, see the following links:
 
-* [Docs](https://docs.dstack.ai/)
-* [Quick start](https://docs.dstack.ai/quick-start)
-* [Playground](https://github.com/dstackai/dstack-playground)
-* [Setup](https://docs.dstack.ai/setup)
-* [Usage](https://docs.dstack.ai/usage/hello-world)
-* [Examples](https://docs.dstack.ai/examples/tensorboard)
+* [Quick start](https://dstack.ai/docs/quick-start)
+* [Docs](https://dstack.ai/docs)
+* [Tutorials](https://dstack.ai/tutorials/dolly)
+* [Blog](https://dstack.ai/blog)
  
 ##  Licence
 

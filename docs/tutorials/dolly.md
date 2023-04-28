@@ -9,7 +9,7 @@ This tutorial shows you how to run (and debug) your own ChatGPT on your cloud ac
 Dolly (Databricks' open-source pre-trained model).
 
 !!! info "NOTE:"
-    The source code of this tutorial is available in the [Playground](../playground.md).
+    The source code of this tutorial is available in the <a href="https://github.com/dstackai/dstack-playground#readme" target="__blank">Playground</a>.
 
 ## 1. Requirements
 
@@ -154,23 +154,10 @@ workflows:
 
 ## 4. Run the workflow
 
-Before we can run our workflow in our cloud account, we need to configure a remote using
-the [`dstack config`](../setup/index.md#configure-a-remote) command:
+!!! info "NOTE:"
+    To run workflows remotely in a configured cloud, we'll need the [Hub application](../docs/quick-start.md#start-the-hub-application).
 
-<div class="termy">
-
-```shell
-$ dstack config
-
-? Choose backend. Use arrows to move, type to filter
-> [aws]
-  [gcp]
-  [hub]
-```
-
-</div>
-
-After configuring the remote, we can use the [`dstack run`](../reference/cli/run.md) command with the `--remote` flag to
+Once the remote is configured, we can use the [`dstack run`](../docs/reference/cli/run.md) command with the `--remote` flag to
 run our workflow in the cloud.
 
 <div class="termy">
@@ -205,7 +192,7 @@ Clicking the URL from the output will open our ChatGPT application running in th
 
 Before coming up with a workflow that runs perfectly in the cloud, you may need to debug it. With `dstack`, you can debug
 your workflow right in the cloud using an IDE. One way to do this is by using
-the [`code`](../reference/providers/code.md) provider.
+the [`code`](../docs/reference/providers/code.md) provider.
 
 Define the following workflow:
 

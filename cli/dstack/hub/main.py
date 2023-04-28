@@ -12,6 +12,7 @@ from dstack.hub.db.models import User
 from dstack.hub.repository.users import UserManager
 from dstack.hub.routers import (
     artifacts,
+    backends,
     jobs,
     link,
     logs,
@@ -20,6 +21,7 @@ from dstack.hub.routers import (
     runners,
     runs,
     secrets,
+    storage,
     tags,
     users,
     workflows,
@@ -32,6 +34,7 @@ logger = logging.get_logger(__name__)
 
 app = FastAPI(docs_url="/api/docs")
 app.include_router(users.router)
+app.include_router(backends.router)
 app.include_router(projects.router)
 app.include_router(runs.router)
 app.include_router(jobs.router)
@@ -39,6 +42,7 @@ app.include_router(runners.router)
 app.include_router(secrets.router)
 app.include_router(logs.router)
 app.include_router(artifacts.router)
+app.include_router(storage.router)
 app.include_router(tags.router)
 app.include_router(repos.router)
 app.include_router(link.router)

@@ -3,7 +3,7 @@
 This tutorial demonstrates how to use TensorBoard with `dstack` to track experiment metrics.
 
 !!! info "NOTE:"
-    The source code of this tutorial is available in the [Playground](../playground.md).
+    The source code of this tutorial is available in the <a href="https://github.com/dstackai/dstack-playground#readme" target="__blank">Playground</a>.
 
 ## 1. Define a workflow file
 
@@ -206,14 +206,14 @@ $ tensorboard --logdir=~/.dstack/artifacts/github.com/dstack-playground/snake-1,
 
 !!! info "NOTE:"
     If you'd like to reuse the logs outside your machine or share them with your team members,
-    you can push the run to the remote via the [`dstack push`](../reference/cli/push.md) command.
+    you can push the run to the remote via the [`dstack push`](../docs/reference/cli/push.md) command.
 
 ## 4. Run remotely
 
 One of the great features of `dstack` is the ability to run workflows remotely (e.g., in a pre-configured cloud
 account). 
 
-This allows you to request any [Resources](../usage/remote.md#resources) required (including GPUs and memory), or to utilize spot instances. 
+This allows you to request any [Resources](../docs/usage/resources.md) required (including GPUs and memory), or to utilize spot instances. 
 The creation and deletion of cloud instances is handled by `dstack` automatically.
 
 To run a workflow remotely, add the `--remote` flag to the `dstack run` command.
@@ -246,7 +246,7 @@ Epoch 1:  0% 0/1719 [00:05<00:09, 108.99it/s, v_num=0, val_loss=0.126, val_acc=0
 Similar to when the workflow runs locally, you can click on the TensorBoard URL to access the logs in real-time.
 
 When the workflow is complete, the `lightning_logs` folder is saved as an output artifact. To access it locally, use the
-[`dstack pull`](../reference/cli/pull.md)  command, which downloads the logs to `~/.dstack/artifacts`.
+[`dstack pull`](../docs/reference/cli/pull.md)  command, which downloads the logs to `~/.dstack/artifacts`.
 
 <div class="termy">
 

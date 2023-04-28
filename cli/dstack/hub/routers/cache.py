@@ -1,24 +1,25 @@
 import json
 from typing import Optional
 
-from dstack.api.backend import dict_backends
-from dstack.backend.base import CloudBackend
+from dstack.api.internal.backend import get_backend_class
+from dstack.backend.base import Backend
 from dstack.core.repo import Repo
 from dstack.hub.db.models import Project
+from dstack.hub.services.backends import get_configurator
 
 cache = {}
 
 
-def get_backend(project: Project, repo: Optional[Repo]) -> CloudBackend:
+def get_backend(project: Project, repo: Optional[Repo] = None) -> Backend:
     key = project.name if repo is None else (project.name, repo.repo_id, repo.repo_user_id)
     if cache.get(key) is not None:
         return cache[key]
-    backend = dict_backends(repo, all_backend=True).get(project.backend)
-    configurator = backend.get_configurator()
+    backend_cls = get_backend_class(project.backend)
+    configurator = get_configurator(project.backend)
     json_data = json.loads(str(project.config))
     auth_data = json.loads(str(project.auth))
-    config = configurator.get_config_from_hub_config_data(json_data, auth_data)
-    backend.__init__(repo=repo, backend_config=config)
+    config = configurator.get_config_from_hub_config_data(project.name, json_data, auth_data)
+    backend = backend_cls(repo=repo, backend_config=config)
     cache[key] = backend
     return cache[key]
 

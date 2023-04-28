@@ -4,7 +4,7 @@ from pydantic import BaseModel
 
 from dstack.core.app import AppHead
 from dstack.core.artifact import ArtifactHead
-from dstack.core.job import JobStatus
+from dstack.core.job import JobHead, JobStatus
 from dstack.core.request import RequestHead, RequestStatus
 from dstack.utils import random_names
 from dstack.utils.common import _quoted
@@ -21,6 +21,7 @@ class RunHead(BaseModel):
     tag_name: Optional[str]
     app_heads: Optional[List[AppHead]]
     request_heads: Optional[List[RequestHead]]
+    job_heads: List[JobHead]
 
     def __str__(self) -> str:
         artifact_heads = (

@@ -4,6 +4,6 @@ from dstack.core.repo import RepoRef
 
 
 class DepSpec(BaseModel):
-    repo_ref: RepoRef
+    repo_ref: RepoRef  # todo: remove
     run_name: str
     mount: bool

@@ -6,7 +6,6 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
-	"github.com/docker/docker/api/types"
 	"io"
 	"os"
 	"path"
@@ -14,18 +13,20 @@ import (
 	"strconv"
 	"time"
 
+	"github.com/docker/docker/api/types"
+
 	"github.com/docker/docker/api/types/mount"
 	"github.com/dstackai/dstack/runner/consts"
+	"github.com/dstackai/dstack/runner/consts/errorcodes"
+	"github.com/dstackai/dstack/runner/consts/states"
 	"github.com/dstackai/dstack/runner/internal/artifacts"
 	"github.com/dstackai/dstack/runner/internal/backend"
-	"github.com/dstackai/dstack/runner/internal/common"
 	"github.com/dstackai/dstack/runner/internal/container"
 	"github.com/dstackai/dstack/runner/internal/environment"
 	"github.com/dstackai/dstack/runner/internal/gerrors"
 	"github.com/dstackai/dstack/runner/internal/log"
 	"github.com/dstackai/dstack/runner/internal/ports"
 	"github.com/dstackai/dstack/runner/internal/repo"
-	"github.com/dstackai/dstack/runner/internal/states"
 	"github.com/dstackai/dstack/runner/internal/stream"
 )
 
@@ -176,6 +177,11 @@ func (ex *Executor) Run(ctx context.Context) error {
 				}
 				log.Error(runCtx, "Failed run", "err", errRun)
 				job.Status = states.Failed
+				containerExitedError := &container.ContainerExitedError{}
+				if errors.As(errRun, containerExitedError) {
+					job.ErrorCode = errorcodes.ContainerExitedWithError
+					job.ContainerExitCode = fmt.Sprintf("%d", containerExitedError.ExitCode)
+				}
 			}
 			_ = ex.backend.UpdateState(runCtx)
 			return errRun
@@ -224,14 +230,25 @@ func (ex *Executor) runJob(ctx context.Context, erCh chan error, stoppedCh chan 
 			job.HostName = *ex.config.Hostname
 		}
 	}
-	log.Trace(jctx, "Fetching git repository")
 
-	if err = ex.prepareGit(jctx); err != nil {
-		erCh <- gerrors.Wrap(err)
-		return
+	switch job.RepoType {
+	case "remote":
+		log.Trace(jctx, "Fetching git repository")
+		if err = ex.prepareGit(jctx); err != nil {
+			erCh <- gerrors.Wrap(err)
+			return
+		}
+	case "local":
+		log.Trace(jctx, "Fetching tar archive")
+		if err = ex.prepareArchive(jctx); err != nil {
+			erCh <- gerrors.Wrap(err)
+			return
+		}
+	default:
+		log.Error(jctx, "Unknown RepoType", "RepoType", job.RepoType)
 	}
-	log.Trace(jctx, "Dependency processing")
 
+	log.Trace(jctx, "Dependency processing")
 	if err = ex.processCache(jctx); err != nil {
 		erCh <- gerrors.Wrap(err)
 		return
@@ -265,6 +282,10 @@ func (ex *Executor) runJob(ctx context.Context, erCh chan error, stoppedCh chan 
 			}
 			for _, artifact := range ex.cacheArtifacts {
 				err = artifact.BeforeRun(jctx)
+				if err != nil {
+					erCh <- gerrors.Wrap(err)
+					return
+				}
 			}
 		}
 		log.Trace(jctx, "Running job")
@@ -315,7 +336,7 @@ func (ex *Executor) runJob(ctx context.Context, erCh chan error, stoppedCh chan 
 
 func (ex *Executor) prepareGit(ctx context.Context) error {
 	job := ex.backend.Job(ctx)
-	dir := path.Join(common.HomeDir(), consts.RUNS_PATH, job.RunName, job.JobID)
+	dir := path.Join(ex.backend.GetTMPDir(ctx), consts.RUNS_DIR, job.RunName, job.JobID)
 	if _, err := os.Stat(dir); err != nil {
 		if err = os.MkdirAll(dir, 0777); err != nil {
 			return gerrors.Wrap(err)
@@ -356,10 +377,10 @@ func (ex *Executor) prepareGit(ctx context.Context) error {
 		return gerrors.Wrap(err)
 	}
 
-	repoDiff := job.RepoDiff
-	if job.RepoDiffFilename != "" {
+	repoDiff := ""
+	if job.RepoCodeFilename != "" {
 		var err error
-		repoDiff, err = ex.backend.GetRepoDiff(ctx, job.RepoDiffFilename)
+		repoDiff, err = ex.backend.GetRepoDiff(ctx, job.RepoCodeFilename)
 		if err != nil {
 			return err
 		}
@@ -368,6 +389,20 @@ func (ex *Executor) prepareGit(ctx context.Context) error {
 		if err := repo.ApplyDiff(ctx, dir, repoDiff); err != nil {
 			return gerrors.Wrap(err)
 		}
+	}
+	return nil
+}
+
+func (ex *Executor) prepareArchive(ctx context.Context) error {
+	job := ex.backend.Job(ctx)
+	dir := path.Join(ex.backend.GetTMPDir(ctx), consts.RUNS_DIR, job.RunName, job.JobID)
+	if _, err := os.Stat(dir); err != nil {
+		if err = os.MkdirAll(dir, 0777); err != nil {
+			return gerrors.Wrap(err)
+		}
+	}
+	if err := ex.backend.GetRepoArchive(ctx, job.RepoCodeFilename, dir); err != nil {
+		return gerrors.Wrap(err)
 	}
 	return nil
 }
@@ -466,7 +501,7 @@ func (ex *Executor) processJob(ctx context.Context, stoppedCh chan struct{}) err
 	bindings := make([]mount.Mount, 0)
 	bindings = append(bindings, mount.Mount{
 		Type:   mount.TypeBind,
-		Source: path.Join(common.HomeDir(), consts.RUNS_PATH, job.RunName, job.JobID),
+		Source: path.Join(ex.backend.GetTMPDir(ctx), consts.RUNS_DIR, job.RunName, job.JobID),
 		Target: "/workflow",
 	})
 	for _, artifact := range ex.artifactsIn {

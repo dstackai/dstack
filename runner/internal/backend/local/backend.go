@@ -3,6 +3,7 @@ package local
 import (
 	"context"
 	"fmt"
+	"github.com/dstackai/dstack/runner/internal/repo"
 	"io"
 	"io/ioutil"
 	"os"
@@ -11,6 +12,7 @@ import (
 	"strings"
 
 	"github.com/dstackai/dstack/runner/consts"
+	"github.com/dstackai/dstack/runner/consts/states"
 	"github.com/dstackai/dstack/runner/internal/artifacts"
 	"github.com/dstackai/dstack/runner/internal/artifacts/local"
 	"github.com/dstackai/dstack/runner/internal/backend"
@@ -18,12 +20,11 @@ import (
 	"github.com/dstackai/dstack/runner/internal/gerrors"
 	"github.com/dstackai/dstack/runner/internal/log"
 	"github.com/dstackai/dstack/runner/internal/models"
-	"github.com/dstackai/dstack/runner/internal/states"
 	"gopkg.in/yaml.v3"
 )
 
-type File struct {
-	Path string `yaml:"path"`
+type LocalConfigFile struct {
+	Namespace string `yaml:"namespace"`
 }
 
 type Local struct {
@@ -34,26 +35,27 @@ type Local struct {
 	cliSecret *ClientSecret
 }
 
+const LOCAL_BACKEND_DIR = "local_backend"
+
 func init() {
-	backend.DefaultBackend = New()
 	backend.RegisterBackend("local", func(ctx context.Context, pathConfig string) (backend.Backend, error) {
-		file := File{}
-		theConfig, err := ioutil.ReadFile(pathConfig)
+		config := LocalConfigFile{}
+		fileContent, err := ioutil.ReadFile(pathConfig)
 		if err != nil {
 			fmt.Println("[ERROR]", err.Error())
 			return nil, err
 		}
-		err = yaml.Unmarshal(theConfig, &file)
+		err = yaml.Unmarshal(fileContent, &config)
 		if err != nil {
 			fmt.Println("[ERROR]", err.Error())
 			return nil, err
 		}
-		return New(), nil
+		return New(config.Namespace), nil
 	})
 }
 
-func New() *Local {
-	path := filepath.Join(common.HomeDir(), consts.DSTACK_DIR_PATH)
+func New(namespace string) *Local {
+	path := filepath.Join(common.HomeDir(), consts.DSTACK_DIR_PATH, LOCAL_BACKEND_DIR, namespace)
 	return &Local{
 		path:      path,
 		storage:   NewLocalStorage(path),
@@ -161,7 +163,7 @@ func (l Local) Shutdown(ctx context.Context) error {
 }
 
 func (l *Local) GetArtifact(ctx context.Context, runName, localPath, remotePath string, _ bool) artifacts.Artifacter {
-	rootPath := path.Join(common.HomeDir(), consts.USER_ARTIFACTS_PATH, runName)
+	rootPath := path.Join(l.GetTMPDir(ctx), consts.USER_ARTIFACTS_DIR, runName)
 	log.Trace(ctx, "Create simple artifact's engine. Local", "Root path", rootPath)
 	art, err := local.NewLocal(l.path, rootPath, localPath, remotePath)
 	if err != nil {
@@ -173,7 +175,7 @@ func (l *Local) GetArtifact(ctx context.Context, runName, localPath, remotePath 
 
 func (l Local) CreateLogger(ctx context.Context, logGroup, logName string) io.Writer {
 	log.Trace(ctx, "Build logger", "LogGroup", logGroup, "LogName", logName)
-	logger, err := NewLogger(logGroup, logName)
+	logger, err := NewLogger(l.state.Job.JobID, l.path, logGroup, logName)
 	if err != nil {
 		log.Error(ctx, "Failed create logger", "LogGroup", logGroup, "LogName", logName)
 		return nil
@@ -195,7 +197,7 @@ func (l Local) GetJobByPath(ctx context.Context, path string) (*models.Job, erro
 
 func (l *Local) GitCredentials(ctx context.Context) *models.GitCredentials {
 	log.Trace(ctx, "Getting credentials")
-	return l.cliSecret.fetchCredentials(ctx, l.state.Job.RepoHostNameWithPort(), l.state.Job.RepoUserName, l.state.Job.RepoName)
+	return l.cliSecret.fetchCredentials(ctx, l.state.Job.RepoId)
 }
 
 func (l *Local) Secrets(ctx context.Context) (map[string]string, error) {
@@ -238,4 +240,16 @@ func (l Local) GetRepoDiff(ctx context.Context, path string) (string, error) {
 		return "", gerrors.Wrap(err)
 	}
 	return string(diff), nil
+}
+
+func (l Local) GetRepoArchive(ctx context.Context, path, dir string) error {
+	src := filepath.Join(l.path, path)
+	if err := repo.ExtractArchive(ctx, src, dir); err != nil {
+		return gerrors.Wrap(err)
+	}
+	return nil
+}
+
+func (l Local) GetTMPDir(ctx context.Context) string {
+	return path.Join(l.path, "tmp")
 }

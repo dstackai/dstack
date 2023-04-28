@@ -30,24 +30,28 @@ type Job struct {
 	Deps         []Dep             `yaml:"deps"`
 	ProviderName string            `yaml:"provider_name"`
 
-	RepoId           string `yaml:"repo_id"`
-	RepoUserId       string `yaml:"repo_user_id"`
-	RepoHostName     string `yaml:"repo_host_name"`
-	RepoPort         int    `yaml:"repo_port,omitempty"`
-	RepoBranch       string `yaml:"repo_branch"`
-	RepoDiff         string `yaml:"repo_diff"`
-	RepoDiffFilename string `yaml:"repo_diff_filename,omitempty"`
-	RepoHash         string `yaml:"repo_hash"`
-	RepoName         string `yaml:"repo_name"`
-	RepoUserName     string `yaml:"repo_user_name"`
+	RepoId     string `yaml:"repo_id"`
+	RepoUserId string `yaml:"repo_user_id"`
+	RepoType   string `yaml:"repo_type"`
 
-	RequestID    string       `yaml:"request_id"`
-	Requirements Requirements `yaml:"requirements"`
-	RunName      string       `yaml:"run_name"`
-	RunnerID     string       `yaml:"runner_id"`
-	Status       string       `yaml:"status"`
-	SubmittedAt  uint64       `yaml:"submitted_at"`
-	TagName      string       `yaml:"tag_name"`
+	RepoHostName string `yaml:"repo_host_name"`
+	RepoPort     int    `yaml:"repo_port,omitempty"`
+	RepoUserName string `yaml:"repo_user_name"`
+	RepoName     string `yaml:"repo_name"`
+	RepoBranch   string `yaml:"repo_branch"`
+	RepoHash     string `yaml:"repo_hash"`
+
+	RepoCodeFilename string `yaml:"repo_code_filename"`
+
+	RequestID         string       `yaml:"request_id"`
+	Requirements      Requirements `yaml:"requirements"`
+	RunName           string       `yaml:"run_name"`
+	RunnerID          string       `yaml:"runner_id"`
+	Status            string       `yaml:"status"`
+	ErrorCode         string       `yaml:"error_code,omitempty"`
+	ContainerExitCode string       `yaml:"container_exit_code,omitempty"`
+	SubmittedAt       uint64       `yaml:"submitted_at"`
+	TagName           string       `yaml:"tag_name"`
 	//Variables    map[string]interface{} `yaml:"variables"`
 	WorkflowName string `yaml:"workflow_name"`
 	WorkingDir   string `yaml:"working_dir"`
@@ -143,7 +147,7 @@ func (j *Job) JobHeadFilepath() string {
 		j.ProviderName,
 		j.RepoUserId,
 		j.SubmittedAt,
-		j.Status,
+		strings.Join([]string{j.Status, j.ErrorCode, j.ContainerExitCode}, ","),
 		strings.Join(artifactSlice, ","),
 		strings.Join(appsSlice, ","),
 		j.TagName,
@@ -167,7 +171,7 @@ func (j *Job) JobHeadFilepathLocal() string {
 		j.ProviderName,
 		j.RepoUserId,
 		j.SubmittedAt,
-		j.Status,
+		strings.Join([]string{j.Status, j.ErrorCode, j.ContainerExitCode}, ","),
 		strings.Join(artifactSlice, ","),
 		strings.Join(appsSlice, ","),
 		j.TagName,

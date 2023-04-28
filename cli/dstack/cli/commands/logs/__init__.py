@@ -1,13 +1,9 @@
-import os
 import sys
 from argparse import Namespace
 
-from dstack.api.backend import list_backends
-from dstack.api.logs import poll_logs
 from dstack.cli.commands import BasicCommand
-from dstack.cli.common import check_backend, check_config, check_git, check_init
-from dstack.cli.config import config
-from dstack.core.repo import RemoteRepo
+from dstack.cli.common import check_init, console
+from dstack.cli.config import get_hub_client
 from dstack.utils.common import since
 
 
@@ -20,6 +16,12 @@ class LogCommand(BasicCommand):
 
     def register(self):
         # TODO: Add --format (short|detailed)
+        self._parser.add_argument(
+            "--project",
+            type=str,
+            help="Hub project to execute the command",
+            default=None,
+        )
         self._parser.add_argument("run_name", metavar="RUN", type=str, help="A name of a run")
         self._parser.add_argument(
             "-a",
@@ -40,19 +42,16 @@ class LogCommand(BasicCommand):
             default="1d",
         )
 
-    @check_config
-    @check_git
-    @check_backend
     @check_init
     def _command(self, args: Namespace):
-        repo = RemoteRepo(repo_ref=config.repo_user_config.repo_ref, local_repo_dir=os.getcwd())
-        anyone = False
-        for backend in list_backends(repo):
-            start_time = since(args.since)
-            job_heads = backend.list_job_heads(args.run_name)
-            if job_heads:
-                anyone = True
-                poll_logs(backend, job_heads, start_time, args.attach)
-
-        if not anyone:
-            sys.exit(f"Cannot find the run '{args.run_name}'")
+        hub_client = get_hub_client(project_name=args.project)
+        job_heads = hub_client.list_job_heads(args.run_name)
+        if len(job_heads) == 0:
+            console.print(f"Cannot find the run '{args.run_name}'")
+            exit(1)
+        start_time = since(args.since)
+        try:
+            for event in hub_client.poll_logs(run_name=args.run_name, start_time=start_time):
+                sys.stdout.write(event.log_message)
+        except KeyboardInterrupt:
+            pass

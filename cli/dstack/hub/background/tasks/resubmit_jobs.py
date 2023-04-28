@@ -28,16 +28,18 @@ def _resubmit_project_jobs(project: Project):
             run_name=None,
             include_request_heads=True,
             interrupted_job_new_status=JobStatus.PENDING,
-            repo_ref=repo_head,
+            repo_id=repo_head.repo_id,
         )
         for run_head in run_heads:
-            job_heads = backend.list_job_heads(run_name=run_head.run_name, repo_ref=repo_head)
+            job_heads = backend.list_job_heads(
+                run_name=run_head.run_name, repo_id=repo_head.repo_id
+            )
             for job_head in job_heads:
                 if (
                     job_head.status == JobStatus.PENDING
                     and curr_time - job_head.submitted_at > RESUBMISSION_INTERVAL * 1000
                 ):
-                    job = backend.get_job(job_head.job_id, repo_ref=repo_head)
+                    job = backend.get_job(job_head.job_id, repo_id=repo_head.repo_id)
                     backend.resubmit_job(
                         job=job,
                         failed_to_start_job_new_status=JobStatus.PENDING,

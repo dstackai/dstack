@@ -1,9 +1,10 @@
+from datetime import datetime
 from typing import List, Optional, Union
 
 from pydantic import BaseModel, Field
 from typing_extensions import Literal
 
-from dstack.core.job import Job, JobHead
+from dstack.core.job import Job
 from dstack.core.repo import RemoteRepoCredentials, RepoSpec
 from dstack.core.secret import Secret
 from dstack.hub.security.utils import GlobalRole, ProjectRole
@@ -27,6 +28,13 @@ class Project(BaseModel):
 class Member(BaseModel):
     user_name: str
     project_role: ProjectRole
+
+
+BackendType = Union[Literal["local"], Literal["aws"], Literal["gcp"]]
+
+
+class LocalProjectConfig(BaseModel):
+    type: Literal["local"] = "local"
 
 
 class AWSProjectConfigPartial(BaseModel):
@@ -91,11 +99,13 @@ class GCPProjectConfigWithCreds(GCPProjectConfig, GCPProjectCreds):
     pass
 
 
-AnyProjectConfig = Union[AWSProjectConfig, GCPProjectConfig]
+AnyProjectConfig = Union[LocalProjectConfig, AWSProjectConfig, GCPProjectConfig]
 AnyProjectConfigWithCredsPartial = Union[
-    AWSProjectConfigWithCredsPartial, GCPProjectConfigWithCredsPartial
+    LocalProjectConfig, AWSProjectConfigWithCredsPartial, GCPProjectConfigWithCredsPartial
 ]
-AnyProjectConfigWithCreds = Union[AWSProjectConfigWithCreds, GCPProjectConfigWithCreds]
+AnyProjectConfigWithCreds = Union[
+    LocalProjectConfig, AWSProjectConfigWithCreds, GCPProjectConfigWithCreds
+]
 
 
 class ProjectConfig(BaseModel):
@@ -146,29 +156,38 @@ class SaveRepoCredentials(BaseModel):
     repo_credentials: RemoteRepoCredentials
 
 
+class RepoHeadGet(BaseModel):
+    repo_id: str
+
+
 class ReposUpdate(BaseModel):
     repo_spec: RepoSpec
     last_run_at: int
 
 
 class RunsList(BaseModel):
-    repo_spec: RepoSpec
+    repo_id: str
     run_name: Optional[str]
     include_request_heads: Optional[bool]
 
 
+class JobHeadList(BaseModel):
+    repo_id: str
+    run_name: Optional[str]
+
+
 class JobsGet(BaseModel):
-    repo_spec: RepoSpec
+    repo_id: str
     job_id: str
 
 
 class JobsList(BaseModel):
-    repo_spec: RepoSpec
+    repo_id: str
     run_name: str
 
 
 class ArtifactsList(BaseModel):
-    repo_spec: RepoSpec
+    repo_id: str
     run_name: str
 
 
@@ -178,13 +197,16 @@ class SecretAddUpdate(BaseModel):
 
 
 class PollLogs(BaseModel):
-    repo_spec: RepoSpec
-    job_heads: List[JobHead]
-    start_time: int
-    attached: bool
+    repo_id: str
+    run_name: str
+    start_time: Optional[datetime]
+    end_time: Optional[datetime]
+    descending: bool = False
+    prev_event_id: Optional[str]
+    limit: int = Field(100, ge=0, le=1000)
 
 
-class LinkUpload(BaseModel):
+class StorageLink(BaseModel):
     object_key: str
 
 
@@ -241,7 +263,7 @@ class GCPProjectValues(BaseModel):
 
 
 class ProjectValues(BaseModel):
-    __root__: Union[AWSProjectValues, GCPProjectValues] = Field(..., discriminator="type")
+    __root__: Union[None, AWSProjectValues, GCPProjectValues] = Field(..., discriminator="type")
 
 
 class UserPatch(BaseModel):
@@ -254,3 +276,7 @@ class AddMembers(BaseModel):
 
 class DeleteUsers(BaseModel):
     users: List[str] = []
+
+
+class FileObject(BaseModel):
+    object_key: str

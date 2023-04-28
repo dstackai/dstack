@@ -11,6 +11,7 @@ export interface IProp {
     text: string;
     label?: string;
     description?: string;
+    info?: React.ReactNode;
     constraintText?: string;
     errorText?: string;
     files: File[];
@@ -29,6 +30,7 @@ export const FileUploader = ({
     text,
     label,
     description,
+    info,
     constraintText,
     errorText,
     files,
@@ -40,7 +42,13 @@ export const FileUploader = ({
 }: IProp) => {
     return (
         <>
-            <FormField label={label} description={description} constraintText={constraintText} errorText={errorText}>
+            <FormField
+                info={info}
+                label={label}
+                description={description}
+                constraintText={constraintText}
+                errorText={errorText}
+            >
                 <Button
                     formAction="none"
                     iconName="upload"
@@ -63,7 +71,7 @@ export const FileUploader = ({
                     {text}
                 </Button>
             </FormField>
-            <Box margin={{ top: 'l' }}>
+            <Box margin={{ top: 'xs' }}>
                 {files &&
                     files.length > 0 &&
                     (multiple ? (

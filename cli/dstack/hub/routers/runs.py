@@ -28,14 +28,14 @@ async def create_run(project_name: str, repo_spec: RepoSpec) -> str:
 
 @router.post(
     "/{project_name}/runs/list",
-    response_model=List[RunHead],
 )
-async def list_run(project_name: str, body: RunsList):
+async def list_run(project_name: str, body: RunsList) -> List[RunHead]:
     project = await get_project(project_name=project_name)
-    backend = get_backend(project, body.repo_spec.repo)
-    run_name = backend.list_run_heads(
+    backend = get_backend(project)
+    run_heads = backend.list_run_heads(
         run_name=body.run_name,
         include_request_heads=body.include_request_heads,
         interrupted_job_new_status=JobStatus.PENDING,
+        repo_id=body.repo_id,
     )
-    return run_name
+    return run_heads

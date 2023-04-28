@@ -31,3 +31,4 @@ packaging
 apscheduler
 alembic
 typing-extensions
+file-read-backwards

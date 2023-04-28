@@ -4,8 +4,10 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"github.com/dstackai/dstack/runner/internal/repo"
 	"io"
 	"io/ioutil"
+	"os"
 	"path"
 	"strings"
 
@@ -172,7 +174,7 @@ func (gbackend *GCPBackend) Shutdown(ctx context.Context) error {
 }
 
 func (gbackend *GCPBackend) GetArtifact(ctx context.Context, runName, localPath, remotePath string, mount bool) artifacts.Artifacter {
-	workDir := path.Join(common.HomeDir(), consts.USER_ARTIFACTS_PATH, runName)
+	workDir := path.Join(gbackend.GetTMPDir(ctx), consts.USER_ARTIFACTS_DIR, runName)
 	return NewGCPArtifacter(gbackend.storage, workDir, localPath, remotePath)
 }
 
@@ -256,4 +258,25 @@ func (gbackend *GCPBackend) GetRepoDiff(ctx context.Context, path string) (strin
 		return "", gerrors.Wrap(err)
 	}
 	return string(diff), nil
+}
+
+func (gbackend *GCPBackend) GetRepoArchive(ctx context.Context, path, dir string) error {
+	archive, err := os.CreateTemp("", "archive-*.tar")
+	if err != nil {
+		return gerrors.Wrap(err)
+	}
+	defer os.Remove(archive.Name())
+
+	if err := gbackend.storage.downloadFile(ctx, path, archive.Name()); err != nil {
+		return gerrors.Wrap(err)
+	}
+
+	if err := repo.ExtractArchive(ctx, archive.Name(), dir); err != nil {
+		return gerrors.Wrap(err)
+	}
+	return nil
+}
+
+func (gbackend *GCPBackend) GetTMPDir(ctx context.Context) string {
+	return path.Join(common.HomeDir(), consts.TMP_DIR_PATH)
 }

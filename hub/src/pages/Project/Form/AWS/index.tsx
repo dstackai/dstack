@@ -9,7 +9,7 @@ import { useNotifications } from 'hooks';
 import { isRequestFormErrors2, isRequestFormFieldError } from 'libs';
 import { useBackendValuesMutation } from 'services/project';
 
-import { FIELD_NAMES } from './constants';
+import { FIELD_NAMES, BUCKET_HELP, CREDENTIALS_HELP, REGION_HELP, SUBNET_HELP } from './constants';
 
 import { IProps } from './types';
 
@@ -28,6 +28,8 @@ export const AWSBackend: React.FC<IProps> = ({ loading }) => {
     const [getBackendValues, { isLoading: isLoadingValues }] = useBackendValuesMutation();
 
     const requestRef = useRef<null | ReturnType<typeof getBackendValues>>(null);
+
+    const [openHelpPanel] = useHelpPanel();
 
     useEffect(() => {
         changeFormHandler().catch(console.log);
@@ -132,6 +134,7 @@ export const AWSBackend: React.FC<IProps> = ({ loading }) => {
     return (
         <SpaceBetween size="l">
             <FormInput
+                info={<InfoLink onFollow={() => openHelpPanel(CREDENTIALS_HELP)} />}
                 label={t('projects.edit.aws.access_key_id')}
                 description={t('projects.edit.aws.access_key_id_description')}
                 control={control}
@@ -143,6 +146,7 @@ export const AWSBackend: React.FC<IProps> = ({ loading }) => {
             />
 
             <FormInput
+                info={<InfoLink onFollow={() => openHelpPanel(CREDENTIALS_HELP)} />}
                 label={t('projects.edit.aws.secret_key_id')}
                 description={t('projects.edit.aws.secret_key_id_description')}
                 control={control}
@@ -154,6 +158,7 @@ export const AWSBackend: React.FC<IProps> = ({ loading }) => {
             />
 
             <FormSelect
+                info={<InfoLink onFollow={() => openHelpPanel(REGION_HELP)} />}
                 label={t('projects.edit.aws.region_name')}
                 description={t('projects.edit.aws.region_name_description')}
                 placeholder={t('projects.edit.aws.region_name_placeholder')}
@@ -167,6 +172,7 @@ export const AWSBackend: React.FC<IProps> = ({ loading }) => {
             />
 
             <FormS3BucketSelector
+                info={<InfoLink onFollow={() => openHelpPanel(BUCKET_HELP)} />}
                 label={t('projects.edit.aws.s3_bucket_name')}
                 description={t('projects.edit.aws.s3_bucket_name_description')}
                 control={control}
@@ -177,13 +183,14 @@ export const AWSBackend: React.FC<IProps> = ({ loading }) => {
                 buckets={buckets}
                 secondaryControl={renderSpinner()}
                 i18nStrings={{
-                    inContextBrowseButton: 'Browse buckets',
+                    inContextBrowseButton: 'Choose a bucket',
                     modalBreadcrumbRootItem: 'S3 buckets',
                     modalTitle: 'Choose an S3 bucket',
                 }}
             />
 
             <FormSelect
+                info={<InfoLink onFollow={() => openHelpPanel(SUBNET_HELP)} />}
                 label={t('projects.edit.aws.ec2_subnet_id')}
                 description={t('projects.edit.aws.ec2_subnet_id_description')}
                 placeholder={t('projects.edit.aws.ec2_subnet_id_placeholder')}

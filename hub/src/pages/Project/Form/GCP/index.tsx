@@ -2,13 +2,13 @@ import React, { useEffect, useRef, useState } from 'react';
 import { useFormContext } from 'react-hook-form';
 import { useTranslation } from 'react-i18next';
 
-import { FileUploader, FormS3BucketSelector, FormSelect, FormSelectOptions, SpaceBetween, Spinner } from 'components';
+import { FileUploader, FormS3BucketSelector, FormSelect, FormSelectOptions, InfoLink, SpaceBetween, Spinner } from 'components';
 
 import { useNotifications } from 'hooks';
 import { isRequestFormErrors2, isRequestFormFieldError } from 'libs';
 import { useBackendValuesMutation } from 'services/project';
 
-import { FIELD_NAMES } from './constants';
+import { FIELD_NAMES, SERVICE_ACCOUNT_HELP, AREA_HELP, REGION_HELP, ZONE_HELP, BUCKET_HELP, SUBNET_HELP } from './constants';
 
 import { IProps, VPCSubnetOption } from './types';
 
@@ -59,6 +59,8 @@ export const GCPBackend: React.FC<IProps> = ({ loading }) => {
             setFiles([file]);
         }
     }, []);
+
+    const [openHelpPanel] = useHelpPanel();
 
     const changeFormHandler = async () => {
         const backendFormValues = getValues('backend');
@@ -234,6 +236,7 @@ export const GCPBackend: React.FC<IProps> = ({ loading }) => {
         <>
             <SpaceBetween size="l">
                 <FileUploader
+                    info={<InfoLink onFollow={() => openHelpPanel(SERVICE_ACCOUNT_HELP)} />}
                     fileInputId="gcp-credentials"
                     text="Choose a file"
                     description="Upload a service account key JSON file"
@@ -265,6 +268,7 @@ export const GCPBackend: React.FC<IProps> = ({ loading }) => {
                 />
 
                 <FormSelect
+                    info={<InfoLink onFollow={() => openHelpPanel(AREA_HELP)} />}
                     label={t('projects.edit.gcp.area')}
                     description={t('projects.edit.gcp.area_description')}
                     placeholder={t('projects.edit.gcp.area_placeholder')}
@@ -278,6 +282,7 @@ export const GCPBackend: React.FC<IProps> = ({ loading }) => {
                 />
 
                 <FormSelect
+                    info={<InfoLink onFollow={() => openHelpPanel(REGION_HELP)} />}
                     label={t('projects.edit.gcp.region')}
                     description={t('projects.edit.gcp.region_description')}
                     placeholder={t('projects.edit.gcp.region_placeholder')}
@@ -291,6 +296,7 @@ export const GCPBackend: React.FC<IProps> = ({ loading }) => {
                 />
 
                 <FormSelect
+                    info={<InfoLink onFollow={() => openHelpPanel(ZONE_HELP)} />}
                     label={t('projects.edit.gcp.zone')}
                     description={t('projects.edit.gcp.zone_description')}
                     placeholder={t('projects.edit.gcp.zone_placeholder')}
@@ -304,6 +310,7 @@ export const GCPBackend: React.FC<IProps> = ({ loading }) => {
                 />
 
                 <FormS3BucketSelector
+                    info={<InfoLink onFollow={() => openHelpPanel(BUCKET_HELP)} />}
                     prefix="gs://"
                     label={t('projects.edit.gcp.bucket_name')}
                     description={t('projects.edit.gcp.bucket_name_description')}
@@ -322,6 +329,7 @@ export const GCPBackend: React.FC<IProps> = ({ loading }) => {
                 />
 
                 <FormSelect
+                    info={<InfoLink onFollow={() => openHelpPanel(SUBNET_HELP)} />}
                     label={t('projects.edit.gcp.subnet')}
                     description={t('projects.edit.gcp.subnet_description')}
                     placeholder={t('projects.edit.gcp.subnet_placeholder')}

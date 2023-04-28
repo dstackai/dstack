@@ -1,90 +1,56 @@
-import os.path
-import time
-from pathlib import Path
-from typing import Generator, List
+import json
+from datetime import datetime
+from typing import Dict, Generator, Optional
 
-from pygtail import Pygtail
+from file_read_backwards import FileReadBackwards
 
-from dstack.backend.base import jobs, runs
-from dstack.backend.base.compute import Compute
 from dstack.backend.base.logs import render_log_message
 from dstack.backend.base.storage import Storage
-from dstack.core.job import JobHead
+from dstack.backend.local.config import LocalConfig
 from dstack.core.log_event import LogEvent
-
-WAIT_N_ONCE_FINISHED = 1
-
-CHECK_STATUS_EVERY_N = 3
-
-POLL_LOGS_RATE_SECS = 1
-
-
-def events_loop(storage: Storage, compute: Compute, repo_id: str, job_heads: List[JobHead]):
-    counter = 0
-    finished_counter = 0
-    tails = {}
-
-    _jobs = [jobs.get_job(storage, repo_id, job_head.job_id) for job_head in job_heads]
-    for _job in _jobs:
-        path_dir = (
-            Path.home()
-            / ".dstack"
-            / "tmp"
-            / "runner"
-            / "configs"
-            / _job.runner_id
-            / "logs"
-            / "jobs"
-            / repo_id
-        )  # TODO Hardcode
-        file_log = f"{_job.run_name}.log"  # TODO Hardcode
-        if not path_dir.exists():
-            path_dir.mkdir(parents=True)
-            f = open(path_dir / file_log, "w")
-            f.close()
-        tails[_job.job_id] = Pygtail(
-            os.path.join(path_dir, file_log), save_on_end=False, copytruncate=False
-        )
-
-    while True:
-        if counter % CHECK_STATUS_EVERY_N == 0:
-            _jobs = [jobs.get_job(storage, repo_id, job_head.job_id) for job_head in job_heads]
-
-            for _job in _jobs:
-                for line_log in tails[_job.job_id]:
-                    yield {
-                        "message": {
-                            "source": "stdout",
-                            "log": line_log.rstrip("\n"),
-                            "job_id": _job.job_id,
-                        },
-                        "eventId": _job.runner_id,
-                        "timestamp": time.time(),
-                    }
-
-            run = next(
-                iter(runs.get_run_heads(storage, compute, _jobs, include_request_heads=False))
-            )
-            if run.status.is_finished():
-                if finished_counter == WAIT_N_ONCE_FINISHED:
-                    break
-                finished_counter += 1
-        counter = counter + 1
-        time.sleep(POLL_LOGS_RATE_SECS)
 
 
 def poll_logs(
+    backend_config: LocalConfig,
     storage: Storage,
-    compute: Compute,
     repo_id: str,
-    job_heads: List[JobHead],
-    start_time: int,
-    attached: bool,
+    run_name: str,
+    start_time: datetime,
+    end_time: Optional[datetime],
+    descending: bool,
 ) -> Generator[LogEvent, None, None]:
     jobs_cache = {}
-    try:
-        # Read log_file
-        for event in events_loop(storage, compute, repo_id, job_heads):
-            yield render_log_message(storage, event, repo_id, jobs_cache)
-    except Exception as e:
-        raise e
+    logs_filepath = (
+        backend_config.backend_dir / "logs" / "dstack" / "jobs" / repo_id / f"{run_name}.log"
+    )
+    if descending:
+        log_file = FileReadBackwards(logs_filepath)
+    else:
+        log_file = open(logs_filepath, "r")
+    found_log = False
+    with log_file as f:
+        for line in f:
+            event = _log_line_to_log_event(line)
+            if start_time <= event["timestamp"] and (
+                end_time is None or event["timestamp"] <= end_time
+            ):
+                found_log = True
+                yield render_log_message(storage, event, repo_id, jobs_cache)
+            else:
+                if found_log:
+                    break
+
+
+def _log_line_to_log_event(line: str) -> Dict:
+    log_line_dict = dict(record.split("=") for record in line.split(" "))
+    log_line_dict = {k: v.strip().strip('"') for k, v in log_line_dict.items()}
+    log_msg = json.loads(log_line_dict["msg"].encode().decode("unicode_escape"))
+    return {
+        "eventId": log_msg["event_id"],
+        "timestamp": datetime.fromisoformat(log_line_dict["time"]),
+        "message": {
+            "source": "stdout",
+            "log": log_msg["log"],
+            "job_id": log_msg["job_id"],
+        },
+    }

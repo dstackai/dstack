@@ -2,6 +2,8 @@
 title: Trigger workflows with GitHub Actions
 ---
 
+[//]: # (TODO: This tutorial must be reworked as the updated `dstack config` won't allow to configure `aws` and `gcp` directly)
+
 # Trigger workflows with GitHub Actions 
 
 This tutorial demonstrates how to use GitHub Actions to trigger `dstack` workflows on
@@ -11,7 +13,7 @@ GitHub Actions handle events, whereas `dstack` assists in provisioning the requi
 workflow, and managing artifacts.
 
 !!! info "NOTE:"
-    The source code of this tutorial is available in the [Playground](../playground.md).
+    The source code of this tutorial is available in the <a href="https://github.com/dstackai/dstack-playground#readme" target="__blank">Playground</a>.
 
 ## 1. Prerequisites
 
@@ -60,9 +62,9 @@ jobs:
 
 </div>
 
-This workflow checks the source code, installs `dstack`, [configures](../reference/cli/config.md) a remote for
-running `dstack` workflows (such as [AWS](../setup/aws.md) or [GCP](../setup/gcp.md)), [initializes](../reference/cli/init.md) `dstack` (needs `~/.ssh/id_rsa` to exist),
-and [runs](../reference/cli/run.md) the workflow.
+This workflow checks the source code, installs `dstack`, [configures](../docs/reference/cli/config.md) a remote for
+running `dstack` workflows (such as [AWS](../docs/installation/aws.md) or [GCP](../docs/installation/gcp.md)), [initializes](../docs/reference/cli/init.md) `dstack` (needs `~/.ssh/id_rsa` to exist),
+and [runs](../docs/reference/cli/run.md) the workflow.
 
 !!! info "NOTE:"
     By default, `dstack` run runs the workflow in attached mode, which means it waits for the workflow to finish and streams real-time 

@@ -6,7 +6,6 @@ import (
 	"errors"
 	"fmt"
 	"io"
-	"strings"
 	"sync"
 	"time"
 
@@ -134,7 +133,7 @@ func (l *Logger) Write(p []byte) (int, error) {
 	var err error
 	l.logCh <- LogMesage{
 		JobID:  l.jobID,
-		Log:    strings.TrimRight(string(p), "\n"),
+		Log:    string(p),
 		Source: "stdout",
 	}
 	return len(p), gerrors.Wrap(err)
