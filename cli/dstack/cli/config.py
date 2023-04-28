@@ -118,6 +118,9 @@ class CLIConfigManager:
         if len(self.config.projects) == 1:
             self.config.projects[0].default = True
 
+    def delete_project(self, name: str):
+        self.config.projects = [p for p in self.config.projects if p.name != name]
+
     def get_project_config(self, name: str) -> Optional[CLIProjectConfig]:
         for project in self.config.projects:
             if project.name == name:
