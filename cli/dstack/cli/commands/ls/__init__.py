@@ -5,7 +5,7 @@ from rich.table import Table
 
 from dstack.api.runs import RunNotFoundError, TagNotFoundError, get_tagged_run_name
 from dstack.cli.commands import BasicCommand
-from dstack.cli.common import check_backend, check_config, check_git, check_init, console
+from dstack.cli.common import check_init, console
 from dstack.cli.config import get_hub_client
 from dstack.utils.common import sizeof_fmt
 
@@ -46,9 +46,6 @@ class LsCommand(BasicCommand):
             "-t", "--total", help="Show total folder size", action="store_true"
         )
 
-    @check_config
-    @check_git
-    @check_backend
     @check_init
     def _command(self, args: Namespace):
         table = Table(box=None)

@@ -3,7 +3,7 @@ from argparse import Namespace
 from rich.prompt import Confirm
 
 from dstack.cli.commands import BasicCommand
-from dstack.cli.common import check_backend, check_config, check_git, check_init, console
+from dstack.cli.common import check_init, console
 from dstack.cli.config import get_hub_client
 
 
@@ -49,9 +49,6 @@ class StopCommand(BasicCommand):
             "-y", "--yes", help="Don't ask for confirmation", action="store_true"
         )
 
-    @check_config
-    @check_git
-    @check_backend
     @check_init
     def _command(self, args: Namespace):
         if not args.run_name and not args.all:

@@ -3,7 +3,6 @@ from typing import List, Tuple
 
 from fastapi import APIRouter, Body, Depends, HTTPException, status
 
-from dstack.core.error import HubConfigError
 from dstack.hub.db.models import Project, User
 from dstack.hub.models import (
     Member,
@@ -23,7 +22,7 @@ from dstack.hub.security.permissions import (
     ensure_user_project_admin,
 )
 from dstack.hub.services.backends import get_configurator
-from dstack.hub.services.backends.base import Configurator
+from dstack.hub.services.backends.base import BackendConfigError, Configurator
 
 router = APIRouter(prefix="/api/projects", tags=["project"])
 
@@ -38,7 +37,7 @@ async def get_backend_config_values(
         result = await asyncio.get_running_loop().run_in_executor(
             None, configurator.configure_hub, config.__root__.dict()
         )
-    except HubConfigError as e:
+    except BackendConfigError as e:
         _error_response_on_config_error(e, path_to_config=[])
     return result
 
@@ -69,7 +68,7 @@ async def create_project(
         await asyncio.get_running_loop().run_in_executor(
             None, configurator.configure_hub, project_info.backend.__root__.dict()
         )
-    except HubConfigError as e:
+    except BackendConfigError as e:
         _error_response_on_config_error(e, path_to_config=["backend"])
     await ProjectManager.create_project_from_info(user=user, project_info=project_info)
     return project_info
@@ -122,7 +121,7 @@ async def update_project(
         await asyncio.get_running_loop().run_in_executor(
             None, configurator.configure_hub, project_info.backend.__root__.dict()
         )
-    except HubConfigError as e:
+    except BackendConfigError as e:
         _error_response_on_config_error(e, path_to_config=["backend"])
     await ProjectManager.update_project_from_info(project_info)
     clear_backend_cache(project_info.project_name)
@@ -139,7 +138,7 @@ def _get_backend_configurator(backend_type: str) -> Configurator:
     return configurator
 
 
-def _error_response_on_config_error(e: HubConfigError, path_to_config: List[str]):
+def _error_response_on_config_error(e: BackendConfigError, path_to_config: List[str]):
     if len(e.fields) > 0:
         error_details = [
             error_detail(e.message, code=e.code, loc=path_to_config + [f]) for f in e.fields

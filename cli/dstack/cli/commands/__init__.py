@@ -3,6 +3,7 @@ from argparse import Namespace, _SubParsersAction
 
 from rich_argparse import RichHelpFormatter
 
+from dstack.cli.common import check_cli_errors
 from dstack.cli.updates import check_for_updates
 
 
@@ -38,6 +39,7 @@ class BasicCommand(object):
     def register(self):
         ...
 
+    @check_cli_errors
     def __command(self, args: Namespace):
         check_for_updates()
         self._command(args)

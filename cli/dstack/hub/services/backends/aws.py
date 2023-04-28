@@ -5,7 +5,6 @@ from boto3.session import Session
 
 from dstack.backend.aws.config import AWSConfig
 from dstack.backend.base.config import BackendConfig
-from dstack.core.error import HubConfigError
 from dstack.hub.models import (
     AWSBucketProjectElement,
     AWSBucketProjectElementValue,
@@ -13,7 +12,7 @@ from dstack.hub.models import (
     ProjectElement,
     ProjectElementValue,
 )
-from dstack.hub.services.backends.base import Configurator
+from dstack.hub.services.backends.base import BackendConfigError, Configurator
 
 regions = [
     ("US East, N. Virginia", "us-east-1"),
@@ -44,7 +43,7 @@ class AWSConfigurator(Configurator):
         config = AWSConfig.deserialize(config_data)
 
         if config.region_name is not None and config.region_name not in {r[1] for r in regions}:
-            raise HubConfigError(f"Invalid AWS region {config.region_name}")
+            raise BackendConfigError(f"Invalid AWS region {config.region_name}")
 
         try:
             session = Session(
@@ -55,7 +54,7 @@ class AWSConfigurator(Configurator):
             sts = session.client("sts")
             sts.get_caller_identity()
         except botocore.exceptions.ClientError:
-            raise HubConfigError(
+            raise BackendConfigError(
                 "Credentials are not valid",
                 code="invalid_credentials",
                 fields=["access_key", "secret_key"],
@@ -102,7 +101,7 @@ class AWSConfigurator(Configurator):
             response = s3_client.head_bucket(Bucket=bucket_name)
             bucket_region = response["ResponseMetadata"]["HTTPHeaders"]["x-amz-bucket-region"]
             if bucket_region.lower() != region:
-                raise HubConfigError(
+                raise BackendConfigError(
                     "The bucket belongs to another AWS region",
                     code="invalid_bucket",
                     fields=["s3_bucket_name"],
@@ -113,7 +112,7 @@ class AWSConfigurator(Configurator):
                 and e.response.get("Error")
                 and e.response["Error"].get("Code") in ["404", "403"]
             ):
-                raise HubConfigError(
+                raise BackendConfigError(
                     f"The bucket {bucket_name} does not exist",
                     code="invalid_bucket",
                     fields=["s3_bucket_name"],

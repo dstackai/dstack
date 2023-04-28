@@ -30,6 +30,9 @@ class Member(BaseModel):
     project_role: ProjectRole
 
 
+BackendType = Union[Literal["local"], Literal["aws"], Literal["gcp"]]
+
+
 class LocalProjectConfig(BaseModel):
     type: Literal["local"] = "local"
 

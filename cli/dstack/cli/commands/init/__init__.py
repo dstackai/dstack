@@ -7,7 +7,7 @@ from git.exc import InvalidGitRepositoryError
 
 from dstack.api.repos import get_local_repo_credentials
 from dstack.cli.commands import BasicCommand
-from dstack.cli.common import check_backend, check_config, check_git, check_init, console
+from dstack.cli.common import console
 from dstack.cli.config import config, get_hub_client
 from dstack.core.repo import LocalRepo, RemoteRepo
 from dstack.core.userconfig import RepoUserConfig
@@ -51,10 +51,6 @@ class InitCommand(BasicCommand):
         )
         self._parser.add_argument("--local", action="store_true", help="Do not use git")
 
-    @check_config
-    @check_git
-    @check_backend
-    @check_init
     def _command(self, args: Namespace):
         try:
             if args.local:  # force fallback to LocalRepo

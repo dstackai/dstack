@@ -1,6 +1,7 @@
 import argparse
 import sys
 import time
+import urllib.parse
 from datetime import datetime
 from pathlib import Path
 from typing import Any, Dict, Generator, List, Optional, Tuple
@@ -9,6 +10,7 @@ from dstack import providers
 from dstack.api.hub._api_client import HubAPIClient
 from dstack.api.hub._config import HubClientConfig
 from dstack.api.hub._storage import HUBStorage
+from dstack.api.hub.errors import HubClientError
 from dstack.api.repos import get_local_repo_credentials
 from dstack.backend.base import artifacts as base_artifacts
 from dstack.core.artifact import Artifact
@@ -48,9 +50,16 @@ class HubClient:
 
     @staticmethod
     def validate_config(config: HubClientConfig, project: str):
-        HubAPIClient(
+        project_info = HubAPIClient(
             url=config.url, token=config.token, project=project, repo=None
         ).get_project_info()
+        if project_info.backend.__root__.type == "local":
+            hostname = urllib.parse.urlparse(config.url).hostname
+            if hostname not in ["localhost", "127.0.0.1"]:
+                raise HubClientError(
+                    "Projects with local backend hosted on remote Hub are not yet supported. "
+                    "Consider starting Hub locally if you need to use local backend."
+                )
 
     def get_project_backend_type(self) -> str:
         return self._get_project_info().backend.__root__.type

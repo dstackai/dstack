@@ -7,7 +7,7 @@ from pathlib import Path
 from dstack.api.hub import HubClient
 from dstack.api.runs import RunNotFoundError, TagNotFoundError, get_tagged_run_name
 from dstack.cli.commands import BasicCommand
-from dstack.cli.common import check_backend, check_config, check_git, check_init, console
+from dstack.cli.common import check_init, console
 from dstack.cli.config import get_hub_client
 from dstack.utils.common import get_dstack_dir
 
@@ -45,9 +45,6 @@ class CpCommand(BasicCommand):
             help="A local path to download artifact file or directory into",
         )
 
-    @check_config
-    @check_git
-    @check_backend
     @check_init
     def _command(self, args: Namespace):
         hub_client = get_hub_client(project_name=args.project)
