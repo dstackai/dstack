@@ -81,6 +81,7 @@ export const UserForm: React.FC<Props> = ({
                             {!isEditing && (
                                 <FormInput
                                     label={t('users.user_name')}
+                                    description={t('users.user_name_description')}
                                     control={control}
                                     name="user_name"
                                     disabled={loading}
@@ -97,6 +98,7 @@ export const UserForm: React.FC<Props> = ({
 
                             <FormSelect
                                 label={t('users.global_role')}
+                                description={t('users.global_role_description')}
                                 control={control}
                                 name="global_role"
                                 options={roleSelectOptions}
@@ -105,7 +107,7 @@ export const UserForm: React.FC<Props> = ({
                         </ColumnLayout>
 
                         {initialValues && (
-                            <FormField label={t('users.token')}>
+                            <FormField label={t('users.token')} description={t('users.token_description')}>
                                 <Box margin={{ right: 'xxs' }} display="inline-block">
                                     <Popover
                                         dismissButton={false}

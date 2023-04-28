@@ -51,13 +51,13 @@
     },
     "backend_type": {
       "aws": "AWS",
-      "aws_description": "Amazon Web Services",
+      "aws_description": "Run workflows and store data in Amazon Web Services ",
       "gcp": "GCP",
-      "gcp_description": "Google Cloud Platform",
+      "gcp_description": "Run workflows and store data in Google Cloud Platform",
       "azure": "Azure",
-      "azure_description": "Microsoft Azure",
+      "azure_description": "Run workflows and store data in Microsoft Azure",
       "local": "Local",
-      "local_description": "Local backend"
+      "local_description": "Run workflows and store data locally via Docker"
     },
     "edit": {
       "general": "General",
@@ -66,7 +66,7 @@
       "project_name_description": "Only latin characters, dashes, underscores, and digits",
       "backend": "Backend",
       "backend_type": "Type",
-      "backend_type_description": "Select the compute and storage provider",
+      "backend_type_description": "Select a backend type",
       "members_empty_message_title": "No members",
       "members_empty_message_text": "Select project's members",
       "cli": "CLI",
@@ -87,11 +87,11 @@
         "ec2_subnet_id": "Subnet"
       },
       "gcp": {
-        "credentials": "Credentials",
+        "credentials": "Service account",
         "credentials_description": "Credentials description",
         "credentials_placeholder": "Credentials placeholder",
-        "area": "Area",
-        "area_description": "Select a geographical area to run workflows and store artifacts",
+        "area": "Location",
+        "area_description": "Select a location to run workflows and store artifacts",
         "area_placeholder": "Not selected",
         "region": "Region",
         "region_description": "Select a region to run workflows and store artifacts",
@@ -157,7 +157,10 @@
     "nomatch_message_title": "No matches",
     "nomatch_message_text": "We can't find a match.",
     "user_name": "User name",
+    "user_name_description": "Only latin characters, dashes, underscores, and digits",
+    "global_role_description": "Whether the user is an administrator or not",
     "token": "Token",
+    "token_description": "The personal access token used for authentication",
     "global_role": "Global role",
     "account_settings": "Account settings",
     "create": {

@@ -8,7 +8,7 @@ import { useHelpPanel, useNotifications } from 'hooks';
 import { isRequestFormErrors2, isRequestFormFieldError } from 'libs';
 
 import { AWSBackend } from './AWS';
-import { PROJECT_NAME_HELP } from './constants';
+import { BACKEND_TYPE_HELP } from './constants';
 import { GCPBackend } from './GCP';
 
 import { IProps, TBackendOption } from './types';
@@ -130,7 +130,6 @@ export const ProjectForm: React.FC<IProps> = ({ initialValues, onCancel, loading
                             <Container header={<Header variant="h2">{t('projects.edit.general')}</Header>}>
                                 <SpaceBetween size="l">
                                     <FormInput
-                                        info={<InfoLink onFollow={() => openHelpPanel(PROJECT_NAME_HELP)} />}
                                         label={t('projects.edit.project_name')}
                                         description={t('projects.edit.project_name_description')}
                                         control={control}
@@ -151,6 +150,7 @@ export const ProjectForm: React.FC<IProps> = ({ initialValues, onCancel, loading
 
                         <Container header={<Header variant="h2">{t('projects.edit.backend')}</Header>}>
                             <FormField
+                                info={<InfoLink onFollow={() => openHelpPanel(BACKEND_TYPE_HELP)} />}
                                 label={t('projects.edit.backend_type')}
                                 description={t('projects.edit.backend_type_description')}
                             />
