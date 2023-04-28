@@ -54,6 +54,12 @@ class RunCommand(BasicCommand):
             nargs="?",
         )
         self._parser.add_argument(
+            "--project",
+            type=str,
+            help="Hub project to execute the command",
+            default=None,
+        )
+        self._parser.add_argument(
             "-t",
             "--tag",
             metavar="TAG",
@@ -80,7 +86,7 @@ class RunCommand(BasicCommand):
             self._parser.print_help()
             exit(1)
         try:
-            hub_client = get_hub_client()
+            hub_client = get_hub_client(project_name=args.project)
             if not hub_client.get_repo_credentials():
                 raise RepoNotInitializedError("No credentials")
 
