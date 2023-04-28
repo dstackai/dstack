@@ -69,7 +69,7 @@ setup(
         "rich",
         "rich-argparse",
         "fastapi",
-        "starlette",
+        "starlette>=0.26.0",
         "uvicorn",
         "pydantic",
         "sqlalchemy[asyncio]>=2.0.0",

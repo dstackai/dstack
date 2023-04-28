@@ -18,7 +18,6 @@ from dstack.hub.models import (
     JobHeadList,
     JobsGet,
     JobsList,
-    LinkUpload,
     PollLogs,
     ProjectInfo,
     ReposUpdate,
@@ -26,6 +25,7 @@ from dstack.hub.models import (
     SaveRepoCredentials,
     SecretAddUpdate,
     StopRunners,
+    StorageLink,
 )
 
 
@@ -569,7 +569,7 @@ class HubAPIClient:
             host=self.url,
             url=url,
             headers=self._headers(),
-            data=LinkUpload(object_key=dest_path).json(),
+            data=StorageLink(object_key=dest_path).json(),
         )
         if resp.ok:
             return resp.text
@@ -586,7 +586,7 @@ class HubAPIClient:
             host=self.url,
             url=url,
             headers=self._headers(),
-            data=LinkUpload(object_key=dest_path).json(),
+            data=StorageLink(object_key=dest_path).json(),
         )
         if resp.ok:
             return resp.text
