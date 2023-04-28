@@ -6,7 +6,7 @@ from rich.table import Table
 from rich_argparse import RichHelpFormatter
 
 from dstack.cli.commands import BasicCommand
-from dstack.cli.common import check_backend, check_config, check_git, check_init, console
+from dstack.cli.common import check_init, console
 from dstack.cli.config import get_hub_client
 from dstack.core.error import BackendError
 from dstack.utils.common import pretty_date
@@ -62,9 +62,6 @@ class TAGCommand(BasicCommand):
         )
         delete_tags_parser.set_defaults(func=self.delete_tag)
 
-    @check_config
-    @check_git
-    @check_backend
     @check_init
     def _command(self, args: Namespace):
         table = Table(box=None)
@@ -86,9 +83,6 @@ class TAGCommand(BasicCommand):
             )
         console.print(table)
 
-    @check_config
-    @check_git
-    @check_backend
     @check_init
     def add_tag(self, args: Namespace):
         if not args.run_name and not args.artifact_paths:
@@ -121,9 +115,6 @@ class TAGCommand(BasicCommand):
                 exit(1)
         print(f"[grey58]OK[/]")
 
-    @check_config
-    @check_git
-    @check_backend
     @check_init
     def delete_tag(self, args: Namespace):
         hub_client = get_hub_client(project_name=args.project)

@@ -7,7 +7,7 @@ from pkgutil import iter_modules
 from typing import Any, Dict, List, Optional, Union
 
 from dstack.core.cache import CacheSpec
-from dstack.core.error import NotInitializedError
+from dstack.core.error import RepoNotInitializedError
 from dstack.core.job import (
     ArtifactSpec,
     DepSpec,
@@ -144,7 +144,7 @@ class Provider:
             if self.openssh_server or (
                 hub_client.get_project_backend_type() != "local" and not args.detach
             ):
-                raise NotInitializedError("No valid SSH identity")
+                raise RepoNotInitializedError("No valid SSH identity")
         self._inject_context()
         self.dep_specs = self._dep_specs(hub_client)
         self.cache_specs = self._cache_specs()

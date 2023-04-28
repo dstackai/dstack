@@ -5,14 +5,7 @@ from rich.live import Live
 
 from dstack.api.runs import list_runs
 from dstack.cli.commands import BasicCommand
-from dstack.cli.common import (
-    check_backend,
-    check_config,
-    check_git,
-    check_init,
-    generate_runs_table,
-    print_runs,
-)
+from dstack.cli.common import check_init, generate_runs_table, print_runs
 from dstack.cli.config import get_hub_client
 
 LIVE_PROVISION_INTERVAL_SECS = 2
@@ -57,9 +50,6 @@ class PSCommand(BasicCommand):
             action="store_true",
         )
 
-    @check_config
-    @check_git
-    @check_backend
     @check_init
     def _command(self, args: Namespace):
         hub_client = get_hub_client(project_name=args.project)

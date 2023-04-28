@@ -2,7 +2,7 @@ import sys
 from argparse import Namespace
 
 from dstack.cli.commands import BasicCommand
-from dstack.cli.common import check_backend, check_config, check_git, check_init, console
+from dstack.cli.common import check_init, console
 from dstack.cli.config import get_hub_client
 from dstack.utils.common import since
 
@@ -42,9 +42,6 @@ class LogCommand(BasicCommand):
             default="1d",
         )
 
-    @check_config
-    @check_git
-    @check_backend
     @check_init
     def _command(self, args: Namespace):
         hub_client = get_hub_client(project_name=args.project)

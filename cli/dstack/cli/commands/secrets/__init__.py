@@ -5,7 +5,7 @@ from rich.table import Table
 from rich_argparse import RichHelpFormatter
 
 from dstack.cli.commands import BasicCommand
-from dstack.cli.common import check_backend, check_config, check_git, check_init, console
+from dstack.cli.common import check_init, console
 from dstack.cli.config import get_hub_client
 from dstack.core.secret import Secret
 
@@ -66,9 +66,6 @@ class SecretCommand(BasicCommand):
         )
         delete_secrets_parser.set_defaults(func=self.delete_secret)
 
-    @check_config
-    @check_git
-    @check_backend
     @check_init
     def add_secret(self, args: Namespace):
         hub_client = get_hub_client(project_name=args.project)
@@ -88,9 +85,6 @@ class SecretCommand(BasicCommand):
             hub_client.add_secret(Secret(secret_name=args.secret_name, secret_value=secret_value))
             console.print(f"[grey58]OK[/]")
 
-    @check_config
-    @check_git
-    @check_backend
     @check_init
     def update_secret(self, args: Namespace):
         hub_client = get_hub_client(project_name=args.project)
@@ -102,9 +96,6 @@ class SecretCommand(BasicCommand):
         hub_client.update_secret(Secret(secret_name=args.secret_name, secret_value=secret_value))
         console.print(f"[grey58]OK[/]")
 
-    @check_config
-    @check_git
-    @check_backend
     @check_init
     def delete_secret(self, args: Namespace):
         hub_client = get_hub_client(project_name=args.project)
@@ -115,9 +106,6 @@ class SecretCommand(BasicCommand):
             hub_client.delete_secret(secret.secret_name)
             console.print(f"[grey58]OK[/]")
 
-    @check_config
-    @check_git
-    @check_backend
     @check_init
     def _command(self, args: Namespace):
         table = Table(box=None)

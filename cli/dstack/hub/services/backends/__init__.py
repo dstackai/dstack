@@ -1,4 +1,4 @@
-from typing import Optional
+from typing import List, Optional
 
 from dstack.hub.services.backends.aws import AWSConfigurator
 from dstack.hub.services.backends.base import Configurator

@@ -7,7 +7,8 @@ import yaml
 from pydantic import BaseModel, ValidationError
 
 from dstack.api.hub import HubClient, HubClientConfig
-from dstack.core.error import ConfigError, NotInitializedError
+from dstack.cli.errors import CLIError
+from dstack.core.error import RepoNotInitializedError
 from dstack.core.repo.remote import RemoteRepo
 from dstack.core.userconfig import RepoUserConfig
 from dstack.utils.common import get_dstack_dir
@@ -38,7 +39,7 @@ class ConfigManager:
         try:
             return self._cached_read(self.repo_user_config_path(), RepoUserConfig)
         except FileNotFoundError:
-            raise NotInitializedError("No repo user config found")
+            raise RepoNotInitializedError("No repo user config found")
 
     def save_repo_user_config(self, value: RepoUserConfig):
         self._cached_write(self.repo_user_config_path(), value, mkdir=True)
@@ -140,11 +141,11 @@ def get_hub_client(project_name: Optional[str] = None) -> HubClient:
     if project_name is not None:
         project_config = cli_config_manager.get_project_config(project_name)
         if project_config is None:
-            raise ConfigError(f"Project '{project_name}' not configured. Call `dstack config`.")
+            raise CLIError(f"Project '{project_name}' not configured. Call `dstack config`.")
     else:
         project_config = cli_config_manager.get_default_project_config()
         if project_config is None:
-            raise ConfigError(f"No default project configured. Call `dstack config`.")
+            raise CLIError(f"No default project configured. Call `dstack config`.")
     repo = RemoteRepo(repo_ref=config.repo_user_config.repo_ref, local_repo_dir=os.getcwd())
     hub_client_config = HubClientConfig(url=project_config.url, token=project_config.token)
     hub_client = HubClient(config=hub_client_config, project=project_config.name, repo=repo)
