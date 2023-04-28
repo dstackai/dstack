@@ -19,18 +19,10 @@ from dstack.api.runs import list_runs
 from dstack.backend.base.logs import fix_urls
 from dstack.cli.commands import BasicCommand
 from dstack.cli.commands.run.ssh_tunnel import allocate_local_ports, run_ssh_tunnel
-from dstack.cli.common import (
-    check_backend,
-    check_config,
-    check_git,
-    check_init,
-    console,
-    print_runs,
-)
+from dstack.cli.common import check_init, console, print_runs
 from dstack.cli.config import config, get_hub_client
-from dstack.core.error import NameNotFoundError, NotInitializedError
+from dstack.core.error import NameNotFoundError, RepoNotInitializedError
 from dstack.core.job import Job, JobHead, JobStatus
-from dstack.core.repo import RemoteRepo
 from dstack.core.request import RequestStatus
 from dstack.utils.workflows import load_workflows
 
@@ -82,9 +74,6 @@ class RunCommand(BasicCommand):
             help="Override workflow or provider arguments",
         )
 
-    @check_config
-    @check_git
-    @check_backend
     @check_init
     def _command(self, args: Namespace):
         if not args.workflow_or_provider:
@@ -93,7 +82,7 @@ class RunCommand(BasicCommand):
         try:
             hub_client = get_hub_client()
             if not hub_client.get_repo_credentials():
-                raise NotInitializedError("No credentials")
+                raise RepoNotInitializedError("No credentials")
 
             if not config.repo_user_config.ssh_key_path:
                 ssh_pub_key = None

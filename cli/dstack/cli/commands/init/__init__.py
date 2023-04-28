@@ -6,7 +6,7 @@ import giturlparse
 
 from dstack.api.repos import get_local_repo_credentials
 from dstack.cli.commands import BasicCommand
-from dstack.cli.common import check_backend, check_config, check_git, check_init, console
+from dstack.cli.common import console
 from dstack.cli.config import config, get_hub_client
 from dstack.core.repo import RemoteRepo
 from dstack.core.userconfig import RepoUserConfig
@@ -49,10 +49,6 @@ class InitCommand(BasicCommand):
             dest="ssh_identity_file",
         )
 
-    @check_config
-    @check_git
-    @check_backend
-    @check_init
     def _command(self, args: Namespace):
         repo = RemoteRepo(local_repo_dir=Path.cwd())
         repo_credentials = get_local_repo_credentials(

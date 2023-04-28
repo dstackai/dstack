@@ -2,7 +2,7 @@ import argparse
 
 from dstack.api.hub import HubClient
 from dstack.cli.commands import BasicCommand
-from dstack.cli.common import check_backend, check_config, check_git, check_init, console
+from dstack.cli.common import check_init, console
 from dstack.cli.config import get_hub_client
 
 
@@ -28,9 +28,6 @@ class PruneCommand(BasicCommand):
         )
         cache_cmd.set_defaults(prune_action=self.prune_cache)
 
-    @check_config
-    @check_git
-    @check_backend
     @check_init
     def _command(self, args: argparse.Namespace):
         hub_client = get_hub_client(project_name=args.project)
