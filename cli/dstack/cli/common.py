@@ -1,76 +1,17 @@
-import os
-from importlib.util import find_spec
-from typing import List, Optional
+from typing import List
 
-from git import InvalidGitRepositoryError
 from rich.console import Console
-from rich.prompt import Prompt
 from rich.table import Table
 
-from dstack.core.error import BackendError, ConfigError, NotInitializedError
+from dstack.api.hub.errors import HubClientError
+from dstack.cli.errors import CLIError
+from dstack.core.error import RepoNotInitializedError
 from dstack.core.job import JobErrorCode, JobStatus
 from dstack.core.request import RequestStatus
 from dstack.core.run import RunHead
 from dstack.utils.common import pretty_date
 
-is_termios_available = find_spec("termios") is not None
-
-
 console = Console()
-
-
-def ask_choice(
-    title: str,
-    labels: List[str],
-    values: List[str],
-    selected_value: Optional[str],
-    show_choices: Optional[bool] = None,
-) -> str:
-    if selected_value not in values:
-        selected_value = None
-    if is_termios_available:
-        from simple_term_menu import TerminalMenu
-
-        console.print(
-            f"[sea_green3 bold]?[/sea_green3 bold] [bold]{title}[/bold] "
-            "[gray46]Use arrows to move, type to filter[/gray46]"
-        )
-        try:
-            cursor_index = values.index(selected_value) if selected_value else None
-        except ValueError:
-            cursor_index = None
-        terminal_menu = TerminalMenu(
-            menu_entries=labels,
-            menu_cursor_style=["fg_red", "bold"],
-            menu_highlight_style=["fg_red", "bold"],
-            search_key=None,
-            search_highlight_style=["fg_purple"],
-            cursor_index=cursor_index,
-            raise_error_on_interrupt=True,
-        )
-        chosen_menu_index = terminal_menu.show()
-        chosen_menu_label = labels[chosen_menu_index].replace("[", "\\[")
-        console.print(f"[sea_green3 bold]✓[/sea_green3 bold] [grey74]{chosen_menu_label}[/grey74]")
-        return values[chosen_menu_index]
-    else:
-        if len(values) < 10 and show_choices is None or show_choices is True:
-            return Prompt.ask(
-                prompt=f"[sea_green3 bold]?[/sea_green3 bold] [bold]{title}[/bold]",
-                choices=values,
-                default=selected_value,
-            )
-        else:
-            value = Prompt.ask(
-                prompt=f"[sea_green3 bold]?[/sea_green3 bold] [bold]{title}[/bold]",
-                default=selected_value,
-            )
-            if value in values:
-                return value
-            else:
-                console.print(
-                    f"[red]Please select one of the available options: \\[{', '.join(values)}][/red]"
-                )
-                return ask_choice(title, labels, values, selected_value, show_choices)
 
 
 def print_runs(runs: List[RunHead], verbose: bool = False):
@@ -156,45 +97,23 @@ def _pretty_print_error_code(run: RunHead) -> str:
     return ""
 
 
-def check_config(func):
-    def decorator(*args, **kwargs):
-        try:
-            func(*args, **kwargs)
-        except ConfigError as e:
-            console.print(e.message)
-            exit(1)
-
-    return decorator
-
-
-def check_git(func):
-    def decorator(*args, **kwargs):
-        try:
-            func(*args, **kwargs)
-        except InvalidGitRepositoryError:
-            console.print(f"{os.getcwd()} is not a Git repo")
-            exit(1)
-
-    return decorator
-
-
-def check_backend(func):
-    def decorator(*args, **kwargs):
-        try:
-            func(*args, **kwargs)
-        except BackendError as e:
-            console.print(e.message)
-            exit(1)
-
-    return decorator
-
-
 def check_init(func):
     def decorator(*args, **kwargs):
         try:
             func(*args, **kwargs)
-        except NotInitializedError:
+        except RepoNotInitializedError:
             console.print(f"The repository is not initialized. Call `dstack init` first.")
+            exit(1)
+
+    return decorator
+
+
+def check_cli_errors(func):
+    def decorator(*args, **kwargs):
+        try:
+            func(*args, **kwargs)
+        except (CLIError, HubClientError) as e:
+            console.print(e.message)
             exit(1)
 
     return decorator
