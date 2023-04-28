@@ -1,4 +1,5 @@
 import json
+import re
 from typing import List, Optional
 
 from dstack.backend.base.secrets import SecretsManager
@@ -12,6 +13,9 @@ from dstack.core.repo import (
     RepoSpec,
 )
 from dstack.utils.escape import Escaper
+
+# repo_id, last_run_at, tags_count, repo_type, repo_info
+repo_head_re = re.compile(r"([^;]+);(\d+);(\d+);(remote|local);(.*)")
 
 
 def list_repo_heads(storage: Storage) -> List[RepoHead]:
@@ -115,13 +119,10 @@ def _get_repo_head_filename_prefix(repo_id: str) -> str:
 
 def _parse_repo_head_filename(repo_head_filepath: str) -> Optional[RepoHead]:
     repo_heads_prefix = _get_repo_heads_prefix()
-    try:
-        repo_id, last_run_at, tags_count, repo_type, repo_info = repo_head_filepath[
-            len(repo_heads_prefix) :
-        ].split(";")
-    except ValueError:
-        # Legacy repo head
-        return None
+    r = repo_head_re.search(repo_head_filepath[len(repo_heads_prefix) :])
+    if r is None:
+        return r
+    repo_id, last_run_at, tags_count, repo_type, repo_info = r.groups()
 
     if repo_type == "remote":
         repo_host_name, repo_port, repo_user_name, repo_name = repo_info.split(",")
