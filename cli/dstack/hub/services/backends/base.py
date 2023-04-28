@@ -1,7 +1,7 @@
 from abc import ABC, abstractmethod
 from typing import Dict
 
-from dstack.core.config import BackendConfig
+from dstack.backend.base.config import BackendConfig
 from dstack.hub.models import ProjectValues
 
 

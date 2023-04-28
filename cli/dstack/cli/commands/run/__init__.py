@@ -27,7 +27,7 @@ from dstack.cli.common import (
     console,
     print_runs,
 )
-from dstack.cli.config import config
+from dstack.cli.config import config, get_hub_client
 from dstack.core.error import NameNotFoundError, NotInitializedError
 from dstack.core.job import Job, JobHead, JobStatus
 from dstack.core.repo import RemoteRepo
@@ -91,11 +91,7 @@ class RunCommand(BasicCommand):
             self._parser.print_help()
             exit(1)
         try:
-            repo = RemoteRepo(
-                repo_ref=config.repo_user_config.repo_ref, local_repo_dir=os.getcwd()
-            )
-            hub_client = HubClient(repo=repo)
-
+            hub_client = get_hub_client()
             if not hub_client.get_repo_credentials():
                 raise NotInitializedError("No credentials")
 

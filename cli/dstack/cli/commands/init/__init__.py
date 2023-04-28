@@ -4,11 +4,10 @@ from typing import Optional
 
 import giturlparse
 
-from dstack.api.hub import HubClient
 from dstack.api.repos import get_local_repo_credentials
 from dstack.cli.commands import BasicCommand
 from dstack.cli.common import check_backend, check_config, check_git, check_init, console
-from dstack.cli.config import config
+from dstack.cli.config import config, get_hub_client
 from dstack.core.repo import RemoteRepo
 from dstack.core.userconfig import RepoUserConfig
 
@@ -21,6 +20,12 @@ class InitCommand(BasicCommand):
         super(InitCommand, self).__init__(parser)
 
     def register(self):
+        self._parser.add_argument(
+            "--project",
+            type=str,
+            help="Hub project to execute the command",
+            default=None,
+        )
         self._parser.add_argument(
             "-t",
             "--token",
@@ -63,7 +68,7 @@ class InitCommand(BasicCommand):
                 ssh_key_path=get_ssh_keypair(args.ssh_identity_file),
             )
         )
-        hub_client = HubClient(repo=repo)
+        hub_client = get_hub_client(project_name=args.project)
         hub_client.save_repo_credentials(repo_credentials)
         status = (
             "[yellow]WARNING[/]"

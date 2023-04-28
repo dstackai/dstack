@@ -1,11 +1,9 @@
 import argparse
-import os
 
 from dstack.api.hub import HubClient
 from dstack.cli.commands import BasicCommand
 from dstack.cli.common import check_backend, check_config, check_git, check_init, console
-from dstack.cli.config import config
-from dstack.core.repo import RemoteRepo
+from dstack.cli.config import get_hub_client
 
 
 class PruneCommand(BasicCommand):
@@ -17,8 +15,13 @@ class PruneCommand(BasicCommand):
 
     def register(self):
         self._parser: argparse.ArgumentParser
+        self._parser.add_argument(
+            "--project",
+            type=str,
+            help="Hub project to execute the command",
+            default=None,
+        )
         subparsers = self._parser.add_subparsers(title="entities", dest="entity", required=True)
-
         cache_cmd = subparsers.add_parser("cache", help="Workflow cache")
         cache_cmd.add_argument(
             "workflow", metavar="WORKFLOW", help="A workflow name to prune cache"
@@ -30,8 +33,7 @@ class PruneCommand(BasicCommand):
     @check_backend
     @check_init
     def _command(self, args: argparse.Namespace):
-        repo = RemoteRepo(repo_ref=config.repo_user_config.repo_ref, local_repo_dir=os.getcwd())
-        hub_client = HubClient(repo=repo)
+        hub_client = get_hub_client(project_name=args.project)
         args.prune_action(args, hub_client)
 
     @staticmethod

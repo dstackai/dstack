@@ -1,7 +1,7 @@
 import os
 from typing import Dict, Optional
 
-from dstack.core.config import BackendConfig
+from dstack.backend.base.config import BackendConfig
 
 _DEFAULT_REGION_NAME = "us-east-1"
 

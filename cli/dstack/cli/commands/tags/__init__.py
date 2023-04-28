@@ -1,4 +1,3 @@
-import os
 from argparse import Namespace
 
 from rich import print
@@ -6,12 +5,10 @@ from rich.prompt import Confirm
 from rich.table import Table
 from rich_argparse import RichHelpFormatter
 
-from dstack.api.hub import HubClient
 from dstack.cli.commands import BasicCommand
 from dstack.cli.common import check_backend, check_config, check_git, check_init, console
-from dstack.cli.config import config
+from dstack.cli.config import get_hub_client
 from dstack.core.error import BackendError
-from dstack.core.repo import RemoteRepo
 from dstack.utils.common import pretty_date
 
 
@@ -23,6 +20,12 @@ class TAGCommand(BasicCommand):
         super(TAGCommand, self).__init__(parser)
 
     def register(self):
+        self._parser.add_argument(
+            "--project",
+            type=str,
+            help="Hub project to execute the command",
+            default=None,
+        )
         subparsers = self._parser.add_subparsers()
 
         add_tags_parser = subparsers.add_parser(
@@ -71,8 +74,7 @@ class TAGCommand(BasicCommand):
         table.add_column("OWNER", style="grey58", no_wrap=True, max_width=16)
         table.add_column("BACKENDS", style="bold green", no_wrap=True)
 
-        repo = RemoteRepo(repo_ref=config.repo_user_config.repo_ref, local_repo_dir=os.getcwd())
-        hub_client = HubClient(repo=repo)
+        hub_client = get_hub_client(project_name=args.project)
         tag_heads = hub_client.list_tag_heads()
         for tag_head in tag_heads:
             created_at = pretty_date(round(tag_head.created_at / 1000))
@@ -92,8 +94,7 @@ class TAGCommand(BasicCommand):
         if not args.run_name and not args.artifact_paths:
             console.print("Specify -r RUN or -a PATH to create a tag")
             exit(1)
-        repo = RemoteRepo(repo_ref=config.repo_user_config.repo_ref, local_repo_dir=os.getcwd())
-        hub_client = HubClient(repo=repo)
+        hub_client = get_hub_client(project_name=args.project)
         tag_head = hub_client.get_tag_head(args.tag_name)
         if tag_head is not None:
             if not args.yes and not Confirm.ask(
@@ -125,8 +126,7 @@ class TAGCommand(BasicCommand):
     @check_backend
     @check_init
     def delete_tag(self, args: Namespace):
-        repo = RemoteRepo(repo_ref=config.repo_user_config.repo_ref, local_repo_dir=os.getcwd())
-        hub_client = HubClient(repo=repo)
+        hub_client = get_hub_client(project_name=args.project)
         tag_head = hub_client.get_tag_head(args.tag_name)
         if tag_head is None:
             console.print(f"The tag '{args.tag_name}' doesn't exist")

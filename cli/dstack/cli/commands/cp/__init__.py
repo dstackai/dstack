@@ -8,9 +8,8 @@ from dstack.api.hub import HubClient
 from dstack.api.runs import RunNotFoundError, TagNotFoundError, get_tagged_run_name
 from dstack.cli.commands import BasicCommand
 from dstack.cli.common import check_backend, check_config, check_git, check_init, console
-from dstack.cli.config import config
-from dstack.core.config import get_dstack_dir
-from dstack.core.repo import RemoteRepo
+from dstack.cli.config import get_hub_client
+from dstack.utils.common import get_dstack_dir
 
 
 class CpCommand(BasicCommand):
@@ -21,6 +20,12 @@ class CpCommand(BasicCommand):
         super().__init__(parser)
 
     def register(self):
+        self._parser.add_argument(
+            "--project",
+            type=str,
+            help="Hub project to execute the command",
+            default=None,
+        )
         self._parser.add_argument(
             "run_name_or_tag_name",
             metavar="(RUN | :TAG)",
@@ -45,8 +50,7 @@ class CpCommand(BasicCommand):
     @check_backend
     @check_init
     def _command(self, args: Namespace):
-        repo = RemoteRepo(repo_ref=config.repo_user_config.repo_ref, local_repo_dir=os.getcwd())
-        hub_client = HubClient(repo=repo)
+        hub_client = get_hub_client(project_name=args.project)
         try:
             run_name, _ = get_tagged_run_name(hub_client, args.run_name_or_tag_name)
         except (TagNotFoundError, RunNotFoundError):

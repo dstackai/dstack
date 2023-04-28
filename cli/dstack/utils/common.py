@@ -3,11 +3,16 @@ import os
 import re
 import time
 from datetime import datetime, timedelta, timezone
+from pathlib import Path
 from typing import Any, Dict, Optional, Union
 
 from botocore.utils import parse_timestamp
 
 PathLike = Union[str, os.PathLike]
+
+
+def get_dstack_dir() -> Path:
+    return Path.joinpath(Path.home(), ".dstack")
 
 
 def _quoted(s: Optional[str]) -> str:
