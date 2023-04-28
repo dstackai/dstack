@@ -11,7 +11,7 @@ from typing_extensions import Literal
 from dstack.core.repo import RepoProtocol
 from dstack.core.repo.base import Repo, RepoData, RepoInfo, RepoRef
 from dstack.utils.common import PathLike
-from dstack.utils.fs import get_sha256
+from dstack.utils.hash import get_sha256, slugify
 from dstack.utils.ssh import get_host_config, make_ssh_command_for_git
 from dstack.utils.workflows import load_workflows
 
@@ -122,7 +122,10 @@ class RemoteRepo(Repo):
             raise ValueError("No remote repo data provided")
 
         if repo_ref is None:
-            repo_ref = RepoRef(repo_id=repo_data.path(sep=","), repo_user_id=repo_user_id)
+            repo_ref = RepoRef(
+                repo_id=slugify(repo_data.repo_name, repo_data.path("/")),
+                repo_user_id=repo_user_id,
+            )
         super().__init__(repo_ref, repo_data)
 
     def get_workflows(

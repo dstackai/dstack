@@ -10,7 +10,7 @@ from typing_extensions import Literal
 from dstack.core.repo.base import Repo, RepoData, RepoInfo, RepoRef
 from dstack.utils.common import PathLike
 from dstack.utils.escape import Escaper
-from dstack.utils.fs import get_sha256
+from dstack.utils.hash import get_sha256, slugify
 from dstack.utils.workflows import load_workflows
 
 
@@ -54,7 +54,8 @@ class LocalRepo(Repo):
 
         if repo_ref is None:
             repo_ref = RepoRef(
-                repo_id=Path(repo_data.repo_dir).name, repo_user_id=getpass.getuser()
+                repo_id=slugify(Path(repo_data.repo_dir).name, repo_data.repo_dir),
+                repo_user_id=getpass.getuser(),
             )
         super().__init__(repo_ref, repo_data)
 
