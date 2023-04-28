@@ -85,7 +85,7 @@ class JobRefId(JobRef):
         return f'JobRefId(job_id="{self.job_id}")'
 
 
-class JobStatus(Enum):
+class JobStatus(str, Enum):
     PENDING = "pending"
     SUBMITTED = "submitted"
     DOWNLOADING = "downloading"
@@ -105,7 +105,7 @@ class JobStatus(Enum):
         return not self.is_finished()
 
 
-class JobErrorCode(Enum):
+class JobErrorCode(str, Enum):
     # Set by CLI
     NO_INSTANCE_MATCHING_REQUIREMENTS = "no_instance_matching_requirements"
     FAILED_TO_START_DUE_TO_NO_CAPACITY = "failed_to_start_due_to_no_capacity"
