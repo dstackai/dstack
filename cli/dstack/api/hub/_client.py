@@ -7,7 +7,7 @@ from typing import Any, Dict, Generator, List, Optional, Tuple
 
 from dstack import providers
 from dstack.api.hub._api_client import HubAPIClient
-from dstack.api.hub._config import HUBConfig
+from dstack.api.hub._config import HubClientConfig
 from dstack.api.hub._storage import HUBStorage
 from dstack.api.repos import get_local_repo_credentials
 from dstack.backend.base import artifacts as base_artifacts
@@ -27,25 +27,30 @@ from dstack.utils.common import merge_workflow_data
 class HubClient:
     def __init__(
         self,
-        config: Optional[HUBConfig] = None,
+        config: HubClientConfig,
+        project: Optional[str] = None,
         repo: Optional[Repo] = None,
         repo_credentials: Optional[RemoteRepoCredentials] = None,
         auto_init: bool = False,
     ):
+        self.project = project
         self.repo = repo
         self._repo_credentials = repo_credentials
         self._auto_init = auto_init
-        self.backend_config = config
-        if self.backend_config is None:
-            self.backend_config = HUBConfig()
-            self.backend_config.load()
+        self._client_config = config
         self._api_client = HubAPIClient(
-            url=self.backend_config.url,
-            project=self.backend_config.project,
-            token=self.backend_config.token,
+            url=self._client_config.url,
+            token=self._client_config.token,
+            project=self.project,
             repo=self.repo,
         )
         self._storage = HUBStorage(self._api_client)
+
+    @staticmethod
+    def validate_config(config: HubClientConfig, project: str):
+        HubAPIClient(
+            url=config.url, token=config.token, project=project, repo=None
+        ).get_project_info()
 
     def get_project_backend_type(self) -> str:
         return self._get_project_info().backend.__root__.type

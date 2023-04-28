@@ -4,8 +4,8 @@ from typing import Dict, Optional, Tuple
 from google.cloud import compute_v1, storage
 from google.oauth2 import service_account
 
+from dstack.backend.base.config import BackendConfig
 from dstack.backend.gcp.config import GCPConfig
-from dstack.core.config import BackendConfig
 from dstack.core.error import HubConfigError
 from dstack.hub.models import (
     GCPProjectValues,

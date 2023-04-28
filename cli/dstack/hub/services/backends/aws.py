@@ -4,7 +4,7 @@ import botocore.exceptions
 from boto3.session import Session
 
 from dstack.backend.aws.config import AWSConfig
-from dstack.core.config import BackendConfig
+from dstack.backend.base.config import BackendConfig
 from dstack.core.error import HubConfigError
 from dstack.hub.models import (
     AWSBucketProjectElement,

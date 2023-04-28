@@ -1,13 +1,13 @@
 from typing import Dict
 
-from dstack.core.config import BackendConfig, get_dstack_dir
+from dstack.backend.base.config import BackendConfig
+from dstack.utils.common import get_dstack_dir
 
 
 class LocalConfig(BackendConfig):
     def __init__(self, namespace: str):
-        self.dstack_dir = get_dstack_dir()
         self.namespace = namespace
-        self.backend_dir = self.dstack_dir / "local_backend" / self.namespace
+        self.backend_dir = get_dstack_dir() / "local_backend" / self.namespace
 
     def serialize(self) -> Dict:
         return {

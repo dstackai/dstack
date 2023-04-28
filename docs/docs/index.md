@@ -13,11 +13,8 @@ So let's get started.
 - [**Quick start**
    Get started with `dstack` and see how it works in just a few minutes.](quick-start.md)
 
-- [**Installation**
-   Learn in more detail how to install and configure `dstack`](installation/index.md)
-
 - [**Usage guide**
-   Browse the featured examples of what `dstack` can do.](usage/hello-world.md)
+   Browse the featured examples of what `dstack` can do.](usage/python.md)
 
 - [**Tutorials**
    Browse the list of featured tutorials on how to use `dstack`.](../tutorials/dolly.md)

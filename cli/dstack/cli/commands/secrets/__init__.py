@@ -4,11 +4,9 @@ from rich.prompt import Confirm, Prompt
 from rich.table import Table
 from rich_argparse import RichHelpFormatter
 
-from dstack.api.hub import HubClient
-from dstack.api.repos import load_repo
 from dstack.cli.commands import BasicCommand
 from dstack.cli.common import check_backend, check_config, check_git, check_init, console
-from dstack.cli.config import config
+from dstack.cli.config import get_hub_client
 from dstack.core.secret import Secret
 
 
@@ -21,7 +19,12 @@ class SecretCommand(BasicCommand):
 
     def register(self):
         subparsers = self._parser.add_subparsers()
-
+        self._parser.add_argument(
+            "--project",
+            type=str,
+            help="Hub project to execute the command",
+            default=None,
+        )
         subparsers.add_parser("list", help="List secrets", formatter_class=RichHelpFormatter)
 
         add_secrets_parser = subparsers.add_parser(
@@ -68,8 +71,7 @@ class SecretCommand(BasicCommand):
     @check_backend
     @check_init
     def add_secret(self, args: Namespace):
-        repo = load_repo(config.repo_user_config)
-        hub_client = HubClient(repo=repo)
+        hub_client = get_hub_client(project_name=args.project)
         secret_value = args.secret_value or Prompt.ask("Value", password=True)
         if hub_client.get_secret(args.secret_name):
             if args.yes or Confirm.ask(
@@ -91,8 +93,7 @@ class SecretCommand(BasicCommand):
     @check_backend
     @check_init
     def update_secret(self, args: Namespace):
-        repo = load_repo(config.repo_user_config)
-        hub_client = HubClient(repo=repo)
+        hub_client = get_hub_client(project_name=args.project)
         secret_value = hub_client.get_secret(args.secret_name)
         if secret_value is None:
             console.print(f"The secret '{args.secret_name}' doesn't exist")
@@ -106,8 +107,7 @@ class SecretCommand(BasicCommand):
     @check_backend
     @check_init
     def delete_secret(self, args: Namespace):
-        repo = load_repo(config.repo_user_config)
-        hub_client = HubClient(repo=repo)
+        hub_client = get_hub_client(project_name=args.project)
         secret = hub_client.get_secret(args.secret_name)
         if secret is None:
             console.print(f"The secret '{args.secret_name}' doesn't exist")
@@ -122,8 +122,7 @@ class SecretCommand(BasicCommand):
     def _command(self, args: Namespace):
         table = Table(box=None)
         table.add_column("NAME", style="bold", no_wrap=True)
-        repo = load_repo(config.repo_user_config)
-        hub_client = HubClient(repo=repo)
+        hub_client = get_hub_client(project_name=args.project)
         secret_names = hub_client.list_secret_names()
         for secret_name in secret_names:
             table.add_row(secret_name)

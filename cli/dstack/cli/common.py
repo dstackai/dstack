@@ -160,8 +160,8 @@ def check_config(func):
     def decorator(*args, **kwargs):
         try:
             func(*args, **kwargs)
-        except ConfigError:
-            console.print(f"Call 'dstack config' first")
+        except ConfigError as e:
+            console.print(e.message)
             exit(1)
 
     return decorator
@@ -194,7 +194,7 @@ def check_init(func):
         try:
             func(*args, **kwargs)
         except NotInitializedError:
-            console.print(f"Call `dstack init` first")
+            console.print(f"The repository is not initialized. Call `dstack init` first.")
             exit(1)
 
     return decorator

@@ -3,8 +3,8 @@ from datetime import datetime
 from typing import Generator, List, Optional
 
 from dstack.backend.base import jobs as base_jobs
+from dstack.backend.base.config import BackendConfig
 from dstack.core.artifact import Artifact
-from dstack.core.config import BackendConfig
 from dstack.core.job import Job, JobHead, JobStatus
 from dstack.core.log_event import LogEvent
 from dstack.core.repo import RemoteRepoCredentials, Repo, RepoHead

@@ -1,7 +1,6 @@
 from typing import Dict, Optional
 
-from dstack.core.config import BackendConfig
-from dstack.core.error import ConfigError
+from dstack.backend.base.config import BackendConfig
 
 
 class GCPConfig(BackendConfig):
@@ -42,7 +41,7 @@ class GCPConfig(BackendConfig):
     @classmethod
     def deserialize(cls, config_data: Dict) -> Optional["GCPConfig"]:
         if config_data.get("backend") != "gcp":
-            raise ConfigError(f"Not a GCP config")
+            return None
         try:
             project_id = config_data["project"]
             region = config_data["region"]
@@ -51,8 +50,7 @@ class GCPConfig(BackendConfig):
             vpc = config_data["vpc"]
             subnet = config_data["subnet"]
         except KeyError:
-            raise ConfigError("Cannot load config")
-
+            return None
         return cls(
             project_id=project_id,
             region=region,

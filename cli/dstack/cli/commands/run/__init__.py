@@ -15,7 +15,6 @@ from websocket import WebSocketApp
 
 from dstack import providers
 from dstack.api.hub import HubClient
-from dstack.api.repos import load_repo
 from dstack.api.runs import list_runs
 from dstack.backend.base.logs import fix_urls
 from dstack.cli.commands import BasicCommand
@@ -28,7 +27,7 @@ from dstack.cli.common import (
     console,
     print_runs,
 )
-from dstack.cli.config import config
+from dstack.cli.config import config, get_hub_client
 from dstack.core.error import NameNotFoundError, NotInitializedError
 from dstack.core.job import Job, JobHead, JobStatus
 from dstack.core.request import RequestStatus
@@ -91,10 +90,11 @@ class RunCommand(BasicCommand):
             self._parser.print_help()
             exit(1)
         try:
-            repo = load_repo(config.repo_user_config)
-            hub_client = HubClient(repo=repo)
-
-            if repo.repo_data.repo_type != "local" and not hub_client.get_repo_credentials():
+            hub_client = get_hub_client()
+            if (
+                hub_client.repo.repo_data.repo_type != "local"
+                and not hub_client.get_repo_credentials()
+            ):
                 raise NotInitializedError("No credentials")
 
             if not config.repo_user_config.ssh_key_path:

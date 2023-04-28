@@ -3,8 +3,6 @@ from argparse import Namespace
 
 from rich.live import Live
 
-from dstack.api.hub import HubClient
-from dstack.api.repos import load_repo
 from dstack.api.runs import list_runs
 from dstack.cli.commands import BasicCommand
 from dstack.cli.common import (
@@ -15,7 +13,7 @@ from dstack.cli.common import (
     generate_runs_table,
     print_runs,
 )
-from dstack.cli.config import config
+from dstack.cli.config import get_hub_client
 
 LIVE_PROVISION_INTERVAL_SECS = 2
 
@@ -32,6 +30,12 @@ class PSCommand(BasicCommand):
     def register(self):
         self._parser.add_argument(
             "run_name", metavar="RUN", type=str, nargs="?", help="A name of a run"
+        )
+        self._parser.add_argument(
+            "--project",
+            type=str,
+            help="Hub project to execute the command",
+            default=None,
         )
         self._parser.add_argument(
             "-a",
@@ -58,8 +62,7 @@ class PSCommand(BasicCommand):
     @check_backend
     @check_init
     def _command(self, args: Namespace):
-        repo = load_repo(config.repo_user_config)
-        hub_client = HubClient(repo=repo)
+        hub_client = get_hub_client(project_name=args.project)
         runs = list_runs(hub_client, run_name=args.run_name, all=args.all)
         if args.watch:
             try:
