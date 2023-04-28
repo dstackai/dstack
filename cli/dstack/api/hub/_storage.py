@@ -17,7 +17,8 @@ class HUBStorage(CloudStorage, ABC):
         url = self._client.upload_file(dest_path=dest_path)
         if not (url is None):
             with open(source_path, "rb") as f:
-                resp = requests.put(url, data=f)
+                # AWS: requests.put() produces bad headers from empty file descriptor
+                resp = requests.put(url, data=f if os.stat(source_path).st_size > 0 else None)
                 if resp.ok:
                     file_stat = os.stat(source_path)
                     callback(file_stat.st_size)

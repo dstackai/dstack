@@ -156,7 +156,8 @@ def create_tag_from_local_dirs(
     run_name = runs.create_run(storage)
     job = Job(
         job_id=f"{run_name},,0",
-        repo=repo.repo_data,  # todo
+        repo_ref=repo.repo_ref,
+        repo_data=repo.repo_data,
         run_name=run_name,
         workflow_name=None,
         provider_name="bash",

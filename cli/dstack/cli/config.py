@@ -7,9 +7,9 @@ import yaml
 from pydantic import BaseModel, ValidationError
 
 from dstack.api.hub import HubClient, HubClientConfig
+from dstack.api.repos import load_repo
 from dstack.cli.errors import CLIError
 from dstack.core.error import RepoNotInitializedError
-from dstack.core.repo.remote import RemoteRepo
 from dstack.core.userconfig import RepoUserConfig
 from dstack.utils.common import get_dstack_dir
 
@@ -92,12 +92,12 @@ class CLIConfigManager:
     def __init__(self):
         self.dstack_dir = get_dstack_dir()
         self.config_filepath = self.dstack_dir / "config.yaml"
-        with open(self.config_filepath, "r") as f:
-            config = yaml.load(f.read(), yaml.FullLoader)
-            try:
-                self.config = CLIConfig.parse_obj(config)
-            except ValidationError:
-                self.config = CLIConfig()
+        try:
+            with open(self.config_filepath, "r") as f:
+                config = yaml.load(f.read(), yaml.FullLoader)
+            self.config = CLIConfig.parse_obj(config)
+        except (FileNotFoundError, ValidationError):
+            self.config = CLIConfig()
 
     def save(self):
         with open(self.config_filepath, "w+") as f:
@@ -146,7 +146,7 @@ def get_hub_client(project_name: Optional[str] = None) -> HubClient:
         project_config = cli_config_manager.get_default_project_config()
         if project_config is None:
             raise CLIError(f"No default project configured. Call `dstack config`.")
-    repo = RemoteRepo(repo_ref=config.repo_user_config.repo_ref, local_repo_dir=os.getcwd())
+    repo = load_repo(config.repo_user_config)
     hub_client_config = HubClientConfig(url=project_config.url, token=project_config.token)
     hub_client = HubClient(config=hub_client_config, project=project_config.name, repo=repo)
     return hub_client

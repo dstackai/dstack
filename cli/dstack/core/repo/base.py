@@ -1,6 +1,6 @@
 from abc import ABC, abstractmethod
 from enum import Enum
-from typing import Any, Dict, Optional
+from typing import Any, BinaryIO, Dict
 
 from pydantic import BaseModel, validator
 from typing_extensions import Literal
@@ -13,7 +13,6 @@ class RepoProtocol(Enum):
 
 # TODO: fix backend methods so that they don't require RepoRef or remove repo_user_id from RepoRef
 class RepoRef(BaseModel):
-    repo_type: Literal["remote"] = "remote"
     repo_id: str
     repo_user_id: str
 
@@ -27,6 +26,20 @@ class RepoRef(BaseModel):
 
 class RepoData(BaseModel):
     repo_type: Literal["none"] = "none"
+
+    def write_code_file(self, fp: BinaryIO) -> str:
+        """
+        :return: repo_code_filename
+        """
+        raise NotImplementedError()
+
+
+class RepoInfo(BaseModel):
+    repo_type: Literal["none"] = "none"
+
+    @property
+    def head_key(self) -> str:
+        raise NotImplementedError()
 
 
 class Repo(ABC):
@@ -44,8 +57,4 @@ class Repo(ABC):
 
     @abstractmethod
     def get_workflows(self, credentials=None) -> Dict[str, Dict[str, Any]]:
-        pass
-
-    @abstractmethod
-    def get_repo_diff(self) -> Optional[str]:
         pass

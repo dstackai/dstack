@@ -4,6 +4,9 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"github.com/aws/aws-sdk-go-v2/aws"
+	"github.com/aws/aws-sdk-go-v2/service/s3"
+	"github.com/dstackai/dstack/runner/internal/repo"
 	"io"
 	"io/ioutil"
 	"os"
@@ -353,7 +356,7 @@ func (s *S3) GitCredentials(ctx context.Context) *models.GitCredentials {
 		log.Error(ctx, "Job is empty")
 		return nil
 	}
-	return s.cliSecret.fetchCredentials(ctx, s.bucket, s.state.Job.RepoHostNameWithPort(), s.state.Job.RepoUserName, s.state.Job.RepoName)
+	return s.cliSecret.fetchCredentials(ctx, s.bucket, s.state.Job.RepoId)
 }
 
 func (s *S3) GetRepoDiff(ctx context.Context, path string) (string, error) {
@@ -362,6 +365,32 @@ func (s *S3) GetRepoDiff(ctx context.Context, path string) (string, error) {
 		return "", gerrors.Wrap(err)
 	}
 	return string(diff), nil
+}
+
+func (s *S3) GetRepoArchive(ctx context.Context, path, dir string) error {
+	archive, err := os.CreateTemp("", "archive-*.tar")
+	if err != nil {
+		return gerrors.Wrap(err)
+	}
+	defer os.Remove(archive.Name())
+
+	out, err := s.cliS3.cli.GetObject(ctx, &s3.GetObjectInput{
+		Bucket: aws.String(s.bucket),
+		Key:    aws.String(path),
+	})
+	if err != nil {
+		return gerrors.Wrap(err)
+	}
+	defer out.Body.Close()
+	size, err := io.Copy(archive, out.Body)
+	if size != out.ContentLength {
+		return gerrors.New("size not equal")
+	}
+
+	if err := repo.ExtractArchive(ctx, archive.Name(), dir); err != nil {
+		return gerrors.Wrap(err)
+	}
+	return nil
 }
 
 func (s *S3) GetTMPDir(ctx context.Context) string {

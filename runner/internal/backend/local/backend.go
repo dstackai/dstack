@@ -3,6 +3,7 @@ package local
 import (
 	"context"
 	"fmt"
+	"github.com/dstackai/dstack/runner/internal/repo"
 	"io"
 	"io/ioutil"
 	"os"
@@ -196,7 +197,7 @@ func (l Local) GetJobByPath(ctx context.Context, path string) (*models.Job, erro
 
 func (l *Local) GitCredentials(ctx context.Context) *models.GitCredentials {
 	log.Trace(ctx, "Getting credentials")
-	return l.cliSecret.fetchCredentials(ctx, l.state.Job.RepoHostNameWithPort(), l.state.Job.RepoUserName, l.state.Job.RepoName)
+	return l.cliSecret.fetchCredentials(ctx, l.state.Job.RepoId)
 }
 
 func (l *Local) Secrets(ctx context.Context) (map[string]string, error) {
@@ -239,6 +240,14 @@ func (l Local) GetRepoDiff(ctx context.Context, path string) (string, error) {
 		return "", gerrors.Wrap(err)
 	}
 	return string(diff), nil
+}
+
+func (l Local) GetRepoArchive(ctx context.Context, path, dir string) error {
+	src := filepath.Join(l.path, path)
+	if err := repo.ExtractArchive(ctx, src, dir); err != nil {
+		return gerrors.Wrap(err)
+	}
+	return nil
 }
 
 func (l Local) GetTMPDir(ctx context.Context) string {

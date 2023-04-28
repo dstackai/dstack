@@ -1,4 +1,3 @@
-import hashlib
 import uuid
 from typing import List, Optional, Tuple
 
@@ -22,13 +21,6 @@ def create_job(
 ):
     if create_head:
         storage.put_object(key=_get_job_head_filename(job), content="")
-
-    if job.repo_data.repo_diff:
-        job.repo_diff_filename = _get_diff_filename(job.repo_data.repo_diff)
-        storage.put_object(
-            key=job.repo_diff_filename, content=job.repo_data.repo_diff
-        )  # todo: check if exists
-        job.repo_data.repo_diff = None
 
     storage.put_object(
         key=_get_job_filename(job.repo_ref.repo_id, job.job_id), content=yaml.dump(job.serialize())
@@ -262,11 +254,6 @@ def _get_jobs_dir(repo_id: str) -> str:
 
 def _get_job_filename(repo_id: str, job_id: str) -> str:
     return f"{_get_jobs_dir(repo_id)}{job_id}.yaml"
-
-
-def _get_diff_filename(job_diff: str) -> str:
-    diff_hash = hashlib.sha256(job_diff.encode()).hexdigest()
-    return f"diffs/{diff_hash}.patch"
 
 
 def _get_jobs_filenames_prefix(repo_id: str, run_name: str) -> str:

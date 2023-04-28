@@ -4,7 +4,7 @@ from typing import List, Optional, Union
 from pydantic import BaseModel, Field
 from typing_extensions import Literal
 
-from dstack.core.job import Job, JobHead
+from dstack.core.job import Job
 from dstack.core.repo import RemoteRepoCredentials, RepoSpec
 from dstack.core.secret import Secret
 from dstack.hub.security.utils import GlobalRole, ProjectRole

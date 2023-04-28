@@ -1,7 +1,7 @@
 import os
 import tempfile
 from pathlib import Path
-from typing import Any, Dict, Optional
+from typing import Any, BinaryIO, Dict, Optional
 
 import git
 import giturlparse
@@ -9,8 +9,9 @@ from pydantic import BaseModel
 from typing_extensions import Literal
 
 from dstack.core.repo import RepoProtocol
-from dstack.core.repo.base import Repo, RepoData, RepoRef
+from dstack.core.repo.base import Repo, RepoData, RepoInfo, RepoRef
 from dstack.utils.common import PathLike
+from dstack.utils.hash import get_sha256, slugify
 from dstack.utils.ssh import get_host_config, make_ssh_command_for_git
 from dstack.utils.workflows import load_workflows
 
@@ -21,19 +22,16 @@ class RemoteRepoCredentials(BaseModel):
     oauth_token: Optional[str]
 
 
-class RemoteRepoInfo(BaseModel):
+class RemoteRepoInfo(RepoInfo):
+    repo_type: Literal["remote"] = "remote"
     repo_host_name: str
     repo_port: Optional[int]
     repo_user_name: str
     repo_name: str
 
-
-class RemoteRepoHead(BaseModel):
-    repo_type: Literal["remote"] = "remote"
-    repo_id: str
-    last_run_at: Optional[int] = None
-    tags_count: int = 0
-    repo_info: RemoteRepoInfo
+    @property
+    def head_key(self) -> str:
+        return f"{self.repo_type};{self.repo_host_name},{self.repo_port or ''},{self.repo_user_name},{self.repo_name}"
 
 
 class RemoteRepoData(RepoData, RemoteRepoInfo):
@@ -77,6 +75,11 @@ class RemoteRepoData(RepoData, RemoteRepoInfo):
             else:
                 return f"git@{self.repo_host_name}:{self.repo_user_name}/{self.repo_name}.git"
 
+    def write_code_file(self, fp: BinaryIO) -> str:
+        if self.repo_diff is not None:
+            fp.write(self.repo_diff.encode())
+        return f"code/remote/{get_sha256(fp)}.patch"
+
 
 class RemoteRepo(Repo):
     """Represents both local git repository with configured remote and just remote repository"""
@@ -119,7 +122,10 @@ class RemoteRepo(Repo):
             raise ValueError("No remote repo data provided")
 
         if repo_ref is None:
-            repo_ref = RepoRef(repo_id=repo_data.path(), repo_user_id=repo_user_id)
+            repo_ref = RepoRef(
+                repo_id=slugify(repo_data.repo_name, repo_data.path("/")),
+                repo_user_id=repo_user_id,
+            )
         super().__init__(repo_ref, repo_data)
 
     def get_workflows(
@@ -134,9 +140,6 @@ class RemoteRepo(Repo):
             local_repo_dir = Path(temp_dir.name)
             _clone_remote_repo(local_repo_dir, self.repo_data, credentials, depth=1)
         return load_workflows(local_repo_dir / ".dstack")
-
-    def get_repo_diff(self) -> Optional[str]:
-        return self.repo_data.repo_diff
 
 
 def _clone_remote_repo(
