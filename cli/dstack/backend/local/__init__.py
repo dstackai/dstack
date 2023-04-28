@@ -221,9 +221,9 @@ class LocalBackend(Backend):
         base_cache.delete_workflow_cache(self._storage, self.repo.repo_ref, workflow_name)
 
     def get_signed_download_url(self, object_key: str) -> str:
-        # TODO: implement to support local backend with remote hub
+        # Implemented by Hub
         raise NotImplementedError()
 
     def get_signed_upload_url(self, object_key: str) -> str:
-        # TODO: implement to support local backend with remote hub
+        # Implemented by Hub
         raise NotImplementedError()

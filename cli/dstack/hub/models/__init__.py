@@ -203,7 +203,7 @@ class PollLogs(BaseModel):
     limit: int = Field(100, ge=0, le=1000)
 
 
-class LinkUpload(BaseModel):
+class StorageLink(BaseModel):
     object_key: str
 
 
@@ -273,3 +273,7 @@ class AddMembers(BaseModel):
 
 class DeleteUsers(BaseModel):
     users: List[str] = []
+
+
+class FileObject(BaseModel):
+    object_key: str
