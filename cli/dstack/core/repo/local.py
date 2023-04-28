@@ -69,7 +69,9 @@ class TarIgnore:
     ):
         self.root_dir = Path(root_dir)
         self.ignore_files = (
-            ignore_files if ignore_files is not None else [".gitignore", ".git/info/exclude"]
+            ignore_files
+            if ignore_files is not None
+            else [".gitignore", ".git/info/exclude", ".dstackignore"]
         )
         self.ignore_globs: Dict[str, List[str]] = {"": globs or []}
 
