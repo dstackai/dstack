@@ -1,6 +1,7 @@
 import React from 'react';
 import { useTranslation } from 'react-i18next';
 import { useParams } from 'react-router-dom';
+import { format } from 'date-fns';
 
 import { Button, Cards, Header, ListEmptyMessage, NavigateLink, Pagination, SpaceBetween, TextFilter } from 'components';
 
@@ -50,10 +51,6 @@ export const ProjectRepositories: React.FC = () => {
             text: paramProjectName,
             href: ROUTES.PROJECT.DETAILS.REPOSITORIES.FORMAT(paramProjectName),
         },
-        {
-            text: t('projects.repositories'),
-            href: ROUTES.PROJECT.DETAILS.REPOSITORIES.FORMAT(paramProjectName),
-        },
     ]);
 
     const renderCounter = () => {
@@ -75,20 +72,17 @@ export const ProjectRepositories: React.FC = () => {
                         fontSize="heading-m"
                         href={ROUTES.PROJECT.DETAILS.REPOSITORIES.DETAILS.FORMAT(paramProjectName, repo.repo_id)}
                     >
-                        {repo.repo_info.repo_name}
+                        {repo.repo_type === 'remote'
+                            ? `${repo.repo_info.repo_user_name}/${repo.repo_info.repo_name}`
+                            : repo.repo_info.repo_name}
                     </NavigateLink>
                 ),
 
                 sections: [
                     {
-                        id: 'owner',
-                        header: t('projects.repo.card.owner'),
-                        content: (repo) => repo.repo_info.repo_user_name,
-                    },
-                    {
                         id: 'last_run',
                         header: t('projects.repo.card.last_run'),
-                        content: (repo) => repo.last_run_at,
+                        content: (repo) => format(new Date(repo.last_run_at), 'MM/dd/yyyy hh:mm'),
                     },
                     {
                         id: 'tags_count',
@@ -105,11 +99,11 @@ export const ProjectRepositories: React.FC = () => {
             header={
                 <Header
                     counter={renderCounter()}
-                    actions={
-                        <SpaceBetween size="xs" direction="horizontal">
-                            <Button disabled>{t('common.delete')}</Button>
-                        </SpaceBetween>
-                    }
+                    // actions={
+                    //     <SpaceBetween size="xs" direction="horizontal">
+                    //         <Button disabled>{t('common.delete')}</Button>
+                    //     </SpaceBetween>
+                    // }
                 >
                     {t('projects.repositories')}
                 </Header>

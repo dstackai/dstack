@@ -1,6 +1,7 @@
 import React from 'react';
 import { useTranslation } from 'react-i18next';
 import { useParams } from 'react-router-dom';
+import { format } from 'date-fns';
 
 import { Button, Header, ListEmptyMessage, NavigateLink, Pagination, SpaceBetween, Table, TextFilter } from 'components';
 
@@ -38,21 +39,32 @@ export const RepositoryDetails: React.FC = () => {
         {
             id: 'run_name',
             header: t('projects.run.run_name'),
-            cell: (item: IRun) => (
-                <NavigateLink href={ROUTES.PROJECT.DETAILS.RUNS.DETAILS.FORMAT(paramProjectName, paramRepoId, item.run_name)}>
-                    {item.run_name}
-                </NavigateLink>
-            ),
+            cell: (item: IRun) =>
+                // TODO revert link after adding run details page
+                // <NavigateLink href={ROUTES.PROJECT.DETAILS.RUNS.DETAILS.FORMAT(paramProjectName, paramRepoId, item.run_name)}>
+                //     {item.run_name}
+                // </NavigateLink>
+                item.run_name,
         },
         {
             id: 'workflow_name',
             header: t('projects.run.workflow_name'),
-            cell: (item: IRun) => item.workflow_name,
+            cell: (item: IRun) => item.workflow_name ?? item.provider_name,
         },
         {
-            id: 'provider_name',
-            header: t('projects.run.provider_name'),
-            cell: (item: IRun) => item.provider_name,
+            id: 'status',
+            header: t('projects.run.status'),
+            cell: (item: IRun) => item.status,
+        },
+        {
+            id: 'submitted_at',
+            header: t('projects.run.submitted_at'),
+            cell: (item: IRun) => format(new Date(item.submitted_at), 'MM/dd/yyyy hh:mm'),
+        },
+        {
+            id: 'artifacts',
+            header: t('projects.run.artifacts'),
+            cell: (item: IRun) => item.artifact_heads?.length ?? '-',
         },
     ];
 

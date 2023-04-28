@@ -41,7 +41,7 @@ export const ProjectAdd: React.FC = () => {
                     content: t('projects.create.success_notification'),
                 });
 
-                navigate(ROUTES.PROJECT.DETAILS.REPOSITORIES.FORMAT(data.project_name));
+                navigate(ROUTES.PROJECT.DETAILS.SETTINGS.FORMAT(data.project_name));
             })
             .catch((error) => console.log(error));
 

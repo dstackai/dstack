@@ -12,6 +12,8 @@ import { selectUserData } from 'App/slice';
 
 import { getProjectRoleByUserName } from '../utils';
 
+import styles from './styles.module.scss';
+
 enum TabTypesEnum {
     REPOSITORIES = 'repositories',
     SETTINGS = 'settings',
@@ -78,9 +80,16 @@ export const ProjectDetails: React.FC = () => {
     };
 
     const activeTabId = useMemo(() => {
-        const tab = tabs.find((t) => pathname.indexOf(t.href) === 0);
+        const tab = tabs.find((t) => pathname === t.href);
 
         return tab?.id;
+    }, [pathname]);
+
+    const isVisibleTabs = useMemo(() => {
+        return [
+            ROUTES.PROJECT.DETAILS.REPOSITORIES.FORMAT(paramProjectName),
+            ROUTES.PROJECT.DETAILS.SETTINGS.FORMAT(paramProjectName),
+        ].includes(pathname);
     }, [pathname]);
 
     return (
@@ -95,7 +104,11 @@ export const ProjectDetails: React.FC = () => {
                 }
             >
                 <SpaceBetween size="l">
-                    <Tabs variant="container" onChange={onChangeTab} activeTabId={activeTabId} tabs={tabs} />
+                    {isVisibleTabs && (
+                        <div className={styles.tabs}>
+                            <Tabs onChange={onChangeTab} activeTabId={activeTabId} tabs={tabs} />
+                        </div>
+                    )}
 
                     <Outlet />
                 </SpaceBetween>
