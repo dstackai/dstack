@@ -4,11 +4,11 @@ import { useTranslation } from 'react-i18next';
 
 import { FileUploader, FormS3BucketSelector, FormSelect, FormSelectOptions, InfoLink, SpaceBetween, Spinner } from 'components';
 
-import { useNotifications } from 'hooks';
+import { useHelpPanel, useNotifications } from 'hooks';
 import { isRequestFormErrors2, isRequestFormFieldError } from 'libs';
 import { useBackendValuesMutation } from 'services/project';
 
-import { FIELD_NAMES, SERVICE_ACCOUNT_HELP, AREA_HELP, REGION_HELP, ZONE_HELP, BUCKET_HELP, SUBNET_HELP } from './constants';
+import { AREA_HELP, BUCKET_HELP, FIELD_NAMES, REGION_HELP, SERVICE_ACCOUNT_HELP, SUBNET_HELP, ZONE_HELP } from './constants';
 
 import { IProps, VPCSubnetOption } from './types';
 
