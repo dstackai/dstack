@@ -1,5 +1,4 @@
 import fnmatch
-import getpass
 import tarfile
 from itertools import zip_longest
 from pathlib import Path
@@ -26,13 +25,12 @@ class LocalRepoData(RepoData):
 
 class LocalRepoInfo(RepoInfo):
     repo_type: Literal["local"] = "local"
-    repo_user_id: str
     repo_dir: str
 
     @property
     def head_key(self) -> str:
         repo_dir = Escaper({"/": "."}, escape_char="~").escape(self.repo_dir)
-        return f"{self.repo_type};{self.repo_user_id},{repo_dir}"
+        return f"{self.repo_type};{repo_dir}"
 
 
 class LocalRepo(Repo):
@@ -53,10 +51,7 @@ class LocalRepo(Repo):
             raise ValueError("No local repo data provided")
 
         if repo_ref is None:
-            repo_ref = RepoRef(
-                repo_id=slugify(Path(repo_data.repo_dir).name, repo_data.repo_dir),
-                repo_user_id=getpass.getuser(),
-            )
+            repo_ref = RepoRef(repo_id=slugify(Path(repo_data.repo_dir).name, repo_data.repo_dir))
         super().__init__(repo_ref, repo_data)
 
     def get_workflows(self, credentials=None) -> Dict[str, Dict[str, Any]]:

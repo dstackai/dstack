@@ -128,6 +128,7 @@ class JobErrorCode(str, Enum):
 class JobHead(JobRef):
     job_id: str
     repo_ref: RepoRef
+    repo_user_id: str
     run_name: str
     workflow_name: Optional[str]
     provider_name: str
@@ -144,28 +145,6 @@ class JobHead(JobRef):
 
     def set_id(self, job_id: Optional[str]):
         self.job_id = job_id
-
-    def __str__(self) -> str:
-        artifact_paths = (
-            ("[" + ", ".join(map(lambda a: _quoted(str(a)), self.artifact_paths)) + "]")
-            if self.artifact_paths
-            else None
-        )
-        app_names = (
-            ("[" + ", ".join(map(lambda a: _quoted(a), self.app_names)) + "]")
-            if self.app_names
-            else None
-        )
-        return (
-            f'JobHead(job_id="{self.job_id}", repo_ref={self.repo_ref}, '
-            f'run_name="{self.run_name}", workflow_name={_quoted(self.workflow_name)}, '
-            f'provider_name="{self.provider_name}", '
-            f"status=JobStatus.{self.status.name}, "
-            f"submitted_at={self.submitted_at}, "
-            f"artifact_paths={artifact_paths}, "
-            f"tag_name={_quoted(self.tag_name)}, "
-            f"app_names={app_names})"
-        )
 
 
 class RegistryAuth(BaseModel):
@@ -236,12 +215,6 @@ class Job(JobHead):
         )
         return data
 
-    def get_id(self) -> Optional[str]:
-        return self.job_id
-
-    def set_id(self, job_id: Optional[str]):
-        self.job_id = job_id
-
     def serialize(self) -> dict:
         deps = []
         if self.dep_specs:
@@ -249,7 +222,7 @@ class Job(JobHead):
                 deps.append(
                     {
                         "repo_id": dep.repo_ref.repo_id,
-                        "repo_user_id": dep.repo_ref.repo_user_id,
+                        "repo_user_id": self.repo_user_id,
                         "run_name": dep.run_name,
                         "mount": dep.mount,
                     }
@@ -263,7 +236,7 @@ class Job(JobHead):
         job_data = {
             "job_id": self.job_id,
             "repo_id": self.repo.repo_id,
-            "repo_user_id": self.repo.repo_user_id,
+            "repo_user_id": self.repo_user_id,
             "repo_type": self.repo.repo_data.repo_type,
             "run_name": self.run_name,
             "workflow_name": self.workflow_name or "",
@@ -354,7 +327,7 @@ class Job(JobHead):
         if job_data.get("deps"):
             for dep in job_data["deps"]:
                 dep_spec = DepSpec(
-                    repo_ref=RepoRef(repo_id=dep["repo_id"], repo_user_id=dep["repo_user_id"]),
+                    repo_ref=RepoRef(repo_id=dep["repo_id"]),
                     run_name=dep["run_name"],
                     mount=dep.get("mount") is True,
                 )
@@ -402,10 +375,8 @@ class Job(JobHead):
 
         job = Job(
             job_id=job_data["job_id"],
-            repo_ref=RepoRef(
-                repo_id=job_data["repo_id"],
-                repo_user_id=job_data["repo_user_id"],
-            ),
+            repo_ref=RepoRef(repo_id=job_data["repo_id"]),
+            repo_user_id=job_data["repo_user_id"],
             repo_data=repo_data,
             repo_code_filename=job_data.get("repo_code_filename"),
             run_name=job_data["run_name"],
@@ -448,6 +419,7 @@ class Job(JobHead):
 
 class JobSpec(JobRef):
     image_name: str
+    job_id: Optional[str] = None
     registry_auth: Optional[RegistryAuth] = None
     commands: Optional[List[str]] = None
     entrypoint: Optional[List[str]] = None

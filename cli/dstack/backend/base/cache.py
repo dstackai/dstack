@@ -1,7 +1,6 @@
 import os.path
 
 from dstack.backend.base.storage import Storage
-from dstack.core.repo import RepoRef
 
 
 def delete_workflow_cache(storage: Storage, repo_id: str, repo_user_id: str, workflow: str):

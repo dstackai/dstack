@@ -86,9 +86,8 @@ class HubAPIClient:
         resp = _make_hub_request(
             requests.post, host=self.url, url=url, headers=self._headers(), data=job.json()
         )
-        if resp.ok:
-            return
         resp.raise_for_status()
+        job.repo_user_id = resp.json()["repo_user_id"]
 
     def get_job(self, job_id: str) -> Optional[Job]:
         url = _project_url(

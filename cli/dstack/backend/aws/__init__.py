@@ -227,10 +227,10 @@ class AwsBackend(Backend):
         return base_secrets.get_secret(self._secrets_manager, repo_id, repo_id)
 
     def add_secret(self, repo_id: str, secret: Secret):
-        base_secrets.add_secret(self._storage, self._secrets_manager, repo_id, repo_id)
+        base_secrets.add_secret(self._storage, self._secrets_manager, repo_id, secret)
 
     def update_secret(self, repo_id: str, secret: Secret):
-        base_secrets.update_secret(self._storage, self._secrets_manager, repo_id, repo_id)
+        base_secrets.update_secret(self._storage, self._secrets_manager, repo_id, secret)
 
     def delete_secret(self, repo_id: str, secret_name: str):
         base_secrets.delete_secret(self._storage, self._secrets_manager, repo_id, repo_id)

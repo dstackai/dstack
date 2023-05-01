@@ -42,7 +42,6 @@ def update_repo_last_run_at(storage: Storage, repo_spec: RepoSpec, last_run_at: 
             )
         elif repo_spec.repo_data.repo_type == "local":
             repo_info = LocalRepoInfo(
-                repo_user_id=repo_spec.repo_ref.repo_user_id,
                 repo_dir=Escaper({"/": "."}, escape_char="~").unescape(
                     repo_spec.repo_data.repo_dir
                 ),
@@ -135,9 +134,8 @@ def _parse_repo_head_filename(repo_head_filepath: str) -> Optional[RepoHead]:
             repo_name=repo_name,
         )
     elif repo_type == "local":
-        repo_user_id, repo_dir = repo_info.split(",")
+        repo_dir = repo_info
         repo_info = LocalRepoInfo(
-            repo_user_id=repo_user_id,
             repo_dir=Escaper({"/": "."}, escape_char="~").unescape(repo_dir),
         )
     return RepoHead(

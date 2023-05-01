@@ -120,7 +120,7 @@ def create_tag_from_run(
         run_name=run_name,
         workflow_name=tag_jobs[0].workflow_name,
         provider_name=tag_jobs[0].provider_name,
-        repo_user_id=tag_jobs[0].repo_ref.repo_user_id,
+        repo_user_id=tag_jobs[0].repo_user_id,
         created_at=int(round(time.time() * 1000)),
         artifact_heads=[
             ArtifactHead(job_id=run_job.job_id, artifact_path=artifact_spec.artifact_path)
@@ -140,6 +140,7 @@ def create_tag_from_run(
 def create_tag_from_local_dirs(
     storage: Storage,
     repo: Repo,
+    repo_user_id: str,
     tag_name: str,
     local_dirs: List[str],
 ):
@@ -157,6 +158,7 @@ def create_tag_from_local_dirs(
     job = Job(
         job_id=f"{run_name},,0",
         repo_ref=repo.repo_ref,
+        repo_user_id=repo_user_id,
         repo_data=repo.repo_data,
         run_name=run_name,
         workflow_name=None,
@@ -196,7 +198,7 @@ def create_tag_from_local_dirs(
         run_name=run_name,
         workflow_name=job.workflow_name,
         provider_name=job.provider_name,
-        repo_user_id=repo.repo_user_id,
+        repo_user_id=repo_user_id,
         created_at=job.submitted_at,
         artifact_heads=[
             ArtifactHead(job_id=job.job_id, artifact_path=a.artifact_path)

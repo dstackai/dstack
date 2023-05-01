@@ -3,19 +3,22 @@ from typing import List
 from fastapi import APIRouter, Depends
 
 from dstack.core.job import Job, JobHead
+from dstack.hub.db.models import User
 from dstack.hub.models import JobHeadList, JobsGet, JobsList
 from dstack.hub.routers.cache import get_backend
 from dstack.hub.routers.util import get_project
-from dstack.hub.security.permissions import ProjectMember
+from dstack.hub.security.permissions import Authenticated, ProjectMember
 
 router = APIRouter(prefix="/api/project", tags=["jobs"], dependencies=[Depends(ProjectMember())])
 
 
 @router.post("/{project_name}/jobs/create")
-async def create_job(project_name: str, job: Job):
+async def create_job(project_name: str, job: Job, user: User = Depends(Authenticated())) -> Job:
     project = await get_project(project_name=project_name)
     backend = get_backend(project)
+    job.repo_user_id = user.name
     backend.create_job(job=job)
+    return job
 
 
 @router.post("/{project_name}/jobs/get")
