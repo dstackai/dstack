@@ -76,6 +76,7 @@ def list_job_head(storage: Storage, repo_id: str, job_id: str) -> Optional[JobHe
         return JobHead(
             job_id=job_id,
             repo_ref=RepoRef(repo_id=repo_id),
+            repo_user_id=repo_user_id,
             run_name=run_name,
             workflow_name=workflow_name or None,
             provider_name=provider_name,
