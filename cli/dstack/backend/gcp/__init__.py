@@ -225,5 +225,5 @@ class GCPBackend(Backend):
     def get_signed_upload_url(self, object_key: str) -> str:
         return self._storage.get_signed_upload_url(object_key)
 
-    def delete_workflow_cache(self, repo_id: str, repo_user_id: str, workflow_name: str):
-        base_cache.delete_workflow_cache(self._storage, repo_id, repo_user_id, workflow_name)
+    def delete_workflow_cache(self, repo_id: str, hub_user_name: str, workflow_name: str):
+        base_cache.delete_workflow_cache(self._storage, repo_id, hub_user_name, workflow_name)

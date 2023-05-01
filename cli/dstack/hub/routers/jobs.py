@@ -16,7 +16,7 @@ router = APIRouter(prefix="/api/project", tags=["jobs"], dependencies=[Depends(P
 async def create_job(project_name: str, job: Job, user: User = Depends(Authenticated())) -> Job:
     project = await get_project(project_name=project_name)
     backend = get_backend(project)
-    job.repo_user_id = user.name
+    job.hub_user_name = user.name
     backend.create_job(job=job)
     return job
 

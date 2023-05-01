@@ -13,7 +13,7 @@ class RunHead(BaseModel):
     run_name: str
     workflow_name: Optional[str]
     provider_name: str
-    repo_user_id: Optional[str]
+    hub_user_name: Optional[str]
     artifact_heads: Optional[List[ArtifactHead]]
     status: JobStatus
     submitted_at: int

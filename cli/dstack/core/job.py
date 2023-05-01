@@ -128,7 +128,7 @@ class JobErrorCode(str, Enum):
 class JobHead(JobRef):
     job_id: str
     repo_ref: RepoRef
-    repo_user_id: str
+    hub_user_name: str
     run_name: str
     workflow_name: Optional[str]
     provider_name: str
@@ -222,7 +222,7 @@ class Job(JobHead):
                 deps.append(
                     {
                         "repo_id": dep.repo_ref.repo_id,
-                        "repo_user_id": self.repo_user_id,
+                        "hub_user_name": self.hub_user_name,
                         "run_name": dep.run_name,
                         "mount": dep.mount,
                     }
@@ -236,7 +236,7 @@ class Job(JobHead):
         job_data = {
             "job_id": self.job_id,
             "repo_id": self.repo.repo_id,
-            "repo_user_id": self.repo_user_id,
+            "hub_user_name": self.hub_user_name,
             "repo_type": self.repo.repo_data.repo_type,
             "run_name": self.run_name,
             "workflow_name": self.workflow_name or "",
@@ -376,7 +376,7 @@ class Job(JobHead):
         job = Job(
             job_id=job_data["job_id"],
             repo_ref=RepoRef(repo_id=job_data["repo_id"]),
-            repo_user_id=job_data["repo_user_id"],
+            hub_user_name=job_data["hub_user_name"],
             repo_data=repo_data,
             repo_code_filename=job_data.get("repo_code_filename"),
             run_name=job_data["run_name"],

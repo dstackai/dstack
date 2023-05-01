@@ -36,7 +36,7 @@ def generate_runs_table(runs: List[RunHead], verbose: bool = False) -> Table:
             _status_color(run, run.run_name, True, False),
             _status_color(run, run.workflow_name or run.provider_name, False, False),
             _status_color(run, submitted_at, False, False),
-            _status_color(run, run.repo_user_id or "", False, False),
+            _status_color(run, run.hub_user_name or "", False, False),
             _pretty_print_status(run),
             _status_color(run, run.tag_name or "", False, False),
         ]

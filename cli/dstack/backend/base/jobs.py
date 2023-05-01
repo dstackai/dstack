@@ -64,7 +64,7 @@ def list_job_head(storage: Storage, repo_id: str, job_id: str) -> Optional[JobHe
         t = job_head_key[len(job_head_key_prefix) :].split(";")
         (
             provider_name,
-            repo_user_id,
+            hub_user_name,
             submitted_at,
             status_info,
             artifacts,
@@ -76,7 +76,7 @@ def list_job_head(storage: Storage, repo_id: str, job_id: str) -> Optional[JobHe
         return JobHead(
             job_id=job_id,
             repo_ref=RepoRef(repo_id=repo_id),
-            repo_user_id=repo_user_id,
+            hub_user_name=hub_user_name,
             run_name=run_name,
             workflow_name=workflow_name or None,
             provider_name=provider_name,
@@ -105,7 +105,7 @@ def list_job_heads(
             _,
             job_id,
             provider_name,
-            repo_user_id,
+            hub_user_name,
             submitted_at,
             status_info,
             artifacts,
@@ -118,7 +118,7 @@ def list_job_heads(
             JobHead(
                 job_id=job_id,
                 repo_ref=RepoRef(repo_id=repo_id),
-                repo_user_id=repo_user_id,
+                hub_user_name=hub_user_name,
                 run_name=run_name,
                 workflow_name=workflow_name or None,
                 provider_name=provider_name,
@@ -278,7 +278,7 @@ def _get_job_head_filename(job: Job) -> str:
         f"{prefix}l;"
         f"{job.job_id};"
         f"{job.provider_name};"
-        f"{job.repo_user_id};"
+        f"{job.hub_user_name};"
         f"{job.submitted_at};"
         f"{job.status.value},{job.error_code.value if job.error_code else ''},{job.container_exit_code or ''};"
         f"{','.join([a.artifact_path.replace('/', '_') for a in (job.artifact_specs or [])])};"

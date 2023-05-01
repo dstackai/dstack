@@ -343,7 +343,7 @@ def _run_instance(
     runner_id: str,
     instance_type: InstanceType,
     repo_id: str,
-    repo_user_id: str,
+    hub_user_name: str,
     ssh_key_pub: str,
 ) -> str:
     launch_specification = {}
@@ -374,7 +374,7 @@ def _run_instance(
         {"Key": "owner", "Value": "dstack"},
         {"Key": "dstack_bucket", "Value": bucket_name},
         {"Key": "dstack_repo", "Value": repo_id},
-        {"Key": "dstack_repo_user", "Value": repo_user_id},
+        {"Key": "dstack_repo_user", "Value": hub_user_name},
     ]
     response = ec2_client.run_instances(
         BlockDeviceMappings=[
@@ -421,7 +421,7 @@ def run_instance_retry(
     runner_id: str,
     instance_type: InstanceType,
     repo_id: str,
-    repo_user_id: str,
+    hub_user_name: str,
     ssh_key_pub: str,
     attempts: int = 3,
 ) -> str:
@@ -435,7 +435,7 @@ def run_instance_retry(
             runner_id,
             instance_type,
             repo_id,
-            repo_user_id,
+            hub_user_name,
             ssh_key_pub,
         )
     except botocore.exceptions.ClientError as e:
@@ -452,7 +452,7 @@ def run_instance_retry(
                     runner_id,
                     instance_type,
                     repo_id,
-                    repo_user_id,
+                    hub_user_name,
                     ssh_key_pub,
                     attempts - 1,
                 )

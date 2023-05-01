@@ -47,7 +47,7 @@ class AWSCompute(Compute):
             runner_id=job.runner_id,
             instance_type=instance_type,
             repo_id=job.repo_ref.repo_id,
-            repo_user_id=job.repo_user_id,
+            hub_user_name=job.hub_user_name,
             ssh_key_pub=job.ssh_key_pub,
         )
 

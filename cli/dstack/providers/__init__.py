@@ -242,7 +242,7 @@ class Provider:
             job = Job(
                 job_id=f"{self.run_name},{self.workflow_name or ''},{i}",
                 repo_ref=hub_client.repo.repo_ref,
-                repo_user_id="",  # HUB will fill it later
+                hub_user_name="",  # HUB will fill it later
                 repo_data=hub_client.repo.repo_data,
                 run_name=self.run_name,
                 workflow_name=self.workflow_name or None,

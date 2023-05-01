@@ -79,7 +79,7 @@ class TAGCommand(BasicCommand):
                 tag_head.tag_name,
                 created_at,
                 tag_head.run_name,
-                tag_head.repo_user_id,
+                tag_head.hub_user_name,
             )
         console.print(table)
 

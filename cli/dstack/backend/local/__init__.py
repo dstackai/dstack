@@ -186,8 +186,8 @@ class LocalBackend(Backend):
     def delete_secret(self, repo_id: str, secret_name: str):
         base_secrets.delete_secret(self._storage, self._secrets_manager, repo_id, secret_name)
 
-    def delete_workflow_cache(self, repo_id: str, repo_user_id: str, workflow_name: str):
-        base_cache.delete_workflow_cache(self._storage, repo_id, repo_user_id, workflow_name)
+    def delete_workflow_cache(self, repo_id: str, hub_user_name: str, workflow_name: str):
+        base_cache.delete_workflow_cache(self._storage, repo_id, hub_user_name, workflow_name)
 
     def get_signed_download_url(self, object_key: str) -> str:
         # Implemented by Hub
