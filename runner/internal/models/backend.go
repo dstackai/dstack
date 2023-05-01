@@ -30,9 +30,9 @@ type Job struct {
 	Deps         []Dep             `yaml:"deps"`
 	ProviderName string            `yaml:"provider_name"`
 
-	RepoId     string `yaml:"repo_id"`
-	RepoUserId string `yaml:"repo_user_id"`
-	RepoType   string `yaml:"repo_type"`
+	RepoId      string `yaml:"repo_id"`
+	RepoType    string `yaml:"repo_type"`
+	HubUserName string `yaml:"hub_user_name"`
 
 	RepoHostName string `yaml:"repo_host_name"`
 	RepoPort     int    `yaml:"repo_port,omitempty"`
@@ -60,10 +60,10 @@ type Job struct {
 }
 
 type Dep struct {
-	RepoId     string `yaml:"repo_id,omitempty"`
-	RepoUserId string `yaml:"repo_user_id,omitempty"`
-	RunName    string `yaml:"run_name,omitempty"`
-	Mount      bool   `yaml:"mount,omitempty"`
+	RepoId      string `yaml:"repo_id,omitempty"`
+	HubUserName string `yaml:"hub_user_name,omitempty"`
+	RunName     string `yaml:"run_name,omitempty"`
+	Mount       bool   `yaml:"mount,omitempty"`
 }
 
 type Artifact struct {
@@ -145,7 +145,7 @@ func (j *Job) JobHeadFilepath() string {
 		j.RepoId,
 		j.JobID,
 		j.ProviderName,
-		j.RepoUserId,
+		j.HubUserName,
 		j.SubmittedAt,
 		strings.Join([]string{j.Status, j.ErrorCode, j.ContainerExitCode}, ","),
 		strings.Join(artifactSlice, ","),
@@ -169,7 +169,7 @@ func (j *Job) JobHeadFilepathLocal() string {
 		j.RepoId,
 		j.JobID,
 		j.ProviderName,
-		j.RepoUserId,
+		j.HubUserName,
 		j.SubmittedAt,
 		strings.Join([]string{j.Status, j.ErrorCode, j.ContainerExitCode}, ","),
 		strings.Join(artifactSlice, ","),

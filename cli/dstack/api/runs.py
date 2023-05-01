@@ -14,9 +14,7 @@ class TagNotFoundError(Exception):
     pass
 
 
-def list_runs(
-    hub_client: HubClient, run_name: str = "", all: bool = False
-) -> List[Tuple[RunHead, Backend]]:
+def list_runs(hub_client: HubClient, run_name: str = "", all: bool = False) -> List[RunHead]:
     runs = [run for run in _get_runs(hub_client, run_name, all)]
     return list(sorted(runs, key=lambda r: -r.submitted_at))
 

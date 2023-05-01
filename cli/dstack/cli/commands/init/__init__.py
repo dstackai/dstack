@@ -72,7 +72,6 @@ class InitCommand(BasicCommand):
         config.save_repo_user_config(
             RepoUserConfig(
                 repo_id=repo.repo_ref.repo_id,
-                repo_user_id=repo.repo_ref.repo_user_id,
                 repo_type=repo.repo_data.repo_type,
                 ssh_key_path=get_ssh_keypair(args.ssh_identity_file),
             )

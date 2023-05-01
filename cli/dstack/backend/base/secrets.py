@@ -6,35 +6,32 @@ from dstack.core.secret import Secret
 
 
 class SecretsManager(ABC):
-    def __init__(self, repo_id: str):
-        self.repo_id = repo_id
-
     @abstractmethod
-    def get_secret(self, secret_name: str) -> Optional[Secret]:
+    def get_secret(self, repo_id: str, secret_name: str) -> Optional[Secret]:
         pass
 
     @abstractmethod
-    def add_secret(self, secret: Secret):
+    def add_secret(self, repo_id: str, secret: Secret):
         pass
 
     @abstractmethod
-    def update_secret(self, secret: Secret):
+    def update_secret(self, repo_id: str, secret: Secret):
         pass
 
     @abstractmethod
-    def delete_secret(self, secret_name: str):
+    def delete_secret(self, repo_id: str, secret_name: str):
         pass
 
     @abstractmethod
-    def get_credentials(self) -> Optional[str]:
+    def get_credentials(self, repo_id: str) -> Optional[str]:
         pass
 
     @abstractmethod
-    def add_credentials(self, data: str):
+    def add_credentials(self, repo_id: str, data: str):
         pass
 
     @abstractmethod
-    def update_credentials(self, data: str):
+    def update_credentials(self, repo_id: str, data: str):
         pass
 
 
@@ -49,43 +46,32 @@ def list_secret_names(storage: Storage, repo_id: str) -> List[str]:
 
 
 def get_secret(
-    secrets_manager: SecretsManager,
-    secret_name: str,
+    secrets_manager: SecretsManager, repo_id: str, secret_name: str
 ) -> Optional[Secret]:
-    return secrets_manager.get_secret(secret_name)
+    return secrets_manager.get_secret(repo_id, secret_name)
 
 
-def add_secret(
-    storage: Storage,
-    secrets_manager: SecretsManager,
-    secret: Secret,
-):
-    secrets_manager.add_secret(secret)
+def add_secret(storage: Storage, secrets_manager: SecretsManager, repo_id: str, secret: Secret):
+    secrets_manager.add_secret(repo_id, secret)
     storage.put_object(
-        key=_get_secret_head_key(secrets_manager.repo_id, secret.secret_name),
+        key=_get_secret_head_key(repo_id, secret.secret_name),
         content="",
     )
 
 
-def update_secret(
-    storage: Storage,
-    secrets_manager: SecretsManager,
-    secret: Secret,
-):
-    secrets_manager.update_secret(secret)
+def update_secret(storage: Storage, secrets_manager: SecretsManager, repo_id: str, secret: Secret):
+    secrets_manager.update_secret(repo_id, secret)
     storage.put_object(
-        key=_get_secret_head_key(secrets_manager.repo_id, secret.secret_name),
+        key=_get_secret_head_key(repo_id, secret.secret_name),
         content="",
     )
 
 
 def delete_secret(
-    storage: Storage,
-    secrets_manager: SecretsManager,
-    secret_name: str,
+    storage: Storage, secrets_manager: SecretsManager, repo_id: str, secret_name: str
 ):
-    secrets_manager.delete_secret(secret_name)
-    storage.delete_object(_get_secret_head_key(secrets_manager.repo_id, secret_name))
+    secrets_manager.delete_secret(repo_id, secret_name)
+    storage.delete_object(_get_secret_head_key(repo_id, secret_name))
 
 
 def _get_secret_heads_dir(repo_id: str) -> str:

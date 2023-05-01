@@ -105,7 +105,7 @@ def _create_run(
         run_name=job_head.run_name,
         workflow_name=job_head.workflow_name,
         provider_name=job_head.provider_name,
-        repo_user_id=job_head.repo_ref.repo_user_id,
+        hub_user_name=job_head.hub_user_name,
         artifact_heads=artifact_heads or None,
         status=job_head.status,
         submitted_at=job_head.submitted_at,

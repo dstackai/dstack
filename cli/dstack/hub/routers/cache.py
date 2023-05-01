@@ -10,8 +10,8 @@ from dstack.hub.services.backends import get_configurator
 cache = {}
 
 
-def get_backend(project: Project, repo: Optional[Repo] = None) -> Backend:
-    key = project.name if repo is None else (project.name, repo.repo_id, repo.repo_user_id)
+def get_backend(project: Project) -> Backend:
+    key = project.name
     if cache.get(key) is not None:
         return cache[key]
     backend_cls = get_backend_class(project.backend)
@@ -19,7 +19,7 @@ def get_backend(project: Project, repo: Optional[Repo] = None) -> Backend:
     json_data = json.loads(str(project.config))
     auth_data = json.loads(str(project.auth))
     config = configurator.get_config_from_hub_config_data(project.name, json_data, auth_data)
-    backend = backend_cls(repo=repo, backend_config=config)
+    backend = backend_cls(backend_config=config)
     cache[key] = backend
     return cache[key]
 

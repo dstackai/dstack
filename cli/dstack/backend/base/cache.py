@@ -1,13 +1,11 @@
 import os.path
 
 from dstack.backend.base.storage import Storage
-from dstack.core.repo import RepoRef
 
 
-def delete_workflow_cache(storage: Storage, repo_ref: RepoRef, workflow: str):
+def delete_workflow_cache(storage: Storage, repo_id: str, hub_user_name: str, workflow: str):
     storage.delete_prefix(
-        keys_prefix=os.path.join(_get_cache_dir(repo_ref.repo_id, repo_ref.repo_user_id), workflow)
-        + "/"
+        keys_prefix=os.path.join(_get_cache_dir(repo_id, hub_user_name), workflow) + "/"
     )
 
 

@@ -475,7 +475,7 @@ def _get_labels(bucket: str, job: Job) -> Dict[str, str]:
     dstack_repo = job.repo.repo_id.lower().replace(".", "-")
     if gcp_utils.is_valid_label_value(dstack_repo):
         labels["dstack_repo"] = dstack_repo
-    dstack_user_name = job.repo.repo_user_id.lower().replace(" ", "_")
+    dstack_user_name = job.hub_user_name.lower().replace(" ", "_")
     if gcp_utils.is_valid_label_value(dstack_user_name):
         labels["dstack_user_name"] = dstack_user_name
     return labels

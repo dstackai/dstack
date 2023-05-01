@@ -7,6 +7,7 @@ from argparse import ArgumentParser, Namespace
 from pkgutil import iter_modules
 from typing import Any, Dict, List, Optional, Union
 
+import dstack.api.hub as hub
 from dstack.core.cache import CacheSpec
 from dstack.core.error import RepoNotInitializedError
 from dstack.core.job import (
@@ -225,7 +226,7 @@ class Provider:
     def parse_args(self):
         pass
 
-    def submit_jobs(self, hub_client, tag_name: str) -> List[Job]:
+    def submit_jobs(self, hub_client: "hub.HubClient", tag_name: str) -> List[Job]:
         if not self.loaded:
             raise Exception("The provider is not loaded")
         job_specs = self.create_job_specs()
@@ -241,6 +242,7 @@ class Provider:
             job = Job(
                 job_id=f"{self.run_name},{self.workflow_name or ''},{i}",
                 repo_ref=hub_client.repo.repo_ref,
+                hub_user_name="",  # HUB will fill it later
                 repo_data=hub_client.repo.repo_data,
                 run_name=self.run_name,
                 workflow_name=self.workflow_name or None,
@@ -274,7 +276,7 @@ class Provider:
             hub_client.add_tag_from_run(tag_name, self.run_name, jobs)
         return jobs
 
-    def _dep_specs(self, hub_client) -> Optional[List[DepSpec]]:
+    def _dep_specs(self, hub_client: "hub.HubClient") -> Optional[List[DepSpec]]:
         if self.provider_data.get("deps"):
             return [self._parse_dep_spec(dep, hub_client) for dep in self.provider_data["deps"]]
         else:
@@ -341,7 +343,7 @@ class Provider:
             sys.exit(f"Invalid dep format: {dep}")
 
     @staticmethod
-    def _tag_dep(hub_client, tag_name: str, mount: bool) -> DepSpec:
+    def _tag_dep(hub_client: "hub.HubClient", tag_name: str, mount: bool) -> DepSpec:
         tag_head = hub_client.get_tag_head(tag_name)
         if tag_head:
             return DepSpec(
@@ -351,7 +353,7 @@ class Provider:
             sys.exit(f"Cannot find the tag '{tag_name}' in the '{hub_client.repo.repo_id}' repo")
 
     @staticmethod
-    def _workflow_dep(hub_client, workflow_name: str, mount: bool) -> DepSpec:
+    def _workflow_dep(hub_client: "hub.HubClient", workflow_name: str, mount: bool) -> DepSpec:
         job_heads = sorted(
             hub_client.list_job_heads(),
             key=lambda j: j.submitted_at,
