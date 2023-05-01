@@ -23,7 +23,7 @@ async def link_upload(
     token: HTTPAuthorizationCredentials = Security(HTTPBearer()),
 ):
     project = await get_project(project_name=project_name)
-    backend = get_backend(project, repo=None)
+    backend = get_backend(project)
     if isinstance(backend, LocalBackend):
         return str(
             request.url_for("put_file", project_name=project_name).replace_query_params(
@@ -46,7 +46,7 @@ async def link_download(
     token: HTTPAuthorizationCredentials = Security(HTTPBearer()),
 ):
     project = await get_project(project_name=project_name)
-    backend = get_backend(project, repo=None)
+    backend = get_backend(project)
     if isinstance(backend, LocalBackend):
         print(request.url_for("download_file", project_name=project_name))
         return str(

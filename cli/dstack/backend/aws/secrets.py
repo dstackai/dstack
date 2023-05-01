@@ -16,66 +16,64 @@ class AWSSecretsManager(SecretsManager):
         iam_client: BaseClient,
         sts_client: BaseClient,
         bucket_name: str,
-        repo_id: str,
     ):
-        super().__init__(repo_id=repo_id)
         self.secretsmanager_client = secretsmanager_client
         self.iam_client = iam_client
         self.sts_client = sts_client
         self.bucket_name = bucket_name
 
-    def get_secret(self, secret_name: str) -> Optional[Secret]:
+    def get_secret(self, repo_id: str, secret_name: str) -> Optional[Secret]:
         value = _get_secret_value(
             secretsmanager_client=self.secretsmanager_client,
-            secret_key=_get_secret_key(self.bucket_name, self.repo_id, secret_name),
+            secret_key=_get_secret_key(self.bucket_name, repo_id, secret_name),
         )
         if value is None:
             return None
         return Secret(secret_name=secret_name, secret_value=value)
 
-    def add_secret(self, secret: Secret):
+    def add_secret(self, repo_id: str, secret: Secret):
         _add_secret(
             secretsmanager_client=self.secretsmanager_client,
             sts_client=self.sts_client,
             iam_client=self.iam_client,
             bucket_name=self.bucket_name,
-            secret_key=_get_secret_key(self.bucket_name, self.repo_id, secret.secret_name),
+            secret_key=_get_secret_key(self.bucket_name, repo_id, secret.secret_name),
             secret_value=secret.secret_value,
         )
 
-    def update_secret(self, secret: Secret):
+    def update_secret(self, repo_id: str, secret: Secret):
         _update_secret(
             secretsmanager_client=self.secretsmanager_client,
-            secret_key=_get_secret_key(self.bucket_name, self.repo_id, secret.secret_name),
+            secret_key=_get_secret_key(self.bucket_name, repo_id, secret.secret_name),
             secret_value=secret.secret_value,
         )
 
-    def delete_secret(self, secret_name: str):
+    def delete_secret(self, repo_id: str, secret_name: str):
         _delete_secret(
             secretsmanager_client=self.secretsmanager_client,
-            secret_key=_get_secret_key(self.bucket_name, self.repo_id, secret_name),
+            secret_key=_get_secret_key(self.bucket_name, repo_id, secret_name),
         )
 
-    def get_credentials(self) -> Optional[str]:
+    def get_credentials(self, repo_id: str) -> Optional[str]:
         return _get_secret_value(
             secretsmanager_client=self.secretsmanager_client,
-            secret_key=_get_credentials_key(self.bucket_name, self.repo_id),
+            secret_key=_get_credentials_key(self.bucket_name, repo_id),
         )
 
-    def add_credentials(self, data: str):
+    def add_credentials(self, repo_id: str, data: str):
         _add_secret(
             secretsmanager_client=self.secretsmanager_client,
             sts_client=self.sts_client,
             iam_client=self.iam_client,
             bucket_name=self.bucket_name,
-            secret_key=_get_credentials_key(self.bucket_name, self.repo_id),
+            secret_key=_get_credentials_key(self.bucket_name, repo_id),
             secret_value=data,
         )
 
-    def update_credentials(self, data: str):
+    def update_credentials(self, repo_id: str, data: str):
         _update_secret(
             secretsmanager_client=self.secretsmanager_client,
-            secret_key=_get_credentials_key(self.bucket_name, self.repo_id),
+            secret_key=_get_credentials_key(self.bucket_name, repo_id),
             secret_value=data,
         )
 

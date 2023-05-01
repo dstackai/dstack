@@ -71,7 +71,7 @@ class HubAPIClient:
             host=self.url,
             url=url,
             headers=self._headers(),
-            data=RepoSpec.from_repo(self.repo).json(),
+            data=self.repo.repo_ref.json(),
         )
         if resp.ok:
             return resp.text
@@ -158,7 +158,7 @@ class HubAPIClient:
             url=url,
             headers=self._headers(),
             data=StopRunners(
-                repo_spec=RepoSpec.from_repo(self.repo),
+                repo_id=self.repo.repo_id,
                 job_id=job_id,
                 abort=abort,
             ).json(),
@@ -209,7 +209,7 @@ class HubAPIClient:
             host=self.url,
             url=url,
             headers=self._headers(),
-            data=RepoSpec.from_repo(self.repo).json(),
+            data=self.repo.repo_ref.json(),
         )
         if resp.ok:
             return TagHead.parse_obj(resp.json())
@@ -228,7 +228,7 @@ class HubAPIClient:
             host=self.url,
             url=url,
             headers=self._headers(),
-            data=RepoSpec.from_repo(self.repo).json(),
+            data=self.repo.repo_ref.json(),
         )
         if resp.ok:
             body = resp.json()
@@ -252,7 +252,7 @@ class HubAPIClient:
             url=url,
             headers=self._headers(),
             data=AddTagRun(
-                repo_spec=RepoSpec.from_repo(self.repo),
+                repo_id=self.repo.repo_id,
                 tag_name=tag_name,
                 run_name=run_name,
                 run_jobs=run_jobs,
@@ -267,25 +267,26 @@ class HubAPIClient:
         tag_name: str,
         local_dirs: List[str],
     ):
-        url = _project_url(
-            url=self.url,
-            project=self.project,
-            additional_path=f"/tags/add/path",
-        )
-        resp = _make_hub_request(
-            requests.post,
-            host=self.url,
-            url=url,
-            headers=self._headers(),
-            data=AddTagPath(
-                repo_spec=RepoSpec.from_repo(self.repo),
-                tag_name=tag_name,
-                local_dirs=local_dirs,
-            ).json(),
-        )
-        if resp.ok:
-            return
-        resp.raise_for_status()
+        # url = _project_url(
+        #     url=self.url,
+        #     project=self.project,
+        #     additional_path=f"/tags/add/path",
+        # )
+        # resp = _make_hub_request(
+        #     requests.post,
+        #     host=self.url,
+        #     url=url,
+        #     headers=self._headers(),
+        #     data=AddTagPath(
+        #         repo_spec=RepoSpec.from_repo(self.repo),
+        #         tag_name=tag_name,
+        #         local_dirs=local_dirs,
+        #     ).json(),
+        # )
+        # if resp.ok:
+        #     return
+        # resp.raise_for_status()
+        raise NotImplementedError()
 
     def delete_tag_head(self, tag_head: TagHead):
         url = _project_url(
@@ -298,7 +299,7 @@ class HubAPIClient:
             host=self.url,
             url=url,
             headers=self._headers(),
-            data=RepoSpec.from_repo(self.repo).json(),
+            data=self.repo.repo_ref.json(),
         )
         if resp.ok:
             return
@@ -363,7 +364,7 @@ class HubAPIClient:
             headers=self._headers(),
         )
         if resp.ok:
-            return [RepoHead(e) for e in resp.json()]
+            return [RepoHead.parse_obj(e) for e in resp.json()]
         resp.raise_for_status()
 
     def get_repos_credentials(self) -> Optional[RemoteRepoCredentials]:
@@ -377,7 +378,7 @@ class HubAPIClient:
             host=self.url,
             url=url,
             headers=self._headers(),
-            data=RepoSpec.from_repo(self.repo).json(),
+            data=self.repo.repo_ref.json(),
         )
         if resp.ok:
             json_data = resp.json()
@@ -398,7 +399,7 @@ class HubAPIClient:
             url=url,
             headers=self._headers(),
             data=SaveRepoCredentials(
-                repo_spec=RepoSpec.from_repo(self.repo),
+                repo_id=self.repo.repo_id,
                 repo_credentials=repo_credentials,
             ).json(),
         )
@@ -417,7 +418,7 @@ class HubAPIClient:
             host=self.url,
             url=url,
             headers=self._headers(),
-            data=RepoSpec.from_repo(self.repo).json(),
+            data=self.repo.repo_ref.json(),
         )
         if resp.ok:
             return resp.json()
@@ -434,7 +435,7 @@ class HubAPIClient:
             host=self.url,
             url=url,
             headers=self._headers(),
-            data=RepoSpec.from_repo(self.repo).json(),
+            data=self.repo.repo_ref.json(),
         )
         if resp.ok:
             json_data = resp.json()
@@ -455,7 +456,7 @@ class HubAPIClient:
             url=url,
             headers=self._headers(),
             data=SecretAddUpdate(
-                repo_spec=RepoSpec.from_repo(self.repo),
+                repo_id=self.repo.repo_id,
                 secret=secret,
             ).json(),
         )
@@ -475,7 +476,7 @@ class HubAPIClient:
             url=url,
             headers=self._headers(),
             data=SecretAddUpdate(
-                repo_spec=RepoSpec.from_repo(self.repo),
+                repo_id=self.repo.repo_id,
                 secret=secret,
             ).json(),
         )
@@ -494,7 +495,7 @@ class HubAPIClient:
             host=self.url,
             url=url,
             headers=self._headers(),
-            data=RepoSpec.from_repo(self.repo).json(),
+            data=self.repo.repo_ref.json(),
         )
         if resp.ok:
             return

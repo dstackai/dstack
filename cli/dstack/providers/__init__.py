@@ -271,7 +271,7 @@ class Provider:
             hub_client.submit_job(job)
             jobs.append(job)
         if tag_name:
-            hub_client.add_tag_from_run(tag_name, self.run_name, jobs)
+            hub_client.add_tag_from_run(repo_id, tag_name, self.run_name, jobs)
         return jobs
 
     def _dep_specs(self, hub_client) -> Optional[List[DepSpec]]:
@@ -342,7 +342,7 @@ class Provider:
 
     @staticmethod
     def _tag_dep(hub_client, tag_name: str, mount: bool) -> DepSpec:
-        tag_head = hub_client.get_tag_head(tag_name)
+        tag_head = hub_client.get_tag_head(repo_id, tag_name)
         if tag_head:
             return DepSpec(
                 repo_ref=hub_client.repo.repo_ref, run_name=tag_head.run_name, mount=mount
@@ -353,7 +353,7 @@ class Provider:
     @staticmethod
     def _workflow_dep(hub_client, workflow_name: str, mount: bool) -> DepSpec:
         job_heads = sorted(
-            hub_client.list_job_heads(),
+            hub_client.list_job_heads(repo_id),
             key=lambda j: j.submitted_at,
             reverse=True,
         )

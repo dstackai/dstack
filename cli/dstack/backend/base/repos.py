@@ -59,8 +59,10 @@ def delete_repo(storage: Storage, repo_id: str):
     _delete_repo_head(storage, repo_id)
 
 
-def get_repo_credentials(secrets_manager: SecretsManager) -> Optional[RemoteRepoCredentials]:
-    credentials_value = secrets_manager.get_credentials()
+def get_repo_credentials(
+    secrets_manager: SecretsManager, repo_id: str
+) -> Optional[RemoteRepoCredentials]:
+    credentials_value = secrets_manager.get_credentials(repo_id)
     if credentials_value is None:
         return None
     credentials_data = json.loads(credentials_value)
@@ -68,7 +70,7 @@ def get_repo_credentials(secrets_manager: SecretsManager) -> Optional[RemoteRepo
 
 
 def save_repo_credentials(
-    secrets_manager: SecretsManager, repo_credentials: RemoteRepoCredentials
+    secrets_manager: SecretsManager, repo_id, repo_credentials: RemoteRepoCredentials
 ):
     credentials_data = {"protocol": repo_credentials.protocol.value}
     if repo_credentials.protocol == RepoProtocol.HTTPS and repo_credentials.oauth_token:
@@ -79,11 +81,11 @@ def save_repo_credentials(
         else:
             raise Exception("No private key is specified")
 
-    credentials_value = secrets_manager.get_credentials()
+    credentials_value = secrets_manager.get_credentials(repo_id)
     if credentials_value is not None:
-        secrets_manager.update_credentials(json.dumps(credentials_data))
+        secrets_manager.update_credentials(repo_id, json.dumps(credentials_data))
     else:
-        secrets_manager.add_credentials(json.dumps(credentials_data))
+        secrets_manager.add_credentials(repo_id, json.dumps(credentials_data))
 
 
 def _get_repo_head(storage: Storage, repo_id: str) -> Optional[RepoHead]:

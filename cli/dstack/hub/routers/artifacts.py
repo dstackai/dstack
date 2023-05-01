@@ -17,4 +17,4 @@ router = APIRouter(
 async def list_artifacts(project_name: str, body: ArtifactsList) -> List[Artifact]:
     project = await get_project(project_name=project_name)
     backend = get_backend(project)
-    return backend.list_run_artifact_files(run_name=body.run_name, repo_id=body.repo_id)
+    return backend.list_run_artifact_files(repo_id=body.repo_id, run_name=body.run_name)
