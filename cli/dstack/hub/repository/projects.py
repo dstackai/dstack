@@ -44,6 +44,18 @@ class ProjectManager:
         )
 
     @staticmethod
+    @reuse_or_make_session
+    async def create_local_project(
+        user: User, project_name: str, session: Optional[AsyncSession] = None
+    ):
+        project_info = ProjectInfoWithCreds(
+            project_name=project_name, backend=LocalProjectConfig()
+        )
+        await ProjectManager.create_project_from_info(
+            user=user, project_info=project_info, session=session
+        )
+
+    @staticmethod
     async def update_project_from_info(
         project_info: ProjectInfoWithCreds, session: Optional[AsyncSession] = None
     ):

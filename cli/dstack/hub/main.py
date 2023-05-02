@@ -3,12 +3,15 @@ import time
 
 import pkg_resources
 from fastapi import FastAPI, Request
+from rich.prompt import Confirm
 from starlette.responses import HTMLResponse, JSONResponse
 from starlette.staticfiles import StaticFiles
 
+from dstack.cli.config import CLIConfigManager
 from dstack.hub.background import start_background_tasks
 from dstack.hub.db.migrate import migrate
 from dstack.hub.db.models import User
+from dstack.hub.repository.projects import ProjectManager
 from dstack.hub.repository.users import UserManager
 from dstack.hub.routers import (
     artifacts,
@@ -26,6 +29,7 @@ from dstack.hub.routers import (
     users,
     workflows,
 )
+from dstack.hub.services.backends import local_backend_available
 from dstack.hub.utils import logging
 
 logging.configure_root_logger()
@@ -49,13 +53,19 @@ app.include_router(link.router)
 app.include_router(workflows.router)
 
 
+DEFAULT_PROJECT_NAME = "default"
+
+
 @app.on_event("startup")
 async def startup_event():
     await migrate()
     admin_user = await update_admin_user()
+    await create_default_project(admin_user)
+    url = f"http://{os.getenv('DSTACK_HUB_HOST')}:{os.getenv('DSTACK_HUB_PORT')}"
+    url_with_token = f"{url}?token={admin_user.token}"
+    create_default_project_config(url, admin_user.token)
     start_background_tasks()
-    url = f"http://{os.getenv('DSTACK_HUB_HOST')}:{os.getenv('DSTACK_HUB_PORT')}?token={admin_user.token}"
-    print(f"The hub is available at {url}")
+    print(f"The hub is available at {url_with_token}")
 
 
 @app.middleware("http")
@@ -85,6 +95,34 @@ async def update_admin_user() -> User:
         admin_user.token = os.getenv("DSTACK_HUB_ADMIN_TOKEN")
         await UserManager.save(admin_user)
     return admin_user
+
+
+async def create_default_project(user: User):
+    if not local_backend_available():
+        return
+    default_project = await ProjectManager.get(DEFAULT_PROJECT_NAME)
+    if default_project is not None:
+        return
+    await ProjectManager.create_local_project(user=user, project_name=DEFAULT_PROJECT_NAME)
+
+
+def create_default_project_config(url: str, token: str):
+    cli_config_manager = CLIConfigManager()
+    default_project_config = cli_config_manager.get_default_project_config()
+    project_config = cli_config_manager.get_project_config(DEFAULT_PROJECT_NAME)
+    if project_config is None:
+        cli_config_manager.configure_project(
+            name=DEFAULT_PROJECT_NAME, url=url, token=token, default=default_project_config is None
+        )
+        cli_config_manager.save()
+        return
+    if project_config.url != url or project_config.token != token:
+        if Confirm.ask(f"CLI config for default project is outdated. Update config?"):
+            cli_config_manager.configure_project(
+                name=DEFAULT_PROJECT_NAME, url=url, token=token, default=True
+            )
+        cli_config_manager.save()
+        return
 
 
 app.mount("/", StaticFiles(packages=["dstack.hub"], html=True), name="static")
