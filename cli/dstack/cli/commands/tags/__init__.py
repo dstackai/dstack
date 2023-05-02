@@ -23,7 +23,7 @@ class TAGCommand(BasicCommand):
         self._parser.add_argument(
             "--project",
             type=str,
-            help="Hub project to execute the command",
+            help="The name of the Hub project to execute the command for",
             default=None,
         )
         subparsers = self._parser.add_subparsers()
@@ -35,7 +35,7 @@ class TAGCommand(BasicCommand):
             "tag_name", metavar="TAG", type=str, help="The name of the tag"
         )
         add_tags_parser.add_argument(
-            "run_name", metavar="RUN", type=str, help="A name of a run", nargs="?"
+            "run_name", metavar="RUN", type=str, help="The name of the run", nargs="?"
         )
         add_tags_parser.add_argument(
             "-a",

@@ -41,7 +41,7 @@ workflows:
 
 </div>
 
-Run it locally to see if it works:
+Run it to see if it works:
 
 <div class="termy">
 
@@ -111,7 +111,3 @@ workflows:
 
 Running `wandb-init` will create the corresponding run in the W&B user interface. If you tracked metrics 
 with [`wandb.log()`](https://docs.wandb.ai/ref/python/log), they would appear in real-time.
-
-!!! info "NOTE:"
-    If your workflow runs locally, it will run remotely with no issues as well. If you have a remote configured, you can run
-    your workflow remotely using the `dstack run` command with the `--remote` flag.

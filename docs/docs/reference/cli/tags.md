@@ -29,15 +29,14 @@ There are two ways of creating a tag:
 
 ```shell
 $ dstack tags add --help
-Usage: dstack tags add [-h] [-a PATH] [-r] [-y] TAG [RUN]
+Usage: dstack tags add [-h] [-a PATH] [-y] TAG [RUN]
 
 Positional Arguments:
   TAG                   The name of the tag
-  RUN                   A name of a run
+  RUN                   The name of the run
 
-Optional Arguments:
+Options:
   -a, --artifact PATH   A path to local directory to upload as an artifact
-  -r, --remote          Upload artifact to remote
   -y, --yes             Don't ask for confirmation
 ```
 
@@ -47,12 +46,12 @@ Optional Arguments:
 
 The following argument is required:
 
-- `TAG` – (Required) A name of the tag. Must be unique within the current Git repo.
+- `TAG` – (Required) The name of the tag.
 
 One of the following arguments is also required:
 
-- `-r`, `--run` - A name of a run
-- `-a PATH`, `--artifact PATH` - A path to a local folder to be uploaded as an artifact.
+- `RUN` – (Optional) The name of the run
+- `-a PATH`, `--artifact PATH` - (Optional) The path to the local folder to be uploaded as an artifact.
 
 ### Examples:
 
@@ -105,7 +104,7 @@ Optional Arguments:
 
 The following arguments are required:
 
-- `TAG` - (Required) A name of a tag
+- `TAG` - (Required) The name of the tag
 
 The following arguments are optional:
 

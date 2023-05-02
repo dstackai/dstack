@@ -1,11 +1,10 @@
 ---
 title: Run your own ChatGPT with Dolly
-status: new
 ---
 
 # Run your own ChatGPT with Dolly
 
-This tutorial shows you how to run (and debug) your own ChatGPT on your cloud account using `dstack`, Gradio, and
+This tutorial shows you how to run and debug your own ChatGPT on your cloud account using `dstack`, Gradio, and
 Dolly (Databricks' open-source pre-trained model).
 
 !!! info "NOTE:"
@@ -56,7 +55,7 @@ print(generate_text("Explain how large language models work"))
     include [`databricks/dolly-v2-3b`](https://huggingface.co/databricks/dolly-v2-3b) and
     [`databricks/dolly-v2-7b`](https://huggingface.co/databricks/dolly-v2-7b).  
 
-## 3. Create an application
+## 3. Create the application
 
 Now, let's put it all together into a simple chat application. To do that, we'll use Gradio and its
 built-in [`Chatbot`](https://gradio.app/creating-a-chatbot/) component.
@@ -122,7 +121,7 @@ if __name__ == "__main__":
     Since we'll run our application via `dstack`, we've added the possibility to override the server port of our application
     using the `PORT_0` environment variable.
 
-## 4. Define a workflow
+## 4. Define the workflow
 
 To run our application in our cloud account using `dstack`, we need to define a `dstack` workflow as follows:
 
@@ -148,22 +147,27 @@ workflows:
 </div>
 
 !!! info "NOTE:"
-    We define the dstack workflow file to specify the requirements, script, ports, cached files, and hardware resources for
+    We define a `dstack` workflow file to specify the requirements, script, ports, cached files, and hardware resources for
     our application. Our workflow requires an A100 GPU with at least 60GB of memory and interruptible (spot) instances if
     run in the cloud. 
 
-## 4. Run the workflow
+## 5. Run the workflow
 
 !!! info "NOTE:"
-    To run workflows remotely in a configured cloud, we'll need the [Hub application](../docs/quick-start.md#start-the-hub-application).
+    Before running the workflow, make sure that you have set up the Hub application and
+    [created a project](../docs/quick-start.md#create-a-hub-project) that can run workflows in the cloud.
 
-Once the remote is configured, we can use the [`dstack run`](../docs/reference/cli/run.md) command with the `--remote` flag to
-run our workflow in the cloud.
+Once the project is configured, we can use the [`dstack run`](../docs/reference/cli/run.md) command to
+run our workflow.
+
+!!! info "NOTE:"
+    The Hub will automatically create the corresponding cloud resources, run the application, and forward the application
+    port to localhost. If the workflow is completed, it automatically destroys the cloud resources.
 
 <div class="termy">
 
 ```shell
-$ dstack run dolly --remote
+$ dstack run dolly
 
 RUN       WORKFLOW  SUBMITTED  STATUS     TAG  BACKENDS
 turtle-1  dolly     now        Submitted       gcp
@@ -180,15 +184,11 @@ Running on local URL:  http://127.0.0.1:51741
 
 </div>
 
-!!! info "NOTE:"
-    `dstack` automatically creates and sets up the corresponding cloud instance, runs the application, and forwards the
-    application port to localhost. If the command is interrupted, `dstack` automatically destroys the cloud instance.
-
 Clicking the URL from the output will open our ChatGPT application running in the cloud. 
 
 ![](dstack-dolly.png){ width=800 }
 
-## 5. Debug the workflow
+## 6. Debug the workflow
 
 Before coming up with a workflow that runs perfectly in the cloud, you may need to debug it. With `dstack`, you can debug
 your workflow right in the cloud using an IDE. One way to do this is by using
@@ -222,10 +222,10 @@ you've specified.
 <div class="termy">
 
 ```shell
-$ dstack run debug-dolly --remote
+$ dstack run debug-dolly
 
-RUN        WORKFLOW     SUBMITTED  STATUS     TAG  BACKENDS
-mangust-1  debug-dolly  now        Submitted       gcp
+RUN        WORKFLOW     SUBMITTED  STATUS     TAG
+mangust-1  debug-dolly  now        Submitted     
 
 Provisioning... It may take up to a minute. ✓
 
@@ -245,16 +245,5 @@ Clicking the last link will open VS Code on the provisioned machine.
 You can run your code interactively, debug it, and run the application there.
 After fixing the workflow, you can run it using the `bash` provider.
 
-!!! info "NOTE:"
-    If you omit the `--remote` flag in your `dstack run` command, the workflow will run locally on your machine. Although you
-    may not have the required hardware resources, it's a good way to quickly test your workflow before running it in the
-    cloud.
-
 As an alternative to the `code` provider, you can run the `bash` provider with `ssh` set to `true`. This allows you to attach
 your own IDE to the running workflow.
-
-## 6. Conclusion
-
-When should I use `dstack`? Firstly, when you want to easily run ML workflows, provision cloud resources on-demand, and
-keep your project reproducible and easy to collaborate on. Secondly, when you want to run batch workflows in the cloud
-on-demand. In the case of Dolly, this could be a batch job that processes specific data.

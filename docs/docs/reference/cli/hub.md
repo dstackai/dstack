@@ -1,6 +1,6 @@
 # dstack hub
 
-This command starts the Hub application. Hub is required for running workflows remotely (e.g. in a configured cloud).
+This command starts the Hub application. The Hub application is required to run workflows.
 
 ## Usage
 
@@ -17,6 +17,10 @@ Options:
 ```
 
 </div>
+
+!!! info "NOTE:"
+    On the first run, this command creates the default project to run workflows locally and updates the local config 
+    accordingly (`~/.dstack/config.yaml`).
 
 ## Arguments reference
 

@@ -8,15 +8,17 @@ The `ls` command lists the files of the artifacts of a given run or tag.
 
 ```shell
 $ dstack ls --help
-Usage: dstack ls [-h] [-r] [-t] RUN | :TAG [SEARCH_PREFIX]
+Usage: dstack ls [-h] [--project PROJECT] [-r] [-t] RUN | :TAG [SEARCH_PREFIX]
 
 Positional Arguments:
-  RUN | :TAG       A name of a run or a tag
-  SEARCH_PREFIX    Show files starting with prefix
+  RUN | :TAG         The name of the run or the tag
+  SEARCH_PREFIX      Show files starting with prefix
 
-Optional Arguments:
-  -r, --recursive  Show all files recursively
-  -t, --total      Show total folder size
+Options:
+  -h, --help         Show this help message and exit
+  --project PROJECT  Hub project to execute the command
+  -r, --recursive    Show all files recursively
+  -t, --total        Show total folder size
 ```
 
 </div>
@@ -25,11 +27,12 @@ Optional Arguments:
 
 One of the following arguments is required:
 
-- `RUN` – A name of a run
-- `:TAG` – A name of a tag
+- `RUN` – The name of the run
+- `:TAG` – The name of the tag
 
 The following arguments are optional:
 
+-  `--project PROJECT` – (Optional) The name of the Hub project to execute the command for
 - `-r`, `--recursive` – (Optional) Show all files recursively
 - `-t`, `--total` – (Optional) Show total folder size
 - `SEARCH_PREFIX` – (Optional) Show files starting with prefix

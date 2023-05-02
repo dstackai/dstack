@@ -169,11 +169,11 @@ nav:
               - docker: docs/reference/providers/docker.md
   - Tutorials:
       - LLMs:
-          - Dolly: tutorials/dolly.md
-          - Stable Diffusion: tutorials/stable-diffusion.md
+          - Run your own ChatGPT with Dolly: tutorials/dolly.md
+          - Generate images with Stable Diffusion: tutorials/stable-diffusion.md
       - Experiment tracking:
-          - TensorBoard: tutorials/tensorboard.md
-          - Weights & Biases: tutorials/wandb.md
+          - Track experiments with TensorBoard: tutorials/tensorboard.md
+          - Track experiments with W&B: tutorials/wandb.md
 #      - CI/CD:
 #          - GitHub Actions: tutorials/github-actions.md
   #      - Community:

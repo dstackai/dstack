@@ -3,8 +3,7 @@
 Before creating a workflow that runs perfectly in the cloud, you may need to debug it.
 The [`code`](../reference/providers/code.md), [`lab`](../reference/providers/lab.md),
 and [`notebook`](../reference/providers/notebook.md) can
-help you do that by providing a way to launch interactive development environments
-either locally or remotely.
+help you do that by providing a way to launch interactive development environments.
 
 ## VS Code
 
@@ -99,4 +98,4 @@ To connect via SSH, use:
 
 </div>
 
-Now, you can use any IDE of your choice to connect to the remote running workflow.
+Now, you can use any IDE of your choice to connect to the running workflow.

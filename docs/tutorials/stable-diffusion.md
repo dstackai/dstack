@@ -4,7 +4,8 @@ title: Generate images with Stable Diffusion
 
 # Generate images with Stable Diffusion
 
-This tutorial demonstrates how to generate images using a pretrained Stable Diffusion model.
+This tutorial will show you how to run and debug a Gradio application on your cloud account that generates images using
+Stable Diffusion.
 
 !!! info "NOTE:"
     The source code of this tutorial is available in the <a href="https://github.com/dstackai/dstack-playground#readme" target="__blank">Playground</a>.
@@ -22,6 +23,7 @@ scipy
 ftfy
 accelerate
 safetensors
+gradio
 ```
 
 </div>
@@ -30,237 +32,217 @@ safetensors
     We're using the [`safetensors`](https://github.com/huggingface/safetensors) library because it implements a new simple format for storing tensors safely (as opposed
     to pickle) and that is still fast (zero-copy).
 
-To ensure our scripts can run smoothly across all environments, let's include them in
-the `tutorials/stable_diffusion/requirements.txt` file.
-
-You can also install these libraries locally:
-
-<div class="termy">
-
-```shell
-$ pip install -r tutorials/stable_diffusion/requirements.txt
-```
-
-</div>
-
-Also, because we'll use `dstack` CLI, let's install it locally:
-
-<div class="termy">
-
-```shell
-$ pip install dstack -U
-```
-
-</div>
-
-## 2. Download the pre-trained model
+## 2. Download the model
 
 In our tutorial, we'll use the [`runwayml/stable-diffusion-v1-5`](https://huggingface.co/runwayml/stable-diffusion-v1-5) model (pretrained by Runway).
-
-Let's create the following Python file:
-
-<div editor-title="stable_diffusion/stable_diffusion.py"> 
 
 ```python
 from huggingface_hub import snapshot_download
 
-if __name__ == '__main__':
-    snapshot_download("runwayml/stable-diffusion-v1-5", local_dir="./models/runwayml/stable-diffusion-v1-5")
+model_name = "runwayml/stable-diffusion-v1-5"
+
+snapshot_download(model_name, local_dir=f".models/{model_name}")
+```
+
+Once it's downloaded, you can load it to generate images based on a prompt:
+
+```python
+from diffusers import StableDiffusionPipeline
+
+pipe = StableDiffusionPipeline.from_pretrained(f"./models/{model_name}", device_map="auto", local_files_only=True)
+
+prompt = "a photo of an astronaut riding a horse on mars"
+image = pipe(prompt).images[0]  
+    
+image.save("astronaut_rides_horse.png")
+```
+
+## 3. Create the application
+
+Now, let's put it all together into a simple Gradio application.
+
+Here's the complete code.
+
+<div editor-title="tutorials/dolly/chat.py">
+
+```python
+import os
+from pathlib import Path
+
+import gradio as gr
+from diffusers import StableDiffusionPipeline
+from huggingface_hub import snapshot_download
+
+model_name = "runwayml/stable-diffusion-v1-5"
+
+local_dir = f"./models/{model_name}"
+if not Path(local_dir).exists() or len(os.listdir(local_dir)) == 0:
+    snapshot_download(model_name, local_dir=local_dir)
+
+pipe = StableDiffusionPipeline.from_pretrained(f"./models/{model_name}", device_map="auto", local_files_only=True)
+
+theme = gr.themes.Monochrome(
+    primary_hue="indigo",
+    secondary_hue="blue",
+    neutral_hue="slate",
+    radius_size=gr.themes.sizes.radius_sm,
+    font=[gr.themes.GoogleFont("Open Sans"), "ui-sans-serif", "system-ui", "sans-serif"],
+)
+
+with gr.Blocks(theme=theme) as demo:
+    def infer(prompt):
+        return pipe([prompt]).images
+
+
+    with gr.Row():
+        text = gr.Textbox(
+            show_label=False,
+            max_lines=1,
+            placeholder="Enter your prompt",
+        ).style(container=False)
+        btn = gr.Button("Generate image").style(full_width=False)
+
+    gallery = gr.Gallery(
+        show_label=False
+    ).style(columns=[2], height="auto")
+
+    text.submit(infer, inputs=text, outputs=[gallery])
+    btn.click(infer, inputs=text, outputs=[gallery])
+
+if __name__ == "__main__":
+    server_port = int(os.getenv("PORT_0")) if os.getenv("PORT_0") else None
+    demo.launch(server_name="0.0.0.0", server_port=server_port)
 ```
 
 </div>
 
-In order to run a script via `dstack`, the script must be defined as a workflow via a YAML file
-under `.dstack/workflows`.
+!!! info "NOTE:"
+    Since we'll run our application via `dstack`, we've added the possibility to override the server port of our application
+    using the `PORT_0` environment variable.
 
-Let's define the following workflow YAML file:
+## 4. Define the workflow
 
-<div editor-title=".dstack/workflows/stable_diffusion.yaml"> 
+To run our application in our cloud account using `dstack`, we need to define a `dstack` workflow as follows:
+
+<div editor-title=".dstack/workflows/dolly.yaml"> 
 
 ```yaml
 workflows:
   - name: stable-diffusion
     provider: bash
+    ports: 1
     commands:
       - pip install -r tutorials/stable_diffusion/requirements.txt
-      - python tutorials/stable_diffusion/stable_diffusion.py
-    artifacts:
-      - path: ./models
+      - python tutorials/stable_diffusion/app.py
+    cache:
+      - ~/.cache/pip
     resources:
+      gpu:
+        count: 1
       memory: 16GB
+      interruptible: true
 ```
 
 </div>
 
-Now, the workflow can be run anywhere via the `dstack` CLI.
+!!! info "NOTE:"
+    We define a `dstack` workflow file to specify the requirements, script, ports, cached files, and hardware resources for
+    our application. Our workflow requires a GPU and at least 16GB of memory and interruptible (spot) instances if
+    run in the cloud. 
+
+## 5. Run the workflow
 
 !!! info "NOTE:"
-    Before you run a workflow via `dstack`, make sure your project has a remote Git branch configured,
-    and invoke the `dstack init` command which will ensure that `dstack` may access the repository:
+    Before running the workflow, make sure that you have set up the Hub application and
+    [created a project](../docs/quick-start.md#create-a-hub-project) that can run workflows in the cloud.
 
-    <div class="termy">
+Once the project is configured, we can use the [`dstack run`](../docs/reference/cli/run.md) command to
+run our workflow.
 
-    ```shell
-    $ dstack init
-    ```
-
-    </div>
-
-Here's how to run a `dstack` workflow locally:
+!!! info "NOTE:"
+    The Hub will automatically create the corresponding cloud resources, run the application, and forward the application
+    port to localhost. If the workflow is completed, it automatically destroys the cloud resources.
 
 <div class="termy">
 
 ```shell
 $ dstack run stable-diffusion
+
+RUN       WORKFLOW          SUBMITTED  STATUS     TAG
+turtle-1  stable-diffusion  now        Submitted     
+
+Provisioning... It may take up to a minute. ✓
+
+To interrupt, press Ctrl+C.
+
+Downloading model files: 
+---> 100%
+
+Running on local URL:  http://127.0.0.1:51741
 ```
 
 </div>
 
-Once you run it, `dstack` will run the script, and save the `models` folder as an artifact.
-After that, you can reuse it in other workflows.
+Clicking the URL from the output will open our Gradio application running in the cloud. 
 
-## 3. Create a dev environment
+![](dstack-stable-diffusion.png){ width=800 }
 
-Sometimes, before you can run a workflow, you may want to run code interactively,
-e.g. via an IDE or a notebook.
+## 6. Debug the workflow
 
-Look at the following example:
+Before coming up with a workflow that runs perfectly in the cloud, you may need to debug it. With `dstack`, you can debug
+your workflow right in the cloud using an IDE. One way to do this is by using
+the [`code`](../docs/reference/providers/code.md) provider.
 
-<div editor-title=".dstack/workflows/stable_diffusion.yaml"> 
+Define the following workflow:
+
+<div editor-title=".dstack/workflows/dolly.yaml"> 
 
 ```yaml
 workflows:
-  - name: code-stable
+  - name: debug-stable-diffusion
     provider: code
-    deps:
-      - workflow: stable-diffusion
+    ports: 1
     setup:
       - pip install -r tutorials/stable_diffusion/requirements.txt
+    cache:
+      - ~/.cache/pip
     resources:
+      gpu:
+        count: 1
       memory: 16GB
+      interruptible: true
 ```
 
 </div>
 
-As you see, the `code-stable` workflow refers the `stable-diffusion` workflow as a dependency.
-
-If you run it, `dstack` will run a VS Code application with the code, pretrained model,
-and Python environment:
-
-<div class="termy">
-
-```shell 
-$ dstack run code-stable
-```
-
-</div>
-
-## 4. Run locally
-
-Let's write a script that generates images using a pre-trained model and given prompts:
-
-<div editor-title="stable_diffusion/prompt_stable.py"> 
-
-```python
-import argparse
-from pathlib import Path
-
-import torch
-from diffusers import StableDiffusionPipeline
-
-if __name__ == '__main__':
-    parser = argparse.ArgumentParser()
-    parser.add_argument("-P", "--prompt", action='append', required=True)
-    args = parser.parse_args()
-
-    pipe = StableDiffusionPipeline.from_pretrained("./models/runwayml/stable-diffusion-v1-5", local_files_only=True)
-    if torch.cuda.is_available():
-        pipe.to("cuda")
-    images = pipe(args.prompt).images
-
-    output = Path("./output")
-    output.mkdir(parents=True, exist_ok=True)
-    for i in range(len(images)):
-        images[i].save(output / f"{i}.png")
-```
-
-</div>
-
-The script loads the model from the local `models` folder, generates images and saves them to the 
-local `output` folder.
-
-Let's define it in our workflow YAML file:
-
-<div editor-title=".dstack/workflows/stable_diffusion.yaml"> 
-
-```yaml
-workflows:
-  - name: prompt-stable
-    provider: bash
-    deps:
-      - workflow: stable-diffusion
-    commands:
-      - pip install -r tutorials/stable_diffusion/requirements.txt
-      - python tutorials/stable_diffusion/prompt_stable.py ${{ run.args }}
-    artifacts:
-      - path: ./output
-    resources:
-      memory: 16GB
-```
-
-</div>
-
-!!! info "NOTE:"
-    The `dstack run` command allows to pass arguments to the workflow via `${{ run.args }}`.
-
-Let's run the workflow locally:
+If you run it, `dstack` will run a VS Code application with the code, dependencies, and hardware resources
+you've specified.
 
 <div class="termy">
 
 ```shell
-$ dstack run prompt-stable -P "cats in hats" 
+$ dstack run debug-stable-diffusion
+
+RUN        WORKFLOW                SUBMITTED  STATUS     TAG
+mangust-1  debug-stable-diffusion  now        Submitted     
+
+Provisioning... It may take up to a minute. ✓
+
+To interrupt, press Ctrl+C.
+
+The PORT_0 port is mapped to http://0.0.0.0:51742
+
+Web UI available at http://127.0.0.1:51741
 ```
 
 </div>
 
-The output artifacts of local runs are stored under `~/.dstack/artifacts`.
+Clicking the last link will open VS Code on the provisioned machine.
 
-Here's an example of the `prompt-stable` workflow output:
+![](dstack-stable-diffusion-code.png)
 
-![cats in hats](cats-in-hats.png)
+You can run your code interactively, debug it, and run the application there.
+After fixing the workflow, you can run it using the `bash` provider.
 
-## 5. Run remotely
-
-!!! info "NOTE:"
-    To run workflows remotely in a configured cloud, we'll need the [Hub application](../docs/quick-start.md#start-the-hub-application).
-
-Once the remote is configured, we can use the [`dstack run`](../docs/reference/cli/run.md) command with the `--remote` flag to
-run our workflow in the cloud.
-
-Let's first run the `stable-diffusion` workflow:
-
-<div class="termy">
-
-```shell
-$ dstack run stable-diffusion --remote
-```
-
-</div>
-
-!!! info "NOTE:"
-    When you run a remote workflow, `dstack` automatically creates resources in the configured cloud,
-    and releases them once the workflow is finished.
-
-Now, you can run the `prompt-stable` remotely as well:
-
-<div class="termy">
-
-```shell
-dstack run prompt-stable --remote --gpu-name V100 -P "cats in hats"
-```
-
-</div>
-
-!!! info "NOTE:"
-    You can configure the required resources to run the workflows either via the `resources` property in YAML
-    or the `dstack run` command's arguments, such as `--gpu`, `--gpu-name`, etc.
+As an alternative to the `code` provider, you can run the `bash` provider with `ssh` set to `true`. This allows you to attach
+your own IDE to the running workflow.

@@ -67,9 +67,6 @@ workflows:
 </div>
 
 !!! info "NOTE:"
-    Tags are only supported for remote runs. If you want to use a tag for a local run, you must first push the
-    artifacts of the local run using the `dstack push` command.
-
     You can create also a tag by uploading arbitrary local files. To do this, use the `dstack tags add` command 
     with the `-a PATH` argument, which should point to the local folder containing local files.
 

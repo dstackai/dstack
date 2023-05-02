@@ -116,7 +116,7 @@ $ dstack config hub --url http://127.0.0.1:3000 \
     you would like to use multiple clouds.
 
 
-## Run a workflow that uses GPU
+## Manage resources
 
 Consider that you have configured a project that allows you to use a GPU (e.g., a local backend if you have a GPU
 locally, or an AWS or GCP backend).

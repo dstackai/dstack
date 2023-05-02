@@ -23,14 +23,14 @@ class CpCommand(BasicCommand):
         self._parser.add_argument(
             "--project",
             type=str,
-            help="Hub project to execute the command",
+            help="The name of the Hub project to execute the command for",
             default=None,
         )
         self._parser.add_argument(
             "run_name_or_tag_name",
             metavar="(RUN | :TAG)",
             type=str,
-            help="A name of a run or a tag",
+            help="The name of the run or the tag",
         )
         self._parser.add_argument(
             "source",

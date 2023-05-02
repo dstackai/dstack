@@ -9,27 +9,31 @@ Not needed for public repos.
 
 ```shell
 $ dstack init --help
-Usage: dstack init [-h] [-t OAUTH_TOKEN] [-i SSH_PRIVATE_KEY]
+Usage: dstack init [-h] [--project PROJECT] [-t OAUTH_TOKEN] [--git-identity SSH_PRIVATE_KEY] [--ssh-identity SSH_PRIVATE_KEY] [--local]
 
-Optional Arguments:
-  -h, --help            Show this help message and exit
+Options:
+  --project PROJECT     The Hub project to execute the command for
   -t, --token OAUTH_TOKEN
                         An authentication token for Git
-  -i, --identity SSH_PRIVATE_KEY
-                        A path to the private SSH key file
+  --git-identity SSH_PRIVATE_KEY
+                        A path to the private SSH key file for non-public repositories
+  --ssh-identity SSH_PRIVATE_KEY
+                        A path to the private SSH key file for SSH tunneling
 ```
 
 </div>
 
 !!! info "NOTE:"
-    The credentials are stored in the encrypted cloud storage (e.g. for AWS, it's Secrets Manager).
+    If the project runs workflows in the cloud (AWS or GCP), the credentials are stored in the encrypted cloud storage (Secrets Manager).
 
 ### Arguments reference
 
 The following arguments are optional:
 
+- `-project PROJECT` – (Optional) The Hub project to execute the command for
 - `-t OAUTH_TOKEN`, `--token OAUTH_TOKEN` – (Optional) An authentication token for GitHub
-- `-i SSH_PRIVATE_KEY`, `--identity SSH_PRIVATE_KEY` – (Optional) A path to the private SSH key file 
+- `--git-identity SSH_PRIVATE_KEY` – (Optional) A path to the private SSH key file for non-public repositories
+- `--ssh-identity SSH_PRIVATE_KEY` – (Optional) A path to the private SSH key file for SSH tunneling 
 
 !!! info "NOTE:"
     If no arguments are provided, `dstack` uses the credentials configured in

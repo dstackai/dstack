@@ -56,7 +56,7 @@ class RunCommand(BasicCommand):
         self._parser.add_argument(
             "--project",
             type=str,
-            help="Hub project to execute the command",
+            help="The name of the Hub project to execute the command for",
             default=None,
         )
         self._parser.add_argument(

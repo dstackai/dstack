@@ -25,11 +25,11 @@ class StopCommand(BasicCommand):
         self._parser.add_argument(
             "--project",
             type=str,
-            help="Hub project to execute the command",
+            help="The name of the Hub project to execute the command for",
             default=None,
         )
         self._parser.add_argument(
-            "run_name", metavar="RUN", type=str, nargs="?", help="A name of a run"
+            "run_name", metavar="RUN", type=str, nargs="?", help="The name of the run"
         )
         self._parser.add_argument(
             "-a",
