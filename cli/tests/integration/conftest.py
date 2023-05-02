@@ -18,6 +18,7 @@ SSH_DIR = HOME_DIR / ".ssh"
 DSTACK_DIR = TESTS_DIR / ".dstack"
 DSTACK_HOMEDIR_WITH_RUNNER = TESTS_DIR / "dstack-runner"
 TESTS_PUBLIC_DIR = TESTS_DIR / "dstack-tests-public"
+TESTS_LOCAL_DIR = TESTS_DIR / "dstack-tests-local"
 TESTS_PUBLIC_REPO_URL = "https://github.com/dstackai/dstack-tests-public"
 
 
@@ -53,6 +54,13 @@ def tests_public_repo():
     Repo.clone_from(TESTS_PUBLIC_REPO_URL, TESTS_PUBLIC_DIR)
     yield TESTS_PUBLIC_DIR
     shutil.rmtree(TESTS_PUBLIC_DIR)
+
+
+@pytest.fixture()
+def tests_local_repo():
+    TESTS_LOCAL_DIR.mkdir(parents=True)
+    yield TESTS_LOCAL_DIR
+    shutil.rmtree(TESTS_LOCAL_DIR)
 
 
 def _generate_ssh_key() -> Tuple[bytes, bytes]:

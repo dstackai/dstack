@@ -3,7 +3,8 @@ from typing import List
 
 from pytest import CaptureFixture
 
-from tests.integration.common import run_dstack_cli
+from dstack.cli.config import CLIConfigManager
+from tests.integration.common import hub_process, run_dstack_cli
 
 
 class TestDstack:
@@ -13,136 +14,161 @@ class TestDstack:
         assert capsys.readouterr().out.startswith("Usage: dstack [-v] [-h] COMMAND ...")
 
 
+class TestHub:
+    def test_starts_and_configures_hub(self, dstack_dir):
+        with hub_process(dstack_dir) as proc:
+            assert "The hub is available at" in proc.stdout.readline()
+            default_project_config = CLIConfigManager().get_default_project_config()
+            assert default_project_config is not None
+
+
+class TestConfig:
+    def test_prints_error_if_hub_not_started(self, capsys: CaptureFixture):
+        exit_code = run_dstack_cli(
+            [
+                "config",
+                "--url",
+                "http://127.0.0.1:31313",
+                "--project",
+                "project",
+                "--token",
+                "token",
+            ]
+        )
+        assert exit_code == 1
+        assert "Cannot connect to hub" in capsys.readouterr().out
+
+
 class TestInit:
     def test_warns_if_no_ssh_key(
-        self, capsys: CaptureFixture, tests_public_repo: Path, dstack_dir: Path
+        self, capsys: CaptureFixture, dstack_dir: Path, tests_local_repo: Path
     ):
-        exit_code = run_dstack_cli(["init"], dstack_dir=dstack_dir, repo_dir=tests_public_repo)
-        assert exit_code == 0
-        stdout = capsys.readouterr().out
-        assert "WARNING" in stdout and "SSH is not enabled" in stdout
-
-    def test_inits_local_backend(
-        self, capsys: CaptureFixture, tests_public_repo: Path, dstack_dir: Path, ssh_key
-    ):
-        exit_code = run_dstack_cli(["init"], dstack_dir=dstack_dir, repo_dir=tests_public_repo)
-        assert exit_code == 0
-        assert "OK (backend: local)" in capsys.readouterr().out
+        with hub_process(dstack_dir):
+            exit_code = run_dstack_cli(["init"], dstack_dir=dstack_dir, repo_dir=tests_local_repo)
+            assert exit_code == 0
+            stdout = capsys.readouterr().out
+            assert "WARNING" in stdout and "SSH is not enabled" in stdout
 
 
 class TestRun:
-    def test_cannot_run_outside_of_git_repo(self, capsys: CaptureFixture):
-        exit_code = run_dstack_cli(["run", "bash"])
+    def test_requires_config(
+        self, capsys: CaptureFixture, dstack_dir: Path, tests_local_repo: Path
+    ):
+        exit_code = run_dstack_cli(
+            ["run", "bash", "-c", "echo hi"], dstack_dir=dstack_dir, repo_dir=tests_local_repo
+        )
         assert exit_code == 1
-        assert "Call `dstack init` first" in capsys.readouterr().out
+        assert "No hub project configured" in capsys.readouterr().out
 
-    def test_asks_for_init_to_run(
+    def test_requires_init_for_remote_repo(
         self, capsys: CaptureFixture, dstack_dir: Path, tests_public_repo: Path
     ):
-        exit_code = run_dstack_cli(
-            ["run", "bash"], dstack_dir=dstack_dir, repo_dir=tests_public_repo
-        )
-        assert exit_code == 1
-        assert "Call `dstack init` first" in capsys.readouterr().out
+        with hub_process(dstack_dir):
+            exit_code = run_dstack_cli(
+                ["run", "bash", "-c", "echo hi"], dstack_dir=dstack_dir, repo_dir=tests_public_repo
+            )
+            assert exit_code == 1
+            assert "Call `dstack init` first" in capsys.readouterr().out
 
     def test_runs_workflow_from_bash_provider(
-        self, capsys: CaptureFixture, dstack_dir: Path, tests_public_repo: Path, ssh_key
+        self, capsys: CaptureFixture, dstack_dir: Path, tests_local_repo: Path
     ):
-        exit_code = run_dstack_cli(["init"], dstack_dir=dstack_dir, repo_dir=tests_public_repo)
-        assert exit_code == 0
-        exit_code = run_dstack_cli(
-            ["run", "bash", "-c", "echo Hello, world!"],
-            dstack_dir=dstack_dir,
-            repo_dir=tests_public_repo,
-        )
-        assert exit_code == 0
-        assert "Hello, world!" in capsys.readouterr().out
+        with hub_process(dstack_dir):
+            exit_code = run_dstack_cli(
+                ["run", "bash", "-c", "echo 'Hello, world!'"],
+                dstack_dir=dstack_dir,
+                repo_dir=tests_local_repo,
+            )
+            assert exit_code == 0
+            assert "Hello, world!" in capsys.readouterr().out
 
     def test_runs_workflow_from_yaml_file(
         self, capsys: CaptureFixture, dstack_dir: Path, tests_public_repo: Path, ssh_key
     ):
-        exit_code = run_dstack_cli(["init"], dstack_dir=dstack_dir, repo_dir=tests_public_repo)
-        assert exit_code == 0
-        exit_code = run_dstack_cli(
-            ["run", "hello"], dstack_dir=dstack_dir, repo_dir=tests_public_repo
-        )
-        assert exit_code == 0
-        assert "Hello, world!" in capsys.readouterr().out
+        with hub_process(dstack_dir):
+            exit_code = run_dstack_cli(["init"], dstack_dir=dstack_dir, repo_dir=tests_public_repo)
+            assert exit_code == 0
+            exit_code = run_dstack_cli(
+                ["run", "hello"], dstack_dir=dstack_dir, repo_dir=tests_public_repo
+            )
+            assert exit_code == 0
+            assert "Hello, world!" in capsys.readouterr().out
 
 
 class TestArtifacts:
     def test_lists_artifacts(
         self, capsys: CaptureFixture, dstack_dir: Path, tests_public_repo: Path, ssh_key
     ):
-        exit_code = run_dstack_cli(["init"], dstack_dir=dstack_dir, repo_dir=tests_public_repo)
-        assert exit_code == 0
-        capsys.readouterr()
-        exit_code = run_dstack_cli(
-            ["run", "artifacts-ls"], dstack_dir=dstack_dir, repo_dir=tests_public_repo
-        )
-        assert exit_code == 0
-        run_name = _get_run_name_from_run_stdout(capsys.readouterr().out)
-        exit_code = run_dstack_cli(
-            ["ls", run_name], dstack_dir=dstack_dir, repo_dir=tests_public_repo
-        )
-        assert exit_code == 0
-        expected_table = [
-            ["ARTIFACT", "FILE", "SIZE", "BACKENDS"],
-            ["dir1/", "dir12/", "local"],
-            ["dir2/dir22/", "2.txt", "2.0B", "local"],
-            ["22.txt", "2.0B", "local"],
-        ]
-        _assert_table_output(capsys.readouterr().out, expected_table)
-        exit_code = run_dstack_cli(
-            ["ls", "-r", run_name], dstack_dir=dstack_dir, repo_dir=tests_public_repo
-        )
-        assert exit_code == 0
-        expected_table = [
-            ["ARTIFACT", "FILE", "SIZE", "BACKENDS"],
-            ["dir1/", "dir12/1.txt", "2.0B", "local"],
-            ["dir12/11.txt", "2.0B", "local"],
-            ["dir2/dir22/", "2.txt", "2.0B", "local"],
-            ["22.txt", "2.0B", "local"],
-        ]
-        _assert_table_output(capsys.readouterr().out, expected_table)
+        with hub_process(dstack_dir):
+            exit_code = run_dstack_cli(["init"], dstack_dir=dstack_dir, repo_dir=tests_public_repo)
+            assert exit_code == 0
+            capsys.readouterr()
+            exit_code = run_dstack_cli(
+                ["run", "artifacts-ls"], dstack_dir=dstack_dir, repo_dir=tests_public_repo
+            )
+            assert exit_code == 0
+            run_name = _get_run_name_from_run_stdout(capsys.readouterr().out)
+            exit_code = run_dstack_cli(
+                ["ls", run_name], dstack_dir=dstack_dir, repo_dir=tests_public_repo
+            )
+            assert exit_code == 0
+            expected_table = [
+                ["ARTIFACT", "FILE", "SIZE"],
+                ["dir1/", "dir12/"],
+                ["dir2/dir22/", "2.txt", "2.0B"],
+                ["22.txt", "2.0B"],
+            ]
+            _assert_table_output(capsys.readouterr().out, expected_table)
+            exit_code = run_dstack_cli(
+                ["ls", "-r", run_name], dstack_dir=dstack_dir, repo_dir=tests_public_repo
+            )
+            assert exit_code == 0
+            expected_table = [
+                ["ARTIFACT", "FILE", "SIZE"],
+                ["dir1/", "dir12/1.txt", "2.0B"],
+                ["dir12/11.txt", "2.0B"],
+                ["dir2/dir22/", "2.txt", "2.0B"],
+                ["22.txt", "2.0B"],
+            ]
+            _assert_table_output(capsys.readouterr().out, expected_table)
 
 
 class TestDeps:
     def test_reads_artifacts_from_dep_workflow(
         self, capsys: CaptureFixture, dstack_dir: Path, tests_public_repo: Path, ssh_key
     ):
-        exit_code = run_dstack_cli(["init"], dstack_dir=dstack_dir, repo_dir=tests_public_repo)
-        assert exit_code == 0
-        exit_code = run_dstack_cli(
-            ["run", "hello-txt"], dstack_dir=dstack_dir, repo_dir=tests_public_repo
-        )
-        assert exit_code == 0
-        exit_code = run_dstack_cli(
-            ["run", "cat-txt-2"], dstack_dir=dstack_dir, repo_dir=tests_public_repo
-        )
-        assert exit_code == 0
-        assert "Hello, world!" in capsys.readouterr().out
+        with hub_process(dstack_dir):
+            exit_code = run_dstack_cli(["init"], dstack_dir=dstack_dir, repo_dir=tests_public_repo)
+            assert exit_code == 0
+            exit_code = run_dstack_cli(
+                ["run", "hello-txt"], dstack_dir=dstack_dir, repo_dir=tests_public_repo
+            )
+            assert exit_code == 0
+            exit_code = run_dstack_cli(
+                ["run", "cat-txt-2"], dstack_dir=dstack_dir, repo_dir=tests_public_repo
+            )
+            assert exit_code == 0
+            assert "Hello, world!" in capsys.readouterr().out
 
 
 class TestSecrets:
     def test_adds_and_reads_secret(
-        self, capsys: CaptureFixture, dstack_dir: Path, tests_public_repo: Path, ssh_key
+        self, capsys: CaptureFixture, dstack_dir: Path, tests_local_repo: Path
     ):
-        exit_code = run_dstack_cli(["init"], dstack_dir=dstack_dir, repo_dir=tests_public_repo)
-        assert exit_code == 0
-        exit_code = run_dstack_cli(
-            ["secrets", "add", "MY_SECRET", "my_secret_value"],
-            dstack_dir=dstack_dir,
-            repo_dir=tests_public_repo,
-        )
-        assert exit_code == 0
-        exit_code = run_dstack_cli(
-            ["run", "bash", "-c", "echo $MY_SECRET"],
-            dstack_dir=dstack_dir,
-            repo_dir=tests_public_repo,
-        )
-        assert exit_code == 0
-        assert "my_secret_value" in capsys.readouterr().out
+        with hub_process(dstack_dir):
+            exit_code = run_dstack_cli(
+                ["secrets", "add", "MY_SECRET", "my_secret_value"],
+                dstack_dir=dstack_dir,
+                repo_dir=tests_local_repo,
+            )
+            assert exit_code == 0
+            exit_code = run_dstack_cli(
+                ["run", "bash", "-c", "echo $MY_SECRET"],
+                dstack_dir=dstack_dir,
+                repo_dir=tests_local_repo,
+            )
+            assert exit_code == 0
+            assert "my_secret_value" in capsys.readouterr().out
 
 
 def _get_run_name_from_run_stdout(run_stdout: str) -> str:
