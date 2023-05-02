@@ -88,8 +88,10 @@ class CLIConfig(BaseModel):
 
 
 class CLIConfigManager:
-    def __init__(self):
-        self.dstack_dir = get_dstack_dir()
+    def __init__(self, dstack_dir: Optional[Path] = None):
+        if dstack_dir is None:
+            dstack_dir = get_dstack_dir()
+        self.dstack_dir = dstack_dir
         self.config_filepath = self.dstack_dir / "config.yaml"
         try:
             with open(self.config_filepath, "r") as f:

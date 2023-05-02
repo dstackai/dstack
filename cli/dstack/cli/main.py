@@ -3,6 +3,7 @@ import sys
 
 from rich_argparse import RichHelpFormatter
 
+from dstack.cli.common import check_cli_errors
 from dstack.cli.handlers import cli_initialize
 from dstack.version import __version__ as version
 
@@ -47,7 +48,7 @@ def main():
         exit(0)
     args, unknown = parser.parse_known_args()
     args.unknown = unknown
-    args.func(args)
+    check_cli_errors(args.func)(args)
 
 
 if __name__ == "__main__":

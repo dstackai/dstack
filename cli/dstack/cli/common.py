@@ -1,3 +1,4 @@
+import argparse
 from typing import List
 
 from rich.console import Console
@@ -117,3 +118,12 @@ def check_cli_errors(func):
             exit(1)
 
     return decorator
+
+
+def add_project_argument(parser: argparse.ArgumentParser):
+    parser.add_argument(
+        "--project",
+        type=str,
+        help="The name of the Hub project to execute the command for",
+        default=None,
+    )

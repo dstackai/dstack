@@ -3,7 +3,7 @@ from argparse import Namespace
 from rich.prompt import Confirm
 
 from dstack.cli.commands import BasicCommand
-from dstack.cli.common import check_init, console
+from dstack.cli.common import add_project_argument, check_init, console
 from dstack.cli.config import get_hub_client
 
 
@@ -15,12 +15,7 @@ class RMCommand(BasicCommand):
         super(RMCommand, self).__init__(parser)
 
     def register(self):
-        self._parser.add_argument(
-            "--project",
-            type=str,
-            help="The name of the Hub project to execute the command for",
-            default=None,
-        )
+        add_project_argument(self._parser)
         self._parser.add_argument(
             "run_name", metavar="RUN", type=str, nargs="?", help="The name of the run"
         )
