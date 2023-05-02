@@ -3,6 +3,8 @@ import shutil
 from pathlib import Path
 from typing import Callable, Dict, List, Optional
 
+import yaml
+
 from dstack.backend.base.storage import Storage
 from dstack.core.storage import StorageFile
 from dstack.utils.common import removeprefix
@@ -18,6 +20,12 @@ class LocalStorage(Storage):
             Key=key,
             Body=content,
         )
+        if metadata is not None:
+            _put_object(
+                Root=self.root_path,
+                Key=_metadata_key(key),
+                Body=yaml.dump(metadata),
+            )
 
     def get_object(self, key: str) -> Optional[str]:
         try:
@@ -123,3 +131,8 @@ def _delete_object(Root: str, Key: str):
             shutil.rmtree(path, ignore_errors=True)
         else:
             os.remove(path)
+
+
+def _metadata_key(key: str) -> str:
+    parts = key.split("/")
+    return "/".join(parts[:-1] + [f"m;{parts[-1]}"])

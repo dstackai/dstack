@@ -190,11 +190,7 @@ func (ex *Executor) Run(ctx context.Context) error {
 }
 
 func (ex *Executor) Stop() {
-	select {
-	case <-ex.stoppedCh:
-		return
-	default:
-	}
+	ex.stoppedCh <- struct{}{}
 	close(ex.stoppedCh)
 }
 
@@ -296,7 +292,7 @@ func (ex *Executor) runJob(ctx context.Context, erCh chan error, stoppedCh chan 
 			return
 		}
 
-		if err = ex.processJob(ctx, stoppedCh); err != nil {
+		if err = ex.processJob(ctx, stoppedCh); err != nil { // todo
 			erCh <- gerrors.Wrap(err)
 			return
 		}
