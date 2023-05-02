@@ -90,6 +90,13 @@ export const projectApi = createApi({
             invalidatesTags: () => ['Projects'],
         }),
 
+        getBackendTypes: builder.query<TProjectBackendType[], void>({
+            query: () => ({
+                url: API.PROJECTS.BACKEND_TYPES(),
+                method: 'POST',
+            }),
+        }),
+
         backendValues: builder.mutation<IProjectAwsBackendValues & IProjectGCPBackendValues, Partial<TProjectBackend>>({
             query: (data) => ({
                 url: API.PROJECTS.BACKEND_VALUES(),
@@ -110,13 +117,25 @@ export const projectApi = createApi({
             providesTags: () => ['ProjectRepos'],
         }),
 
+        getProjectRepo: builder.query<IRepo, { name: IProject['project_name']; repo_id: IRepo['repo_id'] }>({
+            query: ({ name, ...body }) => {
+                return {
+                    url: API.PROJECTS.REPO_ITEM(name),
+                    method: 'POST',
+                    body,
+                };
+            },
+
+            providesTags: () => ['ProjectRepos'],
+        }),
+
         //     Repos queries
         getProjectRuns: builder.query<IRun[], ProjectRunsRequestParams>({
             query: ({ name, ...body }) => {
                 return {
                     url: API.PROJECTS.RUNS_LIST(name),
                     method: 'POST',
-                    body: body,
+                    body,
                 };
             },
 
@@ -133,7 +152,9 @@ export const {
     useUpdateProjectMutation,
     useUpdateProjectMembersMutation,
     useDeleteProjectsMutation,
+    useGetBackendTypesQuery,
     useBackendValuesMutation,
     useGetProjectReposQuery,
+    useGetProjectRepoQuery,
     useGetProjectRunsQuery,
 } = projectApi;

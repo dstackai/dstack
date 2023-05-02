@@ -7,14 +7,20 @@ import { Button, Header, ListEmptyMessage, NavigateLink, Pagination, SpaceBetwee
 
 import { useBreadcrumbs } from 'hooks';
 import { useCollection } from 'hooks';
+import { getRepoDisplayName } from 'libs/repo';
 import { ROUTES } from 'routes';
-import { useGetProjectRunsQuery } from 'services/project';
+import { useGetProjectRepoQuery, useGetProjectRunsQuery } from 'services/project';
 
 export const RepositoryDetails: React.FC = () => {
     const { t } = useTranslation();
     const params = useParams();
     const paramProjectName = params.name ?? '';
     const paramRepoId = params.repoId ?? '';
+
+    const { data: repoData } = useGetProjectRepoQuery({
+        name: paramProjectName,
+        repo_id: paramRepoId,
+    });
 
     useBreadcrumbs([
         {
@@ -30,7 +36,7 @@ export const RepositoryDetails: React.FC = () => {
             href: ROUTES.PROJECT.DETAILS.REPOSITORIES.FORMAT(paramProjectName),
         },
         {
-            text: paramRepoId,
+            text: repoData ? getRepoDisplayName(repoData) : 'Loading...',
             href: ROUTES.PROJECT.DETAILS.REPOSITORIES.DETAILS.FORMAT(paramProjectName, paramRepoId),
         },
     ]);
@@ -48,13 +54,13 @@ export const RepositoryDetails: React.FC = () => {
         },
         {
             id: 'workflow_name',
-            header: t('projects.run.workflow_name'),
+            header: `${t('projects.run.workflow_name')}/${t('projects.run.provider_name')}`,
             cell: (item: IRun) => item.workflow_name ?? item.provider_name,
         },
         {
             id: 'status',
             header: t('projects.run.status'),
-            cell: (item: IRun) => item.status,
+            cell: (item: IRun) => t(`projects.run.statuses.${item.status}`),
         },
         {
             id: 'submitted_at',
@@ -70,8 +76,7 @@ export const RepositoryDetails: React.FC = () => {
 
     const { data, isLoading } = useGetProjectRunsQuery({
         name: paramProjectName,
-        // TODO remove 'replace' after fix on backend
-        repo_id: paramRepoId.replace(/,/gi, '.'),
+        repo_id: paramRepoId,
     });
 
     const renderEmptyMessage = (): React.ReactNode => {

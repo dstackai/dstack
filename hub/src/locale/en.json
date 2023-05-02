@@ -146,7 +146,23 @@
       "nomatch_message_text": "We can't find a match.",
       "run_name": "Run",
       "workflow_name": "Workflow",
-      "provider_name": "Provider"
+      "provider_name": "Provider",
+      "status": "Status",
+      "submitted_at": "Run time",
+      "artifacts": "Artifacts count",
+      "statuses": {
+        "pending": "Pending",
+        "submitted": "Submitted",
+        "downloading":  "Downloading",
+        "running": "Running",
+        "uploading":  "Uploading",
+        "stopping": "Stopping",
+        "stopped":  "Stopped",
+        "aborting": "Aborting",
+        "aborted":  "Aborted",
+        "failed": "Failed",
+        "done":  "Done"
+      }
     }
   },
   "users": {

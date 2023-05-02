@@ -9,6 +9,8 @@ import { useBreadcrumbs, useCollection } from 'hooks';
 import { ROUTES } from 'routes';
 import { useGetProjectReposQuery } from 'services/project';
 
+import { getRepoDisplayName } from '../../../../libs/repo';
+
 export const ProjectRepositories: React.FC = () => {
     const { t } = useTranslation();
     const params = useParams();
@@ -72,9 +74,7 @@ export const ProjectRepositories: React.FC = () => {
                         fontSize="heading-m"
                         href={ROUTES.PROJECT.DETAILS.REPOSITORIES.DETAILS.FORMAT(paramProjectName, repo.repo_id)}
                     >
-                        {repo.repo_type === 'remote'
-                            ? `${repo.repo_info.repo_user_name}/${repo.repo_info.repo_name}`
-                            : repo.repo_info.repo_name}
+                        {getRepoDisplayName(repo)}
                     </NavigateLink>
                 ),
 

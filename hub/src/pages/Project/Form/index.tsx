@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useMemo } from 'react';
 import { DefaultValues, FormProvider, useForm } from 'react-hook-form';
 import { useTranslation } from 'react-i18next';
 
@@ -6,6 +6,7 @@ import { Button, Container, FormField, FormInput, FormTiles, FormUI, Grid, Heade
 
 import { useHelpPanel, useNotifications } from 'hooks';
 import { isRequestFormErrors2, isRequestFormFieldError } from 'libs';
+import { useGetBackendTypesQuery } from 'services/project';
 
 import { AWSBackend } from './AWS';
 import { BACKEND_TYPE_HELP } from './constants';
@@ -19,6 +20,8 @@ export const ProjectForm: React.FC<IProps> = ({ initialValues, onCancel, loading
     const [pushNotification] = useNotifications();
     const isEditing = !!initialValues;
     const [openHelpPanel] = useHelpPanel();
+
+    const { data: backendTypesData } = useGetBackendTypesQuery();
 
     const getDefaultValues = (): DefaultValues<IProject> => {
         if (initialValues) {
@@ -46,32 +49,24 @@ export const ProjectForm: React.FC<IProps> = ({ initialValues, onCancel, loading
 
     const backendType = watch('backend.type');
 
-    const backendOptions: TBackendOption[] = [
-        {
-            label: t('projects.backend_type.aws'),
-            value: 'aws',
-            description: t('projects.backend_type.aws_description'),
-            disabled: loading,
-        },
-        {
-            label: t('projects.backend_type.gcp'),
-            value: 'gcp',
-            description: t('projects.backend_type.gcp_description'),
-            disabled: loading,
-        },
-        {
-            label: t('projects.backend_type.local'),
+    const backendOptions: TBackendOption[] = useMemo(() => {
+        if (backendTypesData)
+            return backendTypesData.map((type) => ({
+                label: t(`projects.backend_type.${type}`),
+                value: type,
+                description: t(`projects.backend_type.${type}_description`),
+                disabled: loading,
+            }));
+
+        const defaultOption: TBackendOption = {
+            label: '-',
             value: 'local',
-            description: t('projects.backend_type.local_description'),
-            disabled: loading,
-        },
-        // {
-        //     label: t('projects.backend_type.azure'),
-        //     value: 'azure',
-        //     description: t('projects.backend_type.azure_description'),
-        //     disabled: loading,
-        // },
-    ];
+            description: '-',
+            disabled: true,
+        };
+
+        return [defaultOption];
+    }, [backendTypesData]);
 
     const onSubmit = (data: IProject) => {
         if (data.backend.type === 'aws' && data.backend.ec2_subnet_id === '') data.backend.ec2_subnet_id = null;
@@ -130,7 +125,6 @@ export const ProjectForm: React.FC<IProps> = ({ initialValues, onCancel, loading
                             <Container header={<Header variant="h2">{t('projects.edit.general')}</Header>}>
                                 <SpaceBetween size="l">
                                     <FormInput
-                                        info={<InfoLink onFollow={() => openHelpPanel(PROJECT_NAME_HELP)} />}
                                         label={t('projects.edit.project_name')}
                                         description={t('projects.edit.project_name_description')}
                                         control={control}
