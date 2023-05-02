@@ -1,4 +1,3 @@
-import os
 from os import PathLike
 from pathlib import Path
 from typing import Dict, List, Optional, Type, TypeVar
@@ -145,7 +144,9 @@ def get_hub_client(project_name: Optional[str] = None) -> HubClient:
     else:
         project_config = cli_config_manager.get_default_project_config()
         if project_config is None:
-            raise CLIError(f"No default project configured. Call `dstack config`.")
+            raise CLIError(
+                f"No hub project configured. Call `dstack hub start` or `dstack config hub`."
+            )
     repo = load_repo(config.repo_user_config)
     hub_client_config = HubClientConfig(url=project_config.url, token=project_config.token)
     hub_client = HubClient(config=hub_client_config, project=project_config.name, repo=repo)
