@@ -18,7 +18,7 @@ class TestHub:
     def test_starts_and_configures_hub(self, dstack_dir):
         with hub_process(dstack_dir) as proc:
             assert "The hub is available at" in proc.stdout.readline()
-            default_project_config = CLIConfigManager().get_default_project_config()
+            default_project_config = CLIConfigManager(dstack_dir).get_default_project_config()
             assert default_project_config is not None
 
 

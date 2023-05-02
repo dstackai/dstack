@@ -48,7 +48,7 @@ def hub_process(dstack_dir: Path) -> subprocess.Popen:
         dstack_dir=dstack_dir,
     )
     with terminate_on_exit(proc):
-        assert hub_available()
+        wait_hub()
         yield proc
 
 
@@ -87,13 +87,15 @@ def terminate_on_exit(proc: subprocess.Popen) -> subprocess.Popen:
         process.kill()
 
 
-def hub_available(host: str = HUB_HOST, port: str = HUB_PORT, attempts=10) -> bool:
+def wait_hub(host: str = HUB_HOST, port: str = HUB_PORT, attempts=10):
     for _ in range(attempts):
         try:
-            resp = requests.get(f"http://{HUB_HOST}:{HUB_PORT}")
+            resp = requests.get(f"http://{host}:{port}")
         except requests.exceptions.ConnectionError:
-            time.sleep(0.1)
+            time.sleep(1)
             continue
         if resp.status_code == 200:
             return True
-    return False
+        else:
+            assert False, (resp.status_code, resp.content)
+    assert False
