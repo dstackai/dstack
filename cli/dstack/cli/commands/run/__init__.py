@@ -19,7 +19,7 @@ from dstack.api.runs import list_runs
 from dstack.backend.base.logs import fix_urls
 from dstack.cli.commands import BasicCommand
 from dstack.cli.commands.run.ssh_tunnel import allocate_local_ports, run_ssh_tunnel
-from dstack.cli.common import check_init, console, print_runs
+from dstack.cli.common import add_project_argument, check_init, console, print_runs
 from dstack.cli.config import config, get_hub_client
 from dstack.core.error import NameNotFoundError, RepoNotInitializedError
 from dstack.core.job import Job, JobHead, JobStatus
@@ -53,12 +53,7 @@ class RunCommand(BasicCommand):
             choices=workflow_or_provider_names,
             nargs="?",
         )
-        self._parser.add_argument(
-            "--project",
-            type=str,
-            help="The name of the Hub project to execute the command for",
-            default=None,
-        )
+        add_project_argument(self._parser)
         self._parser.add_argument(
             "-t",
             "--tag",

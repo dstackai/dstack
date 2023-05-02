@@ -7,7 +7,7 @@ from pathlib import Path
 from dstack.api.hub import HubClient
 from dstack.api.runs import RunNotFoundError, TagNotFoundError, get_tagged_run_name
 from dstack.cli.commands import BasicCommand
-from dstack.cli.common import check_init, console
+from dstack.cli.common import add_project_argument, check_init, console
 from dstack.cli.config import get_hub_client
 from dstack.utils.common import get_dstack_dir
 
@@ -20,12 +20,7 @@ class CpCommand(BasicCommand):
         super().__init__(parser)
 
     def register(self):
-        self._parser.add_argument(
-            "--project",
-            type=str,
-            help="The name of the Hub project to execute the command for",
-            default=None,
-        )
+        add_project_argument(self._parser)
         self._parser.add_argument(
             "run_name_or_tag_name",
             metavar="(RUN | :TAG)",
