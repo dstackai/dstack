@@ -1,4 +1,15 @@
-declare type TRunStatus = "done" | string
+declare type TRunStatus =
+    | 'pending'
+    | 'submitted'
+    | 'downloading'
+    | 'running'
+    | 'uploading'
+    | 'stopping'
+    | 'stopped'
+    | 'aborting'
+    | 'aborted'
+    | 'failed'
+    | 'done';
 
 declare interface IRunJobHead {
     job_id: string,
@@ -10,7 +21,7 @@ declare interface IRunJobHead {
     run_name: string,
     workflow_name: null | string,
     provider_name: string,
-    status: string | "done",
+    status: TRunStatus,
     error_code: null,
     container_exit_code: null,
     submitted_at: number,

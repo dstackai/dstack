@@ -9,8 +9,7 @@ import { useHelpPanel, useNotifications } from 'hooks';
 import { isRequestFormErrors2, isRequestFormFieldError } from 'libs';
 import { useBackendValuesMutation } from 'services/project';
 
-import { BUCKET_HELP, CREDENTIALS_HELP, REGION_HELP, SUBNET_HELP } from './constants';
-import { FIELD_NAMES } from './constants';
+import { BUCKET_HELP, CREDENTIALS_HELP, FIELD_NAMES, REGION_HELP, SUBNET_HELP } from './constants';
 
 import { IProps } from './types';
 

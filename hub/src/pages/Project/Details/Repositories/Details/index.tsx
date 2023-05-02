@@ -1,19 +1,26 @@
 import React from 'react';
 import { useTranslation } from 'react-i18next';
 import { useParams } from 'react-router-dom';
+import { format } from 'date-fns';
 
 import { Button, Header, ListEmptyMessage, NavigateLink, Pagination, SpaceBetween, Table, TextFilter } from 'components';
 
 import { useBreadcrumbs } from 'hooks';
 import { useCollection } from 'hooks';
+import { getRepoDisplayName } from 'libs/repo';
 import { ROUTES } from 'routes';
-import { useGetProjectRunsQuery } from 'services/project';
+import { useGetProjectRepoQuery, useGetProjectRunsQuery } from 'services/project';
 
 export const RepositoryDetails: React.FC = () => {
     const { t } = useTranslation();
     const params = useParams();
     const paramProjectName = params.name ?? '';
     const paramRepoId = params.repoId ?? '';
+
+    const { data: repoData } = useGetProjectRepoQuery({
+        name: paramProjectName,
+        repo_id: paramRepoId,
+    });
 
     useBreadcrumbs([
         {
@@ -29,7 +36,7 @@ export const RepositoryDetails: React.FC = () => {
             href: ROUTES.PROJECT.DETAILS.REPOSITORIES.FORMAT(paramProjectName),
         },
         {
-            text: paramRepoId,
+            text: repoData ? getRepoDisplayName(repoData) : 'Loading...',
             href: ROUTES.PROJECT.DETAILS.REPOSITORIES.DETAILS.FORMAT(paramProjectName, paramRepoId),
         },
     ]);
@@ -38,28 +45,38 @@ export const RepositoryDetails: React.FC = () => {
         {
             id: 'run_name',
             header: t('projects.run.run_name'),
-            cell: (item: IRun) => (
-                <NavigateLink href={ROUTES.PROJECT.DETAILS.RUNS.DETAILS.FORMAT(paramProjectName, paramRepoId, item.run_name)}>
-                    {item.run_name}
-                </NavigateLink>
-            ),
+            cell: (item: IRun) =>
+                // TODO revert link after adding run details page
+                // <NavigateLink href={ROUTES.PROJECT.DETAILS.RUNS.DETAILS.FORMAT(paramProjectName, paramRepoId, item.run_name)}>
+                //     {item.run_name}
+                // </NavigateLink>
+                item.run_name,
         },
         {
             id: 'workflow_name',
-            header: t('projects.run.workflow_name'),
-            cell: (item: IRun) => item.workflow_name,
+            header: `${t('projects.run.workflow_name')}/${t('projects.run.provider_name')}`,
+            cell: (item: IRun) => item.workflow_name ?? item.provider_name,
         },
         {
-            id: 'provider_name',
-            header: t('projects.run.provider_name'),
-            cell: (item: IRun) => item.provider_name,
+            id: 'status',
+            header: t('projects.run.status'),
+            cell: (item: IRun) => t(`projects.run.statuses.${item.status}`),
+        },
+        {
+            id: 'submitted_at',
+            header: t('projects.run.submitted_at'),
+            cell: (item: IRun) => format(new Date(item.submitted_at), 'MM/dd/yyyy hh:mm'),
+        },
+        {
+            id: 'artifacts',
+            header: t('projects.run.artifacts'),
+            cell: (item: IRun) => item.artifact_heads?.length ?? '-',
         },
     ];
 
     const { data, isLoading } = useGetProjectRunsQuery({
         name: paramProjectName,
-        // TODO remove 'replace' after fix on backend
-        repo_id: paramRepoId.replace(/,/gi, '.'),
+        repo_id: paramRepoId,
     });
 
     const renderEmptyMessage = (): React.ReactNode => {
