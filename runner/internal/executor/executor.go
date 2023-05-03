@@ -190,7 +190,11 @@ func (ex *Executor) Run(ctx context.Context) error {
 }
 
 func (ex *Executor) Stop() {
-	ex.stoppedCh <- struct{}{}
+	select {
+	case <-ex.stoppedCh:
+		return
+	default:
+	}
 	close(ex.stoppedCh)
 }
 

@@ -4,7 +4,7 @@ import sys
 import time
 from argparse import Namespace
 from pathlib import Path
-from typing import Dict, List, Optional
+from typing import Dict, Iterator, List, Optional, Tuple
 
 import websocket
 from cursor import cursor
@@ -24,11 +24,14 @@ from dstack.cli.config import config, get_hub_client
 from dstack.core.error import NameNotFoundError, RepoNotInitializedError
 from dstack.core.job import Job, JobHead, JobStatus
 from dstack.core.request import RequestStatus
+from dstack.core.run import RunHead
 from dstack.utils.workflows import load_workflows
 
 POLL_PROVISION_RATE_SECS = 3
 
 POLL_FINISHED_STATE_RATE_SECS = 1
+
+interrupt_count = 0
 
 
 class RunCommand(BasicCommand):
@@ -151,12 +154,7 @@ def _poll_run(
             transient=True,
         ) as progress:
             task = progress.add_task("Provisioning... It may take up to a minute.", total=None)
-            while True:
-                time.sleep(POLL_PROVISION_RATE_SECS)
-                run_heads = hub_client.list_run_heads(run_name)
-                if len(run_heads) == 0:
-                    continue
-                run = run_heads[0]
+            for run in poll_run_head(hub_client, run_name):
                 if run.status == JobStatus.DOWNLOADING and not downloading:
                     progress.update(task, description="Downloading deps... It may take a while.")
                     downloading = True
@@ -194,7 +192,7 @@ def _poll_run(
         else:
             console.print("Provisioning... It may take up to a minute. [green]✓[/]")
         console.print()
-        console.print("[grey58]To interrupt, press Ctrl+C.[/]")
+        console.print("[grey58]To exit, press Ctrl+C.[/]")
         console.print()
 
         if openssh_server:
@@ -209,9 +207,30 @@ def _poll_run(
         if run.status.is_unfinished() or run.status == JobStatus.DONE:
             _poll_logs_ws(hub_client, jobs[0], ports)
     except KeyboardInterrupt:
-        if Confirm.ask(f" [red]Abort the run '{run_name}'?[/]"):
-            hub_client.stop_jobs(run_name, abort=True)
-            console.print(f"[grey58]OK[/]")
+        ask_on_interrupt(hub_client, run_name)
+
+    try:
+        uploading = False
+        status = "unknown"
+        with Progress(
+            TextColumn("[progress.description]{task.description}"),
+            SpinnerColumn(),
+            transient=True,
+        ) as progress:
+            task = progress.add_task("Stopping...", total=None)
+            for run in poll_run_head(hub_client, run_name):
+                if run.status == JobStatus.UPLOADING and not uploading:
+                    progress.update(task, description="Uploading... It may take a while.")
+                    uploading = True
+                elif run.status.is_finished():
+                    progress.update(task, total=100)
+                    status = run.status.name
+                    break
+        console.print(f"[grey58]{status.capitalize()}[/]")
+    except KeyboardInterrupt:
+        global interrupt_count
+        interrupt_count = 1
+        ask_on_interrupt(hub_client, run_name)
 
 
 def _poll_logs_ws(hub_client: HubClient, job: Job, ports: Dict[int, int]):
@@ -222,11 +241,7 @@ def _poll_logs_ws(hub_client: HubClient, job: Job, ports: Dict[int, int]):
 
     def on_error(_: WebSocketApp, err: Exception):
         if isinstance(err, KeyboardInterrupt):
-            run_name = job.run_name
-            if Confirm.ask(f"\n [red]Abort the run '{run_name}'?[/]"):
-                hub_client.stop_jobs(run_name, abort=True)
-                console.print(f"[grey58]OK[/]")
-            exit()
+            ask_on_interrupt(hub_client, job.run_name)
         else:
             console.print(err)
 
@@ -248,18 +263,43 @@ def _poll_logs_ws(hub_client: HubClient, job: Job, ports: Dict[int, int]):
         on_open=on_open,
         on_close=on_close,
     )
-    _ws.run_forever()
+    try:
+        _ws.run_forever()
+    except KeyboardInterrupt:
+        pass  # on_error() has already handled an error, but it raises here too
     if atty:
         cursor.show()
 
-    try:
-        while True:
-            _job_head = hub_client.get_job(job.job_id)
-            run = hub_client.list_run_heads(_job_head.run_name)[0]
-            if run.status.is_finished():
-                break
-            time.sleep(POLL_FINISHED_STATE_RATE_SECS)
-    except KeyboardInterrupt:
-        if Confirm.ask(f"\n [red]Abort the run '{job.run_name}'?[/]"):
-            hub_client.stop_jobs(job.run_name, abort=True)
-            console.print(f"[grey58]OK[/]")
+
+def poll_run_head(
+    hub_client: HubClient, run_name: str, rate: int = POLL_PROVISION_RATE_SECS
+) -> Iterator[RunHead]:
+    while True:
+        run_heads = hub_client.list_run_heads(run_name)
+        if len(run_heads) == 0:
+            continue
+        run_head = run_heads[0]
+        yield run_head
+        time.sleep(rate)
+
+
+def ask_on_interrupt(hub_client: HubClient, run_name: str):
+    global interrupt_count
+    if interrupt_count == 0:
+        try:
+            if Confirm.ask(f"\n[red]Stop the run '{run_name}'?[/]"):
+                interrupt_count += 1
+                hub_client.stop_jobs(run_name, abort=False)
+                console.print(f"[grey58]To abort press Ctrl+C again.[/]")
+            else:
+                console.print("[grey58]Detaching...[/]")
+                console.print("[grey58]OK[/]")
+                exit(0)
+            return
+        except KeyboardInterrupt:
+            interrupt_count += 1
+    if interrupt_count > 0:
+        console.print("[grey58]Aborting...[/]")
+        hub_client.stop_jobs(run_name, abort=True)
+        console.print("[grey58]Aborted[/]")
+        exit(0)
