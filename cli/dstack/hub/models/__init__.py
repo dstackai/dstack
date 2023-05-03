@@ -35,6 +35,7 @@ BackendType = Union[Literal["local"], Literal["aws"], Literal["gcp"]]
 
 class LocalProjectConfig(BaseModel):
     type: Literal["local"] = "local"
+    path: Optional[str]
 
 
 class AWSProjectConfigPartial(BaseModel):

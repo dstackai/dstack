@@ -21,6 +21,7 @@ from dstack.hub.models import (
     ProjectInfoWithCreds,
 )
 from dstack.hub.security.utils import ROLE_ADMIN
+from dstack.hub.services.backends.local import LocalConfigurator
 
 
 class ProjectManager:
@@ -189,7 +190,7 @@ def _project2info(
             )
         )
     if project.backend == "local":
-        backend = LocalProjectConfig()
+        backend = _local(project)
     if project.backend == "aws":
         backend = _aws(project, include_creds=include_creds)
     if project.backend == "gcp":
@@ -197,6 +198,13 @@ def _project2info(
     if include_creds:
         return ProjectInfoWithCreds(project_name=project.name, backend=backend, members=members)
     return ProjectInfo(project_name=project.name, backend=backend, members=members)
+
+
+def _local(project: Project) -> LocalProjectConfig:
+    config = LocalConfigurator().get_config_from_hub_config_data(
+        project.name, project.config, project.auth
+    )
+    return LocalProjectConfig(path=str(config.backend_dir))
 
 
 def _aws(
