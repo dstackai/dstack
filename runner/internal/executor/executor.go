@@ -296,7 +296,7 @@ func (ex *Executor) runJob(ctx context.Context, erCh chan error, stoppedCh chan 
 			return
 		}
 
-		if err = ex.processJob(ctx, stoppedCh); err != nil { // todo
+		if err = ex.processJob(ctx, stoppedCh); err != nil {
 			erCh <- gerrors.Wrap(err)
 			return
 		}
