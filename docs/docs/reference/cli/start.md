@@ -1,4 +1,4 @@
-# dstack hub
+# dstack start
 
 This command starts the Hub application. The Hub application is required to run workflows.
 
@@ -7,8 +7,8 @@ This command starts the Hub application. The Hub application is required to run 
 <div class="termy">
 
 ```shell
-$ dstack hub start --help
-Usage: dstack hub start [-h] [--host HOST] [-p PORT] [-l LOG-LEVEL] [--token TOKEN]
+$ dstack start --help
+Usage: dstack start [-h] [--host HOST] [-p PORT] [-l LOG-LEVEL] [--token TOKEN]
 
 Options:
   --host HOST           Bind socket to this host. Defaults to 127.0.0.1

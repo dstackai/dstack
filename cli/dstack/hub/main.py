@@ -117,7 +117,10 @@ def create_default_project_config(url: str, token: str):
         cli_config_manager.save()
         return
     if project_config.url != url or project_config.token != token:
-        if Confirm.ask(f"CLI config for default project is outdated. Update config?"):
+        if Confirm.ask(
+            f"The default project in {cli_config_manager.dstack_dir / 'config.yaml'} is outdated. "
+            f"Update it?"
+        ):
             cli_config_manager.configure_project(
                 name=DEFAULT_PROJECT_NAME, url=url, token=token, default=True
             )

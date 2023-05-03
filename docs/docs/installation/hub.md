@@ -1,7 +1,3 @@
----
-status: new
----
-
 # Hub
 
 Hub is a tool that helps you manage users, cloud credentials, and settings in one place. 
@@ -21,7 +17,7 @@ The easiest way to start the Hub application server is by using Docker:
 ```shell
 $ docker run -p 3000:3000 \ 
   -v $(pwd)/hub:/root/.dstack/hub \
-  dstackai/dstack-hub
+  dstackai/dstack
 
 The hub is available at http://0.0.0.0:3000?token=b934d226-e24a-4eab-a284-eb92b353b10f
 ```
@@ -52,7 +48,7 @@ terminal to configure the project as a remote.
 <div class="termy">
 
 ```shell
-$ dstack config hub --url http://0.0.0.0:3000 \
+$ dstack config --url http://0.0.0.0:3000 \
   --project my-awesome-project \
   --token b934d226-e24a-4eab-a284-eb92b353b10f
 ```

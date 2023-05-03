@@ -9,8 +9,8 @@ The configuration is stored in `~/.dstack/config.yaml`.
 <div class="termy">
 
 ```shell
-$ dstack config hub --help
-Usage: dstack config hub [-h] --url URL --project PROJECT --token TOKEN
+$ dstack config --help
+Usage: dstack config [-h] --url URL --project PROJECT --token TOKEN
 
 Options:
   --url URL           The URL of the Hub application, e.g. http://127.0.0.0.1

@@ -2,20 +2,19 @@ import os
 from argparse import Namespace
 
 import uvicorn
-from rich_argparse import RichHelpFormatter
 
 from dstack import version
 from dstack.cli.commands import BasicCommand
 
 
-class HubCommand(BasicCommand):
-    NAME = "hub"
-    DESCRIPTION = None  # Hidden by default
+class StartCommand(BasicCommand):
+    NAME = "start"
+    DESCRIPTION = "Start a hub server"
 
     def __init__(self, parser):
-        super(HubCommand, self).__init__(parser)
+        super(StartCommand, self).__init__(parser)
 
-    def _hub_start(self, args: Namespace):
+    def _command(self, args: Namespace):
         os.environ["DSTACK_HUB_HOST"] = args.host
         os.environ["DSTACK_HUB_PORT"] = str(args.port)
         os.environ["DSTACK_HUB_LOG_LEVEL"] = args.log_level
@@ -30,41 +29,24 @@ class HubCommand(BasicCommand):
         )
 
     def register(self):
-        subparsers = self._parser.add_subparsers()
-        hub_parser = subparsers.add_parser(
-            "start",
-            help="Start a hub server",
-            formatter_class=RichHelpFormatter,
-            add_help=False,
-        )
-        hub_parser.add_argument(
-            "-h",
-            "--help",
-            action="help",
-            help="Show this help message and exit",
-        )
-        hub_parser.add_argument(
+        self._parser.add_argument(
             "--host",
             type=str,
             help="Bind socket to this host. Defaults to 127.0.0.1",
             default=os.getenv("DSTACK_HUB_HOST", "127.0.0.1"),
         )
-        hub_parser.add_argument(
+        self._parser.add_argument(
             "-p",
             "--port",
             type=int,
             help="Bind socket to this port. Defaults to 3000.",
             default=os.getenv("DSTACK_HUB_PORT", 3000),
         )
-        hub_parser.add_argument(
+        self._parser.add_argument(
             "-l",
             "--log-level",
             type=str,
             help="Logging level for hub. Defaults to ERROR.",
             default=os.getenv("DSTACK_HUB_LOG_LEVEL", "ERROR"),
         )
-        hub_parser.add_argument("--token", type=str, help="The admin user token")
-        hub_parser.set_defaults(func=self._hub_start)
-
-    def _command(self, args: Namespace):
-        self._parser.print_help()
+        self._parser.add_argument("--token", type=str, help="The admin user token")

@@ -121,6 +121,10 @@ extra:
       link: https://github.com/dstackai/dstack
     #    - icon: fontawesome/brands/python
     #      link: https://pypi.org/project/dstack/
+    - icon: /fontawesome/brands/python
+      link: https://pypi.org/project/dstack
+    - icon: /fontawesome/brands/docker
+      link: https://hub.docker.com/r/dstackai/dstack
     - icon: /fontawesome/brands/slack
       link: https://join.slack.com/t/dstackai/shared_invite/zt-xdnsytie-D4qU9BvJP8vkbkHXdi6clQ
     #    - icon: material/rss
@@ -150,7 +154,7 @@ nav:
           - CLI:
               - dstack run: docs/reference/cli/run.md
               - dstack init: docs/reference/cli/init.md
-              - dstack hub: docs/reference/cli/hub.md
+              - dstack start: docs/reference/cli/start.md
               - dstack config: docs/reference/cli/config.md
               - dstack ps: docs/reference/cli/ps.md
               - dstack ls: docs/reference/cli/ls.md

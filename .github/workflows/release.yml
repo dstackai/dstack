@@ -202,12 +202,12 @@ jobs:
       - name: Build and upload to DockerHub
         run: |
           VERSION=${GITHUB_REF#refs/tags/}
-          docker buildx build --platform linux/arm64/v8 --build-arg VERSION=$VERSION --push --provenance=false --tag dstackai/dstack-hub:$VERSION-arm64 -f release/Dockerfile .
-          docker buildx build --platform linux/amd64 --build-arg VERSION=$VERSION --push --provenance=false --tag dstackai/dstack-hub:$VERSION-amd64 -f release/Dockerfile .
-          docker manifest create dstackai/dstack-hub:$VERSION --amend dstackai/dstack-hub:$VERSION-arm64 --amend dstackai/dstack-hub:$VERSION-amd64
-          docker manifest push dstackai/dstack-hub:$VERSION
-          docker manifest create dstackai/dstack-hub:latest --amend dstackai/dstack-hub:$VERSION-arm64 --amend dstackai/dstack-hub:$VERSION-amd64
-          docker manifest push dstackai/dstack-hub:latest
+          docker buildx build --platform linux/arm64/v8 --build-arg VERSION=$VERSION --push --provenance=false --tag dstackai/dstack:$VERSION-arm64 -f release/Dockerfile .
+          docker buildx build --platform linux/amd64 --build-arg VERSION=$VERSION --push --provenance=false --tag dstackai/dstack:$VERSION-amd64 -f release/Dockerfile .
+          docker manifest create dstackai/dstack:$VERSION --amend dstackai/dstack:$VERSION-arm64 --amend dstackai/dstack:$VERSION-amd64
+          docker manifest push dstackai/dstack:$VERSION
+          docker manifest create dstackai/dstack:latest --amend dstackai/dstack:$VERSION-arm64 --amend dstackai/dstack:$VERSION-amd64
+          docker manifest push dstackai/dstack:latest
 
   ami-build:
     defaults:
