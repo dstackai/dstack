@@ -116,6 +116,10 @@ type RegistryAuth struct {
 	Password string `yaml:"password,omitempty"`
 }
 
+type RunnerMetadata struct {
+	Status string `yaml:"status"`
+}
+
 func (j *Job) RepoHostNameWithPort() string {
 	if j.RepoPort == 0 {
 		return j.RepoHostName

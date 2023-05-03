@@ -16,7 +16,9 @@ class NoMatchingInstanceError(BackendError):
 
 
 class RepoNotInitializedError(DstackError):
-    pass
+    def __init__(self, message: Optional[str] = None, project_name: Optional[str] = None):
+        super().__init__(message)
+        self.project_name = project_name
 
 
 class NameNotFoundError(DstackError):
