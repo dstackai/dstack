@@ -19,7 +19,8 @@
     "stop": "Stop",
     "clearFilter": "Clear filter",
     "server_error": "Server error: {{error}}",
-    "login": "Login"
+    "login": "Login",
+    "general": "General"
   },
 
   "auth": {
@@ -135,7 +136,8 @@
       "card": {
         "owner": "Owner",
         "last_run": "Last run",
-        "tags_count": "Tags count"
+        "tags_count": "Tags count",
+        "directory": "Directory"
       }
     },
     "run": {

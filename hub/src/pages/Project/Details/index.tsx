@@ -103,15 +103,13 @@ export const ProjectDetails: React.FC = () => {
                     />
                 }
             >
-                <SpaceBetween size="l">
-                    {isVisibleTabs && (
-                        <div className={styles.tabs}>
-                            <Tabs onChange={onChangeTab} activeTabId={activeTabId} tabs={tabs} />
-                        </div>
-                    )}
+                {isVisibleTabs && (
+                    <div className={styles.tabs}>
+                        <Tabs onChange={onChangeTab} activeTabId={activeTabId} tabs={tabs} />
+                    </div>
+                )}
 
-                    <Outlet />
-                </SpaceBetween>
+                <Outlet />
             </ContentLayout>
 
             <ConfirmationDialog visible={showDeleteConfirm} onDiscard={toggleDeleteConfirm} onConfirm={deleteUserHandler} />
