@@ -5,6 +5,7 @@ import { useTranslation } from 'react-i18next';
 import { Button, FormInput } from 'components';
 
 import { useAppDispatch } from 'hooks';
+import { useCheckAuthTokenMutation } from 'services/user';
 
 import { setAuthData } from 'App/slice';
 
@@ -18,10 +19,24 @@ export interface Props {
 
 export const LoginByTokenForm: React.FC<Props> = ({ className }) => {
     const { t } = useTranslation();
-    const { handleSubmit, control } = useForm<FormValues>();
+    const { handleSubmit, control, setError } = useForm<FormValues>();
     const dispatch = useAppDispatch();
+
+    const [checkToken, { isLoading }] = useCheckAuthTokenMutation();
     const onSubmit = (data: FormValues) => {
-        dispatch(setAuthData(data));
+        checkToken(data)
+            .unwrap()
+            .then(() => {
+                dispatch(setAuthData(data));
+            })
+            .catch((error) => {
+                if (error?.status === 401) {
+                    setError('token', { type: 'custom', message: t('auth.invalid_token') });
+                    return;
+                }
+
+                setError('token', { type: 'custom', message: t('common.server_error', { error: error?.msg }) });
+            });
     };
 
     return (
@@ -34,12 +49,16 @@ export const LoginByTokenForm: React.FC<Props> = ({ className }) => {
                             constraintText={t('users.token_description')}
                             control={control}
                             name="token"
+                            disabled={isLoading}
                             rules={{ required: t('validation.required') }}
+                            autoComplete="off"
                         />
                     </div>
 
                     <div className={styles.buttonWrap}>
-                        <Button variant="primary">{t('common.login')}</Button>
+                        <Button disabled={isLoading} loading={isLoading} variant="primary">
+                            {t('common.login')}
+                        </Button>
                     </div>
                 </div>
             </form>

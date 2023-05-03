@@ -8,6 +8,9 @@
     min-width: 0;
 }
 .buttonWrap {
+    display: flex;
     flex-shrink: 0;
+    width: 104px;
+    margin-right: -20px;
     margin-top: 4px;
 }

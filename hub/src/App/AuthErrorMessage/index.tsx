@@ -9,9 +9,10 @@ import styles from './styles.module.scss';
 export interface Props {
     title: string;
     text: string;
+    showLoginForm?: boolean;
 }
 
-export const AuthErrorMessage: React.FC<Props> = ({ title, text }) => {
+export const AuthErrorMessage: React.FC<Props> = ({ title, text, showLoginForm }) => {
     return (
         <Box margin={{ vertical: 'xxxl' }} textAlign="center" color="inherit">
             <SpaceBetween size="xxs">
@@ -23,7 +24,7 @@ export const AuthErrorMessage: React.FC<Props> = ({ title, text }) => {
                 </div>
             </SpaceBetween>
 
-            <LoginByTokenForm className={styles.loginForm} />
+            {showLoginForm && <LoginByTokenForm className={styles.loginForm} />}
         </Box>
     );
 };

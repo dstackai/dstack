@@ -42,6 +42,16 @@ export const userApi = createApi({
             providesTags: (result) => (result ? [{ type: 'User' as const, id: result.user_name }] : []),
         }),
 
+        checkAuthToken: builder.mutation<IUser, Pick<IUser, 'token'>>({
+            query: ({ token }) => ({
+                url: API.USERS.INFO(),
+                method: 'GET',
+                headers: {
+                    Authorization: `Bearer ${token}`,
+                },
+            }),
+        }),
+
         createUser: builder.mutation<IUser, Omit<IUser, 'token'>>({
             query: (user) => ({
                 url: API.USERS.BASE(),
@@ -89,6 +99,7 @@ export const {
     useGetUserDataQuery,
     useGetUserListQuery,
     useGetUserQuery,
+    useCheckAuthTokenMutation,
     useCreateUserMutation,
     useDeleteUsersMutation,
     useUpdateUserMutation,
