@@ -44,7 +44,7 @@ def run_dstack_cli(
 @contextmanager
 def hub_process(dstack_dir: Path) -> subprocess.Popen:
     proc = run_dstack_subprocess(
-        ["hub", "start", "--host", HUB_HOST, "--port", HUB_PORT, "--token", HUB_TOKEN],
+        ["hub", "--host", HUB_HOST, "--port", HUB_PORT, "--token", HUB_TOKEN],
         dstack_dir=dstack_dir,
     )
     with terminate_on_exit(proc):
