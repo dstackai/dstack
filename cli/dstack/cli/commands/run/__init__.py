@@ -217,11 +217,11 @@ def _poll_run(
             SpinnerColumn(),
             transient=True,
         ) as progress:
-            task = progress.add_task("Stopping...", total=None)
+            task = progress.add_task("Stopping... To abort press Ctrl+C", total=None)
             for run in poll_run_head(hub_client, run_name):
                 if run.status == JobStatus.UPLOADING and not uploading:
                     progress.update(
-                        task, description="Uploading artifacts and cache... It may take a while."
+                        task, description="Uploading artifacts and cache... To abort press Ctrl+C"
                     )
                     uploading = True
                 elif run.status.is_finished():
@@ -292,7 +292,7 @@ def ask_on_interrupt(hub_client: HubClient, run_name: str):
             if Confirm.ask(f"\n[red]Stop the run '{run_name}'?[/]"):
                 interrupt_count += 1
                 hub_client.stop_jobs(run_name, abort=False)
-                console.print(f"[grey58]To abort press Ctrl+C again.[/]")
+                console.print("[grey58]Stopping... To abort press Ctrl+C[/]", end="")
             else:
                 console.print("[grey58]Detaching...[/]")
                 console.print("[grey58]OK[/]")
@@ -301,7 +301,7 @@ def ask_on_interrupt(hub_client: HubClient, run_name: str):
         except KeyboardInterrupt:
             interrupt_count += 1
     if interrupt_count > 0:
-        console.print("[grey58]Aborting...[/]")
+        console.print("\n[grey58]Aborting...[/]")
         hub_client.stop_jobs(run_name, abort=True)
         console.print("[grey58]Aborted[/]")
         exit(0)

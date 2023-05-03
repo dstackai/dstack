@@ -8,7 +8,7 @@ from dstack.core.repo import RepoRef
 
 class RepoUserConfig(BaseModel):
     repo_id: str
-    repo_type: Literal["remote", "local"]
+    repo_type: Literal["remote", "local"] = "remote"
     ssh_key_path: Optional[str] = None
 
     @property
