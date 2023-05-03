@@ -21,6 +21,7 @@ from dstack.hub.models import (
     ProjectInfoWithCreds,
 )
 from dstack.hub.security.utils import ROLE_ADMIN
+from dstack.hub.services.backends.local import LocalConfigurator
 
 
 class ProjectManager:
@@ -41,6 +42,18 @@ class ProjectManager:
         await ProjectManager.create(project, session=session)
         await ProjectManager._add_member(
             project, Member(user_name=user.name, project_role=ROLE_ADMIN)
+        )
+
+    @staticmethod
+    @reuse_or_make_session
+    async def create_local_project(
+        user: User, project_name: str, session: Optional[AsyncSession] = None
+    ):
+        project_info = ProjectInfoWithCreds(
+            project_name=project_name, backend=LocalProjectConfig()
+        )
+        await ProjectManager.create_project_from_info(
+            user=user, project_info=project_info, session=session
         )
 
     @staticmethod
@@ -177,7 +190,7 @@ def _project2info(
             )
         )
     if project.backend == "local":
-        backend = LocalProjectConfig()
+        backend = _local(project)
     if project.backend == "aws":
         backend = _aws(project, include_creds=include_creds)
     if project.backend == "gcp":
@@ -185,6 +198,13 @@ def _project2info(
     if include_creds:
         return ProjectInfoWithCreds(project_name=project.name, backend=backend, members=members)
     return ProjectInfo(project_name=project.name, backend=backend, members=members)
+
+
+def _local(project: Project) -> LocalProjectConfig:
+    config = LocalConfigurator().get_config_from_hub_config_data(
+        project.name, project.config, project.auth
+    )
+    return LocalProjectConfig(path=str(config.backend_dir))
 
 
 def _aws(

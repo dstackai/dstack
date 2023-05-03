@@ -217,29 +217,28 @@ jobs:
           aws s3 cp dstack-runner-${{ matrix.goos }}-${{ matrix.goarch }} "s3://dstack-runner-downloads-stgn/$VERSION/binaries/dstack-runner-${{ matrix.goos }}-${{ matrix.platform }}${{ matrix.extension }}" --acl public-read
           aws s3 cp dstack-runner-${{ matrix.goos }}-${{ matrix.goarch }} "s3://dstack-runner-downloads-stgn/latest/binaries/dstack-runner-${{ matrix.goos }}-${{ matrix.platform }}${{ matrix.extension }}" --acl public-read
 
-  # TODO: make integartion tests work with hub
-  # cli-integration-tests:
-  #   needs: [ runner-upload-master ]
-  #   runs-on: ${{ matrix.os }}
-  #   strategy:
-  #     matrix:
-  #       os: [ ubuntu-latest ]
-  #       python-version: [ 3.7, 3.8, 3.9, "3.10", 3.11 ]
-  #   defaults:
-  #     run:
-  #       working-directory: cli
-  #   steps:
-  #     - uses: actions/checkout@v2
-  #     - name: Set up Python ${{ matrix.python-version }}
-  #       uses: actions/setup-python@v2
-  #       with:
-  #         python-version: ${{ matrix.python-version }}
-  #     - name: Install dependencies
-  #       run: |
-  #         python -m pip install --upgrade pip
-  #         pip install -r requirements.txt
-  #         pip install -r requirements_dev.txt
-  #     - name: Run pytest
-  #       run: |
-  #         mkdir -p dstack/hub/statics
-  #         pytest tests/integration/
+  cli-integration-tests:
+    needs: [ runner-upload-master ]
+    runs-on: ${{ matrix.os }}
+    strategy:
+      matrix:
+        os: [ ubuntu-latest ]
+        python-version: [ 3.7, 3.8, 3.9, "3.10", 3.11 ]
+    steps:
+      - uses: actions/checkout@v2
+      - name: Set up Python ${{ matrix.python-version }}
+        uses: actions/setup-python@v2
+        with:
+          python-version: ${{ matrix.python-version }}
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -e .
+          pip install -r cli/requirements_dev.txt
+      - name: Prepare hub
+        run: |
+          mkdir -p cli/dstack/hub/statics
+          touch cli/dstack/hub/statics/index.html
+      - name: Run pytest
+        run: |
+          pytest cli/tests/integration/

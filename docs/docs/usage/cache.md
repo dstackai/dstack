@@ -23,7 +23,7 @@ workflows:
 
 </div>
 
-Run it locally using `dstack run`:
+Run it using `dstack run`:
 
 <div class="termy">
 
@@ -34,9 +34,6 @@ $ dstack run hello-cache
 </div>
 
 On the first run, Python packages will be downloaded. On subsequent runs, packages will be installed from the cache.
-
-!!! info "NOTE:"
-    The `cache` feature works for both local and remote runs, like any other `dstack` feature.
 
 ### Prune cache
 

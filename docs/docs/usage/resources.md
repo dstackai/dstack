@@ -1,6 +1,6 @@
 # Resources
 
-When running a workflow remotely, you can specify which [resources](../reference/providers/bash.md#resources) to use,
+When running a workflow in the cloud, you can specify which [resources](../reference/providers/bash.md#resources) to use,
 such as GPU and memory.
 
 ## GPU
@@ -24,12 +24,12 @@ workflows:
 
 </div>
 
-Go ahead, and run this workflow remotely:
+Go ahead, and run this workflow:
 
 <div class="termy">
 
 ```shell
-$ dstack run gpu-v100 --remote
+$ dstack run gpu-v100
 ```
 
 </div>
@@ -58,12 +58,12 @@ workflows:
 
 </div>
 
-Go ahead, and run this workflow remotely:
+Go ahead, and run this workflow:
 
 <div class="termy">
 
 ```shell
-$ dstack run mem-64gb --remote
+$ dstack run mem-64gb
 ```
 
 </div>
@@ -89,7 +89,7 @@ workflows:
 
 </div>
 
-Try running this workflow either locally or remotely:
+Try running this workflow:
 
 <div class="termy">
 
@@ -104,8 +104,8 @@ $ dstack run shm-size
 Interruptible instances (also known as spot instances or preemptive instances) are
 offered at a significant price discount, and allow to use expensive machines at affordable prices.
 
-If you run the following workflow remotely, `dstack` will automatically provision a spot instance with one default GPU
-(`NVIDIA Tesla K80`):
+If you run the following workflow in the cloud, `dstack` will automatically provision a spot instance with one default
+GPU (`NVIDIA Tesla K80`):
 
 <div editor-title=".dstack/workflows/resources.yaml"> 
 
@@ -128,38 +128,6 @@ workflows:
     by the AWS support team beforehand.
     The approval typically takes a few business days.
 
-## Remote by default
-
-If you plan to run a workflow remotely by default (and don't want to include the `--remote` flag to the `dstack run`
-command
-each time), you can set `remote` to `true` inside `resources`.
-
-This workflow will run remotely by default:
-
-<div editor-title=".dstack/workflows/resources.yaml"> 
-
-```yaml
-workflows:
-  - name: local-hello
-    provider: bash
-    commands:
-      - echo "Hello world"
-    resources:
-      remote: true
-```
-
-</div>
-
-Go ahead and run it with `dstack run`:
-
-<div class="termy">
-
-```shell
-$ dstack run local-hello
-```
-
-</div>
-
 ## Override via CLI
 
 Resources can be configured not only through the YAML file but
@@ -170,7 +138,7 @@ The following command that runs the `hello` workflow remotely using a spot insta
 <div class="termy">
 
 ```shell
-$ dstack run hello --remote --gpu 4 --interruptible
+$ dstack run hello --gpu 4 --interruptible
 ```
 
 </div>

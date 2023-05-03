@@ -28,26 +28,32 @@ The `secrets add` command adds a new secret.
 
 ### Usage
 
+<div class="termy">
+
 ```shell
 $ dstack secrets add --help
-Usage: dstack secrets add [-h] [-y] NAME [VALUE]
+Usage: dstack secrets add [-h] [--project PROJECT] [-y] NAME [VALUE]
 
 Positional Arguments:
-  NAME        The name of the secret
-  VALUE       The value of the secret
+  NAME               The name of the secret
+  VALUE              The value of the secret
 
 Optional Arguments:
-  -y, --yes   Don't ask for confirmation
+  --project PROJECT  The name of the Hub project to execute the command for
+  -y, --yes          Don't ask for confirmation
 ```
+
+</div>
 
 ### Arguments reference
 
 The following arguments are required:
 
-- `NAME` – (Required) A name of the secret. Must be unique within the current Git repo.
+- `NAME` – (Required) A name of the secret. Must be unique within the current repository.
 
 The following arguments are optional:
 
+- `--project PROJECT` - (Optional) The name of the Hub project to execute the command for
 -  `-y`, `--yes` – (Optional) Don't ask for confirmation 
 - `VALUE` – (Optional) The value of the secret. If not specified, dstack prompts the user to enter it via a masked input.
 
@@ -58,12 +64,16 @@ The following arguments are optional:
 
 <div class="termy">
 
-```shell
+```shell    
 $ dstack secrets delete --help
-usage: dstack secrets delete [-h] NAME
+usage: dstack secrets delete [-h] [--project PROJECT] [-y] NAME
 
-positional arguments:
-  NAME        The name of the secret
+Positional Arguments:
+  NAME               The name of the secret
+
+Optional Arguments:
+  --project PROJECT  The name of the Hub project to execute the command for
+  -y, --yes          Don't ask for confirmation
 ```
 
 </div>
@@ -76,4 +86,5 @@ The following arguments are required:
 
 The following arguments are optional:
 
--  `-y`, `--yes` – (Optional) Don't ask for confirmation 
+- `--project PROJECT` - (Optional) The name of the Hub project to execute the command for
+- `-y`, `--yes` – (Optional) Don't ask for confirmation 

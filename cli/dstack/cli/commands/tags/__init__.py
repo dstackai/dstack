@@ -6,7 +6,7 @@ from rich.table import Table
 from rich_argparse import RichHelpFormatter
 
 from dstack.cli.commands import BasicCommand
-from dstack.cli.common import check_init, console
+from dstack.cli.common import add_project_argument, check_init, console
 from dstack.cli.config import get_hub_client
 from dstack.core.error import BackendError
 from dstack.utils.common import pretty_date
@@ -20,22 +20,17 @@ class TAGCommand(BasicCommand):
         super(TAGCommand, self).__init__(parser)
 
     def register(self):
-        self._parser.add_argument(
-            "--project",
-            type=str,
-            help="Hub project to execute the command",
-            default=None,
-        )
         subparsers = self._parser.add_subparsers()
 
         add_tags_parser = subparsers.add_parser(
             "add", help="Add a tag", formatter_class=RichHelpFormatter
         )
+        add_project_argument(add_tags_parser)
         add_tags_parser.add_argument(
             "tag_name", metavar="TAG", type=str, help="The name of the tag"
         )
         add_tags_parser.add_argument(
-            "run_name", metavar="RUN", type=str, help="A name of a run", nargs="?"
+            "run_name", metavar="RUN", type=str, help="The name of the run", nargs="?"
         )
         add_tags_parser.add_argument(
             "-a",
@@ -54,6 +49,7 @@ class TAGCommand(BasicCommand):
         delete_tags_parser = subparsers.add_parser(
             "delete", help="Delete a tag", formatter_class=RichHelpFormatter
         )
+        add_project_argument(delete_tags_parser)
         delete_tags_parser.add_argument(
             "tag_name", metavar="TAG_NAME", type=str, help="The name of the tag"
         )
@@ -79,7 +75,7 @@ class TAGCommand(BasicCommand):
                 tag_head.tag_name,
                 created_at,
                 tag_head.run_name,
-                tag_head.repo_user_id,
+                tag_head.hub_user_name,
             )
         console.print(table)
 

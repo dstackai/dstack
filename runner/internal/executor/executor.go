@@ -433,7 +433,7 @@ func (ex *Executor) processDeps(ctx context.Context) error {
 func (ex *Executor) processCache(ctx context.Context) error {
 	job := ex.backend.Job(ctx)
 	for _, cache := range job.Cache {
-		cacheArt := ex.backend.GetArtifact(ctx, job.RunName, cache.Path, path.Join("cache", job.RepoId, job.RepoUserId, job.WorkflowName, cache.Path), false)
+		cacheArt := ex.backend.GetArtifact(ctx, job.RunName, cache.Path, path.Join("cache", job.RepoId, job.HubUserName, job.WorkflowName, cache.Path), false)
 		if cacheArt != nil {
 			ex.cacheArtifacts = append(ex.cacheArtifacts, cacheArt)
 		}

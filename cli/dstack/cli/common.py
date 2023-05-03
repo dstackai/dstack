@@ -1,3 +1,4 @@
+import argparse
 from typing import List
 
 from rich.console import Console
@@ -36,7 +37,7 @@ def generate_runs_table(runs: List[RunHead], verbose: bool = False) -> Table:
             _status_color(run, run.run_name, True, False),
             _status_color(run, run.workflow_name or run.provider_name, False, False),
             _status_color(run, submitted_at, False, False),
-            _status_color(run, run.repo_user_id or "", False, False),
+            _status_color(run, run.hub_user_name or "", False, False),
             _pretty_print_status(run),
             _status_color(run, run.tag_name or "", False, False),
         ]
@@ -101,8 +102,11 @@ def check_init(func):
     def decorator(*args, **kwargs):
         try:
             func(*args, **kwargs)
-        except RepoNotInitializedError:
-            console.print(f"The repository is not initialized. Call `dstack init` first.")
+        except RepoNotInitializedError as e:
+            command = "dstack init"
+            if e.project_name is not None:
+                command += f" --project {e.project_name}"
+            console.print(f"The repository is not initialized. Call `{command}` first.")
             exit(1)
 
     return decorator
@@ -117,3 +121,12 @@ def check_cli_errors(func):
             exit(1)
 
     return decorator
+
+
+def add_project_argument(parser: argparse.ArgumentParser):
+    parser.add_argument(
+        "--project",
+        type=str,
+        help="The name of the Hub project to execute the command for",
+        default=None,
+    )

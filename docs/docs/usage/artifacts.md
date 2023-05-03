@@ -21,7 +21,7 @@ workflows:
 
 </div>
 
-Run it locally using `dstack run`:
+Run it using `dstack run`:
 
 <div class="termy">
 
@@ -59,43 +59,6 @@ data  MNIST/raw/t10k-images-idx3-ubyte      7.5MiB
 
 </div>
 
-## Push artifacts
-
-When you run a workflow locally, artifacts are stored in `~/.dstack/artifacts` and can be reused only from the workflows
-that run locally too.
-
-If you'd like to reuse the artifacts outside your machine, you must push these artifacts using the 
-[`dstack push`](../reference/cli/push.md) command:
-
-<div class="termy">
-
-```shell
-$ dstack push grumpy-zebra-1
-```
-
-</div>
-
-!!! info "NOTE:"
-    If you run a workflow remotely, artifacts are pushed automatically, and it's typically a lot faster
-    than pushing artifacts of a local run.
-
-## Pull artifacts
-
-When running a workflow remotely, such as when using `--remote` with the `dstack run` command, the resulting artifacts are
-stored remotely. 
-
-If you wish to access these artifacts locally, you can use the [`dstack pull`](../reference/cli/pull.md) command.
-
-<div class="termy">
-
-```shell
-$ dstack pull grumpy-zebra-1
-```
-
-</div>
-
-This command downloads the artifacts to `~/.dstack/artifacts` and enables their reuse in your other local workflows.
-
 ## Add tags
 
 If you wish to reuse the artifacts of a specific run, you can assign a tag (via the [`dstack tags`](../reference/cli/tags.md) command) 
@@ -112,9 +75,6 @@ $ dstack tags add grumpy-zebra-1 awesome-tag
 </div>
 
 Even if you delete the `grumpy-zebra-1` run, you can still access its artifacts using the `awesome-tag` tag name. 
-
-You can reference a tag through the [`dstack push`](../reference/cli/push.md),
-[`dstack pull`](../reference/cli/pull.md), [`dstack ls`](../reference/cli/ls.md), and through [Deps](deps.md#tags)."
 
 ## Real-time artifacts
 
@@ -153,7 +113,7 @@ workflows:
 
 </div>
 
-Go ahead and run this workflow remotely:
+Go ahead and run this workflow:
 
 <div class="termy">
 

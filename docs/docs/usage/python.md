@@ -28,7 +28,7 @@ workflows:
 
 </div>
 
-Now, run it locally using the `dstack run` command:
+Now, run it using the `dstack run` command:
 
 <div class="termy">
 
@@ -92,7 +92,7 @@ workflows:
 
 </div>
 
-Run it locally using the `dstack run` command:
+Run it using the `dstack run` command:
 
 <div class="termy">
 
@@ -120,7 +120,7 @@ workflows:
 
 </div>
 
-Run it locally using the `dstack run` command:
+Run it using the `dstack run` command:
 
 <div class="termy">
 
@@ -175,7 +175,7 @@ workflows:
 
 </div>
 
-Run it locally using the `dstack run` command:
+Run it using the `dstack run` command:
 
 <div class="termy">
 

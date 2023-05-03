@@ -132,7 +132,7 @@ func (l Local) UpdateState(ctx context.Context) error {
 }
 
 func (l Local) CheckStop(ctx context.Context) (bool, error) {
-	pathStateFile := fmt.Sprintf("runners/m;%s;status", l.runnerID)
+	pathStateFile := fmt.Sprintf("runners/m;%s.yaml", l.runnerID)
 	log.Trace(ctx, "Reading metadata from state file", "path", pathStateFile)
 	if _, err := os.Stat(filepath.Join(l.path, pathStateFile)); err == nil {
 		file, err := os.Open(filepath.Join(l.path, pathStateFile))
@@ -143,7 +143,11 @@ func (l Local) CheckStop(ctx context.Context) (bool, error) {
 		if err != nil {
 			return false, gerrors.Wrap(err)
 		}
-		if string(body) == states.Stopping {
+		metadata := new(models.RunnerMetadata)
+		if err = yaml.Unmarshal(body, metadata); err != nil {
+			return false, gerrors.Wrap(err)
+		}
+		if metadata.Status == states.Stopping {
 			log.Trace(ctx, "Status equals stopping")
 			return true, nil
 		}

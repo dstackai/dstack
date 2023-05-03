@@ -35,6 +35,7 @@ BackendType = Union[Literal["local"], Literal["aws"], Literal["gcp"]]
 
 class LocalProjectConfig(BaseModel):
     type: Literal["local"] = "local"
+    path: Optional[str]
 
 
 class AWSProjectConfigPartial(BaseModel):
@@ -133,7 +134,7 @@ class ProjectInfoWithCreds(BaseModel):
 
 
 class AddTagRun(BaseModel):
-    repo_spec: RepoSpec
+    repo_id: str
     tag_name: str
     run_name: str
     run_jobs: Optional[List[Job]]
@@ -146,13 +147,13 @@ class AddTagPath(BaseModel):
 
 
 class StopRunners(BaseModel):
-    repo_spec: RepoSpec
+    repo_id: str
     job_id: str
     abort: bool
 
 
 class SaveRepoCredentials(BaseModel):
-    repo_spec: RepoSpec
+    repo_id: str
     repo_credentials: RemoteRepoCredentials
 
 
@@ -192,7 +193,7 @@ class ArtifactsList(BaseModel):
 
 
 class SecretAddUpdate(BaseModel):
-    repo_spec: RepoSpec
+    repo_id: str
     secret: Secret
 
 

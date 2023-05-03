@@ -8,7 +8,7 @@ To use `dstack`, install it with `pip` and start the Hub application.
 
 ```shell
 $ pip install dstack
-$ dstack hub start
+$ dstack start
 
 The hub is available at http://127.0.0.1:3000?token=b934d226-e24a-4eab-eb92b353b10f
 ```
@@ -16,7 +16,7 @@ The hub is available at http://127.0.0.1:3000?token=b934d226-e24a-4eab-eb92b353b
 </div>
 
 !!! info "NOTE:"
-    The `dstack hub start` command starts the Hub application,
+    The `dstack start` command starts the Hub application,
     and creates the default project to run workflows locally.
 
     If you'll want to run workflows in the cloud (e.g. AWS, or GCP), simply log into the Hub application, and 
@@ -98,7 +98,7 @@ Once a project is created, copy the CLI command from the project settings and ex
 <div class="termy">
 
 ```shell
-$ dstack config hub --url http://127.0.0.1:3000 \
+$ dstack config --url http://127.0.0.1:3000 \
   --project my-awesome-project \
   --token b934d226-e24a-4eab-a284-eb92b353b10f
 ```
@@ -116,7 +116,7 @@ $ dstack config hub --url http://127.0.0.1:3000 \
     you would like to use multiple clouds.
 
 
-## Run a workflow that uses GPU
+## Manage resources
 
 Consider that you have configured a project that allows you to use a GPU (e.g., a local backend if you have a GPU
 locally, or an AWS or GCP backend).

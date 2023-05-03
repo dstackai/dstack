@@ -25,11 +25,22 @@ docker_available = None
 
 
 def list_avaialble_backend_types() -> List[BackendType]:
-    global docker_available
     configurators = [AWSConfigurator(), GCPConfigurator()]
-    if docker_available is None:
-        # docker version will exit with 1 if daemon is not running
-        docker_available = subprocess.run(["docker", "version"]).returncode == 0
-    if docker_available:
+    if local_backend_available():
         configurators.append(LocalConfigurator())
     return [c.name for c in configurators]
+
+
+def local_backend_available() -> bool:
+    global docker_available
+    if docker_available is None:
+        # docker version will exit with 1 if daemon is not running
+        try:
+            docker_proc = subprocess.run(
+                ["docker", "version"],
+                stdout=subprocess.DEVNULL,
+            )
+            docker_available = docker_proc.returncode == 0
+        except FileNotFoundError:
+            docker_available = False
+    return docker_available

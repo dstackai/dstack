@@ -7,7 +7,7 @@ from git.exc import InvalidGitRepositoryError
 
 from dstack.api.repos import get_local_repo_credentials
 from dstack.cli.commands import BasicCommand
-from dstack.cli.common import console
+from dstack.cli.common import add_project_argument, console
 from dstack.cli.config import config, get_hub_client
 from dstack.core.repo import LocalRepo, RemoteRepo
 from dstack.core.userconfig import RepoUserConfig
@@ -21,12 +21,7 @@ class InitCommand(BasicCommand):
         super(InitCommand, self).__init__(parser)
 
     def register(self):
-        self._parser.add_argument(
-            "--project",
-            type=str,
-            help="Hub project to execute the command",
-            default=None,
-        )
+        add_project_argument(self._parser)
         self._parser.add_argument(
             "-t",
             "--token",
@@ -72,7 +67,6 @@ class InitCommand(BasicCommand):
         config.save_repo_user_config(
             RepoUserConfig(
                 repo_id=repo.repo_ref.repo_id,
-                repo_user_id=repo.repo_ref.repo_user_id,
                 repo_type=repo.repo_data.repo_type,
                 ssh_key_path=get_ssh_keypair(args.ssh_identity_file),
             )

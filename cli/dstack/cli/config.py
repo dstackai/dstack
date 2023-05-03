@@ -1,4 +1,3 @@
-import os
 from os import PathLike
 from pathlib import Path
 from typing import Dict, List, Optional, Type, TypeVar
@@ -89,8 +88,10 @@ class CLIConfig(BaseModel):
 
 
 class CLIConfigManager:
-    def __init__(self):
-        self.dstack_dir = get_dstack_dir()
+    def __init__(self, dstack_dir: Optional[Path] = None):
+        if dstack_dir is None:
+            dstack_dir = get_dstack_dir()
+        self.dstack_dir = dstack_dir
         self.config_filepath = self.dstack_dir / "config.yaml"
         try:
             with open(self.config_filepath, "r") as f:
@@ -141,11 +142,15 @@ def get_hub_client(project_name: Optional[str] = None) -> HubClient:
     if project_name is not None:
         project_config = cli_config_manager.get_project_config(project_name)
         if project_config is None:
-            raise CLIError(f"Project '{project_name}' not configured. Call `dstack config`.")
+            raise CLIError(
+                f"The '{project_name}' project is not configured. Call `dstack config`."
+            )
     else:
         project_config = cli_config_manager.get_default_project_config()
         if project_config is None:
-            raise CLIError(f"No default project configured. Call `dstack config`.")
+            raise CLIError(
+                f"No default project is configured. Call `dstack start` or `dstack config`."
+            )
     repo = load_repo(config.repo_user_config)
     hub_client_config = HubClientConfig(url=project_config.url, token=project_config.token)
     hub_client = HubClient(config=hub_client_config, project=project_config.name, repo=repo)

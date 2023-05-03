@@ -5,7 +5,7 @@ from rich.table import Table
 from rich_argparse import RichHelpFormatter
 
 from dstack.cli.commands import BasicCommand
-from dstack.cli.common import check_init, console
+from dstack.cli.common import add_project_argument, check_init, console
 from dstack.cli.config import get_hub_client
 from dstack.core.secret import Secret
 
@@ -19,17 +19,15 @@ class SecretCommand(BasicCommand):
 
     def register(self):
         subparsers = self._parser.add_subparsers()
-        self._parser.add_argument(
-            "--project",
-            type=str,
-            help="Hub project to execute the command",
-            default=None,
+        list_parser = subparsers.add_parser(
+            "list", help="List secrets", formatter_class=RichHelpFormatter
         )
-        subparsers.add_parser("list", help="List secrets", formatter_class=RichHelpFormatter)
+        add_project_argument(list_parser)
 
         add_secrets_parser = subparsers.add_parser(
             "add", help="Add a secret", formatter_class=RichHelpFormatter
         )
+        add_project_argument(add_secrets_parser)
         add_secrets_parser.add_argument(
             "secret_name", metavar="NAME", type=str, help="The name of the secret"
         )
@@ -48,6 +46,7 @@ class SecretCommand(BasicCommand):
         update_secrets_parser = subparsers.add_parser(
             "update", help="Update a secret", formatter_class=RichHelpFormatter
         )
+        add_project_argument(update_secrets_parser)
         update_secrets_parser.add_argument(
             "secret_name", metavar="NAME", type=str, help="The name of the secret"
         )
@@ -60,7 +59,10 @@ class SecretCommand(BasicCommand):
         )
         update_secrets_parser.set_defaults(func=self.update_secret)
 
-        delete_secrets_parser = subparsers.add_parser("delete", help="Delete a secret")
+        delete_secrets_parser = subparsers.add_parser(
+            "delete", help="Delete a secret", formatter_class=RichHelpFormatter
+        )
+        add_project_argument(delete_secrets_parser)
         delete_secrets_parser.add_argument(
             "secret_name", metavar="NAME", type=str, help="The name of the secret"
         )
@@ -102,6 +104,7 @@ class SecretCommand(BasicCommand):
         secret = hub_client.get_secret(args.secret_name)
         if secret is None:
             console.print(f"The secret '{args.secret_name}' doesn't exist")
+            exit(1)
         if Confirm.ask(f" [red]Delete the secret '{secret.secret_name}'?[/]"):
             hub_client.delete_secret(secret.secret_name)
             console.print(f"[grey58]OK[/]")

@@ -29,7 +29,7 @@ async def put_file(project_name: str, key: Annotated[str, Query()], request: Req
     project = await get_project(project_name=project_name)
     backend = get_backend(project)
     _check_backend_local(backend)
-    root_path = Path(backend._storage.root_path)
+    root_path = Path(backend._storage.root_path).resolve()
     target_path = (root_path / key).resolve()
     try:  # validate if target_path is inside the root_path
         object_key = target_path.relative_to(root_path)
@@ -50,7 +50,7 @@ async def download_file(project_name: str, key: Annotated[str, Query()], request
     project = await get_project(project_name=project_name)
     backend = get_backend(project)
     _check_backend_local(backend)
-    root_path = Path(backend._storage.root_path)
+    root_path = Path(backend._storage.root_path).resolve()
     target_path = (root_path / key).resolve()
     try:
         target_path.relative_to(root_path)

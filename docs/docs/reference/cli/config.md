@@ -1,6 +1,6 @@
 # dstack config
 
-This command allows you to configure a Hub project as a remote, enabling you to run workflows remotely.
+This command configures a Hub project.
 
 The configuration is stored in `~/.dstack/config.yaml`.
 
@@ -9,8 +9,8 @@ The configuration is stored in `~/.dstack/config.yaml`.
 <div class="termy">
 
 ```shell
-$ dstack config hub --help
-Usage: dstack config hub [-h] --url URL --project PROJECT --token TOKEN
+$ dstack config --help
+Usage: dstack config [-h] --url URL --project PROJECT --token TOKEN
 
 Options:
   --url URL           The URL of the Hub application, e.g. http://127.0.0.0.1
@@ -19,6 +19,13 @@ Options:
 ```
 
 </div>
+
+!!! info "NOTE:"
+    You can configure multiple projects and use them interchangeably (by passing the `--project` argument to the `dstack 
+    run` command. Any project can be set as the default by passing `--default` to the `dstack config` command.
+
+    Configuring multiple projects can be convenient if you want to run workflows both locally and in the cloud or if 
+    you would like to use multiple clouds.
 
 ## Arguments reference
 

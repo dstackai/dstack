@@ -16,5 +16,5 @@ class LocalConfig(BackendConfig):
         }
 
     @classmethod
-    def deserialize(self, config_data: Dict) -> "LocalConfig":
+    def deserialize(cls, config_data: Dict) -> "LocalConfig":
         pass

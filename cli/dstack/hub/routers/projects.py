@@ -21,7 +21,7 @@ from dstack.hub.security.permissions import (
     ProjectMember,
     ensure_user_project_admin,
 )
-from dstack.hub.services.backends import get_configurator
+from dstack.hub.services.backends import get_configurator, local_backend_available
 from dstack.hub.services.backends.base import BackendConfigError, Configurator
 
 router = APIRouter(prefix="/api/projects", tags=["project"])
@@ -64,6 +64,13 @@ async def create_project(
             ],
         )
     configurator = _get_backend_configurator(project_info.backend.__root__.type)
+    if configurator.name == "local" and not local_backend_available():
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=[
+                error_detail("Local backend not available", code="local_backend_not_available")
+            ],
+        )
     try:
         await asyncio.get_running_loop().run_in_executor(
             None, configurator.configure_hub, project_info.backend.__root__.dict()

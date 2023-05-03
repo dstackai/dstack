@@ -33,7 +33,7 @@ workflows:
  
 </div>
 
-Run it locally using `dstack run` and passing `"Hello, world!"` as an argument:
+Run it using `dstack run` and passing `"Hello, world!"` as an argument:
 
 <div class="termy">
 

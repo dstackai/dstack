@@ -96,13 +96,12 @@ class RemoteRepo(Repo):
     ):
         """
         >>> RemoteRepo(local_repo_dir=os.getcwd())
-        >>> RemoteRepo(repo_ref=RepoRef(repo_id="playground", repo_user_id="bob"), repo_url="https://github.com/dstackai/dstack-playground.git")
+        >>> RemoteRepo(repo_ref=RepoRef(repo_id="playground"), repo_url="https://github.com/dstackai/dstack-playground.git")
         """
 
         self.local_repo_dir = local_repo_dir
         self.repo_url = repo_url
 
-        repo_user_id = "default"
         if self.local_repo_dir is not None:
             repo = git.Repo(self.local_repo_dir)
             tracking_branch = repo.active_branch.tracking_branch()
@@ -115,17 +114,13 @@ class RemoteRepo(Repo):
             repo_data.repo_diff = repo.git.diff(
                 repo_data.repo_hash
             )  # TODO: Doesn't support unstaged changes
-            repo_user_id = repo.config_reader().get_value("user", "email", "") or repo_user_id
         elif self.repo_url is not None:
             repo_data = RemoteRepoData.from_url(self.repo_url, parse_ssh_config=True)
         elif repo_data is None:
             raise ValueError("No remote repo data provided")
 
         if repo_ref is None:
-            repo_ref = RepoRef(
-                repo_id=slugify(repo_data.repo_name, repo_data.path("/")),
-                repo_user_id=repo_user_id,
-            )
+            repo_ref = RepoRef(repo_id=slugify(repo_data.repo_name, repo_data.path("/")))
         super().__init__(repo_ref, repo_data)
 
     def get_workflows(

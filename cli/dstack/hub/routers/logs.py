@@ -32,11 +32,11 @@ async def poll_logs(project_name: str, body: PollLogs) -> List[LogEvent]:
     if start_time is None:
         start_time = get_current_datetime() - timedelta(days=30)
     logs_generator = backend.poll_logs(
+        repo_id=body.repo_id,
         run_name=body.run_name,
         start_time=start_time,
         end_time=body.end_time,
         descending=body.descending,
-        repo_id=body.repo_id,
     )
     if body.prev_event_id is None:
         return list(itertools.islice(logs_generator, body.limit))

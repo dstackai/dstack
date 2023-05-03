@@ -5,7 +5,7 @@ from rich.live import Live
 
 from dstack.api.runs import list_runs
 from dstack.cli.commands import BasicCommand
-from dstack.cli.common import check_init, generate_runs_table, print_runs
+from dstack.cli.common import add_project_argument, check_init, generate_runs_table, print_runs
 from dstack.cli.config import get_hub_client
 
 LIVE_PROVISION_INTERVAL_SECS = 2
@@ -22,14 +22,9 @@ class PSCommand(BasicCommand):
 
     def register(self):
         self._parser.add_argument(
-            "run_name", metavar="RUN", type=str, nargs="?", help="A name of a run"
+            "run_name", metavar="RUN", type=str, nargs="?", help="The name of the run"
         )
-        self._parser.add_argument(
-            "--project",
-            type=str,
-            help="Hub project to execute the command",
-            default=None,
-        )
+        add_project_argument(self._parser)
         self._parser.add_argument(
             "-a",
             "--all",

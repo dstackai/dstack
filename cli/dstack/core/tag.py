@@ -11,7 +11,7 @@ class TagHead(BaseModel):
     run_name: str
     workflow_name: Optional[str]
     provider_name: Optional[str]
-    repo_user_id: str
+    hub_user_name: str
     created_at: int
     artifact_heads: Optional[List[ArtifactHead]]
 
@@ -33,7 +33,7 @@ class TagHead(BaseModel):
             f"{self.run_name};"
             f"{self.workflow_name or ''};"
             f"{self.provider_name or ''};"
-            f"{self.repo_user_id or ''};"
+            f"{self.hub_user_name or ''};"
             f"{self.created_at};"
             f"{self.serialize_artifact_heads()}"
         )

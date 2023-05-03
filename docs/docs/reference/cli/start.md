@@ -1,14 +1,14 @@
-# dstack hub
+# dstack start
 
-This command starts the Hub application. Hub is required for running workflows remotely (e.g. in a configured cloud).
+This command starts the Hub application. The Hub application is required to run workflows.
 
 ## Usage
 
 <div class="termy">
 
 ```shell
-$ dstack hub start --help
-Usage: dstack hub start [-h] [--host HOST] [-p PORT] [-l LOG-LEVEL] [--token TOKEN]
+$ dstack start --help
+Usage: dstack start [-h] [--host HOST] [-p PORT] [-l LOG-LEVEL] [--token TOKEN]
 
 Options:
   --host HOST           Bind socket to this host. Defaults to 127.0.0.1
@@ -17,6 +17,10 @@ Options:
 ```
 
 </div>
+
+!!! info "NOTE:"
+    On the first run, this command creates the default project to run workflows locally and updates the local config 
+    accordingly (`~/.dstack/config.yaml`).
 
 ## Arguments reference
 

@@ -14,55 +14,53 @@ class GCPSecretsManager(SecretsManager):
         project_id: str,
         bucket_name: str,
         credentials: Optional[service_account.Credentials],
-        repo_id: str,
     ):
-        super().__init__(repo_id=repo_id)
         self.project_id = project_id
         self.bucket_name = bucket_name
         self.secrets_client = secretmanager.SecretManagerServiceClient(credentials=credentials)
 
-    def get_secret(self, secret_name: str) -> Optional[Secret]:
+    def get_secret(self, repo_id: str, secret_name: str) -> Optional[Secret]:
         secret_value = self._get_secret_value(
-            _get_secret_key(self.bucket_name, self.repo_id, secret_name)
+            _get_secret_key(self.bucket_name, repo_id, secret_name)
         )
         if secret_value is None:
             return None
         return Secret(secret_name=secret_name, secret_value=secret_value)
 
-    def add_secret(self, secret: Secret):
-        secret_key = _get_secret_key(self.bucket_name, self.repo_id, secret.secret_name)
+    def add_secret(self, repo_id: str, secret: Secret):
+        secret_key = _get_secret_key(self.bucket_name, repo_id, secret.secret_name)
         self._create_secret(secret_key)
         self._add_secret_version(
             secret_key=secret_key,
             secret_value=secret.secret_value,
         )
 
-    def update_secret(self, secret: Secret):
+    def update_secret(self, repo_id: str, secret: Secret):
         self._add_secret_version(
-            secret_key=_get_secret_key(self.bucket_name, self.repo_id, secret.secret_name),
+            secret_key=_get_secret_key(self.bucket_name, repo_id, secret.secret_name),
             secret_value=secret.secret_value,
         )
 
-    def delete_secret(self, secret_name: str):
+    def delete_secret(self, repo_id: str, secret_name: str):
         secret_resource = _get_secret_resource(
-            self.project_id, _get_secret_key(self.bucket_name, self.repo_id, secret_name)
+            self.project_id, _get_secret_key(self.bucket_name, repo_id, secret_name)
         )
         self.secrets_client.delete_secret(request={"name": secret_resource})
 
-    def get_credentials(self) -> Optional[str]:
-        return self._get_secret_value(_get_credentials_key(self.bucket_name, self.repo_id))
+    def get_credentials(self, repo_id: str) -> Optional[str]:
+        return self._get_secret_value(_get_credentials_key(self.bucket_name, repo_id))
 
-    def add_credentials(self, data: str):
-        credentails_key = _get_credentials_key(self.bucket_name, self.repo_id)
+    def add_credentials(self, repo_id: str, data: str):
+        credentails_key = _get_credentials_key(self.bucket_name, repo_id)
         self._create_secret(credentails_key)
         self._add_secret_version(
             secret_key=credentails_key,
             secret_value=data,
         )
 
-    def update_credentials(self, data: str):
+    def update_credentials(self, repo_id: str, data: str):
         self._add_secret_version(
-            secret_key=_get_credentials_key(self.bucket_name, self.repo_id),
+            secret_key=_get_credentials_key(self.bucket_name, repo_id),
             secret_value=data,
         )
 

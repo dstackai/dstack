@@ -2,7 +2,7 @@ import sys
 from argparse import Namespace
 
 from dstack.cli.commands import BasicCommand
-from dstack.cli.common import check_init, console
+from dstack.cli.common import add_project_argument, check_init, console
 from dstack.cli.config import get_hub_client
 from dstack.utils.common import since
 
@@ -16,13 +16,8 @@ class LogCommand(BasicCommand):
 
     def register(self):
         # TODO: Add --format (short|detailed)
-        self._parser.add_argument(
-            "--project",
-            type=str,
-            help="Hub project to execute the command",
-            default=None,
-        )
-        self._parser.add_argument("run_name", metavar="RUN", type=str, help="A name of a run")
+        add_project_argument(self._parser)
+        self._parser.add_argument("run_name", metavar="RUN", type=str, help="The name of the run")
         self._parser.add_argument(
             "-a",
             "--attach",

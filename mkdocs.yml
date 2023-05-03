@@ -121,6 +121,10 @@ extra:
       link: https://github.com/dstackai/dstack
     #    - icon: fontawesome/brands/python
     #      link: https://pypi.org/project/dstack/
+    - icon: /fontawesome/brands/python
+      link: https://pypi.org/project/dstack
+    - icon: /fontawesome/brands/docker
+      link: https://hub.docker.com/r/dstackai/dstack
     - icon: /fontawesome/brands/slack
       link: https://join.slack.com/t/dstackai/shared_invite/zt-xdnsytie-D4qU9BvJP8vkbkHXdi6clQ
     #    - icon: material/rss
@@ -150,7 +154,7 @@ nav:
           - CLI:
               - dstack run: docs/reference/cli/run.md
               - dstack init: docs/reference/cli/init.md
-              - dstack hub: docs/reference/cli/hub.md
+              - dstack start: docs/reference/cli/start.md
               - dstack config: docs/reference/cli/config.md
               - dstack ps: docs/reference/cli/ps.md
               - dstack ls: docs/reference/cli/ls.md
@@ -169,11 +173,11 @@ nav:
               - docker: docs/reference/providers/docker.md
   - Tutorials:
       - LLMs:
-          - Dolly: tutorials/dolly.md
-          - Stable Diffusion: tutorials/stable-diffusion.md
+          - Run your own ChatGPT with Dolly: tutorials/dolly.md
+          - Generate images with Stable Diffusion: tutorials/stable-diffusion.md
       - Experiment tracking:
-          - TensorBoard: tutorials/tensorboard.md
-          - Weights & Biases: tutorials/wandb.md
+          - Track experiments with TensorBoard: tutorials/tensorboard.md
+          - Track experiments with W&B: tutorials/wandb.md
 #      - CI/CD:
 #          - GitHub Actions: tutorials/github-actions.md
   #      - Community:

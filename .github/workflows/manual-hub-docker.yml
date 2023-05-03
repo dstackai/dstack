@@ -23,9 +23,9 @@ jobs:
       - name: Build and upload to DockerHub
         run: |
           VERSION=${{ github.run_number }}
-          docker buildx build --platform linux/arm64/v8 --push --provenance=false --tag dstackai/dstack-hub-stgn:$VERSION-arm64 -f stgn/Dockerfile .
-          docker buildx build --platform linux/amd64 --push --provenance=false --tag dstackai/dstack-hub-stgn:$VERSION-amd64 -f stgn/Dockerfile .
-          docker manifest create dstackai/dstack-hub-stgn:$VERSION --amend dstackai/dstack-hub-stgn:$VERSION-arm64 --amend dstackai/dstack-hub-stgn:$VERSION-amd64
-          docker manifest push dstackai/dstack-hub-stgn:$VERSION
-          docker manifest create dstackai/dstack-hub-stgn:latest --amend dstackai/dstack-hub-stgn:$VERSION-arm64 --amend dstackai/dstack-hub-stgn:$VERSION-amd64
-          docker manifest push dstackai/dstack-hub-stgn:latest
+          docker buildx build --platform linux/arm64/v8 --push --provenance=false --tag dstackai/dstack-stgn:$VERSION-arm64 -f stgn/Dockerfile .
+          docker buildx build --platform linux/amd64 --push --provenance=false --tag dstackai/dstack-stgn:$VERSION-amd64 -f stgn/Dockerfile .
+          docker manifest create dstackai/dstack-stgn:$VERSION --amend dstackai/dstack-stgn:$VERSION-arm64 --amend dstackai/dstack-stgn:$VERSION-amd64
+          docker manifest push dstackai/dstack-stgn:$VERSION
+          docker manifest create dstackai/dstack-stgn:latest --amend dstackai/dstack-stgn:$VERSION-arm64 --amend dstackai/dstack-stgn:$VERSION-amd64
+          docker manifest push dstackai/dstack-stgn:latest

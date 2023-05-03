@@ -11,7 +11,7 @@ $ dstack cp --help
 Usage: dstack cp [-h] (RUN | :TAG) SOURCE TARGET
 
 Positional Arguments:
-  (RUN | :TAG)  A name of a run or a tag
+  (RUN | :TAG)  The name of the run or the tag
   SOURCE        A path of an artifact file or directory
   TARGET        A local path to download artifact file or directory into
 ```
@@ -22,8 +22,8 @@ Positional Arguments:
 
 One of the following arguments is required:
 
-- `RUN` – A name of a run
-- `:TAG` – A name of a tag
+- `RUN` – The name of the run
+- `:TAG` – The name of the tag
 
 The following arguments are required:
 

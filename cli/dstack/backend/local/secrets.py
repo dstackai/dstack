@@ -8,56 +8,55 @@ from dstack.core.secret import Secret
 
 
 class LocalSecretsManager(SecretsManager):
-    def __init__(self, root_path: str, repo_id: str):
-        super().__init__(repo_id=repo_id)
+    def __init__(self, root_path: str):
         self.root_path = root_path
 
-    def get_secret(self, secret_name: str) -> Optional[Secret]:
+    def get_secret(self, repo_id: str, secret_name: str) -> Optional[Secret]:
         value = _get_secret_value(
-            db_filepath=_get_secrets_db_filepath(self.root_path, self.repo_id),
-            key=_get_secret_key(self.repo_id, secret_name),
+            db_filepath=_get_secrets_db_filepath(self.root_path, repo_id),
+            key=_get_secret_key(repo_id, secret_name),
         )
         if value is None:
             return None
         return Secret(secret_name=secret_name, secret_value=value)
 
-    def add_secret(self, secret: Secret):
+    def add_secret(self, repo_id: str, secret: Secret):
         _create_secret(
-            db_filepath=_get_secrets_db_filepath(self.root_path, self.repo_id),
-            key=_get_secret_key(self.repo_id, secret.secret_name),
+            db_filepath=_get_secrets_db_filepath(self.root_path, repo_id),
+            key=_get_secret_key(repo_id, secret.secret_name),
             value=secret.secret_value,
         )
 
-    def update_secret(self, secret: Secret):
+    def update_secret(self, repo_id: str, secret: Secret):
         _update_secret(
-            db_filepath=_get_secrets_db_filepath(self.root_path, self.repo_id),
-            key=_get_secret_key(self.repo_id, secret.secret_name),
+            db_filepath=_get_secrets_db_filepath(self.root_path, repo_id),
+            key=_get_secret_key(repo_id, secret.secret_name),
             value=secret.secret_value,
         )
 
-    def delete_secret(self, secret_name: str):
+    def delete_secret(self, repo_id: str, secret_name: str):
         _delete_secret(
-            db_filepath=_get_secrets_db_filepath(self.root_path, self.repo_id),
-            key=_get_secret_key(self.repo_id, secret_name),
+            db_filepath=_get_secrets_db_filepath(self.root_path, repo_id),
+            key=_get_secret_key(repo_id, secret_name),
         )
 
-    def get_credentials(self) -> Optional[str]:
+    def get_credentials(self, repo_id: str) -> Optional[str]:
         return _get_secret_value(
             db_filepath=_get_credentials_db_filepath(self.root_path),
-            key=_get_credentials_key(self.repo_id),
+            key=_get_credentials_key(repo_id),
         )
 
-    def add_credentials(self, data: str):
+    def add_credentials(self, repo_id: str, data: str):
         _create_secret(
             db_filepath=_get_credentials_db_filepath(self.root_path),
-            key=_get_credentials_key(self.repo_id),
+            key=_get_credentials_key(repo_id),
             value=data,
         )
 
-    def update_credentials(self, data: str):
+    def update_credentials(self, repo_id: str, data: str):
         _update_secret(
             db_filepath=_get_credentials_db_filepath(self.root_path),
-            key=_get_credentials_key(self.repo_id),
+            key=_get_credentials_key(repo_id),
             value=data,
         )
 
