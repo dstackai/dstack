@@ -13,7 +13,7 @@ export const userApi = createApi({
     tagTypes: ['User'],
 
     endpoints: (builder) => ({
-        getUserData: builder.query<IUserSmall, void>({
+        getUserData: builder.query<IUserSmall, Partial<Pick<IUser, 'token'>>>({
             query: () => {
                 return {
                     url: API.USERS.INFO(),

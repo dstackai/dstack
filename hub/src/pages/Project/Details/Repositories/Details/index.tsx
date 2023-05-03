@@ -119,9 +119,9 @@ export const RepositoryDetails: React.FC = () => {
                                 {t('common.stop')}
                             </Button>
 
-                            <Button formAction="none" disabled>
-                                {t('common.delete')}
-                            </Button>
+                            {/*<Button formAction="none" disabled>*/}
+                            {/*    {t('common.delete')}*/}
+                            {/*</Button>*/}
                         </SpaceBetween>
                     }
                 >

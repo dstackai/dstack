@@ -2,6 +2,10 @@ import React from 'react';
 
 import { Box, SpaceBetween } from 'components';
 
+import { LoginByTokenForm } from 'App/Login/LoginByTokenForm';
+
+import styles from './styles.module.scss';
+
 export interface Props {
     title: string;
     text: string;
@@ -18,6 +22,8 @@ export const AuthErrorMessage: React.FC<Props> = ({ title, text }) => {
                     </Box>
                 </div>
             </SpaceBetween>
+
+            <LoginByTokenForm className={styles.loginForm} />
         </Box>
     );
 };

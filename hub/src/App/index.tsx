@@ -15,7 +15,8 @@ const App: React.FC = () => {
     const { t } = useTranslation();
     const [searchParams, setSearchParams] = useSearchParams();
     const urlToken = searchParams.get('token');
-    const isAuthenticated = Boolean(useAppSelector(selectAuthToken));
+    const token = useAppSelector(selectAuthToken);
+    const isAuthenticated = Boolean(token);
     const [isAuthorizing, setIsAuthorizing] = useState(true);
     const dispatch = useAppDispatch();
 
@@ -23,9 +24,12 @@ const App: React.FC = () => {
         isLoading,
         data: userData,
         error: getUserError,
-    } = useGetUserDataQuery(undefined, {
-        skip: !isAuthenticated || !!urlToken,
-    });
+    } = useGetUserDataQuery(
+        { token },
+        {
+            skip: !isAuthenticated || !!urlToken,
+        },
+    );
 
     useEffect(() => {
         if (!isAuthenticated && !urlToken) {
