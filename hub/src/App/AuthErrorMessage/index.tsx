@@ -2,12 +2,17 @@ import React from 'react';
 
 import { Box, SpaceBetween } from 'components';
 
+import { LoginByTokenForm } from 'App/Login/LoginByTokenForm';
+
+import styles from './styles.module.scss';
+
 export interface Props {
     title: string;
     text: string;
+    showLoginForm?: boolean;
 }
 
-export const AuthErrorMessage: React.FC<Props> = ({ title, text }) => {
+export const AuthErrorMessage: React.FC<Props> = ({ title, text, showLoginForm }) => {
     return (
         <Box margin={{ vertical: 'xxxl' }} textAlign="center" color="inherit">
             <SpaceBetween size="xxs">
@@ -18,6 +23,8 @@ export const AuthErrorMessage: React.FC<Props> = ({ title, text }) => {
                     </Box>
                 </div>
             </SpaceBetween>
+
+            {showLoginForm && <LoginByTokenForm className={styles.loginForm} />}
         </Box>
     );
 };

@@ -5,13 +5,13 @@ import { format } from 'date-fns';
 
 import { Button, Cards, Header, ListEmptyMessage, NavigateLink, Pagination, SpaceBetween, TextFilter } from 'components';
 
+import { DATE_TIME_FORMAT } from 'consts';
 import { useBreadcrumbs, useCollection } from 'hooks';
+import { getRepoDisplayName } from 'libs/repo';
 import { ROUTES } from 'routes';
 import { useGetProjectReposQuery } from 'services/project';
 
-import { getRepoDisplayName } from '../../../../libs/repo';
-
-export const ProjectRepositories: React.FC = () => {
+export const RepositoryList: React.FC = () => {
     const { t } = useTranslation();
     const params = useParams();
     const paramProjectName = params.name ?? '';
@@ -82,13 +82,13 @@ export const ProjectRepositories: React.FC = () => {
                     {
                         id: 'last_run',
                         header: t('projects.repo.card.last_run'),
-                        content: (repo) => format(new Date(repo.last_run_at), 'MM/dd/yyyy hh:mm'),
+                        content: (repo) => format(new Date(repo.last_run_at), DATE_TIME_FORMAT),
                     },
-                    {
-                        id: 'tags_count',
-                        header: t('projects.repo.card.tags_count'),
-                        content: (repo) => repo.tags_count,
-                    },
+                    // {
+                    //     id: 'tags_count',
+                    //     header: t('projects.repo.card.tags_count'),
+                    //     content: (repo) => repo.tags_count,
+                    // },
                 ],
             }}
             items={items}

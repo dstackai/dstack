@@ -32,11 +32,21 @@ export const appSlice = createSlice({
     reducers: {
         setAuthData: (state, action: PayloadAction<IUserAuthData>) => {
             state.authData = action.payload;
-            localStorage.setItem(AUTH_DATA_STORAGE_KEY, JSON.stringify(action.payload));
+
+            try {
+                localStorage.setItem(AUTH_DATA_STORAGE_KEY, JSON.stringify(action.payload));
+            } catch (e) {
+                console.log(e);
+            }
         },
         removeAuthData: (state) => {
             state.authData = null;
-            localStorage.removeItem(AUTH_DATA_STORAGE_KEY);
+
+            try {
+                localStorage.removeItem(AUTH_DATA_STORAGE_KEY);
+            } catch (e) {
+                console.log(e);
+            }
         },
 
         setUserData: (state, action: PayloadAction<IUserSmall>) => {

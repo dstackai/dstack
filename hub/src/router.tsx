@@ -4,15 +4,8 @@ import { Navigate } from 'react-router-dom';
 
 import App from 'App';
 import { Logout } from 'App/Logout';
-import {
-    ProjectAdd,
-    ProjectDetails,
-    ProjectEditBackend,
-    ProjectList,
-    ProjectRepositories,
-    ProjectSettings,
-    RepositoryDetails,
-} from 'pages/Project';
+import { ProjectAdd, ProjectDetails, ProjectEditBackend, ProjectList, ProjectSettings } from 'pages/Project';
+import { RepositoryDetails, RepositoryList } from 'pages/Repositories';
 import { UserAdd, UserDetails, UserEdit, UserList } from 'pages/User';
 
 import { AuthErrorMessage } from './App/AuthErrorMessage';
@@ -39,21 +32,17 @@ export const router = createBrowserRouter([
                 children: [
                     {
                         path: ROUTES.PROJECT.DETAILS.REPOSITORIES.TEMPLATE,
-                        element: <ProjectRepositories />,
-                    },
-                    {
-                        path: ROUTES.PROJECT.DETAILS.REPOSITORIES.DETAILS.TEMPLATE,
-                        element: <RepositoryDetails />,
+                        element: <RepositoryList />,
                     },
                     {
                         path: ROUTES.PROJECT.DETAILS.SETTINGS.TEMPLATE,
                         element: <ProjectSettings />,
                     },
-                    {
-                        path: ROUTES.PROJECT.DETAILS.RUNS.DETAILS.TEMPLATE,
-                        element: <div>Run details</div>,
-                    },
                 ],
+            },
+            {
+                path: ROUTES.PROJECT.DETAILS.REPOSITORIES.DETAILS.TEMPLATE,
+                element: <RepositoryDetails />,
             },
             {
                 path: ROUTES.PROJECT.EDIT_BACKEND.TEMPLATE,

@@ -85,13 +85,6 @@ export const ProjectDetails: React.FC = () => {
         return tab?.id;
     }, [pathname]);
 
-    const isVisibleTabs = useMemo(() => {
-        return [
-            ROUTES.PROJECT.DETAILS.REPOSITORIES.FORMAT(paramProjectName),
-            ROUTES.PROJECT.DETAILS.SETTINGS.FORMAT(paramProjectName),
-        ].includes(pathname);
-    }, [pathname]);
-
     return (
         <>
             <ContentLayout
@@ -103,15 +96,11 @@ export const ProjectDetails: React.FC = () => {
                     />
                 }
             >
-                <SpaceBetween size="l">
-                    {isVisibleTabs && (
-                        <div className={styles.tabs}>
-                            <Tabs onChange={onChangeTab} activeTabId={activeTabId} tabs={tabs} />
-                        </div>
-                    )}
+                <div className={styles.tabs}>
+                    <Tabs onChange={onChangeTab} activeTabId={activeTabId} tabs={tabs} />
+                </div>
 
-                    <Outlet />
-                </SpaceBetween>
+                <Outlet />
             </ContentLayout>
 
             <ConfirmationDialog visible={showDeleteConfirm} onDiscard={toggleDeleteConfirm} onConfirm={deleteUserHandler} />
