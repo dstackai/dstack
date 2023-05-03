@@ -89,7 +89,7 @@ class RunCommand(BasicCommand):
                 hub_client.repo.repo_data.repo_type != "local"
                 and not hub_client.get_repo_credentials()
             ):
-                raise RepoNotInitializedError("No credentials")
+                raise RepoNotInitializedError("No credentials", project_name=hub_client.project)
 
             if not config.repo_user_config.ssh_key_path:
                 ssh_pub_key = None
@@ -220,7 +220,9 @@ def _poll_run(
             task = progress.add_task("Stopping...", total=None)
             for run in poll_run_head(hub_client, run_name):
                 if run.status == JobStatus.UPLOADING and not uploading:
-                    progress.update(task, description="Uploading... It may take a while.")
+                    progress.update(
+                        task, description="Uploading artifacts and cache... It may take a while."
+                    )
                     uploading = True
                 elif run.status.is_finished():
                     progress.update(task, total=100)

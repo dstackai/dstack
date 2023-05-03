@@ -102,8 +102,11 @@ def check_init(func):
     def decorator(*args, **kwargs):
         try:
             func(*args, **kwargs)
-        except RepoNotInitializedError:
-            console.print(f"The repository is not initialized. Call `dstack init` first.")
+        except RepoNotInitializedError as e:
+            command = "dstack init"
+            if e.project_name is not None:
+                command += f" --project {e.project_name}"
+            console.print(f"The repository is not initialized. Call `{command}` first.")
             exit(1)
 
     return decorator

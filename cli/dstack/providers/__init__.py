@@ -123,7 +123,7 @@ class Provider:
 
     def load(
         self,
-        hub_client,
+        hub_client: "hub.HubClient",
         args: Optional[Namespace],
         workflow_name: Optional[str],
         provider_data: Dict[str, Any],
@@ -146,7 +146,9 @@ class Provider:
             if self.openssh_server or (
                 hub_client.get_project_backend_type() != "local" and not args.detach
             ):
-                raise RepoNotInitializedError("No valid SSH identity")
+                raise RepoNotInitializedError(
+                    "No valid SSH identity", project_name=hub_client.project
+                )
         self._inject_context()
         self.dep_specs = self._dep_specs(hub_client)
         self.cache_specs = self._cache_specs()
