@@ -142,7 +142,9 @@ def get_hub_client(project_name: Optional[str] = None) -> HubClient:
     if project_name is not None:
         project_config = cli_config_manager.get_project_config(project_name)
         if project_config is None:
-            raise CLIError(f"The '{project_name}' project is not configured. Call `dstack config`.")
+            raise CLIError(
+                f"The '{project_name}' project is not configured. Call `dstack config`."
+            )
     else:
         project_config = cli_config_manager.get_default_project_config()
         if project_config is None:

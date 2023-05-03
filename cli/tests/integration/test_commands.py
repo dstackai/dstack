@@ -58,7 +58,7 @@ class TestRun:
             ["run", "bash", "-c", "echo hi"], dstack_dir=dstack_dir, repo_dir=tests_local_repo
         )
         assert exit_code == 1
-        assert "No hub project configured" in capsys.readouterr().out
+        assert "No default project is configured" in capsys.readouterr().out
 
     def test_requires_init_for_remote_repo(
         self, capsys: CaptureFixture, dstack_dir: Path, tests_public_repo: Path
