@@ -13,7 +13,7 @@ ML workflows as code
 </h4>
 
 <p align="center">
-The easiest way to define ML workflows and run them on any cloud platform 
+The easiest way to run ML workflows on any cloud platform 
 </p>
 
 [![Slack](https://img.shields.io/badge/slack-join%20chat-blueviolet?logo=slack&style=for-the-badge)](https://join.slack.com/t/dstackai/shared_invite/zt-xdnsytie-D4qU9BvJP8vkbkHXdi6clQ)
@@ -38,17 +38,23 @@ manages data, and monitors usage for you.
 
 Ideal for processing data, training models, running apps, and any other ML development tasks.
 
-## Install the CLI
+## Installation and setup
 
-Use `pip` to install `dstack`:
+To use `dstack`, install it with `pip` and start the Hub application.
 
 ```shell
 pip install dstack
+dstack start
 ```
 
-## Define workflows
+The `dstack start` command starts the Hub application, and creates the default project to run workflows locally.
 
-Define ML workflows, their output artifacts, hardware requirements, and dependencies via YAML.
+If you'll want to run workflows in the cloud (e.g. AWS, or GCP), simply log into the Hub application, and 
+create a new project.
+
+## Run your first  workflows
+
+Let's define our first ML workflow in `.dstack/workflows/hello.yaml`:
 
 ```yaml
 workflows:
@@ -61,12 +67,93 @@ workflows:
       - path: ./lightning_logs
 ```
 
-## Run locally
+The YAML file allows you to request hardware [resources](https://dstack.ai/docs/usage/resources), run [Python](https://dstack.ai/docs/usage/python),
+save [artifacts](https://dstack.ai/docs/usage/artifacts), use [cache](https://dstack.ai/docs/usage/cache) and  
+[dependencies](https://dstack.ai/docs/usage/deps), create [dev environments](https://dstack.ai/docs/usage/dev-environments),
+run [apps](https://dstack.ai/docs/usage/apps), and many more.
 
-By default, workflows run locally on your machine.
+## Run it
+
+Go ahead and run it:
 
 ```shell
 dstack run train-mnist
+
+RUN        WORKFLOW     SUBMITTED  STATUS     TAG  BACKENDS
+penguin-1  train-mnist  now        Submitted       local
+
+Provisioning... It may take up to a minute. ✓
+
+To interrupt, press Ctrl+C.
+
+GPU available: False, used: False
+
+Epoch 1: [00:03<00:00, 280.17it/s, loss=1.35, v_num=0]
+```
+
+The `dstack run` command runs the workflow using the settings specified for the project configured with the
+Hub application.
+
+## Create a Hub project
+
+As mentioned above, the default project runs workflows locally.
+However, you can log into the application and create other projects that allow you to run workflows in the cloud.
+
+<img src="https://dstack.ai/assets/dstack_hub_create_project.png" width="800px" />
+
+If you want the project to use the cloud, you'll need to provide cloud credentials and specify settings such as the
+artifact storage bucket and the region where the workflows will run.
+
+<img src="https://dstack.ai/assets/dstack_hub_view_project.png" width="800px" />
+
+Once a project is created, copy the CLI command from the project settings and execute it in your terminal.
+
+<div class="termy">
+
+```shell
+dstack config --url http://127.0.0.1:3000 \
+  --project gcp \
+  --token b934d226-e24a-4eab-a284-eb92b353b10f
+```
+
+</div>
+
+The `dstack config` command configures `dstack` to run workflows using the settings from
+the corresponding project.
+
+You can configure multiple projects and use them interchangeably (by passing the `--project` argument to the `dstack 
+run` command. Any project can be set as the default by passing `--default` to the `dstack config` command.
+
+Configuring multiple projects can be convenient if you want to run workflows both locally and in the cloud or if 
+you would like to use multiple clouds.
+
+
+## Manage resources
+
+Consider that you have configured a project that allows you to use a GPU (e.g., a local backend if you have a GPU
+locally, or an AWS or GCP backend).
+
+Let's update our workflow and add `resources`.
+
+```yaml
+workflows:
+  - name: train-mnist
+    provider: bash
+    commands:
+      - pip install torchvision pytorch-lightning tensorboard
+      - python examples/mnist/train_mnist.py
+    artifacts:
+      - path: ./lightning_logs
+    resources:
+      gpu:
+        name: V100
+        count: 1
+```
+
+Let's run the workflow:
+
+```shell
+dstack run train-mnist --project gcp
 
 RUN        WORKFLOW     SUBMITTED  STATUS     TAG  BACKENDS
 penguin-1  train-mnist  now        Submitted       local
@@ -80,72 +167,8 @@ GPU available: True, used: True
 Epoch 1: [00:03<00:00, 280.17it/s, loss=1.35, v_num=0]
 ```
 
-## Run remotely
-
-To run workflows remotely in a configured cloud, you will need the Hub application, which can be installed either on a
-dedicated server for team work or directly on your local machine.
-
-### Start the Hub application
-
-To start the Hub application, use this command:
-
-<div class="termy">
-
-```shell
-$ dstack hub start
-
-The hub is available at http://127.0.0.1:3000?token=b934d226-e24a-4eab-a284-eb92b353b10f
-```
-
-</div>
-
-To login as an administrator, visit the URL in the output.
-
-### Create a project
-
-Go ahead and create a new project.
-
-<img src="https://dstack.ai/assets/dstack_hub_create_project.png" width="800px"/>
-
-Choose a backend type (such as AWS or GCP), provide cloud credentials, and specify settings like
-artifact storage bucket and the region where to run workflows.
-
-<img src="https://dstack.ai/assets/dstack_hub_view_project.png" width="800px"/>
-
-### Configure the CLI
-
-Copy the CLI command from the project settings and execute it in your terminal to configure the project as a remote.
-
-<div class="termy">
-
-```shell
-$ dstack config hub --url http://127.0.0.1:3000 \
-  --project my-awesome-project \
-  --token b934d226-e24a-4eab-a284-eb92b353b10f
-```
-
-</div>
-
-Now, you can run workflows remotely in the created project by adding the `--remote` flag to the `dstack run` command
-and request hardware [`resources`](usage/resources.md) (like GPU, memory, interruptible instances, etc.) that you need.
-
-```shell
-dstack run train-mnist --remote --gpu 1
-
-RUN       WORKFLOW     SUBMITTED  STATUS     TAG  BACKENDS
-turtle-1  train-mnist  now        Submitted       aws
-
-Provisioning... It may take up to a minute. ✓
-
-To interrupt, press Ctrl+C.
-
-GPU available: True, used: True
-
-Epoch 1: [00:03<00:00, 280.17it/s, loss=1.35, v_num=0]
-```
-
-The command will automatically provision the required cloud resources in the corresponding cloud upon workflow 
-startup and tear them down upon completion.
+If your project is configured to use the cloud, the Hub application will automatically create the necessary cloud
+resources to execute the workflow and tear them down once it is finished.
 
 ## More information
 

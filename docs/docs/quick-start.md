@@ -169,7 +169,8 @@ resources to execute the workflow and tear them down once it is finished.
 
 !!! info "NOTE:"
     What's next? Learn how to run [Python](usage/python.md),
-    save [artifacts](usage/artifacts.md), use [dependencies](usage/deps.md), request hardware [resources](usage/resources.md), 
+    save [artifacts](usage/artifacts.md), use [cache](usage/cache.md) and [dependencies](usage/deps.md), 
+request hardware [resources](usage/resources.md), 
     create [dev environments](usage/dev-environments.md), and run [apps](usage/apps.md).
 
     Also, check our featured [tutorials](../tutorials/dolly.md).
