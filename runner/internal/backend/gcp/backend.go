@@ -175,7 +175,12 @@ func (gbackend *GCPBackend) Shutdown(ctx context.Context) error {
 
 func (gbackend *GCPBackend) GetArtifact(ctx context.Context, runName, localPath, remotePath string, mount bool) artifacts.Artifacter {
 	workDir := path.Join(gbackend.GetTMPDir(ctx), consts.USER_ARTIFACTS_DIR, runName)
-	return NewGCPArtifacter(gbackend.storage, workDir, localPath, remotePath)
+	return NewGCPArtifacter(gbackend.storage, workDir, localPath, remotePath, false)
+}
+
+func (gbackend *GCPBackend) GetCache(ctx context.Context, runName, localPath, remotePath string) artifacts.Artifacter {
+	workDir := path.Join(gbackend.GetTMPDir(ctx), consts.USER_ARTIFACTS_DIR, runName)
+	return NewGCPArtifacter(gbackend.storage, workDir, localPath, remotePath, true)
 }
 
 func (gbackend *GCPBackend) Requirements(ctx context.Context) models.Requirements {

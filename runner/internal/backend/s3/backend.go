@@ -225,6 +225,10 @@ func (s *S3) GetArtifact(ctx context.Context, runName, localPath, remotePath str
 	return art
 }
 
+func (s *S3) GetCache(ctx context.Context, runName, localPath, remotePath string) artifacts.Artifacter {
+	return s.GetArtifact(ctx, runName, localPath, remotePath, false)
+}
+
 func (s *S3) Requirements(ctx context.Context) models.Requirements {
 	if s == nil {
 		return models.Requirements{}

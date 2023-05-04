@@ -4,12 +4,14 @@ import (
 	"bytes"
 	"context"
 	"errors"
+	"fmt"
 	"io"
 	"io/fs"
 	"os"
 	"path"
 	"path/filepath"
 	"strings"
+	"time"
 
 	"cloud.google.com/go/storage"
 	"github.com/dstackai/dstack/runner/internal/gerrors"
@@ -24,6 +26,11 @@ type GCPStorage struct {
 	bucket     *storage.BucketHandle
 	project    string
 	bucketName string
+}
+
+type FileInfo struct {
+	Size     int64
+	Modified time.Time
 }
 
 func NewGCPStorage(project, bucketName string) (*GCPStorage, error) {
@@ -130,13 +137,73 @@ func (gstorage *GCPStorage) UploadDir(ctx context.Context, src, dst string) erro
 }
 
 func (gstorage *GCPStorage) DownloadDir(ctx context.Context, src, dst string) error {
-	files, err := gstorage.ListFile(ctx, src)
-	if err != nil {
+	query := &storage.Query{Prefix: src}
+	it := gstorage.bucket.Objects(ctx, query)
+	for {
+		attrs, err := it.Next()
+		if err == iterator.Done {
+			break
+		}
+		if err != nil {
+			return gerrors.Wrap(err)
+		}
+		dstFilepath := path.Join(dst, strings.TrimPrefix(attrs.Name, src))
+		gstorage.downloadFile(ctx, attrs.Name, dstFilepath)
+		if err = os.Chtimes(dstFilepath, attrs.Updated, attrs.Updated); err != nil {
+			return gerrors.Wrap(err)
+		}
+	}
+	return nil
+}
+
+func (gstorage *GCPStorage) SyncDirUpload(ctx context.Context, srcDir, dstPrefix string) error {
+	/* Collect local files */
+	uploadObjects := map[string]FileInfo{}
+	/* Optimization: since filepath.Walk follows lexical order we could avoid keeping entire tree in memory */
+	if err := filepath.Walk(srcDir, func(filepath string, info fs.FileInfo, err error) error {
+		if err != nil {
+			return nil
+		}
+		if info.IsDir() {
+			return nil
+		}
+		name := path.Join(dstPrefix, strings.TrimPrefix(filepath, srcDir))
+		uploadObjects[name] = FileInfo{info.Size(), info.ModTime().UTC()}
+		return nil
+	}); err != nil {
 		return gerrors.Wrap(err)
 	}
-	for _, file := range files {
-		dstFilepath := path.Join(dst, strings.TrimPrefix(file, src))
-		gstorage.downloadFile(ctx, file, dstFilepath)
+	/* Compare with stored objects */
+	query := &storage.Query{Prefix: dstPrefix}
+	it := gstorage.bucket.Objects(ctx, query)
+	for {
+		attrs, err := it.Next()
+		if err == iterator.Done {
+			break
+		}
+		if err != nil {
+			return gerrors.Wrap(err)
+		}
+		info, ok := uploadObjects[attrs.Name]
+		if !ok {
+			log.Trace(ctx, "File doesn't exist anymore", "Name", attrs.Name)
+			if err = gstorage.DeleteFile(ctx, attrs.Name); err != nil {
+				log.Warning(ctx, "Failed to delete object", "Name", attrs.Name, "err", err)
+			}
+		} else if attrs.Size == info.Size && attrs.Updated == info.Modified {
+			/* This won't work with multiple sync uploads. Need to use metadata */
+			log.Trace(ctx, "Object metadata is the same", "Name", attrs.Name)
+			delete(uploadObjects, attrs.Name)
+		} else {
+			log.Trace(ctx, "Object metadata has changed", "Name", attrs.Name, "Size l/r", fmt.Sprintf("%dB/%dB", info.Size, attrs.Size), "Updated l/r", fmt.Sprintf("%s/%s", info.Modified, attrs.Updated))
+		}
+	}
+	/* Upload files */
+	for name := range uploadObjects {
+		file := path.Join(srcDir, strings.TrimPrefix(name, dstPrefix))
+		if err := gstorage.uploadFile(ctx, file, name); err != nil {
+			log.Warning(ctx, "Failed to upload file", "Name", name, "err", err)
+		}
 	}
 	return nil
 }
