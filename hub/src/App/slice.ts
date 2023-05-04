@@ -7,7 +7,13 @@ import { IAppState } from './types';
 
 const getInitialState = (): IAppState => {
     let authData = null;
-    const storageData = localStorage.getItem(AUTH_DATA_STORAGE_KEY);
+    let storageData = null;
+
+    try {
+        storageData = localStorage.getItem(AUTH_DATA_STORAGE_KEY);
+    } catch (e) {
+        console.log(e);
+    }
 
     if (storageData) authData = JSON.parse(storageData) as IUserAuthData;
 
