@@ -23,7 +23,7 @@ type ObjectInfo struct {
 
 type objectOp func(context.Context, string, FileInfo) error
 
-// SyncDirUpload cost-efficiently synchronize local files tree and objects in remote storage.
+// SyncDirUpload cost-efficiently synchronizes local files tree and objects in remote storage.
 // `srcDir` must have trailing slash.
 func SyncDirUpload(ctx context.Context, srcDir string, dstObjects chan ObjectInfo, deleteObject objectOp, uploadObject objectOp) error {
 	// Optimization: avoid keeping entire tree in memory

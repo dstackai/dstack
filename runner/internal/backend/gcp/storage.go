@@ -4,7 +4,7 @@ import (
 	"bytes"
 	"context"
 	"errors"
-	"fmt"
+	"github.com/dstackai/dstack/runner/internal/common"
 	"io"
 	"io/fs"
 	"os"
@@ -157,53 +157,48 @@ func (gstorage *GCPStorage) DownloadDir(ctx context.Context, src, dst string) er
 }
 
 func (gstorage *GCPStorage) SyncDirUpload(ctx context.Context, srcDir, dstPrefix string) error {
-	/* Collect local files */
-	uploadObjects := map[string]FileInfo{}
-	/* Optimization: since filepath.Walk follows lexical order we could avoid keeping entire tree in memory */
-	if err := filepath.Walk(srcDir, func(filepath string, info fs.FileInfo, err error) error {
-		if err != nil {
-			return nil
-		}
-		if info.IsDir() {
-			return nil
-		}
-		name := path.Join(dstPrefix, strings.TrimPrefix(filepath, srcDir))
-		uploadObjects[name] = FileInfo{info.Size(), info.ModTime().UTC()}
-		return nil
-	}); err != nil {
-		return gerrors.Wrap(err)
-	}
-	/* Compare with stored objects */
-	query := &storage.Query{Prefix: dstPrefix}
-	it := gstorage.bucket.Objects(ctx, query)
-	for {
-		attrs, err := it.Next()
-		if err == iterator.Done {
-			break
-		}
-		if err != nil {
-			return gerrors.Wrap(err)
-		}
-		info, ok := uploadObjects[attrs.Name]
-		if !ok {
-			log.Trace(ctx, "File doesn't exist anymore", "Name", attrs.Name)
-			if err = gstorage.DeleteFile(ctx, attrs.Name); err != nil {
-				log.Warning(ctx, "Failed to delete object", "Name", attrs.Name, "err", err)
+	srcDir = common.AddTrailingSlash(srcDir)
+	dstPrefix = common.AddTrailingSlash(dstPrefix)
+
+	dstObjects := make(chan common.ObjectInfo)
+	go func() {
+		defer close(dstObjects)
+		query := &storage.Query{Prefix: dstPrefix}
+		it := gstorage.bucket.Objects(ctx, query)
+		for {
+			attrs, err := it.Next()
+			if err == iterator.Done {
+				break
 			}
-		} else if attrs.Size == info.Size && attrs.Updated == info.Modified {
-			/* This won't work with multiple sync uploads. Need to use metadata */
-			log.Trace(ctx, "Object metadata is the same", "Name", attrs.Name)
-			delete(uploadObjects, attrs.Name)
-		} else {
-			log.Trace(ctx, "Object metadata has changed", "Name", attrs.Name, "Size l/r", fmt.Sprintf("%dB/%dB", info.Size, attrs.Size), "Updated l/r", fmt.Sprintf("%s/%s", info.Modified, attrs.Updated))
+			if err != nil {
+				log.Error(ctx, "Iterating objects", "prefix", dstPrefix, "err", err)
+				return
+			}
+			dstObjects <- common.ObjectInfo{
+				Key: strings.TrimPrefix(attrs.Name, dstPrefix),
+				FileInfo: common.FileInfo{
+					Size:     attrs.Size,
+					Modified: attrs.Updated,
+				},
+			}
 		}
-	}
-	/* Upload files */
-	for name := range uploadObjects {
-		file := path.Join(srcDir, strings.TrimPrefix(name, dstPrefix))
-		if err := gstorage.uploadFile(ctx, file, name); err != nil {
-			log.Warning(ctx, "Failed to upload file", "Name", name, "err", err)
-		}
+	}()
+	err := common.SyncDirUpload(
+		ctx, srcDir, dstObjects,
+		func(ctx context.Context, key string, _ common.FileInfo) error {
+			/* delete object */
+			key = path.Join(dstPrefix, key)
+			return gstorage.DeleteFile(ctx, key)
+		},
+		func(ctx context.Context, key string, _ common.FileInfo) error {
+			/* upload object */
+			file := path.Join(srcDir, key)
+			key = path.Join(dstPrefix, key)
+			return gstorage.uploadFile(ctx, file, key)
+		},
+	)
+	if err != nil {
+		return gerrors.Wrap(err)
 	}
 	return nil
 }
