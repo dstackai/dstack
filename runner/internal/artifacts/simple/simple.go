@@ -22,18 +22,25 @@ type Simple struct {
 	pathLocal  string
 	pathRemote string
 
+	doSync   bool
 	transfer *client.Copier
 }
 
 func (s *Simple) BeforeRun(ctx context.Context) error {
+	log.Trace(ctx, "Download artifact", "artifact", s.pathLocal)
 	s.transfer.Download(ctx, s.bucket, s.pathRemote, path.Join(s.workDir, s.pathLocal))
 	return nil
 }
 
 func (s *Simple) AfterRun(ctx context.Context) error {
 	log.Trace(ctx, "Upload artifact", "artifact", s.pathLocal)
-	s.transfer.Upload(ctx, s.bucket, s.pathRemote, path.Join(s.workDir, s.pathLocal))
-	return nil
+	var err error = nil
+	if s.doSync {
+		err = s.transfer.SyncDirUpload(ctx, s.bucket, path.Join(s.workDir, s.pathLocal), s.pathRemote)
+	} else {
+		s.transfer.Upload(ctx, s.bucket, s.pathRemote, path.Join(s.workDir, s.pathLocal))
+	}
+	return err
 }
 
 func (s *Simple) DockerBindings(workDir string) ([]mount.Mount, error) {
@@ -55,13 +62,14 @@ func (s *Simple) DockerBindings(workDir string) ([]mount.Mount, error) {
 	}, nil
 }
 
-func NewSimple(bucket, region, workDir, pathLocal, pathRemote string) (*Simple, error) {
+func NewSimple(bucket, region, workDir, pathLocal, pathRemote string, doSync bool) (*Simple, error) {
 	s := &Simple{
 		bucket:     bucket,
 		workDir:    workDir,
 		transfer:   client.New(region),
 		pathLocal:  pathLocal,
 		pathRemote: pathRemote,
+		doSync:     doSync,
 	}
 	dir := path.Join(s.workDir, pathLocal)
 	err := os.MkdirAll(dir, 0o755)

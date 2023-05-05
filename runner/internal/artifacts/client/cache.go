@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"github.com/dstackai/dstack/runner/internal/common"
 	"io"
 	"io/fs"
 	"mime"
@@ -282,6 +283,11 @@ func (c *Copier) Download(ctx context.Context, bucket, remote, local string) {
 				errorFound.Store(true)
 				return
 			}
+			if err = os.Chtimes(theFilePath, *file.ModTime, *file.ModTime); err != nil {
+				log.Error(ctx, "Chtimes", "err", err)
+				errorFound.Store(true)
+				return
+			}
 			c.updateBars(file.Size)
 		}(file)
 	}
@@ -302,6 +308,7 @@ func (c *Copier) Download(ctx context.Context, bucket, remote, local string) {
 		}()
 	}
 }
+
 func (c *Copier) Upload(ctx context.Context, bucket, remote, local string) {
 	c.statUpload(local)
 	errorFound := atomic.NewBool(false)
@@ -358,6 +365,62 @@ func (c *Copier) Upload(ctx context.Context, bucket, remote, local string) {
 			}
 		}()
 	}
+}
+
+func (c *Copier) SyncDirUpload(ctx context.Context, bucket, srcDir, dstPrefix string) error {
+	srcDir = common.AddTrailingSlash(srcDir)
+	dstPrefix = common.AddTrailingSlash(dstPrefix)
+
+	dstObjects := make(chan common.ObjectInfo)
+	go func() {
+		defer close(dstObjects)
+		for obj := range c.listObjects(bucket, dstPrefix) {
+			if obj.Type.IsDir() {
+				continue
+			}
+			dstObjects <- common.ObjectInfo{
+				Key: strings.TrimPrefix(obj.Key, dstPrefix),
+				FileInfo: common.FileInfo{
+					Size:     obj.Size,
+					Modified: *obj.ModTime,
+				},
+			}
+		}
+	}()
+	err := common.SyncDirUpload(
+		ctx, srcDir, dstObjects,
+		func(ctx context.Context, key string, _ common.FileInfo) error {
+			/* delete object */
+			key = path.Join(dstPrefix, key)
+			_, err := c.cli.DeleteObject(ctx, &s3.DeleteObjectInput{
+				Bucket: aws.String(bucket),
+				Key:    aws.String(key),
+			})
+			return err
+		},
+		func(ctx context.Context, key string, info common.FileInfo) error {
+			/* upload object */
+			file, err := os.Open(path.Join(srcDir, key))
+			if err != nil {
+				return err
+			}
+			mimeType := mime.TypeByExtension(path.Ext(key))
+			if mimeType == "" {
+				mimeType = "binary/octet-stream"
+			}
+			key = path.Join(dstPrefix, key)
+			if info.Size < c.pb.size() {
+				err = c.doUpload(ctx, bucket, key, file, mimeType, 1, MIN_SIZE)
+			} else {
+				err = c.doUpload(ctx, bucket, key, file, mimeType, int(info.Size/c.pb.size()), c.pb.size())
+			}
+			return err
+		},
+	)
+	if err != nil {
+		return gerrors.Wrap(err)
+	}
+	return nil
 }
 
 func walkFiles(local string) chan *fileJob {

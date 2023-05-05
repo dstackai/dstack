@@ -217,7 +217,7 @@ func (s *S3) GetArtifact(ctx context.Context, runName, localPath, remotePath str
 	}
 	rootPath := path.Join(s.GetTMPDir(ctx), consts.USER_ARTIFACTS_DIR, runName)
 	log.Trace(ctx, "Create simple artifact's engine", "Region", s.region, "Root path", rootPath)
-	art, err := simple.NewSimple(s.bucket, s.region, rootPath, localPath, remotePath)
+	art, err := simple.NewSimple(s.bucket, s.region, rootPath, localPath, remotePath, false)
 	if err != nil {
 		log.Error(ctx, "Error create simple engine", "err", err)
 		return nil
@@ -226,7 +226,13 @@ func (s *S3) GetArtifact(ctx context.Context, runName, localPath, remotePath str
 }
 
 func (s *S3) GetCache(ctx context.Context, runName, localPath, remotePath string) artifacts.Artifacter {
-	return s.GetArtifact(ctx, runName, localPath, remotePath, false)
+	rootPath := path.Join(s.GetTMPDir(ctx), consts.USER_ARTIFACTS_DIR, runName)
+	art, err := simple.NewSimple(s.bucket, s.region, rootPath, localPath, remotePath, true)
+	if err != nil {
+		log.Error(ctx, "Error create simple engine", "err", err)
+		return nil
+	}
+	return art
 }
 
 func (s *S3) Requirements(ctx context.Context) models.Requirements {
