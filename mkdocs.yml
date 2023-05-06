@@ -17,10 +17,10 @@ copyright: © 2023 dstack
 theme:
   name: material
   custom_dir: docs/overrides
-  logo: assets/dstack_notext.svg
-  favicon: images/dstack_fav_32.ico
+  logo: assets/images/dstack-logo-notext.svg
+  favicon: assets/images/dstack-fav-32.ico
   icon:
-    repo: /custom/github
+    repo: custom/github
     edit: material/pencil
   font:
     text: Source Sans Pro
@@ -104,12 +104,12 @@ markdown_extensions:
 
 # Customization
 extra_css:
-  - stylesheets/extra.css
-  - stylesheets/termynal.css
-  - stylesheets/landing.css
+  - assets/stylesheets/extra.css
+  - assets/stylesheets/termynal.css
+  - assets/stylesheets/landing.css
 extra_javascript:
-  - javascripts/extra.js
-  - javascripts/termynal.js
+  - assets/javascripts/extra.js
+  - assets/javascripts/termynal.js
 extra:
   homepage: /
   generator: false

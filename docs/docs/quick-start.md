@@ -86,12 +86,12 @@ Hello, world!
 As mentioned above, the default project runs workflows locally.
 However, you can log into the application and create other projects that allow you to run workflows in the cloud.
 
-![](../assets/dstack_hub_create_project.png){ width=800 }
+![](../assets/images/dstack-hub-create-project.png){ width=800 }
 
 If you want the project to use the cloud, you'll need to provide cloud credentials and specify settings such as the
 artifact storage bucket and the region where the workflows will run.
 
-![](../assets/dstack_hub_view_project.png){ width=800 }
+![](../assets/images/dstack-hub-view-project.png){ width=800 }
 
 Once a project is created, copy the CLI command from the project settings and execute it in your terminal.
 
