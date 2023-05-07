@@ -83,7 +83,7 @@ In order to run, our workflow requires several secrets t obe configured for your
 
 As we're using the `workflow_dispatch` event, it's possible to manually trigger it via the user interface provided by GitHub.
 
-![](dstack-playground-github-actions-ui.png)
+![](../assets/images/dstack-playground-github-actions-ui.png)
 
 ## 5. Trigger via REST API
 

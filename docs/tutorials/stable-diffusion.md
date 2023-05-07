@@ -185,7 +185,7 @@ Running on local URL:  http://127.0.0.1:51741
 
 Clicking the URL from the output will open our Gradio application running in the cloud. 
 
-![](dstack-stable-diffusion.png){ width=800 }
+![](../assets/images/dstack-stable-diffusion.png){ width=800 }
 
 ## 6. Debug the workflow
 
@@ -239,7 +239,7 @@ Web UI available at http://127.0.0.1:51741
 
 Clicking the last link will open VS Code on the provisioned machine.
 
-![](dstack-stable-diffusion-code.png)
+![](../assets/images/dstack-stable-diffusion-code.png)
 
 You can run your code interactively, debug it, and run the application there.
 After fixing the workflow, you can run it using the `bash` provider.

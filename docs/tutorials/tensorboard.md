@@ -203,7 +203,7 @@ Epoch 1:  0% 0/1719 [00:05<00:09, 108.99it/s, v_num=0, val_loss=0.126, val_acc=0
 
 By clicking on the TensorBoard URL in the output, we can monitor the metrics in real-time as the training progresses.
 
-![tensorboard](../assets/dstack-tensorboard.png){ width=800 }
+![tensorboard](../assets/images/dstack-tensorboard.png){ width=800 }
 
 If you're running the workflow locally, its output artifacts are stored in the `~/.dstack/artifacts` directory. As a result, you
 can run the `tensorboard` CLI on your local machine and point it to the corresponding folder to view the logs at any time

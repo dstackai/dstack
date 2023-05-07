@@ -186,7 +186,7 @@ Running on local URL:  http://127.0.0.1:51741
 
 Clicking the URL from the output will open our ChatGPT application running in the cloud. 
 
-![](dstack-dolly.png){ width=800 }
+![](../assets/images/dstack-dolly.png){ width=800 }
 
 ## 6. Debug the workflow
 
@@ -240,7 +240,7 @@ Web UI available at http://127.0.0.1:51741
 
 Clicking the last link will open VS Code on the provisioned machine.
 
-![](dstack-dolly-code.png)
+![](../assets/images/dstack-dolly-code.png)
 
 You can run your code interactively, debug it, and run the application there.
 After fixing the workflow, you can run it using the `bash` provider.
