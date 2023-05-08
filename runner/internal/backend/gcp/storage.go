@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"context"
 	"errors"
+	"github.com/dstackai/dstack/runner/internal/backend/base"
 	"github.com/dstackai/dstack/runner/internal/common"
 	"io"
 	"io/fs"
@@ -160,7 +161,7 @@ func (gstorage *GCPStorage) SyncDirUpload(ctx context.Context, srcDir, dstPrefix
 	srcDir = common.AddTrailingSlash(srcDir)
 	dstPrefix = common.AddTrailingSlash(dstPrefix)
 
-	dstObjects := make(chan common.ObjectInfo)
+	dstObjects := make(chan base.ObjectInfo)
 	go func() {
 		defer close(dstObjects)
 		query := &storage.Query{Prefix: dstPrefix}
@@ -174,23 +175,23 @@ func (gstorage *GCPStorage) SyncDirUpload(ctx context.Context, srcDir, dstPrefix
 				log.Error(ctx, "Iterating objects", "prefix", dstPrefix, "err", err)
 				return
 			}
-			dstObjects <- common.ObjectInfo{
+			dstObjects <- base.ObjectInfo{
 				Key: strings.TrimPrefix(attrs.Name, dstPrefix),
-				FileInfo: common.FileInfo{
+				FileInfo: base.FileInfo{
 					Size:     attrs.Size,
 					Modified: attrs.Updated,
 				},
 			}
 		}
 	}()
-	err := common.SyncDirUpload(
+	err := base.SyncDirUpload(
 		ctx, srcDir, dstObjects,
-		func(ctx context.Context, key string, _ common.FileInfo) error {
+		func(ctx context.Context, key string, _ base.FileInfo) error {
 			/* delete object */
 			key = path.Join(dstPrefix, key)
 			return gstorage.DeleteFile(ctx, key)
 		},
-		func(ctx context.Context, key string, _ common.FileInfo) error {
+		func(ctx context.Context, key string, _ base.FileInfo) error {
 			/* upload object */
 			file := path.Join(srcDir, key)
 			key = path.Join(dstPrefix, key)

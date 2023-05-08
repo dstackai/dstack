@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"github.com/dstackai/dstack/runner/internal/backend/base"
 	"github.com/dstackai/dstack/runner/internal/common"
 	"io"
 	"io/fs"
@@ -78,7 +79,7 @@ type Copier struct {
 	cli        *s3.Client
 	downloader *manager.Downloader
 	uploader   *manager.Uploader
-	threads    semaphore
+	threads    base.Semaphore
 	pb         *ProgressBar
 }
 
@@ -96,7 +97,7 @@ func New(region string) *Copier {
 	c.downloader = manager.NewDownloader(c.cli)
 	c.uploader = manager.NewUploader(c.cli)
 
-	c.threads = make(semaphore, MAX_THREADS)
+	c.threads = make(base.Semaphore, MAX_THREADS)
 	c.pb = &ProgressBar{
 		totalSize:   atomic.Int64{},
 		currentSize: atomic.Int64{},
@@ -235,9 +236,9 @@ func (c *Copier) Download(ctx context.Context, bucket, remote, local string) {
 			errorFound.Store(true)
 			continue
 		}
-		c.threads.acquire(1)
+		c.threads.Acquire(1)
 		go func(file *Object) {
-			defer c.threads.release(1)
+			defer c.threads.Release(1)
 			theFilePath := strings.TrimPrefix(file.Key, remote)
 			theFilePath = filepath.Join(local, theFilePath)
 			if file.Type.IsDir() {
@@ -291,8 +292,8 @@ func (c *Copier) Download(ctx context.Context, bucket, remote, local string) {
 			c.updateBars(file.Size)
 		}(file)
 	}
-	c.threads.acquire(MAX_THREADS) // act as a barrier
-	c.threads.release(MAX_THREADS)
+	c.threads.Acquire(MAX_THREADS) // act as a barrier
+	c.threads.Release(MAX_THREADS)
 	if !errorFound.Load() {
 		log.Info(ctx, "Lock directory")
 		theFile, err := os.Create(filepath.Join(local, consts.FILE_LOCK_FULL_DOWNLOAD))
@@ -313,9 +314,9 @@ func (c *Copier) Upload(ctx context.Context, bucket, remote, local string) {
 	c.statUpload(local)
 	errorFound := atomic.NewBool(false)
 	for file := range walkFiles(local) {
-		c.threads.acquire(1)
+		c.threads.Acquire(1)
 		go func(file *fileJob) {
-			defer c.threads.release(1)
+			defer c.threads.Release(1)
 			key := path.Join(remote, strings.TrimPrefix(file.path, local))
 			if file.info.IsDir() {
 				log.Trace(ctx, "Create dir", "dir", key)
@@ -349,8 +350,8 @@ func (c *Copier) Upload(ctx context.Context, bucket, remote, local string) {
 			c.updateBars(file.info.Size())
 		}(file)
 	}
-	c.threads.acquire(MAX_THREADS) // act as a barrier
-	c.threads.release(MAX_THREADS)
+	c.threads.Acquire(MAX_THREADS) // act as a barrier
+	c.threads.Release(MAX_THREADS)
 	if !errorFound.Load() {
 		log.Info(ctx, "Lock directory")
 		theFile, err := os.Create(filepath.Join(local, consts.FILE_LOCK_FULL_DOWNLOAD))
@@ -371,25 +372,25 @@ func (c *Copier) SyncDirUpload(ctx context.Context, bucket, srcDir, dstPrefix st
 	srcDir = common.AddTrailingSlash(srcDir)
 	dstPrefix = common.AddTrailingSlash(dstPrefix)
 
-	dstObjects := make(chan common.ObjectInfo)
+	dstObjects := make(chan base.ObjectInfo)
 	go func() {
 		defer close(dstObjects)
 		for obj := range c.listObjects(bucket, dstPrefix) {
 			if obj.Type.IsDir() {
 				continue
 			}
-			dstObjects <- common.ObjectInfo{
+			dstObjects <- base.ObjectInfo{
 				Key: strings.TrimPrefix(obj.Key, dstPrefix),
-				FileInfo: common.FileInfo{
+				FileInfo: base.FileInfo{
 					Size:     obj.Size,
 					Modified: *obj.ModTime,
 				},
 			}
 		}
 	}()
-	err := common.SyncDirUpload(
+	err := base.SyncDirUpload(
 		ctx, srcDir, dstObjects,
-		func(ctx context.Context, key string, _ common.FileInfo) error {
+		func(ctx context.Context, key string, _ base.FileInfo) error {
 			/* delete object */
 			key = path.Join(dstPrefix, key)
 			_, err := c.cli.DeleteObject(ctx, &s3.DeleteObjectInput{
@@ -398,7 +399,7 @@ func (c *Copier) SyncDirUpload(ctx context.Context, bucket, srcDir, dstPrefix st
 			})
 			return err
 		},
-		func(ctx context.Context, key string, info common.FileInfo) error {
+		func(ctx context.Context, key string, info base.FileInfo) error {
 			/* upload object */
 			file, err := os.Open(path.Join(srcDir, key))
 			if err != nil {

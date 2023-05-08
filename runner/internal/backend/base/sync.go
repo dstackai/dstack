@@ -1,4 +1,4 @@
-package common
+package base
 
 import (
 	"context"
@@ -10,6 +10,8 @@ import (
 	"strings"
 	"time"
 )
+
+const UploadThreads = 10
 
 type FileInfo struct {
 	Size     int64
@@ -59,11 +61,16 @@ func SyncDirUpload(ctx context.Context, srcDir string, dstObjects chan ObjectInf
 		}
 	}
 	/* Upload files */
-	// todo make parallel
+	semaphore := make(Semaphore, UploadThreads)
 	for key, info := range objectsToUpload {
-		if err := uploadObject(ctx, key, info); err != nil {
-			log.Warning(ctx, "Failed to upload file", "Key", key, "err", err)
-		}
+		semaphore.Acquire(1)
+		go func(key string, info FileInfo) {
+			defer semaphore.Release(1)
+			if err := uploadObject(ctx, key, info); err != nil {
+				log.Warning(ctx, "Failed to upload file", "Key", key, "err", err)
+			}
+		}(key, info)
 	}
+	semaphore.Acquire(UploadThreads) // gather
 	return nil
 }
