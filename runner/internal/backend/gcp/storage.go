@@ -6,6 +6,7 @@ import (
 	"errors"
 	"github.com/dstackai/dstack/runner/internal/backend/base"
 	"github.com/dstackai/dstack/runner/internal/common"
+	"go.uber.org/atomic"
 	"io"
 	"io/fs"
 	"os"
@@ -129,15 +130,29 @@ func (gstorage *GCPStorage) GetMetadata(ctx context.Context, key, tag string) (s
 }
 
 func (gstorage *GCPStorage) UploadDir(ctx context.Context, src, dst string) error {
-	// TODO upload in parallel
+	semaphore := make(base.Semaphore, base.TransferThreads)
+	errorFound := atomic.NewBool(false)
 	for file := range walkFiles(ctx, src) {
 		key := path.Join(dst, strings.TrimPrefix(file, src))
-		gstorage.uploadFile(ctx, file, key)
+		semaphore.Acquire(1)
+		go func(file, key string) {
+			defer semaphore.Release(1)
+			if err := gstorage.uploadFile(ctx, file, key); err != nil {
+				errorFound.Store(true)
+				log.Error(ctx, "Failed to upload file", "Key", key, "err", err)
+			}
+		}(file, key)
+	}
+	semaphore.Acquire(base.TransferThreads) // gather
+	if errorFound.Load() {
+		return errors.New("upload: error occurred")
 	}
 	return nil
 }
 
 func (gstorage *GCPStorage) DownloadDir(ctx context.Context, src, dst string) error {
+	semaphore := make(base.Semaphore, base.TransferThreads)
+	errorFound := atomic.NewBool(false)
 	query := &storage.Query{Prefix: src}
 	it := gstorage.bucket.Objects(ctx, query)
 	for {
@@ -149,10 +164,22 @@ func (gstorage *GCPStorage) DownloadDir(ctx context.Context, src, dst string) er
 			return gerrors.Wrap(err)
 		}
 		dstFilepath := path.Join(dst, strings.TrimPrefix(attrs.Name, src))
-		gstorage.downloadFile(ctx, attrs.Name, dstFilepath)
-		if err = os.Chtimes(dstFilepath, attrs.Updated, attrs.Updated); err != nil {
-			return gerrors.Wrap(err)
-		}
+		semaphore.Acquire(1)
+		go func() {
+			defer semaphore.Release(1)
+			if err := gstorage.downloadFile(ctx, attrs.Name, dstFilepath); err != nil {
+				errorFound.Store(true)
+				log.Error(ctx, "Failed to download file", "Key", attrs.Name, "err", err)
+			}
+			if err := os.Chtimes(dstFilepath, attrs.Updated, attrs.Updated); err != nil {
+				errorFound.Store(true)
+				log.Error(ctx, "Failed to chtimes", "Path", dstFilepath, "err", err)
+			}
+		}()
+	}
+	semaphore.Acquire(base.TransferThreads)
+	if errorFound.Load() {
+		return errors.New("download: error occurred")
 	}
 	return nil
 }

@@ -11,7 +11,7 @@ import (
 	"time"
 )
 
-const UploadThreads = 10
+const TransferThreads = 10
 
 type FileInfo struct {
 	Size     int64
@@ -50,7 +50,7 @@ func SyncDirUpload(ctx context.Context, srcDir string, dstObjects chan ObjectInf
 		if !ok {
 			log.Trace(ctx, "File doesn't exist anymore", "Key", dstInfo.Key)
 			if err := deleteObject(ctx, dstInfo.Key, dstInfo.FileInfo); err != nil {
-				log.Warning(ctx, "Failed to delete object", "Key", dstInfo.Key, "err", err)
+				log.Error(ctx, "Failed to delete object", "Key", dstInfo.Key, "err", err)
 			}
 		} else if dstInfo.Size == srcInfo.Size && dstInfo.Modified == srcInfo.Modified {
 			// This won't work with multiple sync uploads. Need to use metadata
@@ -61,16 +61,16 @@ func SyncDirUpload(ctx context.Context, srcDir string, dstObjects chan ObjectInf
 		}
 	}
 	/* Upload files */
-	semaphore := make(Semaphore, UploadThreads)
+	semaphore := make(Semaphore, TransferThreads)
 	for key, info := range objectsToUpload {
 		semaphore.Acquire(1)
 		go func(key string, info FileInfo) {
 			defer semaphore.Release(1)
 			if err := uploadObject(ctx, key, info); err != nil {
-				log.Warning(ctx, "Failed to upload file", "Key", key, "err", err)
+				log.Error(ctx, "Failed to upload file", "Key", key, "err", err)
 			}
 		}(key, info)
 	}
-	semaphore.Acquire(UploadThreads) // gather
+	semaphore.Acquire(TransferThreads) // gather
 	return nil
 }
