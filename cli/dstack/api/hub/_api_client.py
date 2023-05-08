@@ -604,7 +604,7 @@ class HubAPIClient:
             host=self.url,
             url=url,
             headers=self._headers(),
-            data=RepoSpec.from_repo(self.repo).json(),
+            data=self.repo.repo_ref.json(),
         )
         if resp.ok:
             return

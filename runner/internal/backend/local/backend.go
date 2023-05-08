@@ -177,6 +177,10 @@ func (l *Local) GetArtifact(ctx context.Context, runName, localPath, remotePath 
 	return art
 }
 
+func (l *Local) GetCache(ctx context.Context, runName, localPath, remotePath string) artifacts.Artifacter {
+	return l.GetArtifact(ctx, runName, localPath, remotePath, false)
+}
+
 func (l Local) CreateLogger(ctx context.Context, logGroup, logName string) io.Writer {
 	log.Trace(ctx, "Build logger", "LogGroup", logGroup, "LogName", logName)
 	logger, err := NewLogger(l.state.Job.JobID, l.path, logGroup, logName)

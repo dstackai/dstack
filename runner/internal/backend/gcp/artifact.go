@@ -16,9 +16,10 @@ type GCPArtifacter struct {
 	workDir    string
 	pathLocal  string
 	pathRemote string
+	doSync     bool
 }
 
-func NewGCPArtifacter(storage *GCPStorage, workDir, pathLocal, pathRemote string) *GCPArtifacter {
+func NewGCPArtifacter(storage *GCPStorage, workDir, pathLocal, pathRemote string, doSync bool) *GCPArtifacter {
 	err := os.MkdirAll(path.Join(workDir, pathLocal), 0o755)
 	if err != nil {
 		return nil
@@ -28,17 +29,22 @@ func NewGCPArtifacter(storage *GCPStorage, workDir, pathLocal, pathRemote string
 		workDir:    workDir,
 		pathLocal:  pathLocal,
 		pathRemote: pathRemote,
+		doSync:     doSync,
 	}
 }
 
 func (gart *GCPArtifacter) BeforeRun(ctx context.Context) error {
-	log.Trace(ctx, "Upload artifact", "artifact", gart.pathLocal)
+	log.Trace(ctx, "Download artifact", "artifact", gart.pathLocal)
 	return gart.storage.DownloadDir(ctx, gart.pathRemote, path.Join(gart.workDir, gart.pathLocal))
 }
 
 func (gart *GCPArtifacter) AfterRun(ctx context.Context) error {
 	log.Trace(ctx, "Upload artifact", "artifact", gart.pathLocal)
-	return gart.storage.UploadDir(ctx, path.Join(gart.workDir, gart.pathLocal), gart.pathRemote)
+	if gart.doSync {
+		return gart.storage.SyncDirUpload(ctx, path.Join(gart.workDir, gart.pathLocal), gart.pathRemote)
+	} else {
+		return gart.storage.UploadDir(ctx, path.Join(gart.workDir, gart.pathLocal), gart.pathRemote)
+	}
 }
 
 func (gart *GCPArtifacter) DockerBindings(workDir string) ([]mount.Mount, error) {

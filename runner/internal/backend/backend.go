@@ -27,7 +27,8 @@ type Backend interface {
 	CheckStop(ctx context.Context) (bool, error)
 	IsInterrupted(ctx context.Context) (bool, error)
 	Shutdown(ctx context.Context) error
-	GetArtifact(ctx context.Context, rootPath, localPath, remotePath string, fs bool) artifacts.Artifacter
+	GetArtifact(ctx context.Context, runName, localPath, remotePath string, fs bool) artifacts.Artifacter
+	GetCache(ctx context.Context, runName, localPath, remotePath string) artifacts.Artifacter
 	CreateLogger(ctx context.Context, logGroup, logName string) io.Writer
 	ListSubDir(ctx context.Context, dir string) ([]string, error)
 	Bucket(ctx context.Context) string
