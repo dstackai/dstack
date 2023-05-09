@@ -52,6 +52,7 @@ type Job struct {
 	ContainerExitCode string       `yaml:"container_exit_code,omitempty"`
 	SubmittedAt       uint64       `yaml:"submitted_at"`
 	TagName           string       `yaml:"tag_name"`
+	InstanceType      string       `yaml:"instance_type"`
 	//Variables    map[string]interface{} `yaml:"variables"`
 	WorkflowName string `yaml:"workflow_name"`
 	WorkingDir   string `yaml:"working_dir"`
@@ -145,7 +146,7 @@ func (j *Job) JobHeadFilepath() string {
 		artifactSlice = append(artifactSlice, art.Path)
 	}
 	return fmt.Sprintf(
-		"jobs/%s/l;%s;%s;%s;%d;%s;%s;%s;%s",
+		"jobs/%s/l;%s;%s;%s;%d;%s;%s;%s;%s;%s",
 		j.RepoId,
 		j.JobID,
 		j.ProviderName,
@@ -155,6 +156,7 @@ func (j *Job) JobHeadFilepath() string {
 		strings.Join(artifactSlice, ","),
 		strings.Join(appsSlice, ","),
 		j.TagName,
+		j.InstanceType,
 	)
 }
 
@@ -169,7 +171,7 @@ func (j *Job) JobHeadFilepathLocal() string {
 		artifactSlice = append(artifactSlice, strings.ReplaceAll(art.Path, "/", "_"))
 	}
 	return fmt.Sprintf(
-		"jobs/%s/l;%s;%s;%s;%d;%s;%s;%s;%s",
+		"jobs/%s/l;%s;%s;%s;%d;%s;%s;%s;%s;%s",
 		j.RepoId,
 		j.JobID,
 		j.ProviderName,
@@ -179,6 +181,7 @@ func (j *Job) JobHeadFilepathLocal() string {
 		strings.Join(artifactSlice, ","),
 		strings.Join(appsSlice, ","),
 		j.TagName,
+		j.InstanceType,
 	)
 }
 

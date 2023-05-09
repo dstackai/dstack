@@ -18,6 +18,7 @@ async def run_runners(project_name: str, job: Job):
     backend = get_backend(project)
     try:
         backend.run_job(job=job, failed_to_start_job_new_status=JobStatus.PENDING)
+        print(job.instance_type)
     except NoMatchingInstanceError as e:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
