@@ -25,10 +25,11 @@ def generate_runs_table(runs: List[RunHead], verbose: bool = False) -> Table:
     table.add_column("RUN", style="bold", no_wrap=True)
     table.add_column("WORKFLOW", style="grey58", max_width=16)
     table.add_column("SUBMITTED", style="grey58", no_wrap=True)
-    table.add_column("OWNER", style="grey58", no_wrap=True, max_width=16)
+    table.add_column("USER", style="grey58", no_wrap=True, max_width=16)
     table.add_column("STATUS", no_wrap=True)
-    table.add_column("TAG", style="bold yellow", no_wrap=True)
+    table.add_column("INSTANCE", no_wrap=True)
     if verbose:
+        table.add_column("TAG", style="bold yellow", no_wrap=True)
         table.add_column("ERROR", no_wrap=True)
 
     for run in runs:
@@ -39,10 +40,11 @@ def generate_runs_table(runs: List[RunHead], verbose: bool = False) -> Table:
             _status_color(run, submitted_at, False, False),
             _status_color(run, run.hub_user_name or "", False, False),
             _pretty_print_status(run),
-            _status_color(run, run.tag_name or "", False, False),
+            _pretty_print_instance_type(run),
         ]
         if verbose:
             row += [
+                _status_color(run, run.tag_name or "", False, False),
                 _pretty_print_error_code(run),
             ]
         table.add_row(*row)
@@ -96,6 +98,15 @@ def _pretty_print_error_code(run: RunHead) -> str:
             else:
                 return f"[red]{job_head.error_code.pretty_repr()}[/]"
     return ""
+
+
+def _pretty_print_instance_type(run: RunHead) -> str:
+    instances = [
+        _status_color(run, job.instance_type, False, False)
+        for job in run.job_heads
+        if job.instance_type
+    ]
+    return "\n".join(instances)
 
 
 def check_init(func):

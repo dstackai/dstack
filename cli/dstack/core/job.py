@@ -139,6 +139,7 @@ class JobHead(JobRef):
     artifact_paths: Optional[List[str]]
     tag_name: Optional[str]
     app_names: Optional[List[str]]
+    instance_type: Optional[str]
 
     def get_id(self) -> Optional[str]:
         return self.job_id
@@ -276,6 +277,7 @@ class Job(JobHead):
             "tag_name": self.tag_name or "",
             "ssh_key_pub": self.ssh_key_pub or "",
             "repo_code_filename": self.repo_code_filename,
+            "instance_type": self.instance_type,
         }
         if isinstance(self.repo_data, RemoteRepoData):
             job_data["repo_host_name"] = self.repo_data.repo_host_name
@@ -406,6 +408,7 @@ class Job(JobHead):
             request_id=job_data.get("request_id") or None,
             tag_name=job_data.get("tag_name") or None,
             ssh_key_pub=job_data.get("ssh_key_pub") or None,
+            instance_type=job_data.get("instance_type") or None,
         )
         return job
 
