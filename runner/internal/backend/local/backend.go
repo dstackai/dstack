@@ -120,7 +120,7 @@ func (l Local) UpdateState(ctx context.Context) error {
 	if err != nil {
 		return gerrors.Wrap(err)
 	}
-	jobHeadFilepath := l.state.Job.JobHeadFilepathLocal()
+	jobHeadFilepath := l.state.Job.JobHeadFilepath()
 	for _, file := range files[:1] {
 		log.Trace(ctx, "Renaming file job", "From", file, "To", jobHeadFilepath)
 		err = l.storage.RenameFile(file, jobHeadFilepath)

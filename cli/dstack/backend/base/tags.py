@@ -10,6 +10,7 @@ from dstack.core.job import Job, JobStatus
 from dstack.core.repo import Repo
 from dstack.core.tag import TagHead
 from dstack.utils.common import get_milliseconds_since_epoch
+from dstack.utils.escape import unescape_head
 
 
 def get_tag_head(storage: Storage, repo_id: str, tag_name: str) -> Optional[TagHead]:
@@ -229,17 +230,9 @@ def _get_tag_heads_filenames_prefix(repo_id: str) -> str:
 def _unserialize_artifact_heads(artifact_heads):
     return (
         [
-            ArtifactHead(job_id=a.split("=")[0], artifact_path=a.split("=")[1])
+            ArtifactHead(job_id=a.split("=")[0], artifact_path=unescape_head(a.split("=")[1]))
             for a in artifact_heads.split(":")
         ]
         if artifact_heads
         else None
-    )
-
-
-def _serialize_artifact_heads(tag_head):
-    return (
-        ":".join([a.job_id + "=" + a.artifact_path for a in tag_head.artifact_heads])
-        if tag_head.artifact_heads
-        else ""
     )

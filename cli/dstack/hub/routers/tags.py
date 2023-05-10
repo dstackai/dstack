@@ -50,7 +50,7 @@ async def delete_tag(project_name: str, tag_name: str, repo_ref: RepoRef):
 async def add_tag_from_run(project_name: str, body: AddTagRun):
     project = await get_project(project_name=project_name)
     backend = get_backend(project)
-    backend.add_tag_from_run(
+    backend.add_tag_from_run(  # todo pass error to CLI if tag already exists
         body.repo_id, tag_name=body.tag_name, run_name=body.run_name, run_jobs=body.run_jobs
     )
 
