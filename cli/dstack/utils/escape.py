@@ -1,6 +1,10 @@
 from typing import Dict
 
 
+class UnescapeError(Exception):
+    pass
+
+
 class Escaper:
     """
     Generic escaping for strings.
@@ -10,9 +14,12 @@ class Escaper:
 
     >>> esc = Escaper({"/": "."}, escape_char="$")
     >>> esc.escape("foo/bar")
-    "foo$.bar"
+    'foo$.bar'
     >>> esc.escape("foo/$bar")
-    "foo$.$$bar"
+    'foo$.$$bar'
+    >>> esc.unescape("foo$/bar")
+    Traceback (most recent call last):
+    escape.UnescapeError: ('Unknown escape sequence', '$/')
     """
 
     def __init__(self, chars: Dict[str, str], escape_char: str):
@@ -40,10 +47,21 @@ class Escaper:
                 break
             parts.append(value[start:esc])
             if esc + 1 >= len(value):
-                raise ValueError("Unexpected EOL")
+                raise UnescapeError("Unexpected EOL")
             elif value[esc + 1] not in inv:
-                raise ValueError(f"Unknown escape sequence: {value[esc:esc + 2]}")
+                raise UnescapeError(f"Unknown escape sequence", value[esc : esc + 2])
             else:
                 parts.append(inv[value[esc + 1]])
             start = esc + 2
         return "".join(parts)
+
+
+_head_escaper = Escaper(chars={"/": "."}, escape_char="~")
+
+
+def escape_head(v: str) -> str:
+    return _head_escaper.escape(v)
+
+
+def unescape_head(v: str) -> str:
+    return _head_escaper.unescape(v)
