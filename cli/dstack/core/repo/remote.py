@@ -112,10 +112,10 @@ class RemoteRepo(Repo):
             repo_data.repo_branch = tracking_branch.remote_head
             repo_data.repo_hash = tracking_branch.commit.hexsha
             repo_data.repo_diff = repo.git.diff(repo_data.repo_hash)
-            diffs = [repo_data.repo_diff] if repo_data.repo_diff else []
+            diffs = [repo_data.repo_diff]
             for filename in repo.untracked_files:
                 diffs.append(_add_patch(local_repo_dir, filename))
-            repo_data.repo_diff = "\n".join(diffs)
+            repo_data.repo_diff = "\n".join([d for d in diffs if d])
         elif self.repo_url is not None:
             repo_data = RemoteRepoData.from_url(self.repo_url, parse_ssh_config=True)
         elif repo_data is None:
