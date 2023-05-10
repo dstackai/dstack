@@ -162,31 +162,6 @@ def _clone_remote_repo(
 
 
 def _add_patch(repo_dir: PathLike, filename: str) -> str:
-    fullpath = Path(repo_dir) / filename
-    mode = oct(fullpath.stat().st_mode)[2:]
-    hash_prefix = git.cmd.Git().hash_object(fullpath)[:7]
-    header = [
-        f"diff --git a/{filename} b/{filename}",
-        f"new file mode {mode}",
-        f"index 0000000..{hash_prefix}",
-        f"--- /dev/null",
-        f"+++ b/{filename}",
-    ]
-
-    lines = []
-    no_new_line = False
-    with fullpath.open("r") as f:
-        for line in f:
-            if not line.endswith("\n"):
-                no_new_line = True
-            lines.append("+" + line.rstrip("\n"))
-
-    if len(lines) == 1:
-        header.append(f"@@ -0,0 +1 @@")
-    elif len(lines) > 1:
-        header.append(f"@@ -0,0 +1,{len(lines)} @@")
-    else:
-        header = header[:3]
-    if no_new_line:
-        lines.append("\\ No newline at end of file")
-    return "\n".join(header + lines)
+    return git.cmd.Git(repo_dir).diff(
+        "/dev/null", filename, no_index=True, binary=True, with_exceptions=False
+    )
