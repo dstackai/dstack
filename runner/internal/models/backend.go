@@ -143,32 +143,7 @@ func (j *Job) JobHeadFilepath() string {
 	}
 	artifactSlice := make([]string, len(j.Artifacts))
 	for _, art := range j.Artifacts {
-		artifactSlice = append(artifactSlice, art.Path)
-	}
-	return fmt.Sprintf(
-		"jobs/%s/l;%s;%s;%s;%d;%s;%s;%s;%s;%s",
-		j.RepoId,
-		j.JobID,
-		j.ProviderName,
-		j.HubUserName,
-		j.SubmittedAt,
-		strings.Join([]string{j.Status, j.ErrorCode, j.ContainerExitCode}, ","),
-		strings.Join(artifactSlice, ","),
-		strings.Join(appsSlice, ","),
-		j.TagName,
-		j.InstanceType,
-	)
-}
-
-func (j *Job) JobHeadFilepathLocal() string {
-	// TODO: we can get rid of this function once we stop putting artifact paths into job heads
-	appsSlice := make([]string, len(j.Apps))
-	for _, app := range j.Apps {
-		appsSlice = append(appsSlice, app.Name)
-	}
-	artifactSlice := make([]string, len(j.Artifacts))
-	for _, art := range j.Artifacts {
-		artifactSlice = append(artifactSlice, strings.ReplaceAll(art.Path, "/", "_"))
+		artifactSlice = append(artifactSlice, EscapeHead(art.Path))
 	}
 	return fmt.Sprintf(
 		"jobs/%s/l;%s;%s;%s;%d;%s;%s;%s;%s;%s",

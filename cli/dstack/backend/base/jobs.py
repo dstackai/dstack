@@ -12,6 +12,7 @@ from dstack.core.repo import RepoRef
 from dstack.core.request import RequestStatus
 from dstack.core.runners import Runner
 from dstack.utils.common import get_milliseconds_since_epoch
+from dstack.utils.escape import escape_head, unescape_head
 
 
 def create_job(
@@ -226,7 +227,7 @@ def _get_job_head_filename(job: Job) -> str:
         f"{job.hub_user_name};"
         f"{job.submitted_at};"
         f"{job.status.value},{job.error_code.value if job.error_code else ''},{job.container_exit_code or ''};"
-        f"{','.join([a.artifact_path.replace('/', '_') for a in (job.artifact_specs or [])])};"
+        f"{','.join([escape_head(a.artifact_path) for a in (job.artifact_specs or [])])};"
         f"{','.join([a.app_name for a in (job.app_specs or [])])};"
         f"{job.tag_name or ''};"
         f"{job.instance_type or ''}"
@@ -262,7 +263,9 @@ def _parse_job_head_key(repo_id: str, full_key: str) -> JobHead:
         error_code=JobErrorCode(error_code) if error_code else None,
         container_exit_code=int(container_exit_code) if container_exit_code else None,
         submitted_at=int(submitted_at),
-        artifact_paths=artifacts.split(",") if artifacts else None,
+        artifact_paths=[unescape_head(path) for path in artifacts.split(",")]
+        if artifacts
+        else None,
         tag_name=tag_name or None,
         app_names=app_names.split(",") or None,
         instance_type=instance_type or None,
