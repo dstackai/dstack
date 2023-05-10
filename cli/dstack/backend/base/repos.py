@@ -12,7 +12,7 @@ from dstack.core.repo import (
     RepoProtocol,
     RepoSpec,
 )
-from dstack.utils.escape import Escaper
+from dstack.utils.escape import unescape_head
 
 # repo_id, last_run_at, tags_count, repo_type, repo_info
 repo_head_re = re.compile(r"([^;]+);(\d+);(\d+);(remote|local);(.*)")
@@ -41,11 +41,7 @@ def update_repo_last_run_at(storage: Storage, repo_spec: RepoSpec, last_run_at: 
                 repo_name=repo_spec.repo_data.repo_name,
             )
         elif repo_spec.repo_data.repo_type == "local":
-            repo_info = LocalRepoInfo(
-                repo_dir=Escaper({"/": "."}, escape_char="~").unescape(
-                    repo_spec.repo_data.repo_dir
-                ),
-            )
+            repo_info = LocalRepoInfo(repo_dir=unescape_head(repo_spec.repo_data.repo_dir))
         repo_head = RepoHead(
             repo_id=repo_spec.repo_ref.repo_id,
             repo_info=repo_info,
@@ -135,9 +131,7 @@ def _parse_repo_head_filename(repo_head_filepath: str) -> Optional[RepoHead]:
         )
     elif repo_type == "local":
         repo_dir = repo_info
-        repo_info = LocalRepoInfo(
-            repo_dir=Escaper({"/": "."}, escape_char="~").unescape(repo_dir),
-        )
+        repo_info = LocalRepoInfo(repo_dir=unescape_head(repo_dir))
     return RepoHead(
         repo_id=repo_id,
         repo_info=repo_info,
