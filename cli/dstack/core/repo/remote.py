@@ -111,9 +111,11 @@ class RemoteRepo(Repo):
             repo_data = RemoteRepoData.from_url(self.repo_url, parse_ssh_config=True)
             repo_data.repo_branch = tracking_branch.remote_head
             repo_data.repo_hash = tracking_branch.commit.hexsha
-            repo_data.repo_diff = repo.git.diff(
-                repo_data.repo_hash
-            )  # TODO: Doesn't support unstaged changes
+            repo_data.repo_diff = repo.git.diff(repo_data.repo_hash)
+            diffs = [repo_data.repo_diff] if repo_data.repo_diff else []
+            for filename in repo.untracked_files:
+                diffs.append(_add_patch(local_repo_dir, filename))
+            repo_data.repo_diff = "\n".join(diffs)
         elif self.repo_url is not None:
             repo_data = RemoteRepoData.from_url(self.repo_url, parse_ssh_config=True)
         elif repo_data is None:
@@ -157,3 +159,34 @@ def _clone_remote_repo(
         **kwargs,
     )
     # todo checkout branch/hash
+
+
+def _add_patch(repo_dir: PathLike, filename: str) -> str:
+    fullpath = Path(repo_dir) / filename
+    mode = oct(fullpath.stat().st_mode)[2:]
+    hash_prefix = git.cmd.Git().hash_object(fullpath)[:7]
+    header = [
+        f"diff --git a/{filename} b/{filename}",
+        f"new file mode {mode}",
+        f"index 0000000..{hash_prefix}",
+        f"--- /dev/null",
+        f"+++ b/{filename}",
+    ]
+
+    lines = []
+    no_new_line = False
+    with fullpath.open("r") as f:
+        for line in f:
+            if not line.endswith("\n"):
+                no_new_line = True
+            lines.append("+" + line.rstrip("\n"))
+
+    if len(lines) == 1:
+        header.append(f"@@ -0,0 +1 @@")
+    elif len(lines) > 1:
+        header.append(f"@@ -0,0 +1,{len(lines)} @@")
+    else:
+        header = header[:3]
+    if no_new_line:
+        lines.append("\\ No newline at end of file")
+    return "\n".join(header + lines)
