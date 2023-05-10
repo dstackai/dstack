@@ -84,6 +84,23 @@ class Backend(ABC):
     ) -> List[RunHead]:
         pass
 
+    def get_run_head(
+        self,
+        repo_id: str,
+        run_name: str,
+        include_request_heads: bool = True,
+        interrupted_job_new_status: JobStatus = JobStatus.FAILED,
+    ) -> Optional[RunHead]:
+        run_heads_list = self.list_run_heads(
+            repo_id=repo_id,
+            run_name=run_name,
+            include_request_heads=include_request_heads,
+            interrupted_job_new_status=interrupted_job_new_status,
+        )
+        if len(run_heads_list) == 0:
+            return None
+        return run_heads_list[0]
+
     @abstractmethod
     def poll_logs(
         self,
