@@ -62,7 +62,7 @@ class LocalStorage(Storage):
             for dirpath, dirnames, filenames in os.walk(full_dirpath):
                 for filename in filenames:
                     full_filepath = Path(dirpath, filename)
-                    filesize = full_filepath.stat(follow_symlinks=False).st_size
+                    filesize = os.stat(full_filepath, follow_symlinks=False).st_size
                     filepath = str(full_filepath.relative_to(self.root_path))
                     files.append(
                         StorageFile(
@@ -73,7 +73,7 @@ class LocalStorage(Storage):
         else:
             for entry in os.listdir(full_dirpath):
                 full_filepath = Path(full_dirpath, entry)
-                filesize = full_filepath.stat(follow_symlinks=False).st_size
+                filesize = os.stat(full_filepath, follow_symlinks=False).st_size
                 filepath = str(full_filepath.relative_to(self.root_path))
                 if full_filepath.is_dir():
                     filepath = os.path.join(filepath, "")
