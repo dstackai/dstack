@@ -168,6 +168,11 @@
       "type": "integer",
       "minimum": 1
     },
+    "home_dir": {
+      "description": "The absolute path to the home directory inside the container",
+      "type": "string",
+      "minLength": 1
+    },
     "working_dir": {
       "description": "The absolute or relative path to the working directory where to run the workflow",
       "type": "string",
@@ -282,6 +287,9 @@
         },
         "registry_auth": {
           "$ref": "#/definitions/registry_auth"
+        },
+        "home_dir": {
+          "$ref": "#/definitions/home_dir"
         },
         "working_dir": {
           "$ref": "#/definitions/working_dir"

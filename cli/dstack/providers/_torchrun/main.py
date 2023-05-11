@@ -4,7 +4,7 @@ from typing import Any, Dict, List, Optional
 
 from rich_argparse import RichHelpFormatter
 
-from dstack.backend.base import Backend
+import dstack.api.hub as hub
 from dstack.core.job import GpusRequirements, JobSpec, Requirements
 from dstack.providers import Provider
 
@@ -24,14 +24,14 @@ class TorchrunProvider(Provider):
 
     def load(
         self,
-        backend: Backend,
+        hub_client: "hub.HubClient",
         args: Optional[Namespace],
         workflow_name: Optional[str],
         provider_data: Dict[str, Any],
         run_name: str,
         ssh_key_pub: Optional[str] = None,
     ):
-        super().load(backend, args, workflow_name, provider_data, run_name, ssh_key_pub)
+        super().load(hub_client, args, workflow_name, provider_data, run_name, ssh_key_pub)
         self.script = self.provider_data.get("script") or self.provider_data.get("file")
         self.setup = self._get_list_data("setup") or self._get_list_data("before_run")
         self.python = self._safe_python_version("python")

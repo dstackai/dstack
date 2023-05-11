@@ -256,6 +256,7 @@ class Provider:
                 commands=job_spec.commands,
                 entrypoint=job_spec.entrypoint,
                 env=job_spec.env,
+                home_dir=self.home_dir,
                 working_dir=job_spec.working_dir,
                 artifact_specs=job_spec.artifact_specs,
                 cache_specs=self.cache_specs,
