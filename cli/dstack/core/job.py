@@ -186,6 +186,7 @@ class Job(JobHead):
     commands: Optional[List[str]]
     entrypoint: Optional[List[str]]
     env: Optional[Dict[str, str]]
+    home_dir: Optional[str]
     working_dir: Optional[str]
     artifact_specs: Optional[List[ArtifactSpec]]
     cache_specs: List[CacheSpec]
@@ -252,6 +253,7 @@ class Job(JobHead):
             "commands": self.commands or [],
             "entrypoint": self.entrypoint,
             "env": self.env or {},
+            "home_dir": self.home_dir or "",
             "working_dir": self.working_dir or "",
             "artifacts": artifacts,
             "cache": [item.dict() for item in self.cache_specs],
@@ -394,6 +396,7 @@ class Job(JobHead):
             commands=job_data.get("commands") or None,
             entrypoint=job_data.get("entrypoint") or None,
             env=job_data["env"] or None,
+            home_dir=job_data.get("home_dir") or None,
             working_dir=job_data.get("working_dir") or None,
             artifact_specs=artifact_specs,
             cache_specs=[CacheSpec(**item) for item in job_data.get("cache", [])],

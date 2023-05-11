@@ -55,6 +55,7 @@ type Job struct {
 	InstanceType      string       `yaml:"instance_type"`
 	//Variables    map[string]interface{} `yaml:"variables"`
 	WorkflowName string `yaml:"workflow_name"`
+	HomeDir      string `yaml:"home_dir"`
 	WorkingDir   string `yaml:"working_dir"`
 
 	RegistryAuth RegistryAuth `yaml:"registry_auth"`

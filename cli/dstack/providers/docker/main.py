@@ -40,6 +40,7 @@ class DockerProvider(Provider):
             self.entrypoint = ["/bin/sh", "-i", "-c"]
         self.artifact_specs = self._artifact_specs()
         self.env = self.provider_data.get("env")
+        self.home_dir = self.provider_data.get("home_dir")
         self.working_dir = self.provider_data.get("working_dir")
         self.ports = self.provider_data.get("ports")
         self.resources = self._resources()
