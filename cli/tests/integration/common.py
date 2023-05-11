@@ -86,12 +86,11 @@ def terminate_on_exit(proc: subprocess.Popen) -> subprocess.Popen:
         try:
             stdout, stderr = proc.communicate(timeout=1)
         except subprocess.TimeoutExpired as e:
-            if stderr is not None:
-                stderr = e.stderr.decode()
             process = psutil.Process(proc.pid)
             for child in process.children(recursive=True):
                 child.kill()
             process.kill()
+            stdout, stderr = proc.communicate()
         if stderr is not None:
             print(stderr)
 
