@@ -4,9 +4,6 @@ import (
 	"bytes"
 	"context"
 	"errors"
-	"github.com/dstackai/dstack/runner/internal/backend/base"
-	"github.com/dstackai/dstack/runner/internal/common"
-	"go.uber.org/atomic"
 	"io"
 	"io/fs"
 	"os"
@@ -14,6 +11,10 @@ import (
 	"path/filepath"
 	"strings"
 	"time"
+
+	"github.com/dstackai/dstack/runner/internal/backend/base"
+	"github.com/dstackai/dstack/runner/internal/common"
+	"go.uber.org/atomic"
 
 	"cloud.google.com/go/storage"
 	"github.com/dstackai/dstack/runner/internal/gerrors"
@@ -253,6 +254,13 @@ func (gstorage *GCPStorage) uploadFile(ctx context.Context, src, dst string) err
 	f, err := os.Open(src)
 	if err != nil {
 		return gerrors.Wrap(err)
+	}
+	fileInfo, err := f.Stat()
+	if err != nil {
+		return gerrors.Wrap(err)
+	}
+	if fileInfo.IsDir() {
+		return nil
 	}
 	obj := gstorage.bucket.Object(dst)
 	writer := obj.NewWriter(ctx)
