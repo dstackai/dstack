@@ -43,10 +43,14 @@ class AWSStorage(CloudStorage):
             object_keys.append(obj_metadata["Key"])
         return object_keys
 
-    def list_files(self, dirpath: str) -> List[StorageFile]:
-        prefix = dirpath
+    def list_files(self, prefix: str, recursive: bool) -> List[StorageFile]:
         paginator = self.s3_client.get_paginator("list_objects")
-        page_iterator = paginator.paginate(Bucket=self.bucket_name, Prefix=prefix)
+        delimiter = "/"
+        if recursive:
+            delimiter = ""
+        page_iterator = paginator.paginate(
+            Bucket=self.bucket_name, Prefix=prefix, Delimiter=delimiter
+        )
         files = []
         for page in page_iterator:
             for obj in page.get("Contents") or []:
@@ -54,10 +58,17 @@ class AWSStorage(CloudStorage):
                     filepath = obj["Key"]
                     files.append(
                         StorageFile(
-                            filepath=removeprefix(filepath, prefix),
+                            filepath=filepath,
                             filesize_in_bytes=obj["Size"],
                         )
                     )
+            for obj in page.get("CommonPrefixes") or []:
+                filepath = obj["Prefix"]
+                files.append(
+                    StorageFile(
+                        filepath=filepath,
+                    )
+                )
         return files
 
     def download_file(self, source_path: str, dest_path: str, callback: Callable[[int], None]):

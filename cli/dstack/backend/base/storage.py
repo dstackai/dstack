@@ -24,7 +24,7 @@ class Storage(ABC):
         pass
 
     @abstractmethod
-    def list_files(self, dirpath: str) -> List[StorageFile]:
+    def list_files(self, prefix: str, recursive: bool) -> List[StorageFile]:
         pass
 
     @abstractmethod

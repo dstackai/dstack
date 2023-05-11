@@ -172,6 +172,17 @@ class RunsList(BaseModel):
     include_request_heads: Optional[bool]
 
 
+class RunsStop(BaseModel):
+    repo_id: str
+    run_names: List[str]
+    abort: bool
+
+
+class RunsDelete(BaseModel):
+    repo_id: str
+    run_names: List[str]
+
+
 class JobHeadList(BaseModel):
     repo_id: str
     run_name: Optional[str]
@@ -190,6 +201,8 @@ class JobsList(BaseModel):
 class ArtifactsList(BaseModel):
     repo_id: str
     run_name: str
+    prefix: str
+    recursive: bool
 
 
 class SecretAddUpdate(BaseModel):
