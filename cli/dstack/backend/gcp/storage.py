@@ -55,14 +55,22 @@ class GCPStorage(CloudStorage):
         object_names = [blob.name for blob in blobs]
         return object_names
 
-    def list_files(self, dirpath: str) -> List[StorageFile]:
-        prefix = dirpath
-        blobs = self.bucket.client.list_blobs(self.bucket.name, prefix=prefix)
+    def list_files(self, prefix: str, recursive: bool) -> List[StorageFile]:
+        delimiter = "/"
+        if recursive:
+            delimiter = None
+        blobs = self.bucket.client.list_blobs(self.bucket.name, prefix=prefix, delimiter=delimiter)
         files = []
         for blob in blobs:
             file = StorageFile(
-                filepath=removeprefix(blob.name, prefix),
+                filepath=blob.name,
                 filesize_in_bytes=blob.size,
+            )
+            files.append(file)
+        for dirname in blobs.prefixes:
+            file = StorageFile(
+                filepath=dirname,
+                filesize_in_bytes=None,
             )
             files.append(file)
         return files

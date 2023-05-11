@@ -123,8 +123,12 @@ class GCPBackend(Backend):
             descending=descending,
         )
 
-    def list_run_artifact_files(self, repo_id: str, run_name: str) -> List[Artifact]:
-        return base_artifacts.list_run_artifact_files(self._storage, repo_id, run_name)
+    def list_run_artifact_files(
+        self, repo_id: str, run_name: str, prefix: str, recursive: bool = False
+    ) -> List[Artifact]:
+        return base_artifacts.list_run_artifact_files(
+            self._storage, repo_id, run_name, prefix, recursive
+        )
 
     def download_run_artifact_files(
         self,
