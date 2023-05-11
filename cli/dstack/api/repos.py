@@ -5,6 +5,7 @@ import git
 import yaml
 from git.exc import GitCommandError
 
+from dstack.core.error import DstackError
 from dstack.core.repo import (
     LocalRepo,
     RemoteRepo,
@@ -15,10 +16,14 @@ from dstack.core.repo import (
 )
 from dstack.core.userconfig import RepoUserConfig
 from dstack.utils.common import PathLike
-from dstack.utils.ssh import get_host_config, make_ssh_command_for_git
+from dstack.utils.ssh import get_host_config, make_ssh_command_for_git, try_ssh_key_passphrase
 
 gh_config_path = os.path.expanduser("~/.config/gh/hosts.yml")
 default_ssh_key = os.path.expanduser("~/.ssh/id_rsa")
+
+
+class InvalidRepoCredentialsError(DstackError):
+    pass
 
 
 def get_local_repo_credentials(
@@ -90,12 +95,15 @@ def test_remote_repo_credentials(
         git.cmd.Git().ls_remote(url, env=dict(GIT_TERMINAL_PROMPT="0"))
         return RemoteRepoCredentials(protocol=protocol, oauth_token=oauth_token, private_key=None)
     elif protocol == RepoProtocol.SSH:
+        if not try_ssh_key_passphrase(identity_file):
+            raise InvalidRepoCredentialsError(
+                f"Repo SSH key must be passphrase-less: {identity_file}"
+            )
         with open(identity_file, "r") as f:
             private_key = f.read()
         git.cmd.Git().ls_remote(
             url, env=dict(GIT_SSH_COMMAND=make_ssh_command_for_git(identity_file))
         )
-        # todo: detect if key requires passphrase
         return RemoteRepoCredentials(protocol=protocol, private_key=private_key, oauth_token=None)
 
 
