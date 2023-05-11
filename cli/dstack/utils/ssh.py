@@ -1,4 +1,5 @@
 import os
+import subprocess
 
 from paramiko.config import SSHConfig
 
@@ -19,3 +20,12 @@ def get_host_config(hostname: str) -> dict:
 
 def make_ssh_command_for_git(identity_file: PathLike) -> str:
     return f"ssh -o IdentitiesOnly=yes -F /dev/null -o IdentityFile={identity_file}"
+
+
+def try_ssh_key_passphrase(identity_file: PathLike, passphrase: str = "") -> bool:
+    r = subprocess.run(
+        ["ssh-keygen", "-y", "-P", passphrase, "-f", identity_file],
+        stdout=subprocess.DEVNULL,
+        stderr=subprocess.DEVNULL,
+    )
+    return r.returncode == 0

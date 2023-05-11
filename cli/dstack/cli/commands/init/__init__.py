@@ -5,10 +5,11 @@ from typing import Optional
 import giturlparse
 from git.exc import InvalidGitRepositoryError
 
-from dstack.api.repos import get_local_repo_credentials
+from dstack.api.repos import InvalidRepoCredentialsError, get_local_repo_credentials
 from dstack.cli.commands import BasicCommand
 from dstack.cli.common import add_project_argument, console
 from dstack.cli.config import config, get_hub_client
+from dstack.cli.errors import CLIError
 from dstack.core.repo import LocalRepo, RemoteRepo
 from dstack.core.userconfig import RepoUserConfig
 
@@ -51,12 +52,15 @@ class InitCommand(BasicCommand):
             if args.local:  # force fallback to LocalRepo
                 raise InvalidGitRepositoryError()
             repo = RemoteRepo(local_repo_dir=Path.cwd())
-            repo_credentials = get_local_repo_credentials(
-                repo_data=repo.repo_data,
-                identity_file=args.git_identity_file,
-                oauth_token=args.gh_token,
-                original_hostname=giturlparse.parse(repo.repo_url).resource,
-            )
+            try:
+                repo_credentials = get_local_repo_credentials(
+                    repo_data=repo.repo_data,
+                    identity_file=args.git_identity_file,
+                    oauth_token=args.gh_token,
+                    original_hostname=giturlparse.parse(repo.repo_url).resource,
+                )
+            except InvalidRepoCredentialsError as e:
+                raise CLIError(e.message)
         except InvalidGitRepositoryError:
             console.print(
                 f"[gray58]No git remote is used, it could affect efficiency of source code transfer[/]"
