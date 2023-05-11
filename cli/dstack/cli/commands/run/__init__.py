@@ -89,7 +89,7 @@ class RunCommand(BasicCommand):
                 hub_client.repo.repo_data.repo_type != "local"
                 and not hub_client.get_repo_credentials()
             ):
-                raise RepoNotInitializedError("No credentials", project_name=hub_client.project)
+                raise RepoNotInitializedError("No credentials", project_name=args.project)
 
             if not config.repo_user_config.ssh_key_path:
                 ssh_pub_key = None

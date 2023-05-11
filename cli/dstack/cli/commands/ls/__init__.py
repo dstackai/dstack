@@ -55,8 +55,10 @@ class LsCommand(BasicCommand):
         artifacts = hub_client.list_run_artifact_files(
             run_name, prefix=args.prefix, recursive=args.recursive
         )
+        artifact = sorted(artifacts, key=lambda a: a.path)
         for artifact in artifacts:
-            for i, file in enumerate(artifact.files):
+            files = sorted(artifact.files, key=lambda f: f.filepath)
+            for i, file in enumerate(files):
                 table.add_row(
                     artifact.name if i == 0 else "",
                     file.filepath,
