@@ -48,14 +48,36 @@ class LocalStorage(Storage):
             Prefix=keys_prefix,
         )
 
-    def list_files(self, dirpath: str) -> List[StorageFile]:
-        full_dirpath = os.path.join(self.root_path, dirpath)
+    def list_files(self, prefix: str, recursive: bool) -> List[StorageFile]:
+        prefix_path = Path(prefix)
+        if prefix.endswith("/"):
+            dirpath = prefix
+        else:
+            dirpath = prefix_path.parent
+        full_dirpath = Path(self.root_path, dirpath)
+        if not full_dirpath.exists():
+            return []
         files = []
-        for dirpath, dirnames, filenames in os.walk(full_dirpath):
-            for filename in filenames:
-                full_filepath = os.path.join(dirpath, filename)
-                filesize = os.stat(full_filepath, follow_symlinks=False).st_size
-                filepath = removeprefix(full_filepath, full_dirpath)
+        if recursive:
+            for dirpath, dirnames, filenames in os.walk(full_dirpath):
+                for filename in filenames:
+                    full_filepath = Path(dirpath, filename)
+                    filesize = full_filepath.stat(follow_symlinks=False).st_size
+                    filepath = str(full_filepath.relative_to(self.root_path))
+                    files.append(
+                        StorageFile(
+                            filepath=filepath,
+                            filesize_in_bytes=filesize,
+                        )
+                    )
+        else:
+            for entry in os.listdir(full_dirpath):
+                full_filepath = Path(full_dirpath, entry)
+                filesize = full_filepath.stat(follow_symlinks=False).st_size
+                filepath = str(full_filepath.relative_to(self.root_path))
+                if full_filepath.is_dir():
+                    filepath = os.path.join(filepath, "")
+                    filesize = None
                 files.append(
                     StorageFile(
                         filepath=filepath,

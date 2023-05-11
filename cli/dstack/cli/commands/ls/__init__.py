@@ -37,9 +37,6 @@ class LsCommand(BasicCommand):
         self._parser.add_argument(
             "-r", "--recursive", help="Show all files recursively", action="store_true"
         )
-        self._parser.add_argument(
-            "-t", "--total", help="Show total folder size", action="store_true"
-        )
 
     @check_init
     def _command(self, args: Namespace):
@@ -55,58 +52,16 @@ class LsCommand(BasicCommand):
             console.print(f"Cannot find the run or tag '{args.run_name_or_tag_name}'")
             exit(1)
 
-        artifacts = hub_client.list_run_artifact_files(run_name)
+        artifacts = hub_client.list_run_artifact_files(
+            run_name, prefix=args.prefix, recursive=args.recursive
+        )
         for artifact in artifacts:
-            artifact.files = sorted(
-                [
-                    f
-                    for f in artifact.files
-                    if str(Path(artifact.name, f.filepath)).startswith(args.prefix)
-                ],
-                key=lambda f: f.filepath,
-            )
-
-        if args.recursive:
-            for artifact in artifacts:
-                for i, file in enumerate(artifact.files):
-                    table.add_row(
-                        artifact.name if i == 0 else "",
-                        file.filepath,
-                        sizeof_fmt(file.filesize_in_bytes),
-                    )
-        else:
-            entries = {}
-            for artifact in artifacts:
-                if entries.get(artifact.name) is None:
-                    entries[artifact.name] = {}
-                for i, file in enumerate(artifact.files):
-                    entry_name = _get_entry_name(file.filepath, args.prefix)
-                    if entries[artifact.name].get(entry_name) is None:
-                        entries[artifact.name][entry_name] = {"size": 0, "backends": set()}
-                    entries[artifact.name][entry_name]["size"] += file.filesize_in_bytes
-
-            for artifact_name, entry_map in entries.items():
-                first_entry = True
-                for entry_name, entry_dict in entry_map.items():
-                    table.add_row(
-                        artifact_name if first_entry else "",
-                        entry_name,
-                        sizeof_fmt(entry_dict["size"])
-                        if not entry_name.endswith("/") or args.total
-                        else "",
-                    )
-                    first_entry = False
+            for i, file in enumerate(artifact.files):
+                table.add_row(
+                    artifact.name if i == 0 else "",
+                    file.filepath,
+                    sizeof_fmt(file.filesize_in_bytes)
+                    if file.filesize_in_bytes is not None
+                    else "",
+                )
         console.print(table)
-
-
-def _get_entry_name(filepath: str, prefix: str) -> str:
-    if prefix == "":
-        prefix_parts_num = 1
-    else:
-        prefix_parts_num = len(Path(prefix).parts)
-
-    path_parts = Path(filepath).parts
-    entry_name = str(Path(*path_parts[:prefix_parts_num]))
-    if len(path_parts) > prefix_parts_num:
-        entry_name += "/"
-    return entry_name

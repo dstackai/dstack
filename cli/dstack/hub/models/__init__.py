@@ -201,6 +201,8 @@ class JobsList(BaseModel):
 class ArtifactsList(BaseModel):
     repo_id: str
     run_name: str
+    prefix: str
+    recursive: bool
 
 
 class SecretAddUpdate(BaseModel):
