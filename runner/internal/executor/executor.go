@@ -525,6 +525,41 @@ func (ex *Executor) processJob(ctx context.Context, stoppedCh chan struct{}) err
 		}
 		bindings = append(bindings, art...)
 	}
+	if job.RepoType == "remote" && job.HomeDir != "" {
+		cred := ex.backend.GitCredentials(ctx)
+		if cred != nil {
+			log.Trace(ctx, "Trying to mount git credentials")
+			credPath := path.Join(ex.backend.GetTMPDir(ctx), consts.RUNS_DIR, job.RunName, "credentials")
+			credMountPath := ""
+			switch cred.Protocol {
+			case "ssh":
+				if cred.PrivateKey != nil {
+					credMountPath = path.Join(job.HomeDir, ".ssh/id_rsa")
+					if err := os.WriteFile(credPath, []byte(*cred.PrivateKey), 0600); err != nil {
+						log.Error(ctx, "Failed writing credentials", "err", err)
+					}
+				}
+			case "https":
+				if cred.OAuthToken != nil {
+					credMountPath = path.Join(job.HomeDir, ".config/gh/hosts.yml")
+					ghHost := fmt.Sprintf("%s:\n  oauth_token: \"%s\"\n", job.RepoHostName, *cred.OAuthToken)
+					if err := os.WriteFile(credPath, []byte(ghHost), 0644); err != nil {
+						log.Error(ctx, "Failed writing credentials", "err", err)
+					}
+				}
+			default:
+			}
+			if credMountPath != "" {
+				defer os.Remove(credPath)
+				log.Trace(ctx, "Mounting git credentials", "target", credMountPath)
+				bindings = append(bindings, mount.Mount{
+					Type:   mount.TypeBind,
+					Source: credPath,
+					Target: credMountPath,
+				})
+			}
+		}
+	}
 	logger := ex.backend.CreateLogger(ctx, fmt.Sprintf("/dstack/jobs/%s/%s", ex.backend.Bucket(ctx), job.RepoId), job.RunName)
 	secrets, err := ex.backend.Secrets(ctx)
 	if err != nil {
