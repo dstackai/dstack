@@ -82,17 +82,31 @@ def terminate_on_exit(proc: subprocess.Popen) -> subprocess.Popen:
     try:
         yield proc
     finally:
-        stderr = None
-        try:
-            stdout, stderr = proc.communicate(timeout=1)
-        except subprocess.TimeoutExpired as e:
-            process = psutil.Process(proc.pid)
-            for child in process.children(recursive=True):
-                child.kill()
-            process.kill()
-            stdout, stderr = proc.communicate()
-        if stderr is not None:
-            print(stderr)
+        process = psutil.Process(proc.pid)
+        for child in process.children(recursive=True):
+            child.kill()
+        process.kill()
+
+
+# TODO: Figure out a way to read process stderr reliably.
+# proc.communicate() may hang even with timeout.
+#
+# @contextmanager
+# def terminate_on_exit(proc: subprocess.Popen) -> subprocess.Popen:
+#     try:
+#         yield proc
+#     finally:
+#         stderr = None
+#         try:
+#             stdout, stderr = proc.communicate(timeout=1)
+#         except subprocess.TimeoutExpired as e:
+#             process = psutil.Process(proc.pid)
+#             for child in process.children(recursive=True):
+#                 child.kill()
+#             process.kill()
+#             stdout, stderr = proc.communicate()
+#         if stderr is not None:
+#             print(stderr)
 
 
 def wait_hub(host: str = HUB_HOST, port: str = HUB_PORT, attempts=10):
