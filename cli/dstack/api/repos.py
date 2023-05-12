@@ -92,7 +92,9 @@ def test_remote_repo_credentials(
 ) -> RemoteRepoCredentials:
     url = repo_data.make_url(protocol, oauth_token)
     if protocol == RepoProtocol.HTTPS:
-        git.cmd.Git().ls_remote(url, env=dict(GIT_TERMINAL_PROMPT="0"))
+        git.cmd.Git().ls_remote(
+            url, config="credential.helper=", env=dict(GIT_TERMINAL_PROMPT="0")
+        )
         return RemoteRepoCredentials(protocol=protocol, oauth_token=oauth_token, private_key=None)
     elif protocol == RepoProtocol.SSH:
         if not try_ssh_key_passphrase(identity_file):
