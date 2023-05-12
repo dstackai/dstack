@@ -2,6 +2,7 @@ import os
 from typing import Optional
 
 import git
+import requests
 import yaml
 from git.exc import GitCommandError
 
@@ -32,10 +33,12 @@ def get_local_repo_credentials(
     oauth_token: Optional[str] = None,
     original_hostname: Optional[str] = None,
 ) -> RemoteRepoCredentials:
-    try:  # no auth
-        return test_remote_repo_credentials(repo_data, RepoProtocol.HTTPS)
-    except GitCommandError:
-        pass
+    url = repo_data.make_url(RepoProtocol.HTTPS)  # no auth
+    r = requests.get(f"{url}/info/refs?service=git-upload-pack")
+    if r.status_code == 200:
+        return RemoteRepoCredentials(
+            protocol=RepoProtocol.HTTPS, private_key=None, oauth_token=None
+        )
 
     if identity_file is not None:  # must fail if key is invalid
         try:  # user provided ssh key
@@ -92,9 +95,7 @@ def test_remote_repo_credentials(
 ) -> RemoteRepoCredentials:
     url = repo_data.make_url(protocol, oauth_token)
     if protocol == RepoProtocol.HTTPS:
-        git.cmd.Git().ls_remote(
-            url, config="credential.helper=", env=dict(GIT_TERMINAL_PROMPT="0")
-        )
+        git.cmd.Git().ls_remote(url, env=dict(GIT_TERMINAL_PROMPT="0"))
         return RemoteRepoCredentials(protocol=protocol, oauth_token=oauth_token, private_key=None)
     elif protocol == RepoProtocol.SSH:
         if not try_ssh_key_passphrase(identity_file):
