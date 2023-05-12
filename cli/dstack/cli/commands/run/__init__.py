@@ -289,12 +289,13 @@ def ask_on_interrupt(hub_client: HubClient, run_name: str):
     global interrupt_count
     if interrupt_count == 0:
         try:
-            if Confirm.ask(f"\n[red]Stop the run '{run_name}'?[/]"):
+            console.print("\n")
+            if Confirm.ask(f"[red]Stop the run '{run_name}'?[/]"):
                 interrupt_count += 1
                 hub_client.stop_jobs(run_name, abort=False)
-                console.print("[grey58]Stopping... To abort press Ctrl+C[/]", end="")
+                console.print("\n[grey58]Stopping... To abort press Ctrl+C[/]", end="")
             else:
-                console.print("[grey58]Detaching...[/]")
+                console.print("\n[grey58]Detaching...[/]")
                 console.print("[grey58]OK[/]")
                 exit(0)
             return

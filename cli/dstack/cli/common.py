@@ -105,7 +105,7 @@ def _pretty_print_instance_type(run: RunHead) -> str:
         _status_color(run, job.instance_type, False, False)
         for job in run.job_heads
         if job.instance_type
-    ]
+    ] or [_status_color(run, "-", False, False)]
     return "\n".join(instances)
 
 
