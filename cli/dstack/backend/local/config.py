@@ -1,29 +1,20 @@
-from pathlib import Path
 from typing import Dict
 
-import yaml
-
-from dstack.core.config import BackendConfig, get_config_path, get_dstack_dir
-from dstack.core.error import ConfigError
+from dstack.backend.base.config import BackendConfig
+from dstack.utils.common import get_dstack_dir
 
 
 class LocalConfig(BackendConfig):
-    def __init__(self):
-        super().__init__()
-        self.path = get_dstack_dir()
+    def __init__(self, namespace: str):
+        self.namespace = namespace
+        self.backend_dir = get_dstack_dir() / "local_backend" / self.namespace
 
-    def load(self, path: Path = get_config_path()):
-        super().load(path=path)
-        if path.exists():
-            with path.open() as f:
-                config_data = yaml.load(f, Loader=yaml.FullLoader)
-                if not isinstance(config_data, Dict):
-                    config_data = {}
-                self.path = config_data.get("path") or get_dstack_dir()
+    def serialize(self) -> Dict:
+        return {
+            "backend": "local",
+            "namespace": self.namespace,
+        }
 
-    def save(self, path: Path = get_config_path()):
-        if not path.parent.exists():
-            path.parent.mkdir(parents=True)
-        with path.open("w") as f:
-            config_data = {"backend": "local", "path": self.path}
-            yaml.dump(config_data, f)
+    @classmethod
+    def deserialize(cls, config_data: Dict) -> "LocalConfig":
+        pass

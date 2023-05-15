@@ -1,7 +1,8 @@
-import { createApi } from '@reduxjs/toolkit/query/react';
-import { fetchBaseQuery } from 'libs/fetchBaseQuery';
-import fetchBaseQueryHeaders from 'libs/fetchBaseQueryHeaders';
 import { API } from 'api';
+import { createApi } from '@reduxjs/toolkit/query/react';
+import { fetchBaseQuery } from '@reduxjs/toolkit/query/react';
+
+import fetchBaseQueryHeaders from 'libs/fetchBaseQueryHeaders';
 
 export const userApi = createApi({
     reducerPath: 'userApi',
@@ -12,7 +13,7 @@ export const userApi = createApi({
     tagTypes: ['User'],
 
     endpoints: (builder) => ({
-        getUserData: builder.query<IUserSmall, void>({
+        getUserData: builder.query<IUserSmall, Partial<Pick<IUser, 'token'>>>({
             query: () => {
                 return {
                     url: API.USERS.INFO(),
@@ -39,6 +40,16 @@ export const userApi = createApi({
             },
 
             providesTags: (result) => (result ? [{ type: 'User' as const, id: result.user_name }] : []),
+        }),
+
+        checkAuthToken: builder.mutation<IUser, Pick<IUser, 'token'>>({
+            query: ({ token }) => ({
+                url: API.USERS.INFO(),
+                method: 'GET',
+                headers: {
+                    Authorization: `Bearer ${token}`,
+                },
+            }),
         }),
 
         createUser: builder.mutation<IUser, Omit<IUser, 'token'>>({
@@ -88,6 +99,7 @@ export const {
     useGetUserDataQuery,
     useGetUserListQuery,
     useGetUserQuery,
+    useCheckAuthTokenMutation,
     useCreateUserMutation,
     useDeleteUsersMutation,
     useUpdateUserMutation,

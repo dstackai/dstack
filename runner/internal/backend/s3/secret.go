@@ -46,18 +46,18 @@ func (sm *ClientSecret) fetchSecret(ctx context.Context, bucket string, secrets 
 	return result, nil
 }
 
-func (sm *ClientSecret) fetchCredentials(ctx context.Context, bucket, repoHostnameWithPort, repoUserName, repoName string) *models.GitCredentials {
+func (sm *ClientSecret) fetchCredentials(ctx context.Context, bucket, repoId string) *models.GitCredentials {
 	value, err := sm.cli.GetSecretValue(ctx, &secretsmanager.GetSecretValueInput{
-		SecretId: aws.String(fmt.Sprintf("/dstack/%s/credentials/%s/%s/%s", bucket, repoHostnameWithPort, repoUserName, repoName)),
+		SecretId: aws.String(fmt.Sprintf("/dstack/%s/credentials/%s", bucket, repoId)),
 	})
 	if err != nil {
-		log.Error(ctx, "Fetching value credentials S3", "bucket", bucket, "RepoHostnameWithPort", repoHostnameWithPort, "RepoUserName", repoUserName, "RepoName", repoName, "err", err)
+		log.Error(ctx, "Fetching value credentials S3", "bucket", bucket, "RepoId", repoId, "err", err)
 		return nil
 	}
 	cred := new(models.GitCredentials)
 	err = json.Unmarshal([]byte(aws.StringValue(value.SecretString)), &cred)
 	if err != nil {
-		log.Error(ctx, "Unmarshal value credentials S3", "bucket", bucket, "RepoHostnameWithPort", repoHostnameWithPort, "RepoUserName", repoUserName, "RepoName", repoName, "err", err)
+		log.Error(ctx, "Unmarshal value credentials S3", "bucket", bucket, "RepoId", repoId, "err", err)
 		return nil
 	}
 	return cred

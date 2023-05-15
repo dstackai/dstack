@@ -1,84 +1,53 @@
 from typing import List
 
-from sqlalchemy import Column, ForeignKey, Integer, String, Table
-from sqlalchemy.orm import Mapped, mapped_column, relationship
+from sqlalchemy import ForeignKey, Integer, MetaData, String
+from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column, relationship
 
-from dstack.hub.db import Database
+constraint_naming_convention = {
+    "ix": "ix_%(column_0_label)s",
+    "uq": "uq_%(table_name)s_%(column_0_name)s",
+    "ck": "ck_%(table_name)s_%(constraint_name)s",
+    "fk": "fk_%(table_name)s_%(column_0_name)s_%(referred_table_name)s",
+    "pk": "pk_%(table_name)s",
+}
 
 
-class Base:
+class Base(DeclarativeBase):
+    metadata = MetaData(naming_convention=constraint_naming_convention)
+
     def __repr__(self) -> str:
         src = self.__class__.__name__
-        attr = [f"{key}= {val}" for (key, val) in self.__dict__.items() if not key.startwith("_")]
-        attr_string = ",".join(attr)
+        attr = [f"{key}={val}" for (key, val) in self.__dict__.items() if not key.startswith("_")]
+        attr_string = ", ".join(attr)
         return f"{src}({attr_string})"
 
 
-association_table_user_project = Table(
-    "user_project",
-    Database.Base.metadata,
-    Column("users_name", ForeignKey("users.name")),
-    Column("project_name", ForeignKey("projects.name")),
-)
-
-
-class Role(Base, Database.Base):
-    __tablename__ = "roles"
-
-    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
-    name: Mapped[str] = mapped_column(String(30))
-
-    def __repr__(self) -> str:
-        return super().__repr__()
-
-
-class User(Base, Database.Base):
+class User(Base):
     __tablename__ = "users"
 
-    name: Mapped[str] = mapped_column(String(30), primary_key=True)
+    name: Mapped[str] = mapped_column(String(50), primary_key=True)
     token: Mapped[str] = mapped_column(String(200))
-    role_id: Mapped[int] = mapped_column(ForeignKey("roles.id"))
-    project_role: Mapped[Role] = relationship(lazy="selectin")
-
-    def __repr__(self) -> str:
-        return super().__repr__()
+    global_role: Mapped[str] = mapped_column(String(100))
 
 
-class Member(Base, Database.Base):
+class Member(Base):
     __tablename__ = "members"
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
-    project_name: Mapped[str] = mapped_column(ForeignKey("projects.name"))
+    project_name: Mapped[str] = mapped_column(ForeignKey("projects.name", ondelete="CASCADE"))
     project: Mapped["Project"] = relationship()
 
-    user_name: Mapped[str] = mapped_column(ForeignKey("users.name"))
+    user_name: Mapped[str] = mapped_column(ForeignKey("users.name", ondelete="CASCADE"))
     user: Mapped[User] = relationship()
 
-    role_id: Mapped[int] = mapped_column(ForeignKey("roles.id"))
-    project_role: Mapped[Role] = relationship(lazy="selectin")
-
-    def __repr__(self) -> str:
-        return super().__repr__()
+    project_role: Mapped[str] = mapped_column(String(100))
 
 
-class Project(Base, Database.Base):
+class Project(Base):
     __tablename__ = "projects"
 
-    name: Mapped[str] = mapped_column(String(30), primary_key=True)
+    name: Mapped[str] = mapped_column(String(50), primary_key=True)
     backend: Mapped[str] = mapped_column(String(30))
     config: Mapped[str] = mapped_column(String(300))
     auth: Mapped[str] = mapped_column(String(300))
     members: Mapped[List[Member]] = relationship(back_populates="project", lazy="selectin")
-
-    def __repr__(self) -> str:
-        return super().__repr__()
-
-
-class Scope(Base, Database.Base):
-    __tablename__ = "scopes"
-
-    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
-    pattern: Mapped[str] = mapped_column(String(100), nullable=False)
-
-    def __repr__(self) -> str:
-        return super().__repr__()

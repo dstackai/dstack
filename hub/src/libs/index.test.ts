@@ -1,16 +1,4 @@
-import {
-    isErrorWithMessage,
-    arrayToRecordByKeyName,
-    compareSimpleObject,
-    getDateAgoSting,
-    MINUTE,
-    getYesterdayTimeStamp,
-    getDateFewDaysAgo,
-    getUid,
-    mibToBytes,
-    formatBytes,
-    maskText,
-} from './index';
+import { arrayToRecordByKeyName, getDateAgoSting, getUid, isErrorWithMessage, MINUTE } from './index';
 
 describe('test libs', () => {
     test('Check is error with message', () => {
@@ -37,14 +25,6 @@ describe('test libs', () => {
         });
     });
 
-    test('compare simple project', () => {
-        expect(compareSimpleObject({ test: 'test' }, { test: 'test' })).toBeTruthy();
-        expect(compareSimpleObject({ test: 4 }, { test: 4 })).toBeTruthy();
-        expect(compareSimpleObject({ test: 4 }, { test: null })).toBeFalsy();
-        expect(compareSimpleObject({ test: undefined }, { test: null })).toBeFalsy();
-        expect(compareSimpleObject({ test: 'test', test2: 'test2' }, { test: 'test', test2: 'test2' })).toBeTruthy();
-    });
-
     test('getDateAgoSting', () => {
         const date = new Date();
         const timestamp = date.getTime();
@@ -62,36 +42,6 @@ describe('test libs', () => {
         expect(getDateAgoSting(timestamp - MINUTE * 60 * 24)).toEqual(`${day}/${month}/${year}`);
     });
 
-    test('getYesterdayTimeStamp', () => {
-        const date = new Date();
-        date.setDate(date.getDate() - 1);
-        const yesterdayDate = new Date(getYesterdayTimeStamp());
-
-        expect(yesterdayDate.getDate()).toEqual(date.getDate());
-        expect(yesterdayDate.getMonth()).toEqual(date.getMonth());
-        expect(yesterdayDate.getFullYear()).toEqual(date.getFullYear());
-    });
-
-    test('get date few days ago', () => {
-        for (let i = 0; i <= 15; i++) {
-            const date = new Date();
-            const dateAgo = new Date(getDateFewDaysAgo(i));
-            date.setDate(date.getDate() - i);
-
-            expect(dateAgo.getDate()).toEqual(date.getDate());
-            expect(dateAgo.getMonth()).toEqual(date.getMonth());
-            expect(dateAgo.getFullYear()).toEqual(date.getFullYear());
-        }
-
-        const date = new Date(1645437591390);
-        const dateAgo = new Date(getDateFewDaysAgo(10, date.getTime()));
-        date.setDate(date.getDate() - 10);
-
-        expect(dateAgo.getDate()).toEqual(date.getDate());
-        expect(dateAgo.getMonth()).toEqual(date.getMonth());
-        expect(dateAgo.getFullYear()).toEqual(date.getFullYear());
-    });
-
     test('get unique id', () => {
         const set = new Set();
         const iterationCount = 20;
@@ -99,21 +49,5 @@ describe('test libs', () => {
         for (let i = 0; i < iterationCount; i++) set.add(getUid());
 
         expect(set.size).toBe(iterationCount);
-    });
-
-    test('MiB to Bytes', () => {
-        expect(mibToBytes(16384)).toBe(17179869184);
-    });
-
-    test('Format bytes', () => {
-        expect(formatBytes(0)).toBe('0Bytes');
-        expect(formatBytes(1073741824)).toBe('1GB');
-        expect(formatBytes(mibToBytes(16384))).toBe('16GB');
-    });
-
-    test('Mask text', () => {
-        expect(maskText('')).toBe('');
-        expect(maskText('test')).toBe('****');
-        expect(maskText('test2')).toBe('*****');
     });
 });

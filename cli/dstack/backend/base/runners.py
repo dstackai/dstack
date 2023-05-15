@@ -16,9 +16,9 @@ def get_runner(storage: Storage, runner_id: str) -> Optional[Runner]:
 
 
 def create_runner(storage: Storage, runner: Runner):
-    metadata = {}
+    metadata = None
     if runner.job.status == JobStatus.STOPPING:
-        metadata["status"] = "stopping"
+        metadata = {"status": "stopping"}
     storage.put_object(
         key=_get_runner_filename(runner.runner_id),
         content=yaml.dump(runner.serialize()),

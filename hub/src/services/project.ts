@@ -1,7 +1,10 @@
-import { createApi } from '@reduxjs/toolkit/query/react';
-import { fetchBaseQuery } from 'libs/fetchBaseQuery';
-import fetchBaseQueryHeaders from 'libs/fetchBaseQueryHeaders';
 import { API } from 'api';
+import { createApi } from '@reduxjs/toolkit/query/react';
+import { fetchBaseQuery } from '@reduxjs/toolkit/query/react';
+
+import fetchBaseQueryHeaders from 'libs/fetchBaseQueryHeaders';
+
+import { ProjectRunsRequestParams } from './project.types';
 
 export const projectApi = createApi({
     reducerPath: 'projectApi',
@@ -9,7 +12,7 @@ export const projectApi = createApi({
         prepareHeaders: fetchBaseQueryHeaders,
     }),
 
-    tagTypes: ['Projects'],
+    tagTypes: ['Projects', 'ProjectRepos', 'ProjectRun'],
 
     endpoints: (builder) => ({
         getProjects: builder.query<IProject[], void>({
@@ -29,6 +32,16 @@ export const projectApi = createApi({
             query: ({ name }) => {
                 return {
                     url: API.PROJECTS.DETAILS(name),
+                };
+            },
+
+            providesTags: (result) => (result ? [{ type: 'Projects' as const, id: result.project_name }] : []),
+        }),
+
+        getProjectWithConfigInfo: builder.query<IProject, { name: IProject['project_name'] }>({
+            query: ({ name }) => {
+                return {
+                    url: API.PROJECTS.DETAILS_WITH_CONFIG(name),
                 };
             },
 
@@ -77,12 +90,56 @@ export const projectApi = createApi({
             invalidatesTags: () => ['Projects'],
         }),
 
-        backendValues: builder.mutation<IProjectAwsBackendValues, Partial<TProjectBackend>>({
+        getBackendTypes: builder.query<TProjectBackendType[], void>({
+            query: () => ({
+                url: API.PROJECTS.BACKEND_TYPES(),
+                method: 'POST',
+            }),
+        }),
+
+        backendValues: builder.mutation<IProjectAwsBackendValues & IProjectGCPBackendValues, Partial<TProjectBackend>>({
             query: (data) => ({
                 url: API.PROJECTS.BACKEND_VALUES(),
                 method: 'POST',
                 body: data,
             }),
+        }),
+
+        //     Repos queries
+        getProjectRepos: builder.query<IRepo[], { name: IProject['project_name'] }>({
+            query: ({ name }) => {
+                return {
+                    url: API.PROJECTS.REPO_LIST(name),
+                    method: 'POST',
+                };
+            },
+
+            providesTags: () => ['ProjectRepos'],
+        }),
+
+        getProjectRepo: builder.query<IRepo, { name: IProject['project_name']; repo_id: IRepo['repo_id'] }>({
+            query: ({ name, ...body }) => {
+                return {
+                    url: API.PROJECTS.REPO_ITEM(name),
+                    method: 'POST',
+                    body,
+                };
+            },
+
+            providesTags: () => ['ProjectRepos'],
+        }),
+
+        //     Repos queries
+        getProjectRuns: builder.query<IRun[], ProjectRunsRequestParams>({
+            query: ({ name, ...body }) => {
+                return {
+                    url: API.PROJECTS.RUNS_LIST(name),
+                    method: 'POST',
+                    body,
+                };
+            },
+
+            providesTags: () => ['ProjectRun'],
         }),
     }),
 });
@@ -90,9 +147,14 @@ export const projectApi = createApi({
 export const {
     useGetProjectsQuery,
     useGetProjectQuery,
+    useGetProjectWithConfigInfoQuery,
     useCreateProjectMutation,
     useUpdateProjectMutation,
     useUpdateProjectMembersMutation,
     useDeleteProjectsMutation,
+    useGetBackendTypesQuery,
     useBackendValuesMutation,
+    useGetProjectReposQuery,
+    useGetProjectRepoQuery,
+    useGetProjectRunsQuery,
 } = projectApi;

@@ -7,23 +7,34 @@ from tqdm import tqdm
 from dstack.backend.base import jobs
 from dstack.backend.base.storage import Storage
 from dstack.core.artifact import Artifact
-from dstack.core.repo import RepoAddress
+from dstack.utils.common import PathLike, removeprefix
 
 
 def list_run_artifact_files(
-    storage: Storage, repo_address: RepoAddress, run_name: str
+    storage: Storage, repo_id: str, run_name: str, prefix: str, recursive: bool
 ) -> List[Artifact]:
-    jobs_list = jobs.list_jobs(storage, repo_address, run_name)
+    normalized_prefix = _normalize_path_prefix(prefix)
+    jobs_list = jobs.list_jobs(storage, repo_id, run_name)
     artifacts = []
     for job in jobs_list:
-        job_artifacts_dir = _get_job_artifacts_dir(repo_address, job.job_id)
         if job.artifact_paths is None:
             continue
+        job_artifacts_dir = _get_job_artifacts_dir(repo_id, job.job_id)
         for artifact_path in job.artifact_paths:
             artifact_name = os.path.join(artifact_path, "")
-            artifact_path = artifact_name.lstrip(os.sep)
-            job_artifact_files_path = os.path.join(job_artifacts_dir, artifact_path)
-            artifact_files = storage.list_files(job_artifact_files_path)
+            artifact_path = os.path.join(_normalize_path_prefix(artifact_path), "")
+            artifact_full_path = os.path.join(job_artifacts_dir, artifact_path)
+            if artifact_path.startswith(normalized_prefix):
+                files_path = artifact_full_path
+            elif normalized_prefix.startswith(artifact_path):
+                files_path = os.path.join(job_artifacts_dir, normalized_prefix)
+            else:
+                continue
+            artifact_files = storage.list_files(files_path, recursive=recursive)
+            if len(artifact_files) == 0:
+                continue
+            for file in artifact_files:
+                file.filepath = removeprefix(file.filepath, artifact_full_path)
             artifact = Artifact(
                 job_id=job.job_id,
                 name=artifact_name,
@@ -36,7 +47,7 @@ def list_run_artifact_files(
 
 def download_run_artifact_files(
     storage: Storage,
-    repo_address: RepoAddress,
+    repo_id: str,
     artifacts: List[Artifact],
     output_dir: Optional[str],
     files_path: Optional[str],
@@ -68,7 +79,7 @@ def download_run_artifact_files(
                 pbar.update(size)
 
             for file in files:
-                artifacts_dir = _get_job_artifacts_dir(repo_address, artifact.job_id)
+                artifacts_dir = _get_job_artifacts_dir(repo_id, artifact.job_id)
                 source_path = os.path.join(artifacts_dir, artifact.path, file.filepath)
                 dest_path = os.path.join(output_dir, artifact.job_id, artifact.path, file.filepath)
                 Path(dest_path).parent.mkdir(parents=True, exist_ok=True)
@@ -77,13 +88,13 @@ def download_run_artifact_files(
 
 def upload_job_artifact_files(
     storage: Storage,
-    repo_address: RepoAddress,
+    repo_id: str,
     job_id: str,
     artifact_name: str,
-    artifact_path: str,
-    local_path: Path,
+    artifact_path: PathLike,
+    local_path: PathLike,
 ):
-    artifacts_dir = _get_job_artifacts_dir(repo_address, job_id)
+    artifacts_dir = _get_job_artifacts_dir(repo_id, job_id)
     total_size = 0
     for root, sub_dirs, files in os.walk(local_path):
         for filename in files:
@@ -111,9 +122,16 @@ def upload_job_artifact_files(
                 storage.upload_file(source_path, dest_path, callback)
 
 
-def _get_artifacts_dir(repo_address: RepoAddress) -> str:
-    return f"artifacts/{repo_address.path()}/"
+def _normalize_path_prefix(path: str) -> str:
+    normalized_path = str(Path(path)).lstrip(".").lstrip(os.sep)
+    if path.endswith("/"):
+        normalized_path += "/"
+    return normalized_path
 
 
-def _get_job_artifacts_dir(repo_address: RepoAddress, job_id: str) -> str:
-    return f"{_get_artifacts_dir(repo_address)}{job_id}/"
+def _get_artifacts_dir(repo_id: str) -> str:
+    return f"artifacts/{repo_id}/"
+
+
+def _get_job_artifacts_dir(repo_id: str, job_id: str) -> str:
+    return f"{_get_artifacts_dir(repo_id)}{job_id}/"

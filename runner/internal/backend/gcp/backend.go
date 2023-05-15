@@ -6,8 +6,11 @@ import (
 	"fmt"
 	"io"
 	"io/ioutil"
+	"os"
 	"path"
 	"strings"
+
+	"github.com/dstackai/dstack/runner/internal/repo"
 
 	"github.com/dstackai/dstack/runner/consts"
 	"github.com/dstackai/dstack/runner/internal/artifacts"
@@ -50,22 +53,22 @@ func init() {
 		if err != nil {
 			return nil, gerrors.Wrap(err)
 		}
-		return New(configFile.Project, configFile.Zone, configFile.Bucket), nil
+		return New(configFile.Project, configFile.Zone, configFile.Bucket)
 	})
 }
 
-func New(project, zone, bucket string) *GCPBackend {
+func New(project, zone, bucket string) (*GCPBackend, error) {
 	storage, err := NewGCPStorage(project, bucket)
 	if err != nil {
-		return nil
+		return nil, gerrors.Wrap(err)
 	}
 	compute := NewGCPCompute(project, zone)
 	if compute == nil {
-		return nil
+		return nil, gerrors.Wrap(err)
 	}
 	secretManager := NewGCPSecretManager(project, bucket)
 	if secretManager == nil {
-		return nil
+		return nil, gerrors.Wrap(err)
 	}
 	logging := NewGCPLogging(project)
 	return &GCPBackend{
@@ -76,7 +79,7 @@ func New(project, zone, bucket string) *GCPBackend {
 		compute:       compute,
 		secretManager: secretManager,
 		logging:       logging,
-	}
+	}, nil
 }
 
 func (gbackend *GCPBackend) Init(ctx context.Context, ID string) error {
@@ -144,6 +147,13 @@ func (gbackend *GCPBackend) CheckStop(ctx context.Context) (bool, error) {
 	return false, nil
 }
 
+func (gbackend *GCPBackend) IsInterrupted(ctx context.Context) (bool, error) {
+	if !gbackend.state.Resources.Interruptible {
+		return false, nil
+	}
+	return gbackend.compute.IsInterruptedSpot(ctx, gbackend.state.RequestID)
+}
+
 func (gbackend *GCPBackend) Shutdown(ctx context.Context) error {
 	err := gbackend.compute.TerminateInstance(ctx, gbackend.state.RequestID)
 	if err != nil {
@@ -165,8 +175,13 @@ func (gbackend *GCPBackend) Shutdown(ctx context.Context) error {
 }
 
 func (gbackend *GCPBackend) GetArtifact(ctx context.Context, runName, localPath, remotePath string, mount bool) artifacts.Artifacter {
-	workDir := path.Join(common.HomeDir(), consts.USER_ARTIFACTS_PATH, runName)
-	return NewGCPArtifacter(gbackend.storage, workDir, localPath, remotePath)
+	workDir := path.Join(gbackend.GetTMPDir(ctx), consts.USER_ARTIFACTS_DIR, runName)
+	return NewGCPArtifacter(gbackend.storage, workDir, localPath, remotePath, false)
+}
+
+func (gbackend *GCPBackend) GetCache(ctx context.Context, runName, localPath, remotePath string) artifacts.Artifacter {
+	workDir := path.Join(gbackend.GetTMPDir(ctx), consts.USER_ARTIFACTS_DIR, runName)
+	return NewGCPArtifacter(gbackend.storage, workDir, localPath, remotePath, true)
 }
 
 func (gbackend *GCPBackend) Requirements(ctx context.Context) models.Requirements {
@@ -214,7 +229,7 @@ func (gbackend *GCPBackend) Bucket(ctx context.Context) string {
 
 func (gbackend *GCPBackend) Secrets(ctx context.Context) (map[string]string, error) {
 	log.Trace(ctx, "Getting secrets")
-	prefix := gbackend.state.Job.JobRepoData().SecretsPrefix()
+	prefix := gbackend.state.Job.SecretsPrefix()
 	secretFilenames, err := gbackend.storage.ListFile(ctx, prefix)
 	if err != nil {
 		return nil, gerrors.Wrap(err)
@@ -222,7 +237,7 @@ func (gbackend *GCPBackend) Secrets(ctx context.Context) (map[string]string, err
 	secrets := make(map[string]string, 0)
 	for _, secretFilename := range secretFilenames {
 		secretName := strings.ReplaceAll(secretFilename, prefix, "")
-		secretValue, err := gbackend.secretManager.FetchSecret(ctx, gbackend.state.Job.JobRepoData(), secretName)
+		secretValue, err := gbackend.secretManager.FetchSecret(ctx, gbackend.state.Job.RepoId, secretName)
 		if err != nil {
 			if errors.Is(err, ErrSecretNotFound) {
 				continue
@@ -236,9 +251,38 @@ func (gbackend *GCPBackend) Secrets(ctx context.Context) (map[string]string, err
 
 func (gbackend *GCPBackend) GitCredentials(ctx context.Context) *models.GitCredentials {
 	log.Trace(ctx, "Getting credentials")
-	creds, err := gbackend.secretManager.FetchCredentials(ctx, gbackend.state.Job.JobRepoData())
+	creds, err := gbackend.secretManager.FetchCredentials(ctx, gbackend.state.Job.RepoId)
 	if err != nil {
 		return nil
 	}
 	return creds
+}
+
+func (gbackend *GCPBackend) GetRepoDiff(ctx context.Context, path string) (string, error) {
+	diff, err := gbackend.storage.GetFile(ctx, path)
+	if err != nil {
+		return "", gerrors.Wrap(err)
+	}
+	return string(diff), nil
+}
+
+func (gbackend *GCPBackend) GetRepoArchive(ctx context.Context, path, dir string) error {
+	archive, err := os.CreateTemp("", "archive-*.tar")
+	if err != nil {
+		return gerrors.Wrap(err)
+	}
+	defer os.Remove(archive.Name())
+
+	if err := gbackend.storage.downloadFile(ctx, path, archive.Name()); err != nil {
+		return gerrors.Wrap(err)
+	}
+
+	if err := repo.ExtractArchive(ctx, archive.Name(), dir); err != nil {
+		return gerrors.Wrap(err)
+	}
+	return nil
+}
+
+func (gbackend *GCPBackend) GetTMPDir(ctx context.Context) string {
+	return path.Join(common.HomeDir(), consts.TMP_DIR_PATH)
 }

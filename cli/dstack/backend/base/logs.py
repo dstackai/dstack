@@ -7,7 +7,6 @@ from dstack.backend.base import jobs
 from dstack.backend.base.storage import Storage
 from dstack.core.job import Job
 from dstack.core.log_event import LogEvent, LogEventSource
-from dstack.core.repo import RepoAddress
 
 WAIT_N_ONCE_FINISHED = 1
 
@@ -19,7 +18,7 @@ POLL_LOGS_RATE_SECS = 1
 def render_log_message(
     storage: Storage,
     event: Dict[str, Any],
-    repo_address: RepoAddress,
+    repo_id: str,
     jobs_cache: Dict[str, Job],
 ) -> LogEvent:
     if isinstance(event, str):
@@ -31,7 +30,7 @@ def render_log_message(
     log = message["log"]
     job = jobs_cache.get(job_id)
     if job is None:
-        job = jobs.get_job(storage, repo_address, job_id)
+        job = jobs.get_job(storage, repo_id, job_id)
         jobs_cache[job_id] = job
     log = fix_urls(log.encode(), job, {}).decode()
     return LogEvent(

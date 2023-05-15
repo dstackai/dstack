@@ -1,5 +1,6 @@
 import { isArray } from 'lodash';
-import { FormFieldError, FormErrors, RequestErrorWithDetail } from './types';
+
+import { FormErrors, FormErrors2, FormFieldError, RequestErrorWithDetail } from './types';
 
 export default function isErrorWithMessage(error: unknown): error is { data: { message: string } } {
     return (
@@ -51,5 +52,17 @@ export function isRequestFormErrors(formErrors: unknown): formErrors is FormErro
         'detail' in formErrors &&
         isArray(formErrors?.detail) &&
         isRequestFormFieldError(formErrors.detail[0])
+    );
+}
+
+export function isRequestFormErrors2(formErrors: unknown): formErrors is FormErrors2 {
+    return (
+        typeof formErrors === 'object' &&
+        formErrors !== null &&
+        formErrors !== undefined &&
+        'detail' in formErrors &&
+        isArray(formErrors?.detail) &&
+        !!formErrors.detail.length &&
+        'msg' in formErrors.detail[0]
     );
 }

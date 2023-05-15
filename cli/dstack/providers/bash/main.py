@@ -1,8 +1,10 @@
-from argparse import ArgumentParser
+from argparse import ArgumentParser, Namespace
 from typing import Any, Dict, List, Optional
 
+from rich_argparse import RichHelpFormatter
+
+import dstack.api.hub as hub
 from dstack import version
-from dstack.backend.base import Backend
 from dstack.core.app import AppSpec
 from dstack.core.job import JobSpec
 from dstack.providers import Provider
@@ -20,16 +22,18 @@ class BashProvider(Provider):
         self.ports = None
         self.commands = None
         self.image_name = None
+        self.home_dir = "/root"
 
     def load(
         self,
-        backend: Backend,
-        provider_args: List[str],
+        hub_client: "hub.HubClient",
+        args: Optional[Namespace],
         workflow_name: Optional[str],
         provider_data: Dict[str, Any],
         run_name: str,
+        ssh_key_pub: Optional[str] = None,
     ):
-        super().load(backend, provider_args, workflow_name, provider_data, run_name)
+        super().load(hub_client, args, workflow_name, provider_data, run_name, ssh_key_pub)
         self.python = self._safe_python_version("python")
         self.commands = self._get_list_data("commands")
         self.env = self._env()
@@ -40,7 +44,10 @@ class BashProvider(Provider):
         self.image_name = self._image_name()
 
     def _create_parser(self, workflow_name: Optional[str]) -> Optional[ArgumentParser]:
-        parser = ArgumentParser(prog="dstack run " + (workflow_name or self.provider_name))
+        parser = ArgumentParser(
+            prog="dstack run " + (workflow_name or self.provider_name),
+            formatter_class=RichHelpFormatter,
+        )
         self._add_base_args(parser)
         parser.add_argument("--ssh", action="store_true", dest="openssh_server")
         parser.add_argument("-p", "--ports", metavar="PORT_COUNT", type=int)

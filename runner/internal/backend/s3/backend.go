@@ -4,6 +4,9 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"github.com/aws/aws-sdk-go-v2/aws"
+	"github.com/aws/aws-sdk-go-v2/service/s3"
+	"github.com/dstackai/dstack/runner/internal/repo"
 	"io"
 	"io/ioutil"
 	"os"
@@ -22,8 +25,6 @@ import (
 	"github.com/dstackai/dstack/runner/internal/models"
 	"gopkg.in/yaml.v3"
 )
-
-var _ backend.Backend = (*S3)(nil)
 
 type S3 struct {
 	region    string
@@ -124,60 +125,33 @@ func (s *S3) UpdateState(ctx context.Context) error {
 		log.Trace(ctx, "State not exist")
 		return gerrors.Wrap(backend.ErrLoadStateFile)
 	}
-	log.Trace(ctx, "Fetching list jobs", "Repo username", s.state.Job.RepoUserName, "Repo name", s.state.Job.RepoName, "Job ID", s.state.Job.JobID)
-	listForDelete, err := s.cliS3.ListFile(ctx, s.bucket, fmt.Sprintf("jobs/%s/%s/%s/l;%s;", s.state.Job.RepoHostNameWithPort(), s.state.Job.RepoUserName, s.state.Job.RepoName, s.state.Job.JobID))
-	if err != nil {
-		return gerrors.Wrap(err)
-	}
-	for _, fileForDelete := range listForDelete {
-		log.Trace(ctx, "Deleting file job", "Bucket", s.bucket, "Path", fileForDelete)
-		err = s.cliS3.DeleteFile(ctx, s.bucket, fileForDelete)
-		if err != nil {
-			return gerrors.Wrap(err)
-		}
-	}
 	log.Trace(ctx, "Marshaling job")
 	theFile, err := yaml.Marshal(&s.state.Job)
 	if err != nil {
 		return gerrors.Wrap(err)
 	}
-	pathJob := fmt.Sprintf("jobs/%s/%s/%s/%s.yaml", s.state.Job.RepoHostNameWithPort(), s.state.Job.RepoUserName, s.state.Job.RepoName, s.state.Job.JobID)
-	log.Trace(ctx, "Write to file job", "Path", pathJob)
-	err = s.cliS3.PutFile(ctx, s.bucket, pathJob, theFile)
+	jobFilepath := s.state.Job.JobFilepath()
+	log.Trace(ctx, "Write to file job", "Path", jobFilepath)
+	err = s.cliS3.PutFile(ctx, s.bucket, jobFilepath, theFile)
 	if err != nil {
 		return gerrors.Wrap(err)
 	}
-
-	bufApp := make([]string, 0, len(s.state.Job.Apps))
-	for _, app := range s.state.Job.Apps {
-		bufApp = append(bufApp, app.Name)
-	}
-	appString := strings.Join(bufApp, ",")
-
-	artifactSlice := make([]string, 0)
-	for _, art := range s.state.Job.Artifacts {
-		artifactSlice = append(artifactSlice, art.Path)
-	}
-
-	pathLockJob := fmt.Sprintf("jobs/%s/%s/%s/l;%s;%s;%s;%d;%s;%s;%s;%s",
-		s.state.Job.RepoHostNameWithPort(),
-		s.state.Job.RepoUserName,
-		s.state.Job.RepoName,
-		s.state.Job.JobID,
-		s.state.Job.ProviderName,
-		s.state.Job.LocalRepoUserName,
-		s.state.Job.SubmittedAt,
-		s.state.Job.Status,
-		strings.Join(artifactSlice, ","),
-		appString,
-		s.state.Job.TagName)
-	log.Trace(ctx, "Write to file lock job", "Path", pathLockJob)
-	err = s.cliS3.PutFile(ctx, s.bucket, pathLockJob, []byte{})
+	log.Trace(ctx, "Fetching list jobs", "Repo username", s.state.Job.RepoUserName, "Repo name", s.state.Job.RepoName, "Job ID", s.state.Job.JobID)
+	files, err := s.cliS3.ListFile(ctx, s.bucket, s.state.Job.JobHeadFilepathPrefix())
 	if err != nil {
 		return gerrors.Wrap(err)
+	}
+	jobHeadFilepath := s.state.Job.JobHeadFilepath()
+	for _, file := range files[:1] {
+		log.Trace(ctx, "Renaming file job", "From", file, "To", jobHeadFilepath)
+		err = s.cliS3.RenameFile(ctx, s.bucket, file, jobHeadFilepath)
+		if err != nil {
+			return gerrors.Wrap(err)
+		}
 	}
 	return nil
 }
+
 func (s *S3) CheckStop(ctx context.Context) (bool, error) {
 	if s == nil {
 		return false, gerrors.New("Backend is nil")
@@ -197,6 +171,13 @@ func (s *S3) CheckStop(ctx context.Context) (bool, error) {
 		return true, nil
 	}
 	return false, nil
+}
+
+func (s *S3) IsInterrupted(ctx context.Context) (bool, error) {
+	if !s.state.Resources.Interruptible {
+		return false, nil
+	}
+	return s.cliEC2.IsInterruptedSpot(ctx, s.state.RequestID)
 }
 
 func (s *S3) Shutdown(ctx context.Context) error {
@@ -224,7 +205,7 @@ func (s *S3) GetArtifact(ctx context.Context, runName, localPath, remotePath str
 		return nil
 	}
 	if mount {
-		rootPath := path.Join(common.HomeDir(), consts.FUSE_PATH, runName)
+		rootPath := path.Join(s.GetTMPDir(ctx), consts.FUSE_DIR, runName)
 		iamRole := fmt.Sprintf("dstack_role_%s", strings.ReplaceAll(s.bucket, "-", "_"))
 		log.Trace(ctx, "Create FUSE artifact's engine", "Region", s.region, "Root path", rootPath, "IAM Role", iamRole)
 		art, err := s3fs.New(ctx, s.bucket, s.region, iamRole, rootPath, localPath, remotePath)
@@ -234,9 +215,19 @@ func (s *S3) GetArtifact(ctx context.Context, runName, localPath, remotePath str
 		}
 		return art
 	}
-	rootPath := path.Join(common.HomeDir(), consts.USER_ARTIFACTS_PATH, runName)
+	rootPath := path.Join(s.GetTMPDir(ctx), consts.USER_ARTIFACTS_DIR, runName)
 	log.Trace(ctx, "Create simple artifact's engine", "Region", s.region, "Root path", rootPath)
-	art, err := simple.NewSimple(s.bucket, s.region, rootPath, localPath, remotePath)
+	art, err := simple.NewSimple(s.bucket, s.region, rootPath, localPath, remotePath, false)
+	if err != nil {
+		log.Error(ctx, "Error create simple engine", "err", err)
+		return nil
+	}
+	return art
+}
+
+func (s *S3) GetCache(ctx context.Context, runName, localPath, remotePath string) artifacts.Artifacter {
+	rootPath := path.Join(s.GetTMPDir(ctx), consts.USER_ARTIFACTS_DIR, runName)
+	art, err := simple.NewSimple(s.bucket, s.region, rootPath, localPath, remotePath, true)
 	if err != nil {
 		log.Error(ctx, "Error create simple engine", "err", err)
 		return nil
@@ -264,7 +255,7 @@ func (s *S3) MasterJob(ctx context.Context) *models.Job {
 		log.Trace(ctx, "State not exist")
 		return nil
 	}
-	theFile, err := s.cliS3.GetFile(ctx, s.bucket, fmt.Sprintf("jobs/%s/%s/%s/%s.yaml", s.state.Job.RepoHostNameWithPort(), s.state.Job.RepoUserName, s.state.Job.RepoName, s.state.Job.MasterJobID))
+	theFile, err := s.cliS3.GetFile(ctx, s.bucket, fmt.Sprintf("jobs/%s/%s.yaml", s.state.Job.RepoId, s.state.Job.MasterJobID))
 	if err != nil {
 		return nil
 	}
@@ -312,6 +303,7 @@ func (s *S3) ListSubDir(ctx context.Context, dir string) ([]string, error) {
 	}
 	return listDir, nil
 }
+
 func (s *S3) GetJobByPath(ctx context.Context, path string) (*models.Job, error) {
 	log.Trace(ctx, "Fetching job by path", "Path", path)
 	if s == nil {
@@ -336,6 +328,7 @@ func (s *S3) Bucket(ctx context.Context) string {
 	}
 	return s.bucket
 }
+
 func (s *S3) Secrets(ctx context.Context) (map[string]string, error) {
 	log.Trace(ctx, "Getting secrets")
 	if s == nil {
@@ -344,7 +337,7 @@ func (s *S3) Secrets(ctx context.Context) (map[string]string, error) {
 	if s.state == nil {
 		return nil, gerrors.New("State is empty")
 	}
-	templatePath := fmt.Sprintf("secrets/%s/%s/%s/l;", s.state.Job.RepoHostNameWithPort(), s.state.Job.RepoUserName, s.state.Job.RepoName)
+	templatePath := fmt.Sprintf("secrets/%s/l;", s.state.Job.RepoId)
 	listSecrets, err := s.cliS3.ListFile(ctx, s.bucket, templatePath)
 	if err != nil {
 		return nil, gerrors.Wrap(err)
@@ -352,14 +345,13 @@ func (s *S3) Secrets(ctx context.Context) (map[string]string, error) {
 	secrets := make(map[string]string, 0)
 	for _, secretPath := range listSecrets {
 		clearName := strings.ReplaceAll(secretPath, templatePath, "")
-		secrets[clearName] = fmt.Sprintf("%s/%s/%s/%s",
-			s.state.Job.RepoHostNameWithPort(),
-			s.state.Job.RepoUserName,
-			s.state.Job.RepoName,
+		secrets[clearName] = fmt.Sprintf("%s/%s",
+			s.state.Job.RepoId,
 			clearName)
 	}
 	return s.cliSecret.fetchSecret(ctx, s.bucket, secrets)
 }
+
 func (s *S3) GitCredentials(ctx context.Context) *models.GitCredentials {
 	log.Trace(ctx, "Getting credentials")
 	if s == nil {
@@ -374,5 +366,43 @@ func (s *S3) GitCredentials(ctx context.Context) *models.GitCredentials {
 		log.Error(ctx, "Job is empty")
 		return nil
 	}
-	return s.cliSecret.fetchCredentials(ctx, s.bucket, s.state.Job.RepoHostNameWithPort(), s.state.Job.RepoUserName, s.state.Job.RepoName)
+	return s.cliSecret.fetchCredentials(ctx, s.bucket, s.state.Job.RepoId)
+}
+
+func (s *S3) GetRepoDiff(ctx context.Context, path string) (string, error) {
+	diff, err := s.cliS3.GetFile(ctx, s.bucket, path)
+	if err != nil {
+		return "", gerrors.Wrap(err)
+	}
+	return string(diff), nil
+}
+
+func (s *S3) GetRepoArchive(ctx context.Context, path, dir string) error {
+	archive, err := os.CreateTemp("", "archive-*.tar")
+	if err != nil {
+		return gerrors.Wrap(err)
+	}
+	defer os.Remove(archive.Name())
+
+	out, err := s.cliS3.cli.GetObject(ctx, &s3.GetObjectInput{
+		Bucket: aws.String(s.bucket),
+		Key:    aws.String(path),
+	})
+	if err != nil {
+		return gerrors.Wrap(err)
+	}
+	defer out.Body.Close()
+	size, err := io.Copy(archive, out.Body)
+	if size != out.ContentLength {
+		return gerrors.New("size not equal")
+	}
+
+	if err := repo.ExtractArchive(ctx, archive.Name(), dir); err != nil {
+		return gerrors.Wrap(err)
+	}
+	return nil
+}
+
+func (s *S3) GetTMPDir(ctx context.Context) string {
+	return path.Join(common.HomeDir(), consts.TMP_DIR_PATH)
 }

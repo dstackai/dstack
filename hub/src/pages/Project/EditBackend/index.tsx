@@ -1,11 +1,13 @@
 import React from 'react';
-import { Container, Header, Loader, ContentLayout } from 'components';
 import { useTranslation } from 'react-i18next';
 import { useNavigate, useParams } from 'react-router-dom';
-import { useGetProjectQuery, useUpdateProjectMutation } from 'services/project';
+
+import { Container, ContentLayout, Header, Loader } from 'components';
+
 import { useBreadcrumbs, useNotifications } from 'hooks';
 import { ROUTES } from 'routes';
-import { isRequestErrorWithDetail } from 'libs';
+import { useGetProjectWithConfigInfoQuery, useUpdateProjectMutation } from 'services/project';
+
 import { ProjectForm } from '../Form';
 
 export const ProjectEditBackend: React.FC = () => {
@@ -14,7 +16,7 @@ export const ProjectEditBackend: React.FC = () => {
     const paramProjectName = params.name ?? '';
     const navigate = useNavigate();
     const [pushNotification] = useNotifications();
-    const { data, isLoading } = useGetProjectQuery({ name: paramProjectName });
+    const { data, isLoading } = useGetProjectWithConfigInfoQuery({ name: paramProjectName });
     const [updateProject, { isLoading: isProjectUpdating }] = useUpdateProjectMutation();
 
     useBreadcrumbs([
@@ -24,7 +26,7 @@ export const ProjectEditBackend: React.FC = () => {
         },
         {
             text: paramProjectName,
-            href: ROUTES.PROJECT.DETAILS.FORMAT(paramProjectName),
+            href: ROUTES.PROJECT.DETAILS.REPOSITORIES.FORMAT(paramProjectName),
         },
 
         {
@@ -34,7 +36,7 @@ export const ProjectEditBackend: React.FC = () => {
     ]);
 
     const onCancelHandler = () => {
-        navigate(ROUTES.PROJECT.DETAILS.FORMAT(paramProjectName));
+        navigate(ROUTES.PROJECT.DETAILS.REPOSITORIES.FORMAT(paramProjectName));
     };
 
     const onSubmitHandler = async (data: Partial<IProject>): Promise<IProject> => {
@@ -51,19 +53,9 @@ export const ProjectEditBackend: React.FC = () => {
                 content: t('projects.edit.success_notification'),
             });
 
-            navigate(ROUTES.PROJECT.DETAILS.FORMAT(data.project_name ?? paramProjectName));
+            navigate(ROUTES.PROJECT.DETAILS.REPOSITORIES.FORMAT(data.project_name ?? paramProjectName));
         } catch (e) {
-            if (isRequestErrorWithDetail(e)) {
-                pushNotification({
-                    type: 'error',
-                    content: `${t('projects.edit.error_notification')}: ${e.detail}`,
-                });
-            } else {
-                pushNotification({
-                    type: 'error',
-                    content: t('projects.edit.error_notification'),
-                });
-            }
+            console.log(e);
         }
 
         return request;

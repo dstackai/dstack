@@ -15,7 +15,14 @@
     "profile": "Profile",
     "copied": "Copied",
     "copy": "Copy",
-    "server_error": "Server error: {{error}}"
+    "info": "Info",
+    "stop": "Stop",
+    "clearFilter": "Clear filter",
+    "server_error": "Server error: {{error}}",
+    "login": "Login",
+    "general": "General",
+    "local_storage_unavailable": "Local Storage is unavailable",
+    "local_storage_unavailable_message": "Your browser doesn't support local storage"
   },
 
   "auth": {
@@ -38,6 +45,9 @@
     "nomatch_message_title": "No matches",
     "nomatch_message_text": "We can't find a match.",
     "nomatch_message_button_label": "Clear filter",
+    "repositories": "Repositories",
+    "runs": "Runs",
+    "settings": "Settings",
     "card": {
       "backend": "Backend",
       "region": "Region",
@@ -45,18 +55,22 @@
     },
     "backend_type": {
       "aws": "AWS",
-      "aws_description": "Amazon Web Services",
+      "aws_description": "Run workflows and store data in Amazon Web Services ",
       "gcp": "GCP",
-      "gcp_description": "Google Cloud Platform",
+      "gcp_description": "Run workflows and store data in Google Cloud Platform",
       "azure": "Azure",
-      "azure_description": "Microsoft Azure"
+      "azure_description": "Run workflows and store data in Microsoft Azure",
+      "local": "Local",
+      "local_description": "Run workflows and store data locally via Docker"
     },
     "edit": {
       "general": "General",
       "edit_backend": "Edit backend",
       "project_name": "Project name",
+      "project_name_description": "Only latin characters, dashes, underscores, and digits",
       "backend": "Backend",
       "backend_type": "Type",
+      "backend_type_description": "Select a backend type",
       "members_empty_message_title": "No members",
       "members_empty_message_text": "Select project's members",
       "cli": "CLI",
@@ -64,40 +78,40 @@
         "access_key": "Access key",
         "secret_key": "Secret key",
         "access_key_id": "Access key ID",
-        "access_key_id_description": "Access key ID description",
-        "secret_key_id": "Secret key ID",
-        "secret_key_id_description": "Secret key ID description",
+        "access_key_id_description": "Specify the AWS access key ID",
+        "secret_key_id": "Secret access key",
+        "secret_key_id_description": "Specify the AWS secret access key",
         "region_name":  "Region",
-        "region_name_description":  "Region description",
-        "region_name_placeholder": "Select a region",
+        "region_name_description":  "Select a region to run workflows and store artifacts",
+        "region_name_placeholder": "Not selected",
         "s3_bucket_name": "Bucket",
-        "s3_bucket_name_description": "Bucket description",
-        "ec2_subnet_id_description": "Subnet ID description",
-        "ec2_subnet_id_placeholder":  "Select subnet",
-        "ec2_subnet_id": "Subnet ID"
+        "s3_bucket_name_description": "Select an S3 bucket to store artifacts",
+        "ec2_subnet_id_description": "Select a subnet to run workflows in",
+        "ec2_subnet_id_placeholder":  "Not selected",
+        "ec2_subnet_id": "Subnet"
       },
       "gcp": {
-        "credentials": "Credentials",
+        "credentials": "Service account",
         "credentials_description": "Credentials description",
         "credentials_placeholder": "Credentials placeholder",
-        "area": "Area",
-        "area_description": "Area description",
-        "area_placeholder": "Area placeholder",
+        "area": "Location",
+        "area_description": "Select a location to run workflows and store artifacts",
+        "area_placeholder": "Not selected",
         "region": "Region",
-        "region_description": "Region description",
-        "region_placeholder": "Region placeholder",
+        "region_description": "Select a region to run workflows and store artifacts",
+        "region_placeholder": "Not selected",
         "zone": "Zone",
-        "zone_description": "Zone description",
-        "zone_placeholder": "Zone placeholder",
-        "bucket_name": "Bucket name",
-        "bucket_name_description": "Bucket description",
-        "bucket_name_placeholder": "Bucket placeholder",
-        "vpc":  "VPC",
-        "vpc_description":  "VPC description",
-        "vpc_placeholder":  "VPC placeholder",
+        "zone_description": "Select a zone to run workflows and store artifacts",
+        "zone_placeholder": "Not selected",
+        "bucket_name": "Bucket",
+        "bucket_name_description": "Select a storage bucket to store artifacts",
+        "bucket_name_placeholder": "Not selected",
+        "vpc": "VPC",
+        "vpc_description": "VPC description",
+        "vpc_placeholder": "VPC placeholder",
         "subnet": "Subnet",
-        "subnet_description": "Subnet description",
-        "subnet_placeholder": "Subnet placeholder"
+        "subnet_description": "Select a subnet to run workflows in",
+        "subnet_placeholder": "Not selected"
       },
       "members": {
         "section_title": "Members",
@@ -114,6 +128,46 @@
       "page_title": "Create project",
       "error_notification": "Create project error",
       "success_notification": "Project is created"
+    },
+    "repo": {
+      "search_placeholder": "Find repositories",
+      "empty_message_title": "No repositories",
+      "empty_message_text": "No repositories to display.",
+      "nomatch_message_title": "No matches",
+      "nomatch_message_text": "We can't find a match.",
+      "card": {
+        "owner": "Owner",
+        "last_run": "Last run",
+        "tags_count": "Tags count",
+        "directory": "Directory"
+      }
+    },
+    "run": {
+      "list_page_title": "Runs",
+      "search_placeholder": "Find runs",
+      "empty_message_title": "No runs",
+      "empty_message_text": "No runs to display.",
+      "nomatch_message_title": "No matches",
+      "nomatch_message_text": "We can't find a match.",
+      "run_name": "Run",
+      "workflow_name": "Workflow",
+      "provider_name": "Provider",
+      "status": "Status",
+      "submitted_at": "Run time",
+      "artifacts": "Artifacts count",
+      "statuses": {
+        "pending": "Pending",
+        "submitted": "Submitted",
+        "downloading":  "Downloading",
+        "running": "Running",
+        "uploading":  "Uploading",
+        "stopping": "Stopping",
+        "stopped":  "Stopped",
+        "aborting": "Aborting",
+        "aborted":  "Aborted",
+        "failed": "Failed",
+        "done":  "Done"
+      }
     }
   },
   "users": {
@@ -123,9 +177,11 @@
     "empty_message_text": "No members to display.",
     "nomatch_message_title": "No matches",
     "nomatch_message_text": "We can't find a match.",
-    "nomatch_message_button_label": "Clear filter",
     "user_name": "User name",
+    "user_name_description": "Only latin characters, dashes, underscores, and digits",
+    "global_role_description": "Whether the user is an administrator or not",
     "token": "Token",
+    "token_description": "The personal access token used for authentication",
     "global_role": "Global role",
     "account_settings": "Account settings",
     "create": {
@@ -144,7 +200,9 @@
       "validation": {
         "user_name_format": "Only letters, numbers, - or _"
       }
-    }
+    },
+
+    "token_copied": "Token copied"
   },
   "validation": {
     "required": "This is required field"

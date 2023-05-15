@@ -37,7 +37,7 @@ jobs:
     runs-on: ${{ matrix.os }}
     strategy:
       matrix:
-        os: [ macos-latest, windows-latest, ubuntu-latest ]
+        os: [ macos-latest, ubuntu-latest, windows-latest ]
         python-version: [ 3.7, 3.8, 3.9, "3.10", 3.11 ]
     defaults:
       run:
@@ -52,9 +52,11 @@ jobs:
         run: |
           python -m pip install --upgrade pip
           pip install -r requirements.txt
-      - name: Test with unittest
+          pip install -r requirements_dev.txt
+      - name: Run pytest
         run: |
-          python -m unittest discover tests -t .
+          mkdir -p dstack/hub/statics
+          pytest tests/ --ignore=tests/integration/
 
   build-hub-master:
     runs-on: ubuntu-latest
@@ -132,26 +134,22 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v3
-
       - name: Set up Go
         uses: actions/setup-go@v3
         with:
           go-version: 1.19
-
       - name: golangci-lint
         uses: golangci/golangci-lint-action@v3
         with:
           version: v1.51.2
           args: --issues-exit-code=0 --timeout=20m
           working-directory: runner
-
       - name: Test
         run: |
           go version
           go fmt $(go list ./... | grep -v /vendor/)
           go vet $(go list ./... | grep -v /vendor/)
           go test -race $(go list ./... | grep -v /vendor/)
-
 
   runner-compile-master:
     defaults:
@@ -164,13 +162,16 @@ jobs:
         include:
           - {goos: "linux", goarch: "386", runson: "ubuntu-latest"}
           - {goos: "linux", goarch: "amd64", runson: "ubuntu-latest"}
-#          - {goos: "windows", goarch: "386", runson: "ubuntu-latest"}
           - {goos: "windows", goarch: "amd64", runson: "ubuntu-latest"}
           - {goos: "darwin", goarch: "amd64", runson: "macos-latest"}
           - {goos: "darwin", goarch: "arm64", runson: "macos-latest"}
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v3
+      - name: Set up Go
+        uses: actions/setup-go@v3
+        with:
+          go-version: 1.19
       - name: build
         env:
           GOOS: ${{ matrix.goos }}
@@ -179,11 +180,11 @@ jobs:
         run: |
           VERSION=$((${{ github.run_number }} + 150))
           go build -ldflags "-X '$REPO_NAME/runner/version.Version=$VERSION' -X '$REPO_NAME/runner/pkg/log.CloudLog=true' -extldflags '-static'" -o dstack-runner-${{ matrix.goos }}-${{ matrix.goarch }}
-
       - uses: actions/upload-artifact@v2
         with:
           name: dstack-runner-${{ matrix.goos }}-${{ matrix.goarch }}
           path: runner/dstack-runner-${{ matrix.goos }}-${{ matrix.goarch }}
+
   runner-upload-master:
     defaults:
       run:
@@ -197,7 +198,6 @@ jobs:
         include:
           - {goos: "linux", goarch: "386", runson: "ubuntu-latest", platform: "x86", extension: ""}
           - {goos: "linux", goarch: "amd64", runson: "ubuntu-latest", platform: "amd64", extension: ""}
-#          - {goos: "windows", goarch: "386", runson: "ubuntu-latest", platform: "x86", extension: ".exe"}
           - {goos: "windows", goarch: "amd64", runson: "ubuntu-latest", platform: "amd64", extension: ".exe"}
           - {goos: "darwin", goarch: "amd64", runson: "macos-latest", platform: "amd64", extension: ""}
           - {goos: "darwin", goarch: "arm64", runson: "macos-latest", platform: "arm64", extension: ""}
@@ -216,3 +216,29 @@ jobs:
           VERSION=$((${{ github.run_number }} + 150))
           aws s3 cp dstack-runner-${{ matrix.goos }}-${{ matrix.goarch }} "s3://dstack-runner-downloads-stgn/$VERSION/binaries/dstack-runner-${{ matrix.goos }}-${{ matrix.platform }}${{ matrix.extension }}" --acl public-read
           aws s3 cp dstack-runner-${{ matrix.goos }}-${{ matrix.goarch }} "s3://dstack-runner-downloads-stgn/latest/binaries/dstack-runner-${{ matrix.goos }}-${{ matrix.platform }}${{ matrix.extension }}" --acl public-read
+
+  cli-integration-tests:
+    needs: [ runner-upload-master ]
+    runs-on: ${{ matrix.os }}
+    strategy:
+      matrix:
+        os: [ ubuntu-latest ]
+        python-version: [ 3.7, 3.8, 3.9, "3.10", 3.11 ]
+    steps:
+      - uses: actions/checkout@v2
+      - name: Set up Python ${{ matrix.python-version }}
+        uses: actions/setup-python@v2
+        with:
+          python-version: ${{ matrix.python-version }}
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -e .
+          pip install -r cli/requirements_dev.txt
+      - name: Prepare hub
+        run: |
+          mkdir -p cli/dstack/hub/statics
+          touch cli/dstack/hub/statics/index.html
+      - name: Run pytest
+        run: |
+          pytest cli/tests/integration/

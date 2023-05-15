@@ -1,9 +1,10 @@
 import { S3ResourceSelectorProps } from '@cloudscape-design/components/s3-resource-selector';
 
 export const getResourceSelectorI18n = (
+    prefix: string,
     params?: Partial<S3ResourceSelectorProps['i18nStrings']>,
 ): S3ResourceSelectorProps['i18nStrings'] => ({
-    inContextInputPlaceholder: 's3://my-bucket-name',
+    inContextInputPlaceholder: 'my-bucket-name',
     inContextSelectPlaceholder: '',
     inContextBrowseButton: 'Browse S3',
     inContextViewButton: 'View',
@@ -45,7 +46,7 @@ export const getResourceSelectorI18n = (
     // columnVersionID: 'Version ID',
     // columnVersionLastModified: 'Last modified',
     // columnVersionSize: 'Size',
-    validationPathMustBegin: 'The path must begin with s3://',
+    validationPathMustBegin: `The path must begin with ${prefix}`,
     validationBucketLowerCase: 'The bucket name must start with a lowercase character or number.',
     validationBucketMustNotContain: 'The bucket name must not contain uppercase characters.',
     validationBucketMustComplyDns: 'The bucket name must comply with DNS naming conventions',

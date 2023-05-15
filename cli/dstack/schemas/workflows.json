@@ -61,6 +61,30 @@
         }
       }
     },
+    "cache": {
+      "description": "The directories to be cached between workflow runs",
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "oneOf": [
+          {
+            "type": "string"
+          },
+          {
+            "type": "object",
+            "additionalProperties": false,
+            "properties": {
+              "path": {
+                "type": "string"
+              }
+            },
+            "required": [
+              "path"
+            ]
+          }
+        ]
+      }
+    },
     "python": {
       "description": "The major version of Python",
       "anyOf": [
@@ -144,6 +168,11 @@
       "type": "integer",
       "minimum": 1
     },
+    "home_dir": {
+      "description": "The absolute path to the home directory inside the container",
+      "type": "string",
+      "minLength": 1
+    },
     "working_dir": {
       "description": "The absolute or relative path to the working directory where to run the workflow",
       "type": "string",
@@ -212,6 +241,9 @@
         },
         "ssh": {
           "$ref": "#/definitions/ssh"
+        },
+        "cache": {
+          "$ref": "#/definitions/cache"
         }
       }
     },
@@ -256,6 +288,9 @@
         "registry_auth": {
           "$ref": "#/definitions/registry_auth"
         },
+        "home_dir": {
+          "$ref": "#/definitions/home_dir"
+        },
         "working_dir": {
           "$ref": "#/definitions/working_dir"
         },
@@ -264,6 +299,9 @@
         },
         "resources": {
           "$ref": "#/definitions/resources"
+        },
+        "cache": {
+          "$ref": "#/definitions/cache"
         }
       }
     },
@@ -299,6 +337,11 @@
         "setup": {
           "$ref": "#/definitions/setup"
         },
+        "ports": {
+          "description": "The number of ports to expose",
+          "type": "integer",
+          "minimum": 1
+        },
         "env": {
           "$ref": "#/definitions/env"
         },
@@ -316,6 +359,9 @@
         },
         "ssh": {
           "$ref": "#/definitions/ssh"
+        },
+        "cache": {
+          "$ref": "#/definitions/cache"
         }
       }
     },
@@ -356,6 +402,9 @@
         },
         "ssh": {
           "$ref": "#/definitions/ssh"
+        },
+        "cache": {
+          "$ref": "#/definitions/cache"
         }
       }
     },
@@ -396,6 +445,9 @@
         },
         "ssh": {
           "$ref": "#/definitions/ssh"
+        },
+        "cache": {
+          "$ref": "#/definitions/cache"
         }
       }
     }

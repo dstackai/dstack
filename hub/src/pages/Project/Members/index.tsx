@@ -1,16 +1,21 @@
 import React, { useState } from 'react';
+import { useFieldArray, useForm } from 'react-hook-form';
 import { useTranslation } from 'react-i18next';
-import { useForm, useFieldArray } from 'react-hook-form';
+
+import { Button, FormSelect, Header, Link, ListEmptyMessage, Pagination, Table } from 'components';
+
+import { useCollection } from 'hooks';
+import { ROUTES } from 'routes';
+
+import { UserAutosuggest } from './UsersAutosuggest';
+
+import { IProps, TFormValues, TProjectMemberWithIndex } from './types';
 //TODO move type to special file
 import { TRoleSelectOption } from 'pages/User/Form/types';
-import { Header, Button, FormSelect, Table, ListEmptyMessage, Link, Pagination } from 'components';
-import { ROUTES } from 'routes';
-import { useCollection } from 'hooks';
-import { IProps, TProjectMemberWithIndex, TFormValues } from './types';
-import { UserAutosuggest } from './UsersAutosuggest';
+
 import styles from './styles.module.scss';
 
-export const ProjectMembers: React.FC<IProps> = ({ initialValues, loading, onChange }) => {
+export const ProjectMembers: React.FC<IProps> = ({ initialValues, loading, onChange, readonly }) => {
     const { t } = useTranslation();
     const [selectedItems, setSelectedItems] = useState<TProjectMemberWithIndex[]>([]);
 
@@ -81,23 +86,25 @@ export const ProjectMembers: React.FC<IProps> = ({ initialValues, loading, onCha
                             control={control}
                             name={`members.${field.index}.project_role`}
                             options={roleSelectOptions}
-                            disabled={loading}
+                            disabled={loading || readonly}
                             expandToViewport
                             onChange={onChangeHandler}
                         />
                     </div>
 
                     <div className={styles.deleteMemberButtonWrapper}>
-                        <Button
-                            disabled={loading}
-                            formAction="none"
-                            onClick={() => {
-                                remove(field.index);
-                                onChangeHandler();
-                            }}
-                            variant="icon"
-                            iconName="remove"
-                        />
+                        {!readonly && (
+                            <Button
+                                disabled={loading}
+                                formAction="none"
+                                onClick={() => {
+                                    remove(field.index);
+                                    onChangeHandler();
+                                }}
+                                variant="icon"
+                                iconName="remove"
+                            />
+                        )}
                     </div>
                 </div>
             ),
@@ -119,20 +126,24 @@ export const ProjectMembers: React.FC<IProps> = ({ initialValues, loading, onCha
                         variant="h2"
                         counter={`(${items?.length})`}
                         actions={
-                            <Button formAction="none" onClick={deleteSelectedMembers} disabled={!selectedItems.length}>
-                                {t('common.delete')}
-                            </Button>
+                            readonly ? undefined : (
+                                <Button formAction="none" onClick={deleteSelectedMembers} disabled={!selectedItems.length}>
+                                    {t('common.delete')}
+                                </Button>
+                            )
                         }
                     >
                         {t('projects.edit.members.section_title')}
                     </Header>
                 }
                 filter={
-                    <UserAutosuggest
-                        disabled={loading}
-                        onSelect={({ detail }) => addMember(detail.value)}
-                        optionsFilter={(options) => options.filter((o) => !fields.find((f) => f.user_name === o.value))}
-                    />
+                    readonly ? undefined : (
+                        <UserAutosuggest
+                            disabled={loading}
+                            onSelect={({ detail }) => addMember(detail.value)}
+                            optionsFilter={(options) => options.filter((o) => !fields.find((f) => f.user_name === o.value))}
+                        />
+                    )
                 }
                 pagination={<Pagination {...paginationProps} />}
             />

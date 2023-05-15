@@ -10,6 +10,11 @@ import (
 	"path"
 	"path/filepath"
 	"strings"
+	"time"
+
+	"github.com/dstackai/dstack/runner/internal/backend/base"
+	"github.com/dstackai/dstack/runner/internal/common"
+	"go.uber.org/atomic"
 
 	"cloud.google.com/go/storage"
 	"github.com/dstackai/dstack/runner/internal/gerrors"
@@ -26,9 +31,17 @@ type GCPStorage struct {
 	bucketName string
 }
 
+type FileInfo struct {
+	Size     int64
+	Modified time.Time
+}
+
 func NewGCPStorage(project, bucketName string) (*GCPStorage, error) {
 	ctx := context.TODO()
-	client, _ := storage.NewClient(ctx)
+	client, err := storage.NewClient(ctx)
+	if err != nil {
+		return nil, gerrors.Wrap(err)
+	}
 	bucket := client.Bucket(bucketName)
 	if bucket == nil {
 		return nil, gerrors.New("Cannot access bucket")
@@ -118,22 +131,103 @@ func (gstorage *GCPStorage) GetMetadata(ctx context.Context, key, tag string) (s
 }
 
 func (gstorage *GCPStorage) UploadDir(ctx context.Context, src, dst string) error {
-	// TODO upload in parallel
+	semaphore := make(base.Semaphore, base.TransferThreads)
+	errorFound := atomic.NewBool(false)
 	for file := range walkFiles(ctx, src) {
 		key := path.Join(dst, strings.TrimPrefix(file, src))
-		gstorage.uploadFile(ctx, file, key)
+		semaphore.Acquire(1)
+		go func(file, key string) {
+			defer semaphore.Release(1)
+			if err := gstorage.uploadFile(ctx, file, key); err != nil {
+				errorFound.Store(true)
+				log.Error(ctx, "Failed to upload file", "Key", key, "err", err)
+			}
+		}(file, key)
+	}
+	semaphore.Acquire(base.TransferThreads) // gather
+	if errorFound.Load() {
+		return errors.New("upload: error occurred")
 	}
 	return nil
 }
 
 func (gstorage *GCPStorage) DownloadDir(ctx context.Context, src, dst string) error {
-	files, err := gstorage.ListFile(ctx, src)
+	semaphore := make(base.Semaphore, base.TransferThreads)
+	errorFound := atomic.NewBool(false)
+	query := &storage.Query{Prefix: src}
+	it := gstorage.bucket.Objects(ctx, query)
+	for {
+		attrs, err := it.Next()
+		if err == iterator.Done {
+			break
+		}
+		if err != nil {
+			return gerrors.Wrap(err)
+		}
+		dstFilepath := path.Join(dst, strings.TrimPrefix(attrs.Name, src))
+		semaphore.Acquire(1)
+		go func() {
+			defer semaphore.Release(1)
+			if err := gstorage.downloadFile(ctx, attrs.Name, dstFilepath); err != nil {
+				errorFound.Store(true)
+				log.Error(ctx, "Failed to download file", "Key", attrs.Name, "err", err)
+			}
+			if err := os.Chtimes(dstFilepath, attrs.Updated, attrs.Updated); err != nil {
+				errorFound.Store(true)
+				log.Error(ctx, "Failed to chtimes", "Path", dstFilepath, "err", err)
+			}
+		}()
+	}
+	semaphore.Acquire(base.TransferThreads)
+	if errorFound.Load() {
+		return errors.New("download: error occurred")
+	}
+	return nil
+}
+
+func (gstorage *GCPStorage) SyncDirUpload(ctx context.Context, srcDir, dstPrefix string) error {
+	srcDir = common.AddTrailingSlash(srcDir)
+	dstPrefix = common.AddTrailingSlash(dstPrefix)
+
+	dstObjects := make(chan base.ObjectInfo)
+	go func() {
+		defer close(dstObjects)
+		query := &storage.Query{Prefix: dstPrefix}
+		it := gstorage.bucket.Objects(ctx, query)
+		for {
+			attrs, err := it.Next()
+			if err == iterator.Done {
+				break
+			}
+			if err != nil {
+				log.Error(ctx, "Iterating objects", "prefix", dstPrefix, "err", err)
+				return
+			}
+			dstObjects <- base.ObjectInfo{
+				Key: strings.TrimPrefix(attrs.Name, dstPrefix),
+				FileInfo: base.FileInfo{
+					Size:     attrs.Size,
+					Modified: attrs.Updated,
+				},
+			}
+		}
+	}()
+	err := base.SyncDirUpload(
+		ctx, srcDir, dstObjects,
+		func(ctx context.Context, key string, _ base.FileInfo) error {
+			/* delete object */
+			key = path.Join(dstPrefix, key)
+			return gstorage.DeleteFile(ctx, key)
+		},
+		func(ctx context.Context, key string, _ base.FileInfo) error {
+			/* upload object */
+			file := path.Join(srcDir, key)
+			key = path.Join(dstPrefix, key)
+			return gstorage.uploadFile(ctx, file, key)
+		},
+	)
 	if err != nil {
 		return gerrors.Wrap(err)
-	}
-	for _, file := range files {
-		dstFilepath := path.Join(dst, strings.TrimPrefix(file, src))
-		gstorage.downloadFile(ctx, file, dstFilepath)
 	}
 	return nil
 }
@@ -160,6 +254,13 @@ func (gstorage *GCPStorage) uploadFile(ctx context.Context, src, dst string) err
 	f, err := os.Open(src)
 	if err != nil {
 		return gerrors.Wrap(err)
+	}
+	fileInfo, err := f.Stat()
+	if err != nil {
+		return gerrors.Wrap(err)
+	}
+	if fileInfo.IsDir() {
+		return nil
 	}
 	obj := gstorage.bucket.Object(dst)
 	writer := obj.NewWriter(ctx)

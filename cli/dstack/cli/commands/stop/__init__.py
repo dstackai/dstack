@@ -2,11 +2,9 @@ from argparse import Namespace
 
 from rich.prompt import Confirm
 
-from dstack.api.backend import list_backends
-from dstack.api.repo import load_repo_data
 from dstack.cli.commands import BasicCommand
-from dstack.cli.common import console
-from dstack.core.error import check_config, check_git
+from dstack.cli.common import add_project_argument, check_init, console
+from dstack.cli.config import get_hub_client
 
 
 def _verb(abort: bool):
@@ -24,8 +22,9 @@ class StopCommand(BasicCommand):
         super(StopCommand, self).__init__(parser)
 
     def register(self):
+        add_project_argument(self._parser)
         self._parser.add_argument(
-            "run_name", metavar="RUN", type=str, nargs="?", help="A name of a run"
+            "run_name", metavar="RUN", type=str, nargs="?", help="The name of the run"
         )
         self._parser.add_argument(
             "-a",
@@ -45,8 +44,7 @@ class StopCommand(BasicCommand):
             "-y", "--yes", help="Don't ask for confirmation", action="store_true"
         )
 
-    @check_config
-    @check_git
+    @check_init
     def _command(self, args: Namespace):
         if not args.run_name and not args.all:
             console.print("Specify a run name or use --all to stop all workflows")
@@ -57,15 +55,12 @@ class StopCommand(BasicCommand):
                 args.yes or Confirm.ask(f"[red]{_verb(args.abort)} the run '{args.run_name}'?[/]")
             )
         ) or (args.all and (args.yes or Confirm.ask(f"[red]{_verb(args.abort)} all runs?[/]"))):
-            repo_data = load_repo_data()
-            found_run = False
-            for backend in list_backends():
-                job_heads = backend.list_job_heads(repo_data, args.run_name)
-                found_run = len(job_heads) > 0
-                for job_head in job_heads:
-                    if job_head.status.is_unfinished():
-                        backend.stop_job(repo_data, job_head.job_id, args.abort)
-            if args.run_name and not found_run:
+            hub_client = get_hub_client(project_name=args.project)
+            job_heads = hub_client.list_job_heads(args.run_name)
+            if len(job_heads) == 0:
                 console.print(f"Cannot find the run '{args.run_name}'")
                 exit(1)
+            for job_head in job_heads:
+                if job_head.status.is_unfinished():
+                    hub_client.stop_job(job_head.job_id, args.abort)
             console.print(f"[grey58]OK[/]")

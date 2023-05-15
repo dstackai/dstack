@@ -29,6 +29,10 @@ google-cloud-logging
 aiosqlite
 packaging
 alembic>=1.10.2
+apscheduler
+typing-extensions
+file-read-backwards
+psutil
 azure-identity>=1.12.0
 azure-keyvault-secrets>=4.6.0
 azure-storage-blob>=12.15.0
@@ -42,4 +46,4 @@ azure-mgmt-keyvault>=10.1.0
 azure-mgmt-loganalytics
 azure-mgmt-msi
 azure-mgmt-monitor
-azure-graphrbac	
+azure-graphrbac

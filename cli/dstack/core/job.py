@@ -1,13 +1,22 @@
 from abc import abstractmethod
 from enum import Enum
-from typing import Any, Dict, List, Optional
+from typing import Any, Dict, List, Optional, Union
 
-from pydantic import BaseModel
+from pydantic import BaseModel, Field, root_validator
 
 from dstack.core.app import AppSpec
 from dstack.core.artifact import ArtifactSpec
+from dstack.core.cache import CacheSpec
 from dstack.core.dependents import DepSpec
-from dstack.core.repo import RepoAddress, RepoData
+from dstack.core.repo import (
+    LocalRepo,
+    LocalRepoData,
+    RemoteRepo,
+    RemoteRepoData,
+    Repo,
+    RepoData,
+    RepoRef,
+)
 from dstack.utils.common import _quoted, format_list
 
 
@@ -84,7 +93,8 @@ class JobRefId(JobRef):
         return f'JobRefId(job_id="{self.job_id}")'
 
 
-class JobStatus(Enum):
+class JobStatus(str, Enum):
+    PENDING = "pending"
     SUBMITTED = "submitted"
     DOWNLOADING = "downloading"
     RUNNING = "running"
@@ -103,47 +113,39 @@ class JobStatus(Enum):
         return not self.is_finished()
 
 
+class JobErrorCode(str, Enum):
+    # Set by CLI
+    NO_INSTANCE_MATCHING_REQUIREMENTS = "no_instance_matching_requirements"
+    FAILED_TO_START_DUE_TO_NO_CAPACITY = "failed_to_start_due_to_no_capacity"
+    INTERRUPTED_BY_NO_CAPACITY = "interrupted_by_no_capacity"
+    # Set by runner
+    CONTAINER_EXITED_WITH_ERROR = "container_exited_with_error"
+
+    def pretty_repr(self) -> str:
+        return " ".join(self.value.split("_")).capitalize()
+
+
 class JobHead(JobRef):
     job_id: str
-    repo_address: RepoAddress
+    repo_ref: RepoRef
+    hub_user_name: str
     run_name: str
     workflow_name: Optional[str]
     provider_name: str
-    local_repo_user_name: Optional[str]
     status: JobStatus
+    error_code: Optional[JobErrorCode]
+    container_exit_code: Optional[int]
     submitted_at: int
     artifact_paths: Optional[List[str]]
     tag_name: Optional[str]
     app_names: Optional[List[str]]
+    instance_type: Optional[str]
 
     def get_id(self) -> Optional[str]:
         return self.job_id
 
     def set_id(self, job_id: Optional[str]):
         self.job_id = job_id
-
-    def __str__(self) -> str:
-        artifact_paths = (
-            ("[" + ", ".join(map(lambda a: _quoted(str(a)), self.artifact_paths)) + "]")
-            if self.artifact_paths
-            else None
-        )
-        app_names = (
-            ("[" + ", ".join(map(lambda a: _quoted(a), self.app_names)) + "]")
-            if self.app_names
-            else None
-        )
-        return (
-            f'JobHead(job_id="{self.job_id}", repo_address={self.repo_address}, '
-            f'run_name="{self.run_name}", workflow_name={_quoted(self.workflow_name)}, '
-            f'provider_name="{self.provider_name}", '
-            f"local_repo_user_name={_quoted(self.local_repo_user_name)}, "
-            f"status=JobStatus.{self.status.name}, "
-            f"submitted_at={self.submitted_at}, "
-            f"artifact_paths={artifact_paths}, "
-            f"tag_name={_quoted(self.tag_name)}, "
-            f"app_names={app_names})"
-        )
 
 
 class RegistryAuth(BaseModel):
@@ -167,21 +169,27 @@ def check_dict(element: Any, field: str):
 
 class Job(JobHead):
     job_id: Optional[str]
-    repo_data: RepoData
+    repo_data: Union[RepoData, RemoteRepoData, LocalRepoData] = Field(
+        ..., discriminator="repo_type"
+    )
+    repo_code_filename: Optional[str] = None
     run_name: str
     workflow_name: Optional[str]
     provider_name: str
-    local_repo_user_name: Optional[str]
-    local_repo_user_email: Optional[str]
     status: JobStatus
+    error_code: Optional[JobErrorCode]
+    container_exit_code: Optional[int]
     submitted_at: int
+    submission_num: int = 1
     image_name: str
     registry_auth: Optional[RegistryAuth]
     commands: Optional[List[str]]
     entrypoint: Optional[List[str]]
     env: Optional[Dict[str, str]]
+    home_dir: Optional[str]
     working_dir: Optional[str]
     artifact_specs: Optional[List[ArtifactSpec]]
+    cache_specs: List[CacheSpec]
     port_count: Optional[int]
     ports: Optional[List[int]]
     host_name: Optional[str]
@@ -194,66 +202,20 @@ class Job(JobHead):
     tag_name: Optional[str]
     ssh_key_pub: Optional[str]
 
-    def __init__(self, **data: Any):
+    @root_validator(pre=True)
+    def preprocess_data(cls, data):
         # TODO Ugly style
-        if type(data) == dict:
-            if "repo_address" in data:
-                del data["repo_address"]
-            if "artifact_paths" in data:
-                del data["artifact_paths"]
-            if "app_names" in data:
-                del data["app_names"]
-        super().__init__(
-            repo_address=data.get("repo_data"),
-            artifact_paths=[check_dict(a, "artifact_path") for a in data.get("artifact_specs")]
+        data["artifact_paths"] = (
+            [check_dict(a, "artifact_path") for a in data.get("artifact_specs")]
             if data.get("artifact_specs")
-            else None,
-            app_names=[check_dict(a, "app_name") for a in data.get("app_specs")]
+            else None
+        )
+        data["app_names"] = (
+            [check_dict(a, "app_name") for a in data.get("app_specs")]
             if data.get("app_specs")
-            else None,
-            **data,
+            else None
         )
-
-    def get_id(self) -> Optional[str]:
-        return self.job_id
-
-    def set_id(self, job_id: Optional[str]):
-        self.job_id = job_id
-
-    def __str__(self) -> str:
-        commands = format_list(self.commands, formatter=lambda a: _quoted(str(a)))
-        entrypoint = format_list(self.entrypoint, formatter=lambda a: _quoted(str(a)))
-        artifact_specs = format_list(self.artifact_specs)
-        app_specs = format_list(self.app_specs)
-        dep_specs = format_list(self.dep_specs)
-        ssk_key_pub = f"...{self.ssh_key_pub[-16:]}" if self.ssh_key_pub else None
-        return (
-            f'Job(job_id="{self.job_id}", repo_data={self.repo_data}, '
-            f'run_name="{self.run_name}", workflow_name={_quoted(self.workflow_name)}, '
-            f'provider_name="{self.provider_name}", '
-            f"local_repo_user_name={_quoted(self.local_repo_user_name)}, "
-            f"local_repo_user_email={_quoted(self.local_repo_user_email)}, "
-            f"status=JobStatus.{self.status.name}, "
-            f"submitted_at={self.submitted_at}, "
-            f'image_name="{self.image_name}", '
-            f'registry_auth="{self.registry_auth}", '
-            f"commands={commands}, "
-            f"entrypoint={entrypoint}, "
-            f"env={self.env}, "
-            f"working_dir={_quoted(self.working_dir)}, "
-            f"port_count={self.port_count}, "
-            f"ports={self.ports}, "
-            f"host_name={_quoted(self.host_name)}, "
-            f"artifact_specs={artifact_specs}, "
-            f"requirements={self.requirements}, "
-            f"dep_specs={dep_specs}, "
-            f"master_job={self.master_job}, "
-            f"app_specs={app_specs}, "
-            f"runner_id={_quoted(self.runner_id)}, "
-            f"request_id={_quoted(self.request_id)}, "
-            f"tag_name={_quoted(self.tag_name)}"
-            f"ssh_key_pub={_quoted(ssk_key_pub)})"
-        )
+        return data
 
     def serialize(self) -> dict:
         deps = []
@@ -261,10 +223,8 @@ class Job(JobHead):
             for dep in self.dep_specs:
                 deps.append(
                     {
-                        "repo_host_name": dep.repo_address.repo_host_name,
-                        "repo_port": dep.repo_address.repo_port or 0,
-                        "repo_user_name": dep.repo_address.repo_user_name,
-                        "repo_name": dep.repo_address.repo_name,
+                        "repo_id": dep.repo_ref.repo_id,
+                        "hub_user_name": self.hub_user_name,
                         "run_name": dep.run_name,
                         "mount": dep.mount,
                     }
@@ -277,27 +237,26 @@ class Job(JobHead):
                 )
         job_data = {
             "job_id": self.job_id,
-            "repo_host_name": self.repo_address.repo_host_name,
-            "repo_port": self.repo_address.repo_port or 0,
-            "repo_user_name": self.repo_data.repo_user_name,
-            "repo_name": self.repo_data.repo_name,
-            "repo_branch": self.repo_data.repo_branch,
-            "repo_hash": self.repo_data.repo_hash,
-            "repo_diff": self.repo_data.repo_diff or "",
+            "repo_id": self.repo.repo_id,
+            "hub_user_name": self.hub_user_name,
+            "repo_type": self.repo.repo_data.repo_type,
             "run_name": self.run_name,
             "workflow_name": self.workflow_name or "",
             "provider_name": self.provider_name,
-            "local_repo_user_name": self.local_repo_user_name or "",
-            "local_repo_user_email": self.local_repo_user_email or "",
             "status": self.status.value,
+            "error_code": self.error_code.value if self.error_code is not None else "",
+            "container_exit_code": self.container_exit_code or "",
             "submitted_at": self.submitted_at,
+            "submission_num": self.submission_num,
             "image_name": self.image_name,
             "registry_auth": self.registry_auth.serialize() if self.registry_auth else {},
             "commands": self.commands or [],
             "entrypoint": self.entrypoint,
             "env": self.env or {},
+            "home_dir": self.home_dir or "",
             "working_dir": self.working_dir or "",
             "artifacts": artifacts,
+            "cache": [item.dict() for item in self.cache_specs],
             "port_count": self.port_count if self.port_count else 0,
             "ports": [str(port) for port in self.ports] if self.ports else [],
             "host_name": self.host_name or "",
@@ -319,7 +278,16 @@ class Job(JobHead):
             "request_id": self.request_id or "",
             "tag_name": self.tag_name or "",
             "ssh_key_pub": self.ssh_key_pub or "",
+            "repo_code_filename": self.repo_code_filename,
+            "instance_type": self.instance_type,
         }
+        if isinstance(self.repo_data, RemoteRepoData):
+            job_data["repo_host_name"] = self.repo_data.repo_host_name
+            job_data["repo_port"] = self.repo_data.repo_port or 0
+            job_data["repo_user_name"] = self.repo_data.repo_user_name
+            job_data["repo_name"] = self.repo_data.repo_name
+            job_data["repo_branch"] = self.repo_data.repo_branch or ""
+            job_data["repo_hash"] = self.repo_data.repo_hash or ""
         return job_data
 
     @staticmethod
@@ -331,7 +299,7 @@ class Job(JobHead):
                 memory_mib=_requirements.get("memory_mib") or None,
                 gpus=GpusRequirements(
                     count=_requirements["gpus"].get("count") or None,
-                    memory=_requirements["gpus"].get("memory") or None,
+                    memory_mib=_requirements["gpus"].get("memory") or None,
                     name=_requirements["gpus"].get("name") or None,
                 )
                 if _requirements.get("gpus")
@@ -363,12 +331,7 @@ class Job(JobHead):
         if job_data.get("deps"):
             for dep in job_data["deps"]:
                 dep_spec = DepSpec(
-                    repo_address=RepoAddress(
-                        repo_host_name=dep["repo_host_name"],
-                        repo_port=dep.get("repo_port") or None,
-                        repo_user_name=dep["repo_user_name"],
-                        repo_name=dep["repo_name"],
-                    ),
+                    repo_ref=RepoRef(repo_id=dep["repo_id"]),
                     run_name=dep["run_name"],
                     mount=dep.get("mount") is True,
                 )
@@ -397,31 +360,46 @@ class Job(JobHead):
                 for a in (job_data.get("apps") or [])
             ]
         ) or None
-        job = Job(
-            job_id=job_data["job_id"],
-            repo_data=RepoData(
+        error_code = job_data.get("error_code")
+        container_exit_code = job_data.get("container_exit_code")
+
+        if job_data["repo_type"] == "remote":
+            repo_data = RemoteRepoData(
                 repo_host_name=job_data["repo_host_name"],
                 repo_port=job_data.get("repo_port") or None,
                 repo_user_name=job_data["repo_user_name"],
                 repo_name=job_data["repo_name"],
-                repo_branch=job_data["repo_branch"],
-                repo_hash=job_data["repo_hash"],
-                repo_diff=job_data["repo_diff"] or None,
-            ),
+                repo_branch=job_data["repo_branch"] or None,
+                repo_hash=job_data["repo_hash"] or None,
+            )
+        elif job_data["repo_type"] == "local":
+            repo_data = LocalRepoData(repo_dir=job_data.get("repo_dir", ""))
+        else:
+            raise TypeError(f"Unknown repo_type: {job_data['repo_type']}")
+
+        job = Job(
+            job_id=job_data["job_id"],
+            repo_ref=RepoRef(repo_id=job_data["repo_id"]),
+            hub_user_name=job_data["hub_user_name"],
+            repo_data=repo_data,
+            repo_code_filename=job_data.get("repo_code_filename"),
             run_name=job_data["run_name"],
             workflow_name=job_data.get("workflow_name") or None,
             provider_name=job_data["provider_name"],
-            local_repo_user_name=job_data.get("local_repo_user_name"),
-            local_repo_user_email=job_data.get("local_repo_user_email") or None,
             status=JobStatus(job_data["status"]),
+            error_code=JobErrorCode(error_code) if error_code else None,
+            container_exit_code=int(container_exit_code) if container_exit_code else None,
             submitted_at=job_data["submitted_at"],
+            submission_num=job_data.get("submission_num") or 1,
             image_name=job_data["image_name"],
             registry_auth=RegistryAuth(**job_data.get("registry_auth", {})),
             commands=job_data.get("commands") or None,
             entrypoint=job_data.get("entrypoint") or None,
             env=job_data["env"] or None,
+            home_dir=job_data.get("home_dir") or None,
             working_dir=job_data.get("working_dir") or None,
             artifact_specs=artifact_specs,
+            cache_specs=[CacheSpec(**item) for item in job_data.get("cache", [])],
             port_count=job_data.get("port_count") or None,
             ports=job_data.get("ports") or None,
             host_name=job_data.get("host_name") or None,
@@ -433,12 +411,21 @@ class Job(JobHead):
             request_id=job_data.get("request_id") or None,
             tag_name=job_data.get("tag_name") or None,
             ssh_key_pub=job_data.get("ssh_key_pub") or None,
+            instance_type=job_data.get("instance_type") or None,
         )
         return job
+
+    @property
+    def repo(self) -> Repo:
+        if isinstance(self.repo_data, RemoteRepoData):
+            return RemoteRepo(repo_ref=self.repo_ref, repo_data=self.repo_data)
+        elif isinstance(self.repo_data, LocalRepoData):
+            return LocalRepo(repo_ref=self.repo_ref, repo_data=self.repo_data)
 
 
 class JobSpec(JobRef):
     image_name: str
+    job_id: Optional[str] = None
     registry_auth: Optional[RegistryAuth] = None
     commands: Optional[List[str]] = None
     entrypoint: Optional[List[str]] = None

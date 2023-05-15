@@ -1,24 +1,30 @@
 import React, { useMemo, useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import { useNavigate } from 'react-router-dom';
+
 import {
     Button,
-    Table,
+    ConfirmationDialog,
     Header,
+    ListEmptyMessage,
+    NavigateLink,
     Pagination,
     SpaceBetween,
+    Table,
     TextFilter,
-    NavigateLink,
-    ListEmptyMessage,
-    ConfirmationDialog,
 } from 'components';
-import { useDeleteUsersMutation, useGetUserListQuery } from 'services/user';
-import { useBreadcrumbs, useCollection, useNotifications } from 'hooks';
+
+import { useAppSelector, useBreadcrumbs, useCollection, useNotifications } from 'hooks';
 import { ROUTES } from 'routes';
-import { useTranslation } from 'react-i18next';
+import { useDeleteUsersMutation, useGetUserListQuery } from 'services/user';
+
+import { selectUserData } from 'App/slice';
 
 export const UserList: React.FC = () => {
     const { t } = useTranslation();
     const [showDeleteConfirm, setShowConfirmDelete] = useState(false);
+    const userData = useAppSelector(selectUserData);
+    const userGlobalRole = userData?.global_role ?? '';
     const { isLoading, data } = useGetUserListQuery();
     const [deleteUsers, { isLoading: isDeleting }] = useDeleteUsersMutation();
     const navigate = useNavigate();
@@ -65,7 +71,7 @@ export const UserList: React.FC = () => {
     const renderNoMatchMessage = (onClearFilter: () => void): React.ReactNode => {
         return (
             <ListEmptyMessage title={t('users.nomatch_message_title')} message={t('users.nomatch_message_text')}>
-                <Button onClick={onClearFilter}>{t('users.nomatch_message_button_label')}</Button>
+                <Button onClick={onClearFilter}>{t('common.clearFilter')}</Button>
             </ListEmptyMessage>
         );
     };
@@ -106,11 +112,11 @@ export const UserList: React.FC = () => {
     };
 
     const isDisabledDelete = useMemo(() => {
-        return isDeleting || collectionProps.selectedItems?.length === 0;
+        return isDeleting || collectionProps.selectedItems?.length === 0 || userGlobalRole !== 'admin';
     }, [collectionProps.selectedItems]);
 
     const isDisabledEdit = useMemo(() => {
-        return isDeleting || collectionProps.selectedItems?.length !== 1;
+        return isDeleting || collectionProps.selectedItems?.length !== 1 || userGlobalRole !== 'admin';
     }, [collectionProps.selectedItems]);
 
     const renderCounter = () => {
@@ -149,7 +155,7 @@ export const UserList: React.FC = () => {
                                     {t('common.delete')}
                                 </Button>
 
-                                <Button formAction="none" onClick={addUserHandler}>
+                                <Button formAction="none" onClick={addUserHandler} disabled={userGlobalRole !== 'admin'}>
                                     {t('common.add')}
                                 </Button>
                             </SpaceBetween>

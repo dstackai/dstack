@@ -2,8 +2,9 @@ import React from 'react';
 import { Controller, FieldValues } from 'react-hook-form';
 import FormField from '@cloudscape-design/components/form-field';
 import SelectCSD from '@cloudscape-design/components/select';
-import { FormSelectProps } from './types';
 import { SelectProps } from '@cloudscape-design/components/select/interfaces';
+
+import { FormSelectProps } from './types';
 
 export const FormSelect = <T extends FieldValues>({
     name,

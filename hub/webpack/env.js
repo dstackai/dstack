@@ -15,9 +15,8 @@ const buildDir = join(__dirname, '../build');
 const publicDir = join(__dirname, '../public');
 const apiUrl = process.env.API_URL || apiURLs;
 const publicUrl = process.env.PUBLIC_URL || publicURLs;
-const enableMockingApi = process.env.ENABLE_MOCKING_API === 'true';
 
-const title = "dstack: Git-based CLI to run ML workflows on cloud";
+const title = "dstack Hub";
 const description = "dstack is an open-source tool that allows you to define ML workflows as code and run them on cloud. " +
     "dstack takes care of dependencies, infrastructure, and data management.";
 
@@ -35,5 +34,4 @@ module.exports = {
     publicUrl,
     title,
     description,
-    enableMockingApi,
 }

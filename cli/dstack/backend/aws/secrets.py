@@ -1,12 +1,11 @@
 import json
-from typing import List, Optional
+from typing import Optional
 
 from botocore.client import BaseClient
 
 from dstack.backend.aws import runners
 from dstack.backend.aws.utils import retry_operation_on_service_errors
 from dstack.backend.base.secrets import SecretsManager
-from dstack.core.repo import RepoAddress
 from dstack.core.secret import Secret
 
 
@@ -23,58 +22,58 @@ class AWSSecretsManager(SecretsManager):
         self.sts_client = sts_client
         self.bucket_name = bucket_name
 
-    def get_secret(self, repo_address: RepoAddress, secret_name: str) -> Optional[Secret]:
+    def get_secret(self, repo_id: str, secret_name: str) -> Optional[Secret]:
         value = _get_secret_value(
             secretsmanager_client=self.secretsmanager_client,
-            secret_key=_get_secret_key(self.bucket_name, repo_address, secret_name),
+            secret_key=_get_secret_key(self.bucket_name, repo_id, secret_name),
         )
         if value is None:
             return None
         return Secret(secret_name=secret_name, secret_value=value)
 
-    def add_secret(self, repo_address: RepoAddress, secret: Secret):
+    def add_secret(self, repo_id: str, secret: Secret):
         _add_secret(
             secretsmanager_client=self.secretsmanager_client,
             sts_client=self.sts_client,
             iam_client=self.iam_client,
             bucket_name=self.bucket_name,
-            secret_key=_get_secret_key(self.bucket_name, repo_address, secret.secret_name),
+            secret_key=_get_secret_key(self.bucket_name, repo_id, secret.secret_name),
             secret_value=secret.secret_value,
         )
 
-    def update_secret(self, repo_address: RepoAddress, secret: Secret):
+    def update_secret(self, repo_id: str, secret: Secret):
         _update_secret(
             secretsmanager_client=self.secretsmanager_client,
-            secret_key=_get_secret_key(self.bucket_name, repo_address, secret.secret_name),
+            secret_key=_get_secret_key(self.bucket_name, repo_id, secret.secret_name),
             secret_value=secret.secret_value,
         )
 
-    def delete_secret(self, repo_address: RepoAddress, secret_name: str):
+    def delete_secret(self, repo_id: str, secret_name: str):
         _delete_secret(
             secretsmanager_client=self.secretsmanager_client,
-            secret_key=_get_secret_key(self.bucket_name, repo_address, secret_name),
+            secret_key=_get_secret_key(self.bucket_name, repo_id, secret_name),
         )
 
-    def get_credentials(self, repo_address: RepoAddress) -> Optional[str]:
+    def get_credentials(self, repo_id: str) -> Optional[str]:
         return _get_secret_value(
             secretsmanager_client=self.secretsmanager_client,
-            secret_key=_get_credentials_key(self.bucket_name, repo_address),
+            secret_key=_get_credentials_key(self.bucket_name, repo_id),
         )
 
-    def add_credentials(self, repo_address: RepoAddress, data: str):
+    def add_credentials(self, repo_id: str, data: str):
         _add_secret(
             secretsmanager_client=self.secretsmanager_client,
             sts_client=self.sts_client,
             iam_client=self.iam_client,
             bucket_name=self.bucket_name,
-            secret_key=_get_credentials_key(self.bucket_name, repo_address),
+            secret_key=_get_credentials_key(self.bucket_name, repo_id),
             secret_value=data,
         )
 
-    def update_credentials(self, repo_address: RepoAddress, data: str):
+    def update_credentials(self, repo_id: str, data: str):
         _update_secret(
             secretsmanager_client=self.secretsmanager_client,
-            secret_key=_get_credentials_key(self.bucket_name, repo_address),
+            secret_key=_get_credentials_key(self.bucket_name, repo_id),
             secret_value=data,
         )
 
@@ -163,9 +162,9 @@ def _delete_secret(
     )
 
 
-def _get_secret_key(bucket_name: str, repo_address: RepoAddress, secret_name: str) -> str:
-    return f"/dstack/{bucket_name}/secrets/{repo_address.path()}/{secret_name}"
+def _get_secret_key(bucket_name: str, repo_id: str, secret_name: str) -> str:
+    return f"/dstack/{bucket_name}/secrets/{repo_id}/{secret_name}"
 
 
-def _get_credentials_key(bucket_name: str, repo_address: RepoAddress) -> str:
-    return f"/dstack/{bucket_name}/credentials/{repo_address.path()}"
+def _get_credentials_key(bucket_name: str, repo_id: str) -> str:
+    return f"/dstack/{bucket_name}/credentials/{repo_id}"

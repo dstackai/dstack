@@ -3,6 +3,8 @@ import shutil
 from pathlib import Path
 from typing import Callable, Dict, List, Optional
 
+import yaml
+
 from dstack.backend.base.storage import Storage
 from dstack.core.storage import StorageFile
 from dstack.utils.common import removeprefix
@@ -18,6 +20,12 @@ class LocalStorage(Storage):
             Key=key,
             Body=content,
         )
+        if metadata is not None:
+            _put_object(
+                Root=self.root_path,
+                Key=_metadata_key(key),
+                Body=yaml.dump(metadata),
+            )
 
     def get_object(self, key: str) -> Optional[str]:
         try:
@@ -40,14 +48,36 @@ class LocalStorage(Storage):
             Prefix=keys_prefix,
         )
 
-    def list_files(self, dirpath: str) -> List[StorageFile]:
-        full_dirpath = os.path.join(self.root_path, dirpath)
+    def list_files(self, prefix: str, recursive: bool) -> List[StorageFile]:
+        prefix_path = Path(prefix)
+        if prefix.endswith("/"):
+            dirpath = prefix
+        else:
+            dirpath = prefix_path.parent
+        full_dirpath = Path(self.root_path, dirpath)
+        if not full_dirpath.exists():
+            return []
         files = []
-        for dirpath, dirnames, filenames in os.walk(full_dirpath):
-            for filename in filenames:
-                full_filepath = os.path.join(dirpath, filename)
+        if recursive:
+            for dirpath, dirnames, filenames in os.walk(full_dirpath):
+                for filename in filenames:
+                    full_filepath = Path(dirpath, filename)
+                    filesize = os.stat(full_filepath, follow_symlinks=False).st_size
+                    filepath = str(full_filepath.relative_to(self.root_path))
+                    files.append(
+                        StorageFile(
+                            filepath=filepath,
+                            filesize_in_bytes=filesize,
+                        )
+                    )
+        else:
+            for entry in os.listdir(full_dirpath):
+                full_filepath = Path(full_dirpath, entry)
                 filesize = os.stat(full_filepath, follow_symlinks=False).st_size
-                filepath = removeprefix(full_filepath, full_dirpath)
+                filepath = str(full_filepath.relative_to(self.root_path))
+                if full_filepath.is_dir():
+                    filepath = os.path.join(filepath, "")
+                    filesize = None
                 files.append(
                     StorageFile(
                         filepath=filepath,
@@ -66,6 +96,17 @@ class LocalStorage(Storage):
         Path(full_dest_path).parent.mkdir(parents=True, exist_ok=True)
         shutil.copy2(source_path, full_dest_path)
         callback(os.path.getsize(source_path))
+
+    def delete_prefix(self, keys_prefix: str):
+        if keys_prefix.endswith("/"):
+            shutil.rmtree(Path(self.root_path) / keys_prefix, ignore_errors=True)
+        else:
+            prefix_path = Path(self.root_path) / keys_prefix
+            for file in prefix_path.parent.glob(f"{prefix_path.name}*"):
+                if file.is_dir():
+                    shutil.rmtree(file, ignore_errors=True)
+                else:
+                    file.unlink()
 
 
 def _list_objects(Root: str, Prefix: str, MaxKeys: Optional[int] = None) -> List[str]:
@@ -108,4 +149,12 @@ def _delete_object(Root: str, Key: str):
         return
     path = os.path.join(Root, Key)
     if os.path.exists(path):
-        os.remove(path)
+        if os.path.isdir(path):
+            shutil.rmtree(path, ignore_errors=True)
+        else:
+            os.remove(path)
+
+
+def _metadata_key(key: str) -> str:
+    parts = key.split("/")
+    return "/".join(parts[:-1] + [f"m;{parts[-1]}"])

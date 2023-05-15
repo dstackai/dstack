@@ -1,6 +1,8 @@
 import React from 'react';
 import Flashbar from '@cloudscape-design/components/flashbar';
+
 import { useAppSelector } from 'hooks';
+
 import { selectNotifications } from './slice';
 
 export const Notifications: React.FC = () => {

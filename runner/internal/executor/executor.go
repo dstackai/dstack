@@ -6,7 +6,6 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
-	"github.com/docker/docker/api/types"
 	"io"
 	"os"
 	"path"
@@ -14,34 +13,37 @@ import (
 	"strconv"
 	"time"
 
+	"github.com/docker/docker/api/types"
+
 	"github.com/docker/docker/api/types/mount"
 	"github.com/dstackai/dstack/runner/consts"
+	"github.com/dstackai/dstack/runner/consts/errorcodes"
+	"github.com/dstackai/dstack/runner/consts/states"
 	"github.com/dstackai/dstack/runner/internal/artifacts"
 	"github.com/dstackai/dstack/runner/internal/backend"
-	"github.com/dstackai/dstack/runner/internal/common"
 	"github.com/dstackai/dstack/runner/internal/container"
 	"github.com/dstackai/dstack/runner/internal/environment"
 	"github.com/dstackai/dstack/runner/internal/gerrors"
 	"github.com/dstackai/dstack/runner/internal/log"
 	"github.com/dstackai/dstack/runner/internal/ports"
 	"github.com/dstackai/dstack/runner/internal/repo"
-	"github.com/dstackai/dstack/runner/internal/states"
 	"github.com/dstackai/dstack/runner/internal/stream"
 )
 
 type Executor struct {
-	backend       backend.Backend
-	configDir     string
-	config        *Config
-	engine        *container.Engine
-	artifactsIn   []artifacts.Artifacter
-	artifactsOut  []artifacts.Artifacter
-	artifactsFUSE []artifacts.Artifacter
-	repo          *repo.Manager
-	pm            ports.Manager
-	portID        string
-	streamLogs    *stream.Server
-	stoppedCh     chan struct{}
+	backend        backend.Backend
+	configDir      string
+	config         *Config
+	engine         *container.Engine
+	cacheArtifacts []artifacts.Artifacter
+	artifactsIn    []artifacts.Artifacter
+	artifactsOut   []artifacts.Artifacter
+	artifactsFUSE  []artifacts.Artifacter
+	repo           *repo.Manager
+	pm             ports.Manager
+	portID         string
+	streamLogs     *stream.Server
+	stoppedCh      chan struct{}
 }
 
 func New(b backend.Backend) *Executor {
@@ -98,17 +100,18 @@ func (ex *Executor) Init(ctx context.Context, configDir string) error {
 	}
 
 	for _, artifact := range job.Artifacts {
-		artOut := ex.backend.GetArtifact(ctx, job.RunName, artifact.Path, path.Join("artifacts", job.RepoHostNameWithPort(), job.RepoUserName, job.RepoName, job.JobID, artifact.Path), artifact.Mount)
+		artOut := ex.backend.GetArtifact(ctx, job.RunName, artifact.Path, path.Join("artifacts", job.RepoId, job.JobID, artifact.Path), artifact.Mount)
 		if artOut != nil {
 			ex.artifactsOut = append(ex.artifactsOut, artOut)
 		}
 		if artifact.Mount {
-			art := ex.backend.GetArtifact(ctx, job.RunName, artifact.Path, path.Join("artifacts", job.RepoHostNameWithPort(), job.RepoUserName, job.RepoName, job.JobID, artifact.Path), artifact.Mount)
+			art := ex.backend.GetArtifact(ctx, job.RunName, artifact.Path, path.Join("artifacts", job.RepoId, job.JobID, artifact.Path), artifact.Mount)
 			if art != nil {
 				ex.artifactsFUSE = append(ex.artifactsFUSE, art)
 			}
 		}
 	}
+
 	cloudLog := ex.backend.CreateLogger(ctx, fmt.Sprintf("/dstack/runners/%s", ex.backend.Bucket(ctx)), job.RunnerID)
 	log.SetCloudLogger(cloudLog)
 	return nil
@@ -163,8 +166,22 @@ func (ex *Executor) Run(ctx context.Context) error {
 			if errRun == nil {
 				job.Status = states.Done
 			} else {
+				// The container may fail due to instance interruption.
+				// In this case we'll let the CLI/hub update the job state accodingly.
+				isInterrupted, err := ex.backend.IsInterrupted(runCtx)
+				if err != nil {
+					log.Error(runCtx, "Failed to check if spot was interrupted", "err", err)
+				} else if isInterrupted {
+					log.Trace(runCtx, "Spot was interrupted")
+					return nil
+				}
 				log.Error(runCtx, "Failed run", "err", errRun)
 				job.Status = states.Failed
+				containerExitedError := &container.ContainerExitedError{}
+				if errors.As(errRun, containerExitedError) {
+					job.ErrorCode = errorcodes.ContainerExitedWithError
+					job.ContainerExitCode = fmt.Sprintf("%d", containerExitedError.ExitCode)
+				}
 			}
 			_ = ex.backend.UpdateState(runCtx)
 			return errRun
@@ -213,14 +230,29 @@ func (ex *Executor) runJob(ctx context.Context, erCh chan error, stoppedCh chan 
 			job.HostName = *ex.config.Hostname
 		}
 	}
-	log.Trace(jctx, "Fetching git repository")
 
-	if err = ex.prepareGit(jctx); err != nil {
+	switch job.RepoType {
+	case "remote":
+		log.Trace(jctx, "Fetching git repository")
+		if err = ex.prepareGit(jctx); err != nil {
+			erCh <- gerrors.Wrap(err)
+			return
+		}
+	case "local":
+		log.Trace(jctx, "Fetching tar archive")
+		if err = ex.prepareArchive(jctx); err != nil {
+			erCh <- gerrors.Wrap(err)
+			return
+		}
+	default:
+		log.Error(jctx, "Unknown RepoType", "RepoType", job.RepoType)
+	}
+
+	log.Trace(jctx, "Dependency processing")
+	if err = ex.processCache(jctx); err != nil {
 		erCh <- gerrors.Wrap(err)
 		return
 	}
-	log.Trace(jctx, "Dependency processing")
-
 	if err = ex.processDeps(jctx); err != nil {
 		erCh <- gerrors.Wrap(err)
 		return
@@ -233,7 +265,7 @@ func (ex *Executor) runJob(ctx context.Context, erCh chan error, stoppedCh chan 
 				return
 			}
 		}
-		if len(ex.artifactsIn) > 0 {
+		if len(ex.artifactsIn) > 0 || len(ex.cacheArtifacts) > 0 {
 			log.Trace(jctx, "Start downloading artifacts")
 			job.Status = states.Downloading
 			err = ex.backend.UpdateState(jctx)
@@ -242,6 +274,13 @@ func (ex *Executor) runJob(ctx context.Context, erCh chan error, stoppedCh chan 
 				return
 			}
 			for _, artifact := range ex.artifactsIn {
+				err = artifact.BeforeRun(jctx)
+				if err != nil {
+					erCh <- gerrors.Wrap(err)
+					return
+				}
+			}
+			for _, artifact := range ex.cacheArtifacts {
 				err = artifact.BeforeRun(jctx)
 				if err != nil {
 					erCh <- gerrors.Wrap(err)
@@ -261,7 +300,7 @@ func (ex *Executor) runJob(ctx context.Context, erCh chan error, stoppedCh chan 
 			erCh <- gerrors.Wrap(err)
 			return
 		}
-		if len(ex.artifactsOut) > 0 {
+		if len(ex.artifactsOut) > 0 || len(ex.cacheArtifacts) > 0 {
 			log.Trace(jctx, "Start uploading artifacts")
 			job.Status = states.Uploading
 			err = ex.backend.UpdateState(jctx)
@@ -270,6 +309,13 @@ func (ex *Executor) runJob(ctx context.Context, erCh chan error, stoppedCh chan 
 				return
 			}
 			for _, artifact := range ex.artifactsOut {
+				err = artifact.AfterRun(jctx)
+				if err != nil {
+					erCh <- gerrors.Wrap(err)
+					return
+				}
+			}
+			for _, artifact := range ex.cacheArtifacts {
 				err = artifact.AfterRun(jctx)
 				if err != nil {
 					erCh <- gerrors.Wrap(err)
@@ -290,7 +336,7 @@ func (ex *Executor) runJob(ctx context.Context, erCh chan error, stoppedCh chan 
 
 func (ex *Executor) prepareGit(ctx context.Context) error {
 	job := ex.backend.Job(ctx)
-	dir := path.Join(common.HomeDir(), consts.RUNS_PATH, job.RunName, job.JobID)
+	dir := path.Join(ex.backend.GetTMPDir(ctx), consts.RUNS_DIR, job.RunName, job.JobID)
 	if _, err := os.Stat(dir); err != nil {
 		if err = os.MkdirAll(dir, 0777); err != nil {
 			return gerrors.Wrap(err)
@@ -330,10 +376,33 @@ func (ex *Executor) prepareGit(ctx context.Context) error {
 		log.Trace(ctx, "GIT checkout error", "err", err, "GIT URL", ex.repo.URL())
 		return gerrors.Wrap(err)
 	}
-	if job.RepoDiff != "" {
-		if err := repo.ApplyDiff(ctx, dir, job.RepoDiff); err != nil {
+
+	repoDiff := ""
+	if job.RepoCodeFilename != "" {
+		var err error
+		repoDiff, err = ex.backend.GetRepoDiff(ctx, job.RepoCodeFilename)
+		if err != nil {
+			return err
+		}
+	}
+	if repoDiff != "" {
+		if err := repo.ApplyDiff(ctx, dir, repoDiff); err != nil {
 			return gerrors.Wrap(err)
 		}
+	}
+	return nil
+}
+
+func (ex *Executor) prepareArchive(ctx context.Context) error {
+	job := ex.backend.Job(ctx)
+	dir := path.Join(ex.backend.GetTMPDir(ctx), consts.RUNS_DIR, job.RunName, job.JobID)
+	if _, err := os.Stat(dir); err != nil {
+		if err = os.MkdirAll(dir, 0777); err != nil {
+			return gerrors.Wrap(err)
+		}
+	}
+	if err := ex.backend.GetRepoArchive(ctx, job.RepoCodeFilename, dir); err != nil {
+		return gerrors.Wrap(err)
 	}
 	return nil
 }
@@ -341,7 +410,7 @@ func (ex *Executor) prepareGit(ctx context.Context) error {
 func (ex *Executor) processDeps(ctx context.Context) error {
 	job := ex.backend.Job(ctx)
 	for _, dep := range job.Deps {
-		listDir, err := ex.backend.ListSubDir(ctx, fmt.Sprintf("jobs/%s/%s/%s/%s,", dep.RepoHostNameWithPort(), dep.RepoUserName, dep.RepoName, dep.RunName))
+		listDir, err := ex.backend.ListSubDir(ctx, fmt.Sprintf("jobs/%s/%s,", dep.RepoId, dep.RunName))
 		if err != nil {
 			return gerrors.Wrap(err)
 		}
@@ -351,11 +420,22 @@ func (ex *Executor) processDeps(ctx context.Context) error {
 				return gerrors.Wrap(err)
 			}
 			for _, artifact := range jobDep.Artifacts {
-				artIn := ex.backend.GetArtifact(ctx, jobDep.RunName, artifact.Path, path.Join("artifacts", jobDep.RepoHostNameWithPort(), jobDep.RepoUserName, jobDep.RepoName, jobDep.JobID, artifact.Path), artifact.Mount)
+				artIn := ex.backend.GetArtifact(ctx, jobDep.RunName, artifact.Path, path.Join("artifacts", jobDep.RepoId, jobDep.JobID, artifact.Path), artifact.Mount)
 				if artIn != nil {
 					ex.artifactsIn = append(ex.artifactsIn, artIn)
 				}
 			}
+		}
+	}
+	return nil
+}
+
+func (ex *Executor) processCache(ctx context.Context) error {
+	job := ex.backend.Job(ctx)
+	for _, cache := range job.Cache {
+		cacheArt := ex.backend.GetCache(ctx, job.RunName, cache.Path, path.Join("cache", job.RepoId, job.HubUserName, job.WorkflowName, cache.Path))
+		if cacheArt != nil {
+			ex.cacheArtifacts = append(ex.cacheArtifacts, cacheArt)
 		}
 	}
 	return nil
@@ -421,7 +501,7 @@ func (ex *Executor) processJob(ctx context.Context, stoppedCh chan struct{}) err
 	bindings := make([]mount.Mount, 0)
 	bindings = append(bindings, mount.Mount{
 		Type:   mount.TypeBind,
-		Source: path.Join(common.HomeDir(), consts.RUNS_PATH, job.RunName, job.JobID),
+		Source: path.Join(ex.backend.GetTMPDir(ctx), consts.RUNS_DIR, job.RunName, job.JobID),
 		Target: "/workflow",
 	})
 	for _, artifact := range ex.artifactsIn {
@@ -438,7 +518,49 @@ func (ex *Executor) processJob(ctx context.Context, stoppedCh chan struct{}) err
 		}
 		bindings = append(bindings, art...)
 	}
-	logger := ex.backend.CreateLogger(ctx, fmt.Sprintf("/dstack/jobs/%s/%s/%s/%s", ex.backend.Bucket(ctx), job.RepoHostNameWithPort(), job.RepoUserName, job.RepoName), job.RunName)
+	for _, artifact := range ex.cacheArtifacts {
+		art, err := artifact.DockerBindings(path.Join("/workflow", job.WorkingDir))
+		if err != nil {
+			return gerrors.Wrap(err)
+		}
+		bindings = append(bindings, art...)
+	}
+	if job.RepoType == "remote" && job.HomeDir != "" {
+		cred := ex.backend.GitCredentials(ctx)
+		if cred != nil {
+			log.Trace(ctx, "Trying to mount git credentials")
+			credPath := path.Join(ex.backend.GetTMPDir(ctx), consts.RUNS_DIR, job.RunName, "credentials")
+			credMountPath := ""
+			switch cred.Protocol {
+			case "ssh":
+				if cred.PrivateKey != nil {
+					credMountPath = path.Join(job.HomeDir, ".ssh/id_rsa")
+					if err := os.WriteFile(credPath, []byte(*cred.PrivateKey), 0600); err != nil {
+						log.Error(ctx, "Failed writing credentials", "err", err)
+					}
+				}
+			case "https":
+				if cred.OAuthToken != nil {
+					credMountPath = path.Join(job.HomeDir, ".config/gh/hosts.yml")
+					ghHost := fmt.Sprintf("%s:\n  oauth_token: \"%s\"\n", job.RepoHostName, *cred.OAuthToken)
+					if err := os.WriteFile(credPath, []byte(ghHost), 0644); err != nil {
+						log.Error(ctx, "Failed writing credentials", "err", err)
+					}
+				}
+			default:
+			}
+			if credMountPath != "" {
+				defer os.Remove(credPath)
+				log.Trace(ctx, "Mounting git credentials", "target", credMountPath)
+				bindings = append(bindings, mount.Mount{
+					Type:   mount.TypeBind,
+					Source: credPath,
+					Target: credMountPath,
+				})
+			}
+		}
+	}
+	logger := ex.backend.CreateLogger(ctx, fmt.Sprintf("/dstack/jobs/%s/%s", ex.backend.Bucket(ctx), job.RepoId), job.RunName)
 	secrets, err := ex.backend.Secrets(ctx)
 	if err != nil {
 		log.Error(ctx, "Fail fetching secrets", "err", err)
@@ -465,7 +587,7 @@ func (ex *Executor) processJob(ctx context.Context, stoppedCh chan struct{}) err
 		BindingPorts:       ex.pm.BindPorts(ex.portID),
 		ShmSize:            resource.ShmSize,
 	}
-	logGroup := fmt.Sprintf("/jobs/%s/%s/%s", job.RepoHostNameWithPort(), job.RepoUserName, job.RepoName)
+	logGroup := fmt.Sprintf("/jobs/%s", job.RepoId)
 	fileLog, err := createLocalLog(filepath.Join(ex.configDir, "logs", logGroup), job.RunName)
 	if err != nil {
 		return gerrors.Wrap(err)

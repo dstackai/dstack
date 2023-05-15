@@ -24,7 +24,7 @@ class Storage(ABC):
         pass
 
     @abstractmethod
-    def list_files(self, dirpath: str) -> List[StorageFile]:
+    def list_files(self, prefix: str, recursive: bool) -> List[StorageFile]:
         pass
 
     @abstractmethod
@@ -42,6 +42,13 @@ class Storage(ABC):
         `dest_path` - storage path relative to the storage root.
         """
         pass
+
+    def delete_prefix(self, keys_prefix: str):
+        for key in self.list_objects(keys_prefix):
+            self.delete_object(key)
+
+    def key_exists(self, key: str) -> bool:
+        return any(key == obj for obj in self.list_objects(key))
 
 
 class CloudStorage(Storage):

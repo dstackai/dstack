@@ -17,6 +17,7 @@ type Resource struct {
 type Job struct {
 	Apps         []App             `yaml:"apps"`
 	Artifacts    []Artifact        `yaml:"artifacts"`
+	Cache        []Cache           `yaml:"cache"`
 	Commands     []string          `yaml:"commands"`
 	Entrypoint   *[]string         `yaml:"entrypoint"`
 	Environment  map[string]string `yaml:"env"`
@@ -29,42 +30,51 @@ type Job struct {
 	Deps         []Dep             `yaml:"deps"`
 	ProviderName string            `yaml:"provider_name"`
 
-	RepoHostName       string `yaml:"repo_host_name"`
-	RepoPort           int    `yaml:"repo_port,omitempty"`
-	RepoBranch         string `yaml:"repo_branch"`
-	RepoDiff           string `yaml:"repo_diff"`
-	RepoHash           string `yaml:"repo_hash"`
-	RepoName           string `yaml:"repo_name"`
-	RepoUserName       string `yaml:"repo_user_name"`
-	LocalRepoUserName  string `yaml:"local_repo_user_name,omitempty"`
-	LocalRepoUserEmail string `yaml:"local_repo_user_email,omitempty"`
+	RepoId      string `yaml:"repo_id"`
+	RepoType    string `yaml:"repo_type"`
+	HubUserName string `yaml:"hub_user_name"`
 
-	RequestID    string       `yaml:"request_id"`
-	Requirements Requirements `yaml:"requirements"`
-	RunName      string       `yaml:"run_name"`
-	RunnerID     string       `yaml:"runner_id"`
-	Status       string       `yaml:"status"`
-	SubmittedAt  uint64       `yaml:"submitted_at"`
-	TagName      string       `yaml:"tag_name"`
+	RepoHostName string `yaml:"repo_host_name"`
+	RepoPort     int    `yaml:"repo_port,omitempty"`
+	RepoUserName string `yaml:"repo_user_name"`
+	RepoName     string `yaml:"repo_name"`
+	RepoBranch   string `yaml:"repo_branch"`
+	RepoHash     string `yaml:"repo_hash"`
+
+	RepoCodeFilename string `yaml:"repo_code_filename"`
+
+	RequestID         string       `yaml:"request_id"`
+	Requirements      Requirements `yaml:"requirements"`
+	RunName           string       `yaml:"run_name"`
+	RunnerID          string       `yaml:"runner_id"`
+	Status            string       `yaml:"status"`
+	ErrorCode         string       `yaml:"error_code,omitempty"`
+	ContainerExitCode string       `yaml:"container_exit_code,omitempty"`
+	SubmittedAt       uint64       `yaml:"submitted_at"`
+	TagName           string       `yaml:"tag_name"`
+	InstanceType      string       `yaml:"instance_type"`
 	//Variables    map[string]interface{} `yaml:"variables"`
 	WorkflowName string `yaml:"workflow_name"`
+	HomeDir      string `yaml:"home_dir"`
 	WorkingDir   string `yaml:"working_dir"`
 
 	RegistryAuth RegistryAuth `yaml:"registry_auth"`
 }
 
 type Dep struct {
-	RepoHostName string `yaml:"repo_host_name,omitempty"`
-	RepoPort     int    `yaml:"repo_port,omitempty"`
-	RepoUserName string `yaml:"repo_user_name,omitempty"`
-	RepoName     string `yaml:"repo_name,omitempty"`
-	RunName      string `yaml:"run_name,omitempty"`
-	Mount        bool   `yaml:"mount,omitempty"`
+	RepoId      string `yaml:"repo_id,omitempty"`
+	HubUserName string `yaml:"hub_user_name,omitempty"`
+	RunName     string `yaml:"run_name,omitempty"`
+	Mount       bool   `yaml:"mount,omitempty"`
 }
 
 type Artifact struct {
 	Path  string `yaml:"path,omitempty"`
 	Mount bool   `yaml:"mount,omitempty"`
+}
+
+type Cache struct {
+	Path string `yaml:"path"`
 }
 
 type App struct {
@@ -103,15 +113,13 @@ type GitCredentials struct {
 	Passphrase *string `json:"passphrase,omitempty"`
 }
 
-type RepoData struct {
-	RepoHost     string
-	RepoUserName string
-	RepoName     string
-}
-
 type RegistryAuth struct {
 	Username string `yaml:"username,omitempty"`
 	Password string `yaml:"password,omitempty"`
+}
+
+type RunnerMetadata struct {
+	Status string `yaml:"status"`
 }
 
 func (j *Job) RepoHostNameWithPort() string {
@@ -121,20 +129,12 @@ func (j *Job) RepoHostNameWithPort() string {
 	return fmt.Sprintf("%s:%d", j.RepoHostName, j.RepoPort)
 }
 
-func (j *Job) JobRepoData() *RepoData {
-	return &RepoData{
-		RepoHost:     j.RepoHostNameWithPort(),
-		RepoUserName: j.RepoUserName,
-		RepoName:     j.RepoName,
-	}
-}
-
 func (j *Job) JobFilepath() string {
-	return fmt.Sprintf("jobs/%s/%s/%s/%s.yaml", j.RepoHostNameWithPort(), j.RepoUserName, j.RepoName, j.JobID)
+	return fmt.Sprintf("jobs/%s/%s.yaml", j.RepoId, j.JobID)
 }
 
 func (j *Job) JobHeadFilepathPrefix() string {
-	return fmt.Sprintf("jobs/%s/%s/%s/l;%s;", j.RepoHostNameWithPort(), j.RepoUserName, j.RepoName, j.JobID)
+	return fmt.Sprintf("jobs/%s/l;%s;", j.RepoId, j.JobID)
 }
 
 func (j *Job) JobHeadFilepath() string {
@@ -144,35 +144,23 @@ func (j *Job) JobHeadFilepath() string {
 	}
 	artifactSlice := make([]string, len(j.Artifacts))
 	for _, art := range j.Artifacts {
-		artifactSlice = append(artifactSlice, art.Path)
+		artifactSlice = append(artifactSlice, EscapeHead(art.Path))
 	}
 	return fmt.Sprintf(
-		"jobs/%s/%s/%s/l;%s;%s;%s;%d;%s;%s;%s;%s",
-		j.RepoHostNameWithPort(),
-		j.RepoUserName,
-		j.RepoName,
+		"jobs/%s/l;%s;%s;%s;%d;%s;%s;%s;%s;%s",
+		j.RepoId,
 		j.JobID,
 		j.ProviderName,
-		j.LocalRepoUserName,
+		j.HubUserName,
 		j.SubmittedAt,
-		j.Status,
+		strings.Join([]string{j.Status, j.ErrorCode, j.ContainerExitCode}, ","),
 		strings.Join(artifactSlice, ","),
 		strings.Join(appsSlice, ","),
 		j.TagName,
+		j.InstanceType,
 	)
 }
 
-func (d *Dep) RepoHostNameWithPort() string {
-	if d.RepoPort == 0 {
-		return d.RepoHostName
-	}
-	return fmt.Sprintf("%s:%d", d.RepoHostName, d.RepoPort)
-}
-
-func (rd *RepoData) RepoDataPath(sep string) string {
-	return strings.Join([]string{rd.RepoHost, rd.RepoUserName, rd.RepoName}, sep)
-}
-
-func (rd *RepoData) SecretsPrefix() string {
-	return fmt.Sprintf("secrets/%s/%s/%s/l;", rd.RepoHost, rd.RepoUserName, rd.RepoName)
+func (j *Job) SecretsPrefix() string {
+	return fmt.Sprintf("secrets/%s/l;", j.RepoId)
 }

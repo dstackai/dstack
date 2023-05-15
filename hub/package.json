@@ -7,8 +7,7 @@
   "license": "MIT",
   "private": true,
   "scripts": {
-    "start": "cross-env NODE_ENV=development ENABLE_MOCKING_API=true webpack serve --config webpack.config.js",
-    "start-with-api": "cross-env NODE_ENV=development webpack serve --config webpack.config.js",
+    "start": "cross-env NODE_ENV=development webpack serve --config webpack.config.js",
     "build": "cross-env NODE_ENV=production webpack build --config webpack.config.js",
     "eslint": "eslint ./src --ext .js,.jsx,.ts,.tsx",
     "eslint-fix": "eslint ./src --ext .js,.jsx,.ts,.tsx --fix",
@@ -56,6 +55,7 @@
     "eslint-config-prettier": "^8.6.0",
     "eslint-plugin-i18n": "^2.1.0",
     "eslint-plugin-prettier": "^4.2.1",
+    "eslint-plugin-simple-import-sort": "^10.0.0",
     "favicons": "^7.0.2",
     "favicons-webpack-plugin": "^6.0.0",
     "file-loader": "^6.2.0",

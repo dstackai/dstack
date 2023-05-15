@@ -1,32 +1,42 @@
-import React, { useCallback, useEffect, useState, useRef } from 'react';
-import { SpaceBetween, FormInput, FormSelect, FormSelectOptions, FormS3BucketSelector, Spinner } from 'components';
-import { useTranslation } from 'react-i18next';
+import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { useFormContext } from 'react-hook-form';
+import { useTranslation } from 'react-i18next';
 import { debounce } from 'lodash';
+
+import { FormInput, FormS3BucketSelector, FormSelect, FormSelectOptions, InfoLink, SpaceBetween, Spinner } from 'components';
+
+import { useHelpPanel, useNotifications } from 'hooks';
+import { isRequestFormErrors2, isRequestFormFieldError } from 'libs';
 import { useBackendValuesMutation } from 'services/project';
+
+import { BUCKET_HELP, CREDENTIALS_HELP, FIELD_NAMES, REGION_HELP, SUBNET_HELP } from './constants';
+
 import { IProps } from './types';
+
 import styles from './styles.module.scss';
 
 export const AWSBackend: React.FC<IProps> = ({ loading }) => {
     const { t } = useTranslation();
+    const [pushNotification] = useNotifications();
     const { control, getValues, setValue, setError, clearErrors, watch } = useFormContext();
     const [valuesData, setValuesData] = useState<IProjectAwsBackendValues | undefined>();
     const [regions, setRegions] = useState<FormSelectOptions>([]);
     const [buckets, setBuckets] = useState<TAwsBucket[]>([]);
     const [subnets, setSubnets] = useState<FormSelectOptions>([]);
+    const lastUpdatedField = useRef<string | null>(null);
 
     const [getBackendValues, { isLoading: isLoadingValues }] = useBackendValuesMutation();
 
     const requestRef = useRef<null | ReturnType<typeof getBackendValues>>(null);
 
+    const [openHelpPanel] = useHelpPanel();
+
     useEffect(() => {
         changeFormHandler().catch(console.log);
     }, []);
 
-    const backendAccessKeyValue = watch('backend.access_key');
-    const backendSecretKeyValue = watch('backend.secret_key');
-
-    const disabledFields = loading || !backendAccessKeyValue || !backendSecretKeyValue || !valuesData;
+    const backendAccessKeyValue = watch(`backend.${FIELD_NAMES.ACCESS_KEY}`);
+    const backendSecretKeyValue = watch(`backend.${FIELD_NAMES.SECRET_KEY}`);
 
     const changeFormHandler = async () => {
         const backendFormValues = getValues('backend');
@@ -35,8 +45,7 @@ export const AWSBackend: React.FC<IProps> = ({ loading }) => {
             return;
         }
 
-        clearErrors('backend.access_key');
-        clearErrors('backend.secret_key');
+        clearErrors('backend');
 
         try {
             const request = getBackendValues(backendFormValues);
@@ -46,38 +55,48 @@ export const AWSBackend: React.FC<IProps> = ({ loading }) => {
 
             setValuesData(response);
 
-            if (response.region_name.values.length) {
+            lastUpdatedField.current = null;
+
+            if (response.region_name.values) {
                 setRegions(response.region_name.values);
             }
 
             if (response.region_name.selected !== undefined) {
-                setValue('backend.region_name', response.region_name.selected);
+                setValue(`backend.${FIELD_NAMES.REGION_NAME}`, response.region_name.selected);
             }
 
-            if (response.s3_bucket_name.values.length) {
+            if (response.s3_bucket_name.values) {
                 setBuckets(response.s3_bucket_name.values);
             }
 
             if (response.s3_bucket_name.selected !== undefined) {
-                setValue('backend.s3_bucket_name', response.s3_bucket_name.selected);
+                setValue(`backend.${FIELD_NAMES.S3_BUCKET_NAME}`, response.s3_bucket_name.selected);
             }
 
-            if (response.ec2_subnet_id.values.length) {
+            if (response.ec2_subnet_id.values) {
                 setSubnets([{ value: '', label: 'No preference' }, ...response.ec2_subnet_id.values]);
             }
 
             if (response.ec2_subnet_id.selected !== undefined) {
-                setValue('backend.ec2_subnet_id', response.ec2_subnet_id.selected ?? '');
+                setValue(`backend.${FIELD_NAMES.EC2_SUBNET_ID}`, response.ec2_subnet_id.selected ?? '');
             }
         } catch (errorResponse) {
             console.log('fetch backends values error:', errorResponse);
             // eslint-disable-next-line @typescript-eslint/ban-ts-comment
             // @ts-ignore
-            const detailsError = errorResponse?.data?.detail;
+            const errorRequestData = errorResponse?.data;
 
-            if (detailsError) {
-                setError('backend.access_key', { type: 'custom', message: detailsError as string });
-                setError('backend.secret_key', { type: 'custom', message: detailsError as string });
+            if (isRequestFormErrors2(errorRequestData)) {
+                errorRequestData.detail.forEach((error) => {
+                    if (isRequestFormFieldError(error)) {
+                        setError(`backend.${error.loc.join('.')}`, { type: 'custom', message: error.msg });
+                    } else {
+                        pushNotification({
+                            type: 'error',
+                            content: t('common.server_error', { error: error?.msg }),
+                        });
+                    }
+                });
             }
         }
     };
@@ -89,7 +108,8 @@ export const AWSBackend: React.FC<IProps> = ({ loading }) => {
         debouncedChangeFormHandler();
     };
 
-    const onChangeSelectField = () => {
+    const getOnChangeSelectField = (fieldName: string) => () => {
+        lastUpdatedField.current = fieldName;
         if (requestRef.current) requestRef.current.abort();
         changeFormHandler().catch(console.log);
     };
@@ -103,13 +123,22 @@ export const AWSBackend: React.FC<IProps> = ({ loading }) => {
             );
     };
 
+    const getDisabledByFieldName = (fieldName: string) => {
+        let disabledField = loading || !backendAccessKeyValue || !backendSecretKeyValue || !valuesData;
+
+        disabledField = disabledField || (lastUpdatedField.current !== fieldName && isLoadingValues);
+
+        return disabledField;
+    };
+
     return (
         <SpaceBetween size="l">
             <FormInput
+                info={<InfoLink onFollow={() => openHelpPanel(CREDENTIALS_HELP)} />}
                 label={t('projects.edit.aws.access_key_id')}
                 description={t('projects.edit.aws.access_key_id_description')}
                 control={control}
-                name="backend.access_key"
+                name={`backend.${FIELD_NAMES.ACCESS_KEY}`}
                 onChange={onChangeCredentialField}
                 disabled={loading}
                 rules={{ required: t('validation.required') }}
@@ -117,10 +146,11 @@ export const AWSBackend: React.FC<IProps> = ({ loading }) => {
             />
 
             <FormInput
+                info={<InfoLink onFollow={() => openHelpPanel(CREDENTIALS_HELP)} />}
                 label={t('projects.edit.aws.secret_key_id')}
                 description={t('projects.edit.aws.secret_key_id_description')}
                 control={control}
-                name="backend.secret_key"
+                name={`backend.${FIELD_NAMES.SECRET_KEY}`}
                 onChange={onChangeCredentialField}
                 disabled={loading}
                 rules={{ required: t('validation.required') }}
@@ -128,39 +158,46 @@ export const AWSBackend: React.FC<IProps> = ({ loading }) => {
             />
 
             <FormSelect
+                info={<InfoLink onFollow={() => openHelpPanel(REGION_HELP)} />}
                 label={t('projects.edit.aws.region_name')}
                 description={t('projects.edit.aws.region_name_description')}
                 placeholder={t('projects.edit.aws.region_name_placeholder')}
                 control={control}
-                name="backend.region_name"
-                disabled={disabledFields}
-                onChange={onChangeSelectField}
+                name={`backend.${FIELD_NAMES.REGION_NAME}`}
+                disabled={getDisabledByFieldName(FIELD_NAMES.REGION_NAME)}
+                onChange={getOnChangeSelectField(FIELD_NAMES.REGION_NAME)}
                 options={regions}
                 rules={{ required: t('validation.required') }}
                 secondaryControl={renderSpinner()}
             />
 
             <FormS3BucketSelector
+                info={<InfoLink onFollow={() => openHelpPanel(BUCKET_HELP)} />}
                 label={t('projects.edit.aws.s3_bucket_name')}
                 description={t('projects.edit.aws.s3_bucket_name_description')}
                 control={control}
-                name="backend.s3_bucket_name"
+                name={`backend.${FIELD_NAMES.S3_BUCKET_NAME}`}
                 selectableItemsTypes={['buckets']}
-                disabled={disabledFields}
-                // onChange={debouncedChangeFormHandler}
+                disabled={getDisabledByFieldName(FIELD_NAMES.S3_BUCKET_NAME)}
                 rules={{ required: t('validation.required') }}
                 buckets={buckets}
                 secondaryControl={renderSpinner()}
+                i18nStrings={{
+                    inContextBrowseButton: 'Choose a bucket',
+                    modalBreadcrumbRootItem: 'S3 buckets',
+                    modalTitle: 'Choose an S3 bucket',
+                }}
             />
 
             <FormSelect
+                info={<InfoLink onFollow={() => openHelpPanel(SUBNET_HELP)} />}
                 label={t('projects.edit.aws.ec2_subnet_id')}
                 description={t('projects.edit.aws.ec2_subnet_id_description')}
                 placeholder={t('projects.edit.aws.ec2_subnet_id_placeholder')}
                 control={control}
                 name="backend.ec2_subnet_id"
-                disabled={disabledFields}
-                onChange={onChangeSelectField}
+                disabled={getDisabledByFieldName(FIELD_NAMES.EC2_SUBNET_ID)}
+                onChange={getOnChangeSelectField(FIELD_NAMES.EC2_SUBNET_ID)}
                 options={subnets}
                 secondaryControl={renderSpinner()}
             />

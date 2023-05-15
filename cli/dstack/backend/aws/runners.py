@@ -3,13 +3,14 @@ import time
 from functools import reduce
 from typing import List, Optional, Tuple
 
+import botocore.exceptions
 from botocore.client import BaseClient
 
 from dstack import version
-from dstack.backend.base.compute import choose_instance_type
+from dstack.backend.base.compute import NoCapacityError, choose_instance_type
 from dstack.core.instance import InstanceType
-from dstack.core.job import Job, JobStatus, Requirements
-from dstack.core.repo import RepoAddress
+from dstack.core.job import Job, Requirements
+from dstack.core.repo import RepoRef
 from dstack.core.request import RequestHead, RequestStatus
 from dstack.core.runners import Gpu, Resources
 
@@ -341,9 +342,8 @@ def _run_instance(
     subnet_id: Optional[str],
     runner_id: str,
     instance_type: InstanceType,
-    local_repo_user_name: Optional[str],
-    local_repo_user_email: Optional[str],
-    repo_address: RepoAddress,
+    repo_id: str,
+    hub_user_name: str,
     ssh_key_pub: str,
 ) -> str:
     launch_specification = {}
@@ -353,8 +353,8 @@ def _run_instance(
         launch_specification["InstanceMarketOptions"] = {
             "MarketType": "spot",
             "SpotOptions": {
-                "SpotInstanceType": "persistent",
-                "InstanceInterruptionBehavior": "stop",
+                "SpotInstanceType": "one-time",
+                "InstanceInterruptionBehavior": "terminate",
             },
         }
     if subnet_id:
@@ -373,12 +373,9 @@ def _run_instance(
     tags = [
         {"Key": "owner", "Value": "dstack"},
         {"Key": "dstack_bucket", "Value": bucket_name},
-        {"Key": "dstack_repo", "Value": repo_address.path()},
+        {"Key": "dstack_repo", "Value": repo_id},
+        {"Key": "dstack_repo_user", "Value": hub_user_name},
     ]
-    if local_repo_user_name:
-        tags.append({"Key": "dstack_user_name", "Value": local_repo_user_name})
-    if local_repo_user_email:
-        tags.append({"Key": "dstack_user_email", "Value": local_repo_user_email})
     response = ec2_client.run_instances(
         BlockDeviceMappings=[
             {
@@ -423,9 +420,8 @@ def run_instance_retry(
     subnet_id: Optional[str],
     runner_id: str,
     instance_type: InstanceType,
-    local_repo_user_name: Optional[str],
-    local_repo_user_email: Optional[str],
-    repo_address: RepoAddress,
+    repo_id: str,
+    hub_user_name: str,
     ssh_key_pub: str,
     attempts: int = 3,
 ) -> str:
@@ -438,17 +434,13 @@ def run_instance_retry(
             subnet_id,
             runner_id,
             instance_type,
-            local_repo_user_name,
-            local_repo_user_email,
-            repo_address,
+            repo_id,
+            hub_user_name,
             ssh_key_pub,
         )
-    except Exception as e:
-        if (
-            hasattr(e, "response")
-            and e.response.get("Error")
-            and e.response["Error"].get("Code") == "InvalidParameterValue"
-        ):
+    except botocore.exceptions.ClientError as e:
+        # FIXME: why retry on "InvalidParameterValue"
+        if e.response["Error"]["Code"] == "InvalidParameterValue":
             if attempts > 0:
                 time.sleep(CREATE_INSTANCE_RETRY_RATE_SECS)
                 return run_instance_retry(
@@ -459,20 +451,26 @@ def run_instance_retry(
                     subnet_id,
                     runner_id,
                     instance_type,
-                    local_repo_user_name,
-                    local_repo_user_email,
-                    repo_address,
+                    repo_id,
+                    hub_user_name,
                     ssh_key_pub,
                     attempts - 1,
                 )
             else:
                 raise Exception("Failed to retry", e)
-        else:
-            raise e
+        elif e.response["Error"]["Code"] == "InsufficientInstanceCapacity":
+            raise NoCapacityError()
+        raise e
 
 
 def cancel_spot_request(ec2_client: BaseClient, request_id: str):
-    ec2_client.cancel_spot_instance_requests(SpotInstanceRequestIds=[request_id])
+    try:
+        ec2_client.cancel_spot_instance_requests(SpotInstanceRequestIds=[request_id])
+    except botocore.exceptions.ClientError as e:
+        if e.response["Error"]["Code"] == "InvalidSpotInstanceRequestID.NotFound":
+            return
+        else:
+            raise e
     response = ec2_client.describe_instances(
         Filters=[
             {"Name": "spot-instance-request-id", "Values": [request_id]},
@@ -522,6 +520,9 @@ def get_request_head(
                 if status["Code"] in [
                     "fulfilled",
                     "request-canceled-and-instance-running",
+                    "marked-for-stop-by-experiment",
+                    "marked-for-stop",
+                    "marked-for-termination",
                 ]:
                     request_status = RequestStatus.RUNNING
                 elif status["Code"] in [
@@ -536,7 +537,8 @@ def get_request_head(
                     "instance-terminated-by-price",
                     "instance-stopped-by-price",
                     "instance-terminated-no-capacity",
-                    "marked-for-stop-by-experiment",
+                    "instance-stopped-by-experiment",
+                    "instance-terminated-by-experiment",
                     "limit-exceeded",
                     "price-too-low",
                 ]:
@@ -548,8 +550,6 @@ def get_request_head(
                     "instance-terminated-by-schedule",
                     "instance-terminated-by-service",
                     "spot-instance-terminated-by-user",
-                    "marked-for-stop",
-                    "marked-for-termination",
                 ]:
                     request_status = RequestStatus.TERMINATED
                 else:

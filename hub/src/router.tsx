@@ -1,12 +1,15 @@
 import React from 'react';
 import { createBrowserRouter } from 'react-router-dom';
 import { Navigate } from 'react-router-dom';
+
 import App from 'App';
 import { Logout } from 'App/Logout';
-import { ProjectList, ProjectDetails, ProjectEditBackend, ProjectAdd } from 'pages/Project';
-import { UserList, UserDetails, UserEdit, UserAdd } from 'pages/User';
-import { ROUTES } from './routes';
+import { ProjectAdd, ProjectDetails, ProjectEditBackend, ProjectList, ProjectSettings } from 'pages/Project';
+import { RepositoryDetails, RepositoryList } from 'pages/Repositories';
+import { UserAdd, UserDetails, UserEdit, UserList } from 'pages/User';
+
 import { AuthErrorMessage } from './App/AuthErrorMessage';
+import { ROUTES } from './routes';
 
 export const router = createBrowserRouter([
     {
@@ -26,6 +29,20 @@ export const router = createBrowserRouter([
             {
                 path: ROUTES.PROJECT.DETAILS.TEMPLATE,
                 element: <ProjectDetails />,
+                children: [
+                    {
+                        path: ROUTES.PROJECT.DETAILS.REPOSITORIES.TEMPLATE,
+                        element: <RepositoryList />,
+                    },
+                    {
+                        path: ROUTES.PROJECT.DETAILS.SETTINGS.TEMPLATE,
+                        element: <ProjectSettings />,
+                    },
+                ],
+            },
+            {
+                path: ROUTES.PROJECT.DETAILS.REPOSITORIES.DETAILS.TEMPLATE,
+                element: <RepositoryDetails />,
             },
             {
                 path: ROUTES.PROJECT.EDIT_BACKEND.TEMPLATE,

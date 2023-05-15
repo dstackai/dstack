@@ -24,7 +24,6 @@ import (
 	_ "github.com/dstackai/dstack/runner/internal/backend/gcp"
 	_ "github.com/dstackai/dstack/runner/internal/backend/local"
 	_ "github.com/dstackai/dstack/runner/internal/backend/s3"
-	"github.com/dstackai/dstack/runner/internal/common"
 	"github.com/dstackai/dstack/runner/internal/container"
 	"github.com/dstackai/dstack/runner/internal/executor"
 	"github.com/dstackai/dstack/runner/internal/log"
@@ -79,8 +78,6 @@ func start(logLevel int, httpPort int, configDir string) {
 	log.Info(logCtx, fmt.Sprintf("Log level: %v", log.L.Logger.GetLevel().String()))
 	log.Info(logCtx, "RUNNER START...")
 
-	common.CreateTMPDir()
-
 	pathConfig := filepath.Join(configDir, consts.CONFIG_FILE_NAME)
 
 	b, err := backend.New(logCtx, pathConfig)
@@ -113,12 +110,11 @@ func start(logLevel int, httpPort int, configDir string) {
 	if err = ex.Init(ctxSig, configDir); err != nil {
 		log.Error(logCtx, "Failed to init executor", "err", err)
 		cancel()
-
 	}
+
 	// Also temporary logic during transition
 	wg := sync.WaitGroup{}
 	wg.Add(1)
-
 	go func() {
 		if err = ex.Run(ctxSig); err != nil {
 			log.Error(logCtx, "dstack-runner ended with an error: ", "err", err)
@@ -127,8 +123,12 @@ func start(logLevel int, httpPort int, configDir string) {
 	}()
 	wg.Wait()
 
-	cancel()
-	time.Sleep(1 * time.Second) // TODO: ugly hack. Need wait for buf cloudwatch
+	select {
+	case <-streamLogs.Done:
+		log.Trace(logCtx, "Done streaming logs")
+	case <-time.After(time.Second * 30):
+		log.Trace(logCtx, "Timed out streaming logs")
+	}
 }
 
 func check(configDir string) error {

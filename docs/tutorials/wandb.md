@@ -1,6 +1,10 @@
-# Weights & Biases
+---
+title: Track experiments with W&B
+---
 
-Using W&B with `dstack` is a straightforward process.
+# Track experiments with W&B
+
+Using `dstack` with Weights & Biases is a straightforward process.
 
 ## 1. Configure the API key
 
@@ -37,7 +41,7 @@ workflows:
 
 </div>
 
-Run it locally to see if it works:
+Run it to see if it works:
 
 <div class="termy">
 
@@ -65,7 +69,7 @@ from your Python script.
 
 First, create a run with [`wandb.init()`](https://docs.wandb.ai/ref/python/run):
 
-<div editor-title="tutorials/wandb/main.py"> 
+<div editor-title="examples/wandb/main.py"> 
 
 ```python
 import os
@@ -100,14 +104,10 @@ workflows:
     provider: bash
     commands:
       - pip install wandb
-      - python tutorials/wandb/main.py
+      - python examples/wandb/main.py
 ```
 
 </div>
 
 Running `wandb-init` will create the corresponding run in the W&B user interface. If you tracked metrics 
 with [`wandb.log()`](https://docs.wandb.ai/ref/python/log), they would appear in real-time.
-
-!!! info "NOTE:"
-    If your workflow runs locally, it will run remotely with no issues as well. If you have a remote configured, you can run
-    your workflow remotely using the `dstack run` command with the `--remote` flag.

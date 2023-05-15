@@ -1,4 +1,4 @@
-declare type TProjectBackendType = 'aws' | 'gcp' | 'azure';
+declare type TProjectBackendType = 'aws' | 'gcp' | 'azure' | 'local';
 
 declare type TProjectBackend = { type: TProjectBackendType } & TProjectBackendAWSWithTitles  & TProjectBackendGCP
 declare interface IProject {
@@ -28,7 +28,32 @@ declare interface IProjectAwsBackendValues {
         },
 }
 
-declare type IProjectBackendValues = { type: TProjectBackendType } & IProjectAwsBackendValues
+declare interface TVPCSubnetValue { label: string, vpc: string, subnet: string}
+
+declare interface IProjectGCPBackendValues {
+    area: {
+        selected?: string,
+        values: { value: string, label: string}[]
+    },
+    bucket_name: null | {
+        selected?: string,
+        values: { value: string, label: string}[]
+    },
+    region: null | {
+        selected?: string,
+        values: { value: string, label: string}[]
+    },
+    vpc_subnet: null | {
+        selected?: string,
+        values: TVPCSubnetValue[]
+    },
+    zone: null | {
+        selected?: string,
+        values: { value: string, label: string}[]
+    },
+}
+
+declare type IProjectBackendValues = { type: TProjectBackendType } & IProjectAwsBackendValues & IProjectGCPBackendValues
 
 declare interface TProjectBackendAWS {
     access_key: string,
@@ -39,7 +64,8 @@ declare interface TProjectBackendAWS {
 }
 
 declare interface TProjectBackendGCP {
-    credentials: string,
+    credentials?: string,
+    credentials_filename?: string,
     area: string,
     region: string,
     zone: string,

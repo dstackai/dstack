@@ -1,7 +1,9 @@
+import argparse
 from argparse import Namespace, _SubParsersAction
 
 from rich_argparse import RichHelpFormatter
 
+from dstack.cli.common import check_cli_errors
 from dstack.cli.updates import check_for_updates
 
 
@@ -20,7 +22,8 @@ class BasicCommand(object):
         self._parser.add_argument(
             "-h",
             "--help",
-            action="help",
+            action="store_true" if self.name == "run" else "help",
+            default=argparse.SUPPRESS,
             help="Show this help message and exit",
         )
         self._parser.set_defaults(func=self.__command)
@@ -36,6 +39,7 @@ class BasicCommand(object):
     def register(self):
         ...
 
+    @check_cli_errors
     def __command(self, args: Namespace):
         check_for_updates()
         self._command(args)

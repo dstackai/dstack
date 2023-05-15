@@ -10,6 +10,26 @@ export const ROUTES = {
         DETAILS: {
             TEMPLATE: `/projects/:name`,
             FORMAT: (name: string) => buildRoute(ROUTES.PROJECT.DETAILS.TEMPLATE, { name }),
+            REPOSITORIES: {
+                TEMPLATE: `/projects/:name/repositories`,
+                FORMAT: (name: string) => buildRoute(ROUTES.PROJECT.DETAILS.REPOSITORIES.TEMPLATE, { name }),
+                DETAILS: {
+                    TEMPLATE: `/projects/:name/repositories/:repoId`,
+                    FORMAT: (name: string, repoId: string) =>
+                        buildRoute(ROUTES.PROJECT.DETAILS.REPOSITORIES.DETAILS.TEMPLATE, { name, repoId }),
+                },
+            },
+            RUNS: {
+                DETAILS: {
+                    TEMPLATE: `/projects/:name/repositories/:repoId/runs/:runName`,
+                    FORMAT: (name: string, repoId: string, runName: string) =>
+                        buildRoute(ROUTES.PROJECT.DETAILS.RUNS.DETAILS.TEMPLATE, { name, repoId, runName }),
+                },
+            },
+            SETTINGS: {
+                TEMPLATE: `/projects/:name/settings`,
+                FORMAT: (name: string) => buildRoute(ROUTES.PROJECT.DETAILS.SETTINGS.TEMPLATE, { name }),
+            },
         },
         EDIT_BACKEND: {
             TEMPLATE: `/projects/:name/edit/backend`,

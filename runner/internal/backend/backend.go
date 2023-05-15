@@ -25,14 +25,19 @@ type Backend interface {
 	Requirements(ctx context.Context) models.Requirements
 	UpdateState(ctx context.Context) error
 	CheckStop(ctx context.Context) (bool, error)
+	IsInterrupted(ctx context.Context) (bool, error)
 	Shutdown(ctx context.Context) error
-	GetArtifact(ctx context.Context, rootPath, localPath, remotePath string, fs bool) artifacts.Artifacter
+	GetArtifact(ctx context.Context, runName, localPath, remotePath string, fs bool) artifacts.Artifacter
+	GetCache(ctx context.Context, runName, localPath, remotePath string) artifacts.Artifacter
 	CreateLogger(ctx context.Context, logGroup, logName string) io.Writer
 	ListSubDir(ctx context.Context, dir string) ([]string, error)
 	Bucket(ctx context.Context) string
 	Secrets(ctx context.Context) (map[string]string, error)
 	GitCredentials(ctx context.Context) *models.GitCredentials
 	GetJobByPath(ctx context.Context, path string) (*models.Job, error)
+	GetRepoDiff(ctx context.Context, path string) (string, error)
+	GetRepoArchive(ctx context.Context, path, dst string) error
+	GetTMPDir(ctx context.Context) string
 }
 
 type File struct {

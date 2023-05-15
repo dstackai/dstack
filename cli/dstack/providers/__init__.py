@@ -1,14 +1,15 @@
 import importlib
 import shlex
 import sys
-import time
+import tempfile
 from abc import abstractmethod
 from argparse import ArgumentParser, Namespace
 from pkgutil import iter_modules
 from typing import Any, Dict, List, Optional, Union
 
-from dstack.api.repo import load_repo_data
-from dstack.backend.base import Backend
+import dstack.api.hub as hub
+from dstack.core.cache import CacheSpec
+from dstack.core.error import RepoNotInitializedError
 from dstack.core.job import (
     ArtifactSpec,
     DepSpec,
@@ -18,8 +19,7 @@ from dstack.core.job import (
     JobStatus,
     Requirements,
 )
-from dstack.core.repo import RepoAddress, RepoData
-from dstack.utils.common import _quoted
+from dstack.utils.common import _quoted, get_milliseconds_since_epoch
 from dstack.utils.interpolator import VariablesInterpolator
 
 DEFAULT_CPU = 2
@@ -57,9 +57,11 @@ class Provider:
         self.run_as_provider: Optional[bool] = None
         self.run_name: Optional[str] = None
         self.dep_specs: Optional[List[DepSpec]] = None
+        self.cache_specs: List[CacheSpec] = []
         self.ssh_key_pub: Optional[str] = None
         self.openssh_server: bool = False
         self.loaded = False
+        self.home_dir: Optional[str] = None
 
     def __str__(self) -> str:
         return (
@@ -121,22 +123,35 @@ class Provider:
 
     def load(
         self,
-        backend: Backend,
-        provider_args: List[str],
+        hub_client: "hub.HubClient",
+        args: Optional[Namespace],
         workflow_name: Optional[str],
         provider_data: Dict[str, Any],
         run_name: str,
+        ssh_key_pub: Optional[str] = None,
     ):
-        self.provider_args = provider_args
+        if getattr(args, "help", False):
+            self.help(workflow_name)
+            exit()  # todo: find a better place for this
+
+        self.provider_args = [] if args is None else args.args + args.unknown
         self.workflow_name = workflow_name
         self.provider_data = provider_data
         self.run_as_provider = not workflow_name
         self.run_name = run_name
+        self.ssh_key_pub = ssh_key_pub
         self.openssh_server = self.provider_data.get("ssh", False)
         self.parse_args()
+        if not self.ssh_key_pub:
+            if self.openssh_server or (
+                hub_client.get_project_backend_type() != "local" and not args.detach
+            ):
+                raise RepoNotInitializedError(
+                    "No valid SSH identity", project_name=hub_client.project
+                )
         self._inject_context()
-        self.dep_specs = self._dep_specs(backend)
-        self.ssh_key_pub = self.provider_data.get("ssh_key_pub")
+        self.dep_specs = self._dep_specs(hub_client)
+        self.cache_specs = self._cache_specs()
         self.loaded = True
 
     @abstractmethod
@@ -161,7 +176,6 @@ class Provider:
         parser.add_argument("-w", "--working-dir", metavar="PATH", type=str)
         group = parser.add_mutually_exclusive_group()
         group.add_argument("-i", "--interruptible", action="store_true")
-        group.add_argument("-l", "--local", action="store_true")
         parser.add_argument("--cpu", metavar="NUM", type=int)
         parser.add_argument("--memory", metavar="SIZE", type=str)
         parser.add_argument("--gpu", metavar="NUM", type=int)
@@ -208,40 +222,44 @@ class Provider:
             resources["shm_size"] = args.shm_size
         if args.interruptible:
             resources["interruptible"] = True
-        if args.local:
-            resources["local"] = True
         if unknown_args:
             self.provider_data["run_args"] = unknown_args
 
     def parse_args(self):
         pass
 
-    def submit_jobs(self, backend: Backend, tag_name: str) -> List[Job]:
+    def submit_jobs(self, hub_client: "hub.HubClient", tag_name: str) -> List[Job]:
         if not self.loaded:
             raise Exception("The provider is not loaded")
         job_specs = self.create_job_specs()
-        repo_data = load_repo_data()
+
+        with tempfile.NamedTemporaryFile("w+b") as f:
+            repo_code_filename = hub_client.repo.repo_data.write_code_file(f)
+            f.seek(0)
+            hub_client._storage.upload_file(f.name, repo_code_filename, lambda _: ...)
+
         # [TODO] Handle master job
         jobs = []
         for i, job_spec in enumerate(job_specs):
-            submitted_at = int(round(time.time() * 1000))
             job = Job(
                 job_id=f"{self.run_name},{self.workflow_name or ''},{i}",
-                repo_data=repo_data,
+                repo_ref=hub_client.repo.repo_ref,
+                hub_user_name="",  # HUB will fill it later
+                repo_data=hub_client.repo.repo_data,
                 run_name=self.run_name,
                 workflow_name=self.workflow_name or None,
                 provider_name=self.provider_name,
-                local_repo_user_name=repo_data.local_repo_user_name,
-                local_repo_user_email=repo_data.local_repo_user_email,
                 status=JobStatus.SUBMITTED,
-                submitted_at=submitted_at,
+                submitted_at=get_milliseconds_since_epoch(),
                 image_name=job_spec.image_name,
                 registry_auth=job_spec.registry_auth,
                 commands=job_spec.commands,
                 entrypoint=job_spec.entrypoint,
                 env=job_spec.env,
+                home_dir=self.home_dir,
                 working_dir=job_spec.working_dir,
                 artifact_specs=job_spec.artifact_specs,
+                cache_specs=self.cache_specs,
                 port_count=job_spec.port_count,
                 ports=None,
                 host_name=None,
@@ -253,45 +271,54 @@ class Provider:
                 request_id=None,
                 tag_name=tag_name,
                 ssh_key_pub=self.ssh_key_pub,
+                repo_code_filename=repo_code_filename,
             )
-            backend.submit_job(job)
+            hub_client.submit_job(job)
             jobs.append(job)
         if tag_name:
-            backend.add_tag_from_run(repo_data, tag_name, self.run_name, jobs)
+            hub_client.add_tag_from_run(tag_name, self.run_name, jobs)
         return jobs
 
-    def _dep_specs(self, backend: Backend) -> Optional[List[DepSpec]]:
+    def _dep_specs(self, hub_client: "hub.HubClient") -> Optional[List[DepSpec]]:
         if self.provider_data.get("deps"):
-            repo_data = load_repo_data()
-            return [
-                self._parse_dep_spec(dep, backend, repo_data) for dep in self.provider_data["deps"]
-            ]
+            return [self._parse_dep_spec(dep, hub_client) for dep in self.provider_data["deps"]]
         else:
             return None
+
+    def _validate_local_path(self, path: str) -> str:
+        if path == "~" or path.startswith("~/"):
+            if not self.home_dir:
+                raise KeyError("home_dir is not defined, local path can't start with ~")
+            home = self.home_dir.rstrip("/")
+            path = home if path == "~" else f"{home}/{path[len('~/'):]}"
+        while path.startswith("./"):
+            path = path[len("./") :]
+        if not path.startswith("/"):
+            pass  # todo: use self.working_dir
+        return path
 
     def _artifact_specs(self) -> Optional[List[ArtifactSpec]]:
-        if self.provider_data.get("artifacts"):
-            return [self._parse_artifact_spec(a) for a in self.provider_data["artifacts"]]
-        else:
-            return None
+        artifact_specs = []
+        for item in self.provider_data.get("artifacts", []):
+            if isinstance(item, str):
+                item = {"artifact_path": item}
+            else:
+                item["artifact_path"] = item.pop("path")
+            item["artifact_path"] = self._validate_local_path(item["artifact_path"])
+            artifact_specs.append(ArtifactSpec(**item))
+        return artifact_specs or None
+
+    def _cache_specs(self) -> List[CacheSpec]:
+        cache_specs = []
+        for item in self.provider_data.get("cache", []):
+            if isinstance(item, str):
+                item = {"path": item}
+            item["path"] = self._validate_local_path(item["path"])
+            cache_specs.append(CacheSpec(**item))
+        return cache_specs
 
     @staticmethod
-    def _parse_artifact_spec(artifact: Union[dict, str]) -> ArtifactSpec:
-        def remove_prefix(text: str, prefix: str) -> str:
-            if text.startswith(prefix):
-                return text[len(prefix) :]
-            return text
-
-        if isinstance(artifact, str):
-            return ArtifactSpec(artifact_path=remove_prefix(artifact, "./"), mount=False)
-        else:
-            return ArtifactSpec(
-                artifact_path=remove_prefix(artifact["path"], "./"),
-                mount=artifact.get("mount") is True,
-            )
-
-    @staticmethod
-    def _parse_dep_spec(dep: Union[dict, str], backend: Backend, repo_data: RepoData) -> DepSpec:
+    def _parse_dep_spec(dep: Union[dict, str], hub_client) -> DepSpec:
         if isinstance(dep, str):
             mount = False
             if dep.startswith(":"):
@@ -306,40 +333,32 @@ class Provider:
         t = dep.split("/")
         if len(t) == 1:
             if tag_dep:
-                return Provider._tag_dep(backend, repo_data, t[0], mount)
+                return Provider._tag_dep(hub_client, t[0], mount)
             else:
-                return Provider._workflow_dep(backend, repo_data, t[0], mount)
+                return Provider._workflow_dep(hub_client, t[0], mount)
         elif len(t) == 3:
             # This doesn't allow to refer to projects from other repos
-            repo_address = RepoAddress(
-                repo_host_name=repo_data.repo_host_name,
-                repo_port=repo_data.repo_port,
-                repo_user_name=t[0],
-                repo_name=t[1],
-            )
             if tag_dep:
-                return Provider._tag_dep(backend, repo_address, t[2], mount)
+                return Provider._tag_dep(hub_client, t[2], mount)
             else:
-                return Provider._workflow_dep(backend, repo_address, t[2], mount)
+                return Provider._workflow_dep(hub_client, t[2], mount)
         else:
             sys.exit(f"Invalid dep format: {dep}")
 
     @staticmethod
-    def _tag_dep(
-        backend: Backend, repo_address: RepoAddress, tag_name: str, mount: bool
-    ) -> DepSpec:
-        tag_head = backend.get_tag_head(repo_address, tag_name)
+    def _tag_dep(hub_client: "hub.HubClient", tag_name: str, mount: bool) -> DepSpec:
+        tag_head = hub_client.get_tag_head(tag_name)
         if tag_head:
-            return DepSpec(repo_address=repo_address, run_name=tag_head.run_name, mount=mount)
+            return DepSpec(
+                repo_ref=hub_client.repo.repo_ref, run_name=tag_head.run_name, mount=mount
+            )
         else:
-            sys.exit(f"Cannot find the tag '{tag_name}' in the '{repo_address.path()}' repo")
+            sys.exit(f"Cannot find the tag '{tag_name}' in the '{hub_client.repo.repo_id}' repo")
 
     @staticmethod
-    def _workflow_dep(
-        backend: Backend, repo_address: RepoAddress, workflow_name: str, mount: bool
-    ) -> DepSpec:
+    def _workflow_dep(hub_client: "hub.HubClient", workflow_name: str, mount: bool) -> DepSpec:
         job_heads = sorted(
-            backend.list_job_heads(repo_address),
+            hub_client.list_job_heads(),
             key=lambda j: j.submitted_at,
             reverse=True,
         )
@@ -355,11 +374,11 @@ class Provider:
             None,
         )
         if run_name:
-            return DepSpec(repo_address=repo_address, run_name=run_name, mount=mount)
+            return DepSpec(repo_ref=hub_client.repo.repo_ref, run_name=run_name, mount=mount)
         else:
             sys.exit(
                 f"Cannot find any successful workflow with the name '{workflow_name}' "
-                f"in the '{repo_address.path()}' repo"
+                f"in the '{hub_client.repo.repo_id}' repo"
             )
 
     def _env(self) -> Optional[Dict[str, str]]:
@@ -433,8 +452,6 @@ class Provider:
             resources.shm_size_mib = _str_to_mib(self.provider_data["resources"]["shm_size"])
         if self.provider_data["resources"].get("interruptible"):
             resources.interruptible = self.provider_data["resources"]["interruptible"]
-        if self.provider_data["resources"].get("local"):
-            resources.local = self.provider_data["resources"]["local"]
         return resources
 
     @staticmethod

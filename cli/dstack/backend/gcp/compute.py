@@ -1,5 +1,5 @@
 import re
-from typing import Any, Dict, List, Optional, Tuple
+from typing import Dict, List, Optional
 
 import google.api_core.exceptions
 from google.cloud import compute_v1
@@ -13,7 +13,7 @@ from dstack.backend.gcp.config import GCPConfig
 from dstack.core.instance import InstanceType
 from dstack.core.job import Job, Requirements
 from dstack.core.request import RequestHead, RequestStatus
-from dstack.core.runners import Gpu, Resources, Runner
+from dstack.core.runners import Gpu, Resources
 
 DSTACK_INSTANCE_TAG = "dstack-runner-instance"
 
@@ -21,9 +21,27 @@ DSTACK_INSTANCE_TAG = "dstack-runner-instance"
 _supported_accelerators = [
     {"accelerator_name": "nvidia-a100-80gb", "gpu_name": "A100", "memory_mb": 1024 * 80},
     {"accelerator_name": "nvidia-tesla-a100", "gpu_name": "A100", "memory_mb": 1024 * 40},
-    {"accelerator_name": "nvidia-tesla-v100", "gpu_name": "V100", "memory_mb": 1024 * 16},
-    {"accelerator_name": "nvidia-tesla-p100", "gpu_name": "P100", "memory_mb": 1024 * 16},
-    {"accelerator_name": "nvidia-tesla-k80", "gpu_name": "K80", "memory_mb": 1024 * 12},
+    {
+        "accelerator_name": "nvidia-tesla-v100",
+        "gpu_name": "V100",
+        "memory_mb": 1024 * 16,
+        "max_vcpu": 12,
+        "max_ram_mb": 1024 * 78,
+    },
+    {
+        "accelerator_name": "nvidia-tesla-p100",
+        "gpu_name": "P100",
+        "memory_mb": 1024 * 16,
+        "max_vcpu": 16,
+        "max_ram_mb": 1024 * 104,
+    },
+    {
+        "accelerator_name": "nvidia-tesla-k80",
+        "gpu_name": "K80",
+        "memory_mb": 1024 * 12,
+        "max_vcpu": 8,
+        "max_ram_mb": 1024 * 52,
+    },
 ]
 
 
@@ -42,6 +60,7 @@ class GCPCompute(Compute):
         self.accelerator_types_client = compute_v1.AcceleratorTypesClient(
             credentials=self.credentials
         )
+        self.zone_operations_client = compute_v1.ZoneOperationsClient(credentials=self.credentials)
 
     def get_request_head(self, job: Job, request_id: Optional[str]) -> RequestHead:
         if request_id is None:
@@ -51,7 +70,8 @@ class GCPCompute(Compute):
                 message="request_id is not specified",
             )
         instance_status = _get_instance_status(
-            client=self.instances_client,
+            instances_client=self.instances_client,
+            zone_operations_client=self.zone_operations_client,
             project_id=self.gcp_config.project_id,
             zone=self.gcp_config.zone,
             instance_name=request_id,
@@ -117,7 +137,11 @@ class GCPCompute(Compute):
 
 
 def _get_instance_status(
-    client: compute_v1.InstancesClient, project_id: str, zone: str, instance_name: str
+    instances_client: compute_v1.InstancesClient,
+    zone_operations_client: compute_v1.ZoneOperationsClient,
+    project_id: str,
+    zone: str,
+    instance_name: str,
 ) -> RequestStatus:
     get_instance_request = compute_v1.GetInstanceRequest(
         instance=instance_name,
@@ -125,9 +149,19 @@ def _get_instance_status(
         zone=zone,
     )
     try:
-        instance = client.get(get_instance_request)
+        instance = instances_client.get(get_instance_request)
     except google.api_core.exceptions.NotFound:
         return RequestStatus.TERMINATED
+    if instance.scheduling.provisioning_model == compute_v1.Scheduling.ProvisioningModel.SPOT.name:
+        list_operations_request = compute_v1.ListZoneOperationsRequest(
+            project=project_id,
+            zone=zone,
+            filter=f'(name = "{instance_name}") AND (operationType = "compute.instances.preempted")',
+        )
+        operations = zone_operations_client.list(list_operations_request)
+        if len(list(operations)) > 0:
+            return RequestStatus.NO_CAPACITY
+
     if instance.status in ["PROVISIONING", "STAGING", "RUNNING"]:
         return RequestStatus.RUNNING
     return RequestStatus.TERMINATED
@@ -301,6 +335,13 @@ def _add_gpus_to_instance_type(
     )
     for at in accelerator_types:
         for gpu_count in range(1, at.maximum_cards_per_instance):
+            max_vcpu = _get_max_vcpu_per_accelerator(at.name) * gpu_count
+            max_ram_mb = _get_max_ram_per_accelerator(at.name) * gpu_count
+            if (
+                max_vcpu < instance_type.resources.cpus
+                or max_ram_mb < instance_type.resources.memory_mib
+            ):
+                continue
             instance_types.append(
                 InstanceType(
                     instance_name=instance_type.instance_name,
@@ -348,6 +389,18 @@ def _gpu_to_accelerator_name(gpu: Gpu) -> str:
     for acc in _supported_accelerators:
         if acc["gpu_name"] == gpu.name and acc["memory_mb"] == gpu.memory_mib:
             return acc["accelerator_name"]
+
+
+def _get_max_vcpu_per_accelerator(accelerator_name: str) -> int:
+    for acc in _supported_accelerators:
+        if acc["accelerator_name"] == accelerator_name:
+            return acc["max_vcpu"]
+
+
+def _get_max_ram_per_accelerator(accelerator_name: str) -> int:
+    for acc in _supported_accelerators:
+        if acc["accelerator_name"] == accelerator_name:
+            return acc["max_ram_mb"]
 
 
 def _get_image_name(
@@ -419,13 +472,12 @@ def _get_labels(bucket: str, job: Job) -> Dict[str, str]:
     }
     if gcp_utils.is_valid_label_value(bucket):
         labels["dstack_bucket"] = bucket
-    dstack_repo = job.repo_address.path("-").lower().replace(".", "-")
+    dstack_repo = job.repo.repo_id.lower().replace(".", "-")
     if gcp_utils.is_valid_label_value(dstack_repo):
         labels["dstack_repo"] = dstack_repo
-    if job.local_repo_user_name is not None:
-        dstack_user_name = job.local_repo_user_name.lower().replace(" ", "_")
-        if gcp_utils.is_valid_label_value(dstack_user_name):
-            labels["dstack_user_name"] = dstack_user_name
+    dstack_user_name = job.hub_user_name.lower().replace(" ", "_")
+    if gcp_utils.is_valid_label_value(dstack_user_name):
+        labels["dstack_user_name"] = dstack_user_name
     return labels
 
 

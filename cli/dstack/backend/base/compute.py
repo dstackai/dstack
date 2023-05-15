@@ -1,11 +1,19 @@
 from abc import ABC, abstractmethod
 from functools import cmp_to_key
-from typing import List, Optional, Tuple
+from typing import List, Optional
 
 from dstack.core.instance import InstanceType
 from dstack.core.job import Job, Requirements
 from dstack.core.request import RequestHead
 from dstack.core.runners import Resources
+
+
+class ComputeError(Exception):
+    pass
+
+
+class NoCapacityError(ComputeError):
+    pass
 
 
 class Compute(ABC):
