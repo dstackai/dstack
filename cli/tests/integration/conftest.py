@@ -1,14 +1,9 @@
-import os
 import shutil
 import subprocess
 from pathlib import Path
-from typing import Tuple
 from unittest.mock import patch
 
 import pytest
-from cryptography.hazmat.backends import default_backend as crypto_default_backend
-from cryptography.hazmat.primitives import serialization as crypto_serialization
-from cryptography.hazmat.primitives.asymmetric import rsa
 from git import Repo
 
 from dstack.backend.local.runners import _install_runner_if_necessary
@@ -32,21 +27,14 @@ def local_runner():
 @pytest.fixture
 def dstack_dir(local_runner: Path):
     shutil.copytree(local_runner, DSTACK_DIR)
-    yield DSTACK_DIR
+    with patch("dstack.cli.config.config.home", DSTACK_DIR):
+        yield DSTACK_DIR
     # We need sudo to delete directories created by runner on Linux
     # See https://github.com/dstackai/dstack/issues/335
     try:
         shutil.rmtree(DSTACK_DIR)
     except PermissionError:
         subprocess.run(["sudo", "rm", "-r", DSTACK_DIR])
-
-
-@pytest.fixture
-def ssh_key():
-    os.mkdir(SSH_DIR)
-    _create_ssh_key_files(SSH_DIR)
-    yield
-    shutil.rmtree(SSH_DIR)
 
 
 @pytest.fixture(scope="session")
@@ -61,28 +49,3 @@ def tests_local_repo():
     TESTS_LOCAL_DIR.mkdir(parents=True)
     yield TESTS_LOCAL_DIR
     shutil.rmtree(TESTS_LOCAL_DIR)
-
-
-def _generate_ssh_key() -> Tuple[bytes, bytes]:
-    key = rsa.generate_private_key(
-        backend=crypto_default_backend(), public_exponent=65537, key_size=2048
-    )
-    private_key = key.private_bytes(
-        crypto_serialization.Encoding.PEM,
-        crypto_serialization.PrivateFormat.PKCS8,
-        crypto_serialization.NoEncryption(),
-    )
-    public_key = key.public_key().public_bytes(
-        crypto_serialization.Encoding.OpenSSH, crypto_serialization.PublicFormat.OpenSSH
-    )
-    return private_key, public_key
-
-
-PRIVATE_KEY, PUBLIC_KEY = _generate_ssh_key()
-
-
-def _create_ssh_key_files(ssh_dir: Path):
-    with open(ssh_dir / "id_rsa", "wb+") as f:
-        f.write(PRIVATE_KEY)
-    with open(ssh_dir / "id_rsa.pub", "wb+") as f:
-        f.write(PUBLIC_KEY)
