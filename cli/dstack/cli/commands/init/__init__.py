@@ -62,9 +62,6 @@ class InitCommand(BasicCommand):
             except InvalidRepoCredentialsError as e:
                 raise CLIError(e.message)
         except InvalidGitRepositoryError:
-            console.print(
-                f"[gray58]No git remote is used, it could affect efficiency of source code transfer[/]"
-            )
             repo = LocalRepo(repo_dir=Path.cwd())
             repo_credentials = None
 
