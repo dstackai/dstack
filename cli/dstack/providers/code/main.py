@@ -39,7 +39,7 @@ class CodeProvider(Provider):
         self.setup = self._get_list_data("setup") or self._get_list_data("before_run")
         self.ports = self.provider_data.get("ports")
         self.python = self._safe_python_version("python")
-        self.version = self.provider_data.get("version") or "1.74.3"
+        self.version = self.provider_data.get("version") or "1.78.1"
         self.env = self._env()
         self.artifact_specs = self._artifact_specs()
         self.working_dir = self.provider_data.get("working_dir")
@@ -129,7 +129,7 @@ class CodeProvider(Provider):
                 f"openvscode-server-v{self.version}/openvscode-server-v{self.version}-linux-$arch.tar.gz -O "
                 f"/tmp/openvscode-server-v{self.version}-linux-$arch.tar.gz",
                 f"tar -xzf /tmp/openvscode-server-v{self.version}-linux-$arch.tar.gz -C /tmp",
-                f"/tmp/openvscode-server-v{self.version}-linux-$arch/bin/openvscode-server --install-extension ms-python.python",
+                f"/tmp/openvscode-server-v{self.version}-linux-$arch/bin/openvscode-server --install-extension ms-python.python --install-extension ms-toolsai.jupyter",
                 "rm /usr/bin/python2*",
             ]
         )
