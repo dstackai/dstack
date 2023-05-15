@@ -1,10 +1,11 @@
 from typing import Optional
 
 from dstack.backend.aws import AwsBackend
+from dstack.backend.azure import AzureBackend
 from dstack.backend.gcp import GCPBackend
 from dstack.backend.local import LocalBackend
 
-backends_classes = [AwsBackend, GCPBackend, LocalBackend]
+backends_classes = [LocalBackend, AwsBackend, GCPBackend, AzureBackend]
 
 backend_name_to_backend_class_map = {b.NAME: b for b in backends_classes}
 

@@ -1,3 +1,4 @@
+import asyncio
 import json
 from typing import List, Optional, Union
 
@@ -8,20 +9,9 @@ from sqlalchemy.orm import selectinload
 from dstack.hub.db import reuse_or_make_session
 from dstack.hub.db.models import Member as MemberDB
 from dstack.hub.db.models import Project, User
-from dstack.hub.models import (
-    AWSProjectConfig,
-    AWSProjectConfigWithCreds,
-    AWSProjectCreds,
-    GCPProjectConfig,
-    GCPProjectConfigWithCreds,
-    GCPProjectCreds,
-    LocalProjectConfig,
-    Member,
-    ProjectInfo,
-    ProjectInfoWithCreds,
-)
+from dstack.hub.models import LocalProjectConfig, Member, ProjectInfo, ProjectInfoWithCreds
 from dstack.hub.security.utils import ROLE_ADMIN
-from dstack.hub.services.backends.local import LocalConfigurator
+from dstack.hub.services.backends import get_configurator
 
 
 class ProjectManager:
@@ -38,7 +28,7 @@ class ProjectManager:
     async def create_project_from_info(
         user: User, project_info: ProjectInfoWithCreds, session: Optional[AsyncSession] = None
     ):
-        project = _info2project(project_info)
+        project = await _info2project(project_info)
         await ProjectManager.create(project, session=session)
         await ProjectManager._add_member(
             project, Member(user_name=user.name, project_role=ROLE_ADMIN)
@@ -60,7 +50,7 @@ class ProjectManager:
     async def update_project_from_info(
         project_info: ProjectInfoWithCreds, session: Optional[AsyncSession] = None
     ):
-        project = _info2project(project_info)
+        project = await _info2project(project_info)
         await ProjectManager.update(project, session=session)
 
     @staticmethod
@@ -157,24 +147,18 @@ class ProjectManager:
         await session.commit()
 
 
-def _info2project(project_info: ProjectInfoWithCreds) -> Project:
+async def _info2project(project_info: ProjectInfoWithCreds) -> Project:
     project_info.backend = project_info.backend.__root__
     project = Project(
         name=project_info.project_name,
         backend=project_info.backend.type,
     )
-    if project_info.backend.type == "local":
-        project.config = "{}"
-        project.auth = "{}"
-    elif project_info.backend.type == "aws":
-        project_info.backend.s3_bucket_name = project_info.backend.s3_bucket_name.replace(
-            "s3://", ""
-        )
-        project.config = AWSProjectConfig.parse_obj(project_info.backend).json()
-        project.auth = AWSProjectCreds.parse_obj(project_info.backend).json()
-    elif project_info.backend.type == "gcp":
-        project.config = GCPProjectConfig.parse_obj(project_info.backend).json()
-        project.auth = GCPProjectCreds.parse_obj(project_info.backend).json()
+    configurator = get_configurator(project.backend)
+    config, auth = await asyncio.get_running_loop().run_in_executor(
+        None, configurator.create_config_auth_data_from_project_config, project_info.backend
+    )
+    project.config = json.dumps(config)
+    project.auth = json.dumps(auth)
     return project
 
 
@@ -189,80 +173,8 @@ def _project2info(
                 project_role=member.project_role,
             )
         )
-    if project.backend == "local":
-        backend = _local(project)
-    if project.backend == "aws":
-        backend = _aws(project, include_creds=include_creds)
-    if project.backend == "gcp":
-        backend = _gcp(project, include_creds=include_creds)
+    configurator = get_configurator(project.backend)
+    backend = configurator.get_project_config_from_project(project, include_creds=include_creds)
     if include_creds:
         return ProjectInfoWithCreds(project_name=project.name, backend=backend, members=members)
     return ProjectInfo(project_name=project.name, backend=backend, members=members)
-
-
-def _local(project: Project) -> LocalProjectConfig:
-    config = LocalConfigurator().get_config_from_hub_config_data(
-        project.name, project.config, project.auth
-    )
-    return LocalProjectConfig(path=str(config.backend_dir))
-
-
-def _aws(
-    project: Project, include_creds: bool
-) -> Union[AWSProjectConfig, AWSProjectConfigWithCreds]:
-    json_config = json.loads(project.config)
-    region_name = json_config["region_name"]
-    s3_bucket_name = json_config["s3_bucket_name"]
-    ec2_subnet_id = json_config["ec2_subnet_id"]
-    if include_creds:
-        json_auth = json.loads(project.auth)
-        access_key = json_auth["access_key"]
-        secret_key = json_auth["secret_key"]
-        return AWSProjectConfigWithCreds(
-            access_key=access_key,
-            secret_key=secret_key,
-            region_name=region_name,
-            region_name_title=region_name,
-            s3_bucket_name=s3_bucket_name,
-            ec2_subnet_id=ec2_subnet_id,
-        )
-    return AWSProjectConfig(
-        region_name=region_name,
-        region_name_title=region_name,
-        s3_bucket_name=s3_bucket_name,
-        ec2_subnet_id=ec2_subnet_id,
-    )
-
-
-def _gcp(
-    project: Project, include_creds: bool
-) -> Union[GCPProjectConfig, GCPProjectConfigWithCreds]:
-    json_config = json.loads(project.config)
-    area = json_config["area"]
-    region = json_config["region"]
-    zone = json_config["zone"]
-    bucket_name = json_config["bucket_name"]
-    vpc = json_config["vpc"]
-    subnet = json_config["subnet"]
-    if include_creds:
-        json_auth = json.loads(project.auth)
-        credentials = json_auth["credentials"]
-        credentials_filename = json_auth["credentials_filename"]
-        return GCPProjectConfigWithCreds(
-            credentials=credentials,
-            credentials_filename=credentials_filename,
-            area=area,
-            region=region,
-            zone=zone,
-            bucket_name=bucket_name,
-            vpc=vpc,
-            subnet=subnet,
-        )
-    return GCPProjectConfig(
-        area=area,
-        region=region,
-        zone=zone,
-        bucket_name=bucket_name,
-        vpc=vpc,
-        subnet=subnet,
-    )

@@ -3,12 +3,14 @@ from typing import List, Optional
 
 from dstack.hub.models import BackendType
 from dstack.hub.services.backends.aws import AWSConfigurator
+from dstack.hub.services.backends.azure.configurator import AzureConfigurator
 from dstack.hub.services.backends.base import Configurator
 from dstack.hub.services.backends.gcp import GCPConfigurator
 from dstack.hub.services.backends.local import LocalConfigurator
 
 configurators = [
     AWSConfigurator(),
+    AzureConfigurator(),
     GCPConfigurator(),
     LocalConfigurator(),
 ]
@@ -25,7 +27,7 @@ docker_available = None
 
 
 def list_avaialble_backend_types() -> List[BackendType]:
-    configurators = [AWSConfigurator(), GCPConfigurator()]
+    configurators = [AWSConfigurator(), GCPConfigurator(), AzureConfigurator()]
     if local_backend_available():
         configurators.append(LocalConfigurator())
     return [c.name for c in configurators]

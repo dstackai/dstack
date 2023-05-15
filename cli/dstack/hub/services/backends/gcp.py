@@ -1,5 +1,5 @@
 import json
-from typing import Dict, Optional, Tuple
+from typing import Dict, Optional, Tuple, Union
 
 from google.cloud import compute_v1, storage
 from google.oauth2 import service_account
@@ -7,9 +7,13 @@ from google.oauth2 import service_account
 from dstack.backend.base.config import BackendConfig
 from dstack.backend.gcp.config import GCPConfig
 from dstack.hub.models import (
+    GCPProjectConfig,
+    GCPProjectConfigWithCreds,
+    GCPProjectCreds,
     GCPProjectValues,
     GCPVPCSubnetProjectElement,
     GCPVPCSubnetProjectElementValue,
+    Project,
     ProjectElement,
     ProjectElementValue,
 )
@@ -119,7 +123,7 @@ class GCPConfigurator(Configurator):
         }
         return GCPConfig.deserialize(data)
 
-    def configure_hub(self, config_data: Dict) -> GCPProjectValues:
+    def configure_project(self, config_data: Dict) -> GCPProjectValues:
         try:
             service_account_info = json.loads(config_data.get("credentials"))
             self.credentials = service_account.Credentials.from_service_account_info(
@@ -153,6 +157,46 @@ class GCPConfigurator(Configurator):
             default_subnet=config_data.get("subnet"),
         )
         return project_values
+
+    def create_config_auth_data_from_project_config(
+        self, project_config: GCPProjectConfigWithCreds
+    ) -> Tuple[Dict, Dict]:
+        config = GCPProjectConfig.parse_obj(project_config).dict()
+        auth = GCPProjectCreds.parse_obj(project_config).dict()
+        return config, auth
+
+    def get_project_config_from_project(
+        self, project: Project, include_creds: bool
+    ) -> Union[GCPProjectConfig, GCPProjectConfigWithCreds]:
+        json_config = json.loads(project.config)
+        area = json_config["area"]
+        region = json_config["region"]
+        zone = json_config["zone"]
+        bucket_name = json_config["bucket_name"]
+        vpc = json_config["vpc"]
+        subnet = json_config["subnet"]
+        if include_creds:
+            json_auth = json.loads(project.auth)
+            credentials = json_auth["credentials"]
+            credentials_filename = json_auth["credentials_filename"]
+            return GCPProjectConfigWithCreds(
+                credentials=credentials,
+                credentials_filename=credentials_filename,
+                area=area,
+                region=region,
+                zone=zone,
+                bucket_name=bucket_name,
+                vpc=vpc,
+                subnet=subnet,
+            )
+        return GCPProjectConfig(
+            area=area,
+            region=region,
+            zone=zone,
+            bucket_name=bucket_name,
+            vpc=vpc,
+            subnet=subnet,
+        )
 
     def _get_hub_geographic_area(self, default_area: Optional[str]) -> ProjectElement:
         area_names = sorted([l["name"] for l in GCP_LOCATIONS])

@@ -35,7 +35,7 @@ async def get_backend_config_values(
     configurator = _get_backend_configurator(config.__root__.type)
     try:
         result = await asyncio.get_running_loop().run_in_executor(
-            None, configurator.configure_hub, config.__root__.dict()
+            None, configurator.configure_project, config.__root__.dict()
         )
     except BackendConfigError as e:
         _error_response_on_config_error(e, path_to_config=[])
@@ -73,7 +73,7 @@ async def create_project(
         )
     try:
         await asyncio.get_running_loop().run_in_executor(
-            None, configurator.configure_hub, project_info.backend.__root__.dict()
+            None, configurator.configure_project, project_info.backend.__root__.dict()
         )
     except BackendConfigError as e:
         _error_response_on_config_error(e, path_to_config=["backend"])
@@ -126,7 +126,7 @@ async def update_project(
     configurator = _get_backend_configurator(project_info.backend.__root__.type)
     try:
         await asyncio.get_running_loop().run_in_executor(
-            None, configurator.configure_hub, project_info.backend.__root__.dict()
+            None, configurator.configure_project, project_info.backend.__root__.dict()
         )
     except BackendConfigError as e:
         _error_response_on_config_error(e, path_to_config=["backend"])

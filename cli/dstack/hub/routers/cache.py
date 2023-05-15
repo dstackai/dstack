@@ -1,9 +1,7 @@
 import json
-from typing import Optional
 
 from dstack.api.internal.backend import get_backend_class
 from dstack.backend.base import Backend
-from dstack.core.repo import Repo
 from dstack.hub.db.models import Project
 from dstack.hub.services.backends import get_configurator
 

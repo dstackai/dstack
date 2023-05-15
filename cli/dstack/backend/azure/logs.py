@@ -13,7 +13,6 @@ from dstack.backend.base.logs import fix_urls
 from dstack.backend.base.storage import Storage
 from dstack.core.job import Job
 from dstack.core.log_event import LogEvent
-from dstack.core.repo import RepoAddress
 
 POLL_LOGS_ATTEMPTS = 10
 POLL_LOGS_WAIT_TIME = 2
@@ -39,14 +38,14 @@ class AzureLogging:
     def poll_logs(
         self,
         storage: Storage,
-        repo_address: RepoAddress,
+        repo_id: str,
         run_name: str,
         start_time: int,
     ) -> Generator[LogEvent, None, None]:
-        jobs = {j.job_id: j for j in base_jobs.list_jobs(storage, repo_address, run_name)}
+        jobs = {j.job_id: j for j in base_jobs.list_jobs(storage, repo_id, run_name)}
         start_date = datetime.fromtimestamp(start_time / 1000, tz=timezone.utc)
         timespan = datetime.now(tz=timezone.utc) - start_date
-        log_name = _get_run_log_name(self.resource_group, repo_address, run_name)
+        log_name = _get_run_log_name(self.resource_group, repo_id, run_name)
         found_logs = False
         for _ in range(POLL_LOGS_ATTEMPTS):
             logs = self._query_logs(log_name=log_name, timespan=timespan)
@@ -78,8 +77,8 @@ class AzureLogging:
         yield from _parse_log_entries_from_table(table)
 
 
-def _get_run_log_name(resource_group: str, repo_address: RepoAddress, run_name: str):
-    return f"dstack-jobs-{resource_group}-{repo_address.path('-')}-{run_name}"
+def _get_run_log_name(resource_group: str, repo_id: str, run_name: str):
+    return f"dstack-jobs-{resource_group}-{repo_id}-{run_name}"
 
 
 def _parse_log_entries_from_table(table: LogsTable) -> Generator[Dict, None, None]:
