@@ -33,3 +33,4 @@ alembic
 typing-extensions
 file-read-backwards
 psutil
+cryptography
