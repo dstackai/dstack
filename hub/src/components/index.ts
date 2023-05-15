@@ -31,6 +31,7 @@ export { default as HelpPanel } from '@cloudscape-design/components/help-panel';
 export type { HelpPanelProps } from '@cloudscape-design/components/help-panel';
 export { default as Tabs } from '@cloudscape-design/components/tabs';
 export type { TabsProps } from '@cloudscape-design/components/tabs';
+export { default as TextContent } from '@cloudscape-design/components/text-content';
 
 // custom components
 export { NavigateLink } from './NavigateLink';

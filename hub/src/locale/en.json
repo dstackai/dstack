@@ -149,6 +149,7 @@
       "empty_message_text": "No runs to display.",
       "nomatch_message_title": "No matches",
       "nomatch_message_text": "We can't find a match.",
+      "log": "Log",
       "run_name": "Run",
       "workflow_name": "Workflow",
       "provider_name": "Provider",

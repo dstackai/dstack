@@ -1,4 +1,4 @@
-export type ProjectRunsRequestParams = {
+export type RunsRequestParams = {
     name: IProject['project_name'];
     repo_id?: string;
     run_name?: string;

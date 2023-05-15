@@ -3,6 +3,7 @@ import { configureStore } from '@reduxjs/toolkit';
 import notificationsReducer from 'components/Notifications/slice';
 
 import { projectApi } from 'services/project';
+import { runApi } from 'services/run';
 import { userApi } from 'services/user';
 
 import appReducer from 'App/slice';
@@ -11,8 +12,9 @@ export const store = configureStore({
     reducer: {
         app: appReducer,
         notifications: notificationsReducer,
-        [userApi.reducerPath]: userApi.reducer,
         [projectApi.reducerPath]: projectApi.reducer,
+        [runApi.reducerPath]: runApi.reducer,
+        [userApi.reducerPath]: userApi.reducer,
     },
 
     middleware: (getDefaultMiddleware) =>
@@ -20,6 +22,7 @@ export const store = configureStore({
             serializableCheck: false,
         })
             .concat(projectApi.middleware)
+            .concat(runApi.middleware)
             .concat(userApi.middleware),
 });
 
