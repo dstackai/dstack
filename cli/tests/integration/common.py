@@ -84,8 +84,14 @@ def terminate_on_exit(proc: subprocess.Popen) -> subprocess.Popen:
     finally:
         process = psutil.Process(proc.pid)
         for child in process.children(recursive=True):
-            child.kill()
-        process.kill()
+            try:
+                child.kill()
+            except psutil.NoSuchProcess:
+                continue
+        try:
+            process.kill()
+        except psutil.NoSuchProcess:
+            pass
 
 
 # TODO: Figure out a way to read process stderr reliably.
