@@ -598,7 +598,7 @@ body {
 
 .md-sidebar--primary .md-nav__link {
     padding: 3px 15px 4px;
-    margin: 5px 20px 0 -10px;
+    margin-top: 5px;
 }
 
 .md-sidebar--secondary .md-nav__link {

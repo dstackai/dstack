@@ -1,9 +1,10 @@
 # Dev environments
 
-A dev environment is a virtual machine that can be launched based on a pre-defined configuration. Depending on the
-configured project, you can launch dev environments either locally or in a cloud account of your choice. If launched in
-the cloud, `dstack` takes care of creating cloud resources, saving data, and cleaning up when the dev environment is
-stopped.
+A dev environment is a virtual machine that includes the environment and an interactive IDE or notebook setup
+based on a pre-defined configuration.
+
+With `dstack`, you can define such configurations as code and launch your dev environments with a single command, 
+either locally or in the cloud account you prefer.
 
 [//]: # (TODO [TASK]: Add a link to the Playground)
 
@@ -28,11 +29,13 @@ workflows:
 
 </div>
 
+The configuration allows you to customize hardware resources, set up the Python environment, expose ports, configure cache, and more.
+
 [//]: # (TODO [MAJOR]: It doesn't allow to conveniently load and save artifacts)
 
 ## Running and stopping a dev environment
 
-Once a configuration is defined, you can launch it using the `dstack run` command:
+Once a configuration is defined, you can run it using the `dstack run` command:
 
 <div class="termy">
 
@@ -51,12 +54,20 @@ Web UI available at http://127.0.0.1:51845/?tkn=4d9cc05958094ed2996b6832f899fda1
 
 </div>
 
-For convenience, `dstack` uses an exact copy of the source code that is locally present in the folder where you use the `dstack` command.
+If you configure a project to run dev environments in the cloud, `dstack` will automatically provision the
+required cloud resources, and forward ports of the dev environment to your local machine.
 
 [//]: # (TODO [TASK]: A screenshot)
 
+For convenience, `dstack` uses an exact copy of the source code that is locally present in the folder where you use the `dstack` command.
+
+??? info "Using .gitignore"
+    If you don't want the dev environment to sync certain files (especially large local files that are not needed
+    for the dev environment), feel free to add them to the `.gitignore` file. In this case, `dstack` will ignore them,
+    even if you aren't using Git.
+
 ??? info "Configuring projects"
-    The default project is configured to run dev environments locally. However, you can
+    The default project runs dev environments locally. However, you can
     log into Hub and configure additional projects to run dev environments in a cloud account of your choice. 
 
     You can configure multiple projects and pass the project name to the CLI by using the `--project` argument.
@@ -67,8 +78,8 @@ For convenience, `dstack` uses an exact copy of the source code that is locally 
 
 #### Stopping a dev environment 
 
-To stop a dev environment, click `Ctrl`+`C` while the `dstack run` command is running,
-or use the `dstack stop` command.
+To stop the dev environment, click `Ctrl`+`C` while the `dstack run` command is running,
+or use the `dstack stop` command. `dstack` will automatically clean up any cloud resources if they are used.
 
 ## Supported IDEs
 
@@ -80,9 +91,6 @@ All you have to do is to set the `provider` property in the YAML configuration a
 - `notebook` – Jupyter notebook
 
 [//]: # (TODO [TASK]: Use content tabs to show multiple examples - requires fixing CSS styles)
-
-If you use this configuration, `dstack` sets up the IDE automatically, forwards
-its port to your local machine and prints the URL to access it in the output.
 
 #### Connecting via SSH
 
@@ -105,9 +113,6 @@ environment.
 [//]: # (TODO [MEDIUM]: Currently, you have to use bash and tail)
 
 [//]: # (TODO [TASK]: Show the output)
-
-When you run it, `dstack` forwards the SSH port to your local machine and prints the SSH command for connecting. 
-Then, you can either attach your desktop VS Code or PyCharm, or connect from a terminal.
 
 [//]: # (TODO [MAJOR]: Currently, it doesn't support PyCharm)
 
@@ -135,14 +140,12 @@ workflows:
 
 [//]: # (TODO [MAJOR]: Currently, it doesn't allow you to specify interruptible behaviour, e.g. "spot or fail" or "spot or on-demand")
 
-See the [reference page](../reference/providers/code.md#resources) for details.
-
 ## Setting up the environment
 
 You can use the `setup` property in the YAML file to pre-install packages or run other bash commands during environment
 startup.
 
-Use `python` property to specify a version of Python for pre-installation. Otherwise, `dstack` uses the local version.
+Use the `python` property to specify a version of Python for pre-installation. Otherwise, `dstack` uses the local version.
 
 <div editor-title=".dstack/workflows/hello-setup.yaml"> 
 
@@ -166,7 +169,7 @@ workflows:
 
 ## Exposing ports
 
-To run web apps in the dev environment and access them locally, specify port numbers with the `ports` property. They'll be
+To run web apps in the dev environment and access them locally, specify the number of ports via the `ports` property. They'll be
 passed to the dev environment as environment variables like `PORT_0`, `PORT_1`, etc.
 
 [//]: # (TODO [TASK]: Requires an example, including the YAML and the output)
@@ -177,17 +180,19 @@ output.
 [//]: # (TODO [MEDIUM]: It's not convenient to use dstack environment variables for ports)
 [//]: # (TODO [MEDIUM]: It would be easier if dstack forwarded ports automatically)
 
+[//]: # (TODO [MAJOR]: Currently, it doesn't allow to hot reload changes)
+
 ## Configuring cache
 
 When working in a dev environment, you may need to download files like pre-trained models, external data, or Python
-packages. If you restart the environment, you may have to download them again. To avoid this, `dstack` lets you choose
+packages. To avoid downloading them on each restart of your dev environment, you can choose
 which paths to cache between runs. 
 
-<div editor-title=".dstack/workflows/hello-cache.yaml"> 
+<div editor-title=".dstack/workflows/env-cache.yaml"> 
 
 ```yaml
 workflows:
-  - name: hello-cache
+  - name: env-cache
     provider: code
     cache:
       - ~/.cache/pip
@@ -198,14 +203,13 @@ workflows:
 </div>
 
 !!! info "NOTE:"
-    Cache saves files in its own storage and downloads them at startup. This can
-    improve performance and save on data transfer costs. 
-
+    Cache saves files in its own storage and downloads them at startup. This improves performance and saves you 
+    from data transfer costs. 
 
 #### Cleaning up the cache
 
 To clean up the cache, you can delete the files directly from the dev environment or use the `dstack prune cache`
-CLI command, followed by the name of the development environment.
+CLI command, followed by the name of the configuration.
 
 [//]: # (TODO [MAJOR]: Cache is not the same as persistent storage)
 

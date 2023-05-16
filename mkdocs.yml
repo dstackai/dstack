@@ -71,6 +71,10 @@ plugins:
         'quickstart.md': 'docs/index.md'
         'docs/quick-start.md': 'docs/index.md'
         'docs/installation/index.md': 'docs/index.md'
+        'tutorials/dolly.md': 'examples/dolly.md'
+        'tutorials/stable-diffusion.md': 'examples/stable-diffusion.md'
+        'tutorials/tensorboard.md': 'examples/tensorboard.md'
+        'tutorials/wandb.md': 'examples/wandb.md'
   - typeset
 
 # Extensions
@@ -136,11 +140,13 @@ nav:
   - Docs:
       - Overview:
           - Quick start: docs/index.md
-          - How it works: docs/how-it-works.md
+#          - Installation: docs/installation.md
       - Guides:
           - Dev environments: docs/guides/dev-environments.md
-          - Workflows: docs/usage/workflows.md
-          - Projects: docs/usage/projects.md
+          - Pipelines: docs/guides/pipelines.md
+#          - Apps: docs/guides/apps.md
+#          - Artifacts: docs/guides/artifacts.md
+#          - Hub: docs/guides/hub.md
       - Reference:
           - CLI:
               - dstack run: docs/reference/cli/run.md
@@ -162,13 +168,13 @@ nav:
               - lab: docs/reference/providers/lab.md
               - notebook: docs/reference/providers/notebook.md
               - docker: docs/reference/providers/docker.md
-  - Tutorials:
+  - Examples:
       - LLMs:
-          - Run your own ChatGPT with Dolly: tutorials/dolly.md
-          - Generate images with Stable Diffusion: tutorials/stable-diffusion.md
+          - Run your own ChatGPT with Dolly: examples/dolly.md
+          - Generate images with Stable Diffusion: examples/stable-diffusion.md
       - Experiment tracking:
-          - Track experiments with TensorBoard: tutorials/tensorboard.md
-          - Track experiments with W&B: tutorials/wandb.md
+          - Track experiments with TensorBoard: examples/tensorboard.md
+          - Track experiments with W&B: examples/wandb.md
   - Blog:
       - blog/index.md
   - Slack: https://join.slack.com/t/dstackai/shared_invite/zt-xdnsytie-D4qU9BvJP8vkbkHXdi6clQ

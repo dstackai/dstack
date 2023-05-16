@@ -1,6 +1,7 @@
 # Quick start
 
-`dstack` helps create on-demand dev environments, and run ML workflows cost-effectively on any cloud.
+`dstack` helps ML engineers define dev environments, pipelines, and apps as code and run them cost-effectively with a single command, 
+either locally or in any cloud account of their choice.
 
 ## Installation and setup
 
@@ -12,20 +13,25 @@ To use `dstack`, install it with `pip` and start the Hub server.
 $ pip install dstack
 $ dstack start
 
-The hub is available at http://127.0.0.1:3000?token=b934d226-e24a-4eab-eb92b353b10f
+The Hub is available at http://127.0.0.1:3000?token=b934d226-e24a-4eab-eb92b353b10f
 ```
 
 </div>
 
-!!! info "NOTE:"
-    On startup, Hub configures the default project to run dev environments and workflows locally.
+??? info "What is Hub?"
+    Hub is a server application designed to facilitate team collaboration and streamline the usage of `dstack`. 
+    It orchestrates runs, stores cloud credentials, tracks usage, and performs other essential functions.
 
-    You can log into Hub and configure other projects that will run dev environments and
-    workflows in your cloud account (AWS, GCP, etc.).
+    You have the flexibility to start Hub locally, on a dedicated server, or in the cloud. When starting it locally, 
+    the default project is automatically configured to run everything locally. If Hub is started remotely, you can 
+    configure the CLI to connect to a remote Hub using the `dstack config` command.
 
-## Create your first repo
+    To enable Hub to run dev environments, pipelines, and apps in your preferred cloud account (AWS, GCP, etc), you need to 
+    log in to Hub, configure the corresponding project, and provide the necessary cloud credentials.
 
-A repo is any folder from which you want to run dev environments and workflows.
+## Init the repo
+
+A repo is any folder from which you can run dev environments, pipelines, and apps.
 
 To initialize a folder as a repo, you have to run the `dstack init` command there.
 
@@ -38,7 +44,7 @@ $ dstack init
 
 </div>
 
-## Create your first dev environment
+## Run your first dev environment
 
 To create a dev environment, all you have to do is define it via YAML (under the `.dstack/workflows` folder) 
 and then run it by name via the CLI.
@@ -61,12 +67,12 @@ workflows:
 </div>
 
 !!! info "NOTE:"
-    The YAML file allows you to configure hardware resources, set up the Python environment, pre-install packages,
-    expose ports, and many more.
+    The YAML file support multiple providers and allows you to configure hardware resources, 
+    set up the Python environment, expose ports, configure cache, and many more.
 
 [//]: # (TODO: Currently, it's limited to the built-in VS Code, doesn't forward ports automatically, doesn't provide persistence of the storage, pre-installs packages on every run, and has other limitations)
 
-Now, you can launch the dev environment at any time using the `dstack run` command:
+Now, you can run the dev environment at any time using the `dstack run` command:
 
 <div class="termy">
 
@@ -85,24 +91,22 @@ Web UI available at http://127.0.0.1:51845/?tkn=4d9cc05958094ed2996b6832f899fda1
 
 </div>
 
-`dstack` will launch the dev environment based on the configuration and fetch there an exact copy of the source code
-that was locally present in the folder where you ran the `dstack` command.
+`dstack` launches the dev environment based on the configuration and fetches there an exact copy of the source code
+that is present in the folder where you run the `dstack` command.
 
 [//]: # (TODO: A screenshot)
 
 !!! info "NOTE:"
-    If you configured a project to run dev environments in the cloud, `dstack` will provision the
-    required resources and forward ports to your local machine. When you stop the dev environment, `dstack` will
-    clean up the cloud resources automatically.
+    If you configure a project to run dev environments in the cloud, `dstack` will automatically provision the
+    required cloud resources, and forward ports of the dev environment to your local machine. When you stop the 
+    dev environment, `dstack` will automatically clean up the cloud resources.
 
-## Run your first workflow
+## Run your first pipeline
 
-A workflow is any task that you may want to run based on a pre-defined configuration. This task may involve 
-processing data, training or fine-tuning a model, batch inference, etc.
+Pipelines allow to process data, train or fine-tune models, do batch inference or any other tasks
+based on a pre-defined configuration.
 
-[//]: # (TODO: Need to elaborate why this must be a workflow)
-
-To run a workflow, all you have to do is define it via YAML (under the `.dstack/workflows` folder) 
+To run a pipeline, all you have to do is define it via YAML (under the `.dstack/workflows` folder) 
 and then run it by name via the CLI.
 
 <div editor-title=".dstack/workflows/hello.yaml"> 
@@ -112,18 +116,22 @@ workflows:
   - name: hello
     provider: bash
     commands:
-      - echo "Hello, world!"       
+      - echo "Hello, world!"
+    resources:
+      gpu:
+        name: V100
+        count: 1
 ```
 
 </div>
 
 !!! info "NOTE:"
-    The YAML file allows you to configure hardware resources and output artifacts, set up the Python environment, 
-    expose ports, and many more.
+    The YAML file support multiple providers and allows you to configure hardware resources and output artifacts, set up the
+    Python environment, expose ports, configure cache, and many more.
 
 [//]: # (TODO: Currently, it's limited to YAML)
 
-Now, you can launch the workflow at any time using the `dstack run` command:
+Now, you can run the pipeline using the `dstack run` command:
 
 <div class="termy">
 
@@ -142,35 +150,12 @@ Hello, world!
 
 </div>
 
-When running, the workflow will use the exact copy of the source code that was locally present in the folder where you ran
+When running, the pipeline uses the exact copy of the source code that is locally present in the folder where you run
 the `dstack` command.
 
 !!! info "NOTE:"
-    If you configured a project to run workflows in the cloud, the `dstack run` command will provision the required resources.
-    After the workflow is finished, `dstack` will automatically save output artifacts and clean up the cloud resources.
+    If you configure a project to run pipelines in the cloud, the `dstack run` command will automatically provision the 
+    required cloud resources.
+    After the pipeline is finished, `dstack` will automatically save output artifacts and clean up the cloud resources.
 
-## Create projects
-
-To run dev environments and workflows in the cloud and have the cloud resources automatically provisioned and
-cleaned up, log in to the Hub and create a corresponding project.
-
-![](../assets/images/dstack-hub-create-project.png){ width="750" }
-
-Then, configure the project with the CLI.
-
-<div class="termy">
-
-```shell
-$ dstack config --url http://127.0.0.1:3000 \
-  --project my-awesome-project \
-  --token b934d226-e24a-4eab-a284-eb92b353b10f
-```
-
-</div>
-
-!!! info "NOTE:"
-    With the CLI, you can configure multiple projects and pass the project name to the CLI by using the `--project` argument.
-
-[//]: # (TODO: Currently, Hub doesn't monitor usage)
-
-[//]: # (TODO: Elaborate on the main benefits of using dstack)
+[//]: # (TODO: What's next – Add a link to the Hub guide for the details on how to configure projects)
