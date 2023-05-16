@@ -29,6 +29,7 @@ export const Logs: React.FC<IProps> = ({ name, repo_id, run_name, className }) =
         name,
         repo_id,
         run_name,
+        descending: true,
         prev_event_id: prevEventId,
         end_time: endTime,
         limit: LIMIT_LOG_ROWS,
@@ -51,7 +52,8 @@ export const Logs: React.FC<IProps> = ({ name, repo_id, run_name, className }) =
     useEffect(() => {
         if (fetchData) {
             saveScrollPositionByBottom();
-            setLogsData((old) => [...fetchData, ...old]);
+            const reversed = [...fetchData].reverse();
+            setLogsData((old) => [...reversed, ...old]);
         }
     }, [fetchData]);
 
