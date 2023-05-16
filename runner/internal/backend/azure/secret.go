@@ -30,8 +30,8 @@ func NewAzureSecretManager(credential *azidentity.DefaultAzureCredential, url st
 	}, nil
 }
 
-func (azsecret AzureSecretManager) FetchCredentials(ctx context.Context, repoData *models.RepoData) (*models.GitCredentials, error) {
-	key, err := getCredentialKey(repoData)
+func (azsecret AzureSecretManager) FetchCredentials(ctx context.Context, repoId string) (*models.GitCredentials, error) {
+	key, err := getCredentialKey(repoId)
 	if err != nil {
 		return nil, err
 	}
@@ -44,8 +44,8 @@ func (azsecret AzureSecretManager) FetchCredentials(ctx context.Context, repoDat
 	return &creds, nil
 }
 
-func (azsecret AzureSecretManager) FetchSecret(ctx context.Context, repoData *models.RepoData, name string) (string, error) {
-	key, err := getSecretKey(repoData, name)
+func (azsecret AzureSecretManager) FetchSecret(ctx context.Context, repoId, name string) (string, error) {
+	key, err := getSecretKey(repoId, name)
 	if err != nil {
 		return "", gerrors.Wrap(err)
 	}
@@ -60,14 +60,14 @@ func (azsecret AzureSecretManager) getSecretValue(ctx context.Context, key strin
 	return *response.Value, nil
 }
 
-func getSecretKey(repoData *models.RepoData, name string) (string, error) {
-	repo_part := strings.ReplaceAll(repoData.RepoDataPath("-"), ".", "-")
+func getSecretKey(repoId, name string) (string, error) {
+	repo_part := repoId
 	key_prefix := fmt.Sprintf("dstack-secrets-%s", repo_part)
 	return encodeKey(key_prefix, name), nil
 }
 
-func getCredentialKey(repoData *models.RepoData) (string, error) {
-	repo_part := strings.ReplaceAll(repoData.RepoDataPath("-"), ".", "-")
+func getCredentialKey(repoId string) (string, error) {
+	repo_part := repoId
 	return fmt.Sprintf("dstack-credentials-%s", repo_part), nil
 }
 

@@ -114,16 +114,8 @@ func (azstorage AzureStorage) DownloadDir(ctx context.Context, src, dst string) 
 		dstFilepath := path.Join(dst, strings.TrimPrefix(file, src))
 		os.MkdirAll(filepath.Dir(dstFilepath), 0o755)
 		err = func() error {
-			dstFile, err := os.Create(dstFilepath)
-			if err != nil {
-				return gerrors.Wrap(err)
-			}
-			defer dstFile.Close()
-			_, err = azstorage.containerClient.NewBlobClient(file).DownloadFile(ctx, dstFile, nil)
-			if err != nil {
-				return gerrors.Wrap(err)
-			}
-			return nil
+			err = azstorage.DownloadFile(ctx, file, dstFilepath)
+			return err
 		}()
 		if err != nil {
 			return gerrors.Wrap(err)
@@ -141,7 +133,7 @@ func (azstorage AzureStorage) UploadDir(ctx context.Context, src string, dst str
 			return nil
 		}
 		key := path.Join(dst, strings.TrimPrefix(filePath, src))
-		return gerrors.Wrap(azstorage.uploadFile(ctx, filePath, key))
+		return gerrors.Wrap(azstorage.UploadFile(ctx, filePath, key))
 	})
 	return gerrors.Wrap(err)
 }
@@ -150,7 +142,20 @@ func getBlobStorageAccountUrl(account string) string {
 	return fmt.Sprintf("https://%s.blob.core.windows.net", account)
 }
 
-func (azstorage AzureStorage) uploadFile(ctx context.Context, src string, key string) error {
+func (azstorage AzureStorage) DownloadFile(ctx context.Context, key string, dst string) error {
+	dstFile, err := os.Create(dst)
+	if err != nil {
+		return gerrors.Wrap(err)
+	}
+	defer dstFile.Close()
+	_, err = azstorage.containerClient.NewBlobClient(key).DownloadFile(ctx, dstFile, nil)
+	if err != nil {
+		return gerrors.Wrap(err)
+	}
+	return nil
+}
+
+func (azstorage AzureStorage) UploadFile(ctx context.Context, src string, key string) error {
 	file, err := os.Open(src)
 	if err != nil {
 		return gerrors.Wrap(err)

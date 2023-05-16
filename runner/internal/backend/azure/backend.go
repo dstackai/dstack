@@ -17,6 +17,7 @@ import (
 	"github.com/dstackai/dstack/runner/internal/gerrors"
 	"github.com/dstackai/dstack/runner/internal/log"
 	"github.com/dstackai/dstack/runner/internal/models"
+	"github.com/dstackai/dstack/runner/internal/repo"
 	"gopkg.in/yaml.v2"
 )
 
@@ -168,6 +169,10 @@ func (azbackend *AzureBackend) CheckStop(ctx context.Context) (bool, error) {
 	return false, nil
 }
 
+func (azbackend *AzureBackend) IsInterrupted(ctx context.Context) (bool, error) {
+	return false, nil
+}
+
 func (azbackend *AzureBackend) Shutdown(ctx context.Context) error {
 	log.Trace(ctx, "Starting shutdown")
 	err := azbackend.compute.TerminateInstance(ctx, azbackend.state.RequestID)
@@ -177,8 +182,13 @@ func (azbackend *AzureBackend) Shutdown(ctx context.Context) error {
 	return nil
 }
 
-func (azbackend *AzureBackend) GetArtifact(ctx context.Context, runName, localPath, remotePath string, fs bool) artifacts.Artifacter {
-	workDir := path.Join(common.HomeDir(), consts.USER_ARTIFACTS_PATH, runName)
+func (azbackend *AzureBackend) GetArtifact(ctx context.Context, runName, localPath, remotePath string, mount bool) artifacts.Artifacter {
+	workDir := path.Join(azbackend.GetTMPDir(ctx), consts.USER_ARTIFACTS_DIR, runName)
+	return NewAzureArtifacter(azbackend.storage, workDir, localPath, remotePath)
+}
+
+func (azbackend *AzureBackend) GetCache(ctx context.Context, runName, localPath, remotePath string) artifacts.Artifacter {
+	workDir := path.Join(azbackend.GetTMPDir(ctx), consts.USER_ARTIFACTS_DIR, runName)
 	return NewAzureArtifacter(azbackend.storage, workDir, localPath, remotePath)
 }
 
@@ -206,7 +216,7 @@ func (azbackend *AzureBackend) Bucket(ctx context.Context) string {
 
 func (azbackend *AzureBackend) Secrets(ctx context.Context) (map[string]string, error) {
 	log.Trace(ctx, "Getting secrets")
-	prefix := azbackend.state.Job.JobRepoData().SecretsPrefix()
+	prefix := azbackend.state.Job.SecretsPrefix()
 	secretFilenames, err := azbackend.storage.ListFile(ctx, prefix)
 	if err != nil {
 		return nil, gerrors.Wrap(err)
@@ -214,7 +224,7 @@ func (azbackend *AzureBackend) Secrets(ctx context.Context) (map[string]string, 
 	secrets := make(map[string]string, 0)
 	for _, secretFilename := range secretFilenames {
 		secretName := strings.ReplaceAll(secretFilename, prefix, "")
-		secretValue, err := azbackend.secretManager.FetchSecret(ctx, azbackend.state.Job.JobRepoData(), secretName)
+		secretValue, err := azbackend.secretManager.FetchSecret(ctx, azbackend.state.Job.RepoId, secretName)
 		if err != nil {
 			if errors.Is(err, ErrSecretNotFound) {
 				continue
@@ -228,7 +238,7 @@ func (azbackend *AzureBackend) Secrets(ctx context.Context) (map[string]string, 
 
 func (azbackend *AzureBackend) GitCredentials(ctx context.Context) *models.GitCredentials {
 	log.Trace(ctx, "Getting credentials")
-	creds, err := azbackend.secretManager.FetchCredentials(ctx, azbackend.state.Job.JobRepoData())
+	creds, err := azbackend.secretManager.FetchCredentials(ctx, azbackend.state.Job.RepoId)
 	if err != nil {
 		log.Error(ctx, "Getting credentials failure: %+v", err)
 		return nil
@@ -248,4 +258,33 @@ func (azbackend *AzureBackend) GetJobByPath(ctx context.Context, path string) (*
 		return nil, gerrors.Wrap(err)
 	}
 	return job, nil
+}
+
+func (azbackend *AzureBackend) GetRepoDiff(ctx context.Context, path string) (string, error) {
+	diff, err := azbackend.storage.GetFile(ctx, path)
+	if err != nil {
+		return "", gerrors.Wrap(err)
+	}
+	return string(diff), nil
+}
+
+func (azbackend *AzureBackend) GetRepoArchive(ctx context.Context, path, dir string) error {
+	archive, err := os.CreateTemp("", "archive-*.tar")
+	if err != nil {
+		return gerrors.Wrap(err)
+	}
+	defer os.Remove(archive.Name())
+
+	if err := azbackend.storage.DownloadFile(ctx, path, archive.Name()); err != nil {
+		return gerrors.Wrap(err)
+	}
+
+	if err := repo.ExtractArchive(ctx, archive.Name(), dir); err != nil {
+		return gerrors.Wrap(err)
+	}
+	return nil
+}
+
+func (azbackend *AzureBackend) GetTMPDir(ctx context.Context) string {
+	return path.Join(common.HomeDir(), consts.TMP_DIR_PATH)
 }

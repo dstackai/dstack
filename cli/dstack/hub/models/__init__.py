@@ -30,7 +30,7 @@ class Member(BaseModel):
     project_role: ProjectRole
 
 
-BackendType = Union[Literal["local"], Literal["aws"], Literal["gcp"]]
+BackendType = Union[Literal["local"], Literal["aws"], Literal["gcp"], Literal["azure"]]
 
 
 class LocalProjectConfig(BaseModel):

@@ -1,14 +1,21 @@
 import os
+from datetime import timedelta
 from typing import Callable, Dict, Iterator, List, Optional
 
 from azure.core.credentials import TokenCredential
 from azure.core.exceptions import ResourceNotFoundError
-from azure.storage.blob import BlobProperties, BlobServiceClient, ContainerClient, ContentSettings
+from azure.storage.blob import (
+    BlobProperties,
+    BlobServiceClient,
+    ContainerClient,
+    ContentSettings,
+    generate_blob_sas,
+)
 
 from dstack.backend.azure.utils import DSTACK_CONTAINER_NAME, get_blob_storage_account_url
 from dstack.backend.base.storage import CloudStorage
 from dstack.core.storage import StorageFile
-from dstack.utils.common import removeprefix
+from dstack.utils.common import get_current_datetime, removeprefix
 
 
 class AzureStorage(CloudStorage):
@@ -17,9 +24,11 @@ class AzureStorage(CloudStorage):
         credential: TokenCredential,
         storage_account: str,
     ):
+        self.storage_account = storage_account
+        self.storage_account_url = get_blob_storage_account_url(storage_account)
         self._blob_service_client = BlobServiceClient(
             credential=credential,
-            account_url=get_blob_storage_account_url(storage_account),
+            account_url=self.storage_account_url,
         )
         self._container_client: ContainerClient = self._blob_service_client.get_container_client(
             container=DSTACK_CONTAINER_NAME
@@ -78,7 +87,36 @@ class AzureStorage(CloudStorage):
         )
 
     def get_signed_download_url(self, key: str) -> str:
-        raise NotImplementedError
+        user_delegation_key = self._blob_service_client.get_user_delegation_key(
+            key_start_time=get_current_datetime(),
+            key_expiry_time=get_current_datetime() + timedelta(hours=1),
+        )
+        sas = generate_blob_sas(
+            account_name=self.storage_account,
+            container_name=DSTACK_CONTAINER_NAME,
+            blob_name=key,
+            user_delegation_key=user_delegation_key,
+            permission="r",
+            expiry=get_current_datetime() + timedelta(hours=1),
+        )
+        url = self._build_signed_url(key, sas)
+        return url
 
     def get_signed_upload_url(self, key: str) -> str:
-        raise NotImplementedError
+        user_delegation_key = self._blob_service_client.get_user_delegation_key(
+            key_start_time=get_current_datetime(),
+            key_expiry_time=get_current_datetime() + timedelta(hours=1),
+        )
+        sas = generate_blob_sas(
+            account_name=self.storage_account,
+            container_name=DSTACK_CONTAINER_NAME,
+            blob_name=key,
+            user_delegation_key=user_delegation_key,
+            permission="cw",
+            expiry=get_current_datetime() + timedelta(hours=1),
+        )
+        url = self._build_signed_url(key, sas)
+        return url
+
+    def _build_signed_url(self, key: str, sas: str) -> str:
+        return f"{self.storage_account_url}/{DSTACK_CONTAINER_NAME}/{key}?{sas}"
