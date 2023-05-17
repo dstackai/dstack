@@ -1,11 +1,11 @@
 import json
-from typing import Dict, List, Optional, Tuple
+from typing import Dict, List, Optional, Tuple, Union
 from uuid import UUID, uuid5
 
 from azure.core.credentials import TokenCredential
-from azure.core.exceptions import HttpResponseError
+from azure.core.exceptions import ClientAuthenticationError, HttpResponseError
 from azure.graphrbac import GraphRbacManagementClient
-from azure.identity import DefaultAzureCredential
+from azure.identity import ClientSecretCredential, DefaultAzureCredential
 from azure.mgmt.authorization import AuthorizationManagementClient
 from azure.mgmt.authorization.models import RoleAssignmentCreateParameters
 from azure.mgmt.keyvault import KeyVaultManagementClient
@@ -42,19 +42,16 @@ from azure.mgmt.storage.models import BlobContainer
 from azure.mgmt.storage.models import Sku as StorageSku
 from azure.mgmt.storage.models import StorageAccount, StorageAccountCreateParameters
 from azure.mgmt.subscription import SubscriptionClient
-from azure.mgmt.subscription.models import Subscription, TenantIdDescription
-from rich.prompt import Confirm, Prompt
 
 from dstack.backend.azure import utils as azure_utils
 from dstack.backend.azure.config import AzureConfig
-from dstack.cli.common import console
 from dstack.hub.models import (
     AzureProjectConfig,
+    AzureProjectConfigWithCreds,
     AzureProjectValues,
     Project,
     ProjectElement,
     ProjectElementValue,
-    ProjectValues,
 )
 from dstack.hub.services.backends.azure.azure_identity_credential_adapter import (
     AzureIdentityCredentialAdapter,
@@ -83,21 +80,25 @@ LOCATION_VALUES = [l[1] for l in LOCATIONS]
 
 
 class AzureConfigurator(Configurator):
-    @property
-    def name(self):
-        return "azure"
-
-    def get_config_from_hub_config_data(
-        self, project_name: str, config_data: Dict, auth_data: Dict
-    ) -> AzureConfig:
-        return AzureConfig.deserialize(config_data)
+    NAME = "azure"
 
     def configure_project(self, config_data: Dict) -> AzureProjectValues:
-        self.credential = DefaultAzureCredential()
-        project_values = AzureProjectValues()
-        project_values.tenant_id = self._get_tenant_id(
-            default_tenant_id=config_data.get("tenant_id")
+        self.credential = ClientSecretCredential(
+            tenant_id=config_data["tenant_id"],
+            client_id=config_data["client_id"],
+            client_secret=config_data["client_secret"],
         )
+        project_values = AzureProjectValues()
+        try:
+            project_values.tenant_id = self._get_tenant_id(
+                default_tenant_id=config_data.get("tenant_id")
+            )
+        except ClientAuthenticationError:
+            raise BackendConfigError(
+                "Invalid credentials",
+                code="invalid_credentials",
+                fields=["client_id", "client_secret"],
+            )
         self.tenant_id = project_values.tenant_id.selected
         if self.tenant_id is None:
             return project_values
@@ -117,12 +118,17 @@ class AzureConfigurator(Configurator):
         return project_values
 
     def create_config_auth_data_from_project_config(
-        self, project_config: AzureProjectConfig
+        self, project_config: AzureProjectConfigWithCreds
     ) -> Tuple[Dict, Dict]:
         self.tenant_id = project_config.tenant_id
         self.subscription_id = project_config.subscription_id
         self.location = project_config.location
         self.storage_account = project_config.storage_account
+        self.credential = ClientSecretCredential(
+            tenant_id=project_config.tenant_id,
+            client_id=project_config.client_id,
+            client_secret=project_config.client_secret,
+        )
         self.resource_group = self._get_resource_group()
         self.vault_url = self._create_key_vault()
         self.runner_principal_id = self._create_runner_managed_identity()
@@ -130,26 +136,48 @@ class AzureConfigurator(Configurator):
         self._create_logs_resources()
         self._grant_roles_to_runner_managed_identity()
         self._grant_roles_to_logged_in_user()
-        backend_config = AzureConfig(
-            tenant_id=self.tenant_id,
-            subscription_id=self.subscription_id,
-            location=self.location,
-            resource_group=self.resource_group,
-            storage_account=self.storage_account,
-            vault_url=self.vault_url,
-            network=self.network,
-            subnet=self.subnet,
-        )
-        return backend_config.serialize(), {}
+        config_data = {
+            "backend": "azure",
+            "tenant_id": self.tenant_id,
+            "subscription_id": self.subscription_id,
+            "location": self.location,
+            "resource_group": self.resource_group,
+            "storage_account": self.storage_account,
+            "vault_url": self.vault_url,
+            "network": self.network,
+            "subnet": self.subnet,
+        }
+        auth_data = {
+            "client_id": project_config.client_id,
+            "client_secret": project_config.client_secret,
+        }
+        return config_data, auth_data
+
+    def get_config_from_hub_config_data(
+        self, project_name: str, config_data: Dict, auth_data: Dict
+    ) -> AzureConfig:
+        return AzureConfig.deserialize({**config_data, **auth_data})
 
     def get_project_config_from_project(
         self, project: Project, include_creds: bool
-    ) -> AzureProjectConfig:
+    ) -> Union[AzureProjectConfig, AzureProjectConfigWithCreds]:
         json_config = json.loads(project.config)
         tenant_id = json_config["tenant_id"]
         subscription_id = json_config["subscription_id"]
         location = json_config["location"]
         storage_account = json_config["storage_account"]
+        if include_creds:
+            auth_config = json.loads(project.auth)
+            client_id = auth_config["client_id"]
+            client_secret = auth_config["client_secret"]
+            return AzureProjectConfigWithCreds(
+                tenant_id=tenant_id,
+                subscription_id=subscription_id,
+                location=location,
+                storage_account=storage_account,
+                client_id=client_id,
+                client_secret=client_secret,
+            )
         return AzureProjectConfig(
             tenant_id=tenant_id,
             subscription_id=subscription_id,
@@ -366,23 +394,22 @@ class AzureConfigurator(Configurator):
         roles_manager = RolesManager(
             credential=self.credential, subscription_id=self.subscription_id
         )
-        principal_id = users_manager.get_logged_in_user_principal_id()
+        principal_id = users_manager.get_application_principal_id(
+            client_id=self.credential._client_id
+        )
+        principal_type = "ServicePrincipal"
         roles_manager.grant_storage_contributor_role(
             resource_group=self.resource_group,
             storage_account=self.storage_account,
             principal_id=principal_id,
-            principal_type="User",
+            principal_type=principal_type,
         )
         roles_manager.grant_key_vault_administrator_role(
             resource_group=self.resource_group,
             key_vault=azure_utils.get_key_vault_name(self.storage_account),
             principal_id=principal_id,
-            principal_type="User",
+            principal_type=principal_type,
         )
-
-
-def _get_default_storage_account(subscription_id: str) -> str:
-    return "dstack" + subscription_id.rsplit("-")[-1]
 
 
 class ResourceManager:
@@ -692,6 +719,12 @@ class UsersManager:
     def get_logged_in_user_principal_id(self) -> str:
         user = self.graph_client.signed_in_user.get()
         return user.object_id
+
+    def get_application_principal_id(self, client_id: str) -> str:
+        principal_id = self.graph_client.applications.get_service_principals_id_by_app_id(
+            client_id
+        )
+        return principal_id.value
 
 
 class RolesManager:

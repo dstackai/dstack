@@ -13,10 +13,7 @@ class BackendConfigError(Exception):
 
 
 class Configurator(ABC):
-    @property
-    @abstractmethod
-    def name(self):
-        pass
+    NAME = None
 
     @abstractmethod
     def configure_project(self, config_data: Dict) -> ProjectValues:

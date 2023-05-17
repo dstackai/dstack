@@ -8,19 +8,19 @@ from dstack.hub.services.backends.base import Configurator
 from dstack.hub.services.backends.gcp import GCPConfigurator
 from dstack.hub.services.backends.local import LocalConfigurator
 
-configurators = [
-    AWSConfigurator(),
-    AzureConfigurator(),
-    GCPConfigurator(),
-    LocalConfigurator(),
+configurators_classes = [
+    AWSConfigurator,
+    AzureConfigurator,
+    GCPConfigurator,
+    LocalConfigurator,
 ]
 
 
-backend_type_to_configurator_map = {c.name: c for c in configurators}
+backend_type_to_configurator_class_map = {c.NAME: c for c in configurators_classes}
 
 
 def get_configurator(backend_type: str) -> Optional[Configurator]:
-    return backend_type_to_configurator_map[backend_type]
+    return backend_type_to_configurator_class_map[backend_type]()
 
 
 docker_available = None
@@ -30,7 +30,7 @@ def list_avaialble_backend_types() -> List[BackendType]:
     configurators = [AWSConfigurator(), GCPConfigurator(), AzureConfigurator()]
     if local_backend_available():
         configurators.append(LocalConfigurator())
-    return [c.name for c in configurators]
+    return [c.NAME for c in configurators]
 
 
 def local_backend_available() -> bool:

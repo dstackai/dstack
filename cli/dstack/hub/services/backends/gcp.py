@@ -103,25 +103,7 @@ GCP_LOCATIONS = [
 
 
 class GCPConfigurator(Configurator):
-    @property
-    def name(self):
-        return "gcp"
-
-    def get_config_from_hub_config_data(
-        self, project_name: str, config_data: Dict, auth_data: Dict
-    ) -> BackendConfig:
-        credentials = json.loads(auth_data["credentials"])
-        data = {
-            "backend": "gcp",
-            "credentials": credentials,
-            "project": credentials["project_id"],
-            "region": config_data["region"],
-            "zone": config_data["zone"],
-            "bucket": config_data["bucket_name"],
-            "vpc": config_data["vpc"],
-            "subnet": config_data["subnet"],
-        }
-        return GCPConfig.deserialize(data)
+    NAME = "gcp"
 
     def configure_project(self, config_data: Dict) -> GCPProjectValues:
         try:
@@ -164,6 +146,22 @@ class GCPConfigurator(Configurator):
         config = GCPProjectConfig.parse_obj(project_config).dict()
         auth = GCPProjectCreds.parse_obj(project_config).dict()
         return config, auth
+
+    def get_config_from_hub_config_data(
+        self, project_name: str, config_data: Dict, auth_data: Dict
+    ) -> BackendConfig:
+        credentials = json.loads(auth_data["credentials"])
+        data = {
+            "backend": "gcp",
+            "credentials": credentials,
+            "project": credentials["project_id"],
+            "region": config_data["region"],
+            "zone": config_data["zone"],
+            "bucket": config_data["bucket_name"],
+            "vpc": config_data["vpc"],
+            "subnet": config_data["subnet"],
+        }
+        return GCPConfig.deserialize(data)
 
     def get_project_config_from_project(
         self, project: Project, include_creds: bool

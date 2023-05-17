@@ -1,15 +1,12 @@
 from typing import Dict, Tuple
 
-from dstack.backend.base.config import BackendConfig
 from dstack.backend.local.config import LocalConfig
 from dstack.hub.models import LocalProjectConfig, Project, ProjectValues
 from dstack.hub.services.backends.base import Configurator
 
 
 class LocalConfigurator(Configurator):
-    @property
-    def name(self):
-        return "local"
+    NAME = "local"
 
     def configure_project(self, config_data: Dict) -> ProjectValues:
         return None

@@ -38,7 +38,7 @@ from azure.mgmt.network import NetworkManagementClient
 from azure.mgmt.resource import ResourceManagementClient
 
 from dstack import version
-from dstack.backend.aws.runners import _get_default_ami_image_version, _serialize_runner_yaml
+from dstack.backend.aws.runners import _serialize_runner_yaml
 from dstack.backend.azure import utils as azure_utils
 from dstack.backend.azure.config import AzureConfig
 from dstack.backend.base.compute import Compute, choose_instance_type
@@ -190,13 +190,12 @@ def _get_prod_image_id(
     compute_client: ComputeManagementClient,
     location: str,
     cuda: bool,
-    version: Optional[str] = _get_default_ami_image_version(),
 ) -> str:
     images = compute_client.virtual_machine_images.list(
         location=location,
         publisher_name="dstackai",
-        offer="dstack-1",
-        skus=f"dstack-{'cuda' if cuda else 'nocuda'}",
+        offer="dstack",
+        skus=f"dstack-{'cuda' if cuda else 'nocuda'}-{version.__version__}",
     )
     return images[0].id
 
@@ -205,7 +204,6 @@ def _get_stage_image_id(
     compute_client: ComputeManagementClient,
     location: str,
     cuda: bool,
-    version: Optional[str] = _get_default_ami_image_version(),
 ) -> str:
     images = compute_client.images.list()
     image_prefix = "stgn-dstack"

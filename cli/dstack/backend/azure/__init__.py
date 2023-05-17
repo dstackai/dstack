@@ -1,7 +1,7 @@
 from datetime import datetime
 from typing import Generator, List, Optional
 
-from azure.identity import DefaultAzureCredential
+from azure.identity import ClientSecretCredential, DefaultAzureCredential
 
 from dstack.backend.azure.compute import AzureCompute
 from dstack.backend.azure.config import AzureConfig
@@ -33,7 +33,11 @@ class AzureBackend(Backend):
 
     def __init__(self, backend_config: AzureConfig):
         super().__init__(backend_config=backend_config)
-        credential = DefaultAzureCredential()
+        credential = ClientSecretCredential(
+            tenant_id=backend_config.tenant_id,
+            client_id=backend_config.credentials["client_id"],
+            client_secret=backend_config.credentials["client_secret"],
+        )
         self._secrets_manager = AzureSecretsManager(
             credential=credential,
             vault_url=self.backend_config.vault_url,

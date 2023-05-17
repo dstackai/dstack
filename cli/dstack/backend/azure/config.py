@@ -16,6 +16,7 @@ class AzureConfig(BackendConfig):
         vault_url: str,
         network: str,
         subnet: str,
+        credentials: Dict,
     ):
         self.subscription_id = subscription_id
         self.tenant_id = tenant_id
@@ -25,6 +26,7 @@ class AzureConfig(BackendConfig):
         self.vault_url = vault_url
         self.network = network
         self.subnet = subnet
+        self.credentials = credentials
 
     def serialize(self) -> Dict:
         res = {
@@ -54,6 +56,10 @@ class AzureConfig(BackendConfig):
             vault_url = data["vault_url"]
             network = data["network"]
             subnet = data["subnet"]
+            credentials = {
+                "client_id": data["client_id"],
+                "client_secret": data["client_secret"],
+            }
         except KeyError:
             return None
 
@@ -66,4 +72,5 @@ class AzureConfig(BackendConfig):
             vault_url=vault_url,
             network=network,
             subnet=subnet,
+            credentials=credentials,
         )

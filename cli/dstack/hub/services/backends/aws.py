@@ -35,14 +35,7 @@ regions = [
 
 
 class AWSConfigurator(Configurator):
-    @property
-    def name(self):
-        return "aws"
-
-    def get_config_from_hub_config_data(
-        self, project_name: str, config_data: Dict, auth_data: Dict
-    ) -> BackendConfig:
-        return AWSConfig.deserialize(config_data, auth_data)
+    NAME = "aws"
 
     def configure_project(self, config_data: Dict) -> AWSProjectValues:
         config = AWSConfig.deserialize(config_data)
@@ -85,6 +78,11 @@ class AWSConfigurator(Configurator):
         config = AWSProjectConfig.parse_obj(project_config).dict()
         auth = AWSProjectCreds.parse_obj(project_config).dict()
         return config, auth
+
+    def get_config_from_hub_config_data(
+        self, project_name: str, config_data: Dict, auth_data: Dict
+    ) -> BackendConfig:
+        return AWSConfig.deserialize(config_data, auth_data)
 
     def get_project_config_from_project(
         self, project: Project, include_creds: bool

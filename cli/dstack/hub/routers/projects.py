@@ -64,7 +64,7 @@ async def create_project(
             ],
         )
     configurator = _get_backend_configurator(project_info.backend.__root__.type)
-    if configurator.name == "local" and not local_backend_available():
+    if configurator.NAME == "local" and not local_backend_available():
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail=[

@@ -102,13 +102,18 @@ class GCPProjectConfigWithCreds(GCPProjectConfig, GCPProjectCreds):
 
 class AzureProjectConfigPartial(BaseModel):
     type: Literal["azure"] = "azure"
-    tenant_id: Optional[str]
+    tenant_id: str
     subscription_id: Optional[str]
     location: Optional[str]
     storage_account: Optional[str]
 
 
-class AzureProjectConfigWithCredsPartial(AzureProjectConfigPartial):
+class AzureProjectCreds(BaseModel):
+    client_id: str
+    client_secret: str
+
+
+class AzureProjectConfigWithCredsPartial(AzureProjectConfigPartial, AzureProjectCreds):
     pass
 
 
@@ -120,7 +125,7 @@ class AzureProjectConfig(BaseModel):
     storage_account: str
 
 
-class AzureProjectConfigWithCreds(AzureProjectConfig):
+class AzureProjectConfigWithCreds(AzureProjectConfig, AzureProjectCreds):
     pass
 
 

@@ -15,7 +15,7 @@ from azure.storage.blob import (
 from dstack.backend.azure.utils import DSTACK_CONTAINER_NAME, get_blob_storage_account_url
 from dstack.backend.base.storage import CloudStorage
 from dstack.core.storage import StorageFile
-from dstack.utils.common import get_current_datetime, removeprefix
+from dstack.utils.common import get_current_datetime
 
 
 class AzureStorage(CloudStorage):
