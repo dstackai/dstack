@@ -144,7 +144,7 @@ nav:
       - Guides:
           - Dev environments: docs/guides/dev-environments.md
           - Pipelines: docs/guides/pipelines.md
-#          - Apps: docs/guides/apps.md
+          - Apps: docs/guides/apps.md
 #          - Artifacts: docs/guides/artifacts.md
 #          - Hub: docs/guides/hub.md
       - Reference:

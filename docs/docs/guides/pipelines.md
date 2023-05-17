@@ -1,9 +1,10 @@
 # Pipelines
 
-Pipelines allow to process data, train or fine-tune models, do batch inference or any other tasks
-based on a pre-defined configuration.
+A pipeline is a set of pre-defined configurations that allow to process data, train or fine-tune models, do batch inference 
+or other tasks.
 
-With `dstack`, you can define such configurations as code and run your job with a single command, either locally or in the cloud account you prefer.
+With `dstack`, you can define such configurations as code and run your tasks with a single command, either locally or in
+any cloud.
 
 ## Creating a configuration file
 
@@ -28,7 +29,9 @@ workflows:
 The configuration allows you to customize hardware resources, set up the Python environment, output artifacts, 
 expose ports, configure cache, and more.
 
-[//]: # (TODO [MAJOR]: IT supports only YAML and doesn't allow to define and run jobs using pure Python)
+[//]: # (TODO [TASK]: Include artifacts into the main example)
+
+[//]: # (TODO [MAJOR]: It supports only YAML and doesn't allow to use pure Python)
 
 [//]: # (TODO [MAJOR]: Currently, it doesn't allow to define multiple steps)
 
@@ -189,6 +192,8 @@ passed to the run as environment variables like `PORT_0`, `PORT_1`, etc.
 
 `dstack` will automatically forward ports to your local machine. You'll see the URLs to access each port in the
 output.
+
+[//]: # (TODO [MAJOR]: Currently, it requires the user to hardcode `--host 0.0.0.0`)
 
 ## Configuring cache
 

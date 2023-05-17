@@ -1,7 +1,7 @@
 # Quick start
 
-`dstack` helps ML engineers define dev environments, pipelines, and apps as code and run them cost-effectively with a single command, 
-either locally or in any cloud account of their choice.
+`dstack` helps ML engineers define dev environments, pipelines, and apps as code and run them cost-effectively 
+either locally or in any cloud.
 
 ## Installation and setup
 

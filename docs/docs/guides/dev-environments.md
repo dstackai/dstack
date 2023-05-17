@@ -1,10 +1,12 @@
 # Dev environments
 
+:material-clouds:
+
 A dev environment is a virtual machine that includes the environment and an interactive IDE or notebook setup
 based on a pre-defined configuration.
 
 With `dstack`, you can define such configurations as code and launch your dev environments with a single command, 
-either locally or in the cloud account you prefer.
+either locally or in any cloud.
 
 [//]: # (TODO [TASK]: Add a link to the Playground)
 
@@ -177,10 +179,12 @@ passed to the dev environment as environment variables like `PORT_0`, `PORT_1`, 
 `dstack` will automatically forward ports to your local machine. You'll see the URLs to access each port in the
 output.
 
-[//]: # (TODO [MEDIUM]: It's not convenient to use dstack environment variables for ports)
+[//]: # (TODO [MAJOR]: It's not convenient to use dstack environment variables for ports)
 [//]: # (TODO [MEDIUM]: It would be easier if dstack forwarded ports automatically)
 
 [//]: # (TODO [MAJOR]: Currently, it doesn't allow to hot reload changes)
+
+[//]: # (TODO [MAJOR]: Currently, it requires the user to hardcode `--host 0.0.0.0`)
 
 ## Configuring cache
 
