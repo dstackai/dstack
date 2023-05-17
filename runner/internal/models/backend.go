@@ -25,8 +25,6 @@ type Job struct {
 	Image        string            `yaml:"image_name"`
 	JobID        string            `yaml:"job_id"`
 	MasterJobID  string            `yaml:"master_job_id"`
-	PortCount    int               `yaml:"port_count"`
-	Ports        []string          `yaml:"ports"`
 	Deps         []Dep             `yaml:"deps"`
 	ProviderName string            `yaml:"provider_name"`
 
@@ -79,7 +77,7 @@ type Cache struct {
 
 type App struct {
 	Name           string            `yaml:"app_name"`
-	PortIdx        int               `yaml:"port_index"`
+	Port           int               `yaml:"port"`
 	UrlPath        string            `yaml:"url_path"`
 	UrlQueryParams map[string]string `yaml:"url_query_params"`
 }

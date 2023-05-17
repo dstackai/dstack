@@ -9,9 +9,13 @@ from dstack import version
 from dstack.core.app import AppSpec
 from dstack.core.job import JobSpec
 from dstack.providers import Provider
+from dstack.providers.extensions import OpenSSHExtension
+from dstack.providers.ports import PortsRegistry
 
 
 class NotebookProvider(Provider):
+    notebook_port = 2001
+
     def __init__(self):
         super().__init__("notebook")
         self.setup = None
@@ -63,15 +67,24 @@ class NotebookProvider(Provider):
         env = {}
         token = uuid.uuid4().hex
         env["TOKEN"] = token
-        apps = [
+        apps = []
+        ports = PortsRegistry()
+        for i, port in enumerate(self.ports, start=1):
+            apps.append(
+                AppSpec(
+                    port=ports.allocate(port),
+                    app_name="notebook" + str(i),
+                )
+            )
+        apps.append(
             AppSpec(
-                port_index=0,
+                port=self.notebook_port,
                 app_name="notebook",
                 url_query_params={"token": token},
             )
-        ]
+        )
         if self.openssh_server:
-            apps.append(AppSpec(port_index=len(apps), app_name="openssh-server"))
+            OpenSSHExtension.patch_apps(apps)
         return [
             JobSpec(
                 image_name=self.image_name,
@@ -80,7 +93,6 @@ class NotebookProvider(Provider):
                 env=env,
                 working_dir=self.working_dir,
                 artifact_specs=self.artifact_specs,
-                port_count=len(apps),
                 requirements=self.resources,
                 app_specs=apps,
             )
@@ -97,7 +109,7 @@ class NotebookProvider(Provider):
         if self.env:
             self._extend_commands_with_env(commands, self.env)
         if self.openssh_server:
-            self._extend_commands_with_openssh_server(commands, self.ssh_key_pub, 1)
+            OpenSSHExtension.patch_commands(commands, ssh_key_pub=self.ssh_key_pub)
         commands.extend(
             [
                 "conda install psutil -y",
@@ -106,7 +118,7 @@ class NotebookProvider(Provider):
                 'echo "c.NotebookApp.allow_root = True" > /root/.jupyter/jupyter_notebook_config.py',
                 "echo \"c.NotebookApp.allow_origin = '*'\" >> /root/.jupyter/jupyter_notebook_config.py",
                 'echo "c.NotebookApp.open_browser = False" >> /root/.jupyter/jupyter_notebook_config.py',
-                'echo "c.NotebookApp.port = $PORT_0" >> /root/.jupyter/jupyter_notebook_config.py',
+                f'echo "c.NotebookApp.port = {self.notebook_port}" >> /root/.jupyter/jupyter_notebook_config.py',
                 "echo \"c.NotebookApp.token = '$TOKEN'\" >> /root/.jupyter/jupyter_notebook_config.py",
                 "echo \"c.NotebookApp.ip = '0.0.0.0'\" >> /root/.jupyter/jupyter_notebook_config.py",
             ]

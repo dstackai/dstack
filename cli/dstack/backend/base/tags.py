@@ -172,8 +172,6 @@ def create_tag_from_local_dirs(
         working_dir=None,
         artifact_specs=[ArtifactSpec(artifact_path=a, mount=False) for a in tag_artifacts],
         cache_specs=[],
-        port_count=None,
-        ports=None,
         host_name=None,
         requirements=None,
         dep_specs=None,

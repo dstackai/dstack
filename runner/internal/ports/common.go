@@ -1,6 +1,8 @@
 package ports
 
-import "net"
+import (
+	"net"
+)
 
 func GetFreePort() (int, error) {
 	addr, err := net.ResolveTCPAddr("tcp", "localhost:0")

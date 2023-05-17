@@ -7,6 +7,7 @@ import dstack.api.hub as hub
 from dstack.core.app import AppSpec
 from dstack.core.job import JobSpec
 from dstack.providers import Provider
+from dstack.providers.ports import PortsRegistry
 
 
 class DockerProvider(Provider):
@@ -51,7 +52,6 @@ class DockerProvider(Provider):
             formatter_class=RichHelpFormatter,
         )
         self._add_base_args(parser)
-        parser.add_argument("-p", "--ports", type=int)
         if not workflow_name:
             parser.add_argument("image", metavar="IMAGE", type=str)
             parser.add_argument("-c", "--command", type=str)
@@ -72,16 +72,15 @@ class DockerProvider(Provider):
             self.provider_data["ports"] = args.ports
 
     def create_job_specs(self) -> List[JobSpec]:
-        apps = None
-        if self.ports:
-            apps = []
-            for i in range(self.ports):
-                apps.append(
-                    AppSpec(
-                        port_index=i,
-                        app_name="docker" + (i if self.ports > 1 else ""),
-                    )
+        apps = []
+        ports = PortsRegistry()
+        for i, port in enumerate(self.ports):
+            apps.append(
+                AppSpec(
+                    port=ports.allocate(port),
+                    app_name="docker" + (str(i) if len(self.ports) > 1 else ""),
                 )
+            )
         commands = []
         commands.extend(self.commands or [])
         return [
@@ -93,7 +92,6 @@ class DockerProvider(Provider):
                 env=self.env,
                 working_dir=self.working_dir,
                 artifact_specs=self.artifact_specs,
-                port_count=self.ports,
                 requirements=self.resources,
                 app_specs=apps,
             )

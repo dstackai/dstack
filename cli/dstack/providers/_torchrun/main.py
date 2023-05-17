@@ -89,7 +89,6 @@ class TorchrunProvider(Provider):
             working_dir=self.working_dir,
             artifact_specs=self.artifact_specs,
             requirements=self.resources,
-            port_count=1,
         )
         job_specs = [master_job]
         if self.nodes > 1:

@@ -164,9 +164,13 @@
       }
     },
     "ports": {
-      "description": "The number of ports to expose",
-      "type": "integer",
-      "minimum": 1
+      "description": "Port numbers to expose",
+      "type": "array",
+      "items": {
+        "type": "integer",
+        "minimum": 0,
+        "maximum": 65536
+      }
     },
     "home_dir": {
       "description": "The absolute path to the home directory inside the container",
@@ -338,9 +342,7 @@
           "$ref": "#/definitions/setup"
         },
         "ports": {
-          "description": "The number of ports to expose",
-          "type": "integer",
-          "minimum": 1
+          "$ref": "#/definitions/ports"
         },
         "env": {
           "$ref": "#/definitions/env"
@@ -385,6 +387,9 @@
         "setup": {
           "$ref": "#/definitions/setup"
         },
+        "ports": {
+          "$ref": "#/definitions/ports"
+        },
         "env": {
           "$ref": "#/definitions/env"
         },
@@ -427,6 +432,9 @@
         },
         "setup": {
           "$ref": "#/definitions/setup"
+        },
+        "ports": {
+          "$ref": "#/definitions/ports"
         },
         "env": {
           "$ref": "#/definitions/env"

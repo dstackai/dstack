@@ -9,9 +9,13 @@ from dstack import version
 from dstack.core.app import AppSpec
 from dstack.core.job import JobSpec
 from dstack.providers import Provider
+from dstack.providers.extensions import OpenSSHExtension
+from dstack.providers.ports import PortsRegistry
 
 
 class CodeProvider(Provider):
+    code_port = 2001
+
     def __init__(self):
         super().__init__("code")
         self.setup = None
@@ -53,7 +57,6 @@ class CodeProvider(Provider):
         )
         self._add_base_args(parser)
         parser.add_argument("--ssh", action="store_true", dest="openssh_server")
-        parser.add_argument("-p", "--ports", metavar="PORT_COUNT", type=int)
         return parser
 
     def parse_args(self):
@@ -69,24 +72,26 @@ class CodeProvider(Provider):
         env = {}
         connection_token = uuid.uuid4().hex
         env["CONNECTION_TOKEN"] = connection_token
-        apps = [
+        apps = []
+        ports = PortsRegistry()
+        for i, port in enumerate(self.ports, start=1):
+            apps.append(
+                AppSpec(
+                    port=ports.allocate(port),
+                    app_name="code" + str(i),
+                )
+            )
+        apps.append(
             AppSpec(
-                port_index=0,
+                port=self.code_port,
                 app_name="code",
                 url_query_params={
                     "tkn": connection_token,
                 },
             )
-        ]
-        for i in range(self.ports or 0):
-            apps.append(
-                AppSpec(
-                    port_index=i + 1,
-                    app_name="code" + (str(i + 1)),
-                )
-            )
+        )
         if self.openssh_server:
-            apps.append(AppSpec(port_index=len(apps), app_name="openssh-server"))
+            OpenSSHExtension.patch_apps(apps)
         return [
             JobSpec(
                 image_name=self.image_name,
@@ -95,7 +100,6 @@ class CodeProvider(Provider):
                 env=env,
                 working_dir=self.working_dir,
                 artifact_specs=self.artifact_specs,
-                port_count=len(apps),
                 requirements=self.resources,
                 app_specs=apps,
             )
@@ -112,14 +116,7 @@ class CodeProvider(Provider):
         if self.env:
             self._extend_commands_with_env(commands, self.env)
         if self.openssh_server:
-            self._extend_commands_with_openssh_server(commands, self.ssh_key_pub, 1)
-        commands.append("export _PORT=$PORT_0")
-        if self.ports:
-            for i in range(self.ports):
-                commands.append(f"export PORT_{i}=$PORT_{i + 1}")
-                commands.append(f"echo 'export PORT_{i}=\"$PORT_{i + 1}\"' >> ~/.bashrc")
-                commands.append(f'echo "The PORT_{i} port is mapped to http://0.0.0.0:$PORT_{i}"')
-            commands.append("echo")
+            OpenSSHExtension.patch_commands(commands, ssh_key_pub=self.ssh_key_pub)
         commands.extend(
             [
                 "pip install ipykernel -q",
@@ -136,7 +133,9 @@ class CodeProvider(Provider):
         if self.setup:
             commands.extend(self.setup)
         commands.append(
-            f"/tmp/openvscode-server-v{self.version}-linux-$arch/bin/openvscode-server --port $_PORT --host 0.0.0.0 --connection-token $CONNECTION_TOKEN --default-folder /workflow"
+            f"/tmp/openvscode-server-v{self.version}-linux-$arch/bin/openvscode-server"
+            f"  --port {self.code_port} --host 0.0.0.0 --connection-token $CONNECTION_TOKEN"
+            f"  --default-folder /workflow"
         )
         return commands
 

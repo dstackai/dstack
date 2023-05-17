@@ -190,8 +190,6 @@ class Job(JobHead):
     working_dir: Optional[str]
     artifact_specs: Optional[List[ArtifactSpec]]
     cache_specs: List[CacheSpec]
-    port_count: Optional[int]
-    ports: Optional[List[int]]
     host_name: Optional[str]
     requirements: Optional[Requirements]
     dep_specs: Optional[List[DepSpec]]
@@ -257,15 +255,13 @@ class Job(JobHead):
             "working_dir": self.working_dir or "",
             "artifacts": artifacts,
             "cache": [item.dict() for item in self.cache_specs],
-            "port_count": self.port_count if self.port_count else 0,
-            "ports": [str(port) for port in self.ports] if self.ports else [],
             "host_name": self.host_name or "",
             "requirements": self.requirements.serialize() if self.requirements else {},
             "deps": deps,
             "master_job_id": self.master_job.get_id() if self.master_job else "",
             "apps": [
                 {
-                    "port_index": a.port_index,
+                    "port": a.port,
                     "app_name": a.app_name,
                     "url_path": a.url_path or "",
                     "url_query_params": a.url_query_params or {},
@@ -352,7 +348,7 @@ class Job(JobHead):
         app_specs = (
             [
                 AppSpec(
-                    port_index=a["port_index"],
+                    port=a["port"],
                     app_name=a["app_name"],
                     url_path=a.get("url_path") or None,
                     url_query_params=a.get("url_query_params") or None,
@@ -400,8 +396,6 @@ class Job(JobHead):
             working_dir=job_data.get("working_dir") or None,
             artifact_specs=artifact_specs,
             cache_specs=[CacheSpec(**item) for item in job_data.get("cache", [])],
-            port_count=job_data.get("port_count") or None,
-            ports=job_data.get("ports") or None,
             host_name=job_data.get("host_name") or None,
             requirements=requirements,
             dep_specs=dep_specs or None,
@@ -432,7 +426,6 @@ class JobSpec(JobRef):
     env: Optional[Dict[str, str]] = None
     working_dir: Optional[str] = None
     artifact_specs: Optional[List[ArtifactSpec]] = None
-    port_count: Optional[int] = None
     requirements: Optional[Requirements] = None
     master_job: Optional[JobRef] = None
     app_specs: Optional[List[AppSpec]] = None
@@ -442,22 +435,3 @@ class JobSpec(JobRef):
 
     def set_id(self, job_id: Optional[str]):
         self.job_id = job_id
-
-    def __str__(self) -> str:
-        commands = format_list(self.commands, formatter=lambda a: _quoted(str(a)))
-        entrypoint = format_list(self.entrypoint, formatter=lambda a: _quoted(str(a)))
-        artifact_specs = format_list(self.artifact_specs)
-        app_specs = format_list(self.app_specs)
-        return (
-            f'JobSpec(job_id="{self.job_id}", image_name="{self.image_name}", '
-            f"registry_auth={self.registry_auth}, "
-            f"commands={commands}, "
-            f"entrypoint={entrypoint}, "
-            f"env={self.env}, "
-            f"working_dir={_quoted(self.working_dir)}, "
-            f"port_count={self.port_count}, "
-            f"artifact_specs={artifact_specs}, "
-            f"requirements={self.requirements}, "
-            f"master_job={self.master_job}, "
-            f"app_specs={app_specs})"
-        )

@@ -40,7 +40,6 @@ type Executor struct {
 	artifactsOut   []artifacts.Artifacter
 	artifactsFUSE  []artifacts.Artifacter
 	repo           *repo.Manager
-	pm             ports.Manager
 	portID         string
 	streamLogs     *stream.Server
 	stoppedCh      chan struct{}
@@ -87,8 +86,6 @@ func (ex *Executor) Init(ctx context.Context, configDir string) error {
 		return err
 	}
 
-	//ex.pm = ports.NewSingle(ex.config.ExposePorts())
-	ex.pm = ports.NewSystem()
 	job := ex.backend.Job(ctx)
 
 	//Update port logs
@@ -215,22 +212,11 @@ func (ex *Executor) runJob(ctx context.Context, erCh chan error, stoppedCh chan 
 		"job_id", job.JobID,
 		"workflow", job.WorkflowName,
 	)
-	var err error
-	log.Trace(jctx, "Register in port manager")
-	ex.portID, err = ex.pm.Register(job.PortCount, job.Ports)
-	if err != nil {
-		erCh <- gerrors.Wrap(err)
-		return
-	}
-	defer ex.pm.Unregister(ex.portID)
-	log.Trace(jctx, "Ports gotten", "ports", ex.pm.Ports(ex.portID))
-	{
-		job.Ports = ex.pm.Ports(ex.portID)
-		if ex.config.Hostname != nil {
-			job.HostName = *ex.config.Hostname
-		}
+	if ex.config.Hostname != nil {
+		job.HostName = *ex.config.Hostname
 	}
 
+	var err error
 	switch job.RepoType {
 	case "remote":
 		log.Trace(jctx, "Fetching git repository")
@@ -458,12 +444,6 @@ func (ex *Executor) environment(ctx context.Context) []string {
 		cons["JOB_HOSTNAME"] = *ex.config.Hostname
 		cons["HOSTNAME"] = *ex.config.Hostname
 	}
-	pos := 0
-	for _, v := range ex.pm.Ports(ex.portID) {
-		cons[fmt.Sprintf("PORT_%d", pos)] = v
-		cons[fmt.Sprintf("JOB_PORT_%d", pos)] = v
-		pos++
-	}
 
 	if job.MasterJobID != "" {
 		master := ex.backend.MasterJob(ctx)
@@ -471,19 +451,10 @@ func (ex *Executor) environment(ctx context.Context) []string {
 		cons["MASTER_HOSTNAME"] = master.HostName
 		cons["MASTER_JOB_ID"] = master.JobID
 		cons["MASTER_JOB_HOSTNAME"] = master.HostName
-		pos = 0
-		if master.Ports != nil {
-			for _, v := range master.Ports {
-				cons[fmt.Sprintf("MASTER_JOB_PORT_%d", pos)] = v
-				cons[fmt.Sprintf("MASTER_PORT_%d", pos)] = v
-				pos++
-			}
-		}
 	}
 
 	env.AddMapString(cons)
 	env.AddMapString(job.Environment)
-	//env.AddMapInterface(job.Variables)
 	secrets, err := ex.backend.Secrets(ctx)
 	if err != nil {
 		log.Error(ctx, "Fail fetching secrets", "err", err)
@@ -583,8 +554,8 @@ func (ex *Executor) processJob(ctx context.Context, stoppedCh chan struct{}) err
 		Entrypoint:         job.Entrypoint,
 		Env:                ex.environment(ctx),
 		Mounts:             uniqueMount(bindings),
-		ExposedPorts:       ex.pm.ExposedPorts(ex.portID),
-		BindingPorts:       ex.pm.BindPorts(ex.portID),
+		ExposedPorts:       ports.GetAppsExposedPorts(job.Apps),
+		BindingPorts:       ports.GetAppsBindingPorts(job.Apps),
 		ShmSize:            resource.ShmSize,
 	}
 	logGroup := fmt.Sprintf("/jobs/%s", job.RepoId)

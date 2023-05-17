@@ -4,7 +4,7 @@ import sys
 import time
 from argparse import Namespace
 from pathlib import Path
-from typing import Dict, Iterator, List, Optional, Tuple
+from typing import Dict, Iterator, List, Optional
 
 import websocket
 from cursor import cursor
@@ -117,14 +117,10 @@ class RunCommand(BasicCommand):
                 console.print("\nProvisioning failed\n")
                 exit(1)
             if not args.detach:
-                openssh_server = any(
-                    spec.app_name == "openssh-server" for spec in jobs[0].app_specs or []
-                )
                 _poll_run(
                     hub_client,
                     jobs,
                     ssh_key=config.repo_user_config.ssh_key_path,
-                    openssh_server=openssh_server,
                 )
         except ValidationError as e:
             sys.exit(
@@ -141,7 +137,6 @@ def _poll_run(
     hub_client: HubClient,
     job_heads: List[JobHead],
     ssh_key: Optional[str],
-    openssh_server: bool,
 ):
     run_name = job_heads[0].run_name
     try:
@@ -195,13 +190,15 @@ def _poll_run(
         console.print("[grey58]To exit, press Ctrl+C.[/]")
         console.print()
 
-        if openssh_server:
-            ssh_port = jobs[0].ports[-1]
-            ssh_port = ports.get(ssh_port, ssh_port)
-            ssh_key_escaped = ssh_key.replace(" ", "\\ ")
-            console.print("To connect via SSH, use:")
-            console.print(f"  ssh -i {ssh_key_escaped} root@localhost -p {ssh_port}")
-            console.print()
+        for app_spec in jobs[0].app_specs:
+            if app_spec.app_name == "openssh-server":
+                ssh_port = app_spec.port
+                ssh_port = ports.get(ssh_port, ssh_port)
+                ssh_key_escaped = ssh_key.replace(" ", "\\ ")
+                console.print("To connect via SSH, use:")
+                console.print(f"  ssh -i {ssh_key_escaped} root@localhost -p {ssh_port}")
+                console.print()
+                break
 
         run = hub_client.list_run_heads(run_name)[0]
         if run.status.is_unfinished() or run.status == JobStatus.DONE:
