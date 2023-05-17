@@ -28,6 +28,7 @@ type JsonPayload struct {
 }
 
 type LogEntry struct {
+	EventID       string      `json:"EventID"`
 	LogName       string      `json:"LogName"`
 	JsonPayload   JsonPayload `json:"JsonPayload"`
 	TimeGenerated string      `json:"TimeGenerated"`
@@ -42,11 +43,12 @@ type AzureLoggingClient struct {
 }
 
 type AzureLogger struct {
-	client  *AzureLoggingClient
-	jobID   string
-	logName string
-	logBuff []LogEntry
-	logCh   chan LogEntry
+	client      *AzureLoggingClient
+	jobID       string
+	logName     string
+	logBuff     []LogEntry
+	logCh       chan LogEntry
+	logsWritten int
 }
 
 func NewAzureLoggingClient(ctx context.Context, credential *azidentity.DefaultAzureCredential, subscriptionId, resourceGroup, storageAccount string) *AzureLoggingClient {
@@ -97,6 +99,7 @@ func (azlogger *AzureLogger) Launch(ctx context.Context) error {
 
 func (azlogger *AzureLogger) Write(p []byte) (int, error) {
 	logEntry := azlogger.makeLogEntry(p)
+	azlogger.logsWritten += 1
 	azlogger.logCh <- logEntry
 	return len(p), nil
 }
@@ -153,6 +156,7 @@ func getLogName(logGroup, logStream string) string {
 
 func (azlogger *AzureLogger) makeLogEntry(data []byte) LogEntry {
 	return LogEntry{
+		EventID:       fmt.Sprint(azlogger.logsWritten),
 		LogName:       azlogger.logName,
 		TimeGenerated: time.Now().UTC().Format("2006-01-02T15:04:05.000000Z"),
 		JsonPayload: JsonPayload{

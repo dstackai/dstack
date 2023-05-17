@@ -600,6 +600,7 @@ class LogsManager:
                 schema=Schema(
                     name=name,
                     columns=[
+                        Column(name="EventID", type=ColumnTypeEnum.STRING),
                         Column(name="LogName", type=ColumnTypeEnum.STRING),
                         Column(name="JsonPayload", type=ColumnTypeEnum.DYNAMIC),
                         Column(name="TimeGenerated", type=ColumnTypeEnum.DATE_TIME),
@@ -661,6 +662,10 @@ class LogsManager:
                 stream_declarations={
                     stream_name: StreamDeclaration(
                         columns=[
+                            ColumnDefinition(
+                                name="EventID",
+                                type="string",
+                            ),
                             ColumnDefinition(
                                 name="LogName",
                                 type="string",
