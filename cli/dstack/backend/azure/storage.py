@@ -45,16 +45,18 @@ class AzureStorage(CloudStorage):
             downloader.readinto(f)
         callback(os.path.getsize(dest_path))
 
-    def list_files(self, dirpath: str) -> List[StorageFile]:
-        prefix = dirpath
-        blobs: Iterator[BlobProperties] = self._container_client.list_blobs(
-            name_starts_with=prefix
+    def list_files(self, prefix: str, recursive: bool) -> List[StorageFile]:
+        delimiter = "/"
+        if recursive:
+            delimiter = ""
+        blobs: Iterator[BlobProperties] = self._container_client.walk_blobs(
+            name_starts_with=prefix, delimiter=delimiter
         )
         files = []
         for blob in blobs:
             file = StorageFile(
-                filepath=removeprefix(blob.name, prefix),
-                filesize_in_bytes=blob.size,
+                filepath=blob.name,
+                filesize_in_bytes=blob.get("size"),
             )
             files.append(file)
         return files
