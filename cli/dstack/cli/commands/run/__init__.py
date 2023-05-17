@@ -190,7 +190,7 @@ def _poll_run(
         console.print("[grey58]To exit, press Ctrl+C.[/]")
         console.print()
 
-        for app_spec in jobs[0].app_specs:
+        for app_spec in jobs[0].app_specs or []:
             if app_spec.app_name == "openssh-server":
                 ssh_port = app_spec.port
                 ssh_port = ports.get(ssh_port, ssh_port)
