@@ -4,6 +4,7 @@ from typing import Dict, Optional, Tuple, Union
 import botocore.exceptions
 from boto3.session import Session
 
+from dstack.backend.aws import AwsBackend
 from dstack.backend.aws.config import AWSConfig
 from dstack.backend.base.config import BackendConfig
 from dstack.hub.models import (
@@ -36,6 +37,9 @@ regions = [
 
 class AWSConfigurator(Configurator):
     NAME = "aws"
+
+    def get_backend_class(self) -> type:
+        return AwsBackend
 
     def configure_project(self, config_data: Dict) -> AWSProjectValues:
         config = AWSConfig.deserialize(config_data)
@@ -79,7 +83,7 @@ class AWSConfigurator(Configurator):
         auth = AWSProjectCreds.parse_obj(project_config).dict()
         return config, auth
 
-    def get_config_from_hub_config_data(
+    def get_backend_config_from_hub_config_data(
         self, project_name: str, config_data: Dict, auth_data: Dict
     ) -> BackendConfig:
         return AWSConfig.deserialize(config_data, auth_data)

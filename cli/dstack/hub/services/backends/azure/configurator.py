@@ -43,6 +43,7 @@ from azure.mgmt.storage.models import Sku as StorageSku
 from azure.mgmt.storage.models import StorageAccount, StorageAccountCreateParameters
 from azure.mgmt.subscription import SubscriptionClient
 
+from dstack.backend.azure import AzureBackend
 from dstack.backend.azure import utils as azure_utils
 from dstack.backend.azure.config import AzureConfig
 from dstack.hub.models import (
@@ -81,6 +82,9 @@ LOCATION_VALUES = [l[1] for l in LOCATIONS]
 
 class AzureConfigurator(Configurator):
     NAME = "azure"
+
+    def get_backend_class(self) -> type:
+        return AzureBackend
 
     def configure_project(self, config_data: Dict) -> AzureProjectValues:
         self.credential = ClientSecretCredential(
@@ -153,7 +157,7 @@ class AzureConfigurator(Configurator):
         }
         return config_data, auth_data
 
-    def get_config_from_hub_config_data(
+    def get_backend_config_from_hub_config_data(
         self, project_name: str, config_data: Dict, auth_data: Dict
     ) -> AzureConfig:
         return AzureConfig.deserialize({**config_data, **auth_data})

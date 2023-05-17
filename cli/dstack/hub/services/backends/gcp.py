@@ -5,6 +5,7 @@ from google.cloud import compute_v1, storage
 from google.oauth2 import service_account
 
 from dstack.backend.base.config import BackendConfig
+from dstack.backend.gcp import GCPBackend
 from dstack.backend.gcp.config import GCPConfig
 from dstack.hub.models import (
     GCPProjectConfig,
@@ -105,6 +106,9 @@ GCP_LOCATIONS = [
 class GCPConfigurator(Configurator):
     NAME = "gcp"
 
+    def get_backend_class(self) -> type:
+        return GCPBackend
+
     def configure_project(self, config_data: Dict) -> GCPProjectValues:
         try:
             service_account_info = json.loads(config_data.get("credentials"))
@@ -147,7 +151,7 @@ class GCPConfigurator(Configurator):
         auth = GCPProjectCreds.parse_obj(project_config).dict()
         return config, auth
 
-    def get_config_from_hub_config_data(
+    def get_backend_config_from_hub_config_data(
         self, project_name: str, config_data: Dict, auth_data: Dict
     ) -> BackendConfig:
         credentials = json.loads(auth_data["credentials"])

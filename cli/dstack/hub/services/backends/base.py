@@ -16,6 +16,10 @@ class Configurator(ABC):
     NAME = None
 
     @abstractmethod
+    def get_backend_class(self) -> type:
+        pass
+
+    @abstractmethod
     def configure_project(self, config_data: Dict) -> ProjectValues:
         pass
 
@@ -32,7 +36,7 @@ class Configurator(ABC):
         pass
 
     @abstractmethod
-    def get_config_from_hub_config_data(
+    def get_backend_config_from_hub_config_data(
         self, project_name: str, config_data: Dict, auth_data: Dict
     ) -> BackendConfig:
         pass
