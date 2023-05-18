@@ -60,7 +60,9 @@ class ProjectManager:
         projects = query.scalars().unique().all()
         projects_info = []
         for project in projects:
-            projects_info.append(_project2info(project=project))
+            project_info = _project2info(project=project)
+            if project_info is not None:
+                projects_info.append(project_info)
         return projects_info
 
     @staticmethod
@@ -164,7 +166,7 @@ async def _info2project(project_info: ProjectInfoWithCreds) -> Project:
 
 def _project2info(
     project: Project, include_creds: bool = False
-) -> Union[ProjectInfo, ProjectInfoWithCreds]:
+) -> Union[ProjectInfo, ProjectInfoWithCreds, None]:
     members = []
     for member in project.members:
         members.append(
@@ -174,6 +176,8 @@ def _project2info(
             )
         )
     configurator = get_configurator(project.backend)
+    if configurator is None:
+        return None
     backend = configurator.get_project_config_from_project(project, include_creds=include_creds)
     if include_creds:
         return ProjectInfoWithCreds(project_name=project.name, backend=backend, members=members)

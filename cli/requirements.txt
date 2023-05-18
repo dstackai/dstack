@@ -17,7 +17,6 @@ py-cpuinfo
 websocket-client
 cursor
 simple-term-menu
-jinja2
 pygtail
 aiosqlite
 packaging
@@ -30,12 +29,6 @@ psutil
 # AWS
 boto3
 botocore
-
-# GCP
-google-cloud-storage
-google-cloud-compute
-google-cloud-secret-manager
-google-cloud-logging
 
 # Azure
 azure-identity
@@ -52,3 +45,9 @@ azure-mgmt-loganalytics
 azure-mgmt-msi
 azure-mgmt-monitor
 azure-graphrbac
+
+# GCP
+google-cloud-storage
+google-cloud-compute
+google-cloud-secret-manager
+google-cloud-logging

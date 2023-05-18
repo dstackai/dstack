@@ -59,8 +59,6 @@ setup(
         "pyyaml",
         "requests",
         "gitpython",
-        "boto3",
-        "botocore",
         "tqdm",
         "jsonschema",
         "python-dateutil",
@@ -77,14 +75,8 @@ setup(
         "cursor",
         "simple-term-menu",
         "py-cpuinfo",
-        "jinja2",
         "pygtail",
         "packaging",
-        "google-auth>=2.3.0",  # indirect
-        "google-cloud-storage>=2.0.0",
-        "google-cloud-compute>=1.5.0",
-        "google-cloud-secret-manager>=2.0.0",
-        "google-cloud-logging>=2.0.0",
         "aiosqlite",
         "apscheduler",
         "alembic>=1.10.2",
@@ -93,10 +85,15 @@ setup(
         "psutil>=5.0.0",
     ],
     extras_require={
+        "aws": [
+            "boto3",
+            "botocore",
+        ],
         "azure": [
             "azure-identity>=1.12.0",
             "azure-keyvault-secrets>=4.6.0",
             "azure-storage-blob>=12.15.0",
+            "azure-monitor-query>=1.2.0",
             "azure-mgmt-subscription>=3.1.1",
             "azure-mgmt-compute>=29.1.0",
             "azure-mgmt-network==23.0.0b2",
@@ -104,11 +101,18 @@ setup(
             "azure-mgmt-authorization>=3.0.0",
             "azure-mgmt-storage>=21.0.0",
             "azure-mgmt-keyvault>=10.1.0",
-            "azure-mgmt-loganalytics",
+            "azure-mgmt-loganalytics==13.0.0b6",
             "azure-mgmt-msi",
             "azure-mgmt-monitor",
             "azure-graphrbac",
-        ]
+        ],
+        "gcp": [
+            "google-auth>=2.3.0",  # indirect
+            "google-cloud-storage>=2.0.0",
+            "google-cloud-compute>=1.5.0",
+            "google-cloud-secret-manager>=2.0.0",
+            "google-cloud-logging>=2.0.0",
+        ],
     },
     classifiers=[
         "Development Status :: 2 - Pre-Alpha",

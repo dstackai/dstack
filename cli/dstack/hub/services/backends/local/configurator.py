@@ -1,3 +1,4 @@
+import subprocess
 from typing import Dict, Tuple
 
 from dstack.backend.local import LocalBackend
