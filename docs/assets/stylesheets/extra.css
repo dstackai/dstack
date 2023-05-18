@@ -15,7 +15,8 @@
 }
 
 .md-copyright__highlight {
-    font-size: 0.7rem;
+    font-size: 0.75rem;
+    margin-top: -8px;
 }
 
 .md-copyright__highlight a {
@@ -130,7 +131,7 @@
 
 @media screen and (min-width: 76.1875em) {
     .md-header__topic:first-child {
-        font-size: 25px;
+        font-size: 30px;
         /*font-family: Poppins, metro-web, Metro, -apple-system, "system-ui", "Segoe UI", Roboto, Oxygen-Sans, Ubuntu, Cantarell, "Helvetica Neue", sans-serif;*/
         /*font-weight: 500;*/
     }
@@ -368,7 +369,7 @@
     [data-md-color-primary=white] .md-search__form {
         background-color: transparent;
         border-radius: 18px;
-        border: 1px solid rgba(0,0,0,0.6);
+        border: 1px solid rgba(0,0,0,0.87);
     }
 
     [data-md-color-primary=white] .md-search__form:hover {
@@ -952,7 +953,7 @@ html .md-footer-meta.md-typeset a:is(:focus,:hover) {
 
     .md-tabs__link {
         text-transform: uppercase;
-        font-size: 0.75rem;
+        font-size: 0.8rem;
         font-weight: 700;
         color: black;
         letter-spacing: -0.5px;
@@ -1144,8 +1145,8 @@ html .md-footer-meta.md-typeset a:is(:focus,:hover) {
     margin-right: 5px;
     background: transparent;
     font-weight: 500 !important;
-    padding: 0.55em 2em;
-    font-size: 19px;
+    padding: 0.4em 1.5em;
+    font-size: 17px;
     border-radius: 4px;
 }
 

@@ -10,25 +10,31 @@ locally or in any cloud.
 
 A configuration can be defined as a YAML file (under the `.dstack/workflows` directory).
 
-<div editor-title=".dstack/workflows/hello.yaml"> 
+<div editor-title=".dstack/workflows/fastapi-app.yaml"> 
 
 ```yaml
 workflows:
-  - name: hello-fastapi
+  - name: fastapi-app
     provider: bash
     ports: 1
     commands:
       - pip install fastapi uvicorn
       - uvicorn main:app --port $PORT_0 --host 0.0.0.0
+    resources:
+      gpu:
+        name: P100
 ```
 
 </div>
 
-The configuration allows you to customize hardware resources, set up the Python environment, 
+The [configuration](../reference/providers/bash.md) allows you to customize hardware resources, set up the Python environment, 
 and more.
 
-To configure ports, you have to specify the number of ports via the `ports` property. They'll be
+To configure ports, you have to specify the number of ports via the 
+[`ports`](../reference/providers/bash.md#ports) property. They'll be
 passed to the run as environment variables like `PORT_0`, `PORT_1`, etc.
+
+[//]: # (TODO [MEDIUM]: It doesn't explain how to mount deps)
 
 [//]: # (TODO [MAJOR]: It supports only YAML and doesn't allow to use pure Python)
 
@@ -38,21 +44,23 @@ passed to the run as environment variables like `PORT_0`, `PORT_1`, etc.
 
 ## Running an app
 
-Once a configuration is defined, you can run it using the `dstack run` command:
+Once a configuration is defined, you can run it using the [`dstack run`](../reference/cli/run.md) command:
 
 <div class="termy">
 
 ```shell
-$ dstack run hello
+$ dstack run fastapi-app
+ RUN           WORKFLOW     SUBMITTED  STATUS     TAG
+ silly-dodo-1  fastapi-app  now        Submitted     
 
-RUN      WORKFLOW  SUBMITTED  STATUS     TAG
-shady-1  hello     now        Submitted  
- 
-Provisioning... It may take up to a minute. ✓
+Starting SSH tunnel...
 
-To exit, press Ctrl+C.
+To interrupt, press Ctrl+C.
 
-Hello, world!
+INFO:     Started server process [1]
+INFO:     Waiting for application startup.
+INFO:     Application startup complete.
+INFO:     Uvicorn running on http://127.0.0.1:63475 (Press CTRL+C to quit)
 ```
 
 </div>
@@ -64,8 +72,8 @@ For convenience, `dstack` uses an exact copy of the source code that is locally 
     for the app), feel free to add them to the `.gitignore` file. In this case, `dstack` will ignore them,
     even if you aren't using Git.
 
-If you configure a project to run dev environments in the cloud, `dstack` will automatically provision the
-required cloud resources, and forward ports of the dev environment to your local machine.
+If you configure a project to run apps in the cloud, `dstack` will automatically provision the
+required cloud resources, and forward ports of the app to your local machine.
 
 ??? info "Configuring projects"
     The default project runs apps locally. However, you can
@@ -75,39 +83,44 @@ required cloud resources, and forward ports of the dev environment to your local
 
 #### Stopping a run
 
-To stop the run, click `Ctrl`+`C` while the `dstack run` command is running,
-or use the `dstack stop` command. `dstack` will automatically save the output artifacts and clean up any cloud resources 
+To stop the app, click `Ctrl`+`C` while the [`dstack run`](../reference/cli/run.md) command is running,
+or use the [`dstack stop`](../reference/cli/stop.md) command. `dstack` will automatically clean up any cloud resources 
 if they are used.
 
 ## Configuring hardware resources
 
-If your project is configured to run apps in the cloud, you can use the `resources` property in the YAML file to 
+If your project is configured to run apps in the cloud, you can use the 
+[`resources`](../reference/providers/bash.md#resources) property in the YAML file to 
 request hardware resources like memory, GPUs, and shared memory size.
 
-Additionally, you can choose whether dstack should use interruptible instances (also known as spot instances).
-
-<div editor-title=".dstack/workflows/hello.yaml"> 
+<div editor-title=".dstack/workflows/fastapi-app.yaml"> 
 
 ```yaml
 workflows:
-  - name: hello
+  - name: fastapi-app
     provider: bash
+    ports: 1
     commands:
-      - echo "Hello, world!"
+      - pip install fastapi uvicorn
+      - uvicorn main:app --port $PORT_0 --host 0.0.0.0
     resources:
       gpu:
-        name: V100
-        count: 1
+        name: P100
       interruptible: true
 ```
 
 </div>
 
+The [`interruptible`](../reference/providers/bash.md#resources) property tells `dstack` to utilize spot instances. Spot instances may be not always available.
+But when they are available, they are significantly cheaper.
+
+[//]: # (TODO [MEDIUM]: It doesn't allow to switch to on-demand automatically)
+
 ## Setting up the environment
 
 You can use `pip` and `conda` executables to install packages and set up the environment.
 
-Use the `python` property to specify a version of Python for pre-installation. Otherwise, `dstack` uses the local version.
+Use the [`python`](../reference/providers/bash.md) property to specify a version of Python for pre-installation. Otherwise, `dstack` uses the local version.
 
 [//]: # (TODO [MAJOR]: Currently, there is no way to pre-build the environment)
 
@@ -115,35 +128,40 @@ Use the `python` property to specify a version of Python for pre-installation. O
 
 To run the app with your custom Docker image, you can use the `docker` provider.
 
-<div editor-title=".dstack/workflows/hello-docker.yaml"> 
+<div editor-title=".dstack/workflows/fastapi-app.yaml"> 
 
 ```yaml
 workflows:
-  - name: hello-fastapi
-    provider: python:3.11
+  - name: fastapi-app
+    provider: docker
+    image: python:3.11
     ports: 1
     commands:
       - pip install fastapi uvicorn
       - uvicorn main:app --port $PORT_0 --host 0.0.0.0
+    resources:
+      gpu:
+        name: P100 
 ```
 
 </div>
 
 ## Configuring cache
 
-Your app may download files like pre-trained models, external data, or Python
+Apps may download files like pre-trained models, external data, or Python
 packages. To avoid downloading them on each run, you can choose
 which paths to cache between runs. 
 
-<div editor-title=".dstack/workflows/hello-cache.yaml"> 
+<div editor-title=".dstack/workflows/fastapi-app.yaml"> 
 
 ```yaml
 workflows:
-  - name: hello-cache
+  - name: fastapi-app
     provider: bash
+    ports: 1
     commands:
-      - pip install torchvision
-      - pip list | grep torchvision
+      - pip install fastapi uvicorn
+      - uvicorn main:app --port $PORT_0 --host 0.0.0.0
     cache:
       - ~/.cache/pip
 ```
@@ -151,9 +169,12 @@ workflows:
 </div>
 
 !!! info "NOTE:"
-    Cache saves files in its own storage and downloads them at startup. This improves performance and saves you 
+    Cache saves files in the configured storage and downloads them at startup. This improves performance and saves you 
     from data transfer costs.
 
 #### Cleaning up the cache
 
-To clean up the cache, use the `dstack prune cache` CLI command, followed by the name of the configuration.
+To clean up the cache, use the [`dstack prune cache`](../reference/cli/prune.md) CLI command, followed by the name of the configuration.
+
+!!! info "NOTE:"
+    Check out the [`dstackai/dstack-examples`](https://github.com/dstackai/dstack-examples/blob/main/README.md) repo for source code and other examples.

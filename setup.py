@@ -51,7 +51,7 @@ setup(
     project_urls={
         "Source": "https://github.com/dstackai/dstack",
     },
-    description="The easiest way to run any ML code in the cloud",
+    description="Develop ML faster. Easily and cost-effectively run dev environments, pipelines, and apps on any cloud.",
     long_description=get_long_description(),
     long_description_content_type="text/markdown",
     python_requires=">=3.7",

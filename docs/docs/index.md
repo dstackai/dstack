@@ -1,7 +1,7 @@
-# Quick start
+# Getting started
 
-`dstack` helps ML engineers define dev environments, pipelines, and apps as code and run them cost-effectively 
-either locally or in any cloud.
+`dstack` makes it very easy for ML engineers to manage dev environments and run pipelines and apps cost-effectively 
+on any cloud.
 
 ## Installation and setup
 
@@ -23,64 +23,67 @@ The Hub is available at http://127.0.0.1:3000?token=b934d226-e24a-4eab-eb92b353b
     It orchestrates runs, stores cloud credentials, tracks usage, and performs other essential functions.
 
     You have the flexibility to start Hub locally, on a dedicated server, or in the cloud. When starting it locally, 
-    the default project is automatically configured to run everything locally. If Hub is started remotely, you can 
-    configure the CLI to connect to a remote Hub using the `dstack config` command.
+    the default project is automatically configured to run everything locally.
 
-    To enable Hub to run dev environments, pipelines, and apps in your preferred cloud account (AWS, GCP, etc), you need to 
-    log in to Hub, configure the corresponding project, and provide the necessary cloud credentials.
+    To enable Hub to run dev environments, pipelines, and apps in your preferred cloud account (AWS, GCP, etc), 
+    log in to Hub, and configure the corresponding project.
 
-## Init the repo
+## Initializing the repo
 
-A repo is any folder from which you can run dev environments, pipelines, and apps.
-
-To initialize a folder as a repo, you have to run the `dstack init` command there.
+Before you can run dev environments, pipelines, and apps in any folder,
+first have to initialize it as a repo by running the [`dstack init`](reference/cli/init.md) command.
 
 <div class="termy">
 
 ```shell
-$ mkdir hello-dstack && cd hello-dstack
+$ mkdir quickstart && cd quickstart
 $ dstack init
 ```
 
 </div>
 
-## Run your first dev environment
+## Running a dev environment
 
-To create a dev environment, all you have to do is define it via YAML (under the `.dstack/workflows` folder) 
-and then run it by name via the CLI.
+A dev environment is a virtual machine that includes the environment and an interactive IDE or notebook setup
+based on a pre-defined configuration.
 
-<div editor-title=".dstack/workflows/hello-env.yaml"> 
+Go ahead and define this configuration via YAML (under the `.dstack/workflows` folder).
+
+<div editor-title=".dstack/workflows/dev-env.yaml"> 
 
 ```yaml
 workflows:
-  - name: hello-env
+  - name: dev-env
     provider: code
-    python: 3.10
     setup:
-      - pip install transformers accelerate gradio
+      - pip install requirements.txt
     resources:
       gpu:
-        name: V100
+        name: P100
         count: 1
 ```
 
 </div>
 
+[//]: # (TODO [MAJOR]: Currently, it's not convenient to hardcode resources in the YAML and not have a convenient way to switch between projects and resource profiles)
+
 !!! info "NOTE:"
-    The YAML file support multiple providers and allows you to configure hardware resources, 
-    set up the Python environment, expose ports, configure cache, and many more.
+    For dev environments, the configuration allows you to configure hardware resources, 
+    set up the Python environment, expose ports, configure cache, and many more. 
+
+    [Learn more →](guides/dev-environments){ .md-button .md-button--primary }
 
 [//]: # (TODO: Currently, it's limited to the built-in VS Code, doesn't forward ports automatically, doesn't provide persistence of the storage, pre-installs packages on every run, and has other limitations)
 
-Now, you can run the dev environment at any time using the `dstack run` command:
+Now, you can start it using the [`dstack run`](reference/cli/run.md) command:
 
 <div class="termy">
 
 ```shell
-$ dstack run hello-env
+$ dstack run dev-env
 
-RUN      WORKFLOW   SUBMITTED  STATUS     TAG
-shady-1  hello-env  now        Submitted  
+RUN      WORKFLOW  SUBMITTED  STATUS     TAG
+shady-1  dev-env   now        Submitted  
  
 Starting SSH tunnel...
 
@@ -91,71 +94,123 @@ Web UI available at http://127.0.0.1:51845/?tkn=4d9cc05958094ed2996b6832f899fda1
 
 </div>
 
-`dstack` launches the dev environment based on the configuration and fetches there an exact copy of the source code
-that is present in the folder where you run the `dstack` command.
-
-[//]: # (TODO: A screenshot)
-
 !!! info "NOTE:"
     If you configure a project to run dev environments in the cloud, `dstack` will automatically provision the
     required cloud resources, and forward ports of the dev environment to your local machine. When you stop the 
-    dev environment, `dstack` will automatically clean up the cloud resources.
+    dev environment, `dstack` will automatically clean up cloud resources.
 
-## Run your first pipeline
+## Running a pipeline
 
-Pipelines allow to process data, train or fine-tune models, do batch inference or any other tasks
-based on a pre-defined configuration.
+A pipeline is a set of pre-defined configurations that allow to process data, train or fine-tune models, do batch inference 
+or other tasks.
 
 To run a pipeline, all you have to do is define it via YAML (under the `.dstack/workflows` folder) 
 and then run it by name via the CLI.
 
-<div editor-title=".dstack/workflows/hello.yaml"> 
+<div editor-title=".dstack/workflows/train-pipeline.yaml"> 
 
 ```yaml
 workflows:
-  - name: hello
+  - name: train-pipeline
     provider: bash
     commands:
-      - echo "Hello, world!"
+      - pip install -r requirements.txt
+      - python train.py
+    artifacts:
+      - ./lightning_logs
     resources:
       gpu:
-        name: V100
+        name: P100
+```
+
+</div>
+
+!!! info "NOTE:"
+    For pipelines, the configuration allows you to configure hardware resources and output artifacts, set up the
+    Python environment, expose ports, configure cache, and many more.
+
+    [Learn more →](guides/pipelines){ .md-button .md-button--primary }
+
+[//]: # (TODO: Currently, it's limited to YAML)
+
+Now, you can run the pipeline using the [`dstack run`](reference/cli/run.md) command:
+
+<div class="termy">
+
+```shell
+$ dstack run train-pipeline
+
+RUN      WORKFLOW        SUBMITTED  STATUS     TAG
+shady-1  train-pipeline  now        Submitted  
+ 
+Provisioning... It may take up to a minute. ✓
+
+GPU available: True, used: True
+
+Epoch 1: [00:03<00:00, 280.17it/s, loss=1.35, v_num=0]
+---> 100%
+```
+
+</div>
+
+!!! info "NOTE:"
+    If you configure a project to run pipelines in the cloud, the [`dstack run`](reference/cli/run.md) command will automatically provision the 
+    required cloud resources.
+    After the pipeline is finished, `dstack` will save output artifacts and clean up cloud resources.
+
+## Running an app
+
+An app can be either a web application (such as Streamlit, Gradio, etc.) or an API endpoint (like FastAPI, Flask, etc.)
+setup based on a pre-defined configuration.
+
+Go ahead and define this configuration via YAML (under the `.dstack/workflows` folder).
+
+<div editor-title=".dstack/workflows/fastapi-app.yaml"> 
+
+```yaml
+workflows:
+  - name: fastapi-app
+    provider: bash
+    ports: 1
+    commands:
+      - pip install fastapi uvicorn
+      - uvicorn main:app --port $PORT_0 --host 0.0.0.0
+    resources:
+      gpu:
+        name: P100
         count: 1
 ```
 
 </div>
 
 !!! info "NOTE:"
-    The YAML file support multiple providers and allows you to configure hardware resources and output artifacts, set up the
-    Python environment, expose ports, configure cache, and many more.
+    For apps, the configuration allows you to customize hardware resources, set up the Python environment, 
+    configure cache, and more.
 
-[//]: # (TODO: Currently, it's limited to YAML)
+    [Learn more →](guides/apps){ .md-button .md-button--primary }
 
-Now, you can run the pipeline using the `dstack run` command:
-
-<div class="termy">
+Now, you can run the app using the [`dstack run`](reference/cli/run.md) command:
 
 ```shell
-$ dstack run hello
+$ dstack run fastapi-app
+ RUN           WORKFLOW     SUBMITTED  STATUS     TAG  BACKENDS
+ silly-dodo-1  fastapi-app  now        Submitted       aws
 
-RUN      WORKFLOW  SUBMITTED  STATUS     TAG
-shady-1  hello     now        Submitted  
- 
-Provisioning... It may take up to a min.
+Starting SSH tunnel...
 
-To exit, press Ctrl+C.
+To interrupt, press Ctrl+C.
 
-Hello, world!
+INFO:     Started server process [1]
+INFO:     Waiting for application startup.
+INFO:     Application startup complete.
+INFO:     Uvicorn running on http://127.0.0.1:63475 (Press CTRL+C to quit)
 ```
 
-</div>
-
-When running, the pipeline uses the exact copy of the source code that is locally present in the folder where you run
-the `dstack` command.
-
 !!! info "NOTE:"
-    If you configure a project to run pipelines in the cloud, the `dstack run` command will automatically provision the 
-    required cloud resources.
-    After the pipeline is finished, `dstack` will automatically save output artifacts and clean up the cloud resources.
+    If you configure a project to run apps in the cloud, `dstack` will automatically provision the required cloud
+    resources, and forward ports of the app to your local machine.
 
 [//]: # (TODO: What's next – Add a link to the Hub guide for the details on how to configure projects)
+
+!!! info "NOTE:"
+    Check out the [`dstackai/dstack-examples`](https://github.com/dstackai/dstack-examples/blob/main/README.md) repo for source code and other examples.

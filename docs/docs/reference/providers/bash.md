@@ -1,6 +1,6 @@
 # bash
 
-The `bash` provider runs given shell commands. 
+The `bash` provider runs given bash commands. 
 
 It comes with Python and Conda pre-installed, and allows to expose ports. 
 
@@ -14,8 +14,6 @@ If GPU is requested, the provider pre-installs the CUDA driver too.
 workflows:
   - name: "train"
     provider: bash
-    deps:
-      - tag: some_tag
     python: 3.10
     commands:
       - pip install requirements.txt

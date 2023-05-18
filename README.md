@@ -3,40 +3,30 @@
   <a target="_blank" href="https://dstack.ai">
     <picture>
       <source media="(prefers-color-scheme: dark)" srcset="https://raw.githubusercontent.com/dstackai/dstack/master/docs/assets/images/dstack-logo-dark.svg"/>
-      <img alt="dstack" src="https://raw.githubusercontent.com/dstackai/dstack/master/docs/assets/images/dstack-logo.svg" width="400px"/>
+      <img alt="dstack" src="https://raw.githubusercontent.com/dstackai/dstack/master/docs/assets/images/dstack-logo.svg" width="350px"/>
     </picture>
   </a>
 </h1>
 
-<h4 align="center">
-ML workflows as code
-</h4>
+<h3 align="center">
+Develop ML faster. Use any cloud.
+</h3>
 
 <p align="center">
-The easiest way to run ML workflows on any cloud platform 
-</p>
-
-[![Slack](https://img.shields.io/badge/slack-join%20chat-blueviolet?logo=slack&style=for-the-badge)](https://join.slack.com/t/dstackai/shared_invite/zt-xdnsytie-D4qU9BvJP8vkbkHXdi6clQ)
-
-<p align="center">
-<a href="https://dstack.ai/docs/quick-start" target="_blank"><b>Quick start</b></a> • 
 <a href="https://dstack.ai/docs" target="_blank"><b>Docs</b></a> • 
-<a href="https://dstack.ai/tutorials/dolly" target="_blank"><b>Tutorials</b></a> •
-<a href="https://dstack.ai/blog" target="_blank"><b>Blog</b></a>
+<a href="https://dstack.ai/examples/dolly" target="_blank"><b>Examples</b></a> •
+<a href="https://dstack.ai/blog" target="_blank"><b>Blog</b></a> •
+<a href="https://join.slack.com/t/dstackai/shared_invite/zt-xdnsytie-D4qU9BvJP8vkbkHXdi6clQ" target="_blank"><b>Slack</b></a>
 </p>
 
-[![Last commit](https://img.shields.io/github/last-commit/dstackai/dstack)](https://github.com/dstackai/dstack/commits/)
-[![PyPI - License](https://img.shields.io/pypi/l/dstack?style=flat&color=blue)](https://github.com/dstackai/dstack/blob/master/LICENSE.md)
-
+[![Last commit](https://img.shields.io/github/last-commit/dstackai/dstack?style=flat-square)](https://github.com/dstackai/dstack/commits/)
+[![PyPI - License](https://img.shields.io/pypi/l/dstack?style=flat-square&color=blue)](https://github.com/dstackai/dstack/blob/master/LICENSE.md)
 </div>
 
-## What is dstack?
+`dstack` makes it very easy for ML engineers to define dev environments,
+pipelines, and apps as code and run them cost-effectively in any cloud.
 
-`dstack` makes it very easy to define ML workflows
-and run them on any cloud platform. It provisions infrastructure,
-manages data, and monitors usage for you.
-
-Ideal for processing data, training models, running apps, and any other ML development tasks.
+Simplify ML development, avoiding engineering struggles and vendor lock-in.
 
 ## Installation and setup
 
@@ -47,137 +37,151 @@ pip install dstack
 dstack start
 ```
 
-The `dstack start` command starts the Hub application, and creates the default project to run workflows locally.
+The `dstack start` command starts the Hub server, and creates the default project to run everything locally.
 
-If you'll want to run workflows in the cloud (e.g. AWS, or GCP), simply log into the Hub application, and 
-create a new project.
+To enable Hub to run dev environments, pipelines, and apps in your preferred cloud account (AWS, GCP, Azure, etc), 
+log in to Hub, and configure the corresponding project.
 
-## Run your first  workflows
+## Getting started with dstack
 
-Let's define our first ML workflow in `.dstack/workflows/hello.yaml`:
+### Running a dev environment
 
-```yaml
-workflows:
-  - name: train-mnist
-    provider: bash
-    commands:
-      - pip install torchvision pytorch-lightning tensorboard
-      - python examples/mnist/train_mnist.py
-    artifacts:
-      - path: ./lightning_logs
-```
+A dev environment is a virtual machine that includes the environment and an interactive IDE or notebook setup
+based on a pre-defined configuration.
 
-The YAML file allows you to request hardware [resources](https://dstack.ai/docs/usage/resources), run [Python](https://dstack.ai/docs/usage/python),
-save [artifacts](https://dstack.ai/docs/usage/artifacts), use [cache](https://dstack.ai/docs/usage/cache) and  
-[dependencies](https://dstack.ai/docs/usage/deps), create [dev environments](https://dstack.ai/docs/usage/dev-environments),
-run [apps](https://dstack.ai/docs/usage/apps), and many more.
-
-## Run it
-
-Go ahead and run it:
-
-```shell
-dstack run train-mnist
-
-RUN        WORKFLOW     SUBMITTED  STATUS     TAG  BACKENDS
-penguin-1  train-mnist  now        Submitted       local
-
-Provisioning... It may take up to a minute. ✓
-
-To interrupt, press Ctrl+C.
-
-GPU available: False, used: False
-
-Epoch 1: [00:03<00:00, 280.17it/s, loss=1.35, v_num=0]
-```
-
-The `dstack run` command runs the workflow using the settings specified for the project configured with the
-Hub application.
-
-## Create a Hub project
-
-As mentioned above, the default project runs workflows locally.
-However, you can log into the application and create other projects that allow you to run workflows in the cloud.
-
-<img src="https://dstack.ai/assets/dstack-hub-create-project.png" width="800px" />
-
-If you want the project to use the cloud, you'll need to provide cloud credentials and specify settings such as the
-artifact storage bucket and the region where the workflows will run.
-
-<img src="https://dstack.ai/assets/dstack-hub-view-project.png" width="800px" />
-
-Once a project is created, copy the CLI command from the project settings and execute it in your terminal.
-
-<div class="termy">
-
-```shell
-dstack config --url http://127.0.0.1:3000 \
-  --project gcp \
-  --token b934d226-e24a-4eab-a284-eb92b353b10f
-```
-
-</div>
-
-The `dstack config` command configures `dstack` to run workflows using the settings from
-the corresponding project.
-
-You can configure multiple projects and use them interchangeably (by passing the `--project` argument to the `dstack 
-run` command. Any project can be set as the default by passing `--default` to the `dstack config` command.
-
-Configuring multiple projects can be convenient if you want to run workflows both locally and in the cloud or if 
-you would like to use multiple clouds.
-
-
-## Manage resources
-
-Consider that you have configured a project that allows you to use a GPU (e.g., a local backend if you have a GPU
-locally, or an AWS or GCP backend).
-
-Let's update our workflow and add `resources`.
+Go ahead and define this configuration via YAML (under the `.dstack/workflows` folder).
 
 ```yaml
 workflows:
-  - name: train-mnist
-    provider: bash
-    commands:
-      - pip install torchvision pytorch-lightning tensorboard
-      - python examples/mnist/train_mnist.py
-    artifacts:
-      - path: ./lightning_logs
+  - name: hello-code
+    provider: code
+    python: 3.11
+    setup:
+      - pip install transformers accelerate gradio
     resources:
       gpu:
         name: V100
-        count: 1
 ```
 
-Let's run the workflow:
+The YAML file allows you to configure hardware resources, 
+set up the Python environment, expose ports, configure cache, and many more.
+
+Now, you can start it using the `dstack run` command:
 
 ```shell
-dstack run train-mnist --project gcp
+$ dstack run hello-code
 
-RUN        WORKFLOW     SUBMITTED  STATUS     TAG  BACKENDS
-penguin-1  train-mnist  now        Submitted       local
+RUN      WORKFLOW    SUBMITTED  STATUS     TAG
+shady-1  hello-code  now        Submitted  
+ 
+Starting SSH tunnel...
 
+To exit, press Ctrl+C.
+
+Web UI available at http://127.0.0.1:51845/?tkn=4d9cc05958094ed2996b6832f899fda1
+```
+
+If you configure a project to run dev environments in the cloud, `dstack` will automatically provision the
+required cloud resources, and forward ports of the dev environment to your local machine. 
+
+When you stop the dev environment, `dstack` will automatically clean up cloud resources.
+
+### Running a pipeline
+
+A pipeline is a set of pre-defined configurations that allow to process data, train or fine-tune models, do batch inference 
+or other tasks.
+
+Go ahead and define such a configuration via YAML (under the `.dstack/workflows` folder).
+
+```yaml
+workflows:
+  - name: train
+    provider: bash
+    commands:
+      - pip install -r requirements.txt
+      - python train.py
+    artifacts:
+      - ./lightning_logs
+    resources:
+      gpu:
+        name: P100
+```
+
+The YAML file allows you to configure hardware resources and output artifacts, set up the
+Python environment, expose ports, configure cache, and many more.
+
+Now, you can run the pipeline using the `dstack run` command:
+
+```shell
+$ dstack run train
+
+RUN      WORKFLOW  SUBMITTED  STATUS     TAG
+shady-1  train     now        Submitted  
+ 
 Provisioning... It may take up to a minute. ✓
-
-To interrupt, press Ctrl+C.
 
 GPU available: True, used: True
 
 Epoch 1: [00:03<00:00, 280.17it/s, loss=1.35, v_num=0]
 ```
 
-If your project is configured to use the cloud, the Hub application will automatically create the necessary cloud
-resources to execute the workflow and tear them down once it is finished.
+If you configure a project to run pipelines in the cloud, the `dstack run` command will automatically provision the 
+required cloud resources.
+
+After the pipeline is stopped or finished, `dstack` will save output artifacts and clean up cloud resources.
+
+### Running an app
+
+An app can be either a web application (such as Streamlit, Gradio, etc.) or an API endpoint (like FastAPI, Flask, etc.)
+setup based on a pre-defined configuration.
+
+Go ahead and define this configuration via YAML (under the `.dstack/workflows` folder).
+
+```yaml
+workflows:
+  - name: hello-fastapi
+    provider: bash
+    ports: 1
+    commands:
+      - pip install fastapi uvicorn
+      - uvicorn main:app --port $PORT_0 --host 0.0.0.0
+    resources:
+      gpu:
+        name: V100
+```
+
+The configuration allows you to customize hardware resources, set up the Python environment, 
+configure cache, and more.
+
+Now, you can run the app using the `dstack run` command:
+
+```shell
+$ dstack run hello-fastapi
+ RUN           WORKFLOW       SUBMITTED  STATUS     TAG  BACKENDS
+ silly-dodo-1  hello-fastapi  now        Submitted       aws
+
+Starting SSH tunnel...
+
+To interrupt, press Ctrl+C.
+
+INFO:     Started server process [1]
+INFO:     Waiting for application startup.
+INFO:     Application startup complete.
+INFO:     Uvicorn running on http://127.0.0.1:63475 (Press CTRL+C to quit)
+```
+
+If you configure a project to run apps in the cloud, `dstack` will automatically provision the required cloud
+resources, and forward ports of the app to your local machine.
+If you stop the app, it will automatically clean up cloud resources.
 
 ## More information
 
 For additional information and examples, see the following links:
 
-* [Quick start](https://dstack.ai/docs/quick-start)
 * [Docs](https://dstack.ai/docs)
-* [Tutorials](https://dstack.ai/tutorials/dolly)
+* [Examples](https://github.com/dstackai/dstack-examples/blob/main/README.md)
 * [Blog](https://dstack.ai/blog)
+* [Slack](https://join.slack.com/t/dstackai/shared_invite/zt-xdnsytie-D4qU9BvJP8vkbkHXdi6clQ)
  
 ##  Licence
 

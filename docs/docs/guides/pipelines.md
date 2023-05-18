@@ -10,26 +10,32 @@ any cloud.
 
 A configuration can be defined as a YAML file (under the `.dstack/workflows` directory).
 
-<div editor-title=".dstack/workflows/hello.yaml"> 
+<div editor-title=".dstack/workflows/train-pipeline.yaml"> 
 
 ```yaml
 workflows:
-  - name: hello
+  - name: train-pipeline
     provider: bash
     commands:
-      - echo "Hello, world!"
+      - pip install -r requirements.txt
+      - python train.py
+    artifacts:
+      - ./lightning_logs
     resources:
       gpu:
-        name: V100
-        count: 1
+        name: P100
 ```
 
 </div>
 
-The configuration allows you to customize hardware resources, set up the Python environment, output artifacts, 
-expose ports, configure cache, and more.
+The [configuration](../reference/providers/bash.md) allows you to customize hardware resources, set up the Python environment, output artifacts, 
+expose ports, configure cache, and of course provide the commands to run.
 
-[//]: # (TODO [TASK]: Include artifacts into the main example)
+The artifacts are saved at the end of the run, such as when it's stopped or finished.
+
+[//]: # (TODO [MAJOR]: It doesn't allow to save artifacts via Python API)
+
+[//]: # (TODO [MEDIUM]: It doesn't explain how to mount deps)
 
 [//]: # (TODO [MAJOR]: It supports only YAML and doesn't allow to use pure Python)
 
@@ -42,16 +48,17 @@ Once a configuration is defined, you can run it using the `dstack run` command:
 <div class="termy">
 
 ```shell
-$ dstack run hello
+$ dstack run train-pipeline
 
-RUN      WORKFLOW  SUBMITTED  STATUS     TAG
-shady-1  hello     now        Submitted  
+RUN      WORKFLOW        SUBMITTED  STATUS     TAG
+shady-1  train-pipeline  now        Submitted  
  
 Provisioning... It may take up to a minute. ✓
 
-To exit, press Ctrl+C.
+GPU available: True, used: True
 
-Hello, world!
+Epoch 1: [00:03<00:00, 280.17it/s, loss=1.35, v_num=0]
+---> 100%
 ```
 
 </div>
@@ -64,7 +71,7 @@ For convenience, `dstack` uses an exact copy of the source code that is locally 
     even if you aren't using Git.
 
 If you configure a project to run pipelines in the cloud, `dstack` will automatically provision the required cloud
-resources. After the workflow is finished, `dstack` will automatically save output artifacts and clean up the cloud resources.
+resources. After the workflow is finished, `dstack` will automatically save output artifacts and clean up cloud resources.
 
 ??? info "Configuring projects"
     The default project runs pipelines locally. However, you can
@@ -74,123 +81,94 @@ resources. After the workflow is finished, `dstack` will automatically save outp
 
 #### Stopping a run
 
-To stop the run, click `Ctrl`+`C` while the `dstack run` command is running,
-or use the `dstack stop` command. `dstack` will automatically save the output artifacts and clean up any cloud resources 
-if they are used.
-
-## Saving output artifacts
-
-The pipeline configuration may use the `artifacts` property to specify the paths to the folders that must be saved as 
-output artifacts.
-
-<div editor-title=".dstack/workflows/hello-txt.yaml"> 
-
-```yaml
-workflows:
-  - name: hello-txt
-    provider: bash
-    commands:
-      - echo "Hello, world!" > output/hello.txt
-    artifacts:
-      - path: output
-```
-
-</div>
-
-The artifacts are saved at the end of the run, such as when it's stopped or finished.
-
-[//]: # (TODO [MAJOR]: It doesn't allow to save artifacts via Python API)
+To stop the run, click `Ctrl`+`C` while the [`dstack run`](../reference/cli/run.md) command is running,
+or use the [`dstack stop`](../reference/cli/stop.md) command.
 
 ## Configuring hardware resources
 
-If your project is configured to run pipelines in the cloud, you can use the `resources` property in the YAML file to 
+If your project is configured to run pipelines in the cloud, you can use the 
+[`resources`](../reference/providers/bash.md#resources) property in the YAML file to 
 request hardware resources like memory, GPUs, and shared memory size.
 
-Additionally, you can choose whether dstack should use interruptible instances (also known as spot instances).
-
-<div editor-title=".dstack/workflows/hello.yaml"> 
+<div editor-title=".dstack/workflows/train-pipeline.yaml"> 
 
 ```yaml
 workflows:
-  - name: hello
+  - name: train-pipeline
     provider: bash
     commands:
-      - echo "Hello, world!"
+      - pip install -r requirements.txt
+      - python train.py
+    artifacts:
+      - ./lightning_logs
     resources:
       gpu:
         name: V100
-        count: 1
       interruptible: true
 ```
 
 </div>
 
+!!! info "NOTE:"
+    The [`interruptible`](../reference/providers/bash.md#resources) property instructs `dstack` to use spot instances, which may not always be available. However, when they
+    are, they are significantly cheaper.
+
 ## Setting up the environment
 
 You can use `pip` and `conda` executables to install packages and set up the environment.
 
-Use the `python` property to specify a version of Python for pre-installation. Otherwise, `dstack` uses the local version.
-
-<div editor-title=".dstack/workflows/hello.yaml"> 
-
-```yaml
-workflows:
-  - name: hello
-    provider: bash
-    python: 3.11
-    commands:
-      - conda install pandas
-      - conda list | grep pandas
-```
-
-</div>
+Use the [`python`](../reference/providers/bash.md) property to specify a version of Python for pre-installation. Otherwise, `dstack` uses the local version.
 
 [//]: # (TODO [MAJOR]: Currently, there is no way to pre-build the environment)
 
 #### Using Docker
 
-To run the pipeline with your custom Docker image, you can use the `docker` provider.
+To run the pipeline with your custom Docker image, you can use the [`docker`](../reference/providers/docker.md) provider.
 
-<div editor-title=".dstack/workflows/hello-docker.yaml"> 
+<div editor-title=".dstack/workflows/train-pipeline.yaml"> 
 
 ```yaml
 workflows:
-  - name: hello-docker
-    provider: docker
-    image: ubuntu
+  - name: train-pipeline
+    provider: bash
+    image: 1.9.1-cuda11.1-cudnn8-runtime
     commands:
-      - echo "Hello, world!"
+      - pip install -r requirements.txt
+      - python train.py
+    artifacts:
+      - ./lightning_logs
 ```
 
 </div>
 
+[//]: # (TODO [MEDIUM]: Make a note that a custom Docker image might not have the right CUDA driver configured)
+
 ## Exposing ports
 
-Your pipeline may configure ports to serve web apps.
+If you want the pipeline to serve web apps, specify the number of ports via the 
+[`ports`](../reference/providers/bash.md#ports) property. They'll be
+passed to the run as environment variables like `PORT_0`, `PORT_1`, etc.
 
-<div editor-title=".dstack/workflows/hello-tensorboard.yaml"> 
+<div editor-title=".dstack/workflows/train-pipeline.yaml"> 
 
 ```yaml
 workflows:
-  - name: train-tensorboard
+  - name: train-pipeline
     provider: bash
     ports: 1
     commands:
-      - pip install torchvision pytorch-lightning tensorboard
+      - pip install -r requirements.txt
       - tensorboard --port $PORT_0 --host 0.0.0.0 --logdir ./lightning_logs &
-      - python tutorials/tensorboard/train.py
+      - python train.py
     artifacts:
-      - path: ./lightning_logs
+      - ./lightning_logs
 ```
 
 </div>
 
 [//]: # (TODO [MAJOR]: Currently, you can't choose ports yourself)
 
-To run web apps, specify the number of ports via the `ports` property. They'll be
-passed to the run as environment variables like `PORT_0`, `PORT_1`, etc.
-
-`dstack` will automatically forward ports to your local machine. You'll see the URLs to access each port in the
+`dstack` automatically forwards ports to your local machine. You'll see the URLs to access each port in the
 output.
 
 [//]: # (TODO [MAJOR]: Currently, it requires the user to hardcode `--host 0.0.0.0`)
@@ -201,27 +179,36 @@ When running a pipeline, you may need to download files like pre-trained models,
 packages. To avoid downloading them on each run of your pipeline, you can choose
 which paths to cache between runs. 
 
-<div editor-title=".dstack/workflows/hello-cache.yaml"> 
+<div editor-title=".dstack/workflows/train-pipeline.yaml"> 
 
 ```yaml
 workflows:
-  - name: hello-cache
+  - name: train-pipeline
     provider: bash
     commands:
-      - pip install torchvision
-      - pip list | grep torchvision
+      - pip install -r requirements.txt
+      - python train.py
     cache:
+      - ./data
       - ~/.cache/pip
+    artifacts:
+      - ./lightning_logs
+    resources:
+      gpu:
+        name: P100
 ```
 
 </div>
 
 !!! info "NOTE:"
-    Cache saves files in its own storage and downloads them at startup. This improves performance and saves you 
+    Cache saves files in the configured storage and downloads them at startup. This improves performance and saves you 
     from data transfer costs.
 
 #### Cleaning up the cache
 
-To clean up the cache, use the `dstack prune cache` CLI command, followed by the name of the configuration.
+To clean up the cache, use the [`dstack prune cache`](../reference/cli/prune.md) CLI command, followed by the name of the configuration.
 
 [//]: # (TODO [MAJOR]: Currently, there is no way to run distributed jobs and use distributed frameworks, such as PyTorch DDP, Ray, Spark, etc)
+
+!!! info "NOTE:"
+    Check out the [`dstackai/dstack-examples`](https://github.com/dstackai/dstack-examples/blob/main/README.md) repo for source code and other examples.
