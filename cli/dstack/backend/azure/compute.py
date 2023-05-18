@@ -95,7 +95,7 @@ class AzureCompute(Compute):
             managed_identity=azure_utils.get_runner_managed_identity_name(
                 self.azure_config.storage_account
             ),
-            image_id=_get_image_id(
+            image_reference=_get_image_ref(
                 self._compute_client,
                 self.azure_config.location,
                 len(instance_type.resources.gpus) > 0,
@@ -186,25 +186,24 @@ def _get_instance_name(job: Job) -> str:
     return f"dstack-{job.run_name}"
 
 
-def _get_prod_image_id(
+def _get_prod_image_ref(
     compute_client: ComputeManagementClient,
     location: str,
     cuda: bool,
-) -> str:
-    images = compute_client.virtual_machine_images.list(
+) -> ImageReference:
+    image = compute_client.community_gallery_images.get(
         location=location,
-        publisher_name="dstackai",
-        offer="dstack",
-        skus=f"dstack-{'cuda' if cuda else 'nocuda'}-{version.__version__}",
+        public_gallery_name="dstack-d5e68bdc-cc66-484a-a485-b54e3683f151",
+        gallery_image_name=f"dstack-{'cuda' if cuda else 'nocuda'}-{version.__version__}",
     )
-    return images[0].id
+    return ImageReference(community_gallery_image_id=image.unique_id)
 
 
-def _get_stage_image_id(
+def _get_stage_image_ref(
     compute_client: ComputeManagementClient,
     location: str,
     cuda: bool,
-) -> str:
+) -> ImageReference:
     images = compute_client.images.list()
     image_prefix = "stgn-dstack"
     if cuda:
@@ -214,12 +213,12 @@ def _get_stage_image_id(
 
     images = [im for im in images if im.name.startswith(image_prefix)]
     sorted_images = sorted(images, key=lambda im: int(removeprefix(im.name, image_prefix)))
-    return sorted_images[-1].id
+    return ImageReference(id=sorted_images[-1].id)
 
 
-_get_image_id = _get_prod_image_id
+_get_image_ref = _get_prod_image_ref
 if not version.__is_release__:
-    _get_image_id = _get_stage_image_id
+    _get_image_ref = _get_stage_image_ref
 
 
 def _get_user_data_script(azure_config: AzureConfig, job: Job, instance_type: InstanceType) -> str:
@@ -242,7 +241,7 @@ def _launch_instance(
     network: str,
     subnet: str,
     managed_identity: str,
-    image_id: str,
+    image_reference: ImageReference,
     vm_size: str,
     instance_name: str,
     user_data: str,
@@ -256,7 +255,7 @@ def _launch_instance(
             location=location,
             hardware_profile=HardwareProfile(vm_size=vm_size),
             storage_profile=StorageProfile(
-                image_reference=ImageReference(id=image_id),
+                image_reference=image_reference,
                 os_disk=OSDisk(
                     create_option=DiskCreateOptionTypes.FROM_IMAGE,
                     managed_disk=ManagedDiskParameters(
@@ -325,17 +324,6 @@ def _launch_instance(
         ),
     ).result()
     return vm
-
-
-def _generate_vm_password() -> str:
-    chars = [
-        random.choice(string.ascii_lowercase),
-        random.choice(string.ascii_uppercase),
-        random.choice(string.digits),
-        random.choice(string.punctuation),
-    ] + [random.choice(string.ascii_letters) for _ in range(16)]
-    random.shuffle(chars)
-    return "".join(chars)
 
 
 def _get_instance_status(
