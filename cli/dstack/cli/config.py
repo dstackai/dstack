@@ -21,6 +21,9 @@ class ConfigManager:
         self.home = Path(home).expanduser().resolve()
         self._cache: Dict[str, BaseModel] = {}
 
+    def dstack_key_path(self, repo_dir: Optional[PathLike] = None) -> Path:
+        return self.home / "dstack_rsa"
+
     @property
     def repos(self) -> Path:
         return self.home / "repos"

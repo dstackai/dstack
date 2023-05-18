@@ -83,6 +83,7 @@ setup(
         "typing-extensions>=4.0.0",
         "file-read-backwards>=3.0.0",
         "psutil>=5.0.0",
+        "cryptography",
     ],
     extras_require={
         "aws": [

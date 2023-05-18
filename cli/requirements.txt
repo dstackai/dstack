@@ -20,11 +20,12 @@ simple-term-menu
 pygtail
 aiosqlite
 packaging
-alembic>=1.10.2
+alembic
 apscheduler
 typing-extensions
 file-read-backwards
 psutil
+cryptography
 
 # AWS
 boto3
