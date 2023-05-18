@@ -50,7 +50,7 @@ class RunCommand(BasicCommand):
         workflow_help = "{" + ",".join(workflow_or_provider_names) + "}"
         self._parser.add_argument(
             "workflow_or_provider",
-            metavar="WORKFLOW | PROVIDER",
+            metavar="WORKFLOW",
             type=str,
             help=workflow_help,
             choices=workflow_or_provider_names,

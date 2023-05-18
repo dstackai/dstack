@@ -3,10 +3,14 @@
     color: var(--md-primary-bg-color)
 }
 
-.tx-landing h1 {
+.tx-landing__hero_text h1 {
     margin-bottom: 1rem;
+    font-weight: 700;
+    font-size: 2.3em;
+}
+
+.tx-landing__hero_text h1 strong {
     font-weight: 800;
-    font-size: 2.5em;
 }
 
 @media screen and (max-width: 76.1875em) {
@@ -26,13 +30,15 @@
 
 @media screen and (min-width: 76.1875em) {
     .tx-container {
-        padding-bottom: 4vw;
+        padding-bottom: 3vw;
     }
 
     .tx-landing__hero {
         display: flex;
         align-items: stretch;
-        margin-bottom: -2.5rem;
+        margin-bottom: -3rem;
+        font-size: 19px;
+        line-height: 1.5;
     }
 
     .tx-landing__hero_text {
@@ -48,16 +54,80 @@
     }
 }
 
-.tx-landing__hero .md-button {
+.tx-landing__hero .md-button, .tx-landing__bottom_cta .md-button {
     margin-top: 0.8rem;
+    padding: 0.55em 2em;
+    font-size: 19px;
+}
+
+.tx-landing__highlights {
+    margin-bottom: 5vw;
+    font-size: 19px;
+    line-height: 1.5;
+}
+
+.tx-landing__highlights_text h2 {
+    font-size: 1.7em;
+    max-width: 500px;
+    color: rgba(0,0,0,0.87);
+    margin-bottom: 2.5em;
+}
+
+.tx-landing__highlights_grid {
+    grid-gap: 3rem;
+    display: grid;
+    grid-template-columns: repeat(auto-fill,minmax(20rem,1fr));
+}
+
+.tx-landing__highlights_grid h3 {
+    font-size: 1.3em;
+    border-bottom: none;
+    padding-bottom: 0.1em;
+    margin-top: 0;
+}
+
+.tx-landing__features {
+    margin-bottom: 5vw;
 }
 
 .tx-landing__features_text h2 {
     font-size: 1.7em;
+    max-width: 500px;
+    color: rgba(0,0,0,0.87);
+    margin-bottom: 1.5em;
 }
 
 .tx-landing__features_grid {
     grid-gap: 1.2rem;
     display: grid;
     grid-template-columns: repeat(auto-fill,minmax(15rem,1fr));
+}
+
+.tx-landing__bottom_cta {
+    margin-bottom: 5vw;
+    font-size: 19px;
+    line-height: 1.5;
+}
+
+.tx-landing__bottom_cta_text {
+    font-size: 1em;
+    max-width: 500px;
+    margin: 25px 0 35px;
+}
+
+.tx-landing__bottom_cta h2 {
+    font-size: 1.7em;
+    max-width: 500px;
+    color: rgba(0,0,0,0.87);
+    margin-bottom: 1em;
+}
+
+.tx-landing__bottom_cta_terminal {
+    font-family: var(--md-code-font-family);
+    font-weight: 600;
+    margin-bottom: 1em;
+}
+
+.tx-landing__bottom_cta_terminal_row_prefix {
+    color: var(--md-accent-fg-color)
 }
