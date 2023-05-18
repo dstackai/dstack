@@ -269,7 +269,6 @@ def _launch_instance(
             os_profile=OSProfile(
                 computer_name="runnervm",
                 admin_username="ubuntu",
-                admin_password=os.getenv("DSTACK_AZURE_VM_PASSWORD", _generate_vm_password()),
                 linux_configuration=LinuxConfiguration(
                     ssh=SshConfiguration(
                         public_keys=[
