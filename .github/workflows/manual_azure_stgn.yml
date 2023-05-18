@@ -1,6 +1,6 @@
 name: Manual Azure build for STGN
 
-on: [workflow_dispatch, push]
+on: [workflow_dispatch]
 
 env:
   DOCKER_IMAGE_VERSION: "0.1"
@@ -40,8 +40,3 @@ jobs:
       - name: Run packer
         run: |
           ./packer build -var build_prefix=${{ matrix.image_prefix }} -var build_id=$VERSION -var image_version=${{ env.DOCKER_IMAGE_VERSION }} ${{ matrix.variant }}.json
-      - name: Publish azure image
-        run: |
-          IMAGE_DEFINITION=${{ matrix.image_prefix }}-$VERSION
-          IMAGE_NAME=${{ matrix.image_prefix }}-$VERSION
-          ../scripts/publish_azure_image.sh $IMAGE_DEFINITION $IMAGE_NAME
