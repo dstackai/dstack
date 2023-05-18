@@ -331,7 +331,7 @@ def _get_ami_image(
         if _version:
             return _get_ami_image(ec2_client, cuda, _version=None)
         else:
-            raise Exception(f"Can't find an AMI image prefix='{ami_name}")
+            raise Exception(f"Can't find an AMI image prefix={ami_name!r}")
 
 
 def _run_instance(
