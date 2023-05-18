@@ -236,6 +236,7 @@ class Provider:
         with tempfile.NamedTemporaryFile("w+b") as f:
             repo_code_filename = hub_client.repo.repo_data.write_code_file(f)
             f.seek(0)
+            # FIXME: this should be replaced with public API call
             hub_client._storage.upload_file(f.name, repo_code_filename, lambda _: ...)
 
         # [TODO] Handle master job

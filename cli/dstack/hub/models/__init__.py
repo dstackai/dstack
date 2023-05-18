@@ -30,7 +30,7 @@ class Member(BaseModel):
     project_role: ProjectRole
 
 
-BackendType = Union[Literal["local"], Literal["aws"], Literal["gcp"]]
+BackendType = Union[Literal["local"], Literal["aws"], Literal["gcp"], Literal["azure"]]
 
 
 class LocalProjectConfig(BaseModel):
@@ -100,12 +100,49 @@ class GCPProjectConfigWithCreds(GCPProjectConfig, GCPProjectCreds):
     pass
 
 
-AnyProjectConfig = Union[LocalProjectConfig, AWSProjectConfig, GCPProjectConfig]
+class AzureProjectConfigPartial(BaseModel):
+    type: Literal["azure"] = "azure"
+    tenant_id: str
+    subscription_id: Optional[str]
+    location: Optional[str]
+    storage_account: Optional[str]
+
+
+class AzureProjectCreds(BaseModel):
+    client_id: str
+    client_secret: str
+
+
+class AzureProjectConfigWithCredsPartial(AzureProjectConfigPartial, AzureProjectCreds):
+    pass
+
+
+class AzureProjectConfig(BaseModel):
+    type: Literal["azure"] = "azure"
+    tenant_id: str
+    subscription_id: str
+    location: str
+    storage_account: str
+
+
+class AzureProjectConfigWithCreds(AzureProjectConfig, AzureProjectCreds):
+    pass
+
+
+AnyProjectConfig = Union[
+    LocalProjectConfig, AWSProjectConfig, GCPProjectConfig, AzureProjectConfig
+]
 AnyProjectConfigWithCredsPartial = Union[
-    LocalProjectConfig, AWSProjectConfigWithCredsPartial, GCPProjectConfigWithCredsPartial
+    LocalProjectConfig,
+    AWSProjectConfigWithCredsPartial,
+    GCPProjectConfigWithCredsPartial,
+    AzureProjectConfigWithCredsPartial,
 ]
 AnyProjectConfigWithCreds = Union[
-    LocalProjectConfig, AWSProjectConfigWithCreds, GCPProjectConfigWithCreds
+    LocalProjectConfig,
+    AWSProjectConfigWithCreds,
+    GCPProjectConfigWithCreds,
+    AzureProjectConfigWithCreds,
 ]
 
 
@@ -276,8 +313,18 @@ class GCPProjectValues(BaseModel):
     vpc_subnet: Optional[GCPVPCSubnetProjectElement]
 
 
+class AzureProjectValues(BaseModel):
+    type: Literal["azure"] = "azure"
+    tenant_id: Optional[ProjectElement]
+    subscription_id: Optional[ProjectElement]
+    location: Optional[ProjectElement]
+    storage_account: Optional[ProjectElement]
+
+
 class ProjectValues(BaseModel):
-    __root__: Union[None, AWSProjectValues, GCPProjectValues] = Field(..., discriminator="type")
+    __root__: Union[None, AWSProjectValues, GCPProjectValues, AzureProjectValues] = Field(
+        ..., discriminator="type"
+    )
 
 
 class UserPatch(BaseModel):

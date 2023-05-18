@@ -182,11 +182,12 @@ def _poll_run(
 
         ports = {}
         jobs = [hub_client.get_job(job_head.job_id) for job_head in job_heads]
-        if hub_client.get_project_backend_type() != "local":
+        backend_type = hub_client.get_project_backend_type()
+        if backend_type != "local":
             console.print("Starting SSH tunnel...")
             ports = allocate_local_ports(jobs)
             if not run_ssh_tunnel(
-                ssh_key, jobs[0].host_name, ports
+                ssh_key, jobs[0].host_name, ports, backend_type
             ):  # todo: cleanup explicitly (stop tunnel)
                 console.print("[warning]Warning: failed to start SSH tunnel[/warning] [red]✗[/]")
         else:

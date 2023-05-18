@@ -1,14 +1,20 @@
-from typing import Dict, Optional
+import json
+from typing import Dict, Optional, Tuple, Union
 
 import botocore.exceptions
 from boto3.session import Session
 
+from dstack.backend.aws import AwsBackend
 from dstack.backend.aws.config import AWSConfig
 from dstack.backend.base.config import BackendConfig
 from dstack.hub.models import (
     AWSBucketProjectElement,
     AWSBucketProjectElementValue,
+    AWSProjectConfig,
+    AWSProjectConfigWithCreds,
+    AWSProjectCreds,
     AWSProjectValues,
+    Project,
     ProjectElement,
     ProjectElementValue,
 )
@@ -30,16 +36,12 @@ regions = [
 
 
 class AWSConfigurator(Configurator):
-    @property
-    def name(self):
-        return "aws"
+    NAME = "aws"
 
-    def get_config_from_hub_config_data(
-        self, project_name: str, config_data: Dict, auth_data: Dict
-    ) -> BackendConfig:
-        return AWSConfig.deserialize(config_data, auth_data)
+    def get_backend_class(self) -> type:
+        return AwsBackend
 
-    def configure_hub(self, config_data: Dict) -> AWSProjectValues:
+    def configure_project(self, config_data: Dict) -> AWSProjectValues:
         config = AWSConfig.deserialize(config_data)
 
         if config.region_name is not None and config.region_name not in {r[1] for r in regions}:
@@ -70,6 +72,47 @@ class AWSConfigurator(Configurator):
             session=session, default_subnet=config.subnet_id
         )
         return project_values
+
+    def create_config_auth_data_from_project_config(
+        self, project_config: AWSProjectConfigWithCreds
+    ) -> Tuple[Dict, Dict]:
+        project_config.backend.s3_bucket_name = project_config.backend.s3_bucket_name.replace(
+            "s3://", ""
+        )
+        config = AWSProjectConfig.parse_obj(project_config).dict()
+        auth = AWSProjectCreds.parse_obj(project_config).dict()
+        return config, auth
+
+    def get_backend_config_from_hub_config_data(
+        self, project_name: str, config_data: Dict, auth_data: Dict
+    ) -> BackendConfig:
+        return AWSConfig.deserialize(config_data, auth_data)
+
+    def get_project_config_from_project(
+        self, project: Project, include_creds: bool
+    ) -> Union[AWSProjectConfig, AWSProjectConfigWithCreds]:
+        json_config = json.loads(project.config)
+        region_name = json_config["region_name"]
+        s3_bucket_name = json_config["s3_bucket_name"]
+        ec2_subnet_id = json_config["ec2_subnet_id"]
+        if include_creds:
+            json_auth = json.loads(project.auth)
+            access_key = json_auth["access_key"]
+            secret_key = json_auth["secret_key"]
+            return AWSProjectConfigWithCreds(
+                access_key=access_key,
+                secret_key=secret_key,
+                region_name=region_name,
+                region_name_title=region_name,
+                s3_bucket_name=s3_bucket_name,
+                ec2_subnet_id=ec2_subnet_id,
+            )
+        return AWSProjectConfig(
+            region_name=region_name,
+            region_name_title=region_name,
+            s3_bucket_name=s3_bucket_name,
+            ec2_subnet_id=ec2_subnet_id,
+        )
 
     def _get_hub_regions(self, default_region: Optional[str]) -> ProjectElement:
         element = ProjectElement(selected=default_region)

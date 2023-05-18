@@ -49,7 +49,7 @@ func (m *Manager) WithLocalPath(path string) *Manager {
 	return m
 }
 
-//TODO: works with Github, possibly not with others
+// TODO: works with Github, possibly not with others
 func (m *Manager) WithTokenAuth(token string) *Manager {
 	auth := &http.BasicAuth{
 		Username: "anything",

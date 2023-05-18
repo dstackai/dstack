@@ -6,7 +6,6 @@ from botocore.client import BaseClient
 
 from dstack.backend.base.storage import SIGNED_URL_EXPIRATION, CloudStorage
 from dstack.core.storage import StorageFile
-from dstack.utils.common import removeprefix
 
 
 class AWSStorage(CloudStorage):
