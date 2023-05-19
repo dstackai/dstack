@@ -11,12 +11,14 @@ export { default as Spinner } from '@cloudscape-design/components/spinner';
 export { default as Cards } from '@cloudscape-design/components/cards';
 export { default as Header } from '@cloudscape-design/components/header';
 export { default as Link } from '@cloudscape-design/components/link';
+export type { LinkProps } from '@cloudscape-design/components/link';
 export { default as TextFilter } from '@cloudscape-design/components/text-filter';
 export { default as Pagination } from '@cloudscape-design/components/pagination';
 export { default as Table } from '@cloudscape-design/components/table';
 export { default as ContentLayout } from '@cloudscape-design/components/content-layout';
 export { default as ColumnLayout } from '@cloudscape-design/components/column-layout';
 export { default as BreadcrumbGroup } from '@cloudscape-design/components/breadcrumb-group';
+export type { BreadcrumbGroupProps } from '@cloudscape-design/components/breadcrumb-group';
 export { default as FormUI } from '@cloudscape-design/components/form';
 export { default as FormField } from '@cloudscape-design/components/form-field';
 export { default as InputCSD } from '@cloudscape-design/components/input';
@@ -31,6 +33,7 @@ export { default as HelpPanel } from '@cloudscape-design/components/help-panel';
 export type { HelpPanelProps } from '@cloudscape-design/components/help-panel';
 export { default as Tabs } from '@cloudscape-design/components/tabs';
 export type { TabsProps } from '@cloudscape-design/components/tabs';
+export { default as TextContent } from '@cloudscape-design/components/text-content';
 
 // custom components
 export { NavigateLink } from './NavigateLink';

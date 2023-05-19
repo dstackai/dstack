@@ -2,6 +2,8 @@ declare type AddedEmptyString<Type> = {
     [Property in keyof Type]: Type[Property] | '';
 };
 
+declare type DateTime = string
+
 declare interface HashMap<T = any> {
     [key: string]: T;
 }

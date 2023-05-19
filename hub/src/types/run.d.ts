@@ -35,6 +35,7 @@ declare interface IRun {
     workflow_name: string | null,
     provider_name: string | null,
     repo_user_id: string,
+    hub_user_name: string,
     artifact_heads: null | {
         job_id: string
         artifact_path: string

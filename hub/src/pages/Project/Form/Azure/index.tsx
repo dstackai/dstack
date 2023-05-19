@@ -15,16 +15,7 @@ import { IProps } from './types';
 
 import styles from './styles.module.scss';
 
-const CREDS_FIELDS = [
-    FIELD_NAMES.TENANT_ID,
-    FIELD_NAMES.CLIENT_ID,
-    FIELD_NAMES.CLIENT_SECRET,
-]
-const FIELDS_QUEUE = [
-    FIELD_NAMES.SUBSCRIPTION_ID,
-    FIELD_NAMES.LOCATION,
-    FIELD_NAMES.STORAGE_ACCOUNT,
-];
+const FIELDS_QUEUE = [FIELD_NAMES.SUBSCRIPTION_ID, FIELD_NAMES.LOCATION, FIELD_NAMES.STORAGE_ACCOUNT];
 
 export const AzureBackend: React.FC<IProps> = ({ loading }) => {
     const { t } = useTranslation();
@@ -108,15 +99,15 @@ export const AzureBackend: React.FC<IProps> = ({ loading }) => {
     const debouncedChangeFormHandler = useCallback(debounce(changeFormHandler, 1000), []);
 
     const onChangeCredentialField = () => {
-        clearFields(0)
+        clearFields(0);
         if (requestRef.current) requestRef.current.abort();
         debouncedChangeFormHandler();
     };
 
     const clearFieldByQueueFromField = (name: string) => {
-        let fieldIndex = FIELDS_QUEUE.findIndex((i) => i === name);
+        const fieldIndex = FIELDS_QUEUE.findIndex((i) => i === name);
         if (fieldIndex < 0) return;
-        clearFields(fieldIndex + 1)
+        clearFields(fieldIndex + 1);
     };
 
     const clearFields = (startIndex: number) => {

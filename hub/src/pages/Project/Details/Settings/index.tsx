@@ -123,7 +123,6 @@ export const ProjectSettings: React.FC = () => {
                     <Box variant="awsui-key-label">{t('projects.edit.azure.storage_account')}</Box>
                     <div>{data.backend.storage_account}</div>
                 </div>
-
             </ColumnLayout>
         );
     };
