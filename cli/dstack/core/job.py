@@ -262,6 +262,7 @@ class Job(JobHead):
             "apps": [
                 {
                     "port": a.port,
+                    "map_to_port": a.map_to_port,
                     "app_name": a.app_name,
                     "url_path": a.url_path or "",
                     "url_query_params": a.url_query_params or {},
@@ -349,6 +350,7 @@ class Job(JobHead):
             [
                 AppSpec(
                     port=a["port"],
+                    map_to_port=a.get("map_to_port"),
                     app_name=a["app_name"],
                     url_path=a.get("url_path") or None,
                     url_query_params=a.get("url_query_params") or None,

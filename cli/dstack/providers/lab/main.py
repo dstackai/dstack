@@ -10,7 +10,7 @@ from dstack.core.app import AppSpec
 from dstack.core.job import JobSpec
 from dstack.providers import Provider
 from dstack.providers.extensions import OpenSSHExtension
-from dstack.providers.ports import PortsRegistry
+from dstack.providers.ports import filter_reserved_ports, get_map_to_port
 
 
 class LabProvider(Provider):
@@ -68,24 +68,27 @@ class LabProvider(Provider):
         token = uuid.uuid4().hex
         env["TOKEN"] = token
         apps = []
-        ports = PortsRegistry()
-        for i, port in enumerate(self.ports, start=1):
+        for i, pm in enumerate(filter_reserved_ports(self.ports), start=1):
             apps.append(
                 AppSpec(
-                    port=ports.allocate(port),
+                    port=pm.port,
+                    map_to_port=pm.map_to_port,
                     app_name="lab" + str(i),
                 )
             )
         apps.append(
             AppSpec(
                 port=self.lab_port,
+                map_to_port=get_map_to_port(self.ports, self.lab_port),
                 app_name="lab",
                 url_path="lab",
                 url_query_params={"token": token},
             )
         )
         if self.openssh_server:
-            OpenSSHExtension.patch_apps(apps)
+            OpenSSHExtension.patch_apps(
+                apps, map_to_port=get_map_to_port(self.ports, OpenSSHExtension.port)
+            )
         return [
             JobSpec(
                 image_name=self.image_name,

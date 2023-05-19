@@ -78,6 +78,7 @@ type Cache struct {
 type App struct {
 	Name           string            `yaml:"app_name"`
 	Port           int               `yaml:"port"`
+	MapToPort      int               `yaml:"map_to_port"`
 	UrlPath        string            `yaml:"url_path"`
 	UrlQueryParams map[string]string `yaml:"url_query_params"`
 }

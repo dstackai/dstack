@@ -30,19 +30,29 @@ def port_in_use(port: int) -> bool:
 
 def allocate_local_ports(jobs: List[Job]) -> Dict[int, int]:
     ports = {}
-    for job in jobs:
-        ws_logs_port = int(job.env.get("WS_LOGS_PORT"))
-        if ws_logs_port:
-            ports[ws_logs_port] = ws_logs_port
+    for job in jobs[:1]:  # todo multiple jobs
+        if "WS_LOGS_PORT" in job.env:
+            ports[int(job.env["WS_LOGS_PORT"])] = None
         for app_spec in job.app_specs or []:
-            ports[app_spec.port] = app_spec.port
+            ports[app_spec.port] = app_spec.map_to_port
 
-    # get the closest port to use
-    for remote_port in ports:
-        if port_in_use(remote_port):
-            ports[remote_port] += 1
-            while ports[remote_port] in ports or port_in_use(ports[remote_port]):
-                ports[remote_port] += 1
+    map_to_ports = set()
+    # mapped by user
+    for port, map_to_port in ports.items():
+        if map_to_port is None:
+            continue
+        if map_to_port in map_to_ports or port_in_use(map_to_port):
+            raise PortUsedError(f"Mapped port {port}:{map_to_port} is already in use")
+        map_to_ports.add(map_to_port)
+    # mapped automatically
+    for port, map_to_port in ports.items():
+        if map_to_port is not None:
+            continue
+        map_to_port = port
+        while map_to_port in map_to_ports or port_in_use(map_to_port):
+            map_to_port += 1
+        ports[port] = map_to_port
+        map_to_ports.add(map_to_port)
     return ports
 
 

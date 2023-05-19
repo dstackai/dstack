@@ -9,7 +9,7 @@ from dstack.core.app import AppSpec
 from dstack.core.job import JobSpec
 from dstack.providers import Provider
 from dstack.providers.extensions import OpenSSHExtension
-from dstack.providers.ports import PortsRegistry
+from dstack.providers.ports import filter_reserved_ports, get_map_to_port
 
 
 class BashProvider(Provider):
@@ -65,16 +65,18 @@ class BashProvider(Provider):
 
     def create_job_specs(self) -> List[JobSpec]:
         apps = []
-        ports = PortsRegistry()
-        for i, port in enumerate(self.ports):
+        for i, pm in enumerate(filter_reserved_ports(self.ports)):
             apps.append(
                 AppSpec(
-                    port=ports.allocate(port),
+                    port=pm.port,
+                    map_to_port=pm.map_to_port,
                     app_name="bash" + (str(i) if len(self.ports) > 1 else ""),
                 )
             )
         if self.openssh_server:
-            OpenSSHExtension.patch_apps(apps)
+            OpenSSHExtension.patch_apps(
+                apps, map_to_port=get_map_to_port(self.ports, OpenSSHExtension.port)
+            )
         return [
             JobSpec(
                 image_name=self.image_name,

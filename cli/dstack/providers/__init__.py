@@ -1,3 +1,4 @@
+import argparse
 import importlib
 import shlex
 import sys
@@ -19,6 +20,7 @@ from dstack.core.job import (
     JobStatus,
     Requirements,
 )
+from dstack.providers.ports import PortMapping, merge_ports
 from dstack.utils.common import get_milliseconds_since_epoch
 from dstack.utils.interpolator import VariablesInterpolator
 
@@ -62,7 +64,7 @@ class Provider:
         self.openssh_server: bool = False
         self.loaded = False
         self.home_dir: Optional[str] = None
-        self.ports: List[int] = []
+        self.ports: Dict[int, PortMapping] = {}
 
     # TODO: This is a dirty hack
     def _safe_python_version(self, name: str):
@@ -135,7 +137,7 @@ class Provider:
         self.openssh_server = self.provider_data.get("ssh", False)
 
         self.parse_args()
-        self.ports = self.provider_data.get("ports") or []
+        self.ports = self.provider_data.get("ports") or {}
         if not self.ssh_key_pub:
             if self.openssh_server or (
                 hub_client.get_project_backend_type() != "local" and not args.detach
@@ -177,7 +179,7 @@ class Provider:
         parser.add_argument("--gpu-memory", metavar="SIZE", type=str)
         parser.add_argument("--shm-size", metavar="SIZE", type=str)
         parser.add_argument(
-            "-p", "--ports", metavar="PORTS", type=lambda s: [int(i) for i in s.split(",")]
+            "-p", "--port", metavar="PORTS", type=PortMapping, nargs=argparse.ONE_OR_MORE
         )
 
     def _parse_base_args(self, args: Namespace, unknown_args):
@@ -219,11 +221,9 @@ class Provider:
             resources["shm_size"] = args.shm_size
         if args.interruptible:
             resources["interruptible"] = True
-
-        self.provider_data["ports"] = self.provider_data.get("ports") or []
-        ports_set = set(self.provider_data["ports"])
-        self.provider_data["ports"] += [i for i in (args.ports or []) if i not in ports_set]
-
+        self.provider_data["ports"] = merge_ports(
+            [PortMapping(i) for i in self.provider_data.get("ports") or []], args.port or []
+        )
         if unknown_args:
             self.provider_data["run_args"] = unknown_args
 

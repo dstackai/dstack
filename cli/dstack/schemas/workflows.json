@@ -167,9 +167,16 @@
       "description": "Port numbers to expose",
       "type": "array",
       "items": {
-        "type": "integer",
-        "minimum": 0,
-        "maximum": 65536
+        "oneOf": [
+          {
+            "type": "string"
+          },
+          {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 65536
+          }
+        ]
       }
     },
     "home_dir": {

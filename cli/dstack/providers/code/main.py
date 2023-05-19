@@ -10,7 +10,7 @@ from dstack.core.app import AppSpec
 from dstack.core.job import JobSpec
 from dstack.providers import Provider
 from dstack.providers.extensions import OpenSSHExtension
-from dstack.providers.ports import PortsRegistry
+from dstack.providers.ports import filter_reserved_ports, get_map_to_port
 
 
 class CodeProvider(Provider):
@@ -19,7 +19,6 @@ class CodeProvider(Provider):
     def __init__(self):
         super().__init__("code")
         self.setup = None
-        self.ports = None
         self.python = None
         self.version = None
         self.requirements = None
@@ -41,7 +40,6 @@ class CodeProvider(Provider):
     ):
         super().load(hub_client, args, workflow_name, provider_data, run_name, ssh_key_pub)
         self.setup = self._get_list_data("setup") or self._get_list_data("before_run")
-        self.ports = self.provider_data.get("ports")
         self.python = self._safe_python_version("python")
         self.version = self.provider_data.get("version") or "1.78.1"
         self.env = self._env()
@@ -65,25 +63,24 @@ class CodeProvider(Provider):
         self._parse_base_args(args, unknown_args)
         if args.openssh_server:
             self.openssh_server = True
-        if args.ports:
-            self.provider_data["ports"] = args.ports
 
     def create_job_specs(self) -> List[JobSpec]:
         env = {}
         connection_token = uuid.uuid4().hex
         env["CONNECTION_TOKEN"] = connection_token
         apps = []
-        ports = PortsRegistry()
-        for i, port in enumerate(self.ports, start=1):
+        for i, pm in enumerate(filter_reserved_ports(self.ports), start=1):
             apps.append(
                 AppSpec(
-                    port=ports.allocate(port),
+                    port=pm.port,
+                    map_to_port=pm.map_to_port,
                     app_name="code" + str(i),
                 )
             )
         apps.append(
             AppSpec(
                 port=self.code_port,
+                map_to_port=get_map_to_port(self.ports, self.code_port),
                 app_name="code",
                 url_query_params={
                     "tkn": connection_token,
@@ -91,7 +88,9 @@ class CodeProvider(Provider):
             )
         )
         if self.openssh_server:
-            OpenSSHExtension.patch_apps(apps)
+            OpenSSHExtension.patch_apps(
+                apps, map_to_port=get_map_to_port(self.ports, OpenSSHExtension.port)
+            )
         return [
             JobSpec(
                 image_name=self.image_name,

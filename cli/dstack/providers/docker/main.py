@@ -7,7 +7,7 @@ import dstack.api.hub as hub
 from dstack.core.app import AppSpec
 from dstack.core.job import JobSpec
 from dstack.providers import Provider
-from dstack.providers.ports import PortsRegistry
+from dstack.providers.ports import filter_reserved_ports
 
 
 class DockerProvider(Provider):
@@ -20,7 +20,6 @@ class DockerProvider(Provider):
         self.artifact_specs = None
         self.env = None
         self.working_dir = None
-        self.ports = None
         self.resources = None
 
     def load(
@@ -43,7 +42,6 @@ class DockerProvider(Provider):
         self.env = self.provider_data.get("env")
         self.home_dir = self.provider_data.get("home_dir")
         self.working_dir = self.provider_data.get("working_dir")
-        self.ports = self.provider_data.get("ports")
         self.resources = self._resources()
 
     def _create_parser(self, workflow_name: Optional[str]) -> Optional[ArgumentParser]:
@@ -68,16 +66,14 @@ class DockerProvider(Provider):
                 self.provider_data["commands"] = [args.command]
             if args.entrypoint:
                 self.provider_data["entrypoint"] = args.entrypoint
-        if args.ports:
-            self.provider_data["ports"] = args.ports
 
     def create_job_specs(self) -> List[JobSpec]:
         apps = []
-        ports = PortsRegistry()
-        for i, port in enumerate(self.ports):
+        for i, pm in enumerate(filter_reserved_ports(self.ports)):
             apps.append(
                 AppSpec(
-                    port=ports.allocate(port),
+                    port=pm.port,
+                    map_to_port=pm.map_to_port,
                     app_name="docker" + (str(i) if len(self.ports) > 1 else ""),
                 )
             )

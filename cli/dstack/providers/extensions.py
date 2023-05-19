@@ -1,5 +1,5 @@
 from abc import ABC, abstractmethod
-from typing import List
+from typing import List, Optional
 
 from dstack.core.app import AppSpec
 
@@ -31,5 +31,5 @@ class OpenSSHExtension(ProviderExtension):
         )
 
     @classmethod
-    def patch_apps(cls, apps: List[AppSpec], **kwargs):
-        apps.append(AppSpec(port=cls.port, app_name="openssh-server"))
+    def patch_apps(cls, apps: List[AppSpec], *, map_to_port: Optional[int] = None, **kwargs):
+        apps.append(AppSpec(port=cls.port, map_to_port=map_to_port, app_name="openssh-server"))
