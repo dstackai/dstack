@@ -101,7 +101,7 @@ class AzureConfigurator(Configurator):
             raise BackendConfigError(
                 "Invalid credentials",
                 code="invalid_credentials",
-                fields=["client_id", "client_secret"],
+                fields=["tenant_id", "client_id", "client_secret"],
             )
         self.tenant_id = project_values.tenant_id.selected
         if self.tenant_id is None:
@@ -222,6 +222,8 @@ class AzureConfigurator(Configurator):
                 code="invalid_subscription_id",
                 fields=["subscription_id"],
             )
+        if len(subscription_ids) == 1:
+            element.selected = subscription_ids[0]
         return element
 
     def _get_location(self, default_location: Optional[str]) -> ProjectElement:
@@ -255,6 +257,8 @@ class AzureConfigurator(Configurator):
                 code="invalid_storage_account",
                 fields=["storage_account"],
             )
+        if len(storage_accounts) == 1:
+            element.selected = storage_accounts[0]
         return element
 
     def _get_resource_group(self) -> str:

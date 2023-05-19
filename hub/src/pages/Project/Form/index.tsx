@@ -9,6 +9,7 @@ import { isRequestFormErrors2, isRequestFormFieldError } from 'libs';
 import { useGetBackendTypesQuery } from 'services/project';
 
 import { AWSBackend } from './AWS';
+import { AzureBackend } from './Azure';
 import { BACKEND_TYPE_HELP } from './constants';
 import { GCPBackend } from './GCP';
 
@@ -95,6 +96,9 @@ export const ProjectForm: React.FC<IProps> = ({ initialValues, onCancel, loading
         switch (backendType) {
             case 'aws': {
                 return <AWSBackend loading={loading} />;
+            }
+            case 'azure': {
+                return <AzureBackend loading={loading} />;
             }
             case 'gcp': {
                 return <GCPBackend loading={loading} />;

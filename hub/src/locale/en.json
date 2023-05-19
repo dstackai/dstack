@@ -50,8 +50,7 @@
     "settings": "Settings",
     "card": {
       "backend": "Backend",
-      "region": "Region",
-      "bucket": "Bucket"
+      "settings": "Settings"
     },
     "backend_type": {
       "aws": "AWS",
@@ -90,6 +89,23 @@
         "ec2_subnet_id_placeholder":  "Not selected",
         "ec2_subnet_id": "Subnet"
       },
+      "azure" : {
+        "tenant_id": "Tenant ID",
+        "tenant_id_description": "Specify an Azure tenant ID",
+        "client_id": "Client ID",
+        "client_id_description": "Specify an Azure client (application) ID",
+        "client_secret": "Client secret",
+        "client_secret_description": "Specify an Azure client (application) secret",
+        "subscription_id": "Subscription ID",
+        "subscription_id_description": "Select an Azure subscription ID",
+        "subscription_id_placeholder": "Not selected",
+        "location": "Location",
+        "location_description": "Select an Azure location to run workflows and store artifacts",
+        "location_placeholder": "Not selected",
+        "storage_account":  "Storage account",
+        "storage_account_description":  "Select an Azure storage account to store artifacts",
+        "storage_account_placeholder":  "Not selected"
+      },
       "gcp": {
         "credentials": "Service account",
         "credentials_description": "Credentials description",
@@ -112,6 +128,9 @@
         "subnet": "Subnet",
         "subnet_description": "Select a subnet to run workflows in",
         "subnet_placeholder": "Not selected"
+      },
+      "local": {
+        "path": "Files path"
       },
       "members": {
         "section_title": "Members",
