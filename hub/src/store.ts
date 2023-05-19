@@ -2,6 +2,7 @@ import { configureStore } from '@reduxjs/toolkit';
 
 import notificationsReducer from 'components/Notifications/slice';
 
+import { artifactApi } from 'services/artifact';
 import { projectApi } from 'services/project';
 import { runApi } from 'services/run';
 import { userApi } from 'services/user';
@@ -14,6 +15,7 @@ export const store = configureStore({
         notifications: notificationsReducer,
         [projectApi.reducerPath]: projectApi.reducer,
         [runApi.reducerPath]: runApi.reducer,
+        [artifactApi.reducerPath]: artifactApi.reducer,
         [userApi.reducerPath]: userApi.reducer,
     },
 
@@ -23,6 +25,7 @@ export const store = configureStore({
         })
             .concat(projectApi.middleware)
             .concat(runApi.middleware)
+            .concat(artifactApi.middleware)
             .concat(userApi.middleware),
 });
 

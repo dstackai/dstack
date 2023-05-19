@@ -22,7 +22,9 @@
     "login": "Login",
     "general": "General",
     "local_storage_unavailable": "Local Storage is unavailable",
-    "local_storage_unavailable_message": "Your browser doesn't support local storage"
+    "local_storage_unavailable_message": "Your browser doesn't support local storage",
+    "object": "Object",
+    "objects_other": "Objects"
   },
 
   "auth": {
@@ -155,7 +157,8 @@
       "provider_name": "Provider",
       "status": "Status",
       "submitted_at": "Run time",
-      "artifacts": "Artifacts count",
+      "artifacts": "Artifacts",
+      "artifacts_count": "Artifacts count",
       "statuses": {
         "pending": "Pending",
         "submitted": "Submitted",
@@ -169,6 +172,17 @@
         "failed": "Failed",
         "done":  "Done"
       }
+    },
+    "artifact": {
+      "list_page_title": "Artifacts",
+      "search_placeholder": "Find objects",
+      "empty_message_title": "No objects",
+      "empty_message_text": "No objects to display.",
+      "nomatch_message_title": "No matches",
+      "nomatch_message_text": "We can't find a match.",
+      "name": "Name",
+      "type": "Type",
+      "size": "Size"
     }
   },
   "users": {

@@ -1,5 +1,6 @@
 import React, { useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
+import { useParams } from 'react-router-dom';
 import classNames from 'classnames';
 
 import { Container, Header, Loader, TextContent } from 'components';
@@ -13,8 +14,13 @@ import styles from './styles.module.scss';
 const LIMIT_LOG_ROWS = 100;
 const LOADING_SCROLL_GAP = 100;
 
-export const Logs: React.FC<IProps> = ({ name, repo_id, run_name, className }) => {
+export const Logs: React.FC<IProps> = ({ className, ...props }) => {
     const { t } = useTranslation();
+    const params = useParams();
+    const paramProjectName = props.name ?? params.name ?? '';
+    const paramRepoId = props.repo_id ?? params.repoId ?? '';
+    const paramRunName = props.run_name ?? params.runName ?? '';
+
     const scrollRef = useRef<HTMLDivElement>(null);
     const scrollPositionByBottom = useRef<number>(0);
     const [logsData, setLogsData] = useState<ILogItem[]>([]);
@@ -26,9 +32,9 @@ export const Logs: React.FC<IProps> = ({ name, repo_id, run_name, className }) =
         isLoading,
         isFetching,
     } = useGetProjectLogsQuery({
-        name,
-        repo_id,
-        run_name,
+        name: paramProjectName,
+        repo_id: paramRepoId,
+        run_name: paramRunName,
         descending: true,
         prev_event_id: prevEventId,
         end_time: endTime,
@@ -115,7 +121,7 @@ export const Logs: React.FC<IProps> = ({ name, repo_id, run_name, className }) =
 
                     <div ref={scrollRef} className={styles.scroll}>
                         <code>
-                            {logsData.map((log, index) => (
+                            {logsData.map((log) => (
                                 <div key={log.event_id}>{log.log_message}</div>
                             ))}
                         </code>

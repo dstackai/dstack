@@ -61,11 +61,11 @@ export const RunList: React.FC = () => {
             header: t('projects.run.submitted_at'),
             cell: (item: IRun) => format(new Date(item.submitted_at), DATE_TIME_FORMAT),
         },
-        // {
-        //     id: 'artifacts',
-        //     header: t('projects.run.artifacts'),
-        //     cell: (item: IRun) => item.artifact_heads?.length ?? '-',
-        // },
+        {
+            id: 'artifacts',
+            header: t('projects.run.artifacts_count'),
+            cell: (item: IRun) => item.artifact_heads?.length ?? '-',
+        },
     ];
     const renderEmptyMessage = (): React.ReactNode => {
         return (

@@ -31,5 +31,8 @@ export const API = {
 
         // Logs
         LOGS: (name: IProject['project_name']) => `${API.BASE()}/project/${name}/logs/poll`,
+
+        // Logs
+        ARTIFACTS: (name: IProject['project_name']) => `${API.BASE()}/project/${name}/artifacts/list`,
     },
 };

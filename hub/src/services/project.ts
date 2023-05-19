@@ -136,6 +136,7 @@ export const projectApi = createApi({
                 };
             },
 
+            keepUnusedDataFor: 0,
             providesTags: () => ['ProjectLogs'],
         }),
     }),
