@@ -1,4 +1,4 @@
-import React, { useMemo, useState } from 'react';
+import React, { useMemo, useState, ReactNode } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useNavigate } from 'react-router-dom';
 
@@ -21,6 +21,19 @@ import { useDeleteProjectsMutation, useGetProjectsQuery } from 'services/project
 import { selectUserData } from 'App/slice';
 
 import { getProjectRoleByUserName } from '../utils';
+
+
+interface IProjectSettingsNodeProps {
+    settingsKey: string
+    settingsValue: string 
+}
+
+export const ProjectSettingsNode: React.FC<IProjectSettingsNodeProps> = ({ settingsKey, settingsValue }) => {
+    return (
+        <div style={{display: "flex", justifyContent: "space-between"}}><div>{settingsKey}:</div> {settingsValue}</div>
+    );
+};
+
 
 export const ProjectList: React.FC = () => {
     const { t } = useTranslation();
@@ -128,23 +141,29 @@ export const ProjectList: React.FC = () => {
         );
     }, [isDeleting, userName, userGlobalRole, collectionProps.selectedItems]);
 
-    const getProjectRegion = (project: IProject) => {
+    const getProjectSettings = (project: IProject) => {
         switch (project.backend.type) {
             case 'aws':
-                return project.backend.region_name_title;
+                return (
+                    <div>
+                        <ProjectSettingsNode settingsKey='Region' settingsValue={project.backend.region_name_title}></ProjectSettingsNode>
+                        <ProjectSettingsNode settingsKey='Bucket' settingsValue={project.backend.s3_bucket_name}></ProjectSettingsNode>
+                    </div>
+                );
+            case 'azure':
+                return (
+                    <div>
+                        <ProjectSettingsNode settingsKey='Location' settingsValue={project.backend.location}></ProjectSettingsNode>
+                        <ProjectSettingsNode settingsKey='Storage account' settingsValue={project.backend.storage_account}></ProjectSettingsNode>
+                    </div>
+                );
             case 'gcp':
-                return project.backend.region;
-            case 'local':
-                return '-';
-        }
-    };
-
-    const getProjectBucket = (project: IProject) => {
-        switch (project.backend.type) {
-            case 'aws':
-                return `${project.backend.s3_bucket_name}`;
-            case 'gcp':
-                return `${project.backend.bucket_name}`;
+                return (
+                    <div>
+                        <ProjectSettingsNode settingsKey='Region' settingsValue={project.backend.region}></ProjectSettingsNode>
+                        <ProjectSettingsNode settingsKey='Bucket' settingsValue={project.backend.bucket_name}></ProjectSettingsNode>
+                    </div>
+                );
             case 'local':
                 return '-';
         }
@@ -172,14 +191,9 @@ export const ProjectList: React.FC = () => {
                             content: (project) => t(`projects.backend_type.${project.backend.type}`),
                         },
                         {
-                            id: 'region',
-                            header: t('projects.card.region'),
-                            content: getProjectRegion,
-                        },
-                        {
-                            id: 'bucket',
-                            header: t('projects.card.bucket'),
-                            content: getProjectBucket,
+                            id: 'settings',
+                            header: t('projects.card.settings'),
+                            content: getProjectSettings,
                         },
                     ],
                 }}

@@ -139,6 +139,7 @@ class JobHead(JobRef):
     artifact_paths: Optional[List[str]]
     tag_name: Optional[str]
     app_names: Optional[List[str]]
+    instance_type: Optional[str]
 
     def get_id(self) -> Optional[str]:
         return self.job_id
@@ -185,6 +186,7 @@ class Job(JobHead):
     commands: Optional[List[str]]
     entrypoint: Optional[List[str]]
     env: Optional[Dict[str, str]]
+    home_dir: Optional[str]
     working_dir: Optional[str]
     artifact_specs: Optional[List[ArtifactSpec]]
     cache_specs: List[CacheSpec]
@@ -251,6 +253,7 @@ class Job(JobHead):
             "commands": self.commands or [],
             "entrypoint": self.entrypoint,
             "env": self.env or {},
+            "home_dir": self.home_dir or "",
             "working_dir": self.working_dir or "",
             "artifacts": artifacts,
             "cache": [item.dict() for item in self.cache_specs],
@@ -276,6 +279,7 @@ class Job(JobHead):
             "tag_name": self.tag_name or "",
             "ssh_key_pub": self.ssh_key_pub or "",
             "repo_code_filename": self.repo_code_filename,
+            "instance_type": self.instance_type,
         }
         if isinstance(self.repo_data, RemoteRepoData):
             job_data["repo_host_name"] = self.repo_data.repo_host_name
@@ -392,6 +396,7 @@ class Job(JobHead):
             commands=job_data.get("commands") or None,
             entrypoint=job_data.get("entrypoint") or None,
             env=job_data["env"] or None,
+            home_dir=job_data.get("home_dir") or None,
             working_dir=job_data.get("working_dir") or None,
             artifact_specs=artifact_specs,
             cache_specs=[CacheSpec(**item) for item in job_data.get("cache", [])],
@@ -406,6 +411,7 @@ class Job(JobHead):
             request_id=job_data.get("request_id") or None,
             tag_name=job_data.get("tag_name") or None,
             ssh_key_pub=job_data.get("ssh_key_pub") or None,
+            instance_type=job_data.get("instance_type") or None,
         )
         return job
 

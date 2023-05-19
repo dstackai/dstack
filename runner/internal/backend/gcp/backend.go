@@ -4,12 +4,13 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"github.com/dstackai/dstack/runner/internal/repo"
 	"io"
 	"io/ioutil"
 	"os"
 	"path"
 	"strings"
+
+	"github.com/dstackai/dstack/runner/internal/repo"
 
 	"github.com/dstackai/dstack/runner/consts"
 	"github.com/dstackai/dstack/runner/internal/artifacts"
@@ -52,22 +53,22 @@ func init() {
 		if err != nil {
 			return nil, gerrors.Wrap(err)
 		}
-		return New(configFile.Project, configFile.Zone, configFile.Bucket), nil
+		return New(configFile.Project, configFile.Zone, configFile.Bucket)
 	})
 }
 
-func New(project, zone, bucket string) *GCPBackend {
+func New(project, zone, bucket string) (*GCPBackend, error) {
 	storage, err := NewGCPStorage(project, bucket)
 	if err != nil {
-		return nil
+		return nil, gerrors.Wrap(err)
 	}
 	compute := NewGCPCompute(project, zone)
 	if compute == nil {
-		return nil
+		return nil, gerrors.Wrap(err)
 	}
 	secretManager := NewGCPSecretManager(project, bucket)
 	if secretManager == nil {
-		return nil
+		return nil, gerrors.Wrap(err)
 	}
 	logging := NewGCPLogging(project)
 	return &GCPBackend{
@@ -78,7 +79,7 @@ func New(project, zone, bucket string) *GCPBackend {
 		compute:       compute,
 		secretManager: secretManager,
 		logging:       logging,
-	}
+	}, nil
 }
 
 func (gbackend *GCPBackend) Init(ctx context.Context, ID string) error {
@@ -175,7 +176,12 @@ func (gbackend *GCPBackend) Shutdown(ctx context.Context) error {
 
 func (gbackend *GCPBackend) GetArtifact(ctx context.Context, runName, localPath, remotePath string, mount bool) artifacts.Artifacter {
 	workDir := path.Join(gbackend.GetTMPDir(ctx), consts.USER_ARTIFACTS_DIR, runName)
-	return NewGCPArtifacter(gbackend.storage, workDir, localPath, remotePath)
+	return NewGCPArtifacter(gbackend.storage, workDir, localPath, remotePath, false)
+}
+
+func (gbackend *GCPBackend) GetCache(ctx context.Context, runName, localPath, remotePath string) artifacts.Artifacter {
+	workDir := path.Join(gbackend.GetTMPDir(ctx), consts.USER_ARTIFACTS_DIR, runName)
+	return NewGCPArtifacter(gbackend.storage, workDir, localPath, remotePath, true)
 }
 
 func (gbackend *GCPBackend) Requirements(ctx context.Context) models.Requirements {

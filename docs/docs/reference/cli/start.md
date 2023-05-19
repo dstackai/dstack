@@ -1,6 +1,6 @@
 # dstack start
 
-This command starts the Hub application. The Hub application is required to run workflows.
+This command starts the Hub server. The Hub is required to run workflows.
 
 ## Usage
 

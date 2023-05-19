@@ -40,14 +40,16 @@ class TestConfig:
 
 
 class TestInit:
-    def test_warns_if_no_ssh_key(
+    def test_generate_default_ssh_key(
         self, capsys: CaptureFixture, dstack_dir: Path, tests_local_repo: Path
     ):
+        dstack_key_path = dstack_dir / "dstack_rsa"
         with hub_process(dstack_dir):
+            assert not dstack_key_path.exists()
             exit_code = run_dstack_cli(["init"], dstack_dir=dstack_dir, repo_dir=tests_local_repo)
             assert exit_code == 0
-            stdout = capsys.readouterr().out
-            assert "WARNING" in stdout and "SSH is not enabled" in stdout
+            print(list(dstack_dir.iterdir()))
+            assert dstack_key_path.exists()
 
 
 class TestRun:
@@ -74,6 +76,8 @@ class TestRun:
         self, capsys: CaptureFixture, dstack_dir: Path, tests_local_repo: Path
     ):
         with hub_process(dstack_dir):
+            exit_code = run_dstack_cli(["init"], dstack_dir=dstack_dir, repo_dir=tests_local_repo)
+            assert exit_code == 0
             exit_code = run_dstack_cli(
                 ["run", "bash", "-c", "echo 'Hello, world!'"],
                 dstack_dir=dstack_dir,
@@ -83,7 +87,7 @@ class TestRun:
             assert "Hello, world!" in capsys.readouterr().out
 
     def test_runs_workflow_from_yaml_file(
-        self, capsys: CaptureFixture, dstack_dir: Path, tests_public_repo: Path, ssh_key
+        self, capsys: CaptureFixture, dstack_dir: Path, tests_public_repo: Path
     ):
         with hub_process(dstack_dir):
             exit_code = run_dstack_cli(["init"], dstack_dir=dstack_dir, repo_dir=tests_public_repo)
@@ -97,7 +101,7 @@ class TestRun:
 
 class TestArtifacts:
     def test_lists_artifacts(
-        self, capsys: CaptureFixture, dstack_dir: Path, tests_public_repo: Path, ssh_key
+        self, capsys: CaptureFixture, dstack_dir: Path, tests_public_repo: Path
     ):
         with hub_process(dstack_dir):
             exit_code = run_dstack_cli(["init"], dstack_dir=dstack_dir, repo_dir=tests_public_repo)
@@ -135,7 +139,7 @@ class TestArtifacts:
 
 class TestDeps:
     def test_reads_artifacts_from_dep_workflow(
-        self, capsys: CaptureFixture, dstack_dir: Path, tests_public_repo: Path, ssh_key
+        self, capsys: CaptureFixture, dstack_dir: Path, tests_public_repo: Path
     ):
         with hub_process(dstack_dir):
             exit_code = run_dstack_cli(["init"], dstack_dir=dstack_dir, repo_dir=tests_public_repo)
@@ -156,6 +160,8 @@ class TestSecrets:
         self, capsys: CaptureFixture, dstack_dir: Path, tests_local_repo: Path
     ):
         with hub_process(dstack_dir):
+            exit_code = run_dstack_cli(["init"], dstack_dir=dstack_dir, repo_dir=tests_local_repo)
+            assert exit_code == 0
             exit_code = run_dstack_cli(
                 ["secrets", "add", "MY_SECRET", "my_secret_value"],
                 dstack_dir=dstack_dir,

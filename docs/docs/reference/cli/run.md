@@ -1,6 +1,6 @@
 # dstack run
 
-This command runs a given workflow or a provider.
+This command runs a given configuration.
 
 ## Usage
 
@@ -8,11 +8,11 @@ This command runs a given workflow or a provider.
 
 ```shell
 $ dstack run --help
-Usage: dstack run [-h] [--project PROJECT] [-t TAG] [-d] [WORKFLOW | PROVIDER] [ARGS ...]
+Usage: dstack run [-h] [--project PROJECT] [-t TAG] [-d] [WORKFLOW] [ARGS ...]
 
 Positional Arguments:
-  WORKFLOW | PROVIDER  A name of a workflow or a provider
-  ARGS                 Override workflow or provider arguments
+  WORKFLOW             The name of a workflow
+  ARGS                 Override workflow arguments
 
 Options:
   --project PROJECT    The name of the Hub project to execute the command for
@@ -26,7 +26,7 @@ Options:
 
 The following arguments are required:
 
-- `WORKFLOW | PROVIDER` - (Required) A name of a workflow or provider
+- `WORKFLOW` - (Required) The name of a workflow
 
 The following arguments are optional:
 
@@ -34,10 +34,10 @@ The following arguments are optional:
 - `-t TAG`, `--tag TAG` – (Optional) A tag name. Warning, if the tag exists, it will be overridden.
 - `-d`, `--detach` – (Optional) Run the workflow in the detached mode. Means, the `run` command doesn't
   poll for logs and workflow status, but exits immediately.
-- `ARGS` – (Optional) Use `ARGS` to pass [workflow arguments](../../usage/args.md) or override provider arguments
+- `ARGS` – (Optional) Use `ARGS` to pass [configuration arguments](../../usage/args.md)
 - `-h`, `--help` – (Optional) Shows help for the `dstack run` command. Combine it with the name of a workflow
   or provider to see the provider-specific help message.
 
 !!! info "NOTE:"
-  By default, it runs it in the attached mode, so you'll see the output in real-time as your
-  workflow is running.
+    By default, it runs it in the attached mode, so you'll see the output in real-time as your
+    workflow is running.

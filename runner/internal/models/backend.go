@@ -52,8 +52,10 @@ type Job struct {
 	ContainerExitCode string       `yaml:"container_exit_code,omitempty"`
 	SubmittedAt       uint64       `yaml:"submitted_at"`
 	TagName           string       `yaml:"tag_name"`
+	InstanceType      string       `yaml:"instance_type"`
 	//Variables    map[string]interface{} `yaml:"variables"`
 	WorkflowName string `yaml:"workflow_name"`
+	HomeDir      string `yaml:"home_dir"`
 	WorkingDir   string `yaml:"working_dir"`
 
 	RegistryAuth RegistryAuth `yaml:"registry_auth"`
@@ -142,10 +144,10 @@ func (j *Job) JobHeadFilepath() string {
 	}
 	artifactSlice := make([]string, len(j.Artifacts))
 	for _, art := range j.Artifacts {
-		artifactSlice = append(artifactSlice, art.Path)
+		artifactSlice = append(artifactSlice, EscapeHead(art.Path))
 	}
 	return fmt.Sprintf(
-		"jobs/%s/l;%s;%s;%s;%d;%s;%s;%s;%s",
+		"jobs/%s/l;%s;%s;%s;%d;%s;%s;%s;%s;%s",
 		j.RepoId,
 		j.JobID,
 		j.ProviderName,
@@ -155,30 +157,7 @@ func (j *Job) JobHeadFilepath() string {
 		strings.Join(artifactSlice, ","),
 		strings.Join(appsSlice, ","),
 		j.TagName,
-	)
-}
-
-func (j *Job) JobHeadFilepathLocal() string {
-	// TODO: we can get rid of this function once we stop putting artifact paths into job heads
-	appsSlice := make([]string, len(j.Apps))
-	for _, app := range j.Apps {
-		appsSlice = append(appsSlice, app.Name)
-	}
-	artifactSlice := make([]string, len(j.Artifacts))
-	for _, art := range j.Artifacts {
-		artifactSlice = append(artifactSlice, strings.ReplaceAll(art.Path, "/", "_"))
-	}
-	return fmt.Sprintf(
-		"jobs/%s/l;%s;%s;%s;%d;%s;%s;%s;%s",
-		j.RepoId,
-		j.JobID,
-		j.ProviderName,
-		j.HubUserName,
-		j.SubmittedAt,
-		strings.Join([]string{j.Status, j.ErrorCode, j.ContainerExitCode}, ","),
-		strings.Join(artifactSlice, ","),
-		strings.Join(appsSlice, ","),
-		j.TagName,
+		j.InstanceType,
 	)
 }
 

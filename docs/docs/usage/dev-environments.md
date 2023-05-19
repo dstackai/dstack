@@ -40,7 +40,7 @@ Web UI available at http://127.0.0.1:51303/?tkn=f2de121b04054f1b85bb7c62b98f2de1
 
 If you click the URL, it will open the VS Code application in the browser:
 
-![](../../assets/dstack_code_dark.png)
+![](../../assets/images/dstack-code-dark.png)
 
 For more details, check the [reference](../reference/providers/code.md).
 

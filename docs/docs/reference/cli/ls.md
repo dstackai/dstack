@@ -18,7 +18,6 @@ Options:
   -h, --help         Show this help message and exit
   --project PROJECT  Hub project to execute the command
   -r, --recursive    Show all files recursively
-  -t, --total        Show total folder size
 ```
 
 </div>
@@ -34,5 +33,4 @@ The following arguments are optional:
 
 -  `--project PROJECT` – (Optional) The name of the Hub project to execute the command for
 - `-r`, `--recursive` – (Optional) Show all files recursively
-- `-t`, `--total` – (Optional) Show total folder size
 - `SEARCH_PREFIX` – (Optional) Show files starting with prefix

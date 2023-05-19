@@ -21,6 +21,9 @@ class ConfigManager:
         self.home = Path(home).expanduser().resolve()
         self._cache: Dict[str, BaseModel] = {}
 
+    def dstack_key_path(self, repo_dir: Optional[PathLike] = None) -> Path:
+        return self.home / "dstack_rsa"
+
     @property
     def repos(self) -> Path:
         return self.home / "repos"
@@ -151,7 +154,16 @@ def get_hub_client(project_name: Optional[str] = None) -> HubClient:
             raise CLIError(
                 f"No default project is configured. Call `dstack start` or `dstack config`."
             )
-    repo = load_repo(config.repo_user_config)
+    repo_config = _read_repo_config_or_error_with_project_name(project_name)
+    repo = load_repo(repo_config)
     hub_client_config = HubClientConfig(url=project_config.url, token=project_config.token)
     hub_client = HubClient(config=hub_client_config, project=project_config.name, repo=repo)
     return hub_client
+
+
+def _read_repo_config_or_error_with_project_name(project_name: Optional[str]) -> RepoUserConfig:
+    try:
+        return config.repo_user_config
+    except RepoNotInitializedError as e:
+        e.project_name = project_name
+        raise e

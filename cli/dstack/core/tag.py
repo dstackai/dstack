@@ -3,6 +3,7 @@ from typing import List, Optional
 from pydantic import BaseModel
 
 from dstack.core.artifact import ArtifactHead
+from dstack.utils.escape import escape_head
 
 
 class TagHead(BaseModel):
@@ -17,9 +18,7 @@ class TagHead(BaseModel):
 
     def serialize_artifact_heads(self):
         return (
-            ":".join(
-                [a.job_id + "=" + a.artifact_path.replace("/", "_") for a in self.artifact_heads]
-            )
+            ":".join([a.job_id + "=" + escape_head(a.artifact_path) for a in self.artifact_heads])
             if self.artifact_heads
             else ""
         )

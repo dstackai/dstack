@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"github.com/dstackai/dstack/runner/internal/common"
 	"github.com/dstackai/dstack/runner/internal/log"
 	"strings"
 )
@@ -32,7 +33,7 @@ func (vi *VariablesInterpolator) Interpolate(ctx context.Context, s string) (str
 
 	start := 0
 	for start < len(s) {
-		dollar := IndexWithOffset(s, "$", start)
+		dollar := common.IndexWithOffset(s, "$", start)
 		if dollar == -1 || dollar == len(s)-1 {
 			sb.WriteString(s[start:])
 			break
@@ -43,13 +44,13 @@ func (vi *VariablesInterpolator) Interpolate(ctx context.Context, s string) (str
 			continue
 		}
 
-		opening := IndexWithOffset(s, PatternOpening, start)
+		opening := common.IndexWithOffset(s, PatternOpening, start)
 		if opening == -1 {
 			sb.WriteString(s[start:])
 			break
 		}
 		sb.WriteString(s[start:opening])
-		closing := IndexWithOffset(s, PatternClosing, opening)
+		closing := common.IndexWithOffset(s, PatternClosing, opening)
 		if closing == -1 {
 			return "", errors.New(fmt.Sprintf("no pattern closing: %s", s[opening:]))
 		}
@@ -64,12 +65,4 @@ func (vi *VariablesInterpolator) Interpolate(ctx context.Context, s string) (str
 		start = closing + len(PatternClosing)
 	}
 	return sb.String(), nil
-}
-
-func IndexWithOffset(hay string, needle string, start int) int {
-	idx := strings.Index(hay[start:], needle)
-	if idx < 0 {
-		return -1
-	}
-	return start + idx
 }

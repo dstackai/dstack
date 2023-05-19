@@ -104,6 +104,30 @@ export const ProjectSettings: React.FC = () => {
         );
     };
 
+    const renderAzureBackendDetails = (): React.ReactNode => {
+        if (!data) return null;
+
+        return (
+            <ColumnLayout columns={4} variant="text-grid">
+                <div>
+                    <Box variant="awsui-key-label">{t('projects.edit.backend_type')}</Box>
+                    <div>{t(`projects.backend_type.${data.backend.type}`)}</div>
+                </div>
+
+                <div>
+                    <Box variant="awsui-key-label">{t('projects.edit.azure.location')}</Box>
+                    <div>{data.backend.location}</div>
+                </div>
+
+                <div>
+                    <Box variant="awsui-key-label">{t('projects.edit.azure.storage_account')}</Box>
+                    <div>{data.backend.storage_account}</div>
+                </div>
+
+            </ColumnLayout>
+        );
+    };
+
     const renderGCPBackendDetails = (): React.ReactNode => {
         if (!data) return null;
 
@@ -147,13 +171,37 @@ export const ProjectSettings: React.FC = () => {
         );
     };
 
+    const renderLocalBackendDetails = (): React.ReactNode => {
+        if (!data) return null;
+
+        return (
+            <ColumnLayout variant="text-grid">
+                <div>
+                    <Box variant="awsui-key-label">{t('projects.edit.backend_type')}</Box>
+                    <div>{t(`projects.backend_type.${data.backend.type}`)}</div>
+                </div>
+
+                <div>
+                    <Box variant="awsui-key-label">{t('projects.edit.local.path')}</Box>
+                    <div>{data.backend.path}</div>
+                </div>
+            </ColumnLayout>
+        );
+    };
+
     const renderBackendDetails = () => {
         switch (data?.backend.type) {
             case 'aws': {
                 return renderAwsBackendDetails();
             }
+            case 'azure': {
+                return renderAzureBackendDetails();
+            }
             case 'gcp': {
                 return renderGCPBackendDetails();
+            }
+            case 'local': {
+                return renderLocalBackendDetails();
             }
             default:
                 return null;

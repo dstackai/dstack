@@ -14,15 +14,14 @@ from dstack.hub.models import (
 )
 from dstack.hub.repository.projects import ProjectManager
 from dstack.hub.routers.cache import clear_backend_cache
-from dstack.hub.routers.util import error_detail, get_project
+from dstack.hub.routers.util import error_detail, get_backend_configurator, get_project
 from dstack.hub.security.permissions import (
     Authenticated,
     ProjectAdmin,
     ProjectMember,
     ensure_user_project_admin,
 )
-from dstack.hub.services.backends import get_configurator, local_backend_available
-from dstack.hub.services.backends.base import BackendConfigError, Configurator
+from dstack.hub.services.backends.base import BackendConfigError
 
 router = APIRouter(prefix="/api/projects", tags=["project"])
 
@@ -32,10 +31,10 @@ async def get_backend_config_values(
     config: ProjectConfigWithCredsPartial = Body(),
     user: User = Depends(Authenticated()),
 ) -> ProjectValues:
-    configurator = _get_backend_configurator(config.__root__.type)
+    configurator = get_backend_configurator(config.__root__.type)
     try:
         result = await asyncio.get_running_loop().run_in_executor(
-            None, configurator.configure_hub, config.__root__.dict()
+            None, configurator.configure_project, config.__root__.dict()
         )
     except BackendConfigError as e:
         _error_response_on_config_error(e, path_to_config=[])
@@ -63,17 +62,10 @@ async def create_project(
                 )
             ],
         )
-    configurator = _get_backend_configurator(project_info.backend.__root__.type)
-    if configurator.name == "local" and not local_backend_available():
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail=[
-                error_detail("Local backend not available", code="local_backend_not_available")
-            ],
-        )
+    configurator = get_backend_configurator(project_info.backend.__root__.type)
     try:
         await asyncio.get_running_loop().run_in_executor(
-            None, configurator.configure_hub, project_info.backend.__root__.dict()
+            None, configurator.configure_project, project_info.backend.__root__.dict()
         )
     except BackendConfigError as e:
         _error_response_on_config_error(e, path_to_config=["backend"])
@@ -123,26 +115,16 @@ async def update_project(
     project_info: ProjectInfoWithCreds = Body(),
     user_project: Tuple[User, Project] = Depends(ProjectAdmin()),
 ) -> ProjectInfoWithCreds:
-    configurator = _get_backend_configurator(project_info.backend.__root__.type)
+    configurator = get_backend_configurator(project_info.backend.__root__.type)
     try:
         await asyncio.get_running_loop().run_in_executor(
-            None, configurator.configure_hub, project_info.backend.__root__.dict()
+            None, configurator.configure_project, project_info.backend.__root__.dict()
         )
     except BackendConfigError as e:
         _error_response_on_config_error(e, path_to_config=["backend"])
     await ProjectManager.update_project_from_info(project_info)
     clear_backend_cache(project_info.project_name)
     return project_info
-
-
-def _get_backend_configurator(backend_type: str) -> Configurator:
-    configurator = get_configurator(backend_type)
-    if configurator is None:
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail=error_detail(f"Unknown backend {backend_type}"),
-        )
-    return configurator
 
 
 def _error_response_on_config_error(e: BackendConfigError, path_to_config: List[str]):

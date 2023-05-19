@@ -4,6 +4,8 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"github.com/dstackai/dstack/runner/internal/backend/base"
+	"github.com/dstackai/dstack/runner/internal/common"
 	"io"
 	"io/fs"
 	"mime"
@@ -77,7 +79,7 @@ type Copier struct {
 	cli        *s3.Client
 	downloader *manager.Downloader
 	uploader   *manager.Uploader
-	threads    semaphore
+	threads    base.Semaphore
 	pb         *ProgressBar
 }
 
@@ -95,7 +97,7 @@ func New(region string) *Copier {
 	c.downloader = manager.NewDownloader(c.cli)
 	c.uploader = manager.NewUploader(c.cli)
 
-	c.threads = make(semaphore, MAX_THREADS)
+	c.threads = make(base.Semaphore, MAX_THREADS)
 	c.pb = &ProgressBar{
 		totalSize:   atomic.Int64{},
 		currentSize: atomic.Int64{},
@@ -222,7 +224,8 @@ func (c *Copier) CreateDirObject(ctx context.Context, bucket, path string) error
 }
 
 func (c *Copier) Download(ctx context.Context, bucket, remote, local string) {
-	//Check local file cache
+	// Check local file cache
+	// Has no use, since the AWS backend runs on a fresh machine
 	if _, err := os.Stat(filepath.Join(local, consts.FILE_LOCK_FULL_DOWNLOAD)); err == nil {
 		return
 	}
@@ -234,9 +237,9 @@ func (c *Copier) Download(ctx context.Context, bucket, remote, local string) {
 			errorFound.Store(true)
 			continue
 		}
-		c.threads.acquire(1)
+		c.threads.Acquire(1)
 		go func(file *Object) {
-			defer c.threads.release(1)
+			defer c.threads.Release(1)
 			theFilePath := strings.TrimPrefix(file.Key, remote)
 			theFilePath = filepath.Join(local, theFilePath)
 			if file.Type.IsDir() {
@@ -282,11 +285,16 @@ func (c *Copier) Download(ctx context.Context, bucket, remote, local string) {
 				errorFound.Store(true)
 				return
 			}
+			if err = os.Chtimes(theFilePath, *file.ModTime, *file.ModTime); err != nil {
+				log.Error(ctx, "Chtimes", "err", err)
+				errorFound.Store(true)
+				return
+			}
 			c.updateBars(file.Size)
 		}(file)
 	}
-	c.threads.acquire(MAX_THREADS) // act as a barrier
-	c.threads.release(MAX_THREADS)
+	c.threads.Acquire(MAX_THREADS) // act as a barrier
+	c.threads.Release(MAX_THREADS)
 	if !errorFound.Load() {
 		log.Info(ctx, "Lock directory")
 		theFile, err := os.Create(filepath.Join(local, consts.FILE_LOCK_FULL_DOWNLOAD))
@@ -302,13 +310,14 @@ func (c *Copier) Download(ctx context.Context, bucket, remote, local string) {
 		}()
 	}
 }
+
 func (c *Copier) Upload(ctx context.Context, bucket, remote, local string) {
 	c.statUpload(local)
 	errorFound := atomic.NewBool(false)
 	for file := range walkFiles(local) {
-		c.threads.acquire(1)
+		c.threads.Acquire(1)
 		go func(file *fileJob) {
-			defer c.threads.release(1)
+			defer c.threads.Release(1)
 			key := path.Join(remote, strings.TrimPrefix(file.path, local))
 			if file.info.IsDir() {
 				log.Trace(ctx, "Create dir", "dir", key)
@@ -342,8 +351,8 @@ func (c *Copier) Upload(ctx context.Context, bucket, remote, local string) {
 			c.updateBars(file.info.Size())
 		}(file)
 	}
-	c.threads.acquire(MAX_THREADS) // act as a barrier
-	c.threads.release(MAX_THREADS)
+	c.threads.Acquire(MAX_THREADS) // act as a barrier
+	c.threads.Release(MAX_THREADS)
 	if !errorFound.Load() {
 		log.Info(ctx, "Lock directory")
 		theFile, err := os.Create(filepath.Join(local, consts.FILE_LOCK_FULL_DOWNLOAD))
@@ -358,6 +367,62 @@ func (c *Copier) Upload(ctx context.Context, bucket, remote, local string) {
 			}
 		}()
 	}
+}
+
+func (c *Copier) SyncDirUpload(ctx context.Context, bucket, srcDir, dstPrefix string) error {
+	srcDir = common.AddTrailingSlash(srcDir)
+	dstPrefix = common.AddTrailingSlash(dstPrefix)
+
+	dstObjects := make(chan base.ObjectInfo)
+	go func() {
+		defer close(dstObjects)
+		for obj := range c.listObjects(bucket, dstPrefix) {
+			if obj.Type.IsDir() {
+				continue
+			}
+			dstObjects <- base.ObjectInfo{
+				Key: strings.TrimPrefix(obj.Key, dstPrefix),
+				FileInfo: base.FileInfo{
+					Size:     obj.Size,
+					Modified: *obj.ModTime,
+				},
+			}
+		}
+	}()
+	err := base.SyncDirUpload(
+		ctx, srcDir, dstObjects,
+		func(ctx context.Context, key string, _ base.FileInfo) error {
+			/* delete object */
+			key = path.Join(dstPrefix, key)
+			_, err := c.cli.DeleteObject(ctx, &s3.DeleteObjectInput{
+				Bucket: aws.String(bucket),
+				Key:    aws.String(key),
+			})
+			return err
+		},
+		func(ctx context.Context, key string, info base.FileInfo) error {
+			/* upload object */
+			file, err := os.Open(path.Join(srcDir, key))
+			if err != nil {
+				return err
+			}
+			mimeType := mime.TypeByExtension(path.Ext(key))
+			if mimeType == "" {
+				mimeType = "binary/octet-stream"
+			}
+			key = path.Join(dstPrefix, key)
+			if info.Size < c.pb.size() {
+				err = c.doUpload(ctx, bucket, key, file, mimeType, 1, MIN_SIZE)
+			} else {
+				err = c.doUpload(ctx, bucket, key, file, mimeType, int(info.Size/c.pb.size()), c.pb.size())
+			}
+			return err
+		},
+	)
+	if err != nil {
+		return gerrors.Wrap(err)
+	}
+	return nil
 }
 
 func walkFiles(local string) chan *fileJob {

@@ -16,6 +16,7 @@ from dstack.core.tag import TagHead
 from dstack.hub.models import (
     AddTagPath,
     AddTagRun,
+    ArtifactsList,
     JobHeadList,
     JobsGet,
     JobsList,
@@ -500,7 +501,9 @@ class HubAPIClient:
             return
         resp.raise_for_status()
 
-    def list_run_artifact_files(self, run_name: str) -> List[Artifact]:
+    def list_run_artifact_files(
+        self, run_name: str, prefix: str, recursive: bool
+    ) -> List[Artifact]:
         url = _project_url(
             url=self.url,
             project=self.project,
@@ -511,7 +514,9 @@ class HubAPIClient:
             host=self.url,
             url=url,
             headers=self._headers(),
-            data=JobsList(repo_id=self.repo.repo_id, run_name=run_name).json(),
+            data=ArtifactsList(
+                repo_id=self.repo.repo_id, run_name=run_name, prefix=prefix, recursive=recursive
+            ).json(),
         )
         if resp.ok:
             artifact_data = resp.json()
@@ -604,7 +609,7 @@ class HubAPIClient:
             host=self.url,
             url=url,
             headers=self._headers(),
-            data=RepoSpec.from_repo(self.repo).json(),
+            data=self.repo.repo_ref.json(),
         )
         if resp.ok:
             return

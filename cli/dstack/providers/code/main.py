@@ -4,8 +4,8 @@ from typing import Any, Dict, List, Optional
 
 from rich_argparse import RichHelpFormatter
 
+import dstack.api.hub as hub
 from dstack import version
-from dstack.backend.base import Backend
 from dstack.core.app import AppSpec
 from dstack.core.job import JobSpec
 from dstack.providers import Provider
@@ -28,18 +28,18 @@ class CodeProvider(Provider):
 
     def load(
         self,
-        backend: Backend,
+        hub_client: "hub.HubClient",
         args: Optional[Namespace],
         workflow_name: Optional[str],
         provider_data: Dict[str, Any],
         run_name: str,
         ssh_key_pub: Optional[str] = None,
     ):
-        super().load(backend, args, workflow_name, provider_data, run_name, ssh_key_pub)
+        super().load(hub_client, args, workflow_name, provider_data, run_name, ssh_key_pub)
         self.setup = self._get_list_data("setup") or self._get_list_data("before_run")
         self.ports = self.provider_data.get("ports")
         self.python = self._safe_python_version("python")
-        self.version = self.provider_data.get("version") or "1.74.3"
+        self.version = self.provider_data.get("version") or "1.78.1"
         self.env = self._env()
         self.artifact_specs = self._artifact_specs()
         self.working_dir = self.provider_data.get("working_dir")
@@ -129,7 +129,7 @@ class CodeProvider(Provider):
                 f"openvscode-server-v{self.version}/openvscode-server-v{self.version}-linux-$arch.tar.gz -O "
                 f"/tmp/openvscode-server-v{self.version}-linux-$arch.tar.gz",
                 f"tar -xzf /tmp/openvscode-server-v{self.version}-linux-$arch.tar.gz -C /tmp",
-                f"/tmp/openvscode-server-v{self.version}-linux-$arch/bin/openvscode-server --install-extension ms-python.python",
+                f"/tmp/openvscode-server-v{self.version}-linux-$arch/bin/openvscode-server --install-extension ms-python.python --install-extension ms-toolsai.jupyter",
                 "rm /usr/bin/python2*",
             ]
         )

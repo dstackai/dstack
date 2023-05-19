@@ -50,7 +50,7 @@ class RunCommand(BasicCommand):
         workflow_help = "{" + ",".join(workflow_or_provider_names) + "}"
         self._parser.add_argument(
             "workflow_or_provider",
-            metavar="WORKFLOW | PROVIDER",
+            metavar="WORKFLOW",
             type=str,
             help=workflow_help,
             choices=workflow_or_provider_names,
@@ -89,7 +89,7 @@ class RunCommand(BasicCommand):
                 hub_client.repo.repo_data.repo_type != "local"
                 and not hub_client.get_repo_credentials()
             ):
-                raise RepoNotInitializedError("No credentials", project_name=hub_client.project)
+                raise RepoNotInitializedError("No credentials", project_name=args.project)
 
             if not config.repo_user_config.ssh_key_path:
                 ssh_pub_key = None
@@ -182,11 +182,12 @@ def _poll_run(
 
         ports = {}
         jobs = [hub_client.get_job(job_head.job_id) for job_head in job_heads]
-        if hub_client.get_project_backend_type() != "local":
+        backend_type = hub_client.get_project_backend_type()
+        if backend_type != "local":
             console.print("Starting SSH tunnel...")
             ports = allocate_local_ports(jobs)
             if not run_ssh_tunnel(
-                ssh_key, jobs[0].host_name, ports
+                ssh_key, jobs[0].host_name, ports, backend_type
             ):  # todo: cleanup explicitly (stop tunnel)
                 console.print("[warning]Warning: failed to start SSH tunnel[/warning] [red]✗[/]")
         else:
@@ -289,12 +290,13 @@ def ask_on_interrupt(hub_client: HubClient, run_name: str):
     global interrupt_count
     if interrupt_count == 0:
         try:
-            if Confirm.ask(f"\n[red]Stop the run '{run_name}'?[/]"):
+            console.print("\n")
+            if Confirm.ask(f"[red]Stop the run '{run_name}'?[/]"):
                 interrupt_count += 1
                 hub_client.stop_jobs(run_name, abort=False)
-                console.print("[grey58]Stopping... To abort press Ctrl+C[/]", end="")
+                console.print("\n[grey58]Stopping... To abort press Ctrl+C[/]", end="")
             else:
-                console.print("[grey58]Detaching...[/]")
+                console.print("\n[grey58]Detaching...[/]")
                 console.print("[grey58]OK[/]")
                 exit(0)
             return

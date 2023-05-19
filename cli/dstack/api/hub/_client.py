@@ -143,10 +143,16 @@ class HubClient:
         )
 
     def list_run_artifact_files(
-        self, run_name: str, repo_id: Optional[str] = None
+        self,
+        run_name: str,
+        prefix: str = "",
+        recursive: bool = False,
+        repo_id: Optional[str] = None,
     ) -> List[Artifact]:
         # /{hub_name}/artifacts/list
-        return self._api_client.list_run_artifact_files(run_name=run_name)
+        return self._api_client.list_run_artifact_files(
+            run_name=run_name, prefix=prefix, recursive=recursive
+        )
 
     def download_run_artifact_files(
         self,

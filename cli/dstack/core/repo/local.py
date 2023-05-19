@@ -8,7 +8,7 @@ from typing_extensions import Literal
 
 from dstack.core.repo.base import Repo, RepoData, RepoInfo, RepoRef
 from dstack.utils.common import PathLike
-from dstack.utils.escape import Escaper
+from dstack.utils.escape import escape_head
 from dstack.utils.hash import get_sha256, slugify
 from dstack.utils.workflows import load_workflows
 
@@ -29,7 +29,7 @@ class LocalRepoInfo(RepoInfo):
 
     @property
     def head_key(self) -> str:
-        repo_dir = Escaper({"/": "."}, escape_char="~").escape(self.repo_dir)
+        repo_dir = escape_head(self.repo_dir)
         return f"{self.repo_type};{repo_dir}"
 
 

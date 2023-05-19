@@ -120,7 +120,7 @@ func (l Local) UpdateState(ctx context.Context) error {
 	if err != nil {
 		return gerrors.Wrap(err)
 	}
-	jobHeadFilepath := l.state.Job.JobHeadFilepathLocal()
+	jobHeadFilepath := l.state.Job.JobHeadFilepath()
 	for _, file := range files[:1] {
 		log.Trace(ctx, "Renaming file job", "From", file, "To", jobHeadFilepath)
 		err = l.storage.RenameFile(file, jobHeadFilepath)
@@ -175,6 +175,10 @@ func (l *Local) GetArtifact(ctx context.Context, runName, localPath, remotePath 
 		return nil
 	}
 	return art
+}
+
+func (l *Local) GetCache(ctx context.Context, runName, localPath, remotePath string) artifacts.Artifacter {
+	return l.GetArtifact(ctx, runName, localPath, remotePath, false)
 }
 
 func (l Local) CreateLogger(ctx context.Context, logGroup, logName string) io.Writer {

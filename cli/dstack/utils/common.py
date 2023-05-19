@@ -6,8 +6,6 @@ from datetime import datetime, timedelta, timezone
 from pathlib import Path
 from typing import Any, Dict, Optional, Union
 
-from botocore.utils import parse_timestamp
-
 PathLike = Union[str, os.PathLike]
 
 
@@ -81,9 +79,15 @@ def since(timestamp: str) -> datetime:
         datetime_value = _relative_timestamp_to_datetime(
             int(re_match.group("amount")), re_match.group("unit")
         )
-    else:
-        datetime_value = parse_timestamp(timestamp)
-    return datetime_value
+        return datetime_value
+    try:
+        return datetime.fromisoformat(timestamp)
+    except ValueError:
+        pass
+    try:
+        return datetime.fromtimestamp(int(timestamp))
+    except Exception:
+        raise ValueError("Invalid datetime format")
 
 
 def _relative_timestamp_to_datetime(amount, unit):
