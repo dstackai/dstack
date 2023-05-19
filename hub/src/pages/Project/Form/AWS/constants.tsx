@@ -14,7 +14,7 @@ export const CREDENTIALS_HELP = {
         <>
             <p>
                 To use AWS with <i>dstack Hub</i>, you'll need to create an IAM user in your AWS account, grant this user
-                permissions to perform actions on <i>S3</i>, <i>CloudWatch Logs</i>, <i>Secrets Manager</i>,<i>EC2</i>, and{' '}
+                permissions to perform actions on <i>S3</i>, <i>CloudWatch Logs</i>, <i>Secrets Manager</i>, <i>EC2</i>, and{' '}
                 <i>IAM</i> services, create credentials for that user, and specify them here as the <i>Access key ID</i> and{' '}
                 <i>Secret access</i> key.
             </p>
