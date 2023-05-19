@@ -27,10 +27,15 @@ export const RunList: React.FC = () => {
     const paramProjectName = params.name ?? '';
     const paramRepoId = params.repoId ?? '';
 
-    const { data, isLoading } = useGetRunsQuery({
-        name: paramProjectName,
-        repo_id: paramRepoId,
-    });
+    const { data, isLoading } = useGetRunsQuery(
+        {
+            name: paramProjectName,
+            repo_id: paramRepoId,
+        },
+        {
+            pollingInterval: 10000,
+        },
+    );
 
     const COLUMN_DEFINITIONS = [
         {
@@ -46,6 +51,11 @@ export const RunList: React.FC = () => {
             id: 'workflow_name',
             header: `${t('projects.run.workflow_name')}/${t('projects.run.provider_name')}`,
             cell: (item: IRun) => item.workflow_name ?? item.provider_name,
+        },
+        {
+            id: 'hub_user_name',
+            header: `${t('projects.run.hub_user_name')}`,
+            cell: (item: IRun) => item.hub_user_name,
         },
         {
             id: 'status',

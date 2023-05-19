@@ -16,7 +16,12 @@ export const RepositoryList: React.FC = () => {
     const params = useParams();
     const paramProjectName = params.name ?? '';
 
-    const { data, isLoading } = useGetProjectReposQuery({ name: paramProjectName });
+    const { data, isLoading } = useGetProjectReposQuery(
+        { name: paramProjectName },
+        {
+            pollingInterval: 10000,
+        },
+    );
 
     const renderEmptyMessage = (): React.ReactNode => {
         return (

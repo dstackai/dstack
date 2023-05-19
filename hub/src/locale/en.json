@@ -178,6 +178,7 @@
       "submitted_at": "Run time",
       "artifacts": "Artifacts",
       "artifacts_count": "Artifacts count",
+      "hub_user_name": "Hub user name",
       "statuses": {
         "pending": "Pending",
         "submitted": "Submitted",
