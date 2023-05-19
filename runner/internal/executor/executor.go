@@ -6,6 +6,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	localbackend "github.com/dstackai/dstack/runner/internal/backend/local"
 	"io"
 	"os"
 	"path"
@@ -546,6 +547,13 @@ func (ex *Executor) processJob(ctx context.Context, stoppedCh chan struct{}) err
 	if err != nil {
 		log.Error(ctx, "Failed interpolating registry_auth.password", "err", err, "password", job.RegistryAuth.Password)
 	}
+	_, isLocalBackend := ex.backend.(*localbackend.Local)
+	appsBindingPorts, err := ports.GetAppsBindingPorts(ctx, job.Apps, isLocalBackend)
+	if err != nil {
+		// todo custom exit status
+		log.Error(ctx, "Failed binding ports", "err", err)
+		return gerrors.Wrap(err)
+	}
 	spec := &container.Spec{
 		Image:              job.Image,
 		RegistryAuthBase64: makeRegistryAuthBase64(username, password),
@@ -555,8 +563,9 @@ func (ex *Executor) processJob(ctx context.Context, stoppedCh chan struct{}) err
 		Env:                ex.environment(ctx),
 		Mounts:             uniqueMount(bindings),
 		ExposedPorts:       ports.GetAppsExposedPorts(job.Apps),
-		BindingPorts:       ports.GetAppsBindingPorts(job.Apps),
+		BindingPorts:       appsBindingPorts,
 		ShmSize:            resource.ShmSize,
+		AllowHostMode:      !isLocalBackend,
 	}
 	logGroup := fmt.Sprintf("/jobs/%s", job.RepoId)
 	fileLog, err := createLocalLog(filepath.Join(ex.configDir, "logs", logGroup), job.RunName)

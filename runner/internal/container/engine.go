@@ -125,7 +125,7 @@ func (r *Engine) Create(ctx context.Context, spec *Spec, logs io.Writer) (*Docke
 		config.Entrypoint = *spec.Entrypoint
 	}
 	var networkMode container.NetworkMode = "default"
-	if supportNetworkModeHost() {
+	if spec.AllowHostMode && supportNetworkModeHost() {
 		networkMode = "host"
 	}
 	hostConfig := &container.HostConfig{

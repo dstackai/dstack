@@ -55,7 +55,7 @@ def merge_ports(schema: List[PortMapping], args: List[PortMapping]) -> Dict[int,
         ports[pm.port] = pm
 
     unique_ports_constraint(
-        [pm.map_to_port for pm in ports if pm.map_to_port is not None],
+        [pm.map_to_port for pm in ports.values() if pm.map_to_port is not None],
         error="Mapped port {} is already in use",
     )
     return ports

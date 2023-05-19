@@ -79,12 +79,12 @@ func (l *Local) Init(ctx context.Context, ID string) error {
 	return nil
 }
 
-func (l Local) Job(ctx context.Context) *models.Job {
+func (l *Local) Job(ctx context.Context) *models.Job {
 	log.Trace(ctx, "Getting job from state", "ID", l.state.Job.JobID)
 	return l.state.Job
 }
 
-func (l Local) MasterJob(ctx context.Context) *models.Job {
+func (l *Local) MasterJob(ctx context.Context) *models.Job {
 	contents, err := l.storage.GetFile(filepath.Join("jobs", l.state.Job.RepoUserName, l.state.Job.RepoName, fmt.Sprintf("%s.yaml", l.state.Job.MasterJobID)))
 	if err != nil {
 		return nil
@@ -97,12 +97,12 @@ func (l Local) MasterJob(ctx context.Context) *models.Job {
 	return masterJob
 }
 
-func (l Local) Requirements(ctx context.Context) models.Requirements {
+func (l *Local) Requirements(ctx context.Context) models.Requirements {
 	log.Trace(ctx, "Getting requirements")
 	return l.state.Job.Requirements
 }
 
-func (l Local) UpdateState(ctx context.Context) error {
+func (l *Local) UpdateState(ctx context.Context) error {
 	log.Trace(ctx, "Start update state")
 	log.Trace(ctx, "Marshaling job")
 	contents, err := yaml.Marshal(&l.state.Job)
@@ -131,7 +131,7 @@ func (l Local) UpdateState(ctx context.Context) error {
 	return nil
 }
 
-func (l Local) CheckStop(ctx context.Context) (bool, error) {
+func (l *Local) CheckStop(ctx context.Context) (bool, error) {
 	pathStateFile := fmt.Sprintf("runners/m;%s.yaml", l.runnerID)
 	log.Trace(ctx, "Reading metadata from state file", "path", pathStateFile)
 	if _, err := os.Stat(filepath.Join(l.path, pathStateFile)); err == nil {
@@ -157,11 +157,11 @@ func (l Local) CheckStop(ctx context.Context) (bool, error) {
 	return false, nil
 }
 
-func (l Local) IsInterrupted(ctx context.Context) (bool, error) {
+func (l *Local) IsInterrupted(ctx context.Context) (bool, error) {
 	return false, nil
 }
 
-func (l Local) Shutdown(ctx context.Context) error {
+func (l *Local) Shutdown(ctx context.Context) error {
 	log.Trace(ctx, "Start shutdown")
 	return nil
 }
@@ -181,7 +181,7 @@ func (l *Local) GetCache(ctx context.Context, runName, localPath, remotePath str
 	return l.GetArtifact(ctx, runName, localPath, remotePath, false)
 }
 
-func (l Local) CreateLogger(ctx context.Context, logGroup, logName string) io.Writer {
+func (l *Local) CreateLogger(ctx context.Context, logGroup, logName string) io.Writer {
 	log.Trace(ctx, "Build logger", "LogGroup", logGroup, "LogName", logName)
 	logger, err := NewLogger(l.state.Job.JobID, l.path, logGroup, logName)
 	if err != nil {
@@ -191,7 +191,7 @@ func (l Local) CreateLogger(ctx context.Context, logGroup, logName string) io.Wr
 	return logger
 }
 
-func (l Local) GetJobByPath(ctx context.Context, path string) (*models.Job, error) {
+func (l *Local) GetJobByPath(ctx context.Context, path string) (*models.Job, error) {
 	contents, err := l.storage.GetFile(path)
 	if err != nil {
 		return nil, gerrors.Wrap(err)
@@ -233,16 +233,16 @@ func (l *Local) Secrets(ctx context.Context) (map[string]string, error) {
 	return l.cliSecret.fetchSecret(ctx, templatePath, secrets)
 }
 
-func (l Local) Bucket(ctx context.Context) string {
+func (l *Local) Bucket(ctx context.Context) string {
 	return ""
 }
 
-func (l Local) ListSubDir(ctx context.Context, dir string) ([]string, error) {
+func (l *Local) ListSubDir(ctx context.Context, dir string) ([]string, error) {
 	log.Trace(ctx, "Fetching list sub dir")
 	return l.storage.ListFile(dir)
 }
 
-func (l Local) GetRepoDiff(ctx context.Context, path string) (string, error) {
+func (l *Local) GetRepoDiff(ctx context.Context, path string) (string, error) {
 	diff, err := l.storage.GetFile(path)
 	if err != nil {
 		return "", gerrors.Wrap(err)
@@ -250,7 +250,7 @@ func (l Local) GetRepoDiff(ctx context.Context, path string) (string, error) {
 	return string(diff), nil
 }
 
-func (l Local) GetRepoArchive(ctx context.Context, path, dir string) error {
+func (l *Local) GetRepoArchive(ctx context.Context, path, dir string) error {
 	src := filepath.Join(l.path, path)
 	if err := repo.ExtractArchive(ctx, src, dir); err != nil {
 		return gerrors.Wrap(err)
@@ -258,6 +258,6 @@ func (l Local) GetRepoArchive(ctx context.Context, path, dir string) error {
 	return nil
 }
 
-func (l Local) GetTMPDir(ctx context.Context) string {
+func (l *Local) GetTMPDir(ctx context.Context) string {
 	return path.Join(l.path, "tmp")
 }

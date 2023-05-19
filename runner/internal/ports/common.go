@@ -2,6 +2,7 @@ package ports
 
 import (
 	"net"
+	"strconv"
 )
 
 func GetFreePort() (int, error) {
@@ -18,4 +19,16 @@ func GetFreePort() (int, error) {
 		_ = l.Close()
 	}()
 	return l.Addr().(*net.TCPAddr).Port, nil
+}
+
+func CheckPort(port int) (bool, error) {
+	host := ":" + strconv.Itoa(port)
+	// force IPv4 to detect used ports
+	// https://stackoverflow.com/a/51073906
+	server, err := net.Listen("tcp4", host)
+	if err != nil {
+		return false, err
+	}
+	_ = server.Close()
+	return true, nil
 }
