@@ -16,9 +16,9 @@ const publicDir = join(__dirname, '../public');
 const apiUrl = process.env.API_URL || apiURLs;
 const publicUrl = process.env.PUBLIC_URL || publicURLs;
 
-const title = "dstack Hub";
-const description = "dstack is an open-source tool that allows you to define ML workflows as code and run them on cloud. " +
-    "dstack takes care of dependencies, infrastructure, and data management.";
+const title = "dstack";
+const description = "dstack offers a unified and simple interface for ML engineers to manage dev environments and run " +
+    "                    pipelines and apps cost-effectively on AWS, GCP, and Azure.";
 
 module.exports = {
     environment,

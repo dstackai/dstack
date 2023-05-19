@@ -146,7 +146,7 @@ nav:
           - Pipelines: docs/guides/pipelines.md
           - Apps: docs/guides/apps.md
 #          - Artifacts: docs/guides/artifacts.md
-#          - Hub: docs/guides/hub.md
+          - Projects: docs/guides/projects.md
       - Reference:
           - CLI:
               - dstack run: docs/reference/cli/run.md
@@ -168,6 +168,9 @@ nav:
               - lab: docs/reference/providers/lab.md
               - notebook: docs/reference/providers/notebook.md
               - docker: docs/reference/providers/docker.md
+          - Backends:
+              - AWS: docs/reference/backends/aws.md
+              - GCP: docs/reference/backends/gcp.md
   - Examples: https://github.com/dstackai/dstack-examples/blob/main/README.md
   - Slack: https://join.slack.com/t/dstackai/shared_invite/zt-xdnsytie-D4qU9BvJP8vkbkHXdi6clQ
   - Blog:

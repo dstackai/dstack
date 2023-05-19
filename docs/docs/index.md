@@ -1,5 +1,7 @@
 # Getting started
 
+:material-star:
+
 `dstack` makes it very easy for ML engineers to manage dev environments and run pipelines and apps cost-effectively 
 on any cloud.
 
@@ -19,14 +21,13 @@ The Hub is available at http://127.0.0.1:3000?token=b934d226-e24a-4eab-eb92b353b
 </div>
 
 ??? info "What is Hub?"
-    Hub is a server application designed to facilitate team collaboration and streamline the usage of `dstack`. 
-    It orchestrates runs, stores cloud credentials, tracks usage, and performs other essential functions.
+    Hub is a server that manages projects and users. Each project allows you to configure where to run dev environments,
+    pipelines, and apps (e.g. locally or in the cloud), as well as manage users that access it.
 
-    You have the flexibility to start Hub locally, on a dedicated server, or in the cloud. When starting it locally, 
-    the default project is automatically configured to run everything locally.
+    At startup, `dstack` sets up a default project for local execution. To run dev environments, pipelines, and apps in your
+    desired cloud account, you must create the corresponding project and configure the `dstack` CLI to use it.
 
-    To enable Hub to run dev environments, pipelines, and apps in your preferred cloud account (AWS, GCP, etc), 
-    log in to Hub, and configure the corresponding project.
+    [Learn more →](guides/projects){ .md-button .md-button--primary }
 
 ## Initializing the repo
 

@@ -1,15 +1,31 @@
 {% extends "main.html" %}
 
+{% block scripts %}
+{{ super() }}
+<script>
+    window.$crisp = [];
+    window.CRISP_WEBSITE_ID = "ce56e3b2-a23e-4d3f-9e80-e08c61a2b3cb";
+    (function () {
+        let d = document;
+        let s = d.createElement("script");
+        s.src = "https://client.crisp.chat/l.js";
+        s.async = 1;
+        d.getElementsByTagName("head")[0].appendChild(s);
+        $crisp.push(["do", "chat:hide"]);
+    })();
+</script>
+{% endblock %}
+
 {% block content %}
 <section class="tx-container">
     <div class="md-grid md-typeset">
         <div class="tx-landing__hero">
             <div class="tx-landing__hero_text">
                 <h1>Develop ML faster. Use any cloud.</h1>
-                <p>dstack offers a unified and simple interface for ML engineers to manage dev environments and run
-                    pipelines and apps cost-effectively on AWS, GCP, and Azure.</p>
+                <p>dstack offers a unified and simple interface for ML engineers to manage <b>dev environments</b> and run
+                    <b>pipelines</b> and <b>apps</b> cost-effectively on <b>AWS</b>, <b>GCP</b>, and <b>Azure</b>.</p>
 
-                <p><b style="font-weight: 600">Enjoy ML without engineering struggles or vendor lock-in</b></p>
+                <p>Finally, you can do ML without any engineering struggles or vendor lock-in.</p>
 
                 <a href="/docs/quick-start" class="md-button md-button--primary">Get started</a>
 
@@ -71,6 +87,8 @@
                         Projects
                     </h3>
                     <p>Manage users, permissions, cloud credentials, and usage quotas per project.</p>
+
+                    <p><a href="docs/guides/projects"><span style="font-weight: 500">Learn more →</span></a></p>
                 </div>
             </div>
         </div>

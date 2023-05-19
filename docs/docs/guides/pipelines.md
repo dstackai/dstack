@@ -73,11 +73,11 @@ For convenience, `dstack` uses an exact copy of the source code that is locally 
 If you configure a project to run pipelines in the cloud, `dstack` will automatically provision the required cloud
 resources. After the workflow is finished, `dstack` will automatically save output artifacts and clean up cloud resources.
 
-??? info "Configuring projects"
+??? info "Projects"
     The default project runs pipelines locally. However, you can
     log into Hub and configure additional projects to run pipelines in a cloud account of your choice. 
 
-    You can configure multiple projects and pass the project name to the CLI by using the `--project` argument.
+    [Learn more →](guides/dev-environments){ .md-button .md-button--primary }
 
 #### Stopping a run
 
@@ -212,3 +212,5 @@ To clean up the cache, use the [`dstack prune cache`](../reference/cli/prune.md)
 
 !!! info "NOTE:"
     Check out the [`dstackai/dstack-examples`](https://github.com/dstackai/dstack-examples/blob/main/README.md) repo for source code and other examples.
+
+[//]: # (TODO [TASK]: Explain how to pass arguments)

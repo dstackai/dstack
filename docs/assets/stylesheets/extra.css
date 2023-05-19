@@ -1078,12 +1078,12 @@ html .md-footer-meta.md-typeset a:is(:focus,:hover) {
 }
 
 .md-banner {
-    background-color: rgba(237, 243, 254, 0.75);
+    background-color: rgba(237, 243, 254, 0.9);
     color: var(--md-default-fg-color);
-    border-top: 1px solid rgb(227, 233, 244, 0.75);
-    border-bottom: 1px solid rgba(227, 233, 244, 0.75);
+    /*border-top: 1px solid rgb(227, 233, 244, 0.75);*/
+    /*border-bottom: 1px solid rgba(227, 233, 244, 0.75);*/
     margin-bottom: 1px;
-    font-weight: 600;
+    font-weight: 700;
 }
 
 .md-typeset.md-banner__inner {

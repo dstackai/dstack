@@ -67,11 +67,11 @@ For convenience, `dstack` uses an exact copy of the source code that is locally 
 If you configure a project to run dev environments in the cloud, `dstack` will automatically provision the
 required cloud resources, and forward ports of the dev environment to your local machine.
 
-??? info "Configuring projects"
+??? info "Projects"
     The default project runs dev environments locally. However, you can
     log into Hub and configure additional projects to run dev environments in a cloud account of your choice. 
 
-    You can configure multiple projects and pass the project name to the CLI by using the `--project` argument.
+    [Learn more →](guides/projects){ .md-button .md-button--primary }
 
 [//]: # (TODO [TASK]: Add a link to the Projects guide for more details)
 

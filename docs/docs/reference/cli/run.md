@@ -1,6 +1,6 @@
 # dstack run
 
-This command runs a given workflow.
+This command runs a given configuration.
 
 ## Usage
 
@@ -34,10 +34,10 @@ The following arguments are optional:
 - `-t TAG`, `--tag TAG` – (Optional) A tag name. Warning, if the tag exists, it will be overridden.
 - `-d`, `--detach` – (Optional) Run the workflow in the detached mode. Means, the `run` command doesn't
   poll for logs and workflow status, but exits immediately.
-- `ARGS` – (Optional) Use `ARGS` to override [workflow arguments](../../usage/args.md)
+- `ARGS` – (Optional) Use `ARGS` to pass [configuration arguments](../../usage/args.md)
 - `-h`, `--help` – (Optional) Shows help for the `dstack run` command. Combine it with the name of a workflow
   or provider to see the provider-specific help message.
 
 !!! info "NOTE:"
-  By default, it runs it in the attached mode, so you'll see the output in real-time as your
-  workflow is running.
+    By default, it runs it in the attached mode, so you'll see the output in real-time as your
+    workflow is running.
