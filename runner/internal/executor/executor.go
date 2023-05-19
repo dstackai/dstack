@@ -547,6 +547,7 @@ func (ex *Executor) processJob(ctx context.Context, stoppedCh chan struct{}) err
 	if err != nil {
 		log.Error(ctx, "Failed interpolating registry_auth.password", "err", err, "password", job.RegistryAuth.Password)
 	}
+
 	_, isLocalBackend := ex.backend.(*localbackend.Local)
 	appsBindingPorts, err := ports.GetAppsBindingPorts(ctx, job.Apps, isLocalBackend)
 	if err != nil {
@@ -554,6 +555,10 @@ func (ex *Executor) processJob(ctx context.Context, stoppedCh chan struct{}) err
 		log.Error(ctx, "Failed binding ports", "err", err)
 		return gerrors.Wrap(err)
 	}
+	if err = ex.backend.UpdateState(ctx); err != nil {
+		return gerrors.Wrap(err)
+	}
+
 	spec := &container.Spec{
 		Image:              job.Image,
 		RegistryAuthBase64: makeRegistryAuthBase64(username, password),

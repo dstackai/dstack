@@ -47,7 +47,7 @@ func GetAppsBindingPorts(ctx context.Context, apps []models.App, doMapping bool)
 			},
 		}
 	}
-	for _, app := range apps { // get the closest free port
+	for i, app := range apps { // get the closest free port
 		if app.MapToPort > 0 {
 			continue
 		}
@@ -61,7 +61,7 @@ func GetAppsBindingPorts(ctx context.Context, apps []models.App, doMapping bool)
 			}
 			mapToPort += 1
 		}
-		app.MapToPort = mapToPort // for fix_url
+		apps[i].MapToPort = mapToPort // for fix_url
 		usedPorts[mapToPort] = true
 		resp[nat.Port(fmt.Sprintf("%d/tcp", app.Port))] = []nat.PortBinding{
 			{

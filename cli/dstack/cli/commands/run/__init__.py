@@ -175,8 +175,12 @@ def _poll_run(
                     )
                     request_errors_printed = False
 
-        ports = {}
         jobs = [hub_client.get_job(job_head.job_id) for job_head in job_heads]
+        ports = {
+            app.port: app.map_to_port
+            for app in jobs[0].app_specs
+            if app.map_to_port is not None and app.port != app.map_to_port
+        }
         if hub_client.get_project_backend_type() != "local":
             console.print("Starting SSH tunnel...")
             ports = allocate_local_ports(jobs)
