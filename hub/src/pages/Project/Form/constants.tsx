@@ -12,5 +12,5 @@ export const BACKEND_TYPE_HELP = {
                 resources at the workflow startup and tear them down once it is finished.
             </p>
         </>
-    )
+    ),
 };
