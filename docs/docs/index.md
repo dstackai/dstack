@@ -1,7 +1,5 @@
 # Getting started
 
-:material-star:
-
 `dstack` makes it very easy for ML engineers to manage dev environments and run pipelines and apps cost-effectively 
 on any cloud.
 
