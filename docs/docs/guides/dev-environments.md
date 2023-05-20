@@ -12,15 +12,17 @@ either locally or in any cloud.
 
 A configuration can be defined as a YAML file (under the `.dstack/workflows` directory).
 
-<div editor-title=".dstack/workflows/dev-env.yaml"> 
+<div editor-title=".dstack/workflows/dev-environments.yaml"> 
 
 ```yaml
 workflows:
-  - name: dev-env
+  - name: code-gpu
     provider: code
+    setup:
+      - pip install -r dev-environments/requirements.txt
     resources:
       gpu:
-        name: P100
+        count: 1
 ```
 
 </div>
@@ -39,10 +41,10 @@ Once a configuration is defined, you can run it using the [`dstack run`](../refe
 <div class="termy">
 
 ```shell
-$ dstack run dev-env
+$ dstack run code-gpu
 
 RUN      WORKFLOW  SUBMITTED  STATUS     TAG
-shady-1  dev-env   now        Submitted  
+shady-1  code-gpu   now        Submitted  
  
 Starting SSH tunnel...
 
@@ -99,11 +101,11 @@ Alternatively, you can use the [`bash`](../reference/providers/bash.md) provider
 [`ssh`](../reference/providers/bash.md) property set to `true` to attach any desktop IDE to the dev
 environment via SSH.
 
-<div editor-title=".dstack/workflows/ssh-env.yaml"> 
+<div editor-title=".dstack/workflows/dev-environments.yaml"> 
 
 ```yaml
   workflows:
-  - name: ssh-env
+  - name: ssh
     provider: bash
     ssh: true 
     commands:
@@ -114,21 +116,23 @@ environment via SSH.
 
 [//]: # (TODO [MEDIUM]: Currently, you have to use bash and tail)
 
+[//]: # (TODO [MEDIUM]: Currently, it doesn't create an alias in `~/.ssh/config` automatically)
+
 [//]: # (TODO [TASK]: Show the output)
 
 [//]: # (TODO [MAJOR]: Currently, it doesn't support PyCharm)
 
-## Configuring hardware resources
+## Configuring resources
 
 If your project is configured to run dev environments in the cloud, you can use the 
 [`resources`](../reference/providers/code.md#resources) property in the YAML 
 file to request hardware resources like memory, GPUs, and shared memory size. 
 
-<div editor-title=".dstack/workflows/dev-env.yaml"> 
+<div editor-title=".dstack/workflows/dev-environments.yaml"> 
 
 ```yaml
 workflows:
-  - name: dev-env
+  - name: code-v100-spot
     provider: code
     resources:
       gpu:
@@ -150,26 +154,30 @@ workflows:
 You can use the [`setup`](../reference/providers/code.md) property in the YAML file to pre-install packages or run other bash commands during environment
 startup.
 
-Use the [`python`](../reference/providers/code.md) property to specify a version of Python for pre-installation. Otherwise, `dstack` uses the local version.
-
-<div editor-title=".dstack/workflows/dev-env.yaml"> 
+<div editor-title=".dstack/workflows/dev-environments.yaml"> 
 
 ```yaml
 workflows:
-  - name: dev-env
+  - name: code-conda
     provider: code
     python: 3.11
     setup:
-      - conda install pandas
-    resources:
-      gpu:
-        name: P100
+      - conda env create -f environment.yml
 ```
 
 </div>
 
+[//]: # (TODO [MEDIUM]: Currently, it's hard to cache Conda environments)
+
+[//]: # (TODO [MINOR]: Currently, there's no way to set up the bash profile, e.g. to activate the environment)
+
+The [`python`](../reference/providers/code.md) property specifies the version of Python. If not specified, `dstack` uses
+your current version.
+
+You can use `pip` and `conda` executables to install packages and set up the environment.
+
 !!! info "NOTE:"
-    You can use `pip` and `conda` executables to install packages and set up the environment.
+    Refer to [Configuring cache](#configuring-cache) to speed up the setup process. 
 
 [//]: # (TODO [MINOR]: Make sure conda is configured not to ask for confirmation)
 
@@ -179,13 +187,13 @@ workflows:
 
 ## Exposing ports
 
-To run web apps from within the dev environment and access them locally, 
-specify the number of ports via the [`ports`](../reference/providers/code.md#ports) property. They'll be
-passed to the dev environment as environment variables like `PORT_0`, `PORT_1`, etc.
+If you intend to run web apps from the dev environment, specify the number of ports using the
+[`ports`](../reference/providers/code.md#ports) property and use the ports provided to the 
+environment variables: `PORT_0`, `PORT_1`, etc.
 
 [//]: # (TODO [TASK]: Requires an example, including the YAML and the output)
 
-`dstack` automatically forwards ports to your local machine. You'll see the URLs to access each port in the
+`dstack` will automatically forward these ports to your local machine. You'll see the URLs to access each port in the
 output.
 
 [//]: # (TODO [MAJOR]: It's not convenient to use dstack environment variables for ports)
@@ -197,27 +205,25 @@ output.
 
 ## Configuring cache
 
-When working in a dev environment, you may need to download files like pre-trained models, external data, or Python
-packages. To avoid downloading them on each restart of your dev environment, you can choose
-which paths to cache between runs. 
+To avoid downloading files (e.g. pre-trained models, external data, or Python packages) every time you restart your dev
+environment, you can selectively cache the desired paths between runs.
 
-<div editor-title=".dstack/workflows/dev-env.yaml"> 
+<div editor-title=".dstack/workflows/dev-environments.yaml"> 
 
 ```yaml
 workflows:
-  - name: dev-env
+  - name: code-cached
     provider: code
     cache:
-      - ~/.cache/pip
-      - ./data
-      - ./models
+      - path: ~/.cache/pip
+      - path: ./data
+      - path: ./models
 ```
 
 </div>
 
 !!! info "NOTE:"
-    Cache saves files in the configured storage and downloads them at startup. This improves performance and saves you 
-    from data transfer costs. 
+    Caching enhances performance and helps you avoid unnecessary data transfer costs. 
 
 #### Cleaning up the cache
 
@@ -231,3 +237,5 @@ CLI command, followed by the name of the configuration.
 
 !!! info "NOTE:"
     Check out the [`dstackai/dstack-examples`](https://github.com/dstackai/dstack-examples/blob/main/README.md) repo for source code and other examples.
+
+[//]: # (TODO [TASK]: Mention secrets)

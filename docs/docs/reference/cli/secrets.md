@@ -1,8 +1,15 @@
 # dstack secrets
 
+Secrets allow to use sensitive data within workflows (such as passwords or security tokens) without 
+hard-coding them inside the code.
+Secrets are passed to running workflows via environment variables.
+
+!!! info "NOTE:"
+    If the project is configured to use the cloud, secrets are stored in the encrypted cloud storage.
+
 ## dstack secrets list
 
-The `secrets list` command lists the names of global secrets.
+The `dstack secrets list` command displays the names of the secrets configured in the current repository.
 
 ### Usage
 
@@ -16,15 +23,7 @@ $ dstack secrets list
 
 ## dstack secrets add
 
-Secrets allow to use sensitive data within workflows (such as passwords or security tokens) without 
-hard-coding them inside the code.
-
-Secrets are passed to running workflows via environment variables.
-
-The `secrets add` command adds a new secret.
-
-!!! info "NOTE:"
-    Secret are stored in the encrypted cloud storage (e.g. for AWS, it's Secrets Manager).
+The `dstack secrets add` command adds a new secret for the current repository.
 
 ### Usage
 
@@ -59,6 +58,8 @@ The following arguments are optional:
 
 
 ## dstack secrets delete
+
+The `dstack secrets delete` command adds a new secret for the current repository.
 
 ### Usage
 

@@ -194,3 +194,5 @@ The following arguments are optional:
     Once you have created the project, feel free to use the CLI code snippet to configure it for use with the created project.
 
     [Learn more →](../../../guides/projects#configuring-the-cli){ .md-button .md-button--primary }
+
+[//]: # (TODO: Mention on how to manage EC2 quotas)

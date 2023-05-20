@@ -52,4 +52,6 @@ To use this project with the CLI, you need to pass its name using the `--project
 !!! info "NOTE:"
     If you want to set the project as the default, add the `--default` flag to the `dstack config` command.
 
+[//]: # (TODO [TASK]: Mention where the configuration is stored (i.e. `~/.dstack/config.yaml`)
+
 [//]: # (TODO [MEDIUM]: Currently, there is no settings, such as quota management, max duration, etc.)
