@@ -182,7 +182,7 @@ die() {{ status=$1; shift; echo "FATAL: $*"; exit $status; }}
 EC2_PUBLIC_HOSTNAME="`wget -q -O - http://169.254.169.254/latest/meta-data/public-hostname || die \"wget public-hostname has failed: $?\"`"
 echo "hostname: $EC2_PUBLIC_HOSTNAME" >> /root/.dstack/runner.yaml
 mkdir ~/.ssh; chmod 700 ~/.ssh; echo "{ssh_key_pub}" > ~/.ssh/authorized_keys; chmod 600 ~/.ssh/authorized_keys
-HOME=/root nohup dstack-runner --log-level 6 start --http-port 4000 &
+HOME=/root nohup dstack-runner --log-level 6 start --http-port 2000 &
 """
     return user_data
 

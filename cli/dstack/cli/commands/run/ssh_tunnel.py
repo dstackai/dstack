@@ -39,14 +39,14 @@ def allocate_local_ports(jobs: List[Job]) -> Dict[int, int]:
     map_to_ports = set()
     # mapped by user
     for port, map_to_port in ports.items():
-        if map_to_port is None:
+        if not map_to_port:  # None or 0
             continue
         if map_to_port in map_to_ports or port_in_use(map_to_port):
             raise PortUsedError(f"Mapped port {port}:{map_to_port} is already in use")
         map_to_ports.add(map_to_port)
     # mapped automatically
     for port, map_to_port in ports.items():
-        if map_to_port is not None:
+        if map_to_port:
             continue
         map_to_port = port
         while map_to_port in map_to_ports or port_in_use(map_to_port):

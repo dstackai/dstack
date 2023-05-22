@@ -440,7 +440,7 @@ echo '{config_content}' > /root/.dstack/config.yaml
 echo '{runner_content}' > /root/.dstack/runner.yaml
 EXTERNAL_IP=`curl -H "Metadata-Flavor: Google" http://169.254.169.254/computeMetadata/v1/instance/network-interfaces/0/access-configs/0/external-ip`
 echo "hostname: $EXTERNAL_IP" >> /root/.dstack/runner.yaml
-HOME=/root nohup dstack-runner --log-level 6 start --http-port 4000
+HOME=/root nohup dstack-runner --log-level 6 start --http-port 2000
 """
 
 
