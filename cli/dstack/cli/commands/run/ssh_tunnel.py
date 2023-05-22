@@ -17,14 +17,14 @@ def get_free_port() -> int:
 
 
 def port_in_use(port: int) -> bool:
-    with closing(socket.socket(socket.AF_INET, socket.SOCK_STREAM)) as s:
-        try:
+    try:
+        with closing(socket.socket(socket.AF_INET, socket.SOCK_STREAM)) as s:
             s.bind(("", port))
             s.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
-        except socket.error as e:
-            if e.errno == errno.EADDRINUSE:
-                return True
-            raise
+    except socket.error as e:
+        if e.errno == errno.EADDRINUSE:
+            return True
+        raise
     return False
 
 
@@ -77,7 +77,7 @@ def make_ssh_tunnel_args(
         "-f",
     ]
     for port_remote, local_port in ports.items():
-        args.extend(["-L", f"{local_port}:{hostname}:{port_remote}"])
+        args.extend(["-L", f"{local_port}:localhost:{port_remote}"])
     return args
 
 
