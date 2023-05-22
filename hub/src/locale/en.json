@@ -22,7 +22,9 @@
     "login": "Login",
     "general": "General",
     "local_storage_unavailable": "Local Storage is unavailable",
-    "local_storage_unavailable_message": "Your browser doesn't support local storage"
+    "local_storage_unavailable_message": "Your browser doesn't support local storage",
+    "object": "Object",
+    "objects_other": "Objects"
   },
 
   "auth": {
@@ -50,8 +52,7 @@
     "settings": "Settings",
     "card": {
       "backend": "Backend",
-      "region": "Region",
-      "bucket": "Bucket"
+      "settings": "Settings"
     },
     "backend_type": {
       "aws": "AWS",
@@ -90,6 +91,23 @@
         "ec2_subnet_id_placeholder":  "Not selected",
         "ec2_subnet_id": "Subnet"
       },
+      "azure" : {
+        "tenant_id": "Tenant ID",
+        "tenant_id_description": "Specify an Azure tenant ID",
+        "client_id": "Client ID",
+        "client_id_description": "Specify an Azure client (application) ID",
+        "client_secret": "Client secret",
+        "client_secret_description": "Specify an Azure client (application) secret",
+        "subscription_id": "Subscription ID",
+        "subscription_id_description": "Select an Azure subscription ID",
+        "subscription_id_placeholder": "Not selected",
+        "location": "Location",
+        "location_description": "Select an Azure location to run workflows and store artifacts",
+        "location_placeholder": "Not selected",
+        "storage_account":  "Storage account",
+        "storage_account_description":  "Select an Azure storage account to store artifacts",
+        "storage_account_placeholder":  "Not selected"
+      },
       "gcp": {
         "credentials": "Service account",
         "credentials_description": "Credentials description",
@@ -112,6 +130,9 @@
         "subnet": "Subnet",
         "subnet_description": "Select a subnet to run workflows in",
         "subnet_placeholder": "Not selected"
+      },
+      "local": {
+        "path": "Files path"
       },
       "members": {
         "section_title": "Members",
@@ -149,12 +170,15 @@
       "empty_message_text": "No runs to display.",
       "nomatch_message_title": "No matches",
       "nomatch_message_text": "We can't find a match.",
+      "log": "Log",
       "run_name": "Run",
       "workflow_name": "Workflow",
       "provider_name": "Provider",
       "status": "Status",
       "submitted_at": "Run time",
-      "artifacts": "Artifacts count",
+      "artifacts": "Artifacts",
+      "artifacts_count": "Artifacts count",
+      "hub_user_name": "Hub user name",
       "statuses": {
         "pending": "Pending",
         "submitted": "Submitted",
@@ -168,6 +192,17 @@
         "failed": "Failed",
         "done":  "Done"
       }
+    },
+    "artifact": {
+      "list_page_title": "Artifacts",
+      "search_placeholder": "Find objects",
+      "empty_message_title": "No objects",
+      "empty_message_text": "No objects to display.",
+      "nomatch_message_title": "No matches",
+      "nomatch_message_text": "We can't find a match.",
+      "name": "Name",
+      "type": "Type",
+      "size": "Size"
     }
   },
   "users": {

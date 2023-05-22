@@ -17,8 +17,13 @@ class HUBStorage(CloudStorage, ABC):
         url = self._client.upload_file(dest_path=dest_path)
         if not (url is None):
             with open(source_path, "rb") as f:
+                headers = {}
+                # Azure requires special headers
+                if "blob.core.windows.net" in url:
+                    headers["x-ms-blob-type"] = "BlockBlob"
                 # AWS: requests.put() produces bad headers from empty file descriptor
-                resp = requests.put(url, data=f if os.stat(source_path).st_size > 0 else None)
+                data = f if os.stat(source_path).st_size > 0 else None
+                resp = requests.put(url, data=data, headers=headers)
                 if resp.ok:
                     file_stat = os.stat(source_path)
                     callback(file_stat.st_size)

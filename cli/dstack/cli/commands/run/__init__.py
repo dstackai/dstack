@@ -50,7 +50,7 @@ class RunCommand(BasicCommand):
         workflow_help = "{" + ",".join(workflow_or_provider_names) + "}"
         self._parser.add_argument(
             "workflow_or_provider",
-            metavar="WORKFLOW | PROVIDER",
+            metavar="WORKFLOW",
             type=str,
             help=workflow_help,
             choices=workflow_or_provider_names,
@@ -185,7 +185,7 @@ def _poll_run(
             console.print("Starting SSH tunnel...")
             ports = allocate_local_ports(jobs)
             if not run_ssh_tunnel(
-                ssh_key, jobs[0].host_name, ports
+                ssh_key, jobs[0].host_name, ports, backend_type
             ):  # todo: cleanup explicitly (stop tunnel)
                 console.print("[warning]Warning: failed to start SSH tunnel[/warning] [red]✗[/]")
         else:

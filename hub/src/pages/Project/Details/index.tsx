@@ -2,7 +2,7 @@ import React, { useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Outlet, useLocation, useNavigate, useParams } from 'react-router-dom';
 
-import { ConfirmationDialog, ContentLayout, DetailsHeader, SpaceBetween, Tabs, TabsProps } from 'components';
+import { ConfirmationDialog, ContentLayout, DetailsHeader, Tabs, TabsProps } from 'components';
 
 import { useAppSelector, useNotifications } from 'hooks';
 import { ROUTES } from 'routes';

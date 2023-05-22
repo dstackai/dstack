@@ -3,7 +3,7 @@ import { useTranslation } from 'react-i18next';
 import { useParams } from 'react-router-dom';
 import { format } from 'date-fns';
 
-import { Button, Cards, Header, ListEmptyMessage, NavigateLink, Pagination, SpaceBetween, TextFilter } from 'components';
+import { Button, Cards, Header, ListEmptyMessage, NavigateLink, Pagination, TextFilter } from 'components';
 
 import { DATE_TIME_FORMAT } from 'consts';
 import { useBreadcrumbs, useCollection } from 'hooks';
@@ -16,7 +16,12 @@ export const RepositoryList: React.FC = () => {
     const params = useParams();
     const paramProjectName = params.name ?? '';
 
-    const { data, isLoading } = useGetProjectReposQuery({ name: paramProjectName });
+    const { data, isLoading } = useGetProjectReposQuery(
+        { name: paramProjectName },
+        {
+            pollingInterval: 10000,
+        },
+    );
 
     const renderEmptyMessage = (): React.ReactNode => {
         return (

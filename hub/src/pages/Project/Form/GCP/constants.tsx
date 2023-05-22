@@ -17,8 +17,7 @@ export const SERVICE_ACCOUNT_HELP = {
     body: (
         <>
             <p>
-                In order to use GCP with <i>dstack Hub</i>, you'll need to set up a <i>Service account</i>{' '}
-                in your GCP project.
+                In order to use GCP with <i>dstack Hub</i>, you'll need to set up a <i>Service account</i> in your GCP project.
             </p>
 
             <h4>Enable APIs</h4>
@@ -31,9 +30,9 @@ export const SERVICE_ACCOUNT_HELP = {
             </p>
             <h4>Create a service account</h4>
             <p>
-                Once the required APIs are enabled for the GCP project, you have to create a service account configure the following roles for it:{' '}
-                <i>Service Account User</i>, <i>Compute Admin</i>,<i>Storage Admin</i>, <i>Secret Manager Admin</i>, and{' '}
-                <i>Logging Admin</i>.
+                Once the required APIs are enabled for the GCP project, you have to create a service account configure the
+                following roles for it: <i>Service Account User</i>, <i>Compute Admin</i>,<i>Storage Admin</i>,{' '}
+                <i>Secret Manager Admin</i>, and <i>Logging Admin</i>.
             </p>
             <h4>Create a service account key</h4>
             <p>

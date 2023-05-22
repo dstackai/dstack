@@ -25,6 +25,11 @@ export const ROUTES = {
                     FORMAT: (name: string, repoId: string, runName: string) =>
                         buildRoute(ROUTES.PROJECT.DETAILS.RUNS.DETAILS.TEMPLATE, { name, repoId, runName }),
                 },
+                ARTIFACTS: {
+                    TEMPLATE: `/projects/:name/repositories/:repoId/runs/:runName/artifacts`,
+                    FORMAT: (name: string, repoId: string, runName: string) =>
+                        buildRoute(ROUTES.PROJECT.DETAILS.RUNS.ARTIFACTS.TEMPLATE, { name, repoId, runName }),
+                },
             },
             SETTINGS: {
                 TEMPLATE: `/projects/:name/settings`,

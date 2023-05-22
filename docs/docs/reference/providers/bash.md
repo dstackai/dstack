@@ -1,6 +1,6 @@
 # bash
 
-The `bash` provider runs given shell commands. 
+The `bash` provider runs given bash commands. 
 
 It comes with Python and Conda pre-installed, and allows to expose ports. 
 
@@ -14,8 +14,6 @@ If GPU is requested, the provider pre-installs the CUDA driver too.
 workflows:
   - name: "train"
     provider: bash
-    deps:
-      - tag: some_tag
     python: 3.10
     commands:
       - pip install requirements.txt
@@ -77,8 +75,6 @@ The hardware resources required by the workflow
 - `shm_size` - (Optional) The size of shared memory, e.g. `"8GB"`
 - `interruptible` - (Optional) `true` if you want the workflow to use interruptible instances.
     By default, it's `false`.
-- `remote` - (Optional) `true` if you want the workflow to run in the cloud.
-   By default, it's `false`.
 
 !!! info "NOTE:"
     If your workflow is using parallel communicating processes (e.g. dataloaders in PyTorch), 

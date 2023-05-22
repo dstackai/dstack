@@ -1,29 +1,36 @@
-{% extends "base.html" %}
+{% extends "main.html" %}
 
-{# block announce %}
-Like dstack? Give us a <img alt="⭐" style="display: inline-block; height: 1.125em; margin-bottom: -2px"
-                            src="https://cdnjs.cloudflare.com/ajax/libs/twemoji/14.0.2/svg/2b50.svg">
-on <img style="display: inline-block; height: 1.15em; margin-bottom: -4px; margin-right: -2px"
-        src="assets/images/github-logo.png"/> <a href="https://github.com/dstackai/dstack" target="_blank">
-    GitHub</a><span style="color: var(--md-code-hl-punctuation-color)">!</span>
-{% endblock #}
+{% block scripts %}
+{{ super() }}
+<script>
+    window.$crisp = [];
+    window.CRISP_WEBSITE_ID = "ce56e3b2-a23e-4d3f-9e80-e08c61a2b3cb";
+    (function () {
+        let d = document;
+        let s = d.createElement("script");
+        s.src = "https://client.crisp.chat/l.js";
+        s.async = 1;
+        d.getElementsByTagName("head")[0].appendChild(s);
+        $crisp.push(["do", "chat:hide"]);
+    })();
+</script>
+{% endblock %}
 
 {% block content %}
 <section class="tx-container">
     <div class="md-grid md-typeset">
         <div class="tx-landing__hero">
             <div class="tx-landing__hero_text">
-                <h1>Machine learning workflows as code</h1>
-                <p>dstack makes it very easy to define ML workflows
-                    and run them on any cloud platform. It provisions infrastructure,
-                    manages data, and monitors usage for you.</p>
+                <h1>Develop ML faster. Use any cloud.</h1>
+                <p>dstack offers a unified and simple interface for ML engineers to run <b>dev environments</b>,
+                    <b>pipelines</b> and <b>apps</b> cost-effectively on <b>AWS</b>, <b>GCP</b>, and <b>Azure</b>.</p>
 
-                <p><b>Ideal for processing data, training models, running apps, and any other ML development tasks.</b>
-                </p>
+                <p>No more engineering struggles or vendor lock-in.</p>
 
-                <a href="/docs/quick-start" class="md-button md-button--primary">Quick start</a>
+                <a href="/docs/quick-start" class="md-button md-button--primary">Get started</a>
 
-                <a href="/docs" class="md-button">Learn more</a>
+                <!--<a href="https://join.slack.com/t/dstackai/shared_invite/zt-xdnsytie-D4qU9BvJP8vkbkHXdi6clQ"
+                   class="md-button">Join on Slack</a>-->
             </div>
 
             <div class="tx-landing__hero_image">
@@ -31,75 +38,137 @@ on <img style="display: inline-block; height: 1.15em; margin-bottom: -4px; margi
             </div>
         </div>
 
-        <div class="tx-landing__features">
+        <div class="tx-landing__highlights">
+            <div class="tx-landing__highlights_text">
+                <h2>Focus on ML and let magic handle Ops for you
+                    <span class="twemoji"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path
+                            d="M21 22H3v-2h18v2m-2-3H5l6.1-16.4c.2-.4.5-.6.9-.6l6 3h-4.1L19 19M10 7.5l1.04.47L11.5 9l.47-1.03L13 7.5l-1.03-.47L11.5 6l-.46 1.03L10 7.5m3 7.5-2.06-.93L10 12l-.93 2.07L7 15l2.07.93L10 18l.94-2.07L13 15m.97-3.03L15 11.5l-1.03-.47L13.5 10l-.46 1.03-1.04.47 1.04.47.46 1.03.47-1.03m2 4L17 15.5l-1.03-.47L15.5 14l-.46 1.03-1.04.47 1.04.47.46 1.03.47-1.03Z"></path></svg></span>
+                </h2>
+            </div>
+
+            <div class="tx-landing__highlights_grid">
+                <div>
+                    <h3><span class="twemoji"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path
+                            d="M17 16.47V7.39l-6 4.54M2.22 9.19a.858.858 0 0 1-.02-1.15l1.2-1.11c.2-.18.69-.26 1.05 0l3.42 2.61 7.93-7.25c.32-.32.87-.45 1.5-.12l4 1.91c.36.21.7.54.7 1.15v13.5c0 .4-.29.83-.6 1l-4.4 2.1c-.32.13-.92.01-1.13-.2l-8.02-7.3-3.4 2.6c-.38.26-.85.19-1.05 0l-1.2-1.1c-.32-.33-.28-.87.05-1.2l3-2.7"></path></svg></span>
+                        &nbsp;
+                        Dev environments
+                    </h3>
+
+                    <p>Create virtual machines that include the environment and an interactive IDE or
+                        notebook setup based on pre-defined configurations.</p>
+
+                    <p><a href="docs/guides/pipelines"><span style="font-weight: 500">Learn more →</span></a></p>
+                </div>
+                <div>
+                    <h3><span class="twemoji"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 16 16"><path
+                            d="m11.28 3.22 4.25 4.25a.75.75 0 0 1 0 1.06l-4.25 4.25a.749.749 0 0 1-1.275-.326.749.749 0 0 1 .215-.734L13.94 8l-3.72-3.72a.749.749 0 0 1 .326-1.275.749.749 0 0 1 .734.215Zm-6.56 0a.751.751 0 0 1 1.042.018.751.751 0 0 1 .018 1.042L2.06 8l3.72 3.72a.749.749 0 0 1-.326 1.275.749.749 0 0 1-.734-.215L.47 8.53a.75.75 0 0 1 0-1.06Z"></path></svg></span>
+                        &nbsp;
+                        Pipelines
+                    </h3>
+
+                    <p>Run data processing, training, finetuning models, batch inference, or any other tasks based on
+                        pre-defined configurations.</p>
+
+                    <p><a href="docs/guides/pipelines"><span style="font-weight: 500">Learn more →</span></a></p>
+                </div>
+                <div>
+                    <h3><span class="twemoji"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path
+                            d="m13.13 22.19-1.63-3.83c1.57-.58 3.04-1.36 4.4-2.27l-2.77 6.1M5.64 12.5l-3.83-1.63 6.1-2.77C7 9.46 6.22 10.93 5.64 12.5M21.61 2.39S16.66.269 11 5.93c-2.19 2.19-3.5 4.6-4.35 6.71-.28.75-.09 1.57.46 2.13l2.13 2.12c.55.56 1.37.74 2.12.46A19.1 19.1 0 0 0 18.07 13c5.66-5.66 3.54-10.61 3.54-10.61m-7.07 7.07c-.78-.78-.78-2.05 0-2.83s2.05-.78 2.83 0c.77.78.78 2.05 0 2.83-.78.78-2.05.78-2.83 0m-5.66 7.07-1.41-1.41 1.41 1.41M6.24 22l3.64-3.64c-.34-.09-.67-.24-.97-.45L4.83 22h1.41M2 22h1.41l4.77-4.76-1.42-1.41L2 20.59V22m0-2.83 4.09-4.08c-.21-.3-.36-.62-.45-.97L2 17.76v1.41Z"></path></svg></span>
+                        Apps
+                    </h3>
+                    <p>Run web applications with the required cloud resources and dependencies using a
+                        single command.</p>
+
+                    <p><a href="docs/guides/apps"><span style="font-weight: 500">Learn more →</span></a></p>
+                </div>
+                <div>
+                    <h3><span class="twemoji"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path
+                            d="M12 5.5A3.5 3.5 0 0 1 15.5 9a3.5 3.5 0 0 1-3.5 3.5A3.5 3.5 0 0 1 8.5 9 3.5 3.5 0 0 1 12 5.5M5 8c.56 0 1.08.15 1.53.42-.15 1.43.27 2.85 1.13 3.96C7.16 13.34 6.16 14 5 14a3 3 0 0 1-3-3 3 3 0 0 1 3-3m14 0a3 3 0 0 1 3 3 3 3 0 0 1-3 3c-1.16 0-2.16-.66-2.66-1.62a5.536 5.536 0 0 0 1.13-3.96c.45-.27.97-.42 1.53-.42M5.5 18.25c0-2.07 2.91-3.75 6.5-3.75s6.5 1.68 6.5 3.75V20h-13v-1.75M0 20v-1.5c0-1.39 1.89-2.56 4.45-2.9-.59.68-.95 1.62-.95 2.65V20H0m24 0h-3.5v-1.75c0-1.03-.36-1.97-.95-2.65 2.56.34 4.45 1.51 4.45 2.9V20Z"></path></svg></span>
+                        Projects
+                    </h3>
+                    <p>Manage users, permissions, cloud credentials, and usage quotas per project.</p>
+
+                    <p><a href="docs/guides/projects"><span style="font-weight: 500">Learn more →</span></a></p>
+                </div>
+            </div>
+        </div>
+
+        <!--<div class="tx-landing__features">
             <div class="tx-landing__features_text">
                 <h2>Features</h2>
             </div>
 
             <div class="tx-landing__features_grid">
                 <div>
-                    <h3><span class="twemoji"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 16 16"><path
-                            d="m11.28 3.22 4.25 4.25a.75.75 0 0 1 0 1.06l-4.25 4.25a.749.749 0 0 1-1.275-.326.749.749 0 0 1 .215-.734L13.94 8l-3.72-3.72a.749.749 0 0 1 .326-1.275.749.749 0 0 1 .734.215Zm-6.56 0a.751.751 0 0 1 1.042.018.751.751 0 0 1 .018 1.042L2.06 8l3.72 3.72a.749.749 0 0 1-.326 1.275.749.749 0 0 1-.734-.215L.47 8.53a.75.75 0 0 1 0-1.06Z"></path></svg></span>
-                        Workflows as code
+                    <h3>
+                        Feature 1
                     </h3>
-                    <p>ML workflows can be defined as YAML or Python code and executed locally or on any cloud provider
-                        with a single command, without custom Docker images or Kubernetes.</p>
+                    <p>
+                        Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor incididunt ut
+                        labore et dolore magna aliqua.
+                    </p>
                 </div>
                 <div>
-                    <h3><span class="twemoji"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path
-                            d="M13 19c0 .34.04.67.09 1H6.5c-1.5 0-2.81-.5-3.89-1.57C1.54 17.38 1 16.09 1 14.58c0-1.3.39-2.46 1.17-3.48S4 9.43 5.25 9.15c.42-1.53 1.25-2.77 2.5-3.72S10.42 4 12 4c1.95 0 3.6.68 4.96 2.04C18.32 7.4 19 9.05 19 11c1.15.13 2.1.63 2.86 1.5.51.57.84 1.21 1 1.92A5.908 5.908 0 0 0 19 13c-3.31 0-6 2.69-6 6m4.75.43-1.59-1.59L15 19l2.75 3 4.75-4.75-1.16-1.41-3.59 3.59Z"></path></svg></span>
-                        Infrastructure provisioning
+                    <h3>
+                        Feature 2
                     </h3>
-                    <p>Automatically provision the required cloud resources at workflow startup and tear them down after
-                        workflow completion, irrespective of the cloud provider used.</p>
+                    <p>Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor incididunt ut
+                        labore et dolore magna aliqua.</p>
                 </div>
                 <div>
-                    <h3><span class="twemoji"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path
-                            d="M9.5 8.5 11 10l-3 3 3 3-1.5 1.5L5 13l4.5-4.5m5 9L13 16l3-3-3-3 1.5-1.5L19 13l-4.5 4.5M21 2H3a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h18a2 2 0 0 0 2-2V4a2 2 0 0 0-2-2m0 18H3V6h18v14Z"></path></svg></span>
-                        Dev environments
+                    <h3>
+                        Feature 3
                     </h3>
-                    <p>Create dev environments such as IDEs or notebooks with the required cloud resources and
-                        dependencies with a single command. Or attach your own IDE to running workflows.</p>
+                    <p>Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor incididunt ut
+                        labore et dolore magna aliqua.</p>
                 </div>
                 <div>
-                    <h3><span class="twemoji"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path
-                            d="M11 15H6l7-14v8h5l-7 14v-8Z"></path></svg></span> Applications
+                    <h3>
+                        Feature 4
                     </h3>
-                    <p>Run machine learning applications with the required cloud resources and dependencies using a
-                        single command, and access them as if they were running locally.</p>
+                    <p>Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor incididunt ut
+                        labore et dolore magna aliqua.</p>
                 </div>
                 <div>
-                    <h3><span class="twemoji"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path
-                            d="M12 3C7.58 3 4 4.79 4 7s3.58 4 8 4 8-1.79 8-4-3.58-4-8-4M4 9v3c0 2.21 3.58 4 8 4s8-1.79 8-4V9c0 2.21-3.58 4-8 4s-8-1.79-8-4m0 5v3c0 2.21 3.58 4 8 4s8-1.79 8-4v-3c0 2.21-3.58 4-8 4s-8-1.79-8-4Z"></path></svg></span>
-                        Data management
+                    <h3>
+                        Feature 5
                     </h3>
-                    <p>Save the output artifacts from machine learning workflows and reuse them as dependencies in other
-                        workflows. Artifacts can be used to reuse data, models, and environments.</p>
+                    <p>Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor incididunt ut
+                        labore et dolore magna aliqua.</p>
                 </div>
                 <div>
-                    <h3><span class="twemoji"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path
-                            d="M11 17a1 1 0 0 0 1 1 1 1 0 0 0 1-1 1 1 0 0 0-1-1 1 1 0 0 0-1 1m0-14v4h2V5.08c3.39.49 6 3.39 6 6.92a7 7 0 0 1-7 7 7 7 0 0 1-7-7c0-1.68.59-3.22 1.58-4.42L12 13l1.41-1.41-6.8-6.8v.02C4.42 6.45 3 9.05 3 12a9 9 0 0 0 9 9 9 9 0 0 0 9-9 9 9 0 0 0-9-9m6 9a1 1 0 0 0-1-1 1 1 0 0 0-1 1 1 1 0 0 0 1 1 1 1 0 0 0 1-1M6 12a1 1 0 0 0 1 1 1 1 0 0 0 1-1 1 1 0 0 0-1-1 1 1 0 0 0-1 1Z"></path></svg></span>
-                        Workflow scheduling
+                    <h3>
+                        Feature 6
                     </h3>
-                    <p>The built-in scheduling capabilities allow for handling the queue of running workflows, efficient
-                        use of cloud spot instances, and running workflows on a schedule.</p>
+                    <p>Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor incididunt ut
+                        labore et dolore magna aliqua.</p>
                 </div>
-                <div>
-                    <h3><span class="twemoji"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path
-                            d="m16 11.78 4.24-7.33 1.73 1-5.23 9.05-6.51-3.75L5.46 19H22v2H2V3h2v14.54L9.5 8l6.5 3.78Z"></path></svg></span>
-                        Usage monitoring
-                    </h3>
-                    <p>Monitor compute usage costs. Define and enforce compute usage quotas per workflow or per project.
-                        Manage compute usage policies per project.</p>
+            </div>
+        </div>-->
+
+        <div class="tx-landing__bottom_cta">
+            <div>
+                <h2>Setup is a piece of cake
+                    <span class="twemoji"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path
+                            d="M12 1.5A2.5 2.5 0 0 1 14.5 4 2.5 2.5 0 0 1 12 6.5 2.5 2.5 0 0 1 9.5 4 2.5 2.5 0 0 1 12 1.5M15.87 5C18 5 20 7 20 9c2.7 0 2.7 4 0 4H4c-2.7 0-2.7-4 0-4 0-2 2-4 4.13-4 .44 1.73 2.01 3 3.87 3 1.86 0 3.43-1.27 3.87-3M5 15h3l1 7H7l-2-7m5 0h4l-1 7h-2l-1-7m6 0h3l-2 7h-2l1-7Z"></path></svg></span>
+                </h2>
+                <p class="tx-landing__bottom_cta_text">
+                    Getting started with dstack's <a href="https://github.com/dstackai/dstack">open source</a> tool is
+                    just a mater of:
+                </p>
+                <div class="tx-landing__bottom_cta_terminal">
+                    <div class="tx-landing__bottom_cta_terminal_row">
+                        <span class="tx-landing__bottom_cta_terminal_row_prefix">$</span>
+                        pip install dstack
+                    </div>
+                    <div class="tx-landing__bottom_cta_terminal_row">
+                        <span class="tx-landing__bottom_cta_terminal_row_prefix">$</span>
+                        dstack start
+                    </div>
                 </div>
-                <div>
-                    <h3><span class="twemoji"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path
-                            d="M12 5.5A3.5 3.5 0 0 1 15.5 9a3.5 3.5 0 0 1-3.5 3.5A3.5 3.5 0 0 1 8.5 9 3.5 3.5 0 0 1 12 5.5M5 8c.56 0 1.08.15 1.53.42-.15 1.43.27 2.85 1.13 3.96C7.16 13.34 6.16 14 5 14a3 3 0 0 1-3-3 3 3 0 0 1 3-3m14 0a3 3 0 0 1 3 3 3 3 0 0 1-3 3c-1.16 0-2.16-.66-2.66-1.62a5.536 5.536 0 0 0 1.13-3.96c.45-.27.97-.42 1.53-.42M5.5 18.25c0-2.07 2.91-3.75 6.5-3.75s6.5 1.68 6.5 3.75V20h-13v-1.75M0 20v-1.5c0-1.39 1.89-2.56 4.45-2.9-.59.68-.95 1.62-.95 2.65V20H0m24 0h-3.5v-1.75c0-1.03-.36-1.97-.95-2.65 2.56.34 4.45 1.51 4.45 2.9V20Z"></path></svg></span>
-                        Roles and permissions
-                    </h3>
-                    <p>The built-in authentication allows you to manage user profiles, their roles, and permissions
-                        across multiple projects.</p>
-                </div>
+                <p class="tx-landing__bottom_cta_text">
+                    And you're done! Now you can run anything either locally or on any cloud.
+                </p>
             </div>
         </div>
     </div>

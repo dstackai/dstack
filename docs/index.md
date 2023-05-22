@@ -1,6 +1,6 @@
 ---
 template: home.html
-title: ML workflows as code
+title: Develop ML faster. Use any cloud.
 hide:
    - navigation
    - toc

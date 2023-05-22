@@ -1,0 +1,49 @@
+.logs {
+    display: flex;
+    flex-direction: column;
+    flex-grow: 1;
+    min-height: 0;
+    max-height: calc(100vh - 366px);
+    & > [class^="awsui_root"] {
+        display: flex;
+        flex-direction: column;
+        flex-grow: 1;
+        min-height: 0;
+        & > [class^="awsui_header"] {
+            flex-shrink: 0;
+        }
+        & > [class^="awsui_content"] {
+            display: flex;
+            flex-direction: column;
+            flex-grow: 1;
+            min-height: 0;
+            & > [class^="awsui_text-content"] {
+                overflow: hidden;
+                position: relative;
+                display: flex;
+                flex-direction: column;
+                flex-grow: 1;
+                min-height: 0;
+                .loader {
+                    pointer-events: none;
+                    position: absolute;
+                    left: 0;
+                    right: 0;
+                    top: -20px;
+                    height: 20px;
+                    background-color: rgba(255, 255, 255, .8);
+                    transition: transform .3s ease;
+                    color: #6e6e6e;
+                    &:global(.show) {
+                        transform: translateY(100%);
+                    }
+                }
+                .scroll {
+                    overflow-y: auto;
+                    flex-grow: 1;
+                    min-height: 0;
+                }
+            }
+        }
+    }
+}

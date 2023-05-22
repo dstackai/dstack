@@ -1,20 +1,23 @@
 # AWS
 
-`dstack` enables the running remote workflows on AWS. It automatically provisions cloud resources and
-destroys them upon workflow completion. Check out the following instructions to configure `dstack` for use with AWS.
+The `AWS` backend type allows to provision infrastructure and store state and artifacts in
+an AWS account.
 
-## Create an S3 bucket
+Follow the step-by-step guide below to configure a project with this backend.
 
-In order to use AWS with `dstack`, you first have to create an S3 bucket in your AWS account.
-This bucket will be used to store workflow artifacts and metadata.
+## 1. Create an S3 bucket
+
+First have to create an S3 bucket. `dstack` will use this bucket to store state and artifacts.
 
 !!! info "NOTE:"
-    Make sure to create an S3 bucket in the AWS region where you'd like to run your workflows.
+    Make sure that the bucket is created in the same region where you plan to provision
+    infrastructure.
 
-## Configure AWS credentials
+## 2. Create an IAM user
 
-The next step is to create AWS credentials. The credentials should grant
-the permissions to perform actions on `s3`, `logs`, `secretsmanager`, `ec2`, and `iam` services.
+The next step is to [create an IAM user](https://docs.aws.amazon.com/IAM/latest/UserGuide/id_users_create.html) and 
+grant this user permissions to perform actions on the `s3`, `logs`, `secretsmanager`, `ec2`, and `iam`
+services.
 
 ??? info "IAM policy template"
     If you'd like to limit the permissions to the most narrow scope, feel free to use the IAM policy template
@@ -25,8 +28,8 @@ the permissions to perform actions on `s3`, `logs`, `secretsmanager`, `ec2`, and
 
     For `{bucket_name}`, use the name of the S3 bucket. 
     For `{bucket_name_under_score}`, use the same but with dash characters replaced to underscores 
-    (e.g. if `{bucket_name}` is `dstack-142421590066-eu-west-1`, then  `{bucket_name_under_score}` 
-    must be `dstack_142421590066_eu_west_1`.
+    (e.g. if `{bucket_name}` is `my-awesome-project`, then  `{bucket_name_under_score}` 
+    must be `my_awesome_project`.
 
     ```json
     {
@@ -155,25 +158,41 @@ the permissions to perform actions on `s3`, `logs`, `secretsmanager`, `ec2`, and
     }
     ```
 
-## Configure the CLI
+## 3. Create an access key
 
-In order to configure the CLI, so it runs remote workflows in your AWS account, you have to use 
-the `dstack config` command.
+Once the IAM user is created, go ahead and
+[create an access key](https://docs.aws.amazon.com/cli/latest/userguide/cli-authentication-user.html#cli-authentication-user-get).
 
-<div class="termy">
+!!! info "NOTE:"
+    Once the access key is created, make sure to download the `.csv` file containing your IAM user's
+    `Access key ID` and `Secret access key`.
 
-```shell
-$ dstack config
-? Choose backend. Use arrows to move, type to filter
-> [aws]
-  [gcp]
-  [hub]
-```
+## 4. Create a project
 
-</div>
+Now that you have an access key, log in to the Hub, open the `Projects` page, click `Add`, and select `AWS` in
+the `Type` field.
 
-If you want the CLI to run remote workflows directly in cloud using your local credentials, choose `aws`.
-It will prompt you to select an AWS region (where to run workflows), an S3 bucket, etc.
+![](../../../assets/images/dstack-hub-create-aws-project.png){ width=800 }
 
-If you prefer managing cloud credentials and settings through a user interface (e.g. while working in a team),
-select `hub`. Check [Hub](hub.md) for more details.
+### Fields reference
+
+The following fields are required:
+
+- `Access key ID` - (Required) The [Access key ID](#3-create-an-access-key) to authenticate `dstack` 
+- `Secret access key` - (Required) The [Secret access key](#3-create-an-access-key) to authenticate `dstack`
+- `Region` - (Required) The region where `dstack` will create provision infrastructure and store state and artifacts
+- `Bucket` - (Required) The [S3 bucket](#1-create-an-s3-bucket) to store state and artifacts (must be in the same region)
+
+The following arguments are optional:
+
+- `Subnet` - (Optional) The EC2 subnet is required to provision infrastructure using a non-default VPC and subnet. If
+  not specified, dstack will use the default VPC and subnet.
+
+## 5. Configure the CLI
+
+!!! info "NOTE:"
+    Once you have created the project, feel free to use the CLI code snippet to configure it for use with the created project.
+
+    [Learn more →](../../../guides/projects#configuring-the-cli){ .md-button .md-button--primary }
+
+[//]: # (TODO: Mention on how to manage EC2 quotas)
