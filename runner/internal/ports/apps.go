@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"github.com/docker/go-connections/nat"
+	"github.com/dstackai/dstack/runner/internal/log"
 	"github.com/dstackai/dstack/runner/internal/models"
 	"strconv"
 )
@@ -27,6 +28,7 @@ func GetAppsBindingPorts(ctx context.Context, apps []models.App, doMapping bool)
 				},
 			}
 		}
+		log.Trace(ctx, "Identity port mapping", "AppsBindingPorts", resp)
 		return resp, nil
 	}
 	// do dynamic mapping
@@ -70,5 +72,6 @@ func GetAppsBindingPorts(ctx context.Context, apps []models.App, doMapping bool)
 			},
 		}
 	}
+	log.Trace(ctx, "Dynamic port mapping", "AppsBindingPorts", resp)
 	return resp, nil
 }

@@ -1,8 +1,11 @@
 package ports
 
 import (
+	"context"
 	"net"
+	"runtime"
 	"strconv"
+	"syscall"
 )
 
 func GetFreePort() (int, error) {
@@ -25,10 +28,20 @@ func CheckPort(port int) (bool, error) {
 	host := ":" + strconv.Itoa(port)
 	// force IPv4 to detect used ports
 	// https://stackoverflow.com/a/51073906
-	server, err := net.Listen("tcp4", host)
+	config := &net.ListenConfig{Control: reusePortControl}
+	server, err := config.Listen(context.TODO(), "tcp4", host)
 	if err != nil {
 		return false, err
 	}
 	_ = server.Close()
 	return true, nil
+}
+
+func reusePortControl(network, address string, conn syscall.RawConn) error {
+	if runtime.GOOS == "windows" {
+		return nil
+	}
+	return conn.Control(func(descriptor uintptr) {
+		_ = syscall.SetsockoptInt(int(descriptor), syscall.SOL_SOCKET, syscall.SO_REUSEPORT, 1)
+	})
 }
