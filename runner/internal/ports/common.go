@@ -1,12 +1,9 @@
 package ports
 
 import (
-	"context"
-	"golang.org/x/sys/unix"
+	"github.com/libp2p/go-reuseport"
 	"net"
-	"runtime"
 	"strconv"
-	"syscall"
 )
 
 func GetFreePort() (int, error) {
@@ -29,20 +26,10 @@ func CheckPort(port int) (bool, error) {
 	host := ":" + strconv.Itoa(port)
 	// force IPv4 to detect used ports
 	// https://stackoverflow.com/a/51073906
-	config := &net.ListenConfig{Control: reusePortControl}
-	server, err := config.Listen(context.TODO(), "tcp4", host)
+	server, err := reuseport.Listen("tcp4", host)
 	if err != nil {
 		return false, err
 	}
 	_ = server.Close()
 	return true, nil
-}
-
-func reusePortControl(network, address string, conn syscall.RawConn) error {
-	if runtime.GOOS == "windows" {
-		return nil
-	}
-	return conn.Control(func(descriptor uintptr) {
-		_ = unix.SetsockoptInt(int(descriptor), unix.SOL_SOCKET, unix.SO_REUSEPORT, 1)
-	})
 }
