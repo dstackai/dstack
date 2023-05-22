@@ -17,6 +17,7 @@
     "copy": "Copy",
     "info": "Info",
     "stop": "Stop",
+    "abort": "Abort",
     "clearFilter": "Clear filter",
     "server_error": "Server error: {{error}}",
     "login": "Login",

@@ -2,18 +2,30 @@ import React, { useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Outlet, useLocation, useNavigate, useParams } from 'react-router-dom';
 import { format } from 'date-fns';
+import Button from '@cloudscape-design/components/button';
 
-import { Box, ColumnLayout, Container, ContentLayout, DetailsHeader, Header, Loader, StatusIndicator, Tabs } from 'components';
+import {
+    Box,
+    ColumnLayout,
+    Container,
+    ContentLayout,
+    DetailsHeader,
+    Header,
+    Loader,
+    StatusIndicator,
+    Tabs,
+    TabsProps,
+} from 'components';
 
 import { DATE_TIME_FORMAT } from 'consts';
-import { useBreadcrumbs } from 'hooks';
+import { useBreadcrumbs, useNotifications } from 'hooks';
 import { getRepoDisplayName } from 'libs/repo';
 import { getStatusIconType } from 'libs/run';
 import { ROUTES } from 'routes';
 import { useGetProjectRepoQuery } from 'services/project';
-import { useGetRunQuery } from 'services/run';
+import { useDeleteRunsMutation, useGetRunQuery, useStopRunsMutation } from 'services/run';
 
-import { TabsProps } from '../../../components';
+import { isAvailableAbortingForRun, isAvailableDeletingForRun, isAvailableStoppingForRun } from '../utils';
 
 import styles from './styles.module.scss';
 
@@ -30,6 +42,7 @@ export const RunDetails: React.FC = () => {
     const paramProjectName = params.name ?? '';
     const paramRepoId = params.repoId ?? '';
     const paramRunName = params.runName ?? '';
+    const [pushNotification] = useNotifications();
 
     const { data: repoData } = useGetProjectRepoQuery({
         name: paramProjectName,
@@ -41,6 +54,9 @@ export const RunDetails: React.FC = () => {
         repo_id: paramRepoId,
         run_name: paramRunName,
     });
+
+    const [stopRun, { isLoading: isStopping }] = useStopRunsMutation();
+    const [deleteRun, { isLoading: isDeleting }] = useDeleteRunsMutation();
 
     const displayRepoName = repoData ? getRepoDisplayName(repoData) : 'Loading...';
 
@@ -99,9 +115,84 @@ export const RunDetails: React.FC = () => {
         return tab?.id;
     }, [pathname]);
 
+    const abortClickHandle = () => {
+        stopRun({
+            name: paramProjectName,
+            repo_id: paramRepoId,
+            run_names: [paramRunName],
+            abort: true,
+        })
+            .unwrap()
+            .catch((error) => {
+                pushNotification({
+                    type: 'error',
+                    content: t('common.server_error', { error: error?.error }),
+                });
+            });
+    };
+
+    const stopClickHandle = () => {
+        stopRun({
+            name: paramProjectName,
+            repo_id: paramRepoId,
+            run_names: [paramRunName],
+            abort: false,
+        })
+            .unwrap()
+            .catch((error) => {
+                pushNotification({
+                    type: 'error',
+                    content: t('common.server_error', { error: error?.error }),
+                });
+            });
+    };
+
+    const deleteClickHandle = () => {
+        deleteRun({
+            name: paramProjectName,
+            repo_id: paramRepoId,
+            run_names: [paramRunName],
+        })
+            .unwrap()
+            .then(() => {
+                navigate(ROUTES.PROJECT.DETAILS.REPOSITORIES.DETAILS.FORMAT(paramProjectName, paramRepoId));
+            })
+            .catch((error) => {
+                pushNotification({
+                    type: 'error',
+                    content: t('common.server_error', { error: error?.error }),
+                });
+            });
+    };
+
+    const isDisabledAbortButton = !runData || !isAvailableAbortingForRun(runData) || isStopping || isDeleting;
+    const isDisabledStopButton = !runData || !isAvailableStoppingForRun(runData) || isStopping || isDeleting;
+    const isDisabledDeleteButton = !runData || !isAvailableDeletingForRun(runData) || isStopping || isDeleting;
+
     return (
         <div className={styles.page}>
-            <ContentLayout header={<DetailsHeader title={paramRunName} />}>
+            <ContentLayout
+                header={
+                    <DetailsHeader
+                        title={paramRunName}
+                        actionButtons={
+                            <>
+                                <Button onClick={abortClickHandle} disabled={isDisabledAbortButton}>
+                                    {t('common.abort')}
+                                </Button>
+
+                                <Button onClick={stopClickHandle} disabled={isDisabledStopButton}>
+                                    {t('common.stop')}
+                                </Button>
+
+                                <Button onClick={deleteClickHandle} disabled={isDisabledDeleteButton}>
+                                    {t('common.delete')}
+                                </Button>
+                            </>
+                        }
+                    />
+                }
+            >
                 {isLoadingRun && (
                     <Container>
                         <Loader />

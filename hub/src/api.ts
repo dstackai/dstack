@@ -25,9 +25,11 @@ export const API = {
         REPO_ITEM: (name: IProject['project_name']) => `${API.PROJECTS.REPOS(name)}/heads/get`,
         REPO_LIST: (name: IProject['project_name']) => `${API.PROJECTS.REPOS(name)}/heads/list`,
 
-        // Repos
+        // Runs
         RUNS: (name: IProject['project_name']) => `${API.BASE()}/project/${name}/runs`,
         RUNS_LIST: (name: IProject['project_name']) => `${API.PROJECTS.RUNS(name)}/list`,
+        RUNS_DELETE: (name: IProject['project_name']) => `${API.PROJECTS.RUNS(name)}/delete`,
+        RUNS_STOP: (name: IProject['project_name']) => `${API.PROJECTS.RUNS(name)}/stop`,
 
         // Logs
         LOGS: (name: IProject['project_name']) => `${API.BASE()}/project/${name}/logs/poll`,

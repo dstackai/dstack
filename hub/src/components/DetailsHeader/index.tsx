@@ -6,7 +6,14 @@ import SpaceBetween from '@cloudscape-design/components/space-between';
 
 import { IProps } from './types';
 
-export const DetailsHeader: React.FC<IProps> = ({ title, editAction, deleteAction, editDisabled, deleteDisabled }) => {
+export const DetailsHeader: React.FC<IProps> = ({
+    title,
+    actionButtons,
+    editAction,
+    deleteAction,
+    editDisabled,
+    deleteDisabled,
+}) => {
     const { t } = useTranslation();
 
     return (
@@ -14,6 +21,8 @@ export const DetailsHeader: React.FC<IProps> = ({ title, editAction, deleteActio
             variant="awsui-h1-sticky"
             actions={
                 <SpaceBetween direction="horizontal" size="xs">
+                    {actionButtons}
+
                     {editAction && (
                         <Button onClick={editAction} disabled={editDisabled}>
                             {t('common.edit')}

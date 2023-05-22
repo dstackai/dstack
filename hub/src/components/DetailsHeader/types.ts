@@ -6,4 +6,5 @@ export interface IProps {
     deleteAction?: () => void;
     editDisabled?: boolean;
     deleteDisabled?: boolean;
+    actionButtons?: React.ReactNode;
 }
