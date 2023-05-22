@@ -173,7 +173,7 @@ export const AzureBackend: React.FC<IProps> = ({ loading }) => {
                 onChange={onChangeCredentialField}
                 disabled={loading}
                 rules={{ required: t('validation.required') }}
-                // autoComplete="off"
+                autoComplete="off"
             />
 
             <FormInput
@@ -185,7 +185,7 @@ export const AzureBackend: React.FC<IProps> = ({ loading }) => {
                 onChange={onChangeCredentialField}
                 disabled={loading}
                 rules={{ required: t('validation.required') }}
-                // autoComplete="off"
+                autoComplete="off"
             />
 
             <FormSelect
