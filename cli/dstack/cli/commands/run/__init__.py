@@ -178,7 +178,7 @@ def _poll_run(
         jobs = [hub_client.get_job(job_head.job_id) for job_head in job_heads]
         ports = {
             app.port: app.map_to_port
-            for app in jobs[0].app_specs
+            for app in jobs[0].app_specs or []
             if app.map_to_port is not None and app.port != app.map_to_port
         }
         backend_type = hub_client.get_project_backend_type()
