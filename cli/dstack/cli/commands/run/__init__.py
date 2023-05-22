@@ -181,7 +181,8 @@ def _poll_run(
             for app in jobs[0].app_specs
             if app.map_to_port is not None and app.port != app.map_to_port
         }
-        if hub_client.get_project_backend_type() != "local":
+        backend_type = hub_client.get_project_backend_type()
+        if backend_type != "local":
             console.print("Starting SSH tunnel...")
             ports = allocate_local_ports(jobs)
             if not run_ssh_tunnel(
