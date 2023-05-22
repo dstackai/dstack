@@ -2,6 +2,7 @@ package ports
 
 import (
 	"context"
+	"golang.org/x/sys/unix"
 	"net"
 	"runtime"
 	"strconv"
@@ -42,6 +43,6 @@ func reusePortControl(network, address string, conn syscall.RawConn) error {
 		return nil
 	}
 	return conn.Control(func(descriptor uintptr) {
-		_ = syscall.SetsockoptInt(int(descriptor), syscall.SOL_SOCKET, syscall.SO_REUSEPORT, 1)
+		_ = unix.SetsockoptInt(int(descriptor), unix.SOL_SOCKET, unix.SO_REUSEPORT, 1)
 	})
 }
