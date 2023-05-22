@@ -67,20 +67,20 @@ export const Artifacts: React.FC<IProps> = ({ className, ...props }) => {
 
         if (!selectedArtifactPath) {
             items = data.map((a) => ({
-                name: a.name,
+                name: a.name.replace(/\/$/, ''),
                 path: a.path,
                 type: 'Folder',
                 size: null,
             }));
         } else {
-            items = [
-                {
-                    name: '/',
-                    path: '..',
-                    type: 'Folder',
-                    size: null,
-                },
-            ];
+            // items = [
+            //     {
+            //         name: '/',
+            //         path: '..',
+            //         type: 'Folder',
+            //         size: null,
+            //     },
+            // ];
 
             data.forEach((a) => {
                 const sortedFiles = [...a.files].sort((a, b) => {
@@ -99,7 +99,7 @@ export const Artifacts: React.FC<IProps> = ({ className, ...props }) => {
                     }
 
                     items.push({
-                        name: path,
+                        name: path.replace(/\/$/, ''),
                         path: path,
                         type: f.filesize_in_bytes === null ? 'Folder' : 'File',
                         size: f.filesize_in_bytes,
@@ -186,7 +186,7 @@ export const Artifacts: React.FC<IProps> = ({ className, ...props }) => {
         const crumbs = [...(selectedArtifactPath ? [selectedArtifactPath] : []), ...globalPath].reduce(
             (result, item, index) => {
                 result.push({
-                    text: item,
+                    text: item.replace(/\/$/, ''),
                     href: index ? result[index - 1].href + item : item,
                 });
 
