@@ -24,6 +24,12 @@ For instructions specific to a particular cloud, please refer to the relevant se
 
     [Learn more →](../../reference/backends/aws){ .md-button .md-button--primary }
 
+??? info "Azure"
+    To use Azure, you will require a storage account for storing state and artifacts, as well as Azure AD app credentials
+    to access the corresponding cloud services.
+
+    [Learn more →](../../reference/backends/azure){ .md-button .md-button--primary }
+
 ??? info "GCP"
     To use GCP, you will require a cloud bucket for storing state and artifacts, as well as a
     service account to access the corresponding cloud services.
@@ -51,5 +57,7 @@ To use this project with the CLI, you need to pass its name using the `--project
 
 !!! info "NOTE:"
     If you want to set the project as the default, add the `--default` flag to the `dstack config` command.
+
+[//]: # (TODO [TASK]: Mention where the configuration is stored (i.e. `~/.dstack/config.yaml`)
 
 [//]: # (TODO [MEDIUM]: Currently, there is no settings, such as quota management, max duration, etc.)

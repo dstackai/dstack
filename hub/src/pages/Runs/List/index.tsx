@@ -55,7 +55,7 @@ export const RunList: React.FC = () => {
         },
         {
             id: 'workflow_name',
-            header: `${t('projects.run.workflow_name')}/${t('projects.run.provider_name')}`,
+            header: `${t('projects.run.workflow_name')}`,
             cell: (item: IRun) => item.workflow_name ?? item.provider_name,
         },
         {

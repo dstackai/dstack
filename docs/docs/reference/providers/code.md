@@ -68,8 +68,6 @@ The hardware resources required by the workflow
 - `shm_size` - (Optional) The size of shared memory, e.g. `"8GB"`
 - `interruptible` - (Optional) `true` if you want the workflow to use interruptible instances.
     By default, it's `false`.
-- `remote` - (Optional) `true` if you want the workflow to run in the cloud.
-   By default, it's `false`.
 
 !!! info "NOTE:"
     If your workflow is using parallel communicating processes (e.g. dataloaders in PyTorch), 

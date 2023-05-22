@@ -23,17 +23,15 @@ Develop ML faster. Use any cloud.
 [![PyPI - License](https://img.shields.io/pypi/l/dstack?style=flat-square&color=blue)](https://github.com/dstackai/dstack/blob/master/LICENSE.md)
 </div>
 
-`dstack` makes it very easy for ML engineers to define dev environments,
-pipelines, and apps as code and run them cost-effectively in any cloud.
-
-Simplify ML development, avoiding engineering struggles and vendor lock-in.
+`dstack` makes it very easy for ML engineers to run dev environments, pipelines and apps cost-effectively 
+on any cloud.
 
 ## Installation and setup
 
 To use `dstack`, install it with `pip` and start the Hub application.
 
 ```shell
-pip install dstack
+pip install "dstack[aws,gcp,azure]"
 dstack start
 ```
 
@@ -42,9 +40,7 @@ The `dstack start` command starts the Hub server, and creates the default projec
 To enable Hub to run dev environments, pipelines, and apps in your preferred cloud account (AWS, GCP, Azure, etc), 
 log in to Hub, and configure the corresponding project.
 
-## Getting started with dstack
-
-### Running a dev environment
+## Running a dev environment
 
 A dev environment is a virtual machine that includes the environment and an interactive IDE or notebook setup
 based on a pre-defined configuration.
@@ -53,14 +49,13 @@ Go ahead and define this configuration via YAML (under the `.dstack/workflows` f
 
 ```yaml
 workflows:
-  - name: hello-code
+  - name: code-gpu
     provider: code
-    python: 3.11
     setup:
-      - pip install transformers accelerate gradio
+      - pip install -r dev-environments/requirements.txt
     resources:
       gpu:
-        name: V100
+        count: 1
 ```
 
 The YAML file allows you to configure hardware resources, 
@@ -69,10 +64,10 @@ set up the Python environment, expose ports, configure cache, and many more.
 Now, you can start it using the `dstack run` command:
 
 ```shell
-$ dstack run hello-code
+$ dstack run code-gpu
 
-RUN      WORKFLOW    SUBMITTED  STATUS     TAG
-shady-1  hello-code  now        Submitted  
+RUN      WORKFLOW  SUBMITTED  STATUS     TAG
+shady-1  code-gpu  now        Submitted  
  
 Starting SSH tunnel...
 
@@ -86,7 +81,7 @@ required cloud resources, and forward ports of the dev environment to your local
 
 When you stop the dev environment, `dstack` will automatically clean up cloud resources.
 
-### Running a pipeline
+## Running a pipeline
 
 A pipeline is a set of pre-defined configurations that allow to process data, train or fine-tune models, do batch inference 
 or other tasks.
@@ -95,16 +90,16 @@ Go ahead and define such a configuration via YAML (under the `.dstack/workflows`
 
 ```yaml
 workflows:
-  - name: train
+  - name: train-mnist-gpu
     provider: bash
     commands:
-      - pip install -r requirements.txt
-      - python train.py
+      - pip install -r pipelines/requirements.txt
+      - python pipelines/train.py
     artifacts:
       - ./lightning_logs
     resources:
       gpu:
-        name: P100
+        count: 1
 ```
 
 The YAML file allows you to configure hardware resources and output artifacts, set up the
@@ -113,10 +108,10 @@ Python environment, expose ports, configure cache, and many more.
 Now, you can run the pipeline using the `dstack run` command:
 
 ```shell
-$ dstack run train
+$ dstack run train-mnist-gpu
 
-RUN      WORKFLOW  SUBMITTED  STATUS     TAG
-shady-1  train     now        Submitted  
+RUN      WORKFLOW         SUBMITTED  STATUS     TAG
+shady-1  train-mnist-gpu  now        Submitted  
  
 Provisioning... It may take up to a minute. ✓
 
@@ -130,7 +125,7 @@ required cloud resources.
 
 After the pipeline is stopped or finished, `dstack` will save output artifacts and clean up cloud resources.
 
-### Running an app
+## Running an app
 
 An app can be either a web application (such as Streamlit, Gradio, etc.) or an API endpoint (like FastAPI, Flask, etc.)
 setup based on a pre-defined configuration.
@@ -139,15 +134,15 @@ Go ahead and define this configuration via YAML (under the `.dstack/workflows` f
 
 ```yaml
 workflows:
-  - name: hello-fastapi
+  - name: fastapi-gpu
     provider: bash
     ports: 1
     commands:
-      - pip install fastapi uvicorn
-      - uvicorn main:app --port $PORT_0 --host 0.0.0.0
+      - pip install -r apps/requirements.txt
+      - uvicorn apps.main:app --port $PORT_0 --host 0.0.0.0
     resources:
       gpu:
-        name: V100
+        count: 1
 ```
 
 The configuration allows you to customize hardware resources, set up the Python environment, 
@@ -156,9 +151,9 @@ configure cache, and more.
 Now, you can run the app using the `dstack run` command:
 
 ```shell
-$ dstack run hello-fastapi
- RUN           WORKFLOW       SUBMITTED  STATUS     TAG  BACKENDS
- silly-dodo-1  hello-fastapi  now        Submitted       aws
+$ dstack run fastapi-gpu
+ RUN           WORKFLOW     SUBMITTED  STATUS     TAG
+ silly-dodo-1  fastapi-gpu  now        Submitted     
 
 Starting SSH tunnel...
 

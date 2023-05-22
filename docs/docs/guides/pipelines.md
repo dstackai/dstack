@@ -10,20 +10,20 @@ any cloud.
 
 A configuration can be defined as a YAML file (under the `.dstack/workflows` directory).
 
-<div editor-title=".dstack/workflows/train-pipeline.yaml"> 
+<div editor-title=".dstack/workflows/pipelines.yaml"> 
 
 ```yaml
 workflows:
-  - name: train-pipeline
+  - name: train-mnist-gpu
     provider: bash
     commands:
-      - pip install -r requirements.txt
-      - python train.py
+      - pip install -r pipelines/requirements.txt
+      - python pipelines/train.py
     artifacts:
-      - ./lightning_logs
+      - path: ./lightning_logs
     resources:
       gpu:
-        name: P100
+        count: 1
 ```
 
 </div>
@@ -48,10 +48,10 @@ Once a configuration is defined, you can run it using the `dstack run` command:
 <div class="termy">
 
 ```shell
-$ dstack run train-pipeline
+$ dstack run train-mnist-gpu
 
 RUN      WORKFLOW        SUBMITTED  STATUS     TAG
-shady-1  train-pipeline  now        Submitted  
+shady-1  train-mnist-gpu  now        Submitted  
  
 Provisioning... It may take up to a minute. ✓
 
@@ -84,23 +84,52 @@ resources. After the workflow is finished, `dstack` will automatically save outp
 To stop the run, click `Ctrl`+`C` while the [`dstack run`](../reference/cli/run.md) command is running,
 or use the [`dstack stop`](../reference/cli/stop.md) command.
 
-## Configuring hardware resources
+## Passing arguments
+
+To pass arguments to your pipeline, use the `${{ run.args }}` markup within the configuration:
+
+<div editor-title=".dstack/workflows/pipelines.yaml"> 
+
+```yaml
+workflows:
+    name: train-mnist-args
+    provider: bash
+    commands:
+      - pip install -r pipelines/requirements.txt
+      - python pipelines/train.py ${{ run.args }}
+    artifacts:
+      - path: ./lightning_logs
+```
+
+</div>
+
+This allows you to include arguments when executing the `dstack run` command for your pipeline:
+
+<div class="termy">
+
+```shell
+$ dstack run train-mnist-gpu --batch-size 32
+```
+
+</div>
+
+## Configuring resources
 
 If your project is configured to run pipelines in the cloud, you can use the 
 [`resources`](../reference/providers/bash.md#resources) property in the YAML file to 
 request hardware resources like memory, GPUs, and shared memory size.
 
-<div editor-title=".dstack/workflows/train-pipeline.yaml"> 
+<div editor-title=".dstack/workflows/pipelines.yaml"> 
 
 ```yaml
 workflows:
-  - name: train-pipeline
+  - name: train-mnist-v100-i
     provider: bash
     commands:
-      - pip install -r requirements.txt
-      - python train.py
+      - pip install -r pipelines/requirements.txt
+      - python pipelines/train.py
     artifacts:
-      - ./lightning_logs
+      - path: ./lightning_logs
     resources:
       gpu:
         name: V100
@@ -125,18 +154,18 @@ Use the [`python`](../reference/providers/bash.md) property to specify a version
 
 To run the pipeline with your custom Docker image, you can use the [`docker`](../reference/providers/docker.md) provider.
 
-<div editor-title=".dstack/workflows/train-pipeline.yaml"> 
+<div editor-title=".dstack/workflows/pipelines.yaml"> 
 
 ```yaml
 workflows:
-  - name: train-pipeline
-    provider: bash
-    image: 1.9.1-cuda11.1-cudnn8-runtime
+  - name: train-mnist-docker
+    provider: docker
+    image: python:3.11
     commands:
-      - pip install -r requirements.txt
-      - python train.py
+      - pip install -r pipelines/requirements.txt
+      - python pipelines/train.py
     artifacts:
-      - ./lightning_logs
+      - path: ./lightning_logs
 ```
 
 </div>
@@ -149,11 +178,11 @@ If you want the pipeline to serve web apps, specify the number of ports via the
 [`ports`](../reference/providers/bash.md#ports) property. They'll be
 passed to the run as environment variables like `PORT_0`, `PORT_1`, etc.
 
-<div editor-title=".dstack/workflows/train-pipeline.yaml"> 
+<div editor-title=".dstack/workflows/pipelines.yaml"> 
 
 ```yaml
 workflows:
-  - name: train-pipeline
+  - name: train-mnist-gpu
     provider: bash
     ports: 1
     commands:
@@ -161,7 +190,7 @@ workflows:
       - tensorboard --port $PORT_0 --host 0.0.0.0 --logdir ./lightning_logs &
       - python train.py
     artifacts:
-      - ./lightning_logs
+      - path: ./lightning_logs
 ```
 
 </div>
@@ -179,23 +208,23 @@ When running a pipeline, you may need to download files like pre-trained models,
 packages. To avoid downloading them on each run of your pipeline, you can choose
 which paths to cache between runs. 
 
-<div editor-title=".dstack/workflows/train-pipeline.yaml"> 
+<div editor-title=".dstack/workflows/pipelines.yaml"> 
 
 ```yaml
 workflows:
-  - name: train-pipeline
+  - name: train-mnist-cached
     provider: bash
     commands:
-      - pip install -r requirements.txt
-      - python train.py
+      - pip install -r pipelines/requirements.txt
+      - python pipelines/train.py
     cache:
-      - ./data
-      - ~/.cache/pip
+      - path: ./data
+      - path: ~/.cache/pip
     artifacts:
-      - ./lightning_logs
+      - path: ./lightning_logs
     resources:
       gpu:
-        name: P100
+        count: 1
 ```
 
 </div>
@@ -213,4 +242,4 @@ To clean up the cache, use the [`dstack prune cache`](../reference/cli/prune.md)
 !!! info "NOTE:"
     Check out the [`dstackai/dstack-examples`](https://github.com/dstackai/dstack-examples/blob/main/README.md) repo for source code and other examples.
 
-[//]: # (TODO [TASK]: Explain how to pass arguments)
+[//]: # (TODO [TASK]: Mention secrets)

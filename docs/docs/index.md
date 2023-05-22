@@ -1,6 +1,6 @@
 # Getting started
 
-`dstack` makes it very easy for ML engineers to manage dev environments and run pipelines and apps cost-effectively 
+`dstack` makes it very easy for ML engineers to run dev environments, pipelines and apps cost-effectively 
 on any cloud.
 
 ## Installation and setup
@@ -10,7 +10,7 @@ To use `dstack`, install it with `pip` and start the Hub server.
 <div class="termy">
 
 ```shell
-$ pip install dstack
+$ pip install "dstack[aws,gcp,azure]"
 $ dstack start
 
 The Hub is available at http://127.0.0.1:3000?token=b934d226-e24a-4eab-eb92b353b10f
@@ -48,17 +48,16 @@ based on a pre-defined configuration.
 
 Go ahead and define this configuration via YAML (under the `.dstack/workflows` folder).
 
-<div editor-title=".dstack/workflows/dev-env.yaml"> 
+<div editor-title=".dstack/workflows/dev-environments.yaml"> 
 
 ```yaml
 workflows:
-  - name: dev-env
+  - name: code-gpu
     provider: code
     setup:
-      - pip install requirements.txt
+      - pip install -r dev-environments/requirements.txt
     resources:
       gpu:
-        name: P100
         count: 1
 ```
 
@@ -79,10 +78,10 @@ Now, you can start it using the [`dstack run`](reference/cli/run.md) command:
 <div class="termy">
 
 ```shell
-$ dstack run dev-env
+$ dstack run code-gpu
 
 RUN      WORKFLOW  SUBMITTED  STATUS     TAG
-shady-1  dev-env   now        Submitted  
+shady-1  code-gpu  now        Submitted  
  
 Starting SSH tunnel...
 
@@ -106,20 +105,20 @@ or other tasks.
 To run a pipeline, all you have to do is define it via YAML (under the `.dstack/workflows` folder) 
 and then run it by name via the CLI.
 
-<div editor-title=".dstack/workflows/train-pipeline.yaml"> 
+<div editor-title=".dstack/workflows/pipelines.yaml"> 
 
 ```yaml
 workflows:
-  - name: train-pipeline
+  - name: train-mnist-gpu
     provider: bash
     commands:
-      - pip install -r requirements.txt
-      - python train.py
+      - pip install -r pipelines/requirements.txt
+      - python pipelines/train.py
     artifacts:
       - ./lightning_logs
     resources:
       gpu:
-        name: P100
+        count: 1
 ```
 
 </div>
@@ -137,10 +136,10 @@ Now, you can run the pipeline using the [`dstack run`](reference/cli/run.md) com
 <div class="termy">
 
 ```shell
-$ dstack run train-pipeline
+$ dstack run train-mnist-gpu
 
-RUN      WORKFLOW        SUBMITTED  STATUS     TAG
-shady-1  train-pipeline  now        Submitted  
+RUN      WORKFLOW         SUBMITTED  STATUS     TAG
+shady-1  train-mnist-gpu  now        Submitted  
  
 Provisioning... It may take up to a minute. ✓
 
@@ -164,19 +163,18 @@ setup based on a pre-defined configuration.
 
 Go ahead and define this configuration via YAML (under the `.dstack/workflows` folder).
 
-<div editor-title=".dstack/workflows/fastapi-app.yaml"> 
+<div editor-title=".dstack/workflows/apps.yaml"> 
 
 ```yaml
 workflows:
-  - name: fastapi-app
+  - name: fastapi-gpu
     provider: bash
     ports: 1
     commands:
-      - pip install fastapi uvicorn
-      - uvicorn main:app --port $PORT_0 --host 0.0.0.0
+      - pip install -r apps/requirements.txt
+      - uvicorn apps.main:app --port $PORT_0 --host 0.0.0.0
     resources:
       gpu:
-        name: P100
         count: 1
 ```
 
@@ -191,9 +189,9 @@ workflows:
 Now, you can run the app using the [`dstack run`](reference/cli/run.md) command:
 
 ```shell
-$ dstack run fastapi-app
- RUN           WORKFLOW     SUBMITTED  STATUS     TAG  BACKENDS
- silly-dodo-1  fastapi-app  now        Submitted       aws
+$ dstack run fastapi-gpu
+ RUN           WORKFLOW     SUBMITTED  STATUS     TAG
+ silly-dodo-1  fastapi-gpu  now        Submitted     
 
 Starting SSH tunnel...
 

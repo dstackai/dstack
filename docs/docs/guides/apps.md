@@ -10,19 +10,19 @@ locally or in any cloud.
 
 A configuration can be defined as a YAML file (under the `.dstack/workflows` directory).
 
-<div editor-title=".dstack/workflows/fastapi-app.yaml"> 
+<div editor-title=".dstack/workflows/apps.yaml"> 
 
 ```yaml
 workflows:
-  - name: fastapi-app
+  - name: fastapi-gpu
     provider: bash
     ports: 1
     commands:
-      - pip install fastapi uvicorn
-      - uvicorn main:app --port $PORT_0 --host 0.0.0.0
+      - pip install -r apps/requirements.txt
+      - uvicorn apps.main:app --port $PORT_0 --host 0.0.0.0
     resources:
       gpu:
-        name: P100
+        count: 1
 ```
 
 </div>
@@ -49,9 +49,9 @@ Once a configuration is defined, you can run it using the [`dstack run`](../refe
 <div class="termy">
 
 ```shell
-$ dstack run fastapi-app
+$ dstack run fastapi-gpu
  RUN           WORKFLOW     SUBMITTED  STATUS     TAG
- silly-dodo-1  fastapi-app  now        Submitted     
+ silly-dodo-1  fastapi-gpu  now        Submitted     
 
 Starting SSH tunnel...
 
@@ -87,25 +87,25 @@ To stop the app, click `Ctrl`+`C` while the [`dstack run`](../reference/cli/run.
 or use the [`dstack stop`](../reference/cli/stop.md) command. `dstack` will automatically clean up any cloud resources 
 if they are used.
 
-## Configuring hardware resources
+## Configuring resources
 
 If your project is configured to run apps in the cloud, you can use the 
 [`resources`](../reference/providers/bash.md#resources) property in the YAML file to 
 request hardware resources like memory, GPUs, and shared memory size.
 
-<div editor-title=".dstack/workflows/fastapi-app.yaml"> 
+<div editor-title=".dstack/workflows/apps.yaml"> 
 
 ```yaml
 workflows:
-  - name: fastapi-app
+  - name: fastapi-gpu-i
     provider: bash
     ports: 1
     commands:
-      - pip install fastapi uvicorn
-      - uvicorn main:app --port $PORT_0 --host 0.0.0.0
+      - pip install -r apps/requirements.txt
+      - uvicorn apps.main:app --port $PORT_0 --host 0.0.0.0
     resources:
       gpu:
-        name: P100
+        count: 1
       interruptible: true
 ```
 
@@ -128,20 +128,17 @@ Use the [`python`](../reference/providers/bash.md) property to specify a version
 
 To run the app with your custom Docker image, you can use the `docker` provider.
 
-<div editor-title=".dstack/workflows/fastapi-app.yaml"> 
+<div editor-title=".dstack/workflows/apps.yaml"> 
 
 ```yaml
 workflows:
-  - name: fastapi-app
+  - name: fastapi-docker
     provider: docker
     image: python:3.11
     ports: 1
     commands:
-      - pip install fastapi uvicorn
-      - uvicorn main:app --port $PORT_0 --host 0.0.0.0
-    resources:
-      gpu:
-        name: P100 
+      - pip install -r apps/requirements.txt
+      - uvicorn apps.main:app --port $PORT_0 --host 0.0.0.0
 ```
 
 </div>
@@ -152,18 +149,18 @@ Apps may download files like pre-trained models, external data, or Python
 packages. To avoid downloading them on each run, you can choose
 which paths to cache between runs. 
 
-<div editor-title=".dstack/workflows/fastapi-app.yaml"> 
+<div editor-title=".dstack/workflows/apps.yaml"> 
 
 ```yaml
 workflows:
-  - name: fastapi-app
+  - name: fastapi-cached
     provider: bash
     ports: 1
     commands:
-      - pip install fastapi uvicorn
-      - uvicorn main:app --port $PORT_0 --host 0.0.0.0
+      - pip install -r apps/requirements.txt
+      - uvicorn apps.main:app --port $PORT_0 --host 0.0.0.0
     cache:
-      - ~/.cache/pip
+      - path: ~/.cache/pip
 ```
 
 </div>
@@ -178,3 +175,5 @@ To clean up the cache, use the [`dstack prune cache`](../reference/cli/prune.md)
 
 !!! info "NOTE:"
     Check out the [`dstackai/dstack-examples`](https://github.com/dstackai/dstack-examples/blob/main/README.md) repo for source code and other examples.
+
+[//]: # (TODO [TASK]: Mention secrets)

@@ -1,5 +1,5 @@
 import json
-from typing import Dict, List, Optional, Tuple, Union
+from typing import Dict, Optional, Tuple, Union
 from uuid import UUID, uuid5
 
 from azure.core.credentials import TokenCredential
@@ -134,6 +134,7 @@ class AzureConfigurator(Configurator):
             client_secret=project_config.client_secret,
         )
         self.resource_group = self._get_resource_group()
+        self._create_storage_container()
         self.vault_url = self._create_key_vault()
         self.runner_principal_id = self._create_runner_managed_identity()
         self.network, self.subnet = self._create_network_resources()
@@ -847,9 +848,7 @@ class RolesManager:
     ):
         self.authorization_client.role_assignments.create(
             scope=azure_utils.get_key_vault_id(self.subscription_id, resource_group, key_vault),
-            role_assignment_name=uuid5(
-                UUID(principal_id), f"Key vault {resource_group} administrator"
-            ),
+            role_assignment_name=uuid5(UUID(principal_id), f"Key vault {key_vault} administrator"),
             parameters=RoleAssignmentCreateParameters(
                 # https://learn.microsoft.com/en-us/azure/role-based-access-control/built-in-roles#key-vault-administrator
                 role_definition_id=f"/subscriptions/{self.subscription_id}/providers/Microsoft.Authorization/roleDefinitions/00482a5a-887f-4fb3-b363-3b7fe8e74483",

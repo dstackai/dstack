@@ -9,6 +9,8 @@ from dstack.backend.base.storage import Storage
 from dstack.backend.local.config import LocalConfig
 from dstack.core.log_event import LogEvent
 
+LOGS_TIME_FORMAT = "%Y-%m-%dT%H:%M:%S.%f%z"
+
 
 def poll_logs(
     backend_config: LocalConfig,
@@ -42,12 +44,12 @@ def poll_logs(
 
 
 def _log_line_to_log_event(line: str) -> Dict:
-    log_line_dict = dict(record.split("=") for record in line.split(" "))
+    log_line_dict = dict(record.split("=", maxsplit=1) for record in line.split(" ", maxsplit=2))
     log_line_dict = {k: v.strip().strip('"') for k, v in log_line_dict.items()}
     log_msg = json.loads(log_line_dict["msg"].encode().decode("unicode_escape"))
     return {
         "eventId": log_msg["event_id"],
-        "timestamp": datetime.fromisoformat(log_line_dict["time"]),
+        "timestamp": datetime.strptime(log_line_dict["time"], LOGS_TIME_FORMAT),
         "message": {
             "source": "stdout",
             "log": log_msg["log"],

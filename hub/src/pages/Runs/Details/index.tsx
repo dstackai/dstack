@@ -203,9 +203,7 @@ export const RunDetails: React.FC = () => {
                     <Container header={<Header variant="h2">{t('common.general')}</Header>}>
                         <ColumnLayout columns={4} variant="text-grid">
                             <div>
-                                <Box variant="awsui-key-label">
-                                    {t('projects.run.workflow_name')}/{t('projects.run.provider_name')}
-                                </Box>
+                                <Box variant="awsui-key-label">{t('projects.run.workflow_name')}</Box>
                                 <div>{runData.workflow_name ?? runData.provider_name}</div>
                             </div>
 
