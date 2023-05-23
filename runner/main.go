@@ -28,7 +28,6 @@ import (
 	"github.com/dstackai/dstack/runner/internal/executor"
 	"github.com/dstackai/dstack/runner/internal/log"
 	"github.com/dstackai/dstack/runner/internal/models"
-	"github.com/dstackai/dstack/runner/internal/ports"
 	"github.com/dstackai/dstack/runner/internal/stream"
 	"github.com/sirupsen/logrus"
 	"github.com/urfave/cli/v2"
@@ -86,11 +85,7 @@ func start(logLevel int, httpPort int, configDir string) {
 		os.Exit(1)
 	}
 	if httpPort == 0 {
-		httpPort, err = ports.GetFreePort()
-		if err != nil {
-			log.L.Error("[ERROR]", err)
-			os.Exit(1)
-		}
+		httpPort = 10999
 	}
 	streamLogs := stream.New(httpPort)
 	go func() {

@@ -49,7 +49,7 @@ The following properties are optional:
 - `env` - (Optional) The list of environment variables 
 - [`artifacts`](#artifacts) - (Optional) The list of output artifacts
 - [`resources`](#resources) - (Optional) The hardware resources required by the workflow
-- [`ports`](#ports) - (Optional) The number of ports to expose
+- [`ports`](#ports) - (Optional) The list of ports to expose
 - `working_dir` - (Optional) The path to the working directory
 - `ssh` - (Optional) Runs SSH server in the container if `true`
 - [`cache`](#cache) - (Optional) The list of directories to cache between runs
@@ -98,9 +98,12 @@ The list of directories to cache between runs
 
 ### Ports
 
-If you'd like your workflow to expose ports, you have to specify the `ports` property with the number
-of ports to expose. Actual ports will be assigned on startup and passed to the workflow via the environment
-variables `PORT_<number>`.
+If you'd like your workflow to expose ports, you have to specify the `ports` property with the list
+of ports to expose. You could specify a mapping `APP_PORT:LOCAL_PORT` or just `APP_PORT` — in this
+case dstack will choose available `LOCAL_PORT` for you.
+
+!!! info "NOTE:"
+    Ports range `10000-10999` is reserved for dstack needs. However, you could remap them to different `LOCAL_PORT`s.
 
 <div editor-title=".dstack/workflows/app-example.yaml">
 
@@ -108,10 +111,11 @@ variables `PORT_<number>`.
 workflows:
   - name: app
     provider: bash
-    ports: 1
+    ports:
+      - 3000
     commands: 
       - pip install -r requirements.txt
-      - gunicorn main:app --bind 0.0.0.0:$PORT_0
+      - gunicorn main:app --bind 0.0.0.0:3000
 ```
 
 </div>
@@ -132,10 +136,11 @@ Here's an example:
 workflows:
   - name: train-with-tensorboard
     provider: bash
-    ports: 1
+    ports:
+      - 6006
     commands:
       - pip install torchvision pytorch-lightning tensorboard
-      - tensorboard --port $PORT_0 --host 0.0.0.0 --logdir lightning_logs &
+      - tensorboard --port 6006 --host 0.0.0.0 --logdir lightning_logs &
       - python train.py
     artifacts:
       - path: lightning_logs

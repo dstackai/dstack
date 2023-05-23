@@ -169,10 +169,11 @@ Go ahead and define this configuration via YAML (under the `.dstack/workflows` f
 workflows:
   - name: fastapi-gpu
     provider: bash
-    ports: 1
+    ports:
+      - 3000
     commands:
       - pip install -r apps/requirements.txt
-      - uvicorn apps.main:app --port $PORT_0 --host 0.0.0.0
+      - uvicorn apps.main:app --port 3000 --host 0.0.0.0
     resources:
       gpu:
         count: 1

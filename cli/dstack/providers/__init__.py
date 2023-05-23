@@ -1,3 +1,4 @@
+import argparse
 import importlib
 import shlex
 import sys
@@ -19,7 +20,8 @@ from dstack.core.job import (
     JobStatus,
     Requirements,
 )
-from dstack.utils.common import _quoted, get_milliseconds_since_epoch
+from dstack.providers.ports import PortMapping, merge_ports
+from dstack.utils.common import get_milliseconds_since_epoch
 from dstack.utils.interpolator import VariablesInterpolator
 
 DEFAULT_CPU = 2
@@ -62,15 +64,7 @@ class Provider:
         self.openssh_server: bool = False
         self.loaded = False
         self.home_dir: Optional[str] = None
-
-    def __str__(self) -> str:
-        return (
-            f'Provider(name="{self.provider_name}", '
-            f'workflow_data="{self.provider_data}", '
-            f'workflow_name="{_quoted(self.workflow_name)}, '
-            f'provider_name="{self.provider_name}", '
-            f"run_as_provider={self.run_as_provider})"
-        )
+        self.ports: Dict[int, PortMapping] = {}
 
     # TODO: This is a dirty hack
     def _safe_python_version(self, name: str):
@@ -141,7 +135,9 @@ class Provider:
         self.run_name = run_name
         self.ssh_key_pub = ssh_key_pub
         self.openssh_server = self.provider_data.get("ssh", False)
+
         self.parse_args()
+        self.ports = self.provider_data.get("ports") or {}
         if not self.ssh_key_pub:
             if self.openssh_server or (
                 hub_client.get_project_backend_type() != "local" and not args.detach
@@ -182,6 +178,9 @@ class Provider:
         parser.add_argument("--gpu-name", metavar="NAME", type=str)
         parser.add_argument("--gpu-memory", metavar="SIZE", type=str)
         parser.add_argument("--shm-size", metavar="SIZE", type=str)
+        parser.add_argument(
+            "-p", "--port", metavar="PORTS", type=PortMapping, nargs=argparse.ONE_OR_MORE
+        )
 
     def _parse_base_args(self, args: Namespace, unknown_args):
         if args.requirements:
@@ -222,6 +221,9 @@ class Provider:
             resources["shm_size"] = args.shm_size
         if args.interruptible:
             resources["interruptible"] = True
+        self.provider_data["ports"] = merge_ports(
+            [PortMapping(i) for i in self.provider_data.get("ports") or []], args.port or []
+        )
         if unknown_args:
             self.provider_data["run_args"] = unknown_args
 
@@ -261,8 +263,6 @@ class Provider:
                 working_dir=job_spec.working_dir,
                 artifact_specs=job_spec.artifact_specs,
                 cache_specs=self.cache_specs,
-                port_count=job_spec.port_count,
-                ports=None,
                 host_name=None,
                 requirements=job_spec.requirements,
                 dep_specs=self.dep_specs,
@@ -458,16 +458,6 @@ class Provider:
     @staticmethod
     def _extend_commands_with_env(commands, env):
         commands.extend([f"export {e}={env[e] if env.get(e) else ''}" for e in env])
-
-    @staticmethod
-    def _extend_commands_with_openssh_server(commands: List[str], ssh_pub_key: str, port_idx: int):
-        commands.extend(
-            [
-                f'echo "{ssh_pub_key}" >> ~/.ssh/authorized_keys',
-                "ssh-keygen -A > /dev/null",
-                f"/usr/sbin/sshd -p $PORT_{port_idx}",
-            ]
-        )
 
 
 def get_provider_names() -> List[str]:

@@ -37,6 +37,7 @@ The following arguments are optional:
 - `ARGS` – (Optional) Use `ARGS` to pass [configuration arguments](../../usage/args.md)
 - `-h`, `--help` – (Optional) Shows help for the `dstack run` command. Combine it with the name of a workflow
   or provider to see the provider-specific help message.
+- `-p PORT [PORT ...]`, `--port PORT [PORT ...]` – (Optional) Requests ports or define mappings for them (`APP_PORT:LOCAL_PORT`)
 
 !!! info "NOTE:"
     By default, it runs it in the attached mode, so you'll see the output in real-time as your
