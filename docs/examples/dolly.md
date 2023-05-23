@@ -111,15 +111,10 @@ with gr.Blocks(theme=theme) as demo:
     clear.click(lambda: None, None, chatbot, queue=False)
 
 if __name__ == "__main__":
-    server_port = int(os.getenv("PORT_0")) if os.getenv("PORT_0") else None
-    demo.launch(server_name="0.0.0.0", server_port=server_port)
+    demo.launch(server_name="0.0.0.0", server_port=3000)
 ```
 
-</div> 
-
-!!! info "NOTE:"
-    Since we'll run our application via `dstack`, we've added the possibility to override the server port of our application
-    using the `PORT_0` environment variable.
+</div>
 
 ## 4. Define the workflow
 
@@ -131,7 +126,8 @@ To run our application in our cloud account using `dstack`, we need to define a 
 workflows:
   - name: dolly
     provider: bash
-    ports: 1
+    ports:
+      - 3000
     commands:
       - pip install -r tutorials/dolly/requirements.txt
       - python tutorials/dolly/chat.py
@@ -179,7 +175,7 @@ To interrupt, press Ctrl+C.
 Downloading model files: 
 ---> 100%
 
-Running on local URL:  http://127.0.0.1:51741
+Running on local URL:  http://127.0.0.1:3000
 ```
 
 </div>
@@ -202,7 +198,8 @@ Define the following workflow:
 workflows:
   - name: debug-dolly
     provider: code
-    ports: 1
+    ports:
+      - 3000
     setup:
       - pip install -r tutorials/dolly/requirements.txt
     cache:
@@ -231,9 +228,7 @@ Provisioning... It may take up to a minute. ✓
 
 To interrupt, press Ctrl+C.
 
-The PORT_0 port is mapped to http://0.0.0.0:51742
-
-Web UI available at http://127.0.0.1:51741
+Web UI available at http://127.0.0.1:3000
 ```
 
 </div>

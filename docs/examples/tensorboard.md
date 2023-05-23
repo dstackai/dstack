@@ -141,10 +141,11 @@ Create the following YAML file:
 workflows:
   - name: train-tensorboard
     provider: bash
-    ports: 1
+    ports:
+      - port 6006
     commands:
       - pip install torchvision pytorch-lightning tensorboard
-      - tensorboard --port $PORT_0 --host 0.0.0.0 --logdir ./lightning_logs &
+      - tensorboard --port 6006 --host 0.0.0.0 --logdir ./lightning_logs &
       - python tutorials/tensorboard/train.py
     artifacts:
       - path: ./lightning_logs
