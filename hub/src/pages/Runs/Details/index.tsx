@@ -229,9 +229,7 @@ export const RunDetails: React.FC = () => {
                     </Container>
                 )}
 
-                <div className={styles.tabs}>
-                    <Tabs onChange={onChangeTab} activeTabId={activeTabId} tabs={tabs} />
-                </div>
+                <Tabs onChange={onChangeTab} activeTabId={activeTabId} tabs={tabs} />
 
                 <Outlet />
             </ContentLayout>

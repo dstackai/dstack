@@ -31,8 +31,6 @@ export type { AutosuggestProps } from '@cloudscape-design/components/autosuggest
 export { default as Grid } from '@cloudscape-design/components/grid';
 export { default as HelpPanel } from '@cloudscape-design/components/help-panel';
 export type { HelpPanelProps } from '@cloudscape-design/components/help-panel';
-export { default as Tabs } from '@cloudscape-design/components/tabs';
-export type { TabsProps } from '@cloudscape-design/components/tabs';
 export { default as TextContent } from '@cloudscape-design/components/text-content';
 
 // custom components
@@ -50,3 +48,5 @@ export { Notifications } from './Notifications';
 export { ConfirmationDialog } from './ConfirmationDialog';
 export { FileUploader } from './FileUploader';
 export { InfoLink } from './InfoLink';
+export { Tabs } from './Tabs';
+export type { IProps as TabsProps } from './Tabs';

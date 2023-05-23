@@ -4,8 +4,6 @@ import { fetchBaseQuery } from '@reduxjs/toolkit/query/react';
 
 import fetchBaseQueryHeaders from 'libs/fetchBaseQueryHeaders';
 
-import { DeleteRunsRequestParams, RunsRequestParams, StopRunsRequestParams } from './run.types';
-
 export const runApi = createApi({
     reducerPath: 'runApi',
     baseQuery: fetchBaseQuery({
@@ -15,7 +13,7 @@ export const runApi = createApi({
     tagTypes: ['Runs'],
 
     endpoints: (builder) => ({
-        getRuns: builder.query<IRun[], RunsRequestParams>({
+        getRuns: builder.query<IRun[], TRunsRequestParams>({
             query: ({ name, ...body }) => {
                 return {
                     url: API.PROJECTS.RUNS_LIST(name),
@@ -28,7 +26,7 @@ export const runApi = createApi({
                 result ? [...result.map(({ run_name }) => ({ type: 'Runs' as const, id: run_name })), 'Runs'] : ['Runs'],
         }),
 
-        getRun: builder.query<IRun | undefined, RunsRequestParams>({
+        getRun: builder.query<IRun | undefined, TRunsRequestParams>({
             query: ({ name, ...body }) => {
                 return {
                     url: API.PROJECTS.RUNS_LIST(name),
@@ -42,24 +40,26 @@ export const runApi = createApi({
             providesTags: (result) => (result ? [{ type: 'Runs' as const, id: result?.run_name }] : []),
         }),
 
-        stopRuns: builder.mutation<void, StopRunsRequestParams>({
+        stopRuns: builder.mutation<void, TStopRunsRequestParams>({
             query: ({ name, ...body }) => ({
                 url: API.PROJECTS.RUNS_STOP(name),
                 method: 'POST',
                 body,
             }),
 
-            invalidatesTags: (result, error, params) => params.run_names.map((run) => ({ type: 'Runs' as const, id: run })),
+            invalidatesTags: (result, error, params) =>
+                params.run_names.map((run: string) => ({ type: 'Runs' as const, id: run })),
         }),
 
-        deleteRuns: builder.mutation<void, DeleteRunsRequestParams>({
+        deleteRuns: builder.mutation<void, TDeleteRunsRequestParams>({
             query: ({ name, ...body }) => ({
                 url: API.PROJECTS.RUNS_DELETE(name),
                 method: 'POST',
                 body,
             }),
 
-            invalidatesTags: (result, error, params) => params.run_names.map((run) => ({ type: 'Runs' as const, id: run })),
+            invalidatesTags: (result, error, params) =>
+                params.run_names.map((run: string) => ({ type: 'Runs' as const, id: run })),
         }),
     }),
 });

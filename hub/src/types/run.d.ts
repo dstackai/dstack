@@ -1,3 +1,24 @@
+declare type TRunsRequestParams = {
+    name: IProject['project_name'];
+    repo_id?: string;
+    run_name?: string;
+    include_request_heads?: boolean;
+};
+
+declare type TDeleteRunsRequestParams = {
+    name: IProject['project_name'];
+    repo_id?: string;
+    run_names: IRun['run_name'][];
+};
+
+declare type TStopRunsRequestParams = {
+    name: IProject['project_name'];
+    repo_id?: string;
+    run_names: IRun['run_name'][];
+    abort: boolean;
+};
+
+
 declare type TRunStatus =
     | 'pending'
     | 'submitted'

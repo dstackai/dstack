@@ -7,6 +7,7 @@ import { Logout } from 'App/Logout';
 import { ProjectAdd, ProjectDetails, ProjectEditBackend, ProjectList, ProjectSettings } from 'pages/Project';
 import { RepositoryDetails, RepositoryList } from 'pages/Repositories';
 import { Artifacts as RunArtifacts, Logs as RunLogs, RunDetails, RunList } from 'pages/Runs';
+import { TagDetails, TagList } from 'pages/Tags';
 import { UserAdd, UserDetails, UserEdit, UserList } from 'pages/User';
 
 import { AuthErrorMessage } from './App/AuthErrorMessage';
@@ -50,6 +51,10 @@ export const router = createBrowserRouter([
                         index: true,
                         element: <RunList />,
                     },
+                    {
+                        path: ROUTES.PROJECT.DETAILS.TAGS.TEMPLATE,
+                        element: <TagList />,
+                    },
                 ],
             },
             {
@@ -66,6 +71,17 @@ export const router = createBrowserRouter([
                         path: ROUTES.PROJECT.DETAILS.RUNS.ARTIFACTS.TEMPLATE,
                         element: <RunArtifacts />,
                     },
+                ],
+            },
+            {
+                path: ROUTES.PROJECT.DETAILS.TAGS.DETAILS.TEMPLATE,
+                element: <TagDetails />,
+
+                children: [
+                    // {
+                    //     index: true,
+                    //     element: <RunLogs />,
+                    // },
                 ],
             },
 

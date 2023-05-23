@@ -10,6 +10,11 @@ export const ROUTES = {
         DETAILS: {
             TEMPLATE: `/projects/:name`,
             FORMAT: (name: string) => buildRoute(ROUTES.PROJECT.DETAILS.TEMPLATE, { name }),
+            SETTINGS: {
+                TEMPLATE: `/projects/:name/settings`,
+                FORMAT: (name: string) => buildRoute(ROUTES.PROJECT.DETAILS.SETTINGS.TEMPLATE, { name }),
+            },
+
             REPOSITORIES: {
                 TEMPLATE: `/projects/:name/repositories`,
                 FORMAT: (name: string) => buildRoute(ROUTES.PROJECT.DETAILS.REPOSITORIES.TEMPLATE, { name }),
@@ -19,6 +24,7 @@ export const ROUTES = {
                         buildRoute(ROUTES.PROJECT.DETAILS.REPOSITORIES.DETAILS.TEMPLATE, { name, repoId }),
                 },
             },
+
             RUNS: {
                 DETAILS: {
                     TEMPLATE: `/projects/:name/repositories/:repoId/runs/:runName`,
@@ -31,9 +37,16 @@ export const ROUTES = {
                         buildRoute(ROUTES.PROJECT.DETAILS.RUNS.ARTIFACTS.TEMPLATE, { name, repoId, runName }),
                 },
             },
-            SETTINGS: {
-                TEMPLATE: `/projects/:name/settings`,
-                FORMAT: (name: string) => buildRoute(ROUTES.PROJECT.DETAILS.SETTINGS.TEMPLATE, { name }),
+
+            TAGS: {
+                TEMPLATE: `/projects/:name/repositories/:repoId/tags`,
+                FORMAT: (name: string, repoId: string) => buildRoute(ROUTES.PROJECT.DETAILS.TAGS.TEMPLATE, { name, repoId }),
+
+                DETAILS: {
+                    TEMPLATE: `/projects/:name/repositories/:repoId/tags/:tagName`,
+                    FORMAT: (name: string, repoId: string, tagName: string) =>
+                        buildRoute(ROUTES.PROJECT.DETAILS.TAGS.DETAILS.TEMPLATE, { name, repoId, tagName }),
+                },
             },
         },
         EDIT_BACKEND: {

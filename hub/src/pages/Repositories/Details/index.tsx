@@ -3,7 +3,7 @@ import { useTranslation } from 'react-i18next';
 import { Outlet, useParams } from 'react-router-dom';
 import { format } from 'date-fns';
 
-import { Box, ColumnLayout, Container, ContentLayout, DetailsHeader, Header, Loader, SpaceBetween } from 'components';
+import { Box, ColumnLayout, Container, ContentLayout, DetailsHeader, Header, Loader, SpaceBetween, Tabs } from 'components';
 
 import { DATE_TIME_FORMAT } from 'consts';
 import { useBreadcrumbs } from 'hooks';
@@ -11,7 +11,7 @@ import { getRepoDisplayName } from 'libs/repo';
 import { ROUTES } from 'routes';
 import { useGetProjectRepoQuery } from 'services/project';
 
-import { RepoTypeEnum } from '../types';
+import { RepoTabTypeEnum, RepoTypeEnum } from '../types';
 
 export const RepositoryDetails: React.FC = () => {
     const { t } = useTranslation();
@@ -45,6 +45,24 @@ export const RepositoryDetails: React.FC = () => {
         },
     ]);
 
+    const tabs: {
+        label: string;
+        id: RepoTabTypeEnum;
+        href: string;
+    }[] = [
+        {
+            label: t('projects.run.list_page_title'),
+            id: RepoTabTypeEnum.RUNS,
+            href: ROUTES.PROJECT.DETAILS.REPOSITORIES.DETAILS.FORMAT(paramProjectName, paramRepoId),
+        },
+
+        {
+            label: t('projects.tag.list_page_title'),
+            id: RepoTabTypeEnum.TAGS,
+            href: ROUTES.PROJECT.DETAILS.TAGS.FORMAT(paramProjectName, paramRepoId),
+        },
+    ];
+
     return (
         <ContentLayout header={<DetailsHeader title={displayRepoName} />}>
             <SpaceBetween size="l">
@@ -71,6 +89,8 @@ export const RepositoryDetails: React.FC = () => {
                         </ColumnLayout>
                     </Container>
                 )}
+
+                <Tabs withNavigation tabs={tabs} />
 
                 <Outlet />
             </SpaceBetween>
