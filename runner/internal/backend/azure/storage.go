@@ -99,6 +99,9 @@ func (azstorage AzureStorage) GetMetadata(ctx context.Context, key string, tag s
 	if err != nil {
 		return "", gerrors.Wrap(err)
 	}
+	// azure-sdk-for-go seems to capitalize metadata key
+	// https://github.com/Azure/azure-sdk-for-go/issues/17850
+	tag = strings.ToUpper(tag[:1]) + tag[1:]
 	if value, ok := properties.Metadata[tag]; ok {
 		return strings.Clone(*value), nil
 	}
