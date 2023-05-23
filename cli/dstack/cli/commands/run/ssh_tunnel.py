@@ -56,23 +56,10 @@ def allocate_local_ports(jobs: List[Job]) -> Dict[int, int]:
     return ports
 
 
-def make_ssh_tunnel_args(
-    ssh_key: PathLike, hostname: str, ports: Dict[int, int], backend_type: str
-) -> List[str]:
-    username = "root"
-    if backend_type == "azure":
-        # root login is disabled on azure
-        # TODO: use non-root for all backends
-        username = "ubuntu"
+def make_ssh_tunnel_args(run_name: str, ports: Dict[int, int]) -> List[str]:
     args = [
         "ssh",
-        "-o",
-        "StrictHostKeyChecking=no",
-        "-o",
-        "UserKnownHostsFile=/dev/null",
-        "-i",
-        str(ssh_key),
-        f"{username}@{hostname}",
+        run_name,
         "-N",
         "-f",
     ]
@@ -81,10 +68,8 @@ def make_ssh_tunnel_args(
     return args
 
 
-def run_ssh_tunnel(
-    ssh_key: PathLike, hostname: str, ports: Dict[int, int], backend_type: str
-) -> bool:
-    args = make_ssh_tunnel_args(ssh_key, hostname, ports, backend_type)
+def run_ssh_tunnel(run_name: str, ports: Dict[int, int]) -> bool:
+    args = make_ssh_tunnel_args(run_name, ports)
     return (
         subprocess.run(args, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL).returncode == 0
     )

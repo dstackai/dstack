@@ -21,6 +21,10 @@ class ConfigManager:
         self.home = Path(home).expanduser().resolve()
         self._cache: Dict[str, BaseModel] = {}
 
+    @property
+    def ssh_config(self) -> Path:
+        return self.home / "ssh_config"
+
     def dstack_key_path(self, repo_dir: Optional[PathLike] = None) -> Path:
         return self.home / "dstack_rsa"
 
