@@ -349,7 +349,7 @@ class Job(JobHead):
         app_specs = (
             [
                 AppSpec(
-                    port=a["port"],
+                    port=a.get("port", 0),
                     map_to_port=a.get("map_to_port"),
                     app_name=a["app_name"],
                     url_path=a.get("url_path") or None,
