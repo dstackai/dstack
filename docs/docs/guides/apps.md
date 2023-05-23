@@ -58,7 +58,7 @@ To interrupt, press Ctrl+C.
 INFO:     Started server process [1]
 INFO:     Waiting for application startup.
 INFO:     Application startup complete.
-INFO:     Uvicorn running on http://127.0.0.1:63475 (Press CTRL+C to quit)
+INFO:     Uvicorn running on http://127.0.0.1:3000 (Press CTRL+C to quit)
 ```
 
 </div>
@@ -72,6 +72,11 @@ For convenience, `dstack` uses an exact copy of the source code that is locally 
 
 If you configure a project to run apps in the cloud, `dstack` will automatically provision the
 required cloud resources, and forward ports of the app to your local machine.
+
+!!! info "NOTE:"
+    By default, `dstack` tries to map the application ports to the same local ports. However, you can specify which local
+    ports to map the application ports to. For example, if you want to access the application port `3000` 
+    on `127.0.0.1:3001`, you have to pass `3000:3001` to `ports`.
 
 ??? info "Projects"
     The default project runs apps locally. However, you can

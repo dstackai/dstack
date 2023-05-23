@@ -50,7 +50,7 @@ Starting SSH tunnel...
 
 To exit, press Ctrl+C.
 
-Web UI available at http://127.0.0.1:51845/?tkn=4d9cc05958094ed2996b6832f899fda1
+Web UI available at http://127.0.0.1:10000/?tkn=4d9cc05958094ed2996b6832f899fda1
 ```
 
 </div>

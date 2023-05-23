@@ -61,10 +61,10 @@ plugins:
       blog_dir: blog
       blog_toc: true
   - social:
-      cards_color:
-        fill: "black"
-        text: "#FFFFFF"
-      cards_font: Roboto
+      cards_layout_options:
+        background_color: "black"
+        color: "#FFFFFF"
+        font_family: Roboto
   - search
   - redirects:
       redirect_maps:
