@@ -1,4 +1,3 @@
-import asyncio
 from typing import List, Tuple
 
 from fastapi import APIRouter, Body, Depends, HTTPException, status
@@ -22,6 +21,7 @@ from dstack.hub.security.permissions import (
     ensure_user_project_admin,
 )
 from dstack.hub.services.backends.base import BackendConfigError
+from dstack.hub.utils.common import run_async
 
 router = APIRouter(prefix="/api/projects", tags=["project"])
 
@@ -33,9 +33,7 @@ async def get_backend_config_values(
 ) -> ProjectValues:
     configurator = get_backend_configurator(config.__root__.type)
     try:
-        result = await asyncio.get_running_loop().run_in_executor(
-            None, configurator.configure_project, config.__root__.dict()
-        )
+        result = await run_async(configurator.configure_project, config.__root__.dict())
     except BackendConfigError as e:
         _error_response_on_config_error(e, path_to_config=[])
     return result
@@ -64,9 +62,7 @@ async def create_project(
         )
     configurator = get_backend_configurator(project_info.backend.__root__.type)
     try:
-        await asyncio.get_running_loop().run_in_executor(
-            None, configurator.configure_project, project_info.backend.__root__.dict()
-        )
+        await run_async(configurator.configure_project, project_info.backend.__root__.dict())
     except BackendConfigError as e:
         _error_response_on_config_error(e, path_to_config=["backend"])
     await ProjectManager.create_project_from_info(user=user, project_info=project_info)
@@ -117,9 +113,7 @@ async def update_project(
 ) -> ProjectInfoWithCreds:
     configurator = get_backend_configurator(project_info.backend.__root__.type)
     try:
-        await asyncio.get_running_loop().run_in_executor(
-            None, configurator.configure_project, project_info.backend.__root__.dict()
-        )
+        await run_async(configurator.configure_project, project_info.backend.__root__.dict())
     except BackendConfigError as e:
         _error_response_on_config_error(e, path_to_config=["backend"])
     await ProjectManager.update_project_from_info(project_info)

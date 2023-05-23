@@ -11,6 +11,7 @@ from dstack.hub.models import RunsDelete, RunsList, RunsStop
 from dstack.hub.routers.cache import get_backend
 from dstack.hub.routers.util import error_detail, get_project
 from dstack.hub.security.permissions import ProjectMember
+from dstack.hub.utils.common import run_async
 
 router = APIRouter(prefix="/api/project", tags=["runs"], dependencies=[Depends(ProjectMember())])
 
@@ -23,7 +24,7 @@ router = APIRouter(prefix="/api/project", tags=["runs"], dependencies=[Depends(P
 async def create_run(project_name: str, repo_ref: RepoRef) -> str:
     project = await get_project(project_name=project_name)
     backend = get_backend(project)
-    run_name = backend.create_run(repo_ref.repo_id)
+    run_name = await run_async(backend.create_run, repo_ref.repo_id)
     return run_name
 
 
@@ -33,11 +34,12 @@ async def create_run(project_name: str, repo_ref: RepoRef) -> str:
 async def list_runs(project_name: str, body: RunsList) -> List[RunHead]:
     project = await get_project(project_name=project_name)
     backend = get_backend(project)
-    run_heads = backend.list_run_heads(
-        repo_id=body.repo_id,
-        run_name=body.run_name,
-        include_request_heads=body.include_request_heads,
-        interrupted_job_new_status=JobStatus.PENDING,
+    run_heads = await run_async(
+        backend.list_run_heads,
+        body.repo_id,
+        body.run_name,
+        body.include_request_heads,
+        JobStatus.PENDING,
     )
     return run_heads
 
@@ -50,14 +52,15 @@ async def stop_runs(project_name: str, body: RunsStop):
     backend = get_backend(project)
     run_heads: List[RunHead] = []
     for run_name in body.run_names:
-        run_head = _get_run_head(backend, body.repo_id, run_name)
+        run_head = await _get_run_head(backend, body.repo_id, run_name)
         run_heads.append(run_head)
     for run_head in run_heads:
         for job_head in run_head.job_heads:
-            backend.stop_job(
-                repo_id=body.repo_id,
-                job_id=job_head.job_id,
-                abort=body.abort,
+            await run_async(
+                backend.stop_job,
+                body.repo_id,
+                job_head.job_id,
+                body.abort,
             )
 
 
@@ -69,7 +72,7 @@ async def delete_runs(project_name: str, body: RunsDelete):
     backend = get_backend(project)
     run_heads: List[RunHead] = []
     for run_name in body.run_names:
-        run_head = _get_run_head(backend, body.repo_id, run_name)
+        run_head = await _get_run_head(backend, body.repo_id, run_name)
         if run_head.status.is_unfinished():
             raise HTTPException(
                 status_code=status.HTTP_400_BAD_REQUEST,
@@ -82,17 +85,19 @@ async def delete_runs(project_name: str, body: RunsDelete):
         run_heads.append(run_head)
     for run_head in run_heads:
         for job_head in run_head.job_heads:
-            backend.delete_job_head(
-                repo_id=body.repo_id,
-                job_id=job_head.job_id,
+            await run_async(
+                backend.delete_job_head,
+                body.repo_id,
+                job_head.job_id,
             )
 
 
-def _get_run_head(backend: Backend, repo_id: str, run_name: str) -> RunHead:
-    run_head = backend.get_run_head(
-        repo_id=repo_id,
-        run_name=run_name,
-        include_request_heads=False,
+async def _get_run_head(backend: Backend, repo_id: str, run_name: str) -> RunHead:
+    run_head = await run_async(
+        backend.get_run_head,
+        repo_id,
+        run_name,
+        False,
     )
     if run_head is not None:
         return run_head

@@ -1,10 +1,10 @@
-import asyncio
 from typing import List
 
 from dstack.core.job import JobStatus
 from dstack.hub.db.models import Project
 from dstack.hub.repository.projects import ProjectManager
 from dstack.hub.routers.cache import get_backend
+from dstack.hub.utils.common import run_async
 from dstack.utils.common import get_milliseconds_since_epoch
 
 RESUBMISSION_INTERVAL = 60
@@ -12,7 +12,7 @@ RESUBMISSION_INTERVAL = 60
 
 async def resubmit_jobs():
     projects = await ProjectManager.list()
-    await asyncio.get_running_loop().run_in_executor(None, _resubmit_projects_jobs, projects)
+    await run_async(_resubmit_projects_jobs, projects)
 
 
 def _resubmit_projects_jobs(projects: List[Project]):
