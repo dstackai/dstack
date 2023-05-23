@@ -1,12 +1,10 @@
 ---
 date: 2023-04-11
-authors:
-  - peterschmidt85
 description: A new tool for teams to manage their ML workflows.
 slug: "introducing-dstack-hub"
 ---
 
-# dstack 0.7: Hub preview
+# dstack 0.7: Hub Preview
 
 __A preview of the new tool for teams to manage their ML workflows.__
 

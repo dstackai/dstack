@@ -1,12 +1,10 @@
 ---
 date: 2023-03-13
-authors: 
-  - peterschmidt85
 description: The latest update of dstack now supports Google Cloud Platform (GCP).
 slug: "gcp-support-just-landed"
 ---
 
-# dstack 0.2: GCP support just landed
+# dstack 0.2: GCP Support just Landed
 
 __The latest update of dstack now supports Google Cloud Platform (GCP).__
 

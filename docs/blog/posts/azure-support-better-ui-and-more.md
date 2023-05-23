@@ -1,12 +1,10 @@
 ---
 date: 2023-05-22
-authors: 
-  - peterschmidt85
 description: The latest update introduces Azure support, enables browsing of logs and artifacts through UI, and includes other improvements.
 slug: azure-support-better-ui-and-more
 ---
 
-# dstack 0.9.1: Azure, better UI and more
+# dstack 0.9.1: Azure, Better UI and More
 
 __The latest update introduces Azure support, and includes other improvements.__
 
@@ -48,7 +46,6 @@ emphasis on specific use cases: [dev environments](../../docs/guides/dev-environ
 Please note that when installing `dstack` via `pip`, you now need to specify the exact list of cloud providers you intend to use:
 
 <div class="termy">
-
 
 ```shell
 $ pip install "dstack[aws,gcp,azure]" -U
