@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useParams } from 'react-router-dom';
 import { format } from 'date-fns';
@@ -16,16 +16,19 @@ import {
 } from 'components';
 
 import { DATE_TIME_FORMAT } from 'consts';
-import { useCollection } from 'hooks';
+import { useCollection, useNotifications } from 'hooks';
 import { getStatusIconType } from 'libs/run';
 import { ROUTES } from 'routes';
-import { useGetRunsQuery } from 'services/run';
+import { useDeleteRunsMutation, useGetRunsQuery, useStopRunsMutation } from 'services/run';
+
+import { isAvailableAbortingForRun, isAvailableDeletingForRun, isAvailableStoppingForRun } from '../utils';
 
 export const RunList: React.FC = () => {
     const { t } = useTranslation();
     const params = useParams();
     const paramProjectName = params.name ?? '';
     const paramRepoId = params.repoId ?? '';
+    const [pushNotification] = useNotifications();
 
     const { data, isLoading } = useGetRunsQuery(
         {
@@ -36,6 +39,9 @@ export const RunList: React.FC = () => {
             pollingInterval: 10000,
         },
     );
+
+    const [stopRun, { isLoading: isStopping }] = useStopRunsMutation();
+    const [deleteRun, { isLoading: isDeleting }] = useDeleteRunsMutation();
 
     const COLUMN_DEFINITIONS = [
         {
@@ -49,7 +55,7 @@ export const RunList: React.FC = () => {
         },
         {
             id: 'workflow_name',
-            header: `${t('projects.run.workflow_name')}/${t('projects.run.provider_name')}`,
+            header: `${t('projects.run.workflow_name')}`,
             cell: (item: IRun) => item.workflow_name ?? item.provider_name,
         },
         {
@@ -100,6 +106,81 @@ export const RunList: React.FC = () => {
         selection: {},
     });
 
+    const { selectedItems } = collectionProps;
+
+    const abortClickHandle = () => {
+        if (!selectedItems?.length) return;
+
+        stopRun({
+            name: paramProjectName,
+            repo_id: paramRepoId,
+            run_names: selectedItems.map((item) => item.run_name),
+            abort: true,
+        })
+            .unwrap()
+            .then(() => actions.setSelectedItems([]))
+            .catch((error) => {
+                pushNotification({
+                    type: 'error',
+                    content: t('common.server_error', { error: error?.error }),
+                });
+            });
+    };
+
+    const stopClickHandle = () => {
+        if (!selectedItems?.length) return;
+
+        stopRun({
+            name: paramProjectName,
+            repo_id: paramRepoId,
+            run_names: selectedItems.map((item) => item.run_name),
+            abort: false,
+        })
+            .unwrap()
+            .then(() => actions.setSelectedItems([]))
+            .catch((error) => {
+                pushNotification({
+                    type: 'error',
+                    content: t('common.server_error', { error: error?.error }),
+                });
+            });
+    };
+
+    const deleteClickHandle = () => {
+        if (!selectedItems?.length) return;
+
+        deleteRun({
+            name: paramProjectName,
+            repo_id: paramRepoId,
+            run_names: selectedItems.map((item) => item.run_name),
+        })
+            .unwrap()
+            .catch((error) => {
+                pushNotification({
+                    type: 'error',
+                    content: t('common.server_error', { error: error?.error }),
+                });
+            });
+    };
+
+    const isDisabledAbortButton = useMemo<boolean>(() => {
+        return (
+            !selectedItems?.length || selectedItems.some((item) => !isAvailableAbortingForRun(item)) || isStopping || isDeleting
+        );
+    }, [selectedItems, isStopping, isDeleting]);
+
+    const isDisabledStopButton = useMemo<boolean>(() => {
+        return (
+            !selectedItems?.length || selectedItems.some((item) => !isAvailableStoppingForRun(item)) || isStopping || isDeleting
+        );
+    }, [selectedItems, isStopping, isDeleting]);
+
+    const isDisabledDeleteButton = useMemo<boolean>(() => {
+        return (
+            !selectedItems?.length || selectedItems.some((item) => !isAvailableDeletingForRun(item)) || isStopping || isDeleting
+        );
+    }, [selectedItems, isStopping, isDeleting]);
+
     return (
         <Table
             {...collectionProps}
@@ -113,13 +194,17 @@ export const RunList: React.FC = () => {
                 <Header
                     actions={
                         <SpaceBetween size="xs" direction="horizontal">
-                            {/*<Button formAction="none" disabled>*/}
-                            {/*    {t('common.stop')}*/}
-                            {/*</Button>*/}
+                            <Button formAction="none" onClick={abortClickHandle} disabled={isDisabledAbortButton}>
+                                {t('common.abort')}
+                            </Button>
 
-                            {/*<Button formAction="none" disabled>*/}
-                            {/*    {t('common.delete')}*/}
-                            {/*</Button>*/}
+                            <Button formAction="none" onClick={stopClickHandle} disabled={isDisabledStopButton}>
+                                {t('common.stop')}
+                            </Button>
+
+                            <Button formAction="none" onClick={deleteClickHandle} disabled={isDisabledDeleteButton}>
+                                {t('common.delete')}
+                            </Button>
                         </SpaceBetween>
                     }
                 >

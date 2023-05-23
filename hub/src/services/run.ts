@@ -4,7 +4,7 @@ import { fetchBaseQuery } from '@reduxjs/toolkit/query/react';
 
 import fetchBaseQueryHeaders from 'libs/fetchBaseQueryHeaders';
 
-import { RunsRequestParams } from './run.types';
+import { DeleteRunsRequestParams, RunsRequestParams, StopRunsRequestParams } from './run.types';
 
 export const runApi = createApi({
     reducerPath: 'runApi',
@@ -41,7 +41,27 @@ export const runApi = createApi({
 
             providesTags: (result) => (result ? [{ type: 'Runs' as const, id: result?.run_name }] : []),
         }),
+
+        stopRuns: builder.mutation<void, StopRunsRequestParams>({
+            query: ({ name, ...body }) => ({
+                url: API.PROJECTS.RUNS_STOP(name),
+                method: 'POST',
+                body,
+            }),
+
+            invalidatesTags: (result, error, params) => params.run_names.map((run) => ({ type: 'Runs' as const, id: run })),
+        }),
+
+        deleteRuns: builder.mutation<void, DeleteRunsRequestParams>({
+            query: ({ name, ...body }) => ({
+                url: API.PROJECTS.RUNS_DELETE(name),
+                method: 'POST',
+                body,
+            }),
+
+            invalidatesTags: (result, error, params) => params.run_names.map((run) => ({ type: 'Runs' as const, id: run })),
+        }),
     }),
 });
 
-export const { useGetRunsQuery, useGetRunQuery } = runApi;
+export const { useGetRunsQuery, useGetRunQuery, useStopRunsMutation, useDeleteRunsMutation } = runApi;

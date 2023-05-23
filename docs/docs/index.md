@@ -10,7 +10,7 @@ To use `dstack`, install it with `pip` and start the Hub server.
 <div class="termy">
 
 ```shell
-$ pip install dstack
+$ pip install "dstack[aws,gcp,azure]"
 $ dstack start
 
 The Hub is available at http://127.0.0.1:3000?token=b934d226-e24a-4eab-eb92b353b10f

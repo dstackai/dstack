@@ -31,7 +31,7 @@ on any cloud.
 To use `dstack`, install it with `pip` and start the Hub application.
 
 ```shell
-pip install dstack
+pip install "dstack[aws,gcp,azure]"
 dstack start
 ```
 
