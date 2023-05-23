@@ -174,9 +174,8 @@ workflows:
 
 ## Exposing ports
 
-If you want the pipeline to serve web apps, specify the number of ports via the 
-[`ports`](../reference/providers/bash.md#ports) property. They'll be
-passed to the run as environment variables like `PORT_0`, `PORT_1`, etc.
+If you want the pipeline to serve web apps, specify the list of ports via the 
+[`ports`](../reference/providers/bash.md#ports) property.
 
 <div editor-title=".dstack/workflows/pipelines.yaml"> 
 
@@ -184,10 +183,11 @@ passed to the run as environment variables like `PORT_0`, `PORT_1`, etc.
 workflows:
   - name: train-mnist-gpu
     provider: bash
-    ports: 1
+    ports:
+      - 6006
     commands:
       - pip install -r requirements.txt
-      - tensorboard --port $PORT_0 --host 0.0.0.0 --logdir ./lightning_logs &
+      - tensorboard --port 6006 --host 0.0.0.0 --logdir ./lightning_logs &
       - python train.py
     artifacts:
       - path: ./lightning_logs

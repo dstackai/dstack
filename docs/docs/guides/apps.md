@@ -16,10 +16,11 @@ A configuration can be defined as a YAML file (under the `.dstack/workflows` dir
 workflows:
   - name: fastapi-gpu
     provider: bash
-    ports: 1
+    ports:
+      - 3000
     commands:
       - pip install -r apps/requirements.txt
-      - uvicorn apps.main:app --port $PORT_0 --host 0.0.0.0
+      - uvicorn apps.main:app --port 3000 --host 0.0.0.0
     resources:
       gpu:
         count: 1
@@ -30,15 +31,12 @@ workflows:
 The [configuration](../reference/providers/bash.md) allows you to customize hardware resources, set up the Python environment, 
 and more.
 
-To configure ports, you have to specify the number of ports via the 
-[`ports`](../reference/providers/bash.md#ports) property. They'll be
-passed to the run as environment variables like `PORT_0`, `PORT_1`, etc.
+To configure ports, you have to specify the list of ports via the 
+[`ports`](../reference/providers/bash.md#ports) property.
 
 [//]: # (TODO [MEDIUM]: It doesn't explain how to mount deps)
 
 [//]: # (TODO [MAJOR]: It supports only YAML and doesn't allow to use pure Python)
-
-[//]: # (TODO [MAJOR]: It's not convenient to use dstack environment variables for ports)
 
 [//]: # (TODO [MAJOR]: Currently, it requires the user to hardcode `--host 0.0.0.0`)
 
@@ -99,10 +97,11 @@ request hardware resources like memory, GPUs, and shared memory size.
 workflows:
   - name: fastapi-gpu-i
     provider: bash
-    ports: 1
+    ports:
+      - 3000
     commands:
       - pip install -r apps/requirements.txt
-      - uvicorn apps.main:app --port $PORT_0 --host 0.0.0.0
+      - uvicorn apps.main:app --port 3000 --host 0.0.0.0
     resources:
       gpu:
         count: 1
@@ -135,10 +134,11 @@ workflows:
   - name: fastapi-docker
     provider: docker
     image: python:3.11
-    ports: 1
+    ports:
+      - 3000
     commands:
       - pip install -r apps/requirements.txt
-      - uvicorn apps.main:app --port $PORT_0 --host 0.0.0.0
+      - uvicorn apps.main:app --port 3000 --host 0.0.0.0
 ```
 
 </div>
@@ -155,10 +155,11 @@ which paths to cache between runs.
 workflows:
   - name: fastapi-cached
     provider: bash
-    ports: 1
+    ports:
+      - 3000
     commands:
       - pip install -r apps/requirements.txt
-      - uvicorn apps.main:app --port $PORT_0 --host 0.0.0.0
+      - uvicorn apps.main:app --port 3000 --host 0.0.0.0
     cache:
       - path: ~/.cache/pip
 ```
