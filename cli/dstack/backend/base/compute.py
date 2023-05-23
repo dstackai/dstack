@@ -7,6 +7,8 @@ from dstack.core.job import Job, Requirements
 from dstack.core.request import RequestHead
 from dstack.core.runners import Resources
 
+WS_PORT = 10999
+
 
 class ComputeError(Exception):
     pass

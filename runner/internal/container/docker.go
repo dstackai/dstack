@@ -44,6 +44,7 @@ type Spec struct {
 	ShmSize            int64
 	LocalPortsRange    string
 	Runtime            string
+	AllowHostMode      bool
 }
 
 var _ = Container((*Docker)(nil))

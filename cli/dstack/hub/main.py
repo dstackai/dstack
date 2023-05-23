@@ -53,7 +53,7 @@ app.include_router(link.router)
 app.include_router(workflows.router)
 
 
-DEFAULT_PROJECT_NAME = "default"
+DEFAULT_PROJECT_NAME = "local"
 
 
 @app.on_event("startup")
@@ -110,9 +110,11 @@ def create_default_project_config(url: str, token: str):
     cli_config_manager = CLIConfigManager()
     default_project_config = cli_config_manager.get_default_project_config()
     project_config = cli_config_manager.get_project_config(DEFAULT_PROJECT_NAME)
-    if project_config is None:
+    # "default" is old name for "local"
+    default = default_project_config is None or default_project_config.name == "default"
+    if project_config is None or default_project_config is None:
         cli_config_manager.configure_project(
-            name=DEFAULT_PROJECT_NAME, url=url, token=token, default=default_project_config is None
+            name=DEFAULT_PROJECT_NAME, url=url, token=token, default=default
         )
         cli_config_manager.save()
         return

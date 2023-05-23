@@ -73,7 +73,7 @@ Starting SSH tunnel...
 
 To exit, press Ctrl+C.
 
-Web UI available at http://127.0.0.1:51845/?tkn=4d9cc05958094ed2996b6832f899fda1
+Web UI available at http://127.0.0.1:10000/?tkn=4d9cc05958094ed2996b6832f899fda1
 ```
 
 If you configure a project to run dev environments in the cloud, `dstack` will automatically provision the
@@ -136,10 +136,11 @@ Go ahead and define this configuration via YAML (under the `.dstack/workflows` f
 workflows:
   - name: fastapi-gpu
     provider: bash
-    ports: 1
+    ports:
+      - 3000
     commands:
       - pip install -r apps/requirements.txt
-      - uvicorn apps.main:app --port $PORT_0 --host 0.0.0.0
+      - uvicorn apps.main:app --port 3000 --host 0.0.0.0
     resources:
       gpu:
         count: 1
@@ -162,7 +163,7 @@ To interrupt, press Ctrl+C.
 INFO:     Started server process [1]
 INFO:     Waiting for application startup.
 INFO:     Application startup complete.
-INFO:     Uvicorn running on http://127.0.0.1:63475 (Press CTRL+C to quit)
+INFO:     Uvicorn running on http://127.0.0.1:3000 (Press CTRL+C to quit)
 ```
 
 If you configure a project to run apps in the cloud, `dstack` will automatically provision the required cloud

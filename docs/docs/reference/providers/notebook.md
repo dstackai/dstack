@@ -40,6 +40,7 @@ The following properties are optional:
 - `environment` - (Optional) The list of environment variables 
 - [`artifacts`](#artifacts) - (Optional) The list of output artifacts
 - [`resources`](#resources) - (Optional) The hardware resources required by the workflow
+- [`ports`](#ports) - (Optional) The list of ports to expose
 - `working_dir` - (Optional) The path to the working directory
 - `ssh` - (Optional) Runs SSH server in the container if `true`
 - [`cache`](#cache) - (Optional) The list of directories to cache between runs
@@ -83,3 +84,12 @@ The number of GPUs, their name and memory
 The list of directories to cache between runs
 
 - `path` – (Required) The relative path of the folder that must be cached
+
+### Ports
+
+If you'd like your workflow to expose ports, you have to specify the `ports` property with the list
+of ports to expose. You could specify a mapping `APP_PORT:LOCAL_PORT` or just `APP_PORT` — in this
+case dstack will choose available `LOCAL_PORT` for you.
+
+!!! info "NOTE:"
+    Ports range `10000-10999` is reserved for dstack needs. However, you could remap them to different `LOCAL_PORT`s.

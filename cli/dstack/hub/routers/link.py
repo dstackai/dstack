@@ -7,6 +7,7 @@ from dstack.hub.models import StorageLink
 from dstack.hub.routers.cache import get_backend
 from dstack.hub.routers.util import get_project
 from dstack.hub.security.permissions import ProjectMember
+from dstack.hub.utils.common import run_async
 
 router = APIRouter(prefix="/api/project", tags=["link"], dependencies=[Depends(ProjectMember())])
 
@@ -31,7 +32,8 @@ async def link_upload(
                 token=token.credentials,
             )
         )
-    return backend.get_signed_upload_url(object_key=body.object_key)
+    url = await run_async(backend.get_signed_upload_url, body.object_key)
+    return url
 
 
 @router.post(
@@ -55,4 +57,5 @@ async def link_download(
                 token=token.credentials,
             )
         )
-    return backend.get_signed_download_url(object_key=body.object_key)
+    url = await run_async(backend.get_signed_download_url, body.object_key)
+    return url

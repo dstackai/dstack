@@ -6,6 +6,7 @@ from dstack.hub.models import StopRunners
 from dstack.hub.routers.cache import get_backend
 from dstack.hub.routers.util import error_detail, get_project
 from dstack.hub.security.permissions import ProjectMember
+from dstack.hub.utils.common import run_async
 
 router = APIRouter(
     prefix="/api/project", tags=["runners"], dependencies=[Depends(ProjectMember())]
@@ -17,7 +18,7 @@ async def run_runners(project_name: str, job: Job):
     project = await get_project(project_name=project_name)
     backend = get_backend(project)
     try:
-        backend.run_job(job=job, failed_to_start_job_new_status=JobStatus.PENDING)
+        await run_async(backend.run_job, job, JobStatus.PENDING)
     except NoMatchingInstanceError as e:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
@@ -29,4 +30,4 @@ async def run_runners(project_name: str, job: Job):
 async def stop_runners(project_name: str, body: StopRunners):
     project = await get_project(project_name=project_name)
     backend = get_backend(project)
-    backend.stop_job(body.repo_id, abort=body.abort, job_id=body.job_id)
+    await run_async(backend.stop_job, body.repo_id, body.abort, body.job_id)

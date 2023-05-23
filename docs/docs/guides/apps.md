@@ -16,10 +16,11 @@ A configuration can be defined as a YAML file (under the `.dstack/workflows` dir
 workflows:
   - name: fastapi-gpu
     provider: bash
-    ports: 1
+    ports:
+      - 3000
     commands:
       - pip install -r apps/requirements.txt
-      - uvicorn apps.main:app --port $PORT_0 --host 0.0.0.0
+      - uvicorn apps.main:app --port 3000 --host 0.0.0.0
     resources:
       gpu:
         count: 1
@@ -30,15 +31,12 @@ workflows:
 The [configuration](../reference/providers/bash.md) allows you to customize hardware resources, set up the Python environment, 
 and more.
 
-To configure ports, you have to specify the number of ports via the 
-[`ports`](../reference/providers/bash.md#ports) property. They'll be
-passed to the run as environment variables like `PORT_0`, `PORT_1`, etc.
+To configure ports, you have to specify the list of ports via the 
+[`ports`](../reference/providers/bash.md#ports) property.
 
 [//]: # (TODO [MEDIUM]: It doesn't explain how to mount deps)
 
 [//]: # (TODO [MAJOR]: It supports only YAML and doesn't allow to use pure Python)
-
-[//]: # (TODO [MAJOR]: It's not convenient to use dstack environment variables for ports)
 
 [//]: # (TODO [MAJOR]: Currently, it requires the user to hardcode `--host 0.0.0.0`)
 
@@ -60,7 +58,7 @@ To interrupt, press Ctrl+C.
 INFO:     Started server process [1]
 INFO:     Waiting for application startup.
 INFO:     Application startup complete.
-INFO:     Uvicorn running on http://127.0.0.1:63475 (Press CTRL+C to quit)
+INFO:     Uvicorn running on http://127.0.0.1:3000 (Press CTRL+C to quit)
 ```
 
 </div>
@@ -74,6 +72,11 @@ For convenience, `dstack` uses an exact copy of the source code that is locally 
 
 If you configure a project to run apps in the cloud, `dstack` will automatically provision the
 required cloud resources, and forward ports of the app to your local machine.
+
+!!! info "NOTE:"
+    By default, `dstack` tries to map the application ports to the same local ports. However, you can specify which local
+    ports to map the application ports to. For example, if you want to access the application port `3000` 
+    on `127.0.0.1:3001`, you have to pass `3000:3001` to `ports`.
 
 ??? info "Projects"
     The default project runs apps locally. However, you can
@@ -99,10 +102,11 @@ request hardware resources like memory, GPUs, and shared memory size.
 workflows:
   - name: fastapi-gpu-i
     provider: bash
-    ports: 1
+    ports:
+      - 3000
     commands:
       - pip install -r apps/requirements.txt
-      - uvicorn apps.main:app --port $PORT_0 --host 0.0.0.0
+      - uvicorn apps.main:app --port 3000 --host 0.0.0.0
     resources:
       gpu:
         count: 1
@@ -135,10 +139,11 @@ workflows:
   - name: fastapi-docker
     provider: docker
     image: python:3.11
-    ports: 1
+    ports:
+      - 3000
     commands:
       - pip install -r apps/requirements.txt
-      - uvicorn apps.main:app --port $PORT_0 --host 0.0.0.0
+      - uvicorn apps.main:app --port 3000 --host 0.0.0.0
 ```
 
 </div>
@@ -155,10 +160,11 @@ which paths to cache between runs.
 workflows:
   - name: fastapi-cached
     provider: bash
-    ports: 1
+    ports:
+      - 3000
     commands:
       - pip install -r apps/requirements.txt
-      - uvicorn apps.main:app --port $PORT_0 --host 0.0.0.0
+      - uvicorn apps.main:app --port 3000 --host 0.0.0.0
     cache:
       - path: ~/.cache/pip
 ```

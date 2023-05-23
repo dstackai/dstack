@@ -42,7 +42,7 @@ The following properties are optional:
 - `environment` - (Optional) The list of environment variables 
 - [`artifacts`](#artifacts) - (Optional) The list of output artifacts
 - [`resources`](#resources) - (Optional) The hardware resources required by the workflow
-- [`ports`](#ports) - (Optional) The number of ports to expose
+- [`ports`](#ports) - (Optional) The list of ports to expose
 - `working_dir` - (Optional) The path to the working directory
 - `ssh` - (Optional) Runs SSH server in the container if `true`
 - [`cache`](#cache) - (Optional) The list of directories to cache between runs
@@ -89,9 +89,12 @@ The list of directories to cache between runs
 
 ### Ports
 
-If you'd like your workflow to expose additional ports, you have to specify the `ports` property with the number
-of ports to expose. Actual ports will be assigned on startup and passed to the workflow via the environment
-variables `PORT_<number>`.
+If you'd like your workflow to expose ports, you have to specify the `ports` property with the list
+of ports to expose. You could specify a mapping `APP_PORT:LOCAL_PORT` or just `APP_PORT` — in this
+case dstack will choose available `LOCAL_PORT` for you.
+
+!!! info "NOTE:"
+    Ports range `10000-10999` is reserved for dstack needs. However, you could remap them to different `LOCAL_PORT`s.
 
 <div editor-title=".dstack/workflows/code-example.yaml">
 
@@ -99,10 +102,11 @@ variables `PORT_<number>`.
 workflows:
   - name: app
     provider: code
-    ports: 1
+    ports:
+      - 3000
     setup: 
       - pip install -r requirements.txt
-      - gunicorn main:app --bind 0.0.0.0:$PORT_0
+      - gunicorn main:app --bind 0.0.0.0:3000
 ```
 
 </div>

@@ -50,7 +50,7 @@ Starting SSH tunnel...
 
 To exit, press Ctrl+C.
 
-Web UI available at http://127.0.0.1:51845/?tkn=4d9cc05958094ed2996b6832f899fda1
+Web UI available at http://127.0.0.1:10000/?tkn=4d9cc05958094ed2996b6832f899fda1
 ```
 
 </div>
@@ -187,16 +187,14 @@ You can use `pip` and `conda` executables to install packages and set up the env
 
 ## Exposing ports
 
-If you intend to run web apps from the dev environment, specify the number of ports using the
-[`ports`](../reference/providers/code.md#ports) property and use the ports provided to the 
-environment variables: `PORT_0`, `PORT_1`, etc.
+If you intend to run web apps from the dev environment, specify the list of ports using the
+[`ports`](../reference/providers/code.md#ports) property.
 
 [//]: # (TODO [TASK]: Requires an example, including the YAML and the output)
 
 `dstack` will automatically forward these ports to your local machine. You'll see the URLs to access each port in the
 output.
 
-[//]: # (TODO [MAJOR]: It's not convenient to use dstack environment variables for ports)
 [//]: # (TODO [MEDIUM]: It would be easier if dstack forwarded ports automatically)
 
 [//]: # (TODO [MAJOR]: Currently, it doesn't allow to hot reload changes)

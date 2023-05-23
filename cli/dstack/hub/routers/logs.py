@@ -1,22 +1,15 @@
 import itertools
 from datetime import timedelta
-from functools import partial
-from typing import Any, AsyncIterable, Callable, Coroutine, List, Mapping, Optional
+from typing import List
 
-import anyio
 from fastapi import APIRouter, Depends
-from starlette.background import BackgroundTask
-from starlette.concurrency import iterate_in_threadpool
-from starlette.responses import Response
-from starlette.types import Receive
-from starlette.types import Scope as StarletteScope
-from starlette.types import Send
 
 from dstack.core.log_event import LogEvent
 from dstack.hub.models import PollLogs
 from dstack.hub.routers.cache import get_backend
 from dstack.hub.routers.util import get_project
 from dstack.hub.security.permissions import ProjectMember
+from dstack.hub.utils.common import run_async
 from dstack.utils.common import get_current_datetime
 
 router = APIRouter(prefix="/api/project", tags=["logs"], dependencies=[Depends(ProjectMember())])
@@ -31,12 +24,8 @@ async def poll_logs(project_name: str, body: PollLogs) -> List[LogEvent]:
     start_time = body.start_time
     if start_time is None:
         start_time = get_current_datetime() - timedelta(days=30)
-    logs_generator = backend.poll_logs(
-        repo_id=body.repo_id,
-        run_name=body.run_name,
-        start_time=start_time,
-        end_time=body.end_time,
-        descending=body.descending,
+    logs_generator = await run_async(
+        backend.poll_logs, body.repo_id, body.run_name, start_time, body.end_time, body.descending
     )
     if body.prev_event_id is None:
         return list(itertools.islice(logs_generator, body.limit))
