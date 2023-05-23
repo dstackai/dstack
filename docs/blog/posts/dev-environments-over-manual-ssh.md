@@ -36,7 +36,7 @@ use it via a Jupyter notebook running on the instance.
 Finally, and even more importantly, SSH gives you direct access to the environment, allowing you to debug your code and
 have the shortest feedback loop possible.
 
-## Drawbacks of using SSH for cloud
+## Problems that SSH doesn't solve
 
 While SSH makes remote access easier, it by no means helps you set up the environment or provision cloud resources.
 
@@ -62,7 +62,7 @@ Here are some of the reasons that come to mind:
 While dev environments are growing in popularity, there is still a gap before they become the new standard for ML. At
 dstack, we aim to change this
 
-## How dstack is solving this
+## How dstack is addressing them
 
 `dstack` is an [open-source](https://github.com/dstackai/dstack) tool licensed under the Mozilla Public License 2.0 and
 works with any cloud vendor. Secondly, `dstack` focuses entirely on ML challenges. So, how does it work?
