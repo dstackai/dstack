@@ -22,11 +22,14 @@ class ConfigManager:
         self._cache: Dict[str, BaseModel] = {}
 
     @property
-    def ssh_config(self) -> Path:
-        return self.home / "ssh_config"
+    def ssh_config_path(self) -> Path:
+        return _mkdir_parent(self.home / "ssh" / "config")
+
+    def ssh_control_path(self, run_name: str) -> Path:
+        return _mkdir_parent(self.home / "ssh" / "controls" / run_name)
 
     def dstack_key_path(self, repo_dir: Optional[PathLike] = None) -> Path:
-        return self.home / "dstack_rsa"
+        return _mkdir_parent(self.home / "ssh" / "id_rsa")
 
     @property
     def repos(self) -> Path:
@@ -171,3 +174,8 @@ def _read_repo_config_or_error_with_project_name(project_name: Optional[str]) ->
     except RepoNotInitializedError as e:
         e.project_name = project_name
         raise e
+
+
+def _mkdir_parent(path: Path) -> Path:
+    path.parent.mkdir(parents=True, exist_ok=True)
+    return path

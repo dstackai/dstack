@@ -184,9 +184,9 @@ def _poll_run(
         }
         backend_type = hub_client.get_project_backend_type()
         if backend_type != "local":
-            include_ssh_config(config.ssh_config)
+            include_ssh_config(config.ssh_config_path)
             ssh_config_add_host(
-                config.ssh_config,
+                config.ssh_config_path,
                 run_name,
                 {
                     "HostName": jobs[0].host_name,
@@ -195,6 +195,9 @@ def _poll_run(
                     "IdentityFile": ssh_key,
                     "StrictHostKeyChecking": "no",
                     "UserKnownHostsFile": "/dev/null",
+                    "ControlPath": config.ssh_control_path(run_name),
+                    "ControlMaster": "auto",
+                    "ControlPersist": "10m",
                 },
             )
             console.print("Starting SSH tunnel...")
@@ -244,7 +247,7 @@ def _poll_run(
                     status = run.status.name
                     break
         console.print(f"[grey58]{status.capitalize()}[/]")
-        ssh_config_remove_host(config.ssh_config, run_name)
+        ssh_config_remove_host(config.ssh_config_path, run_name)
     except KeyboardInterrupt:
         global interrupt_count
         interrupt_count = 1
@@ -321,5 +324,5 @@ def ask_on_interrupt(hub_client: HubClient, run_name: str):
         console.print("\n[grey58]Aborting...[/]")
         hub_client.stop_jobs(run_name, abort=True)
         console.print("[grey58]Aborted[/]")
-        ssh_config_remove_host(config.ssh_config, run_name)
+        ssh_config_remove_host(config.ssh_config_path, run_name)
         exit(0)
