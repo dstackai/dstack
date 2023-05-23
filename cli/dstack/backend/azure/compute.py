@@ -1,8 +1,5 @@
 import base64
-import os
-import random
 import re
-import string
 from operator import attrgetter
 from typing import List, Optional, Tuple
 
@@ -41,7 +38,7 @@ from dstack import version
 from dstack.backend.aws.runners import _serialize_runner_yaml
 from dstack.backend.azure import utils as azure_utils
 from dstack.backend.azure.config import AzureConfig
-from dstack.backend.base.compute import Compute, choose_instance_type
+from dstack.backend.base.compute import WS_PORT, Compute, choose_instance_type
 from dstack.core.instance import InstanceType
 from dstack.core.job import Job
 from dstack.core.request import RequestHead, RequestStatus
@@ -228,7 +225,7 @@ def _get_user_data_script(azure_config: AzureConfig, job: Job, instance_type: In
 mkdir -p /root/.dstack/
 echo '{config_content}' > /root/.dstack/config.yaml
 echo '{runner_content}' > /root/.dstack/runner.yaml
-HOME=/root nohup dstack-runner --log-level 6 start --http-port 2000
+HOME=/root nohup dstack-runner --log-level 6 start --http-port {WS_PORT}
 """
 
 

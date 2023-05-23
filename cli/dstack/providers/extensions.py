@@ -17,7 +17,7 @@ class ProviderExtension(ABC):
 
 
 class OpenSSHExtension(ProviderExtension):
-    port = 2222
+    port = 10022
 
     @classmethod
     def patch_commands(cls, commands: List[str], *, ssh_pub_key: str = None, **kwargs):

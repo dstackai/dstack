@@ -7,10 +7,9 @@ import botocore.exceptions
 from botocore.client import BaseClient
 
 from dstack import version
-from dstack.backend.base.compute import NoCapacityError, choose_instance_type
+from dstack.backend.base.compute import WS_PORT, NoCapacityError, choose_instance_type
 from dstack.core.instance import InstanceType
 from dstack.core.job import Job, Requirements
-from dstack.core.repo import RepoRef
 from dstack.core.request import RequestHead, RequestStatus
 from dstack.core.runners import Gpu, Resources
 
@@ -182,7 +181,7 @@ die() {{ status=$1; shift; echo "FATAL: $*"; exit $status; }}
 EC2_PUBLIC_HOSTNAME="`wget -q -O - http://169.254.169.254/latest/meta-data/public-hostname || die \"wget public-hostname has failed: $?\"`"
 echo "hostname: $EC2_PUBLIC_HOSTNAME" >> /root/.dstack/runner.yaml
 mkdir ~/.ssh; chmod 700 ~/.ssh; echo "{ssh_key_pub}" > ~/.ssh/authorized_keys; chmod 600 ~/.ssh/authorized_keys
-HOME=/root nohup dstack-runner --log-level 6 start --http-port 2000 &
+HOME=/root nohup dstack-runner --log-level 6 start --http-port {WS_PORT} &
 """
     return user_data
 

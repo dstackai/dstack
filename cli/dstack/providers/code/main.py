@@ -14,7 +14,7 @@ from dstack.providers.ports import filter_reserved_ports, get_map_to_port
 
 
 class CodeProvider(Provider):
-    code_port = 2001
+    code_port = 10000
 
     def __init__(self):
         super().__init__("code")

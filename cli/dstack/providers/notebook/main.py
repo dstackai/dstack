@@ -14,7 +14,7 @@ from dstack.providers.ports import filter_reserved_ports, get_map_to_port
 
 
 class NotebookProvider(Provider):
-    notebook_port = 2001
+    notebook_port = 10000
 
     def __init__(self):
         super().__init__("notebook")

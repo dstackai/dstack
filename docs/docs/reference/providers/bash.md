@@ -103,7 +103,7 @@ of ports to expose. You could specify a mapping `APP_PORT:LOCAL_PORT` or just `A
 case dstack will choose available `LOCAL_PORT` for you.
 
 !!! info "NOTE:"
-    Ports range `2000–2999` is reserved for dstack needs. However, you could remap them to different `LOCAL_PORT`s.
+    Ports range `10000-10999` is reserved for dstack needs. However, you could remap them to different `LOCAL_PORT`s.
 
 <div editor-title=".dstack/workflows/app-example.yaml">
 

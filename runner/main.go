@@ -85,7 +85,7 @@ func start(logLevel int, httpPort int, configDir string) {
 		os.Exit(1)
 	}
 	if httpPort == 0 {
-		httpPort = 2000
+		httpPort = 10999
 	}
 	streamLogs := stream.New(httpPort)
 	go func() {

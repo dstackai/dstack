@@ -4,8 +4,8 @@ from typing import Dict, Iterator, List, Optional, Union
 
 from dstack.core.error import DstackError
 
-RESERVED_PORTS_START = 2000
-RESERVED_PORTS_END = 2999
+RESERVED_PORTS_START = 10000
+RESERVED_PORTS_END = 10999
 
 
 class PortReservedError(DstackError):
