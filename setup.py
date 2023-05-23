@@ -84,6 +84,7 @@ setup(
         "file-read-backwards>=3.0.0",
         "psutil>=5.0.0",
         "cryptography",
+        "filelock",
     ],
     extras_require={
         "aws": [

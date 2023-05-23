@@ -1,20 +1,21 @@
 import os
+import re
 import subprocess
+from pathlib import Path
 
+from filelock import FileLock
 from paramiko.config import SSHConfig
 
 from dstack.utils.common import PathLike
 
-ssh_config_path = os.path.expanduser("~/.ssh/config")
+default_ssh_config_path = "~/.ssh/config"
 
 
-def get_host_config(hostname: str) -> dict:
+def get_host_config(hostname: str, ssh_config_path: PathLike = default_ssh_config_path) -> dict:
+    ssh_config_path = os.path.expanduser(ssh_config_path)
     if os.path.exists(ssh_config_path):
-        with open(ssh_config_path, "r") as f:
-            config = SSHConfig()
-            with open(ssh_config_path, "r") as f:
-                config.parse(f)
-            return config.lookup(hostname)
+        config = SSHConfig.from_path(ssh_config_path)
+        return config.lookup(hostname)
     return {}
 
 
@@ -29,3 +30,51 @@ def try_ssh_key_passphrase(identity_file: PathLike, passphrase: str = "") -> boo
         stderr=subprocess.DEVNULL,
     )
     return r.returncode == 0
+
+
+def include_ssh_config(path: PathLike, ssh_config_path: PathLike = default_ssh_config_path):
+    """
+    Adds Include entry on top of the default ssh config file
+    :param path: Absolute path to config
+    :param ssh_config_path: ~/.ssh/config
+    """
+    ssh_config_path = os.path.expanduser(ssh_config_path)
+    Path(ssh_config_path).parent.mkdir(0o600, parents=True, exist_ok=True)
+    include = f"Include {path}\n"
+    with FileLock(str(ssh_config_path) + ".lock"):
+        with open(ssh_config_path, "r+") as f:
+            content = f.read()
+            if include not in content:
+                content = include + content
+            f.seek(0)
+            f.write(content)
+            f.truncate()
+            f.flush()
+
+
+def ssh_config_add_host(path: PathLike, host: str, options: dict):
+    Path(path).parent.mkdir(parents=True, exist_ok=True)
+    with FileLock(str(path) + ".lock"):
+        with open(path, "a") as f:
+            f.write(f"Host {host}\n")
+            for k, v in options.items():
+                f.write(f"    {k} {v}\n")
+            f.flush()
+
+
+def ssh_config_remove_host(path: PathLike, host: str):
+    Path(path).parent.mkdir(parents=True, exist_ok=True)
+    with FileLock(str(path) + ".lock"):
+        copy_mode = True
+        content = ""
+        with open(path, "r+") as f:
+            for line in f:
+                m = re.match(rf"^Host\s+(\S+)$", line.strip())
+                if m is not None:
+                    copy_mode = m.group(1) != host
+                if copy_mode:
+                    content += line
+            f.seek(0)
+            f.write(content)
+            f.truncate()
+            f.flush()
