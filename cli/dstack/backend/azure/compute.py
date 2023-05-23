@@ -21,6 +21,7 @@ from azure.mgmt.compute.models import (
     OSDisk,
     OSProfile,
     ResourceIdentityType,
+    ResourceSku,
     SshConfiguration,
     SshPublicKey,
     StorageAccountTypes,
@@ -140,13 +141,13 @@ class AzureCompute(Compute):
 def _get_instance_types(client: ComputeManagementClient, location: str) -> List[InstanceType]:
     instance_types = []
     vm_series_pattern = re.compile(
-        r"^(Standard_D\d+s_v3|Standard_E\d+(-\d*)?s_v4|Standard_NC\d+|Standard_NC\d+s_v3|Standard_NC\d+ads_A100_v4|Standard_NC\d+as_T4_v3)$"
+        r"^(Standard_D\d+s_v3|Standard_E\d+(-\d*)?s_v4|Standard_NC\d+|Standard_NC\d+s_v3|Standard_NC\d+as_T4_v3)$"
     )
     # Only location filter is supported currently in azure API.
     # See: https://learn.microsoft.com/en-us/python/api/azure-mgmt-compute/azure.mgmt.compute.v2021_07_01.operations.resourceskusoperations?view=azure-python#azure-mgmt-compute-v2021-07-01-operations-resourceskusoperations-list
     resources = client.resource_skus.list(filter=f"location eq '{location}'")
     for resource in resources:
-        if resource.resource_type != "virtualMachines" or len(resource.restrictions) > 0:
+        if resource.resource_type != "virtualMachines" or not _vm_type_available(resource):
             continue
         if re.match(vm_series_pattern, resource.name) is None:
             continue
@@ -168,6 +169,16 @@ def _get_instance_types(client: ComputeManagementClient, location: str) -> List[
             )
         )
     return instance_types
+
+
+def _vm_type_available(vm_resource: ResourceSku) -> bool:
+    if len(vm_resource.restrictions) == 0:
+        return True
+    # If a VM type is restricted in "Zone", it is still available in other zone.
+    # Otherwise the restriction type is "Location"
+    if vm_resource.restrictions[0].type == "Zone":
+        return True
+    return False
 
 
 def _get_gpu_name_memory(vm_name: str) -> Tuple[int, str]:
