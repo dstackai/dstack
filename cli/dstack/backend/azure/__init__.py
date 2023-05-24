@@ -33,11 +33,14 @@ class AzureBackend(Backend):
 
     def __init__(self, backend_config: AzureConfig):
         super().__init__(backend_config=backend_config)
-        credential = ClientSecretCredential(
-            tenant_id=backend_config.tenant_id,
-            client_id=backend_config.credentials["client_id"],
-            client_secret=backend_config.credentials["client_secret"],
-        )
+        if backend_config.credentials["type"] == "client":
+            credential = ClientSecretCredential(
+                tenant_id=backend_config.tenant_id,
+                client_id=backend_config.credentials["client_id"],
+                client_secret=backend_config.credentials["client_secret"],
+            )
+        else:
+            credential = DefaultAzureCredential()
         self._secrets_manager = AzureSecretsManager(
             credential=credential,
             vault_url=self.backend_config.vault_url,

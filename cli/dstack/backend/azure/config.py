@@ -56,10 +56,7 @@ class AzureConfig(BackendConfig):
             vault_url = data["vault_url"]
             network = data["network"]
             subnet = data["subnet"]
-            credentials = {
-                "client_id": data["client_id"],
-                "client_secret": data["client_secret"],
-            }
+            credentials = data["credentials"]
         except KeyError:
             return None
 

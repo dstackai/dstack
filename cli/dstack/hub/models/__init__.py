@@ -102,19 +102,30 @@ class GCPProjectConfigWithCreds(GCPProjectConfig, GCPProjectCreds):
 
 class AzureProjectConfigPartial(BaseModel):
     type: Literal["azure"] = "azure"
-    tenant_id: str
+    tenant_id: Optional[str]
     subscription_id: Optional[str]
     location: Optional[str]
     storage_account: Optional[str]
 
 
-class AzureProjectCreds(BaseModel):
+class AzureProjectClientCreds(BaseModel):
+    type: Literal["client"] = "client"
     client_id: str
     client_secret: str
 
 
-class AzureProjectConfigWithCredsPartial(AzureProjectConfigPartial, AzureProjectCreds):
-    pass
+class AzureProjectDefaultCreds(BaseModel):
+    type: Literal["default"] = "default"
+
+
+class AzureProjectCreds(BaseModel):
+    __root__: Union[AzureProjectClientCreds, AzureProjectDefaultCreds] = Field(
+        ..., discriminator="type"
+    )
+
+
+class AzureProjectConfigWithCredsPartial(AzureProjectConfigPartial):
+    credentials: Optional[AzureProjectCreds]
 
 
 class AzureProjectConfig(BaseModel):
@@ -125,8 +136,8 @@ class AzureProjectConfig(BaseModel):
     storage_account: str
 
 
-class AzureProjectConfigWithCreds(AzureProjectConfig, AzureProjectCreds):
-    pass
+class AzureProjectConfigWithCreds(AzureProjectConfig):
+    credentials: AzureProjectCreds
 
 
 AnyProjectConfig = Union[
@@ -315,6 +326,7 @@ class GCPProjectValues(BaseModel):
 
 class AzureProjectValues(BaseModel):
     type: Literal["azure"] = "azure"
+    default_credentials: bool = False
     tenant_id: Optional[ProjectElement]
     subscription_id: Optional[ProjectElement]
     location: Optional[ProjectElement]
