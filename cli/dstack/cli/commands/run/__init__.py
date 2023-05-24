@@ -25,6 +25,7 @@ from dstack.core.error import NameNotFoundError, RepoNotInitializedError
 from dstack.core.job import Job, JobHead, JobStatus
 from dstack.core.request import RequestStatus
 from dstack.core.run import RunHead
+from dstack.utils.ssh import include_ssh_config, ssh_config_add_host, ssh_config_remove_host
 from dstack.utils.workflows import load_workflows
 
 POLL_PROVISION_RATE_SECS = 3
@@ -183,11 +184,26 @@ def _poll_run(
         }
         backend_type = hub_client.get_project_backend_type()
         if backend_type != "local":
+            include_ssh_config(config.ssh_config_path)
+            ssh_config_add_host(
+                config.ssh_config_path,
+                run_name,
+                {
+                    "HostName": jobs[0].host_name,
+                    # TODO: use non-root for all backends
+                    "User": "root" if backend_type != "azure" else "ubuntu",
+                    "IdentityFile": ssh_key,
+                    "StrictHostKeyChecking": "no",
+                    "UserKnownHostsFile": "/dev/null",
+                    "ControlPath": config.ssh_control_path(run_name),
+                    "ControlMaster": "auto",
+                    "ControlPersist": "10m",
+                },
+            )
             console.print("Starting SSH tunnel...")
             ports = allocate_local_ports(jobs)
-            if not run_ssh_tunnel(
-                ssh_key, jobs[0].host_name, ports, backend_type
-            ):  # todo: cleanup explicitly (stop tunnel)
+            # TODO: cleanup explicitly (stop tunnel)
+            if not run_ssh_tunnel(run_name, ports):
                 console.print("[warning]Warning: failed to start SSH tunnel[/warning] [red]✗[/]")
         else:
             console.print("Provisioning... It may take up to a minute. [green]✓[/]")
@@ -231,6 +247,7 @@ def _poll_run(
                     status = run.status.name
                     break
         console.print(f"[grey58]{status.capitalize()}[/]")
+        ssh_config_remove_host(config.ssh_config_path, run_name)
     except KeyboardInterrupt:
         global interrupt_count
         interrupt_count = 1
@@ -307,4 +324,5 @@ def ask_on_interrupt(hub_client: HubClient, run_name: str):
         console.print("\n[grey58]Aborting...[/]")
         hub_client.stop_jobs(run_name, abort=True)
         console.print("[grey58]Aborted[/]")
+        ssh_config_remove_host(config.ssh_config_path, run_name)
         exit(0)
