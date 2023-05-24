@@ -84,7 +84,7 @@ setup(
         "file-read-backwards>=3.0.0",
         "psutil>=5.0.0",
         "cryptography",
-        "grpcio>=1.50,<=1.54",  # indirect
+        "grpcio>=1.50",  # indirect
         "filelock",
     ],
     extras_require={

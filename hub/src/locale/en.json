@@ -9,6 +9,8 @@
     "remove": "Remove",
     "match_count_with_value_one": "{{count}} match",
     "match_count_with_value_other": "{{count}} matches",
+    "nomatch_message_title": "No matches",
+    "nomatch_message_text": "We can't find a match.",
     "sign_out": "Sign out",
     "cancel": "Cancel",
     "save": "Save",
@@ -50,6 +52,7 @@
     "nomatch_message_button_label": "Clear filter",
     "repositories": "Repositories",
     "runs": "Runs",
+    "tags": "Tags",
     "settings": "Settings",
     "card": {
       "backend": "Backend",
@@ -193,6 +196,15 @@
         "failed": "Failed",
         "done":  "Done"
       }
+    },
+    "tag": {
+      "list_page_title": "Tags",
+      "search_placeholder": "Find tags",
+      "empty_message_title": "No tags",
+      "empty_message_text": "No tags to display.",
+      "tag_name": "Name",
+      "run_name": "Run",
+      "artifacts": "Artifacts"
     },
     "artifact": {
       "list_page_title": "Artifacts",

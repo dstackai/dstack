@@ -1,12 +1,5 @@
 .page {
     height: 100%;
-    .tabs {
-        :global {
-            [class^="awsui_tabs-content-wrapper"] {
-                display: none;
-            }
-        }
-    }
 
     & > [class^="awsui_layout"] {
         height: 100%;

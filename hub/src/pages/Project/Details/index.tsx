@@ -96,9 +96,7 @@ export const ProjectDetails: React.FC = () => {
                     />
                 }
             >
-                <div className={styles.tabs}>
-                    <Tabs onChange={onChangeTab} activeTabId={activeTabId} tabs={tabs} />
-                </div>
+                <Tabs className={styles.tabs} onChange={onChangeTab} activeTabId={activeTabId} tabs={tabs} />
 
                 <Outlet />
             </ContentLayout>

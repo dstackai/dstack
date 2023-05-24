@@ -21,20 +21,25 @@ export const API = {
         BACKEND_TYPES: () => `${API.BASE()}/backends/list`,
 
         // Repos
-        REPOS: (name: IProject['project_name']) => `${API.BASE()}/project/${name}/repos`,
-        REPO_ITEM: (name: IProject['project_name']) => `${API.PROJECTS.REPOS(name)}/heads/get`,
-        REPO_LIST: (name: IProject['project_name']) => `${API.PROJECTS.REPOS(name)}/heads/list`,
+        REPOS: (projectName: IProject['project_name']) => `${API.BASE()}/project/${projectName}/repos`,
+        REPO_ITEM: (projectName: IProject['project_name']) => `${API.PROJECTS.REPOS(projectName)}/heads/get`,
+        REPO_LIST: (projectName: IProject['project_name']) => `${API.PROJECTS.REPOS(projectName)}/heads/list`,
 
         // Runs
-        RUNS: (name: IProject['project_name']) => `${API.BASE()}/project/${name}/runs`,
-        RUNS_LIST: (name: IProject['project_name']) => `${API.PROJECTS.RUNS(name)}/list`,
-        RUNS_DELETE: (name: IProject['project_name']) => `${API.PROJECTS.RUNS(name)}/delete`,
-        RUNS_STOP: (name: IProject['project_name']) => `${API.PROJECTS.RUNS(name)}/stop`,
+        RUNS: (projectName: IProject['project_name']) => `${API.BASE()}/project/${projectName}/runs`,
+        RUNS_LIST: (projectName: IProject['project_name']) => `${API.PROJECTS.RUNS(projectName)}/list`,
+        RUNS_DELETE: (projectName: IProject['project_name']) => `${API.PROJECTS.RUNS(projectName)}/delete`,
+        RUNS_STOP: (projectName: IProject['project_name']) => `${API.PROJECTS.RUNS(projectName)}/stop`,
 
         // Logs
-        LOGS: (name: IProject['project_name']) => `${API.BASE()}/project/${name}/logs/poll`,
+        LOGS: (projectName: IProject['project_name']) => `${API.BASE()}/project/${projectName}/logs/poll`,
 
         // Logs
-        ARTIFACTS: (name: IProject['project_name']) => `${API.BASE()}/project/${name}/artifacts/list`,
+        ARTIFACTS: (projectName: IProject['project_name']) => `${API.BASE()}/project/${projectName}/artifacts/list`,
+
+        // Tags
+        TAG_LIST: (projectName: IProject['project_name']) => `${API.BASE()}/project/${projectName}/tags/list/heads`,
+        TAG_ITEM: (projectName: IProject['project_name'], tagName: ITag['tag_name']) =>
+            `${API.BASE()}/project/${projectName}/tags/${tagName}`,
     },
 };
