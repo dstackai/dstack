@@ -1,10 +1,11 @@
 import json
 from typing import Dict, Optional, Tuple, Union
 
+import google.auth
+import google.auth.exceptions
 from google.cloud import compute_v1, storage
 from google.oauth2 import service_account
 
-from dstack.backend.base.config import BackendConfig
 from dstack.backend.gcp import GCPBackend
 from dstack.backend.gcp.config import GCPConfig
 from dstack.hub.models import (
@@ -110,18 +111,31 @@ class GCPConfigurator(Configurator):
         return GCPBackend
 
     def configure_project(self, config_data: Dict) -> GCPProjectValues:
-        try:
-            service_account_info = json.loads(config_data.get("credentials"))
-            self.credentials = service_account.Credentials.from_service_account_info(
-                info=service_account_info
-            )
-            storage_client = storage.Client(credentials=self.credentials)
-            storage_client.list_buckets(max_results=1)
-        except Exception:
-            raise BackendConfigError(
-                "Credentials are not valid", code="invalid_credentials", fields=["credentials"]
-            )
         project_values = GCPProjectValues()
+        try:
+            self.credentials, _ = google.auth.default()
+        except google.auth.exceptions.DefaultCredentialsError:
+            project_values.default_credentials = False
+        else:
+            project_values.default_credentials = True
+
+        credentials_data = config_data.get("credentials")
+        if credentials_data is None:
+            return project_values
+
+        if credentials_data["type"] == "service_account":
+            try:
+                service_account_info = json.loads(credentials_data["data"])
+                self.credentials = service_account.Credentials.from_service_account_info(
+                    info=service_account_info
+                )
+                storage_client = storage.Client(credentials=self.credentials)
+                storage_client.list_buckets(max_results=1)
+            except Exception:
+                self._raise_invalid_credentials_error()
+        elif not project_values.default_credentials:
+            self._raise_invalid_credentials_error()
+
         project_values.area = self._get_hub_geographic_area(config_data.get("area"))
         location = self._get_location(project_values.area.selected)
         project_values.region, regions = self._get_hub_region(
@@ -148,17 +162,28 @@ class GCPConfigurator(Configurator):
         self, project_config: GCPProjectConfigWithCreds
     ) -> Tuple[Dict, Dict]:
         config = GCPProjectConfig.parse_obj(project_config).dict()
-        auth = GCPProjectCreds.parse_obj(project_config).dict()
+        auth = project_config.credentials.__root__.dict()
         return config, auth
 
     def get_backend_config_from_hub_config_data(
         self, project_name: str, config_data: Dict, auth_data: Dict
-    ) -> BackendConfig:
-        credentials = json.loads(auth_data["credentials"])
+    ) -> GCPConfig:
+        credentials = auth_data
+        if credentials.get("type") is None:
+            credentials = {
+                "type": "service_account",
+                "filename": credentials["credentials_filename"],
+                "data": credentials["credentials"],
+            }
+            credentials["type"] = "service_account"
+        if credentials["type"] == "service_account":
+            project_id = json.loads(credentials["data"])["project_id"]
+        else:
+            _, project_id = google.auth.default()
         data = {
             "backend": "gcp",
             "credentials": credentials,
-            "project": credentials["project_id"],
+            "project": project_id,
             "region": config_data["region"],
             "zone": config_data["zone"],
             "bucket": config_data["bucket_name"],
@@ -179,11 +204,14 @@ class GCPConfigurator(Configurator):
         subnet = json_config["subnet"]
         if include_creds:
             json_auth = json.loads(project.auth)
-            credentials = json_auth["credentials"]
-            credentials_filename = json_auth["credentials_filename"]
+            if json_auth.get("type") is None:
+                json_auth = {
+                    "type": "service_account",
+                    "filename": json_auth["credentials_filename"],
+                    "data": json_auth["credentials"],
+                }
             return GCPProjectConfigWithCreds(
-                credentials=credentials,
-                credentials_filename=credentials_filename,
+                credentials=GCPProjectCreds.parse_obj(json_auth),
                 area=area,
                 region=region,
                 zone=zone,
@@ -198,6 +226,11 @@ class GCPConfigurator(Configurator):
             bucket_name=bucket_name,
             vpc=vpc,
             subnet=subnet,
+        )
+
+    def _raise_invalid_credentials_error(self):
+        raise BackendConfigError(
+            "Credentials are not valid", code="invalid_credentials", fields=["credentials"]
         )
 
     def _get_hub_geographic_area(self, default_area: Optional[str]) -> ProjectElement:

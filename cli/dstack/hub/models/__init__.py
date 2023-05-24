@@ -71,7 +71,7 @@ class AWSProjectCreds(BaseModel):
 
 
 class AWSProjectConfigWithCredsPartial(AWSProjectConfigPartial):
-    credentials: AWSProjectCreds
+    credentials: Optional[AWSProjectCreds]
 
 
 class AWSProjectConfigWithCreds(AWSProjectConfig):
@@ -98,17 +98,28 @@ class GCPProjectConfig(BaseModel):
     subnet: str
 
 
+class GCPProjectDefaultCreds(BaseModel):
+    type: Literal["default"] = "default"
+
+
+class GCPProjectServiceAccountCreds(BaseModel):
+    type: Literal["service_account"] = "service_account"
+    filename: str
+    data: str
+
+
 class GCPProjectCreds(BaseModel):
-    credentials_filename: str
-    credentials: str
+    __root__: Union[GCPProjectServiceAccountCreds, GCPProjectDefaultCreds] = Field(
+        ..., discriminator="type"
+    )
 
 
-class GCPProjectConfigWithCredsPartial(GCPProjectConfigPartial, GCPProjectCreds):
-    pass
+class GCPProjectConfigWithCredsPartial(GCPProjectConfigPartial):
+    credentials: Optional[GCPProjectCreds]
 
 
-class GCPProjectConfigWithCreds(GCPProjectConfig, GCPProjectCreds):
-    pass
+class GCPProjectConfigWithCreds(GCPProjectConfig):
+    credentials: GCPProjectCreds
 
 
 class AzureProjectConfigPartial(BaseModel):
@@ -329,6 +340,7 @@ class GCPVPCSubnetProjectElement(BaseModel):
 
 class GCPProjectValues(BaseModel):
     type: Literal["gcp"] = "gcp"
+    default_credentials: bool = False
     area: Optional[ProjectElement]
     region: Optional[ProjectElement]
     zone: Optional[ProjectElement]

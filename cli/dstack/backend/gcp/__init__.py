@@ -1,7 +1,9 @@
+import json
 import warnings
 from datetime import datetime
 from typing import Generator, List, Optional
 
+import google.auth
 from google.auth._default import _CLOUD_SDK_CREDENTIALS_WARNING
 from google.oauth2 import service_account
 
@@ -43,9 +45,12 @@ class GCPBackend(Backend):
         backend_config: GCPConfig,
     ):
         super().__init__(backend_config=backend_config)
-        credentials = service_account.Credentials.from_service_account_info(
-            self.backend_config.credentials
-        )
+        if self.backend_config.credentials["type"] == "service_account":
+            credentials = service_account.Credentials.from_service_account_info(
+                json.loads(self.backend_config.credentials["data"])
+            )
+        else:
+            credentials, _ = google.auth.default()
         self._storage = GCPStorage(
             project_id=self.backend_config.project_id,
             bucket_name=self.backend_config.bucket_name,

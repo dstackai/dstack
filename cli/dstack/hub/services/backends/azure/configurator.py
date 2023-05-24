@@ -98,9 +98,11 @@ class AzureConfigurator(Configurator):
             project_values.default_credentials = False
         else:
             project_values.default_credentials = True
+
         credentials_data = config_data.get("credentials")
         if credentials_data is None:
             return project_values
+
         if credentials_data["type"] == "client":
             self.credential = ClientSecretCredential(
                 tenant_id=config_data.get("tenant_id"),
