@@ -37,4 +37,4 @@ class PruneCommand(BasicCommand):
     @staticmethod
     def prune_cache(args: argparse.Namespace, hub_client: HubClient):
         hub_client.delete_workflow_cache(args.workflow)
-        console.print(f"[gray58]Cache pruned[/]")
+        console.print(f"[grey58]Cache pruned[/]")
