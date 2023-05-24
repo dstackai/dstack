@@ -41,15 +41,14 @@ def include_ssh_config(path: PathLike, ssh_config_path: PathLike = default_ssh_c
     ssh_config_path = os.path.expanduser(ssh_config_path)
     Path(ssh_config_path).parent.mkdir(0o600, parents=True, exist_ok=True)
     include = f"Include {path}\n"
+    content = ""
     with FileLock(str(ssh_config_path) + ".lock"):
-        with open(ssh_config_path, "r+") as f:
-            content = f.read()
-            if include not in content:
-                content = include + content
-            f.seek(0)
-            f.write(content)
-            f.truncate()
-            f.flush()
+        if os.path.exists(ssh_config_path):
+            with open(ssh_config_path, "r") as f:
+                content = f.read()
+        if include not in content:
+            with open(ssh_config_path, "w") as f:
+                f.write(include + content)
 
 
 def ssh_config_add_host(path: PathLike, host: str, options: dict):
@@ -67,14 +66,13 @@ def ssh_config_remove_host(path: PathLike, host: str):
     with FileLock(str(path) + ".lock"):
         copy_mode = True
         content = ""
-        with open(path, "r+") as f:
-            for line in f:
-                m = re.match(rf"^Host\s+(\S+)$", line.strip())
-                if m is not None:
-                    copy_mode = m.group(1) != host
-                if copy_mode:
-                    content += line
-            f.seek(0)
+        if os.path.exists(path):
+            with open(path, "r") as f:
+                for line in f:
+                    m = re.match(rf"^Host\s+(\S+)$", line.strip())
+                    if m is not None:
+                        copy_mode = m.group(1) != host
+                    if copy_mode:
+                        content += line
+        with open(path, "w") as f:
             f.write(content)
-            f.truncate()
-            f.flush()
