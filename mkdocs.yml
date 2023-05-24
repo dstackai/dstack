@@ -138,15 +138,18 @@ extra:
 nav:
   - Home: index.md
   - Docs:
-      - Overview:
-          - Getting started: docs/index.md
-#          - Installation: docs/installation.md
+      - Getting started:
+          - Quick start: docs/index.md
       - Guides:
           - Dev environments: docs/guides/dev-environments.md
           - Pipelines: docs/guides/pipelines.md
           - Apps: docs/guides/apps.md
 #          - Artifacts: docs/guides/artifacts.md
           - Projects: docs/guides/projects.md
+      - Deployment:
+          - Docker: docs/deployment/docker.md
+          - Hugging Face Spaces: docs/deployment/hf-spaces.md
+          - Clouds: docs/deployment/clouds.md
       - Reference:
           - CLI:
               - dstack run: docs/reference/cli/run.md
