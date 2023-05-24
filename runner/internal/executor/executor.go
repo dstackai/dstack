@@ -567,7 +567,7 @@ func (ex *Executor) processJob(ctx context.Context, stoppedCh chan struct{}) err
 		Entrypoint:         job.Entrypoint,
 		Env:                ex.environment(ctx),
 		Mounts:             uniqueMount(bindings),
-		ExposedPorts:       ports.GetAppsExposedPorts(job.Apps),
+		ExposedPorts:       ports.GetAppsExposedPorts(ctx, job.Apps, isLocalBackend),
 		BindingPorts:       appsBindingPorts,
 		ShmSize:            resource.ShmSize,
 		AllowHostMode:      !isLocalBackend,

@@ -308,7 +308,8 @@ def attach(backend_type: str, job: Job, ssh_key_path: str) -> Dict[int, int]:
 
     console.print("Starting SSH tunnel...")
     include_ssh_config(config.ssh_config_path)
-    host_ports = {int(job.env["WS_LOGS_PORT"]): 0}
+    ws_port = int(job.env["WS_LOGS_PORT"])
+    host_ports = {ws_port: ws_port}
 
     if backend_type != "local":
         ssh_config_add_host(
@@ -326,10 +327,16 @@ def attach(backend_type: str, job: Job, ssh_key_path: str) -> Dict[int, int]:
                 "ControlPersist": "10m",
             },
         )
+        host_ports[ws_port] = 0  # to map dynamically
         if openssh_server_port == 0:
             host_ports.update(app_ports)
             app_ports = {}
-        if not run_ssh_tunnel(f"{job.run_name}-host", allocate_local_ports(host_ports)):
+        host_ports = allocate_local_ports(host_ports)
+        for i in range(3):  # retry
+            if run_ssh_tunnel(f"{job.run_name}-host", host_ports):
+                break
+            time.sleep(2**i)
+        else:
             console.print("[warning]Warning: failed to start SSH tunnel[/warning] [red]✗[/]")
 
     if openssh_server_port != 0:
@@ -349,7 +356,12 @@ def attach(backend_type: str, job: Job, ssh_key_path: str) -> Dict[int, int]:
         ssh_config_add_host(config.ssh_config_path, job.run_name, options)
         del app_ports[openssh_server_port]
         if app_ports:
-            if not run_ssh_tunnel(job.run_name, allocate_local_ports(app_ports)):
+            app_ports = allocate_local_ports(app_ports)
+            for i in range(3):  # retry
+                if run_ssh_tunnel(job.run_name, app_ports):
+                    break
+                time.sleep(2**i)
+            else:
                 console.print("[warning]Warning: failed to start SSH tunnel[/warning] [red]✗[/]")
         console.print(f"To connect via SSH, use: `ssh {job.run_name}`")
 
