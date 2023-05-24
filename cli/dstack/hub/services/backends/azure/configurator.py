@@ -113,6 +113,9 @@ class AzureConfigurator(Configurator):
                 )
             except ClientAuthenticationError:
                 self._raise_invalid_credentials_error()
+        elif not project_values.default_credentials:
+            self._raise_invalid_credentials_error()
+
         self.tenant_id = project_values.tenant_id.selected
         if self.tenant_id is None:
             return project_values

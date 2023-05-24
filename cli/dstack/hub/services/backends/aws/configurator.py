@@ -47,23 +47,26 @@ class AWSConfigurator(Configurator):
         if config.region_name is not None and config.region_name not in {r[1] for r in regions}:
             raise BackendConfigError(f"Invalid AWS region {config.region_name}")
 
-        try:
+        project_values = AWSProjectValues()
+        session = Session()
+        project_values.default_credentials = self._valid_credentials(session=session)
+
+        credentials_data = config_data.get("credentials")
+        if credentials_data is None:
+            return project_values
+
+        if credentials_data["type"] == "access_key":
             session = Session(
                 region_name=config.region_name,
-                aws_access_key_id=config_data.get("access_key"),
+                aws_access_key_id=config_data[""]("access_key"),
                 aws_secret_access_key=config_data.get("secret_key"),
             )
-            sts = session.client("sts")
-            sts.get_caller_identity()
-        except botocore.exceptions.ClientError:
-            raise BackendConfigError(
-                "Credentials are not valid",
-                code="invalid_credentials",
-                fields=["access_key", "secret_key"],
-            )
+            if not self._valid_credentials(session=session):
+                self._raise_invalid_credentials_error()
+        elif not project_values.default_credentials:
+            self._raise_invalid_credentials_error()
 
         # TODO validate config values
-        project_values = AWSProjectValues()
         project_values.region_name = self._get_hub_regions(default_region=config.region_name)
         project_values.s3_bucket_name = self._get_hub_buckets(
             session=session, region=config.region_name, default_bucket=config.bucket_name
@@ -76,11 +79,8 @@ class AWSConfigurator(Configurator):
     def create_config_auth_data_from_project_config(
         self, project_config: AWSProjectConfigWithCreds
     ) -> Tuple[Dict, Dict]:
-        project_config.backend.s3_bucket_name = project_config.backend.s3_bucket_name.replace(
-            "s3://", ""
-        )
         config = AWSProjectConfig.parse_obj(project_config).dict()
-        auth = AWSProjectCreds.parse_obj(project_config).dict()
+        auth = project_config.credentials.__root__.dict()
         return config, auth
 
     def get_backend_config_from_hub_config_data(
@@ -97,21 +97,35 @@ class AWSConfigurator(Configurator):
         ec2_subnet_id = json_config["ec2_subnet_id"]
         if include_creds:
             json_auth = json.loads(project.auth)
-            access_key = json_auth["access_key"]
-            secret_key = json_auth["secret_key"]
+            if json_auth.get("type") is None:
+                json_auth["type"] = "access_key"
             return AWSProjectConfigWithCreds(
-                access_key=access_key,
-                secret_key=secret_key,
                 region_name=region_name,
                 region_name_title=region_name,
                 s3_bucket_name=s3_bucket_name,
                 ec2_subnet_id=ec2_subnet_id,
+                credentials=AWSProjectCreds.parse_obj(json_auth),
             )
         return AWSProjectConfig(
             region_name=region_name,
             region_name_title=region_name,
             s3_bucket_name=s3_bucket_name,
             ec2_subnet_id=ec2_subnet_id,
+        )
+
+    def _valid_credentials(self, session: Session) -> bool:
+        sts = session.client("sts")
+        try:
+            sts.get_caller_identity()
+        except botocore.exceptions.ClientError:
+            return False
+        return True
+
+    def _raise_invalid_credentials_error(self):
+        raise BackendConfigError(
+            "Invalid credentials",
+            code="invalid_credentials",
+            fields=["credentials"],
         )
 
     def _get_hub_regions(self, default_region: Optional[str]) -> ProjectElement:

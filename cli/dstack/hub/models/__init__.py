@@ -54,17 +54,28 @@ class AWSProjectConfig(BaseModel):
     ec2_subnet_id: Optional[str]
 
 
-class AWSProjectCreds(BaseModel):
+class AWSProjectDefaultCreds(BaseModel):
+    type: Literal["default"] = "default"
+
+
+class AWSProjectAccessKeyCreds(BaseModel):
+    type: Literal["access_key"] = "access_key"
     access_key: str
     secret_key: str
 
 
-class AWSProjectConfigWithCredsPartial(AWSProjectConfigPartial, AWSProjectCreds):
-    pass
+class AWSProjectCreds(BaseModel):
+    __root__: Union[AWSProjectAccessKeyCreds, AWSProjectDefaultCreds] = Field(
+        ..., discriminator="type"
+    )
 
 
-class AWSProjectConfigWithCreds(AWSProjectConfig, AWSProjectCreds):
-    pass
+class AWSProjectConfigWithCredsPartial(AWSProjectConfigPartial):
+    credentials: AWSProjectCreds
+
+
+class AWSProjectConfigWithCreds(AWSProjectConfig):
+    credentials: AWSProjectCreds
 
 
 class GCPProjectConfigPartial(BaseModel):
@@ -299,6 +310,7 @@ class AWSBucketProjectElement(BaseModel):
 
 class AWSProjectValues(BaseModel):
     type: Literal["aws"] = "aws"
+    default_credentials: bool = False
     region_name: Optional[ProjectElement]
     s3_bucket_name: Optional[AWSBucketProjectElement]
     ec2_subnet_id: Optional[ProjectElement]
