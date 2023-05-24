@@ -113,7 +113,7 @@ class LabProvider(Provider):
         if self.env:
             self._extend_commands_with_env(commands, self.env)
         if self.openssh_server:
-            OpenSSHExtension.patch_commands(commands, ssh_pub_key=self.ssh_key_pub)
+            OpenSSHExtension.patch_commands(commands, ssh_key_pub=self.ssh_key_pub)
         commands.extend(
             [
                 "conda install psutil -y",
