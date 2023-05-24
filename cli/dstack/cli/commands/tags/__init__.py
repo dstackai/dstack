@@ -20,7 +20,12 @@ class TAGCommand(BasicCommand):
         super(TAGCommand, self).__init__(parser)
 
     def register(self):
+        add_project_argument(self._parser)
         subparsers = self._parser.add_subparsers()
+        list_parser = subparsers.add_parser(
+            "list", help="List tags", formatter_class=RichHelpFormatter
+        )
+        add_project_argument(list_parser)
 
         add_tags_parser = subparsers.add_parser(
             "add", help="Add a tag", formatter_class=RichHelpFormatter
