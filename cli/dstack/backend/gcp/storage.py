@@ -7,7 +7,6 @@ from google.oauth2 import service_account
 
 from dstack.backend.base.storage import SIGNED_URL_EXPIRATION, CloudStorage
 from dstack.core.storage import StorageFile
-from dstack.utils.common import removeprefix
 
 
 class GCPStorageError(Exception):
