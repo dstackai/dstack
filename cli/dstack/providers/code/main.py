@@ -28,6 +28,7 @@ class CodeProvider(Provider):
         self.resources = None
         self.image_name = None
         self.home_dir = "/root"
+        self.openssh_server = True
 
     def load(
         self,
@@ -54,15 +55,15 @@ class CodeProvider(Provider):
             formatter_class=RichHelpFormatter,
         )
         self._add_base_args(parser)
-        parser.add_argument("--ssh", action="store_true", dest="openssh_server")
+        parser.add_argument("--no-ssh", action="store_false", dest="openssh_server")
         return parser
 
     def parse_args(self):
         parser = self._create_parser(self.workflow_name)
         args, unknown_args = parser.parse_known_args(self.provider_args)
         self._parse_base_args(args, unknown_args)
-        if args.openssh_server:
-            self.openssh_server = True
+        if not args.openssh_server:
+            self.openssh_server = False
 
     def create_job_specs(self) -> List[JobSpec]:
         env = {}
