@@ -132,6 +132,13 @@ class CodeProvider(Provider):
         )
         if self.setup:
             commands.extend(self.setup)
+        commands.extend(
+            [
+                f"echo Connect from code desktop",
+                f"echo '  vscode://vscode-remote/ssh-remote+{self.run_name}/workflow'",
+                f"echo '  vscode-insiders://vscode-remote/ssh-remote+{self.run_name}/workflow'",
+            ]
+        )
         commands.append(
             f"/tmp/openvscode-server-v{self.version}-linux-$arch/bin/openvscode-server"
             f"  --port {self.code_port} --host 0.0.0.0 --connection-token $CONNECTION_TOKEN"
