@@ -58,8 +58,8 @@ class AWSConfigurator(Configurator):
         if credentials_data["type"] == "access_key":
             session = Session(
                 region_name=config.region_name,
-                aws_access_key_id=config_data[""]("access_key"),
-                aws_secret_access_key=config_data.get("secret_key"),
+                aws_access_key_id=credentials_data["access_key"],
+                aws_secret_access_key=credentials_data["secret_key"],
             )
             if not self._valid_credentials(session=session):
                 self._raise_invalid_credentials_error()
@@ -97,8 +97,6 @@ class AWSConfigurator(Configurator):
         ec2_subnet_id = json_config["ec2_subnet_id"]
         if include_creds:
             json_auth = json.loads(project.auth)
-            if json_auth.get("type") is None:
-                json_auth["type"] = "access_key"
             return AWSProjectConfigWithCreds(
                 region_name=region_name,
                 region_name_title=region_name,

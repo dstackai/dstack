@@ -176,8 +176,6 @@ class AzureConfigurator(Configurator):
     def get_backend_config_from_hub_config_data(
         self, project_name: str, config_data: Dict, auth_data: Dict
     ) -> AzureConfig:
-        if auth_data.get("type") is None:
-            auth_data["type"] = "client"
         return AzureConfig.deserialize({**config_data, "credentials": auth_data})
 
     def get_project_config_from_project(
@@ -190,8 +188,6 @@ class AzureConfigurator(Configurator):
         storage_account = json_config["storage_account"]
         if include_creds:
             auth_config = json.loads(project.auth)
-            if auth_config.get("type") is None:
-                auth_config["type"] = "client"
             return AzureProjectConfigWithCreds(
                 tenant_id=tenant_id,
                 subscription_id=subscription_id,

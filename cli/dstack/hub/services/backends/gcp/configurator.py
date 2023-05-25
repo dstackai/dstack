@@ -169,13 +169,6 @@ class GCPConfigurator(Configurator):
         self, project_name: str, config_data: Dict, auth_data: Dict
     ) -> GCPConfig:
         credentials = auth_data
-        if credentials.get("type") is None:
-            credentials = {
-                "type": "service_account",
-                "filename": credentials["credentials_filename"],
-                "data": credentials["credentials"],
-            }
-            credentials["type"] = "service_account"
         if credentials["type"] == "service_account":
             project_id = json.loads(credentials["data"])["project_id"]
         else:
@@ -204,12 +197,6 @@ class GCPConfigurator(Configurator):
         subnet = json_config["subnet"]
         if include_creds:
             json_auth = json.loads(project.auth)
-            if json_auth.get("type") is None:
-                json_auth = {
-                    "type": "service_account",
-                    "filename": json_auth["credentials_filename"],
-                    "data": json_auth["credentials"],
-                }
             return GCPProjectConfigWithCreds(
                 credentials=GCPProjectCreds.parse_obj(json_auth),
                 area=area,
