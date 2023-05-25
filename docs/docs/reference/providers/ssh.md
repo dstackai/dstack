@@ -1,34 +1,19 @@
-# lab
+# ssh
 
-The `lab` provider launches a JupyterLab dev environment.
+The `ssh` provider runs ssh server inside the container and waits infinitely.
 
-It comes with Python and Conda pre-installed, and allows to expose ports.
+It comes with Python and Conda pre-installed, and allows to expose ports. 
 
-If GPU is requested, the provider pre-installs the CUDA driver too. 
+If GPU is requested, the provider pre-installs the CUDA driver too.
 
 ## Usage example
 
-<div editor-title=".dstack/workflows/lab-example.yaml">
+To run instance with 1 GPU and print connection URI for VS Code
 
-```yaml
-workflows:
-  - name: ide-lab
-    provider: lab
-    artifacts: 
-      - path: ./output
-    resources:
-      interruptible: true
-      gpu: 1
-```
-
-</div>
-
-To run this workflow, use the following command:
-
-<div class="termy">
+<div class="termy"> 
 
 ```shell
-$ dstack run ide-lab
+$ dstack run ssh --code --gpu 1
 ```
 
 </div>
@@ -37,14 +22,13 @@ $ dstack run ide-lab
 
 The following properties are optional:
 
-- `setup` - (Optional) The list of shell commands to run before running the JupyterLab application
+- `setup` - (Optional) The list of shell commands to run before idling
 - `python` - (Optional) The major version of Python
-- `environment` - (Optional) The list of environment variables 
+- `env` - (Optional) The list of environment variables 
 - [`artifacts`](#artifacts) - (Optional) The list of output artifacts
 - [`resources`](#resources) - (Optional) The hardware resources required by the workflow
 - [`ports`](#ports) - (Optional) The list of ports to expose
 - `working_dir` - (Optional) The path to the working directory
-- `ssh` - (Optional) Runs SSH server in the container if `true` (by default)
 - [`cache`](#cache) - (Optional) The list of directories to cache between runs
 
 ### artifacts
@@ -53,9 +37,9 @@ The list of output artifacts
 
 - `path` – (Required) The relative path of the folder that must be saved as an output artifact
 - `mount` – (Optional) `true` if the artifact files must be saved in real-time.
-    Must be used only when real-time access to the artifacts is important: 
-    for storing checkpoints (e.g. if interruptible instances are used) and event files
-    (e.g. TensorBoard event files, etc.)
+    Must be used only when real-time access to the artifacts is important. 
+    For example, for storing checkpoints when interruptible instances are used, or for storing
+    event files in real-time (e.g. TensorBoard event files.)
     By default, it's `false`.
 
 ### resources
@@ -87,11 +71,6 @@ The list of directories to cache between runs
 
 - `path` – (Required) The relative path of the folder that must be cached
 
-### Ports
+## More examples
 
-If you'd like your workflow to expose ports, you have to specify the `ports` property with the list
-of ports to expose. You could specify a mapping `APP_PORT:LOCAL_PORT` or just `APP_PORT` — in this
-case dstack will choose available `LOCAL_PORT` for you.
-
-!!! info "NOTE:"
-    Ports range `10000-10999` is reserved for dstack needs. However, you could remap them to different `LOCAL_PORT`s.
+See more examples at [bash provider](bash.md#more-examples) page.

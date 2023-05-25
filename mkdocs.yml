@@ -171,6 +171,7 @@ nav:
               - lab: docs/reference/providers/lab.md
               - notebook: docs/reference/providers/notebook.md
               - docker: docs/reference/providers/docker.md
+              - ssh: docs/reference/providers/ssh.md
           - Backends:
               - AWS: docs/reference/backends/aws.md
               - Azure: docs/reference/backends/azure.md
