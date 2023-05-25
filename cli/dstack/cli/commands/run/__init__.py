@@ -177,49 +177,14 @@ def _poll_run(
                     request_errors_printed = False
 
         jobs = [hub_client.get_job(job_head.job_id) for job_head in job_heads]
-        ports = {
-            app.port: app.map_to_port
-            for app in jobs[0].app_specs or []
-            if app.map_to_port is not None and app.port != app.map_to_port
-        }
-        backend_type = hub_client.get_project_backend_type()
-        if backend_type != "local":
-            include_ssh_config(config.ssh_config_path)
-            ssh_config_add_host(
-                config.ssh_config_path,
-                run_name,
-                {
-                    "HostName": jobs[0].host_name,
-                    # TODO: use non-root for all backends
-                    "User": "root" if backend_type != "azure" else "ubuntu",
-                    "IdentityFile": ssh_key,
-                    "StrictHostKeyChecking": "no",
-                    "UserKnownHostsFile": "/dev/null",
-                    "ControlPath": config.ssh_control_path(run_name),
-                    "ControlMaster": "auto",
-                    "ControlPersist": "10m",
-                },
-            )
-            console.print("Starting SSH tunnel...")
-            ports = allocate_local_ports(jobs)
-            # TODO: cleanup explicitly (stop tunnel)
-            if not run_ssh_tunnel(run_name, ports):
-                console.print("[warning]Warning: failed to start SSH tunnel[/warning] [red]✗[/]")
-        else:
-            console.print("Provisioning... It may take up to a minute. [green]✓[/]")
+        ports = attach(
+            hub_client.get_project_backend_type(),
+            jobs[0],
+            ssh_key,
+        )
         console.print()
         console.print("[grey58]To exit, press Ctrl+C.[/]")
         console.print()
-
-        for app_spec in jobs[0].app_specs or []:
-            if app_spec.app_name == "openssh-server":
-                ssh_port = app_spec.port
-                ssh_port = ports.get(ssh_port, ssh_port)
-                ssh_key_escaped = ssh_key.replace(" ", "\\ ")
-                console.print("To connect via SSH, use:")
-                console.print(f"  ssh -i {ssh_key_escaped} root@localhost -p {ssh_port}")
-                console.print()
-                break
 
         run = hub_client.list_run_heads(run_name)[0]
         if run.status.is_unfinished() or run.status == JobStatus.DONE:
@@ -247,6 +212,7 @@ def _poll_run(
                     status = run.status.name
                     break
         console.print(f"[grey58]{status.capitalize()}[/]")
+        ssh_config_remove_host(config.ssh_config_path, f"{run_name}-host")
         ssh_config_remove_host(config.ssh_config_path, run_name)
     except KeyboardInterrupt:
         global interrupt_count
@@ -324,5 +290,79 @@ def ask_on_interrupt(hub_client: HubClient, run_name: str):
         console.print("\n[grey58]Aborting...[/]")
         hub_client.stop_jobs(run_name, abort=True)
         console.print("[grey58]Aborted[/]")
+        ssh_config_remove_host(config.ssh_config_path, f"{run_name}-host")
         ssh_config_remove_host(config.ssh_config_path, run_name)
         exit(0)
+
+
+def attach(backend_type: str, job: Job, ssh_key_path: str) -> Dict[int, int]:
+    app_ports = {}
+    openssh_server_port = 0
+    for app in job.app_specs or []:
+        app_ports[app.port] = app.map_to_port or 0
+        if app.app_name == "openssh-server":
+            openssh_server_port = app.port
+    if not (backend_type != "local" or openssh_server_port != 0):
+        console.print("Provisioning... It may take up to a minute. [green]✓[/]")
+        return {k: v for k, v in app_ports.items() if v != 0}
+
+    console.print("Starting SSH tunnel...")
+    include_ssh_config(config.ssh_config_path)
+    ws_port = int(job.env["WS_LOGS_PORT"])
+    host_ports = {ws_port: ws_port}
+
+    if backend_type != "local":
+        ssh_config_add_host(
+            config.ssh_config_path,
+            f"{job.run_name}-host",
+            {
+                "HostName": job.host_name,
+                # TODO: use non-root for all backends
+                "User": "root" if backend_type != "azure" else "ubuntu",
+                "IdentityFile": ssh_key_path,
+                "StrictHostKeyChecking": "no",
+                "UserKnownHostsFile": "/dev/null",
+                "ControlPath": config.ssh_control_path(f"{job.run_name}-host"),
+                "ControlMaster": "auto",
+                "ControlPersist": "10m",
+            },
+        )
+        host_ports[ws_port] = 0  # to map dynamically
+        if openssh_server_port == 0:
+            host_ports.update(app_ports)
+            app_ports = {}
+        host_ports = allocate_local_ports(host_ports)
+        for i in range(3):  # retry
+            if run_ssh_tunnel(f"{job.run_name}-host", host_ports):
+                break
+            time.sleep(2**i)
+        else:
+            console.print("[warning]Warning: failed to start SSH tunnel[/warning] [red]✗[/]")
+
+    if openssh_server_port != 0:
+        options = {
+            "HostName": "localhost",
+            "Port": app_ports[openssh_server_port] or openssh_server_port,
+            "User": "root",
+            "IdentityFile": ssh_key_path,
+            "StrictHostKeyChecking": "no",
+            "UserKnownHostsFile": "/dev/null",
+            "ControlPath": config.ssh_control_path(job.run_name),
+            "ControlMaster": "auto",
+            "ControlPersist": "10m",
+        }
+        if backend_type != "local":
+            options["ProxyJump"] = f"{job.run_name}-host"
+        ssh_config_add_host(config.ssh_config_path, job.run_name, options)
+        del app_ports[openssh_server_port]
+        if app_ports:
+            app_ports = allocate_local_ports(app_ports)
+            for i in range(3):  # retry
+                if run_ssh_tunnel(job.run_name, app_ports):
+                    break
+                time.sleep(2**i)
+            else:
+                console.print("[warning]Warning: failed to start SSH tunnel[/warning] [red]✗[/]")
+        console.print(f"To connect via SSH, use: `ssh {job.run_name}`")
+
+    return {**host_ports, **app_ports}

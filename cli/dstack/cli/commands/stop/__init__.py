@@ -64,5 +64,6 @@ class StopCommand(BasicCommand):
             for job_head in job_heads:
                 if job_head.status.is_unfinished():
                     hub_client.stop_job(job_head.job_id, args.abort)
+            ssh_config_remove_host(config.ssh_config_path, f"{args.run_name}-host")
             ssh_config_remove_host(config.ssh_config_path, args.run_name)
             console.print(f"[grey58]OK[/]")

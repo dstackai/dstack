@@ -4,9 +4,7 @@ import subprocess
 from contextlib import closing
 from typing import Dict, List
 
-from dstack.core.job import Job
 from dstack.providers.ports import PortUsedError
-from dstack.utils.common import PathLike
 
 
 def get_free_port() -> int:
@@ -28,14 +26,7 @@ def port_in_use(port: int) -> bool:
     return False
 
 
-def allocate_local_ports(jobs: List[Job]) -> Dict[int, int]:
-    ports = {}
-    for job in jobs[:1]:  # todo multiple jobs
-        if "WS_LOGS_PORT" in job.env:
-            ports[int(job.env["WS_LOGS_PORT"])] = None
-        for app_spec in job.app_specs or []:
-            ports[app_spec.port] = app_spec.map_to_port
-
+def allocate_local_ports(ports: Dict[int, int]) -> Dict[int, int]:
     map_to_ports = set()
     # mapped by user
     for port, map_to_port in ports.items():
