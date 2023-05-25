@@ -21,6 +21,8 @@ def upgrade() -> None:
     conn = op.get_bind()
     results = conn.execute(sa.text("SELECT name, backend, auth FROM projects"))
     for name, backend, auth in results:
+        if backend == "local":
+            continue
         auth_data = json.loads(auth)
         if backend == "aws":
             auth_data["type"] = "access_key"
@@ -39,4 +41,25 @@ def upgrade() -> None:
 
 
 def downgrade() -> None:
-    pass
+    conn = op.get_bind()
+    results = conn.execute(sa.text("SELECT name, backend, auth FROM projects"))
+    for name, backend, auth in results:
+        if backend == "local":
+            continue
+        auth_data = json.loads(auth)
+        if auth_data["type"] == "default":
+            conn.execute(sa.text("DELETE FROM projects WHERE name=:name"), {"name": name})
+            continue
+        if backend == "aws":
+            del auth_data["type"]
+        elif backend == "azure":
+            del auth_data["type"]
+        elif backend == "gcp":
+            auth_data = {
+                "credentials_filename": auth_data["filename"],
+                "credentials": auth_data["data"],
+            }
+        conn.execute(
+            sa.text("UPDATE projects SET auth=:auth WHERE name=:name"),
+            {"name": name, "auth": json.dumps(auth_data)},
+        )
