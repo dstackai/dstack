@@ -171,7 +171,7 @@ class Provider:
         parser.add_argument("--dep", metavar="(:TAG | WORKFLOW)", dest="deps", action="append")
         parser.add_argument("-w", "--working-dir", metavar="PATH", type=str)
         group = parser.add_mutually_exclusive_group()
-        group.add_argument("-i", "--interruptible", action="store_true")
+        group.add_argument("-s", "--spot", action="store_true")
         parser.add_argument("--cpu", metavar="NUM", type=int)
         parser.add_argument("--memory", metavar="SIZE", type=str)
         parser.add_argument("--gpu", metavar="NUM", type=int)
