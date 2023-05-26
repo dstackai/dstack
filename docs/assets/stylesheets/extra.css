@@ -36,14 +36,10 @@
     margin-top: -25px;
     overflow-y: hidden;
 
-    -webkit-mask-image: -webkit-gradient(
-            linear,
-            left 92%,
-            left bottom,
-            from(rgba(0,0,0,1)),
-            to(rgba(0,0,0,0)));
+    -webkit-mask-image: linear-gradient(rgba(0,0,0,1) 85%, rgba(0,0,0,0));
+    mask-image: linear-gradient(rgba(0,0,0,1) 85%, rgba(0,0,0,0));
 
-    padding-bottom: 40px
+    padding-bottom: 40px;
 }
 
 .md-sidebar__scrollwrap:hover {
@@ -591,6 +587,7 @@ body {
         background-color: rgba(0,0,0,.87);
         border-radius: 5px;
         right: 10px;
+        top: 0;
         /*z-index: 1;*/
         width: 26px;
         text-align: center;
