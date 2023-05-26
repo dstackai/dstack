@@ -1,9 +1,11 @@
+import logging
 import queue
 import shutil
+import subprocess
 import threading
 import time
 from pathlib import Path
-from typing import Dict, NamedTuple, Optional, Type
+from typing import Dict, List, NamedTuple, Optional, Type, Union
 
 import watchfiles
 
@@ -24,7 +26,7 @@ class Copier(threading.Thread):
         stop_event: threading.Event,
         src_root: Path,
         timeout: float = 1.0,
-        **kwargs
+        **kwargs,
     ):
         super().__init__(**kwargs)
         self.queue = q
@@ -118,3 +120,26 @@ class LocalCopier(Copier):
         target = self.dst_root / path.relative_to(self.src_root)
         target.parent.mkdir(parents=True, exist_ok=True)
         shutil.copy(path, target)
+
+
+class SSHCopier(Copier):
+    def __init__(self, *, ssh_host: str, dst_root: PathLike, **kwargs):
+        super().__init__(**kwargs)
+        self.dst_root = Path(dst_root)
+        self.ssh_host = ssh_host
+
+    @staticmethod
+    def _exec(args: List[Union[str, PathLike]]) -> int:
+        logging.debug(f"SSHCopier: {args}")
+        return subprocess.run(
+            args, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL
+        ).returncode
+
+    def rm(self, path: Path):
+        target = self.dst_root / path.relative_to(self.src_root)
+        self._exec(["ssh", self.ssh_host, f"rm -rf {target}"])
+
+    def copy(self, path: Path):
+        target = self.dst_root / path.relative_to(self.src_root)
+        self._exec(["ssh", self.ssh_host, f"mkdir -p {target.parent}"])
+        self._exec(["scp", path, f"{self.ssh_host}:{target}"])
