@@ -5,7 +5,7 @@ import { Navigate } from 'react-router-dom';
 import App from 'App';
 import { Logout } from 'App/Logout';
 import { ProjectAdd, ProjectDetails, ProjectEditBackend, ProjectList, ProjectSettings } from 'pages/Project';
-import { RepositoryDetails, RepositoryList } from 'pages/Repositories';
+import { RepositoryDetails, RepositoryList, RepositorySettings } from 'pages/Repositories';
 import { Artifacts as RunArtifacts, Logs as RunLogs, RunDetails, RunList } from 'pages/Runs';
 import { TagDetails, TagList } from 'pages/Tags';
 import { UserAdd, UserDetails, UserEdit, UserList } from 'pages/User';
@@ -56,6 +56,10 @@ export const router = createBrowserRouter([
                         element: <TagList />,
                     },
                 ],
+            },
+            {
+                path: ROUTES.PROJECT.DETAILS.REPOSITORIES.SETTINGS.TEMPLATE,
+                element: <RepositorySettings />,
             },
             {
                 path: ROUTES.PROJECT.DETAILS.RUNS.DETAILS.TEMPLATE,
