@@ -73,6 +73,10 @@ class GitIgnore:
     def ignore(self, path: PathLike, sep="/") -> bool:
         if not path:
             return False
+        path = Path(path)
+        if path.is_absolute():
+            path = path.relative_to(self.root_dir)
+
         tokens = ("." + sep + str(path)).split(sep)
         for i in range(1, len(tokens)):
             parent = sep.join(tokens[:-i])

@@ -86,6 +86,7 @@ setup(
         "cryptography",
         "grpcio>=1.50",  # indirect
         "filelock",
+        "watchfiles",
     ],
     extras_require={
         "aws": [
