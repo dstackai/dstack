@@ -588,7 +588,7 @@ func (ex *Executor) processJob(ctx context.Context, stoppedCh chan struct{}) err
 	if err != nil {
 		return gerrors.Wrap(err)
 	}
-	errCh := make(chan error)
+	errCh := make(chan error, 2) // err and nil
 	go func() {
 		defer func() {
 			ex.streamLogs.Close()
