@@ -13,7 +13,7 @@ export const secretApi = createApi({
     tagTypes: ['Secrets'],
 
     endpoints: (builder) => ({
-        getSecrets: builder.query<ISecret[], TGetSecretsRequestParams>({
+        getSecrets: builder.query<ISecret['secret_name'][], TGetSecretsRequestParams>({
             query: ({ project_name, ...body }) => {
                 return {
                     url: API.PROJECTS.SECRET_LIST(project_name),
@@ -24,7 +24,7 @@ export const secretApi = createApi({
 
             providesTags: (result) =>
                 result
-                    ? [...result.map(({ secret_name }) => ({ type: 'Secrets' as const, id: secret_name })), 'Secrets']
+                    ? [...result.map((secret_name) => ({ type: 'Secrets' as const, id: secret_name })), 'Secrets']
                     : ['Secrets'],
         }),
 
@@ -37,7 +37,27 @@ export const secretApi = createApi({
 
             invalidatesTags: ['Secrets'],
         }),
+
+        updateSecret: builder.mutation<ISecret['secret_name'], TAddSecretRequestParams>({
+            query: ({ project_name, ...body }) => ({
+                url: API.PROJECTS.SECRET_UPDATE(project_name),
+                method: 'POST',
+                body: body,
+            }),
+
+            invalidatesTags: (result, _, params) => [{ type: 'Secrets' as const, id: params.secret.secret_name }, 'Secrets'],
+        }),
+
+        deleteSecret: builder.mutation<void, TDeleteSecretRequestParams>({
+            query: ({ project_name, secret_name, ...body }) => ({
+                url: API.PROJECTS.SECRET_DELETE(project_name, secret_name),
+                method: 'POST',
+                body: body,
+            }),
+
+            invalidatesTags: ['Secrets'],
+        }),
     }),
 });
 
-export const { useGetSecretsQuery, useCreateSecretMutation } = secretApi;
+export const { useGetSecretsQuery, useCreateSecretMutation, useUpdateSecretMutation, useDeleteSecretMutation } = secretApi;

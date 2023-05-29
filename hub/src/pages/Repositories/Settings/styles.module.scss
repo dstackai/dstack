@@ -1,0 +1,10 @@
+.secretValueWrapper {
+    display: flex;
+    align-items: center;
+    gap: 20px;
+}
+
+.secretValue {
+    flex-grow: 1;
+    flex-basis: 0;
+}

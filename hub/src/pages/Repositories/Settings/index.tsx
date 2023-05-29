@@ -16,22 +16,26 @@ import {
     TextFilter,
 } from 'components';
 
-import { useBreadcrumbs } from 'hooks';
+import { useBreadcrumbs, useNotifications } from 'hooks';
 import { useCollection } from 'hooks';
 import { getRepoDisplayName } from 'libs/repo';
 import { ROUTES } from 'routes';
 import { useGetProjectRepoQuery } from 'services/project';
-import { useGetSecretsQuery } from 'services/secret';
+import { useDeleteSecretMutation, useGetSecretsQuery } from 'services/secret';
 
 import { RepositoryGeneralInfo } from '../components/GeneralInfo';
 import { SecretForm } from './SecretForm';
 
+import styles from './styles.module.scss';
+
 export const RepositorySettings: React.FC = () => {
     const { t } = useTranslation();
+    const [pushNotification] = useNotifications();
     const params = useParams();
     const paramProjectName = params.name ?? '';
     const paramRepoId = params.repoId ?? '';
-    const [isVisibleForm, setIsVisibleForm] = useState(true);
+    const [isVisibleForm, setIsVisibleForm] = useState(false);
+    const [editableSecret, setEditableSecret] = useState<ISecret | undefined>();
 
     const { data: repoData, isLoading: isLoadingRepo } = useGetProjectRepoQuery({
         name: paramProjectName,
@@ -42,6 +46,8 @@ export const RepositorySettings: React.FC = () => {
         project_name: paramProjectName,
         repo_id: paramRepoId,
     });
+
+    const [deleteSecret, { isLoading: isDeleting }] = useDeleteSecretMutation();
 
     const displayRepoName = repoData ? getRepoDisplayName(repoData) : 'Loading...';
 
@@ -68,16 +74,49 @@ export const RepositorySettings: React.FC = () => {
         },
     ]);
 
+    const remove = (secret_name: ISecret['secret_name']) => {
+        deleteSecret({
+            project_name: paramProjectName,
+            repo_id: paramRepoId,
+            secret_name: secret_name,
+        })
+            .unwrap()
+            .catch((error) => {
+                pushNotification({
+                    type: 'error',
+                    content: t('common.server_error', { error: error.msg }),
+                });
+            });
+    };
+
+    const edit = (secretName: ISecret['secret_name']) => {
+        setEditableSecret({ secret_name: secretName });
+        setIsVisibleForm(true);
+    };
+
     const COLUMN_DEFINITIONS = [
         {
             id: 'secret_name',
             header: t('projects.repo.secrets.name'),
-            cell: (item: ISecret) => item,
+            cell: (name: ISecret['secret_name']) => name,
         },
         {
             id: 'secret_value',
             header: `${t('projects.repo.secrets.value')}`,
-            cell: () => '************************************',
+            cell: (name: ISecret['secret_name']) => (
+                <div className={styles.secretValueWrapper}>
+                    <div className={styles.secretValue}>************************************</div>
+                    <Button disabled={isDeleting} formAction="none" onClick={() => edit(name)} variant="icon" iconName="edit" />
+
+                    <Button
+                        disabled={isDeleting}
+                        formAction="none"
+                        onClick={() => remove(name)}
+                        variant="icon"
+                        iconName="remove"
+                    />
+                </div>
+            ),
         },
     ];
 
@@ -109,6 +148,7 @@ export const RepositorySettings: React.FC = () => {
 
     const onCloseForm = () => {
         setIsVisibleForm(false);
+        setEditableSecret(undefined);
     };
 
     return (
@@ -128,7 +168,7 @@ export const RepositorySettings: React.FC = () => {
                     items={items}
                     loading={isLoading}
                     loadingText={t('common.loading')}
-                    selectionType="multi"
+                    // selectionType="multi"
                     header={
                         <Header
                             actions={
@@ -154,7 +194,14 @@ export const RepositorySettings: React.FC = () => {
                 />
             </SpaceBetween>
 
-            {isVisibleForm && <SecretForm projectName={paramProjectName} repoId={paramRepoId} onClose={onCloseForm} />}
+            {isVisibleForm && (
+                <SecretForm
+                    projectName={paramProjectName}
+                    repoId={paramRepoId}
+                    onClose={onCloseForm}
+                    initialValues={editableSecret}
+                />
+            )}
         </ContentLayout>
     );
 };

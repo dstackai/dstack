@@ -6,7 +6,7 @@ import { Button, FormInput, FormTextarea, FormUI, Modal, SpaceBetween } from 'co
 
 import { useNotifications } from 'hooks';
 import { isRequestFormErrors2, isRequestFormFieldError } from 'libs';
-import { useCreateSecretMutation } from 'services/secret';
+import { useCreateSecretMutation, useUpdateSecretMutation } from 'services/secret';
 
 import { FormValues, IProps } from './types';
 import { FieldPath } from 'react-hook-form/dist/types/path';
@@ -19,12 +19,15 @@ export const SecretForm: React.FC<IProps> = ({ onClose, repoId, projectName, ini
         defaultValues: initialValues,
     });
 
+    const [updateSecret, { isLoading: isUpdating }] = useUpdateSecretMutation();
     const [createSecret, { isLoading }] = useCreateSecretMutation();
 
-    const loading = isLoading;
+    const loading = isLoading || isUpdating;
 
     const onSubmit = (values: FormValues) => {
-        createSecret({
+        const action = initialValues?.secret_name ? updateSecret : createSecret;
+
+        action({
             project_name: projectName,
             repo_id: repoId,
             secret: values,
