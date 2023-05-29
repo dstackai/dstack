@@ -15,7 +15,6 @@ from dstack.providers.ports import filter_reserved_ports, get_map_to_port
 class BashProvider(Provider):
     def __init__(self):
         super().__init__("bash")
-        self.file = None
         self.python = None
         self.env = None
         self.artifact_specs = None
@@ -24,6 +23,7 @@ class BashProvider(Provider):
         self.commands = None
         self.image_name = None
         self.home_dir = "/root"
+        self.openssh_server = True
 
     def load(
         self,
@@ -49,7 +49,7 @@ class BashProvider(Provider):
             formatter_class=RichHelpFormatter,
         )
         self._add_base_args(parser)
-        parser.add_argument("--ssh", action="store_true", dest="openssh_server")
+        parser.add_argument("--no-ssh", action="store_false", dest="openssh_server")
         if not workflow_name:
             parser.add_argument("-c", "--command", type=str)
         return parser
@@ -60,8 +60,8 @@ class BashProvider(Provider):
         self._parse_base_args(args, unknown_args)
         if self.run_as_provider:
             self.provider_data["commands"] = [args.command]
-        if args.openssh_server:
-            self.openssh_server = True
+        if not args.openssh_server:
+            self.openssh_server = False
 
     def create_job_specs(self) -> List[JobSpec]:
         apps = []

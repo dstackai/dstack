@@ -19,12 +19,14 @@ from dstack.api.runs import list_runs
 from dstack.backend.base.logs import fix_urls
 from dstack.cli.commands import BasicCommand
 from dstack.cli.commands.run.ssh_tunnel import allocate_local_ports, run_ssh_tunnel
+from dstack.cli.commands.run.watcher import LocalCopier, SSHCopier, Watcher
 from dstack.cli.common import add_project_argument, check_init, console, print_runs
 from dstack.cli.config import config, get_hub_client
 from dstack.core.error import NameNotFoundError, RepoNotInitializedError
 from dstack.core.job import Job, JobHead, JobStatus
 from dstack.core.request import RequestStatus
 from dstack.core.run import RunHead
+from dstack.utils.ssh import include_ssh_config, ssh_config_add_host, ssh_config_remove_host
 from dstack.utils.workflows import load_workflows
 
 POLL_PROVISION_RATE_SECS = 3
@@ -77,13 +79,21 @@ class RunCommand(BasicCommand):
             nargs=argparse.ZERO_OR_MORE,
             help="Override workflow or provider arguments",
         )
+        self._parser.add_argument(
+            "--reload",
+            action="store_true",
+            help="Enable local changes one-directional synchronization",
+        )
 
     @check_init
     def _command(self, args: Namespace):
         if not args.workflow_or_provider:
             self._parser.print_help()
             exit(1)
+        watcher = Watcher(os.getcwd())
         try:
+            if args.reload:
+                watcher.start()
             hub_client = get_hub_client(project_name=args.project)
             if (
                 hub_client.repo.repo_data.repo_type != "local"
@@ -121,11 +131,16 @@ class RunCommand(BasicCommand):
                     hub_client,
                     jobs,
                     ssh_key=config.repo_user_config.ssh_key_path,
+                    watcher=watcher,
                 )
         except ValidationError as e:
             sys.exit(
                 f"There a syntax error in one of the files inside the {os.getcwd()}/.dstack/workflows directory:\n\n{e}"
             )
+        finally:
+            if watcher.is_alive():
+                watcher.stop()
+                watcher.join()
 
 
 def _read_ssh_key_pub(key_path: str) -> str:
@@ -137,6 +152,7 @@ def _poll_run(
     hub_client: HubClient,
     job_heads: List[JobHead],
     ssh_key: Optional[str],
+    watcher: Optional[Watcher],
 ):
     run_name = job_heads[0].run_name
     try:
@@ -176,34 +192,30 @@ def _poll_run(
                     request_errors_printed = False
 
         jobs = [hub_client.get_job(job_head.job_id) for job_head in job_heads]
-        ports = {
-            app.port: app.map_to_port
-            for app in jobs[0].app_specs or []
-            if app.map_to_port is not None and app.port != app.map_to_port
-        }
         backend_type = hub_client.get_project_backend_type()
-        if backend_type != "local":
-            console.print("Starting SSH tunnel...")
-            ports = allocate_local_ports(jobs)
-            if not run_ssh_tunnel(
-                ssh_key, jobs[0].host_name, ports, backend_type
-            ):  # todo: cleanup explicitly (stop tunnel)
-                console.print("[warning]Warning: failed to start SSH tunnel[/warning] [red]✗[/]")
-        else:
-            console.print("Provisioning... It may take up to a minute. [green]✓[/]")
+        ports = attach(
+            backend_type,
+            jobs[0],
+            ssh_key,
+        )
         console.print()
         console.print("[grey58]To exit, press Ctrl+C.[/]")
         console.print()
 
-        for app_spec in jobs[0].app_specs or []:
-            if app_spec.app_name == "openssh-server":
-                ssh_port = app_spec.port
-                ssh_port = ports.get(ssh_port, ssh_port)
-                ssh_key_escaped = ssh_key.replace(" ", "\\ ")
-                console.print("To connect via SSH, use:")
-                console.print(f"  ssh -i {ssh_key_escaped} root@localhost -p {ssh_port}")
-                console.print()
-                break
+        if watcher.is_alive():  # reload is enabled
+            if backend_type == "local":
+                watcher.start_copier(
+                    LocalCopier,
+                    dst_root=os.path.expanduser(
+                        f"~/.dstack/local_backend/{hub_client.project}/tmp/runs/{run_name}/{jobs[0].job_id}"
+                    ),
+                )
+            else:
+                watcher.start_copier(
+                    SSHCopier,
+                    ssh_host=f"{run_name}-host",
+                    dst_root=f".dstack/tmp/runs/{run_name}/{jobs[0].job_id}",
+                )
 
         run = hub_client.list_run_heads(run_name)[0]
         if run.status.is_unfinished() or run.status == JobStatus.DONE:
@@ -231,6 +243,8 @@ def _poll_run(
                     status = run.status.name
                     break
         console.print(f"[grey58]{status.capitalize()}[/]")
+        ssh_config_remove_host(config.ssh_config_path, f"{run_name}-host")
+        ssh_config_remove_host(config.ssh_config_path, run_name)
     except KeyboardInterrupt:
         global interrupt_count
         interrupt_count = 1
@@ -307,4 +321,79 @@ def ask_on_interrupt(hub_client: HubClient, run_name: str):
         console.print("\n[grey58]Aborting...[/]")
         hub_client.stop_jobs(run_name, abort=True)
         console.print("[grey58]Aborted[/]")
+        ssh_config_remove_host(config.ssh_config_path, f"{run_name}-host")
+        ssh_config_remove_host(config.ssh_config_path, run_name)
         exit(0)
+
+
+def attach(backend_type: str, job: Job, ssh_key_path: str) -> Dict[int, int]:
+    app_ports = {}
+    openssh_server_port = 0
+    for app in job.app_specs or []:
+        app_ports[app.port] = app.map_to_port or 0
+        if app.app_name == "openssh-server":
+            openssh_server_port = app.port
+    if not (backend_type != "local" or openssh_server_port != 0):
+        console.print("Provisioning... It may take up to a minute. [green]✓[/]")
+        return {k: v for k, v in app_ports.items() if v != 0}
+
+    console.print("Starting SSH tunnel...")
+    include_ssh_config(config.ssh_config_path)
+    ws_port = int(job.env["WS_LOGS_PORT"])
+    host_ports = {ws_port: ws_port}
+
+    if backend_type != "local":
+        ssh_config_add_host(
+            config.ssh_config_path,
+            f"{job.run_name}-host",
+            {
+                "HostName": job.host_name,
+                # TODO: use non-root for all backends
+                "User": "root" if backend_type != "azure" else "ubuntu",
+                "IdentityFile": ssh_key_path,
+                "StrictHostKeyChecking": "no",
+                "UserKnownHostsFile": "/dev/null",
+                "ControlPath": config.ssh_control_path(f"{job.run_name}-host"),
+                "ControlMaster": "auto",
+                "ControlPersist": "10m",
+            },
+        )
+        host_ports[ws_port] = 0  # to map dynamically
+        if openssh_server_port == 0:
+            host_ports.update(app_ports)
+            app_ports = {}
+        host_ports = allocate_local_ports(host_ports)
+        for i in range(3):  # retry
+            if run_ssh_tunnel(f"{job.run_name}-host", host_ports):
+                break
+            time.sleep(2**i)
+        else:
+            console.print("[warning]Warning: failed to start SSH tunnel[/warning] [red]✗[/]")
+
+    if openssh_server_port != 0:
+        options = {
+            "HostName": "localhost",
+            "Port": app_ports[openssh_server_port] or openssh_server_port,
+            "User": "root",
+            "IdentityFile": ssh_key_path,
+            "StrictHostKeyChecking": "no",
+            "UserKnownHostsFile": "/dev/null",
+            "ControlPath": config.ssh_control_path(job.run_name),
+            "ControlMaster": "auto",
+            "ControlPersist": "10m",
+        }
+        if backend_type != "local":
+            options["ProxyJump"] = f"{job.run_name}-host"
+        ssh_config_add_host(config.ssh_config_path, job.run_name, options)
+        del app_ports[openssh_server_port]
+        if app_ports:
+            app_ports = allocate_local_ports(app_ports)
+            for i in range(3):  # retry
+                if run_ssh_tunnel(job.run_name, app_ports):
+                    break
+                time.sleep(2**i)
+            else:
+                console.print("[warning]Warning: failed to start SSH tunnel[/warning] [red]✗[/]")
+        console.print(f"To connect via SSH, use: `ssh {job.run_name}`")
+
+    return {**host_ports, **app_ports}

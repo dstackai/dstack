@@ -1,4 +1,4 @@
-# Getting started
+# Quick start
 
 `dstack` makes it very easy for ML engineers to run dev environments, pipelines and apps cost-effectively 
 on any cloud.

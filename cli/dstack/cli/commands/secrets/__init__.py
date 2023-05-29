@@ -18,6 +18,8 @@ class SecretCommand(BasicCommand):
         super(SecretCommand, self).__init__(parser)
 
     def register(self):
+        add_project_argument(self._parser)
+
         subparsers = self._parser.add_subparsers()
         list_parser = subparsers.add_parser(
             "list", help="List secrets", formatter_class=RichHelpFormatter

@@ -70,6 +70,24 @@ export const RepositoryDetails: React.FC = () => {
         navigate(ROUTES.PROJECT.DETAILS.REPOSITORIES.SETTINGS.FORMAT(paramProjectName, paramRepoId));
     };
 
+    const tabs: {
+        label: string;
+        id: RepoTabTypeEnum;
+        href: string;
+    }[] = [
+        {
+            label: t('projects.run.list_page_title'),
+            id: RepoTabTypeEnum.RUNS,
+            href: ROUTES.PROJECT.DETAILS.REPOSITORIES.DETAILS.FORMAT(paramProjectName, paramRepoId),
+        },
+
+        {
+            label: t('projects.tag.list_page_title'),
+            id: RepoTabTypeEnum.TAGS,
+            href: ROUTES.PROJECT.DETAILS.TAGS.FORMAT(paramProjectName, paramRepoId),
+        },
+    ];
+
     return (
         <ContentLayout
             header={
@@ -94,6 +112,8 @@ export const RepositoryDetails: React.FC = () => {
                 )}
 
                 {repoData && <RepositoryGeneralInfo {...repoData} />}
+
+                <Tabs withNavigation tabs={tabs} />
 
                 <Tabs withNavigation tabs={tabs} />
 

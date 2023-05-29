@@ -43,7 +43,7 @@ class TestInit:
     def test_generate_default_ssh_key(
         self, capsys: CaptureFixture, dstack_dir: Path, tests_local_repo: Path
     ):
-        dstack_key_path = dstack_dir / "dstack_rsa"
+        dstack_key_path = dstack_dir / "ssh" / "id_rsa"
         with hub_process(dstack_dir):
             assert not dstack_key_path.exists()
             exit_code = run_dstack_cli(["init"], dstack_dir=dstack_dir, repo_dir=tests_local_repo)
