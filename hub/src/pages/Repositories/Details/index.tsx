@@ -97,8 +97,6 @@ export const RepositoryDetails: React.FC = () => {
 
                 <Tabs withNavigation tabs={tabs} />
 
-                <Tabs withNavigation tabs={tabs} />
-
                 <Outlet />
             </SpaceBetween>
         </ContentLayout>
