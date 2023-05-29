@@ -23,7 +23,7 @@ class SSHProvider(Provider):
         self.setup = None
         self.image_name = None
         self.home_dir = "/root"
-        self.code = False
+        self.code = True
         self.setup = []
 
     def load(

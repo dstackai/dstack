@@ -13,7 +13,7 @@ To run instance with 1 GPU and print connection URI for VS Code
 <div class="termy"> 
 
 ```shell
-$ dstack run ssh --code --gpu 1
+$ dstack run ssh --gpu 1
 ```
 
 </div>
