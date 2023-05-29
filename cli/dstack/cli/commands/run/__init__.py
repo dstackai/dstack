@@ -79,24 +79,27 @@ class RunCommand(BasicCommand):
             nargs=argparse.ZERO_OR_MORE,
             help="Override workflow or provider arguments",
         )
-        self._parser.add_argument("--sync", action="store_true")
+        self._parser.add_argument(
+            "--reload",
+            action="store_true",
+            help="Enable local changes one-directional synchronization",
+        )
 
     @check_init
     def _command(self, args: Namespace):
         if not args.workflow_or_provider:
             self._parser.print_help()
             exit(1)
-        watcher = None
+        watcher = Watcher(os.getcwd())
         try:
+            if args.reload:
+                watcher.start()
             hub_client = get_hub_client(project_name=args.project)
             if (
                 hub_client.repo.repo_data.repo_type != "local"
                 and not hub_client.get_repo_credentials()
             ):
                 raise RepoNotInitializedError("No credentials", project_name=args.project)
-            if args.sync:
-                watcher = Watcher(os.getcwd())
-                watcher.start()
 
             if not config.repo_user_config.ssh_key_path:
                 ssh_pub_key = None
@@ -135,7 +138,7 @@ class RunCommand(BasicCommand):
                 f"There a syntax error in one of the files inside the {os.getcwd()}/.dstack/workflows directory:\n\n{e}"
             )
         finally:
-            if watcher is not None:
+            if watcher.is_alive():
                 watcher.stop()
                 watcher.join()
 
@@ -199,7 +202,7 @@ def _poll_run(
         console.print("[grey58]To exit, press Ctrl+C.[/]")
         console.print()
 
-        if watcher is not None:
+        if watcher.is_alive():  # reload is enabled
             if backend_type == "local":
                 watcher.start_copier(
                     LocalCopier,
