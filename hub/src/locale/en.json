@@ -7,6 +7,7 @@
     "edit": "Edit",
     "delete": "Delete",
     "remove": "Remove",
+    "settings": "Settings",
     "match_count_with_value_one": "{{count}} match",
     "match_count_with_value_other": "{{count}} matches",
     "nomatch_message_title": "No matches",
@@ -165,6 +166,18 @@
         "last_run": "Last run",
         "tags_count": "Tags count",
         "directory": "Directory"
+      },
+      "secrets": {
+        "table_title": "Secrets",
+        "add_modal_title": "Add secret",
+        "update_modal_title": "Update secret",
+        "name": "Secret name",
+        "name_description": "Secret name",
+        "value": "Secret value",
+        "value_description": "Secret value",
+        "search_placeholder": "Find secrets",
+        "empty_message_title": "No secrets",
+        "empty_message_text": "No secrets to display."
       }
     },
     "run": {

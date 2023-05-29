@@ -41,5 +41,12 @@ export const API = {
         TAG_LIST: (projectName: IProject['project_name']) => `${API.BASE()}/project/${projectName}/tags/list/heads`,
         TAG_ITEM: (projectName: IProject['project_name'], tagName: ITag['tag_name']) =>
             `${API.BASE()}/project/${projectName}/tags/${tagName}`,
+
+        // Secrets
+        SECRET_LIST: (projectName: IProject['project_name']) => `${API.BASE()}/project/${projectName}/secrets/list`,
+        SECRET_ADD: (projectName: IProject['project_name']) => `${API.BASE()}/project/${projectName}/secrets/add`,
+        SECRET_UPDATE: (projectName: IProject['project_name']) => `${API.BASE()}/project/${projectName}/secrets/update`,
+        SECRET_DELETE: (projectName: IProject['project_name'], secretName: ISecret['secret_name']) =>
+            `${API.BASE()}/project/${projectName}/secrets/${secretName}/delete`,
     },
 };
