@@ -119,6 +119,8 @@ class LocalCopier(Copier):
     def copy(self, path: Path):
         target = self.dst_root / path.relative_to(self.src_root)
         target.parent.mkdir(parents=True, exist_ok=True)
+        if target.is_dir():
+            shutil.rmtree(target, ignore_errors=True)
         shutil.copy(path, target)
 
 
@@ -141,5 +143,11 @@ class SSHCopier(Copier):
 
     def copy(self, path: Path):
         target = self.dst_root / path.relative_to(self.src_root)
-        self._exec(["ssh", self.ssh_host, f"mkdir -p {target.parent}"])
+        self._exec(
+            [
+                "ssh",
+                self.ssh_host,
+                f'mkdir -p "{target.parent}"; if [ -d "{target}" ]; then rm -rf "{target}"; fi',
+            ]
+        )
         self._exec(["scp", path, f"{self.ssh_host}:{target}"])

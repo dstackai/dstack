@@ -214,7 +214,7 @@ def _poll_run(
                 watcher.start_copier(
                     SSHCopier,
                     ssh_host=f"{run_name}-host",
-                    dst_root=f"~/.dstack/tmp/runs/{run_name}/{jobs[0].job_id}",
+                    dst_root=f".dstack/tmp/runs/{run_name}/{jobs[0].job_id}",
                 )
 
         run = hub_client.list_run_heads(run_name)[0]
