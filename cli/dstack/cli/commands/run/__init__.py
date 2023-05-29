@@ -19,6 +19,7 @@ from dstack.api.runs import list_runs
 from dstack.backend.base.logs import fix_urls
 from dstack.cli.commands import BasicCommand
 from dstack.cli.commands.run.ssh_tunnel import allocate_local_ports, run_ssh_tunnel
+from dstack.cli.commands.run.watcher import LocalCopier, SSHCopier, Watcher
 from dstack.cli.common import add_project_argument, check_init, console, print_runs
 from dstack.cli.config import config, get_hub_client
 from dstack.core.error import NameNotFoundError, RepoNotInitializedError
@@ -78,13 +79,21 @@ class RunCommand(BasicCommand):
             nargs=argparse.ZERO_OR_MORE,
             help="Override workflow or provider arguments",
         )
+        self._parser.add_argument(
+            "--reload",
+            action="store_true",
+            help="Enable local changes one-directional synchronization",
+        )
 
     @check_init
     def _command(self, args: Namespace):
         if not args.workflow_or_provider:
             self._parser.print_help()
             exit(1)
+        watcher = Watcher(os.getcwd())
         try:
+            if args.reload:
+                watcher.start()
             hub_client = get_hub_client(project_name=args.project)
             if (
                 hub_client.repo.repo_data.repo_type != "local"
@@ -122,11 +131,16 @@ class RunCommand(BasicCommand):
                     hub_client,
                     jobs,
                     ssh_key=config.repo_user_config.ssh_key_path,
+                    watcher=watcher,
                 )
         except ValidationError as e:
             sys.exit(
                 f"There a syntax error in one of the files inside the {os.getcwd()}/.dstack/workflows directory:\n\n{e}"
             )
+        finally:
+            if watcher.is_alive():
+                watcher.stop()
+                watcher.join()
 
 
 def _read_ssh_key_pub(key_path: str) -> str:
@@ -138,6 +152,7 @@ def _poll_run(
     hub_client: HubClient,
     job_heads: List[JobHead],
     ssh_key: Optional[str],
+    watcher: Optional[Watcher],
 ):
     run_name = job_heads[0].run_name
     try:
@@ -177,14 +192,30 @@ def _poll_run(
                     request_errors_printed = False
 
         jobs = [hub_client.get_job(job_head.job_id) for job_head in job_heads]
+        backend_type = hub_client.get_project_backend_type()
         ports = attach(
-            hub_client.get_project_backend_type(),
+            backend_type,
             jobs[0],
             ssh_key,
         )
         console.print()
         console.print("[grey58]To exit, press Ctrl+C.[/]")
         console.print()
+
+        if watcher.is_alive():  # reload is enabled
+            if backend_type == "local":
+                watcher.start_copier(
+                    LocalCopier,
+                    dst_root=os.path.expanduser(
+                        f"~/.dstack/local_backend/{hub_client.project}/tmp/runs/{run_name}/{jobs[0].job_id}"
+                    ),
+                )
+            else:
+                watcher.start_copier(
+                    SSHCopier,
+                    ssh_host=f"{run_name}-host",
+                    dst_root=f".dstack/tmp/runs/{run_name}/{jobs[0].job_id}",
+                )
 
         run = hub_client.list_run_heads(run_name)[0]
         if run.status.is_unfinished() or run.status == JobStatus.DONE:

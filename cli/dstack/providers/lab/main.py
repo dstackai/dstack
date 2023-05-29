@@ -120,7 +120,7 @@ class LabProvider(Provider):
                 "conda install psutil -y",
                 "pip install jupyterlab" + (f"=={self.version}" if self.version else ""),
                 "pip install ipywidgets",
-                "jupyter nbextension enable --py widgetsnbextension",
+                "jupyter labextension enable --py widgetsnbextension",
                 "mkdir -p /root/.jupyter",
                 'echo "c.ServerApp.allow_root = True" > /root/.jupyter/jupyter_server_config.py',
                 "echo \"c.ServerApp.allow_origin = '*'\" >> /root/.jupyter/jupyter_server_config.py",

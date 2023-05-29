@@ -27,6 +27,7 @@ file-read-backwards
 psutil
 cryptography
 filelock
+watchfiles
 
 # AWS
 boto3
