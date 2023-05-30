@@ -364,9 +364,9 @@ def attach(backend_type: str, job: Job, ssh_key_path: str) -> Dict[int, int]:
             app_ports = {}
         host_ports = allocate_local_ports(host_ports)
         for i in range(3):  # retry
+            time.sleep(2**i)
             if run_ssh_tunnel(f"{job.run_name}-host", host_ports):
                 break
-            time.sleep(2**i)
         else:
             console.print("[warning]Warning: failed to start SSH tunnel[/warning] [red]✗[/]")
 
@@ -388,10 +388,10 @@ def attach(backend_type: str, job: Job, ssh_key_path: str) -> Dict[int, int]:
         del app_ports[openssh_server_port]
         if app_ports:
             app_ports = allocate_local_ports(app_ports)
-            for i in range(3):  # retry
+            for i in range(5):  # retry
+                time.sleep(2**i)
                 if run_ssh_tunnel(job.run_name, app_ports):
                     break
-                time.sleep(2**i)
             else:
                 console.print("[warning]Warning: failed to start SSH tunnel[/warning] [red]✗[/]")
         console.print(f"To connect via SSH, use: `ssh {job.run_name}`")
