@@ -194,7 +194,7 @@ def _poll_run(
         jobs = [hub_client.get_job(job_head.job_id) for job_head in job_heads]
         backend_type = hub_client.get_project_backend_type()
         ports = attach(
-            backend_type,
+            hub_client,
             jobs[0],
             ssh_key,
         )
@@ -202,23 +202,22 @@ def _poll_run(
         console.print("[grey58]To exit, press Ctrl+C.[/]")
         console.print()
 
-        if watcher.is_alive():  # reload is enabled
-            if backend_type == "local":
-                watcher.start_copier(
-                    LocalCopier,
-                    dst_root=os.path.expanduser(
-                        f"~/.dstack/local_backend/{hub_client.project}/tmp/runs/{run_name}/{jobs[0].job_id}"
-                    ),
-                )
-            else:
-                watcher.start_copier(
-                    SSHCopier,
-                    ssh_host=f"{run_name}-host",
-                    dst_root=f".dstack/tmp/runs/{run_name}/{jobs[0].job_id}",
-                )
-
         run = hub_client.list_run_heads(run_name)[0]
         if run.status.is_unfinished() or run.status == JobStatus.DONE:
+            if watcher.is_alive():  # reload is enabled
+                if backend_type == "local":
+                    watcher.start_copier(
+                        LocalCopier,
+                        dst_root=os.path.expanduser(
+                            f"~/.dstack/local_backend/{hub_client.project}/tmp/runs/{run_name}/{jobs[0].job_id}"
+                        ),
+                    )
+                else:
+                    watcher.start_copier(
+                        SSHCopier,
+                        ssh_host=f"{run_name}-host",
+                        dst_root=f".dstack/tmp/runs/{run_name}/{jobs[0].job_id}",
+                    )
             _poll_logs_ws(hub_client, jobs[0], ports)
     except KeyboardInterrupt:
         ask_on_interrupt(hub_client, run_name)
@@ -326,7 +325,8 @@ def ask_on_interrupt(hub_client: HubClient, run_name: str):
         exit(0)
 
 
-def attach(backend_type: str, job: Job, ssh_key_path: str) -> Dict[int, int]:
+def attach(hub_client: HubClient, job: Job, ssh_key_path: str) -> Dict[int, int]:
+    backend_type = hub_client.get_project_backend_type()
     app_ports = {}
     openssh_server_port = 0
     for app in job.app_specs or []:
@@ -364,9 +364,9 @@ def attach(backend_type: str, job: Job, ssh_key_path: str) -> Dict[int, int]:
             app_ports = {}
         host_ports = allocate_local_ports(host_ports)
         for i in range(3):  # retry
+            time.sleep(2**i)
             if run_ssh_tunnel(f"{job.run_name}-host", host_ports):
                 break
-            time.sleep(2**i)
         else:
             console.print("[warning]Warning: failed to start SSH tunnel[/warning] [red]✗[/]")
 
@@ -388,12 +388,22 @@ def attach(backend_type: str, job: Job, ssh_key_path: str) -> Dict[int, int]:
         del app_ports[openssh_server_port]
         if app_ports:
             app_ports = allocate_local_ports(app_ports)
-            for i in range(3):  # retry
+            for delay in range(0, 61, POLL_PROVISION_RATE_SECS):  # retry
+                time.sleep(POLL_PROVISION_RATE_SECS if delay else 0)  # skip first sleep
                 if run_ssh_tunnel(job.run_name, app_ports):
                     break
-                time.sleep(2**i)
+                run_status = hub_client.list_run_heads(job.run_name, repo_id=job.repo_ref.repo_id)[
+                    0
+                ].status
+                if run_status != JobStatus.RUNNING:
+                    break
             else:
-                console.print("[warning]Warning: failed to start SSH tunnel[/warning] [red]✗[/]")
+                console.print(
+                    "[red]ERROR[/] Can't establish SSH tunnel with the container\n"
+                    "[grey58]Aborting...[/]"
+                )
+                hub_client.stop_jobs(job.run_name, abort=True)
+                exit(1)
         console.print(f"To connect via SSH, use: `ssh {job.run_name}`")
 
     return {**host_ports, **app_ports}
