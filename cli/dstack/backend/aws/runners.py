@@ -8,6 +8,8 @@ from botocore.client import BaseClient
 
 from dstack import version
 from dstack.backend.base.compute import WS_PORT, NoCapacityError, choose_instance_type
+from dstack.backend.base.config import BACKEND_CONFIG_FILENAME, RUNNER_CONFIG_FILENAME
+from dstack.backend.base.runners import serialize_runner_yaml
 from dstack.core.instance import InstanceType
 from dstack.core.job import Job, Requirements
 from dstack.core.request import RequestHead, RequestStatus
@@ -129,29 +131,6 @@ def _serialize_config_yaml(bucket_name: str, region_name: str):
     return f"backend: aws\\n" f"bucket: {bucket_name}\\n" f"region: {region_name}"
 
 
-def _serialize_runner_yaml(
-    runner_id: str,
-    resources: Resources,
-    runner_port_range_from: int,
-    runner_port_range_to: int,
-):
-    s = (
-        f"id: {runner_id}\\n"
-        f"expose_ports: {runner_port_range_from}-{runner_port_range_to}\\n"
-        f"resources:\\n"
-    )
-    s += f"  cpus: {resources.cpus}\\n"
-    if resources.gpus:
-        s += "  gpus:\\n"
-        for gpu in resources.gpus:
-            s += f"    - name: {gpu.name}\\n      memory_mib: {gpu.memory_mib}\\n"
-    if resources.interruptible:
-        s += "  interruptible: true\\n"
-    if resources.local:
-        s += "  local: true\\n"
-    return s[:-2]
-
-
 def _user_data(
     bucket_name,
     region_name,
@@ -175,13 +154,13 @@ echo "user_allow_other" | sudo tee -a /etc/fuse.conf > /dev/null
 fi
 sudo sysctl -w net.ipv4.ip_local_port_range="{sysctl_port_range_from} ${sysctl_port_range_to}"
 mkdir -p /root/.dstack/
-echo $'{_serialize_config_yaml(bucket_name, region_name)}' > /root/.dstack/config.yaml
-echo $'{_serialize_runner_yaml(runner_id, resources, runner_port_range_from, runner_port_range_to)}' > /root/.dstack/runner.yaml
+echo $'{_serialize_config_yaml(bucket_name, region_name)}' > /root/.dstack/{BACKEND_CONFIG_FILENAME}
+echo $'{serialize_runner_yaml(runner_id, resources, runner_port_range_from, runner_port_range_to)}' > /root/.dstack/{RUNNER_CONFIG_FILENAME}
 die() {{ status=$1; shift; echo "FATAL: $*"; exit $status; }}
 EC2_PUBLIC_HOSTNAME="`wget -q -O - http://169.254.169.254/latest/meta-data/public-hostname || die \"wget public-hostname has failed: $?\"`"
-echo "hostname: $EC2_PUBLIC_HOSTNAME" >> /root/.dstack/runner.yaml
+echo "hostname: $EC2_PUBLIC_HOSTNAME" >> /root/.dstack/{RUNNER_CONFIG_FILENAME}
 mkdir ~/.ssh; chmod 700 ~/.ssh; echo "{ssh_key_pub}" > ~/.ssh/authorized_keys; chmod 600 ~/.ssh/authorized_keys
-HOME=/root nohup dstack-runner --log-level 6 start --http-port {WS_PORT} &
+# HOME=/root nohup dstack-runner --log-level 6 start --http-port {WS_PORT} &
 """
     return user_data
 

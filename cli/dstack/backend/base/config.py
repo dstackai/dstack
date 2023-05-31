@@ -3,6 +3,9 @@ from typing import Dict, Optional
 
 import yaml
 
+BACKEND_CONFIG_FILENAME = "backend.yaml"
+RUNNER_CONFIG_FILENAME = "runner.yaml"
+
 
 class BackendConfig(ABC):
     @abstractmethod
