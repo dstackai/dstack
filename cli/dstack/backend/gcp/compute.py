@@ -675,7 +675,7 @@ def _create_instance(
     if delete_protection:
         instance.deletion_protection = True
 
-    metadata_items = [compute_v1.Items(key="ssh-keys", value=f"root:{ssh_key_pub}")]
+    metadata_items = [compute_v1.Items(key="ssh-keys", value=f"ubuntu:{ssh_key_pub}")]
     if user_data_script is not None:
         metadata_items.append(compute_v1.Items(key="user-data", value=user_data_script))
     instance.metadata = compute_v1.Metadata(items=metadata_items)
