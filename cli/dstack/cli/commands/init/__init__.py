@@ -130,4 +130,5 @@ def get_ssh_keypair(
                     crypto_serialization.PublicFormat.OpenSSH,
                 )
             )
+            f.write(b" dstack\n")
     return str(dstack_key_path)
