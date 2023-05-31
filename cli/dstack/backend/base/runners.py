@@ -5,7 +5,7 @@ import yaml
 from dstack.backend.base.compute import Compute
 from dstack.backend.base.storage import Storage
 from dstack.core.job import JobStatus
-from dstack.core.runners import Runner
+from dstack.core.runners import Resources, Runner
 
 
 def get_runner(storage: Storage, runner_id: str) -> Optional[Runner]:
@@ -41,6 +41,29 @@ def stop_runner(storage: Storage, compute: Compute, runner: Runner):
         else:
             compute.terminate_instance(runner.request_id)
     delete_runner(storage, runner)
+
+
+def serialize_runner_yaml(
+    runner_id: str,
+    resources: Resources,
+    runner_port_range_from: int,
+    runner_port_range_to: int,
+):
+    s = (
+        f"id: {runner_id}\\n"
+        f"expose_ports: {runner_port_range_from}-{runner_port_range_to}\\n"
+        f"resources:\\n"
+    )
+    s += f"  cpus: {resources.cpus}\\n"
+    if resources.gpus:
+        s += "  gpus:\\n"
+        for gpu in resources.gpus:
+            s += f"    - name: {gpu.name}\\n      memory_mib: {gpu.memory_mib}\\n"
+    if resources.interruptible:
+        s += "  interruptible: true\\n"
+    if resources.local:
+        s += "  local: true\\n"
+    return s[:-2]
 
 
 def _get_runner_filename(runner_id: str) -> str:

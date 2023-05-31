@@ -14,6 +14,7 @@ from psutil import NoSuchProcess
 from tqdm import tqdm
 
 from dstack import version
+from dstack.backend.base.config import BACKEND_CONFIG_FILENAME, RUNNER_CONFIG_FILENAME
 from dstack.backend.local.config import LocalConfig
 from dstack.core.job import Job
 from dstack.core.request import RequestHead, RequestStatus
@@ -42,10 +43,10 @@ def start_runner_process(backend_config: LocalConfig, runner_id: str) -> str:
 def check_runner_resources(backend_config: LocalConfig, runner_id: str) -> Resources:
     _install_runner_if_necessary()
     runner_config_dir = _get_runner_config_dir(backend_config, runner_id, create=True)
-    backend_config_path = runner_config_dir / "config.yaml"
+    backend_config_path = runner_config_dir / BACKEND_CONFIG_FILENAME
     with open(backend_config_path, "w+") as f:
         f.write(backend_config.serialize_yaml())
-    runner_config_path = runner_config_dir / "runner.yaml"
+    runner_config_path = runner_config_dir / RUNNER_CONFIG_FILENAME
     result = subprocess.run(
         [f"{_runner_path()} --config-dir {runner_config_dir} check"],
         shell=True,
@@ -117,7 +118,7 @@ def _get_runner_config_dir(
     runner_config_dir_path = backend_config.backend_dir / "tmp" / "runner" / "configs" / runner_id
     if create:
         runner_config_dir_path.mkdir(parents=True, exist_ok=True)
-        runner_config_path = runner_config_dir_path / "runner.yaml"
+        runner_config_path = runner_config_dir_path / RUNNER_CONFIG_FILENAME
         runner_config_path.write_text(
             yaml.dump(
                 {

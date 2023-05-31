@@ -6,8 +6,9 @@ from google.cloud import compute_v1
 from google.oauth2 import service_account
 
 from dstack import version
-from dstack.backend.aws.runners import _serialize_runner_yaml
 from dstack.backend.base.compute import WS_PORT, Compute, choose_instance_type
+from dstack.backend.base.config import BACKEND_CONFIG_FILENAME, RUNNER_CONFIG_FILENAME
+from dstack.backend.base.runners import serialize_runner_yaml
 from dstack.backend.gcp import utils as gcp_utils
 from dstack.backend.gcp.config import GCPConfig
 from dstack.core.instance import InstanceType
@@ -433,13 +434,13 @@ def _get_instance_name(job: Job) -> str:
 
 def _get_user_data_script(gcp_config: GCPConfig, job: Job, instance_type: InstanceType) -> str:
     config_content = gcp_config.serialize_yaml().replace("\n", "\\n")
-    runner_content = _serialize_runner_yaml(job.runner_id, instance_type.resources, 3000, 4000)
+    runner_content = serialize_runner_yaml(job.runner_id, instance_type.resources, 3000, 4000)
     return f"""#!/bin/sh
 mkdir -p /root/.dstack/
-echo '{config_content}' > /root/.dstack/config.yaml
-echo '{runner_content}' > /root/.dstack/runner.yaml
+echo '{config_content}' > /root/.dstack/{BACKEND_CONFIG_FILENAME}
+echo '{runner_content}' > /root/.dstack/{RUNNER_CONFIG_FILENAME}
 EXTERNAL_IP=`curl -H "Metadata-Flavor: Google" http://169.254.169.254/computeMetadata/v1/instance/network-interfaces/0/access-configs/0/external-ip`
-echo "hostname: $EXTERNAL_IP" >> /root/.dstack/runner.yaml
+echo "hostname: $EXTERNAL_IP" >> /root/.dstack/{RUNNER_CONFIG_FILENAME}
 HOME=/root nohup dstack-runner --log-level 6 start --http-port {WS_PORT}
 """
 
