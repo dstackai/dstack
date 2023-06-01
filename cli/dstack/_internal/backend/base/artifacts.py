@@ -7,6 +7,7 @@ from tqdm import tqdm
 from dstack._internal.backend.base import jobs
 from dstack._internal.backend.base.storage import Storage
 from dstack._internal.core.artifact import Artifact
+from dstack._internal.core.error import DstackError
 from dstack._internal.utils.common import PathLike, removeprefix
 
 
@@ -94,7 +95,11 @@ def upload_job_artifact_files(
     artifact_path: PathLike,
     local_path: PathLike,
 ):
+    local_path = Path(local_path).expanduser().absolute()
+    if not local_path.exists():
+        raise DstackError(f"Local path {local_path} does not exist")
     artifacts_dir = _get_job_artifacts_dir(repo_id, job_id)
+    artifact_path = _normalize_upload_artifact_path(artifact_path)
     total_size = 0
     for root, sub_dirs, files in os.walk(local_path):
         for filename in files:
@@ -120,6 +125,17 @@ def upload_job_artifact_files(
                     artifacts_dir, artifact_path, Path(filepath).relative_to(local_path)
                 )
                 storage.upload_file(source_path, dest_path, callback)
+
+
+def _normalize_upload_artifact_path(path: PathLike) -> str:
+    path = Path(path).expanduser()
+    valid_path = path.absolute() == path or path.absolute().resolve() == Path.cwd() / path
+    if not valid_path:
+        raise DstackError("Artifact path should be absolute or be inside the working directory.")
+    path = str(path)
+    if path.startswith("/"):
+        return path[1:]
+    return path
 
 
 def _normalize_path_prefix(path: str) -> str:

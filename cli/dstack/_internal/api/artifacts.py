@@ -35,6 +35,18 @@ def download_backend_artifact_files(
     )
 
 
+def upload_backend_artifact_files(
+    backend: Backend, repo_id: str, job_id: str, local_path: str, artifact_path: str
+):
+    backend.upload_job_artifact_files(
+        repo_id=repo_id,
+        job_id=job_id,
+        artifact_name=artifact_path,
+        artifact_path=artifact_path,
+        local_path=local_path,
+    )
+
+
 def _download_artifact_files(
     download_run_artifact_files_func, repo_id: str, run_name: str, source: str, target: str
 ):

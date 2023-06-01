@@ -1,1 +1,1 @@
-from dstack.artifacts._artifacts import download
+from dstack.artifacts._artifacts import download, upload
