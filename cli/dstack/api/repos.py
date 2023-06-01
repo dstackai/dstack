@@ -6,8 +6,8 @@ import requests
 import yaml
 from git.exc import GitCommandError
 
-from dstack.core.error import DstackError
-from dstack.core.repo import (
+from dstack._internal.core.error import DstackError
+from dstack._internal.core.repo import (
     LocalRepo,
     RemoteRepo,
     RemoteRepoCredentials,
@@ -15,9 +15,13 @@ from dstack.core.repo import (
     Repo,
     RepoProtocol,
 )
-from dstack.core.userconfig import RepoUserConfig
-from dstack.utils.common import PathLike
-from dstack.utils.ssh import get_host_config, make_ssh_command_for_git, try_ssh_key_passphrase
+from dstack._internal.core.userconfig import RepoUserConfig
+from dstack._internal.utils.common import PathLike
+from dstack._internal.utils.ssh import (
+    get_host_config,
+    make_ssh_command_for_git,
+    try_ssh_key_passphrase,
+)
 
 gh_config_path = os.path.expanduser("~/.config/gh/hosts.yml")
 default_ssh_key = os.path.expanduser("~/.ssh/id_rsa")

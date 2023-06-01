@@ -6,24 +6,24 @@ from datetime import datetime
 from pathlib import Path
 from typing import Any, Dict, Generator, List, Optional, Tuple
 
-from dstack import providers
+from dstack._internal import providers
+from dstack._internal.backend.base import artifacts as base_artifacts
+from dstack._internal.core.artifact import Artifact
+from dstack._internal.core.error import NameNotFoundError
+from dstack._internal.core.job import Job, JobHead, JobStatus
+from dstack._internal.core.log_event import LogEvent
+from dstack._internal.core.repo import RemoteRepoCredentials, Repo, RepoHead
+from dstack._internal.core.repo.remote import RemoteRepo
+from dstack._internal.core.run import RunHead
+from dstack._internal.core.secret import Secret
+from dstack._internal.core.tag import TagHead
+from dstack._internal.hub.models import ProjectInfo
+from dstack._internal.utils.common import merge_workflow_data
 from dstack.api.hub._api_client import HubAPIClient
 from dstack.api.hub._config import HubClientConfig
 from dstack.api.hub._storage import HUBStorage
 from dstack.api.hub.errors import HubClientError
 from dstack.api.repos import get_local_repo_credentials
-from dstack.backend.base import artifacts as base_artifacts
-from dstack.core.artifact import Artifact
-from dstack.core.error import NameNotFoundError
-from dstack.core.job import Job, JobHead, JobStatus
-from dstack.core.log_event import LogEvent
-from dstack.core.repo import RemoteRepoCredentials, Repo, RepoHead
-from dstack.core.repo.remote import RemoteRepo
-from dstack.core.run import RunHead
-from dstack.core.secret import Secret
-from dstack.core.tag import TagHead
-from dstack.hub.models import ProjectInfo
-from dstack.utils.common import merge_workflow_data
 
 
 class HubClient:

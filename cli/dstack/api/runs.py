@@ -1,9 +1,8 @@
 from typing import List, Optional, Tuple
 
+from dstack._internal.core.run import RunHead
+from dstack._internal.core.tag import TagHead
 from dstack.api.hub import HubClient
-from dstack.backend.base import Backend
-from dstack.core.run import RunHead
-from dstack.core.tag import TagHead
 
 
 class RunNotFoundError(Exception):

@@ -1,7 +1,7 @@
 import pytest_asyncio
 
-from dstack.hub.db import Database, override_db
-from dstack.hub.db.models import Base
+from dstack._internal.hub.db import Database, override_db
+from dstack._internal.hub.db.models import Base
 
 db = Database("sqlite+aiosqlite://")
 override_db(db)

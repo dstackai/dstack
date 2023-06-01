@@ -1,4 +1,4 @@
-from dstack.utils.ignore import GitIgnore
+from dstack._internal.utils.ignore import GitIgnore
 
 
 def test_plain_text():

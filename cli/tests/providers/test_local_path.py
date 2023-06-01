@@ -1,6 +1,6 @@
 import unittest
 
-from dstack.providers import Provider
+from dstack._internal.providers import Provider
 
 
 def make_provider(**kwargs):

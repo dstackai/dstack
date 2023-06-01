@@ -23,8 +23,8 @@ jobs:
           pip install -r cli/requirements_dev.txt
       - name: Prepare hub
         run: |
-          mkdir -p cli/dstack/hub/statics
-          touch cli/dstack/hub/statics/index.html
+          mkdir -p cli/dstack/_internal/hub/statics
+          touch cli/dstack/_internal/hub/statics/index.html
       - name: Run pytest
         run: |
           pytest cli/tests/integration/
