@@ -1,11 +1,26 @@
+import os
+
 from dstack._internal.backend.base import Backend
 from dstack._internal.backend.gcp import GCPBackend
+from dstack._internal.backend.local import LocalBackend
 from dstack._internal.core.job import Job
 
-backend_classes = [GCPBackend]
+backend_classes = [LocalBackend, GCPBackend]
 
 
 current_backend = None
+
+
+def get_current_repo_id() -> str:
+    return os.environ["DSTACK_REPO"]
+
+
+def get_current_run_name() -> str:
+    return os.environ["RUN_NAME"]
+
+
+def get_current_job_id() -> str:
+    return os.environ["JOB_ID"]
 
 
 def get_current_backend() -> Backend:

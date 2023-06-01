@@ -3,6 +3,7 @@ from argparse import Namespace
 
 from rich.live import Live
 
+from dstack._internal.api.runs import list_runs
 from dstack._internal.cli.commands import BasicCommand
 from dstack._internal.cli.common import (
     add_project_argument,
@@ -11,7 +12,6 @@ from dstack._internal.cli.common import (
     print_runs,
 )
 from dstack._internal.cli.config import get_hub_client
-from dstack.api.runs import list_runs
 
 LIVE_PROVISION_INTERVAL_SECS = 2
 

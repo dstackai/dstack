@@ -69,9 +69,12 @@ class GCPBackend(Backend):
 
     @classmethod
     def load(cls) -> Optional["GCPBackend"]:
+        config = GCPConfig.load()
+        if config is None:
+            return None
         credentials, _ = google.auth.default()
         return cls(
-            backend_config=GCPConfig.load(),
+            backend_config=config,
             credentials=credentials,
         )
 
@@ -149,7 +152,9 @@ class GCPBackend(Backend):
         output_dir: Optional[PathLike],
         files_path: Optional[PathLike] = None,
     ):
-        artifacts = self.list_run_artifact_files(repo_id, run_name=run_name)
+        artifacts = self.list_run_artifact_files(
+            repo_id, run_name=run_name, prefix="", recursive=True
+        )
         base_artifacts.download_run_artifact_files(
             storage=self._storage,
             repo_id=repo_id,

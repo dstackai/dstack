@@ -7,6 +7,7 @@ from pathlib import Path
 from typing import Any, Dict, Generator, List, Optional, Tuple
 
 from dstack._internal import providers
+from dstack._internal.api.repos import get_local_repo_credentials
 from dstack._internal.backend.base import artifacts as base_artifacts
 from dstack._internal.core.artifact import Artifact
 from dstack._internal.core.error import NameNotFoundError
@@ -23,7 +24,6 @@ from dstack.api.hub._api_client import HubAPIClient
 from dstack.api.hub._config import HubClientConfig
 from dstack.api.hub._storage import HUBStorage
 from dstack.api.hub.errors import HubClientError
-from dstack.api.repos import get_local_repo_credentials
 
 
 class HubClient:
@@ -161,7 +161,7 @@ class HubClient:
         files_path: Optional[str] = None,
     ):
         # /{hub_name}/artifacts/download
-        artifacts = self.list_run_artifact_files(run_name=run_name)
+        artifacts = self.list_run_artifact_files(run_name=run_name, recursive=True)
         base_artifacts.download_run_artifact_files(
             storage=self._storage,
             repo_id=self.repo.repo_id,

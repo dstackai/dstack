@@ -1,13 +1,12 @@
 from argparse import Namespace
-from pathlib import Path
 
 from rich.table import Table
 
+from dstack._internal.api.runs import RunNotFoundError, TagNotFoundError, get_tagged_run_name
 from dstack._internal.cli.commands import BasicCommand
 from dstack._internal.cli.common import add_project_argument, check_init, console
 from dstack._internal.cli.config import get_hub_client
 from dstack._internal.utils.common import sizeof_fmt
-from dstack.api.runs import RunNotFoundError, TagNotFoundError, get_tagged_run_name
 
 
 class LsCommand(BasicCommand):

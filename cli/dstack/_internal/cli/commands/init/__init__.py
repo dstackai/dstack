@@ -9,13 +9,13 @@ from cryptography.hazmat.primitives import serialization as crypto_serialization
 from cryptography.hazmat.primitives.asymmetric import rsa
 from git.exc import InvalidGitRepositoryError
 
+from dstack._internal.api.repos import InvalidRepoCredentialsError, get_local_repo_credentials
 from dstack._internal.cli.commands import BasicCommand
 from dstack._internal.cli.common import add_project_argument, console
 from dstack._internal.cli.config import config, get_hub_client
 from dstack._internal.cli.errors import CLIError
 from dstack._internal.core.repo import LocalRepo, RemoteRepo
 from dstack._internal.core.userconfig import RepoUserConfig
-from dstack.api.repos import InvalidRepoCredentialsError, get_local_repo_credentials
 
 
 class InitCommand(BasicCommand):

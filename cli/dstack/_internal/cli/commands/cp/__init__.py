@@ -1,15 +1,12 @@
-import os
-import shutil
-import sys
 from argparse import Namespace
-from pathlib import Path
 
+from dstack._internal.api.artifacts import download_hub_artifact_files
+from dstack._internal.api.runs import RunNotFoundError, TagNotFoundError, get_tagged_run_name
 from dstack._internal.cli.commands import BasicCommand
 from dstack._internal.cli.common import add_project_argument, check_init, console
 from dstack._internal.cli.config import get_hub_client
-from dstack._internal.utils.common import get_dstack_dir
+from dstack._internal.core.error import DstackError
 from dstack.api.hub import HubClient
-from dstack.api.runs import RunNotFoundError, TagNotFoundError, get_tagged_run_name
 
 
 class CpCommand(BasicCommand):
@@ -58,49 +55,8 @@ class CpCommand(BasicCommand):
 
 
 def _copy_artifact_files(hub_client: HubClient, run_name: str, source: str, target: str):
-    tmp_output_dir = get_dstack_dir() / "tmp" / "copied_artifacts" / hub_client.repo.repo_id
-    tmp_output_dir.mkdir(parents=True, exist_ok=True)
-    source = _normalize_source(source)
-    hub_client.download_run_artifact_files(
-        run_name=run_name,
-        output_dir=tmp_output_dir,
-        files_path=source,
-    )
-    tmp_job_output_dir = None
-    # TODO: We support copy for a single job.
-    # Decide later how to work with multi-job artifacts.
-    for job_dir in os.listdir(tmp_output_dir):
-        if job_dir.startswith(run_name):
-            tmp_job_output_dir = tmp_output_dir / job_dir
-            break
-    if tmp_job_output_dir is None:
-        console.print(f"Artifact source path '{source}' does not exist")
+    try:
+        download_hub_artifact_files(hub_client, run_name, source, target)
+    except DstackError as e:
+        console.print(e.message)
         exit(1)
-    source_full_path = tmp_job_output_dir / source
-    target_path = Path(target)
-    if source_full_path.is_dir():
-        if target_path.exists() and not target_path.is_dir():
-            console.print(f"Local target path '{target}' exists and is not a directory")
-            shutil.rmtree(tmp_job_output_dir)
-            exit(1)
-        if sys.version_info[1] >= 8:
-            shutil.copytree(source_full_path, target, dirs_exist_ok=True)
-        else:  # todo: drop along with 3.7
-            import distutils.dir_util
-
-            distutils.dir_util.copy_tree(source_full_path, target)
-    else:
-        if not target_path.exists():
-            if target.endswith("/"):
-                target_path.mkdir(parents=True, exist_ok=True)
-            else:
-                target_path.parent.mkdir(parents=True, exist_ok=True)
-        shutil.copy2(source_full_path, target_path)
-    shutil.rmtree(tmp_job_output_dir)
-
-
-def _normalize_source(source: str) -> str:
-    source = str(Path(source))
-    if source.startswith("/"):
-        source = source[1:]
-    return source

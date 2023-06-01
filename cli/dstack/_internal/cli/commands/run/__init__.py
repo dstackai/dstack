@@ -14,6 +14,7 @@ from rich.prompt import Confirm
 from websocket import WebSocketApp
 
 from dstack._internal import providers
+from dstack._internal.api.runs import list_runs
 from dstack._internal.backend.base.logs import fix_urls
 from dstack._internal.cli.commands import BasicCommand
 from dstack._internal.cli.commands.run.ssh_tunnel import allocate_local_ports, run_ssh_tunnel
@@ -31,7 +32,6 @@ from dstack._internal.utils.ssh import (
 )
 from dstack._internal.utils.workflows import load_workflows
 from dstack.api.hub import HubClient
-from dstack.api.runs import list_runs
 
 POLL_PROVISION_RATE_SECS = 3
 

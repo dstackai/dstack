@@ -6,13 +6,14 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
-	localbackend "github.com/dstackai/dstack/runner/internal/backend/local"
 	"io"
 	"os"
 	"path"
 	"path/filepath"
 	"strconv"
 	"time"
+
+	localbackend "github.com/dstackai/dstack/runner/internal/backend/local"
 
 	"github.com/docker/docker/api/types"
 
@@ -435,12 +436,9 @@ func (ex *Executor) environment(ctx context.Context) []string {
 
 	cons := make(map[string]string)
 	cons["PYTHONUNBUFFERED"] = "1"
-	if job.JobID != "" {
-		cons["JOB_ID"] = job.JobID
-	}
-	if job.RunName != "" {
-		cons["RUN_NAME"] = job.RunName
-	}
+	cons["DSTACK_REPO"] = job.RepoId
+	cons["JOB_ID"] = job.JobID
+	cons["RUN_NAME"] = job.RunName
 	if ex.config.Hostname != nil {
 		cons["JOB_HOSTNAME"] = *ex.config.Hostname
 		cons["HOSTNAME"] = *ex.config.Hostname
@@ -475,6 +473,11 @@ func (ex *Executor) processJob(ctx context.Context, stoppedCh chan struct{}) err
 		Type:   mount.TypeBind,
 		Source: path.Join(ex.backend.GetTMPDir(ctx), consts.RUNS_DIR, job.RunName, job.JobID),
 		Target: "/workflow",
+	})
+	bindings = append(bindings, mount.Mount{
+		Type:   mount.TypeBind,
+		Source: filepath.Join(ex.configDir, consts.CONFIG_FILE_NAME),
+		Target: filepath.Join(job.HomeDir, ".dstack", consts.CONFIG_FILE_NAME),
 	})
 	for _, artifact := range ex.artifactsIn {
 		art, err := artifact.DockerBindings(path.Join("/workflow", job.WorkingDir))

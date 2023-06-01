@@ -17,4 +17,10 @@ class LocalConfig(BackendConfig):
 
     @classmethod
     def deserialize(cls, config_data: Dict) -> "LocalConfig":
-        pass
+        if config_data.get("backend") != "local":
+            return None
+        try:
+            namespace = config_data["namespace"]
+        except KeyError:
+            return None
+        return LocalConfig(namespace)

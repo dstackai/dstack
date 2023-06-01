@@ -132,7 +132,9 @@ class AzureBackend(Backend):
         output_dir: Optional[PathLike],
         files_path: Optional[PathLike] = None,
     ):
-        artifacts = self.list_run_artifact_files(repo_id, run_name=run_name)
+        artifacts = self.list_run_artifact_files(
+            repo_id, run_name=run_name, prefix="", recursive=True
+        )
         base_artifacts.download_run_artifact_files(
             storage=self._storage,
             repo_id=repo_id,

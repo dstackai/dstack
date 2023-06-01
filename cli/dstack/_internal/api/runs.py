@@ -1,15 +1,16 @@
 from typing import List, Optional, Tuple
 
+from dstack._internal.core.error import DstackError
 from dstack._internal.core.run import RunHead
 from dstack._internal.core.tag import TagHead
 from dstack.api.hub import HubClient
 
 
-class RunNotFoundError(Exception):
+class RunNotFoundError(DstackError):
     pass
 
 
-class TagNotFoundError(Exception):
+class TagNotFoundError(DstackError):
     pass
 
 

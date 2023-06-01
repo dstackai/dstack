@@ -5,12 +5,12 @@ from typing import Dict, List, Optional, Type, TypeVar
 import yaml
 from pydantic import BaseModel, ValidationError
 
+from dstack._internal.api.repos import load_repo
 from dstack._internal.cli.errors import CLIError
 from dstack._internal.core.error import RepoNotInitializedError
 from dstack._internal.core.userconfig import RepoUserConfig
 from dstack._internal.utils.common import get_dstack_dir
 from dstack.api.hub import HubClient, HubClientConfig
-from dstack.api.repos import load_repo
 
 Model = TypeVar("Model", bound=BaseModel)
 

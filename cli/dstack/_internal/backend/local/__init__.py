@@ -43,8 +43,11 @@ class LocalBackend(Backend):
         self._secrets_manager = LocalSecretsManager(self.backend_config.backend_dir)
 
     @classmethod
-    def load(cls) -> Optional["AWSBackend"]:
-        return None
+    def load(cls) -> Optional["LocalBackend"]:
+        config = LocalConfig.load()
+        if config is None:
+            return None
+        return cls(backend_config=config)
 
     def create_run(self, repo_id: str) -> str:
         return base_runs.create_run(self._storage)
@@ -112,11 +115,13 @@ class LocalBackend(Backend):
         output_dir: Optional[PathLike],
         files_path: Optional[PathLike] = None,
     ):
-        list_artifacts = self.list_run_artifact_files(repo_id, run_name)
+        artifacts = self.list_run_artifact_files(
+            repo_id, run_name=run_name, prefix="", recursive=True
+        )
         base_artifacts.download_run_artifact_files(
             storage=self._storage,
             repo_id=repo_id,
-            artifacts=list_artifacts,
+            artifacts=artifacts,
             output_dir=output_dir,
             files_path=files_path,
         )
