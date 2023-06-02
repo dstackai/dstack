@@ -18,7 +18,6 @@ class LabProvider(Provider):
 
     def __init__(self):
         super().__init__("lab")
-        self.setup = None
         self.python = None
         self.version = None
         self.env = None
@@ -39,7 +38,6 @@ class LabProvider(Provider):
         ssh_key_pub: Optional[str] = None,
     ):
         super().load(hub_client, args, workflow_name, provider_data, run_name, ssh_key_pub)
-        self.setup = self._get_list_data("setup") or self._get_list_data("before_run")
         self.python = self._safe_python_version("python")
         self.version = self.provider_data.get("version")
         self.env = self._env()
@@ -67,7 +65,7 @@ class LabProvider(Provider):
     def create_job_specs(self) -> List[JobSpec]:
         env = {}
         token = uuid.uuid4().hex
-        env["TOKEN"] = token
+        env["TOKEN"] = token  # fixme
         apps = []
         for i, pm in enumerate(filter_reserved_ports(self.ports), start=1):
             apps.append(
@@ -100,6 +98,7 @@ class LabProvider(Provider):
                 artifact_specs=self.artifact_specs,
                 requirements=self.resources,
                 app_specs=apps,
+                setup=self._setup(),
             )
         ]
 
@@ -109,6 +108,22 @@ class LabProvider(Provider):
         cpu_image_name = f"dstackai/miniforge:py{self.python}-{version.miniforge_image}"
         return cuda_image_name if cuda_is_required else cpu_image_name
 
+    def _setup(self) -> List[str]:
+        commands = [
+            "conda install psutil -y",
+            "pip install jupyterlab" + (f"=={self.version}" if self.version else ""),
+            "pip install ipywidgets",
+            "jupyter labextension enable --py widgetsnbextension",
+            "mkdir -p /root/.jupyter",
+            'echo "c.ServerApp.allow_root = True" > /root/.jupyter/jupyter_server_config.py',
+            "echo \"c.ServerApp.allow_origin = '*'\" >> /root/.jupyter/jupyter_server_config.py",
+            'echo "c.ServerApp.open_browser = False" >> /root/.jupyter/jupyter_server_config.py',
+            "echo \"c.ServerApp.ip = '0.0.0.0'\" >> /root/.jupyter/jupyter_server_config.py",
+        ]
+        if self.setup:
+            commands.extend(self.setup)
+        return commands
+
     def _commands(self):
         commands = []
         if self.env:
@@ -117,21 +132,10 @@ class LabProvider(Provider):
             OpenSSHExtension.patch_commands(commands, ssh_key_pub=self.ssh_key_pub)
         commands.extend(
             [
-                "conda install psutil -y",
-                "pip install jupyterlab" + (f"=={self.version}" if self.version else ""),
-                "pip install ipywidgets",
-                "jupyter labextension enable --py widgetsnbextension",
-                "mkdir -p /root/.jupyter",
-                'echo "c.ServerApp.allow_root = True" > /root/.jupyter/jupyter_server_config.py',
-                "echo \"c.ServerApp.allow_origin = '*'\" >> /root/.jupyter/jupyter_server_config.py",
-                'echo "c.ServerApp.open_browser = False" >> /root/.jupyter/jupyter_server_config.py',
                 f'echo "c.ServerApp.port = {self.lab_port}" >> /root/.jupyter/jupyter_server_config.py',
                 "echo \"c.ServerApp.token = '$TOKEN'\" >> /root/.jupyter/jupyter_server_config.py",
-                "echo \"c.ServerApp.ip = '0.0.0.0'\" >> /root/.jupyter/jupyter_server_config.py",
             ]
         )
-        if self.setup:
-            commands.extend(self.setup)
         commands.append(f"jupyter lab")
         return commands
 

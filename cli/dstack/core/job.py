@@ -438,6 +438,7 @@ class JobSpec(JobRef):
     requirements: Optional[Requirements] = None
     master_job: Optional[JobRef] = None
     app_specs: Optional[List[AppSpec]] = None
+    setup: Optional[List[str]] = None
 
     def get_id(self) -> Optional[str]:
         return self.job_id

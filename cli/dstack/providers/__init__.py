@@ -283,7 +283,7 @@ class Provider:
                 ssh_key_pub=self.ssh_key_pub,
                 repo_code_filename=repo_code_filename,
                 prebuild=self.prebuild,
-                setup=self.setup,
+                setup=job_spec.setup,
             )
             hub_client.submit_job(job)
             jobs.append(job)

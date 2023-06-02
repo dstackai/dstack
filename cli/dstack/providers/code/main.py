@@ -18,7 +18,6 @@ class CodeProvider(Provider):
 
     def __init__(self):
         super().__init__("code")
-        self.setup = None
         self.python = None
         self.version = None
         self.requirements = None
@@ -40,7 +39,6 @@ class CodeProvider(Provider):
         ssh_key_pub: Optional[str] = None,
     ):
         super().load(hub_client, args, workflow_name, provider_data, run_name, ssh_key_pub)
-        self.setup = self._get_list_data("setup") or self._get_list_data("before_run")
         self.python = self._safe_python_version("python")
         self.version = self.provider_data.get("version") or "1.78.1"
         self.env = self._env()
@@ -68,7 +66,7 @@ class CodeProvider(Provider):
     def create_job_specs(self) -> List[JobSpec]:
         env = {}
         connection_token = uuid.uuid4().hex
-        env["CONNECTION_TOKEN"] = connection_token
+        env["CONNECTION_TOKEN"] = connection_token  # fixme problem!
         apps = []
         for i, pm in enumerate(filter_reserved_ports(self.ports), start=1):
             apps.append(
@@ -102,6 +100,7 @@ class CodeProvider(Provider):
                 artifact_specs=self.artifact_specs,
                 requirements=self.resources,
                 app_specs=apps,
+                setup=self._setup(),
             )
         ]
 
@@ -111,27 +110,28 @@ class CodeProvider(Provider):
         cpu_image_name = f"dstackai/miniforge:py{self.python}-{version.miniforge_image}"
         return cuda_image_name if cuda_is_required else cpu_image_name
 
+    def _setup(self) -> List[str]:
+        commands = [
+            "pip install ipykernel -q",
+            "mkdir -p /tmp",
+            'if [ $(uname -m) = "aarch64" ]; then arch="arm64"; else arch="x64"; fi',
+            f"wget -q https://github.com/gitpod-io/openvscode-server/releases/download/"
+            f"openvscode-server-v{self.version}/openvscode-server-v{self.version}-linux-$arch.tar.gz -O "
+            f"/tmp/openvscode-server-v{self.version}-linux-$arch.tar.gz",
+            f"tar -xzf /tmp/openvscode-server-v{self.version}-linux-$arch.tar.gz -C /tmp",
+            f"/tmp/openvscode-server-v{self.version}-linux-$arch/bin/openvscode-server --install-extension ms-python.python --install-extension ms-toolsai.jupyter",
+            "rm /usr/bin/python2*",
+        ]
+        if self.setup:
+            commands.extend(self.setup)
+        return commands
+
     def _commands(self):
         commands = []
         if self.env:
             self._extend_commands_with_env(commands, self.env)
         if self.openssh_server:
             OpenSSHExtension.patch_commands(commands, ssh_key_pub=self.ssh_key_pub)
-        commands.extend(
-            [
-                "pip install ipykernel -q",
-                "mkdir -p /tmp",
-                'if [ $(uname -m) = "aarch64" ]; then arch="arm64"; else arch="x64"; fi',
-                f"wget -q https://github.com/gitpod-io/openvscode-server/releases/download/"
-                f"openvscode-server-v{self.version}/openvscode-server-v{self.version}-linux-$arch.tar.gz -O "
-                f"/tmp/openvscode-server-v{self.version}-linux-$arch.tar.gz",
-                f"tar -xzf /tmp/openvscode-server-v{self.version}-linux-$arch.tar.gz -C /tmp",
-                f"/tmp/openvscode-server-v{self.version}-linux-$arch/bin/openvscode-server --install-extension ms-python.python --install-extension ms-toolsai.jupyter",
-                "rm /usr/bin/python2*",
-            ]
-        )
-        if self.setup:
-            commands.extend(self.setup)
         if self.openssh_server:
             commands.extend(
                 [
@@ -140,10 +140,13 @@ class CodeProvider(Provider):
                     f"echo '  vscode-insiders://vscode-remote/ssh-remote+{self.run_name}/workflow'",
                 ]
             )
-        commands.append(
-            f"/tmp/openvscode-server-v{self.version}-linux-$arch/bin/openvscode-server"
-            f"  --port {self.code_port} --host 0.0.0.0 --connection-token $CONNECTION_TOKEN"
-            f"  --default-folder /workflow"
+        commands.extend(
+            [
+                'if [ $(uname -m) = "aarch64" ]; then arch="arm64"; else arch="x64"; fi',
+                f"/tmp/openvscode-server-v{self.version}-linux-$arch/bin/openvscode-server"
+                f"  --port {self.code_port} --host 0.0.0.0 --connection-token $CONNECTION_TOKEN"
+                f"  --default-folder /workflow",
+            ]
         )
         return commands
 
