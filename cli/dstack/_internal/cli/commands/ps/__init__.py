@@ -3,7 +3,7 @@ from argparse import Namespace
 
 from rich.live import Live
 
-from dstack._internal.api.runs import list_runs
+from dstack._internal.api.runs import list_runs_hub
 from dstack._internal.cli.commands import BasicCommand
 from dstack._internal.cli.common import (
     add_project_argument,
@@ -53,7 +53,7 @@ class PSCommand(BasicCommand):
     @check_init
     def _command(self, args: Namespace):
         hub_client = get_hub_client(project_name=args.project)
-        runs = list_runs(hub_client, run_name=args.run_name, all=args.all)
+        runs = list_runs_hub(hub_client, run_name=args.run_name, all=args.all)
         if args.watch:
             try:
                 with Live(
@@ -62,7 +62,7 @@ class PSCommand(BasicCommand):
                 ) as live:
                     while True:
                         time.sleep(LIVE_PROVISION_INTERVAL_SECS)
-                        runs = list_runs(hub_client, run_name=args.run_name, all=args.all)
+                        runs = list_runs_hub(hub_client, run_name=args.run_name, all=args.all)
                         live.update(generate_runs_table(runs, verbose=args.verbose))
             except KeyboardInterrupt:
                 pass

@@ -1,7 +1,7 @@
 from argparse import Namespace
 
-from dstack._internal.api.artifacts import download_hub_artifact_files
-from dstack._internal.api.runs import RunNotFoundError, TagNotFoundError, get_tagged_run_name
+from dstack._internal.api.artifacts import download_artifact_files_hub
+from dstack._internal.api.runs import RunNotFoundError, TagNotFoundError, get_tagged_run_name_hub
 from dstack._internal.cli.commands import BasicCommand
 from dstack._internal.cli.common import add_project_argument, check_init, console
 from dstack._internal.cli.config import get_hub_client
@@ -41,7 +41,7 @@ class CpCommand(BasicCommand):
     def _command(self, args: Namespace):
         hub_client = get_hub_client(project_name=args.project)
         try:
-            run_name, _ = get_tagged_run_name(hub_client, args.run_name_or_tag_name)
+            run_name, _ = get_tagged_run_name_hub(hub_client, args.run_name_or_tag_name)
         except (TagNotFoundError, RunNotFoundError):
             console.print(f"Cannot find the run or tag '{args.run_name_or_tag_name}'")
             exit(1)
@@ -56,7 +56,7 @@ class CpCommand(BasicCommand):
 
 def _copy_artifact_files(hub_client: HubClient, run_name: str, source: str, target: str):
     try:
-        download_hub_artifact_files(hub_client, run_name, source, target)
+        download_artifact_files_hub(hub_client, run_name, source, target)
     except DstackError as e:
         console.print(e.message)
         exit(1)

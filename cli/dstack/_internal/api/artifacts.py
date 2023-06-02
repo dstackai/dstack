@@ -6,11 +6,12 @@ from pathlib import Path
 
 from dstack._internal.backend.base import Backend
 from dstack._internal.core.error import DstackError
+from dstack._internal.core.repo.base import Repo
 from dstack._internal.utils.common import get_dstack_dir
 from dstack.api.hub import HubClient
 
 
-def download_hub_artifact_files(hub_client: HubClient, run_name: str, source: str, target: str):
+def download_artifact_files_hub(hub_client: HubClient, run_name: str, source: str, target: str):
     _download_artifact_files(
         download_run_artifact_files_func=hub_client.download_run_artifact_files,
         repo_id=hub_client.repo.repo_id,
@@ -20,7 +21,7 @@ def download_hub_artifact_files(hub_client: HubClient, run_name: str, source: st
     )
 
 
-def download_backend_artifact_files(
+def download_artifact_files_backend(
     backend: Backend, repo_id: str, run_name: str, source: str, target: str
 ):
     download_run_artifact_files_func = partial(
@@ -35,7 +36,7 @@ def download_backend_artifact_files(
     )
 
 
-def upload_backend_artifact_files(
+def upload_artifact_files_backend(
     backend: Backend, repo_id: str, job_id: str, local_path: str, artifact_path: str
 ):
     backend.upload_job_artifact_files(
@@ -44,6 +45,25 @@ def upload_backend_artifact_files(
         artifact_name=artifact_path,
         artifact_path=artifact_path,
         local_path=local_path,
+    )
+
+
+def upload_artifact_files_from_tag_backend(
+    backend: Backend,
+    repo: Repo,
+    hub_user_name: str,
+    local_path: str,
+    artifact_path: str,
+    tag_name: str,
+):
+    if backend.get_tag_head(repo_id=repo.repo_id, tag_name=tag_name) is not None:
+        raise DstackError(f"Tag {tag_name} already exists")
+    backend.add_tag_from_local_dirs(
+        repo=repo,
+        hub_user_name=hub_user_name,
+        tag_name=tag_name,
+        local_dirs=[local_path],
+        artifact_paths=[artifact_path],
     )
 
 

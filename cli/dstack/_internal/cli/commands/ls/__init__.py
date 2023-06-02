@@ -2,7 +2,7 @@ from argparse import Namespace
 
 from rich.table import Table
 
-from dstack._internal.api.runs import RunNotFoundError, TagNotFoundError, get_tagged_run_name
+from dstack._internal.api.runs import RunNotFoundError, TagNotFoundError, get_tagged_run_name_hub
 from dstack._internal.cli.commands import BasicCommand
 from dstack._internal.cli.common import add_project_argument, check_init, console
 from dstack._internal.cli.config import get_hub_client
@@ -46,7 +46,7 @@ class LsCommand(BasicCommand):
 
         hub_client = get_hub_client(project_name=args.project)
         try:
-            run_name, _ = get_tagged_run_name(hub_client, args.run_name_or_tag_name)
+            run_name, _ = get_tagged_run_name_hub(hub_client, args.run_name_or_tag_name)
         except (TagNotFoundError, RunNotFoundError):
             console.print(f"Cannot find the run or tag '{args.run_name_or_tag_name}'")
             exit(1)

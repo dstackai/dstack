@@ -2,17 +2,30 @@ from typing import Optional
 
 from dstack._internal.api import workflow_api
 from dstack._internal.api.artifacts import (
-    download_backend_artifact_files,
-    upload_backend_artifact_files,
+    download_artifact_files_backend,
+    upload_artifact_files_backend,
+    upload_artifact_files_from_tag_backend,
 )
+from dstack._internal.api.runs import get_tagged_run_name_backend
 
 
-def download(run_name: str, artifact_path: str, local_path: Optional[str] = None):
+def download(
+    artifact_path: str,
+    local_path: Optional[str] = None,
+    run: Optional[str] = None,
+    tag: Optional[str] = None,
+):
     if local_path is None:
         local_path = artifact_path
     backend = workflow_api.get_current_backend()
     repo_id = workflow_api.get_current_repo_id()
-    download_backend_artifact_files(
+    run_name, _ = get_tagged_run_name_backend(
+        backend=backend,
+        repo_id=repo_id,
+        run_name=run,
+        tag_name=tag,
+    )
+    download_artifact_files_backend(
         backend=backend,
         repo_id=repo_id,
         run_name=run_name,
@@ -27,10 +40,21 @@ def upload(local_path: str, artifact_path: Optional[str] = None, tag: Optional[s
     backend = workflow_api.get_current_backend()
     repo_id = workflow_api.get_current_repo_id()
     job_id = workflow_api.get_current_job_id()
-    upload_backend_artifact_files(
+    if tag is None:
+        upload_artifact_files_backend(
+            backend=backend,
+            repo_id=repo_id,
+            job_id=job_id,
+            local_path=local_path,
+            artifact_path=artifact_path,
+        )
+        return
+    job = workflow_api.get_current_job()
+    upload_artifact_files_from_tag_backend(
         backend=backend,
-        repo_id=repo_id,
-        job_id=job_id,
+        repo=job.repo,
+        hub_user_name=job.hub_user_name,
         local_path=local_path,
         artifact_path=artifact_path,
+        tag_name=tag,
     )

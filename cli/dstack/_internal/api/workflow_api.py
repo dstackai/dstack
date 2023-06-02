@@ -42,5 +42,5 @@ def get_current_job() -> Job:
     if current_job is not None:
         return current_job
     backend = get_current_backend()
-    current_job = backend.get_job()
+    current_job = backend.get_job(get_current_repo_id(), get_current_job_id())
     return current_job

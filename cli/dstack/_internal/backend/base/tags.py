@@ -5,7 +5,7 @@ from typing import List, Optional
 from dstack._internal.backend.base import artifacts, jobs, runs
 from dstack._internal.backend.base.storage import Storage
 from dstack._internal.core.artifact import ArtifactHead, ArtifactSpec
-from dstack._internal.core.error import BackendError
+from dstack._internal.core.error import BackendError, DstackError
 from dstack._internal.core.job import Job, JobStatus
 from dstack._internal.core.repo import Repo
 from dstack._internal.core.tag import TagHead
@@ -144,16 +144,17 @@ def create_tag_from_local_dirs(
     hub_user_name: str,
     tag_name: str,
     local_dirs: List[str],
+    artifact_paths: List[str],
 ):
     local_paths = []
     tag_artifacts = []
-    for local_dir in local_dirs:
-        path = Path(local_dir)
-        if path.is_dir():
-            local_paths.append(path)
-            tag_artifacts.append(str(path))
+    for local_path, artifact_path in zip(local_dirs, artifact_paths):
+        local_path = Path(local_path).expanduser().absolute()
+        if local_path.is_dir():
+            local_paths.append(local_path)
+            tag_artifacts.append(str(artifacts.normalize_upload_artifact_path(artifact_path)))
         else:
-            exit(f"The '{local_dir}' path doesn't refer to an existing directory")
+            raise DstackError(f"The '{local_path}' path doesn't refer to an existing directory")
 
     run_name = runs.create_run(storage)
     job = Job(

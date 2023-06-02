@@ -11,6 +11,7 @@ from dstack._internal.core.artifact import Artifact
 from dstack._internal.core.job import Job, JobHead, JobStatus
 from dstack._internal.core.log_event import LogEvent
 from dstack._internal.core.repo import RemoteRepoCredentials, RepoHead, RepoSpec
+from dstack._internal.core.repo.base import Repo
 from dstack._internal.core.run import RunHead
 from dstack._internal.core.secret import Secret
 from dstack._internal.core.tag import TagHead
@@ -159,7 +160,14 @@ class Backend(ABC):
         pass
 
     @abstractmethod
-    def add_tag_from_local_dirs(self, tag_name: str, local_dirs: List[str]):
+    def add_tag_from_local_dirs(
+        self,
+        repo: Repo,
+        hub_user_name: str,
+        tag_name: str,
+        local_dirs: List[str],
+        artifact_paths: List[str],
+    ):
         pass
 
     @abstractmethod

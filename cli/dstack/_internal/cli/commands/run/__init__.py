@@ -14,7 +14,7 @@ from rich.prompt import Confirm
 from websocket import WebSocketApp
 
 from dstack._internal import providers
-from dstack._internal.api.runs import list_runs
+from dstack._internal.api.runs import list_runs_hub
 from dstack._internal.backend.base.logs import fix_urls
 from dstack._internal.cli.commands import BasicCommand
 from dstack._internal.cli.commands.run.ssh_tunnel import allocate_local_ports, run_ssh_tunnel
@@ -124,7 +124,7 @@ class RunCommand(BasicCommand):
                     tag_name=args.tag_name,
                     args=args,
                 )
-            runs = list_runs(hub_client, run_name=run_name)
+            runs = list_runs_hub(hub_client, run_name=run_name)
             print_runs(runs)
             run = runs[0]
             if run.status == JobStatus.FAILED:
