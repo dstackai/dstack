@@ -3,13 +3,15 @@ package local
 import (
 	"context"
 	"fmt"
-	"github.com/dstackai/dstack/runner/internal/repo"
 	"io"
 	"io/ioutil"
 	"os"
 	"path"
 	"path/filepath"
 	"strings"
+
+	"github.com/docker/docker/api/types/mount"
+	"github.com/dstackai/dstack/runner/internal/repo"
 
 	"github.com/dstackai/dstack/runner/consts"
 	"github.com/dstackai/dstack/runner/consts/states"
@@ -28,6 +30,7 @@ type LocalConfigFile struct {
 }
 
 type Local struct {
+	namespace string
 	path      string
 	runnerID  string
 	state     *models.State
@@ -57,6 +60,7 @@ func init() {
 func New(namespace string) *Local {
 	path := filepath.Join(common.HomeDir(), consts.DSTACK_DIR_PATH, LOCAL_BACKEND_DIR, namespace)
 	return &Local{
+		namespace: namespace,
 		path:      path,
 		storage:   NewLocalStorage(path),
 		cliSecret: NewClientSecret(path),
@@ -260,4 +264,14 @@ func (l *Local) GetRepoArchive(ctx context.Context, path, dir string) error {
 
 func (l *Local) GetTMPDir(ctx context.Context) string {
 	return path.Join(l.path, "tmp")
+}
+
+func (l *Local) GetDockerBindings(ctx context.Context) []mount.Mount {
+	return []mount.Mount{
+		{
+			Type:   mount.TypeBind,
+			Source: l.path,
+			Target: path.Join(l.state.Job.HomeDir, consts.DSTACK_DIR_PATH, LOCAL_BACKEND_DIR, l.namespace),
+		},
+	}
 }

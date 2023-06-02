@@ -479,6 +479,8 @@ func (ex *Executor) processJob(ctx context.Context, stoppedCh chan struct{}) err
 		Source: filepath.Join(ex.configDir, consts.CONFIG_FILE_NAME),
 		Target: filepath.Join(job.HomeDir, ".dstack", consts.CONFIG_FILE_NAME),
 	})
+	bindings = append(bindings, ex.backend.GetDockerBindings(ctx)...)
+
 	for _, artifact := range ex.artifactsIn {
 		art, err := artifact.DockerBindings(path.Join("/workflow", job.WorkingDir))
 		if err != nil {

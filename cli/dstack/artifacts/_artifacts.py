@@ -10,11 +10,14 @@ from dstack._internal.api.runs import get_tagged_run_name_backend
 
 
 def download(
-    artifact_path: str,
-    local_path: Optional[str] = None,
     run: Optional[str] = None,
     tag: Optional[str] = None,
+    artifact_path: Optional[str] = None,
+    local_path: Optional[str] = None,
 ):
+    if artifact_path is None:
+        artifact_path = ""
+        local_path = "."
     if local_path is None:
         local_path = artifact_path
     backend = workflow_api.get_current_backend()

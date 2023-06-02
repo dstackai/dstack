@@ -157,6 +157,8 @@ def _normalize_path_prefix(path: str) -> str:
 def _update_job_artifacts(storage: Storage, repo_id: str, job_id: str, artifact_path: Path):
     artifact_path = str(artifact_path)
     job = jobs.get_job(storage, repo_id, job_id)
+    if job.artifact_specs is None:
+        job.artifact_specs = []
     artifact_paths = [s.artifact_path for s in job.artifact_specs]
     if artifact_path in artifact_paths:
         return

@@ -10,6 +10,7 @@ import (
 	"strings"
 
 	"github.com/Azure/azure-sdk-for-go/sdk/azidentity"
+	"github.com/docker/docker/api/types/mount"
 	"github.com/dstackai/dstack/runner/consts"
 	"github.com/dstackai/dstack/runner/internal/artifacts"
 	"github.com/dstackai/dstack/runner/internal/backend"
@@ -287,4 +288,8 @@ func (azbackend *AzureBackend) GetRepoArchive(ctx context.Context, path, dir str
 
 func (azbackend *AzureBackend) GetTMPDir(ctx context.Context) string {
 	return path.Join(common.HomeDir(), consts.TMP_DIR_PATH)
+}
+
+func (azbackend *AzureBackend) GetDockerBindings(ctx context.Context) []mount.Mount {
+	return []mount.Mount{}
 }

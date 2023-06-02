@@ -9,6 +9,7 @@ import (
 	"path/filepath"
 	"sync"
 
+	"github.com/docker/docker/api/types/mount"
 	"github.com/dstackai/dstack/runner/internal/artifacts"
 	"github.com/dstackai/dstack/runner/internal/gerrors"
 	"github.com/dstackai/dstack/runner/internal/log"
@@ -38,6 +39,7 @@ type Backend interface {
 	GetRepoDiff(ctx context.Context, path string) (string, error)
 	GetRepoArchive(ctx context.Context, path, dst string) error
 	GetTMPDir(ctx context.Context) string
+	GetDockerBindings(ctx context.Context) []mount.Mount
 }
 
 type File struct {

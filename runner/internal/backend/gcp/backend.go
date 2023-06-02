@@ -10,6 +10,7 @@ import (
 	"path"
 	"strings"
 
+	"github.com/docker/docker/api/types/mount"
 	"github.com/dstackai/dstack/runner/internal/repo"
 
 	"github.com/dstackai/dstack/runner/consts"
@@ -285,4 +286,8 @@ func (gbackend *GCPBackend) GetRepoArchive(ctx context.Context, path, dir string
 
 func (gbackend *GCPBackend) GetTMPDir(ctx context.Context) string {
 	return path.Join(common.HomeDir(), consts.TMP_DIR_PATH)
+}
+
+func (gbackend *GCPBackend) GetDockerBindings(ctx context.Context) []mount.Mount {
+	return []mount.Mount{}
 }
