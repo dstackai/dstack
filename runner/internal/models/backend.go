@@ -18,8 +18,10 @@ type Job struct {
 	Apps         []App             `yaml:"apps"`
 	Artifacts    []Artifact        `yaml:"artifacts"`
 	Cache        []Cache           `yaml:"cache"`
+	Setup        []string          `yaml:"setup"`
 	Commands     []string          `yaml:"commands"`
-	Entrypoint   *[]string         `yaml:"entrypoint"`
+	Prebuild     PrebuildMode      `yaml:"prebuild"`
+	Entrypoint   []string          `yaml:"entrypoint"`
 	Environment  map[string]string `yaml:"env"`
 	HostName     string            `yaml:"host_name"`
 	Image        string            `yaml:"image_name"`
@@ -120,6 +122,14 @@ type RegistryAuth struct {
 type RunnerMetadata struct {
 	Status string `yaml:"status"`
 }
+
+type PrebuildMode string
+
+const (
+	LAZY_PREBUILD  PrebuildMode = ""
+	NEVER_PREBUILD PrebuildMode = "never"
+	FORCE_PREBUILD PrebuildMode = "force"
+)
 
 func (j *Job) RepoHostNameWithPort() string {
 	if j.RepoPort == 0 {

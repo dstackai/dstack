@@ -2,6 +2,7 @@ package local
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"github.com/dstackai/dstack/runner/internal/repo"
 	"io"
@@ -253,6 +254,29 @@ func (l *Local) GetRepoDiff(ctx context.Context, path string) (string, error) {
 func (l *Local) GetRepoArchive(ctx context.Context, path, dir string) error {
 	src := filepath.Join(l.path, path)
 	if err := repo.ExtractArchive(ctx, src, dir); err != nil {
+		return gerrors.Wrap(err)
+	}
+	return nil
+}
+
+func (l *Local) GetPrebuildDiff(ctx context.Context, key, dst string) error {
+	src := filepath.Join(l.path, key)
+	if _, err := os.Stat(src); err == nil {
+		if err = os.Symlink(src, dst); err != nil {
+			return gerrors.Wrap(err)
+		}
+	} else if !errors.Is(err, os.ErrNotExist) {
+		return gerrors.Wrap(err)
+	}
+	return nil
+}
+
+func (l *Local) PutPrebuildDiff(ctx context.Context, src, key string) error {
+	dst := filepath.Join(l.path, key)
+	if err := os.MkdirAll(filepath.Dir(dst), 0o755); err != nil {
+		return gerrors.Wrap(err)
+	}
+	if err := os.Rename(src, dst); err != nil {
 		return gerrors.Wrap(err)
 	}
 	return nil

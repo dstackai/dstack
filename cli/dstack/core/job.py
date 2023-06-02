@@ -3,6 +3,7 @@ from enum import Enum
 from typing import Any, Dict, List, Optional, Union
 
 from pydantic import BaseModel, Field, root_validator
+from typing_extensions import Literal
 
 from dstack.core.app import AppSpec
 from dstack.core.artifact import ArtifactSpec
@@ -199,6 +200,8 @@ class Job(JobHead):
     request_id: Optional[str]
     tag_name: Optional[str]
     ssh_key_pub: Optional[str]
+    prebuild: Optional[Literal["never", "force"]]
+    setup: Optional[List[str]]
 
     @root_validator(pre=True)
     def preprocess_data(cls, data):
@@ -277,6 +280,8 @@ class Job(JobHead):
             "ssh_key_pub": self.ssh_key_pub or "",
             "repo_code_filename": self.repo_code_filename,
             "instance_type": self.instance_type,
+            "prebuild": self.prebuild,
+            "setup": self.setup or [],
         }
         if isinstance(self.repo_data, RemoteRepoData):
             job_data["repo_host_name"] = self.repo_data.repo_host_name
@@ -408,6 +413,8 @@ class Job(JobHead):
             tag_name=job_data.get("tag_name") or None,
             ssh_key_pub=job_data.get("ssh_key_pub") or None,
             instance_type=job_data.get("instance_type") or None,
+            prebuild=job_data.get("prebuild") or None,
+            setup=job_data.get("setup") or None,
         )
         return job
 

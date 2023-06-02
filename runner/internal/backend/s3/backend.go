@@ -403,6 +403,44 @@ func (s *S3) GetRepoArchive(ctx context.Context, path, dir string) error {
 	return nil
 }
 
+func (s *S3) GetPrebuildDiff(ctx context.Context, key, dst string) error {
+	out, err := s.cliS3.cli.GetObject(ctx, &s3.GetObjectInput{
+		Bucket: aws.String(s.bucket),
+		Key:    aws.String(key),
+	})
+	if err != nil { // it's okay not to have a diff
+		return nil
+	}
+	defer func() { _ = out.Body.Close() }()
+	file, err := os.Create(dst)
+	if err != nil {
+		return gerrors.Wrap(err)
+	}
+	defer func() { _ = file.Close() }()
+	_, err = io.Copy(file, out.Body)
+	if err != nil {
+		return gerrors.Wrap(err)
+	}
+	return nil
+}
+
+func (s *S3) PutPrebuildDiff(ctx context.Context, src, key string) error {
+	file, err := os.Open(src)
+	if err != nil {
+		return gerrors.Wrap(err)
+	}
+	defer func() { _ = file.Close() }()
+	_, err = s.cliS3.cli.PutObject(ctx, &s3.PutObjectInput{
+		Bucket: aws.String(s.bucket),
+		Key:    aws.String(key),
+		Body:   file,
+	})
+	if err != nil {
+		return gerrors.Wrap(err)
+	}
+	return nil
+}
+
 func (s *S3) GetTMPDir(ctx context.Context) string {
 	return path.Join(common.HomeDir(), consts.TMP_DIR_PATH)
 }

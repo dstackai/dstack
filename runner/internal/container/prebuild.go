@@ -16,17 +16,20 @@ import (
 	"golang.org/x/sync/errgroup"
 	"io"
 	"os"
+	"sort"
 	"strings"
 )
 
 type PrebuildSpec struct {
-	Image      string
-	WorkDir    string
-	Commands   []string
-	Entrypoint []string
-	Env        []string
+	BaseImageID string
+	WorkDir     string
+	Commands    []string
+	Entrypoint  []string
+	Env         []string
 
-	RepoPath string
+	BaseImageName      string
+	RegistryAuthBase64 string
+	RepoPath           string
 }
 
 type ImageManifest struct {
@@ -183,7 +186,7 @@ func LoadLayer(ctx context.Context, client docker.APIClient, baseImageName, diff
 
 		}
 		if config == nil || len(manifest) != 1 {
-			return gerrors.Wrap(fmt.Errorf("config or manifest is not presented in diff"))
+			return gerrors.Newf("config or manifest is not presented in diff")
 		}
 
 		tempFile, err := os.CreateTemp("", "layer")
@@ -260,18 +263,18 @@ func LoadLayer(ctx context.Context, client docker.APIClient, baseImageName, diff
 	return nil
 }
 
-func PrebuildImage(ctx context.Context, client docker.APIClient, spec *PrebuildSpec, image string) error {
+func PrebuildImage(ctx context.Context, client docker.APIClient, spec *PrebuildSpec, imageName string, logs io.Writer) error {
 	stopTimeout := 10 * 60
 	config := &container.Config{
-		Image:       spec.Image,
+		Image:       spec.BaseImageID,
 		WorkingDir:  spec.WorkDir,
 		Cmd:         spec.Commands,
 		Entrypoint:  spec.Entrypoint,
 		Env:         spec.Env,
-		Tty:         true,
 		StopTimeout: &stopTimeout,
-		// todo attach stdout?
+		Tty:         true,
 	}
+	fmt.Println(spec.Entrypoint, len(spec.Entrypoint))
 	hostConfig := &container.HostConfig{
 		Mounts: []mount.Mount{
 			{
@@ -291,11 +294,28 @@ func PrebuildImage(ctx context.Context, client docker.APIClient, spec *PrebuildS
 		return gerrors.Wrap(err)
 	}
 	defer func() { _ = client.ContainerRemove(ctx, createResp.ID, types.ContainerRemoveOptions{Force: true}) }()
+
+	log.Trace(ctx, "Streaming prebuild logs")
+	attachResp, err := client.ContainerAttach(ctx, createResp.ID, types.ContainerAttachOptions{
+		Stream: true,
+		Stdout: true,
+		Stderr: true,
+		Logs:   true,
+	})
+	if err != nil {
+		return gerrors.Wrap(err)
+	}
+	go func() {
+		_, err = io.Copy(logs, attachResp.Reader)
+		if err != nil {
+			log.Error(ctx, "Failed to stream prebuild logs", "err", err)
+		}
+	}()
+
 	statusCh, errCh := client.ContainerWait(ctx, createResp.ID, container.WaitConditionNotRunning)
 	if err != nil {
 		return gerrors.Wrap(err)
 	}
-	// todo stream logs
 	select {
 	case err := <-errCh:
 		if err != nil {
@@ -310,7 +330,8 @@ func PrebuildImage(ctx context.Context, client docker.APIClient, spec *PrebuildS
 	if info.State.ExitCode != 0 {
 		return gerrors.Wrap(ContainerExitedError{info.State.ExitCode})
 	}
-	_, err = client.ContainerCommit(ctx, createResp.ID, types.ContainerCommitOptions{Reference: image})
+	log.Trace(ctx, "Committing prebuild image", "image", imageName)
+	_, err = client.ContainerCommit(ctx, createResp.ID, types.ContainerCommitOptions{Reference: imageName})
 	if err != nil {
 		return gerrors.Wrap(err)
 	}
@@ -319,7 +340,7 @@ func PrebuildImage(ctx context.Context, client docker.APIClient, spec *PrebuildS
 
 func (s *PrebuildSpec) Hash() string {
 	var buffer bytes.Buffer
-	buffer.WriteString(s.Image)
+	buffer.WriteString(s.BaseImageID)
 	buffer.WriteString("\n")
 	buffer.WriteString(s.WorkDir)
 	buffer.WriteString("\n")
@@ -327,8 +348,7 @@ func (s *PrebuildSpec) Hash() string {
 	buffer.WriteString("\n")
 	buffer.WriteString(strings.Join(s.Entrypoint, " "))
 	buffer.WriteString("\n")
-	// todo filter env
-	// todo sort env keys
+	sort.Strings(s.Env)
 	buffer.WriteString(strings.Join(s.Env, ":"))
 	buffer.WriteString("\n")
 	return fmt.Sprintf("%x", sha256.Sum256(buffer.Bytes()))

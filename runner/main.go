@@ -149,12 +149,10 @@ func check(configDir string) error {
 	config.Resources.CPUs, config.Resources.Memory = engine.CPU(), engine.MemMiB()
 	if engine.DockerRuntime() == consts.NVIDIA_RUNTIME {
 		var logger bytes.Buffer
-		docker, err := engine.Create(ctx,
-			&container.Spec{
-				Image:    consts.NVIDIA_CUDA_IMAGE,
-				Commands: strings.Split(consts.NVIDIA_SMI_CMD, " "),
-			},
-			&logger)
+		docker, err := engine.Create(ctx, &container.Spec{
+			Image:    consts.NVIDIA_CUDA_IMAGE,
+			Commands: strings.Split(consts.NVIDIA_SMI_CMD, " "),
+		}, &logger)
 		if err != nil {
 			return cli.Exit("Failed to create docker container: "+err.Error(), 1)
 		}

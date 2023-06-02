@@ -209,6 +209,14 @@
       "type": "boolean",
       "default": false
     },
+    "prebuild": {
+      "description": "Prebuild image to accelerate start",
+      "type": "string",
+      "enum": [
+        "never",
+        "force"
+      ]
+    },
     "bash": {
       "type": "object",
       "required": [
@@ -255,6 +263,12 @@
         },
         "cache": {
           "$ref": "#/definitions/cache"
+        },
+        "prebuild": {
+          "$ref": "#/definitions/prebuild"
+        },
+        "setup": {
+          "$ref": "#/definitions/setup"
         }
       }
     },
@@ -313,6 +327,12 @@
         },
         "cache": {
           "$ref": "#/definitions/cache"
+        },
+        "prebuild": {
+          "$ref": "#/definitions/prebuild"
+        },
+        "setup": {
+          "$ref": "#/definitions/setup"
         }
       }
     },
@@ -371,6 +391,9 @@
         },
         "cache": {
           "$ref": "#/definitions/cache"
+        },
+        "prebuild": {
+          "$ref": "#/definitions/prebuild"
         }
       }
     },
@@ -417,6 +440,9 @@
         },
         "cache": {
           "$ref": "#/definitions/cache"
+        },
+        "prebuild": {
+          "$ref": "#/definitions/prebuild"
         }
       }
     },
@@ -463,6 +489,9 @@
         },
         "cache": {
           "$ref": "#/definitions/cache"
+        },
+        "prebuild": {
+          "$ref": "#/definitions/prebuild"
         }
       }
     },
@@ -511,6 +540,9 @@
           "description": "Print VS Code connection URI",
           "type": "boolean",
           "default": false
+        },
+        "prebuild": {
+          "$ref": "#/definitions/prebuild"
         }
       }
     }

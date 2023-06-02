@@ -8,6 +8,8 @@ from argparse import ArgumentParser, Namespace
 from pkgutil import iter_modules
 from typing import Any, Dict, List, Optional, Union
 
+from typing_extensions import Literal
+
 import dstack.api.hub as hub
 from dstack.core.cache import CacheSpec
 from dstack.core.error import RepoNotInitializedError
@@ -65,6 +67,8 @@ class Provider:
         self.loaded = False
         self.home_dir: Optional[str] = None
         self.ports: Dict[int, PortMapping] = {}
+        self.prebuild: Optional[Literal["never", "force"]] = None
+        self.setup: List[str] = []
 
     # TODO: This is a dirty hack
     def _safe_python_version(self, name: str):
@@ -135,6 +139,8 @@ class Provider:
         self.run_name = run_name
         self.ssh_key_pub = ssh_key_pub
         self.openssh_server = self.provider_data.get("ssh", self.openssh_server)
+        self.prebuild = self.provider_data.get("prebuild")
+        self.setup = self._get_list_data("setup")
 
         self.parse_args()
         self.ports = self.provider_data.get("ports") or {}
@@ -181,6 +187,7 @@ class Provider:
         parser.add_argument(
             "-p", "--port", metavar="PORTS", type=PortMapping, nargs=argparse.ONE_OR_MORE
         )
+        parser.add_argument("--prebuild", choices=["never", "force", "lazy"])
 
     def _parse_base_args(self, args: Namespace, unknown_args):
         if args.requirements:
@@ -224,6 +231,8 @@ class Provider:
         self.provider_data["ports"] = merge_ports(
             [PortMapping(i) for i in self.provider_data.get("ports") or []], args.port or []
         )
+        if args.prebuild:
+            self.prebuild = None if args.prebuild == "lazy" else args.prebuild
         if unknown_args:
             self.provider_data["run_args"] = unknown_args
 
@@ -273,6 +282,8 @@ class Provider:
                 tag_name=tag_name,
                 ssh_key_pub=self.ssh_key_pub,
                 repo_code_filename=repo_code_filename,
+                prebuild=self.prebuild,
+                setup=self.setup,
             )
             hub_client.submit_job(job)
             jobs.append(job)
