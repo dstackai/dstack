@@ -57,8 +57,8 @@ class AzureConfig(BackendConfig):
             network = data["network"]
             subnet = data["subnet"]
             credentials = {
-                "client_id": data["client_id"],
-                "client_secret": data["client_secret"],
+                "client_id": data.get("client_id"),
+                "client_secret": data.get("client_secret"),
             }
         except KeyError:
             return None

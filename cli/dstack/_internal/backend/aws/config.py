@@ -49,7 +49,13 @@ class AWSConfig(BackendConfig):
 
     @classmethod
     def deserialize(cls, config_data: Dict, auth_data: Dict = None) -> Optional["AWSConfig"]:
-        bucket_name = config_data.get("bucket_name") or config_data.get("s3_bucket_name")
+        if config_data.get("backend") != "aws":
+            return None
+        bucket_name = (
+            config_data.get("bucket")
+            or config_data.get("bucket_name")
+            or config_data.get("s3_bucket_name")
+        )
         region_name = config_data.get("region_name") or _DEFAULT_REGION_NAME
         profile_name = config_data.get("profile_name")
         subnet_id = (

@@ -1,6 +1,7 @@
 from datetime import datetime
 from typing import Generator, List, Optional
 
+from azure.core.credentials import TokenCredential
 from azure.identity import ClientSecretCredential, DefaultAzureCredential
 
 from dstack._internal.backend.azure.compute import AzureCompute
@@ -31,13 +32,14 @@ from dstack._internal.utils.common import PathLike
 class AzureBackend(Backend):
     NAME = "azure"
 
-    def __init__(self, backend_config: AzureConfig):
+    def __init__(self, backend_config: AzureConfig, credential: Optional[TokenCredential] = None):
         super().__init__(backend_config=backend_config)
-        credential = ClientSecretCredential(
-            tenant_id=backend_config.tenant_id,
-            client_id=backend_config.credentials["client_id"],
-            client_secret=backend_config.credentials["client_secret"],
-        )
+        if credential is None:
+            credential = ClientSecretCredential(
+                tenant_id=backend_config.tenant_id,
+                client_id=backend_config.credentials["client_id"],
+                client_secret=backend_config.credentials["client_secret"],
+            )
         self._secrets_manager = AzureSecretsManager(
             credential=credential,
             vault_url=self.backend_config.vault_url,
@@ -59,7 +61,10 @@ class AzureBackend(Backend):
 
     @classmethod
     def load(cls) -> Optional["AzureBackend"]:
-        return None
+        config = AzureConfig.load()
+        if config is None:
+            return None
+        return cls(backend_config=config, credential=DefaultAzureCredential())
 
     def create_run(self, repo_id: str) -> str:
         return base_runs.create_run(self._storage)

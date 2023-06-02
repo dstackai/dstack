@@ -1,11 +1,13 @@
 import os
 
+from dstack._internal.backend.aws import AwsBackend
+from dstack._internal.backend.azure import AzureBackend
 from dstack._internal.backend.base import Backend
 from dstack._internal.backend.gcp import GCPBackend
 from dstack._internal.backend.local import LocalBackend
 from dstack._internal.core.job import Job
 
-backend_classes = [LocalBackend, GCPBackend]
+backend_classes = [AwsBackend, AzureBackend, LocalBackend, GCPBackend]
 
 
 current_backend = None

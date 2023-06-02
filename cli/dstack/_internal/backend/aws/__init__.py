@@ -39,11 +39,14 @@ class AwsBackend(Backend):
         backend_config: AWSConfig,
     ):
         super().__init__(backend_config=backend_config)
-        self._session = boto3.session.Session(
-            region_name=self.backend_config.region_name,
-            aws_access_key_id=self.backend_config.credentials.get("access_key"),
-            aws_secret_access_key=self.backend_config.credentials.get("secret_key"),
-        )
+        if self.backend_config.credentials is not None:
+            self._session = boto3.session.Session(
+                region_name=self.backend_config.region_name,
+                aws_access_key_id=self.backend_config.credentials.get("access_key"),
+                aws_secret_access_key=self.backend_config.credentials.get("secret_key"),
+            )
+        else:
+            self._session = boto3.session.Session(region_name=self.backend_config.region_name)
         self._storage = AWSStorage(
             s3_client=self._s3_client(), bucket_name=self.backend_config.bucket_name
         )
@@ -63,7 +66,12 @@ class AwsBackend(Backend):
 
     @classmethod
     def load(cls) -> Optional["AwsBackend"]:
-        return None
+        config = AWSConfig.load()
+        if config is None:
+            return None
+        return cls(
+            backend_config=config,
+        )
 
     def _s3_client(self) -> BaseClient:
         return self._get_client("s3")
