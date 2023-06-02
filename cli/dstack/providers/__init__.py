@@ -284,6 +284,7 @@ class Provider:
                 repo_code_filename=repo_code_filename,
                 prebuild=self.prebuild,
                 setup=job_spec.setup,
+                run_env=job_spec.run_env,
             )
             hub_client.submit_job(job)
             jobs.append(job)

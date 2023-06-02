@@ -202,6 +202,7 @@ class Job(JobHead):
     ssh_key_pub: Optional[str]
     prebuild: Optional[Literal["never", "force"]]
     setup: Optional[List[str]]
+    run_env: Optional[Dict[str, str]]
 
     @root_validator(pre=True)
     def preprocess_data(cls, data):
@@ -282,6 +283,7 @@ class Job(JobHead):
             "instance_type": self.instance_type,
             "prebuild": self.prebuild,
             "setup": self.setup or [],
+            "run_env": self.run_env or {},
         }
         if isinstance(self.repo_data, RemoteRepoData):
             job_data["repo_host_name"] = self.repo_data.repo_host_name
@@ -415,6 +417,7 @@ class Job(JobHead):
             instance_type=job_data.get("instance_type") or None,
             prebuild=job_data.get("prebuild") or None,
             setup=job_data.get("setup") or None,
+            run_env=job_data.get("run_env") or None,
         )
         return job
 
@@ -433,6 +436,7 @@ class JobSpec(JobRef):
     commands: Optional[List[str]] = None
     entrypoint: Optional[List[str]] = None
     env: Optional[Dict[str, str]] = None
+    run_env: Optional[Dict[str, str]] = None
     working_dir: Optional[str] = None
     artifact_specs: Optional[List[ArtifactSpec]] = None
     requirements: Optional[Requirements] = None

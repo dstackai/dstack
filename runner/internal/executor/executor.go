@@ -454,6 +454,7 @@ func (ex *Executor) environment(ctx context.Context, includeRun bool) []string {
 			cons["MASTER_JOB_ID"] = master.JobID
 			cons["MASTER_JOB_HOSTNAME"] = master.HostName
 		}
+		env.AddMapString(job.RunEnvironment)
 		env.AddMapString(cons)
 	}
 	env.AddMapString(job.Environment)

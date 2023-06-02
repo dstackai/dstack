@@ -65,7 +65,7 @@ class NotebookProvider(Provider):
     def create_job_specs(self) -> List[JobSpec]:
         env = {}
         token = uuid.uuid4().hex
-        env["TOKEN"] = token  # fixme
+        env["TOKEN"] = token
         apps = []
         for i, pm in enumerate(filter_reserved_ports(self.ports), start=1):
             apps.append(
@@ -92,7 +92,7 @@ class NotebookProvider(Provider):
                 image_name=self.image_name,
                 commands=self._commands(),
                 entrypoint=["/bin/bash", "-i", "-c"],
-                env=env,
+                run_env=env,
                 working_dir=self.working_dir,
                 artifact_specs=self.artifact_specs,
                 requirements=self.resources,

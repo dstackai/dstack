@@ -66,7 +66,7 @@ class CodeProvider(Provider):
     def create_job_specs(self) -> List[JobSpec]:
         env = {}
         connection_token = uuid.uuid4().hex
-        env["CONNECTION_TOKEN"] = connection_token  # fixme problem!
+        env["CONNECTION_TOKEN"] = connection_token
         apps = []
         for i, pm in enumerate(filter_reserved_ports(self.ports), start=1):
             apps.append(
@@ -95,7 +95,7 @@ class CodeProvider(Provider):
                 image_name=self.image_name,
                 commands=self._commands(),
                 entrypoint=["/bin/bash", "-i", "-c"],
-                env=env,
+                run_env=env,
                 working_dir=self.working_dir,
                 artifact_specs=self.artifact_specs,
                 requirements=self.resources,
