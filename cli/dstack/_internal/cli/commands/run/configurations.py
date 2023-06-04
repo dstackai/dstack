@@ -7,7 +7,7 @@ import jsonschema
 import pkg_resources
 import yaml
 
-from dstack.cli.profiles import load_profiles
+from dstack._internal.cli.profiles import load_profiles
 
 
 def _init_base_provider_data(configuration_data: Dict[str, Any], provider_data: Dict[str, Any]):

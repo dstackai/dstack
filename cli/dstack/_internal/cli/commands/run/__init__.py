@@ -418,7 +418,7 @@ def attach_to_container(hub_client: HubClient, run_name: str, ports_lock: PortsL
     for delay in range(0, 61, POLL_PROVISION_RATE_SECS):  # retry
         time.sleep(POLL_PROVISION_RATE_SECS if delay else 0)  # skip first sleep
         if run_ssh_tunnel(run_name, app_ports):
-            console.print(f"To connect via SSH, use: `ssh {run_name}`")
+            # console.print(f"To connect via SSH, use: `ssh {run_name}`")
             break
         if next(poll_run_head(hub_client, run_name)).status != JobStatus.RUNNING:
             break
