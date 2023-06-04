@@ -1,0 +1,213 @@
+{
+  "$schema": "http://json-schema.org/draft-04/schema",
+  "definitions": {
+    "ports": {
+      "description": "The list of port numbers to expose",
+      "type": "array",
+      "items": {
+        "oneOf": [
+          {
+            "type": "string"
+          },
+          {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 65536
+          }
+        ]
+      }
+    },
+    "_commands": {
+      "anyOf": [
+        {
+          "type": "array",
+          "minItems": 1,
+          "items": {
+            "type": "string",
+            "minLength": 1
+          }
+        },
+        {
+          "type": "string",
+          "minLength": 1
+        }
+      ]
+    },
+    "cache": {
+      "description": "The directories to be cached between runs",
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "type": "string",
+        "minLength": 1
+      }
+    },
+    "python": {
+      "description": "The major version of Python",
+      "anyOf": [
+        {
+          "type": "string",
+          "pattern": "^\\d+(\\.\\d+)?$"
+        },
+        {
+          "type": "number"
+        }
+      ]
+    },
+    "env": {
+      "description": "The list of environment variables",
+      "type": "array",
+      "items": {
+        "type": "string",
+        "minLength": 1
+      },
+      "minItems": 1
+    },
+    "image": {
+      "description": "The name of the Docker image",
+      "type": "string",
+      "minLength": 1
+    },
+    "registry_auth": {
+      "description": "Credentials to pull the private Docker image",
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "username": {
+          "description": "Username",
+          "type": "string"
+        },
+        "password": {
+          "description": "Password or access token",
+          "type": "string"
+        }
+      }
+    },
+    "artifacts": {
+      "description": "The list of output artifacts",
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "path"
+        ],
+        "properties": {
+          "path": {
+            "description": "The absolute or relative path to the folder that must be stored as an output artifact",
+            "type": "string",
+            "minLength": 1
+          },
+          "mount": {
+            "description": "Must be set to `true` if the artifact files must be saved in real-time",
+            "type": "boolean",
+            "enum": [
+              true
+            ]
+          }
+        }
+      }
+    },
+    "dev-environment": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "type": {
+          "type": "string",
+          "description": "The type of the configuration",
+          "enum": [
+            "dev-environment"
+          ]
+        },
+        "ide": {
+          "description": "The name of the IDE to setup",
+          "type": "string",
+          "enum": [
+            "vscode"
+          ]
+        },
+        "ports": {
+          "$ref": "#/definitions/ports"
+        },
+        "env": {
+          "$ref": "#/definitions/env"
+        },
+        "python": {
+          "$ref": "#/definitions/python"
+        },
+        "setup": {
+          "description": "The bash commands to pre-build the environment",
+          "$ref": "#/definitions/_commands"
+        },
+        "cache": {
+          "$ref": "#/definitions/cache"
+        },
+        "image": {
+          "$ref": "#/definitions/image"
+        },
+        "registry_auth": {
+          "$ref": "#/definitions/registry_auth"
+        }
+      },
+      "required": [
+        "type",
+        "ide"
+      ]
+    },
+    "task": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "type": {
+          "type": "string",
+          "description": "The type of the configuration",
+          "enum": [
+            "task"
+          ]
+        },
+        "ports": {
+          "$ref": "#/definitions/ports"
+        },
+        "env": {
+          "$ref": "#/definitions/env"
+        },
+        "python": {
+          "$ref": "#/definitions/python"
+        },
+        "setup": {
+          "description": "The bash commands to pre-build the environment",
+          "$ref": "#/definitions/_commands"
+        },
+        "commands": {
+          "description": "The bash commands to run the task",
+          "$ref": "#/definitions/_commands"
+        },
+        "cache": {
+          "$ref": "#/definitions/cache"
+        },
+        "image": {
+          "$ref": "#/definitions/image"
+        },
+        "registry_auth": {
+          "$ref": "#/definitions/registry_auth"
+        },
+        "artifacts": {
+          "$ref": "#/definitions/artifacts"
+        }
+      },
+      "required": [
+        "type",
+        "commands"
+      ]
+    }
+  },
+  "oneOf": [
+    {
+      "$ref": "#/definitions/dev-environment"
+    },
+    {
+      "$ref": "#/definitions/task"
+    }
+  ]
+}

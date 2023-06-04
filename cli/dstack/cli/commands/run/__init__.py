@@ -13,21 +13,20 @@ from rich.progress import Progress, SpinnerColumn, TextColumn
 from rich.prompt import Confirm
 from websocket import WebSocketApp
 
-from dstack import providers
 from dstack.api.hub import HubClient
 from dstack.api.runs import list_runs
 from dstack.backend.base.logs import fix_urls
 from dstack.cli.commands import BasicCommand
+from dstack.cli.commands.run import configurations
 from dstack.cli.commands.run.ssh_tunnel import allocate_local_ports, run_ssh_tunnel
 from dstack.cli.commands.run.watcher import LocalCopier, SSHCopier, Watcher
 from dstack.cli.common import add_project_argument, check_init, console, print_runs
 from dstack.cli.config import config, get_hub_client
-from dstack.core.error import NameNotFoundError, RepoNotInitializedError
+from dstack.core.error import RepoNotInitializedError
 from dstack.core.job import Job, JobHead, JobStatus
 from dstack.core.request import RequestStatus
 from dstack.core.run import RunHead
 from dstack.utils.ssh import include_ssh_config, ssh_config_add_host, ssh_config_remove_host
-from dstack.utils.workflows import load_workflows
 
 POLL_PROVISION_RATE_SECS = 3
 
@@ -44,21 +43,28 @@ class RunCommand(BasicCommand):
         super(RunCommand, self).__init__(parser)
 
     def register(self):
-        workflow_names = list(
-            load_workflows(os.path.join(os.getcwd(), ".dstack")).keys()
-        )  # todo use repo
-        provider_names = providers.get_provider_names()
-        workflow_or_provider_names = workflow_names + provider_names
-        workflow_help = "{" + ",".join(workflow_or_provider_names) + "}"
         self._parser.add_argument(
-            "workflow_or_provider",
-            metavar="WORKFLOW",
+            "working_dir",
+            metavar="WORKING_DIR",
             type=str,
-            help=workflow_help,
-            choices=workflow_or_provider_names,
-            nargs="?",
+            help="The working directory of the run",
+        )
+        self._parser.add_argument(
+            "-f",
+            "--file",
+            metavar="FILE",
+            help="The path to the run configuration file. Defaults to WORKING_DIR/.dstack.yml.",
+            type=str,
+            dest="file_name",
         )
         add_project_argument(self._parser)
+        self._parser.add_argument(
+            "--profile",
+            metavar="PROFILE",
+            help="The name of the profile",
+            type=str,
+            dest="profile_name",
+        )
         self._parser.add_argument(
             "-t",
             "--tag",
@@ -70,56 +76,51 @@ class RunCommand(BasicCommand):
         self._parser.add_argument(
             "-d",
             "--detach",
-            help="Do not poll for status update and logs",
+            help="Do not poll logs and run status",
             action="store_true",
         )
         self._parser.add_argument(
             "args",
             metavar="ARGS",
             nargs=argparse.ZERO_OR_MORE,
-            help="Override workflow or provider arguments",
+            help="Run arguments",
         )
         self._parser.add_argument(
             "--reload",
             action="store_true",
-            help="Enable local changes one-directional synchronization",
+            help="Enable auto-reload",
         )
 
     @check_init
     def _command(self, args: Namespace):
-        if not args.workflow_or_provider:
-            self._parser.print_help()
-            exit(1)
+        (provider_name, provider_data, project_name,) = configurations.parse_configuration_file(
+            args.working_dir, args.file_name, args.profile_name
+        )
+        if args.project:
+            project_name = args.project
         watcher = Watcher(os.getcwd())
         try:
             if args.reload:
                 watcher.start()
-            hub_client = get_hub_client(project_name=args.project)
+            hub_client = get_hub_client(project_name=project_name)
             if (
                 hub_client.repo.repo_data.repo_type != "local"
                 and not hub_client.get_repo_credentials()
             ):
-                raise RepoNotInitializedError("No credentials", project_name=args.project)
+                raise RepoNotInitializedError("No credentials", project_name=project_name)
 
             if not config.repo_user_config.ssh_key_path:
                 ssh_pub_key = None
             else:
                 ssh_pub_key = _read_ssh_key_pub(config.repo_user_config.ssh_key_path)
 
-            try:
-                run_name, jobs = hub_client.run_workflow(
-                    args.workflow_or_provider,
-                    ssh_pub_key=ssh_pub_key,
-                    tag_name=args.tag_name,
-                    args=args,
-                )
-            except NameNotFoundError:
-                run_name, jobs = hub_client.run_provider(
-                    args.workflow_or_provider,
-                    ssh_pub_key=ssh_pub_key,
-                    tag_name=args.tag_name,
-                    args=args,
-                )
+            run_name, jobs = hub_client.run_provider(
+                provider_name,
+                provider_data=provider_data,
+                ssh_pub_key=ssh_pub_key,
+                tag_name=args.tag_name,
+                args=args,
+            )
             runs = list_runs(hub_client, run_name=run_name)
             print_runs(runs)
             run = runs[0]
@@ -199,7 +200,7 @@ def _poll_run(
             ssh_key,
         )
         console.print()
-        console.print("[grey58]To exit, press Ctrl+C.[/]")
+        console.print("[grey58]To stop, press Ctrl+C.[/]")
         console.print()
 
         run = hub_client.list_run_heads(run_name)[0]
@@ -404,6 +405,6 @@ def attach(hub_client: HubClient, job: Job, ssh_key_path: str) -> Dict[int, int]
                 )
                 hub_client.stop_jobs(job.run_name, abort=True)
                 exit(1)
-        console.print(f"To connect via SSH, use: `ssh {job.run_name}`")
+        # console.print(f"To connect via SSH, use: `ssh {job.run_name}`")
 
     return {**host_ports, **app_ports}

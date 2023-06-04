@@ -58,7 +58,7 @@ class BashProvider(Provider):
         parser = self._create_parser(self.workflow_name)
         args, unknown_args = parser.parse_known_args(self.provider_args)
         self._parse_base_args(args, unknown_args)
-        if self.run_as_provider:
+        if self.run_as_provider and args.command:
             self.provider_data["commands"] = [args.command]
         if not args.openssh_server:
             self.openssh_server = False

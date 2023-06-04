@@ -138,6 +138,6 @@ def add_project_argument(parser: argparse.ArgumentParser):
     parser.add_argument(
         "--project",
         type=str,
-        help="The name of the Hub project to execute the command for",
+        help="The name of the project",
         default=None,
     )
