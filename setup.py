@@ -35,8 +35,8 @@ setup(
     package_dir={"": "cli"},
     packages=find_packages("cli"),
     package_data={
-        "dstack.schemas": ["*.json"],
-        "dstack.hub": [
+        "dstack._internal.schemas": ["*.json"],
+        "dstack._internal.hub": [
             "statics/*",
             "statics/**/*",
             "statics/**/**/*",
@@ -45,7 +45,7 @@ setup(
     include_package_data=True,
     scripts=[],
     entry_points={
-        "console_scripts": ["dstack=dstack.cli.main:main"],
+        "console_scripts": ["dstack=dstack._internal.cli.main:main"],
     },
     url="https://dstack.ai",
     project_urls={

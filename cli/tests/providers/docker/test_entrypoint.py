@@ -3,8 +3,8 @@ from argparse import Namespace
 from typing import List, Optional
 from unittest import mock
 
-from dstack.core.repo import RemoteRepo
-from dstack.providers.docker.main import DockerProvider
+from dstack._internal.core.repo import RemoteRepo
+from dstack._internal.providers.docker.main import DockerProvider
 
 
 def create_provider_data(

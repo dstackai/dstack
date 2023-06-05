@@ -3,7 +3,7 @@ from typing import List
 
 from pytest import CaptureFixture
 
-from dstack.cli.config import CLIConfigManager
+from dstack._internal.cli.config import CLIConfigManager
 from tests.integration.common import hub_process, run_dstack_cli
 
 

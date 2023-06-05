@@ -2,8 +2,8 @@ import unittest
 from dataclasses import dataclass
 from typing import List
 
-from dstack.backend.base.logs import fix_urls
-from dstack.core.job import AppSpec
+from dstack._internal.backend.base.logs import fix_urls
+from dstack._internal.core.job import AppSpec
 
 localhost = "127.0.0.1"
 

@@ -6,7 +6,7 @@ from unittest.mock import patch
 import pytest
 from git import Repo
 
-from dstack.backend.local.runners import _install_runner_if_necessary
+from dstack._internal.backend.local.runners import _install_runner_if_necessary
 
 TESTS_DIR = HOME_DIR = Path("/tmp", "dstack-tests")
 SSH_DIR = HOME_DIR / ".ssh"
@@ -28,7 +28,7 @@ def local_runner():
 def dstack_dir(local_runner: Path):
     shutil.copytree(local_runner, DSTACK_DIR)
     SSH_DIR.mkdir(exist_ok=True)
-    with patch("dstack.cli.config.config.home", DSTACK_DIR):
+    with patch("dstack._internal.cli.config.config.home", DSTACK_DIR):
         yield DSTACK_DIR
     # We need sudo to delete directories created by runner on Linux
     # See https://github.com/dstackai/dstack/issues/335

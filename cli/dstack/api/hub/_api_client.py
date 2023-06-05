@@ -4,16 +4,15 @@ from urllib.parse import urlencode, urlparse, urlunparse
 
 import requests
 
-from dstack.api.hub.errors import HubClientError
-from dstack.core.artifact import Artifact
-from dstack.core.error import NoMatchingInstanceError
-from dstack.core.job import Job, JobHead
-from dstack.core.log_event import LogEvent
-from dstack.core.repo import RemoteRepoCredentials, Repo, RepoHead, RepoSpec
-from dstack.core.run import RunHead
-from dstack.core.secret import Secret
-from dstack.core.tag import TagHead
-from dstack.hub.models import (
+from dstack._internal.core.artifact import Artifact
+from dstack._internal.core.error import NoMatchingInstanceError
+from dstack._internal.core.job import Job, JobHead
+from dstack._internal.core.log_event import LogEvent
+from dstack._internal.core.repo import RemoteRepoCredentials, Repo, RepoHead, RepoSpec
+from dstack._internal.core.run import RunHead
+from dstack._internal.core.secret import Secret
+from dstack._internal.core.tag import TagHead
+from dstack._internal.hub.models import (
     AddTagPath,
     AddTagRun,
     ArtifactsList,
@@ -29,6 +28,7 @@ from dstack.hub.models import (
     StopRunners,
     StorageLink,
 )
+from dstack.api.hub.errors import HubClientError
 
 
 class HubAPIClient:
