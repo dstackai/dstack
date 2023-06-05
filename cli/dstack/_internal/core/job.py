@@ -18,7 +18,6 @@ from dstack._internal.core.repo import (
     RepoData,
     RepoRef,
 )
-from dstack._internal.utils.common import _quoted, format_list
 
 PrebuildMode = Literal["never", "lazy", "force"]
 
@@ -82,6 +81,7 @@ class JobStatus(str, Enum):
     PENDING = "pending"
     SUBMITTED = "submitted"
     DOWNLOADING = "downloading"
+    PREBUILDING = "prebuilding"
     RUNNING = "running"
     UPLOADING = "uploading"
     STOPPING = "stopping"

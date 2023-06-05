@@ -6,7 +6,6 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
-	localbackend "github.com/dstackai/dstack/runner/internal/backend/local"
 	"github.com/dstackai/dstack/runner/internal/models"
 	"io"
 	"os"
@@ -284,18 +283,50 @@ func (ex *Executor) runJob(ctx context.Context, erCh chan error, stoppedCh chan 
 				}
 			}
 		}
+
+		spec, err := ex.newSpec(ctx)
+		if err != nil {
+			erCh <- gerrors.Wrap(err)
+			return
+		}
+		logger := ex.backend.CreateLogger(ctx, fmt.Sprintf("/dstack/jobs/%s/%s", ex.backend.Bucket(ctx), job.RepoId), job.RunName)
+		logGroup := fmt.Sprintf("/jobs/%s", job.RepoId)
+		fileLog, err := createLocalLog(filepath.Join(ex.configDir, "logs", logGroup), job.RunName)
+		if err != nil {
+			erCh <- gerrors.Wrap(err)
+			return
+		}
+		defer func() { _ = fileLog.Close() }()
+		logs := io.MultiWriter(logger, ex.streamLogs, fileLog)
+
+		log.Trace(ctx, "Prebuilding container", "mode", job.Prebuild)
+		if job.Prebuild == models.NEVER_PREBUILD || len(job.Setup) == 0 {
+			commands := append([]string(nil), job.Setup...)
+			commands = append(commands, job.Commands...)
+			spec.Commands = container.ShellCommands(commands)
+		} else {
+			job.Status = states.Prebuilding
+			if err = ex.backend.UpdateState(jctx); err != nil {
+				erCh <- gerrors.Wrap(err)
+				return
+			}
+			if err = ex.prebuild(ctx, spec, logs); err != nil {
+				erCh <- gerrors.Wrap(err)
+				return
+			}
+		}
+
 		log.Trace(jctx, "Running job")
 		job.Status = states.Running
-
 		if err = ex.backend.UpdateState(jctx); err != nil {
 			erCh <- gerrors.Wrap(err)
 			return
 		}
-
-		if err = ex.processJob(ctx, stoppedCh); err != nil {
+		if err = ex.processJob(ctx, spec, stoppedCh, logs); err != nil {
 			erCh <- gerrors.Wrap(err)
 			return
 		}
+
 		if len(ex.artifactsOut) > 0 || len(ex.cacheArtifacts) > 0 {
 			log.Trace(jctx, "Start uploading artifacts")
 			job.Status = states.Uploading
@@ -446,9 +477,9 @@ func (ex *Executor) environment(ctx context.Context, includeRun bool) []string {
 		cons := make(map[string]string)
 		cons["PYTHONUNBUFFERED"] = "1"
 		cons["DSTACK_REPO"] = job.RepoId
-			cons["JOB_ID"] = job.JobID
+		cons["JOB_ID"] = job.JobID
 
-			cons["RUN_NAME"] = job.RunName
+		cons["RUN_NAME"] = job.RunName
 
 		if ex.config.Hostname != nil {
 			cons["JOB_HOSTNAME"] = *ex.config.Hostname
@@ -475,9 +506,10 @@ func (ex *Executor) environment(ctx context.Context, includeRun bool) []string {
 	return env.ToSlice()
 }
 
-func (ex *Executor) processJob(ctx context.Context, stoppedCh chan struct{}) error {
+func (ex *Executor) newSpec(ctx context.Context) (*container.Spec, error) {
 	job := ex.backend.Job(ctx)
 	resource := ex.backend.Requirements(ctx)
+
 	bindings := make([]mount.Mount, 0)
 	bindings = append(bindings, mount.Mount{
 		Type:   mount.TypeBind,
@@ -494,21 +526,21 @@ func (ex *Executor) processJob(ctx context.Context, stoppedCh chan struct{}) err
 	for _, artifact := range ex.artifactsIn {
 		art, err := artifact.DockerBindings(path.Join("/workflow", job.WorkingDir))
 		if err != nil {
-			return gerrors.Wrap(err)
+			return nil, gerrors.Wrap(err)
 		}
 		bindings = append(bindings, art...)
 	}
 	for _, artifact := range ex.artifactsOut {
 		art, err := artifact.DockerBindings(path.Join("/workflow", job.WorkingDir))
 		if err != nil {
-			return gerrors.Wrap(err)
+			return nil, gerrors.Wrap(err)
 		}
 		bindings = append(bindings, art...)
 	}
 	for _, artifact := range ex.cacheArtifacts {
 		art, err := artifact.DockerBindings(path.Join("/workflow", job.WorkingDir))
 		if err != nil {
-			return gerrors.Wrap(err)
+			return nil, gerrors.Wrap(err)
 		}
 		bindings = append(bindings, art...)
 	}
@@ -537,7 +569,7 @@ func (ex *Executor) processJob(ctx context.Context, stoppedCh chan struct{}) err
 			default:
 			}
 			if credMountPath != "" {
-				defer os.Remove(credPath)
+				defer func() { _ = os.Remove(credPath) }()
 				log.Trace(ctx, "Mounting git credentials", "target", credMountPath)
 				bindings = append(bindings, mount.Mount{
 					Type:   mount.TypeBind,
@@ -547,7 +579,7 @@ func (ex *Executor) processJob(ctx context.Context, stoppedCh chan struct{}) err
 			}
 		}
 	}
-	logger := ex.backend.CreateLogger(ctx, fmt.Sprintf("/dstack/jobs/%s/%s", ex.backend.Bucket(ctx), job.RepoId), job.RunName)
+
 	secrets, err := ex.backend.Secrets(ctx)
 	if err != nil {
 		log.Error(ctx, "Fail fetching secrets", "err", err)
@@ -568,10 +600,10 @@ func (ex *Executor) processJob(ctx context.Context, stoppedCh chan struct{}) err
 	if err != nil {
 		// todo custom exit status
 		log.Error(ctx, "Failed binding ports", "err", err)
-		return gerrors.Wrap(err)
+		return nil, gerrors.Wrap(err)
 	}
 	if err = ex.backend.UpdateState(ctx); err != nil {
-		return gerrors.Wrap(err)
+		return nil, gerrors.Wrap(err)
 	}
 
 	spec := &container.Spec{
@@ -587,19 +619,11 @@ func (ex *Executor) processJob(ctx context.Context, stoppedCh chan struct{}) err
 		ShmSize:            resource.ShmSize,
 		AllowHostMode:      !isLocalBackend,
 	}
-	logGroup := fmt.Sprintf("/jobs/%s", job.RepoId)
-	fileLog, err := createLocalLog(filepath.Join(ex.configDir, "logs", logGroup), job.RunName)
-	if err != nil {
-		return gerrors.Wrap(err)
-	}
-	defer fileLog.Close()
+	return spec, nil
+}
 
-	ml := io.MultiWriter(logger, ex.streamLogs, fileLog)
-	if err = ex.prebuild(ctx, spec, ml); err != nil {
-		return gerrors.Wrap(err)
-	}
-	// todo change state to RUNNING
-	docker, err := ex.engine.Create(ctx, spec, ml)
+func (ex *Executor) processJob(ctx context.Context, spec *container.Spec, stoppedCh chan struct{}, logs io.Writer) error {
+	docker, err := ex.engine.Create(ctx, spec, logs)
 	if err != nil {
 		return gerrors.Wrap(err)
 	}
@@ -650,15 +674,6 @@ func (ex *Executor) Shutdown(ctx context.Context) {
 
 func (ex *Executor) prebuild(ctx context.Context, spec *container.Spec, logs io.Writer) error {
 	job := ex.backend.Job(ctx)
-
-	log.Trace(ctx, "Start prebuild", "mode", job.Prebuild)
-	if job.Prebuild == models.NEVER_PREBUILD || len(job.Setup) == 0 {
-		log.Trace(ctx, "Do not prebuild")
-		commands := append([]string(nil), job.Setup...)
-		commands = append(commands, job.Commands...)
-		spec.Commands = container.ShellCommands(commands)
-		return nil
-	}
 
 	prebuildSpec := &container.PrebuildSpec{
 		BaseImageName:      spec.Image,
