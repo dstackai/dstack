@@ -49,7 +49,8 @@ class AWSConfig(BackendConfig):
 
     @classmethod
     def deserialize(cls, config_data: Dict, auth_data: Dict = None) -> Optional["AWSConfig"]:
-        if config_data.get("backend") != "aws":
+        backend = config_data.get("backend") or config_data.get("type")
+        if backend != "aws":
             return None
         bucket_name = (
             config_data.get("bucket")
