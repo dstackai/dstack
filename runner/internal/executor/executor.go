@@ -6,13 +6,14 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
-	localbackend "github.com/dstackai/dstack/runner/internal/backend/local"
 	"io"
 	"os"
 	"path"
 	"path/filepath"
 	"strconv"
 	"time"
+
+	localbackend "github.com/dstackai/dstack/runner/internal/backend/local"
 
 	"github.com/docker/docker/api/types"
 
@@ -120,7 +121,7 @@ func (ex *Executor) Run(ctx context.Context) error {
 	defer func() {
 		if r := recover(); r != nil {
 			log.Error(runCtx, "[PANIC]", "", r)
-			job := ex.backend.Job(runCtx)
+			job, _ := ex.backend.RefetchJob(runCtx)
 			job.Status = states.Failed
 			_ = ex.backend.UpdateState(runCtx)
 			time.Sleep(1 * time.Second)
@@ -141,26 +142,32 @@ func (ex *Executor) Run(ctx context.Context) error {
 				log.Info(runCtx, "Stopped")
 				ex.Stop()
 				log.Info(runCtx, "Waiting job end")
-				err = <-erCh
-				job := ex.backend.Job(runCtx)
+				errRun := <-erCh
+				job, err := ex.backend.RefetchJob(runCtx)
+				if err != nil {
+					return gerrors.Wrap(err)
+				}
 				job.Status = states.Stopped
 				_ = ex.backend.UpdateState(runCtx)
-				return err
+				return errRun
 			}
 		case <-ctx.Done():
 			log.Info(runCtx, "Stopped")
 			ex.Stop()
 			log.Info(runCtx, "Waiting job end")
-			err := <-erCh
-			job := ex.backend.Job(runCtx)
-			job.Status = states.Stopped
-			_ = ex.backend.UpdateState(runCtx)
+			errRun := <-erCh
+			job, err := ex.backend.RefetchJob(runCtx)
 			if err != nil {
 				return gerrors.Wrap(err)
 			}
-			return nil
+			job.Status = states.Stopped
+			_ = ex.backend.UpdateState(runCtx)
+			return errRun
 		case errRun := <-erCh:
-			job := ex.backend.Job(runCtx)
+			job, err := ex.backend.RefetchJob(runCtx)
+			if err != nil {
+				return gerrors.Wrap(err)
+			}
 			if errRun == nil {
 				job.Status = states.Done
 			} else {
@@ -435,12 +442,9 @@ func (ex *Executor) environment(ctx context.Context) []string {
 
 	cons := make(map[string]string)
 	cons["PYTHONUNBUFFERED"] = "1"
-	if job.JobID != "" {
-		cons["JOB_ID"] = job.JobID
-	}
-	if job.RunName != "" {
-		cons["RUN_NAME"] = job.RunName
-	}
+	cons["DSTACK_REPO"] = job.RepoId
+	cons["JOB_ID"] = job.JobID
+	cons["RUN_NAME"] = job.RunName
 	if ex.config.Hostname != nil {
 		cons["JOB_HOSTNAME"] = *ex.config.Hostname
 		cons["HOSTNAME"] = *ex.config.Hostname
@@ -476,6 +480,13 @@ func (ex *Executor) processJob(ctx context.Context, stoppedCh chan struct{}) err
 		Source: path.Join(ex.backend.GetTMPDir(ctx), consts.RUNS_DIR, job.RunName, job.JobID),
 		Target: "/workflow",
 	})
+	bindings = append(bindings, mount.Mount{
+		Type:   mount.TypeBind,
+		Source: filepath.Join(ex.configDir, consts.CONFIG_FILE_NAME),
+		Target: filepath.Join(job.HomeDir, ".dstack", consts.CONFIG_FILE_NAME),
+	})
+	bindings = append(bindings, ex.backend.GetDockerBindings(ctx)...)
+
 	for _, artifact := range ex.artifactsIn {
 		art, err := artifact.DockerBindings(path.Join("/workflow", job.WorkingDir))
 		if err != nil {

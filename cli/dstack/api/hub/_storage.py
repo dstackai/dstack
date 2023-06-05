@@ -4,9 +4,9 @@ from typing import Callable, Dict, List, Optional
 
 import requests
 
+from dstack._internal.backend.base.storage import SIGNED_URL_EXPIRATION, CloudStorage
+from dstack._internal.core.storage import StorageFile
 from dstack.api.hub._api_client import HubAPIClient
-from dstack.backend.base.storage import SIGNED_URL_EXPIRATION, CloudStorage
-from dstack.core.storage import StorageFile
 
 
 class HUBStorage(CloudStorage, ABC):

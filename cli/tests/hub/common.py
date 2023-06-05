@@ -1,9 +1,9 @@
 import json
 from typing import Dict, Optional
 
-from dstack.hub.db.models import Project, User
-from dstack.hub.repository.projects import ProjectManager
-from dstack.hub.repository.users import UserManager
+from dstack._internal.hub.db.models import Project, User
+from dstack._internal.hub.repository.projects import ProjectManager
+from dstack._internal.hub.repository.users import UserManager
 
 
 async def create_user(
