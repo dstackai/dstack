@@ -1,4 +1,4 @@
-from dstack.utils.escape import Escaper
+from dstack._internal.utils.escape import Escaper
 
 esc = Escaper({"/": "."}, escape_char="$")
 

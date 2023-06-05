@@ -10,6 +10,7 @@ import (
 	"path"
 	"strings"
 
+	"github.com/docker/docker/api/types/mount"
 	"github.com/dstackai/dstack/runner/internal/repo"
 
 	"github.com/dstackai/dstack/runner/consts"
@@ -103,6 +104,19 @@ func (gbackend *GCPBackend) Job(ctx context.Context) *models.Job {
 	log.Trace(ctx, "Getting job from state")
 	log.Trace(ctx, "Get job", "ID", gbackend.state.Job.JobID)
 	return gbackend.state.Job
+}
+
+func (gbackend *GCPBackend) RefetchJob(ctx context.Context) (*models.Job, error) {
+	log.Trace(ctx, "Refetching job from state", "ID", gbackend.state.Job.JobID)
+	contents, err := gbackend.storage.GetFile(ctx, gbackend.state.Job.JobFilepath())
+	if err != nil {
+		return nil, gerrors.Wrap(err)
+	}
+	err = yaml.Unmarshal(contents, &gbackend.state.Job)
+	if err != nil {
+		return nil, gerrors.Wrap(err)
+	}
+	return gbackend.state.Job, nil
 }
 
 func (gbackend *GCPBackend) UpdateState(ctx context.Context) error {
@@ -297,4 +311,8 @@ func (gbackend *GCPBackend) PutPrebuildDiff(ctx context.Context, src, key string
 
 func (gbackend *GCPBackend) GetTMPDir(ctx context.Context) string {
 	return path.Join(common.HomeDir(), consts.TMP_DIR_PATH)
+}
+
+func (gbackend *GCPBackend) GetDockerBindings(ctx context.Context) []mount.Mount {
+	return []mount.Mount{}
 }

@@ -9,6 +9,7 @@ import (
 	"path/filepath"
 	"sync"
 
+	"github.com/docker/docker/api/types/mount"
 	"github.com/dstackai/dstack/runner/internal/artifacts"
 	"github.com/dstackai/dstack/runner/internal/gerrors"
 	"github.com/dstackai/dstack/runner/internal/log"
@@ -21,6 +22,7 @@ var ErrLoadStateFile = errors.New("not load state file")
 type Backend interface {
 	Init(ctx context.Context, ID string) error
 	Job(ctx context.Context) *models.Job
+	RefetchJob(ctx context.Context) (*models.Job, error)
 	MasterJob(ctx context.Context) *models.Job
 	Requirements(ctx context.Context) models.Requirements
 	UpdateState(ctx context.Context) error
@@ -40,6 +42,7 @@ type Backend interface {
 	GetPrebuildDiff(ctx context.Context, key, dst string) error
 	PutPrebuildDiff(ctx context.Context, src, key string) error
 	GetTMPDir(ctx context.Context) string
+	GetDockerBindings(ctx context.Context) []mount.Mount
 }
 
 type File struct {
