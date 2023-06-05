@@ -121,7 +121,7 @@ func (ex *Executor) Run(ctx context.Context) error {
 	defer func() {
 		if r := recover(); r != nil {
 			log.Error(runCtx, "[PANIC]", "", r)
-			job := ex.backend.Job(runCtx)
+			job, _ := ex.backend.RefetchJob(runCtx)
 			job.Status = states.Failed
 			_ = ex.backend.UpdateState(runCtx)
 			time.Sleep(1 * time.Second)
@@ -142,26 +142,32 @@ func (ex *Executor) Run(ctx context.Context) error {
 				log.Info(runCtx, "Stopped")
 				ex.Stop()
 				log.Info(runCtx, "Waiting job end")
-				err = <-erCh
-				job := ex.backend.Job(runCtx)
+				errRun := <-erCh
+				job, err := ex.backend.RefetchJob(runCtx)
+				if err != nil {
+					return gerrors.Wrap(err)
+				}
 				job.Status = states.Stopped
 				_ = ex.backend.UpdateState(runCtx)
-				return err
+				return errRun
 			}
 		case <-ctx.Done():
 			log.Info(runCtx, "Stopped")
 			ex.Stop()
 			log.Info(runCtx, "Waiting job end")
-			err := <-erCh
-			job := ex.backend.Job(runCtx)
-			job.Status = states.Stopped
-			_ = ex.backend.UpdateState(runCtx)
+			errRun := <-erCh
+			job, err := ex.backend.RefetchJob(runCtx)
 			if err != nil {
 				return gerrors.Wrap(err)
 			}
-			return nil
+			job.Status = states.Stopped
+			_ = ex.backend.UpdateState(runCtx)
+			return errRun
 		case errRun := <-erCh:
-			job := ex.backend.Job(runCtx)
+			job, err := ex.backend.RefetchJob(runCtx)
+			if err != nil {
+				return gerrors.Wrap(err)
+			}
 			if errRun == nil {
 				job.Status = states.Done
 			} else {

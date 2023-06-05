@@ -22,6 +22,7 @@ var ErrLoadStateFile = errors.New("not load state file")
 type Backend interface {
 	Init(ctx context.Context, ID string) error
 	Job(ctx context.Context) *models.Job
+	RefetchJob(ctx context.Context) (*models.Job, error)
 	MasterJob(ctx context.Context) *models.Job
 	Requirements(ctx context.Context) models.Requirements
 	UpdateState(ctx context.Context) error

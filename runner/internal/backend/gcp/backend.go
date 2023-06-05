@@ -106,6 +106,19 @@ func (gbackend *GCPBackend) Job(ctx context.Context) *models.Job {
 	return gbackend.state.Job
 }
 
+func (gbackend *GCPBackend) RefetchJob(ctx context.Context) (*models.Job, error) {
+	log.Trace(ctx, "Refetching job from state", "ID", gbackend.state.Job.JobID)
+	contents, err := gbackend.storage.GetFile(ctx, gbackend.state.Job.JobFilepath())
+	if err != nil {
+		return nil, gerrors.Wrap(err)
+	}
+	err = yaml.Unmarshal(contents, &gbackend.state.Job)
+	if err != nil {
+		return nil, gerrors.Wrap(err)
+	}
+	return gbackend.state.Job, nil
+}
+
 func (gbackend *GCPBackend) UpdateState(ctx context.Context) error {
 	log.Trace(ctx, "Marshaling job")
 	contents, err := yaml.Marshal(&gbackend.state.Job)

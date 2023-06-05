@@ -118,6 +118,19 @@ func (s *S3) Job(ctx context.Context) *models.Job {
 	return s.state.Job
 }
 
+func (s *S3) RefetchJob(ctx context.Context) (*models.Job, error) {
+	log.Trace(ctx, "Refetching job from state", "ID", s.state.Job.JobID)
+	contents, err := s.cliS3.GetFile(ctx, s.bucket, s.state.Job.JobFilepath())
+	if err != nil {
+		return nil, gerrors.Wrap(err)
+	}
+	err = yaml.Unmarshal(contents, &s.state.Job)
+	if err != nil {
+		return nil, gerrors.Wrap(err)
+	}
+	return s.state.Job, nil
+}
+
 func (s *S3) UpdateState(ctx context.Context) error {
 	log.Trace(ctx, "Start update state")
 	if s == nil {

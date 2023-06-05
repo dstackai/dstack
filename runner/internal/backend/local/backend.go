@@ -88,6 +88,19 @@ func (l *Local) Job(ctx context.Context) *models.Job {
 	return l.state.Job
 }
 
+func (l *Local) RefetchJob(ctx context.Context) (*models.Job, error) {
+	log.Trace(ctx, "Refetching job from state", "ID", l.state.Job.JobID)
+	contents, err := l.storage.GetFile(l.state.Job.JobFilepath())
+	if err != nil {
+		return nil, gerrors.Wrap(err)
+	}
+	err = yaml.Unmarshal(contents, &l.state.Job)
+	if err != nil {
+		return nil, gerrors.Wrap(err)
+	}
+	return l.state.Job, nil
+}
+
 func (l *Local) MasterJob(ctx context.Context) *models.Job {
 	contents, err := l.storage.GetFile(filepath.Join("jobs", l.state.Job.RepoUserName, l.state.Job.RepoName, fmt.Sprintf("%s.yaml", l.state.Job.MasterJobID)))
 	if err != nil {

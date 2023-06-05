@@ -114,6 +114,19 @@ func (azbackend *AzureBackend) Job(ctx context.Context) *models.Job {
 	return azbackend.state.Job
 }
 
+func (azbackend *AzureBackend) RefetchJob(ctx context.Context) (*models.Job, error) {
+	log.Trace(ctx, "Refetching job from state", "ID", azbackend.state.Job.JobID)
+	contents, err := azbackend.storage.GetFile(ctx, azbackend.state.Job.JobFilepath())
+	if err != nil {
+		return nil, gerrors.Wrap(err)
+	}
+	err = yaml.Unmarshal(contents, &azbackend.state.Job)
+	if err != nil {
+		return nil, gerrors.Wrap(err)
+	}
+	return azbackend.state.Job, nil
+}
+
 func (azbackend *AzureBackend) MasterJob(ctx context.Context) *models.Job {
 	//TODO
 	return nil
