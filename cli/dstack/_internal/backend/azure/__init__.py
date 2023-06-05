@@ -20,6 +20,7 @@ from dstack._internal.backend.base import tags as base_tags
 from dstack._internal.core.artifact import Artifact
 from dstack._internal.core.job import Job, JobHead, JobStatus
 from dstack._internal.core.log_event import LogEvent
+from dstack._internal.core.repo.base import Repo
 from dstack._internal.core.repo.head import RepoHead
 from dstack._internal.core.repo.remote import RemoteRepoCredentials
 from dstack._internal.core.repo.spec import RepoSpec
@@ -182,12 +183,21 @@ class AzureBackend(Backend):
             run_jobs,
         )
 
-    def add_tag_from_local_dirs(self, tag_name: str, local_dirs: List[str]):
+    def add_tag_from_local_dirs(
+        self,
+        repo: Repo,
+        hub_user_name: str,
+        tag_name: str,
+        local_dirs: List[str],
+        artifact_paths: List[str],
+    ):
         base_tags.create_tag_from_local_dirs(
-            self._storage,
-            self.repo,
-            tag_name,
-            local_dirs,
+            storage=self._storage,
+            repo=repo,
+            hub_user_name=hub_user_name,
+            tag_name=tag_name,
+            local_dirs=local_dirs,
+            artifact_paths=artifact_paths,
         )
 
     def delete_tag_head(self, repo_id: str, tag_head: TagHead):
