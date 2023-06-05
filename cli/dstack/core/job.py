@@ -2,7 +2,7 @@ from abc import abstractmethod
 from enum import Enum
 from typing import Any, Dict, List, Optional, Union
 
-from pydantic import BaseModel, Field, root_validator
+from pydantic import BaseModel, Field, root_validator, validator
 from typing_extensions import Literal
 
 from dstack.core.app import AppSpec
@@ -18,19 +18,14 @@ from dstack.core.repo import (
     RepoData,
     RepoRef,
 )
-from dstack.utils.common import _quoted, format_list
+
+PrebuildMode = Literal["never", "lazy", "force"]
 
 
 class GpusRequirements(BaseModel):
     count: Optional[int] = None
     memory_mib: Optional[int] = None
     name: Optional[str] = None
-
-    def __str__(self) -> str:
-        return (
-            f"GpusRequirements(count={self.count}, memory_mib={self.memory_mib}, "
-            f"name={_quoted(self.name)})"
-        )
 
 
 class Requirements(BaseModel):
@@ -40,15 +35,6 @@ class Requirements(BaseModel):
     shm_size_mib: Optional[int] = None
     interruptible: Optional[bool] = None
     local: Optional[bool] = None
-
-    def __str__(self) -> str:
-        return (
-            f"Requirements(cpus={self.cpus}, memory_mib={self.memory_mib}, "
-            f"gpus={self.gpus}, "
-            f"shm_size_mib={self.shm_size_mib}, "
-            f"interruptible={self.interruptible}, "
-            f"local={self.local})"
-        )
 
     def serialize(self) -> Dict[str, Any]:
         req_data = {}
@@ -89,9 +75,6 @@ class JobRefId(JobRef):
 
     def set_id(self, job_id: Optional[str]):
         self.job_id = job_id
-
-    def __str__(self) -> str:
-        return f'JobRefId(job_id="{self.job_id}")'
 
 
 class JobStatus(str, Enum):
@@ -153,9 +136,6 @@ class RegistryAuth(BaseModel):
     username: Optional[str] = None
     password: Optional[str] = None
 
-    def __str__(self) -> str:
-        return f"RegistryCredentials(username={self.username}, password={self.password})"
-
     def serialize(self) -> Dict[str, Any]:
         return self.dict(exclude_none=True)
 
@@ -200,7 +180,7 @@ class Job(JobHead):
     request_id: Optional[str]
     tag_name: Optional[str]
     ssh_key_pub: Optional[str]
-    prebuild: Optional[Literal["never", "force"]]
+    prebuild: Optional[PrebuildMode]
     setup: Optional[List[str]]
     run_env: Optional[Dict[str, str]]
 
@@ -218,6 +198,12 @@ class Job(JobHead):
             else None
         )
         return data
+
+    @validator("prebuild")
+    def default_prebuild(cls, v: Optional[str]) -> str:
+        if not v:
+            return "never"
+        return v
 
     def serialize(self) -> dict:
         deps = []

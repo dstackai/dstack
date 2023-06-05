@@ -637,6 +637,7 @@ func (ex *Executor) Shutdown(ctx context.Context) {
 func (ex *Executor) prebuild(ctx context.Context, spec *container.Spec, logs io.Writer) error {
 	job := ex.backend.Job(ctx)
 
+	log.Trace(ctx, "Start prebuild", "mode", job.Prebuild)
 	if job.Prebuild == models.NEVER_PREBUILD || len(job.Setup) == 0 {
 		log.Trace(ctx, "Do not prebuild")
 		commands := append([]string(nil), job.Setup...)

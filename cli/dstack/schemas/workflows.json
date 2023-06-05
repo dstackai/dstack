@@ -212,8 +212,10 @@
     "prebuild": {
       "description": "Prebuild image to accelerate start",
       "type": "string",
+      "default": "never",
       "enum": [
         "never",
+        "lazy",
         "force"
       ]
     },

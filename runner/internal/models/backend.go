@@ -127,8 +127,8 @@ type RunnerMetadata struct {
 type PrebuildMode string
 
 const (
-	LAZY_PREBUILD  PrebuildMode = ""
 	NEVER_PREBUILD PrebuildMode = "never"
+	LAZY_PREBUILD  PrebuildMode = "lazy"
 	FORCE_PREBUILD PrebuildMode = "force"
 )
 

@@ -8,8 +8,6 @@ from argparse import ArgumentParser, Namespace
 from pkgutil import iter_modules
 from typing import Any, Dict, List, Optional, Union
 
-from typing_extensions import Literal
-
 import dstack.api.hub as hub
 from dstack.core.cache import CacheSpec
 from dstack.core.error import RepoNotInitializedError
@@ -20,6 +18,7 @@ from dstack.core.job import (
     Job,
     JobSpec,
     JobStatus,
+    PrebuildMode,
     Requirements,
 )
 from dstack.providers.ports import PortMapping, merge_ports
@@ -28,28 +27,6 @@ from dstack.utils.interpolator import VariablesInterpolator
 
 DEFAULT_CPU = 2
 DEFAULT_MEM = "8GB"
-
-
-def _str_to_mib(s: str) -> int:
-    ns = s.replace(" ", "").lower()
-    if ns.endswith("mib"):
-        return int(s[:-3])
-    elif ns.endswith("gib"):
-        return int(s[:-3]) * 1024
-    elif ns.endswith("mi"):
-        return int(s[:-2])
-    elif ns.endswith("gi"):
-        return int(s[:-2]) * 1024
-    elif ns.endswith("mb"):
-        return int(int(s[:-2]) * 1000 * 1000 / 1024 / 1024)
-    elif ns.endswith("gb"):
-        return int(int(s[:-2]) * (1000 * 1000 * 1000) / 1024 / 1024)
-    elif ns.endswith("m"):
-        return int(int(s[:-1]) * 1000 * 1000 / 1024 / 1024)
-    elif ns.endswith("g"):
-        return int(int(s[:-1]) * (1000 * 1000 * 1000) / 1024 / 1024)
-    else:
-        raise Exception(f"Unknown memory unit: {s}")
 
 
 class Provider:
@@ -67,7 +44,7 @@ class Provider:
         self.loaded = False
         self.home_dir: Optional[str] = None
         self.ports: Dict[int, PortMapping] = {}
-        self.prebuild: Optional[Literal["never", "force"]] = None
+        self.prebuild: Optional[PrebuildMode] = None
         self.setup: List[str] = []
 
     # TODO: This is a dirty hack
@@ -232,7 +209,7 @@ class Provider:
             [PortMapping(i) for i in self.provider_data.get("ports") or []], args.port or []
         )
         if args.prebuild:
-            self.prebuild = None if args.prebuild == "lazy" else args.prebuild
+            self.prebuild = args.prebuild
         if unknown_args:
             self.provider_data["run_args"] = unknown_args
 
@@ -482,6 +459,28 @@ def get_provider_names() -> List[str]:
             ),
         )
     )
+
+
+def _str_to_mib(s: str) -> int:
+    ns = s.replace(" ", "").lower()
+    if ns.endswith("mib"):
+        return int(s[:-3])
+    elif ns.endswith("gib"):
+        return int(s[:-3]) * 1024
+    elif ns.endswith("mi"):
+        return int(s[:-2])
+    elif ns.endswith("gi"):
+        return int(s[:-2]) * 1024
+    elif ns.endswith("mb"):
+        return int(int(s[:-2]) * 1000 * 1000 / 1024 / 1024)
+    elif ns.endswith("gb"):
+        return int(int(s[:-2]) * (1000 * 1000 * 1000) / 1024 / 1024)
+    elif ns.endswith("m"):
+        return int(int(s[:-1]) * 1000 * 1000 / 1024 / 1024)
+    elif ns.endswith("g"):
+        return int(int(s[:-1]) * (1000 * 1000 * 1000) / 1024 / 1024)
+    else:
+        raise Exception(f"Unknown memory unit: {s}")
 
 
 def load_provider(provider_name) -> Provider:
