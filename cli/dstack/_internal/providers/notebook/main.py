@@ -18,7 +18,6 @@ class NotebookProvider(Provider):
 
     def __init__(self):
         super().__init__("notebook")
-        self.setup = None
         self.python = None
         self.version = None
         self.env = None
@@ -39,7 +38,6 @@ class NotebookProvider(Provider):
         ssh_key_pub: Optional[str] = None,
     ):
         super().load(hub_client, args, workflow_name, provider_data, run_name, ssh_key_pub)
-        self.setup = self._get_list_data("setup") or self._get_list_data("before_run")
         self.python = self._safe_python_version("python")
         self.version = self.provider_data.get("version")
         self.env = self._env()
@@ -94,11 +92,12 @@ class NotebookProvider(Provider):
                 image_name=self.image_name,
                 commands=self._commands(),
                 entrypoint=["/bin/bash", "-i", "-c"],
-                env=env,
+                run_env=env,
                 working_dir=self.working_dir,
                 artifact_specs=self.artifact_specs,
                 requirements=self.resources,
                 app_specs=apps,
+                setup=self._setup(),
             )
         ]
 
@@ -108,6 +107,20 @@ class NotebookProvider(Provider):
         cpu_image_name = f"dstackai/miniforge:py{self.python}-{version.miniforge_image}"
         return cuda_image_name if cuda_is_required else cpu_image_name
 
+    def _setup(self) -> List[str]:
+        commands = [
+            "conda install psutil -y",
+            "pip install jupyter" + (f"=={self.version}" if self.version else ""),
+            "mkdir -p /root/.jupyter",
+            'echo "c.NotebookApp.allow_root = True" > /root/.jupyter/jupyter_notebook_config.py',
+            "echo \"c.NotebookApp.allow_origin = '*'\" >> /root/.jupyter/jupyter_notebook_config.py",
+            'echo "c.NotebookApp.open_browser = False" >> /root/.jupyter/jupyter_notebook_config.py',
+            "echo \"c.NotebookApp.ip = '0.0.0.0'\" >> /root/.jupyter/jupyter_notebook_config.py",
+        ]
+        if self.setup:
+            commands.extend(self.setup)
+        return commands
+
     def _commands(self):
         commands = []
         if self.env:
@@ -116,19 +129,10 @@ class NotebookProvider(Provider):
             OpenSSHExtension.patch_commands(commands, ssh_key_pub=self.ssh_key_pub)
         commands.extend(
             [
-                "conda install psutil -y",
-                "pip install jupyter" + (f"=={self.version}" if self.version else ""),
-                "mkdir -p /root/.jupyter",
-                'echo "c.NotebookApp.allow_root = True" > /root/.jupyter/jupyter_notebook_config.py',
-                "echo \"c.NotebookApp.allow_origin = '*'\" >> /root/.jupyter/jupyter_notebook_config.py",
-                'echo "c.NotebookApp.open_browser = False" >> /root/.jupyter/jupyter_notebook_config.py',
                 f'echo "c.NotebookApp.port = {self.notebook_port}" >> /root/.jupyter/jupyter_notebook_config.py',
                 "echo \"c.NotebookApp.token = '$TOKEN'\" >> /root/.jupyter/jupyter_notebook_config.py",
-                "echo \"c.NotebookApp.ip = '0.0.0.0'\" >> /root/.jupyter/jupyter_notebook_config.py",
             ]
         )
-        if self.setup:
-            commands.extend(self.setup)
         commands.append(f"jupyter notebook")
         return commands
 

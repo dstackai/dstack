@@ -2,7 +2,8 @@ from abc import abstractmethod
 from enum import Enum
 from typing import Any, Dict, List, Optional, Union
 
-from pydantic import BaseModel, Field, root_validator
+from pydantic import BaseModel, Field, root_validator, validator
+from typing_extensions import Literal
 
 from dstack._internal.core.app import AppSpec
 from dstack._internal.core.artifact import ArtifactSpec
@@ -17,19 +18,14 @@ from dstack._internal.core.repo import (
     RepoData,
     RepoRef,
 )
-from dstack._internal.utils.common import _quoted, format_list
+
+PrebuildMode = Literal["never", "lazy", "force"]
 
 
 class GpusRequirements(BaseModel):
     count: Optional[int] = None
     memory_mib: Optional[int] = None
     name: Optional[str] = None
-
-    def __str__(self) -> str:
-        return (
-            f"GpusRequirements(count={self.count}, memory_mib={self.memory_mib}, "
-            f"name={_quoted(self.name)})"
-        )
 
 
 class Requirements(BaseModel):
@@ -39,15 +35,6 @@ class Requirements(BaseModel):
     shm_size_mib: Optional[int] = None
     interruptible: Optional[bool] = None
     local: Optional[bool] = None
-
-    def __str__(self) -> str:
-        return (
-            f"Requirements(cpus={self.cpus}, memory_mib={self.memory_mib}, "
-            f"gpus={self.gpus}, "
-            f"shm_size_mib={self.shm_size_mib}, "
-            f"interruptible={self.interruptible}, "
-            f"local={self.local})"
-        )
 
     def serialize(self) -> Dict[str, Any]:
         req_data = {}
@@ -89,14 +76,12 @@ class JobRefId(JobRef):
     def set_id(self, job_id: Optional[str]):
         self.job_id = job_id
 
-    def __str__(self) -> str:
-        return f'JobRefId(job_id="{self.job_id}")'
-
 
 class JobStatus(str, Enum):
     PENDING = "pending"
     SUBMITTED = "submitted"
     DOWNLOADING = "downloading"
+    PREBUILDING = "prebuilding"
     RUNNING = "running"
     UPLOADING = "uploading"
     STOPPING = "stopping"
@@ -152,9 +137,6 @@ class RegistryAuth(BaseModel):
     username: Optional[str] = None
     password: Optional[str] = None
 
-    def __str__(self) -> str:
-        return f"RegistryCredentials(username={self.username}, password={self.password})"
-
     def serialize(self) -> Dict[str, Any]:
         return self.dict(exclude_none=True)
 
@@ -199,6 +181,9 @@ class Job(JobHead):
     request_id: Optional[str]
     tag_name: Optional[str]
     ssh_key_pub: Optional[str]
+    prebuild: Optional[PrebuildMode]
+    setup: Optional[List[str]]
+    run_env: Optional[Dict[str, str]]
 
     @root_validator(pre=True)
     def preprocess_data(cls, data):
@@ -214,6 +199,12 @@ class Job(JobHead):
             else None
         )
         return data
+
+    @validator("prebuild")
+    def default_prebuild(cls, v: Optional[str]) -> str:
+        if not v:
+            return "never"
+        return v
 
     def serialize(self) -> dict:
         deps = []
@@ -277,6 +268,9 @@ class Job(JobHead):
             "ssh_key_pub": self.ssh_key_pub or "",
             "repo_code_filename": self.repo_code_filename,
             "instance_type": self.instance_type,
+            "prebuild": self.prebuild,
+            "setup": self.setup or [],
+            "run_env": self.run_env or {},
         }
         if isinstance(self.repo_data, RemoteRepoData):
             job_data["repo_host_name"] = self.repo_data.repo_host_name
@@ -408,6 +402,9 @@ class Job(JobHead):
             tag_name=job_data.get("tag_name") or None,
             ssh_key_pub=job_data.get("ssh_key_pub") or None,
             instance_type=job_data.get("instance_type") or None,
+            prebuild=job_data.get("prebuild") or None,
+            setup=job_data.get("setup") or None,
+            run_env=job_data.get("run_env") or None,
         )
         return job
 
@@ -426,11 +423,13 @@ class JobSpec(JobRef):
     commands: Optional[List[str]] = None
     entrypoint: Optional[List[str]] = None
     env: Optional[Dict[str, str]] = None
+    run_env: Optional[Dict[str, str]] = None
     working_dir: Optional[str] = None
     artifact_specs: Optional[List[ArtifactSpec]] = None
     requirements: Optional[Requirements] = None
     master_job: Optional[JobRef] = None
     app_specs: Optional[List[AppSpec]] = None
+    setup: Optional[List[str]] = None
 
     def get_id(self) -> Optional[str]:
         return self.job_id
