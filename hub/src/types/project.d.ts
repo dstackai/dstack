@@ -68,7 +68,7 @@ declare interface IProjectGCPBackendValues {
     },
 }
 
-declare type IProjectBackendValues = { type: TProjectBackendType } & IProjectAwsBackendValues & IProjectGCPBackendValues
+declare type TProjectBackendValuesResponse = IProjectAwsBackendValues & IProjectAzureBackendValues & IProjectGCPBackendValues
 
 declare interface TProjectBackendAWS {
     access_key: string,
