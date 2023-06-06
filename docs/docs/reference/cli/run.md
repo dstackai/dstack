@@ -39,6 +39,7 @@ The following arguments are optional:
 - `--project PROJECT` – (Optional) The name of the project
 - `--project PROJECT` – (Optional) The name of the profile
 - `--reload` – (Optional) Enable auto-reload 
+- `--prebuild MODE` – (Optional) Enable image prebuild from setup commands. Possible values: `lazy`, `force`, and `never` (default)
 - `-d`, `--detach` – (Optional) Run in the detached mode. Means, the command doesn't
   poll logs and run status.
 - `-p PORT [PORT ...]`, `--port PORT [PORT ...]` – (Optional) Requests ports or define mappings for them (`APP_PORT:LOCAL_PORT`)

@@ -18,6 +18,7 @@ from dstack._internal.core.job import (
     Job,
     JobSpec,
     JobStatus,
+    PrebuildMode,
     Requirements,
 )
 from dstack._internal.providers.ports import PortMapping, merge_ports
@@ -26,28 +27,6 @@ from dstack._internal.utils.interpolator import VariablesInterpolator
 
 DEFAULT_CPU = 2
 DEFAULT_MEM = "8GB"
-
-
-def _str_to_mib(s: str) -> int:
-    ns = s.replace(" ", "").lower()
-    if ns.endswith("mib"):
-        return int(s[:-3])
-    elif ns.endswith("gib"):
-        return int(s[:-3]) * 1024
-    elif ns.endswith("mi"):
-        return int(s[:-2])
-    elif ns.endswith("gi"):
-        return int(s[:-2]) * 1024
-    elif ns.endswith("mb"):
-        return int(int(s[:-2]) * 1000 * 1000 / 1024 / 1024)
-    elif ns.endswith("gb"):
-        return int(int(s[:-2]) * (1000 * 1000 * 1000) / 1024 / 1024)
-    elif ns.endswith("m"):
-        return int(int(s[:-1]) * 1000 * 1000 / 1024 / 1024)
-    elif ns.endswith("g"):
-        return int(int(s[:-1]) * (1000 * 1000 * 1000) / 1024 / 1024)
-    else:
-        raise Exception(f"Unknown memory unit: {s}")
 
 
 class Provider:
@@ -65,6 +44,8 @@ class Provider:
         self.loaded = False
         self.home_dir: Optional[str] = None
         self.ports: Dict[int, PortMapping] = {}
+        self.prebuild: Optional[PrebuildMode] = None
+        self.setup: List[str] = []
 
     # TODO: This is a dirty hack
     def _safe_python_version(self, name: str):
@@ -135,6 +116,8 @@ class Provider:
         self.run_name = run_name
         self.ssh_key_pub = ssh_key_pub
         self.openssh_server = self.provider_data.get("ssh", self.openssh_server)
+        self.prebuild = self.provider_data.get("prebuild")
+        self.setup = self._get_list_data("setup")
 
         self.parse_args()
         self.ports = self.provider_data.get("ports") or {}
@@ -181,6 +164,7 @@ class Provider:
         parser.add_argument(
             "-p", "--port", metavar="PORTS", type=PortMapping, nargs=argparse.ONE_OR_MORE
         )
+        parser.add_argument("--prebuild", choices=["never", "force", "lazy"])
 
     def _parse_base_args(self, args: Namespace, unknown_args):
         if args.requirements:
@@ -224,6 +208,8 @@ class Provider:
         self.provider_data["ports"] = merge_ports(
             [PortMapping(i) for i in self.provider_data.get("ports") or []], args.port or []
         )
+        if args.prebuild:
+            self.prebuild = args.prebuild
         if unknown_args:
             self.provider_data["run_args"] = unknown_args
 
@@ -273,6 +259,9 @@ class Provider:
                 tag_name=tag_name,
                 ssh_key_pub=self.ssh_key_pub,
                 repo_code_filename=repo_code_filename,
+                prebuild=self.prebuild,
+                setup=job_spec.setup,
+                run_env=job_spec.run_env,
             )
             hub_client.submit_job(job)
             jobs.append(job)
@@ -470,6 +459,28 @@ def get_provider_names() -> List[str]:
             ),
         )
     )
+
+
+def _str_to_mib(s: str) -> int:
+    ns = s.replace(" ", "").lower()
+    if ns.endswith("mib"):
+        return int(s[:-3])
+    elif ns.endswith("gib"):
+        return int(s[:-3]) * 1024
+    elif ns.endswith("mi"):
+        return int(s[:-2])
+    elif ns.endswith("gi"):
+        return int(s[:-2]) * 1024
+    elif ns.endswith("mb"):
+        return int(int(s[:-2]) * 1000 * 1000 / 1024 / 1024)
+    elif ns.endswith("gb"):
+        return int(int(s[:-2]) * (1000 * 1000 * 1000) / 1024 / 1024)
+    elif ns.endswith("m"):
+        return int(int(s[:-1]) * 1000 * 1000 / 1024 / 1024)
+    elif ns.endswith("g"):
+        return int(int(s[:-1]) * (1000 * 1000 * 1000) / 1024 / 1024)
+    else:
+        raise Exception(f"Unknown memory unit: {s}")
 
 
 def load_provider(provider_name) -> Provider:

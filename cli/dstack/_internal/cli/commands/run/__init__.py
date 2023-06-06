@@ -1,6 +1,7 @@
 import argparse
 import os
 import sys
+import threading
 import time
 from argparse import Namespace
 from pathlib import Path
@@ -17,7 +18,7 @@ from dstack._internal.api.runs import list_runs_hub
 from dstack._internal.backend.base.logs import fix_urls
 from dstack._internal.cli.commands import BasicCommand
 from dstack._internal.cli.commands.run import configurations
-from dstack._internal.cli.commands.run.ssh_tunnel import allocate_local_ports, run_ssh_tunnel
+from dstack._internal.cli.commands.run.ssh_tunnel import PortsLock, run_ssh_tunnel
 from dstack._internal.cli.commands.run.watcher import LocalCopier, SSHCopier, Watcher
 from dstack._internal.cli.common import add_project_argument, check_init, console, print_runs
 from dstack._internal.cli.config import config, get_hub_client
@@ -162,32 +163,19 @@ def _poll_run(
     run_name = job_heads[0].run_name
     try:
         console.print()
-        request_errors_printed = False
-        downloading = False
         with Progress(
             TextColumn("[progress.description]{task.description}"),
             SpinnerColumn(),
             transient=True,
         ) as progress:
             task = progress.add_task("Provisioning... It may take up to a minute.", total=None)
-            for run in poll_run_head(hub_client, run_name):
-                if run.status == JobStatus.DOWNLOADING and not downloading:
-                    progress.update(task, description="Downloading deps... It may take a while.")
-                    downloading = True
-                elif run.status not in [JobStatus.SUBMITTED, JobStatus.DOWNLOADING]:
-                    progress.update(task, total=100)
-                    break
-                if run.has_request_status([RequestStatus.TERMINATED, RequestStatus.NO_CAPACITY]):
-                    if run.has_request_status([RequestStatus.TERMINATED]):
-                        progress.update(
-                            task,
-                            description=f"[red]Request(s) terminated[/]",
-                            total=100,
-                        )
-                        break
-                    elif not request_errors_printed and run.has_request_status(
-                        [RequestStatus.NO_CAPACITY]
-                    ):
+            # idle PENDING and SUBMITTED
+            request_errors_printed = False
+            for run in poll_run_head(
+                hub_client, run_name, loop_statuses=[JobStatus.PENDING, JobStatus.SUBMITTED]
+            ):
+                if run.has_request_status([RequestStatus.NO_CAPACITY]):
+                    if not request_errors_printed:
                         progress.update(task, description=f"[dark_orange]No capacity[/]")
                         request_errors_printed = True
                 elif request_errors_printed:
@@ -195,14 +183,24 @@ def _poll_run(
                         task, description="Provisioning... It may take up to a minute."
                     )
                     request_errors_printed = False
+            # handle TERMINATED and DOWNLOADING
+            run = next(poll_run_head(hub_client, run_name))
+            if run.status == JobStatus.DOWNLOADING:
+                progress.update(task, description="Downloading deps... It may take a while.")
+            elif run.has_request_status([RequestStatus.TERMINATED]):
+                progress.update(
+                    task,
+                    total=100,
+                    description=f"[red]Request(s) terminated[/]",
+                )
+            # idle DOWNLOADING
+            for run in poll_run_head(hub_client, run_name, loop_statuses=[JobStatus.DOWNLOADING]):
+                pass
+            progress.update(task, total=100)
 
+        # attach to the instance, attach to the container in the background
         jobs = [hub_client.get_job(job_head.job_id) for job_head in job_heads]
-        backend_type = hub_client.get_project_backend_type()
-        ports = attach(
-            hub_client,
-            jobs[0],
-            ssh_key,
-        )
+        ports = attach(hub_client, jobs[0], ssh_key)
         console.print()
         console.print("[grey58]To stop, press Ctrl+C.[/]")
         console.print()
@@ -210,7 +208,7 @@ def _poll_run(
         run = hub_client.list_run_heads(run_name)[0]
         if run.status.is_unfinished() or run.status == JobStatus.DONE:
             if watcher.is_alive():  # reload is enabled
-                if backend_type == "local":
+                if hub_client.get_project_backend_type() == "local":
                     watcher.start_copier(
                         LocalCopier,
                         dst_root=os.path.expanduser(
@@ -294,13 +292,18 @@ def _poll_logs_ws(hub_client: HubClient, job: Job, ports: Dict[int, int]):
 
 
 def poll_run_head(
-    hub_client: HubClient, run_name: str, rate: int = POLL_PROVISION_RATE_SECS
+    hub_client: HubClient,
+    run_name: str,
+    rate: int = POLL_PROVISION_RATE_SECS,
+    loop_statuses: Optional[List[JobStatus]] = None,
 ) -> Iterator[RunHead]:
     while True:
         run_heads = hub_client.list_run_heads(run_name)
         if len(run_heads) == 0:
             continue
         run_head = run_heads[0]
+        if loop_statuses is not None and run_head.status not in loop_statuses:
+            return
         yield run_head
         time.sleep(rate)
 
@@ -331,6 +334,9 @@ def ask_on_interrupt(hub_client: HubClient, run_name: str):
 
 
 def attach(hub_client: HubClient, job: Job, ssh_key_path: str) -> Dict[int, int]:
+    """
+    :return: (host tunnel ports, container tunnel ports, ports mapping)
+    """
     backend_type = hub_client.get_project_backend_type()
     app_ports = {}
     openssh_server_port = 0
@@ -338,11 +344,11 @@ def attach(hub_client: HubClient, job: Job, ssh_key_path: str) -> Dict[int, int]
         app_ports[app.port] = app.map_to_port or 0
         if app.app_name == "openssh-server":
             openssh_server_port = app.port
-    if not (backend_type != "local" or openssh_server_port != 0):
+    if backend_type == "local" and openssh_server_port == 0:
         console.print("Provisioning... It may take up to a minute. [green]✓[/]")
         return {k: v for k, v in app_ports.items() if v != 0}
 
-    console.print("Starting SSH tunnel...")
+    # console.print("Starting SSH tunnel...")
     include_ssh_config(config.ssh_config_path)
     ws_port = int(job.env["WS_LOGS_PORT"])
     host_ports = {ws_port: ws_port}
@@ -367,7 +373,7 @@ def attach(hub_client: HubClient, job: Job, ssh_key_path: str) -> Dict[int, int]
         if openssh_server_port == 0:
             host_ports.update(app_ports)
             app_ports = {}
-        host_ports = allocate_local_ports(host_ports)
+        host_ports = PortsLock(host_ports).acquire().release()
         for i in range(3):  # retry
             time.sleep(2**i)
             if run_ssh_tunnel(f"{job.run_name}-host", host_ports):
@@ -392,23 +398,34 @@ def attach(hub_client: HubClient, job: Job, ssh_key_path: str) -> Dict[int, int]
         ssh_config_add_host(config.ssh_config_path, job.run_name, options)
         del app_ports[openssh_server_port]
         if app_ports:
-            app_ports = allocate_local_ports(app_ports)
-            for delay in range(0, 61, POLL_PROVISION_RATE_SECS):  # retry
-                time.sleep(POLL_PROVISION_RATE_SECS if delay else 0)  # skip first sleep
-                if run_ssh_tunnel(job.run_name, app_ports):
-                    break
-                run_status = hub_client.list_run_heads(job.run_name, repo_id=job.repo_ref.repo_id)[
-                    0
-                ].status
-                if run_status != JobStatus.RUNNING:
-                    break
-            else:
-                console.print(
-                    "[red]ERROR[/] Can't establish SSH tunnel with the container\n"
-                    "[grey58]Aborting...[/]"
-                )
-                hub_client.stop_jobs(job.run_name, abort=True)
-                exit(1)
-        # console.print(f"To connect via SSH, use: `ssh {job.run_name}`")
+            app_ports_lock = PortsLock(app_ports).acquire()
+            app_ports = app_ports_lock.dict()
+            # try to attach in the background
+            threading.Thread(
+                target=attach_to_container,
+                args=(hub_client, job.run_name, app_ports_lock),
+                daemon=True,
+            ).start()
 
     return {**host_ports, **app_ports}
+
+
+def attach_to_container(hub_client: HubClient, run_name: str, ports_lock: PortsLock):
+    # idle PREBUILDING
+    for run in poll_run_head(hub_client, run_name, loop_statuses=[JobStatus.PREBUILDING]):
+        pass
+    app_ports = ports_lock.release()
+    for delay in range(0, 61, POLL_PROVISION_RATE_SECS):  # retry
+        time.sleep(POLL_PROVISION_RATE_SECS if delay else 0)  # skip first sleep
+        if run_ssh_tunnel(run_name, app_ports):
+            console.print(f"To connect via SSH, use: `ssh {run_name}`")
+            break
+        if next(poll_run_head(hub_client, run_name)).status != JobStatus.RUNNING:
+            break
+    else:
+        console.print(
+            "[red]ERROR[/] Can't establish SSH tunnel with the container\n"
+            "[grey58]Aborting...[/]"
+        )
+        hub_client.stop_jobs(run_name, abort=True)
+        exit(1)

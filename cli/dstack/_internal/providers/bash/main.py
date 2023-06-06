@@ -86,6 +86,7 @@ class BashProvider(Provider):
                 artifact_specs=self.artifact_specs,
                 requirements=self.resources,
                 app_specs=apps,
+                setup=self.setup,
             )
         ]
 

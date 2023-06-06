@@ -1,50 +1,68 @@
 import errno
 import socket
 import subprocess
-from contextlib import closing
-from typing import Dict, List
+from typing import Dict, List, Optional
 
 from dstack._internal.providers.ports import PortUsedError
 
 
-def get_free_port() -> int:
-    with closing(socket.socket(socket.AF_INET, socket.SOCK_STREAM)) as s:
-        s.bind(("", 0))
-        s.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
-        return s.getsockname()[1]
+class PortsLock:
+    def __init__(self, restrictions: Optional[Dict[int, int]] = None):
+        self.restrictions = restrictions or {}
+        self.sockets: Dict[int, socket.socket] = {}
 
+    def acquire(self) -> "PortsLock":
+        assert not self.sockets
+        assigned_ports = set()
 
-def port_in_use(port: int) -> bool:
-    try:
-        with closing(socket.socket(socket.AF_INET, socket.SOCK_STREAM)) as s:
-            s.bind(("", port))
-            s.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
-    except socket.error as e:
-        if e.errno == errno.EADDRINUSE:
-            return True
-        raise
-    return False
+        # mapped by user
+        for app_port, local_port in self.restrictions.items():
+            if not local_port:  # None or 0
+                continue
+            if local_port in assigned_ports:
+                raise PortUsedError(f"Mapped port {app_port}:{local_port} is already in use")
+            sock = self._listen(local_port)
+            if sock is None:
+                raise PortUsedError(f"Mapped port {app_port}:{local_port} is already in use")
+            self.sockets[app_port] = sock
+            assigned_ports.add(local_port)
 
+        # mapped automatically
+        for app_port, local_port in self.restrictions.items():
+            if local_port:
+                continue
+            local_port = app_port
+            while True:
+                if local_port not in assigned_ports:
+                    sock = self._listen(local_port)
+                    if sock is not None:
+                        break
+                local_port += 1
+            self.sockets[app_port] = sock
+            assigned_ports.add(local_port)
+        return self
 
-def allocate_local_ports(ports: Dict[int, int]) -> Dict[int, int]:
-    map_to_ports = set()
-    # mapped by user
-    for port, map_to_port in ports.items():
-        if not map_to_port:  # None or 0
-            continue
-        if map_to_port in map_to_ports or port_in_use(map_to_port):
-            raise PortUsedError(f"Mapped port {port}:{map_to_port} is already in use")
-        map_to_ports.add(map_to_port)
-    # mapped automatically
-    for port, map_to_port in ports.items():
-        if map_to_port:
-            continue
-        map_to_port = port
-        while map_to_port in map_to_ports or port_in_use(map_to_port):
-            map_to_port += 1
-        ports[port] = map_to_port
-        map_to_ports.add(map_to_port)
-    return ports
+    def release(self) -> Dict[int, int]:
+        mapping = self.dict()
+        for sock in self.sockets.values():
+            sock.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
+            sock.close()
+        self.sockets = {}
+        return mapping
+
+    def dict(self) -> Dict[int, int]:
+        return {app_port: sock.getsockname()[1] for app_port, sock in self.sockets.items()}
+
+    @staticmethod
+    def _listen(port: int) -> Optional[socket.socket]:
+        try:
+            sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+            sock.bind(("", port))
+            return sock
+        except socket.error as e:
+            if e.errno == errno.EADDRINUSE:
+                return None
+            raise
 
 
 def make_ssh_tunnel_args(run_name: str, ports: Dict[int, int]) -> List[str]:

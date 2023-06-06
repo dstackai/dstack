@@ -15,18 +15,21 @@ type Resource struct {
 }
 
 type Job struct {
-	Apps         []App             `yaml:"apps"`
-	Artifacts    []Artifact        `yaml:"artifacts"`
-	Cache        []Cache           `yaml:"cache"`
-	Commands     []string          `yaml:"commands"`
-	Entrypoint   *[]string         `yaml:"entrypoint"`
-	Environment  map[string]string `yaml:"env"`
-	HostName     string            `yaml:"host_name"`
-	Image        string            `yaml:"image_name"`
-	JobID        string            `yaml:"job_id"`
-	MasterJobID  string            `yaml:"master_job_id"`
-	Deps         []Dep             `yaml:"deps"`
-	ProviderName string            `yaml:"provider_name"`
+	Apps           []App             `yaml:"apps"`
+	Artifacts      []Artifact        `yaml:"artifacts"`
+	Cache          []Cache           `yaml:"cache"`
+	Setup          []string          `yaml:"setup"`
+	Commands       []string          `yaml:"commands"`
+	Prebuild       PrebuildMode      `yaml:"prebuild"`
+	Entrypoint     []string          `yaml:"entrypoint"`
+	Environment    map[string]string `yaml:"env"`
+	RunEnvironment map[string]string `yaml:"run_env"`
+	HostName       string            `yaml:"host_name"`
+	Image          string            `yaml:"image_name"`
+	JobID          string            `yaml:"job_id"`
+	MasterJobID    string            `yaml:"master_job_id"`
+	Deps           []Dep             `yaml:"deps"`
+	ProviderName   string            `yaml:"provider_name"`
 
 	RepoId      string `yaml:"repo_id"`
 	RepoType    string `yaml:"repo_type"`
@@ -120,6 +123,14 @@ type RegistryAuth struct {
 type RunnerMetadata struct {
 	Status string `yaml:"status"`
 }
+
+type PrebuildMode string
+
+const (
+	NEVER_PREBUILD PrebuildMode = "never"
+	LAZY_PREBUILD  PrebuildMode = "lazy"
+	FORCE_PREBUILD PrebuildMode = "force"
+)
 
 func (j *Job) RepoHostNameWithPort() string {
 	if j.RepoPort == 0 {
