@@ -348,7 +348,7 @@ def attach(hub_client: HubClient, job: Job, ssh_key_path: str) -> Dict[int, int]
         console.print("Provisioning... It may take up to a minute. [green]✓[/]")
         return {k: v for k, v in app_ports.items() if v != 0}
 
-    # console.print("Starting SSH tunnel...")
+    console.print("Starting SSH tunnel...")
     include_ssh_config(config.ssh_config_path)
     ws_port = int(job.env["WS_LOGS_PORT"])
     host_ports = {ws_port: ws_port}

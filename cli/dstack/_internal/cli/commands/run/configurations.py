@@ -57,7 +57,9 @@ def parse_configuration_file(
         exit(f"Error: No such configuration file {configuration_path}")
     with configuration_path.open("r") as f:
         configuration_data = yaml.load(f, yaml.FullLoader)
-    schema = json.loads(pkg_resources.resource_string("dstack.schemas", "configuration.json"))
+    schema = json.loads(
+        pkg_resources.resource_string("dstack._internal.schemas", "configuration.json")
+    )
     jsonschema.validate(configuration_data, schema)
     configuration_type = configuration_data["type"]
     if configuration_type == "dev-environment":

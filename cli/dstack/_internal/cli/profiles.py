@@ -1,6 +1,6 @@
 import json
 from pathlib import Path
-from typing import Optional, Dict, Any
+from typing import Any, Dict, Optional
 
 import jsonschema
 import pkg_resources
@@ -17,7 +17,9 @@ def load_profiles() -> Optional[Dict[str, Dict[str, Any]]]:
     else:
         with profiles_path.open("r") as f:
             profiles = yaml.load(f, yaml.FullLoader)
-        schema = json.loads(pkg_resources.resource_string("dstack.schemas", "profiles.json"))
+        schema = json.loads(
+            pkg_resources.resource_string("dstack._internal.schemas", "profiles.json")
+        )
         jsonschema.validate(profiles, schema)
         for profile in profiles["profiles"]:
             if profile.get("default"):
