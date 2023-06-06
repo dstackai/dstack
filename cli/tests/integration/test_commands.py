@@ -17,7 +17,7 @@ class TestDstack:
 class TestHub:
     def test_starts_and_configures_hub(self, dstack_dir):
         with hub_process(dstack_dir) as proc:
-            assert "The hub is available at" in proc.stdout.readline()
+            assert "The server is available at" in proc.stdout.readline()
             default_project_config = CLIConfigManager(dstack_dir).get_default_project_config()
             assert default_project_config is not None
 
@@ -40,7 +40,7 @@ class TestConfig:
 
 
 class TestInit:
-    def test_generate_default_ssh_key(
+    def test_generates_default_ssh_key(
         self, capsys: CaptureFixture, dstack_dir: Path, tests_local_repo: Path
     ):
         dstack_key_path = dstack_dir / "ssh" / "id_rsa"

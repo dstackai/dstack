@@ -65,7 +65,7 @@ async def startup_event():
     url_with_token = f"{url}?token={admin_user.token}"
     create_default_project_config(url, admin_user.token)
     start_background_tasks()
-    print(f"The hub is available at {url_with_token}")
+    print(f"The server is available at {url_with_token}")
 
 
 @app.middleware("http")
