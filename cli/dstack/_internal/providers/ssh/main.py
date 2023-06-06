@@ -98,17 +98,23 @@ class SSHProvider(Provider):
         if self.env:
             self._extend_commands_with_env(commands, self.env)
         OpenSSHExtension.patch_commands(commands, ssh_key_pub=self.ssh_key_pub)
+        # TODO: Pre-install ipykernel and other VS Code extensions
         if self.code:
             commands.extend(
                 [
-                    f"echo Connect from code desktop",
+                    "echo ''",
+                    f"echo To open in VS Code Desktop, use one of these links:",
+                    f"echo ''",
                     f"echo '  vscode://vscode-remote/ssh-remote+{self.run_name}/workflow'",
                     f"echo '  vscode-insiders://vscode-remote/ssh-remote+{self.run_name}/workflow'",
+                    "echo ''",
+                    f"echo 'To connect via SSH, use: `ssh {self.run_name}`'",
+                    "echo ''",
+                    "echo -n 'To exit, press Ctrl+C.'",
                 ]
             )
         commands.extend(
             [
-                'echo "Infinitely idling... Don\'t forget to stop the instance"',
                 "cat",
             ]
         )

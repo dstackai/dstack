@@ -22,7 +22,7 @@ class BasicCommand(object):
         self._parser.add_argument(
             "-h",
             "--help",
-            action="store_true" if self.name == "run" else "help",
+            action="help",
             default=argparse.SUPPRESS,
             help="Show this help message and exit",
         )

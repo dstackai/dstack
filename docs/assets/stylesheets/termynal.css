@@ -15,7 +15,7 @@
 [data-termynal] {
     overflow-x: scroll;
     white-space: pre;
-    width: 750px;
+    /*width: 750px;*/
     max-width: 100%;
     background: var(--color-bg);
     color: var(--color-text);
