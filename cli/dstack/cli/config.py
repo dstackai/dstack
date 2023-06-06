@@ -8,6 +8,7 @@ from pydantic import BaseModel, ValidationError
 from dstack.api.hub import HubClient, HubClientConfig
 from dstack.api.repos import load_repo
 from dstack.cli.errors import CLIError
+from dstack.cli.profiles import load_profiles
 from dstack.core.error import RepoNotInitializedError
 from dstack.core.userconfig import RepoUserConfig
 from dstack.utils.common import get_dstack_dir
@@ -147,6 +148,11 @@ class CLIConfigManager:
 
 
 def get_hub_client(project_name: Optional[str] = None) -> HubClient:
+    if project_name is None:
+        profiles = load_profiles()
+        if "default" in profiles:
+            if "project" in profiles["default"]:
+                project_name = profiles["default"]["project"]
     cli_config_manager = CLIConfigManager()
     project_config = cli_config_manager.get_default_project_config()
     if project_name is not None:

@@ -7,6 +7,8 @@ import jsonschema
 import pkg_resources
 import yaml
 
+from dstack.cli.profiles import load_profiles
+
 
 def _init_base_provider_data(configuration_data: Dict[str, Any], provider_data: Dict[str, Any]):
     if "cache" in configuration_data:
@@ -45,26 +47,6 @@ def _parse_task_configuration_data(
     return provider_name, provider_data
 
 
-def _load_profiles() -> Optional[Dict[str, Dict[str, Any]]]:
-    # NOTE: This only supports local profiles
-    profiles_path = Path(".dstack") / "profiles.yml"
-    if not profiles_path.exists():
-        profiles_path = Path(".dstack") / "profiles.yaml"
-    if not profiles_path.exists():
-        return {}
-    else:
-        with profiles_path.open("r") as f:
-            profiles = yaml.load(f, yaml.FullLoader)
-        schema = json.loads(pkg_resources.resource_string("dstack.schemas", "profiles.json"))
-        jsonschema.validate(profiles, schema)
-        for profile in profiles["profiles"]:
-            if profile.get("default"):
-                profiles["default"] = profile
-            profiles[profile["name"]] = profile
-    del profiles["profiles"]
-    return profiles
-
-
 def parse_configuration_file(
     working_dir: str, file_name: Optional[str], profile_name: Optional[str]
 ) -> Tuple[str, Dict[str, Any], Optional[str]]:
@@ -86,7 +68,7 @@ def parse_configuration_file(
         (provider_name, provider_data) = _parse_task_configuration_data(configuration_data)
     else:
         exit(f"Unsupported configuration type: {configuration_type}")
-    profiles = _load_profiles()
+    profiles = load_profiles()
     if profile_name:
         if profile_name in profiles:
             profile = profiles[profile_name]
@@ -97,10 +79,11 @@ def parse_configuration_file(
     if profile and "resources" in profile:
         provider_data["resources"] = profile["resources"]
         provider_data["resources"]["interruptible"] = True
-        if profile["resources"]["instance-type"] == "on-demand":
-            del provider_data["resources"]["interruptible"]
-            # TODO: It doesn't support instance-type properly
-        del provider_data["resources"]["instance-type"]
+        if "instance-type" in profile["resources"]:
+            if profile["resources"]["instance-type"] == "on-demand":
+                del provider_data["resources"]["interruptible"]
+                # TODO: It doesn't support instance-type properly
+            del provider_data["resources"]["instance-type"]
     project_name = profile.get("project") if profile else None
     if not Path(os.getcwd()).samefile(Path(working_dir)):
         provider_data["working_dir"] = str(Path(working_dir))
