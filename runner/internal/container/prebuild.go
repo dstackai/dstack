@@ -305,7 +305,7 @@ func PrebuildImage(ctx context.Context, client docker.APIClient, spec *PrebuildS
 		return gerrors.Wrap(err)
 	}
 	go func() {
-		_, err = io.Copy(logs, attachResp.Reader)
+		_, err := io.Copy(logs, attachResp.Reader)
 		if err != nil {
 			log.Error(ctx, "Failed to stream prebuild logs", "err", err)
 		}
