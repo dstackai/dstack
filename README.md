@@ -23,8 +23,25 @@ Develop ML faster. Use any cloud.
 [![PyPI - License](https://img.shields.io/pypi/l/dstack?style=flat-square&color=blue)](https://github.com/dstackai/dstack/blob/master/LICENSE.md)
 </div>
 
-`dstack` makes it very easy for ML engineers to run dev environments, pipelines and apps cost-effectively 
-on any cloud.
+`dstack` makes it very easy for ML engineers to run development environments and ML tasks on any cloud.
+
+Development environments and tasks can be defined via simple YAML configurations and quickly run with a single command
+on any configured cloud, whether it's AWS, GCP, or Azure.
+
+The tool is open-source and can be self-hosted. You can run it on your local machine or deploy it to your own cloud. The
+tool will orchestrate development environments and tasks for your entire ML team.
+
+**`dstack` makes it very easy to:**
+
+- Configure and reuse prebuilt environments (without Docker)
+- Utilize spot instances
+- Save and reuse output artifacts
+- Use multiple clouds via the same simple interface
+
+More importantly, `dstack` increases your productivity as an ML engineer, allowing you to focus on ML without worrying
+  about infrastructure, costs, etc.
+
+**🍒 is, `dstack` is 100% open-source and can be self-hosted**
 
 ## Installation and setup
 
@@ -35,140 +52,84 @@ pip install "dstack[aws,gcp,azure]"
 dstack start
 ```
 
-The `dstack start` command starts the Hub server, and creates the default project to run everything locally.
+The server will set up a default project to run dev environments and tasks locally. 
+To run dev environments and tasks in the cloud, log into the UI, create the corresponding project,
+and [configure](https://dstack.ai/docs/guides/projects) the CLI to use it.
 
-To enable Hub to run dev environments, pipelines, and apps in your preferred cloud account (AWS, GCP, Azure, etc), 
-log in to Hub, and configure the corresponding project.
+## Configurations
 
-## Running a dev environment
+A configuration is a YAML file that describes what you want to run.
 
-A dev environment is a virtual machine that includes the environment and an interactive IDE or notebook setup
-based on a pre-defined configuration.
+> **Note:**
+> All configuration files must be named with the suffix `.dstack.yml`. For example,
+> you can name the configuration file `.dstack.yml` or `app.dstack.yml`. You can define
+> these configurations anywhere within your project.
 
-Go ahead and define this configuration via YAML (under the `.dstack/workflows` folder).
+Configurations can be of two types: `dev-environment` and `task`.
+
+Below is a configuration that runs a dev environment with a pre-built environment to which you can connect via VS Code Desktop.
 
 ```yaml
-workflows:
-  - name: code-gpu
-    provider: code
-    setup:
-      - pip install -r dev-environments/requirements.txt
-    resources:
-      gpu:
-        count: 1
+type: dev-environment
+setup:
+  - pip install -r requirements.txt
+ide: vscode
 ```
 
-The YAML file allows you to configure hardware resources, 
-set up the Python environment, expose ports, configure cache, and many more.
+Here's an example of a task configuration.
+A task can be either a batch job, such as training or fine-tuning a model, or a web application.
 
-Now, you can start it using the `dstack run` command:
+```yaml
+type: task
+setup:
+  - pip install -r requirements.txt
+ports:
+  - 7860
+commands:
+  - gradio app.py
+```
+
+## CLI
+
+To run a configuration, use the [`dstack run`](https://dstack.ai/docs/reference/cli/run.md) command and pass the path to the 
+directory with the configuration.
 
 ```shell
-$ dstack run code-gpu
+$ dstack run . 
 
-RUN      WORKFLOW  SUBMITTED  STATUS     TAG
-shady-1  code-gpu  now        Submitted  
- 
+ RUN          WORKFLOW  SUBMITTED  USER   STATUS     INSTANCE 
+ fast-moth-1  ssh       now        admin  Submitted  a2-highgpu-1g        
+
 Starting SSH tunnel...
+
+To open in VS Code Desktop, use one of these links:
+  vscode://vscode-remote/ssh-remote+fast-moth-1/workflow
+  vscode-insiders://vscode-remote/ssh-remote+fast-moth-1/workflow
 
 To exit, press Ctrl+C.
-
-Web UI available at http://127.0.0.1:10000/?tkn=4d9cc05958094ed2996b6832f899fda1
 ```
 
-If you configure a project to run dev environments in the cloud, `dstack` will automatically provision the
-required cloud resources, and forward ports of the dev environment to your local machine. 
+The CLI automatically provisions the required cloud resources and forwards the ports to your local machine.
+If you interrupt the run, the cloud resources will be released automatically.
 
-When you stop the dev environment, `dstack` will automatically clean up cloud resources.
+## Profiles
 
-## Running a pipeline
-
-A pipeline is a set of pre-defined configurations that allow to process data, train or fine-tune models, do batch inference 
-or other tasks.
-
-Go ahead and define such a configuration via YAML (under the `.dstack/workflows` folder).
+The `.dstack/profiles.yml` file allows to describe multiple profiles. 
+ach profile can configure the project to use and the resources required for the run.
 
 ```yaml
-workflows:
-  - name: train-mnist-gpu
-    provider: bash
-    commands:
-      - pip install -r pipelines/requirements.txt
-      - python pipelines/train.py
-    artifacts:
-      - ./lightning_logs
+profiles:
+  - name: gpu-large
+    project: gcp
     resources:
-      gpu:
-        count: 1
+       memory: 48GB
+       gpu:
+         memory: 24GB
+    default: true
 ```
 
-The YAML file allows you to configure hardware resources and output artifacts, set up the
-Python environment, expose ports, configure cache, and many more.
-
-Now, you can run the pipeline using the `dstack run` command:
-
-```shell
-$ dstack run train-mnist-gpu
-
-RUN      WORKFLOW         SUBMITTED  STATUS     TAG
-shady-1  train-mnist-gpu  now        Submitted  
- 
-Provisioning... It may take up to a minute. ✓
-
-GPU available: True, used: True
-
-Epoch 1: [00:03<00:00, 280.17it/s, loss=1.35, v_num=0]
-```
-
-If you configure a project to run pipelines in the cloud, the `dstack run` command will automatically provision the 
-required cloud resources.
-
-After the pipeline is stopped or finished, `dstack` will save output artifacts and clean up cloud resources.
-
-## Running an app
-
-An app can be either a web application (such as Streamlit, Gradio, etc.) or an API endpoint (like FastAPI, Flask, etc.)
-setup based on a pre-defined configuration.
-
-Go ahead and define this configuration via YAML (under the `.dstack/workflows` folder).
-
-```yaml
-workflows:
-  - name: fastapi-gpu
-    provider: bash
-    ports:
-      - 3000
-    commands:
-      - pip install -r apps/requirements.txt
-      - uvicorn apps.main:app --port 3000 --host 0.0.0.0
-    resources:
-      gpu:
-        count: 1
-```
-
-The configuration allows you to customize hardware resources, set up the Python environment, 
-configure cache, and more.
-
-Now, you can run the app using the `dstack run` command:
-
-```shell
-$ dstack run fastapi-gpu
- RUN           WORKFLOW     SUBMITTED  STATUS     TAG
- silly-dodo-1  fastapi-gpu  now        Submitted     
-
-Starting SSH tunnel...
-
-To interrupt, press Ctrl+C.
-
-INFO:     Started server process [1]
-INFO:     Waiting for application startup.
-INFO:     Application startup complete.
-INFO:     Uvicorn running on http://127.0.0.1:3000 (Press CTRL+C to quit)
-```
-
-If you configure a project to run apps in the cloud, `dstack` will automatically provision the required cloud
-resources, and forward ports of the app to your local machine.
-If you stop the app, it will automatically clean up cloud resources.
+If you have configured the default profile, the `dstack run` command will use it automatically.
+Otherwise, you can always specify the profile using `--profile PROFILE`.
 
 ## More information
 
