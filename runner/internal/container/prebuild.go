@@ -274,7 +274,6 @@ func PrebuildImage(ctx context.Context, client docker.APIClient, spec *PrebuildS
 		StopTimeout: &stopTimeout,
 		Tty:         true,
 	}
-	fmt.Println(spec.Entrypoint, len(spec.Entrypoint))
 	hostConfig := &container.HostConfig{
 		Mounts: []mount.Mount{
 			{
