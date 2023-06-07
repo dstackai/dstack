@@ -37,7 +37,7 @@ export const ProjectForm: React.FC<IProps> = ({ initialValues, onCancel, loading
 
         return {
             backend: {
-                type: 'aws',
+                type: 'azure',
             },
         };
     };

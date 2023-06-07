@@ -81,10 +81,13 @@
       "members_empty_message_text": "Select project's members",
       "cli": "CLI",
       "aws": {
+        "authorization": "Authorization",
+        "authorization_default": "Default",
+        "authorization_access_key": "Credentials",
         "access_key": "Access key",
-        "secret_key": "Secret key",
         "access_key_id": "Access key ID",
         "access_key_id_description": "Specify the AWS access key ID",
+        "secret_key": "Secret key",
         "secret_key_id": "Secret access key",
         "secret_key_id_description": "Specify the AWS secret access key",
         "region_name":  "Region",
@@ -92,11 +95,14 @@
         "region_name_placeholder": "Not selected",
         "s3_bucket_name": "Bucket",
         "s3_bucket_name_description": "Select an S3 bucket to store artifacts",
+        "ec2_subnet_id": "Subnet",
         "ec2_subnet_id_description": "Select a subnet to run workflows in",
-        "ec2_subnet_id_placeholder":  "Not selected",
-        "ec2_subnet_id": "Subnet"
+        "ec2_subnet_id_placeholder":  "Not selected"
       },
       "azure" : {
+        "authorization": "Authorization",
+        "authorization_default": "Default",
+        "authorization_client": "Client",
         "tenant_id": "Tenant ID",
         "tenant_id_description": "Specify an Azure tenant ID",
         "client_id": "Client ID",
@@ -114,7 +120,9 @@
         "storage_account_placeholder":  "Not selected"
       },
       "gcp": {
-        "credentials": "Service account",
+        "authorization": "Authorization",
+        "authorization_default": "Default",
+        "service_account": "Service account",
         "credentials_description": "Credentials description",
         "credentials_placeholder": "Credentials placeholder",
         "area": "Location",

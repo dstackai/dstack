@@ -14,39 +14,40 @@ declare type TAwsBucket = {
 }
 
 declare interface IProjectAwsBackendValues {
+        default_credentials: boolean
         region_name: {
             selected?: string,
             values: { value: string, label: string}[]
-        },
+        } | null,
         s3_bucket_name: {
             selected?: string,
             values: TAwsBucket[]
-        },
+        } | null,
         ec2_subnet_id: {
             selected?: string | null,
             values: { value: string, label: string}[]
-        },
+        } | null,
 }
 
 declare interface IProjectAzureBackendValues {
     subscription_id: {
         selected?: string,
         values: { value: string, label: string}[]
-    },
+    } | null,
     location: {
         selected?: string,
         values: { value: string, label: string}[]
-    },
+    } | null,
     storage_account: {
         selected?: string | null,
         values: { value: string, label: string}[]
-    },
+    } | null,
 }
 
 declare interface TVPCSubnetValue { label: string, vpc: string, subnet: string}
 
 declare interface IProjectGCPBackendValues {
-    area: {
+    area: null | {
         selected?: string,
         values: { value: string, label: string}[]
     },
@@ -71,8 +72,11 @@ declare interface IProjectGCPBackendValues {
 declare type TProjectBackendValuesResponse = IProjectAwsBackendValues & IProjectAzureBackendValues & IProjectGCPBackendValues
 
 declare interface TProjectBackendAWS {
-    access_key: string,
-    secret_key: string,
+    credentials: {
+        type: 'access_key',
+        access_key: string,
+        secret_key: string,
+    } | {type: 'default'},
     region_name: string,
     s3_bucket_name: string,
     ec2_subnet_id: string | null,
@@ -80,15 +84,23 @@ declare interface TProjectBackendAWS {
 
 declare interface TProjectBackendAzure {
     tenant_id: string,
-    client_id?: string,
-    client_secret?: string,
+
+    credentials: {
+        type: 'client',
+        client_id?: string,
+        client_secret?: string,
+    } | {type: 'default'}
     subscription_id: string,
     location: string,
     storage_account: string,
 }
 
 declare interface TProjectBackendGCP {
-    credentials?: string,
+    credentials: {
+        type: 'service_account',
+        filename?: string,
+        data?: string,
+    } | {type: 'default'},
     credentials_filename?: string,
     area: string,
     region: string,

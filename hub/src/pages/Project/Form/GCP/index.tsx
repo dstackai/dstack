@@ -15,7 +15,8 @@ import { IProps, VPCSubnetOption } from './types';
 import styles from './styles.module.scss';
 
 const FIELDS_QUEUE = [
-    FIELD_NAMES.CREDENTIALS,
+    FIELD_NAMES.CREDENTIALS.TYPE,
+    FIELD_NAMES.CREDENTIALS.DATA,
     FIELD_NAMES.AREA,
     FIELD_NAMES.REGION,
     FIELD_NAMES.ZONE,
@@ -42,12 +43,14 @@ export const GCPBackend: React.FC<IProps> = ({ loading }) => {
     const [zoneOptions, setZoneOptions] = useState<FormSelectOptions>([]);
     const [bucketNameOptions, setBucketNameOptions] = useState<TAwsBucket[]>([]);
     const [subnetOptions, setSubnetOptions] = useState<VPCSubnetOption[]>([]);
+    const [availableDefaultCredentials, setAvailableDefaultCredentials] = useState(false);
     const requestRef = useRef<null | ReturnType<typeof getBackendValues>>(null);
     const [pushNotification] = useNotifications();
     const lastUpdatedField = useRef<string | null>(null);
 
     const [getBackendValues, { isLoading: isLoadingValues }] = useBackendValuesMutation();
-    const backendCredentials = watch('backend.credentials');
+    const backendCredentialTypeValue = watch(`backend.${FIELD_NAMES.CREDENTIALS.TYPE}`);
+    const backendCredentials = watch(`backend.${FIELD_NAMES.CREDENTIALS.DATA}`);
 
     useEffect(() => {
         changeFormHandler().catch(console.log);
@@ -65,9 +68,11 @@ export const GCPBackend: React.FC<IProps> = ({ loading }) => {
     const changeFormHandler = async () => {
         const backendFormValues = getValues('backend');
 
-        if (!backendFormValues.credentials) {
+        if (backendFormValues?.credentials?.type === 'service_account' && !backendFormValues?.credentials?.data) {
             return;
         }
+
+        if (backendFormValues?.credentials && !backendFormValues.credentials?.type) delete backendFormValues.credentials;
 
         clearErrors('backend');
 
@@ -80,11 +85,13 @@ export const GCPBackend: React.FC<IProps> = ({ loading }) => {
 
             lastUpdatedField.current = null;
 
-            if (response.area.values) {
+            setAvailableDefaultCredentials(response.default_credentials);
+
+            if (response.area?.values) {
                 setAreaOptions(response.area.values);
             }
 
-            if (response.area.selected !== undefined) {
+            if (response.area?.selected !== undefined) {
                 setValue(`backend.${FIELD_NAMES.AREA}`, response.area.selected);
             }
 
@@ -147,7 +154,11 @@ export const GCPBackend: React.FC<IProps> = ({ loading }) => {
             if (isRequestFormErrors2(errorRequestData)) {
                 errorRequestData.detail.forEach((error) => {
                     if (isRequestFormFieldError(error)) {
-                        setError(`backend.${error.loc.join('.')}`, { type: 'custom', message: error.msg });
+                        if (error.loc.length === 1 && error.loc[0] === 'credentials') {
+                            setError(`backend.${FIELD_NAMES.CREDENTIALS.TYPE}`, { type: 'custom', message: error.msg });
+                        } else {
+                            setError(`backend.${error.loc.join('.')}`, { type: 'custom', message: error.msg });
+                        }
                     } else {
                         pushNotification({
                             type: 'error',
@@ -201,7 +212,9 @@ export const GCPBackend: React.FC<IProps> = ({ loading }) => {
     };
 
     const getDisabledByFieldName = (fieldName: string) => {
-        let disabledField = loading || !backendCredentials || !valuesData;
+        let disabledField = loading || !backendCredentialTypeValue || !valuesData;
+
+        disabledField = disabledField || (backendCredentialTypeValue === 'service_account' && !backendCredentials);
 
         disabledField = disabledField || (lastUpdatedField.current !== fieldName && isLoadingValues);
 
@@ -235,37 +248,60 @@ export const GCPBackend: React.FC<IProps> = ({ loading }) => {
     return (
         <>
             <SpaceBetween size="l">
-                <FileUploader
-                    info={<InfoLink onFollow={() => openHelpPanel(SERVICE_ACCOUNT_HELP)} />}
-                    fileInputId="gcp-credentials"
-                    text="Choose a file"
-                    description="Upload a service account key JSON file"
-                    label={t('projects.edit.gcp.credentials')}
-                    accept="application/json"
+                <FormSelect
+                    label={t('projects.edit.gcp.authorization')}
+                    control={control}
+                    name={`backend.${FIELD_NAMES.CREDENTIALS.TYPE}`}
+                    onChange={onChangeFormField}
                     // eslint-disable-next-line @typescript-eslint/ban-ts-comment
                     // @ts-ignore
                     errorText={errors?.backend?.credentials?.message}
-                    files={files}
-                    onFilesUploaded={(uploadedFiles) => {
-                        if (uploadedFiles.length) {
-                            setFiles([...uploadedFiles]);
-
-                            const [file] = uploadedFiles;
-
-                            const reader = new FileReader();
-                            reader.onload = function () {
-                                const text = reader.result;
-                                if (text) {
-                                    setValue(`backend.${FIELD_NAMES.CREDENTIALS}`, text);
-                                    setValue(`backend.${FIELD_NAMES.CREDENTIALS_FILENAME}`, file.name);
-                                    onChangeFormField();
-                                }
-                            };
-
-                            reader.readAsText(file);
-                        }
-                    }}
+                    options={[
+                        {
+                            label: t('projects.edit.gcp.authorization_default'),
+                            value: 'default',
+                            disabled: !availableDefaultCredentials,
+                        },
+                        {
+                            label: t('projects.edit.gcp.service_account'),
+                            value: 'service_account',
+                        },
+                    ]}
                 />
+
+                {backendCredentialTypeValue === 'service_account' && (
+                    <FileUploader
+                        info={<InfoLink onFollow={() => openHelpPanel(SERVICE_ACCOUNT_HELP)} />}
+                        fileInputId="gcp-credentials"
+                        text="Choose a file"
+                        description="Upload a service account key JSON file"
+                        label={t('projects.edit.gcp.service_account')}
+                        accept="application/json"
+                        // eslint-disable-next-line @typescript-eslint/ban-ts-comment
+                        // @ts-ignore
+                        errorText={errors?.backend?.credentials.data?.message}
+                        files={files}
+                        onFilesUploaded={(uploadedFiles) => {
+                            if (uploadedFiles.length) {
+                                setFiles([...uploadedFiles]);
+
+                                const [file] = uploadedFiles;
+
+                                const reader = new FileReader();
+                                reader.onload = function () {
+                                    const text = reader.result;
+                                    if (text) {
+                                        setValue(`backend.${FIELD_NAMES.CREDENTIALS.DATA}`, text);
+                                        setValue(`backend.${FIELD_NAMES.CREDENTIALS.FILENAME}`, file.name);
+                                        onChangeFormField();
+                                    }
+                                };
+
+                                reader.readAsText(file);
+                            }
+                        }}
+                    />
+                )}
 
                 <FormSelect
                     info={<InfoLink onFollow={() => openHelpPanel(AREA_HELP)} />}
