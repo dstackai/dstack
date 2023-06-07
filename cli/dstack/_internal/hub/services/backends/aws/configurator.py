@@ -7,6 +7,7 @@ from boto3.session import Session
 from dstack._internal.backend.aws import AwsBackend
 from dstack._internal.backend.aws.config import AWSConfig
 from dstack._internal.backend.base.config import BackendConfig
+from dstack._internal.hub.db.models import Project
 from dstack._internal.hub.models import (
     AWSBucketProjectElement,
     AWSBucketProjectElementValue,
@@ -14,7 +15,6 @@ from dstack._internal.hub.models import (
     AWSProjectConfigWithCreds,
     AWSProjectCreds,
     AWSProjectValues,
-    Project,
     ProjectElement,
     ProjectElementValue,
 )

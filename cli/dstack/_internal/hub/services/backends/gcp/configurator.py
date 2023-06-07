@@ -7,6 +7,7 @@ from google.oauth2 import service_account
 from dstack._internal.backend.base.config import BackendConfig
 from dstack._internal.backend.gcp import GCPBackend
 from dstack._internal.backend.gcp.config import GCPConfig
+from dstack._internal.hub.db.models import Project
 from dstack._internal.hub.models import (
     GCPProjectConfig,
     GCPProjectConfigWithCreds,
@@ -14,7 +15,6 @@ from dstack._internal.hub.models import (
     GCPProjectValues,
     GCPVPCSubnetProjectElement,
     GCPVPCSubnetProjectElementValue,
-    Project,
     ProjectElement,
     ProjectElementValue,
 )

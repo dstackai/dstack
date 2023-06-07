@@ -2,12 +2,8 @@ from abc import ABC, abstractmethod
 from typing import Dict, List, Tuple, Union
 
 from dstack._internal.backend.base.config import BackendConfig
-from dstack._internal.hub.models import (
-    AnyProjectConfig,
-    AnyProjectConfigWithCreds,
-    Project,
-    ProjectValues,
-)
+from dstack._internal.hub.db.models import Project
+from dstack._internal.hub.models import AnyProjectConfig, AnyProjectConfigWithCreds, ProjectValues
 
 
 class BackendConfigError(Exception):

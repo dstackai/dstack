@@ -46,11 +46,11 @@ from azure.mgmt.subscription import SubscriptionClient
 from dstack._internal.backend.azure import AzureBackend
 from dstack._internal.backend.azure import utils as azure_utils
 from dstack._internal.backend.azure.config import AzureConfig
+from dstack._internal.hub.db.models import Project
 from dstack._internal.hub.models import (
     AzureProjectConfig,
     AzureProjectConfigWithCreds,
     AzureProjectValues,
-    Project,
     ProjectElement,
     ProjectElementValue,
 )
