@@ -28,7 +28,7 @@ class TestEntrypoint(unittest.TestCase):
         provider.load(
             self.hub_client, args, "dummy-workflow", create_provider_data(), "dummy-run-1"
         )
-        for job in provider.submit_jobs(self.hub_client, ""):
+        for job in provider.get_jobs(self.hub_client.repo, "", ""):
             data = job.serialize()
             self.assertListEqual(data["commands"], [])
             self.assertEqual(data["entrypoint"], None)
@@ -43,7 +43,7 @@ class TestEntrypoint(unittest.TestCase):
             create_provider_data(commands=commands),
             "dummy-run-1",
         )
-        for job in provider.submit_jobs(self.hub_client, ""):
+        for job in provider.get_jobs(self.hub_client.repo, "", ""):
             data = job.serialize()
             self.assertListEqual(data["commands"], commands)
             self.assertListEqual(data["entrypoint"], ["/bin/sh", "-i", "-c"])
@@ -57,7 +57,7 @@ class TestEntrypoint(unittest.TestCase):
             create_provider_data(entrypoint="/bin/bash -ic"),
             "dummy-run-1",
         )
-        for job in provider.submit_jobs(self.hub_client, ""):
+        for job in provider.get_jobs(self.hub_client.repo, "", ""):
             data = job.serialize()
             self.assertListEqual(data["commands"], [])
             self.assertListEqual(data["entrypoint"], ["/bin/bash", "-ic"])
@@ -72,7 +72,7 @@ class TestEntrypoint(unittest.TestCase):
             create_provider_data(commands=commands, entrypoint="/bin/bash -ic"),
             "dummy-run-1",
         )
-        for job in provider.submit_jobs(self.hub_client, ""):
+        for job in provider.get_jobs(self.hub_client.repo, "", ""):
             data = job.serialize()
             self.assertListEqual(data["commands"], commands)
             self.assertListEqual(data["entrypoint"], ["/bin/bash", "-ic"])
