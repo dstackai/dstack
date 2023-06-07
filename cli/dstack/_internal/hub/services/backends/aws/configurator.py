@@ -76,9 +76,7 @@ class AWSConfigurator(Configurator):
     def create_config_auth_data_from_project_config(
         self, project_config: AWSProjectConfigWithCreds
     ) -> Tuple[Dict, Dict]:
-        project_config.backend.s3_bucket_name = project_config.backend.s3_bucket_name.replace(
-            "s3://", ""
-        )
+        project_config.s3_bucket_name = project_config.s3_bucket_name.replace("s3://", "")
         config = AWSProjectConfig.parse_obj(project_config).dict()
         auth = AWSProjectCreds.parse_obj(project_config).dict()
         return config, auth
