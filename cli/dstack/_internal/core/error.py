@@ -13,6 +13,7 @@ class BackendError(DstackError):
 
 class NoMatchingInstanceError(BackendError):
     code = "no_matching_instance"
+    message = "No instance type matching requirements"
 
 
 class RepoNotInitializedError(DstackError):

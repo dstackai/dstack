@@ -8,6 +8,7 @@ from dstack._internal.backend.base.config import BackendConfig
 from dstack._internal.backend.base.secrets import SecretsManager
 from dstack._internal.backend.base.storage import Storage
 from dstack._internal.core.artifact import Artifact
+from dstack._internal.core.instance import InstanceType
 from dstack._internal.core.job import Job, JobHead, JobStatus
 from dstack._internal.core.log_event import LogEvent
 from dstack._internal.core.repo import RemoteRepoCredentials, RepoHead, RepoSpec
@@ -39,6 +40,10 @@ class Backend(ABC):
     @property
     def name(self) -> str:
         return self.NAME
+
+    @abstractmethod
+    def predict_instance_type(self, job: Job) -> Optional[InstanceType]:
+        pass
 
     @abstractmethod
     def create_run(self, repo_id: str) -> str:

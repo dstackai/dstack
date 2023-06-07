@@ -7,6 +7,7 @@ from dstack._internal.backend.base import runners
 from dstack._internal.backend.base.compute import Compute, NoCapacityError
 from dstack._internal.backend.base.storage import Storage
 from dstack._internal.core.error import NoMatchingInstanceError
+from dstack._internal.core.instance import InstanceType
 from dstack._internal.core.job import Job, JobErrorCode, JobHead, JobStatus
 from dstack._internal.core.repo import RepoRef
 from dstack._internal.core.request import RequestStatus
@@ -86,6 +87,13 @@ def delete_job_head(storage: Storage, repo_id: str, job_id: str):
         storage.delete_object(job_head_key)
 
 
+def predict_job_instance(
+    compute: Compute,
+    job: Job,
+) -> Optional[InstanceType]:
+    return compute.get_instance_type(job)
+
+
 def run_job(
     storage: Storage,
     compute: Compute,
@@ -97,13 +105,12 @@ def run_job(
 
     runner = None
     try:
-        job.runner_id = uuid.uuid4().hex
         instance_type = compute.get_instance_type(job)
         if instance_type is None:
             job.status = JobStatus.FAILED
             job.error_code = JobErrorCode.NO_INSTANCE_MATCHING_REQUIREMENTS
             update_job(storage, job)
-            raise NoMatchingInstanceError("No instance type matching requirements")
+            raise NoMatchingInstanceError()
         job.instance_type = instance_type.instance_name
         update_job(storage, job)
         runner = Runner(

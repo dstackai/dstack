@@ -22,6 +22,7 @@ from dstack._internal.backend.gcp.secrets import GCPSecretsManager
 from dstack._internal.backend.gcp.storage import GCPStorage
 from dstack._internal.cli.common import console
 from dstack._internal.core.artifact import Artifact
+from dstack._internal.core.instance import InstanceType
 from dstack._internal.core.job import Job, JobHead, JobStatus
 from dstack._internal.core.log_event import LogEvent
 from dstack._internal.core.repo import RemoteRepoCredentials, RepoHead, RepoSpec
@@ -78,6 +79,9 @@ class GCPBackend(Backend):
             backend_config=config,
             credentials=credentials,
         )
+
+    def predict_instance_type(self, job: Job) -> Optional[InstanceType]:
+        return base_jobs.predict_job_instance(self._compute, job)
 
     def create_run(self, repo_id: str) -> str:
         return base_runs.create_run(self._storage)

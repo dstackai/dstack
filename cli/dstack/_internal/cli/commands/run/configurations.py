@@ -57,7 +57,7 @@ def _parse_task_configuration_data(
 
 def parse_configuration_file(
     working_dir: str, file_name: Optional[str], profile_name: Optional[str]
-) -> Tuple[str, Dict[str, Any], Optional[str]]:
+) -> Tuple[str, str, Dict[str, Any], Optional[str]]:
     configuration_path = Path(file_name) if file_name else Path(working_dir) / ".dstack.yml"
     if not file_name and not configuration_path.exists():
         configuration_path = Path(working_dir) / ".dstack.yaml"
@@ -97,4 +97,4 @@ def parse_configuration_file(
     project_name = profile.get("project") if profile else None
     if not Path(os.getcwd()).samefile(Path(working_dir)):
         provider_data["working_dir"] = str(Path(working_dir))
-    return provider_name, provider_data, project_name
+    return str(configuration_path), provider_name, provider_data, project_name

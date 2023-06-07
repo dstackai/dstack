@@ -18,6 +18,7 @@ from dstack._internal.backend.base import runs as base_runs
 from dstack._internal.backend.base import secrets as base_secrets
 from dstack._internal.backend.base import tags as base_tags
 from dstack._internal.core.artifact import Artifact
+from dstack._internal.core.instance import InstanceType
 from dstack._internal.core.job import Job, JobHead, JobStatus
 from dstack._internal.core.log_event import LogEvent
 from dstack._internal.core.repo.base import Repo
@@ -66,6 +67,9 @@ class AzureBackend(Backend):
         if config is None:
             return None
         return cls(backend_config=config, credential=DefaultAzureCredential())
+
+    def predict_instance_type(self, job: Job) -> Optional[InstanceType]:
+        return base_jobs.predict_job_instance(self._compute, job)
 
     def create_run(self, repo_id: str) -> str:
         return base_runs.create_run(self._storage)

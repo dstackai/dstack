@@ -203,6 +203,10 @@ class ReposUpdate(BaseModel):
     last_run_at: int
 
 
+class RunsGetPlan(BaseModel):
+    jobs: List[Job]
+
+
 class RunsList(BaseModel):
     repo_id: str
     run_name: Optional[str]
