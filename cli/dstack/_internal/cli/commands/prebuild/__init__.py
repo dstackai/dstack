@@ -3,10 +3,16 @@ import os
 import sys
 
 from jsonschema import ValidationError
+from rich.prompt import Confirm
 
 from dstack._internal.api.runs import list_runs_hub
 from dstack._internal.cli.commands import BasicCommand
-from dstack._internal.cli.commands.run import _poll_run, _read_ssh_key_pub, configurations
+from dstack._internal.cli.commands.run import (
+    _poll_run,
+    _print_run_plan,
+    _read_ssh_key_pub,
+    configurations,
+)
 from dstack._internal.cli.common import add_project_argument, check_init, console, print_runs
 from dstack._internal.cli.config import config, get_hub_client
 from dstack._internal.core.error import RepoNotInitializedError
@@ -19,7 +25,12 @@ class PrebuildCommand(BasicCommand):
 
     @check_init
     def _command(self, args: argparse.Namespace):
-        (provider_name, provider_data, project_name,) = configurations.parse_configuration_file(
+        (
+            configuration_path,
+            provider_name,
+            provider_data,
+            project_name,
+        ) = configurations.parse_configuration_file(
             args.working_dir, args.file_name, args.profile_name
         )
         provider_data["prebuild"] = "prebuild-only"
@@ -39,8 +50,18 @@ class PrebuildCommand(BasicCommand):
             else:
                 ssh_pub_key = _read_ssh_key_pub(config.repo_user_config.ssh_key_path)
 
+            run_plan = hub_client.get_run_plan(
+                provider_name=provider_name, provider_data=provider_data, args=args
+            )
+            console.print("dstack will execute the following plan:\n")
+            _print_run_plan(configuration_path, run_plan)
+            if not args.yes and not Confirm.ask("Continue?"):
+                console.print("Exiting...")
+                exit(0)
+            console.print("Provisioning...\n")
+
             run_name, jobs = hub_client.run_provider(
-                provider_name,
+                provider_name=provider_name,
                 provider_data=provider_data,
                 ssh_pub_key=ssh_pub_key,
                 args=args,
@@ -81,6 +102,12 @@ class PrebuildCommand(BasicCommand):
             dest="file_name",
         )
         add_project_argument(self._parser)
+        self._parser.add_argument(
+            "-y",
+            "--yes",
+            help="Do not ask for plan confirmation",
+            action="store_true",
+        )
         self._parser.add_argument(
             "--profile",
             metavar="PROFILE",
