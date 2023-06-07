@@ -49,6 +49,9 @@ class AWSConfigurator(Configurator):
 
         project_values = AWSProjectValues()
         session = Session()
+        if session.region_name is None:
+            session = Session(region_name=config.region_name)
+
         project_values.default_credentials = self._valid_credentials(session=session)
 
         credentials_data = config_data.get("credentials")
@@ -67,7 +70,7 @@ class AWSConfigurator(Configurator):
             self._raise_invalid_credentials_error()
 
         # TODO validate config values
-        project_values.region_name = self._get_hub_regions(default_region=config.region_name)
+        project_values.region_name = self._get_hub_regions(default_region=session.region_name)
         project_values.s3_bucket_name = self._get_hub_buckets(
             session=session, region=config.region_name, default_bucket=config.bucket_name
         )
