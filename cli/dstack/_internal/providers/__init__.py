@@ -168,9 +168,7 @@ class Provider:
         )
         prebuild = parser.add_mutually_exclusive_group()
         for value in PrebuildPolicy:
-            prebuild.add_argument(
-                f"--{value}", action="store_const", dest="prebuild", const="value"
-            )
+            prebuild.add_argument(f"--{value}", action="store_const", dest="prebuild", const=value)
 
     def _parse_base_args(self, args: Namespace, unknown_args):
         if args.requirements:
