@@ -35,12 +35,9 @@ func Test_Prebuild_Save_Load(t *testing.T) {
 	imageName := fmt.Sprintf("dstackai/test-prebuild:%s", name)
 	diffPath := filepath.Join(t.TempDir(), fmt.Sprintf("%s.tar", name))
 
-	put, err := engine.Prebuild(context.TODO(), spec, imageName, diffPath, &bytes.Buffer{})
+	err = engine.Prebuild(context.TODO(), spec, imageName, diffPath, os.Stdout, &bytes.Buffer{})
 	if err != nil {
 		t.Error("Prebuild & Save:", err)
-	}
-	if put == false {
-		t.Error("Prebuild & Save: put=false")
 	}
 	t.Cleanup(func() {
 		_, _ = engine.client.ImageRemove(context.TODO(), imageName, types.ImageRemoveOptions{Force: true})
@@ -55,12 +52,9 @@ func Test_Prebuild_Save_Load(t *testing.T) {
 		t.Error("Prebuild remove:", err)
 	}
 
-	put, err = engine.Prebuild(context.TODO(), spec, imageName, diffPath, &bytes.Buffer{})
+	err = engine.UsePrebuild(context.TODO(), spec, diffPath)
 	if err != nil {
 		t.Error("Load:", err)
-	}
-	if put == true {
-		t.Error("Load: put=true")
 	}
 
 	loadInspect, _, err := engine.client.ImageInspectWithRaw(context.TODO(), imageName)

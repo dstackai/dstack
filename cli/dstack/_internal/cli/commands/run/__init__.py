@@ -23,7 +23,7 @@ from dstack._internal.cli.commands.run.ssh_tunnel import PortsLock, run_ssh_tunn
 from dstack._internal.cli.commands.run.watcher import LocalCopier, SSHCopier, Watcher
 from dstack._internal.cli.common import add_project_argument, check_init, console, print_runs
 from dstack._internal.cli.config import config, get_hub_client
-from dstack._internal.core.error import NameNotFoundError, RepoNotInitializedError
+from dstack._internal.core.error import RepoNotInitializedError
 from dstack._internal.core.instance import InstanceType
 from dstack._internal.core.job import Job, JobHead, JobStatus
 from dstack._internal.core.plan import RunPlan
@@ -261,7 +261,7 @@ def _poll_run(
 
         run = hub_client.list_run_heads(run_name)[0]
         if run.status.is_unfinished() or run.status == JobStatus.DONE:
-            if watcher.is_alive():  # reload is enabled
+            if watcher is not None and watcher.is_alive():  # reload is enabled
                 if hub_client.get_project_backend_type() == "local":
                     watcher.start_copier(
                         LocalCopier,

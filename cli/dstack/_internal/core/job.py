@@ -3,7 +3,6 @@ from enum import Enum
 from typing import Any, Dict, List, Optional, Union
 
 from pydantic import BaseModel, Field, root_validator, validator
-from typing_extensions import Literal
 
 from dstack._internal.core.app import AppSpec
 from dstack._internal.core.artifact import ArtifactSpec
@@ -19,7 +18,7 @@ from dstack._internal.core.repo import (
     RepoRef,
 )
 
-PrebuildMode = Literal["never", "lazy", "force"]
+PrebuildPolicy = ["use-prebuild", "no-prebuild", "force-prebuild", "prebuild-only"]
 
 
 class GpusRequirements(BaseModel):
@@ -181,7 +180,7 @@ class Job(JobHead):
     request_id: Optional[str]
     tag_name: Optional[str]
     ssh_key_pub: Optional[str]
-    prebuild: Optional[PrebuildMode]
+    prebuild: Optional[str]
     setup: Optional[List[str]]
     run_env: Optional[Dict[str, str]]
 
@@ -203,7 +202,9 @@ class Job(JobHead):
     @validator("prebuild")
     def default_prebuild(cls, v: Optional[str]) -> str:
         if not v:
-            return "never"
+            return PrebuildPolicy[0]
+        if v not in PrebuildPolicy:
+            raise KeyError(f"Unknown prebuild policy: {v}")
         return v
 
     def serialize(self) -> dict:
