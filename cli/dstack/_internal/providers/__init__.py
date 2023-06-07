@@ -3,6 +3,7 @@ import importlib
 import shlex
 import sys
 import tempfile
+import uuid
 from abc import abstractmethod
 from argparse import ArgumentParser, Namespace
 from pkgutil import iter_modules
@@ -21,6 +22,7 @@ from dstack._internal.core.job import (
     PrebuildMode,
     Requirements,
 )
+from dstack._internal.core.repo.base import Repo
 from dstack._internal.providers.ports import PortMapping, merge_ports
 from dstack._internal.utils.common import get_milliseconds_since_epoch
 from dstack._internal.utils.interpolator import VariablesInterpolator
@@ -121,7 +123,7 @@ class Provider:
 
         self.parse_args()
         self.ports = self.provider_data.get("ports") or {}
-        if not self.ssh_key_pub:
+        if self.ssh_key_pub is None:
             if self.openssh_server or (
                 hub_client.get_project_backend_type() != "local" and not args.detach
             ):
@@ -216,25 +218,20 @@ class Provider:
     def parse_args(self):
         pass
 
-    def submit_jobs(self, hub_client: "hub.HubClient", tag_name: str) -> List[Job]:
+    def get_jobs(
+        self, repo: Repo, repo_code_filename: Optional[str] = None, tag_name: Optional[str] = None
+    ) -> List[Job]:
         if not self.loaded:
             raise Exception("The provider is not loaded")
         job_specs = self.create_job_specs()
 
-        with tempfile.NamedTemporaryFile("w+b") as f:
-            repo_code_filename = hub_client.repo.repo_data.write_code_file(f)
-            f.seek(0)
-            # FIXME: this should be replaced with public API call
-            hub_client._storage.upload_file(f.name, repo_code_filename, lambda _: ...)
-
-        # [TODO] Handle master job
         jobs = []
         for i, job_spec in enumerate(job_specs):
             job = Job(
                 job_id=f"{self.run_name},{self.workflow_name or ''},{i}",
-                repo_ref=hub_client.repo.repo_ref,
+                repo_ref=repo.repo_ref,
                 hub_user_name="",  # HUB will fill it later
-                repo_data=hub_client.repo.repo_data,
+                repo_data=repo.repo_data,
                 run_name=self.run_name,
                 workflow_name=self.workflow_name or None,
                 provider_name=self.provider_name,
@@ -254,7 +251,7 @@ class Provider:
                 dep_specs=self.dep_specs,
                 master_job=job_spec.master_job,
                 app_specs=job_spec.app_specs,
-                runner_id=None,
+                runner_id=uuid.uuid4().hex,
                 request_id=None,
                 tag_name=tag_name,
                 ssh_key_pub=self.ssh_key_pub,
@@ -263,10 +260,7 @@ class Provider:
                 setup=job_spec.setup,
                 run_env=job_spec.run_env,
             )
-            hub_client.submit_job(job)
             jobs.append(job)
-        if tag_name:
-            hub_client.add_tag_from_run(tag_name, self.run_name, jobs)
         return jobs
 
     def _dep_specs(self, hub_client: "hub.HubClient") -> Optional[List[DepSpec]]:

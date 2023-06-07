@@ -12,6 +12,7 @@ from cursor import cursor
 from jsonschema import ValidationError
 from rich.progress import Progress, SpinnerColumn, TextColumn
 from rich.prompt import Confirm
+from rich.table import Table
 from websocket import WebSocketApp
 
 from dstack._internal.api.runs import list_runs_hub
@@ -23,7 +24,9 @@ from dstack._internal.cli.commands.run.watcher import LocalCopier, SSHCopier, Wa
 from dstack._internal.cli.common import add_project_argument, check_init, console, print_runs
 from dstack._internal.cli.config import config, get_hub_client
 from dstack._internal.core.error import NameNotFoundError, RepoNotInitializedError
+from dstack._internal.core.instance import InstanceType
 from dstack._internal.core.job import Job, JobHead, JobStatus
+from dstack._internal.core.plan import RunPlan
 from dstack._internal.core.request import RequestStatus
 from dstack._internal.core.run import RunHead
 from dstack._internal.utils.ssh import (
@@ -64,6 +67,12 @@ class RunCommand(BasicCommand):
         )
         add_project_argument(self._parser)
         self._parser.add_argument(
+            "-y",
+            "--yes",
+            help="Do not ask for plan confirmation",
+            action="store_true",
+        )
+        self._parser.add_argument(
             "--profile",
             metavar="PROFILE",
             help="The name of the profile",
@@ -98,7 +107,12 @@ class RunCommand(BasicCommand):
 
     @check_init
     def _command(self, args: Namespace):
-        (provider_name, provider_data, project_name,) = configurations.parse_configuration_file(
+        (
+            configuration_path,
+            provider_name,
+            provider_data,
+            project_name,
+        ) = configurations.parse_configuration_file(
             args.working_dir, args.file_name, args.profile_name
         )
         if args.project:
@@ -119,8 +133,18 @@ class RunCommand(BasicCommand):
             else:
                 ssh_pub_key = _read_ssh_key_pub(config.repo_user_config.ssh_key_path)
 
+            run_plan = hub_client.get_run_plan(
+                provider_name=provider_name, provider_data=provider_data, args=args
+            )
+            console.print("dstack will execute the following plan:\n")
+            _print_run_plan(configuration_path, run_plan)
+            if not args.yes and not Confirm.ask("Continue?"):
+                console.print("Exiting...")
+                exit(0)
+            console.print("Provisioning...\n")
+
             run_name, jobs = hub_client.run_provider(
-                provider_name,
+                provider_name=provider_name,
                 provider_data=provider_data,
                 ssh_pub_key=ssh_pub_key,
                 tag_name=args.tag_name,
@@ -154,6 +178,36 @@ def _read_ssh_key_pub(key_path: str) -> str:
     return path.with_suffix(path.suffix + ".pub").read_text().strip("\n")
 
 
+def _print_run_plan(configuration_file: str, run_plan: RunPlan):
+    table = Table(box=None)
+    table.add_column("CONFIGURATION", style="grey58")
+    table.add_column("USER", style="grey58", no_wrap=True, max_width=16)
+    table.add_column("PROJECT", style="grey58", no_wrap=True, max_width=16)
+    table.add_column("INSTANCE")
+    table.add_column("RESOURCES")
+    table.add_column("SPOT")
+    job_plan = run_plan.job_plans[0]
+    instance = job_plan.instance_type.instance_name or "-"
+    instance_info = _format_resources(job_plan.instance_type)
+    spot = "yes" if job_plan.instance_type.resources.interruptible else "no"
+    table.add_row(
+        configuration_file, run_plan.hub_user_name, run_plan.project, instance, instance_info, spot
+    )
+    console.print(table)
+    console.print()
+
+
+def _format_resources(instance_type: InstanceType) -> str:
+    instance_info = ""
+    instance_info += f"{instance_type.resources.cpus}xCPUs"
+    instance_info += f", {instance_type.resources.memory_mib}MB"
+    if instance_type.resources.gpus:
+        instance_info += (
+            f", {len(instance_type.resources.gpus)}x{instance_type.resources.gpus[0].name}"
+        )
+    return instance_info
+
+
 def _poll_run(
     hub_client: HubClient,
     job_heads: List[JobHead],
@@ -171,7 +225,7 @@ def _poll_run(
             task = progress.add_task("Provisioning... It may take up to a minute.", total=None)
             # idle PENDING and SUBMITTED
             request_errors_printed = False
-            for run in poll_run_head(
+            for run in _poll_run_head(
                 hub_client, run_name, loop_statuses=[JobStatus.PENDING, JobStatus.SUBMITTED]
             ):
                 if run.has_request_status([RequestStatus.NO_CAPACITY]):
@@ -184,7 +238,7 @@ def _poll_run(
                     )
                     request_errors_printed = False
             # handle TERMINATED and DOWNLOADING
-            run = next(poll_run_head(hub_client, run_name))
+            run = next(_poll_run_head(hub_client, run_name))
             if run.status == JobStatus.DOWNLOADING:
                 progress.update(task, description="Downloading deps... It may take a while.")
             elif run.has_request_status([RequestStatus.TERMINATED]):
@@ -194,13 +248,13 @@ def _poll_run(
                     description=f"[red]Request(s) terminated[/]",
                 )
             # idle DOWNLOADING
-            for run in poll_run_head(hub_client, run_name, loop_statuses=[JobStatus.DOWNLOADING]):
+            for run in _poll_run_head(hub_client, run_name, loop_statuses=[JobStatus.DOWNLOADING]):
                 pass
             progress.update(task, total=100)
 
         # attach to the instance, attach to the container in the background
         jobs = [hub_client.get_job(job_head.job_id) for job_head in job_heads]
-        ports = attach(hub_client, jobs[0], ssh_key)
+        ports = _attach(hub_client, jobs[0], ssh_key)
         console.print()
         console.print("[grey58]To stop, press Ctrl+C.[/]")
         console.print()
@@ -223,7 +277,7 @@ def _poll_run(
                     )
             _poll_logs_ws(hub_client, jobs[0], ports)
     except KeyboardInterrupt:
-        ask_on_interrupt(hub_client, run_name)
+        _ask_on_interrupt(hub_client, run_name)
 
     try:
         uploading = False
@@ -234,7 +288,7 @@ def _poll_run(
             transient=True,
         ) as progress:
             task = progress.add_task("Stopping... To abort press Ctrl+C", total=None)
-            for run in poll_run_head(hub_client, run_name):
+            for run in _poll_run_head(hub_client, run_name):
                 if run.status == JobStatus.UPLOADING and not uploading:
                     progress.update(
                         task, description="Uploading artifacts and cache... To abort press Ctrl+C"
@@ -250,90 +304,10 @@ def _poll_run(
     except KeyboardInterrupt:
         global interrupt_count
         interrupt_count = 1
-        ask_on_interrupt(hub_client, run_name)
+        _ask_on_interrupt(hub_client, run_name)
 
 
-def _poll_logs_ws(hub_client: HubClient, job: Job, ports: Dict[int, int]):
-    def on_message(ws: WebSocketApp, message):
-        message = fix_urls(message, job, ports, hostname="127.0.0.1")
-        sys.stdout.buffer.write(message)
-        sys.stdout.buffer.flush()
-
-    def on_error(_: WebSocketApp, err: Exception):
-        if isinstance(err, KeyboardInterrupt):
-            ask_on_interrupt(hub_client, job.run_name)
-        else:
-            console.print(err)
-
-    def on_open(_: WebSocketApp):
-        pass
-
-    def on_close(_: WebSocketApp, close_status_code, close_msg):
-        pass
-
-    local_ws_logs_port = ports.get(int(job.env["WS_LOGS_PORT"]), int(job.env["WS_LOGS_PORT"]))
-    url = f"ws://127.0.0.1:{local_ws_logs_port}/logsws"
-    atty = sys.stdout.isatty()
-    if atty:
-        cursor.hide()
-    _ws = websocket.WebSocketApp(
-        url,
-        on_message=on_message,
-        on_error=on_error,
-        on_open=on_open,
-        on_close=on_close,
-    )
-    try:
-        _ws.run_forever()
-    except KeyboardInterrupt:
-        pass  # on_error() has already handled an error, but it raises here too
-    if atty:
-        cursor.show()
-
-
-def poll_run_head(
-    hub_client: HubClient,
-    run_name: str,
-    rate: int = POLL_PROVISION_RATE_SECS,
-    loop_statuses: Optional[List[JobStatus]] = None,
-) -> Iterator[RunHead]:
-    while True:
-        run_heads = hub_client.list_run_heads(run_name)
-        if len(run_heads) == 0:
-            continue
-        run_head = run_heads[0]
-        if loop_statuses is not None and run_head.status not in loop_statuses:
-            return
-        yield run_head
-        time.sleep(rate)
-
-
-def ask_on_interrupt(hub_client: HubClient, run_name: str):
-    global interrupt_count
-    if interrupt_count == 0:
-        try:
-            console.print("\n")
-            if Confirm.ask(f"[red]Stop the run '{run_name}'?[/]"):
-                interrupt_count += 1
-                hub_client.stop_jobs(run_name, abort=False)
-                console.print("\n[grey58]Stopping... To abort press Ctrl+C[/]", end="")
-            else:
-                console.print("\n[grey58]Detaching...[/]")
-                console.print("[grey58]OK[/]")
-                exit(0)
-            return
-        except KeyboardInterrupt:
-            interrupt_count += 1
-    if interrupt_count > 0:
-        console.print("\n[grey58]Aborting...[/]")
-        hub_client.stop_jobs(run_name, abort=True)
-        console.print("[grey58]Aborted[/]")
-        ssh_config_remove_host(config.ssh_config_path, f"{run_name}-host")
-        ssh_config_remove_host(config.ssh_config_path, run_name)
-        exit(0)
-
-
-def attach(hub_client: HubClient, job: Job, ssh_key_path: str) -> Dict[int, int]:
+def _attach(hub_client: HubClient, job: Job, ssh_key_path: str) -> Dict[int, int]:
     """
     :return: (host tunnel ports, container tunnel ports, ports mapping)
     """
@@ -402,7 +376,7 @@ def attach(hub_client: HubClient, job: Job, ssh_key_path: str) -> Dict[int, int]
             app_ports = app_ports_lock.dict()
             # try to attach in the background
             threading.Thread(
-                target=attach_to_container,
+                target=_attach_to_container,
                 args=(hub_client, job.run_name, app_ports_lock),
                 daemon=True,
             ).start()
@@ -410,9 +384,9 @@ def attach(hub_client: HubClient, job: Job, ssh_key_path: str) -> Dict[int, int]
     return {**host_ports, **app_ports}
 
 
-def attach_to_container(hub_client: HubClient, run_name: str, ports_lock: PortsLock):
+def _attach_to_container(hub_client: HubClient, run_name: str, ports_lock: PortsLock):
     # idle PREBUILDING
-    for run in poll_run_head(hub_client, run_name, loop_statuses=[JobStatus.PREBUILDING]):
+    for run in _poll_run_head(hub_client, run_name, loop_statuses=[JobStatus.PREBUILDING]):
         pass
     app_ports = ports_lock.release()
     for delay in range(0, 61, POLL_PROVISION_RATE_SECS):  # retry
@@ -420,7 +394,7 @@ def attach_to_container(hub_client: HubClient, run_name: str, ports_lock: PortsL
         if run_ssh_tunnel(run_name, app_ports):
             # console.print(f"To connect via SSH, use: `ssh {run_name}`")
             break
-        if next(poll_run_head(hub_client, run_name)).status != JobStatus.RUNNING:
+        if next(_poll_run_head(hub_client, run_name)).status != JobStatus.RUNNING:
             break
     else:
         console.print(
@@ -429,3 +403,83 @@ def attach_to_container(hub_client: HubClient, run_name: str, ports_lock: PortsL
         )
         hub_client.stop_jobs(run_name, abort=True)
         exit(1)
+
+
+def _poll_logs_ws(hub_client: HubClient, job: Job, ports: Dict[int, int]):
+    def on_message(ws: WebSocketApp, message):
+        message = fix_urls(message, job, ports, hostname="127.0.0.1")
+        sys.stdout.buffer.write(message)
+        sys.stdout.buffer.flush()
+
+    def on_error(_: WebSocketApp, err: Exception):
+        if isinstance(err, KeyboardInterrupt):
+            _ask_on_interrupt(hub_client, job.run_name)
+        else:
+            console.print(err)
+
+    def on_open(_: WebSocketApp):
+        pass
+
+    def on_close(_: WebSocketApp, close_status_code, close_msg):
+        pass
+
+    local_ws_logs_port = ports.get(int(job.env["WS_LOGS_PORT"]), int(job.env["WS_LOGS_PORT"]))
+    url = f"ws://127.0.0.1:{local_ws_logs_port}/logsws"
+    atty = sys.stdout.isatty()
+    if atty:
+        cursor.hide()
+    _ws = websocket.WebSocketApp(
+        url,
+        on_message=on_message,
+        on_error=on_error,
+        on_open=on_open,
+        on_close=on_close,
+    )
+    try:
+        _ws.run_forever()
+    except KeyboardInterrupt:
+        pass  # on_error() has already handled an error, but it raises here too
+    if atty:
+        cursor.show()
+
+
+def _poll_run_head(
+    hub_client: HubClient,
+    run_name: str,
+    rate: int = POLL_PROVISION_RATE_SECS,
+    loop_statuses: Optional[List[JobStatus]] = None,
+) -> Iterator[RunHead]:
+    while True:
+        run_heads = hub_client.list_run_heads(run_name)
+        if len(run_heads) == 0:
+            continue
+        run_head = run_heads[0]
+        if loop_statuses is not None and run_head.status not in loop_statuses:
+            return
+        yield run_head
+        time.sleep(rate)
+
+
+def _ask_on_interrupt(hub_client: HubClient, run_name: str):
+    global interrupt_count
+    if interrupt_count == 0:
+        try:
+            console.print("\n")
+            if Confirm.ask(f"[red]Stop the run '{run_name}'?[/]"):
+                interrupt_count += 1
+                hub_client.stop_jobs(run_name, abort=False)
+                console.print("\n[grey58]Stopping... To abort press Ctrl+C[/]", end="")
+            else:
+                console.print("\n[grey58]Detaching...[/]")
+                console.print("[grey58]OK[/]")
+                exit(0)
+            return
+        except KeyboardInterrupt:
+            interrupt_count += 1
+    if interrupt_count > 0:
+        console.print("\n[grey58]Aborting...[/]")
+        hub_client.stop_jobs(run_name, abort=True)
+        console.print("[grey58]Aborted[/]")
+        ssh_config_remove_host(config.ssh_config_path, f"{run_name}-host")
+        ssh_config_remove_host(config.ssh_config_path, run_name)
+        exit(0)

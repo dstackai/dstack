@@ -18,6 +18,7 @@ from dstack._internal.backend.base import runs as base_runs
 from dstack._internal.backend.base import secrets as base_secrets
 from dstack._internal.backend.base import tags as base_tags
 from dstack._internal.core.artifact import Artifact
+from dstack._internal.core.instance import InstanceType
 from dstack._internal.core.job import Job, JobHead, JobStatus
 from dstack._internal.core.log_event import LogEvent
 from dstack._internal.core.repo import RemoteRepoCredentials, RepoHead, RepoSpec
@@ -94,6 +95,9 @@ class AwsBackend(Backend):
 
     def _get_client(self, client_name: str) -> BaseClient:
         return self._session.client(client_name)
+
+    def predict_instance_type(self, job: Job) -> Optional[InstanceType]:
+        return base_jobs.predict_job_instance(self._compute, job)
 
     def create_run(self, repo_id: str) -> str:
         logs.create_log_groups_if_not_exist(

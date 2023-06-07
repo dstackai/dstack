@@ -4,16 +4,40 @@ from fastapi import APIRouter, Depends, HTTPException, status
 from fastapi.responses import PlainTextResponse
 
 from dstack._internal.backend.base import Backend
-from dstack._internal.core.job import JobStatus
+from dstack._internal.core.error import NoMatchingInstanceError
+from dstack._internal.core.job import Job, JobStatus
+from dstack._internal.core.plan import JobPlan, RunPlan
 from dstack._internal.core.repo import RepoRef
 from dstack._internal.core.run import RunHead
-from dstack._internal.hub.models import RunsDelete, RunsList, RunsStop
+from dstack._internal.hub.db.models import User
+from dstack._internal.hub.models import RunsDelete, RunsGetPlan, RunsList, RunsStop
 from dstack._internal.hub.routers.cache import get_backend
 from dstack._internal.hub.routers.util import error_detail, get_project
-from dstack._internal.hub.security.permissions import ProjectMember
+from dstack._internal.hub.security.permissions import Authenticated, ProjectMember
 from dstack._internal.hub.utils.common import run_async
 
 router = APIRouter(prefix="/api/project", tags=["runs"], dependencies=[Depends(ProjectMember())])
+
+
+@router.post("/{project_name}/runs/get_plan")
+async def get_run_plan(
+    project_name: str, body: RunsGetPlan, user: User = Depends(Authenticated())
+) -> RunPlan:
+    project = await get_project(project_name=project_name)
+    backend = get_backend(project)
+    job_plans = []
+    for job in body.jobs:
+        instance_type = await run_async(backend.predict_instance_type, job)
+        if instance_type is None:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail=error_detail(
+                    msg=NoMatchingInstanceError.message, code=NoMatchingInstanceError.code
+                ),
+            )
+        job_plans.append(JobPlan(job=job, instance_type=instance_type))
+    run_plan = RunPlan(project=project_name, hub_user_name=user.name, job_plans=job_plans)
+    return run_plan
 
 
 @router.post(

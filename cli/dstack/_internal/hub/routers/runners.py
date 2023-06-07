@@ -19,10 +19,12 @@ async def run_runners(project_name: str, job: Job):
     backend = get_backend(project)
     try:
         await run_async(backend.run_job, job, JobStatus.PENDING)
-    except NoMatchingInstanceError as e:
+    except NoMatchingInstanceError:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
-            detail=error_detail(e.message, code=NoMatchingInstanceError.code),
+            detail=error_detail(
+                NoMatchingInstanceError.message, code=NoMatchingInstanceError.code
+            ),
         )
 
 

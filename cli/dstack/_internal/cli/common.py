@@ -15,33 +15,39 @@ from dstack.api.hub.errors import HubClientError
 console = Console()
 
 
-def print_runs(runs: List[RunHead], verbose: bool = False):
-    table = generate_runs_table(runs, verbose=verbose)
+def print_runs(runs: List[RunHead], include_configuration: bool = False, verbose: bool = False):
+    table = generate_runs_table(runs, include_configuration=include_configuration, verbose=verbose)
     console.print(table)
 
 
-def generate_runs_table(runs: List[RunHead], verbose: bool = False) -> Table:
+def generate_runs_table(
+    runs: List[RunHead], include_configuration: bool = False, verbose: bool = False
+) -> Table:
     table = Table(box=None)
     table.add_column("RUN", style="bold", no_wrap=True)
-    table.add_column("WORKFLOW", style="grey58", max_width=16)
-    table.add_column("SUBMITTED", style="grey58", no_wrap=True)
+    if include_configuration:
+        table.add_column("CONFIGURATION", style="grey58")
     table.add_column("USER", style="grey58", no_wrap=True, max_width=16)
-    table.add_column("STATUS", no_wrap=True)
     table.add_column("INSTANCE", no_wrap=True)
+    table.add_column("STATUS", no_wrap=True)
+    table.add_column("SUBMITTED", style="grey58", no_wrap=True)
     if verbose:
         table.add_column("TAG", style="bold yellow", no_wrap=True)
         table.add_column("ERROR", no_wrap=True)
 
     for run in runs:
         submitted_at = pretty_date(round(run.submitted_at / 1000))
-        row = [
-            _status_color(run, run.run_name, True, False),
-            _status_color(run, run.workflow_name or run.provider_name, False, False),
-            _status_color(run, submitted_at, False, False),
-            _status_color(run, run.hub_user_name or "", False, False),
-            _pretty_print_status(run),
-            _pretty_print_instance_type(run),
-        ]
+        row = [_status_color(run, run.run_name, True, False)]
+        if include_configuration:
+            row.append(_status_color(run, run.workflow_name, False, False))
+        row.extend(
+            [
+                _status_color(run, run.hub_user_name or "", False, False),
+                _pretty_print_instance_type(run),
+                _pretty_print_status(run),
+                _status_color(run, submitted_at, False, False),
+            ]
+        )
         if verbose:
             row += [
                 _status_color(run, run.tag_name or "", False, False),
