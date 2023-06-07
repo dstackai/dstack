@@ -19,7 +19,7 @@ from dstack._internal.core.job import (
     Job,
     JobSpec,
     JobStatus,
-    PrebuildMode,
+    PrebuildPolicy,
     Requirements,
 )
 from dstack._internal.core.repo.base import Repo
@@ -46,7 +46,7 @@ class Provider:
         self.loaded = False
         self.home_dir: Optional[str] = None
         self.ports: Dict[int, PortMapping] = {}
-        self.prebuild: Optional[PrebuildMode] = None
+        self.prebuild: Optional[str] = None
         self.setup: List[str] = []
 
     # TODO: This is a dirty hack
@@ -166,7 +166,11 @@ class Provider:
         parser.add_argument(
             "-p", "--port", metavar="PORTS", type=PortMapping, nargs=argparse.ONE_OR_MORE
         )
-        parser.add_argument("--prebuild", choices=["never", "force", "lazy"])
+        prebuild = parser.add_mutually_exclusive_group()
+        for value in PrebuildPolicy:
+            prebuild.add_argument(
+                f"--{value}", action="store_const", dest="prebuild", const="value"
+            )
 
     def _parse_base_args(self, args: Namespace, unknown_args):
         if args.requirements:

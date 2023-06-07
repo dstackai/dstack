@@ -2,11 +2,9 @@ package container
 
 import (
 	"context"
-	"errors"
 	"fmt"
 	"io"
 	"io/ioutil"
-	"os"
 	"runtime"
 	"strings"
 
@@ -303,21 +301,24 @@ func (r *Engine) GetPrebuildName(ctx context.Context, spec *PrebuildSpec) (strin
 	return spec.Hash(), nil
 }
 
-func (r *Engine) Prebuild(ctx context.Context, spec *PrebuildSpec, imageName, diffPath string, logs io.Writer) (bool, error) {
-	if _, err := os.Stat(diffPath); errors.Is(err, os.ErrNotExist) {
-		if err = PrebuildImage(ctx, r.client, spec, imageName, logs); err != nil {
-			return false, gerrors.Wrap(err)
-		}
-		if err = SaveLayer(ctx, r.client, spec.BaseImageName, imageName, diffPath); err != nil {
-			return false, gerrors.Wrap(err)
-		}
-		return true, nil // need to put
-	} else {
-		if err = LoadLayer(ctx, r.client, spec.BaseImageName, diffPath); err != nil {
-			return false, gerrors.Wrap(err)
-		}
-		return false, nil
+func (r *Engine) UsePrebuild(ctx context.Context, spec *PrebuildSpec, diffPath string) error {
+	if err := LoadLayer(ctx, r.client, spec.BaseImageName, diffPath); err != nil {
+		return gerrors.Wrap(err)
 	}
+	return nil
+}
+
+func (r *Engine) Prebuild(ctx context.Context, spec *PrebuildSpec, imageName, diffPath string, userLogs, logs io.Writer) error {
+	if err := PrebuildImage(ctx, r.client, spec, imageName, logs); err != nil {
+		return gerrors.Wrap(err)
+	}
+	if _, err := fmt.Fprintf(userLogs, "[PREBUILD] Saving image\n"); err != nil {
+		return gerrors.Wrap(err)
+	}
+	if err := SaveLayer(ctx, r.client, spec.BaseImageName, imageName, diffPath); err != nil {
+		return gerrors.Wrap(err)
+	}
+	return nil
 }
 
 func ShellCommands(commands []string) []string {

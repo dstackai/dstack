@@ -3,6 +3,7 @@ from dstack._internal.cli.commands.cp import CpCommand
 from dstack._internal.cli.commands.init import InitCommand
 from dstack._internal.cli.commands.logs import LogCommand
 from dstack._internal.cli.commands.ls import LsCommand
+from dstack._internal.cli.commands.prebuild import PrebuildCommand
 from dstack._internal.cli.commands.prune import PruneCommand
 from dstack._internal.cli.commands.ps import PSCommand
 from dstack._internal.cli.commands.rm import RMCommand
@@ -18,14 +19,15 @@ commands_classes = [
     InitCommand,
     LogCommand,
     LsCommand,
+    PrebuildCommand,
     PruneCommand,
     PSCommand,
     RMCommand,
     RunCommand,
     SecretCommand,
+    StartCommand,
     StopCommand,
     TAGCommand,
-    StartCommand,
 ]
 
 

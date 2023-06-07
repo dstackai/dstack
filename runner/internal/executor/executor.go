@@ -7,6 +7,7 @@ import (
 	"errors"
 	"fmt"
 	"github.com/dstackai/dstack/runner/internal/models"
+	"github.com/dustin/go-humanize"
 	"io"
 	"os"
 	"path"
@@ -243,16 +244,16 @@ func (ex *Executor) runJob(ctx context.Context, erCh chan error, stoppedCh chan 
 		log.Error(jctx, "Unknown RepoType", "RepoType", job.RepoType)
 	}
 
-	log.Trace(jctx, "Dependency processing")
-	if err = ex.processCache(jctx); err != nil {
-		erCh <- gerrors.Wrap(err)
-		return
-	}
-	if err = ex.processDeps(jctx); err != nil {
-		erCh <- gerrors.Wrap(err)
-		return
-	}
-	{
+	if job.Prebuild != models.PREBUILD_ONLY {
+		log.Trace(jctx, "Dependency processing")
+		if err = ex.processCache(jctx); err != nil {
+			erCh <- gerrors.Wrap(err)
+			return
+		}
+		if err = ex.processDeps(jctx); err != nil {
+			erCh <- gerrors.Wrap(err)
+			return
+		}
 		for _, artifact := range ex.artifactsFUSE {
 			err = artifact.BeforeRun(jctx)
 			if err != nil {
@@ -283,79 +284,83 @@ func (ex *Executor) runJob(ctx context.Context, erCh chan error, stoppedCh chan 
 				}
 			}
 		}
+	}
 
-		spec, err := ex.newSpec(ctx)
-		if err != nil {
-			erCh <- gerrors.Wrap(err)
-			return
-		}
-		logger := ex.backend.CreateLogger(ctx, fmt.Sprintf("/dstack/jobs/%s/%s", ex.backend.Bucket(ctx), job.RepoId), job.RunName)
-		logGroup := fmt.Sprintf("/jobs/%s", job.RepoId)
-		fileLog, err := createLocalLog(filepath.Join(ex.configDir, "logs", logGroup), job.RunName)
-		if err != nil {
-			erCh <- gerrors.Wrap(err)
-			return
-		}
-		defer func() { _ = fileLog.Close() }()
-		logs := io.MultiWriter(logger, ex.streamLogs, fileLog)
+	spec, err := ex.newSpec(ctx)
+	if err != nil {
+		erCh <- gerrors.Wrap(err)
+		return
+	}
+	logger := ex.backend.CreateLogger(ctx, fmt.Sprintf("/dstack/jobs/%s/%s", ex.backend.Bucket(ctx), job.RepoId), job.RunName)
+	logGroup := fmt.Sprintf("/jobs/%s", job.RepoId)
+	fileLog, err := createLocalLog(filepath.Join(ex.configDir, "logs", logGroup), job.RunName)
+	if err != nil {
+		erCh <- gerrors.Wrap(err)
+		return
+	}
+	defer func() { _ = fileLog.Close() }()
+	allLogs := io.MultiWriter(logger, ex.streamLogs, fileLog)
 
-		log.Trace(ctx, "Prebuilding container", "mode", job.Prebuild)
-		if job.Prebuild == models.NEVER_PREBUILD || len(job.Setup) == 0 {
-			commands := append([]string(nil), job.Setup...)
-			commands = append(commands, job.Commands...)
-			spec.Commands = container.ShellCommands(commands)
-		} else {
-			job.Status = states.Prebuilding
-			if err = ex.backend.UpdateState(jctx); err != nil {
-				erCh <- gerrors.Wrap(err)
-				return
-			}
-			if err = ex.prebuild(ctx, spec, logs); err != nil {
-				erCh <- gerrors.Wrap(err)
-				return
-			}
-		}
-
-		log.Trace(jctx, "Running job")
-		job.Status = states.Running
+	log.Trace(ctx, "Prebuilding container", "mode", job.Prebuild)
+	if job.Prebuild == models.NO_PREBUILD || len(job.Setup) == 0 {
+		mergeSetup(spec, job.Setup, job.Commands)
+	} else {
+		job.Status = states.Prebuilding
 		if err = ex.backend.UpdateState(jctx); err != nil {
 			erCh <- gerrors.Wrap(err)
 			return
 		}
-		if err = ex.processJob(ctx, spec, stoppedCh, logs); err != nil {
+		if err = ex.prebuild(ctx, spec, allLogs); err != nil {
 			erCh <- gerrors.Wrap(err)
 			return
 		}
+	}
 
-		if len(ex.artifactsOut) > 0 || len(ex.cacheArtifacts) > 0 {
-			log.Trace(jctx, "Start uploading artifacts")
-			job.Status = states.Uploading
-			err = ex.backend.UpdateState(jctx)
-			if err != nil {
-				erCh <- gerrors.Wrap(err)
-				return
-			}
-			for _, artifact := range ex.artifactsOut {
-				err = artifact.AfterRun(jctx)
-				if err != nil {
-					erCh <- gerrors.Wrap(err)
-					return
-				}
-			}
-			for _, artifact := range ex.cacheArtifacts {
-				err = artifact.AfterRun(jctx)
-				if err != nil {
-					erCh <- gerrors.Wrap(err)
-					return
-				}
-			}
+	if job.Prebuild == models.PREBUILD_ONLY {
+		log.Trace(ctx, "Prebuild only, do not run the job")
+		ex.streamLogs.Close()
+		erCh <- nil
+		return
+	}
+	log.Trace(jctx, "Running job")
+	job.Status = states.Running
+	if err = ex.backend.UpdateState(jctx); err != nil {
+		erCh <- gerrors.Wrap(err)
+		return
+	}
+	if err = ex.processJob(ctx, spec, stoppedCh, allLogs); err != nil {
+		erCh <- gerrors.Wrap(err)
+		return
+	}
+
+	if len(ex.artifactsOut) > 0 || len(ex.cacheArtifacts) > 0 {
+		log.Trace(jctx, "Start uploading artifacts")
+		job.Status = states.Uploading
+		err = ex.backend.UpdateState(jctx)
+		if err != nil {
+			erCh <- gerrors.Wrap(err)
+			return
 		}
-		for _, artifact := range ex.artifactsFUSE {
+		for _, artifact := range ex.artifactsOut {
 			err = artifact.AfterRun(jctx)
 			if err != nil {
 				erCh <- gerrors.Wrap(err)
 				return
 			}
+		}
+		for _, artifact := range ex.cacheArtifacts {
+			err = artifact.AfterRun(jctx)
+			if err != nil {
+				erCh <- gerrors.Wrap(err)
+				return
+			}
+		}
+	}
+	for _, artifact := range ex.artifactsFUSE {
+		err = artifact.AfterRun(jctx)
+		if err != nil {
+			erCh <- gerrors.Wrap(err)
+			return
 		}
 	}
 	erCh <- nil
@@ -698,25 +703,57 @@ func (ex *Executor) prebuild(ctx context.Context, spec *container.Spec, logs io.
 	key := fmt.Sprintf("prebuilds/%s/%s.tar", job.RepoId, prebuildName)
 	imageName := fmt.Sprintf("dstackai/prebuild:%s", prebuildName)
 
-	if job.Prebuild == models.LAZY_PREBUILD {
+	if job.Prebuild == models.USE_PREBUILD {
 		log.Trace(ctx, "Trying to fetch prebuild layer", "key", key, "image", imageName)
+		if _, err = fmt.Fprintf(ex.streamLogs, "[PREBUILD] Looking for the image\n"); err != nil {
+			return gerrors.Wrap(err)
+		}
 		if err = ex.backend.GetPrebuildDiff(ctx, key, diffPath); err != nil {
 			return gerrors.Wrap(err)
 		}
-	}
-	put, err := ex.engine.Prebuild(ctx, prebuildSpec, imageName, diffPath, logs)
-	if err != nil {
-		return gerrors.Wrap(err)
-	}
-	if put {
-		log.Trace(ctx, "Putting prebuild layer", "key", key, "image", imageName)
+		if stat, err := os.Stat(diffPath); err == nil {
+			if _, err = fmt.Fprintf(ex.streamLogs, "[PREBUILD] Loading image: %s\n", humanize.Bytes(uint64(stat.Size()))); err != nil {
+				return gerrors.Wrap(err)
+			}
+			if err = ex.engine.UsePrebuild(ctx, prebuildSpec, diffPath); err != nil {
+				return gerrors.Wrap(err)
+			}
+			if _, err = fmt.Fprintf(ex.streamLogs, "[PREBUILD] Image loaded\n"); err != nil {
+				return gerrors.Wrap(err)
+			}
+			spec.Image = imageName
+		} else {
+			if _, err = fmt.Fprintf(ex.streamLogs, "[PREBUILD] No image found\n"); err != nil {
+				return gerrors.Wrap(err)
+			}
+			mergeSetup(spec, job.Setup, job.Commands)
+		}
+	} else if job.Prebuild == models.FORCE_PREBUILD || job.Prebuild == models.PREBUILD_ONLY {
+		err := ex.engine.Prebuild(ctx, prebuildSpec, imageName, diffPath, ex.streamLogs, logs)
+		if err != nil {
+			return gerrors.Wrap(err)
+		}
+		stat, err := os.Stat(diffPath)
+		if err != nil {
+			return gerrors.Wrap(err)
+		}
+		log.Trace(ctx, "Putting prebuild layer", "key", key, "image", imageName, "size", stat.Size())
+		if _, err = fmt.Fprintf(ex.streamLogs, "[PREBUILD] Uploading image: %s\n", humanize.Bytes(uint64(stat.Size()))); err != nil {
+			return gerrors.Wrap(err)
+		}
 		if err = ex.backend.PutPrebuildDiff(ctx, diffPath, key); err != nil {
 			return gerrors.Wrap(err)
 		}
+		spec.Image = imageName
 	}
-	spec.Image = imageName
 
 	return nil
+}
+
+func mergeSetup(spec *container.Spec, setup []string, commands []string) {
+	merged := append([]string(nil), setup...)
+	merged = append(merged, commands...)
+	spec.Commands = container.ShellCommands(merged)
 }
 
 func uniqueMount(m []mount.Mount) []mount.Mount {
