@@ -36,7 +36,16 @@ def _get_instance_types(ec2_client: BaseClient) -> List[InstanceType]:
             Filters=[
                 {
                     "Name": "instance-type",
-                    "Values": ["t2.small", "c5.*", "m5.*", "p2.*", "p3.*", "p4d.*", "p4de.*"],
+                    "Values": [
+                        "t2.small",
+                        "c5.*",
+                        "m5.*",
+                        "p2.*",
+                        "p3.*",
+                        "g5.*",
+                        "p4d.*",
+                        "p4de.*",
+                    ],
                 },
             ],
             **kwargs,
@@ -287,7 +296,7 @@ def _get_ami_image(
 ) -> Tuple[str, str]:
     ami_name = "dstack"
     if cuda:
-        ami_name = ami_name + "-cuda-11.1"
+        ami_name = ami_name + "-cuda-11.4"
     if not version.__is_release__:
         ami_name = "[stgn] " + ami_name
     ami_name = ami_name + f"-{_version or '*'}"
