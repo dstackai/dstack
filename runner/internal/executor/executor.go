@@ -286,11 +286,16 @@ func (ex *Executor) runJob(ctx context.Context, erCh chan error, stoppedCh chan 
 		}
 	}
 
-	spec, err := ex.newSpec(ctx)
+	credPath := path.Join(ex.backend.GetTMPDir(ctx), consts.RUNS_DIR, job.RunName, "credentials")
+	spec, err := ex.newSpec(ctx, credPath)
 	if err != nil {
 		erCh <- gerrors.Wrap(err)
 		return
 	}
+	defer func() { // cleanup credentials
+		_ = os.Remove(credPath)
+	}()
+
 	logger := ex.backend.CreateLogger(ctx, fmt.Sprintf("/dstack/jobs/%s/%s", ex.backend.Bucket(ctx), job.RepoId), job.RunName)
 	logGroup := fmt.Sprintf("/jobs/%s", job.RepoId)
 	fileLog, err := createLocalLog(filepath.Join(ex.configDir, "logs", logGroup), job.RunName)
@@ -511,7 +516,7 @@ func (ex *Executor) environment(ctx context.Context, includeRun bool) []string {
 	return env.ToSlice()
 }
 
-func (ex *Executor) newSpec(ctx context.Context) (*container.Spec, error) {
+func (ex *Executor) newSpec(ctx context.Context, credPath string) (*container.Spec, error) {
 	job := ex.backend.Job(ctx)
 	resource := ex.backend.Requirements(ctx)
 
@@ -553,7 +558,6 @@ func (ex *Executor) newSpec(ctx context.Context) (*container.Spec, error) {
 		cred := ex.backend.GitCredentials(ctx)
 		if cred != nil {
 			log.Trace(ctx, "Trying to mount git credentials")
-			credPath := path.Join(ex.backend.GetTMPDir(ctx), consts.RUNS_DIR, job.RunName, "credentials")
 			credMountPath := ""
 			switch cred.Protocol {
 			case "ssh":
@@ -574,7 +578,6 @@ func (ex *Executor) newSpec(ctx context.Context) (*container.Spec, error) {
 			default:
 			}
 			if credMountPath != "" {
-				defer func() { _ = os.Remove(credPath) }()
 				log.Trace(ctx, "Mounting git credentials", "target", credMountPath)
 				bindings = append(bindings, mount.Mount{
 					Type:   mount.TypeBind,
