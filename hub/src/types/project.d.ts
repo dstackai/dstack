@@ -30,6 +30,10 @@ declare interface IProjectAwsBackendValues {
 }
 
 declare interface IProjectAzureBackendValues {
+    tenant_id: {
+        selected?: string,
+        values: { value: string, label: string}[]
+    } | null,
     subscription_id: {
         selected?: string,
         values: { value: string, label: string}[]

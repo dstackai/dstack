@@ -67,6 +67,10 @@ export const AzureBackend: React.FC<IProps> = ({ loading }) => {
 
             setAvailableDefaultCredentials(response.default_credentials);
 
+            if (response.tenant_id?.selected) {
+                setValue(`backend.${FIELD_NAMES.TENANT_ID}`, response.tenant_id.selected);
+            }
+
             if (response.subscription_id?.values) {
                 setSubscriptionIds(response.subscription_id.values);
             }
@@ -112,6 +116,12 @@ export const AzureBackend: React.FC<IProps> = ({ loading }) => {
         clearFields(0);
         if (requestRef.current) requestRef.current.abort();
         debouncedChangeFormHandler();
+    };
+
+    const onChangeCredentialsTypeField = () => {
+        clearFields(0);
+        if (requestRef.current) requestRef.current.abort();
+        changeFormHandler().catch(console.log);
     };
 
     const clearFieldByQueueFromField = (name: string) => {
@@ -172,7 +182,8 @@ export const AzureBackend: React.FC<IProps> = ({ loading }) => {
                 label={t('projects.edit.azure.authorization')}
                 control={control}
                 name={`backend.${FIELD_NAMES.CREDENTIALS.TYPE}`}
-                onChange={onChangeCredentialField}
+                onChange={onChangeCredentialsTypeField}
+                disabled={loading}
                 options={[
                     {
                         label: t('projects.edit.azure.authorization_default'),

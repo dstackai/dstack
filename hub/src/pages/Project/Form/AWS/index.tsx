@@ -41,16 +41,20 @@ export const AWSBackend: React.FC<IProps> = ({ loading }) => {
     const backendSecretKeyValue = watch(`backend.${FIELD_NAMES.CREDENTIALS.SECRET_KEY}`);
 
     const changeFormHandler = async () => {
-        const backendFormValues = getValues('backend');
+        let backendFormValues = getValues('backend');
 
         if (
-            backendFormValues.credentials.type === 'access_key' &&
-            (!backendFormValues.credentials.secret_key || !backendFormValues.credentials.access_key)
+            backendFormValues.credentials?.type === 'access_key' &&
+            (!backendFormValues.credentials?.secret_key || !backendFormValues.credentials?.access_key)
         ) {
             return;
         }
 
-        if (!backendFormValues.credentials.type) delete backendFormValues.credentials;
+        if (!backendFormValues.credentials?.type) {
+            const { credentials, ...otherValues } = backendFormValues;
+
+            backendFormValues = otherValues;
+        }
 
         clearErrors('backend');
 
@@ -151,6 +155,7 @@ export const AWSBackend: React.FC<IProps> = ({ loading }) => {
                 control={control}
                 name={`backend.${FIELD_NAMES.CREDENTIALS.TYPE}`}
                 onChange={onChangeCredentialField}
+                disabled={loading}
                 options={[
                     {
                         label: t('projects.edit.aws.authorization_default'),

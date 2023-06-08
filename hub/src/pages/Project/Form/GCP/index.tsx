@@ -256,6 +256,7 @@ export const GCPBackend: React.FC<IProps> = ({ loading }) => {
                     // eslint-disable-next-line @typescript-eslint/ban-ts-comment
                     // @ts-ignore
                     errorText={errors?.backend?.credentials?.message}
+                    disabled={loading}
                     options={[
                         {
                             label: t('projects.edit.gcp.authorization_default'),

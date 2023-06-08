@@ -53,7 +53,7 @@ export const ProjectEditBackend: React.FC = () => {
                 content: t('projects.edit.success_notification'),
             });
 
-            navigate(ROUTES.PROJECT.DETAILS.REPOSITORIES.FORMAT(data.project_name ?? paramProjectName));
+            navigate(ROUTES.PROJECT.DETAILS.SETTINGS.FORMAT(data.project_name ?? paramProjectName));
         } catch (e) {
             console.log(e);
         }
