@@ -3,7 +3,7 @@ name: Manual AMI build for STGN
 on: [workflow_dispatch]
 
 env:
-  IMAGE_VERSION: "0.1"
+  IMAGE_VERSION: "0.2"
 
 jobs:
   ami-build:
