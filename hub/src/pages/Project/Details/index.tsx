@@ -2,7 +2,7 @@ import React, { useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Outlet, useLocation, useNavigate, useParams } from 'react-router-dom';
 
-import { ConfirmationDialog, ContentLayout, DetailsHeader, Tabs, TabsProps } from 'components';
+import { Button, ConfirmationDialog, ContentLayout, DetailsHeader } from 'components';
 
 import { useAppSelector, useNotifications } from 'hooks';
 import { ROUTES } from 'routes';
@@ -10,14 +10,8 @@ import { useDeleteProjectsMutation, useGetProjectQuery } from 'services/project'
 
 import { selectUserData } from 'App/slice';
 
+import { ButtonProps } from '../../../components';
 import { getProjectRoleByUserName } from '../utils';
-
-import styles from './styles.module.scss';
-
-enum TabTypesEnum {
-    REPOSITORIES = 'repositories',
-    SETTINGS = 'settings',
-}
 
 export const ProjectDetails: React.FC = () => {
     const { t } = useTranslation();
@@ -57,33 +51,13 @@ export const ProjectDetails: React.FC = () => {
         setShowConfirmDelete(false);
     };
 
-    const tabs: {
-        label: string;
-        id: TabTypesEnum;
-        href: string;
-    }[] = [
-        {
-            label: t('projects.repositories'),
-            id: TabTypesEnum.REPOSITORIES,
-            href: ROUTES.PROJECT.DETAILS.REPOSITORIES.FORMAT(paramProjectName),
-        },
-        {
-            label: t('projects.settings'),
-            id: TabTypesEnum.SETTINGS,
-            href: ROUTES.PROJECT.DETAILS.SETTINGS.FORMAT(paramProjectName),
-        },
-    ];
+    const goToProjectSettings: ButtonProps['onClick'] = (event) => {
+        event.preventDefault();
 
-    const onChangeTab: TabsProps['onChange'] = ({ detail }) => {
-        // eslint-disable-next-line @typescript-eslint/no-non-null-assertion
-        navigate(detail.activeTabHref!);
+        navigate(ROUTES.PROJECT.DETAILS.SETTINGS.FORMAT(paramProjectName));
     };
 
-    const activeTabId = useMemo(() => {
-        const tab = tabs.find((t) => pathname === t.href);
-
-        return tab?.id;
-    }, [pathname]);
+    const isSettingsPage = pathname === ROUTES.PROJECT.DETAILS.SETTINGS.FORMAT(paramProjectName);
 
     return (
         <>
@@ -93,11 +67,19 @@ export const ProjectDetails: React.FC = () => {
                         title={paramProjectName}
                         deleteAction={toggleDeleteConfirm}
                         deleteDisabled={isDisabledButtons}
+                        actionButtons={
+                            !isSettingsPage ? (
+                                <Button
+                                    href={ROUTES.PROJECT.DETAILS.SETTINGS.FORMAT(paramProjectName)}
+                                    onClick={goToProjectSettings}
+                                >
+                                    {t('common.settings')}
+                                </Button>
+                            ) : null
+                        }
                     />
                 }
             >
-                <Tabs className={styles.tabs} onChange={onChangeTab} activeTabId={activeTabId} tabs={tabs} />
-
                 <Outlet />
             </ContentLayout>
 
