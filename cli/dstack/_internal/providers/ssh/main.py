@@ -89,7 +89,7 @@ class SSHProvider(Provider):
 
     def _image_name(self) -> str:
         cuda_is_required = self.resources and self.resources.gpus
-        cuda_image_name = f"dstackai/miniforge:py{self.python}-{version.miniforge_image}-cuda-11.1"
+        cuda_image_name = f"dstackai/miniforge:py{self.python}-{version.miniforge_image}-cuda-11.4"
         cpu_image_name = f"dstackai/miniforge:py{self.python}-{version.miniforge_image}"
         return cuda_image_name if cuda_is_required else cpu_image_name
 
