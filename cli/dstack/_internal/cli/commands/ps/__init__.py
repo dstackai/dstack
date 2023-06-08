@@ -57,14 +57,18 @@ class PSCommand(BasicCommand):
         if args.watch:
             try:
                 with Live(
-                    generate_runs_table(runs, verbose=args.verbose),
+                    generate_runs_table(runs, include_configuration=True, verbose=args.verbose),
                     refresh_per_second=REFRESH_RATE_PER_SEC,
                 ) as live:
                     while True:
                         time.sleep(LIVE_PROVISION_INTERVAL_SECS)
                         runs = list_runs_hub(hub_client, run_name=args.run_name, all=args.all)
-                        live.update(generate_runs_table(runs, verbose=args.verbose))
+                        live.update(
+                            generate_runs_table(
+                                runs, include_configuration=True, verbose=args.verbose
+                            )
+                        )
             except KeyboardInterrupt:
                 pass
         else:
-            print_runs(runs, verbose=args.verbose)
+            print_runs(runs, include_configuration=True, verbose=args.verbose)

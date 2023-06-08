@@ -221,7 +221,11 @@ class Provider:
         pass
 
     def get_jobs(
-        self, repo: Repo, repo_code_filename: Optional[str] = None, tag_name: Optional[str] = None
+        self,
+        repo: Repo,
+        configuration_path: Optional[str] = None,
+        repo_code_filename: Optional[str] = None,
+        tag_name: Optional[str] = None,
     ) -> List[Job]:
         if not self.loaded:
             raise Exception("The provider is not loaded")
@@ -237,6 +241,7 @@ class Provider:
                 run_name=self.run_name,
                 workflow_name=self.workflow_name or None,
                 provider_name=self.provider_name,
+                configuration_path=configuration_path,
                 status=JobStatus.SUBMITTED,
                 submitted_at=get_milliseconds_since_epoch(),
                 image_name=job_spec.image_name,
