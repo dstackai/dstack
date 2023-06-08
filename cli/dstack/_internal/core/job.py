@@ -116,6 +116,7 @@ class JobHead(JobRef):
     run_name: str
     workflow_name: Optional[str]
     provider_name: str
+    configuration_path: Optional[str]
     status: JobStatus
     error_code: Optional[JobErrorCode]
     container_exit_code: Optional[int]
@@ -233,6 +234,7 @@ class Job(JobHead):
             "run_name": self.run_name,
             "workflow_name": self.workflow_name or "",
             "provider_name": self.provider_name,
+            "configuration_path": self.configuration_path,
             "status": self.status.value,
             "error_code": self.error_code.value if self.error_code is not None else "",
             "container_exit_code": self.container_exit_code or "",
@@ -379,6 +381,7 @@ class Job(JobHead):
             run_name=job_data["run_name"],
             workflow_name=job_data.get("workflow_name") or None,
             provider_name=job_data["provider_name"],
+            configuration_path=job_data.get("configuration_path"),
             status=JobStatus(job_data["status"]),
             error_code=JobErrorCode(error_code) if error_code else None,
             container_exit_code=int(container_exit_code) if container_exit_code else None,

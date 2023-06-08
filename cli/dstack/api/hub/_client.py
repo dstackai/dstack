@@ -283,6 +283,7 @@ class HubClient:
         self,
         provider_name: str,
         provider_data: Optional[Dict[str, Any]] = None,
+        configuration_path: Optional[str] = None,
         tag_name: Optional[str] = None,
         ssh_pub_key: Optional[str] = None,
         args: Optional[argparse.Namespace] = None,
@@ -310,7 +311,10 @@ class HubClient:
 
         repo_code_filename = self._upload_code_file()
         jobs = provider.get_jobs(
-            repo=self.repo, repo_code_filename=repo_code_filename, tag_name=tag_name
+            repo=self.repo,
+            configuration_path=configuration_path,
+            repo_code_filename=repo_code_filename,
+            tag_name=tag_name,
         )
         for job in jobs:
             self.submit_job(job)

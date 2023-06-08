@@ -105,6 +105,7 @@ def _create_run(
         run_name=job_head.run_name,
         workflow_name=job_head.workflow_name,
         provider_name=job_head.provider_name,
+        configuration_path=job_head.configuration_path,
         hub_user_name=job_head.hub_user_name,
         artifact_heads=artifact_heads or None,
         status=job_head.status,
