@@ -453,6 +453,7 @@ def _poll_run_head(
     while True:
         run_heads = hub_client.list_run_heads(run_name)
         if len(run_heads) == 0:
+            time.sleep(rate / 2)
             continue
         run_head = run_heads[0]
         if loop_statuses is not None and run_head.status not in loop_statuses:
