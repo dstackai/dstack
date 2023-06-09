@@ -54,10 +54,10 @@ type Job struct {
 	SubmittedAt       uint64       `yaml:"submitted_at"`
 	TagName           string       `yaml:"tag_name"`
 	InstanceType      string       `yaml:"instance_type"`
-	//Variables    map[string]interface{} `yaml:"variables"`
-	WorkflowName string `yaml:"workflow_name"`
-	HomeDir      string `yaml:"home_dir"`
-	WorkingDir   string `yaml:"working_dir"`
+	ConfigurationPath string       `yaml:"configuration_path"`
+	WorkflowName      string       `yaml:"workflow_name"`
+	HomeDir           string       `yaml:"home_dir"`
+	WorkingDir        string       `yaml:"working_dir"`
 
 	RegistryAuth RegistryAuth `yaml:"registry_auth"`
 }
@@ -158,7 +158,7 @@ func (j *Job) JobHeadFilepath() string {
 		artifactSlice = append(artifactSlice, EscapeHead(art.Path))
 	}
 	return fmt.Sprintf(
-		"jobs/%s/l;%s;%s;%s;%d;%s;%s;%s;%s;%s",
+		"jobs/%s/l;%s;%s;%s;%d;%s;%s;%s;%s;%s;%s",
 		j.RepoId,
 		j.JobID,
 		j.ProviderName,
@@ -169,6 +169,7 @@ func (j *Job) JobHeadFilepath() string {
 		strings.Join(appsSlice, ","),
 		j.TagName,
 		j.InstanceType,
+		EscapeHead(j.ConfigurationPath),
 	)
 }
 

@@ -39,7 +39,7 @@ def generate_runs_table(
         submitted_at = pretty_date(round(run.submitted_at / 1000))
         row = [_status_color(run, run.run_name, True, False)]
         if include_configuration:
-            row.append(_status_color(run, run.workflow_name, False, False))
+            row.append(_status_color(run, run.configuration_path, False, False))
         row.extend(
             [
                 _status_color(run, run.hub_user_name or "", False, False),
