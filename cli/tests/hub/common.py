@@ -34,6 +34,7 @@ async def create_project(
         }
     if auth is None:
         auth = {
+            "type": "access_key",
             "access_key": "test_access_key",
             "secret_key": "test_secret_key",
         }
