@@ -1,10 +1,12 @@
 import json
+import os
 from typing import Dict, Optional, Tuple, Union
 from uuid import UUID, uuid5
 
 from azure.core.credentials import TokenCredential
 from azure.core.exceptions import ClientAuthenticationError, HttpResponseError
 from azure.graphrbac import GraphRbacManagementClient
+from azure.graphrbac.models.graph_error_py3 import GraphErrorException
 from azure.identity import ClientSecretCredential, DefaultAzureCredential
 from azure.mgmt.authorization import AuthorizationManagementClient
 from azure.mgmt.authorization.models import RoleAssignmentCreateParameters
@@ -420,18 +422,12 @@ class AzureConfigurator(Configurator):
         )
 
     def _grant_roles_to_logged_in_user(self):
-        users_manager = UsersManager(credential=self.credential, tenant_id=self.tenant_id)
         roles_manager = RolesManager(
             credential=self.credential, subscription_id=self.subscription_id
         )
-        try:
-            client_id = self.credential._client_id
-        except AttributeError:
-            principal_id = users_manager.get_logged_in_user_principal_id()
-            principal_type = "User"
-        else:
-            principal_id = users_manager.get_application_principal_id(client_id=client_id)
-            principal_type = "ServicePrincipal"
+
+        principal_id, principal_type = self._get_principal_id_type()
+
         roles_manager.grant_storage_contributor_role(
             resource_group=self.resource_group,
             storage_account=self.storage_account,
@@ -444,6 +440,25 @@ class AzureConfigurator(Configurator):
             principal_id=principal_id,
             principal_type=principal_type,
         )
+
+    def _get_principal_id_type(self) -> Tuple[str, str]:
+        users_manager = UsersManager(credential=self.credential, tenant_id=self.tenant_id)
+
+        client_id = None
+        principal_id = None
+        try:
+            client_id = self.credential._client_id
+        except AttributeError:
+            principal_id = users_manager.get_logged_in_user_principal_id()
+            principal_type = "User"
+
+        if principal_id is None:
+            if client_id is None:
+                client_id = os.getenv("AZURE_CLIENT_ID")
+            principal_id = users_manager.get_application_principal_id(client_id=client_id)
+            principal_type = "ServicePrincipal"
+
+        return principal_id, principal_type
 
 
 class ResourceManager:
@@ -750,9 +765,12 @@ class UsersManager:
             credentials=AzureIdentityCredentialAdapter(credential), tenant_id=tenant_id
         )
 
-    def get_logged_in_user_principal_id(self) -> str:
-        user = self.graph_client.signed_in_user.get()
-        return user.object_id
+    def get_logged_in_user_principal_id(self) -> Optional[str]:
+        try:
+            user = self.graph_client.signed_in_user.get()
+            return user.object_id
+        except GraphErrorException:
+            return None
 
     def get_application_principal_id(self, client_id: str) -> str:
         principal_id = self.graph_client.applications.get_service_principals_id_by_app_id(
