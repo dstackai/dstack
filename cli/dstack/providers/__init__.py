@@ -134,7 +134,7 @@ class Provider:
         self.run_as_provider = not workflow_name
         self.run_name = run_name
         self.ssh_key_pub = ssh_key_pub
-        self.openssh_server = self.provider_data.get("ssh", False)
+        self.openssh_server = self.provider_data.get("ssh", self.openssh_server)
 
         self.parse_args()
         self.ports = self.provider_data.get("ports") or {}

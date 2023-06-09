@@ -20,11 +20,11 @@ class OpenSSHExtension(ProviderExtension):
     port = 10022
 
     @classmethod
-    def patch_commands(cls, commands: List[str], *, ssh_pub_key: str = None, **kwargs):
-        assert ssh_pub_key is not None
+    def patch_commands(cls, commands: List[str], *, ssh_key_pub: str = None, **kwargs):
+        assert ssh_key_pub is not None, "No SSH key provided"
         commands.extend(
             [
-                f'echo "{ssh_pub_key}" >> ~/.ssh/authorized_keys',
+                f'echo "{ssh_key_pub}" >> ~/.ssh/authorized_keys',
                 f"ssh-keygen -A > /dev/null",
                 f"/usr/sbin/sshd -p {cls.port}",
             ]

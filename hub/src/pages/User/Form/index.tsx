@@ -17,7 +17,7 @@ import {
     StatusIndicator,
 } from 'components';
 
-import { copyToClipboard } from '../../../libs';
+import { copyToClipboard } from 'libs';
 
 import { TRoleSelectOption } from './types';
 

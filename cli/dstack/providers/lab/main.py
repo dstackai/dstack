@@ -27,6 +27,7 @@ class LabProvider(Provider):
         self.resources = None
         self.image_name = None
         self.home_dir = "/root"
+        self.openssh_server = True
 
     def load(
         self,
@@ -53,15 +54,15 @@ class LabProvider(Provider):
             formatter_class=RichHelpFormatter,
         )
         self._add_base_args(parser)
-        parser.add_argument("--ssh", action="store_true", dest="openssh_server")
+        parser.add_argument("--no-ssh", action="store_false", dest="openssh_server")
         return parser
 
     def parse_args(self):
         parser = self._create_parser(self.workflow_name)
         args, unknown_args = parser.parse_known_args(self.provider_args)
         self._parse_base_args(args, unknown_args)
-        if args.openssh_server:
-            self.openssh_server = True
+        if not args.openssh_server:
+            self.openssh_server = False
 
     def create_job_specs(self) -> List[JobSpec]:
         env = {}
@@ -113,13 +114,13 @@ class LabProvider(Provider):
         if self.env:
             self._extend_commands_with_env(commands, self.env)
         if self.openssh_server:
-            OpenSSHExtension.patch_commands(commands, ssh_pub_key=self.ssh_key_pub)
+            OpenSSHExtension.patch_commands(commands, ssh_key_pub=self.ssh_key_pub)
         commands.extend(
             [
                 "conda install psutil -y",
                 "pip install jupyterlab" + (f"=={self.version}" if self.version else ""),
                 "pip install ipywidgets",
-                "jupyter nbextension enable --py widgetsnbextension",
+                "jupyter labextension enable --py widgetsnbextension",
                 "mkdir -p /root/.jupyter",
                 'echo "c.ServerApp.allow_root = True" > /root/.jupyter/jupyter_server_config.py',
                 "echo \"c.ServerApp.allow_origin = '*'\" >> /root/.jupyter/jupyter_server_config.py",

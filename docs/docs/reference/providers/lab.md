@@ -44,7 +44,7 @@ The following properties are optional:
 - [`resources`](#resources) - (Optional) The hardware resources required by the workflow
 - [`ports`](#ports) - (Optional) The list of ports to expose
 - `working_dir` - (Optional) The path to the working directory
-- `ssh` - (Optional) Runs SSH server in the container if `true`
+- `ssh` - (Optional) Runs SSH server in the container if `true` (by default)
 - [`cache`](#cache) - (Optional) The list of directories to cache between runs
 
 ### artifacts

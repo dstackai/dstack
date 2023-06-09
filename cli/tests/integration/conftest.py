@@ -27,6 +27,7 @@ def local_runner():
 @pytest.fixture
 def dstack_dir(local_runner: Path):
     shutil.copytree(local_runner, DSTACK_DIR)
+    SSH_DIR.mkdir(exist_ok=True)
     with patch("dstack.cli.config.config.home", DSTACK_DIR):
         yield DSTACK_DIR
     # We need sudo to delete directories created by runner on Linux

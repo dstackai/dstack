@@ -57,7 +57,7 @@ _status_colors = {
     JobStatus.DOWNLOADING: "yellow",
     JobStatus.RUNNING: "dark_sea_green4",
     JobStatus.UPLOADING: "dark_sea_green4",
-    JobStatus.DONE: "gray74",
+    JobStatus.DONE: "grey74",
     JobStatus.FAILED: "red",
     JobStatus.STOPPED: "grey58",
     JobStatus.STOPPING: "yellow",

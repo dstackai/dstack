@@ -1,20 +1,21 @@
 import React from 'react';
 import { useTranslation } from 'react-i18next';
-import { Outlet, useParams } from 'react-router-dom';
-import { format } from 'date-fns';
+import { Outlet, useNavigate, useParams } from 'react-router-dom';
 
-import { Box, ColumnLayout, Container, ContentLayout, DetailsHeader, Header, Loader, SpaceBetween, Tabs } from 'components';
+import { Button, ButtonProps, Container, ContentLayout, DetailsHeader, Loader, SpaceBetween, Tabs } from 'components';
 
-import { DATE_TIME_FORMAT } from 'consts';
 import { useBreadcrumbs } from 'hooks';
 import { getRepoDisplayName } from 'libs/repo';
 import { ROUTES } from 'routes';
 import { useGetProjectRepoQuery } from 'services/project';
 
-import { RepoTabTypeEnum, RepoTypeEnum } from '../types';
+import { RepositoryGeneralInfo } from '../components/GeneralInfo';
+
+import { RepoTabTypeEnum } from '../types';
 
 export const RepositoryDetails: React.FC = () => {
     const { t } = useTranslation();
+    const navigate = useNavigate();
     const params = useParams();
     const paramProjectName = params.name ?? '';
     const paramRepoId = params.repoId ?? '';
@@ -45,6 +46,12 @@ export const RepositoryDetails: React.FC = () => {
         },
     ]);
 
+    const goToRepoSettings: ButtonProps['onClick'] = (event) => {
+        event.preventDefault();
+
+        navigate(ROUTES.PROJECT.DETAILS.REPOSITORIES.SETTINGS.FORMAT(paramProjectName, paramRepoId));
+    };
+
     const tabs: {
         label: string;
         id: RepoTabTypeEnum;
@@ -64,7 +71,21 @@ export const RepositoryDetails: React.FC = () => {
     ];
 
     return (
-        <ContentLayout header={<DetailsHeader title={displayRepoName} />}>
+        <ContentLayout
+            header={
+                <DetailsHeader
+                    title={displayRepoName}
+                    actionButtons={
+                        <Button
+                            href={ROUTES.PROJECT.DETAILS.REPOSITORIES.SETTINGS.FORMAT(paramProjectName, paramRepoId)}
+                            onClick={goToRepoSettings}
+                        >
+                            {t('common.settings')}
+                        </Button>
+                    }
+                />
+            }
+        >
             <SpaceBetween size="l">
                 {isLoadingRepo && !repoData && (
                     <Container>
@@ -72,23 +93,7 @@ export const RepositoryDetails: React.FC = () => {
                     </Container>
                 )}
 
-                {repoData && (
-                    <Container header={<Header variant="h2">{t('common.general')}</Header>}>
-                        <ColumnLayout columns={4} variant="text-grid">
-                            <div>
-                                <Box variant="awsui-key-label">{t('projects.repo.card.last_run')}</Box>
-                                <div>{format(new Date(repoData.last_run_at), DATE_TIME_FORMAT)}</div>
-                            </div>
-
-                            {repoData.repo_info.repo_type === RepoTypeEnum.LOCAL && (
-                                <div>
-                                    <Box variant="awsui-key-label">{t('projects.repo.card.directory')}</Box>
-                                    <div>{repoData.repo_info.repo_dir}</div>
-                                </div>
-                            )}
-                        </ColumnLayout>
-                    </Container>
-                )}
+                {repoData && <RepositoryGeneralInfo {...repoData} />}
 
                 <Tabs withNavigation tabs={tabs} />
 

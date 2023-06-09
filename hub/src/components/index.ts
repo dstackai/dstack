@@ -1,5 +1,6 @@
 export { default as Alert } from '@cloudscape-design/components/alert';
 export { default as Button } from '@cloudscape-design/components/button';
+export type { ButtonProps } from '@cloudscape-design/components/button';
 export { default as AppLayout } from '@cloudscape-design/components/app-layout';
 export type { AppLayoutProps } from '@cloudscape-design/components/app-layout';
 export { default as SideNavigation } from '@cloudscape-design/components/side-navigation';
@@ -32,6 +33,9 @@ export { default as Grid } from '@cloudscape-design/components/grid';
 export { default as HelpPanel } from '@cloudscape-design/components/help-panel';
 export type { HelpPanelProps } from '@cloudscape-design/components/help-panel';
 export { default as TextContent } from '@cloudscape-design/components/text-content';
+export { default as Modal } from '@cloudscape-design/components/modal';
+export type { ModalProps } from '@cloudscape-design/components/modal';
+export type { TilesProps } from '@cloudscape-design/components/tiles';
 
 // custom components
 export { NavigateLink } from './NavigateLink';
@@ -40,9 +44,11 @@ export { DetailsHeader } from './DetailsHeader';
 export { Loader } from './Loader';
 export { FormInput } from './form/Input';
 export { FormSelect } from './form/Select';
+export { FormTextarea } from './form/Textarea';
 export { FormRadioButtons } from './form/RadioButtons';
 export type { FormSelectOptions, FormSelectProps } from './form/Select/types';
 export { FormS3BucketSelector } from './form/S3BucketSelector';
+export type { FormTilesProps } from './form/Tiles/types';
 export { FormTiles } from './form/Tiles';
 export { Notifications } from './Notifications';
 export { ConfirmationDialog } from './ConfirmationDialog';

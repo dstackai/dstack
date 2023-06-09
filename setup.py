@@ -85,6 +85,8 @@ setup(
         "psutil>=5.0.0",
         "cryptography",
         "grpcio>=1.50",  # indirect
+        "filelock",
+        "watchfiles",
     ],
     extras_require={
         "aws": [

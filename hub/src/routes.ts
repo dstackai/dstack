@@ -18,10 +18,17 @@ export const ROUTES = {
             REPOSITORIES: {
                 TEMPLATE: `/projects/:name/repositories`,
                 FORMAT: (name: string) => buildRoute(ROUTES.PROJECT.DETAILS.REPOSITORIES.TEMPLATE, { name }),
+
                 DETAILS: {
                     TEMPLATE: `/projects/:name/repositories/:repoId`,
                     FORMAT: (name: string, repoId: string) =>
                         buildRoute(ROUTES.PROJECT.DETAILS.REPOSITORIES.DETAILS.TEMPLATE, { name, repoId }),
+                },
+
+                SETTINGS: {
+                    TEMPLATE: `/projects/:name/repositories/:repoId/settings`,
+                    FORMAT: (name: string, repoId: string) =>
+                        buildRoute(ROUTES.PROJECT.DETAILS.REPOSITORIES.SETTINGS.TEMPLATE, { name, repoId }),
                 },
             },
 

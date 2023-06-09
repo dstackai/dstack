@@ -204,7 +204,7 @@
         }
       }
     },
-    "ssh": {
+    "ssh_server": {
       "description": "Run openssh server in the container",
       "type": "boolean",
       "default": false
@@ -251,7 +251,7 @@
           "$ref": "#/definitions/resources"
         },
         "ssh": {
-          "$ref": "#/definitions/ssh"
+          "$ref": "#/definitions/ssh_server"
         },
         "cache": {
           "$ref": "#/definitions/cache"
@@ -367,7 +367,7 @@
           "$ref": "#/definitions/resources"
         },
         "ssh": {
-          "$ref": "#/definitions/ssh"
+          "$ref": "#/definitions/ssh_server"
         },
         "cache": {
           "$ref": "#/definitions/cache"
@@ -413,7 +413,7 @@
           "$ref": "#/definitions/resources"
         },
         "ssh": {
-          "$ref": "#/definitions/ssh"
+          "$ref": "#/definitions/ssh_server"
         },
         "cache": {
           "$ref": "#/definitions/cache"
@@ -459,10 +459,58 @@
           "$ref": "#/definitions/resources"
         },
         "ssh": {
-          "$ref": "#/definitions/ssh"
+          "$ref": "#/definitions/ssh_server"
         },
         "cache": {
           "$ref": "#/definitions/cache"
+        }
+      }
+    },
+    "ssh_provider": {
+      "type": "object",
+      "additionalProperties": false,
+      "patternProperties": {
+        "^name$": {
+        },
+        "^help$": {
+        },
+        "^deps$": {
+        }
+      },
+      "properties": {
+        "provider": {
+          "enum": [
+            "ssh"
+          ]
+        },
+        "ports": {
+          "$ref": "#/definitions/ports"
+        },
+        "setup": {
+          "$ref": "#/definitions/setup"
+        },
+        "env": {
+          "$ref": "#/definitions/env"
+        },
+        "python": {
+          "$ref": "#/definitions/python"
+        },
+        "working_dir": {
+          "$ref": "#/definitions/working_dir"
+        },
+        "artifacts": {
+          "$ref": "#/definitions/artifacts"
+        },
+        "resources": {
+          "$ref": "#/definitions/resources"
+        },
+        "cache": {
+          "$ref": "#/definitions/cache"
+        },
+        "code": {
+          "description": "Print VS Code connection URI",
+          "type": "boolean",
+          "default": false
         }
       }
     }
@@ -532,6 +580,9 @@
           },
           {
             "$ref": "#/definitions/notebook"
+          },
+          {
+            "$ref": "#/definitions/ssh_provider"
           }
         ]
       }

@@ -1,8 +1,11 @@
 import React from 'react';
 
 export const FIELD_NAMES = {
-    CREDENTIALS: 'credentials',
-    CREDENTIALS_FILENAME: 'credentials_filename',
+    CREDENTIALS: {
+        TYPE: 'credentials.type',
+        FILENAME: 'credentials.filename',
+        DATA: 'credentials.data',
+    },
     AREA: 'area',
     REGION: 'region',
     ZONE: 'zone',

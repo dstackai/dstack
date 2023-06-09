@@ -4,9 +4,7 @@ import subprocess
 from contextlib import closing
 from typing import Dict, List
 
-from dstack.core.job import Job
 from dstack.providers.ports import PortUsedError
-from dstack.utils.common import PathLike
 
 
 def get_free_port() -> int:
@@ -28,14 +26,7 @@ def port_in_use(port: int) -> bool:
     return False
 
 
-def allocate_local_ports(jobs: List[Job]) -> Dict[int, int]:
-    ports = {}
-    for job in jobs[:1]:  # todo multiple jobs
-        if "WS_LOGS_PORT" in job.env:
-            ports[int(job.env["WS_LOGS_PORT"])] = None
-        for app_spec in job.app_specs or []:
-            ports[app_spec.port] = app_spec.map_to_port
-
+def allocate_local_ports(ports: Dict[int, int]) -> Dict[int, int]:
     map_to_ports = set()
     # mapped by user
     for port, map_to_port in ports.items():
@@ -56,23 +47,10 @@ def allocate_local_ports(jobs: List[Job]) -> Dict[int, int]:
     return ports
 
 
-def make_ssh_tunnel_args(
-    ssh_key: PathLike, hostname: str, ports: Dict[int, int], backend_type: str
-) -> List[str]:
-    username = "root"
-    if backend_type == "azure":
-        # root login is disabled on azure
-        # TODO: use non-root for all backends
-        username = "ubuntu"
+def make_ssh_tunnel_args(run_name: str, ports: Dict[int, int]) -> List[str]:
     args = [
         "ssh",
-        "-o",
-        "StrictHostKeyChecking=no",
-        "-o",
-        "UserKnownHostsFile=/dev/null",
-        "-i",
-        str(ssh_key),
-        f"{username}@{hostname}",
+        run_name,
         "-N",
         "-f",
     ]
@@ -81,10 +59,8 @@ def make_ssh_tunnel_args(
     return args
 
 
-def run_ssh_tunnel(
-    ssh_key: PathLike, hostname: str, ports: Dict[int, int], backend_type: str
-) -> bool:
-    args = make_ssh_tunnel_args(ssh_key, hostname, ports, backend_type)
+def run_ssh_tunnel(run_name: str, ports: Dict[int, int]) -> bool:
+    args = make_ssh_tunnel_args(run_name, ports)
     return (
         subprocess.run(args, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL).returncode == 0
     )
