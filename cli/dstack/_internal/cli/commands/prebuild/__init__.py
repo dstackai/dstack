@@ -56,9 +56,9 @@ class PrebuildCommand(BasicCommand):
             console.print("dstack will execute the following plan:\n")
             _print_run_plan(configuration_path, run_plan)
             if not args.yes and not Confirm.ask("Continue?"):
-                console.print("Exiting...")
+                console.print("\nExiting...")
                 exit(0)
-            console.print("Provisioning...\n")
+            console.print("\nProvisioning...\n")
 
             run_name, jobs = hub_client.run_provider(
                 provider_name=provider_name,
