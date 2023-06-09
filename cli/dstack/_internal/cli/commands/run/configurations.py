@@ -48,8 +48,7 @@ def _parse_task_configuration_data(
     provider_name = "bash"
     provider_data = {"commands": []}
     if "setup" in configuration_data:
-        provider_data["commands"].extend(configuration_data["setup"])
-    # TODO: Support the `setup` property once it's added
+        provider_data["setup"] = configuration_data["setup"] or []
     provider_data["commands"].extend(configuration_data["commands"])
     _init_base_provider_data(configuration_data, provider_data)
     return provider_name, provider_data

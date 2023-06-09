@@ -106,7 +106,7 @@ class SSHProvider(Provider):
                     f"echo To open in VS Code Desktop, use one of these links:",
                     f"echo ''",
                     f"echo '  vscode://vscode-remote/ssh-remote+{self.run_name}/workflow'",
-                    f"echo '  vscode-insiders://vscode-remote/ssh-remote+{self.run_name}/workflow'",
+                    # f"echo '  vscode-insiders://vscode-remote/ssh-remote+{self.run_name}/workflow'",
                     "echo ''",
                     f"echo 'To connect via SSH, use: `ssh {self.run_name}`'",
                     "echo ''",

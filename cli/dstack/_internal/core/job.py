@@ -18,7 +18,7 @@ from dstack._internal.core.repo import (
     RepoRef,
 )
 
-PrebuildPolicy = ["use-prebuild", "no-prebuild", "force-prebuild", "prebuild-only"]
+PrebuildPolicy = ["no-prebuild", "use-prebuild", "force-prebuild", "prebuild-only"]
 
 
 class GpusRequirements(BaseModel):
