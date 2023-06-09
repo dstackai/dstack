@@ -38,9 +38,9 @@ def _parse_dev_environment_configuration_data(
                 "ms-toolsai.jupyter",
             ],
         )
-        provider_data["setup"].append("pip install -q --no-cache-dir ipykernel")
     except NoVSCodeVersionError as e:
         console.print(f"[yellow]WARNING[/] {e.message}")
+    provider_data["setup"].append("pip install -q --no-cache-dir ipykernel")
     provider_data["setup"].extend(configuration_data.get("setup") or [])
     return provider_name, provider_data
 
