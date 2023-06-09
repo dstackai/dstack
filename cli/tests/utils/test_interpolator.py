@@ -1,6 +1,6 @@
 import unittest
 
-from dstack.utils.interpolator import VariablesInterpolator
+from dstack._internal.utils.interpolator import VariablesInterpolator
 
 
 def get_interpolator():

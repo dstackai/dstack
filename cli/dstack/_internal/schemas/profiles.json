@@ -1,0 +1,111 @@
+{
+  "$schema": "http://json-schema.org/draft-04/schema",
+  "type": "object",
+  "additionalProperties": false,
+  "definitions": {
+    "resources": {
+      "description": "The hardware resource requirements",
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "gpu": {
+          "description": "The GPU requirements",
+          "anyOf": [
+            {
+              "type": "integer",
+              "minimum": 1
+            },
+            {
+              "type": "object",
+              "additionalProperties": false,
+              "properties": {
+                "name": {
+                  "description": "The name of the GPU, e.g. K80 or V100",
+                  "type": "string",
+                  "minLength": 1
+                },
+                "count": {
+                  "description": "The minimum number of GPUs",
+                  "type": "integer",
+                  "minimum": 1
+                },
+                "memory": {
+                  "description": "The minimum amount of GPU memory, e.g. 512MB or 16GB",
+                  "type": "string",
+                  "pattern": "^\\d+[MG]B$"
+                }
+              }
+            }
+          ]
+        },
+        "memory": {
+          "description": "The minimum amount of RAM memory, e.g. 512MB or 16GB",
+          "type": "string",
+          "pattern": "^\\d+[MG]B$"
+        },
+        "shm_size": {
+          "description": "The minimum amount of shared memory, e.g. 512MB or 16GB",
+          "type": "string",
+          "pattern": "^\\d+[MG]B$"
+        },
+        "cpu": {
+          "description": "The minimum number of virtual CPU cores",
+          "type": "integer",
+          "minimum": 1
+        },
+        "local": {
+          "description": "Must be set to `true` if the workflow must run locally",
+          "type": "boolean",
+          "enum": [
+            true
+          ]
+        },
+        "instance-type": {
+          "description": "The type of instance",
+          "type": "string",
+          "enum": [
+            "on-demand",
+            "auto",
+            "spot"
+          ]
+        }
+      }
+    }
+  },
+  "properties": {
+    "profiles": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "type": "object",
+        "minProperties": 2,
+        "additionalProperties": false,
+        "required": [
+          "name"
+        ],
+        "properties": {
+          "name": {
+            "type": "string",
+            "minLength": 1
+          },
+          "project": {
+            "type": "string",
+            "minLength": 1
+          },
+          "resources": {
+            "$ref": "#/definitions/resources"
+          },
+          "default": {
+            "type": "boolean",
+            "enum": [
+              true
+            ]
+          }
+        }
+      }
+    }
+  },
+  "required": [
+    "profiles"
+  ]
+}

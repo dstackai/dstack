@@ -3,7 +3,7 @@ import json
 import pytest
 from fastapi.testclient import TestClient
 
-from dstack.hub.main import app
+from dstack._internal.hub.main import app
 from tests.hub.common import create_project, create_user
 
 client = TestClient(app)

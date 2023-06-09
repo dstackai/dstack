@@ -10,6 +10,7 @@ import (
 	"strings"
 
 	"github.com/Azure/azure-sdk-for-go/sdk/azidentity"
+	"github.com/docker/docker/api/types/mount"
 	"github.com/dstackai/dstack/runner/consts"
 	"github.com/dstackai/dstack/runner/internal/artifacts"
 	"github.com/dstackai/dstack/runner/internal/backend"
@@ -111,6 +112,19 @@ func (azbackend *AzureBackend) Job(ctx context.Context) *models.Job {
 	log.Trace(ctx, "Getting job from state")
 	log.Trace(ctx, "Get job", "ID", azbackend.state.Job.JobID)
 	return azbackend.state.Job
+}
+
+func (azbackend *AzureBackend) RefetchJob(ctx context.Context) (*models.Job, error) {
+	log.Trace(ctx, "Refetching job from state", "ID", azbackend.state.Job.JobID)
+	contents, err := azbackend.storage.GetFile(ctx, azbackend.state.Job.JobFilepath())
+	if err != nil {
+		return nil, gerrors.Wrap(err)
+	}
+	err = yaml.Unmarshal(contents, &azbackend.state.Job)
+	if err != nil {
+		return nil, gerrors.Wrap(err)
+	}
+	return azbackend.state.Job, nil
 }
 
 func (azbackend *AzureBackend) MasterJob(ctx context.Context) *models.Job {
@@ -285,6 +299,22 @@ func (azbackend *AzureBackend) GetRepoArchive(ctx context.Context, path, dir str
 	return nil
 }
 
+func (azbackend *AzureBackend) GetPrebuildDiff(ctx context.Context, key, dst string) error {
+	_ = azbackend.storage.DownloadFile(ctx, key, dst)
+	return nil
+}
+
+func (azbackend *AzureBackend) PutPrebuildDiff(ctx context.Context, src, key string) error {
+	if err := azbackend.storage.UploadFile(ctx, src, key); err != nil {
+		return gerrors.Wrap(err)
+	}
+	return nil
+}
+
 func (azbackend *AzureBackend) GetTMPDir(ctx context.Context) string {
 	return path.Join(common.HomeDir(), consts.TMP_DIR_PATH)
+}
+
+func (azbackend *AzureBackend) GetDockerBindings(ctx context.Context) []mount.Mount {
+	return []mount.Mount{}
 }

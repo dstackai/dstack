@@ -2,14 +2,17 @@ package local
 
 import (
 	"context"
+	"errors"
 	"fmt"
-	"github.com/dstackai/dstack/runner/internal/repo"
 	"io"
 	"io/ioutil"
 	"os"
 	"path"
 	"path/filepath"
 	"strings"
+
+	"github.com/docker/docker/api/types/mount"
+	"github.com/dstackai/dstack/runner/internal/repo"
 
 	"github.com/dstackai/dstack/runner/consts"
 	"github.com/dstackai/dstack/runner/consts/states"
@@ -28,6 +31,7 @@ type LocalConfigFile struct {
 }
 
 type Local struct {
+	namespace string
 	path      string
 	runnerID  string
 	state     *models.State
@@ -57,6 +61,7 @@ func init() {
 func New(namespace string) *Local {
 	path := filepath.Join(common.HomeDir(), consts.DSTACK_DIR_PATH, LOCAL_BACKEND_DIR, namespace)
 	return &Local{
+		namespace: namespace,
 		path:      path,
 		storage:   NewLocalStorage(path),
 		cliSecret: NewClientSecret(path),
@@ -82,6 +87,19 @@ func (l *Local) Init(ctx context.Context, ID string) error {
 func (l *Local) Job(ctx context.Context) *models.Job {
 	log.Trace(ctx, "Getting job from state", "ID", l.state.Job.JobID)
 	return l.state.Job
+}
+
+func (l *Local) RefetchJob(ctx context.Context) (*models.Job, error) {
+	log.Trace(ctx, "Refetching job from state", "ID", l.state.Job.JobID)
+	contents, err := l.storage.GetFile(l.state.Job.JobFilepath())
+	if err != nil {
+		return nil, gerrors.Wrap(err)
+	}
+	err = yaml.Unmarshal(contents, &l.state.Job)
+	if err != nil {
+		return nil, gerrors.Wrap(err)
+	}
+	return l.state.Job, nil
 }
 
 func (l *Local) MasterJob(ctx context.Context) *models.Job {
@@ -258,6 +276,39 @@ func (l *Local) GetRepoArchive(ctx context.Context, path, dir string) error {
 	return nil
 }
 
+func (l *Local) GetPrebuildDiff(ctx context.Context, key, dst string) error {
+	src := filepath.Join(l.path, key)
+	if _, err := os.Stat(src); err == nil {
+		if err = os.Symlink(src, dst); err != nil {
+			return gerrors.Wrap(err)
+		}
+	} else if !errors.Is(err, os.ErrNotExist) {
+		return gerrors.Wrap(err)
+	}
+	return nil
+}
+
+func (l *Local) PutPrebuildDiff(ctx context.Context, src, key string) error {
+	dst := filepath.Join(l.path, key)
+	if err := os.MkdirAll(filepath.Dir(dst), 0o755); err != nil {
+		return gerrors.Wrap(err)
+	}
+	if err := os.Rename(src, dst); err != nil {
+		return gerrors.Wrap(err)
+	}
+	return nil
+}
+
 func (l *Local) GetTMPDir(ctx context.Context) string {
 	return path.Join(l.path, "tmp")
+}
+
+func (l *Local) GetDockerBindings(ctx context.Context) []mount.Mount {
+	return []mount.Mount{
+		{
+			Type:   mount.TypeBind,
+			Source: l.path,
+			Target: path.Join(l.state.Job.HomeDir, consts.DSTACK_DIR_PATH, LOCAL_BACKEND_DIR, l.namespace),
+		},
+	}
 }

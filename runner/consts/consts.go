@@ -3,7 +3,7 @@ package consts
 import "time"
 
 const DSTACK_DIR_PATH string = ".dstack"
-const CONFIG_FILE_NAME string = "config.yaml"
+const CONFIG_FILE_NAME string = "backend.yaml"
 const RUNNER_FILE_NAME string = "runner.yaml"
 const TMP_DIR_PATH = DSTACK_DIR_PATH + "/tmp"
 const USER_ARTIFACTS_DIR = "artifacts"

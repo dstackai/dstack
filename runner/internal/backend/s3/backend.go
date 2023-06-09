@@ -4,15 +4,17 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"github.com/aws/aws-sdk-go-v2/aws"
-	"github.com/aws/aws-sdk-go-v2/service/s3"
-	"github.com/dstackai/dstack/runner/internal/repo"
 	"io"
 	"io/ioutil"
 	"os"
 	"path"
 	"strings"
 	"time"
+
+	"github.com/aws/aws-sdk-go-v2/aws"
+	"github.com/aws/aws-sdk-go-v2/service/s3"
+	"github.com/docker/docker/api/types/mount"
+	"github.com/dstackai/dstack/runner/internal/repo"
 
 	"github.com/dstackai/dstack/runner/consts"
 	"github.com/dstackai/dstack/runner/internal/artifacts"
@@ -114,6 +116,19 @@ func (s *S3) Job(ctx context.Context) *models.Job {
 	}
 	log.Trace(ctx, "Get job", "job ID", s.state.Job.JobID)
 	return s.state.Job
+}
+
+func (s *S3) RefetchJob(ctx context.Context) (*models.Job, error) {
+	log.Trace(ctx, "Refetching job from state", "ID", s.state.Job.JobID)
+	contents, err := s.cliS3.GetFile(ctx, s.bucket, s.state.Job.JobFilepath())
+	if err != nil {
+		return nil, gerrors.Wrap(err)
+	}
+	err = yaml.Unmarshal(contents, &s.state.Job)
+	if err != nil {
+		return nil, gerrors.Wrap(err)
+	}
+	return s.state.Job, nil
 }
 
 func (s *S3) UpdateState(ctx context.Context) error {
@@ -403,6 +418,48 @@ func (s *S3) GetRepoArchive(ctx context.Context, path, dir string) error {
 	return nil
 }
 
+func (s *S3) GetPrebuildDiff(ctx context.Context, key, dst string) error {
+	out, err := s.cliS3.cli.GetObject(ctx, &s3.GetObjectInput{
+		Bucket: aws.String(s.bucket),
+		Key:    aws.String(key),
+	})
+	if err != nil { // it's okay not to have a diff
+		return nil
+	}
+	defer func() { _ = out.Body.Close() }()
+	file, err := os.Create(dst)
+	if err != nil {
+		return gerrors.Wrap(err)
+	}
+	defer func() { _ = file.Close() }()
+	_, err = io.Copy(file, out.Body)
+	if err != nil {
+		return gerrors.Wrap(err)
+	}
+	return nil
+}
+
+func (s *S3) PutPrebuildDiff(ctx context.Context, src, key string) error {
+	file, err := os.Open(src)
+	if err != nil {
+		return gerrors.Wrap(err)
+	}
+	defer func() { _ = file.Close() }()
+	_, err = s.cliS3.cli.PutObject(ctx, &s3.PutObjectInput{
+		Bucket: aws.String(s.bucket),
+		Key:    aws.String(key),
+		Body:   file,
+	})
+	if err != nil {
+		return gerrors.Wrap(err)
+	}
+	return nil
+}
+
 func (s *S3) GetTMPDir(ctx context.Context) string {
 	return path.Join(common.HomeDir(), consts.TMP_DIR_PATH)
+}
+
+func (s *S3) GetDockerBindings(ctx context.Context) []mount.Mount {
+	return []mount.Mount{}
 }

@@ -4,16 +4,16 @@ from urllib.parse import urlencode, urlparse, urlunparse
 
 import requests
 
-from dstack.api.hub.errors import HubClientError
-from dstack.core.artifact import Artifact
-from dstack.core.error import NoMatchingInstanceError
-from dstack.core.job import Job, JobHead
-from dstack.core.log_event import LogEvent
-from dstack.core.repo import RemoteRepoCredentials, Repo, RepoHead, RepoSpec
-from dstack.core.run import RunHead
-from dstack.core.secret import Secret
-from dstack.core.tag import TagHead
-from dstack.hub.models import (
+from dstack._internal.core.artifact import Artifact
+from dstack._internal.core.error import NoMatchingInstanceError
+from dstack._internal.core.job import Job, JobHead
+from dstack._internal.core.log_event import LogEvent
+from dstack._internal.core.plan import RunPlan
+from dstack._internal.core.repo import RemoteRepoCredentials, Repo, RepoHead, RepoSpec
+from dstack._internal.core.run import RunHead
+from dstack._internal.core.secret import Secret
+from dstack._internal.core.tag import TagHead
+from dstack._internal.hub.models import (
     AddTagPath,
     AddTagRun,
     ArtifactsList,
@@ -23,12 +23,14 @@ from dstack.hub.models import (
     PollLogs,
     ProjectInfo,
     ReposUpdate,
+    RunsGetPlan,
     RunsList,
     SaveRepoCredentials,
     SecretAddUpdate,
     StopRunners,
     StorageLink,
 )
+from dstack.api.hub.errors import HubClientError
 
 
 class HubAPIClient:
@@ -59,6 +61,28 @@ class HubAPIClient:
         )
         if resp.ok:
             return ProjectInfo.parse_obj(resp.json())
+        resp.raise_for_status()
+
+    def get_run_plan(self, jobs: List[Job]) -> RunPlan:
+        url = _project_url(
+            url=self.url,
+            project=self.project,
+            additional_path=f"/runs/get_plan",
+        )
+        resp = _make_hub_request(
+            requests.post,
+            host=self.url,
+            url=url,
+            headers=self._headers(),
+            data=RunsGetPlan(jobs=jobs).json(),
+        )
+        if resp.ok:
+            body = resp.json()
+            return RunPlan.parse_obj(body)
+        elif resp.status_code == 400:
+            body = resp.json()
+            if body["detail"]["code"] == NoMatchingInstanceError.code:
+                raise HubClientError(body["detail"]["msg"])
         resp.raise_for_status()
 
     def create_run(self) -> str:
