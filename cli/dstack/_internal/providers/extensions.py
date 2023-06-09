@@ -1,9 +1,11 @@
+import subprocess
 from abc import ABC, abstractmethod
 from typing import List, Optional
 
 import requests
 
 from dstack._internal.core.app import AppSpec
+from dstack._internal.core.error import DstackError
 
 
 class ProviderExtension(ABC):
@@ -48,20 +50,34 @@ class OpenSSHExtension(ProviderExtension):
 
 class VSCodeDesktopServer(ProviderExtension):
     @staticmethod
-    def get_tag_sha(version: Optional[str] = None) -> str:
+    def get_tag_sha(tag: Optional[str] = None) -> str:
         repo_api = "https://api.github.com/repos/microsoft/vscode"
-        if version is None:  # get latest
-            version = requests.get(f"{repo_api}/releases/latest").json()["tag_name"]
-        obj = requests.get(f"{repo_api}/git/ref/tags/{version}").json()["object"]
+        if tag is None:  # get latest
+            tag = requests.get(f"{repo_api}/releases/latest").json()["tag_name"]
+        obj = requests.get(f"{repo_api}/git/ref/tags/{tag}").json()["object"]
         if obj["type"] == "commit":
             return obj["sha"]
         raise NotImplementedError()
+
+    @staticmethod
+    def detect_code_sha(exe: str = "code") -> Optional[str]:
+        try:
+            run = subprocess.run([exe, "--version"], capture_output=True)
+        except FileNotFoundError:
+            return None
+        if run.returncode == 0:
+            return run.stdout.decode().split("\n")[1].strip()
+        return None
 
     @classmethod
     def patch_setup(
         cls, commands: List[str], *, vscode_extensions: Optional[List[str]] = None, **kwargs
     ):
-        commit = cls.get_tag_sha()
+        commit = cls.detect_code_sha()
+        if commit is None:
+            raise NoVSCodeVersionError(
+                "Couldn't detect VS Code version. Make sure `code` binary is in the PATH"
+            )
         url = f"https://update.code.visualstudio.com/commit:{commit}/server-linux-$arch/stable"
         archive = "vscode-server-linux-$arch.tar.gz"
         target = f'~/.vscode-server/bin/"{commit}"'
@@ -86,3 +102,7 @@ class VSCodeDesktopServer(ProviderExtension):
     @classmethod
     def patch_apps(cls, apps: List[AppSpec], **kwargs):
         pass
+
+
+class NoVSCodeVersionError(DstackError):
+    pass

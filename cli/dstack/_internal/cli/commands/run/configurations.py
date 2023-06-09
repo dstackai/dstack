@@ -7,8 +7,9 @@ import jsonschema
 import pkg_resources
 import yaml
 
+from dstack._internal.cli.common import console
 from dstack._internal.cli.profiles import load_profiles
-from dstack._internal.providers.extensions import VSCodeDesktopServer
+from dstack._internal.providers.extensions import NoVSCodeVersionError, VSCodeDesktopServer
 
 
 def _init_base_provider_data(configuration_data: Dict[str, Any], provider_data: Dict[str, Any]):
@@ -29,14 +30,17 @@ def _parse_dev_environment_configuration_data(
     provider_data = {}
     _init_base_provider_data(configuration_data, provider_data)
     provider_data["setup"] = []
-    VSCodeDesktopServer.patch_setup(
-        provider_data["setup"],
-        vscode_extensions=[
-            "ms-python.python",
-            "ms-toolsai.jupyter",
-        ],
-    )
-    provider_data["setup"].append("pip install -q --no-cache-dir ipykernel")
+    try:
+        VSCodeDesktopServer.patch_setup(
+            provider_data["setup"],
+            vscode_extensions=[
+                "ms-python.python",
+                "ms-toolsai.jupyter",
+            ],
+        )
+        provider_data["setup"].append("pip install -q --no-cache-dir ipykernel")
+    except NoVSCodeVersionError as e:
+        console.print(f"[yellow]WARNING[/] {e.message}")
     provider_data["setup"].extend(configuration_data.get("setup") or [])
     return provider_name, provider_data
 
