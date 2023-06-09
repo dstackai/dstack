@@ -75,9 +75,7 @@ class VSCodeDesktopServer(ProviderExtension):
     ):
         commit = cls.detect_code_sha()
         if commit is None:
-            raise NoVSCodeVersionError(
-                "Couldn't detect VS Code version. Make sure `code` binary is in the PATH"
-            )
+            raise NoVSCodeVersionError()
         url = f"https://update.code.visualstudio.com/commit:{commit}/server-linux-$arch/stable"
         archive = "vscode-server-linux-$arch.tar.gz"
         target = f'~/.vscode-server/bin/"{commit}"'

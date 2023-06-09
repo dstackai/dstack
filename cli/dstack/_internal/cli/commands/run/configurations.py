@@ -39,7 +39,11 @@ def _parse_dev_environment_configuration_data(
             ],
         )
     except NoVSCodeVersionError as e:
-        console.print(f"[yellow]WARNING[/] {e.message}")
+        console.print(
+            "[grey58]Unable to detect the VS Code version and pre-install extensions. Fix by opening ["
+            "sea_green3]Command Palette[/sea_green3], executing [sea_green3]Shell Command: Install 'code' command in "
+            "PATH[/sea_green3], and restarting terminal.[/]\n"
+        )
     provider_data["setup"].append("pip install -q --no-cache-dir ipykernel")
     provider_data["setup"].extend(configuration_data.get("setup") or [])
     return provider_name, provider_data
