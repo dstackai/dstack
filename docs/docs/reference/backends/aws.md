@@ -7,7 +7,7 @@ Follow the step-by-step guide below to configure a project with this backend.
 
 ## 1. Create an S3 bucket
 
-First have to create an S3 bucket. `dstack` will use this bucket to store state and artifacts.
+First you need to create an S3 bucket. `dstack` will use this bucket to store state and artifacts.
 
 !!! info "NOTE:"
     Make sure that the bucket is created in the same region where you plan to provision
@@ -158,18 +158,25 @@ services.
     }
     ```
 
-## 3. Create an access key
+## 3. Set up AWS credentials
 
-Once the IAM user is created, go ahead and
-[create an access key](https://docs.aws.amazon.com/cli/latest/userguide/cli-authentication-user.html#cli-authentication-user-get).
+`dstack` support two methods to authenticate with AWS: Default credentials and Access key.
 
-!!! info "NOTE:"
-    Once the access key is created, make sure to download the `.csv` file containing your IAM user's
-    `Access key ID` and `Secret access key`.
+### Default credentials
+
+`dstack` can automatically pick up AWS credentials set up on your machine
+(e.g. credentials stored as AWS profiles or environment variables).
+You can use default credentials if you don't want to enter and store AWS credentials in `dstack`.
+
+### Access key
+
+`dstack` also support authentication using an access key. To create an access key,
+[follow this guide](https://docs.aws.amazon.com/cli/latest/userguide/cli-authentication-user.html#cli-authentication-user-get). Once the access key is created, make sure to download the `.csv` file containing your IAM user's
+`Access key ID` and `Secret access key`.
 
 ## 4. Create a project
 
-Now that you have an access key, log in to the Hub, open the `Projects` page, click `Add`, and select `AWS` in
+Now that you set up the AWS credentials, log in to the `Hub`, open the `Projects` page, click `Add`, and select `AWS` in
 the `Type` field.
 
 ![](../../../assets/images/dstack-hub-create-aws-project.png){ width=800 }
@@ -178,13 +185,13 @@ the `Type` field.
 
 The following fields are required:
 
-- `Access key ID` - (Required) The [Access key ID](#3-create-an-access-key) to authenticate `dstack` 
-- `Secret access key` - (Required) The [Secret access key](#3-create-an-access-key) to authenticate `dstack`
-- `Region` - (Required) The region where `dstack` will create provision infrastructure and store state and artifacts
+- `Region` - (Required) The region where `dstack` will provision infrastructure and store state and artifacts
 - `Bucket` - (Required) The [S3 bucket](#1-create-an-s3-bucket) to store state and artifacts (must be in the same region)
 
 The following arguments are optional:
 
+- `Access key ID` - (Optional) The [Access key ID](#3-create-an-access-key) to authenticate `dstack` 
+- `Secret access key` - (Optional) The [Secret access key](#3-create-an-access-key) to authenticate `dstack`
 - `Subnet` - (Optional) The EC2 subnet is required to provision infrastructure using a non-default VPC and subnet. If
   not specified, dstack will use the default VPC and subnet.
 

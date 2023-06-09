@@ -25,6 +25,7 @@ export const AzureBackend: React.FC<IProps> = ({ loading }) => {
     const [subscriptionIds, setSubscriptionIds] = useState<FormSelectOptions>([]);
     const [locations, setLocations] = useState<FormSelectOptions>([]);
     const [storageAccounts, setStorageAccounts] = useState<FormSelectOptions>([]);
+    const [availableDefaultCredentials, setAvailableDefaultCredentials] = useState(false);
     const lastUpdatedField = useRef<string | null>(null);
 
     const [getBackendValues, { isLoading: isLoadingValues }] = useBackendValuesMutation();
@@ -38,15 +39,22 @@ export const AzureBackend: React.FC<IProps> = ({ loading }) => {
     }, []);
 
     const tenantIdValue = watch(`backend.${FIELD_NAMES.TENANT_ID}`);
-    const clientIdValue = watch(`backend.${FIELD_NAMES.CLIENT_ID}`);
-    const clientSecretValue = watch(`backend.${FIELD_NAMES.CLIENT_SECRET}`);
+    const clientIdValue = watch(`backend.${FIELD_NAMES.CREDENTIALS.CLIENT_ID}`);
+    const clientSecretValue = watch(`backend.${FIELD_NAMES.CREDENTIALS.CLIENT_SECRET}`);
+    const credentialTypeValue = watch(`backend.${FIELD_NAMES.CREDENTIALS.TYPE}`);
 
     const changeFormHandler = async () => {
         const backendFormValues = getValues('backend');
+        const backendCredentials = backendFormValues?.credentials ?? {};
 
-        if (!backendFormValues.client_secret || !backendFormValues.client_id || !backendFormValues.tenant_id) {
+        if (
+            backendCredentials.type === 'client' &&
+            (!backendFormValues.tenant_id || !backendCredentials.client_id || !backendCredentials.client_secret)
+        ) {
             return;
         }
+
+        if (backendFormValues?.credentials && !backendFormValues.credentials.type) delete backendFormValues.credentials;
 
         clearErrors('backend');
 
@@ -57,22 +65,28 @@ export const AzureBackend: React.FC<IProps> = ({ loading }) => {
             setValuesData(response);
             lastUpdatedField.current = null;
 
-            if (response.subscription_id.values) {
+            setAvailableDefaultCredentials(response.default_credentials);
+
+            if (response.tenant_id?.selected) {
+                setValue(`backend.${FIELD_NAMES.TENANT_ID}`, response.tenant_id.selected);
+            }
+
+            if (response.subscription_id?.values) {
                 setSubscriptionIds(response.subscription_id.values);
             }
-            if (response.subscription_id.selected !== undefined) {
+            if (response.subscription_id?.selected !== undefined) {
                 setValue(`backend.${FIELD_NAMES.SUBSCRIPTION_ID}`, response.subscription_id.selected);
             }
-            if (response.location.values) {
+            if (response.location?.values) {
                 setLocations(response.location.values);
             }
-            if (response.location.selected !== undefined) {
+            if (response.location?.selected !== undefined) {
                 setValue(`backend.${FIELD_NAMES.LOCATION}`, response.location.selected);
             }
-            if (response.storage_account.values) {
+            if (response.storage_account?.values) {
                 setStorageAccounts(response.storage_account.values);
             }
-            if (response.storage_account.selected !== undefined) {
+            if (response.storage_account?.selected !== undefined) {
                 setValue(`backend.${FIELD_NAMES.STORAGE_ACCOUNT}`, response.storage_account.selected);
             }
         } catch (errorResponse) {
@@ -104,6 +118,12 @@ export const AzureBackend: React.FC<IProps> = ({ loading }) => {
         debouncedChangeFormHandler();
     };
 
+    const onChangeCredentialsTypeField = () => {
+        clearFields(0);
+        if (requestRef.current) requestRef.current.abort();
+        changeFormHandler().catch(console.log);
+    };
+
     const clearFieldByQueueFromField = (name: string) => {
         const fieldIndex = FIELDS_QUEUE.findIndex((i) => i === name);
         if (fieldIndex < 0) return;
@@ -133,7 +153,12 @@ export const AzureBackend: React.FC<IProps> = ({ loading }) => {
     };
 
     const getDisabledByFieldName = (fieldName: string) => {
-        let disabledField = loading || !tenantIdValue || !clientIdValue || !clientSecretValue || !valuesData;
+        let disabledField = loading || !credentialTypeValue;
+
+        disabledField =
+            disabledField ||
+            (credentialTypeValue === 'client' && (!tenantIdValue || !clientIdValue || !clientSecretValue || !valuesData));
+
         disabledField = disabledField || (lastUpdatedField.current !== fieldName && isLoadingValues);
 
         switch (fieldName) {
@@ -153,6 +178,25 @@ export const AzureBackend: React.FC<IProps> = ({ loading }) => {
 
     return (
         <SpaceBetween size="l">
+            <FormSelect
+                label={t('projects.edit.azure.authorization')}
+                control={control}
+                name={`backend.${FIELD_NAMES.CREDENTIALS.TYPE}`}
+                onChange={onChangeCredentialsTypeField}
+                disabled={loading}
+                options={[
+                    {
+                        label: t('projects.edit.azure.authorization_default'),
+                        value: 'default',
+                        disabled: !availableDefaultCredentials,
+                    },
+                    {
+                        label: t('projects.edit.azure.authorization_client'),
+                        value: 'client',
+                    },
+                ]}
+            />
+
             <FormInput
                 info={<InfoLink onFollow={() => openHelpPanel(CREDENTIALS_HELP)} />}
                 label={t('projects.edit.azure.tenant_id')}
@@ -164,29 +208,33 @@ export const AzureBackend: React.FC<IProps> = ({ loading }) => {
                 rules={{ required: t('validation.required') }}
             />
 
-            <FormInput
-                info={<InfoLink onFollow={() => openHelpPanel(CREDENTIALS_HELP)} />}
-                label={t('projects.edit.azure.client_id')}
-                description={t('projects.edit.azure.client_id_description')}
-                control={control}
-                name={`backend.${FIELD_NAMES.CLIENT_ID}`}
-                onChange={onChangeCredentialField}
-                disabled={loading}
-                rules={{ required: t('validation.required') }}
-                autoComplete="off"
-            />
+            {credentialTypeValue === 'client' && (
+                <>
+                    <FormInput
+                        info={<InfoLink onFollow={() => openHelpPanel(CREDENTIALS_HELP)} />}
+                        label={t('projects.edit.azure.client_id')}
+                        description={t('projects.edit.azure.client_id_description')}
+                        control={control}
+                        name={`backend.${FIELD_NAMES.CREDENTIALS.CLIENT_ID}`}
+                        onChange={onChangeCredentialField}
+                        disabled={loading}
+                        rules={{ required: t('validation.required') }}
+                        autoComplete="off"
+                    />
 
-            <FormInput
-                info={<InfoLink onFollow={() => openHelpPanel(CREDENTIALS_HELP)} />}
-                label={t('projects.edit.azure.client_secret')}
-                description={t('projects.edit.azure.client_secret_description')}
-                control={control}
-                name={`backend.${FIELD_NAMES.CLIENT_SECRET}`}
-                onChange={onChangeCredentialField}
-                disabled={loading}
-                rules={{ required: t('validation.required') }}
-                autoComplete="off"
-            />
+                    <FormInput
+                        info={<InfoLink onFollow={() => openHelpPanel(CREDENTIALS_HELP)} />}
+                        label={t('projects.edit.azure.client_secret')}
+                        description={t('projects.edit.azure.client_secret_description')}
+                        control={control}
+                        name={`backend.${FIELD_NAMES.CREDENTIALS.CLIENT_SECRET}`}
+                        onChange={onChangeCredentialField}
+                        disabled={loading}
+                        rules={{ required: t('validation.required') }}
+                        autoComplete="off"
+                    />
+                </>
+            )}
 
             <FormSelect
                 info={<InfoLink onFollow={() => openHelpPanel(SUBSCRIPTION_HELP)} />}

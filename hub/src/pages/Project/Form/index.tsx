@@ -2,7 +2,19 @@ import React, { useMemo } from 'react';
 import { DefaultValues, FormProvider, useForm } from 'react-hook-form';
 import { useTranslation } from 'react-i18next';
 
-import { Button, Container, FormField, FormInput, FormTiles, FormUI, Grid, Header, InfoLink, SpaceBetween } from 'components';
+import {
+    Button,
+    Container,
+    FormField,
+    FormInput,
+    FormTiles,
+    FormUI,
+    Grid,
+    Header,
+    InfoLink,
+    SpaceBetween,
+    TilesProps,
+} from 'components';
 
 import { useHelpPanel, useNotifications } from 'hooks';
 import { isRequestFormErrors2, isRequestFormFieldError } from 'libs';
@@ -46,9 +58,10 @@ export const ProjectForm: React.FC<IProps> = ({ initialValues, onCancel, loading
         defaultValues: getDefaultValues(),
     });
 
-    const { handleSubmit, control, watch, setError, clearErrors } = formMethods;
+    const { handleSubmit, control, watch, setError, reset, clearErrors } = formMethods;
 
     const backendType = watch('backend.type');
+    const projectNameValue = watch('project_name');
 
     const backendOptions: TBackendOption[] = useMemo(() => {
         if (backendTypesData)
@@ -67,7 +80,7 @@ export const ProjectForm: React.FC<IProps> = ({ initialValues, onCancel, loading
         };
 
         return [defaultOption];
-    }, [backendTypesData]);
+    }, [backendTypesData, loading]);
 
     const onSubmit = (data: IProject) => {
         if (data.backend.type === 'aws' && data.backend.ec2_subnet_id === '') data.backend.ec2_subnet_id = null;
@@ -88,7 +101,21 @@ export const ProjectForm: React.FC<IProps> = ({ initialValues, onCancel, loading
                         });
                     }
                 });
+            } else {
+                pushNotification({
+                    type: 'error',
+                    content: t('common.server_error', { error: errorResponse?.error ?? errorResponse }),
+                });
             }
+        });
+    };
+
+    const onChangeBackendType: TilesProps['onChange'] = ({ detail: { value } }) => {
+        reset({
+            project_name: projectNameValue,
+            backend: {
+                type: value as TProjectBackendType,
+            },
         });
     };
 
@@ -156,7 +183,12 @@ export const ProjectForm: React.FC<IProps> = ({ initialValues, onCancel, loading
 
                             <SpaceBetween size="l">
                                 <Grid gridDefinition={[{ colspan: 8 }]}>
-                                    <FormTiles control={control} name="backend.type" items={backendOptions} />
+                                    <FormTiles
+                                        control={control}
+                                        onChange={onChangeBackendType}
+                                        name="backend.type"
+                                        items={backendOptions}
+                                    />
                                 </Grid>
 
                                 {renderBackendFields()}

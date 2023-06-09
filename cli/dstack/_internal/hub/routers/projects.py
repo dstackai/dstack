@@ -124,7 +124,7 @@ async def update_project(
 def _error_response_on_config_error(e: BackendConfigError, path_to_config: List[str]):
     if len(e.fields) > 0:
         error_details = [
-            error_detail(e.message, code=e.code, loc=path_to_config + [f]) for f in e.fields
+            error_detail(e.message, code=e.code, loc=path_to_config + f) for f in e.fields
         ]
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,

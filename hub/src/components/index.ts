@@ -35,6 +35,7 @@ export type { HelpPanelProps } from '@cloudscape-design/components/help-panel';
 export { default as TextContent } from '@cloudscape-design/components/text-content';
 export { default as Modal } from '@cloudscape-design/components/modal';
 export type { ModalProps } from '@cloudscape-design/components/modal';
+export type { TilesProps } from '@cloudscape-design/components/tiles';
 
 // custom components
 export { NavigateLink } from './NavigateLink';
@@ -47,6 +48,7 @@ export { FormTextarea } from './form/Textarea';
 export { FormRadioButtons } from './form/RadioButtons';
 export type { FormSelectOptions, FormSelectProps } from './form/Select/types';
 export { FormS3BucketSelector } from './form/S3BucketSelector';
+export type { FormTilesProps } from './form/Tiles/types';
 export { FormTiles } from './form/Tiles';
 export { Notifications } from './Notifications';
 export { ConfirmationDialog } from './ConfirmationDialog';

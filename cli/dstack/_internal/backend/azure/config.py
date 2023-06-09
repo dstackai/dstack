@@ -16,7 +16,7 @@ class AzureConfig(BackendConfig):
         vault_url: str,
         network: str,
         subnet: str,
-        credentials: Dict,
+        credentials: Optional[Dict],
     ):
         self.subscription_id = subscription_id
         self.tenant_id = tenant_id
@@ -56,10 +56,7 @@ class AzureConfig(BackendConfig):
             vault_url = data["vault_url"]
             network = data["network"]
             subnet = data["subnet"]
-            credentials = {
-                "client_id": data.get("client_id"),
-                "client_secret": data.get("client_secret"),
-            }
+            credentials = data.get("credentials")
         except KeyError:
             return None
 

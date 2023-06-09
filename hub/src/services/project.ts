@@ -95,10 +95,7 @@ export const projectApi = createApi({
             }),
         }),
 
-        backendValues: builder.mutation<
-            IProjectAwsBackendValues & IProjectAzureBackendValues & IProjectGCPBackendValues,
-            Partial<TProjectBackend>
-        >({
+        backendValues: builder.mutation<TProjectBackendValuesResponse, Partial<TProjectBackend>>({
             query: (data) => ({
                 url: API.PROJECTS.BACKEND_VALUES(),
                 method: 'POST',

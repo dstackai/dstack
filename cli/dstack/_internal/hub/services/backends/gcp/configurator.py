@@ -1,11 +1,15 @@
 import json
-from typing import Dict, Optional, Tuple, Union
+from typing import Dict, List, Optional, Tuple, Union
 
+import google.auth
+import google.auth.exceptions
+import googleapiclient.discovery
+import googleapiclient.errors
 from google.cloud import compute_v1, storage
 from google.oauth2 import service_account
 
-from dstack._internal.backend.base.config import BackendConfig
 from dstack._internal.backend.gcp import GCPBackend
+from dstack._internal.backend.gcp import utils as gcp_utils
 from dstack._internal.backend.gcp.config import GCPConfig
 from dstack._internal.hub.db.models import Project
 from dstack._internal.hub.models import (
@@ -110,18 +114,28 @@ class GCPConfigurator(Configurator):
         return GCPBackend
 
     def configure_project(self, config_data: Dict) -> GCPProjectValues:
-        try:
-            service_account_info = json.loads(config_data.get("credentials"))
-            self.credentials = service_account.Credentials.from_service_account_info(
-                info=service_account_info
-            )
-            storage_client = storage.Client(credentials=self.credentials)
-            storage_client.list_buckets(max_results=1)
-        except Exception:
-            raise BackendConfigError(
-                "Credentials are not valid", code="invalid_credentials", fields=["credentials"]
-            )
         project_values = GCPProjectValues()
+        try:
+            self.credentials, self.project_id = google.auth.default()
+        except google.auth.exceptions.DefaultCredentialsError:
+            project_values.default_credentials = False
+        else:
+            project_values.default_credentials = True
+
+        credentials_data = config_data.get("credentials")
+        if credentials_data is None:
+            return project_values
+
+        if credentials_data["type"] == "service_account":
+            try:
+                self._auth(credentials_data)
+                storage_client = storage.Client(credentials=self.credentials)
+                storage_client.list_buckets(max_results=1)
+            except Exception:
+                self._raise_invalid_credentials_error(fields=[["credentials", "data"]])
+        elif not project_values.default_credentials:
+            self._raise_invalid_credentials_error(fields=[["credentials"]])
+
         project_values.area = self._get_hub_geographic_area(config_data.get("area"))
         location = self._get_location(project_values.area.selected)
         project_values.region, regions = self._get_hub_region(
@@ -147,18 +161,25 @@ class GCPConfigurator(Configurator):
     def create_config_auth_data_from_project_config(
         self, project_config: GCPProjectConfigWithCreds
     ) -> Tuple[Dict, Dict]:
-        config = GCPProjectConfig.parse_obj(project_config).dict()
-        auth = GCPProjectCreds.parse_obj(project_config).dict()
-        return config, auth
+        config_data = GCPProjectConfig.parse_obj(project_config).dict()
+        auth_data = project_config.credentials.__root__.dict()
+        if project_config.credentials.__root__.type == "default":
+            self._auth(auth_data)
+            service_account_email = self._get_or_create_service_account(
+                f"{project_config.bucket_name}-sa"
+            )
+            self._grant_roles_to_service_account(service_account_email)
+            auth_data["service_account_email"] = service_account_email
+        return config_data, auth_data
 
     def get_backend_config_from_hub_config_data(
         self, project_name: str, config_data: Dict, auth_data: Dict
-    ) -> BackendConfig:
-        credentials = json.loads(auth_data["credentials"])
+    ) -> GCPConfig:
+        self._auth(auth_data)
         data = {
             "backend": "gcp",
-            "credentials": credentials,
-            "project": credentials["project_id"],
+            "credentials": auth_data,
+            "project": self.project_id,
             "region": config_data["region"],
             "zone": config_data["zone"],
             "bucket": config_data["bucket_name"],
@@ -179,11 +200,8 @@ class GCPConfigurator(Configurator):
         subnet = json_config["subnet"]
         if include_creds:
             json_auth = json.loads(project.auth)
-            credentials = json_auth["credentials"]
-            credentials_filename = json_auth["credentials_filename"]
             return GCPProjectConfigWithCreds(
-                credentials=credentials,
-                credentials_filename=credentials_filename,
+                credentials=GCPProjectCreds.parse_obj(json_auth),
                 area=area,
                 region=region,
                 zone=zone,
@@ -198,6 +216,13 @@ class GCPConfigurator(Configurator):
             bucket_name=bucket_name,
             vpc=vpc,
             subnet=subnet,
+        )
+
+    def _raise_invalid_credentials_error(self, fields: Optional[List[List[str]]] = None):
+        raise BackendConfigError(
+            "Invalid credentials",
+            code="invalid_credentials",
+            fields=fields,
         )
 
     def _get_hub_geographic_area(self, default_area: Optional[str]) -> ProjectElement:
@@ -215,7 +240,7 @@ class GCPConfigurator(Configurator):
         self, location: Dict, default_region: Optional[str]
     ) -> Tuple[ProjectElement, Dict]:
         regions_client = compute_v1.RegionsClient(credentials=self.credentials)
-        regions = regions_client.list(project=self.credentials.project_id)
+        regions = regions_client.list(project=self.project_id)
         region_names = sorted(
             [r.name for r in regions if r.name in location["regions"]],
             key=lambda name: (name != location["default_region"], name),
@@ -231,11 +256,17 @@ class GCPConfigurator(Configurator):
             element.values.append(ProjectElementValue(value=region_name, label=region_name))
         return element, {r.name: r for r in regions}
 
+    def _get_location(self, area: str) -> Optional[Dict]:
+        for location in GCP_LOCATIONS:
+            if location["name"] == area:
+                return location
+        return None
+
     def _get_hub_zone(
         self, location: Dict, region: compute_v1.Region, default_zone: Optional[str]
     ) -> ProjectElement:
         zone_names = sorted(
-            [self._get_resource_name(z) for z in region.zones],
+            [gcp_utils.get_resource_name(z) for z in region.zones],
             key=lambda name: (name != location["default_zone"], name),
         )
         if default_zone is None:
@@ -257,7 +288,7 @@ class GCPConfigurator(Configurator):
             raise BackendConfigError(
                 f"Invalid bucket {default_bucket} for region {region}",
                 code="invalid_bucket",
-                fields=["bucket_name"],
+                fields=[["bucket_name"]],
             )
         element = ProjectElement(selected=default_bucket)
         for bucket_name in bucket_names:
@@ -276,14 +307,14 @@ class GCPConfigurator(Configurator):
             default_subnet = "default"
         no_preference_vpc_subnet = ("default", "default")
         networks_client = compute_v1.NetworksClient(credentials=self.credentials)
-        networks = networks_client.list(project=self.credentials.project_id)
+        networks = networks_client.list(project=self.project_id)
         vpc_subnet_list = []
         for network in networks:
             for subnet in network.subnetworks:
-                subnet_region = self._get_subnet_region(subnet)
+                subnet_region = gcp_utils.get_subnet_region(subnet)
                 if subnet_region != region:
                     continue
-                vpc_subnet_list.append((network.name, self._get_subnet_name(subnet)))
+                vpc_subnet_list.append((network.name, gcp_utils.get_subnet_name(subnet)))
         if (default_vpc, default_subnet) not in vpc_subnet_list:
             raise BackendConfigError(f"Invalid VPC subnet {default_vpc, default_subnet}")
         if (default_vpc, default_subnet) != no_preference_vpc_subnet:
@@ -304,17 +335,60 @@ class GCPConfigurator(Configurator):
             )
         return element
 
-    def _get_resource_name(self, resource_path: str) -> str:
-        return resource_path.rsplit(sep="/", maxsplit=1)[1]
+    def _auth(self, credentials_data: Dict):
+        if credentials_data["type"] == "service_account":
+            service_account_info = json.loads(credentials_data["data"])
+            self.credentials = service_account.Credentials.from_service_account_info(
+                info=service_account_info
+            )
+            self.project_id = self.credentials.project_id
+        else:
+            self.credentials, self.project_id = google.auth.default()
 
-    def _get_location(self, area: str) -> Optional[Dict]:
-        for location in GCP_LOCATIONS:
-            if location["name"] == area:
-                return location
-        return None
+    def _get_or_create_service_account(self, name: str) -> str:
+        iam_service = googleapiclient.discovery.build("iam", "v1", credentials=self.credentials)
+        try:
+            service_account = (
+                iam_service.projects()
+                .serviceAccounts()
+                .create(
+                    name="projects/" + self.project_id,
+                    body={
+                        "accountId": name,
+                        "serviceAccount": {
+                            "displayName": name,
+                        },
+                    },
+                )
+                .execute()
+            )
+            return service_account["email"]
+        except googleapiclient.errors.HttpError as e:
+            if e.status_code == 409:
+                return gcp_utils.get_service_account_email(self.project_id, name)
+            raise e
 
-    def _get_subnet_region(self, subnet_resource: str) -> str:
-        return subnet_resource.rsplit(sep="/", maxsplit=3)[1]
+    def _grant_roles_to_service_account(self, service_account_email: str):
+        service = googleapiclient.discovery.build(
+            "cloudresourcemanager", "v1", credentials=self.credentials
+        )
+        policy = service.projects().getIamPolicy(resource=self.project_id).execute()
+        self._add_roles_to_policy(
+            policy=policy,
+            service_account_email=service_account_email,
+            roles=[
+                "roles/compute.admin",
+                "roles/logging.admin",
+                "roles/secretmanager.admin",
+                "roles/storage.admin",
+                "roles/iam.serviceAccountUser",
+            ],
+        )
+        service.projects().setIamPolicy(
+            resource=self.project_id, body={"policy": policy}
+        ).execute()
 
-    def _get_subnet_name(self, subnet_resource: str) -> str:
-        return subnet_resource.rsplit(sep="/", maxsplit=1)[1]
+    def _add_roles_to_policy(self, policy: Dict, service_account_email: str, roles: List[str]):
+        member = f"serviceAccount:{service_account_email}"
+        for role in roles:
+            policy["bindings"].append({"role": role, "members": [member]})

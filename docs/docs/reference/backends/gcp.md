@@ -30,20 +30,27 @@ artifacts.
     Make sure that the bucket is created in the same region where you plan to provision
     infrastructure.
 
-## 3. Create a service account
+## 3. Set up AWS credentials
 
-The next step is to [create a service account](https://cloud.google.com/iam/docs/service-accounts-create) and configure the
-following roles for it: `Service Account User`, `Compute Admin`, `Storage Admin`, `Secret Manager Admin`,
+`dstack` support two methods to authenticate with GCP: Default credentials and Service account key.
+
+### Default credentials
+
+`dstack` can automatically pick up [GCP default credentials](https://cloud.google.com/docs/authentication/application-default-credentials)
+set up on your machine. You can use default credentials if you don't want to enter and store GCP credentials in `dstack`.
+
+### Service account key
+
+`dstack` also support authentication using a service account key. [Follow this guide](https://cloud.google.com/iam/docs/service-accounts-create) to create a service account
+and configure the following roles for it: `Service Account User`, `Compute Admin`, `Storage Admin`, `Secret Manager Admin`,
 and `Logging Admin`.
-
-## 4. Create a service account key
 
 Once the service account is set up, [create a key](https://cloud.google.com/iam/docs/keys-create-delete) for it and
 download the corresponding JSON file.
 
 ## 5. Create a project
 
-Now that you have a service account key, log in to the Hub, open the `Projects` page, click `Add`, and select `GCP` in
+Now that you have GCP credentials set up, log in to the Hub, open the `Projects` page, click `Add`, and select `GCP` in
 the `Type` field.
 
 ![](../../../assets/images/dstack-hub-create-gcp-project.png){ width=800 }
@@ -52,16 +59,16 @@ the `Type` field.
 
 The following fields are required:
 
-- `Service account` - (Required) The JSON file of the [Service account key](#4-create-a-service-account-key) to authenticate `dstack` 
-- `Location` - (Required) The location where `dstack` will create provision infrastructure and store state and artifacts
-- `Region` - (Required) The region where `dstack` will create provision infrastructure and store state and artifacts
-- `Zone` - (Required) The zone where `dstack` will create provision infrastructure and store state and artifacts
-- `Bucket` - (Required) The [Storage bucket](#2-create-a-storage-bucket) to store state and artifacts (must be in the same region)
+- `Location` - (Required) The location where `dstack` will provision infrastructure and store state and artifacts
+- `Region` - (Required) The region where `dstack` will provision infrastructure and store state and artifacts
+- `Zone` - (Required) The zone where `dstack` will provision infrastructure and store state and artifacts
+- `Bucket` - (Required) The [storage bucket](#2-create-a-storage-bucket) to store state and artifacts (must be in the same region)
 
 The following arguments are optional:
 
-- `Subnet` - (Optional) The EC2 subnet is required to provision infrastructure using a non-default VPC and subnet. If
-  not specified, dstack will use the default VPC and subnet.
+- `Service account` - (Optional) The JSON file of the [service account key](#4-create-a-service-account-key) to authenticate `dstack` 
+- `Subnet` - (Optional) The VPC subnet where `dstack` will provision infrastructure. If
+  not specified, `dstack` will use the default VPC and subnet.
 
 ## 6. Configure the CLI
 

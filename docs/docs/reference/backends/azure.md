@@ -17,9 +17,18 @@ Next, create an Azure storage account in the newly created resource group. `dsta
     Make sure that the storage account is created in the same region where you plan to provision
     infrastructure.
 
-## 3. Create an Azure Active Directory app 
+## 3. Set up Azure credentials
 
-`dstack` needs an Azure Active Directory app credentials to authenticate with your Azure account. If the app is `Owner` of the subscription, `dstack` will automatically set up all the resources required to run workflows. It will also create a separate managed identity with fine-grained permissions to authenticate with your Azure account when running workflows. 
+`dstack` support two methods to authenticate with Azure: Default credentials and Client secret.
+
+### Default credentials
+
+`dstack` can automatically pick up [Azure default credentials](https://learn.microsoft.com/en-us/dotnet/api/azure.identity.defaultazurecredential?view=azure-dotnet)
+set up on your machine. You can use default credentials if you don't want to enter and store Azure credentials in `dstack`.
+
+### Client secret
+
+`dstack` also supports an Azure Active Directory app credentials to authenticate with your Azure account. If the app is `Owner` of the subscription, `dstack` will automatically set up all the resources required to run workflows. It will also create a separate managed identity with fine-grained permissions to authenticate with your Azure account when running workflows. 
 
 To create new application credentials using the Azure CLI, run:
 
@@ -41,11 +50,14 @@ It may take up to a minute to set up Azure resource after saving the project set
 The following fields are required:
 
 - `Tenant ID` - (Required) The Azure Tenant ID
-- `Client ID` - (Required) The Client ID to authenticate `dstack`
-- `Client Secret` - (Required) The Client secret to authenticate `dstack`
 - `Subscription ID` - (Required) The Azure Subscription ID
-- `Location` - (Required) The region where `dstack` will create provision infrastructure and store state and artifacts
+- `Location` - (Required) The region where `dstack` will provision infrastructure and store state and artifacts
 - `Storage account` - (Required) The Storage account to store state and artifacts (must be in the same region)
+
+The following fields are optional:
+
+- `Client ID` - (Optional) The Client ID to authenticate `dstack`
+- `Client Secret` - (Optional) The Client secret to authenticate `dstack`
 
 ## 5. Configure the CLI
 

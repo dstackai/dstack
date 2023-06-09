@@ -54,17 +54,28 @@ class AWSProjectConfig(BaseModel):
     ec2_subnet_id: Optional[str]
 
 
-class AWSProjectCreds(BaseModel):
+class AWSProjectDefaultCreds(BaseModel):
+    type: Literal["default"] = "default"
+
+
+class AWSProjectAccessKeyCreds(BaseModel):
+    type: Literal["access_key"] = "access_key"
     access_key: str
     secret_key: str
 
 
-class AWSProjectConfigWithCredsPartial(AWSProjectConfigPartial, AWSProjectCreds):
-    pass
+class AWSProjectCreds(BaseModel):
+    __root__: Union[AWSProjectAccessKeyCreds, AWSProjectDefaultCreds] = Field(
+        ..., discriminator="type"
+    )
 
 
-class AWSProjectConfigWithCreds(AWSProjectConfig, AWSProjectCreds):
-    pass
+class AWSProjectConfigWithCredsPartial(AWSProjectConfigPartial):
+    credentials: Optional[AWSProjectCreds]
+
+
+class AWSProjectConfigWithCreds(AWSProjectConfig):
+    credentials: AWSProjectCreds
 
 
 class GCPProjectConfigPartial(BaseModel):
@@ -87,34 +98,56 @@ class GCPProjectConfig(BaseModel):
     subnet: str
 
 
+class GCPProjectDefaultCreds(BaseModel):
+    type: Literal["default"] = "default"
+
+
+class GCPProjectServiceAccountCreds(BaseModel):
+    type: Literal["service_account"] = "service_account"
+    filename: str
+    data: str
+
+
 class GCPProjectCreds(BaseModel):
-    credentials_filename: str
-    credentials: str
+    __root__: Union[GCPProjectServiceAccountCreds, GCPProjectDefaultCreds] = Field(
+        ..., discriminator="type"
+    )
 
 
-class GCPProjectConfigWithCredsPartial(GCPProjectConfigPartial, GCPProjectCreds):
-    pass
+class GCPProjectConfigWithCredsPartial(GCPProjectConfigPartial):
+    credentials: Optional[GCPProjectCreds]
 
 
-class GCPProjectConfigWithCreds(GCPProjectConfig, GCPProjectCreds):
-    pass
+class GCPProjectConfigWithCreds(GCPProjectConfig):
+    credentials: GCPProjectCreds
 
 
 class AzureProjectConfigPartial(BaseModel):
     type: Literal["azure"] = "azure"
-    tenant_id: str
+    tenant_id: Optional[str]
     subscription_id: Optional[str]
     location: Optional[str]
     storage_account: Optional[str]
 
 
-class AzureProjectCreds(BaseModel):
+class AzureProjectClientCreds(BaseModel):
+    type: Literal["client"] = "client"
     client_id: str
     client_secret: str
 
 
-class AzureProjectConfigWithCredsPartial(AzureProjectConfigPartial, AzureProjectCreds):
-    pass
+class AzureProjectDefaultCreds(BaseModel):
+    type: Literal["default"] = "default"
+
+
+class AzureProjectCreds(BaseModel):
+    __root__: Union[AzureProjectClientCreds, AzureProjectDefaultCreds] = Field(
+        ..., discriminator="type"
+    )
+
+
+class AzureProjectConfigWithCredsPartial(AzureProjectConfigPartial):
+    credentials: Optional[AzureProjectCreds]
 
 
 class AzureProjectConfig(BaseModel):
@@ -125,8 +158,8 @@ class AzureProjectConfig(BaseModel):
     storage_account: str
 
 
-class AzureProjectConfigWithCreds(AzureProjectConfig, AzureProjectCreds):
-    pass
+class AzureProjectConfigWithCreds(AzureProjectConfig):
+    credentials: AzureProjectCreds
 
 
 AnyProjectConfig = Union[
@@ -292,6 +325,7 @@ class AWSBucketProjectElement(BaseModel):
 
 class AWSProjectValues(BaseModel):
     type: Literal["aws"] = "aws"
+    default_credentials: bool = False
     region_name: Optional[ProjectElement]
     s3_bucket_name: Optional[AWSBucketProjectElement]
     ec2_subnet_id: Optional[ProjectElement]
@@ -310,6 +344,7 @@ class GCPVPCSubnetProjectElement(BaseModel):
 
 class GCPProjectValues(BaseModel):
     type: Literal["gcp"] = "gcp"
+    default_credentials: bool = False
     area: Optional[ProjectElement]
     region: Optional[ProjectElement]
     zone: Optional[ProjectElement]
@@ -319,6 +354,7 @@ class GCPProjectValues(BaseModel):
 
 class AzureProjectValues(BaseModel):
     type: Literal["azure"] = "azure"
+    default_credentials: bool = False
     tenant_id: Optional[ProjectElement]
     subscription_id: Optional[ProjectElement]
     location: Optional[ProjectElement]

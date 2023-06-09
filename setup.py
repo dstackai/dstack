@@ -116,6 +116,7 @@ setup(
             "google-cloud-compute>=1.5.0",
             "google-cloud-secret-manager>=2.0.0",
             "google-cloud-logging>=2.0.0",
+            "google-api-python-client>=2.80.0",
         ],
     },
     classifiers=[

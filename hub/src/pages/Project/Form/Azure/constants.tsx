@@ -2,8 +2,11 @@ import React from 'react';
 
 export const FIELD_NAMES = {
     TENANT_ID: 'tenant_id',
-    CLIENT_ID: 'client_id',
-    CLIENT_SECRET: 'client_secret',
+    CREDENTIALS: {
+        TYPE: 'credentials.type',
+        CLIENT_ID: 'credentials.client_id',
+        CLIENT_SECRET: 'credentials.client_secret',
+    },
     SUBSCRIPTION_ID: 'subscription_id',
     LOCATION: 'location',
     STORAGE_ACCOUNT: 'storage_account',

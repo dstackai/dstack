@@ -52,3 +52,23 @@ def is_valid_label_value(value: str) -> bool:
         return False
     m = re.match(r"^[a-z\d_-]+$", value)
     return m is not None
+
+
+def get_resource_name(resource_path: str) -> str:
+    return resource_path.rsplit(sep="/", maxsplit=1)[1]
+
+
+def get_subnet_region(subnet_resource: str) -> str:
+    return subnet_resource.rsplit(sep="/", maxsplit=3)[1]
+
+
+def get_subnet_name(subnet_resource: str) -> str:
+    return subnet_resource.rsplit(sep="/", maxsplit=1)[1]
+
+
+def get_service_account_email(project_id: str, name: str) -> str:
+    return f"{name}@{project_id}.iam.gserviceaccount.com"
+
+
+def get_service_account_resource(project_id: str, email: str) -> str:
+    return f"projects/{project_id}/serviceAccounts/{email}"

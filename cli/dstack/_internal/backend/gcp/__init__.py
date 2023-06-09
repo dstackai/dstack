@@ -15,6 +15,7 @@ from dstack._internal.backend.base import repos as base_repos
 from dstack._internal.backend.base import runs as base_runs
 from dstack._internal.backend.base import secrets as base_secrets
 from dstack._internal.backend.base import tags as base_tags
+from dstack._internal.backend.gcp.auth import authenticate
 from dstack._internal.backend.gcp.compute import GCPCompute
 from dstack._internal.backend.gcp.config import GCPConfig
 from dstack._internal.backend.gcp.logs import GCPLogging
@@ -49,9 +50,7 @@ class GCPBackend(Backend):
     ):
         super().__init__(backend_config=backend_config)
         if credentials is None:
-            credentials = service_account.Credentials.from_service_account_info(
-                self.backend_config.credentials
-            )
+            credentials = authenticate(backend_config)
         self._storage = GCPStorage(
             project_id=self.backend_config.project_id,
             bucket_name=self.backend_config.bucket_name,
