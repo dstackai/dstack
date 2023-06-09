@@ -5,8 +5,8 @@ import google.auth
 import googleapiclient.discovery
 from google.oauth2 import service_account
 
-from dstack.backend.gcp import utils as gcp_utils
-from dstack.backend.gcp.config import GCPConfig
+from dstack._internal.backend.gcp import utils as gcp_utils
+from dstack._internal.backend.gcp.config import GCPConfig
 
 
 def authenticate(backend_config: GCPConfig):
