@@ -132,9 +132,9 @@ class GCPConfigurator(Configurator):
                 storage_client = storage.Client(credentials=self.credentials)
                 storage_client.list_buckets(max_results=1)
             except Exception:
-                self._raise_invalid_credentials_error()
+                self._raise_invalid_credentials_error(fields=[["credentials", "data"]])
         elif not project_values.default_credentials:
-            self._raise_invalid_credentials_error()
+            self._raise_invalid_credentials_error(fields=[["credentials"]])
 
         project_values.area = self._get_hub_geographic_area(config_data.get("area"))
         location = self._get_location(project_values.area.selected)
@@ -218,9 +218,11 @@ class GCPConfigurator(Configurator):
             subnet=subnet,
         )
 
-    def _raise_invalid_credentials_error(self):
+    def _raise_invalid_credentials_error(self, fields: Optional[List[List[str]]] = None):
         raise BackendConfigError(
-            "Credentials are not valid", code="invalid_credentials", fields=["credentials"]
+            "Invalid credentials",
+            code="invalid_credentials",
+            fields=fields,
         )
 
     def _get_hub_geographic_area(self, default_area: Optional[str]) -> ProjectElement:
@@ -286,7 +288,7 @@ class GCPConfigurator(Configurator):
             raise BackendConfigError(
                 f"Invalid bucket {default_bucket} for region {region}",
                 code="invalid_bucket",
-                fields=["bucket_name"],
+                fields=[["bucket_name"]],
             )
         element = ProjectElement(selected=default_bucket)
         for bucket_name in bucket_names:

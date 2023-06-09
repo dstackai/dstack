@@ -1,5 +1,5 @@
 import json
-from typing import Dict, Optional, Tuple, Union
+from typing import Dict, List, Optional, Tuple, Union
 
 import botocore.exceptions
 from boto3.session import Session
@@ -65,9 +65,11 @@ class AWSConfigurator(Configurator):
                 aws_secret_access_key=credentials_data["secret_key"],
             )
             if not self._valid_credentials(session=session):
-                self._raise_invalid_credentials_error()
+                self._raise_invalid_credentials_error(
+                    fields=[["credentials", "access_key"], ["credentials", "secret_key"]]
+                )
         elif not project_values.default_credentials:
-            self._raise_invalid_credentials_error()
+            self._raise_invalid_credentials_error(fields=[["credentials"]])
 
         # TODO validate config values
         project_values.region_name = self._get_hub_regions(default_region=session.region_name)
@@ -123,11 +125,11 @@ class AWSConfigurator(Configurator):
             return False
         return True
 
-    def _raise_invalid_credentials_error(self):
+    def _raise_invalid_credentials_error(self, fields: Optional[List[List[str]]] = None):
         raise BackendConfigError(
             "Invalid credentials",
             code="invalid_credentials",
-            fields=["credentials"],
+            fields=fields,
         )
 
     def _get_hub_regions(self, default_region: Optional[str]) -> ProjectElement:
@@ -163,7 +165,7 @@ class AWSConfigurator(Configurator):
                 raise BackendConfigError(
                     "The bucket belongs to another AWS region",
                     code="invalid_bucket",
-                    fields=["s3_bucket_name"],
+                    fields=[["s3_bucket_name"]],
                 )
         except botocore.exceptions.ClientError as e:
             if (
@@ -174,7 +176,7 @@ class AWSConfigurator(Configurator):
                 raise BackendConfigError(
                     f"The bucket {bucket_name} does not exist",
                     code="invalid_bucket",
-                    fields=["s3_bucket_name"],
+                    fields=[["s3_bucket_name"]],
                 )
             raise e
 
