@@ -4,7 +4,7 @@ description: The latest update introduces Azure support, enables browsing of log
 slug: azure-support-better-ui-and-more
 ---
 
-# dstack 0.9.1: Azure, Better UI and More
+# dstack 0.9.1: Azure, better UI and more
 
 __The latest update introduces Azure support, and includes other improvements.__
 

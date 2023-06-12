@@ -1,4 +1,4 @@
-# Quick start
+# Getting started
 
 `dstack` makes it very easy for ML engineers to run cost-effectively dev environments and ML tasks
 on any cloud.
@@ -113,7 +113,6 @@ Starting SSH tunnel...
 
 To open in VS Code Desktop, use one of these links:
   vscode://vscode-remote/ssh-remote+fast-moth-1/workflow
-  vscode-insiders://vscode-remote/ssh-remote+fast-moth-1/workflow
 
 To exit, press Ctrl+C.
 ```

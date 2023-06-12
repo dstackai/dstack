@@ -138,8 +138,8 @@ extra:
 nav:
   - Home: index.md
   - Docs:
-      - Getting started:
-          - Quick start: docs/index.md
+      - Intro:
+          - Getting started: docs/index.md
           - Installation:
               - Docker: docs/deployment/docker.md
               - Hugging Face Spaces: docs/deployment/hf-spaces.md

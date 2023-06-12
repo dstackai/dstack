@@ -4,9 +4,13 @@
 }
 
 .tx-landing__hero_text h1 {
-    margin-bottom: 1rem;
-    font-weight: 700;
-    font-size: 2.3em;
+    margin-bottom: 1.7rem;
+    font-weight: 800;
+    font-size: 2.5em;
+    background: -webkit-linear-gradient(45deg, #ff00ff, #8500ff);
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    letter-spacing: -3px;
 }
 
 .tx-landing__hero_text h1 strong {
@@ -15,7 +19,7 @@
 
 @media screen and (max-width: 76.1875em) {
     .tx-landing h1 {
-        font-size: 1.4rem
+        font-size: 1.4rem;
     }
 
     .tx-landing__hero_text {
@@ -37,53 +41,147 @@
         display: flex;
         align-items: stretch;
         margin-bottom: -3rem;
-        font-size: 19px;
+        font-size: 18px;
         line-height: 1.5;
     }
 
     .tx-landing__hero_text {
-        max-width: 23rem;
-        margin-top: 3rem;
+        max-width: 27rem;
+        margin-top: 3.5rem;
     }
 
     .tx-landing__hero_image {
         order: 1;
         width: 26rem;
         margin-top: 0.5rem;
-        margin-left: 7rem;
+        margin-left: 3rem;
     }
 }
 
 .tx-landing__hero .md-button, .tx-landing__bottom_cta .md-button {
-    margin-top: 0.8rem;
+    margin-top: 1rem;
     padding: 0.55em 2em;
-    font-size: 19px;
+    font-size: 22px;
+    font-weight: 300 !important;
+    min-width: 200px;
+    text-align: center;
+    border-radius: 3px;
+    border-color: transparent;
+    margin-right: 15px;
+}
+
+.tx-landing__hero .md-button--primary, .tx-landing__bottom_cta .md-button--primary {
+    background: -webkit-linear-gradient(45deg, #002aff, #002aff, #e165fe);
+}
+
+.tx-landing__hero .md-button-secondary, .tx-landing__bottom_cta .md-button-secondary {
+    border-image: linear-gradient(45deg, #0048ff, #ce00ff) 10;
+    border-width: 1px;
+    border-style: solid;
+    background: -webkit-linear-gradient(45deg, #0048ff, #ce00ff);
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+}
+
+.tx-landing__hero .md-button-secondary:hover, .tx-landing__bottom_cta .md-button-secondary:hover {
+    background: inherit;
+    background: -webkit-linear-gradient(45deg, #0048ff, #ce00ff);
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
 }
 
 .tx-landing__highlights {
     margin-bottom: 5vw;
-    font-size: 19px;
+    font-size: 18px;
     line-height: 1.5;
 }
 
 .tx-landing__highlights_text h2 {
-    font-size: 1.7em;
+    font-size: 1.8em;
     max-width: 500px;
-    color: rgba(0,0,0,0.87);
-    margin-bottom: 2.5em;
+    margin-bottom: 2.75em;
+    background: -webkit-linear-gradient(45deg, #0048ff, #ce00ff);
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    letter-spacing: -1.5px;
+}
+
+.tx-landing__highlights_grid .feature-cell {
+    padding: 25px 40px 40px;
+    border-radius: 5px;
+    border-image: linear-gradient(45deg, #0048ff, #ce00ff) 10;
+    border-width: 0.75px;
+    border-style: solid;
+
+}
+
+.tx-landing__integrations {
+}
+
+.tx-landing__integrations_text h2 {
+    font-size: 1.8em;
+    max-width: 500px;
+    margin-bottom: 1.75em;
+    background: -webkit-linear-gradient(45deg, #0048ff, #ce00ff);
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    letter-spacing: -1.5px;
+}
+
+.tx-landing__integrations_logos {
+    display: inline-flex;
+    align-items: center;
+    flex-direction: row;
+    justify-content: space-around;
+    gap: 55px;
+    padding: 40px 68px 40px 60px;
+    border-radius: 5px;
+    border-image: linear-gradient(45deg, #0048ff, #ce00ff) 10;
+    border-width: 0.75px;
+    border-style: solid;
+}
+
+.tx-landing__integrations .logo-xlarge {
+    width: 67px;
+}
+
+.tx-landing__integrations .logo-large {
+    width: 63px;
+}
+
+.tx-landing__integrations .logo-medium {
+    width: 53px;
 }
 
 .tx-landing__highlights_grid {
-    grid-gap: 3rem;
+    grid-gap: 2rem;
     display: grid;
-    grid-template-columns: repeat(auto-fill,minmax(20rem,1fr));
+    grid-template-columns: repeat(auto-fill, minmax(15rem, 1fr));
+}
+
+.tx-landing__highlights_grid .feature-icon svg {
+    padding: 12px;
+    background: rgba(125, 4, 233, 0.02);
+    color: #002aff;
+    width: 50px;
+    height: 50px;
+    border-radius: 25px;
+    text-align: center;
+    display: inline-flex;
+    vertical-align: text-top;
+    fill: currentColor;
+    margin-bottom: 15px;
 }
 
 .tx-landing__highlights_grid h3 {
-    font-size: 1.3em;
+    font-size: 1.4em;
+    font-weight: 800;
     border-bottom: none;
     padding-bottom: 0.1em;
     margin-top: 0;
+    background: -webkit-linear-gradient(45deg, #6e14ed, #bf04e9, #bf04e9);
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
 }
 
 .tx-landing__features {
@@ -93,41 +191,51 @@
 .tx-landing__features_text h2 {
     font-size: 1.7em;
     max-width: 500px;
-    color: rgba(0,0,0,0.87);
+    color: rgba(0, 0, 0, 0.87);
     margin-bottom: 1.5em;
 }
 
 .tx-landing__features_grid {
     grid-gap: 1.2rem;
     display: grid;
-    grid-template-columns: repeat(auto-fill,minmax(15rem,1fr));
+    grid-template-columns: repeat(auto-fill, minmax(15rem, 1fr));
 }
 
 .tx-landing__bottom_cta {
+    margin-top: 9vw;
     margin-bottom: 5vw;
-    font-size: 19px;
+    font-size: 18px;
     line-height: 1.5;
 }
 
 .tx-landing__bottom_cta_text {
     font-size: 1em;
     max-width: 500px;
-    margin: 25px 0 35px;
 }
 
 .tx-landing__bottom_cta h2 {
-    font-size: 1.7em;
+    font-size: 1.8em;
     max-width: 500px;
-    color: rgba(0,0,0,0.87);
-    margin-bottom: 1em;
+    margin-bottom: 1.75em;
+    background: -webkit-linear-gradient(45deg, #ff00ff, #8500ff);
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    letter-spacing: -1.5px;
 }
 
-.tx-landing__bottom_cta_terminal {
-    font-family: var(--md-code-font-family);
-    font-weight: 600;
-    margin-bottom: 1em;
+.tx-landing__bottom_cta a[data-terminal-control] {
+    color: #e37cff;
 }
 
-.tx-landing__bottom_cta_terminal_row_prefix {
-    color: var(--md-accent-fg-color)
+.tx-landing__bottom_cta [data-ty="input"]:before, [data-ty-prompt]:before {
+    color: #e37cff;
+}
+
+.tx-landing__bottom_cta [data-termynal] {
+    font-size: 17px;
+}
+
+.tx-landing__bottom_cta .termy {
+    max-width: 800px;
+    margin-bottom: 2rem;
 }
