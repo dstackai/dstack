@@ -162,7 +162,7 @@ func (gbackend *GCPBackend) CheckStop(ctx context.Context) (bool, error) {
 }
 
 func (gbackend *GCPBackend) IsInterrupted(ctx context.Context) (bool, error) {
-	if !gbackend.state.Resources.Interruptible {
+	if !gbackend.state.Resources.Spot {
 		return false, nil
 	}
 	return gbackend.compute.IsInterruptedSpot(ctx, gbackend.state.RequestID)

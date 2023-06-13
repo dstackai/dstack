@@ -108,7 +108,7 @@ class GCPCompute(Compute):
             instance_name=_get_instance_name(job),
             user_data_script=_get_user_data_script(self.gcp_config, job, instance_type),
             service_account=self.credentials.service_account_email,
-            interruptible=instance_type.resources.interruptible,
+            spot=instance_type.resources.spot,
             accelerators=_get_accelerator_configs(
                 project_id=self.gcp_config.project_id,
                 zone=self.gcp_config.zone,
@@ -234,7 +234,7 @@ def _get_gpu_instance_type(
             cpus=requirements.cpus,
             memory_mib=requirements.memory_mib,
             shm_size_mib=requirements.shm_size_mib,
-            interruptible=requirements.interruptible,
+            spot=requirements.spot,
             local=requirements.local,
             gpus=None,
         ),
@@ -308,7 +308,7 @@ def _machine_type_to_instance_type(machine_type: compute_v1.MachineType) -> Inst
             cpus=machine_type.guest_cpus,
             memory_mib=machine_type.memory_mb,
             gpus=gpus,
-            interruptible=True,
+            spot=True,
             local=False,
         ),
     )
@@ -349,7 +349,7 @@ def _add_gpus_to_instance_type(
                     resources=Resources(
                         cpus=instance_type.resources.cpus,
                         memory_mib=instance_type.resources.memory_mib,
-                        interruptible=instance_type.resources.interruptible,
+                        spot=instance_type.resources.spot,
                         local=instance_type.resources.local,
                         gpus=[
                             Gpu(
@@ -494,7 +494,7 @@ def _launch_instance(
     instance_name: str,
     user_data_script: str,
     service_account: str,
-    interruptible: bool,
+    spot: bool,
     accelerators: List[compute_v1.AcceleratorConfig],
     labels: Dict[str, str],
     ssh_key_pub: str,
@@ -526,7 +526,7 @@ def _launch_instance(
         user_data_script=user_data_script,
         service_account=service_account,
         external_access=True,
-        spot=interruptible,
+        spot=spot,
         accelerators=accelerators,
         labels=labels,
         ssh_key_pub=ssh_key_pub,

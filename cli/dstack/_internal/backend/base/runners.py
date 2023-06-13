@@ -36,7 +36,7 @@ def delete_runner(storage: Storage, runner: Runner):
 
 def stop_runner(storage: Storage, compute: Compute, runner: Runner):
     if runner.request_id:
-        if runner.resources.interruptible:
+        if runner.resources.spot:
             compute.cancel_spot_request(runner.request_id)
         else:
             compute.terminate_instance(runner.request_id)
@@ -59,8 +59,8 @@ def serialize_runner_yaml(
         s += "  gpus:\\n"
         for gpu in resources.gpus:
             s += f"    - name: {gpu.name}\\n      memory_mib: {gpu.memory_mib}\\n"
-    if resources.interruptible:
-        s += "  interruptible: true\\n"
+    if resources.spot:
+        s += "  spot: true\\n"
     if resources.local:
         s += "  local: true\\n"
     return s[:-2]

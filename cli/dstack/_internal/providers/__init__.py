@@ -21,6 +21,7 @@ from dstack._internal.core.job import (
     JobStatus,
     PrebuildPolicy,
     Requirements,
+    SpotPolicy,
 )
 from dstack._internal.core.repo.base import Repo
 from dstack._internal.providers.ports import PortMapping, merge_ports
@@ -157,6 +158,11 @@ class Provider:
         parser.add_argument("-w", "--working-dir", metavar="PATH", type=str)
         group = parser.add_mutually_exclusive_group()
         group.add_argument("-i", "--interruptible", action="store_true")
+        group.add_argument("--spot", action="store_true")
+        group.add_argument("--on-demand", action="store_true")
+        group.add_argument("--spot-auto", action="store_true")
+        group.add_argument("--spot-policy", type=str)
+
         parser.add_argument("--cpu", metavar="NUM", type=int)
         parser.add_argument("--memory", metavar="SIZE", type=str)
         parser.add_argument("--gpu", metavar="NUM", type=int)
@@ -183,6 +189,14 @@ class Provider:
             env = self.provider_data.get("env") or []
             env.extend(args.env)
             self.provider_data["env"] = env
+        if args.spot_policy:
+            self.provider_data["spot_policy"] = args.spot_policy
+        if args.interruptible or args.spot:
+            self.provider_data["spot_policy"] = SpotPolicy.SPOT.value
+        if args.on_demand:
+            self.provider_data["spot_policy"] = SpotPolicy.ONDEMAND.value
+        if args.spot_auto:
+            self.provider_data["spot_policy"] = SpotPolicy.AUTO.value
 
         resources = self.provider_data.get("resources") or {}
         self.provider_data["resources"] = resources
@@ -207,8 +221,6 @@ class Provider:
                 gpu["name"] = args.gpu_name
         if args.shm_size:
             resources["shm_size"] = args.shm_size
-        if args.interruptible:
-            resources["interruptible"] = True
         self.provider_data["ports"] = merge_ports(
             [PortMapping(i) for i in self.provider_data.get("ports") or []], args.port or []
         )
@@ -254,6 +266,7 @@ class Provider:
                 artifact_specs=job_spec.artifact_specs,
                 cache_specs=self.cache_specs,
                 host_name=None,
+                spot_policy=self._spot_policy(),
                 requirements=job_spec.requirements,
                 dep_specs=self.dep_specs,
                 master_job=job_spec.master_job,
@@ -398,6 +411,10 @@ class Provider:
             return shlex.split(v)
         return v
 
+    def _spot_policy(self) -> SpotPolicy:
+        spot_policy = self.provider_data.get("spot_policy")
+        return SpotPolicy(spot_policy)
+
     def _resources(self) -> Requirements:
         resources = Requirements()
         cpu = self.provider_data["resources"].get("cpu", DEFAULT_CPU)
@@ -441,8 +458,6 @@ class Provider:
                     resources.gpus = GpusRequirements(count=gpu, name=resource_name[:-4])
         if self.provider_data["resources"].get("shm_size"):
             resources.shm_size_mib = _str_to_mib(self.provider_data["resources"]["shm_size"])
-        if self.provider_data["resources"].get("interruptible"):
-            resources.interruptible = self.provider_data["resources"]["interruptible"]
         return resources
 
     @staticmethod

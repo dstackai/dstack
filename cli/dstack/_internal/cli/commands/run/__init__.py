@@ -186,11 +186,11 @@ def _print_run_plan(configuration_file: str, run_plan: RunPlan):
     table.add_column("PROJECT", style="grey58", no_wrap=True, max_width=16)
     table.add_column("INSTANCE")
     table.add_column("RESOURCES")
-    table.add_column("SPOT")
+    table.add_column("SPOT POLICY")
     job_plan = run_plan.job_plans[0]
     instance = job_plan.instance_type.instance_name or "-"
     instance_info = _format_resources(job_plan.instance_type)
-    spot = "yes" if job_plan.instance_type.resources.interruptible else "no"
+    spot = job_plan.job.spot_policy.value
     table.add_row(
         configuration_file, run_plan.hub_user_name, run_plan.project, instance, instance_info, spot
     )

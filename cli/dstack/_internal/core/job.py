@@ -32,7 +32,7 @@ class Requirements(BaseModel):
     memory_mib: Optional[int] = None
     gpus: Optional[GpusRequirements] = None
     shm_size_mib: Optional[int] = None
-    interruptible: Optional[bool] = None
+    spot: Optional[bool] = None
     local: Optional[bool] = None
 
     def serialize(self) -> Dict[str, Any]:
@@ -49,8 +49,8 @@ class Requirements(BaseModel):
                 req_data["gpus"]["name"] = self.gpus.name
         if self.shm_size_mib:
             req_data["shm_size_mib"] = self.shm_size_mib
-        if self.interruptible:
-            req_data["interruptible"] = self.interruptible
+        if self.spot:
+            req_data["spot"] = self.spot
         if self.local:
             req_data["local"] = self.local
         return req_data
@@ -95,6 +95,12 @@ class JobStatus(str, Enum):
 
     def is_unfinished(self):
         return not self.is_finished()
+
+
+class SpotPolicy(str, Enum):
+    SPOT = "spot"
+    ONDEMAND = "on-demand"
+    AUTO = "auto"
 
 
 class JobErrorCode(str, Enum):
@@ -174,6 +180,7 @@ class Job(JobHead):
     cache_specs: List[CacheSpec]
     host_name: Optional[str]
     requirements: Optional[Requirements]
+    spot_policy: Optional[SpotPolicy]
     dep_specs: Optional[List[DepSpec]]
     master_job: Optional[JobRef]
     app_specs: Optional[List[AppSpec]]
@@ -250,6 +257,7 @@ class Job(JobHead):
             "artifacts": artifacts,
             "cache": [item.dict() for item in self.cache_specs],
             "host_name": self.host_name or "",
+            "spot_policy": self.spot_policy.value if self.spot_policy else None,
             "requirements": self.requirements.serialize() if self.requirements else {},
             "deps": deps,
             "master_job_id": self.master_job.get_id() if self.master_job else "",
@@ -299,28 +307,13 @@ class Job(JobHead):
                 if _requirements.get("gpus")
                 else None,
                 shm_size_mib=_requirements.get("shm_size_mib") or None,
-                interruptible=_requirements.get("interruptible") or None,
+                spot=_requirements.get("spot") or _requirements.get("interruptible"),
                 local=_requirements.get("local") or None,
             )
             if _requirements
-            else None
+            else Requirements()
         )
-        if requirements:
-            if (
-                not requirements.cpus
-                and (
-                    not requirements.gpus
-                    or (
-                        not requirements.gpus.count
-                        and not requirements.gpus.memory_mib
-                        and not requirements.gpus.name
-                    )
-                )
-                and not requirements.interruptible
-                and not requirements.local
-                and not not requirements.shm_size_mib
-            ):
-                requirements = None
+        spot_policy = job_data.get("spot_policy")
         dep_specs = []
         if job_data.get("deps"):
             for dep in job_data["deps"]:
@@ -397,6 +390,7 @@ class Job(JobHead):
             artifact_specs=artifact_specs,
             cache_specs=[CacheSpec(**item) for item in job_data.get("cache", [])],
             host_name=job_data.get("host_name") or None,
+            spot_policy=SpotPolicy(spot_policy) if spot_policy else None,
             requirements=requirements,
             dep_specs=dep_specs or None,
             master_job=master_job,

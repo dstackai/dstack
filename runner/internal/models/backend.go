@@ -6,12 +6,12 @@ import (
 )
 
 type Resource struct {
-	CPUs          int    `yaml:"cpus,omitempty"`
-	Memory        uint64 `yaml:"memory_mib,omitempty"`
-	GPUs          []GPU  `yaml:"gpus,omitempty"`
-	Interruptible bool   `yaml:"interruptible,omitempty"`
-	ShmSize       int64  `yaml:"shm_size_mib,omitempty"`
-	Local         bool   `json:"local"`
+	CPUs    int    `yaml:"cpus,omitempty"`
+	Memory  uint64 `yaml:"memory_mib,omitempty"`
+	GPUs    []GPU  `yaml:"gpus,omitempty"`
+	Spot    bool   `yaml:"spot,omitempty"`
+	ShmSize int64  `yaml:"shm_size_mib,omitempty"`
+	Local   bool   `json:"local"`
 }
 
 type Job struct {
@@ -87,12 +87,12 @@ type App struct {
 }
 
 type Requirements struct {
-	GPUs          GPU   `yaml:"gpus,omitempty"`
-	CPUs          int   `yaml:"cpus,omitempty"`
-	Memory        int   `yaml:"memory_mib,omitempty"`
-	Interruptible bool  `yaml:"interruptible,omitempty"`
-	ShmSize       int64 `yaml:"shm_size_mib,omitempty"`
-	Local         bool  `json:"local"`
+	GPUs    GPU   `yaml:"gpus,omitempty"`
+	CPUs    int   `yaml:"cpus,omitempty"`
+	Memory  int   `yaml:"memory_mib,omitempty"`
+	Spot    bool  `yaml:"spot,omitempty"`
+	ShmSize int64 `yaml:"shm_size_mib,omitempty"`
+	Local   bool  `json:"local"`
 }
 
 type GPU struct {

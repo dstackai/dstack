@@ -95,12 +95,7 @@ def parse_configuration_file(
         profile = profiles.get("default")
     if profile and "resources" in profile:
         provider_data["resources"] = profile["resources"]
-        provider_data["resources"]["interruptible"] = True
-        if "instance-type" in profile["resources"]:
-            if profile["resources"]["instance-type"] == "on-demand":
-                del provider_data["resources"]["interruptible"]
-                # TODO: It doesn't support instance-type properly
-            del provider_data["resources"]["instance-type"]
+    provider_data["spot_policy"] = profile.get("spot_policy")
     project_name = profile.get("project") if profile else None
     if not Path(os.getcwd()).samefile(Path(working_dir)):
         provider_data["working_dir"] = str(Path(working_dir))
