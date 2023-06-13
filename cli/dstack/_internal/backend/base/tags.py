@@ -157,6 +157,7 @@ def create_tag_from_local_dirs(
             raise DstackError(f"The '{local_path}' path doesn't refer to an existing directory")
 
     run_name = runs.create_run(storage)
+    created_at = get_milliseconds_since_epoch()
     job = Job(
         job_id=f"{run_name},,0",
         repo_ref=repo.repo_ref,
@@ -166,7 +167,8 @@ def create_tag_from_local_dirs(
         workflow_name=None,
         provider_name="bash",
         status=JobStatus.DONE,
-        submitted_at=get_milliseconds_since_epoch(),
+        created_at=created_at,
+        submitted_at=created_at,
         image_name="scratch",
         commands=None,
         env=None,

@@ -48,10 +48,14 @@ type Job struct {
 	Requirements      Requirements `yaml:"requirements"`
 	RunName           string       `yaml:"run_name"`
 	RunnerID          string       `yaml:"runner_id"`
+	SpotPolicy        string       `yaml:"spot_policy"`
+	RetryPolicy       RetryPolicy  `yaml:"retry_policy"`
 	Status            string       `yaml:"status"`
 	ErrorCode         string       `yaml:"error_code,omitempty"`
 	ContainerExitCode string       `yaml:"container_exit_code,omitempty"`
+	CreatedAt         uint64       `yaml:"created_at"`
 	SubmittedAt       uint64       `yaml:"submitted_at"`
+	SubmissionNum     int          `yaml:"submission_num"`
 	TagName           string       `yaml:"tag_name"`
 	InstanceType      string       `yaml:"instance_type"`
 	ConfigurationPath string       `yaml:"configuration_path"`
@@ -100,6 +104,11 @@ type GPU struct {
 	Count     int    `yaml:"count,omitempty"`
 	Name      string `yaml:"name,omitempty"`
 	MemoryMiB int    `yaml:"memory_mib,omitempty"`
+}
+
+type RetryPolicy struct {
+	Retry bool `yaml:"retry"`
+	Limit int  `yaml:"limit,omitempty"`
 }
 
 type State struct {

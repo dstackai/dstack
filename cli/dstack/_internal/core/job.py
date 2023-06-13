@@ -108,6 +108,11 @@ class SpotPolicy(str, Enum):
     AUTO = "auto"
 
 
+class RetryPolicy(BaseModel):
+    retry: bool
+    limit: Optional[int]
+
+
 class JobErrorCode(str, Enum):
     # Set by CLI
     NO_INSTANCE_MATCHING_REQUIREMENTS = "no_instance_matching_requirements"
@@ -175,6 +180,7 @@ class Job(JobHead):
     status: JobStatus
     error_code: Optional[JobErrorCode]
     container_exit_code: Optional[int]
+    created_at: int
     submitted_at: int
     submission_num: int = 1
     image_name: str
@@ -189,6 +195,7 @@ class Job(JobHead):
     host_name: Optional[str]
     requirements: Optional[Requirements]
     spot_policy: Optional[SpotPolicy]
+    retry_policy: Optional[RetryPolicy]
     dep_specs: Optional[List[DepSpec]]
     master_job: Optional[JobRef]
     app_specs: Optional[List[AppSpec]]
@@ -261,6 +268,7 @@ class Job(JobHead):
             "status": self.status.value,
             "error_code": self.error_code.value if self.error_code is not None else "",
             "container_exit_code": self.container_exit_code or "",
+            "created_at": self.created_at,
             "submitted_at": self.submitted_at,
             "submission_num": self.submission_num,
             "image_name": self.image_name,
@@ -274,6 +282,7 @@ class Job(JobHead):
             "cache": [item.dict() for item in self.cache_specs],
             "host_name": self.host_name or "",
             "spot_policy": self.spot_policy.value if self.spot_policy else None,
+            "retry_policy": self.retry_policy.dict() if self.retry_policy else None,
             "requirements": self.requirements.serialize() if self.requirements else {},
             "deps": deps,
             "master_job_id": self.master_job.get_id() if self.master_job else "",
@@ -330,6 +339,9 @@ class Job(JobHead):
             else Requirements()
         )
         spot_policy = job_data.get("spot_policy")
+        retry_policy = None
+        if job_data.get("retry_policy") is not None:
+            retry_policy = RetryPolicy.parse_obj(job_data.get("retry_policy"))
         dep_specs = []
         if job_data.get("deps"):
             for dep in job_data["deps"]:
@@ -398,6 +410,7 @@ class Job(JobHead):
             status=JobStatus(job_data["status"]),
             error_code=JobErrorCode(error_code) if error_code else None,
             container_exit_code=int(container_exit_code) if container_exit_code else None,
+            created_at=job_data.get("created_at") or job_data["submitted_at"],
             submitted_at=job_data["submitted_at"],
             submission_num=job_data.get("submission_num") or 1,
             image_name=job_data["image_name"],
@@ -411,6 +424,7 @@ class Job(JobHead):
             cache_specs=[CacheSpec(**item) for item in job_data.get("cache", [])],
             host_name=job_data.get("host_name") or None,
             spot_policy=SpotPolicy(spot_policy) if spot_policy else None,
+            retry_policy=retry_policy,
             requirements=requirements,
             dep_specs=dep_specs or None,
             master_job=master_job,

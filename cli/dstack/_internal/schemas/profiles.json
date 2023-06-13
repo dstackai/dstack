@@ -70,6 +70,21 @@
         "on-demand",
         "auto"
       ]
+    },
+    "retry_policy": {
+      "description": "The policy for re-submitting runs",
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "retry": {
+          "description": "Whether to retry runs on failure or not",
+          "type": "boolean"
+        },
+        "limit": {
+          "description": "The maximum period of re-submitting the run, e.g. 1d",
+          "type": "string"
+        }
+      }
     }
   },
   "properties": {
@@ -97,6 +112,9 @@
           },
           "spot_policy": {
             "$ref": "#/definitions/spot_policy"
+          },
+          "retry_policy": {
+            "$ref": "#/definitions/retry_policy"
           },
           "default": {
             "type": "boolean",

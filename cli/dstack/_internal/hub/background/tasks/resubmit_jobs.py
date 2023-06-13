@@ -40,7 +40,17 @@ def _resubmit_project_jobs(project: Project):
                     and curr_time - job_head.submitted_at > RESUBMISSION_INTERVAL * 1000
                 ):
                     job = backend.get_job(repo_id=repo_head.repo_id, job_id=job_head.job_id)
-                    backend.resubmit_job(
-                        job=job,
-                        failed_to_start_job_new_status=JobStatus.PENDING,
-                    )
+                    if (
+                        job.retry_policy is not None
+                        and job.retry_policy.retry
+                        and curr_time - job.created_at < job.retry_policy.limit
+                    ):
+                        backend.resubmit_job(
+                            job=job,
+                            failed_to_start_job_new_status=JobStatus.PENDING,
+                        )
+                    else:
+                        backend.resubmit_job(
+                            job=job,
+                            failed_to_start_job_new_status=JobStatus.FAILED,
+                        )

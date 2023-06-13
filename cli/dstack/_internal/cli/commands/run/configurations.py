@@ -96,6 +96,7 @@ def parse_configuration_file(
     if profile and "resources" in profile:
         provider_data["resources"] = profile["resources"]
     provider_data["spot_policy"] = profile.get("spot_policy")
+    provider_data["retry_policy"] = profile.get("retry_policy")
     project_name = profile.get("project") if profile else None
     if not Path(os.getcwd()).samefile(Path(working_dir)):
         provider_data["working_dir"] = str(Path(working_dir))

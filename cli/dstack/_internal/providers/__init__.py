@@ -22,15 +22,18 @@ from dstack._internal.core.job import (
     JobStatus,
     PrebuildPolicy,
     Requirements,
+    RetryPolicy,
     SpotPolicy,
 )
 from dstack._internal.core.repo.base import Repo
 from dstack._internal.providers.ports import PortMapping, merge_ports
-from dstack._internal.utils.common import get_milliseconds_since_epoch
+from dstack._internal.utils.common import get_milliseconds_since_epoch, parse_pretty_duration
 from dstack._internal.utils.interpolator import VariablesInterpolator
 
 DEFAULT_CPU = 2
 DEFAULT_MEM = "8GB"
+
+DEFAULT_RETRY_LIMIT = 3600
 
 
 class Provider:
@@ -158,12 +161,17 @@ class Provider:
         parser.add_argument("-a", "--artifact", metavar="PATH", dest="artifacts", action="append")
         parser.add_argument("--dep", metavar="(:TAG | WORKFLOW)", dest="deps", action="append")
         parser.add_argument("-w", "--working-dir", metavar="PATH", type=str)
-        group = parser.add_mutually_exclusive_group()
-        group.add_argument("-i", "--interruptible", action="store_true")
-        group.add_argument("--spot", action="store_true")
-        group.add_argument("--on-demand", action="store_true")
-        group.add_argument("--spot-auto", action="store_true")
-        group.add_argument("--spot-policy", type=str)
+        spot_group = parser.add_mutually_exclusive_group()
+        spot_group.add_argument("-i", "--interruptible", action="store_true")
+        spot_group.add_argument("--spot", action="store_true")
+        spot_group.add_argument("--on-demand", action="store_true")
+        spot_group.add_argument("--spot-auto", action="store_true")
+        spot_group.add_argument("--spot-policy", type=str)
+
+        retry_group = parser.add_mutually_exclusive_group()
+        retry_group.add_argument("--retry", action="store_true")
+        retry_group.add_argument("--no-retry", action="store_true")
+        retry_group.add_argument("--retry-limit", type=str)
 
         parser.add_argument("--cpu", metavar="NUM", type=int)
         parser.add_argument("--memory", metavar="SIZE", type=str)
@@ -191,6 +199,7 @@ class Provider:
             env = self.provider_data.get("env") or []
             env.extend(args.env)
             self.provider_data["env"] = env
+
         if args.spot_policy:
             self.provider_data["spot_policy"] = args.spot_policy
         if args.interruptible or args.spot:
@@ -199,6 +208,13 @@ class Provider:
             self.provider_data["spot_policy"] = SpotPolicy.ONDEMAND.value
         if args.spot_auto:
             self.provider_data["spot_policy"] = SpotPolicy.AUTO.value
+
+        if args.retry:
+            self.provider_data["retry_policy"] = {"retry": True}
+        if args.no_retry:
+            self.provider_data["retry_policy"] = {"retry": False}
+        if args.retry_limit:
+            self.provider_data["retry_policy"] = {"retry": True, "limit": args.retry_limit}
 
         resources = self.provider_data.get("resources") or {}
         self.provider_data["resources"] = resources
@@ -243,8 +259,8 @@ class Provider:
     ) -> List[Job]:
         if not self.loaded:
             raise Exception("The provider is not loaded")
+        created_at = get_milliseconds_since_epoch()
         job_specs = self.create_job_specs()
-
         jobs = []
         for i, job_spec in enumerate(job_specs):
             job = Job(
@@ -258,7 +274,8 @@ class Provider:
                 configuration_type=self.configuration_type,
                 configuration_path=configuration_path,
                 status=JobStatus.SUBMITTED,
-                submitted_at=get_milliseconds_since_epoch(),
+                created_at=created_at,
+                submitted_at=created_at,
                 image_name=job_spec.image_name,
                 registry_auth=job_spec.registry_auth,
                 commands=job_spec.commands,
@@ -270,6 +287,7 @@ class Provider:
                 cache_specs=self.cache_specs,
                 host_name=None,
                 spot_policy=self._spot_policy(),
+                retry_policy=self._retry_policy(),
                 requirements=job_spec.requirements,
                 dep_specs=self.dep_specs,
                 master_job=job_spec.master_job,
@@ -421,6 +439,25 @@ class Provider:
         if self.configuration_type is ConfigurationType.DEV_ENVIRONMENT:
             return SpotPolicy.ONDEMAND
         return SpotPolicy.AUTO
+
+    def _retry_policy(self) -> RetryPolicy:
+        retry_policy = self.provider_data.get("retry_policy")
+        if retry_policy is None:
+            return RetryPolicy(
+                retry=False,
+                limit=0,
+            )
+        if retry_policy.get("retry") is False:
+            return RetryPolicy(
+                retry=False,
+                limit=None,
+            )
+        if retry_policy.get("limit"):
+            return RetryPolicy(retry=True, limit=parse_pretty_duration(retry_policy.get("limit")))
+        return RetryPolicy(
+            retry=retry_policy.get("retry"),
+            limit=DEFAULT_RETRY_LIMIT,
+        )
 
     def _resources(self) -> Requirements:
         resources = Requirements()
