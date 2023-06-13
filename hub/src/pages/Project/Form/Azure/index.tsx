@@ -8,6 +8,7 @@ import { FormInput, FormSelect, FormSelectOptions, InfoLink, SpaceBetween, Spinn
 import { useHelpPanel, useNotifications } from 'hooks';
 import { isRequestFormErrors2, isRequestFormFieldError } from 'libs';
 import { useBackendValuesMutation } from 'services/project';
+import { AzureCredentialTypeEnum } from 'types';
 
 import { CREDENTIALS_HELP, FIELD_NAMES, LOCATION_HELP, STORAGE_ACCOUNT_HELP, SUBSCRIPTION_HELP } from './constants';
 
@@ -25,7 +26,7 @@ export const AzureBackend: React.FC<IProps> = ({ loading }) => {
     const [subscriptionIds, setSubscriptionIds] = useState<FormSelectOptions>([]);
     const [locations, setLocations] = useState<FormSelectOptions>([]);
     const [storageAccounts, setStorageAccounts] = useState<FormSelectOptions>([]);
-    const [availableDefaultCredentials, setAvailableDefaultCredentials] = useState(false);
+    const [availableDefaultCredentials, setAvailableDefaultCredentials] = useState<boolean | null>(null);
     const lastUpdatedField = useRef<string | null>(null);
 
     const [getBackendValues, { isLoading: isLoadingValues }] = useBackendValuesMutation();
@@ -48,7 +49,7 @@ export const AzureBackend: React.FC<IProps> = ({ loading }) => {
         const backendCredentials = backendFormValues?.credentials ?? {};
 
         if (
-            backendCredentials.type === 'client' &&
+            backendCredentials.type === AzureCredentialTypeEnum.CLIENT &&
             (!backendFormValues.tenant_id || !backendCredentials.client_id || !backendCredentials.client_secret)
         ) {
             return;
@@ -67,7 +68,12 @@ export const AzureBackend: React.FC<IProps> = ({ loading }) => {
 
             setAvailableDefaultCredentials(response.default_credentials);
 
-            if (response.tenant_id?.selected) {
+            // If default credentials unavailable, set selected client credential option
+            if (!backendCredentials.type && !response.default_credentials)
+                setValue(`backend.${FIELD_NAMES.CREDENTIALS.TYPE}`, AzureCredentialTypeEnum.CLIENT);
+
+            // TENANT_ID available for only client credentials type
+            if (response.tenant_id?.selected && backendCredentials.type === AzureCredentialTypeEnum.CLIENT) {
                 setValue(`backend.${FIELD_NAMES.TENANT_ID}`, response.tenant_id.selected);
             }
 
@@ -143,8 +149,8 @@ export const AzureBackend: React.FC<IProps> = ({ loading }) => {
         changeFormHandler().catch(console.log);
     };
 
-    const renderSpinner = () => {
-        if (isLoadingValues)
+    const renderSpinner = (force?: boolean) => {
+        if (isLoadingValues || force)
             return (
                 <div className={styles.fieldSpinner}>
                     <Spinner />
@@ -157,7 +163,8 @@ export const AzureBackend: React.FC<IProps> = ({ loading }) => {
 
         disabledField =
             disabledField ||
-            (credentialTypeValue === 'client' && (!tenantIdValue || !clientIdValue || !clientSecretValue || !valuesData));
+            (credentialTypeValue === AzureCredentialTypeEnum.CLIENT &&
+                (!tenantIdValue || !clientIdValue || !clientSecretValue || !valuesData));
 
         disabledField = disabledField || (lastUpdatedField.current !== fieldName && isLoadingValues);
 
@@ -183,33 +190,34 @@ export const AzureBackend: React.FC<IProps> = ({ loading }) => {
                 control={control}
                 name={`backend.${FIELD_NAMES.CREDENTIALS.TYPE}`}
                 onChange={onChangeCredentialsTypeField}
-                disabled={loading}
+                disabled={loading || availableDefaultCredentials === null}
+                secondaryControl={availableDefaultCredentials === null && renderSpinner(true)}
                 options={[
                     {
                         label: t('projects.edit.azure.authorization_default'),
-                        value: 'default',
+                        value: AzureCredentialTypeEnum.DEFAULT,
                         disabled: !availableDefaultCredentials,
                     },
                     {
                         label: t('projects.edit.azure.authorization_client'),
-                        value: 'client',
+                        value: AzureCredentialTypeEnum.CLIENT,
                     },
                 ]}
             />
 
-            <FormInput
-                info={<InfoLink onFollow={() => openHelpPanel(CREDENTIALS_HELP)} />}
-                label={t('projects.edit.azure.tenant_id')}
-                description={t('projects.edit.azure.tenant_id_description')}
-                control={control}
-                name={`backend.${FIELD_NAMES.TENANT_ID}`}
-                onChange={onChangeCredentialField}
-                disabled={loading}
-                rules={{ required: t('validation.required') }}
-            />
-
-            {credentialTypeValue === 'client' && (
+            {credentialTypeValue === AzureCredentialTypeEnum.CLIENT && (
                 <>
+                    <FormInput
+                        info={<InfoLink onFollow={() => openHelpPanel(CREDENTIALS_HELP)} />}
+                        label={t('projects.edit.azure.tenant_id')}
+                        description={t('projects.edit.azure.tenant_id_description')}
+                        control={control}
+                        name={`backend.${FIELD_NAMES.TENANT_ID}`}
+                        onChange={onChangeCredentialField}
+                        disabled={loading}
+                        rules={{ required: t('validation.required') }}
+                    />
+
                     <FormInput
                         info={<InfoLink onFollow={() => openHelpPanel(CREDENTIALS_HELP)} />}
                         label={t('projects.edit.azure.client_id')}

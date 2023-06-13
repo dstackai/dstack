@@ -8,6 +8,7 @@ import { FormInput, FormS3BucketSelector, FormSelect, FormSelectOptions, InfoLin
 import { useHelpPanel, useNotifications } from 'hooks';
 import { isRequestFormErrors2, isRequestFormFieldError } from 'libs';
 import { useBackendValuesMutation } from 'services/project';
+import { AWSCredentialTypeEnum } from 'types';
 
 import { BUCKET_HELP, CREDENTIALS_HELP, FIELD_NAMES, REGION_HELP, SUBNET_HELP } from './constants';
 
@@ -23,7 +24,7 @@ export const AWSBackend: React.FC<IProps> = ({ loading }) => {
     const [regions, setRegions] = useState<FormSelectOptions>([]);
     const [buckets, setBuckets] = useState<TAwsBucket[]>([]);
     const [subnets, setSubnets] = useState<FormSelectOptions>([]);
-    const [availableDefaultCredentials, setAvailableDefaultCredentials] = useState(false);
+    const [availableDefaultCredentials, setAvailableDefaultCredentials] = useState<null | boolean>(null);
     const lastUpdatedField = useRef<string | null>(null);
 
     const [getBackendValues, { isLoading: isLoadingValues }] = useBackendValuesMutation();
@@ -44,7 +45,7 @@ export const AWSBackend: React.FC<IProps> = ({ loading }) => {
         let backendFormValues = getValues('backend');
 
         if (
-            backendFormValues.credentials?.type === 'access_key' &&
+            backendFormValues.credentials?.type === AWSCredentialTypeEnum.ACCESS_KEY &&
             (!backendFormValues.credentials?.secret_key || !backendFormValues.credentials?.access_key)
         ) {
             return;
@@ -69,6 +70,11 @@ export const AWSBackend: React.FC<IProps> = ({ loading }) => {
             lastUpdatedField.current = null;
 
             setAvailableDefaultCredentials(response.default_credentials);
+
+            // If default credentials unavailable, set selected client credential option
+            if (!backendFormValues?.credentials?.type && !response.default_credentials) {
+                setValue(`backend.${FIELD_NAMES.CREDENTIALS.TYPE}`, AWSCredentialTypeEnum.ACCESS_KEY);
+            }
 
             if (response.region_name?.values) {
                 setRegions(response.region_name.values);
@@ -127,8 +133,8 @@ export const AWSBackend: React.FC<IProps> = ({ loading }) => {
         changeFormHandler().catch(console.log);
     };
 
-    const renderSpinner = () => {
-        if (isLoadingValues)
+    const renderSpinner = (force?: boolean) => {
+        if (isLoadingValues || force)
             return (
                 <div className={styles.fieldSpinner}>
                     <Spinner />
@@ -141,7 +147,8 @@ export const AWSBackend: React.FC<IProps> = ({ loading }) => {
 
         disabledField =
             disabledField ||
-            (backendCredentialTypeValue === 'access_key' && (!backendAccessKeyValue || !backendSecretKeyValue));
+            (backendCredentialTypeValue === AWSCredentialTypeEnum.ACCESS_KEY &&
+                (!backendAccessKeyValue || !backendSecretKeyValue));
 
         disabledField = disabledField || (lastUpdatedField.current !== fieldName && isLoadingValues);
 
@@ -154,22 +161,23 @@ export const AWSBackend: React.FC<IProps> = ({ loading }) => {
                 label={t('projects.edit.aws.authorization')}
                 control={control}
                 name={`backend.${FIELD_NAMES.CREDENTIALS.TYPE}`}
-                onChange={onChangeCredentialField}
-                disabled={loading}
+                onChange={getOnChangeSelectField(`backend.${FIELD_NAMES.CREDENTIALS.TYPE}`)}
+                disabled={loading || availableDefaultCredentials === null}
+                secondaryControl={availableDefaultCredentials === null && renderSpinner(true)}
                 options={[
                     {
                         label: t('projects.edit.aws.authorization_default'),
-                        value: 'default',
+                        value: AWSCredentialTypeEnum.DEFAULT,
                         disabled: !availableDefaultCredentials,
                     },
                     {
                         label: t('projects.edit.aws.authorization_access_key'),
-                        value: 'access_key',
+                        value: AWSCredentialTypeEnum.ACCESS_KEY,
                     },
                 ]}
             />
 
-            {backendCredentialTypeValue === 'access_key' && (
+            {backendCredentialTypeValue === AWSCredentialTypeEnum.ACCESS_KEY && (
                 <>
                     <FormInput
                         info={<InfoLink onFollow={() => openHelpPanel(CREDENTIALS_HELP)} />}
