@@ -14,6 +14,7 @@ from dstack._internal.core.cache import CacheSpec
 from dstack._internal.core.error import RepoNotInitializedError
 from dstack._internal.core.job import (
     ArtifactSpec,
+    ConfigurationType,
     DepSpec,
     GpusRequirements,
     Job,
@@ -116,6 +117,7 @@ class Provider:
         self.workflow_name = workflow_name
         self.provider_data = provider_data
         self.run_as_provider = not workflow_name
+        self.configuration_type = ConfigurationType(self.provider_data["configuration_type"])
         self.run_name = run_name
         self.ssh_key_pub = ssh_key_pub
         self.openssh_server = self.provider_data.get("ssh", self.openssh_server)
@@ -253,6 +255,7 @@ class Provider:
                 run_name=self.run_name,
                 workflow_name=self.workflow_name or None,
                 provider_name=self.provider_name,
+                configuration_type=self.configuration_type,
                 configuration_path=configuration_path,
                 status=JobStatus.SUBMITTED,
                 submitted_at=get_milliseconds_since_epoch(),
@@ -413,7 +416,11 @@ class Provider:
 
     def _spot_policy(self) -> SpotPolicy:
         spot_policy = self.provider_data.get("spot_policy")
-        return SpotPolicy(spot_policy)
+        if spot_policy is not None:
+            return SpotPolicy(spot_policy)
+        if self.configuration_type is ConfigurationType.DEV_ENVIRONMENT:
+            return SpotPolicy.ONDEMAND
+        return SpotPolicy.AUTO
 
     def _resources(self) -> Requirements:
         resources = Requirements()

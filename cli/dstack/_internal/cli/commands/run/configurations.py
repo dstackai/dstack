@@ -27,7 +27,7 @@ def _parse_dev_environment_configuration_data(
     configuration_data: Dict[str, Any]
 ) -> Tuple[str, Dict[str, Any]]:
     provider_name = "ssh"
-    provider_data = {}
+    provider_data = {"configuration_type": "dev-environment"}
     _init_base_provider_data(configuration_data, provider_data)
     provider_data["setup"] = []
     try:
@@ -54,7 +54,7 @@ def _parse_task_configuration_data(
 ) -> Tuple[str, Dict[str, Any]]:
     # TODO: Support the `docker` provider
     provider_name = "bash"
-    provider_data = {"commands": []}
+    provider_data = {"configuration_type": "task", "commands": []}
     if "setup" in configuration_data:
         provider_data["setup"] = configuration_data["setup"] or []
     provider_data["commands"].extend(configuration_data["commands"])

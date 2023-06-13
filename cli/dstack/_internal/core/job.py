@@ -76,6 +76,11 @@ class JobRefId(JobRef):
         self.job_id = job_id
 
 
+class ConfigurationType(str, Enum):
+    DEV_ENVIRONMENT = "dev-environment"
+    TASK = "task"
+
+
 class JobStatus(str, Enum):
     PENDING = "pending"
     SUBMITTED = "submitted"
@@ -131,6 +136,7 @@ class JobHead(JobRef):
     tag_name: Optional[str]
     app_names: Optional[List[str]]
     instance_type: Optional[str]
+    instance_spot_type: Optional[str]
 
     def get_id(self) -> Optional[str]:
         return self.job_id
@@ -164,6 +170,8 @@ class Job(JobHead):
     run_name: str
     workflow_name: Optional[str]
     provider_name: str
+    configuration_type: Optional[ConfigurationType]
+    configuration_path: Optional[str]
     status: JobStatus
     error_code: Optional[JobErrorCode]
     container_exit_code: Optional[int]
@@ -215,6 +223,11 @@ class Job(JobHead):
             raise KeyError(f"Unknown prebuild policy: {v}")
         return v
 
+    def get_instance_spot_type(self) -> str:
+        if self.requirements and self.requirements.spot:
+            return "spot"
+        return "on-demand"
+
     def serialize(self) -> dict:
         deps = []
         if self.dep_specs:
@@ -241,6 +254,9 @@ class Job(JobHead):
             "run_name": self.run_name,
             "workflow_name": self.workflow_name or "",
             "provider_name": self.provider_name,
+            "configuration_type": self.configuration_type.value
+            if self.configuration_type
+            else None,
             "configuration_path": self.configuration_path,
             "status": self.status.value,
             "error_code": self.error_code.value if self.error_code is not None else "",
@@ -350,6 +366,7 @@ class Job(JobHead):
         ) or None
         error_code = job_data.get("error_code")
         container_exit_code = job_data.get("container_exit_code")
+        configuration_type = job_data.get("configuration_type")
 
         if job_data["repo_type"] == "remote":
             repo_data = RemoteRepoData(
@@ -374,6 +391,9 @@ class Job(JobHead):
             run_name=job_data["run_name"],
             workflow_name=job_data.get("workflow_name") or None,
             provider_name=job_data["provider_name"],
+            configuration_type=ConfigurationType(configuration_type)
+            if configuration_type
+            else None,
             configuration_path=job_data.get("configuration_path"),
             status=JobStatus(job_data["status"]),
             error_code=JobErrorCode(error_code) if error_code else None,

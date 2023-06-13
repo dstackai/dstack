@@ -200,7 +200,7 @@ def _try_run_job(
     instance_type = compute.get_instance_type(job)
     if instance_type is None:
         if job.spot_policy == SpotPolicy.AUTO and attempt == 0:
-            _try_run_job(
+            return _try_run_job(
                 storage=storage,
                 compute=compute,
                 job=job,
@@ -222,7 +222,7 @@ def _try_run_job(
         runner.request_id = compute.run_instance(job, instance_type)
     except NoCapacityError:
         if job.spot_policy == SpotPolicy.AUTO and attempt == 0:
-            _try_run_job(
+            return _try_run_job(
                 storage=storage,
                 compute=compute,
                 job=job,
@@ -274,14 +274,15 @@ def _get_job_head_filename(job: Job) -> str:
         f"{','.join([a.app_name for a in (job.app_specs or [])])};"
         f"{job.tag_name or ''};"
         f"{job.instance_type or ''};"
-        f"{escape_head(job.configuration_path)}"
+        f"{escape_head(job.configuration_path)};"
+        f"{job.get_instance_spot_type()}"
     )
     return key
 
 
 def _parse_job_head_key(repo_id: str, full_key: str) -> JobHead:
     tokens = full_key[len(_get_jobs_dir(repo_id)) :].split(";")
-    tokens.extend([""] * (11 - len(tokens)))  # pad with empty tokens
+    tokens.extend([""] * (12 - len(tokens)))  # pad with empty tokens
     (
         _,
         job_id,
@@ -294,6 +295,7 @@ def _parse_job_head_key(repo_id: str, full_key: str) -> JobHead:
         tag_name,
         instance_type,
         configuration_path,
+        instance_spot_type,
     ) = tokens
     run_name, workflow_name, job_index = tuple(job_id.split(","))
     status, error_code, container_exit_code = _parse_job_status_info(status_info)
@@ -315,6 +317,7 @@ def _parse_job_head_key(repo_id: str, full_key: str) -> JobHead:
         app_names=app_names.split(",") or None,
         instance_type=instance_type or None,
         configuration_path=unescape_head(configuration_path),
+        instance_spot_type=instance_spot_type or None,
     )
 
 

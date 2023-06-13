@@ -93,6 +93,8 @@ def _compare_instance_types(i1, i2):
 def _matches_requirements(resources: Resources, requirements: Optional[Requirements]) -> bool:
     if not requirements:
         return True
+    if requirements.spot and not resources.spot:
+        return False
     if requirements.cpus and requirements.cpus > resources.cpus:
         return False
     if requirements.memory_mib and requirements.memory_mib > resources.memory_mib:
@@ -113,7 +115,5 @@ def _matches_requirements(resources: Resources, requirements: Optional[Requireme
                 )
             )
         ):
-            return False
-        if requirements.spot and not resources.spot:
             return False
     return True

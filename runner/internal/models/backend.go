@@ -55,6 +55,7 @@ type Job struct {
 	TagName           string       `yaml:"tag_name"`
 	InstanceType      string       `yaml:"instance_type"`
 	ConfigurationPath string       `yaml:"configuration_path"`
+	ConfigurationType string       `yaml:"configuration_type"`
 	WorkflowName      string       `yaml:"workflow_name"`
 	HomeDir           string       `yaml:"home_dir"`
 	WorkingDir        string       `yaml:"working_dir"`
