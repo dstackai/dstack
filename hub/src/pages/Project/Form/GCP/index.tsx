@@ -7,6 +7,7 @@ import { FileUploader, FormS3BucketSelector, FormSelect, FormSelectOptions, Info
 import { useHelpPanel, useNotifications } from 'hooks';
 import { isRequestFormErrors2, isRequestFormFieldError } from 'libs';
 import { useBackendValuesMutation } from 'services/project';
+import { GCPCredentialTypeEnum } from 'types';
 
 import { AREA_HELP, BUCKET_HELP, FIELD_NAMES, REGION_HELP, SERVICE_ACCOUNT_HELP, SUBNET_HELP, ZONE_HELP } from './constants';
 
@@ -43,7 +44,7 @@ export const GCPBackend: React.FC<IProps> = ({ loading }) => {
     const [zoneOptions, setZoneOptions] = useState<FormSelectOptions>([]);
     const [bucketNameOptions, setBucketNameOptions] = useState<TAwsBucket[]>([]);
     const [subnetOptions, setSubnetOptions] = useState<VPCSubnetOption[]>([]);
-    const [availableDefaultCredentials, setAvailableDefaultCredentials] = useState(false);
+    const [availableDefaultCredentials, setAvailableDefaultCredentials] = useState<boolean | null>(null);
     const requestRef = useRef<null | ReturnType<typeof getBackendValues>>(null);
     const [pushNotification] = useNotifications();
     const lastUpdatedField = useRef<string | null>(null);
@@ -68,7 +69,10 @@ export const GCPBackend: React.FC<IProps> = ({ loading }) => {
     const changeFormHandler = async () => {
         const backendFormValues = getValues('backend');
 
-        if (backendFormValues?.credentials?.type === 'service_account' && !backendFormValues?.credentials?.data) {
+        if (
+            backendFormValues?.credentials?.type === GCPCredentialTypeEnum.SERVICE_ACCOUNT &&
+            !backendFormValues?.credentials?.data
+        ) {
             return;
         }
 
@@ -86,6 +90,10 @@ export const GCPBackend: React.FC<IProps> = ({ loading }) => {
             lastUpdatedField.current = null;
 
             setAvailableDefaultCredentials(response.default_credentials);
+            // If default credentials unavailable, set selected client credential option
+            if (!backendFormValues?.credentials?.type && !response.default_credentials) {
+                setValue(`backend.${FIELD_NAMES.CREDENTIALS.TYPE}`, GCPCredentialTypeEnum.SERVICE_ACCOUNT);
+            }
 
             if (response.area?.values) {
                 setAreaOptions(response.area.values);
@@ -214,7 +222,8 @@ export const GCPBackend: React.FC<IProps> = ({ loading }) => {
     const getDisabledByFieldName = (fieldName: string) => {
         let disabledField = loading || !backendCredentialTypeValue || !valuesData;
 
-        disabledField = disabledField || (backendCredentialTypeValue === 'service_account' && !backendCredentials);
+        disabledField =
+            disabledField || (backendCredentialTypeValue === GCPCredentialTypeEnum.SERVICE_ACCOUNT && !backendCredentials);
 
         disabledField = disabledField || (lastUpdatedField.current !== fieldName && isLoadingValues);
 
@@ -236,8 +245,8 @@ export const GCPBackend: React.FC<IProps> = ({ loading }) => {
         return disabledField;
     };
 
-    const renderSpinner = () => {
-        if (isLoadingValues)
+    const renderSpinner = (force?: boolean) => {
+        if (isLoadingValues || force)
             return (
                 <div className={styles.fieldSpinner}>
                     <Spinner />
@@ -256,21 +265,22 @@ export const GCPBackend: React.FC<IProps> = ({ loading }) => {
                     // eslint-disable-next-line @typescript-eslint/ban-ts-comment
                     // @ts-ignore
                     errorText={errors?.backend?.credentials?.message}
-                    disabled={loading}
+                    disabled={loading || availableDefaultCredentials === null}
+                    secondaryControl={availableDefaultCredentials === null && renderSpinner(true)}
                     options={[
                         {
                             label: t('projects.edit.gcp.authorization_default'),
-                            value: 'default',
+                            value: GCPCredentialTypeEnum.DEFAULT,
                             disabled: !availableDefaultCredentials,
                         },
                         {
                             label: t('projects.edit.gcp.service_account'),
-                            value: 'service_account',
+                            value: GCPCredentialTypeEnum.SERVICE_ACCOUNT,
                         },
                     ]}
                 />
 
-                {backendCredentialTypeValue === 'service_account' && (
+                {backendCredentialTypeValue === GCPCredentialTypeEnum.SERVICE_ACCOUNT && (
                     <FileUploader
                         info={<InfoLink onFollow={() => openHelpPanel(SERVICE_ACCOUNT_HELP)} />}
                         fileInputId="gcp-credentials"

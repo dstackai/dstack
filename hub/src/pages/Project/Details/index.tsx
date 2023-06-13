@@ -2,7 +2,7 @@ import React, { useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Outlet, useLocation, useNavigate, useParams } from 'react-router-dom';
 
-import { Button, ConfirmationDialog, ContentLayout, DetailsHeader } from 'components';
+import { Button, ButtonProps, ConfirmationDialog, ContentLayout, DetailsHeader } from 'components';
 
 import { useAppSelector, useNotifications } from 'hooks';
 import { ROUTES } from 'routes';
@@ -10,7 +10,6 @@ import { useDeleteProjectsMutation, useGetProjectQuery } from 'services/project'
 
 import { selectUserData } from 'App/slice';
 
-import { ButtonProps } from '../../../components';
 import { getProjectRoleByUserName } from '../utils';
 
 export const ProjectDetails: React.FC = () => {
@@ -65,7 +64,7 @@ export const ProjectDetails: React.FC = () => {
                 header={
                     <DetailsHeader
                         title={paramProjectName}
-                        deleteAction={toggleDeleteConfirm}
+                        deleteAction={isSettingsPage ? toggleDeleteConfirm : undefined}
                         deleteDisabled={isDisabledButtons}
                         actionButtons={
                             !isSettingsPage ? (

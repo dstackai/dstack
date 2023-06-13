@@ -75,36 +75,50 @@ declare interface IProjectGCPBackendValues {
 
 declare type TProjectBackendValuesResponse = IProjectAwsBackendValues & IProjectAzureBackendValues & IProjectGCPBackendValues
 
+enum AWSCredentialTypeEnum {
+    DEFAULT = 'default',
+    ACCESS_KEY = 'access_key'
+}
 declare interface TProjectBackendAWS {
     credentials: {
-        type: 'access_key',
+        type: AWSCredentialTypeEnum.ACCESS_KEY,
         access_key: string,
         secret_key: string,
-    } | {type: 'default'},
+    } | {type: AWSCredentialTypeEnum.DEFAULT},
     region_name: string,
     s3_bucket_name: string,
     ec2_subnet_id: string | null,
+}
+
+enum AzureCredentialTypeEnum {
+    DEFAULT = 'default',
+    CLIENT = 'client'
 }
 
 declare interface TProjectBackendAzure {
     tenant_id: string,
 
     credentials: {
-        type: 'client',
+        type: AzureCredentialTypeEnum.CLIENT,
         client_id?: string,
         client_secret?: string,
-    } | {type: 'default'}
+    } | {type: AzureCredentialTypeEnum.DEFAULT}
     subscription_id: string,
     location: string,
     storage_account: string,
 }
 
+enum GCPCredentialTypeEnum {
+    DEFAULT = 'default',
+    SERVICE_ACCOUNT = 'service_account'
+}
+
 declare interface TProjectBackendGCP {
     credentials: {
-        type: 'service_account',
+        type: GCPCredentialTypeEnum.SERVICE_ACCOUNT,
         filename?: string,
         data?: string,
-    } | {type: 'default'},
+    } | {type: GCPCredentialTypeEnum.DEFAULT},
     credentials_filename?: string,
     area: string,
     region: string,
