@@ -35,8 +35,8 @@ setup(
     package_dir={"": "cli"},
     packages=find_packages("cli"),
     package_data={
-        "dstack.schemas": ["*.json"],
-        "dstack.hub": [
+        "dstack._internal.schemas": ["*.json"],
+        "dstack._internal.hub": [
             "statics/*",
             "statics/**/*",
             "statics/**/**/*",
@@ -45,7 +45,7 @@ setup(
     include_package_data=True,
     scripts=[],
     entry_points={
-        "console_scripts": ["dstack=dstack.cli.main:main"],
+        "console_scripts": ["dstack=dstack._internal.cli.main:main"],
     },
     url="https://dstack.ai",
     project_urls={
@@ -116,6 +116,7 @@ setup(
             "google-cloud-compute>=1.5.0",
             "google-cloud-secret-manager>=2.0.0",
             "google-cloud-logging>=2.0.0",
+            "google-api-python-client>=2.80.0",
         ],
     },
     classifiers=[

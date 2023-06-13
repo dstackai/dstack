@@ -1,4 +1,4 @@
-from dstack.utils.common import merge_workflow_data
+from dstack._internal.utils.common import merge_workflow_data
 
 
 def test_none_override():

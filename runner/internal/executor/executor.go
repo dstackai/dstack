@@ -6,13 +6,16 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
-	localbackend "github.com/dstackai/dstack/runner/internal/backend/local"
+	"github.com/dstackai/dstack/runner/internal/models"
+	"github.com/dustin/go-humanize"
 	"io"
 	"os"
 	"path"
 	"path/filepath"
 	"strconv"
 	"time"
+
+	localbackend "github.com/dstackai/dstack/runner/internal/backend/local"
 
 	"github.com/docker/docker/api/types"
 
@@ -120,7 +123,7 @@ func (ex *Executor) Run(ctx context.Context) error {
 	defer func() {
 		if r := recover(); r != nil {
 			log.Error(runCtx, "[PANIC]", "", r)
-			job := ex.backend.Job(runCtx)
+			job, _ := ex.backend.RefetchJob(runCtx)
 			job.Status = states.Failed
 			_ = ex.backend.UpdateState(runCtx)
 			time.Sleep(1 * time.Second)
@@ -141,26 +144,32 @@ func (ex *Executor) Run(ctx context.Context) error {
 				log.Info(runCtx, "Stopped")
 				ex.Stop()
 				log.Info(runCtx, "Waiting job end")
-				err = <-erCh
-				job := ex.backend.Job(runCtx)
+				errRun := <-erCh
+				job, err := ex.backend.RefetchJob(runCtx)
+				if err != nil {
+					return gerrors.Wrap(err)
+				}
 				job.Status = states.Stopped
 				_ = ex.backend.UpdateState(runCtx)
-				return err
+				return errRun
 			}
 		case <-ctx.Done():
 			log.Info(runCtx, "Stopped")
 			ex.Stop()
 			log.Info(runCtx, "Waiting job end")
-			err := <-erCh
-			job := ex.backend.Job(runCtx)
-			job.Status = states.Stopped
-			_ = ex.backend.UpdateState(runCtx)
+			errRun := <-erCh
+			job, err := ex.backend.RefetchJob(runCtx)
 			if err != nil {
 				return gerrors.Wrap(err)
 			}
-			return nil
+			job.Status = states.Stopped
+			_ = ex.backend.UpdateState(runCtx)
+			return errRun
 		case errRun := <-erCh:
-			job := ex.backend.Job(runCtx)
+			job, err := ex.backend.RefetchJob(runCtx)
+			if err != nil {
+				return gerrors.Wrap(err)
+			}
 			if errRun == nil {
 				job.Status = states.Done
 			} else {
@@ -235,16 +244,16 @@ func (ex *Executor) runJob(ctx context.Context, erCh chan error, stoppedCh chan 
 		log.Error(jctx, "Unknown RepoType", "RepoType", job.RepoType)
 	}
 
-	log.Trace(jctx, "Dependency processing")
-	if err = ex.processCache(jctx); err != nil {
-		erCh <- gerrors.Wrap(err)
-		return
-	}
-	if err = ex.processDeps(jctx); err != nil {
-		erCh <- gerrors.Wrap(err)
-		return
-	}
-	{
+	if job.Prebuild != models.PREBUILD_ONLY {
+		log.Trace(jctx, "Dependency processing")
+		if err = ex.processCache(jctx); err != nil {
+			erCh <- gerrors.Wrap(err)
+			return
+		}
+		if err = ex.processDeps(jctx); err != nil {
+			erCh <- gerrors.Wrap(err)
+			return
+		}
 		for _, artifact := range ex.artifactsFUSE {
 			err = artifact.BeforeRun(jctx)
 			if err != nil {
@@ -275,47 +284,88 @@ func (ex *Executor) runJob(ctx context.Context, erCh chan error, stoppedCh chan 
 				}
 			}
 		}
-		log.Trace(jctx, "Running job")
-		job.Status = states.Running
+	}
 
+	credPath := path.Join(ex.backend.GetTMPDir(ctx), consts.RUNS_DIR, job.RunName, "credentials")
+	spec, err := ex.newSpec(ctx, credPath)
+	if err != nil {
+		erCh <- gerrors.Wrap(err)
+		return
+	}
+	defer func() { // cleanup credentials
+		_ = os.Remove(credPath)
+	}()
+
+	logger := ex.backend.CreateLogger(ctx, fmt.Sprintf("/dstack/jobs/%s/%s", ex.backend.Bucket(ctx), job.RepoId), job.RunName)
+	logGroup := fmt.Sprintf("/jobs/%s", job.RepoId)
+	fileLog, err := createLocalLog(filepath.Join(ex.configDir, "logs", logGroup), job.RunName)
+	if err != nil {
+		erCh <- gerrors.Wrap(err)
+		return
+	}
+	defer func() { _ = fileLog.Close() }()
+	allLogs := io.MultiWriter(logger, ex.streamLogs, fileLog)
+
+	log.Trace(ctx, "Prebuilding container", "mode", job.Prebuild)
+	if job.Prebuild == models.NO_PREBUILD || len(job.Setup) == 0 {
+		mergeSetup(spec, job.Setup, job.Commands)
+	} else {
+		job.Status = states.Prebuilding
 		if err = ex.backend.UpdateState(jctx); err != nil {
 			erCh <- gerrors.Wrap(err)
 			return
 		}
-
-		if err = ex.processJob(ctx, stoppedCh); err != nil {
+		if err = ex.prebuild(ctx, spec, allLogs); err != nil {
 			erCh <- gerrors.Wrap(err)
 			return
 		}
-		if len(ex.artifactsOut) > 0 || len(ex.cacheArtifacts) > 0 {
-			log.Trace(jctx, "Start uploading artifacts")
-			job.Status = states.Uploading
-			err = ex.backend.UpdateState(jctx)
-			if err != nil {
-				erCh <- gerrors.Wrap(err)
-				return
-			}
-			for _, artifact := range ex.artifactsOut {
-				err = artifact.AfterRun(jctx)
-				if err != nil {
-					erCh <- gerrors.Wrap(err)
-					return
-				}
-			}
-			for _, artifact := range ex.cacheArtifacts {
-				err = artifact.AfterRun(jctx)
-				if err != nil {
-					erCh <- gerrors.Wrap(err)
-					return
-				}
-			}
+	}
+
+	if job.Prebuild == models.PREBUILD_ONLY {
+		log.Trace(ctx, "Prebuild only, do not run the job")
+		ex.streamLogs.Close()
+		erCh <- nil
+		return
+	}
+	log.Trace(jctx, "Running job")
+	job.Status = states.Running
+	if err = ex.backend.UpdateState(jctx); err != nil {
+		erCh <- gerrors.Wrap(err)
+		return
+	}
+	if err = ex.processJob(ctx, spec, stoppedCh, allLogs); err != nil {
+		erCh <- gerrors.Wrap(err)
+		return
+	}
+
+	if len(ex.artifactsOut) > 0 || len(ex.cacheArtifacts) > 0 {
+		log.Trace(jctx, "Start uploading artifacts")
+		job.Status = states.Uploading
+		err = ex.backend.UpdateState(jctx)
+		if err != nil {
+			erCh <- gerrors.Wrap(err)
+			return
 		}
-		for _, artifact := range ex.artifactsFUSE {
+		for _, artifact := range ex.artifactsOut {
 			err = artifact.AfterRun(jctx)
 			if err != nil {
 				erCh <- gerrors.Wrap(err)
 				return
 			}
+		}
+		for _, artifact := range ex.cacheArtifacts {
+			err = artifact.AfterRun(jctx)
+			if err != nil {
+				erCh <- gerrors.Wrap(err)
+				return
+			}
+		}
+	}
+	for _, artifact := range ex.artifactsFUSE {
+		err = artifact.AfterRun(jctx)
+		if err != nil {
+			erCh <- gerrors.Wrap(err)
+			return
 		}
 	}
 	erCh <- nil
@@ -428,33 +478,33 @@ func (ex *Executor) processCache(ctx context.Context) error {
 	return nil
 }
 
-func (ex *Executor) environment(ctx context.Context) []string {
+func (ex *Executor) environment(ctx context.Context, includeRun bool) []string {
 	log.Trace(ctx, "Start generate env")
 	job := ex.backend.Job(ctx)
 	env := environment.New()
 
-	cons := make(map[string]string)
-	cons["PYTHONUNBUFFERED"] = "1"
-	if job.JobID != "" {
+	if includeRun {
+		cons := make(map[string]string)
+		cons["PYTHONUNBUFFERED"] = "1"
+		cons["DSTACK_REPO"] = job.RepoId
 		cons["JOB_ID"] = job.JobID
-	}
-	if job.RunName != "" {
+
 		cons["RUN_NAME"] = job.RunName
-	}
-	if ex.config.Hostname != nil {
-		cons["JOB_HOSTNAME"] = *ex.config.Hostname
-		cons["HOSTNAME"] = *ex.config.Hostname
-	}
 
-	if job.MasterJobID != "" {
-		master := ex.backend.MasterJob(ctx)
-		cons["MASTER_ID"] = master.JobID
-		cons["MASTER_HOSTNAME"] = master.HostName
-		cons["MASTER_JOB_ID"] = master.JobID
-		cons["MASTER_JOB_HOSTNAME"] = master.HostName
+		if ex.config.Hostname != nil {
+			cons["JOB_HOSTNAME"] = *ex.config.Hostname
+			cons["HOSTNAME"] = *ex.config.Hostname
+		}
+		if job.MasterJobID != "" {
+			master := ex.backend.MasterJob(ctx)
+			cons["MASTER_ID"] = master.JobID
+			cons["MASTER_HOSTNAME"] = master.HostName
+			cons["MASTER_JOB_ID"] = master.JobID
+			cons["MASTER_JOB_HOSTNAME"] = master.HostName
+		}
+		env.AddMapString(job.RunEnvironment)
+		env.AddMapString(cons)
 	}
-
-	env.AddMapString(cons)
 	env.AddMapString(job.Environment)
 	secrets, err := ex.backend.Secrets(ctx)
 	if err != nil {
@@ -464,36 +514,43 @@ func (ex *Executor) environment(ctx context.Context) []string {
 
 	log.Trace(ctx, "Stop generate env", "slice", env.ToSlice())
 	return env.ToSlice()
-
 }
 
-func (ex *Executor) processJob(ctx context.Context, stoppedCh chan struct{}) error {
+func (ex *Executor) newSpec(ctx context.Context, credPath string) (*container.Spec, error) {
 	job := ex.backend.Job(ctx)
 	resource := ex.backend.Requirements(ctx)
+
 	bindings := make([]mount.Mount, 0)
 	bindings = append(bindings, mount.Mount{
 		Type:   mount.TypeBind,
 		Source: path.Join(ex.backend.GetTMPDir(ctx), consts.RUNS_DIR, job.RunName, job.JobID),
 		Target: "/workflow",
 	})
+	bindings = append(bindings, mount.Mount{
+		Type:   mount.TypeBind,
+		Source: filepath.Join(ex.configDir, consts.CONFIG_FILE_NAME),
+		Target: filepath.Join(job.HomeDir, ".dstack", consts.CONFIG_FILE_NAME),
+	})
+	bindings = append(bindings, ex.backend.GetDockerBindings(ctx)...)
+
 	for _, artifact := range ex.artifactsIn {
 		art, err := artifact.DockerBindings(path.Join("/workflow", job.WorkingDir))
 		if err != nil {
-			return gerrors.Wrap(err)
+			return nil, gerrors.Wrap(err)
 		}
 		bindings = append(bindings, art...)
 	}
 	for _, artifact := range ex.artifactsOut {
 		art, err := artifact.DockerBindings(path.Join("/workflow", job.WorkingDir))
 		if err != nil {
-			return gerrors.Wrap(err)
+			return nil, gerrors.Wrap(err)
 		}
 		bindings = append(bindings, art...)
 	}
 	for _, artifact := range ex.cacheArtifacts {
 		art, err := artifact.DockerBindings(path.Join("/workflow", job.WorkingDir))
 		if err != nil {
-			return gerrors.Wrap(err)
+			return nil, gerrors.Wrap(err)
 		}
 		bindings = append(bindings, art...)
 	}
@@ -501,7 +558,6 @@ func (ex *Executor) processJob(ctx context.Context, stoppedCh chan struct{}) err
 		cred := ex.backend.GitCredentials(ctx)
 		if cred != nil {
 			log.Trace(ctx, "Trying to mount git credentials")
-			credPath := path.Join(ex.backend.GetTMPDir(ctx), consts.RUNS_DIR, job.RunName, "credentials")
 			credMountPath := ""
 			switch cred.Protocol {
 			case "ssh":
@@ -522,7 +578,6 @@ func (ex *Executor) processJob(ctx context.Context, stoppedCh chan struct{}) err
 			default:
 			}
 			if credMountPath != "" {
-				defer os.Remove(credPath)
 				log.Trace(ctx, "Mounting git credentials", "target", credMountPath)
 				bindings = append(bindings, mount.Mount{
 					Type:   mount.TypeBind,
@@ -532,7 +587,7 @@ func (ex *Executor) processJob(ctx context.Context, stoppedCh chan struct{}) err
 			}
 		}
 	}
-	logger := ex.backend.CreateLogger(ctx, fmt.Sprintf("/dstack/jobs/%s/%s", ex.backend.Bucket(ctx), job.RepoId), job.RunName)
+
 	secrets, err := ex.backend.Secrets(ctx)
 	if err != nil {
 		log.Error(ctx, "Fail fetching secrets", "err", err)
@@ -553,10 +608,10 @@ func (ex *Executor) processJob(ctx context.Context, stoppedCh chan struct{}) err
 	if err != nil {
 		// todo custom exit status
 		log.Error(ctx, "Failed binding ports", "err", err)
-		return gerrors.Wrap(err)
+		return nil, gerrors.Wrap(err)
 	}
 	if err = ex.backend.UpdateState(ctx); err != nil {
-		return gerrors.Wrap(err)
+		return nil, gerrors.Wrap(err)
 	}
 
 	spec := &container.Spec{
@@ -565,22 +620,18 @@ func (ex *Executor) processJob(ctx context.Context, stoppedCh chan struct{}) err
 		WorkDir:            path.Join("/workflow", job.WorkingDir),
 		Commands:           container.ShellCommands(job.Commands),
 		Entrypoint:         job.Entrypoint,
-		Env:                ex.environment(ctx),
+		Env:                ex.environment(ctx, true),
 		Mounts:             uniqueMount(bindings),
 		ExposedPorts:       ports.GetAppsExposedPorts(ctx, job.Apps, isLocalBackend),
 		BindingPorts:       appsBindingPorts,
 		ShmSize:            resource.ShmSize,
 		AllowHostMode:      !isLocalBackend,
 	}
-	logGroup := fmt.Sprintf("/jobs/%s", job.RepoId)
-	fileLog, err := createLocalLog(filepath.Join(ex.configDir, "logs", logGroup), job.RunName)
-	if err != nil {
-		return gerrors.Wrap(err)
-	}
-	defer fileLog.Close()
+	return spec, nil
+}
 
-	ml := io.MultiWriter(logger, ex.streamLogs, fileLog)
-	docker, err := ex.engine.Create(ctx, spec, ml)
+func (ex *Executor) processJob(ctx context.Context, spec *container.Spec, stoppedCh chan struct{}, logs io.Writer) error {
+	docker, err := ex.engine.Create(ctx, spec, logs)
 	if err != nil {
 		return gerrors.Wrap(err)
 	}
@@ -627,6 +678,85 @@ func (ex *Executor) Shutdown(ctx context.Context) {
 		log.Error(ctx, "Shutdown", "err", err)
 		return
 	}
+}
+
+func (ex *Executor) prebuild(ctx context.Context, spec *container.Spec, logs io.Writer) error {
+	job := ex.backend.Job(ctx)
+
+	prebuildSpec := &container.PrebuildSpec{
+		BaseImageName:      spec.Image,
+		WorkDir:            spec.WorkDir,
+		Commands:           container.ShellCommands(job.Setup),
+		Entrypoint:         spec.Entrypoint,
+		Env:                ex.environment(ctx, false),
+		RegistryAuthBase64: spec.RegistryAuthBase64,
+		RepoPath:           path.Join(ex.backend.GetTMPDir(ctx), consts.RUNS_DIR, job.RunName, job.JobID),
+	}
+	prebuildName, err := ex.engine.GetPrebuildName(ctx, prebuildSpec)
+	if err != nil {
+		return gerrors.Wrap(err)
+	}
+
+	tempDir, err := os.MkdirTemp("", "prebuild")
+	if err != nil {
+		return gerrors.Wrap(err)
+	}
+	defer func() { _ = os.RemoveAll(tempDir) }()
+	diffPath := filepath.Join(tempDir, "layer.tar")
+	key := fmt.Sprintf("prebuilds/%s/%s.tar", job.RepoId, prebuildName)
+	imageName := fmt.Sprintf("dstackai/prebuild:%s", prebuildName)
+
+	if job.Prebuild == models.USE_PREBUILD {
+		log.Trace(ctx, "Trying to fetch prebuild layer", "key", key, "image", imageName)
+		if _, err = fmt.Fprintf(ex.streamLogs, "[PREBUILD] Looking for the image\n"); err != nil {
+			return gerrors.Wrap(err)
+		}
+		if err = ex.backend.GetPrebuildDiff(ctx, key, diffPath); err != nil {
+			return gerrors.Wrap(err)
+		}
+		if stat, err := os.Stat(diffPath); err == nil {
+			if _, err = fmt.Fprintf(ex.streamLogs, "[PREBUILD] Loading image: %s\n", humanize.Bytes(uint64(stat.Size()))); err != nil {
+				return gerrors.Wrap(err)
+			}
+			if err = ex.engine.UsePrebuild(ctx, prebuildSpec, diffPath); err != nil {
+				return gerrors.Wrap(err)
+			}
+			if _, err = fmt.Fprintf(ex.streamLogs, "[PREBUILD] Image loaded\n"); err != nil {
+				return gerrors.Wrap(err)
+			}
+			spec.Image = imageName
+		} else {
+			if _, err = fmt.Fprintf(ex.streamLogs, "[PREBUILD] No image found\n"); err != nil {
+				return gerrors.Wrap(err)
+			}
+			mergeSetup(spec, job.Setup, job.Commands)
+		}
+	} else if job.Prebuild == models.FORCE_PREBUILD || job.Prebuild == models.PREBUILD_ONLY {
+		err := ex.engine.Prebuild(ctx, prebuildSpec, imageName, diffPath, ex.streamLogs, logs)
+		if err != nil {
+			return gerrors.Wrap(err)
+		}
+		stat, err := os.Stat(diffPath)
+		if err != nil {
+			return gerrors.Wrap(err)
+		}
+		log.Trace(ctx, "Putting prebuild layer", "key", key, "image", imageName, "size", stat.Size())
+		if _, err = fmt.Fprintf(ex.streamLogs, "[PREBUILD] Uploading image: %s\n", humanize.Bytes(uint64(stat.Size()))); err != nil {
+			return gerrors.Wrap(err)
+		}
+		if err = ex.backend.PutPrebuildDiff(ctx, diffPath, key); err != nil {
+			return gerrors.Wrap(err)
+		}
+		spec.Image = imageName
+	}
+
+	return nil
+}
+
+func mergeSetup(spec *container.Spec, setup []string, commands []string) {
+	merged := append([]string(nil), setup...)
+	merged = append(merged, commands...)
+	spec.Commands = container.ShellCommands(merged)
 }
 
 func uniqueMount(m []mount.Mount) []mount.Mount {

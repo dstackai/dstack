@@ -1,4 +1,4 @@
-FROM dstackai/cuda:11.1-base-ubuntu20.04
+FROM dstackai/cuda:11.4-base-ubuntu20.04
 
 ARG PYTHON
 ENV PYTHON=$PYTHON

@@ -3,7 +3,7 @@ import json
 import pytest
 from fastapi.testclient import TestClient
 
-from dstack.hub.main import app
+from dstack._internal.hub.main import app
 from tests.hub.common import create_project, create_user
 
 client = TestClient(app)
@@ -97,8 +97,11 @@ class TestGetProjectConfigInfo:
             "project_name": project.name,
             "backend": {
                 "type": "aws",
-                "access_key": project_auth["access_key"],
-                "secret_key": project_auth["secret_key"],
+                "credentials": {
+                    "type": "access_key",
+                    "access_key": project_auth["access_key"],
+                    "secret_key": project_auth["secret_key"],
+                },
                 "region_name": project_config["region_name"],
                 "region_name_title": project_config["region_name"],
                 "s3_bucket_name": project_config["s3_bucket_name"],

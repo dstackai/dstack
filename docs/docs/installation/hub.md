@@ -19,7 +19,7 @@ $ docker run -p 3000:3000 \
   -v $(pwd)/hub:/root/.dstack/hub \
   dstackai/dstack
 
-The hub is available at http://0.0.0.0:3000?token=b934d226-e24a-4eab-a284-eb92b353b10f
+The server is available at http://0.0.0.0:3000?token=b934d226-e24a-4eab-a284-eb92b353b10f
 ```
 
 </div>

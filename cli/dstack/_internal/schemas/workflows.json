@@ -1,0 +1,629 @@
+{
+  "$schema": "http://json-schema.org/draft-04/schema",
+  "additionalProperties": false,
+  "definitions": {
+    "_commands": {
+      "anyOf": [
+        {
+          "type": "array",
+          "minItems": 1,
+          "items": {
+            "type": "string",
+            "minLength": 1
+          }
+        },
+        {
+          "type": "string",
+          "minLength": 1
+        }
+      ]
+    },
+    "commands": {
+      "description": "The bash commands to run",
+      "$ref": "#/definitions/_commands"
+    },
+    "setup": {
+      "description": "The bash commands to run before running workflow",
+      "$ref": "#/definitions/_commands"
+    },
+    "env": {
+      "description": "The list of environment variables",
+      "type": "array",
+      "items": {
+        "type": "string",
+        "minLength": 1
+      },
+      "minItems": 1
+    },
+    "artifacts": {
+      "description": "The list of output artifacts",
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "path"
+        ],
+        "properties": {
+          "path": {
+            "description": "The absolute or relative path to the folder that must be stored as an output artifact",
+            "type": "string",
+            "minLength": 1
+          },
+          "mount": {
+            "description": "Must be set to `true` if the artifact files must be saved in real-time",
+            "type": "boolean",
+            "enum": [
+              true
+            ]
+          }
+        }
+      }
+    },
+    "cache": {
+      "description": "The directories to be cached between workflow runs",
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "oneOf": [
+          {
+            "type": "string"
+          },
+          {
+            "type": "object",
+            "additionalProperties": false,
+            "properties": {
+              "path": {
+                "type": "string"
+              }
+            },
+            "required": [
+              "path"
+            ]
+          }
+        ]
+      }
+    },
+    "python": {
+      "description": "The major version of Python",
+      "anyOf": [
+        {
+          "type": "string",
+          "pattern": "^\\d+(\\.\\d+)?$"
+        },
+        {
+          "type": "number"
+        }
+      ]
+    },
+    "resources": {
+      "description": "The hardware resource requirements",
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "gpu": {
+          "description": "The GPU requirements",
+          "anyOf": [
+            {
+              "type": "integer",
+              "minimum": 1
+            },
+            {
+              "type": "object",
+              "additionalProperties": false,
+              "properties": {
+                "name": {
+                  "description": "The name of the GPU, e.g. K80 or V100",
+                  "type": "string",
+                  "minLength": 1
+                },
+                "count": {
+                  "description": "The minimum number of GPUs",
+                  "type": "integer",
+                  "minimum": 1
+                },
+                "memory": {
+                  "description": "The minimum amount of GPU memory, e.g. 512MB or 16GB",
+                  "type": "string",
+                  "pattern": "^\\d+[MG]B$"
+                }
+              }
+            }
+          ]
+        },
+        "memory": {
+          "description": "The minimum amount of RAM memory, e.g. 512MB or 16GB",
+          "type": "string",
+          "pattern": "^\\d+[MG]B$"
+        },
+        "shm_size": {
+          "description": "The minimum amount of shared memory, e.g. 512MB or 16GB",
+          "type": "string",
+          "pattern": "^\\d+[MG]B$"
+        },
+        "cpu": {
+          "description": "The minimum number of virtual CPU cores",
+          "type": "integer",
+          "minimum": 1
+        },
+        "local": {
+          "description": "Must be set to `true` if the workflow must run locally",
+          "type": "boolean",
+          "enum": [
+            true
+          ]
+        },
+        "interruptible": {
+          "description": "Must be set to `true` if the workflow must use interruptible instances",
+          "type": "boolean",
+          "enum": [
+            true
+          ]
+        }
+      }
+    },
+    "ports": {
+      "description": "Port numbers to expose",
+      "type": "array",
+      "items": {
+        "oneOf": [
+          {
+            "type": "string"
+          },
+          {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 65536
+          }
+        ]
+      }
+    },
+    "home_dir": {
+      "description": "The absolute path to the home directory inside the container",
+      "type": "string",
+      "minLength": 1
+    },
+    "working_dir": {
+      "description": "The absolute or relative path to the working directory where to run the workflow",
+      "type": "string",
+      "minLength": 1
+    },
+    "registry_auth": {
+      "description": "Credentials for pulling private container",
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "username": {
+          "description": "Username",
+          "type": "string"
+        },
+        "password": {
+          "description": "Password or access token",
+          "type": "string"
+        }
+      }
+    },
+    "ssh_server": {
+      "description": "Run openssh server in the container",
+      "type": "boolean",
+      "default": false
+    },
+    "prebuild": {
+      "description": "Prebuild image to accelerate start",
+      "type": "string",
+      "default": "never",
+      "enum": [
+        "never",
+        "lazy",
+        "force"
+      ]
+    },
+    "bash": {
+      "type": "object",
+      "required": [
+        "commands"
+      ],
+      "additionalProperties": false,
+      "patternProperties": {
+        "^name$": {
+        },
+        "^help$": {
+        },
+        "^deps$": {
+        }
+      },
+      "properties": {
+        "provider": {
+          "enum": [
+            "bash"
+          ]
+        },
+        "ports": {
+          "$ref": "#/definitions/ports"
+        },
+        "commands": {
+          "$ref": "#/definitions/commands"
+        },
+        "env": {
+          "$ref": "#/definitions/env"
+        },
+        "python": {
+          "$ref": "#/definitions/python"
+        },
+        "working_dir": {
+          "$ref": "#/definitions/working_dir"
+        },
+        "artifacts": {
+          "$ref": "#/definitions/artifacts"
+        },
+        "resources": {
+          "$ref": "#/definitions/resources"
+        },
+        "ssh": {
+          "$ref": "#/definitions/ssh_server"
+        },
+        "cache": {
+          "$ref": "#/definitions/cache"
+        },
+        "prebuild": {
+          "$ref": "#/definitions/prebuild"
+        },
+        "setup": {
+          "$ref": "#/definitions/setup"
+        }
+      }
+    },
+    "docker": {
+      "type": "object",
+      "required": [
+        "image"
+      ],
+      "additionalProperties": false,
+      "patternProperties": {
+        "^name$": {
+        },
+        "^help$": {
+        },
+        "^deps$": {
+        }
+      },
+      "properties": {
+        "provider": {
+          "enum": [
+            "docker"
+          ]
+        },
+        "ports": {
+          "$ref": "#/definitions/ports"
+        },
+        "commands": {
+          "$ref": "#/definitions/commands"
+        },
+        "entrypoint": {
+          "description": "The Docker entrypoint",
+          "type": "string"
+        },
+        "env": {
+          "$ref": "#/definitions/env"
+        },
+        "image": {
+          "description": "The name of the Docker image to run",
+          "type": "string",
+          "minLength": 1
+        },
+        "registry_auth": {
+          "$ref": "#/definitions/registry_auth"
+        },
+        "home_dir": {
+          "$ref": "#/definitions/home_dir"
+        },
+        "working_dir": {
+          "$ref": "#/definitions/working_dir"
+        },
+        "artifacts": {
+          "$ref": "#/definitions/artifacts"
+        },
+        "resources": {
+          "$ref": "#/definitions/resources"
+        },
+        "cache": {
+          "$ref": "#/definitions/cache"
+        },
+        "prebuild": {
+          "$ref": "#/definitions/prebuild"
+        },
+        "setup": {
+          "$ref": "#/definitions/setup"
+        }
+      }
+    },
+    "code": {
+      "type": "object",
+      "additionalProperties": false,
+      "patternProperties": {
+        "^name$": {
+        },
+        "^help$": {
+        },
+        "^deps$": {
+        }
+      },
+      "properties": {
+        "provider": {
+          "enum": [
+            "code"
+          ]
+        },
+        "version": {
+          "description": "The version of openvscode-server",
+          "anyOf": [
+            {
+              "type": "string",
+              "pattern": "^\\d+(\\.\\d+)+$"
+            },
+            {
+              "type": "number"
+            }
+          ]
+        },
+        "setup": {
+          "$ref": "#/definitions/setup"
+        },
+        "ports": {
+          "$ref": "#/definitions/ports"
+        },
+        "env": {
+          "$ref": "#/definitions/env"
+        },
+        "python": {
+          "$ref": "#/definitions/python"
+        },
+        "working_dir": {
+          "$ref": "#/definitions/working_dir"
+        },
+        "artifacts": {
+          "$ref": "#/definitions/artifacts"
+        },
+        "resources": {
+          "$ref": "#/definitions/resources"
+        },
+        "ssh": {
+          "$ref": "#/definitions/ssh_server"
+        },
+        "cache": {
+          "$ref": "#/definitions/cache"
+        },
+        "prebuild": {
+          "$ref": "#/definitions/prebuild"
+        }
+      }
+    },
+    "lab": {
+      "type": "object",
+      "additionalProperties": false,
+      "patternProperties": {
+        "^name$": {
+        },
+        "^help$": {
+        },
+        "^deps$": {
+        }
+      },
+      "properties": {
+        "provider": {
+          "enum": [
+            "lab"
+          ]
+        },
+        "setup": {
+          "$ref": "#/definitions/setup"
+        },
+        "ports": {
+          "$ref": "#/definitions/ports"
+        },
+        "env": {
+          "$ref": "#/definitions/env"
+        },
+        "python": {
+          "$ref": "#/definitions/python"
+        },
+        "working_dir": {
+          "$ref": "#/definitions/working_dir"
+        },
+        "artifacts": {
+          "$ref": "#/definitions/artifacts"
+        },
+        "resources": {
+          "$ref": "#/definitions/resources"
+        },
+        "ssh": {
+          "$ref": "#/definitions/ssh_server"
+        },
+        "cache": {
+          "$ref": "#/definitions/cache"
+        },
+        "prebuild": {
+          "$ref": "#/definitions/prebuild"
+        }
+      }
+    },
+    "notebook": {
+      "type": "object",
+      "additionalProperties": false,
+      "patternProperties": {
+        "^name$": {
+        },
+        "^help$": {
+        },
+        "^deps$": {
+        }
+      },
+      "properties": {
+        "provider": {
+          "enum": [
+            "notebook"
+          ]
+        },
+        "setup": {
+          "$ref": "#/definitions/setup"
+        },
+        "ports": {
+          "$ref": "#/definitions/ports"
+        },
+        "env": {
+          "$ref": "#/definitions/env"
+        },
+        "python": {
+          "$ref": "#/definitions/python"
+        },
+        "working_dir": {
+          "$ref": "#/definitions/working_dir"
+        },
+        "artifacts": {
+          "$ref": "#/definitions/artifacts"
+        },
+        "resources": {
+          "$ref": "#/definitions/resources"
+        },
+        "ssh": {
+          "$ref": "#/definitions/ssh_server"
+        },
+        "cache": {
+          "$ref": "#/definitions/cache"
+        },
+        "prebuild": {
+          "$ref": "#/definitions/prebuild"
+        }
+      }
+    },
+    "ssh_provider": {
+      "type": "object",
+      "additionalProperties": false,
+      "patternProperties": {
+        "^name$": {
+        },
+        "^help$": {
+        },
+        "^deps$": {
+        }
+      },
+      "properties": {
+        "provider": {
+          "enum": [
+            "ssh"
+          ]
+        },
+        "ports": {
+          "$ref": "#/definitions/ports"
+        },
+        "setup": {
+          "$ref": "#/definitions/setup"
+        },
+        "env": {
+          "$ref": "#/definitions/env"
+        },
+        "python": {
+          "$ref": "#/definitions/python"
+        },
+        "working_dir": {
+          "$ref": "#/definitions/working_dir"
+        },
+        "artifacts": {
+          "$ref": "#/definitions/artifacts"
+        },
+        "resources": {
+          "$ref": "#/definitions/resources"
+        },
+        "cache": {
+          "$ref": "#/definitions/cache"
+        },
+        "code": {
+          "description": "Print VS Code connection URI",
+          "type": "boolean",
+          "default": false
+        },
+        "prebuild": {
+          "$ref": "#/definitions/prebuild"
+        }
+      }
+    }
+  },
+  "properties": {
+    "workflows": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "type": "object",
+        "required": [
+          "name"
+        ],
+        "properties": {
+          "name": {
+            "type": "string",
+            "minLength": 1
+          },
+          "help": {
+            "type": "string",
+            "minLength": 1
+          },
+          "deps": {
+            "description": "The dependencies on other workflows or tags",
+            "type": "array",
+            "minItems": 1,
+            "items": {
+              "oneOf": [
+                {
+                  "type": "object",
+                  "additionalProperties": false,
+                  "properties": {
+                    "workflow": {
+                      "description": "The name of the workflow",
+                      "type": "string",
+                      "minLength": 1
+                    }
+                  }
+                },
+                {
+                  "type": "object",
+                  "additionalProperties": false,
+                  "properties": {
+                    "tag": {
+                      "description": "The name of the tag",
+                      "type": "string",
+                      "minLength": 1
+                    }
+                  }
+                }
+              ]
+            }
+          }
+        },
+        "anyOf": [
+          {
+            "$ref": "#/definitions/bash"
+          },
+          {
+            "$ref": "#/definitions/docker"
+          },
+          {
+            "$ref": "#/definitions/code"
+          },
+          {
+            "$ref": "#/definitions/lab"
+          },
+          {
+            "$ref": "#/definitions/notebook"
+          },
+          {
+            "$ref": "#/definitions/ssh_provider"
+          }
+        ]
+      }
+    }
+  },
+  "required": [
+    "workflows"
+  ],
+  "type": "object"
+}

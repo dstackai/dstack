@@ -1,29 +1,31 @@
 import argparse
 import sys
+import tempfile
 import time
 import urllib.parse
 from datetime import datetime
 from pathlib import Path
 from typing import Any, Dict, Generator, List, Optional, Tuple
 
-from dstack import providers
+from dstack._internal import providers
+from dstack._internal.api.repos import get_local_repo_credentials
+from dstack._internal.backend.base import artifacts as base_artifacts
+from dstack._internal.core.artifact import Artifact
+from dstack._internal.core.error import NameNotFoundError
+from dstack._internal.core.job import Job, JobHead, JobStatus
+from dstack._internal.core.log_event import LogEvent
+from dstack._internal.core.plan import RunPlan
+from dstack._internal.core.repo import RemoteRepoCredentials, Repo, RepoHead
+from dstack._internal.core.repo.remote import RemoteRepo
+from dstack._internal.core.run import RunHead
+from dstack._internal.core.secret import Secret
+from dstack._internal.core.tag import TagHead
+from dstack._internal.hub.models import ProjectInfo
+from dstack._internal.utils.common import merge_workflow_data
 from dstack.api.hub._api_client import HubAPIClient
 from dstack.api.hub._config import HubClientConfig
 from dstack.api.hub._storage import HUBStorage
 from dstack.api.hub.errors import HubClientError
-from dstack.api.repos import get_local_repo_credentials
-from dstack.backend.base import artifacts as base_artifacts
-from dstack.core.artifact import Artifact
-from dstack.core.error import NameNotFoundError
-from dstack.core.job import Job, JobHead, JobStatus
-from dstack.core.log_event import LogEvent
-from dstack.core.repo import RemoteRepoCredentials, Repo, RepoHead
-from dstack.core.repo.remote import RemoteRepo
-from dstack.core.run import RunHead
-from dstack.core.secret import Secret
-from dstack.core.tag import TagHead
-from dstack.hub.models import ProjectInfo
-from dstack.utils.common import merge_workflow_data
 
 
 class HubClient:
@@ -161,7 +163,7 @@ class HubClient:
         files_path: Optional[str] = None,
     ):
         # /{hub_name}/artifacts/download
-        artifacts = self.list_run_artifact_files(run_name=run_name)
+        artifacts = self.list_run_artifact_files(run_name=run_name, recursive=True)
         base_artifacts.download_run_artifact_files(
             storage=self._storage,
             repo_id=self.repo.repo_id,
@@ -256,10 +258,32 @@ class HubClient:
     def delete_workflow_cache(self, workflow_name: str):
         self._api_client.delete_workflow_cache(workflow_name=workflow_name)
 
+    def get_run_plan(
+        self,
+        provider_name: str,
+        provider_data: Optional[Dict[str, Any]] = None,
+        args: Optional[argparse.Namespace] = None,
+    ) -> RunPlan:
+        if provider_name not in providers.get_provider_names():
+            raise NameNotFoundError(f"No provider '{provider_name}' is found")
+        provider = providers.load_provider(provider_name)
+        provider.load(
+            hub_client=self,
+            args=args,
+            workflow_name=None,
+            provider_data=provider_data or {},
+            run_name="dry-run",
+            ssh_key_pub="",
+        )
+        jobs = provider.get_jobs(repo=self.repo)
+        run_plan = self._api_client.get_run_plan(jobs)
+        return run_plan
+
     def run_provider(
         self,
         provider_name: str,
         provider_data: Optional[Dict[str, Any]] = None,
+        configuration_path: Optional[str] = None,
         tag_name: Optional[str] = None,
         ssh_pub_key: Optional[str] = None,
         args: Optional[argparse.Namespace] = None,
@@ -273,13 +297,29 @@ class HubClient:
 
         run_name = self.create_run()
         provider.load(
-            self, args, None, provider_data or {}, run_name, ssh_pub_key
+            hub_client=self,
+            args=args,
+            workflow_name=None,
+            provider_data=provider_data or {},
+            run_name=run_name,
+            ssh_key_pub=ssh_pub_key,
         )  # todo validate data
         if tag_name:
             tag_head = self.get_tag_head(tag_name)
             if tag_head:
                 self.delete_tag_head(tag_head)
-        jobs = provider.submit_jobs(self, tag_name)
+
+        repo_code_filename = self._upload_code_file()
+        jobs = provider.get_jobs(
+            repo=self.repo,
+            configuration_path=configuration_path,
+            repo_code_filename=repo_code_filename,
+            tag_name=tag_name,
+        )
+        for job in jobs:
+            self.submit_job(job)
+        if tag_name:
+            self.add_tag_from_run(tag_name, self.run_name, jobs)
         self.update_repo_last_run_at(last_run_at=int(round(time.time() * 1000)))
         return run_name, jobs  # todo return run_head
 
@@ -314,6 +354,21 @@ class HubClient:
             tag_head = self.get_tag_head(tag_name)
             if tag_head:
                 self.delete_tag_head(tag_head)
-        jobs = provider.submit_jobs(self, tag_name)
+
+        repo_code_filename = self._upload_code_file()
+        jobs = provider.get_jobs(
+            repo=self.repo, repo_code_filename=repo_code_filename, tag_name=tag_name
+        )
+        for job in jobs:
+            self.submit_job(job)
+        if tag_name:
+            self.add_tag_from_run(tag_name, self.run_name, jobs)
         self.update_repo_last_run_at(last_run_at=int(round(time.time() * 1000)))
         return run_name, jobs  # todo return run_head
+
+    def _upload_code_file(self) -> str:
+        with tempfile.NamedTemporaryFile("w+b") as f:
+            repo_code_filename = self.repo.repo_data.write_code_file(f)
+            f.seek(0)
+            self._storage.upload_file(f.name, repo_code_filename, lambda _: ...)
+        return repo_code_filename

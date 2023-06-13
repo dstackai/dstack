@@ -4,7 +4,7 @@ description: A new tool for teams to manage their ML workflows.
 slug: "introducing-dstack-hub"
 ---
 
-# dstack 0.7: Hub Preview
+# dstack 0.7: Hub preview
 
 __A preview of the new tool for teams to manage their ML workflows.__
 

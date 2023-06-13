@@ -82,8 +82,8 @@
       "cli": "CLI",
       "aws": {
         "authorization": "Authorization",
-        "authorization_default": "Default",
-        "authorization_access_key": "Credentials",
+        "authorization_default": "Default credentials",
+        "authorization_access_key": "Access key",
         "access_key": "Access key",
         "access_key_id": "Access key ID",
         "access_key_id_description": "Specify the AWS access key ID",
@@ -101,8 +101,8 @@
       },
       "azure" : {
         "authorization": "Authorization",
-        "authorization_default": "Default",
-        "authorization_client": "Client",
+        "authorization_default": "Default credentials",
+        "authorization_client": "Client secret",
         "tenant_id": "Tenant ID",
         "tenant_id_description": "Specify an Azure tenant ID",
         "client_id": "Client ID",
@@ -121,8 +121,8 @@
       },
       "gcp": {
         "authorization": "Authorization",
-        "authorization_default": "Default",
-        "service_account": "Service account",
+        "authorization_default": "Default credentials",
+        "service_account": "Service account key",
         "credentials_description": "Credentials description",
         "credentials_placeholder": "Credentials placeholder",
         "area": "Location",

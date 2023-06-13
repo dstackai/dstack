@@ -15,7 +15,7 @@
 [data-termynal] {
     overflow-x: scroll;
     white-space: pre;
-    width: 750px;
+    /*width: 750px;*/
     max-width: 100%;
     background: var(--color-bg);
     color: var(--color-text);
@@ -49,7 +49,7 @@
 }
 
 [data-termynal]:after {
-    content: 'bash';
+    content: '';
     position: absolute;
     color: var(--color-text-subtle);
     top: 7px;

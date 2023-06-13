@@ -10,7 +10,7 @@ from unittest.mock import patch
 import psutil
 import requests
 
-from dstack.cli.main import main
+from dstack._internal.cli.main import main
 
 HUB_HOST = "127.0.0.1"
 HUB_PORT = "31313"

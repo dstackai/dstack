@@ -24,7 +24,7 @@
       "source_ami": "{{user `base_ami`}}",
       "instance_type": "{{user `instance_type` }}",
       "ssh_username": "{{user `ssh_username`}}",
-      "ami_name": "{{user `build_prefix`}}dstack-cuda-11.1-{{user `build_id`}}",
+      "ami_name": "{{user `build_prefix`}}dstack-cuda-11.4-{{user `build_id`}}",
       "associate_public_ip_address": true,
       "ami_regions": "{{user `ami_regions`}}",
       "ami_groups": "{{user `ami_groups`}}",
@@ -79,7 +79,7 @@
     },
     {
       "type": "shell",
-      "environment_vars": ["CUDA_DRIVERS_VERSION=455.45.01-1"],
+      "environment_vars": ["CUDA_DRIVERS_VERSION=470.182.03-1"],
       "script": "provisioners/cuda.sh"
     },
     {

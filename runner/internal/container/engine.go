@@ -113,6 +113,7 @@ func (r *Engine) Create(ctx context.Context, spec *Spec, logs io.Writer) (*Docke
 	config := &container.Config{
 		Image:        spec.Image,
 		Cmd:          spec.Commands,
+		Entrypoint:   spec.Entrypoint,
 		Tty:          true,
 		WorkingDir:   spec.WorkDir,
 		Env:          spec.Env,
@@ -120,9 +121,6 @@ func (r *Engine) Create(ctx context.Context, spec *Spec, logs io.Writer) (*Docke
 		Labels:       spec.Labels,
 		AttachStdout: true,
 		AttachStdin:  true,
-	}
-	if spec.Entrypoint != nil {
-		config.Entrypoint = *spec.Entrypoint
 	}
 	var networkMode container.NetworkMode = "default"
 	if spec.AllowHostMode && supportNetworkModeHost() {
@@ -287,6 +285,39 @@ func (r *Engine) pullImageIfAbsent(ctx context.Context, image string, registryAu
 		return gerrors.Wrap(err)
 	}
 	log.Trace(ctx, "Image pull stdout", "stdout", string(buf))
+	return nil
+}
+
+func (r *Engine) GetPrebuildName(ctx context.Context, spec *PrebuildSpec) (string, error) {
+	err := r.pullImageIfAbsent(ctx, spec.BaseImageName, spec.RegistryAuthBase64)
+	if err != nil {
+		return "", gerrors.Wrap(err)
+	}
+	info, _, err := r.client.ImageInspectWithRaw(ctx, spec.BaseImageName)
+	if err != nil {
+		return "", gerrors.Wrap(err)
+	}
+	spec.BaseImageID = info.ID
+	return spec.Hash(), nil
+}
+
+func (r *Engine) UsePrebuild(ctx context.Context, spec *PrebuildSpec, diffPath string) error {
+	if err := LoadLayer(ctx, r.client, spec.BaseImageName, diffPath); err != nil {
+		return gerrors.Wrap(err)
+	}
+	return nil
+}
+
+func (r *Engine) Prebuild(ctx context.Context, spec *PrebuildSpec, imageName, diffPath string, userLogs, logs io.Writer) error {
+	if err := PrebuildImage(ctx, r.client, spec, imageName, logs); err != nil {
+		return gerrors.Wrap(err)
+	}
+	if _, err := fmt.Fprintf(userLogs, "[PREBUILD] Saving image\n"); err != nil {
+		return gerrors.Wrap(err)
+	}
+	if err := SaveLayer(ctx, r.client, spec.BaseImageName, imageName, diffPath); err != nil {
+		return gerrors.Wrap(err)
+	}
 	return nil
 }
 

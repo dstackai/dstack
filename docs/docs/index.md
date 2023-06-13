@@ -1,11 +1,11 @@
-# Quick start
+# Getting started
 
-`dstack` makes it very easy for ML engineers to run dev environments, pipelines and apps cost-effectively 
+`dstack` makes it very easy for ML engineers to run cost-effectively dev environments and ML tasks
 on any cloud.
 
 ## Installation and setup
 
-To use `dstack`, install it with `pip` and start the Hub server.
+To use `dstack`, install it with `pip` and start the server.
 
 <div class="termy">
 
@@ -13,24 +13,24 @@ To use `dstack`, install it with `pip` and start the Hub server.
 $ pip install "dstack[aws,gcp,azure]"
 $ dstack start
 
-The Hub is available at http://127.0.0.1:3000?token=b934d226-e24a-4eab-eb92b353b10f
+The server is available at http://127.0.0.1:3000?token=b934d226-e24a-4eab-eb92b353b10f
 ```
 
 </div>
 
-??? info "What is Hub?"
-    Hub is a server that manages projects and users. Each project allows you to configure where to run dev environments,
-    pipelines, and apps (e.g. locally or in the cloud), as well as manage users that access it.
+On startup, the server sets up a default project that runs dev environments and tasks locally. 
 
-    At startup, `dstack` sets up a default project for local execution. To run dev environments, pipelines, and apps in your
-    desired cloud account, you must create the corresponding project and configure the `dstack` CLI to use it.
+!!! info "Configuring projects"
 
-    [Learn more →](guides/projects){ .md-button .md-button--primary }
+    To run dev environments and tasks in the cloud, log into the UI, create the corresponding project, 
+    and [configure](guides/projects) the CLI to use it.
+
+    [//]: # (TODO: Give an instruction on how to configure a project to run in the cloud without logging into UI)
 
 ## Initializing the repo
 
-Before you can run dev environments, pipelines, and apps in any folder,
-first have to initialize it as a repo by running the [`dstack init`](reference/cli/init.md) command.
+To use `dstack` from a folder, you need to initialize it as a `dstack` repo by running the [`dstack
+init`](reference/cli/init.md) command.
 
 <div class="termy">
 
@@ -41,174 +41,156 @@ $ dstack init
 
 </div>
 
-## Running a dev environment
+## Defining configurations
 
-A dev environment is a virtual machine that includes the environment and an interactive IDE or notebook setup
-based on a pre-defined configuration.
+A configuration is a YAML file that describes what you want to run with `dstack`. Configurations can be of two
+types: `dev-environment` and `task`.
 
-Go ahead and define this configuration via YAML (under the `.dstack/workflows` folder).
+### Dev environments
 
-<div editor-title=".dstack/workflows/dev-environments.yaml"> 
+Here's an example of a `dev-environment` configuration:
+
+<div editor-title=".dstack.yml"> 
 
 ```yaml
-workflows:
-  - name: code-gpu
-    provider: code
-    setup:
-      - pip install -r dev-environments/requirements.txt
-    resources:
-      gpu:
-        count: 1
+type: dev-environment
+setup:
+  - pip install -r requirements.txt
+ide: vscode
 ```
 
 </div>
 
-[//]: # (TODO [MAJOR]: Currently, it's not convenient to hardcode resources in the YAML and not have a convenient way to switch between projects and resource profiles)
+This configuration runs a dev environment with a pre-built environment to which you can connect via VS Code Desktop.
 
-!!! info "NOTE:"
-    For dev environments, the configuration allows you to configure hardware resources, 
-    set up the Python environment, expose ports, configure cache, and many more. 
+### Tasks
 
-    [Learn more →](guides/dev-environments){ .md-button .md-button--primary }
+Here's an example of a `task` configuration:
 
-[//]: # (TODO: Currently, it's limited to the built-in VS Code, doesn't forward ports automatically, doesn't provide persistence of the storage, pre-installs packages on every run, and has other limitations)
+<div editor-title="app.dstack.yml"> 
 
-Now, you can start it using the [`dstack run`](reference/cli/run.md) command:
+```yaml
+type: task
+setup:
+  - pip install -r requirements.txt
+ports:
+  - 7860
+commands:
+  - gradio app.py
+```
+
+</div>
+
+A task can be either a batch job, such as training or fine-tuning a model, or a web application.
+
+!!! info "Configuration filename"
+    The configuration file must be named with the suffix `.dstack.yml`. For example,
+    you can name the configuration file `.dstack.yml` or `app.dstack.yml`. You can define
+    these configurations anywhere within your project. 
+    
+    Each folder may have one default configuration file named `.dstack.yml`.
+
+[//]: # (TODO: Mention pre-built)
+
+For more details on the syntax of configuration file, refer to the [`.dstack.yml` Reference](reference/dstack.yaml.md).
+
+## Running configurations
+
+### Default configuration
+
+To run a configuration, you have to call the [`dstack run`](reference/cli/run.md) command and pass the path to the 
+directory which you want to use as a working directory when running the configuration.
 
 <div class="termy">
 
 ```shell
-$ dstack run code-gpu
+$ dstack run . 
 
-RUN      WORKFLOW  SUBMITTED  STATUS     TAG
-shady-1  code-gpu  now        Submitted  
- 
+ RUN          WORKFLOW  SUBMITTED  USER   STATUS     INSTANCE 
+ fast-moth-1  ssh       now        admin  Submitted  -        
+
 Starting SSH tunnel...
+
+To open in VS Code Desktop, use one of these links:
+  vscode://vscode-remote/ssh-remote+fast-moth-1/workflow
 
 To exit, press Ctrl+C.
-
-Web UI available at http://127.0.0.1:10000/?tkn=4d9cc05958094ed2996b6832f899fda1
 ```
 
 </div>
 
-!!! info "NOTE:"
-    If you configure a project to run dev environments in the cloud, `dstack` will automatically provision the
-    required cloud resources, and forward ports of the dev environment to your local machine. When you stop the 
-    dev environment, `dstack` will automatically clean up cloud resources.
+If you've not specified a specific configuration file, `dstack` will use the default configuration
+defined in the given directory (named `.dstack.yml`).
 
-## Running a pipeline
+### Non-default configuration
 
-A pipeline is a set of pre-defined configurations that allow to process data, train or fine-tune models, do batch inference 
-or other tasks.
-
-To run a pipeline, all you have to do is define it via YAML (under the `.dstack/workflows` folder) 
-and then run it by name via the CLI.
-
-<div editor-title=".dstack/workflows/pipelines.yaml"> 
-
-```yaml
-workflows:
-  - name: train-mnist-gpu
-    provider: bash
-    commands:
-      - pip install -r pipelines/requirements.txt
-      - python pipelines/train.py
-    artifacts:
-      - ./lightning_logs
-    resources:
-      gpu:
-        count: 1
-```
-
-</div>
-
-!!! info "NOTE:"
-    For pipelines, the configuration allows you to configure hardware resources and output artifacts, set up the
-    Python environment, expose ports, configure cache, and many more.
-
-    [Learn more →](guides/pipelines){ .md-button .md-button--primary }
-
-[//]: # (TODO: Currently, it's limited to YAML)
-
-Now, you can run the pipeline using the [`dstack run`](reference/cli/run.md) command:
+If you want to run a non-default configuration, you have to specify the path to the configuration
+using the `-f` argument:
 
 <div class="termy">
 
 ```shell
-$ dstack run train-mnist-gpu
+$ dstack run . -f app.dstack.yml
 
-RUN      WORKFLOW         SUBMITTED  STATUS     TAG
-shady-1  train-mnist-gpu  now        Submitted  
- 
-Provisioning... It may take up to a minute. ✓
-
-GPU available: True, used: True
-
-Epoch 1: [00:03<00:00, 280.17it/s, loss=1.35, v_num=0]
----> 100%
-```
-
-</div>
-
-!!! info "NOTE:"
-    If you configure a project to run pipelines in the cloud, the [`dstack run`](reference/cli/run.md) command will automatically provision the 
-    required cloud resources.
-    After the pipeline is finished, `dstack` will save output artifacts and clean up cloud resources.
-
-## Running an app
-
-An app can be either a web application (such as Streamlit, Gradio, etc.) or an API endpoint (like FastAPI, Flask, etc.)
-setup based on a pre-defined configuration.
-
-Go ahead and define this configuration via YAML (under the `.dstack/workflows` folder).
-
-<div editor-title=".dstack/workflows/apps.yaml"> 
-
-```yaml
-workflows:
-  - name: fastapi-gpu
-    provider: bash
-    ports:
-      - 3000
-    commands:
-      - pip install -r apps/requirements.txt
-      - uvicorn apps.main:app --port 3000 --host 0.0.0.0
-    resources:
-      gpu:
-        count: 1
-```
-
-</div>
-
-!!! info "NOTE:"
-    For apps, the configuration allows you to customize hardware resources, set up the Python environment, 
-    configure cache, and more.
-
-    [Learn more →](guides/apps){ .md-button .md-button--primary }
-
-Now, you can run the app using the [`dstack run`](reference/cli/run.md) command:
-
-```shell
-$ dstack run fastapi-gpu
- RUN           WORKFLOW     SUBMITTED  STATUS     TAG
- silly-dodo-1  fastapi-gpu  now        Submitted     
+ RUN             WORKFLOW  SUBMITTED  USER   STATUS     INSTANCE 
+ old-lionfish-1  ssh       now        admin  Submitted  -        
 
 Starting SSH tunnel...
 
-To interrupt, press Ctrl+C.
+To stop, press Ctrl+C.
 
-INFO:     Started server process [1]
-INFO:     Waiting for application startup.
-INFO:     Application startup complete.
-INFO:     Uvicorn running on http://127.0.0.1:3000 (Press CTRL+C to quit)
+Launching in *reload mode* on: http://127.0.0.1:7860 (Press CTRL+C to quit)
+
+Watching: '/opt/conda/envs/workflow/lib/python3.10/site-packages/gradio', '/workflow'
 ```
 
-!!! info "NOTE:"
-    If you configure a project to run apps in the cloud, `dstack` will automatically provision the required cloud
-    resources, and forward ports of the app to your local machine.
+</div>
 
-[//]: # (TODO: What's next – Add a link to the Hub guide for the details on how to configure projects)
+!!! info "Port forwarding"
+    By default, `dstack` forwards the ports used by dev environments and tasks to your local machine for convenient access.
 
-!!! info "NOTE:"
-    Check out the [`dstackai/dstack-examples`](https://github.com/dstackai/dstack-examples/blob/main/README.md) repo for source code and other examples.
+??? info "Using .gitignore"
+    When running dev environments or tasks, `dstack` uses the exact version of code that is present in the folder where you
+    use the `dstack run` command.
+
+    If your folder has large files or folders, this may affect the performance of the `dstack run` command. To avoid this,
+    make sure to create a `.gitignore` file and include these large files or folders that you don't want to include when
+    running dev environments or tasks.
+
+For more details on how the `dstack run` command works, refer to the [CLI Reference](reference/cli/run.md).
+
+## Defining profiles
+
+If you have [configured](guides/projects.md) a project that runs dev environments and tasks in the cloud, you can define multiple
+profiles. Each profile can configure the project to use and the resources required for the run.
+
+To define profiles, create the `profiles.yml` file in the `.dstack` folder within your project directory. Here's an example:
+
+<div editor-title=".dstack/profiles.yml"> 
+
+```yaml
+profiles:
+  - name: gpu-large
+    project: gcp
+    resources:
+       memory: 48GB
+       gpu:
+         memory: 24GB
+    default: true
+```
+
+</div>
+
+!!! info "Instance type"
+    By default, `dstack` will try to use spot instances if available and if they aren't available, it will
+    use on-demand instances. You can change this behavior by specifying the [`instance-type`](reference/profiles.yml.md) property.
+
+[//]: # (TODO: The `instance-type` property is not supported properly yet)
+
+Now, if you use the `dstack run` command, `dstack` will use the default profile.
+
+!!! info "Multiple profiles"
+    You can define multiple profiles according to your needs and use any of them with the `dstack run` command by specifying
+    the desired profile using the `--profile` argument.
+
+For more details on the syntax of the `profiles.yml` file, refer to the [`profiles.yml` Reference](reference/profiles.yml.md).

@@ -1,9 +1,9 @@
 import json
 from typing import Dict, Optional
 
-from dstack.hub.db.models import Project, User
-from dstack.hub.repository.projects import ProjectManager
-from dstack.hub.repository.users import UserManager
+from dstack._internal.hub.db.models import Project, User
+from dstack._internal.hub.repository.projects import ProjectManager
+from dstack._internal.hub.repository.users import UserManager
 
 
 async def create_user(
@@ -34,6 +34,7 @@ async def create_project(
         }
     if auth is None:
         auth = {
+            "type": "access_key",
             "access_key": "test_access_key",
             "secret_key": "test_secret_key",
         }

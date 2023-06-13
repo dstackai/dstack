@@ -4,7 +4,7 @@ description: The latest update of dstack now supports Google Cloud Platform (GCP
 slug: "gcp-support-just-landed"
 ---
 
-# dstack 0.2: GCP Support just Landed
+# dstack 0.2: GCP support just landed
 
 __The latest update of dstack now supports Google Cloud Platform (GCP).__
 

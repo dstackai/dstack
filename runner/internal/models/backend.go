@@ -15,18 +15,21 @@ type Resource struct {
 }
 
 type Job struct {
-	Apps         []App             `yaml:"apps"`
-	Artifacts    []Artifact        `yaml:"artifacts"`
-	Cache        []Cache           `yaml:"cache"`
-	Commands     []string          `yaml:"commands"`
-	Entrypoint   *[]string         `yaml:"entrypoint"`
-	Environment  map[string]string `yaml:"env"`
-	HostName     string            `yaml:"host_name"`
-	Image        string            `yaml:"image_name"`
-	JobID        string            `yaml:"job_id"`
-	MasterJobID  string            `yaml:"master_job_id"`
-	Deps         []Dep             `yaml:"deps"`
-	ProviderName string            `yaml:"provider_name"`
+	Apps           []App             `yaml:"apps"`
+	Artifacts      []Artifact        `yaml:"artifacts"`
+	Cache          []Cache           `yaml:"cache"`
+	Setup          []string          `yaml:"setup"`
+	Commands       []string          `yaml:"commands"`
+	Prebuild       PrebuildPolicy    `yaml:"prebuild"`
+	Entrypoint     []string          `yaml:"entrypoint"`
+	Environment    map[string]string `yaml:"env"`
+	RunEnvironment map[string]string `yaml:"run_env"`
+	HostName       string            `yaml:"host_name"`
+	Image          string            `yaml:"image_name"`
+	JobID          string            `yaml:"job_id"`
+	MasterJobID    string            `yaml:"master_job_id"`
+	Deps           []Dep             `yaml:"deps"`
+	ProviderName   string            `yaml:"provider_name"`
 
 	RepoId      string `yaml:"repo_id"`
 	RepoType    string `yaml:"repo_type"`
@@ -51,10 +54,10 @@ type Job struct {
 	SubmittedAt       uint64       `yaml:"submitted_at"`
 	TagName           string       `yaml:"tag_name"`
 	InstanceType      string       `yaml:"instance_type"`
-	//Variables    map[string]interface{} `yaml:"variables"`
-	WorkflowName string `yaml:"workflow_name"`
-	HomeDir      string `yaml:"home_dir"`
-	WorkingDir   string `yaml:"working_dir"`
+	ConfigurationPath string       `yaml:"configuration_path"`
+	WorkflowName      string       `yaml:"workflow_name"`
+	HomeDir           string       `yaml:"home_dir"`
+	WorkingDir        string       `yaml:"working_dir"`
 
 	RegistryAuth RegistryAuth `yaml:"registry_auth"`
 }
@@ -121,6 +124,15 @@ type RunnerMetadata struct {
 	Status string `yaml:"status"`
 }
 
+type PrebuildPolicy string
+
+const (
+	USE_PREBUILD   PrebuildPolicy = "use-prebuild"
+	NO_PREBUILD    PrebuildPolicy = "no-prebuild"
+	FORCE_PREBUILD PrebuildPolicy = "force-prebuild"
+	PREBUILD_ONLY  PrebuildPolicy = "prebuild-only"
+)
+
 func (j *Job) RepoHostNameWithPort() string {
 	if j.RepoPort == 0 {
 		return j.RepoHostName
@@ -146,7 +158,7 @@ func (j *Job) JobHeadFilepath() string {
 		artifactSlice = append(artifactSlice, EscapeHead(art.Path))
 	}
 	return fmt.Sprintf(
-		"jobs/%s/l;%s;%s;%s;%d;%s;%s;%s;%s;%s",
+		"jobs/%s/l;%s;%s;%s;%d;%s;%s;%s;%s;%s;%s",
 		j.RepoId,
 		j.JobID,
 		j.ProviderName,
@@ -157,6 +169,7 @@ func (j *Job) JobHeadFilepath() string {
 		strings.Join(appsSlice, ","),
 		j.TagName,
 		j.InstanceType,
+		EscapeHead(j.ConfigurationPath),
 	)
 }
 

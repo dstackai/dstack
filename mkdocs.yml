@@ -138,18 +138,17 @@ extra:
 nav:
   - Home: index.md
   - Docs:
-      - Getting started:
-          - Quick start: docs/index.md
+      - Intro:
+          - Getting started: docs/index.md
+          - Installation:
+              - Docker: docs/deployment/docker.md
+              - Hugging Face Spaces: docs/deployment/hf-spaces.md
+              - Clouds: docs/deployment/clouds.md
       - Guides:
-          - Dev environments: docs/guides/dev-environments.md
-          - Pipelines: docs/guides/pipelines.md
-          - Apps: docs/guides/apps.md
+#          - Dev environments: docs/guides/dev-environments.md
+#          - Tasks: docs/guides/tasks.md
 #          - Artifacts: docs/guides/artifacts.md
           - Projects: docs/guides/projects.md
-      - Deployment:
-          - Docker: docs/deployment/docker.md
-          - Hugging Face Spaces: docs/deployment/hf-spaces.md
-          - Clouds: docs/deployment/clouds.md
       - Reference:
           - CLI:
               - dstack run: docs/reference/cli/run.md
@@ -165,13 +164,9 @@ nav:
               - dstack tags: docs/reference/cli/tags.md
               - dstack secrets: docs/reference/cli/secrets.md
               - dstack prune: docs/reference/cli/prune.md
-          - Providers:
-              - bash: docs/reference/providers/bash.md
-              - code: docs/reference/providers/code.md
-              - lab: docs/reference/providers/lab.md
-              - notebook: docs/reference/providers/notebook.md
-              - docker: docs/reference/providers/docker.md
-              - ssh: docs/reference/providers/ssh.md
+              - dstack prebuild: docs/reference/cli/prebuild.md
+          - .dstack.yml: docs/reference/dstack.yml.md
+          - profiles.yml: docs/reference/profiles.yml.md
           - Backends:
               - AWS: docs/reference/backends/aws.md
               - Azure: docs/reference/backends/azure.md

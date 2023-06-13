@@ -35,7 +35,7 @@ type Spec struct {
 	RegistryAuthBase64 string
 	WorkDir            string
 	Commands           []string
-	Entrypoint         *[]string
+	Entrypoint         []string
 	Env                []string
 	Labels             map[string]string
 	Mounts             []mount.Mount

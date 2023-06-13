@@ -6,7 +6,7 @@ on:
       - '*'
 
 env:
-  IMAGE_VERSION: "0.1"
+  IMAGE_VERSION: "0.2"
 
 jobs:
   cli-test-tag:
@@ -31,7 +31,7 @@ jobs:
           pip install -r requirements_dev.txt
       - name: Run pytest
         run: |
-          mkdir -p dstack/hub/statics
+          mkdir -p dstack/_internal/hub/statics
           pytest tests/ --ignore=tests/integration/
 
   build-hub-tag:
@@ -72,8 +72,8 @@ jobs:
           name: hub-dist
       - name: Copy hub dist
         run: |
-          mkdir -p cli/dstack/hub/statics
-          cp -a hub-dist/** cli/dstack/hub/statics
+          mkdir -p cli/dstack/_internal/hub/statics
+          cp -a hub-dist/** cli/dstack/_internal/hub/statics
       - name: Install dependencies
         run: |
           python -m pip install --upgrade pip
