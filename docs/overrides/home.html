@@ -41,6 +41,74 @@
             </div>
         </div>
 
+        <div class="tx-landing__major_feature">
+            <h2>Dev environments in your cloud on demand</h2>
+            <div class="section">
+                <div  class="block large margin">
+                    <div class="termy">
+                    <pre class="highlight">$ dstack run .
+
+ RUN        USER   INSTANCE       RESOURCES                 SPOT
+ turtle-11  peter  a2-highgpu-1g  12xCPUs, 87040MB, 1xA100  yes
+
+Provisioning and starting a tunnel...
+---> 100%
+
+To open in VS Code Desktop, use this link:
+  vscode://vscode-remote/ssh-remote+turtle-11/workflow
+
+To exit, press Ctrl+C.
+                    </pre>
+                    </div>
+                </div>
+                <div class="block">
+                    <div>
+                        <p>Specify hardware <strong>resources</strong> (e.g., GPU and memory), and indicate if you want
+                            to use <strong>spot</strong> instances.</p>
+                        <p>Pre-build the environment for easy reuse, avoiding manual Docker usage.</p>
+                        <p><strong>dstack</strong> automates the <strong>provisioning</strong> of cloud resources,
+                            fetches your code, and sets up port <strong>forwarding</strong> for secure and convenient access.</p>
+                        <p>Use an SSH URL to open the remote dev environment in your desktop IDE.</p>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+                <div class="tx-landing__major_feature">
+            <h2>Running ML tasks in your cloud with ease</h2>
+            <div class="section">
+                <div class="block margin">
+                    <div>
+                        <p>A task can be a <strong>web application</strong>,
+                            a <strong>training</strong> script, a <strong>data preparation</strong> job, etc.</p>
+                        <p>Specify hardware <strong>resources</strong> (e.g., GPU and memory), and indicate if you want
+                            to use <strong>spot</strong> instances.</p>
+                        <p><strong>dstack</strong> automates the <strong>provisioning</strong> of cloud resources, runs the task,
+                            and cleans up the resources once it's finished or stopped.</p>
+                        <p>If the task exposes any ports, <strong>dstack</strong>
+                            <strong>forwards</strong> them for secure and convenient access.</p>
+                    </div>
+                </div>
+
+                <div  class="block large">
+                    <div class="termy">
+                    <pre class="highlight">$ dstack run . -f train.dstack.yml
+
+ RUN        USER   INSTANCE       RESOURCES                 SPOT
+ mangust-7  peter  a2-highgpu-1g  12xCPUs, 87040MB, 1xA100  yes
+
+Provisioning and starting a tunnel...
+---> 100%
+
+Epoch 0:  98% 1680/1719 [00:18<00:00, 92.32it/s, loss=0.0981, acc=0.969]
+---> 100%
+
+</pre>
+                    </div>
+                </div>
+            </div>
+        </div>
+
         <div class="tx-landing__highlights">
             <div class="tx-landing__highlights_text">
                 <h2>Run ML on any cloud easily and cost-effectively</h2>
@@ -144,7 +212,7 @@
 
         <div class="tx-landing__bottom_cta">
             <div>
-                <h2>Get started with dstack in under a minute</h2>
+                <h2>Installation and setup take less than a minute</h2>
                 <div class="termy">
                     <pre class="highlight">
 $ pip install "dstack[aws,gcp,azure]"
@@ -152,12 +220,15 @@ $ dstack start
                     </pre>
                 </div>
                 <p class="tx-landing__bottom_cta_text">
-                    <strong>And you're done!</strong> Now you can run dev environments and tasks
+                    And you're <strong>done</strong>! Now you and your team can run dev environments and tasks
                     both <strong>locally</strong> and in <strong>your cloud</strong>.
                 </p>
 
                 <a href="/docs" class="md-button md-button--primary">
                     Docs</a>
+
+                <a href="https://calendly.com/dstackai/office-hours" target="_blank"
+                   class="md-button md-button-secondary">Get a demo</a>
             </div>
         </div>
     </div>
