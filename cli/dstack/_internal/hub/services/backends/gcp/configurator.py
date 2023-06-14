@@ -9,6 +9,7 @@ from google.cloud import compute_v1, storage
 from google.oauth2 import service_account
 
 from dstack._internal.backend.gcp import GCPBackend
+from dstack._internal.backend.gcp import auth as gcp_auth
 from dstack._internal.backend.gcp import utils as gcp_utils
 from dstack._internal.backend.gcp.config import GCPConfig
 from dstack._internal.hub.db.models import Project
@@ -169,6 +170,7 @@ class GCPConfigurator(Configurator):
                 f"{project_config.bucket_name}-sa"
             )
             self._grant_roles_to_service_account(service_account_email)
+            self._check_if_can_create_service_account_key(service_account_email)
             auth_data["service_account_email"] = service_account_email
         return config_data, auth_data
 
@@ -217,9 +219,6 @@ class GCPConfigurator(Configurator):
             vpc=vpc,
             subnet=subnet,
         )
-
-    def _check_default_credentials(self):
-        pass
 
     def _get_hub_geographic_area(self, default_area: Optional[str]) -> ProjectElement:
         area_names = sorted([l["name"] for l in GCP_LOCATIONS])
@@ -362,32 +361,66 @@ class GCPConfigurator(Configurator):
         except googleapiclient.errors.HttpError as e:
             if e.status_code == 409:
                 return gcp_utils.get_service_account_email(self.project_id, name)
+            elif e.status_code == 403:
+                raise BackendConfigError(
+                    "Not enough permissions. Default credentials must have Service Account Admin role.",
+                    code="not_enough_permissions",
+                    fields=[["credentials"]],
+                )
             raise e
 
     def _grant_roles_to_service_account(self, service_account_email: str):
         service = googleapiclient.discovery.build(
             "cloudresourcemanager", "v1", credentials=self.credentials
         )
-        policy = service.projects().getIamPolicy(resource=self.project_id).execute()
-        self._add_roles_to_policy(
-            policy=policy,
-            service_account_email=service_account_email,
-            roles=[
-                "roles/compute.admin",
-                "roles/logging.admin",
-                "roles/secretmanager.admin",
-                "roles/storage.admin",
-                "roles/iam.serviceAccountUser",
-            ],
-        )
-        service.projects().setIamPolicy(
-            resource=self.project_id, body={"policy": policy}
-        ).execute()
+        try:
+            policy = service.projects().getIamPolicy(resource=self.project_id).execute()
+            self._add_roles_to_policy(
+                policy=policy,
+                service_account_email=service_account_email,
+                roles=self._get_service_account_roles(),
+            )
+            service.projects().setIamPolicy(
+                resource=self.project_id, body={"policy": policy}
+            ).execute()
+        except googleapiclient.errors.HttpError as e:
+            if e.status_code == 403:
+                raise BackendConfigError(
+                    "Not enough permissions. Default credentials must have Security Admin role.",
+                    code="not_enough_permissions",
+                    fields=[["credentials"]],
+                )
+            raise e
+
+    def _get_service_account_roles(self) -> List[str]:
+        return [
+            "roles/compute.admin",
+            "roles/logging.admin",
+            "roles/secretmanager.admin",
+            "roles/storage.admin",
+            "roles/iam.serviceAccountUser",
+        ]
 
     def _add_roles_to_policy(self, policy: Dict, service_account_email: str, roles: List[str]):
         member = f"serviceAccount:{service_account_email}"
         for role in roles:
             policy["bindings"].append({"role": role, "members": [member]})
+
+    def _check_if_can_create_service_account_key(self, service_account_email: str):
+        try:
+            gcp_auth.create_service_account_key(
+                iam_service=googleapiclient.discovery.build(
+                    "iam", "v1", credentials=self.credentials
+                ),
+                project_id=self.project_id,
+                service_account_email=service_account_email,
+            )
+        except gcp_auth.NotEnoughPermissionError:
+            raise BackendConfigError(
+                "Not enough permissions. Default credentials must have Service Account Key Admin role.",
+                code="not_enough_permissions",
+                fields=[["credentials"]],
+            )
 
     def _raise_invalid_credentials_error(self, fields: Optional[List[List[str]]] = None):
         raise BackendConfigError(
