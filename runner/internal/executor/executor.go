@@ -315,7 +315,7 @@ func (ex *Executor) runJob(ctx context.Context, erCh chan error, stoppedCh chan 
 			erCh <- gerrors.Wrap(err)
 			return
 		}
-		if err = ex.prebuild(ctx, spec, allLogs); err != nil {
+		if err = ex.prebuild(ctx, spec, stoppedCh, allLogs); err != nil {
 			erCh <- gerrors.Wrap(err)
 			return
 		}
@@ -680,8 +680,9 @@ func (ex *Executor) Shutdown(ctx context.Context) {
 	}
 }
 
-func (ex *Executor) prebuild(ctx context.Context, spec *container.Spec, logs io.Writer) error {
+func (ex *Executor) prebuild(ctx context.Context, spec *container.Spec, stoppedCh chan struct{}, logs io.Writer) error {
 	job := ex.backend.Job(ctx)
+	_, isLocalBackend := ex.backend.(*localbackend.Local)
 
 	prebuildSpec := &container.PrebuildSpec{
 		BaseImageName:      spec.Image,
@@ -707,45 +708,68 @@ func (ex *Executor) prebuild(ctx context.Context, spec *container.Spec, logs io.
 	imageName := fmt.Sprintf("dstackai/prebuild:%s", prebuildName)
 
 	if job.Prebuild == models.USE_PREBUILD {
-		log.Trace(ctx, "Trying to fetch prebuild layer", "key", key, "image", imageName)
-		if _, err = fmt.Fprintf(ex.streamLogs, "[PREBUILD] Looking for the image\n"); err != nil {
+		log.Trace(ctx, "Trying to fetch prebuild image diff", "key", key, "image", imageName)
+		if _, err := fmt.Fprintf(ex.streamLogs, "[PREBUILD] Looking for the image\n"); err != nil {
 			return gerrors.Wrap(err)
 		}
-		if err = ex.backend.GetPrebuildDiff(ctx, key, diffPath); err != nil {
-			return gerrors.Wrap(err)
-		}
-		if stat, err := os.Stat(diffPath); err == nil {
-			if _, err = fmt.Fprintf(ex.streamLogs, "[PREBUILD] Loading image: %s\n", humanize.Bytes(uint64(stat.Size()))); err != nil {
+		if isLocalBackend {
+			exists, err := ex.engine.ImageExists(ctx, imageName)
+			if err != nil {
 				return gerrors.Wrap(err)
 			}
-			if err = ex.engine.UsePrebuild(ctx, prebuildSpec, diffPath); err != nil {
-				return gerrors.Wrap(err)
+			if exists {
+				if _, err := fmt.Fprintf(ex.streamLogs, "[PREBUILD] Using image from the cache\n"); err != nil {
+					return gerrors.Wrap(err)
+				}
+				spec.Image = imageName
+				return nil
 			}
-			if _, err = fmt.Fprintf(ex.streamLogs, "[PREBUILD] Image loaded\n"); err != nil {
-				return gerrors.Wrap(err)
-			}
-			spec.Image = imageName
 		} else {
-			if _, err = fmt.Fprintf(ex.streamLogs, "[PREBUILD] No image found\n"); err != nil {
+			if err := ex.backend.GetPrebuildDiff(ctx, key, diffPath); err != nil {
 				return gerrors.Wrap(err)
 			}
-			mergeSetup(spec, job.Setup, job.Commands)
+			if stat, err := os.Stat(diffPath); err == nil {
+				if _, err = fmt.Fprintf(ex.streamLogs, "[PREBUILD] Loading image: %s\n", humanize.Bytes(uint64(stat.Size()))); err != nil {
+					return gerrors.Wrap(err)
+				}
+				if err := ex.engine.ImportImageDiff(ctx, diffPath); err != nil {
+					return gerrors.Wrap(err)
+				}
+				if _, err = fmt.Fprintf(ex.streamLogs, "[PREBUILD] Image loaded\n"); err != nil {
+					return gerrors.Wrap(err)
+				}
+				spec.Image = imageName
+				return nil
+			}
 		}
+		if _, err = fmt.Fprintf(ex.streamLogs, "[PREBUILD] No image found\n"); err != nil {
+			return gerrors.Wrap(err)
+		}
+		mergeSetup(spec, job.Setup, job.Commands)
 	} else if job.Prebuild == models.FORCE_PREBUILD || job.Prebuild == models.PREBUILD_ONLY {
-		err := ex.engine.Prebuild(ctx, prebuildSpec, imageName, diffPath, ex.streamLogs, logs)
+		err := ex.engine.Prebuild(ctx, prebuildSpec, imageName, stoppedCh, logs)
 		if err != nil {
 			return gerrors.Wrap(err)
 		}
-		stat, err := os.Stat(diffPath)
-		if err != nil {
-			return gerrors.Wrap(err)
-		}
-		log.Trace(ctx, "Putting prebuild layer", "key", key, "image", imageName, "size", stat.Size())
-		if _, err = fmt.Fprintf(ex.streamLogs, "[PREBUILD] Uploading image: %s\n", humanize.Bytes(uint64(stat.Size()))); err != nil {
-			return gerrors.Wrap(err)
-		}
-		if err = ex.backend.PutPrebuildDiff(ctx, diffPath, key); err != nil {
-			return gerrors.Wrap(err)
+		// local backend: store image in daemon cache
+		if !isLocalBackend {
+			if _, err := fmt.Fprintf(ex.streamLogs, "[PREBUILD] Saving image\n"); err != nil {
+				return gerrors.Wrap(err)
+			}
+			if err := ex.engine.ExportImageDiff(ctx, imageName, diffPath); err != nil {
+				return gerrors.Wrap(err)
+			}
+			stat, err := os.Stat(diffPath)
+			if err != nil {
+				return gerrors.Wrap(err)
+			}
+			log.Trace(ctx, "Putting prebuild image diff", "key", key, "image", imageName, "size", stat.Size())
+			if _, err = fmt.Fprintf(ex.streamLogs, "[PREBUILD] Uploading image: %s\n", humanize.Bytes(uint64(stat.Size()))); err != nil {
+				return gerrors.Wrap(err)
+			}
+			if err = ex.backend.PutPrebuildDiff(ctx, diffPath, key); err != nil {
+				return gerrors.Wrap(err)
+			}
 		}
 		spec.Image = imageName
 	}

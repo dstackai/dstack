@@ -301,21 +301,32 @@ func (r *Engine) GetPrebuildName(ctx context.Context, spec *PrebuildSpec) (strin
 	return spec.Hash(), nil
 }
 
-func (r *Engine) UsePrebuild(ctx context.Context, spec *PrebuildSpec, diffPath string) error {
-	if err := LoadLayer(ctx, r.client, spec.BaseImageName, diffPath); err != nil {
+func (r *Engine) Prebuild(ctx context.Context, spec *PrebuildSpec, imageName string, stoppedCh chan struct{}, logs io.Writer) error {
+	if err := PrebuildImage(ctx, r.client, spec, imageName, stoppedCh, logs); err != nil {
 		return gerrors.Wrap(err)
 	}
 	return nil
 }
 
-func (r *Engine) Prebuild(ctx context.Context, spec *PrebuildSpec, imageName, diffPath string, userLogs, logs io.Writer) error {
-	if err := PrebuildImage(ctx, r.client, spec, imageName, logs); err != nil {
+func (r *Engine) ImageExists(ctx context.Context, imageName string) (bool, error) {
+	summaries, err := r.client.ImageList(ctx, types.ImageListOptions{
+		Filters: filters.NewArgs(filters.Arg("reference", imageName)),
+	})
+	if err != nil {
+		return false, gerrors.Wrap(err)
+	}
+	return len(summaries) != 0, nil
+}
+
+func (r *Engine) ExportImageDiff(ctx context.Context, imageName, diffPath string) error {
+	if err := Overlay2ExportImageDiff(ctx, r.client, imageName, diffPath); err != nil {
 		return gerrors.Wrap(err)
 	}
-	if _, err := fmt.Fprintf(userLogs, "[PREBUILD] Saving image\n"); err != nil {
-		return gerrors.Wrap(err)
-	}
-	if err := SaveLayer(ctx, r.client, spec.BaseImageName, imageName, diffPath); err != nil {
+	return nil
+}
+
+func (r *Engine) ImportImageDiff(ctx context.Context, diffPath string) error {
+	if err := Overlay2ImportImageDiff(ctx, diffPath); err != nil {
 		return gerrors.Wrap(err)
 	}
 	return nil

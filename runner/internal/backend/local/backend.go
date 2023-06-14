@@ -277,26 +277,11 @@ func (l *Local) GetRepoArchive(ctx context.Context, path, dir string) error {
 }
 
 func (l *Local) GetPrebuildDiff(ctx context.Context, key, dst string) error {
-	src := filepath.Join(l.path, key)
-	if _, err := os.Stat(src); err == nil {
-		if err = os.Symlink(src, dst); err != nil {
-			return gerrors.Wrap(err)
-		}
-	} else if !errors.Is(err, os.ErrNotExist) {
-		return gerrors.Wrap(err)
-	}
-	return nil
+	return errors.New("not implemented")
 }
 
 func (l *Local) PutPrebuildDiff(ctx context.Context, src, key string) error {
-	dst := filepath.Join(l.path, key)
-	if err := os.MkdirAll(filepath.Dir(dst), 0o755); err != nil {
-		return gerrors.Wrap(err)
-	}
-	if err := os.Rename(src, dst); err != nil {
-		return gerrors.Wrap(err)
-	}
-	return nil
+	return errors.New("not implemented")
 }
 
 func (l *Local) GetTMPDir(ctx context.Context) string {

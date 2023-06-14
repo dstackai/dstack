@@ -61,6 +61,7 @@ class PrebuildCommand(BasicCommand):
             console.print("\nProvisioning...\n")
 
             run_name, jobs = hub_client.run_provider(
+                configuration_path=configuration_path,
                 provider_name=provider_name,
                 provider_data=provider_data,
                 ssh_pub_key=ssh_pub_key,
