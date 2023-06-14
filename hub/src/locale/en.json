@@ -219,13 +219,13 @@
       }
     },
     "tag": {
-      "list_page_title": "Tags",
+      "list_page_title": "Artifacts",
       "search_placeholder": "Find tags",
       "empty_message_title": "No tags",
       "empty_message_text": "No tags to display.",
-      "tag_name": "Name",
+      "tag_name": "Tag",
       "run_name": "Run",
-      "artifacts": "Artifacts"
+      "artifacts": "Files"
     },
     "artifact": {
       "list_page_title": "Artifacts",

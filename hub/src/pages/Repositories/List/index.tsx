@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useParams } from 'react-router-dom';
 import { format } from 'date-fns';
@@ -23,6 +23,12 @@ export const RepositoryList: React.FC = () => {
         },
     );
 
+    const sortingData = useMemo(() => {
+        if (!data) return [];
+
+        return [...data].sort((a, b) => b.last_run_at - a.last_run_at);
+    }, [data]);
+
     const renderEmptyMessage = (): React.ReactNode => {
         return (
             <ListEmptyMessage title={t('projects.repo.empty_message_title')} message={t('projects.repo.empty_message_text')} />
@@ -40,7 +46,7 @@ export const RepositoryList: React.FC = () => {
         );
     };
 
-    const { items, actions, filteredItemsCount, collectionProps, filterProps, paginationProps } = useCollection(data ?? [], {
+    const { items, actions, filteredItemsCount, collectionProps, filterProps, paginationProps } = useCollection(sortingData, {
         filtering: {
             empty: renderEmptyMessage(),
             noMatch: renderNoMatchMessage(() => actions.setFiltering('')),
@@ -63,11 +69,11 @@ export const RepositoryList: React.FC = () => {
     const renderCounter = () => {
         const { selectedItems } = collectionProps;
 
-        if (!data?.length) return '';
+        if (!sortingData.length) return '';
 
         if (selectedItems?.length) return `(${selectedItems?.length}/${data?.length ?? 0})`;
 
-        return `(${data.length})`;
+        return `(${sortingData.length})`;
     };
 
     return (

@@ -68,9 +68,13 @@ export const AzureBackend: React.FC<IProps> = ({ loading }) => {
 
             setAvailableDefaultCredentials(response.default_credentials);
 
-            // If default credentials unavailable, set selected client credential option
-            if (!backendCredentials.type && !response.default_credentials)
-                setValue(`backend.${FIELD_NAMES.CREDENTIALS.TYPE}`, AzureCredentialTypeEnum.CLIENT);
+            // select authorization option
+            if (!backendCredentials.type) {
+                setValue(
+                    `backend.${FIELD_NAMES.CREDENTIALS.TYPE}`,
+                    response.default_credentials ? AzureCredentialTypeEnum.DEFAULT : AzureCredentialTypeEnum.CLIENT,
+                );
+            }
 
             // TENANT_ID available for only client credentials type
             if (response.tenant_id?.selected && backendCredentials.type === AzureCredentialTypeEnum.CLIENT) {

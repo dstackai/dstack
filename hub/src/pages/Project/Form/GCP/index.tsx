@@ -90,9 +90,13 @@ export const GCPBackend: React.FC<IProps> = ({ loading }) => {
             lastUpdatedField.current = null;
 
             setAvailableDefaultCredentials(response.default_credentials);
-            // If default credentials unavailable, set selected client credential option
-            if (!backendFormValues?.credentials?.type && !response.default_credentials) {
-                setValue(`backend.${FIELD_NAMES.CREDENTIALS.TYPE}`, GCPCredentialTypeEnum.SERVICE_ACCOUNT);
+
+            // select authorization option
+            if (!backendFormValues?.credentials?.type) {
+                setValue(
+                    `backend.${FIELD_NAMES.CREDENTIALS.TYPE}`,
+                    response.default_credentials ? GCPCredentialTypeEnum.DEFAULT : GCPCredentialTypeEnum.SERVICE_ACCOUNT,
+                );
             }
 
             if (response.area?.values) {

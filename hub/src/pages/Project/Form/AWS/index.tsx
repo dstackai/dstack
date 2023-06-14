@@ -71,9 +71,12 @@ export const AWSBackend: React.FC<IProps> = ({ loading }) => {
 
             setAvailableDefaultCredentials(response.default_credentials);
 
-            // If default credentials unavailable, set selected client credential option
-            if (!backendFormValues?.credentials?.type && !response.default_credentials) {
-                setValue(`backend.${FIELD_NAMES.CREDENTIALS.TYPE}`, AWSCredentialTypeEnum.ACCESS_KEY);
+            // select authorization option
+            if (!backendFormValues?.credentials?.type) {
+                setValue(
+                    `backend.${FIELD_NAMES.CREDENTIALS.TYPE}`,
+                    response.default_credentials ? AWSCredentialTypeEnum.DEFAULT : AWSCredentialTypeEnum.ACCESS_KEY,
+                );
             }
 
             if (response.region_name?.values) {
