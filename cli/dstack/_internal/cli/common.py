@@ -29,6 +29,7 @@ def generate_runs_table(
         table.add_column("CONFIGURATION", style="grey58")
     table.add_column("USER", style="grey58", no_wrap=True, max_width=16)
     table.add_column("INSTANCE", no_wrap=True)
+    table.add_column("SPOT", no_wrap=True)
     table.add_column("STATUS", no_wrap=True)
     table.add_column("SUBMITTED", style="grey58", no_wrap=True)
     if verbose:
@@ -44,6 +45,7 @@ def generate_runs_table(
             [
                 _status_color(run, run.hub_user_name or "", False, False),
                 _pretty_print_instance_type(run),
+                _pretty_print_spot(run),
                 _pretty_print_status(run),
                 _status_color(run, submitted_at, False, False),
             ]
@@ -105,6 +107,11 @@ def _pretty_print_error_code(run: RunHead) -> str:
             else:
                 return f"[red]{job_head.error_code.pretty_repr()}[/]"
     return ""
+
+
+def _pretty_print_spot(run: RunHead) -> str:
+    spot = "yes" if run.job_heads[0].instance_spot_type == "spot" else "no"
+    return _status_color(run, spot, False, False)
 
 
 def _pretty_print_instance_type(run: RunHead) -> str:

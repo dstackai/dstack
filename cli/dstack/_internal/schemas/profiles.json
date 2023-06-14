@@ -59,15 +59,30 @@
           "enum": [
             true
           ]
+        }
+      }
+    },
+    "spot_policy": {
+      "description": "The policy for provisioning spot or on-demand instances",
+      "type": "string",
+      "enum": [
+        "spot",
+        "on-demand",
+        "auto"
+      ]
+    },
+    "retry_policy": {
+      "description": "The policy for re-submitting the run",
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "retry": {
+          "description": "Whether to retry the run on failure or not",
+          "type": "boolean"
         },
-        "instance-type": {
-          "description": "The type of instance",
-          "type": "string",
-          "enum": [
-            "on-demand",
-            "auto",
-            "spot"
-          ]
+        "limit": {
+          "description": "The maximum period of retrying the run, e.g. 1d",
+          "type": "string"
         }
       }
     }
@@ -94,6 +109,12 @@
           },
           "resources": {
             "$ref": "#/definitions/resources"
+          },
+          "spot_policy": {
+            "$ref": "#/definitions/spot_policy"
+          },
+          "retry_policy": {
+            "$ref": "#/definitions/retry_policy"
           },
           "default": {
             "type": "boolean",

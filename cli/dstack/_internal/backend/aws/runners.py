@@ -68,7 +68,7 @@ def _get_instance_types(ec2_client: BaseClient) -> List[InstanceType]:
                         cpus=instance_type["VCpuInfo"]["DefaultVCpus"],
                         memory_mib=instance_type["MemoryInfo"]["SizeInMiB"],
                         gpus=reduce(list.__add__, gpus) if gpus else [],
-                        interruptible="spot" in instance_type["SupportedUsageClasses"],
+                        spot="spot" in instance_type["SupportedUsageClasses"],
                         local=False,
                     ),
                 )
@@ -330,6 +330,7 @@ def _run_instance(
     subnet_id: Optional[str],
     runner_id: str,
     instance_type: InstanceType,
+    spot: bool,
     repo_id: str,
     hub_user_name: str,
     ssh_key_pub: str,
@@ -337,7 +338,7 @@ def _run_instance(
     launch_specification = {}
     if not version.__is_release__:
         launch_specification["KeyName"] = "dstack_victor"
-    if instance_type.resources.interruptible:
+    if spot:
         launch_specification["InstanceMarketOptions"] = {
             "MarketType": "spot",
             "SpotOptions": {
@@ -392,7 +393,7 @@ def _run_instance(
         ],
         **launch_specification,
     )
-    if instance_type.resources.interruptible:
+    if spot:
         request_id = response["Instances"][0]["SpotInstanceRequestId"]
         ec2_client.create_tags(Resources=[request_id], Tags=tags)
     else:
@@ -408,6 +409,7 @@ def run_instance_retry(
     subnet_id: Optional[str],
     runner_id: str,
     instance_type: InstanceType,
+    spot: bool,
     repo_id: str,
     hub_user_name: str,
     ssh_key_pub: str,
@@ -422,6 +424,7 @@ def run_instance_retry(
             subnet_id,
             runner_id,
             instance_type,
+            spot,
             repo_id,
             hub_user_name,
             ssh_key_pub,
@@ -439,6 +442,7 @@ def run_instance_retry(
                     subnet_id,
                     runner_id,
                     instance_type,
+                    spot,
                     repo_id,
                     hub_user_name,
                     ssh_key_pub,
@@ -489,16 +493,16 @@ def get_request_head(
     job: Job,
     request_id: Optional[str],
 ) -> RequestHead:
-    interruptible = job.requirements and job.requirements.interruptible
+    spot = job.requirements.spot
     if request_id is None:
         message = (
             "The spot instance request ID is not specified"
-            if interruptible
+            if spot
             else "The instance ID is not specified"
         )
         return RequestHead(job_id=job.job_id, status=RequestStatus.TERMINATED, message=message)
 
-    if interruptible:
+    if spot:
         try:
             response = ec2_client.describe_spot_instance_requests(
                 SpotInstanceRequestIds=[request_id]

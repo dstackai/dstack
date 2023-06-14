@@ -45,6 +45,19 @@ The following arguments are optional:
 - `-t TAG`, `--tag TAG` – (Optional) A tag name. Warning, if the tag exists, it will be overridden.
 - `ARGS` – (Optional) Use `ARGS` to pass custom run arguments
 
+Spot policy (the arguments are mutually exclusive):
+
+- `--spot-policy` – The policy for provisioning spot or on-demand instances: `spot`, `on-demand`, or `auto`. 
+- `--spot` – A shorthand for `--spot-policy spot`
+- `--on-demand` – A shorthand for `--spot-policy on-demand`
+- `--spot-auto` – A shorthand for `--spot-policy auto`
+
+Retry policy (the arguments are mutually exclusive):
+
+- `--no-retry` – Do not retry the run on failure
+- `--retry` – Retry the run on failure. Use a default retry limit (1h). 
+- `--retry-limit` – Retry the run on failure with a custom retry limit, e.g. 4h or 1d
+
 Prebuild policies:
 
 - `--no-prebuild` – Run `setup` first, then `commands` if any

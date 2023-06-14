@@ -67,7 +67,7 @@ def _unserialize_runner_resources(data: dict) -> Resources:
         gpus=[Gpu(name=g["name"], memory_mib=g["memory_mib"]) for g in data["gpus"]]
         if data.get("gpus")
         else [],
-        interruptible=False,
+        spot=False,
         local=True,
     )
 

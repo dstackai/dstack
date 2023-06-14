@@ -9,24 +9,13 @@ class Gpu(BaseModel):
     name: str
     memory_mib: int
 
-    def __str__(self) -> str:
-        return f'Gpu(name="{self.name}", memory_mib={self.memory_mib})'
-
 
 class Resources(BaseModel):
     cpus: int
     memory_mib: int
     gpus: Optional[List[Gpu]]
-    interruptible: bool
+    spot: bool
     local: bool
-
-    def __str__(self) -> str:
-        return (
-            f"Resources(cpus={self.cpus}, memory_mib={self.memory_mib}, "
-            f'gpus=[{", ".join(map(lambda g: str(g), self.gpus))}], '
-            f"interruptible={self.interruptible}, "
-            f"local={self.local})"
-        )
 
 
 class Runner(BaseModel):
@@ -46,7 +35,7 @@ class Runner(BaseModel):
                 }
                 for gpu in (self.resources.gpus or [])
             ],
-            "interruptible": self.resources.interruptible is True,
+            "spot": self.resources.spot is True,
             "local": self.resources.local is True,
         }
         data = {
@@ -69,8 +58,10 @@ class Runner(BaseModel):
                     Gpu(name=g["name"], memory_mib=g["memory_mib"])
                     for g in data["resources"]["gpus"]
                 ],
-                interruptible=data["resources"]["interruptible"] is True,
-                local=data["resources"].get("local") is True,
+                spot=data["resources"].get("spot")
+                or data["resources"].get("interruptible")
+                or False,
+                local=data["resources"].get("local") or False,
             ),
             job=Job.unserialize(data["job"]),
         )
