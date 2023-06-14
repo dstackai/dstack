@@ -24,7 +24,7 @@ async def get_run_plan(
     project_name: str, body: RunsGetPlan, user: User = Depends(Authenticated())
 ) -> RunPlan:
     project = await get_project(project_name=project_name)
-    backend = get_backend(project)
+    backend = await get_backend(project)
     job_plans = []
     for job in body.jobs:
         instance_type = await run_async(backend.predict_instance_type, job)
@@ -47,7 +47,7 @@ async def get_run_plan(
 )
 async def create_run(project_name: str, repo_ref: RepoRef) -> str:
     project = await get_project(project_name=project_name)
-    backend = get_backend(project)
+    backend = await get_backend(project)
     run_name = await run_async(backend.create_run, repo_ref.repo_id)
     return run_name
 
@@ -57,7 +57,7 @@ async def create_run(project_name: str, repo_ref: RepoRef) -> str:
 )
 async def list_runs(project_name: str, body: RunsList) -> List[RunHead]:
     project = await get_project(project_name=project_name)
-    backend = get_backend(project)
+    backend = await get_backend(project)
     run_heads = await run_async(
         backend.list_run_heads,
         body.repo_id,
@@ -73,7 +73,7 @@ async def list_runs(project_name: str, body: RunsList) -> List[RunHead]:
 )
 async def stop_runs(project_name: str, body: RunsStop):
     project = await get_project(project_name=project_name)
-    backend = get_backend(project)
+    backend = await get_backend(project)
     run_heads: List[RunHead] = []
     for run_name in body.run_names:
         run_head = await _get_run_head(backend, body.repo_id, run_name)
@@ -93,7 +93,7 @@ async def stop_runs(project_name: str, body: RunsStop):
 )
 async def delete_runs(project_name: str, body: RunsDelete):
     project = await get_project(project_name=project_name)
-    backend = get_backend(project)
+    backend = await get_backend(project)
     run_heads: List[RunHead] = []
     for run_name in body.run_names:
         run_head = await _get_run_head(backend, body.repo_id, run_name)

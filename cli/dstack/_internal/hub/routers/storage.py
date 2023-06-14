@@ -27,7 +27,7 @@ router = APIRouter(
 @router.put("/{project_name}/storage/upload", response_model=FileObject)
 async def put_file(project_name: str, key: Annotated[str, Query()], request: Request):
     project = await get_project(project_name=project_name)
-    backend = get_backend(project)
+    backend = await get_backend(project)
     _check_backend_local(backend)
     root_path = Path(backend._storage.root_path).resolve()
     target_path = (root_path / key).resolve()
@@ -48,7 +48,7 @@ async def put_file(project_name: str, key: Annotated[str, Query()], request: Req
 @router.get("/{project_name}/storage/download", response_model=FileObject)
 async def download_file(project_name: str, key: Annotated[str, Query()], request: Request):
     project = await get_project(project_name=project_name)
-    backend = get_backend(project)
+    backend = await get_backend(project)
     _check_backend_local(backend)
     root_path = Path(backend._storage.root_path).resolve()
     target_path = (root_path / key).resolve()

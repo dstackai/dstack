@@ -20,7 +20,7 @@ router = APIRouter(prefix="/api/project", tags=["logs"], dependencies=[Depends(P
 )
 async def poll_logs(project_name: str, body: PollLogs) -> List[LogEvent]:
     project = await get_project(project_name=project_name)
-    backend = get_backend(project)
+    backend = await get_backend(project)
     start_time = body.start_time
     if start_time is None:
         start_time = get_current_datetime() - timedelta(days=30)
