@@ -3,7 +3,7 @@ site_name: dstack
 site_url: https://dstack.ai
 site_author: dstack GmbH
 site_description: >-
-  Develop ML faster. Easily and cost-effectively run dev environments, pipelines, and apps on any cloud.
+  dstack is an open-source tool for managing dev environments and automating ML tasks on any cloud.
 
 # Repository
 repo_url: https://github.com/dstackai/dstack
