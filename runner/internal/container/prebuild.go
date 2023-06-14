@@ -32,7 +32,7 @@ type PrebuildSpec struct {
 	RepoPath           string
 }
 
-type ImageManifest struct {
+type ImageManifestV1 struct {
 	Layers []string `json:"Layers"`
 }
 
@@ -142,7 +142,7 @@ func LoadLayer(ctx context.Context, client docker.APIClient, baseImageName, diff
 		}
 		diffReader := tar.NewReader(diffFile)
 		var config *ImageConfig
-		var manifest []ImageManifest
+		var manifest []ImageManifestV1
 		for { // write image diff
 			header, err := diffReader.Next()
 			if err != nil {

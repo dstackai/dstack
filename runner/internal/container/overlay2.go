@@ -4,6 +4,7 @@ import (
 	"archive/tar"
 	"context"
 	"encoding/json"
+	"fmt"
 	"github.com/codeclysm/extract/v3"
 	docker "github.com/docker/docker/client"
 	"github.com/dstackai/dstack/runner/internal/gerrors"
@@ -34,6 +35,12 @@ type Repositories struct {
 	Repositories map[string]map[string]string `json:"Repositories"`
 }
 
+type ImageManifest struct {
+	RootFS struct {
+		Layers []string `json:"diff_ids"`
+	} `json:"rootfs"`
+}
+
 // Overlay2ExportImageDiff works directly with docker overlay2 directory to export single layer
 // `imageName` must contain tag
 func Overlay2ExportImageDiff(ctx context.Context, client docker.APIClient, imageName, diffPath string) error {
@@ -46,17 +53,16 @@ func Overlay2ExportImageDiff(ctx context.Context, client docker.APIClient, image
 	if err != nil {
 		return gerrors.Wrap(err)
 	}
-	chainDigest, err := digest.Parse(chainID(inspect.RootFS.Layers))
-	if err != nil {
-		return gerrors.Wrap(err)
-	}
-	log.Trace(ctx, "Export image", "ID", imageDigest.Encoded(), "chainID", chainDigest.Encoded())
+	log.Trace(ctx, "Export image", "ID", imageDigest.Encoded(), "chainID", getChainID(inspect.RootFS.Layers))
 
-	cacheIDBytes, err := os.ReadFile(filepath.Join(DockerRoot, DockerLayerdb, chainDigest.Encoded(), "cache-id"))
+	chainDigest, err := digest.Parse(getChainID(inspect.RootFS.Layers))
 	if err != nil {
 		return gerrors.Wrap(err)
 	}
-	cacheID := string(cacheIDBytes)
+	cacheID, err := getCacheID(chainDigest.String())
+	if err != nil {
+		return gerrors.Wrap(err)
+	}
 	log.Trace(ctx, "Export layer", "cacheID", cacheID)
 
 	imageTagBytes, err := json.Marshal(&ImageTag{
@@ -119,11 +125,11 @@ func Overlay2ExportImageDiff(ctx context.Context, client docker.APIClient, image
 			return gerrors.Wrap(err)
 		}
 		if entry.Name() == "link" {
-			linkName, err := os.ReadFile(filepath.Join(DockerRoot, DockerOverlay2, cacheID, entry.Name()))
+			link, err := getCacheLink(cacheID)
 			if err != nil {
 				return gerrors.Wrap(err)
 			}
-			if err := tarWriteFile(diffWriter, filepath.Join(DockerRoot, DockerOverlay2, "l", string(linkName)), DockerRoot); err != nil {
+			if err := tarWriteFile(diffWriter, filepath.Join(DockerRoot, DockerOverlay2, "l", link), DockerRoot); err != nil {
 				return gerrors.Wrap(err)
 			}
 		}
@@ -162,10 +168,6 @@ func Overlay2ImportImageDiff(ctx context.Context, diffPath string) error {
 	if err := json.Unmarshal(reposBytes, &repos); err != nil {
 		return gerrors.Wrap(err)
 	}
-	reposStat, err := os.Stat(filepath.Join(DockerRoot, DockerRepositories))
-	if err != nil {
-		return gerrors.Wrap(err)
-	}
 
 	if _, ok := repos.Repositories[imageTag.Repo()]; !ok {
 		repos.Repositories[imageTag.Repo()] = make(map[string]string)
@@ -176,14 +178,39 @@ func Overlay2ImportImageDiff(ctx context.Context, diffPath string) error {
 	if err != nil {
 		return gerrors.Wrap(err)
 	}
-	if err := os.WriteFile(filepath.Join(DockerRoot, DockerRepositories), reposBytes, reposStat.Mode()); err != nil {
+	if err := os.WriteFile(filepath.Join(DockerRoot, DockerRepositories), reposBytes, 0644); err != nil {
+		return gerrors.Wrap(err)
+	}
+
+	log.Trace(ctx, "Rebuilding lower links")
+	imageManifest, err := getImageManifest(imageTag.Digest)
+	if err != nil {
+		return gerrors.Wrap(err)
+	}
+	links := make([]string, 0)
+	for i := 1; i < len(imageManifest.RootFS.Layers); i++ {
+		cacheID, err := getCacheID(getChainID(imageManifest.RootFS.Layers[:i]))
+		if err != nil {
+			return gerrors.Wrap(err)
+		}
+		link, err := getCacheLink(cacheID)
+		if err != nil {
+			return gerrors.Wrap(err)
+		}
+		links = append(links, fmt.Sprintf("l/%s", link))
+	}
+	cacheID, err := getCacheID(getChainID(imageManifest.RootFS.Layers))
+	if err != nil {
+		return gerrors.Wrap(err)
+	}
+	if err := os.WriteFile(filepath.Join(DockerRoot, DockerOverlay2, cacheID, "lower"), []byte(strings.Join(links, ":")), 0644); err != nil {
 		return gerrors.Wrap(err)
 	}
 
 	return nil
 }
 
-func chainID(layers []string) string {
+func getChainID(layers []string) string {
 	id := layers[0]
 	for _, layer := range layers[1:] {
 		id = digest.FromString(id + " " + layer).String()
@@ -284,4 +311,40 @@ func extractImageTag(diffPath string) (*ImageTag, error) {
 		}
 	}
 	return nil, gerrors.New("no tag.json")
+}
+
+func getCacheID(chainID string) (string, error) {
+	chainDigest, err := digest.Parse(chainID)
+	if err != nil {
+		return "", gerrors.Wrap(err)
+	}
+	cacheIDBytes, err := os.ReadFile(filepath.Join(DockerRoot, DockerLayerdb, chainDigest.Encoded(), "cache-id"))
+	if err != nil {
+		return "", gerrors.Wrap(err)
+	}
+	return string(cacheIDBytes), nil
+}
+
+func getImageManifest(imageID string) (*ImageManifest, error) {
+	imageDigest, err := digest.Parse(imageID)
+	if err != nil {
+		return nil, gerrors.Wrap(err)
+	}
+	imageManifestBytes, err := os.ReadFile(filepath.Join(DockerRoot, DockerImagedbContent, imageDigest.Encoded()))
+	if err != nil {
+		return nil, gerrors.Wrap(err)
+	}
+	var imageManifest ImageManifest
+	if err := json.Unmarshal(imageManifestBytes, &imageManifest); err != nil {
+		return nil, gerrors.Wrap(err)
+	}
+	return &imageManifest, nil
+}
+
+func getCacheLink(cacheID string) (string, error) {
+	link, err := os.ReadFile(filepath.Join(DockerRoot, DockerOverlay2, cacheID, "link"))
+	if err != nil {
+		return "", gerrors.Wrap(err)
+	}
+	return string(link), nil
 }
