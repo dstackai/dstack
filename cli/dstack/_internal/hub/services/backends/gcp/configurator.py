@@ -365,7 +365,6 @@ class GCPConfigurator(Configurator):
                 raise BackendConfigError(
                     "Not enough permissions. Default credentials must have Service Account Admin role.",
                     code="not_enough_permissions",
-                    fields=[["credentials"]],
                 )
             raise e
 
@@ -388,7 +387,6 @@ class GCPConfigurator(Configurator):
                 raise BackendConfigError(
                     "Not enough permissions. Default credentials must have Security Admin role.",
                     code="not_enough_permissions",
-                    fields=[["credentials"]],
                 )
             raise e
 
@@ -419,7 +417,6 @@ class GCPConfigurator(Configurator):
             raise BackendConfigError(
                 "Not enough permissions. Default credentials must have Service Account Key Admin role.",
                 code="not_enough_permissions",
-                fields=[["credentials"]],
             )
 
     def _raise_invalid_credentials_error(self, fields: Optional[List[List[str]]] = None):
