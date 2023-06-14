@@ -31,7 +31,7 @@ async def get_backend_config_values(
     config: ProjectConfigWithCredsPartial = Body(),
     user: User = Depends(Authenticated()),
 ) -> ProjectValues:
-    configurator = await get_backend_configurator(config.__root__.type)
+    configurator = get_backend_configurator(config.__root__.type)
     try:
         result = await run_async(configurator.configure_project, config.__root__.dict())
     except BackendConfigError as e:
@@ -60,7 +60,7 @@ async def create_project(
                 )
             ],
         )
-    configurator = await get_backend_configurator(project_info.backend.__root__.type)
+    configurator = get_backend_configurator(project_info.backend.__root__.type)
     try:
         await run_async(configurator.configure_project, project_info.backend.__root__.dict())
     except BackendConfigError as e:
@@ -111,7 +111,7 @@ async def update_project(
     project_info: ProjectInfoWithCreds = Body(),
     user_project: Tuple[User, Project] = Depends(ProjectAdmin()),
 ) -> ProjectInfoWithCreds:
-    configurator = await get_backend_configurator(project_info.backend.__root__.type)
+    configurator = get_backend_configurator(project_info.backend.__root__.type)
     try:
         await run_async(configurator.configure_project, project_info.backend.__root__.dict())
     except BackendConfigError as e:
