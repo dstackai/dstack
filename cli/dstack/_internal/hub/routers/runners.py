@@ -16,7 +16,7 @@ router = APIRouter(
 @router.post("/{project_name}/runners/run")
 async def run_runners(project_name: str, job: Job):
     project = await get_project(project_name=project_name)
-    backend = get_backend(project)
+    backend = await get_backend(project)
     failed_to_start_job_new_status = JobStatus.FAILED
     if job.retry_policy.retry:
         failed_to_start_job_new_status = JobStatus.PENDING
@@ -34,5 +34,5 @@ async def run_runners(project_name: str, job: Job):
 @router.post("/{project_name}/runners/stop")
 async def stop_runners(project_name: str, body: StopRunners):
     project = await get_project(project_name=project_name)
-    backend = get_backend(project)
+    backend = await get_backend(project)
     await run_async(backend.stop_job, body.repo_id, body.abort, body.job_id)

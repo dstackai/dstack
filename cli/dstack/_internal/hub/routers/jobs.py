@@ -16,7 +16,7 @@ router = APIRouter(prefix="/api/project", tags=["jobs"], dependencies=[Depends(P
 @router.post("/{project_name}/jobs/create")
 async def create_job(project_name: str, job: Job, user: User = Depends(Authenticated())) -> Job:
     project = await get_project(project_name=project_name)
-    backend = get_backend(project)
+    backend = await get_backend(project)
     job.hub_user_name = user.name
     await run_async(backend.create_job, job)
     return job
@@ -25,7 +25,7 @@ async def create_job(project_name: str, job: Job, user: User = Depends(Authentic
 @router.post("/{project_name}/jobs/get")
 async def get_job(project_name: str, body: JobsGet) -> Job:
     project = await get_project(project_name=project_name)
-    backend = get_backend(project)
+    backend = await get_backend(project)
     job = await run_async(backend.get_job, body.repo_id, body.job_id)
     return job
 
@@ -33,7 +33,7 @@ async def get_job(project_name: str, body: JobsGet) -> Job:
 @router.post("/{project_name}/jobs/list")
 async def list_job(project_name: str, body: JobsList) -> List[Job]:
     project = await get_project(project_name=project_name)
-    backend = get_backend(project)
+    backend = await get_backend(project)
     jobs = await run_async(backend.list_jobs, body.repo_id, body.run_name)
     return jobs
 
@@ -41,7 +41,7 @@ async def list_job(project_name: str, body: JobsList) -> List[Job]:
 @router.post("/{project_name}/jobs/list/heads")
 async def list_job_heads(project_name: str, body: JobHeadList) -> List[JobHead]:
     project = await get_project(project_name=project_name)
-    backend = get_backend(project)
+    backend = await get_backend(project)
     job_heads = await run_async(backend.list_job_heads, body.repo_id, body.run_name)
     return job_heads
 
@@ -49,5 +49,5 @@ async def list_job_heads(project_name: str, body: JobHeadList) -> List[JobHead]:
 @router.post("/{project_name}/jobs/delete")
 async def delete_job(project_name: str, body: JobsGet):
     project = await get_project(project_name=project_name)
-    backend = get_backend(project)
+    backend = await get_backend(project)
     await run_async(backend.delete_job_head, body.repo_id, body.job_id)

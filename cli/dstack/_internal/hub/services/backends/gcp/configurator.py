@@ -218,12 +218,8 @@ class GCPConfigurator(Configurator):
             subnet=subnet,
         )
 
-    def _raise_invalid_credentials_error(self, fields: Optional[List[List[str]]] = None):
-        raise BackendConfigError(
-            "Invalid credentials",
-            code="invalid_credentials",
-            fields=fields,
-        )
+    def _check_default_credentials(self):
+        pass
 
     def _get_hub_geographic_area(self, default_area: Optional[str]) -> ProjectElement:
         area_names = sorted([l["name"] for l in GCP_LOCATIONS])
@@ -392,3 +388,10 @@ class GCPConfigurator(Configurator):
         member = f"serviceAccount:{service_account_email}"
         for role in roles:
             policy["bindings"].append({"role": role, "members": [member]})
+
+    def _raise_invalid_credentials_error(self, fields: Optional[List[List[str]]] = None):
+        raise BackendConfigError(
+            "Invalid credentials",
+            code="invalid_credentials",
+            fields=fields,
+        )
