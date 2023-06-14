@@ -1,0 +1,342 @@
+---
+date: 2023-06-14
+description: Let's build a chatbot using Falcon with LangChain and run it on your cloud.
+links: 
+  - Source code: https://github.com/dstackai/langchain-meetup
+  - LangChain's Hugging Face Pipelines: https://python.langchain.com/en/latest/modules/models/llms/integrations/huggingface_pipelines.html
+  - Falcon-7B-Instruct model on Hugging Face: https://huggingface.co/tiiuae/falcon-7b-instruct
+  - Dolly 2.0's instruct pipeline: https://huggingface.co/databricks/dolly-v2-12b/raw/main/instruct_pipeline.py
+---
+
+# Using OSS LLMs with LangChain in your cloud
+
+__Let's build a chatbot using Falcon with LangChain and run it on your cloud.__
+
+LangChain makes it easier to use LLMs for app development, which is why many people want to use it. 
+This tutorial will show you how to use LangChain with OSS LLMs on your own cloud.
+
+<!-- more -->
+
+## Introduction to LangChain and OSS LLMs
+
+What's LangChain? LangChain is a framework that extends the capabilities of LLMs using prompt templates, knowledge
+bases, and agents. Here's a very simple example.
+
+```python
+from langchain import LLMChain, PromptTemplate
+from langchain.llms import OpenAI
+
+template = """Answer the question based on the context below. If the
+question cannot be answered using the information provided answer
+with "I don't know".
+
+Context: Large Language Models (LLMs) are the latest models used in NLP.
+Their superior performance over smaller models has made them incredibly
+useful for developers building NLP enabled applications. These models
+can be accessed via Hugging Face's `transformers` library, via OpenAI
+using the `openai` library, and via Cohere using the `cohere` library.
+
+Question: {query}
+
+Answer: """
+
+prompt_template = PromptTemplate(
+    input_variables=["query"],
+    template=template
+)
+
+llm = OpenAI(model_name='text-davinci-003')
+
+llm_chain = LLMChain(
+    prompt=prompt_template,
+    llm=llm
+)
+
+question = "Which libraries and model providers offer LLMs?"
+
+print(llm_chain.run(question))
+```
+
+We ask an OpenAI LLM a question using a prompt template.
+
+While other features of LangChain, such as knowledge bases and agents, are much more powerful,they rely on the same
+principle. LangChain orchestrates LLMs and other code responsible for handling the LLM's prompt and response.
+
+### Using OSS LLMs with LangChain
+
+In the example above, LangChain accesses the LLM through the API endpoint provided by OpenAI. LangChain can also access
+LLMs deployed elsewhere.
+
+Instead of OpenAI, you can use OSS LLMs, which offer several advantages. Firstly, they can be easily fine-tuned
+(e.g. using the PEFT technique) on your own data for your specific task. Secondly, deploying privately is a breeze with fine-tuned OSS LLMs.
+
+Furthermore, when developing, there's no need to deploy the LLM to use it with LangChain. LangChain enables you to run
+your LLM on the same machine where you execute LangChain code, as long as you have enough GPU and memory.
+
+Here's an example of running an LLM locally with LangChain.
+
+```python
+from langchain import PromptTemplate, LLMChain, HuggingFacePipeline
+
+llm = HuggingFacePipeline.from_model_id(model_id="bigscience/bloom-1b7", task="text-generation",
+                                        model_kwargs={"temperature": 0, "max_length": 64})
+
+template = """Question: {question}
+
+Answer: Let's think step by step."""
+
+prompt = PromptTemplate(template=template, input_variables=["question"])
+
+llm_chain = LLMChain(prompt=prompt, llm=llm)
+
+question = "What is electroencephalography?"
+
+print(llm_chain.run(question))
+```
+
+Running LLMs on the same machine can be particularly convenient during development when you don't necessarily need your
+model to be deployed.
+
+## Example: Building a chatbot with Falcon LLM
+
+Let's demonstrate how to use OSS LLMs with LangChain, using the example of building a chatbot with Falcon and Gradio.
+
+### Setting up a dev environment with dstack
+
+Since we'll be developing in the cloud, we'll use `dstack` to streamline the process of setting up dev
+environments and running ML tasks.
+
+`dstack` allows you to define dev environments and tasks as code, and then run them conveniently in your cloud with a
+single command.
+
+Before using `dstack`, you need to define one or several profiles with a list of resources you want to use.
+
+Since we're going to use Falcon-7B-Instruct, we will need a GPU with at least 24GB of memory, as well as at least 48GB
+of RAM.
+
+<div editor-title=".dstack/profiles.yml">
+
+```yaml
+profiles:
+  - name: gcp-large
+    project: gcp
+    resources:
+      memory: 48GB
+      gpu:
+        memory: 24GB
+    default: true
+```
+
+</div>
+
+After defining the profile, place the following file in your project's root folder to create a dev environment
+configuration.
+
+<div editor-title=".dstack.yml">
+
+```yaml
+type: dev-environment
+setup:
+  - pip install -r requirements.txt
+ide: vscode
+```
+
+</div>
+
+Now, you can proceed and run this configuration using the `dstack` CLI.
+
+<div class="termy">
+
+```shell
+$ dstack run . 
+
+ RUN                USER   INSTANCE       STATUS     SUBMITTED 
+ ancient-turtle-11  admin  a2-highgpu-1g  Submitted  54 secs ago        
+
+Starting SSH tunnel...
+
+To open in VS Code Desktop, use one of these link:
+  vscode://vscode-remote/ssh-remote+ancient-turtle-11/workflow
+
+To exit, press Ctrl+C.
+```
+
+</div>
+
+`dstack` will automatically create the required cloud resources, fetch your local code, and invite you to open it in your desktop IDE.
+
+![dstack-v010-vscode-desktop.png](../../assets/images/dstack-v010-vscode-desktop.png)
+
+### Loading the Falcon-7B-Instruct pipeline
+
+Now that you have set up the dev environment with the required GPU and memory, you can load the Falcon model
+from the Hugging Face Hub.
+
+```python
+import torch
+from transformers import AutoTokenizer, AutoModelForCausalLM
+
+model_path = "tiiuae/falcon-7b-instruct"
+tokenizer = AutoTokenizer.from_pretrained(model_path)
+
+model = AutoModelForCausalLM.from_pretrained(
+    model_path, trust_remote_code=True, torch_dtype=torch.bfloat16, device_map="auto"
+)
+```
+
+!!! info "Using Dolly 2.0's instruct pipeline"
+
+    Although Falcon7B-Instruct is fine-tuned on chat/instruct datasets, it may not perfectly follow conversation
+    instructions. To improve this, we'll use 
+    [Dolly 2.0's instruct pipeline](https://huggingface.co/databricks/dolly-v2-12b/raw/main/instruct_pipeline.py) 
+    to adjust the prompt.
+
+```python
+from instruct_pipeline import InstructionTextGenerationPipeline
+
+pipeline = InstructionTextGenerationPipeline(
+    model=model,
+    tokenizer=tokenizer,
+    max_new_tokens=128,
+    return_full_text=True,
+    task="text-generation",
+)
+```
+
+### Passing the pipeline to LangChain
+
+Now that our pipeline is ready, we can use it in conjunction with LangChain and its memory feature.
+
+```python
+from langchain.llms import HuggingFacePipeline, ConversationChain
+from langchain.memory import ConversationBufferMemory
+
+local_llm = HuggingFacePipeline(pipeline=pipeline)
+
+llm_chain = ConversationChain(llm=local_llm, memory=ConversationBufferMemory())
+
+print(llm_chain.run("What is the capital of England?"))
+
+print(llm_chain.run("What is its population?"))
+```
+
+If we run it, we will see that indeed the LLM answers the second question based on the previous history of the
+conversation.
+
+### Building a Gradio app
+
+Now that we see that the LLM is capable of keeping up a conversation, it is very easy to put it all together into a chatbot app using Gradio.
+
+<div editor-title="app.py">
+
+```python
+import gradio as gr
+
+import torch
+from transformers import AutoTokenizer, AutoModelForCausalLM
+
+model_path = "tiiuae/falcon-7b-instruct"
+tokenizer = AutoTokenizer.from_pretrained(model_path)
+
+model = AutoModelForCausalLM.from_pretrained(
+    model_path, trust_remote_code=True, torch_dtype=torch.bfloat16, device_map="auto"
+)
+
+from instruct_pipeline import InstructionTextGenerationPipeline
+
+pipeline = InstructionTextGenerationPipeline(
+    model=model,
+    tokenizer=tokenizer,
+    max_new_tokens=128,
+    return_full_text=True,
+    task="text-generation",
+)
+
+from langchain.llms import HuggingFacePipeline
+
+local_llm = HuggingFacePipeline(pipeline=pipeline)
+
+from langchain import ConversationChain
+from langchain.memory import ConversationBufferMemory
+
+memory = ConversationBufferMemory()
+
+llm_chain = ConversationChain(llm=local_llm, memory=memory)
+
+with gr.Blocks() as demo:
+    chatbot = gr.Chatbot()
+    msg = gr.Textbox()
+    clear = gr.Button("Clear")
+
+    def user(user_message, history):
+        return "", history + [[user_message, None]]
+
+    def bot(history):
+        history[-1][1] = llm_chain.run(history[-1][0])
+        return history
+
+    def reset():
+        memory.clear()
+        pass
+
+    msg.submit(user, [msg, chatbot], [msg, chatbot], queue=False).then(bot, chatbot, chatbot)
+    clear.click(reset, None, chatbot, queue=False)
+
+if __name__ == "__main__":
+    demo.launch()
+
+
+```
+
+</div>
+
+Go ahead and run it with `gradio app.py` to ensure that it works.
+
+![dstack-gradio-falcon.png](../../assets/images/dstack-gradio-falcon.png)
+
+When you no longer require your cloud dev environment, just interrupt the `dstack run` command. This will
+automatically release and clean up all the associated cloud resources.
+
+[//]: # (TODO: It doesn't allow to save local changes)
+
+### Running the app as a task with dstack 
+
+Now, what if you would like to run the app in the cloud outside of the development environment? For example, for development and testing purposes.
+
+This can be easily done if you define a task configuration.
+
+<div editor-title="app.dstack.yml">
+
+```
+type: task
+setup:
+  - pip install -r requirements.txt
+ports: [7860]
+commands:
+  - gradio app.py
+```
+
+</div>
+
+Once it is defined, you can run it in the same way as a dev environment.
+
+<div class="termy">
+
+```shell
+$ dstack run . -f app.dstack.yml
+```
+
+</div>
+
+Just like with the dev environment, `dstack` will automatically create cloud resources, run the app, and forward
+the remote port to your local machine for secure and convenient access. And if you interrupt it, dstack will clean up
+the resources.
+
+This way, you can run apps that use LLMs for development and testing purposes without having your models deployed.
+
+!!! info "Live reload"
+    If you add `--reload` to `dstack run`, it will automatically reload your changes so you can keep making changes to the code
+    and have the app running in the cloud, being reloaded on the fly.
+
+Tasks can be used not only to run apps but also for running training, finetuning, or any other ML workloads.
+

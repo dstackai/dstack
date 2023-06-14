@@ -301,7 +301,7 @@
 }
 
 .md-nav__item, .md-nav__link .md-typeset {
-    color: rgba(0,0,0,0.87);
+    /*color: rgba(0,0,0,0.87);*/
     font-weight: 500;
     font-size: 0.75rem;
 }
