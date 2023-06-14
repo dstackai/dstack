@@ -10,10 +10,11 @@ links:
 
 # Using OSS LLMs with LangChain in your cloud
 
-__Let's build a chatbot using Falcon with LangChain and run it on your cloud.__
+__A tutorial explaining how to build a chatbot using OSS LLMs on your cloud.__
 
-LangChain makes it easier to use LLMs for app development, which is why many people want to use it. 
-This tutorial will show you how to use LangChain with OSS LLMs on your own cloud.
+LangChain makes it easier to use LLMs for app development, which is why many people want to use it. However, some
+engineers are curious about other options besides OpenAI. This step-by-step tutorial will show you how to 
+build a chatbot using OSS LLMs with LangChain on your own cloud.
 
 <!-- more -->
 
@@ -340,3 +341,7 @@ This way, you can run apps that use LLMs for development and testing purposes wi
 
 Tasks can be used not only to run apps but also for running training, finetuning, or any other ML workloads.
 
+### Conclusion
+
+That's it! Using OSS LLMs with LangChain to build apps on your cloud is easy. Check out the links on the left for more
+information, including the source code used in this tutorial.
