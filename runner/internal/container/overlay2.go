@@ -4,6 +4,7 @@ import (
 	"archive/tar"
 	"context"
 	"encoding/json"
+	"github.com/codeclysm/extract/v3"
 	docker "github.com/docker/docker/client"
 	"github.com/dstackai/dstack/runner/internal/gerrors"
 	"github.com/dstackai/dstack/runner/internal/log"
@@ -12,10 +13,12 @@ import (
 	"io/fs"
 	"os"
 	"path/filepath"
+	"strings"
 )
 
 const (
 	DockerRoot            = "/var/lib/docker"
+	DockerRepositories    = "image/overlay2/repositories.json"
 	DockerImagedbContent  = "image/overlay2/imagedb/content/sha256"
 	DockerImagedbMetadata = "image/overlay2/imagedb/metadata/sha256"
 	DockerLayerdb         = "image/overlay2/layerdb/sha256"
@@ -26,7 +29,10 @@ type ImageTag struct {
 	Name   string `json:"name"`
 	Digest string `json:"digest"`
 }
-type Writer tar.Writer
+
+type Repositories struct {
+	Repositories map[string]map[string]string `json:"Repositories"`
+}
 
 // Overlay2ExportImageDiff works directly with docker overlay2 directory to export single layer
 // `imageName` must contain tag
@@ -46,12 +52,7 @@ func Overlay2ExportImageDiff(ctx context.Context, client docker.APIClient, image
 	}
 	log.Trace(ctx, "Export image", "ID", imageDigest.Encoded(), "chainID", chainDigest.Encoded())
 
-	cacheIDFile, err := os.Open(filepath.Join(DockerRoot, DockerLayerdb, chainDigest.Encoded(), "cache-id"))
-	if err != nil {
-		return gerrors.Wrap(err)
-	}
-	defer func() { _ = cacheIDFile.Close() }()
-	cacheIDBytes, err := io.ReadAll(cacheIDFile)
+	cacheIDBytes, err := os.ReadFile(filepath.Join(DockerRoot, DockerLayerdb, chainDigest.Encoded(), "cache-id"))
 	if err != nil {
 		return gerrors.Wrap(err)
 	}
@@ -117,12 +118,69 @@ func Overlay2ExportImageDiff(ctx context.Context, client docker.APIClient, image
 		if err := tarWriteWalk(diffWriter, filepath.Join(DockerRoot, DockerOverlay2, cacheID, entry.Name()), DockerRoot); err != nil {
 			return gerrors.Wrap(err)
 		}
+		if entry.Name() == "link" {
+			linkName, err := os.ReadFile(filepath.Join(DockerRoot, DockerOverlay2, cacheID, entry.Name()))
+			if err != nil {
+				return gerrors.Wrap(err)
+			}
+			if err := tarWriteFile(diffWriter, filepath.Join(DockerRoot, DockerOverlay2, "l", string(linkName)), DockerRoot); err != nil {
+				return gerrors.Wrap(err)
+			}
+		}
 	}
 	return nil
 }
 
 func Overlay2ImportImageDiff(ctx context.Context, diffPath string) error {
-	return gerrors.New("not implemented")
+	log.Trace(ctx, "Opening archive to import image diff", "path", diffPath)
+	diffFile, err := os.Open(diffPath)
+	if err != nil {
+		return gerrors.Wrap(err)
+	}
+	defer func() { _ = diffFile.Close() }()
+
+	log.Trace(ctx, "Extracting image diff from archive")
+	imageTag, err := extractImageTag(diffPath)
+	if err != nil {
+		return gerrors.Wrap(err)
+	}
+	err = extract.Archive(ctx, diffFile, DockerRoot, func(path string) string {
+		if path == "tag.json" {
+			return ""
+		}
+		return path
+	})
+	if err != nil {
+		return gerrors.Wrap(err)
+	}
+
+	var repos Repositories
+	reposBytes, err := os.ReadFile(filepath.Join(DockerRoot, DockerRepositories))
+	if err != nil {
+		return gerrors.Wrap(err)
+	}
+	if err := json.Unmarshal(reposBytes, &repos); err != nil {
+		return gerrors.Wrap(err)
+	}
+	reposStat, err := os.Stat(filepath.Join(DockerRoot, DockerRepositories))
+	if err != nil {
+		return gerrors.Wrap(err)
+	}
+
+	if _, ok := repos.Repositories[imageTag.Repo()]; !ok {
+		repos.Repositories[imageTag.Repo()] = make(map[string]string)
+	}
+	repoTags, _ := repos.Repositories[imageTag.Repo()]
+	repoTags[imageTag.Name] = imageTag.Digest
+	reposBytes, err = json.Marshal(repos)
+	if err != nil {
+		return gerrors.Wrap(err)
+	}
+	if err := os.WriteFile(filepath.Join(DockerRoot, DockerRepositories), reposBytes, reposStat.Mode()); err != nil {
+		return gerrors.Wrap(err)
+	}
+
+	return nil
 }
 
 func chainID(layers []string) string {
@@ -134,7 +192,7 @@ func chainID(layers []string) string {
 }
 
 func tarWriteFile(writer *tar.Writer, path string, relTo string) error {
-	info, err := os.Stat(path)
+	info, err := os.Lstat(path)
 	if err != nil {
 		return gerrors.Wrap(err)
 	}
@@ -160,11 +218,20 @@ func tarWriteWalk(writer *tar.Writer, root string, relTo string) error {
 }
 
 func tarWritePath(writer *tar.Writer, path string, info os.FileInfo, relTo string) error {
-	header, err := tar.FileInfoHeader(info, path)
+	name, err := filepath.Rel(relTo, path)
 	if err != nil {
 		return gerrors.Wrap(err)
 	}
-	name, err := filepath.Rel(relTo, path)
+	var header *tar.Header
+	if info.Mode()&os.ModeSymlink != 0 {
+		link, err := os.Readlink(path)
+		if err != nil {
+			return gerrors.Wrap(err)
+		}
+		header, err = tar.FileInfoHeader(info, link)
+	} else {
+		header, err = tar.FileInfoHeader(info, "")
+	}
 	if err != nil {
 		return gerrors.Wrap(err)
 	}
@@ -173,7 +240,7 @@ func tarWritePath(writer *tar.Writer, path string, info os.FileInfo, relTo strin
 		return gerrors.Wrap(err)
 	}
 
-	if !info.IsDir() {
+	if header.Typeflag == tar.TypeReg {
 		file, err := os.Open(path)
 		if err != nil {
 			return gerrors.Wrap(err)
@@ -184,4 +251,37 @@ func tarWritePath(writer *tar.Writer, path string, info os.FileInfo, relTo strin
 		}
 	}
 	return nil
+}
+
+func (i *ImageTag) Repo() string {
+	return strings.Split(i.Name, ":")[0]
+}
+
+func extractImageTag(diffPath string) (*ImageTag, error) {
+	diffFile, err := os.Open(diffPath)
+	if err != nil {
+		return nil, gerrors.Wrap(err)
+	}
+	defer func() { _ = diffFile.Close() }()
+	diffReader := tar.NewReader(diffFile)
+	for {
+		header, err := diffReader.Next()
+		if err == io.EOF {
+			break
+		} else if err != nil {
+			return nil, gerrors.Wrap(err)
+		}
+		if header.Name == "tag.json" {
+			imageTagBytes, err := io.ReadAll(diffReader)
+			if err != nil {
+				return nil, gerrors.Wrap(err)
+			}
+			var imageTag ImageTag
+			if err := json.Unmarshal(imageTagBytes, &imageTag); err != nil {
+				return nil, gerrors.Wrap(err)
+			}
+			return &imageTag, nil
+		}
+	}
+	return nil, gerrors.New("no tag.json")
 }
