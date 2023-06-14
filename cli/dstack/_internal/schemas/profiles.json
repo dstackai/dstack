@@ -72,16 +72,16 @@
       ]
     },
     "retry_policy": {
-      "description": "The policy for re-submitting runs",
+      "description": "The policy for re-submitting the run",
       "type": "object",
       "additionalProperties": false,
       "properties": {
         "retry": {
-          "description": "Whether to retry runs on failure or not",
+          "description": "Whether to retry the run on failure or not",
           "type": "boolean"
         },
         "limit": {
-          "description": "The maximum period of re-submitting the run, e.g. 1d",
+          "description": "The maximum period of retrying the run, e.g. 1d",
           "type": "string"
         }
       }

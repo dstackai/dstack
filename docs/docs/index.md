@@ -181,12 +181,6 @@ profiles:
 
 </div>
 
-!!! info "Instance type"
-    By default, `dstack` will try to use spot instances if available and if they aren't available, it will
-    use on-demand instances. You can change this behavior by specifying the [`instance-type`](reference/profiles.yml.md) property.
-
-[//]: # (TODO: The `instance-type` property is not supported properly yet)
-
 Now, if you use the `dstack run` command, `dstack` will use the default profile.
 
 !!! info "Multiple profiles"
