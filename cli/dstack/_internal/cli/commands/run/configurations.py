@@ -92,12 +92,12 @@ def parse_configuration_file(
         else:
             exit(f"Error: No profile `{profile_name}` found")
     else:
-        profile = profiles.get("default")
-    if profile and "resources" in profile:
+        profile = profiles.get("default", {})
+    if "resources" in profile:
         provider_data["resources"] = profile["resources"]
     provider_data["spot_policy"] = profile.get("spot_policy")
     provider_data["retry_policy"] = profile.get("retry_policy")
-    project_name = profile.get("project") if profile else None
+    project_name = profile.get("project")
     if not Path(os.getcwd()).samefile(Path(working_dir)):
         provider_data["working_dir"] = str(Path(working_dir))
     return str(configuration_path), provider_name, provider_data, project_name
