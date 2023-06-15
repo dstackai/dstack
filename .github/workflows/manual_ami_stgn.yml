@@ -27,8 +27,8 @@ jobs:
           cp -R ami/packer/* .
       - name: Get runner version from the current branch
         run: |
-          buildRunNumber=$(gh api -H "Accept: application/vnd.github+json" -H "X-GitHub-Api-Version: 2022-11-28"
-            "/repos/${{ github.repository }}/actions/runs?branch=${{ github.ref_name }}&status=success"
+          buildRunNumber=$(gh api -H "Accept: application/vnd.github+json" -H "X-GitHub-Api-Version: 2022-11-28" \
+            "/repos/${{ github.repository }}/actions/runs?branch=${{ github.ref_name }}&status=success" \
             --jq '[.workflow_runs[] | select(.path==".github/workflows/build.yml")][0].run_number')
           echo 'RUNNER_VERSION='$(($buildRunNumber + 150)) >> $GITHUB_ENV
         env:
