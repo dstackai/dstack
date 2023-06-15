@@ -88,6 +88,11 @@
     },
     {
       "type": "shell",
+      "environment_vars": ["IMAGE_VERSION={{user `image_version`}}"],
+      "script": "provisioners/docker-image-with-cuda.sh"
+    },
+    {
+      "type": "shell",
       "inline": ["/usr/local/bin/dstack-runner --version"]
     }
   ]
