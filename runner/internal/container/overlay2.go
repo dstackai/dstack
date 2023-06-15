@@ -4,7 +4,6 @@ import (
 	"archive/tar"
 	"context"
 	"encoding/json"
-	"fmt"
 	"github.com/codeclysm/extract/v3"
 	docker "github.com/docker/docker/client"
 	"github.com/dstackai/dstack/runner/internal/gerrors"
@@ -13,6 +12,7 @@ import (
 	"io"
 	"io/fs"
 	"os"
+	"path"
 	"path/filepath"
 	"strings"
 )
@@ -187,23 +187,25 @@ func Overlay2ImportImageDiff(ctx context.Context, diffPath string) error {
 	if err != nil {
 		return gerrors.Wrap(err)
 	}
-	links := make([]string, 0)
-	for i := 1; i < len(imageManifest.RootFS.Layers); i++ {
-		cacheID, err := getCacheID(getChainID(imageManifest.RootFS.Layers[:i]))
-		if err != nil {
-			return gerrors.Wrap(err)
-		}
-		link, err := getCacheLink(cacheID)
-		if err != nil {
-			return gerrors.Wrap(err)
-		}
-		links = append(links, fmt.Sprintf("l/%s", link))
-	}
-	cacheID, err := getCacheID(getChainID(imageManifest.RootFS.Layers))
+
+	layerID, err := getCacheID(getChainID(imageManifest.RootFS.Layers))
 	if err != nil {
 		return gerrors.Wrap(err)
 	}
-	if err := os.WriteFile(filepath.Join(DockerRoot, DockerOverlay2, cacheID, "lower"), []byte(strings.Join(links, ":")), 0644); err != nil {
+	parentID, err := getCacheID(getChainID(imageManifest.RootFS.Layers[:len(imageManifest.RootFS.Layers)-1]))
+	if err != nil {
+		return gerrors.Wrap(err)
+	}
+	parentLink, err := os.ReadFile(path.Join(DockerRoot, DockerOverlay2, parentID, "link"))
+	if err != nil {
+		return gerrors.Wrap(err)
+	}
+	lower := "l/" + string(parentLink)
+	if parentLower, err := os.ReadFile(path.Join(DockerRoot, DockerOverlay2, parentID, "lower")); err == nil {
+		lower += ":" + string(parentLower)
+	}
+
+	if err := os.WriteFile(filepath.Join(DockerRoot, DockerOverlay2, layerID, "lower"), []byte(lower), 0666); err != nil {
 		return gerrors.Wrap(err)
 	}
 
