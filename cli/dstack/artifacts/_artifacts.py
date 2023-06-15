@@ -17,6 +17,8 @@ def upload(local_path: str, artifact_path: Optional[str] = None, tag: Optional[s
 
     Examples:
     ```python
+    from dstack import artifacts
+
     # Uploads local_path as an artifact of the current run
     artifacts.upload(local_path="datasets/dataset1")
 
@@ -70,6 +72,8 @@ def download(
 
     Examples:
     ```python
+    from dstack import artifacts
+
     # Downloads all artifact files of a run
     artifacts.download(run="sharp-shrimp-1")
 

@@ -32,6 +32,8 @@ The `artifact_path` parameter can be used to specify a different artifact path.
 
 Examples:
 ```python
+from dstack import artifacts
+
 # Uploads local_path as an artifact of the current run
 artifacts.upload(local_path="datasets/dataset1")
 
@@ -68,6 +70,8 @@ By default, downloads all the files and saves them to the current directory.
 
 Examples:
 ```python
+from dstack import artifacts
+
 # Downloads all artifact files of a run
 artifacts.download(run="sharp-shrimp-1")
 
