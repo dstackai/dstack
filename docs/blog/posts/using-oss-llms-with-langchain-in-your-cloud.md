@@ -14,17 +14,16 @@ __A tutorial explaining how to build a chatbot using OSS LLMs on your cloud.__
 
 LangChain makes it easier to use LLMs for app development, which is why many people want to use it.
 This tutorial shows how to use LangChain with OSS LLMs on your own cloud, using the example of building a chatbot with
-the Falcon LLM.
+Falcon.
 
 <!-- more -->
 
 ## Introduction
 
-LangChain is a powerful framework that extends the capabilities of LLMs using prompt templates, knowledge bases, and
-agents. It can be used with closed-source LLMs such as OpenAI, as well as with any other LLMs, including OSS LLMs or
-LLMs that you've fine-tuned using one of the OSS LLMs.
+It can be used with closed-source LLMs such as OpenAI, as well as with any other variations, including OSS LLMs or those
+fine-tuned based on OSS LLMs.
 
-Here's an example of using LangChain with a local LMM loaded from Hugging Face Hub.
+Here's an example of using LangChain with a local LLM loaded from Hugging Face Hub.
 
 ```python
 from langchain import PromptTemplate, LLMChain, HuggingFacePipeline
@@ -103,7 +102,8 @@ $ dstack run .
  RUN                USER   INSTANCE       STATUS     SUBMITTED 
  ancient-turtle-11  admin  a2-highgpu-1g  Submitted  54 secs ago        
 
-Starting SSH tunnel...
+Provisioning and starting SSH tunnel...
+---> 100%
 
 To open in VS Code Desktop, use one of these link:
   vscode://vscode-remote/ssh-remote+ancient-turtle-11/workflow
@@ -258,7 +258,7 @@ This can be easily done if you define a task configuration.
 
 <div editor-title="app.dstack.yml">
 
-```
+```yaml
 type: task
 setup:
   - pip install -r requirements.txt
@@ -275,6 +275,14 @@ Once it is defined, you can run it in the same way as a dev environment.
 
 ```shell
 $ dstack run . -f app.dstack.yml
+
+ RUN           USER   INSTANCE       STATUS     SUBMITTED 
+ tasty-bat-11  admin  a2-highgpu-1g  Submitted  54 secs ago        
+
+Provisioning and starting SSH tunnel...
+---> 100%
+
+Launching in *reload mode* on: http://127.0.0.1:7860 (Press CTRL+C to quit)
 ```
 
 </div>

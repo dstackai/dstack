@@ -109,7 +109,8 @@ $ dstack run .
  RUN          WORKFLOW  SUBMITTED  USER   STATUS     INSTANCE 
  fast-moth-1  ssh       now        admin  Submitted  -        
 
-Starting SSH tunnel...
+Provisioning and starting SSH tunnel...
+---> 100%
 
 To open in VS Code Desktop, use one of these links:
   vscode://vscode-remote/ssh-remote+fast-moth-1/workflow
@@ -135,13 +136,12 @@ $ dstack run . -f app.dstack.yml
  RUN             WORKFLOW  SUBMITTED  USER   STATUS     INSTANCE 
  old-lionfish-1  ssh       now        admin  Submitted  -        
 
-Starting SSH tunnel...
+Provisioning and starting SSH tunnel...
+---> 100%
 
 To stop, press Ctrl+C.
 
 Launching in *reload mode* on: http://127.0.0.1:7860 (Press CTRL+C to quit)
-
-Watching: '/opt/conda/envs/workflow/lib/python3.10/site-packages/gradio', '/workflow'
 ```
 
 </div>

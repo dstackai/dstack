@@ -31,9 +31,9 @@ class Termynal {
         this.container = (typeof container === 'string') ? document.querySelector(container) : container;
         this.pfx = `data-${options.prefix || 'ty'}`;
         this.originalStartDelay = this.startDelay = options.startDelay
-            || parseFloat(this.container.getAttribute(`${this.pfx}-startDelay`)) || 600;
+            || parseFloat(this.container.getAttribute(`${this.pfx}-startDelay`)) || 300;
         this.originalTypeDelay = this.typeDelay = options.typeDelay
-            || parseFloat(this.container.getAttribute(`${this.pfx}-typeDelay`)) || 90;
+            || parseFloat(this.container.getAttribute(`${this.pfx}-typeDelay`)) || 60;
         this.originalLineDelay = this.lineDelay = options.lineDelay
             || parseFloat(this.container.getAttribute(`${this.pfx}-lineDelay`)) || 1500;
         this.progressLength = options.progressLength
