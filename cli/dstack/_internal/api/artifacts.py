@@ -5,6 +5,7 @@ from functools import partial
 from pathlib import Path
 
 from dstack._internal.backend.base import Backend
+from dstack._internal.backend.base.artifacts import ArtifactsDownloadError, ArtifactsUploadError
 from dstack._internal.core.error import DstackError
 from dstack._internal.core.repo.base import Repo
 from dstack._internal.utils.common import get_dstack_dir
@@ -86,14 +87,16 @@ def _download_artifact_files(
             tmp_job_output_dir = tmp_output_dir / job_dir
             break
     if tmp_job_output_dir is None:
-        raise DstackError(f"Artifact source path '{source}' does not exist")
+        raise ArtifactsDownloadError(f"Artifact source path '{source}' does not exist")
 
     source_full_path = tmp_job_output_dir / source
     target_path = Path(target)
     if source_full_path.is_dir():
         if target_path.exists() and not target_path.is_dir():
             shutil.rmtree(tmp_job_output_dir)
-            raise DstackError(f"Local target path '{target}' exists and is not a directory")
+            raise ArtifactsDownloadError(
+                f"Local target path '{target}' exists and is not a directory"
+            )
         if sys.version_info[1] >= 8:
             shutil.copytree(source_full_path, target, dirs_exist_ok=True)
         else:  # todo: drop along with 3.7
