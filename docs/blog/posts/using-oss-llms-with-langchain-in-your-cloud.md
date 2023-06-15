@@ -12,69 +12,18 @@ links:
 
 __A tutorial explaining how to build a chatbot using OSS LLMs on your cloud.__
 
-LangChain makes it easier to use LLMs for app development, which is why many people want to use it. However, some
-engineers are curious about other options besides OpenAI. This step-by-step tutorial will show you how to 
-build a chatbot using OSS LLMs with LangChain on your own cloud.
+LangChain makes it easier to use LLMs for app development, which is why many people want to use it.
+This tutorial shows how to use LangChain with OSS LLMs on your own cloud, using the example of building a chatbot with
+Falcon.
 
 <!-- more -->
 
-## Introduction to LangChain and OSS LLMs
+## Introduction
 
-What's LangChain? LangChain is a framework that extends the capabilities of LLMs using prompt templates, knowledge
-bases, and agents. Here's a very simple example.
+It can be used with closed-source LLMs such as OpenAI, as well as with any other variations, including OSS LLMs or those
+fine-tuned based on OSS LLMs.
 
-```python
-from langchain import LLMChain, PromptTemplate
-from langchain.llms import OpenAI
-
-template = """Answer the question based on the context below. If the
-question cannot be answered using the information provided answer
-with "I don't know".
-
-Context: Large Language Models (LLMs) are the latest models used in NLP.
-Their superior performance over smaller models has made them incredibly
-useful for developers building NLP enabled applications. These models
-can be accessed via Hugging Face's `transformers` library, via OpenAI
-using the `openai` library, and via Cohere using the `cohere` library.
-
-Question: {query}
-
-Answer: """
-
-prompt_template = PromptTemplate(
-    input_variables=["query"],
-    template=template
-)
-
-llm = OpenAI(model_name='text-davinci-003')
-
-llm_chain = LLMChain(
-    prompt=prompt_template,
-    llm=llm
-)
-
-question = "Which libraries and model providers offer LLMs?"
-
-print(llm_chain.run(question))
-```
-
-We ask an OpenAI LLM a question using a prompt template.
-
-While other features of LangChain, such as knowledge bases and agents, are much more powerful,they rely on the same
-principle. LangChain orchestrates LLMs and other code responsible for handling the LLM's prompt and response.
-
-### Using OSS LLMs with LangChain
-
-In the example above, LangChain accesses the LLM through the API endpoint provided by OpenAI. LangChain can also access
-LLMs deployed elsewhere.
-
-Instead of OpenAI, you can use OSS LLMs, which offer several advantages. Firstly, they can be easily fine-tuned
-(e.g. using the PEFT technique) on your own data for your specific task. Secondly, deploying privately is a breeze with fine-tuned OSS LLMs.
-
-Furthermore, when developing, there's no need to deploy the LLM to use it with LangChain. LangChain enables you to run
-your LLM on the same machine where you execute LangChain code, as long as you have enough GPU and memory.
-
-Here's an example of running an LLM locally with LangChain.
+Here's an example of using LangChain with a local LLM loaded from Hugging Face Hub.
 
 ```python
 from langchain import PromptTemplate, LLMChain, HuggingFacePipeline
@@ -95,14 +44,13 @@ question = "What is electroencephalography?"
 print(llm_chain.run(question))
 ```
 
-Running LLMs on the same machine can be particularly convenient during development when you don't necessarily need your
-model to be deployed.
+!!! info "NOTE:"
+    Running LLMs on the same machine can be particularly convenient during the development stage when you don't necessarily need your
+    model to be deployed.
 
-## Example: Building a chatbot with Falcon LLM
+Let's see how to use OSS LLMs with LangChain, using the example of building a chatbot with Falcon and Gradio.
 
-Let's demonstrate how to use OSS LLMs with LangChain, using the example of building a chatbot with Falcon and Gradio.
-
-### Setting up a dev environment with dstack
+## Setting up a dev environment with dstack
 
 Since we'll be developing in the cloud, we'll use `dstack` to streamline the process of setting up dev
 environments and running ML tasks.
@@ -154,7 +102,8 @@ $ dstack run .
  RUN                USER   INSTANCE       STATUS     SUBMITTED 
  ancient-turtle-11  admin  a2-highgpu-1g  Submitted  54 secs ago        
 
-Starting SSH tunnel...
+Provisioning and starting SSH tunnel...
+---> 100%
 
 To open in VS Code Desktop, use one of these link:
   vscode://vscode-remote/ssh-remote+ancient-turtle-11/workflow
@@ -168,7 +117,7 @@ To exit, press Ctrl+C.
 
 ![dstack-v010-vscode-desktop.png](../../assets/images/dstack-v010-vscode-desktop.png)
 
-### Loading the Falcon-7B-Instruct pipeline
+## Loading the Falcon-7B-Instruct pipeline
 
 Now that you have set up the dev environment with the required GPU and memory, you can load the Falcon model
 from the Hugging Face Hub.
@@ -204,7 +153,7 @@ pipeline = InstructionTextGenerationPipeline(
 )
 ```
 
-### Passing the pipeline to LangChain
+## Passing the pipeline to LangChain
 
 Now that our pipeline is ready, we can use it in conjunction with LangChain and its memory feature.
 
@@ -224,7 +173,7 @@ print(llm_chain.run("What is its population?"))
 If we run it, we will see that indeed the LLM answers the second question based on the previous history of the
 conversation.
 
-### Building a Gradio app
+## Building a Gradio app
 
 Now that we see that the LLM is capable of keeping up a conversation, it is very easy to put it all together into a chatbot app using Gradio.
 
@@ -300,15 +249,16 @@ automatically release and clean up all the associated cloud resources.
 
 [//]: # (TODO: It doesn't allow to save local changes)
 
-### Running the app as a task with dstack 
+## Running the app as a task with dstack 
 
-Now, what if you would like to run the app in the cloud outside of the development environment? For example, for development and testing purposes.
+Now, what if you would like to run the app in the cloud outside the dev environment? 
+For example, for development and testing purposes.
 
 This can be easily done if you define a task configuration.
 
 <div editor-title="app.dstack.yml">
 
-```
+```yaml
 type: task
 setup:
   - pip install -r requirements.txt
@@ -325,6 +275,14 @@ Once it is defined, you can run it in the same way as a dev environment.
 
 ```shell
 $ dstack run . -f app.dstack.yml
+
+ RUN           USER   INSTANCE       STATUS     SUBMITTED 
+ tasty-bat-11  admin  a2-highgpu-1g  Submitted  54 secs ago        
+
+Provisioning and starting SSH tunnel...
+---> 100%
+
+Launching in *reload mode* on: http://127.0.0.1:7860 (Press CTRL+C to quit)
 ```
 
 </div>
@@ -341,7 +299,9 @@ This way, you can run apps that use LLMs for development and testing purposes wi
 
 Tasks can be used not only to run apps but also for running training, finetuning, or any other ML workloads.
 
-### Conclusion
+## Conclusion
 
-That's it! Using OSS LLMs with LangChain to build apps on your cloud is easy. Check out the links on the left for more
-information, including the source code used in this tutorial.
+!!! info "NOTE:"
+    We have just seen how to use LangChain with OSS LLMs on your cloud for development and testing purposes. Once the
+    development is done, you will proceed with deploying the model to production. However, that is outside the scope of this
+    tutorial.

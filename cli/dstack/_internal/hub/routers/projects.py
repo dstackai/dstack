@@ -63,9 +63,9 @@ async def create_project(
     configurator = get_backend_configurator(project_info.backend.__root__.type)
     try:
         await run_async(configurator.configure_project, project_info.backend.__root__.dict())
+        await ProjectManager.create_project_from_info(user=user, project_info=project_info)
     except BackendConfigError as e:
         _error_response_on_config_error(e, path_to_config=["backend"])
-    await ProjectManager.create_project_from_info(user=user, project_info=project_info)
     return project_info
 
 

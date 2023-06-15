@@ -165,8 +165,7 @@ class AzureConfigurator(Configurator):
         self.runner_principal_id = self._create_runner_managed_identity()
         self.network, self.subnet = self._create_network_resources()
         self._create_logs_resources()
-        self._grant_roles_to_runner_managed_identity()
-        self._grant_roles_to_logged_in_user()
+        self._grant_roles_or_error()
         config_data = {
             "backend": "azure",
             "tenant_id": self.tenant_id,
@@ -254,6 +253,12 @@ class AzureConfigurator(Configurator):
             )
         if len(subscription_ids) == 1:
             element.selected = subscription_ids[0]
+        if len(subscription_ids) == 0:
+            # Credentials without granted roles don't see any subscriptions
+            raise BackendConfigError(
+                message="No Azure subscriptions found for provided credentials. Ensure the account has enough permissions.",
+                code="not_enough_permissions",
+            )
         return element
 
     def _get_location(self, default_location: Optional[str]) -> ProjectElement:
@@ -315,8 +320,7 @@ class AzureConfigurator(Configurator):
                 name=name,
                 location=self.location,
             )
-        except HttpResponseError as e:
-            print(e.message)
+        except HttpResponseError:
             return self._ask_storage_account(name)
         return storage_account, resource_group
 
@@ -397,6 +401,18 @@ class AzureConfigurator(Configurator):
             data_collection_endpoint_id=dce_id,
             name=azure_utils.get_data_collection_rule_name(self.storage_account),
         )
+
+    def _grant_roles_or_error(self):
+        try:
+            self._grant_roles_to_runner_managed_identity()
+            self._grant_roles_to_logged_in_user()
+        except HttpResponseError as e:
+            if e.status_code == 403:
+                raise BackendConfigError(
+                    "Not enough permissions. The account must have permissions to assign Azure RBAC roles (e.g. be an Owner).",
+                    code="not_enough_permissions",
+                )
+            raise e
 
     def _grant_roles_to_runner_managed_identity(self) -> str:
         roles_manager = RolesManager(

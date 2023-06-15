@@ -1,6 +1,6 @@
 ---
 template: home.html
-title: Develop ML faster. Use any cloud.
+title: Cost-effective ML development in your cloud
 hide:
    - navigation
    - toc

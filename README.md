@@ -9,7 +9,7 @@
 </h1>
 
 <h3 align="center">
-Develop ML faster. Use any cloud.
+Cost-effective ML development in your cloud
 </h3>
 
 <p align="center">
