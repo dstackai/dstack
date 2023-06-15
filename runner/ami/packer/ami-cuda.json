@@ -12,7 +12,8 @@
     "build_prefix": "[stgn] ",
     "ami_regions": "",
     "dstack_stage": "STGN",
-    "ami_groups": ""
+    "ami_groups": "",
+    "runner_version": "latest"
   },
   "builders": [
     {
@@ -57,7 +58,10 @@
     },
     {
       "type": "shell",
-      "environment_vars": ["DSTACK_STAGE={{user `dstack_stage`}}"],
+      "environment_vars": [
+        "DSTACK_STAGE={{user `dstack_stage`}}",
+        "RUNNER_VERSION={{user `runner_version`}}"
+      ],
       "script": "provisioners/get-dstack-runner.sh"
     },
     {
