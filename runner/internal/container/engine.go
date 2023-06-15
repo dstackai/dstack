@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"io"
 	"io/ioutil"
+	"os/exec"
 	"runtime"
 	"strings"
 
@@ -327,6 +328,18 @@ func (r *Engine) ExportImageDiff(ctx context.Context, imageName, diffPath string
 
 func (r *Engine) ImportImageDiff(ctx context.Context, diffPath string) error {
 	if err := Overlay2ImportImageDiff(ctx, diffPath); err != nil {
+		return gerrors.Wrap(err)
+	}
+	if err := r.RestartDaemon(ctx); err != nil {
+		return gerrors.Wrap(err)
+	}
+	return nil
+}
+
+func (r *Engine) RestartDaemon(ctx context.Context) error {
+	log.Trace(ctx, "Restarting docker daemon")
+	cmd := exec.Command("systemctl", "restart", "docker")
+	if err := cmd.Run(); err != nil {
 		return gerrors.Wrap(err)
 	}
 	return nil
