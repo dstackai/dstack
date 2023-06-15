@@ -24,6 +24,7 @@ export const AzureBackend: React.FC<IProps> = ({ loading }) => {
     const { control, getValues, setValue, setError, clearErrors, watch } = useFormContext();
     const [valuesData, setValuesData] = useState<IProjectAzureBackendValues | undefined>();
     const [subscriptionIds, setSubscriptionIds] = useState<FormSelectOptions>([]);
+    const [tenantIds, setTenantIds] = useState<FormSelectOptions>([]);
     const [locations, setLocations] = useState<FormSelectOptions>([]);
     const [storageAccounts, setStorageAccounts] = useState<FormSelectOptions>([]);
     const [availableDefaultCredentials, setAvailableDefaultCredentials] = useState<boolean | null>(null);
@@ -77,13 +78,18 @@ export const AzureBackend: React.FC<IProps> = ({ loading }) => {
             }
 
             // TENANT_ID available for only client credentials type
-            if (response.tenant_id?.selected && backendCredentials.type === AzureCredentialTypeEnum.CLIENT) {
+            if (response.tenant_id?.selected) {
                 setValue(`backend.${FIELD_NAMES.TENANT_ID}`, response.tenant_id.selected);
+            }
+
+            if (response.tenant_id?.values) {
+                setTenantIds(response.tenant_id?.values);
             }
 
             if (response.subscription_id?.values) {
                 setSubscriptionIds(response.subscription_id.values);
             }
+
             if (response.subscription_id?.selected !== undefined) {
                 setValue(`backend.${FIELD_NAMES.SUBSCRIPTION_ID}`, response.subscription_id.selected);
             }
@@ -187,6 +193,40 @@ export const AzureBackend: React.FC<IProps> = ({ loading }) => {
         return disabledField;
     };
 
+    const renderTenantIdField = () => {
+        if (credentialTypeValue === AzureCredentialTypeEnum.CLIENT)
+            return (
+                <FormInput
+                    info={<InfoLink onFollow={() => openHelpPanel(CREDENTIALS_HELP)} />}
+                    label={t('projects.edit.azure.tenant_id')}
+                    description={t('projects.edit.azure.tenant_id_description')}
+                    control={control}
+                    name={`backend.${FIELD_NAMES.TENANT_ID}`}
+                    onChange={onChangeCredentialField}
+                    disabled={loading}
+                    rules={{ required: t('validation.required') }}
+                />
+            );
+
+        if (credentialTypeValue === AzureCredentialTypeEnum.DEFAULT)
+            return (
+                <FormSelect
+                    info={<InfoLink onFollow={() => openHelpPanel(CREDENTIALS_HELP)} />}
+                    label={t('projects.edit.azure.tenant_id')}
+                    description={t('projects.edit.azure.tenant_id_description')}
+                    placeholder={t('projects.edit.azure.tenant_id_placeholder')}
+                    control={control}
+                    name={`backend.${FIELD_NAMES.TENANT_ID}`}
+                    disabled={loading}
+                    onChange={getOnChangeSelectField(FIELD_NAMES.TENANT_ID)}
+                    options={tenantIds}
+                    rules={{ required: t('validation.required') }}
+                />
+            );
+
+        return null;
+    };
+
     return (
         <SpaceBetween size="l">
             <FormSelect
@@ -209,19 +249,10 @@ export const AzureBackend: React.FC<IProps> = ({ loading }) => {
                 ]}
             />
 
+            {renderTenantIdField()}
+
             {credentialTypeValue === AzureCredentialTypeEnum.CLIENT && (
                 <>
-                    <FormInput
-                        info={<InfoLink onFollow={() => openHelpPanel(CREDENTIALS_HELP)} />}
-                        label={t('projects.edit.azure.tenant_id')}
-                        description={t('projects.edit.azure.tenant_id_description')}
-                        control={control}
-                        name={`backend.${FIELD_NAMES.TENANT_ID}`}
-                        onChange={onChangeCredentialField}
-                        disabled={loading}
-                        rules={{ required: t('validation.required') }}
-                    />
-
                     <FormInput
                         info={<InfoLink onFollow={() => openHelpPanel(CREDENTIALS_HELP)} />}
                         label={t('projects.edit.azure.client_id')}

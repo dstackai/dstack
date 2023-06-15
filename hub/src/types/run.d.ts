@@ -40,6 +40,9 @@ declare interface IRunJobHead {
         repo_user_id: string
     },
     run_name: string,
+
+    configuration_path: string,
+    instance_type: string,
     workflow_name: null | string,
     provider_name: string,
     status: TRunStatus,
@@ -47,7 +50,7 @@ declare interface IRunJobHead {
     container_exit_code: null,
     submitted_at: number,
     artifact_paths: null,
-    tag_name: null,
+    tag_name: null | string,
     app_names: string[]
 }
 
