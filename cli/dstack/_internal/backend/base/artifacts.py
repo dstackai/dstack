@@ -11,6 +11,18 @@ from dstack._internal.core.error import DstackError
 from dstack._internal.utils.common import PathLike, removeprefix
 
 
+class ArtifactsError(DstackError):
+    pass
+
+
+class ArtifactsUploadError(ArtifactsError):
+    pass
+
+
+class ArtifactsDownloadError(ArtifactsError):
+    pass
+
+
 def list_run_artifact_files(
     storage: Storage, repo_id: str, run_name: str, prefix: str, recursive: bool
 ) -> List[Artifact]:
@@ -98,7 +110,9 @@ def upload_job_artifact_files(
 ):
     local_path = Path(local_path).expanduser().absolute()
     if not local_path.exists():
-        raise DstackError(f"Local path {local_path} does not exist")
+        raise ArtifactsUploadError(f"Local path {local_path} does not exist")
+    if not local_path.is_dir():
+        raise ArtifactsUploadError(f"Local artifact path must be a directory")
     artifacts_dir = _get_job_artifacts_dir(repo_id, job_id)
     artifact_path = normalize_upload_artifact_path(artifact_path)
     relative_artifact_path = _relativize_upload_artifact_path(artifact_path)
@@ -140,7 +154,9 @@ def normalize_upload_artifact_path(path: PathLike) -> Path:
 def _validate_upload_artifact_path(path: Path):
     valid_path = path.absolute() == path or path.absolute().resolve() == Path.cwd() / path
     if not valid_path:
-        raise DstackError("Artifact path should be absolute or be inside the working directory.")
+        raise ArtifactsUploadError(
+            "Artifact path should be absolute or be inside the working directory."
+        )
 
 
 def _relativize_upload_artifact_path(path: Path) -> Path:
