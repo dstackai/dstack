@@ -17,6 +17,7 @@ from dstack._internal.hub.models import (
 )
 from dstack._internal.hub.security.utils import ROLE_ADMIN
 from dstack._internal.hub.services.backends import get_configurator
+from dstack._internal.hub.utils.common import run_async
 
 
 class ProjectManager:
@@ -161,8 +162,8 @@ async def _info2project(project_info: ProjectInfoWithCreds) -> Project:
         backend=project_info.backend.type,
     )
     configurator = get_configurator(project.backend)
-    config, auth = await asyncio.get_running_loop().run_in_executor(
-        None, configurator.create_config_auth_data_from_project_config, project_info.backend
+    config, auth = await run_async(
+        configurator.create_config_auth_data_from_project_config, project_info.backend
     )
     project.config = json.dumps(config)
     project.auth = json.dumps(auth)

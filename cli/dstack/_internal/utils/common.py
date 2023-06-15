@@ -73,13 +73,11 @@ def pretty_date(time: Any = False):
 
 
 def since(timestamp: str) -> datetime:
-    regex = re.compile(r"(?P<amount>\d+)(?P<unit>s|m|h|d|w)$")
-    re_match = regex.match(timestamp)
-    if re_match:
-        datetime_value = _relative_timestamp_to_datetime(
-            int(re_match.group("amount")), re_match.group("unit")
-        )
-        return datetime_value
+    try:
+        seconds = parse_pretty_duration(timestamp)
+        return get_current_datetime() - timedelta(seconds=seconds)
+    except ValueError:
+        pass
     try:
         return datetime.fromisoformat(timestamp)
     except ValueError:
@@ -90,7 +88,12 @@ def since(timestamp: str) -> datetime:
         raise ValueError("Invalid datetime format")
 
 
-def _relative_timestamp_to_datetime(amount, unit):
+def parse_pretty_duration(duration: str) -> int:
+    regex = re.compile(r"(?P<amount>\d+)(?P<unit>s|m|h|d|w)$")
+    re_match = regex.match(duration)
+    if not re_match:
+        raise ValueError(f"Cannot parse the duration {duration}")
+    amount, unit = int(re_match.group("amount")), re_match.group("unit")
     multiplier = {
         "s": 1,
         "m": 60,
@@ -98,7 +101,7 @@ def _relative_timestamp_to_datetime(amount, unit):
         "d": 24 * 3600,
         "w": 7 * 24 * 3600,
     }[unit]
-    return get_current_datetime() + timedelta(seconds=amount * multiplier * -1)
+    return amount * multiplier
 
 
 def sizeof_fmt(num, suffix="B"):

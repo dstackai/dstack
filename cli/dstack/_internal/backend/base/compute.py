@@ -53,16 +53,16 @@ def choose_instance_type(
     if len(eligible_instance_types) == 0:
         return None
     instance_type = eligible_instance_types[0]
-    interruptible = False
-    if requirements and requirements.interruptible:
-        interruptible = True
+    spot = False
+    if requirements and requirements.spot:
+        spot = True
     return InstanceType(
         instance_name=instance_type.instance_name,
         resources=Resources(
             cpus=instance_type.resources.cpus,
             memory_mib=instance_type.resources.memory_mib,
             gpus=instance_type.resources.gpus,
-            interruptible=interruptible,
+            spot=spot,
             local=False,
         ),
     )
@@ -93,6 +93,8 @@ def _compare_instance_types(i1, i2):
 def _matches_requirements(resources: Resources, requirements: Optional[Requirements]) -> bool:
     if not requirements:
         return True
+    if requirements.spot and not resources.spot:
+        return False
     if requirements.cpus and requirements.cpus > resources.cpus:
         return False
     if requirements.memory_mib and requirements.memory_mib > resources.memory_mib:
@@ -113,7 +115,5 @@ def _matches_requirements(resources: Resources, requirements: Optional[Requireme
                 )
             )
         ):
-            return False
-        if requirements.interruptible and not resources.interruptible:
             return False
     return True

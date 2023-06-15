@@ -1,4 +1,3 @@
-import uuid
 from typing import List, Optional, Tuple
 
 import yaml
@@ -8,7 +7,7 @@ from dstack._internal.backend.base.compute import Compute, NoCapacityError
 from dstack._internal.backend.base.storage import Storage
 from dstack._internal.core.error import NoMatchingInstanceError
 from dstack._internal.core.instance import InstanceType
-from dstack._internal.core.job import Job, JobErrorCode, JobHead, JobStatus
+from dstack._internal.core.job import Job, JobErrorCode, JobHead, JobStatus, SpotPolicy
 from dstack._internal.core.repo import RepoRef
 from dstack._internal.core.request import RequestStatus
 from dstack._internal.core.runners import Runner
@@ -102,31 +101,15 @@ def run_job(
 ):
     if job.status != JobStatus.SUBMITTED:
         raise Exception("Can't create a request for a job which status is not SUBMITTED")
-
-    runner = None
     try:
-        instance_type = compute.get_instance_type(job)
-        if instance_type is None:
-            job.status = JobStatus.FAILED
-            job.error_code = JobErrorCode.NO_INSTANCE_MATCHING_REQUIREMENTS
-            update_job(storage, job)
-            raise NoMatchingInstanceError()
-        job.instance_type = instance_type.instance_name
-        update_job(storage, job)
-        runner = Runner(
-            runner_id=job.runner_id, request_id=None, resources=instance_type.resources, job=job
+        _try_run_job(
+            storage=storage,
+            compute=compute,
+            job=job,
+            failed_to_start_job_new_status=failed_to_start_job_new_status,
         )
-        runners.create_runner(storage, runner)
-        runner.request_id = compute.run_instance(job, instance_type)
-        runners.update_runner(storage, runner)
-    except NoCapacityError:
-        job.status = failed_to_start_job_new_status
-        job.error_code = JobErrorCode.FAILED_TO_START_DUE_TO_NO_CAPACITY
-        job.request_id = runner.request_id if runner else None
-        update_job(storage, job)
     except Exception as e:
         job.status = JobStatus.FAILED
-        job.request_id = runner.request_id if runner else None
         update_job(storage, job)
         raise e
 
@@ -203,6 +186,59 @@ def update_job_submission(job: Job):
     job.submitted_at = get_milliseconds_since_epoch()
 
 
+def _try_run_job(
+    storage: Storage,
+    compute: Compute,
+    job: Job,
+    failed_to_start_job_new_status: JobStatus,
+    attempt: int = 0,
+):
+    spot = (
+        job.spot_policy is SpotPolicy.SPOT or job.spot_policy is SpotPolicy.AUTO and attempt == 0
+    )
+    job.requirements.spot = spot
+    instance_type = compute.get_instance_type(job)
+    if instance_type is None:
+        if job.spot_policy == SpotPolicy.AUTO and attempt == 0:
+            return _try_run_job(
+                storage=storage,
+                compute=compute,
+                job=job,
+                failed_to_start_job_new_status=failed_to_start_job_new_status,
+                attempt=attempt + 1,
+            )
+        else:
+            job.status = JobStatus.FAILED
+            job.error_code = JobErrorCode.NO_INSTANCE_MATCHING_REQUIREMENTS
+            update_job(storage, job)
+            raise NoMatchingInstanceError()
+    job.instance_type = instance_type.instance_name
+    update_job(storage, job)
+    runner = Runner(
+        runner_id=job.runner_id, request_id=None, resources=instance_type.resources, job=job
+    )
+    runners.create_runner(storage, runner)
+    try:
+        runner.request_id = compute.run_instance(job, instance_type)
+    except NoCapacityError:
+        if job.spot_policy == SpotPolicy.AUTO and attempt == 0:
+            return _try_run_job(
+                storage=storage,
+                compute=compute,
+                job=job,
+                failed_to_start_job_new_status=failed_to_start_job_new_status,
+                attempt=attempt + 1,
+            )
+        else:
+            job.status = failed_to_start_job_new_status
+            job.error_code = JobErrorCode.FAILED_TO_START_DUE_TO_NO_CAPACITY
+            job.request_id = runner.request_id if runner else None
+            update_job(storage, job)
+    else:
+        runners.update_runner(storage, runner)
+        update_job(storage, job)
+
+
 def _get_jobs_dir(repo_id: str) -> str:
     return f"jobs/{repo_id}/"
 
@@ -238,14 +274,15 @@ def _get_job_head_filename(job: Job) -> str:
         f"{','.join([a.app_name for a in (job.app_specs or [])])};"
         f"{job.tag_name or ''};"
         f"{job.instance_type or ''};"
-        f"{escape_head(job.configuration_path)}"
+        f"{escape_head(job.configuration_path)};"
+        f"{job.get_instance_spot_type()}"
     )
     return key
 
 
 def _parse_job_head_key(repo_id: str, full_key: str) -> JobHead:
     tokens = full_key[len(_get_jobs_dir(repo_id)) :].split(";")
-    tokens.extend([""] * (11 - len(tokens)))  # pad with empty tokens
+    tokens.extend([""] * (12 - len(tokens)))  # pad with empty tokens
     (
         _,
         job_id,
@@ -258,6 +295,7 @@ def _parse_job_head_key(repo_id: str, full_key: str) -> JobHead:
         tag_name,
         instance_type,
         configuration_path,
+        instance_spot_type,
     ) = tokens
     run_name, workflow_name, job_index = tuple(job_id.split(","))
     status, error_code, container_exit_code = _parse_job_status_info(status_info)
@@ -279,6 +317,7 @@ def _parse_job_head_key(repo_id: str, full_key: str) -> JobHead:
         app_names=app_names.split(",") or None,
         instance_type=instance_type or None,
         configuration_path=unescape_head(configuration_path),
+        instance_spot_type=instance_spot_type or None,
     )
 
 

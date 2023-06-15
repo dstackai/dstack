@@ -189,7 +189,7 @@ func (s *S3) CheckStop(ctx context.Context) (bool, error) {
 }
 
 func (s *S3) IsInterrupted(ctx context.Context) (bool, error) {
-	if !s.state.Resources.Interruptible {
+	if !s.state.Resources.Spot {
 		return false, nil
 	}
 	return s.cliEC2.IsInterruptedSpot(ctx, s.state.RequestID)
@@ -203,7 +203,7 @@ func (s *S3) Shutdown(ctx context.Context) error {
 	if s.state.Resources.Local {
 		return nil
 	}
-	if s.state.Resources.Interruptible {
+	if s.state.Resources.Spot {
 		log.Trace(ctx, "Instance interruptible")
 		if err := s.cliEC2.CancelSpot(ctx, s.state.RequestID); err != nil {
 			return gerrors.Wrap(err)

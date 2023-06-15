@@ -6,12 +6,12 @@ import (
 )
 
 type Resource struct {
-	CPUs          int    `yaml:"cpus,omitempty"`
-	Memory        uint64 `yaml:"memory_mib,omitempty"`
-	GPUs          []GPU  `yaml:"gpus,omitempty"`
-	Interruptible bool   `yaml:"interruptible,omitempty"`
-	ShmSize       int64  `yaml:"shm_size_mib,omitempty"`
-	Local         bool   `json:"local"`
+	CPUs    int    `yaml:"cpus,omitempty"`
+	Memory  uint64 `yaml:"memory_mib,omitempty"`
+	GPUs    []GPU  `yaml:"gpus,omitempty"`
+	Spot    bool   `yaml:"spot,omitempty"`
+	ShmSize int64  `yaml:"shm_size_mib,omitempty"`
+	Local   bool   `json:"local"`
 }
 
 type Job struct {
@@ -48,13 +48,18 @@ type Job struct {
 	Requirements      Requirements `yaml:"requirements"`
 	RunName           string       `yaml:"run_name"`
 	RunnerID          string       `yaml:"runner_id"`
+	SpotPolicy        string       `yaml:"spot_policy"`
+	RetryPolicy       RetryPolicy  `yaml:"retry_policy"`
 	Status            string       `yaml:"status"`
 	ErrorCode         string       `yaml:"error_code,omitempty"`
 	ContainerExitCode string       `yaml:"container_exit_code,omitempty"`
+	CreatedAt         uint64       `yaml:"created_at"`
 	SubmittedAt       uint64       `yaml:"submitted_at"`
+	SubmissionNum     int          `yaml:"submission_num"`
 	TagName           string       `yaml:"tag_name"`
 	InstanceType      string       `yaml:"instance_type"`
 	ConfigurationPath string       `yaml:"configuration_path"`
+	ConfigurationType string       `yaml:"configuration_type"`
 	WorkflowName      string       `yaml:"workflow_name"`
 	HomeDir           string       `yaml:"home_dir"`
 	WorkingDir        string       `yaml:"working_dir"`
@@ -87,18 +92,23 @@ type App struct {
 }
 
 type Requirements struct {
-	GPUs          GPU   `yaml:"gpus,omitempty"`
-	CPUs          int   `yaml:"cpus,omitempty"`
-	Memory        int   `yaml:"memory_mib,omitempty"`
-	Interruptible bool  `yaml:"interruptible,omitempty"`
-	ShmSize       int64 `yaml:"shm_size_mib,omitempty"`
-	Local         bool  `json:"local"`
+	GPUs    GPU   `yaml:"gpus,omitempty"`
+	CPUs    int   `yaml:"cpus,omitempty"`
+	Memory  int   `yaml:"memory_mib,omitempty"`
+	Spot    bool  `yaml:"spot,omitempty"`
+	ShmSize int64 `yaml:"shm_size_mib,omitempty"`
+	Local   bool  `json:"local"`
 }
 
 type GPU struct {
 	Count     int    `yaml:"count,omitempty"`
 	Name      string `yaml:"name,omitempty"`
 	MemoryMiB int    `yaml:"memory_mib,omitempty"`
+}
+
+type RetryPolicy struct {
+	Retry bool `yaml:"retry"`
+	Limit int  `yaml:"limit,omitempty"`
 }
 
 type State struct {

@@ -16,9 +16,12 @@ router = APIRouter(
 @router.post("/{project_name}/runners/run")
 async def run_runners(project_name: str, job: Job):
     project = await get_project(project_name=project_name)
-    backend = get_backend(project)
+    backend = await get_backend(project)
+    failed_to_start_job_new_status = JobStatus.FAILED
+    if job.retry_policy.retry:
+        failed_to_start_job_new_status = JobStatus.PENDING
     try:
-        await run_async(backend.run_job, job, JobStatus.PENDING)
+        await run_async(backend.run_job, job, failed_to_start_job_new_status)
     except NoMatchingInstanceError:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
@@ -31,5 +34,5 @@ async def run_runners(project_name: str, job: Job):
 @router.post("/{project_name}/runners/stop")
 async def stop_runners(project_name: str, body: StopRunners):
     project = await get_project(project_name=project_name)
-    backend = get_backend(project)
+    backend = await get_backend(project)
     await run_async(backend.stop_job, body.repo_id, body.abort, body.job_id)

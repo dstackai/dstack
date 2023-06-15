@@ -4,11 +4,12 @@ from typing import Optional
 from dstack._internal.backend.base import Backend
 from dstack._internal.hub.db.models import Project
 from dstack._internal.hub.services.backends import get_configurator
+from dstack._internal.hub.utils.common import run_async
 
 cache = {}
 
 
-def get_backend(project: Project) -> Optional[Backend]:
+async def get_backend(project: Project) -> Optional[Backend]:
     configurator = get_configurator(project.backend)
     if configurator is None:
         return None
@@ -21,7 +22,7 @@ def get_backend(project: Project) -> Optional[Backend]:
         project.name, json_data, auth_data
     )
     backend_cls = configurator.get_backend_class()
-    backend = backend_cls(backend_config=config)
+    backend = await run_async(backend_cls, config)
     cache[key] = backend
     return cache[key]
 

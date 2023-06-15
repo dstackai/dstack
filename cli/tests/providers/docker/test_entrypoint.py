@@ -10,7 +10,12 @@ from dstack._internal.providers.docker.main import DockerProvider
 def create_provider_data(
     commands: Optional[List[str]] = None, entrypoint: Optional[str] = None
 ) -> dict:
-    return {"image": "ubuntu:20.04", "commands": commands, "entrypoint": entrypoint}
+    return {
+        "image": "ubuntu:20.04",
+        "commands": commands,
+        "entrypoint": entrypoint,
+        "configuration_type": "task",
+    }
 
 
 args = Namespace(args=[], unknown=[], detach=True)

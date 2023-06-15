@@ -1,6 +1,6 @@
 from typing import Optional
 
-from dstack._internal.backend.base.compute import Compute
+from dstack._internal.backend.base.compute import Compute, choose_instance_type
 from dstack._internal.backend.local import runners
 from dstack._internal.backend.local.config import LocalConfig
 from dstack._internal.core.instance import InstanceType
@@ -17,7 +17,11 @@ class LocalCompute(Compute):
 
     def get_instance_type(self, job: Job) -> Optional[InstanceType]:
         resources = runners.check_runner_resources(self.backend_config, job.runner_id)
-        return InstanceType(instance_name="", resources=resources)
+        instance_type = choose_instance_type(
+            instance_types=[InstanceType(instance_name="", resources=resources)],
+            requirements=job.requirements,
+        )
+        return instance_type
 
     def run_instance(self, job: Job, instance_type: InstanceType) -> str:
         return runners.start_runner_process(self.backend_config, job.runner_id)

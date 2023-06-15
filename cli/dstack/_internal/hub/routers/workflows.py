@@ -17,5 +17,5 @@ async def delete_workflow_cache(
     project_name: str, workflow_name: str, repo_ref: RepoRef, user: User = Depends(Authenticated())
 ):
     project = await get_project(project_name=project_name)
-    backend = get_backend(project)
+    backend = await get_backend(project)
     await run_async(backend.delete_workflow_cache, repo_ref.repo_id, user.name, workflow_name)

@@ -103,7 +103,7 @@ class AzureCompute(Compute):
             instance_name=_get_instance_name(job),
             user_data=_get_user_data_script(self.azure_config, job, instance_type),
             ssh_pub_key=job.ssh_key_pub,
-            spot=instance_type.resources.interruptible,
+            spot=instance_type.resources.spot,
         )
         return vm.name
 
@@ -161,7 +161,7 @@ def _get_instance_types(client: ComputeManagementClient, location: str) -> List[
                     cpus=capabilities["vCPUs"],
                     memory_mib=int(float(capabilities["MemoryGB"]) * 1024),
                     gpus=gpus,
-                    interruptible=False,
+                    spot=True,
                     local=False,
                 ),
             )

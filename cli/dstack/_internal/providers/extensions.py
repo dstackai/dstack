@@ -38,8 +38,9 @@ class OpenSSHExtension(ProviderExtension):
         commands.extend(
             [
                 f'echo "{ssh_key_pub}" >> ~/.ssh/authorized_keys',
+                f"env >> ~/.ssh/environment",
                 f"ssh-keygen -A > /dev/null",
-                f"/usr/sbin/sshd -p {cls.port}",
+                f"/usr/sbin/sshd -p {cls.port} -o PermitUserEnvironment=yes",
             ]
         )
 

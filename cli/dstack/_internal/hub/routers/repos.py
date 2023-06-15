@@ -15,7 +15,7 @@ router = APIRouter(prefix="/api/project", tags=["repos"], dependencies=[Depends(
 @router.post("/{project_name}/repos/heads/list")
 async def list_repo_heads(project_name: str) -> List[RepoHead]:
     project = await get_project(project_name=project_name)
-    backend = get_backend(project)
+    backend = await get_backend(project)
     repo_heads = await run_async(backend.list_repo_heads)
     return repo_heads
 
@@ -23,7 +23,7 @@ async def list_repo_heads(project_name: str) -> List[RepoHead]:
 @router.post("/{project_name}/repos/heads/get")
 async def get_repo_head(project_name: str, body: RepoHeadGet) -> RepoHead:
     project = await get_project(project_name=project_name)
-    backend = get_backend(project)
+    backend = await get_backend(project)
     repo_heads = await run_async(backend.list_repo_heads)
     for repo_head in repo_heads:
         if repo_head.repo_id == body.repo_id:
@@ -37,7 +37,7 @@ async def get_repo_head(project_name: str, body: RepoHeadGet) -> RepoHead:
 @router.post("/{project_name}/repos/credentials/save")
 async def save_repo_credentials(project_name: str, body: SaveRepoCredentials):
     project = await get_project(project_name=project_name)
-    backend = get_backend(project)
+    backend = await get_backend(project)
     await run_async(backend.save_repo_credentials, body.repo_id, body.repo_credentials)
 
 
@@ -46,7 +46,7 @@ async def save_repo_credentials(project_name: str, body: SaveRepoCredentials):
 )
 async def get_repo_credentials(project_name: str, repo_ref: RepoRef) -> RemoteRepoCredentials:
     project = await get_project(project_name=project_name)
-    backend = get_backend(project)
+    backend = await get_backend(project)
     repo_credentials = await run_async(backend.get_repo_credentials, repo_ref.repo_id)
     if repo_credentials is None:
         raise HTTPException(
@@ -59,5 +59,5 @@ async def get_repo_credentials(project_name: str, repo_ref: RepoRef) -> RemoteRe
 @router.post("/{project_name}/repos/update")
 async def update_repo(project_name: str, body: ReposUpdate):
     project = await get_project(project_name=project_name)
-    backend = get_backend(project)
+    backend = await get_backend(project)
     await run_async(backend.update_repo_last_run_at, body.repo_spec, body.last_run_at)

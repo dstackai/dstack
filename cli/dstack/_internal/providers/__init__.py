@@ -14,6 +14,7 @@ from dstack._internal.core.cache import CacheSpec
 from dstack._internal.core.error import RepoNotInitializedError
 from dstack._internal.core.job import (
     ArtifactSpec,
+    ConfigurationType,
     DepSpec,
     GpusRequirements,
     Job,
@@ -21,14 +22,18 @@ from dstack._internal.core.job import (
     JobStatus,
     PrebuildPolicy,
     Requirements,
+    RetryPolicy,
+    SpotPolicy,
 )
 from dstack._internal.core.repo.base import Repo
 from dstack._internal.providers.ports import PortMapping, merge_ports
-from dstack._internal.utils.common import get_milliseconds_since_epoch
+from dstack._internal.utils.common import get_milliseconds_since_epoch, parse_pretty_duration
 from dstack._internal.utils.interpolator import VariablesInterpolator
 
 DEFAULT_CPU = 2
 DEFAULT_MEM = "8GB"
+
+DEFAULT_RETRY_LIMIT = 3600
 
 
 class Provider:
@@ -115,6 +120,7 @@ class Provider:
         self.workflow_name = workflow_name
         self.provider_data = provider_data
         self.run_as_provider = not workflow_name
+        self.configuration_type = ConfigurationType(self.provider_data["configuration_type"])
         self.run_name = run_name
         self.ssh_key_pub = ssh_key_pub
         self.openssh_server = self.provider_data.get("ssh", self.openssh_server)
@@ -155,8 +161,18 @@ class Provider:
         parser.add_argument("-a", "--artifact", metavar="PATH", dest="artifacts", action="append")
         parser.add_argument("--dep", metavar="(:TAG | WORKFLOW)", dest="deps", action="append")
         parser.add_argument("-w", "--working-dir", metavar="PATH", type=str)
-        group = parser.add_mutually_exclusive_group()
-        group.add_argument("-i", "--interruptible", action="store_true")
+        spot_group = parser.add_mutually_exclusive_group()
+        spot_group.add_argument("-i", "--interruptible", action="store_true")
+        spot_group.add_argument("--spot", action="store_true")
+        spot_group.add_argument("--on-demand", action="store_true")
+        spot_group.add_argument("--spot-auto", action="store_true")
+        spot_group.add_argument("--spot-policy", type=str)
+
+        retry_group = parser.add_mutually_exclusive_group()
+        retry_group.add_argument("--retry", action="store_true")
+        retry_group.add_argument("--no-retry", action="store_true")
+        retry_group.add_argument("--retry-limit", type=str)
+
         parser.add_argument("--cpu", metavar="NUM", type=int)
         parser.add_argument("--memory", metavar="SIZE", type=str)
         parser.add_argument("--gpu", metavar="NUM", type=int)
@@ -184,6 +200,22 @@ class Provider:
             env.extend(args.env)
             self.provider_data["env"] = env
 
+        if args.spot_policy:
+            self.provider_data["spot_policy"] = args.spot_policy
+        if args.interruptible or args.spot:
+            self.provider_data["spot_policy"] = SpotPolicy.SPOT.value
+        if args.on_demand:
+            self.provider_data["spot_policy"] = SpotPolicy.ONDEMAND.value
+        if args.spot_auto:
+            self.provider_data["spot_policy"] = SpotPolicy.AUTO.value
+
+        if args.retry:
+            self.provider_data["retry_policy"] = {"retry": True}
+        if args.no_retry:
+            self.provider_data["retry_policy"] = {"retry": False}
+        if args.retry_limit:
+            self.provider_data["retry_policy"] = {"retry": True, "limit": args.retry_limit}
+
         resources = self.provider_data.get("resources") or {}
         self.provider_data["resources"] = resources
         if args.cpu:
@@ -207,8 +239,6 @@ class Provider:
                 gpu["name"] = args.gpu_name
         if args.shm_size:
             resources["shm_size"] = args.shm_size
-        if args.interruptible:
-            resources["interruptible"] = True
         self.provider_data["ports"] = merge_ports(
             [PortMapping(i) for i in self.provider_data.get("ports") or []], args.port or []
         )
@@ -229,8 +259,8 @@ class Provider:
     ) -> List[Job]:
         if not self.loaded:
             raise Exception("The provider is not loaded")
+        created_at = get_milliseconds_since_epoch()
         job_specs = self.create_job_specs()
-
         jobs = []
         for i, job_spec in enumerate(job_specs):
             job = Job(
@@ -241,9 +271,11 @@ class Provider:
                 run_name=self.run_name,
                 workflow_name=self.workflow_name or None,
                 provider_name=self.provider_name,
+                configuration_type=self.configuration_type,
                 configuration_path=configuration_path,
                 status=JobStatus.SUBMITTED,
-                submitted_at=get_milliseconds_since_epoch(),
+                created_at=created_at,
+                submitted_at=created_at,
                 image_name=job_spec.image_name,
                 registry_auth=job_spec.registry_auth,
                 commands=job_spec.commands,
@@ -254,6 +286,8 @@ class Provider:
                 artifact_specs=job_spec.artifact_specs,
                 cache_specs=self.cache_specs,
                 host_name=None,
+                spot_policy=self._spot_policy(),
+                retry_policy=self._retry_policy(),
                 requirements=job_spec.requirements,
                 dep_specs=self.dep_specs,
                 master_job=job_spec.master_job,
@@ -398,6 +432,33 @@ class Provider:
             return shlex.split(v)
         return v
 
+    def _spot_policy(self) -> SpotPolicy:
+        spot_policy = self.provider_data.get("spot_policy")
+        if spot_policy is not None:
+            return SpotPolicy(spot_policy)
+        if self.configuration_type is ConfigurationType.DEV_ENVIRONMENT:
+            return SpotPolicy.ONDEMAND
+        return SpotPolicy.AUTO
+
+    def _retry_policy(self) -> RetryPolicy:
+        retry_policy = self.provider_data.get("retry_policy")
+        if retry_policy is None:
+            return RetryPolicy(
+                retry=False,
+                limit=0,
+            )
+        if retry_policy.get("retry") is False:
+            return RetryPolicy(
+                retry=False,
+                limit=None,
+            )
+        if retry_policy.get("limit"):
+            return RetryPolicy(retry=True, limit=parse_pretty_duration(retry_policy.get("limit")))
+        return RetryPolicy(
+            retry=retry_policy.get("retry"),
+            limit=DEFAULT_RETRY_LIMIT,
+        )
+
     def _resources(self) -> Requirements:
         resources = Requirements()
         cpu = self.provider_data["resources"].get("cpu", DEFAULT_CPU)
@@ -441,8 +502,6 @@ class Provider:
                     resources.gpus = GpusRequirements(count=gpu, name=resource_name[:-4])
         if self.provider_data["resources"].get("shm_size"):
             resources.shm_size_mib = _str_to_mib(self.provider_data["resources"]["shm_size"])
-        if self.provider_data["resources"].get("interruptible"):
-            resources.interruptible = self.provider_data["resources"]["interruptible"]
         return resources
 
     @staticmethod

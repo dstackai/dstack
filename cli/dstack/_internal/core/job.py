@@ -32,7 +32,7 @@ class Requirements(BaseModel):
     memory_mib: Optional[int] = None
     gpus: Optional[GpusRequirements] = None
     shm_size_mib: Optional[int] = None
-    interruptible: Optional[bool] = None
+    spot: Optional[bool] = None
     local: Optional[bool] = None
 
     def serialize(self) -> Dict[str, Any]:
@@ -49,8 +49,8 @@ class Requirements(BaseModel):
                 req_data["gpus"]["name"] = self.gpus.name
         if self.shm_size_mib:
             req_data["shm_size_mib"] = self.shm_size_mib
-        if self.interruptible:
-            req_data["interruptible"] = self.interruptible
+        if self.spot:
+            req_data["spot"] = self.spot
         if self.local:
             req_data["local"] = self.local
         return req_data
@@ -76,6 +76,11 @@ class JobRefId(JobRef):
         self.job_id = job_id
 
 
+class ConfigurationType(str, Enum):
+    DEV_ENVIRONMENT = "dev-environment"
+    TASK = "task"
+
+
 class JobStatus(str, Enum):
     PENDING = "pending"
     SUBMITTED = "submitted"
@@ -95,6 +100,17 @@ class JobStatus(str, Enum):
 
     def is_unfinished(self):
         return not self.is_finished()
+
+
+class SpotPolicy(str, Enum):
+    SPOT = "spot"
+    ONDEMAND = "on-demand"
+    AUTO = "auto"
+
+
+class RetryPolicy(BaseModel):
+    retry: bool
+    limit: Optional[int]
 
 
 class JobErrorCode(str, Enum):
@@ -125,6 +141,7 @@ class JobHead(JobRef):
     tag_name: Optional[str]
     app_names: Optional[List[str]]
     instance_type: Optional[str]
+    instance_spot_type: Optional[str]
 
     def get_id(self) -> Optional[str]:
         return self.job_id
@@ -158,9 +175,12 @@ class Job(JobHead):
     run_name: str
     workflow_name: Optional[str]
     provider_name: str
+    configuration_type: Optional[ConfigurationType]
+    configuration_path: Optional[str]
     status: JobStatus
     error_code: Optional[JobErrorCode]
     container_exit_code: Optional[int]
+    created_at: int
     submitted_at: int
     submission_num: int = 1
     image_name: str
@@ -174,6 +194,8 @@ class Job(JobHead):
     cache_specs: List[CacheSpec]
     host_name: Optional[str]
     requirements: Optional[Requirements]
+    spot_policy: Optional[SpotPolicy]
+    retry_policy: Optional[RetryPolicy]
     dep_specs: Optional[List[DepSpec]]
     master_job: Optional[JobRef]
     app_specs: Optional[List[AppSpec]]
@@ -208,6 +230,11 @@ class Job(JobHead):
             raise KeyError(f"Unknown prebuild policy: {v}")
         return v
 
+    def get_instance_spot_type(self) -> str:
+        if self.requirements and self.requirements.spot:
+            return "spot"
+        return "on-demand"
+
     def serialize(self) -> dict:
         deps = []
         if self.dep_specs:
@@ -234,10 +261,14 @@ class Job(JobHead):
             "run_name": self.run_name,
             "workflow_name": self.workflow_name or "",
             "provider_name": self.provider_name,
+            "configuration_type": self.configuration_type.value
+            if self.configuration_type
+            else None,
             "configuration_path": self.configuration_path,
             "status": self.status.value,
             "error_code": self.error_code.value if self.error_code is not None else "",
             "container_exit_code": self.container_exit_code or "",
+            "created_at": self.created_at,
             "submitted_at": self.submitted_at,
             "submission_num": self.submission_num,
             "image_name": self.image_name,
@@ -250,6 +281,8 @@ class Job(JobHead):
             "artifacts": artifacts,
             "cache": [item.dict() for item in self.cache_specs],
             "host_name": self.host_name or "",
+            "spot_policy": self.spot_policy.value if self.spot_policy else None,
+            "retry_policy": self.retry_policy.dict() if self.retry_policy else None,
             "requirements": self.requirements.serialize() if self.requirements else {},
             "deps": deps,
             "master_job_id": self.master_job.get_id() if self.master_job else "",
@@ -299,28 +332,16 @@ class Job(JobHead):
                 if _requirements.get("gpus")
                 else None,
                 shm_size_mib=_requirements.get("shm_size_mib") or None,
-                interruptible=_requirements.get("interruptible") or None,
+                spot=_requirements.get("spot") or _requirements.get("interruptible"),
                 local=_requirements.get("local") or None,
             )
             if _requirements
-            else None
+            else Requirements()
         )
-        if requirements:
-            if (
-                not requirements.cpus
-                and (
-                    not requirements.gpus
-                    or (
-                        not requirements.gpus.count
-                        and not requirements.gpus.memory_mib
-                        and not requirements.gpus.name
-                    )
-                )
-                and not requirements.interruptible
-                and not requirements.local
-                and not not requirements.shm_size_mib
-            ):
-                requirements = None
+        spot_policy = job_data.get("spot_policy")
+        retry_policy = None
+        if job_data.get("retry_policy") is not None:
+            retry_policy = RetryPolicy.parse_obj(job_data.get("retry_policy"))
         dep_specs = []
         if job_data.get("deps"):
             for dep in job_data["deps"]:
@@ -357,6 +378,7 @@ class Job(JobHead):
         ) or None
         error_code = job_data.get("error_code")
         container_exit_code = job_data.get("container_exit_code")
+        configuration_type = job_data.get("configuration_type")
 
         if job_data["repo_type"] == "remote":
             repo_data = RemoteRepoData(
@@ -381,10 +403,14 @@ class Job(JobHead):
             run_name=job_data["run_name"],
             workflow_name=job_data.get("workflow_name") or None,
             provider_name=job_data["provider_name"],
+            configuration_type=ConfigurationType(configuration_type)
+            if configuration_type
+            else None,
             configuration_path=job_data.get("configuration_path"),
             status=JobStatus(job_data["status"]),
             error_code=JobErrorCode(error_code) if error_code else None,
             container_exit_code=int(container_exit_code) if container_exit_code else None,
+            created_at=job_data.get("created_at") or job_data["submitted_at"],
             submitted_at=job_data["submitted_at"],
             submission_num=job_data.get("submission_num") or 1,
             image_name=job_data["image_name"],
@@ -397,6 +423,8 @@ class Job(JobHead):
             artifact_specs=artifact_specs,
             cache_specs=[CacheSpec(**item) for item in job_data.get("cache", [])],
             host_name=job_data.get("host_name") or None,
+            spot_policy=SpotPolicy(spot_policy) if spot_policy else None,
+            retry_policy=retry_policy,
             requirements=requirements,
             dep_specs=dep_specs or None,
             master_job=master_job,

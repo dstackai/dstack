@@ -27,7 +27,7 @@ def _parse_dev_environment_configuration_data(
     configuration_data: Dict[str, Any]
 ) -> Tuple[str, Dict[str, Any]]:
     provider_name = "ssh"
-    provider_data = {}
+    provider_data = {"configuration_type": "dev-environment"}
     _init_base_provider_data(configuration_data, provider_data)
     provider_data["setup"] = []
     try:
@@ -54,7 +54,7 @@ def _parse_task_configuration_data(
 ) -> Tuple[str, Dict[str, Any]]:
     # TODO: Support the `docker` provider
     provider_name = "bash"
-    provider_data = {"commands": []}
+    provider_data = {"configuration_type": "task", "commands": []}
     if "setup" in configuration_data:
         provider_data["setup"] = configuration_data["setup"] or []
     provider_data["commands"].extend(configuration_data["commands"])
@@ -92,16 +92,12 @@ def parse_configuration_file(
         else:
             exit(f"Error: No profile `{profile_name}` found")
     else:
-        profile = profiles.get("default")
+        profile = profiles.get("default", {})
     if profile and "resources" in profile:
         provider_data["resources"] = profile["resources"]
-        provider_data["resources"]["interruptible"] = True
-        if "instance-type" in profile["resources"]:
-            if profile["resources"]["instance-type"] == "on-demand":
-                del provider_data["resources"]["interruptible"]
-                # TODO: It doesn't support instance-type properly
-            del provider_data["resources"]["instance-type"]
-    project_name = profile.get("project") if profile else None
+    provider_data["spot_policy"] = profile.get("spot_policy")
+    provider_data["retry_policy"] = profile.get("retry_policy")
+    project_name = profile.get("project")
     if not Path(os.getcwd()).samefile(Path(working_dir)):
         provider_data["working_dir"] = str(Path(working_dir))
     return str(configuration_path), provider_name, provider_data, project_name
