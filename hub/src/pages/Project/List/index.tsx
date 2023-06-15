@@ -1,26 +1,12 @@
-import React, { useMemo, useState } from 'react';
+import React from 'react';
 import { useTranslation } from 'react-i18next';
 import { useNavigate } from 'react-router-dom';
 
-import {
-    Button,
-    Cards,
-    ConfirmationDialog,
-    Header,
-    ListEmptyMessage,
-    NavigateLink,
-    Pagination,
-    SpaceBetween,
-    TextFilter,
-} from 'components';
+import { Button, Cards, Header, ListEmptyMessage, NavigateLink, Pagination, SpaceBetween, TextFilter } from 'components';
 
-import { useAppSelector, useBreadcrumbs, useCollection, useNotifications } from 'hooks';
+import { useBreadcrumbs, useCollection } from 'hooks';
 import { ROUTES } from 'routes';
-import { useDeleteProjectsMutation, useGetProjectsQuery } from 'services/project';
-
-import { selectUserData } from 'App/slice';
-
-import { getProjectRoleByUserName } from '../utils';
+import { useGetProjectsQuery } from 'services/project';
 
 interface IProjectSettingsNodeProps {
     settingsKey: string;
@@ -37,14 +23,8 @@ export const ProjectSettingsNode: React.FC<IProjectSettingsNodeProps> = ({ setti
 
 export const ProjectList: React.FC = () => {
     const { t } = useTranslation();
-    const [showDeleteConfirm, setShowConfirmDelete] = useState(false);
-    const userData = useAppSelector(selectUserData);
-    const userName = userData?.user_name ?? '';
-    const userGlobalRole = userData?.global_role ?? '';
     const { isLoading, data } = useGetProjectsQuery();
     const navigate = useNavigate();
-    const [deleteProjects, { isLoading: isDeleting }] = useDeleteProjectsMutation();
-    const [pushNotification] = useNotifications();
 
     useBreadcrumbs([
         {
@@ -52,10 +32,6 @@ export const ProjectList: React.FC = () => {
             href: ROUTES.PROJECT.LIST,
         },
     ]);
-
-    const toggleDeleteConfirm = () => {
-        setShowConfirmDelete((val) => !val);
-    };
 
     const addProjectHandler = () => {
         navigate(ROUTES.PROJECT.ADD);
@@ -86,97 +62,33 @@ export const ProjectList: React.FC = () => {
         selection: {},
     });
 
-    const deleteSelectedProjectsHandler = () => {
-        if (collectionProps.selectedItems?.length) {
-            deleteProjects(collectionProps.selectedItems.map((project) => project.project_name))
-                .unwrap()
-                .then(() => actions.setSelectedItems([]))
-                .catch((error) => {
-                    pushNotification({
-                        type: 'error',
-                        content: t('common.server_error', { error: error?.error }),
-                    });
-                });
-        }
-
-        setShowConfirmDelete(false);
-    };
-
-    const editSelectedProjectHandler = () => {
-        if (collectionProps.selectedItems?.length === 1)
-            navigate(ROUTES.PROJECT.EDIT_BACKEND.FORMAT(collectionProps.selectedItems[0].project_name));
-    };
-
     const renderCounter = () => {
-        const { selectedItems } = collectionProps;
-
         if (!data?.length) return '';
-
-        if (selectedItems?.length) return `(${selectedItems?.length}/${data?.length ?? 0})`;
 
         return `(${data.length})`;
     };
-
-    const getIsTableItemDisabled = () => {
-        return isDeleting;
-    };
-
-    const isDisabledEdit = useMemo(() => {
-        if (collectionProps.selectedItems?.length !== 1) return true;
-
-        return (
-            collectionProps.selectedItems?.some(
-                (item) => getProjectRoleByUserName(item, userName) !== 'admin' && userGlobalRole !== 'admin',
-            ) ?? false
-        );
-    }, [isDeleting, userName, userGlobalRole, collectionProps.selectedItems]);
-
-    const isDisabledDelete = useMemo(() => {
-        if (isDeleting || collectionProps.selectedItems?.length === 0) return true;
-
-        return (
-            collectionProps.selectedItems?.some(
-                (item) => getProjectRoleByUserName(item, userName) !== 'admin' && userGlobalRole !== 'admin',
-            ) ?? false
-        );
-    }, [isDeleting, userName, userGlobalRole, collectionProps.selectedItems]);
 
     const getProjectSettings = (project: IProject) => {
         switch (project.backend.type) {
             case 'aws':
                 return (
                     <div>
-                        <ProjectSettingsNode
-                            settingsKey="Region"
-                            settingsValue={project.backend.region_name_title}
-                        ></ProjectSettingsNode>
-                        <ProjectSettingsNode
-                            settingsKey="Bucket"
-                            settingsValue={project.backend.s3_bucket_name}
-                        ></ProjectSettingsNode>
+                        <ProjectSettingsNode settingsKey="Region" settingsValue={project.backend.region_name_title} />
+                        <ProjectSettingsNode settingsKey="Bucket" settingsValue={project.backend.s3_bucket_name} />
                     </div>
                 );
             case 'azure':
                 return (
                     <div>
-                        <ProjectSettingsNode
-                            settingsKey="Location"
-                            settingsValue={project.backend.location}
-                        ></ProjectSettingsNode>
-                        <ProjectSettingsNode
-                            settingsKey="Storage account"
-                            settingsValue={project.backend.storage_account}
-                        ></ProjectSettingsNode>
+                        <ProjectSettingsNode settingsKey="Location" settingsValue={project.backend.location} />
+                        <ProjectSettingsNode settingsKey="Storage account" settingsValue={project.backend.storage_account} />
                     </div>
                 );
             case 'gcp':
                 return (
                     <div>
-                        <ProjectSettingsNode settingsKey="Region" settingsValue={project.backend.region}></ProjectSettingsNode>
-                        <ProjectSettingsNode
-                            settingsKey="Bucket"
-                            settingsValue={project.backend.bucket_name}
-                        ></ProjectSettingsNode>
+                        <ProjectSettingsNode settingsKey="Region" settingsValue={project.backend.region} />
+                        <ProjectSettingsNode settingsKey="Bucket" settingsValue={project.backend.bucket_name} />
                     </div>
                 );
             case 'local':
@@ -214,23 +126,13 @@ export const ProjectList: React.FC = () => {
                 }}
                 items={items}
                 loading={isLoading}
-                isItemDisabled={getIsTableItemDisabled}
                 loadingText="Loading"
-                selectionType="multi"
                 header={
                     <Header
                         variant="awsui-h1-sticky"
                         counter={renderCounter()}
                         actions={
                             <SpaceBetween size="xs" direction="horizontal">
-                                <Button onClick={editSelectedProjectHandler} disabled={isDisabledEdit}>
-                                    {t('common.edit')}
-                                </Button>
-
-                                <Button onClick={toggleDeleteConfirm} disabled={isDisabledDelete}>
-                                    {t('common.delete')}
-                                </Button>
-
                                 <Button onClick={addProjectHandler}>{t('common.add')}</Button>
                             </SpaceBetween>
                         }
@@ -247,12 +149,6 @@ export const ProjectList: React.FC = () => {
                     />
                 }
                 pagination={<Pagination {...paginationProps} disabled={isLoading} />}
-            />
-
-            <ConfirmationDialog
-                visible={showDeleteConfirm}
-                onDiscard={toggleDeleteConfirm}
-                onConfirm={deleteSelectedProjectsHandler}
             />
         </>
     );
