@@ -10,7 +10,8 @@
     "build_id": "{{timestamp}}",
     "build_prefix": "dstack-cuda",
     "docker_version": "20.10.17",
-    "dstack_stage": "STGN"
+    "dstack_stage": "STGN",
+    "runner_version": "latest"
   },
   "builders": [{
     "type": "azure-arm",
@@ -46,7 +47,10 @@
     },
     {
       "type": "shell",
-      "environment_vars": ["DSTACK_STAGE={{user `dstack_stage`}}"],
+      "environment_vars": [
+        "DSTACK_STAGE={{user `dstack_stage`}}",
+        "RUNNER_VERSION={{user `runner_version`}}"
+      ],
       "script": "provisioners/get-dstack-runner.sh"
     },
     {

@@ -93,7 +93,7 @@ def parse_configuration_file(
             exit(f"Error: No profile `{profile_name}` found")
     else:
         profile = profiles.get("default", {})
-    if profile and "resources" in profile:
+    if "resources" in profile:
         provider_data["resources"] = profile["resources"]
     provider_data["spot_policy"] = profile.get("spot_policy")
     provider_data["retry_policy"] = profile.get("retry_policy")
