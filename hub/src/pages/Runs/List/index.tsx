@@ -54,9 +54,14 @@ export const RunList: React.FC = () => {
             ),
         },
         {
-            id: 'workflow_name',
-            header: `${t('projects.run.workflow_name')}`,
-            cell: (item: IRun) => item.workflow_name ?? item.provider_name,
+            id: 'configuration',
+            header: `${t('projects.run.configuration')}`,
+            cell: (item: IRun) => item.job_heads?.[0].configuration_path,
+        },
+        {
+            id: 'instance',
+            header: `${t('projects.run.instance')}`,
+            cell: (item: IRun) => item.job_heads?.[0].instance_type,
         },
         {
             id: 'hub_user_name',

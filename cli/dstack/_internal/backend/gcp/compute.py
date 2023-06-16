@@ -6,7 +6,12 @@ from google.cloud import compute_v1
 from google.oauth2 import service_account
 
 from dstack import version
-from dstack._internal.backend.base.compute import WS_PORT, Compute, choose_instance_type
+from dstack._internal.backend.base.compute import (
+    WS_PORT,
+    Compute,
+    NoCapacityError,
+    choose_instance_type,
+)
 from dstack._internal.backend.base.config import BACKEND_CONFIG_FILENAME, RUNNER_CONFIG_FILENAME
 from dstack._internal.backend.base.runners import serialize_runner_yaml
 from dstack._internal.backend.gcp import utils as gcp_utils
@@ -699,7 +704,10 @@ def _create_instance(
     request.instance_resource = instance
 
     operation = instances_client.insert(request=request)
-    gcp_utils.wait_for_extended_operation(operation, "instance creation")
+    try:
+        gcp_utils.wait_for_extended_operation(operation, "instance creation")
+    except google.api_core.exceptions.ServiceUnavailable:
+        raise NoCapacityError()
 
     return instances_client.get(project=project_id, zone=zone, instance=instance_name)
 
