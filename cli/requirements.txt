@@ -47,6 +47,7 @@ azure-mgmt-keyvault
 azure-mgmt-loganalytics
 azure-mgmt-msi
 azure-mgmt-monitor
+azure-monitor-query
 azure-graphrbac
 
 # GCP
