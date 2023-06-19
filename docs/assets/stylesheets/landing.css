@@ -84,7 +84,6 @@
 }
 
 .tx-landing__hero .md-button-secondary:hover, .tx-landing__bottom_cta .md-button-secondary:hover {
-    background: inherit;
     background: -webkit-linear-gradient(45deg, #0048ff, #ce00ff);
     -webkit-background-clip: text;
     -webkit-text-fill-color: transparent;
@@ -217,8 +216,22 @@
     max-width: 500px;
 }
 
+.tx-landing__major_feature h3 {
+    padding-bottom: 0;
+    border-bottom: none;
+    background: -webkit-linear-gradient(45deg, #0048ff, #ce00ff);
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    font-size: 1.2em;
+}
+
+.tx-landing__major_feature img.border {
+    border: 0.25px rgba(0,0,0,0.2) solid;
+    border-radius: 7px;
+}
+
 .tx-landing__bottom_cta h2, .tx-landing__major_feature h2 {
-    font-size: 1.8em;
+    font-size: 1.9em;
     max-width: 500px;
     margin-bottom: 1.75em;
     background: -webkit-linear-gradient(45deg, #ff00ff, #8500ff);

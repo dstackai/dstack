@@ -1,5 +1,10 @@
 {% extends "base.html" %}
 
+{% block scripts %}
+<script src="/assets/javascripts/termynal.js" data-termynal-container="#termynal"></script>
+{{ super() }}
+{% endblock %}
+
 {% block announce %}
 Like dstack? Give us a <img alt="⭐" style="display: inline-block; height: 1.125em; margin-bottom: -2px"
                             src="https://cdnjs.cloudflare.com/ajax/libs/twemoji/14.0.2/svg/2b50.svg">

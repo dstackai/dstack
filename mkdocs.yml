@@ -114,7 +114,6 @@ extra_css:
   - assets/stylesheets/landing.css
 extra_javascript:
   - assets/javascripts/extra.js
-  - assets/javascripts/termynal.js
 extra:
   homepage: /
   generator: false

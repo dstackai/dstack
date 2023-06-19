@@ -23,23 +23,18 @@ Cost-effective ML development in your cloud
 [![PyPI - License](https://img.shields.io/pypi/l/dstack?style=flat-square&color=blue)](https://github.com/dstackai/dstack/blob/master/LICENSE.md)
 </div>
 
-`dstack` makes it very easy for ML engineers to run development environments and ML tasks on any cloud.
+`dstack` is an open-source developer platform that helps manage dev environments and run ML tasks in your cloud.
 
-Development environments and tasks can be defined via simple YAML configurations and quickly run with a single command
-on any configured cloud, whether it's AWS, GCP, or Azure.
+`dstack` handles the automatic provisioning of cloud resources, including waiting for spot instances if required. It
+runs the script and performs resource cleanup once the training is complete.
 
-The tool is open-source and can be self-hosted. You can run it on your local machine or deploy it to your own cloud. The
-tool will orchestrate development environments and tasks for your entire ML team.
+**Why use dstack?**
 
-**`dstack` makes it very easy to:**
-
-- Configure and reuse prebuilt environments (without Docker)
-- Utilize spot instances
-- Save and reuse output artifacts
-- Use multiple clouds via the same simple interface
-
-More importantly, `dstack` increases your productivity as an ML engineer, allowing you to focus on ML without worrying
-  about infrastructure, costs, etc.
+- Define dev environments and tasks declaratively as code and run with one command
+- Save costs by effectively utilizing cloud spot instances
+- Run dev environments and tasks where your data is located
+- No hustle with Kubernetes or custom Docker images
+- Use the same interface to work with any major cloud provider
 
 **🍒 is, `dstack` is 100% open-source and can be self-hosted**
 

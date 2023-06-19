@@ -1230,3 +1230,11 @@ div[editor-title] code .editor-title {
 .md-blog-sidebar .md-nav__link--active {
     display: none;
 }
+
+[data-ty].no-newline, .no-newline {
+    display: inline-block;
+}
+
+[data-ty].newline, .newline {
+    display: block;
+}

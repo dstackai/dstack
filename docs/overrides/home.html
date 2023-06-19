@@ -14,6 +14,137 @@
         $crisp.push(["do", "chat:hide"]);
     })();
 </script>
+<script type="text/javascript">
+    new Termynal('#vscode-command-example',
+        {
+            lineData: [
+                {type: 'input', value: 'dstack run .'},
+                {delay: 0, value: ' ', class: 'newline'},
+                {
+                    delay: 0,
+                    value: 'RUN                 USER   INSTANCE       RESOURCES                 SPOT',
+                    class: 'newline'
+                },
+                {
+                    delay: 0,
+                    value: 'honest-jellyfish-1  peter  a2-highgpu-1g  12xCPUs, 87040MB, 1xA100  yes',
+                    class: 'newline'
+                },
+                {delay: 0, value: ' ', class: 'newline'},
+                {delay: 0, startDelay: 0, lineDelay: 0, value: 'Continue? ', class: 'no-newline'},
+                {
+                    type: 'input',
+                    startDelay: 0,
+                    lineDelay: 0,
+                    typeDelay: 1000,
+                    prompt: '[y/n]',
+                    value: 'y',
+                    class: 'no-newline'
+                },
+                {delay: 0, value: ' ', class: 'newline'},
+                {delay: 0, value: 'Provisioning and starting a tunnel...', class: 'newline'},
+                {type: 'progress', progressPercent: 100},
+                {delay: 0, value: ' ', class: 'newline'},
+                {delay: 0, value: 'To open in VS Code Desktop, use this link:', class: 'newline'},
+                {delay: 0, value: '  vscode://vscode-remote/ssh-remote+turtle-11/workflow', class: 'newline'},
+                {delay: 0, value: ' ', class: 'newline'},
+                {delay: 0, value: 'To exit, press Ctrl+C.\n', class: 'no-newline'},
+            ]
+        }
+    );
+    new Termynal('#train-command-example',
+        {
+            lineData: [
+                {type: 'input', value: 'dstack run . -f train.dstack.yml'},
+                {delay: 0, value: ' ', class: 'newline'},
+                {
+                    delay: 0,
+                    value: 'RUN            USER   INSTANCE       RESOURCES                 SPOT',
+                    class: 'newline'
+                },
+                {
+                    delay: 0,
+                    value: 'wet-mangust-7  peter  a2-highgpu-1g  12xCPUs, 87040MB, 1xA100  yes',
+                    class: 'newline'
+                },
+                {delay: 0, value: ' ', class: 'newline'},
+                {delay: 0, startDelay: 0, lineDelay: 0, value: 'Continue? ', class: 'no-newline'},
+                {
+                    type: 'input',
+                    startDelay: 0,
+                    lineDelay: 0,
+                    typeDelay: 1000,
+                    prompt: '[y/n]',
+                    value: 'y',
+                    class: 'no-newline'
+                },
+                {delay: 0, value: ' ', class: 'newline'},
+                {delay: 0, value: 'Waiting for capacity... To exit, press Ctrl+C.', class: 'newline'},
+                {delay: 5000, value: ' ', class: 'newline'},
+                {
+                    delay: 5000,
+                    value: 'Epoch 0:  100% 1719/1719 [00:18<00:00, 92.32it/s, loss=0.0981, acc=0.969]\n',
+                    class: 'newline'
+                },
+                {
+                    delay: 5000,
+                    value: 'Epoch 1:  100% 1719/1719 [00:18<00:00, 92.32it/s, loss=0.0981, acc=0.969]\n',
+                    class: 'newline'
+                },
+                {
+                    delay: 5000,
+                    value: 'Epoch 2:  100% 1719/1719 [00:18<00:00, 92.32it/s, loss=0.0981, acc=0.969]\n',
+                    class: 'newline'
+                },
+                {delay: 0, value: ' ', class: 'newline'},
+            ]
+        }
+    );
+    new Termynal('#app-command-example',
+        {
+            lineData: [
+                {type: 'input', value: 'dstack run . -f app.dstack.yml --reload'},
+                {delay: 0, value: ' ', class: 'newline'},
+                {
+                    delay: 0,
+                    value: 'RUN           USER   INSTANCE       RESOURCES                 SPOT',
+                    class: 'newline'
+                },
+                {
+                    delay: 0,
+                    value: 'mean-snail-1  peter  a2-highgpu-1g  12xCPUs, 87040MB, 1xA100  yes',
+                    class: 'newline'
+                },
+                {delay: 0, value: ' ', class: 'newline'},
+                {delay: 0, startDelay: 0, lineDelay: 0, value: 'Continue? ', class: 'no-newline'},
+                {
+                    type: 'input',
+                    startDelay: 0,
+                    lineDelay: 0,
+                    typeDelay: 1000,
+                    prompt: '[y/n]',
+                    value: 'y',
+                    class: 'no-newline'
+                },
+                {delay: 0, value: ' ', class: 'newline'},
+                {delay: 0, value: 'Provisioning and starting a tunnel...', class: 'newline'},
+                {type: 'progress', progressPercent: 100},
+                {delay: 0, value: ' ', class: 'newline'},
+                {
+                    delay: 0,
+                    value: 'Launching in *reload mode* on: http://127.0.0.1:7860 (Press CTRL+C to quit)',
+                    class: 'newline'
+                },
+                {
+                    delay: 0,
+                    value: 'Watching: \'/opt/conda/lib/python3.10/site-packages/gradio\', \'/workflow\'',
+                    class: 'newline'
+                },
+                {delay: 0, value: ' ', class: 'newline'},
+            ]
+        }
+    );
+</script>
 {% endblock %}
 
 {% block content %}
@@ -22,8 +153,8 @@
         <div class="tx-landing__hero">
             <div class="tx-landing__hero_text">
                 <h1>Cost-effective ML development in your cloud</h1>
-                <p><strong>dstack</strong> is an open-source tool for managing <strong>dev environments</strong>
-                    and automating <strong>ML tasks</strong> on any cloud.
+                <p><strong>dstack</strong> is an open-source developer platform that helps manage <strong>dev
+                    environments</strong> and run <strong>ML tasks</strong> in your cloud.
                 </p>
 
                 <p><strong>dstack</strong> supports all major cloud providers,
@@ -44,66 +175,92 @@
         <div class="tx-landing__major_feature">
             <h2>Dev environments in your cloud on demand</h2>
             <div class="section">
-                <div  class="block large margin">
-                    <div class="termy">
-                    <pre class="highlight">$ dstack run .
-
- RUN        USER   INSTANCE       RESOURCES                 SPOT
- turtle-11  peter  a2-highgpu-1g  12xCPUs, 87040MB, 1xA100  yes
-
-Provisioning and starting a tunnel...
----> 100%
-
-To open in VS Code Desktop, use this link:
-  vscode://vscode-remote/ssh-remote+turtle-11/workflow
-
-To exit, press Ctrl+C.
-                    </pre>
+                <div class="block large margin">
+                    <div id="vscode-command-example" data-termynal>
                     </div>
                 </div>
                 <div class="block">
                     <div>
-                        <p>Specify hardware <strong>resources</strong> (e.g., GPU and memory), and indicate if you want
-                            to use <strong>spot</strong> instances.</p>
-                        <p>Pre-build the environment for easy reuse, avoiding manual Docker usage.</p>
-                        <p><strong>dstack</strong> automates the <strong>provisioning</strong> of cloud resources,
-                            fetches your code, and sets up port <strong>forwarding</strong> for secure and convenient access.</p>
-                        <p>Use an SSH URL to open the remote dev environment in your desktop IDE.</p>
+                        <h3>Launch dev environments in your cloud with a single command</h3>
+                        <p>Configure the <strong>hardware resources</strong> you need (GPU, memory, etc.) and
+                            indicate whether you want to use <strong>spot</strong> or <strong>on-demand</strong>
+                            instances.</p>
+                        <p>Run the configuration with a single command.</p>
+
+                        <p><strong>dstack</strong> will automatically provision cloud resources,
+                            <strong>fetch</strong> your code, and <strong>forward ports</strong> for secure
+                            and convenient access.</p>
                     </div>
                 </div>
             </div>
         </div>
 
-                <div class="tx-landing__major_feature">
-            <h2>Running ML tasks in your cloud with ease</h2>
+        <div class="tx-landing__major_feature">
             <div class="section">
                 <div class="block margin">
                     <div>
-                        <p>A task can be a <strong>web application</strong>,
-                            a <strong>training</strong> script, a <strong>data preparation</strong> job, etc.</p>
-                        <p>Specify hardware <strong>resources</strong> (e.g., GPU and memory), and indicate if you want
-                            to use <strong>spot</strong> instances.</p>
-                        <p><strong>dstack</strong> automates the <strong>provisioning</strong> of cloud resources, runs the task,
-                            and cleans up the resources once it's finished or stopped.</p>
-                        <p>If the task exposes any ports, <strong>dstack</strong>
-                            <strong>forwards</strong> them for secure and convenient access.</p>
+                        <h3>Work with cloud dev environments using a desktop IDE</h3>
+                        <p>Click the <strong>SSH</strong> URL from the output to automatically
+                            open the cloud dev environment in your local <strong>desktop</strong> IDE.</p>
+                        <p>The cloud dev environment is automatically <strong>pre-configured</strong>
+                            with the Python environment, and IDE extensions for working with <strong>Python</strong>
+                            and <strong>Jupyter</strong> notebooks.</p>
                     </div>
                 </div>
 
-                <div  class="block large">
-                    <div class="termy">
-                    <pre class="highlight">$ dstack run . -f train.dstack.yml
+                <div class="block large">
+                    <img src="assets/images/dstack-vscode-jupyter.png" alt="">
+                </div>
+            </div>
+        </div>
 
- RUN        USER   INSTANCE       RESOURCES                 SPOT
- mangust-7  peter  a2-highgpu-1g  12xCPUs, 87040MB, 1xA100  yes
+        <div class="tx-landing__major_feature">
+            <h2>Run tasks in your cloud, easily and cost effectively</h2>
+            <div class="section">
+                <div class="block margin">
+                    <div>
+                        <h3>Train or finetune LLMs in your cloud effortlessly</h3>
+                        <p><strong>dstack</strong> handles the automatic provisioning of cloud resources, including
+                            waiting for <strong>spot instances</strong> if required. It runs the script and performs
+                            resource
+                            cleanup
+                            once the training is complete.</p>
 
-Provisioning and starting a tunnel...
----> 100%
+                        <p>If a task is <strong>interrupted</strong>, it is able to resume from where it last stopped.
+                        </p>
 
-Epoch 0:  98% 1680/1719 [00:18<00:00, 92.32it/s, loss=0.0981, acc=0.969]
----> 100%
+                        <p>Use the <strong>dstack</strong> Python API to <strong>store</strong> and
+                            <strong>load</strong>
+                            <strong>artifacts</strong> such as model checkpoints and datasets.</p>
+                    </div>
+                </div>
 
-</pre>
+                <div class="block large">
+                    <div id="train-command-example" data-termynal>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="tx-landing__major_feature">
+            <div class="section">
+                <div class="block large margin">
+                    <div id="app-command-example" data-termynal>
+                    </div>
+                </div>
+
+                <div class="block">
+                    <div>
+                        <h3>Run apps in the cloud with a single command</h3>
+                        <p>Run app in your cloud for <strong>development</strong> and
+                            <strong>testing purposes</strong> with a single command.</p>
+
+                        <p>Configure the <strong>hardware resources</strong> you need (GPU, memory, etc.) and
+                            indicate whether you want to use <strong>spot</strong> or <strong>on-demand</strong>
+                            instances.</p>
+
+                        <p><strong>dstack</strong> will automatically provision cloud resources,
+                            and <strong>forward ports</strong> for secure and convenient access.</p>
                     </div>
                 </div>
             </div>
@@ -140,8 +297,10 @@ Epoch 0:  98% 1680/1719 [00:18<00:00, 92.32it/s, loss=0.0981, acc=0.969]
                         GPU cost optimization
                     </h3>
 
-                    <p>Save costs by effectively utilizing cloud <strong>spot</strong> instances across multiple regions. Automatically
-                        recover from interruptions and track <strong>GPU usage</strong>, while enforcing limits per team.</p>
+                    <p>Save costs by effectively utilizing cloud <strong>spot</strong> instances across multiple
+                        regions. Automatically
+                        recover from interruptions and track <strong>GPU usage</strong>, while enforcing limits per
+                        team.</p>
                 </div>
                 <div class="feature-cell">
                     <div class="feature-icon">
@@ -153,7 +312,8 @@ Epoch 0:  98% 1680/1719 [00:18<00:00, 92.32it/s, loss=0.0981, acc=0.969]
                     <h3>
                         Data-centric approach
                     </h3>
-                    <p>Run dev environments and tasks where your <strong>data</strong> is located. Eliminate costs associated
+                    <p>Run dev environments and tasks where your <strong>data</strong> is located. Eliminate costs
+                        associated
                         with <strong>ingress</strong> and <strong>egress</strong> data transfers.
                         Ensure the <strong>security</strong> and <strong>privacy</strong> of your data and models.
                     </p>
@@ -168,7 +328,8 @@ Epoch 0:  98% 1680/1719 [00:18<00:00, 92.32it/s, loss=0.0981, acc=0.969]
                         No MLOps is required
                     </h3>
                     <p><strong>dstack</strong> integrates with your cloud natively and doesn't require
-                        engineering. No hustle with <strong>Kubernetes</strong> or custom <strong>Docker</strong> images.</p>
+                        engineering. No hustle with <strong>Kubernetes</strong> or custom <strong>Docker</strong>
+                        images.</p>
                 </div>
                 <div class="feature-cell">
                     <div class="feature-icon">
@@ -193,7 +354,8 @@ Epoch 0:  98% 1680/1719 [00:18<00:00, 92.32it/s, loss=0.0981, acc=0.969]
                     <h3>
                         Self-hosted
                     </h3>
-                    <p>Run the <strong>dstack</strong> server on your local machine or easily deploy it, as a <strong>Docker</strong> image,
+                    <p>Run the <strong>dstack</strong> server on your local machine or easily deploy it, as a <strong>Docker</strong>
+                        image,
                         anywhere within your environment, including your own cloud.</p>
                 </div>
             </div>
@@ -201,7 +363,7 @@ Epoch 0:  98% 1680/1719 [00:18<00:00, 92.32it/s, loss=0.0981, acc=0.969]
 
         <div class="tx-landing__integrations">
             <div class="tx-landing__integrations_text">
-                <h2>Integrates natively with all major clouds</h2>
+                <h2>Use it easily with your cloud account</h2>
             </div>
             <div class="tx-landing__integrations_logos">
                 <img class="logo-xlarge" src="assets/images/aws-logo.svg" title="Amazon Web Services">
