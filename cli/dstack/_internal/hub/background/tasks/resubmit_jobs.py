@@ -44,7 +44,7 @@ def _resubmit_backend_jobs(backend: Backend):
                     if (
                         job.retry_policy is not None
                         and job.retry_policy.retry
-                        and curr_time - job.created_at < job.retry_policy.limit
+                        and curr_time - job.created_at < job.retry_policy.limit * 1000
                     ):
                         backend.resubmit_job(
                             job=job,

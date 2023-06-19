@@ -25,7 +25,7 @@ from dstack._internal.cli.common import add_project_argument, check_init, consol
 from dstack._internal.cli.config import config, get_hub_client
 from dstack._internal.core.error import RepoNotInitializedError
 from dstack._internal.core.instance import InstanceType
-from dstack._internal.core.job import Job, JobHead, JobStatus
+from dstack._internal.core.job import Job, JobErrorCode, JobHead, JobStatus
 from dstack._internal.core.plan import RunPlan
 from dstack._internal.core.request import RequestStatus
 from dstack._internal.core.run import RunHead
@@ -153,15 +153,10 @@ class RunCommand(BasicCommand):
             )
             runs = list_runs_hub(hub_client, run_name=run_name)
             run = runs[0]
-            if run.status == JobStatus.PENDING:
-                console.print("Cannot provision the instance due to no capacity. Retrying...\n")
-            print_runs(runs)
-            if run.status == JobStatus.FAILED:
-                console.print("\nProvisioning failed\n")
-                exit(1)
             if not args.detach:
                 _poll_run(
                     hub_client,
+                    run,
                     jobs,
                     ssh_key=config.repo_user_config.ssh_key_path,
                     watcher=watcher,
@@ -213,19 +208,34 @@ def _format_resources(instance_type: InstanceType) -> str:
 
 def _poll_run(
     hub_client: HubClient,
+    run: RunHead,
     job_heads: List[JobHead],
     ssh_key: Optional[str],
     watcher: Optional[Watcher],
 ):
-    run_name = job_heads[0].run_name
+    print_runs([run])
+    console.print()
+    if run.status == JobStatus.FAILED:
+        _print_failed_run_message(run)
+        exit(1)
+    run_name = run.run_name
+
     try:
-        console.print()
         with Progress(
             TextColumn("[progress.description]{task.description}"),
             SpinnerColumn(),
             transient=True,
         ) as progress:
-            task = progress.add_task("Provisioning... It may take up to a minute.", total=None)
+            task = None
+            for run in _poll_run_head(hub_client, run_name, loop_statuses=[JobStatus.PENDING]):
+                if task is None:
+                    task = progress.add_task(
+                        "Waiting for capacity... To exit, press Ctrl+C.", total=None
+                    )
+
+            if task is None:
+                task = progress.add_task("Provisioning... It may take up to a minute.", total=None)
+
             # idle PENDING and SUBMITTED
             request_errors_printed = False
             for run in _poll_run_head(
@@ -242,6 +252,10 @@ def _poll_run(
                     request_errors_printed = False
             # handle TERMINATED and DOWNLOADING
             run = next(_poll_run_head(hub_client, run_name))
+            if run.status == JobStatus.FAILED:
+                console.print()
+                _print_failed_run_message(run)
+                exit(1)
             if run.status == JobStatus.DOWNLOADING:
                 progress.update(task, description="Downloading deps... It may take a while.")
             elif run.has_request_status([RequestStatus.TERMINATED]):
@@ -308,6 +322,13 @@ def _poll_run(
         global interrupt_count
         interrupt_count = 1
         _ask_on_interrupt(hub_client, run_name)
+
+
+def _print_failed_run_message(run: RunHead):
+    if run.job_heads[0].error_code is JobErrorCode.FAILED_TO_START_DUE_TO_NO_CAPACITY:
+        console.print("Provisioning failed due to no capacity\n")
+    else:
+        console.print("Provisioning failed\n")
 
 
 def _attach(hub_client: HubClient, job: Job, ssh_key_path: str) -> Dict[int, int]:
