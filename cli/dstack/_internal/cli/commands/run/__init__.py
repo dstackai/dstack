@@ -252,6 +252,10 @@ def _poll_run(
                     request_errors_printed = False
             # handle TERMINATED and DOWNLOADING
             run = next(_poll_run_head(hub_client, run_name))
+            if run.status == JobStatus.FAILED:
+                console.print()
+                _print_failed_run_message(run)
+                exit(1)
             if run.status == JobStatus.DOWNLOADING:
                 progress.update(task, description="Downloading deps... It may take a while.")
             elif run.has_request_status([RequestStatus.TERMINATED]):
@@ -322,9 +326,7 @@ def _poll_run(
 
 def _print_failed_run_message(run: RunHead):
     if run.job_heads[0].error_code is JobErrorCode.FAILED_TO_START_DUE_TO_NO_CAPACITY:
-        console.print(
-            "Provisioning failed due to no capacity. Set up retry policy to retry runs automatically.\n"
-        )
+        console.print("Provisioning failed due to no capacity\n")
     else:
         console.print("Provisioning failed\n")
 
