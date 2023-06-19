@@ -236,6 +236,10 @@ class ReposUpdate(BaseModel):
     last_run_at: int
 
 
+class ReposDelete(BaseModel):
+    repo_ids: List[str]
+
+
 class RunsGetPlan(BaseModel):
     jobs: List[Job]
 

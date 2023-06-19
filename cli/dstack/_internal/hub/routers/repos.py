@@ -3,7 +3,7 @@ from typing import List
 from fastapi import APIRouter, Depends, HTTPException, status
 
 from dstack._internal.core.repo import RemoteRepoCredentials, RepoHead, RepoRef
-from dstack._internal.hub.models import RepoHeadGet, ReposUpdate, SaveRepoCredentials
+from dstack._internal.hub.models import RepoHeadGet, ReposDelete, ReposUpdate, SaveRepoCredentials
 from dstack._internal.hub.routers.cache import get_backend
 from dstack._internal.hub.routers.util import error_detail, get_project
 from dstack._internal.hub.security.permissions import ProjectMember
@@ -61,3 +61,11 @@ async def update_repo(project_name: str, body: ReposUpdate):
     project = await get_project(project_name=project_name)
     backend = await get_backend(project)
     await run_async(backend.update_repo_last_run_at, body.repo_spec, body.last_run_at)
+
+
+@router.post("/{project_name}/repos/delete")
+async def delete_repos(project_name: str, body: ReposDelete):
+    project = await get_project(project_name=project_name)
+    backend = await get_backend(project)
+    for repo_id in body.repo_ids:
+        await run_async(backend.delete_repo, repo_id)

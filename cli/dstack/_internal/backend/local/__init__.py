@@ -197,6 +197,9 @@ class LocalBackend(Backend):
     def save_repo_credentials(self, repo_id: str, repo_credentials: RemoteRepoCredentials):
         base_repos.save_repo_credentials(self._secrets_manager, repo_id, repo_credentials)
 
+    def delete_repo(self, repo_id: str):
+        base_repos.delete_repo(self._storage, repo_id)
+
     def list_secret_names(self, repo_id: str) -> List[str]:
         return base_secrets.list_secret_names(self._storage, repo_id)
 

@@ -196,6 +196,10 @@ class Backend(ABC):
         pass
 
     @abstractmethod
+    def delete_repo(self, repo_id: str):
+        pass
+
+    @abstractmethod
     def list_secret_names(self, repo_id: str) -> List[str]:
         pass
 
