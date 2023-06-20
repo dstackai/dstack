@@ -31,7 +31,7 @@ class LogCommand(BasicCommand):
         self._parser.add_argument(
             "-d",
             "--diagnose",
-            help="Show dstack diagnostics logs",
+            help="Show diagnostic logs",
             action="store_true",
         )
 
