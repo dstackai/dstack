@@ -20,11 +20,9 @@ class SSHProvider(Provider):
         self.artifact_specs = None
         self.working_dir = None
         self.resources = None
-        self.setup = None
         self.image_name = None
         self.home_dir = "/root"
         self.code = True
-        self.setup = []
 
     def load(
         self,
@@ -37,7 +35,6 @@ class SSHProvider(Provider):
     ):
         super().load(hub_client, args, workflow_name, provider_data, run_name, ssh_key_pub)
         self.python = self._safe_python_version("python")
-        self.setup = self._get_list_data("setup") or []
         self.env = self._env()
         self.artifact_specs = self._artifact_specs()
         self.working_dir = self.provider_data.get("working_dir")
@@ -83,7 +80,7 @@ class SSHProvider(Provider):
                 artifact_specs=self.artifact_specs,
                 requirements=self.resources,
                 app_specs=apps,
-                setup=self.setup,
+                build_commands=self.build_commands,
             )
         ]
 

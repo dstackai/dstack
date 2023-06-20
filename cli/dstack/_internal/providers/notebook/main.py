@@ -97,7 +97,7 @@ class NotebookProvider(Provider):
                 artifact_specs=self.artifact_specs,
                 requirements=self.resources,
                 app_specs=apps,
-                setup=self._setup(),
+                build_commands=self._setup(),
             )
         ]
 
@@ -117,8 +117,8 @@ class NotebookProvider(Provider):
             'echo "c.NotebookApp.open_browser = False" >> /root/.jupyter/jupyter_notebook_config.py',
             "echo \"c.NotebookApp.ip = '0.0.0.0'\" >> /root/.jupyter/jupyter_notebook_config.py",
         ]
-        if self.setup:
-            commands.extend(self.setup)
+        if self.build_commands:
+            commands.extend(self.build_commands)
         return commands
 
     def _commands(self):

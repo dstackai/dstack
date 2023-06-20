@@ -299,12 +299,12 @@ func (azbackend *AzureBackend) GetRepoArchive(ctx context.Context, path, dir str
 	return nil
 }
 
-func (azbackend *AzureBackend) GetPrebuildDiff(ctx context.Context, key, dst string) error {
+func (azbackend *AzureBackend) GetBuildDiff(ctx context.Context, key, dst string) error {
 	_ = azbackend.storage.DownloadFile(ctx, key, dst)
 	return nil
 }
 
-func (azbackend *AzureBackend) PutPrebuildDiff(ctx context.Context, src, key string) error {
+func (azbackend *AzureBackend) PutBuildDiff(ctx context.Context, src, key string) error {
 	if err := azbackend.storage.UploadFile(ctx, src, key); err != nil {
 		return gerrors.Wrap(err)
 	}

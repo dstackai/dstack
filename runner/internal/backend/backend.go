@@ -39,8 +39,8 @@ type Backend interface {
 	GetJobByPath(ctx context.Context, path string) (*models.Job, error)
 	GetRepoDiff(ctx context.Context, path string) (string, error)
 	GetRepoArchive(ctx context.Context, path, dst string) error
-	GetPrebuildDiff(ctx context.Context, key, dst string) error
-	PutPrebuildDiff(ctx context.Context, src, key string) error
+	GetBuildDiff(ctx context.Context, key, dst string) error
+	PutBuildDiff(ctx context.Context, src, key string) error
 	GetTMPDir(ctx context.Context) string
 	GetDockerBindings(ctx context.Context) []mount.Mount
 }

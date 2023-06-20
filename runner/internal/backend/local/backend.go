@@ -276,11 +276,11 @@ func (l *Local) GetRepoArchive(ctx context.Context, path, dir string) error {
 	return nil
 }
 
-func (l *Local) GetPrebuildDiff(ctx context.Context, key, dst string) error {
+func (l *Local) GetBuildDiff(ctx context.Context, key, dst string) error {
 	return errors.New("not implemented")
 }
 
-func (l *Local) PutPrebuildDiff(ctx context.Context, src, key string) error {
+func (l *Local) PutBuildDiff(ctx context.Context, src, key string) error {
 	return errors.New("not implemented")
 }
 

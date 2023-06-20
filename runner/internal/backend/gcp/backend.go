@@ -297,12 +297,12 @@ func (gbackend *GCPBackend) GetRepoArchive(ctx context.Context, path, dir string
 	return nil
 }
 
-func (gbackend *GCPBackend) GetPrebuildDiff(ctx context.Context, key, dst string) error {
+func (gbackend *GCPBackend) GetBuildDiff(ctx context.Context, key, dst string) error {
 	_ = gbackend.storage.downloadFile(ctx, key, dst)
 	return nil
 }
 
-func (gbackend *GCPBackend) PutPrebuildDiff(ctx context.Context, src, key string) error {
+func (gbackend *GCPBackend) PutBuildDiff(ctx context.Context, src, key string) error {
 	if err := gbackend.storage.uploadFile(ctx, src, key); err != nil {
 		return gerrors.Wrap(err)
 	}

@@ -29,10 +29,10 @@ def _parse_dev_environment_configuration_data(
     provider_name = "ssh"
     provider_data = {"configuration_type": "dev-environment"}
     _init_base_provider_data(configuration_data, provider_data)
-    provider_data["setup"] = []
+    provider_data["build"] = []
     try:
         VSCodeDesktopServer.patch_setup(
-            provider_data["setup"],
+            provider_data["build"],
             vscode_extensions=[
                 "ms-python.python",
                 "ms-toolsai.jupyter",
@@ -44,8 +44,8 @@ def _parse_dev_environment_configuration_data(
             "sea_green3]Command Palette[/sea_green3], executing [sea_green3]Shell Command: Install 'code' command in "
             "PATH[/sea_green3], and restarting terminal.[/]\n"
         )
-    provider_data["setup"].append("pip install -q --no-cache-dir ipykernel")
-    provider_data["setup"].extend(configuration_data.get("setup") or [])
+    provider_data["build"].append("pip install -q --no-cache-dir ipykernel")
+    provider_data["build"].extend(configuration_data.get("build") or [])
     return provider_name, provider_data
 
 
@@ -55,8 +55,8 @@ def _parse_task_configuration_data(
     # TODO: Support the `docker` provider
     provider_name = "bash"
     provider_data = {"configuration_type": "task", "commands": []}
-    if "setup" in configuration_data:
-        provider_data["setup"] = configuration_data["setup"] or []
+    if "build" in configuration_data:
+        provider_data["build"] = configuration_data["build"] or []
     provider_data["commands"].extend(configuration_data["commands"])
     _init_base_provider_data(configuration_data, provider_data)
     return provider_name, provider_data
