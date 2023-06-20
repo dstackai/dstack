@@ -25,7 +25,7 @@ import { AzureBackend } from './Azure';
 import { BACKEND_TYPE_HELP } from './constants';
 import { GCPBackend } from './GCP';
 
-import { IProps, TBackendOption } from './types';
+import { BackendTypesEnum, IProps, TBackendOption } from './types';
 import { FieldPath } from 'react-hook-form/dist/types/path';
 
 export const ProjectForm: React.FC<IProps> = ({ initialValues, onCancel, loading, onSubmit: onSubmitProp }) => {
@@ -64,22 +64,16 @@ export const ProjectForm: React.FC<IProps> = ({ initialValues, onCancel, loading
     const projectNameValue = watch('project_name');
 
     const backendOptions: TBackendOption[] = useMemo(() => {
-        if (backendTypesData)
-            return backendTypesData.map((type) => ({
+        return Object.values(BackendTypesEnum).map((type) => {
+            const disabled: boolean = loading || !backendTypesData || !backendTypesData.includes(type);
+
+            return {
                 label: t(`projects.backend_type.${type}`),
                 value: type,
                 description: t(`projects.backend_type.${type}_description`),
-                disabled: loading,
-            }));
-
-        const defaultOption: TBackendOption = {
-            label: '-',
-            value: 'local',
-            description: '-',
-            disabled: true,
-        };
-
-        return [defaultOption];
+                disabled,
+            };
+        });
     }, [backendTypesData, loading]);
 
     const onSubmit = (data: IProject) => {
@@ -121,13 +115,13 @@ export const ProjectForm: React.FC<IProps> = ({ initialValues, onCancel, loading
 
     const renderBackendFields = () => {
         switch (backendType) {
-            case 'aws': {
+            case BackendTypesEnum.AWS: {
                 return <AWSBackend loading={loading} />;
             }
-            case 'azure': {
+            case BackendTypesEnum.AZURE: {
                 return <AzureBackend loading={loading} />;
             }
-            case 'gcp': {
+            case BackendTypesEnum.GCP: {
                 return <GCPBackend loading={loading} />;
             }
             default:
