@@ -134,6 +134,7 @@ class HubClient:
         start_time: datetime,
         end_time: Optional[datetime] = None,
         descending: bool = False,
+        diagnose: bool = False,
         repo_id: Optional[str] = None,
     ) -> Generator[LogEvent, None, None]:
         # /{hub_name}/logs/poll
@@ -142,6 +143,7 @@ class HubClient:
             start_time=start_time,
             end_time=end_time,
             descending=descending,
+            diagnose=diagnose,
         )
 
     def list_run_artifact_files(

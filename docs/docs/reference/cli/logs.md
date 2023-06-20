@@ -15,9 +15,7 @@ Positional Arguments:
 
 Optional Arguments:
   --project PROJECT     The name of the Hub project to execute the command for
-  -a, --attach          Whether to continuously poll for new logs. By default, the command will
-                        exit once there are no more logs to display. To exit from this mode, use
-                        Control-C.
+  -d, --diagnose        Show diagnostic logs
   -s, --since SINCE     From what time to begin displaying logs. By default, logs will be
                         displayed starting from 24 hours in the past. The value provided can be an
                         ISO 8601 timestamp or a relative time. For example, a value of 5m would
@@ -35,8 +33,7 @@ The following arguments are required:
 The following arguments are optional:
 
 - `--project PROJECT` - (Optional) The name of the Hub project to execute the command for
--  `-a`, `--attach` – (Optional) Whether to continuously poll for new logs while the workflow is still running. 
-   By default, the command will exit once there are no more logs to display. To exit from this mode, use `Ctrl+C`.
+- `-d`, `--diagnose` - (Optional) Show diagnostic logs
 - `-s SINCE`, `--since SINCE` – (Optional) From what time to begin displaying logs. By default, logs will be displayed
   starting from 24 hours in the past. The value provided can be an ISO 8601 timestamp or a
   relative time. For example, a value of `5m` would indicate to display logs starting five

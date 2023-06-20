@@ -53,13 +53,11 @@ class AzureSecretsManager(SecretsManager):
 
 
 def _get_secret_key(repo_id: str, secret_name: str) -> str:
-    repo_part = repo_id
-    return _encode_key(f"dstack-secrets-{repo_part}-", secret_name)
+    return _encode_key(f"dstack-secrets-", f"{repo_id}-{secret_name}")
 
 
 def _get_credentials_key(repo_id: str) -> str:
-    repo_part = repo_id
-    return f"dstack-credentials-{repo_part}"
+    return _encode_key(f"dstack-credentials-", f"{repo_id}")
 
 
 def _encode_key(key_prefix: str, key_suffix: str) -> str:

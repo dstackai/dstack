@@ -149,6 +149,7 @@ class AwsBackend(Backend):
         start_time: datetime,
         end_time: Optional[datetime] = None,
         descending: bool = False,
+        diagnose: bool = False,
     ) -> Generator[LogEvent, None, None]:
         return logs.poll_logs(
             self._storage,
@@ -159,6 +160,7 @@ class AwsBackend(Backend):
             start_time,
             end_time,
             descending,
+            diagnose,
         )
 
     def list_run_artifact_files(

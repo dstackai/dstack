@@ -121,6 +121,7 @@ class AzureBackend(Backend):
         start_time: datetime,
         end_time: Optional[datetime] = None,
         descending: bool = False,
+        diagnose: bool = False,
     ) -> Generator[LogEvent, None, None]:
         yield from self._logging.poll_logs(
             storage=self._storage,
@@ -129,6 +130,7 @@ class AzureBackend(Backend):
             start_time=start_time,
             end_time=end_time,
             descending=descending,
+            diagnose=diagnose,
         )
 
     def list_run_artifact_files(

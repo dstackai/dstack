@@ -15,11 +15,8 @@ CHECK_STATUS_EVERY_N = 3
 POLL_LOGS_RATE_SECS = 1
 
 
-def render_log_message(
-    storage: Storage,
+def render_log_event(
     event: Dict[str, Any],
-    repo_id: str,
-    jobs_cache: Dict[str, Job],
 ) -> LogEvent:
     if isinstance(event, str):
         event = json.loads(event)
@@ -28,11 +25,6 @@ def render_log_message(
         message = json.loads(message)
     job_id = message["job_id"]
     log = message["log"]
-    job = jobs_cache.get(job_id)
-    if job is None:
-        job = jobs.get_job(storage, repo_id, job_id)
-        jobs_cache[job_id] = job
-    log = fix_urls(log.encode(), job, {}).decode()
     return LogEvent(
         event_id=event["eventId"],
         timestamp=event["timestamp"],
@@ -42,6 +34,12 @@ def render_log_message(
         if message["source"] == "stdout"
         else LogEventSource.STDERR,
     )
+
+
+def fix_log_event_urls(log_event: LogEvent, jobs_map: Dict[str, Job]) -> LogEvent:
+    job = jobs_map[log_event.job_id]
+    log_event.log_message = fix_urls(log_event.log_message.encode(), job, {}).decode()
+    return log_event
 
 
 def fix_urls(log: bytes, job: Job, ports: Dict[int, int], hostname: Optional[str] = None) -> bytes:

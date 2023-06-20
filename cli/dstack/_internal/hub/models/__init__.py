@@ -296,6 +296,7 @@ class PollLogs(BaseModel):
     descending: bool = False
     prev_event_id: Optional[str]
     limit: int = Field(100, ge=0, le=1000)
+    diagnose: bool = False
 
 
 class StorageLink(BaseModel):

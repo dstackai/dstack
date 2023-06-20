@@ -553,6 +553,7 @@ class HubAPIClient:
         start_time: datetime,
         end_time: Optional[datetime],
         descending: bool,
+        diagnose: bool,
     ) -> Generator[LogEvent, None, None]:
         url = _project_url(
             url=self.url,
@@ -573,6 +574,7 @@ class HubAPIClient:
                     end_time=end_time.isoformat() if end_time else None,
                     descending=descending,
                     prev_event_id=prev_event_id,
+                    diagnose=diagnose,
                 ).json(),
             )
             if not resp.ok:
