@@ -3,6 +3,7 @@ import { DefaultValues, FormProvider, useForm } from 'react-hook-form';
 import { useTranslation } from 'react-i18next';
 
 import {
+    Alert,
     Button,
     Container,
     FormField,
@@ -25,7 +26,7 @@ import { AzureBackend } from './Azure';
 import { BACKEND_TYPE_HELP } from './constants';
 import { GCPBackend } from './GCP';
 
-import { IProps, TBackendOption } from './types';
+import { BackendTypesEnum, IProps, TBackendOption } from './types';
 import { FieldPath } from 'react-hook-form/dist/types/path';
 
 export const ProjectForm: React.FC<IProps> = ({ initialValues, onCancel, loading, onSubmit: onSubmitProp }) => {
@@ -49,7 +50,7 @@ export const ProjectForm: React.FC<IProps> = ({ initialValues, onCancel, loading
 
         return {
             backend: {
-                type: 'aws',
+                type: BackendTypesEnum.AWS,
             },
         };
     };
@@ -64,22 +65,16 @@ export const ProjectForm: React.FC<IProps> = ({ initialValues, onCancel, loading
     const projectNameValue = watch('project_name');
 
     const backendOptions: TBackendOption[] = useMemo(() => {
-        if (backendTypesData)
-            return backendTypesData.map((type) => ({
+        return Object.values(BackendTypesEnum).map((type) => {
+            const disabled: boolean = loading || !backendTypesData;
+
+            return {
                 label: t(`projects.backend_type.${type}`),
                 value: type,
                 description: t(`projects.backend_type.${type}_description`),
-                disabled: loading,
-            }));
-
-        const defaultOption: TBackendOption = {
-            label: '-',
-            value: 'local',
-            description: '-',
-            disabled: true,
-        };
-
-        return [defaultOption];
+                disabled,
+            };
+        });
     }, [backendTypesData, loading]);
 
     const onSubmit = (data: IProject) => {
@@ -119,20 +114,59 @@ export const ProjectForm: React.FC<IProps> = ({ initialValues, onCancel, loading
         });
     };
 
+    const renderUnsupportedBackedMessage = (backendName: string, backendTypeName: BackendTypesEnum) => {
+        return (
+            <Grid gridDefinition={[{ colspan: 8 }]}>
+                <Alert statusIconAriaLabel="Info" header="Unsupported backend type">
+                    Dependencies for {backendName} backend are not installed. Run{' '}
+                    <code>pip install dstack[{backendTypeName}]</code> to enable {backendName} support.
+                </Alert>
+            </Grid>
+        );
+    };
+
     const renderBackendFields = () => {
-        switch (backendType) {
-            case 'aws': {
-                return <AWSBackend loading={loading} />;
+        if (!backendTypesData) return null;
+
+        if (backendTypesData.includes(backendType)) {
+            switch (backendType) {
+                case BackendTypesEnum.AWS: {
+                    return <AWSBackend loading={loading} />;
+                }
+                case BackendTypesEnum.AZURE: {
+                    return <AzureBackend loading={loading} />;
+                }
+                case BackendTypesEnum.GCP: {
+                    return <GCPBackend loading={loading} />;
+                }
+                default:
+                    return null;
             }
-            case 'azure': {
-                return <AzureBackend loading={loading} />;
+        } else {
+            switch (backendType) {
+                case BackendTypesEnum.AWS: {
+                    return renderUnsupportedBackedMessage('AWS', BackendTypesEnum.AWS);
+                }
+                case BackendTypesEnum.AZURE: {
+                    return renderUnsupportedBackedMessage('Azure', BackendTypesEnum.AZURE);
+                }
+                case BackendTypesEnum.GCP: {
+                    return renderUnsupportedBackedMessage('GCP', BackendTypesEnum.GCP);
+                }
+                default:
+                    return (
+                        <Grid gridDefinition={[{ colspan: 8 }]}>
+                            <Alert statusIconAriaLabel="Info" header="Unsupported backend type">
+                                Local backend requires Docker. Ensure Docker daemon is running to enable Local backend support.
+                            </Alert>
+                        </Grid>
+                    );
             }
-            case 'gcp': {
-                return <GCPBackend loading={loading} />;
-            }
-            default:
-                return null;
         }
+    };
+
+    const getDisabledSubmitButton = () => {
+        return loading || !backendTypesData || !backendTypesData.includes(backendType);
     };
 
     return (
@@ -145,7 +179,7 @@ export const ProjectForm: React.FC<IProps> = ({ initialValues, onCancel, loading
                                 {t('common.cancel')}
                             </Button>
 
-                            <Button loading={loading} disabled={loading} variant="primary">
+                            <Button loading={loading} disabled={getDisabledSubmitButton()} variant="primary">
                                 {t('common.save')}
                             </Button>
                         </SpaceBetween>
