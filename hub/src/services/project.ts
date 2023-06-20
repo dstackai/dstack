@@ -127,6 +127,18 @@ export const projectApi = createApi({
             providesTags: () => ['ProjectRepos'],
         }),
 
+        deleteProjectRepo: builder.mutation<void, { name: IProject['project_name']; repo_ids: IRepo['repo_id'][] }>({
+            query: ({ name, ...body }) => {
+                return {
+                    url: API.PROJECTS.DELETE_REPO(name),
+                    method: 'POST',
+                    body,
+                };
+            },
+
+            invalidatesTags: () => ['ProjectRepos'],
+        }),
+
         getProjectLogs: builder.query<ILogItem[], TRequestLogsParams>({
             query: ({ name, ...body }) => {
                 return {
@@ -154,5 +166,6 @@ export const {
     useBackendValuesMutation,
     useGetProjectReposQuery,
     useGetProjectRepoQuery,
+    useDeleteProjectRepoMutation,
     useGetProjectLogsQuery,
 } = projectApi;
