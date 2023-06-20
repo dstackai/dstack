@@ -81,6 +81,10 @@ func NewEngine(opts ...Option) *Engine {
 	return engine
 }
 
+func (r *Engine) DockerClient() docker.APIClient {
+	return r.client
+}
+
 func (r *Engine) DockerRuntime() string {
 	return r.runtime
 }
