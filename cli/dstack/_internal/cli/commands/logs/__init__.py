@@ -19,14 +19,6 @@ class LogCommand(BasicCommand):
         add_project_argument(self._parser)
         self._parser.add_argument("run_name", metavar="RUN", type=str, help="The name of the run")
         self._parser.add_argument(
-            "-a",
-            "--attach",
-            help="Whether to continuously poll for new logs. By default, the command "
-            "will exit once there are no more logs to display. To exit from this "
-            "mode, use Control-C.",
-            action="store_true",
-        )
-        self._parser.add_argument(
             "-s",
             "--since",
             help="From what time to begin displaying logs. By default, logs will be displayed starting "
@@ -35,6 +27,12 @@ class LogCommand(BasicCommand):
             "minutes in the past.",
             type=str,
             default="1d",
+        )
+        self._parser.add_argument(
+            "-d",
+            "--diagnose",
+            help="Show dstack diagnostics logs",
+            action="store_true",
         )
 
     @check_init
@@ -46,7 +44,11 @@ class LogCommand(BasicCommand):
             exit(1)
         start_time = since(args.since)
         try:
-            for event in hub_client.poll_logs(run_name=args.run_name, start_time=start_time):
+            for event in hub_client.poll_logs(
+                run_name=args.run_name, start_time=start_time, diagnose=args.diagnose
+            ):
                 sys.stdout.write(event.log_message)
+                if args.diagnose:
+                    print()
         except KeyboardInterrupt:
             pass

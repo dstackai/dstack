@@ -3,7 +3,8 @@ from typing import Generator, Optional
 
 from botocore.client import BaseClient
 
-from dstack._internal.backend.base.logs import render_log_message
+from dstack._internal.backend.base import jobs as base_jobs
+from dstack._internal.backend.base.logs import fix_log_event_urls, render_log_event
 from dstack._internal.backend.base.storage import Storage
 from dstack._internal.core.log_event import LogEvent
 from dstack._internal.utils.common import (
@@ -21,10 +22,23 @@ def poll_logs(
     start_time: datetime,
     end_time: Optional[datetime],
     descending: bool,
+    diagnose: bool,
 ) -> Generator[LogEvent, None, None]:
-    jobs_cache = {}
+    jobs = base_jobs.list_jobs(storage, repo_id, run_name)
+    jobs_map = {j.job_id: j for j in jobs}
+    if diagnose:
+        runner_id = jobs[0].runner_id
+        log_group = f"/dstack/runners/{bucket_name}"
+        log_stream = runner_id
+    else:
+        log_group = f"/dstack/jobs/{bucket_name}/{repo_id}"
+        log_stream = run_name
     filter_logs_events_kwargs = _filter_logs_events_kwargs(
-        bucket_name, repo_id, run_name, start_time, end_time=end_time, next_token=None
+        log_group=log_group,
+        log_stream=log_stream,
+        start_time=start_time,
+        end_time=end_time,
+        next_token=None,
     )
     try:
         paginator = logs_client.get_paginator("filter_log_events")
@@ -38,12 +52,10 @@ def poll_logs(
                 events = reversed(page["events"])
             for event in events:
                 event["timestamp"] = timestamps_in_milliseconds_to_datetime(event["timestamp"])
-                yield render_log_message(
-                    storage,
-                    event,
-                    repo_id,
-                    jobs_cache,
-                )
+                log_event = render_log_event(event)
+                if not diagnose:
+                    log_event = fix_log_event_urls(log_event, jobs_map)
+                yield log_event
     except Exception as e:
         if (
             hasattr(e, "response")
@@ -56,16 +68,15 @@ def poll_logs(
 
 
 def _filter_logs_events_kwargs(
-    bucket_name: str,
-    repo_id: str,
-    run_name: str,
+    log_group: str,
+    log_stream: str,
     start_time: datetime,
     end_time: Optional[datetime],
     next_token: Optional[str],
 ):
     filter_logs_events_kwargs = {
-        "logGroupName": f"/dstack/jobs/{bucket_name}/{repo_id}",
-        "logStreamNames": [run_name],
+        "logGroupName": log_group,
+        "logStreamNames": [log_stream],
         "startTime": datetime_to_timestamp_in_milliseconds(start_time),
     }
     if end_time:

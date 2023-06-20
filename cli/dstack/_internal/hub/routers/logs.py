@@ -25,7 +25,13 @@ async def poll_logs(project_name: str, body: PollLogs) -> List[LogEvent]:
     if start_time is None:
         start_time = get_current_datetime() - timedelta(days=30)
     logs_generator = await run_async(
-        backend.poll_logs, body.repo_id, body.run_name, start_time, body.end_time, body.descending
+        backend.poll_logs,
+        body.repo_id,
+        body.run_name,
+        start_time,
+        body.end_time,
+        body.descending,
+        body.diagnose,
     )
     if body.prev_event_id is None:
         return list(itertools.islice(logs_generator, body.limit))

@@ -8,9 +8,8 @@ from azure.monitor.query import LogsQueryClient, LogsTable
 
 from dstack._internal.backend.azure.utils import DSTACK_LOGS_TABLE_NAME, get_logs_workspace_name
 from dstack._internal.backend.base import jobs as base_jobs
-from dstack._internal.backend.base.logs import fix_urls
+from dstack._internal.backend.base.logs import fix_log_event_urls
 from dstack._internal.backend.base.storage import Storage
-from dstack._internal.core.job import Job
 from dstack._internal.core.log_event import LogEvent
 from dstack._internal.utils.common import get_current_datetime
 
@@ -40,14 +39,23 @@ class AzureLogging:
         start_time: datetime,
         end_time: Optional[datetime],
         descending: bool,
+        diagnose: bool,
     ) -> Generator[LogEvent, None, None]:
-        jobs = {j.job_id: j for j in base_jobs.list_jobs(storage, repo_id, run_name)}
-        log_name = _get_run_log_name(self.resource_group, repo_id, run_name)
+        jobs = base_jobs.list_jobs(storage, repo_id, run_name)
+        jobs_map = {j.job_id: j for j in jobs}
+        if diagnose:
+            runner_id = jobs[0].runner_id
+            log_name = _get_runnners_log_name(self.resource_group, runner_id)
+        else:
+            log_name = _get_jobs_log_name(self.resource_group, repo_id, run_name)
         logs = self._query_logs(
             log_name=log_name, start_time=start_time, end_time=end_time, descending=descending
         )
         for log_entry in logs:
-            yield _log_entry_to_log_event(jobs, log_entry)
+            log_event = _log_entry_to_log_event(log_entry)
+            if not diagnose:
+                log_event = fix_log_event_urls(log_event, jobs_map)
+            yield log_event
 
     def _get_workspace_id(self) -> str:
         workspace = self.log_analytics_client.workspaces.get(
@@ -75,8 +83,12 @@ class AzureLogging:
         yield from _parse_log_entries_from_table(table)
 
 
-def _get_run_log_name(resource_group: str, repo_id: str, run_name: str):
+def _get_jobs_log_name(resource_group: str, repo_id: str, run_name: str):
     return f"dstack-jobs-{resource_group}-{repo_id}-{run_name}"
+
+
+def _get_runnners_log_name(resource_group: str, runner_id: str):
+    return f"dstack-runners-{resource_group}-{runner_id}"
 
 
 def _parse_log_entries_from_table(table: LogsTable) -> Generator[Dict, None, None]:
@@ -93,12 +105,10 @@ def _parse_log_entries_from_table(table: LogsTable) -> Generator[Dict, None, Non
         }
 
 
-def _log_entry_to_log_event(jobs: Dict[str, Job], log_entry: Dict) -> LogEvent:
+def _log_entry_to_log_event(log_entry: Dict) -> LogEvent:
     payload = json.loads(log_entry["JsonPayload"])
     log = payload["log"]
     job_id = payload["job_id"]
-    job = jobs[job_id]
-    log = fix_urls(log.encode(), job, {}).decode()
     return LogEvent(
         event_id=log_entry["EventID"],
         timestamp=log_entry["TimeGenerated"].timestamp(),

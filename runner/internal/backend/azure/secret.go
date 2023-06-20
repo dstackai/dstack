@@ -61,14 +61,13 @@ func (azsecret AzureSecretManager) getSecretValue(ctx context.Context, key strin
 }
 
 func getSecretKey(repoId, name string) (string, error) {
-	repo_part := repoId
-	key_prefix := fmt.Sprintf("dstack-secrets-%s-", repo_part)
-	return encodeKey(key_prefix, name), nil
+	key_suffix := fmt.Sprintf("%s-%s", repoId, name)
+	return encodeKey("dstack-secrets-", key_suffix), nil
 }
 
 func getCredentialKey(repoId string) (string, error) {
-	repo_part := repoId
-	return fmt.Sprintf("dstack-credentials-%s", repo_part), nil
+	key_suffix := repoId
+	return encodeKey("dstack-credentials-", key_suffix), nil
 }
 
 func encodeKey(key_prefix, key_suffix string) string {

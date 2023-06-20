@@ -101,9 +101,17 @@ class LocalBackend(Backend):
         start_time: datetime,
         end_time: Optional[datetime] = None,
         descending: bool = False,
+        diagnose: bool = False,
     ) -> Generator[LogEvent, None, None]:
         return logs.poll_logs(
-            self.backend_config, self._storage, repo_id, run_name, start_time, end_time, descending
+            self.backend_config,
+            self._storage,
+            repo_id,
+            run_name,
+            start_time,
+            end_time,
+            descending,
+            diagnose,
         )
 
     def list_run_artifact_files(

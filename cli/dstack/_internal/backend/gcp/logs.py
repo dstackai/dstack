@@ -4,8 +4,8 @@ from typing import Dict, Generator, Optional
 from google.cloud import logging
 from google.oauth2 import service_account
 
-from dstack._internal.backend.base import jobs
-from dstack._internal.backend.base.logs import fix_urls
+from dstack._internal.backend.base import jobs as base_jobs
+from dstack._internal.backend.base.logs import fix_log_event_urls
 from dstack._internal.backend.base.storage import Storage
 from dstack._internal.core.job import Job
 from dstack._internal.core.log_event import LogEvent, LogEventSource
@@ -29,8 +29,15 @@ class GCPLogging:
         start_time: datetime,
         end_time: Optional[datetime],
         descending: bool,
+        diagnose: bool,
     ) -> Generator[LogEvent, None, None]:
-        log_name = _get_log_name(self.bucket_name, repo_id, run_name)
+        jobs = base_jobs.list_jobs(storage, repo_id, run_name)
+        jobs_map = {j.job_id: j for j in jobs}
+        if diagnose:
+            runner_id = jobs[0].runner_id
+            log_name = _get_runners_log_name(self.bucket_name, runner_id)
+        else:
+            log_name = _get_jobs_log_name(self.bucket_name, repo_id, run_name)
 
         timestamp_from = start_time.strftime(LOGS_TIME_FORMAT)
         filter = f'timestamp>="{timestamp_from}"'
@@ -44,29 +51,27 @@ class GCPLogging:
             order_by = logging.DESCENDING
 
         logger = self.logging_client.logger(log_name)
-        jobs_cache = {}
         log_entries = logger.list_entries(filter_=filter, order_by=order_by)
         for log_entry in log_entries:
-            yield _log_entry_to_log_event(storage, repo_id, log_entry, jobs_cache)
+            log_event = _log_entry_to_log_event(log_entry)
+            if not diagnose:
+                log_event = fix_log_event_urls(log_event, jobs_map)
+            yield log_event
 
 
-def _get_log_name(bucket_name: str, repo_id: str, run_name) -> str:
+def _get_jobs_log_name(bucket_name: str, repo_id: str, run_name) -> str:
     return f"dstack-jobs-{bucket_name}-{repo_id}-{run_name}"
 
 
+def _get_runners_log_name(bucket_name: str, runner_id: str) -> str:
+    return f"dstack-runners-{bucket_name}-{runner_id}"
+
+
 def _log_entry_to_log_event(
-    storage: Storage,
-    repo_id: str,
     log_entry: logging.LogEntry,
-    jobs_cache: Dict[str, Job],
 ) -> LogEvent:
     job_id = log_entry.payload["job_id"]
     log = log_entry.payload["log"]
-    job = jobs_cache.get(job_id)
-    if job is None:
-        job = jobs.get_job(storage, repo_id, job_id)
-        jobs_cache[job_id] = job
-    log = fix_urls(log.encode(), job, {}).decode()
     timestamp = log_entry.timestamp
     return LogEvent(
         event_id=log_entry.insert_id,
