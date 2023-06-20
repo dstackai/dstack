@@ -100,50 +100,6 @@
             ]
         }
     );
-    new Termynal('#app-command-example',
-        {
-            lineData: [
-                {type: 'input', value: 'dstack run . -f app.dstack.yml --reload'},
-                {delay: 0, value: ' ', class: 'newline'},
-                {
-                    delay: 0,
-                    value: 'RUN           USER   INSTANCE       RESOURCES                 SPOT',
-                    class: 'newline'
-                },
-                {
-                    delay: 0,
-                    value: 'mean-snail-1  peter  a2-highgpu-1g  12xCPUs, 87040MB, 1xA100  yes',
-                    class: 'newline'
-                },
-                {delay: 0, value: ' ', class: 'newline'},
-                {delay: 0, startDelay: 0, lineDelay: 0, value: 'Continue? ', class: 'no-newline'},
-                {
-                    type: 'input',
-                    startDelay: 0,
-                    lineDelay: 0,
-                    typeDelay: 1000,
-                    prompt: '[y/n]',
-                    value: 'y',
-                    class: 'no-newline'
-                },
-                {delay: 0, value: ' ', class: 'newline'},
-                {delay: 0, value: 'Provisioning and starting a tunnel...', class: 'newline'},
-                {type: 'progress', progressPercent: 100},
-                {delay: 0, value: ' ', class: 'newline'},
-                {
-                    delay: 0,
-                    value: 'Launching in *reload mode* on: http://127.0.0.1:7860 (Press CTRL+C to quit)',
-                    class: 'newline'
-                },
-                {
-                    delay: 0,
-                    value: 'Watching: \'/opt/conda/lib/python3.10/site-packages/gradio\', \'/workflow\'',
-                    class: 'newline'
-                },
-                {delay: 0, value: ' ', class: 'newline'},
-            ]
-        }
-    );
 </script>
 {% endblock %}
 
@@ -152,19 +108,20 @@
     <div class="md-grid md-typeset">
         <div class="tx-landing__hero">
             <div class="tx-landing__hero_text">
-                <h1>Cost-effective ML development in your cloud</h1>
-                <p><strong>dstack</strong> is an open-source developer platform that helps manage <strong>dev
-                    environments</strong> and run <strong>ML tasks</strong> in your cloud.
+                <h1>Cost-effective ML development in the cloud</h1>
+                <p><strong>dstack</strong> is an open-source tool designed for ML teams
+                    to automate running <strong>dev environments</strong> and <strong>tasks</strong>
+                    in your cloud.
                 </p>
 
-                <p><strong>dstack</strong> supports all major cloud providers,
-                    including <strong>AWS</strong>, <strong>GCP</strong>, and <strong>Azure</strong>.</p>
+                <p><strong>dstack</strong> simplifies the developer workflow of ML teams while
+                    driving <strong>productivity</strong> and reducing <strong>cloud costs</strong>.</p>
 
                 <a href="/docs" class="md-button md-button--primary">
                     Docs</a>
 
-                <a href="https://calendly.com/dstackai/office-hours" target="_blank"
-                   class="md-button md-button-secondary">Get a demo</a>
+                <a href="https://join.slack.com/t/dstackai/shared_invite/zt-xdnsytie-D4qU9BvJP8vkbkHXdi6clQ" target="_blank"
+                   class="md-button md-button-secondary">Join community</a>
             </div>
 
             <div class="tx-landing__hero_image">
@@ -181,7 +138,7 @@
                 </div>
                 <div class="block">
                     <div>
-                        <h3>Launch dev environments in your cloud with a single command</h3>
+                        <h3>Provision dev environments with a single command</h3>
                         <p>Configure the <strong>hardware resources</strong> you need (GPU, memory, etc.) and
                             indicate whether you want to use <strong>spot</strong> or <strong>on-demand</strong>
                             instances.</p>
@@ -199,7 +156,7 @@
             <div class="section">
                 <div class="block margin">
                     <div>
-                        <h3>Work with cloud dev environments using a desktop IDE</h3>
+                        <h3>Work with dev environments via a desktop IDE</h3>
                         <p>Click the <strong>SSH</strong> URL from the output to automatically
                             open the cloud dev environment in your local <strong>desktop</strong> IDE.</p>
                         <p>The cloud dev environment is automatically <strong>pre-configured</strong>
@@ -219,19 +176,18 @@
             <div class="section">
                 <div class="block margin">
                     <div>
-                        <h3>Train or finetune LLMs in your cloud effortlessly</h3>
+                        <h3>Run any type of ML task with a single command</h3>
+                        <p>Whether you want to run a <strong>training script</strong>, a
+                            <strong>data processing</strong> job, or a <strong>web-based
+                                app</strong>, simply define its configuration and run it with a single command.</p>
+
                         <p><strong>dstack</strong> handles the automatic provisioning of cloud resources, including
-                            waiting for <strong>spot instances</strong> if required. It runs the script and performs
-                            resource
-                            cleanup
-                            once the training is complete.</p>
+                            waiting for <strong>spot instances</strong> if required, as well as port <strong>forwarding</strong> for
+                            secure access.</p>
 
-                        <p>If a task is <strong>interrupted</strong>, it is able to resume from where it last stopped.
-                        </p>
-
-                        <p>Use the <strong>dstack</strong> Python API to <strong>store</strong> and
+                        <p>Use <strong>dstack</strong>'s Python API to <strong>save</strong> and
                             <strong>load</strong>
-                            <strong>artifacts</strong> such as model checkpoints and datasets.</p>
+                            <strong>artifacts</strong> (e.g. model checkpoints and data.)</p>
                     </div>
                 </div>
 
@@ -245,22 +201,19 @@
         <div class="tx-landing__major_feature">
             <div class="section">
                 <div class="block large margin">
-                    <div id="app-command-example" data-termynal>
-                    </div>
+                    <img src="assets/images/dstack-train-artifacts.png" alt="" class="border">
                 </div>
 
                 <div class="block">
                     <div>
-                        <h3>Run apps in the cloud with a single command</h3>
-                        <p>Run app in your cloud for <strong>development</strong> and
-                            <strong>testing purposes</strong> with a single command.</p>
+                        <h3>Manage projects and control costs across teams via UI</h3>
+                        <p>Manage <strong>users</strong> and cloud <strong>credentials</strong> in a secure and
+                            centralized manner.</p>
 
-                        <p>Configure the <strong>hardware resources</strong> you need (GPU, memory, etc.) and
-                            indicate whether you want to use <strong>spot</strong> or <strong>on-demand</strong>
-                            instances.</p>
+                        <p>Browse and manage runs and artifacts through a web-based <strong>dashboard</strong>.</p>
 
-                        <p><strong>dstack</strong> will automatically provision cloud resources,
-                            and <strong>forward ports</strong> for secure and convenient access.</p>
+                        <p>Track <strong>cloud costs</strong> per run and manage <strong>usage quotas</strong> per team
+                            via UI.</p>
                     </div>
                 </div>
             </div>
@@ -328,7 +281,7 @@
                         No MLOps is required
                     </h3>
                     <p><strong>dstack</strong> integrates with your cloud natively and doesn't require
-                        engineering. No hustle with <strong>Kubernetes</strong> or custom <strong>Docker</strong>
+                        engineering. No hustle with <strong>Terraform</strong>, <strong>Kubernetes</strong> or custom <strong>Docker</strong>
                         images.</p>
                 </div>
                 <div class="feature-cell">
@@ -374,7 +327,7 @@
 
         <div class="tx-landing__bottom_cta">
             <div>
-                <h2>Installation and setup take less than a minute</h2>
+                <h2>Install dstack in under a minute</h2>
                 <div class="termy">
                     <pre class="highlight">
 $ pip install "dstack[aws,gcp,azure]"
@@ -382,14 +335,14 @@ $ dstack start
                     </pre>
                 </div>
                 <p class="tx-landing__bottom_cta_text">
-                    And you're <strong>done</strong>! Now you and your team can run dev environments and tasks
+                    And you're <strong>done</strong>! Now you can run dev environments and tasks
                     both <strong>locally</strong> and in <strong>your cloud</strong>.
                 </p>
 
                 <a href="/docs" class="md-button md-button--primary">
                     Docs</a>
 
-                <a href="https://calendly.com/dstackai/office-hours" target="_blank"
+                <a href="https://join.slack.com/t/dstackai/shared_invite/zt-xdnsytie-D4qU9BvJP8vkbkHXdi6clQ" target="_blank"
                    class="md-button md-button-secondary">Get a demo</a>
             </div>
         </div>
