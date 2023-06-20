@@ -6,8 +6,6 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
-	"github.com/dstackai/dstack/runner/internal/models"
-	"github.com/dustin/go-humanize"
 	"io"
 	"os"
 	"path"
@@ -15,10 +13,14 @@ import (
 	"strconv"
 	"time"
 
+	"github.com/dstackai/dstack/runner/internal/models"
+	"github.com/dustin/go-humanize"
+
 	localbackend "github.com/dstackai/dstack/runner/internal/backend/local"
 
 	"github.com/docker/docker/api/types"
 
+	"github.com/docker/docker/api/types/filters"
 	"github.com/docker/docker/api/types/mount"
 	"github.com/dstackai/dstack/runner/consts"
 	"github.com/dstackai/dstack/runner/consts/errorcodes"
@@ -305,6 +307,15 @@ func (ex *Executor) runJob(ctx context.Context, erCh chan error, stoppedCh chan 
 	}
 	defer func() { _ = fileLog.Close() }()
 	allLogs := io.MultiWriter(logger, ex.streamLogs, fileLog)
+
+	_, isLocalBackend := ex.backend.(*localbackend.Local)
+	if isLocalBackend {
+		err := ex.warnOnLongImagePull(ctx, job.Image)
+		if err != nil {
+			erCh <- gerrors.Wrap(err)
+			return
+		}
+	}
 
 	log.Trace(ctx, "Prebuilding container", "mode", job.Prebuild)
 	if job.Prebuild == models.NO_PREBUILD || len(job.Setup) == 0 {
@@ -628,6 +639,23 @@ func (ex *Executor) newSpec(ctx context.Context, credPath string) (*container.Sp
 		AllowHostMode:      !isLocalBackend,
 	}
 	return spec, nil
+}
+
+func (ex *Executor) warnOnLongImagePull(ctx context.Context, image string) error {
+	client := ex.engine.DockerClient()
+	imageFilters := filters.NewArgs()
+	imageFilters.Add("reference", image)
+	images, err := client.ImageList(ctx, types.ImageListOptions{All: false, Filters: imageFilters})
+	if err != nil {
+		return gerrors.Wrap(err)
+	}
+	if len(images) == 0 {
+		if _, err := fmt.Fprintf(ex.streamLogs, "Pulling a docker image. This may take a while...\n\n"); err != nil {
+			return gerrors.Wrap(err)
+		}
+		return nil
+	}
+	return nil
 }
 
 func (ex *Executor) processJob(ctx context.Context, spec *container.Spec, stoppedCh chan struct{}, logs io.Writer) error {
