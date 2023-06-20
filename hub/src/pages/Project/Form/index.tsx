@@ -3,6 +3,7 @@ import { DefaultValues, FormProvider, useForm } from 'react-hook-form';
 import { useTranslation } from 'react-i18next';
 
 import {
+    Alert,
     Button,
     Container,
     FormField,
@@ -49,7 +50,7 @@ export const ProjectForm: React.FC<IProps> = ({ initialValues, onCancel, loading
 
         return {
             backend: {
-                type: 'aws',
+                type: BackendTypesEnum.AWS,
             },
         };
     };
@@ -65,7 +66,7 @@ export const ProjectForm: React.FC<IProps> = ({ initialValues, onCancel, loading
 
     const backendOptions: TBackendOption[] = useMemo(() => {
         return Object.values(BackendTypesEnum).map((type) => {
-            const disabled: boolean = loading || !backendTypesData || !backendTypesData.includes(type);
+            const disabled: boolean = loading || !backendTypesData;
 
             return {
                 label: t(`projects.backend_type.${type}`),
@@ -113,20 +114,59 @@ export const ProjectForm: React.FC<IProps> = ({ initialValues, onCancel, loading
         });
     };
 
+    const renderUnsupportedBackedMessage = (backendName: string, backendTypeName: BackendTypesEnum) => {
+        return (
+            <Grid gridDefinition={[{ colspan: 8 }]}>
+                <Alert statusIconAriaLabel="Info" header="Unsupported backend type">
+                    Dependencies for {backendName} backend are not installed. Run{' '}
+                    <code>pip install dstack[{backendTypeName}]</code> to enable {backendName} support.
+                </Alert>
+            </Grid>
+        );
+    };
+
     const renderBackendFields = () => {
-        switch (backendType) {
-            case BackendTypesEnum.AWS: {
-                return <AWSBackend loading={loading} />;
+        if (!backendTypesData) return null;
+
+        if (backendTypesData.includes(backendType)) {
+            switch (backendType) {
+                case BackendTypesEnum.AWS: {
+                    return <AWSBackend loading={loading} />;
+                }
+                case BackendTypesEnum.AZURE: {
+                    return <AzureBackend loading={loading} />;
+                }
+                case BackendTypesEnum.GCP: {
+                    return <GCPBackend loading={loading} />;
+                }
+                default:
+                    return null;
             }
-            case BackendTypesEnum.AZURE: {
-                return <AzureBackend loading={loading} />;
+        } else {
+            switch (backendType) {
+                case BackendTypesEnum.AWS: {
+                    return renderUnsupportedBackedMessage('AWS', BackendTypesEnum.AWS);
+                }
+                case BackendTypesEnum.AZURE: {
+                    return renderUnsupportedBackedMessage('Azure', BackendTypesEnum.AZURE);
+                }
+                case BackendTypesEnum.GCP: {
+                    return renderUnsupportedBackedMessage('GCP', BackendTypesEnum.GCP);
+                }
+                default:
+                    return (
+                        <Grid gridDefinition={[{ colspan: 8 }]}>
+                            <Alert statusIconAriaLabel="Info" header="Unsupported backend type">
+                                Local backend requires Docker. Ensure Docker daemon is running to enable Local backend support.
+                            </Alert>
+                        </Grid>
+                    );
             }
-            case BackendTypesEnum.GCP: {
-                return <GCPBackend loading={loading} />;
-            }
-            default:
-                return null;
         }
+    };
+
+    const getDisabledSubmitButton = () => {
+        return loading || !backendTypesData || !backendTypesData.includes(backendType);
     };
 
     return (
@@ -139,7 +179,7 @@ export const ProjectForm: React.FC<IProps> = ({ initialValues, onCancel, loading
                                 {t('common.cancel')}
                             </Button>
 
-                            <Button loading={loading} disabled={loading} variant="primary">
+                            <Button loading={loading} disabled={getDisabledSubmitButton()} variant="primary">
                                 {t('common.save')}
                             </Button>
                         </SpaceBetween>
