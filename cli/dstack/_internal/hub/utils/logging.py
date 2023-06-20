@@ -8,7 +8,7 @@ class AsyncioCancelledErrorFilter(logging.Filter):
     def filter(self, record: logging.LogRecord) -> bool:
         if record.exc_info is None:
             return True
-        if isinstance(record.exc_info[1], asyncio.exceptions.CancelledError):
+        if isinstance(record.exc_info[1], asyncio.CancelledError):
             return False
         return True
 

@@ -9,7 +9,7 @@ from dstack._internal.hub.background.tasks.resubmit_jobs import resubmit_jobs
 
 def start_background_tasks():
     def _error_listner(event: JobExecutionEvent):
-        if isinstance(event.exception, asyncio.exceptions.CancelledError):
+        if isinstance(event.exception, asyncio.CancelledError):
             scheduler.shutdown()
 
     scheduler = AsyncIOScheduler()
