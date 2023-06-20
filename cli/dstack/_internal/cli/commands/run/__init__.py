@@ -464,8 +464,9 @@ def _poll_logs_ws(hub_client: HubClient, job: Job, ports: Dict[int, int]):
         _ws.run_forever()
     except KeyboardInterrupt:
         pass  # on_error() has already handled an error, but it raises here too
-    if atty:
-        cursor.show()
+    finally:
+        if atty:
+            cursor.show()
 
 
 def _poll_run_head(
