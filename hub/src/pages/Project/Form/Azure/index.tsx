@@ -29,16 +29,13 @@ export const AzureBackend: React.FC<IProps> = ({ loading }) => {
     const [storageAccounts, setStorageAccounts] = useState<FormSelectOptions>([]);
     const [availableDefaultCredentials, setAvailableDefaultCredentials] = useState<boolean | null>(null);
     const lastUpdatedField = useRef<string | null>(null);
+    const isFirstRender = useRef<boolean>(true);
 
     const [getBackendValues, { isLoading: isLoadingValues }] = useBackendValuesMutation();
 
     const requestRef = useRef<null | ReturnType<typeof getBackendValues>>(null);
 
     const [openHelpPanel] = useHelpPanel();
-
-    useEffect(() => {
-        changeFormHandler().catch(console.log);
-    }, []);
 
     const tenantIdValue = watch(`backend.${FIELD_NAMES.TENANT_ID}`);
     const clientIdValue = watch(`backend.${FIELD_NAMES.CREDENTIALS.CLIENT_ID}`);
@@ -75,6 +72,8 @@ export const AzureBackend: React.FC<IProps> = ({ loading }) => {
                     `backend.${FIELD_NAMES.CREDENTIALS.TYPE}`,
                     response.default_credentials ? AzureCredentialTypeEnum.DEFAULT : AzureCredentialTypeEnum.CLIENT,
                 );
+
+                if (response.default_credentials) changeFormHandler().catch(console.log);
             }
 
             // TENANT_ID available for only client credentials type
@@ -125,6 +124,13 @@ export const AzureBackend: React.FC<IProps> = ({ loading }) => {
             }
         }
     };
+
+    useEffect(() => {
+        if (!isFirstRender.current) return;
+
+        changeFormHandler().catch(console.log);
+        isFirstRender.current = false;
+    }, []);
 
     const debouncedChangeFormHandler = useCallback(debounce(changeFormHandler, 1000), []);
 

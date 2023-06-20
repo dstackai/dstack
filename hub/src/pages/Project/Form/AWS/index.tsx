@@ -26,16 +26,13 @@ export const AWSBackend: React.FC<IProps> = ({ loading }) => {
     const [subnets, setSubnets] = useState<FormSelectOptions>([]);
     const [availableDefaultCredentials, setAvailableDefaultCredentials] = useState<null | boolean>(null);
     const lastUpdatedField = useRef<string | null>(null);
+    const isFirstRender = useRef<boolean>(true);
 
     const [getBackendValues, { isLoading: isLoadingValues }] = useBackendValuesMutation();
 
     const requestRef = useRef<null | ReturnType<typeof getBackendValues>>(null);
 
     const [openHelpPanel] = useHelpPanel();
-
-    useEffect(() => {
-        changeFormHandler().catch(console.log);
-    }, []);
 
     const backendCredentialTypeValue = watch(`backend.${FIELD_NAMES.CREDENTIALS.TYPE}`);
     const backendAccessKeyValue = watch(`backend.${FIELD_NAMES.CREDENTIALS.ACCESS_KEY}`);
@@ -77,6 +74,8 @@ export const AWSBackend: React.FC<IProps> = ({ loading }) => {
                     `backend.${FIELD_NAMES.CREDENTIALS.TYPE}`,
                     response.default_credentials ? AWSCredentialTypeEnum.DEFAULT : AWSCredentialTypeEnum.ACCESS_KEY,
                 );
+
+                if (response.default_credentials) changeFormHandler().catch(console.log);
             }
 
             if (response.region_name?.values) {
@@ -122,6 +121,13 @@ export const AWSBackend: React.FC<IProps> = ({ loading }) => {
             }
         }
     };
+
+    useEffect(() => {
+        if (!isFirstRender.current) return;
+
+        changeFormHandler().catch(console.log);
+        isFirstRender.current = false;
+    }, []);
 
     const debouncedChangeFormHandler = useCallback(debounce(changeFormHandler, 1000), []);
 

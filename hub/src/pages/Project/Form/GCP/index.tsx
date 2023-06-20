@@ -48,21 +48,11 @@ export const GCPBackend: React.FC<IProps> = ({ loading }) => {
     const requestRef = useRef<null | ReturnType<typeof getBackendValues>>(null);
     const [pushNotification] = useNotifications();
     const lastUpdatedField = useRef<string | null>(null);
+    const isFirstRender = useRef<boolean>(true);
 
     const [getBackendValues, { isLoading: isLoadingValues }] = useBackendValuesMutation();
     const backendCredentialTypeValue = watch(`backend.${FIELD_NAMES.CREDENTIALS.TYPE}`);
     const backendCredentials = watch(`backend.${FIELD_NAMES.CREDENTIALS.DATA}`);
-
-    useEffect(() => {
-        changeFormHandler().catch(console.log);
-
-        const fileName = getValues('backend.credentials_filename');
-
-        if (fileName) {
-            const file = new File([''], fileName, { type: 'text/plain' });
-            setFiles([file]);
-        }
-    }, []);
 
     const [openHelpPanel] = useHelpPanel();
 
@@ -101,6 +91,8 @@ export const GCPBackend: React.FC<IProps> = ({ loading }) => {
                     `backend.${FIELD_NAMES.CREDENTIALS.TYPE}`,
                     response.default_credentials ? GCPCredentialTypeEnum.DEFAULT : GCPCredentialTypeEnum.SERVICE_ACCOUNT,
                 );
+
+                if (response.default_credentials) changeFormHandler().catch(console.log);
             }
 
             if (response.area?.values) {
@@ -185,6 +177,20 @@ export const GCPBackend: React.FC<IProps> = ({ loading }) => {
             }
         }
     };
+
+    useEffect(() => {
+        if (!isFirstRender.current) return;
+
+        changeFormHandler().catch(console.log);
+        isFirstRender.current = false;
+
+        const fileName = getValues('backend.credentials_filename');
+
+        if (fileName) {
+            const file = new File([''], fileName, { type: 'text/plain' });
+            setFiles([file]);
+        }
+    }, []);
 
     const onChangeFormField = () => {
         if (requestRef.current) requestRef.current.abort();
