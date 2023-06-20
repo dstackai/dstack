@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"context"
 	"fmt"
+	"github.com/dstackai/dstack/runner/internal/ports"
 	"io"
 	"io/ioutil"
 	"math/bits"
@@ -85,7 +86,15 @@ func start(logLevel int, httpPort int, configDir string) {
 		os.Exit(1)
 	}
 	if httpPort == 0 {
-		httpPort = 10999
+		for httpPort = 10999; httpPort >= 10000; httpPort-- {
+			if vacant, _ := ports.CheckPort(httpPort); vacant {
+				break
+			}
+		}
+		if httpPort == 9999 {
+			log.Error(ctx, "Can't pick a vacant port for logs streaming")
+			os.Exit(1)
+		}
 	}
 	streamLogs := stream.New(httpPort)
 	go func() {
