@@ -71,32 +71,45 @@ class VSCodeDesktopServer(ProviderExtension):
         return None
 
     @classmethod
+    def _vscode_server_install(cls, commit: str, extensions: Optional[List[str]]) -> List[str]:
+        url = f"https://update.code.visualstudio.com/commit:{commit}/server-linux-$arch/stable"
+        archive = "vscode-server-linux-$arch.tar.gz"
+        target = f'~/.vscode-server/bin/"{commit}"'
+        commands = [
+            f'if [ $(uname -m) = "aarch64" ]; then arch="arm64"; else arch="x64"; fi',
+            f"mkdir -p /tmp",
+            f'wget -q --show-progress "{url}" -O "/tmp/{archive}"',
+            f"mkdir -vp {target}",
+            f'tar --no-same-owner -xz --strip-components=1 -C {target} -f "/tmp/{archive}"',
+            f'rm "/tmp/{archive}"',
+        ]
+        if extensions:
+            extensions = " ".join(f'--install-extension "{name}"' for name in extensions)
+            commands.append(f'PATH="$PATH":{target}/bin code-server {extensions}')
+        return commands
+
+    @classmethod
     def patch_setup(
         cls, commands: List[str], *, vscode_extensions: Optional[List[str]] = None, **kwargs
     ):
         commit = cls.detect_code_sha()
         if commit is None:
             raise NoVSCodeVersionError()
-        url = f"https://update.code.visualstudio.com/commit:{commit}/server-linux-$arch/stable"
-        archive = "vscode-server-linux-$arch.tar.gz"
-        target = f'~/.vscode-server/bin/"{commit}"'
-        commands.extend(
-            [
-                f'if [ $(uname -m) = "aarch64" ]; then arch="arm64"; else arch="x64"; fi',
-                f"mkdir -p /tmp",
-                f'wget -q --show-progress "{url}" -O "/tmp/{archive}"',
-                f"mkdir -vp {target}",
-                f'tar --no-same-owner -xz --strip-components=1 -C {target} -f "/tmp/{archive}"',
-                f'rm "/tmp/{archive}"',
-            ]
-        )
-        if vscode_extensions:
-            extensions = " ".join(f'--install-extension "{name}"' for name in vscode_extensions)
-            commands.append(f'PATH="$PATH":{target}/bin code-server {extensions}')
+        commands.extend(cls._vscode_server_install(commit, extensions=vscode_extensions))
 
     @classmethod
-    def patch_commands(cls, commands: List[str], **kwargs):
-        pass
+    def patch_commands(
+        cls, commands: List[str], *, vscode_extensions: Optional[List[str]] = None, **kwargs
+    ):
+        commit = cls.detect_code_sha()
+        if commit is None:
+            raise NoVSCodeVersionError()
+        install_commands = " && ".join(
+            cls._vscode_server_install(commit, extensions=vscode_extensions)
+        )
+        commands.append(
+            f'if [ ! -d ~/.vscode-server/bin/"{commit}" ]; then {install_commands}; fi'
+        )
 
     @classmethod
     def patch_apps(cls, apps: List[AppSpec], **kwargs):

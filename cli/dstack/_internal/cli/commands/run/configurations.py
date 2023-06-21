@@ -30,14 +30,11 @@ def _parse_dev_environment_configuration_data(
     provider_data = {"configuration_type": "dev-environment"}
     _init_base_provider_data(configuration_data, provider_data)
     provider_data["build"] = []
+    provider_data["commands"] = []
     try:
-        VSCodeDesktopServer.patch_setup(
-            provider_data["build"],
-            vscode_extensions=[
-                "ms-python.python",
-                "ms-toolsai.jupyter",
-            ],
-        )
+        extensions = ["ms-python.python", "ms-toolsai.jupyter"]
+        VSCodeDesktopServer.patch_setup(provider_data["build"], vscode_extensions=extensions)
+        VSCodeDesktopServer.patch_commands(provider_data["commands"], vscode_extensions=extensions)
     except NoVSCodeVersionError as e:
         console.print(
             "[grey58]Unable to detect the VS Code version and pre-install extensions. Fix by opening ["
@@ -46,7 +43,7 @@ def _parse_dev_environment_configuration_data(
         )
     provider_data["build"].append("pip install -q --no-cache-dir ipykernel")
     provider_data["build"].extend(configuration_data.get("build") or [])
-    provider_data["commands"] = configuration_data.get("init")
+    provider_data["commands"].extend(configuration_data.get("init") or [])
     return provider_name, provider_data
 
 
