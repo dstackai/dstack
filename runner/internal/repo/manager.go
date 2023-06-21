@@ -3,6 +3,7 @@ package repo
 import (
 	"context"
 	"fmt"
+	"github.com/dstackai/dstack/runner/internal/gerrors"
 	"os"
 
 	"github.com/dstackai/dstack/runner/internal/log"
@@ -17,27 +18,20 @@ type Manager struct {
 	ctx       context.Context
 	localPath string
 	clo       git.CloneOptions
-	cho       git.CheckoutOptions
+	hash      string
 }
 
 func NewManager(ctx context.Context, url, branch, hash string) *Manager {
 	ctx = log.AppendArgsCtx(ctx, "url", url, "branch", branch, "hash", hash)
-	referenceName := plumbing.NewBranchReferenceName(branch)
-	var cho git.CheckoutOptions
-	if hash != "" {
-		cho = git.CheckoutOptions{Hash: plumbing.NewHash(hash)}
-	} else {
-		cho = git.CheckoutOptions{Branch: referenceName}
-	}
 	m := &Manager{
 		ctx: ctx,
 		clo: git.CloneOptions{
 			URL:               url,
 			RecurseSubmodules: git.DefaultSubmoduleRecursionDepth,
-			ReferenceName:     referenceName,
+			ReferenceName:     plumbing.NewBranchReferenceName(branch),
 			SingleBranch:      true,
 		},
-		cho: cho,
+		hash: hash,
 	}
 
 	return m
@@ -82,14 +76,26 @@ func (m *Manager) Checkout() error {
 		return err
 	}
 	if ref != nil {
+		branchRef, err := ref.Reference(m.clo.ReferenceName, true)
+		if err != nil {
+			return gerrors.Wrap(err)
+		}
+		var cho git.CheckoutOptions
+		if m.hash == "" || m.hash == branchRef.Hash().String() {
+			cho.Branch = m.clo.ReferenceName
+		} else {
+			cho.Hash = plumbing.NewHash(m.hash)
+		}
+
 		workTree, err := ref.Worktree()
 		if err != nil {
 			return err
 		}
-		err = workTree.Checkout(&m.cho)
+		err = workTree.Checkout(&cho)
 		if err != nil {
 			return err
 		}
+
 	} else {
 		log.Warning(m.ctx, "git clone ref==nil")
 	}
