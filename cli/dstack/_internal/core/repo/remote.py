@@ -39,6 +39,8 @@ class RemoteRepoData(RepoData, RemoteRepoInfo):
     repo_branch: Optional[str] = None
     repo_hash: Optional[str] = None
     repo_diff: Optional[str] = None
+    repo_config_name: Optional[str] = None
+    repo_config_email: Optional[str] = None
 
     @staticmethod
     def from_url(url: str, parse_ssh_config: bool = True):
@@ -112,6 +114,8 @@ class RemoteRepo(Repo):
             repo_data.repo_branch = tracking_branch.remote_head
             repo_data.repo_hash = tracking_branch.commit.hexsha
             repo_data.repo_diff = repo.git.diff(repo_data.repo_hash)
+            repo_data.repo_config_name = repo.config_reader().get_value("user", "name")
+            repo_data.repo_config_email = repo.config_reader().get_value("user", "email")
             diffs = [repo_data.repo_diff]
             for filename in repo.untracked_files:
                 diffs.append(_add_patch(local_repo_dir, filename))
