@@ -68,7 +68,6 @@ class BuildCommand(BasicCommand):
                 args=args,
             )
             runs = list_runs_hub(hub_client, run_name=run_name)
-            print_runs(runs)
             run = runs[0]
             if run.status == JobStatus.FAILED:
                 console.print("\nProvisioning failed\n")
