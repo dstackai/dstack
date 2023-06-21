@@ -318,6 +318,8 @@ class Job(JobHead):
             job_data["repo_name"] = self.repo_data.repo_name
             job_data["repo_branch"] = self.repo_data.repo_branch or ""
             job_data["repo_hash"] = self.repo_data.repo_hash or ""
+            job_data["repo_config_name"] = self.repo_data.repo_config_name or ""
+            job_data["repo_config_email"] = self.repo_data.repo_config_email or ""
         return job_data
 
     @staticmethod
@@ -391,6 +393,8 @@ class Job(JobHead):
                 repo_name=job_data["repo_name"],
                 repo_branch=job_data["repo_branch"] or None,
                 repo_hash=job_data["repo_hash"] or None,
+                repo_config_name=job_data["repo_config_name"] or None,
+                repo_config_email=job_data["repo_config_email"] or None,
             )
         elif job_data["repo_type"] == "local":
             repo_data = LocalRepoData(repo_dir=job_data.get("repo_dir", ""))

@@ -140,3 +140,20 @@ func (m *Manager) CheckoutMaster() error {
 func (m *Manager) URL() string {
 	return m.clo.URL
 }
+
+func (m *Manager) SetConfig(name, email string) error {
+	repo, err := git.PlainOpen(m.localPath)
+	if err != nil {
+		return gerrors.Wrap(err)
+	}
+	config, err := repo.Config()
+	if err != nil {
+		return gerrors.Wrap(err)
+	}
+	config.User.Name = name
+	config.User.Email = email
+	if err := repo.SetConfig(config); err != nil {
+		return gerrors.Wrap(err)
+	}
+	return nil
+}

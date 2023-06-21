@@ -35,12 +35,14 @@ type Job struct {
 	RepoType    string `yaml:"repo_type"`
 	HubUserName string `yaml:"hub_user_name"`
 
-	RepoHostName string `yaml:"repo_host_name"`
-	RepoPort     int    `yaml:"repo_port,omitempty"`
-	RepoUserName string `yaml:"repo_user_name"`
-	RepoName     string `yaml:"repo_name"`
-	RepoBranch   string `yaml:"repo_branch"`
-	RepoHash     string `yaml:"repo_hash"`
+	RepoHostName    string `yaml:"repo_host_name,omitempty"`
+	RepoPort        int    `yaml:"repo_port,omitempty"`
+	RepoUserName    string `yaml:"repo_user_name,omitempty"`
+	RepoName        string `yaml:"repo_name,omitempty"`
+	RepoBranch      string `yaml:"repo_branch,omitempty"`
+	RepoHash        string `yaml:"repo_hash,omitempty"`
+	RepoConfigName  string `yaml:"repo_config_name,omitempty"`
+	RepoConfigEmail string `yaml:"repo_config_email,omitempty"`
 
 	RepoCodeFilename string `yaml:"repo_code_filename"`
 

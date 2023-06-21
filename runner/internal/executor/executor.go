@@ -422,6 +422,9 @@ func (ex *Executor) prepareGit(ctx context.Context) error {
 		log.Trace(ctx, "GIT checkout error", "err", err, "GIT URL", ex.repo.URL())
 		return gerrors.Wrap(err)
 	}
+	if err := ex.repo.SetConfig(job.RepoConfigName, job.RepoConfigEmail); err != nil {
+		return gerrors.Wrap(err)
+	}
 
 	repoDiff := ""
 	if job.RepoCodeFilename != "" {
