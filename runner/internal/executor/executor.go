@@ -741,7 +741,7 @@ func (ex *Executor) build(ctx context.Context, spec *container.Spec, stoppedCh c
 
 	if job.BuildPolicy == models.UseBuild || job.BuildPolicy == models.Build {
 		log.Trace(ctx, "Trying to fetch build image diff", "key", key, "image", imageName)
-		if _, err := fmt.Fprintf(ex.streamLogs, "[BUILD] Looking for the image\n"); err != nil {
+		if _, err := fmt.Fprintf(ex.streamLogs, "Looking for the image...\n"); err != nil {
 			return gerrors.Wrap(err)
 		}
 		if isLocalBackend {
@@ -750,7 +750,7 @@ func (ex *Executor) build(ctx context.Context, spec *container.Spec, stoppedCh c
 				return gerrors.Wrap(err)
 			}
 			if exists {
-				if _, err := fmt.Fprintf(ex.streamLogs, "[BUILD] Using image from the cache\n"); err != nil {
+				if _, err := fmt.Fprintf(ex.streamLogs, "Using the image from the cache\n"); err != nil {
 					return gerrors.Wrap(err)
 				}
 				spec.Image = imageName
@@ -761,26 +761,26 @@ func (ex *Executor) build(ctx context.Context, spec *container.Spec, stoppedCh c
 				return gerrors.Wrap(err)
 			}
 			if stat, err := os.Stat(diffPath); err == nil {
-				if _, err = fmt.Fprintf(ex.streamLogs, "[BUILD] Loading image: %s\n", humanize.Bytes(uint64(stat.Size()))); err != nil {
+				if _, err = fmt.Fprintf(ex.streamLogs, "Loading the image (%s)...\n", humanize.Bytes(uint64(stat.Size()))); err != nil {
 					return gerrors.Wrap(err)
 				}
 				if err := ex.engine.ImportImageDiff(ctx, diffPath); err != nil {
 					return gerrors.Wrap(err)
 				}
-				if _, err = fmt.Fprintf(ex.streamLogs, "[BUILD] Image loaded\n"); err != nil {
+				if _, err = fmt.Fprintf(ex.streamLogs, "The image is loaded\n\n"); err != nil {
 					return gerrors.Wrap(err)
 				}
 				spec.Image = imageName
 				return nil
 			}
 		}
-		if _, err = fmt.Fprintf(ex.streamLogs, "[BUILD] No image found\n"); err != nil {
+		if _, err = fmt.Fprintf(ex.streamLogs, "No image is found\n\n"); err != nil {
 			return gerrors.Wrap(err)
 		}
 		if job.BuildPolicy == models.UseBuild {
 			job.ErrorCode = errorcodes.BuildNotFound
 			_ = ex.backend.UpdateState(ctx)
-			return gerrors.New("no build image found")
+			return gerrors.New("no build image is found")
 		}
 	}
 
@@ -791,7 +791,7 @@ func (ex *Executor) build(ctx context.Context, spec *container.Spec, stoppedCh c
 		}
 		// local backend: store image in daemon cache
 		if !isLocalBackend {
-			if _, err := fmt.Fprintf(ex.streamLogs, "[BUILD] Saving image\n"); err != nil {
+			if _, err := fmt.Fprintf(ex.streamLogs, "Saving the image...\n"); err != nil {
 				return gerrors.Wrap(err)
 			}
 			if err := ex.engine.ExportImageDiff(ctx, imageName, diffPath); err != nil {
@@ -802,7 +802,7 @@ func (ex *Executor) build(ctx context.Context, spec *container.Spec, stoppedCh c
 				return gerrors.Wrap(err)
 			}
 			log.Trace(ctx, "Putting build image diff", "key", key, "image", imageName, "size", stat.Size())
-			if _, err = fmt.Fprintf(ex.streamLogs, "[BUILD] Uploading image: %s\n", humanize.Bytes(uint64(stat.Size()))); err != nil {
+			if _, err = fmt.Fprintf(ex.streamLogs, "Uploading the image (%s)...\n", humanize.Bytes(uint64(stat.Size()))); err != nil {
 				return gerrors.Wrap(err)
 			}
 			if err = ex.backend.PutBuildDiff(ctx, diffPath, key); err != nil {
