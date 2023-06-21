@@ -127,6 +127,7 @@ class NotebookProvider(Provider):
             self._extend_commands_with_env(commands, self.env)
         if self.openssh_server:
             OpenSSHExtension.patch_commands(commands, ssh_key_pub=self.ssh_key_pub)
+        commands.extend(self.commands)
         commands.extend(
             [
                 f'echo "c.NotebookApp.port = {self.notebook_port}" >> /root/.jupyter/jupyter_notebook_config.py',

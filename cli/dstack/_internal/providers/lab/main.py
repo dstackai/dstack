@@ -130,6 +130,7 @@ class LabProvider(Provider):
             self._extend_commands_with_env(commands, self.env)
         if self.openssh_server:
             OpenSSHExtension.patch_commands(commands, ssh_key_pub=self.ssh_key_pub)
+        commands.extend(self.commands)
         commands.extend(
             [
                 f'echo "c.ServerApp.port = {self.lab_port}" >> /root/.jupyter/jupyter_server_config.py',

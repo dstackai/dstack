@@ -53,6 +53,7 @@ class Provider:
         self.ports: Dict[int, PortMapping] = {}
         self.build_policy: Optional[str] = None
         self.build_commands: List[str] = []
+        self.commands: List[str] = []
 
     # TODO: This is a dirty hack
     def _safe_python_version(self, name: str):
@@ -126,6 +127,7 @@ class Provider:
         self.openssh_server = self.provider_data.get("ssh", self.openssh_server)
         self.build_policy = self.provider_data.get("build_policy")
         self.build_commands = self._get_list_data("build") or []
+        self.commands = self._get_list_data("commands") or []
 
         self.parse_args()
         self.ports = self.provider_data.get("ports") or {}

@@ -95,7 +95,7 @@ class SSHProvider(Provider):
         if self.env:
             self._extend_commands_with_env(commands, self.env)
         OpenSSHExtension.patch_commands(commands, ssh_key_pub=self.ssh_key_pub)
-        # TODO: Pre-install ipykernel and other VS Code extensions
+        commands.extend(self.commands)
         if self.code:
             commands.extend(
                 [

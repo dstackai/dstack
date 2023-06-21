@@ -46,6 +46,7 @@ def _parse_dev_environment_configuration_data(
         )
     provider_data["build"].append("pip install -q --no-cache-dir ipykernel")
     provider_data["build"].extend(configuration_data.get("build") or [])
+    provider_data["commands"] = configuration_data.get("init")
     return provider_name, provider_data
 
 

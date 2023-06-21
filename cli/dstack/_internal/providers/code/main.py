@@ -140,6 +140,7 @@ class CodeProvider(Provider):
                     f"echo '  vscode-insiders://vscode-remote/ssh-remote+{self.run_name}/workflow'",
                 ]
             )
+        commands.extend(self.commands)
         commands.extend(
             [
                 'if [ $(uname -m) = "aarch64" ]; then arch="arm64"; else arch="x64"; fi',

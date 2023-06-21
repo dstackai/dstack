@@ -15,7 +15,6 @@ class DockerProvider(Provider):
         super().__init__("docker")
         self.image_name = None
         self.registry_auth = None
-        self.commands = None
         self.entrypoint = None
         self.artifact_specs = None
         self.env = None
@@ -34,7 +33,6 @@ class DockerProvider(Provider):
         super().load(hub_client, args, workflow_name, provider_data, run_name, ssh_key_pub)
         self.image_name = self.provider_data["image"]
         self.registry_auth = self.provider_data.get("registry_auth")
-        self.commands = self._get_list_data("commands")
         self.entrypoint = self._get_entrypoint()
         if self.commands and self.entrypoint is None:  # commands not empty
             self.entrypoint = ["/bin/sh", "-i", "-c"]
