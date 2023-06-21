@@ -101,6 +101,10 @@ def _create_run(
             if interrupted_job_new_status == JobStatus.FAILED:
                 job.error_code = JobErrorCode.INTERRUPTED_BY_NO_CAPACITY
             jobs.update_job(storage, job)
+        elif request_head.status == RequestStatus.TERMINATED:
+            job.status = job_head.status = JobStatus.FAILED
+            job.error_code = JobErrorCode.INSTANCE_TERMINATED
+            jobs.update_job(storage, job)
     run_head = RunHead(
         run_name=job_head.run_name,
         workflow_name=job_head.workflow_name,
@@ -166,6 +170,10 @@ def _update_run(
                 job.status = job_head.status = interrupted_job_new_status
                 if interrupted_job_new_status == JobStatus.FAILED:
                     job.error_code = JobErrorCode.INTERRUPTED_BY_NO_CAPACITY
+                jobs.update_job(storage, job)
+            elif request_head.status == RequestStatus.TERMINATED:
+                job.status = job_head.status = JobStatus.FAILED
+                job.error_code = JobErrorCode.INSTANCE_TERMINATED
                 jobs.update_job(storage, job)
         run.status = job_head.status
     run.job_heads.append(job_head)

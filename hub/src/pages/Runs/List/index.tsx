@@ -34,6 +34,7 @@ export const RunList: React.FC = () => {
         {
             name: paramProjectName,
             repo_id: paramRepoId,
+            include_request_heads: true,
         },
         {
             pollingInterval: 10000,
