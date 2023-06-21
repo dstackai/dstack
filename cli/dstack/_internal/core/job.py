@@ -120,6 +120,8 @@ class JobErrorCode(str, Enum):
     INTERRUPTED_BY_NO_CAPACITY = "interrupted_by_no_capacity"
     # Set by runner
     CONTAINER_EXITED_WITH_ERROR = "container_exited_with_error"
+    BUILD_NOT_FOUND = "build_not_found"
+    PORTS_BINDING_FAILED = "ports_binding_failed"
 
     def pretty_repr(self) -> str:
         return " ".join(self.value.split("_")).capitalize()

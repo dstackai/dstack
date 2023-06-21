@@ -615,8 +615,9 @@ func (ex *Executor) newSpec(ctx context.Context, credPath string) (*container.Sp
 	_, isLocalBackend := ex.backend.(*localbackend.Local)
 	appsBindingPorts, err := ports.GetAppsBindingPorts(ctx, job.Apps, isLocalBackend)
 	if err != nil {
-		// todo custom exit status
 		log.Error(ctx, "Failed binding ports", "err", err)
+		job.ErrorCode = errorcodes.PortsBindingFailed
+		_ = ex.backend.UpdateState(ctx)
 		return nil, gerrors.Wrap(err)
 	}
 	if err = ex.backend.UpdateState(ctx); err != nil {
@@ -774,6 +775,8 @@ func (ex *Executor) build(ctx context.Context, spec *container.Spec, stoppedCh c
 			return gerrors.Wrap(err)
 		}
 		if job.BuildPolicy == models.UseBuild {
+			job.ErrorCode = errorcodes.BuildNotFound
+			_ = ex.backend.UpdateState(ctx)
 			return gerrors.New("no build image found")
 		}
 	}

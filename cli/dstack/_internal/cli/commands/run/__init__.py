@@ -327,6 +327,8 @@ def _poll_run(
 def _print_failed_run_message(run: RunHead):
     if run.job_heads[0].error_code is JobErrorCode.FAILED_TO_START_DUE_TO_NO_CAPACITY:
         console.print("Provisioning failed due to no capacity\n")
+    elif run.job_heads[0].error_code is JobErrorCode.BUILD_NOT_FOUND:
+        console.print("Build not found. Run `dstack build` or add `--build` flag")
     else:
         console.print("Provisioning failed\n")
 
