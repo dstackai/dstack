@@ -118,6 +118,7 @@ class JobErrorCode(str, Enum):
     NO_INSTANCE_MATCHING_REQUIREMENTS = "no_instance_matching_requirements"
     FAILED_TO_START_DUE_TO_NO_CAPACITY = "failed_to_start_due_to_no_capacity"
     INTERRUPTED_BY_NO_CAPACITY = "interrupted_by_no_capacity"
+    INSTANCE_TERMINATED = "instance_terminated"
     # Set by runner
     CONTAINER_EXITED_WITH_ERROR = "container_exited_with_error"
     BUILD_NOT_FOUND = "build_not_found"

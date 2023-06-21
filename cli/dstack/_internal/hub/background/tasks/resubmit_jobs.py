@@ -5,6 +5,7 @@ from dstack._internal.core.job import JobStatus
 from dstack._internal.hub.db.models import Project
 from dstack._internal.hub.repository.projects import ProjectManager
 from dstack._internal.hub.routers.cache import get_backend
+from dstack._internal.hub.services.backends import get_configurator
 from dstack._internal.hub.utils.common import run_async
 from dstack._internal.utils.common import get_milliseconds_since_epoch
 
@@ -19,6 +20,9 @@ async def resubmit_jobs():
 async def _resubmit_projects_jobs(projects: List[Project]):
     for project in projects:
         backend = await get_backend(project)
+        configurator = get_configurator(backend)
+        if configurator is None:
+            continue
         await run_async(_resubmit_backend_jobs, backend)
 
 

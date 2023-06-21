@@ -65,13 +65,19 @@ class RunCommand(BasicCommand):
             type=str,
             dest="file_name",
         )
-        add_project_argument(self._parser)
         self._parser.add_argument(
             "-y",
             "--yes",
             help="Do not ask for plan confirmation",
             action="store_true",
         )
+        self._parser.add_argument(
+            "-d",
+            "--detach",
+            help="Do not poll logs and run status",
+            action="store_true",
+        )
+        add_project_argument(self._parser)
         self._parser.add_argument(
             "--profile",
             metavar="PROFILE",
@@ -86,12 +92,6 @@ class RunCommand(BasicCommand):
             help="A tag name. Warning, if the tag exists, " "it will be overridden.",
             type=str,
             dest="tag_name",
-        )
-        self._parser.add_argument(
-            "-d",
-            "--detach",
-            help="Do not poll logs and run status",
-            action="store_true",
         )
         self._parser.add_argument(
             "args",
