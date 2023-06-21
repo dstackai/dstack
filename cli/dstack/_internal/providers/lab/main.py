@@ -98,7 +98,7 @@ class LabProvider(Provider):
                 artifact_specs=self.artifact_specs,
                 requirements=self.resources,
                 app_specs=apps,
-                setup=self._setup(),
+                build_commands=self._setup(),
             )
         ]
 
@@ -120,8 +120,8 @@ class LabProvider(Provider):
             'echo "c.ServerApp.open_browser = False" >> /root/.jupyter/jupyter_server_config.py',
             "echo \"c.ServerApp.ip = '0.0.0.0'\" >> /root/.jupyter/jupyter_server_config.py",
         ]
-        if self.setup:
-            commands.extend(self.setup)
+        if self.build_commands:
+            commands.extend(self.build_commands)
         return commands
 
     def _commands(self):
@@ -130,6 +130,7 @@ class LabProvider(Provider):
             self._extend_commands_with_env(commands, self.env)
         if self.openssh_server:
             OpenSSHExtension.patch_commands(commands, ssh_key_pub=self.ssh_key_pub)
+        commands.extend(self.commands)
         commands.extend(
             [
                 f'echo "c.ServerApp.port = {self.lab_port}" >> /root/.jupyter/jupyter_server_config.py',

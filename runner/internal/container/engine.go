@@ -293,7 +293,7 @@ func (r *Engine) pullImageIfAbsent(ctx context.Context, image string, registryAu
 	return nil
 }
 
-func (r *Engine) GetPrebuildName(ctx context.Context, spec *PrebuildSpec) (string, error) {
+func (r *Engine) GetBuildDigest(ctx context.Context, spec *BuildSpec) (string, error) {
 	err := r.pullImageIfAbsent(ctx, spec.BaseImageName, spec.RegistryAuthBase64)
 	if err != nil {
 		return "", gerrors.Wrap(err)
@@ -306,8 +306,8 @@ func (r *Engine) GetPrebuildName(ctx context.Context, spec *PrebuildSpec) (strin
 	return spec.Hash(), nil
 }
 
-func (r *Engine) Prebuild(ctx context.Context, spec *PrebuildSpec, imageName string, stoppedCh chan struct{}, logs io.Writer) error {
-	if err := PrebuildImage(ctx, r.client, spec, imageName, stoppedCh, logs); err != nil {
+func (r *Engine) Build(ctx context.Context, spec *BuildSpec, imageName string, stoppedCh chan struct{}, logs io.Writer) error {
+	if err := BuildImage(ctx, r.client, spec, imageName, stoppedCh, logs); err != nil {
 		return gerrors.Wrap(err)
 	}
 	return nil

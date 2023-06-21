@@ -20,7 +20,6 @@ class BashProvider(Provider):
         self.artifact_specs = None
         self.working_dir = None
         self.resources = None
-        self.commands = None
         self.image_name = None
         self.home_dir = "/root"
         self.openssh_server = True
@@ -36,7 +35,6 @@ class BashProvider(Provider):
     ):
         super().load(hub_client, args, workflow_name, provider_data, run_name, ssh_key_pub)
         self.python = self._safe_python_version("python")
-        self.commands = self._get_list_data("commands")
         self.env = self._env()
         self.artifact_specs = self._artifact_specs()
         self.working_dir = self.provider_data.get("working_dir")
@@ -86,7 +84,7 @@ class BashProvider(Provider):
                 artifact_specs=self.artifact_specs,
                 requirements=self.resources,
                 app_specs=apps,
-                setup=self.setup,
+                build_commands=self.build_commands,
             )
         ]
 

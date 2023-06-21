@@ -209,14 +209,15 @@
       "type": "boolean",
       "default": false
     },
-    "prebuild": {
-      "description": "Prebuild image to accelerate start",
+    "build": {
+      "description": "Build image to accelerate start",
       "type": "string",
-      "default": "never",
+      "default": "use-build",
       "enum": [
-        "never",
-        "lazy",
-        "force"
+        "use-build",
+        "build",
+        "force-build",
+        "build-only"
       ]
     },
     "bash": {
@@ -266,8 +267,8 @@
         "cache": {
           "$ref": "#/definitions/cache"
         },
-        "prebuild": {
-          "$ref": "#/definitions/prebuild"
+        "build": {
+          "$ref": "#/definitions/build"
         },
         "setup": {
           "$ref": "#/definitions/setup"
@@ -330,8 +331,8 @@
         "cache": {
           "$ref": "#/definitions/cache"
         },
-        "prebuild": {
-          "$ref": "#/definitions/prebuild"
+        "build": {
+          "$ref": "#/definitions/build"
         },
         "setup": {
           "$ref": "#/definitions/setup"
@@ -394,8 +395,8 @@
         "cache": {
           "$ref": "#/definitions/cache"
         },
-        "prebuild": {
-          "$ref": "#/definitions/prebuild"
+        "build": {
+          "$ref": "#/definitions/build"
         }
       }
     },
@@ -443,8 +444,8 @@
         "cache": {
           "$ref": "#/definitions/cache"
         },
-        "prebuild": {
-          "$ref": "#/definitions/prebuild"
+        "build": {
+          "$ref": "#/definitions/build"
         }
       }
     },
@@ -492,8 +493,8 @@
         "cache": {
           "$ref": "#/definitions/cache"
         },
-        "prebuild": {
-          "$ref": "#/definitions/prebuild"
+        "build": {
+          "$ref": "#/definitions/build"
         }
       }
     },
@@ -543,8 +544,8 @@
           "type": "boolean",
           "default": false
         },
-        "prebuild": {
-          "$ref": "#/definitions/prebuild"
+        "build": {
+          "$ref": "#/definitions/build"
         }
       }
     }

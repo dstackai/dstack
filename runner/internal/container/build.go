@@ -12,23 +12,23 @@ import (
 	"github.com/dstackai/dstack/runner/internal/gerrors"
 	"github.com/dstackai/dstack/runner/internal/log"
 	"io"
-	"sort"
-	"strings"
 )
 
-type PrebuildSpec struct {
-	BaseImageID string
-	WorkDir     string
-	Commands    []string
-	Entrypoint  []string
-	Env         []string
+type BuildSpec struct {
+	BaseImageID       string
+	WorkDir           string
+	ConfigurationPath string
+	ConfigurationType string
 
+	Commands           []string
+	Entrypoint         []string
+	Env                []string
 	BaseImageName      string
 	RegistryAuthBase64 string
 	RepoPath           string
 }
 
-func PrebuildImage(ctx context.Context, client docker.APIClient, spec *PrebuildSpec, imageName string, stoppedCh chan struct{}, logs io.Writer) error {
+func BuildImage(ctx context.Context, client docker.APIClient, spec *BuildSpec, imageName string, stoppedCh chan struct{}, logs io.Writer) error {
 	stopTimeout := 10 * 60
 	config := &container.Config{
 		Image:       spec.BaseImageID,
@@ -61,7 +61,7 @@ func PrebuildImage(ctx context.Context, client docker.APIClient, spec *PrebuildS
 		_ = client.ContainerRemove(ctx, createResp.ID, types.ContainerRemoveOptions{Force: true})
 	}()
 
-	log.Trace(ctx, "Streaming prebuild logs")
+	log.Trace(ctx, "Streaming build logs")
 	attachResp, err := client.ContainerAttach(ctx, createResp.ID, types.ContainerAttachOptions{
 		Stream: true,
 		Stdout: true,
@@ -74,7 +74,7 @@ func PrebuildImage(ctx context.Context, client docker.APIClient, spec *PrebuildS
 	go func() {
 		_, err := io.Copy(logs, attachResp.Reader)
 		if err != nil {
-			log.Error(ctx, "Failed to stream prebuild logs", "err", err)
+			log.Error(ctx, "Failed to stream build logs", "err", err)
 		}
 	}()
 
@@ -101,7 +101,7 @@ func PrebuildImage(ctx context.Context, client docker.APIClient, spec *PrebuildS
 	if info.State.ExitCode != 0 {
 		return gerrors.Wrap(ContainerExitedError{info.State.ExitCode})
 	}
-	log.Trace(ctx, "Committing prebuild image", "image", imageName)
+	log.Trace(ctx, "Committing build image", "image", imageName)
 	_, err = client.ContainerCommit(ctx, createResp.ID, types.ContainerCommitOptions{Reference: imageName})
 	if err != nil {
 		return gerrors.Wrap(err)
@@ -109,18 +109,15 @@ func PrebuildImage(ctx context.Context, client docker.APIClient, spec *PrebuildS
 	return nil
 }
 
-func (s *PrebuildSpec) Hash() string {
+func (s *BuildSpec) Hash() string {
 	var buffer bytes.Buffer
 	buffer.WriteString(s.BaseImageID)
 	buffer.WriteString("\n")
 	buffer.WriteString(s.WorkDir)
 	buffer.WriteString("\n")
-	buffer.WriteString(strings.Join(s.Commands, " "))
+	buffer.WriteString(s.ConfigurationPath)
 	buffer.WriteString("\n")
-	buffer.WriteString(strings.Join(s.Entrypoint, " "))
-	buffer.WriteString("\n")
-	sort.Strings(s.Env)
-	buffer.WriteString(strings.Join(s.Env, ":"))
+	buffer.WriteString(s.ConfigurationType)
 	buffer.WriteString("\n")
 	return fmt.Sprintf("%x", sha256.Sum256(buffer.Bytes()))
 }

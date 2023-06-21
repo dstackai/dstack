@@ -18,7 +18,7 @@ from dstack._internal.core.repo import (
     RepoRef,
 )
 
-PrebuildPolicy = ["no-prebuild", "use-prebuild", "force-prebuild", "prebuild-only"]
+BuildPolicy = ["use-build", "build", "force-build", "build-only"]
 
 
 class GpusRequirements(BaseModel):
@@ -85,7 +85,7 @@ class JobStatus(str, Enum):
     PENDING = "pending"
     SUBMITTED = "submitted"
     DOWNLOADING = "downloading"
-    PREBUILDING = "prebuilding"
+    BUILDING = "building"
     RUNNING = "running"
     UPLOADING = "uploading"
     STOPPING = "stopping"
@@ -120,6 +120,8 @@ class JobErrorCode(str, Enum):
     INTERRUPTED_BY_NO_CAPACITY = "interrupted_by_no_capacity"
     # Set by runner
     CONTAINER_EXITED_WITH_ERROR = "container_exited_with_error"
+    BUILD_NOT_FOUND = "build_not_found"
+    PORTS_BINDING_FAILED = "ports_binding_failed"
 
     def pretty_repr(self) -> str:
         return " ".join(self.value.split("_")).capitalize()
@@ -203,8 +205,8 @@ class Job(JobHead):
     request_id: Optional[str]
     tag_name: Optional[str]
     ssh_key_pub: Optional[str]
-    prebuild: Optional[str]
-    setup: Optional[List[str]]
+    build_policy: Optional[str]
+    build_commands: Optional[List[str]]
     run_env: Optional[Dict[str, str]]
 
     @root_validator(pre=True)
@@ -222,12 +224,12 @@ class Job(JobHead):
         )
         return data
 
-    @validator("prebuild")
-    def default_prebuild(cls, v: Optional[str]) -> str:
+    @validator("build_policy")
+    def default_build_policy(cls, v: Optional[str]) -> str:
         if not v:
-            return PrebuildPolicy[0]
-        if v not in PrebuildPolicy:
-            raise KeyError(f"Unknown prebuild policy: {v}")
+            return BuildPolicy[0]
+        if v not in BuildPolicy:
+            raise KeyError(f"Unknown build policy: {v}")
         return v
 
     def get_instance_spot_type(self) -> str:
@@ -304,8 +306,8 @@ class Job(JobHead):
             "ssh_key_pub": self.ssh_key_pub or "",
             "repo_code_filename": self.repo_code_filename,
             "instance_type": self.instance_type,
-            "prebuild": self.prebuild,
-            "setup": self.setup or [],
+            "build_policy": self.build_policy,
+            "build_commands": self.build_commands or [],
             "run_env": self.run_env or {},
         }
         if isinstance(self.repo_data, RemoteRepoData):
@@ -434,8 +436,8 @@ class Job(JobHead):
             tag_name=job_data.get("tag_name") or None,
             ssh_key_pub=job_data.get("ssh_key_pub") or None,
             instance_type=job_data.get("instance_type") or None,
-            prebuild=job_data.get("prebuild") or None,
-            setup=job_data.get("setup") or None,
+            build_policy=job_data.get("build_policy") or None,
+            build_commands=job_data.get("build_commands") or None,
             run_env=job_data.get("run_env") or None,
         )
         return job
@@ -461,7 +463,7 @@ class JobSpec(JobRef):
     requirements: Optional[Requirements] = None
     master_job: Optional[JobRef] = None
     app_specs: Optional[List[AppSpec]] = None
-    setup: Optional[List[str]] = None
+    build_commands: Optional[List[str]] = None
 
     def get_id(self) -> Optional[str]:
         return self.job_id

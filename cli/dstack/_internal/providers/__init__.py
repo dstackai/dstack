@@ -14,13 +14,13 @@ from dstack._internal.core.cache import CacheSpec
 from dstack._internal.core.error import RepoNotInitializedError
 from dstack._internal.core.job import (
     ArtifactSpec,
+    BuildPolicy,
     ConfigurationType,
     DepSpec,
     GpusRequirements,
     Job,
     JobSpec,
     JobStatus,
-    PrebuildPolicy,
     Requirements,
     RetryPolicy,
     SpotPolicy,
@@ -51,8 +51,9 @@ class Provider:
         self.loaded = False
         self.home_dir: Optional[str] = None
         self.ports: Dict[int, PortMapping] = {}
-        self.prebuild: Optional[str] = None
-        self.setup: List[str] = []
+        self.build_policy: Optional[str] = None
+        self.build_commands: List[str] = []
+        self.commands: List[str] = []
 
     # TODO: This is a dirty hack
     def _safe_python_version(self, name: str):
@@ -124,8 +125,9 @@ class Provider:
         self.run_name = run_name
         self.ssh_key_pub = ssh_key_pub
         self.openssh_server = self.provider_data.get("ssh", self.openssh_server)
-        self.prebuild = self.provider_data.get("prebuild")
-        self.setup = self._get_list_data("setup")
+        self.build_policy = self.provider_data.get("build_policy")
+        self.build_commands = self._get_list_data("build") or []
+        self.commands = self._get_list_data("commands") or []
 
         self.parse_args()
         self.ports = self.provider_data.get("ports") or {}
@@ -182,9 +184,11 @@ class Provider:
         parser.add_argument(
             "-p", "--port", metavar="PORTS", type=PortMapping, nargs=argparse.ONE_OR_MORE
         )
-        prebuild = parser.add_mutually_exclusive_group()
-        for value in PrebuildPolicy:
-            prebuild.add_argument(f"--{value}", action="store_const", dest="prebuild", const=value)
+        build_policy = parser.add_mutually_exclusive_group()
+        for value in BuildPolicy:
+            build_policy.add_argument(
+                f"--{value}", action="store_const", dest="build_policy", const=value
+            )
 
     def _parse_base_args(self, args: Namespace, unknown_args):
         if args.requirements:
@@ -242,8 +246,8 @@ class Provider:
         self.provider_data["ports"] = merge_ports(
             [PortMapping(i) for i in self.provider_data.get("ports") or []], args.port or []
         )
-        if args.prebuild:
-            self.prebuild = args.prebuild
+        if args.build_policy:
+            self.build_policy = args.build_policy
         if unknown_args:
             self.provider_data["run_args"] = unknown_args
 
@@ -297,8 +301,8 @@ class Provider:
                 tag_name=tag_name,
                 ssh_key_pub=self.ssh_key_pub,
                 repo_code_filename=repo_code_filename,
-                prebuild=self.prebuild,
-                setup=job_spec.setup,
+                build_policy=self.build_policy,
+                build_commands=job_spec.build_commands,
                 run_env=job_spec.run_env,
             )
             jobs.append(job)

@@ -246,7 +246,7 @@ func (ex *Executor) runJob(ctx context.Context, erCh chan error, stoppedCh chan 
 		log.Error(jctx, "Unknown RepoType", "RepoType", job.RepoType)
 	}
 
-	if job.Prebuild != models.PREBUILD_ONLY {
+	if job.BuildPolicy != models.BuildOnly {
 		log.Trace(jctx, "Dependency processing")
 		if err = ex.processCache(jctx); err != nil {
 			erCh <- gerrors.Wrap(err)
@@ -317,23 +317,21 @@ func (ex *Executor) runJob(ctx context.Context, erCh chan error, stoppedCh chan 
 		}
 	}
 
-	log.Trace(ctx, "Prebuilding container", "mode", job.Prebuild)
-	if job.Prebuild == models.NO_PREBUILD || len(job.Setup) == 0 {
-		mergeSetup(spec, job.Setup, job.Commands)
-	} else {
-		job.Status = states.Prebuilding
+	log.Trace(ctx, "Building container", "mode", job.BuildPolicy)
+	if len(job.BuildCommands) > 0 {
+		job.Status = states.Building
 		if err = ex.backend.UpdateState(jctx); err != nil {
 			erCh <- gerrors.Wrap(err)
 			return
 		}
-		if err = ex.prebuild(ctx, spec, stoppedCh, allLogs); err != nil {
+		if err = ex.build(ctx, spec, stoppedCh, allLogs); err != nil {
 			erCh <- gerrors.Wrap(err)
 			return
 		}
 	}
 
-	if job.Prebuild == models.PREBUILD_ONLY {
-		log.Trace(ctx, "Prebuild only, do not run the job")
+	if job.BuildPolicy == models.BuildOnly {
+		log.Trace(ctx, "Build only, do not run the job")
 		ex.streamLogs.Close()
 		erCh <- nil
 		return
@@ -617,8 +615,9 @@ func (ex *Executor) newSpec(ctx context.Context, credPath string) (*container.Sp
 	_, isLocalBackend := ex.backend.(*localbackend.Local)
 	appsBindingPorts, err := ports.GetAppsBindingPorts(ctx, job.Apps, isLocalBackend)
 	if err != nil {
-		// todo custom exit status
 		log.Error(ctx, "Failed binding ports", "err", err)
+		job.ErrorCode = errorcodes.PortsBindingFailed
+		_ = ex.backend.UpdateState(ctx)
 		return nil, gerrors.Wrap(err)
 	}
 	if err = ex.backend.UpdateState(ctx); err != nil {
@@ -708,36 +707,38 @@ func (ex *Executor) Shutdown(ctx context.Context) {
 	}
 }
 
-func (ex *Executor) prebuild(ctx context.Context, spec *container.Spec, stoppedCh chan struct{}, logs io.Writer) error {
+func (ex *Executor) build(ctx context.Context, spec *container.Spec, stoppedCh chan struct{}, logs io.Writer) error {
 	job := ex.backend.Job(ctx)
 	_, isLocalBackend := ex.backend.(*localbackend.Local)
 
-	prebuildSpec := &container.PrebuildSpec{
+	buildSpec := &container.BuildSpec{
 		BaseImageName:      spec.Image,
 		WorkDir:            spec.WorkDir,
-		Commands:           container.ShellCommands(job.Setup),
+		ConfigurationPath:  job.ConfigurationPath,
+		ConfigurationType:  job.ConfigurationType,
+		Commands:           container.ShellCommands(job.BuildCommands),
 		Entrypoint:         spec.Entrypoint,
 		Env:                ex.environment(ctx, false),
 		RegistryAuthBase64: spec.RegistryAuthBase64,
 		RepoPath:           path.Join(ex.backend.GetTMPDir(ctx), consts.RUNS_DIR, job.RunName, job.JobID),
 	}
-	prebuildName, err := ex.engine.GetPrebuildName(ctx, prebuildSpec)
+	buildName, err := ex.engine.GetBuildDigest(ctx, buildSpec)
 	if err != nil {
 		return gerrors.Wrap(err)
 	}
 
-	tempDir, err := os.MkdirTemp("", "prebuild")
+	tempDir, err := os.MkdirTemp("", "build")
 	if err != nil {
 		return gerrors.Wrap(err)
 	}
 	defer func() { _ = os.RemoveAll(tempDir) }()
 	diffPath := filepath.Join(tempDir, "layer.tar")
-	key := fmt.Sprintf("prebuilds/%s/%s.tar", job.RepoId, prebuildName)
-	imageName := fmt.Sprintf("dstackai/prebuild:%s", prebuildName)
+	key := fmt.Sprintf("builds/%s/%s.tar", job.RepoId, buildName)
+	imageName := fmt.Sprintf("dstackai/build:%s", buildName)
 
-	if job.Prebuild == models.USE_PREBUILD {
-		log.Trace(ctx, "Trying to fetch prebuild image diff", "key", key, "image", imageName)
-		if _, err := fmt.Fprintf(ex.streamLogs, "[PREBUILD] Looking for the image\n"); err != nil {
+	if job.BuildPolicy == models.UseBuild || job.BuildPolicy == models.Build {
+		log.Trace(ctx, "Trying to fetch build image diff", "key", key, "image", imageName)
+		if _, err := fmt.Fprintf(ex.streamLogs, "[BUILD] Looking for the image\n"); err != nil {
 			return gerrors.Wrap(err)
 		}
 		if isLocalBackend {
@@ -746,42 +747,48 @@ func (ex *Executor) prebuild(ctx context.Context, spec *container.Spec, stoppedC
 				return gerrors.Wrap(err)
 			}
 			if exists {
-				if _, err := fmt.Fprintf(ex.streamLogs, "[PREBUILD] Using image from the cache\n"); err != nil {
+				if _, err := fmt.Fprintf(ex.streamLogs, "[BUILD] Using image from the cache\n"); err != nil {
 					return gerrors.Wrap(err)
 				}
 				spec.Image = imageName
 				return nil
 			}
 		} else {
-			if err := ex.backend.GetPrebuildDiff(ctx, key, diffPath); err != nil {
+			if err := ex.backend.GetBuildDiff(ctx, key, diffPath); err != nil {
 				return gerrors.Wrap(err)
 			}
 			if stat, err := os.Stat(diffPath); err == nil {
-				if _, err = fmt.Fprintf(ex.streamLogs, "[PREBUILD] Loading image: %s\n", humanize.Bytes(uint64(stat.Size()))); err != nil {
+				if _, err = fmt.Fprintf(ex.streamLogs, "[BUILD] Loading image: %s\n", humanize.Bytes(uint64(stat.Size()))); err != nil {
 					return gerrors.Wrap(err)
 				}
 				if err := ex.engine.ImportImageDiff(ctx, diffPath); err != nil {
 					return gerrors.Wrap(err)
 				}
-				if _, err = fmt.Fprintf(ex.streamLogs, "[PREBUILD] Image loaded\n"); err != nil {
+				if _, err = fmt.Fprintf(ex.streamLogs, "[BUILD] Image loaded\n"); err != nil {
 					return gerrors.Wrap(err)
 				}
 				spec.Image = imageName
 				return nil
 			}
 		}
-		if _, err = fmt.Fprintf(ex.streamLogs, "[PREBUILD] No image found\n"); err != nil {
+		if _, err = fmt.Fprintf(ex.streamLogs, "[BUILD] No image found\n"); err != nil {
 			return gerrors.Wrap(err)
 		}
-		mergeSetup(spec, job.Setup, job.Commands)
-	} else if job.Prebuild == models.FORCE_PREBUILD || job.Prebuild == models.PREBUILD_ONLY {
-		err := ex.engine.Prebuild(ctx, prebuildSpec, imageName, stoppedCh, logs)
+		if job.BuildPolicy == models.UseBuild {
+			job.ErrorCode = errorcodes.BuildNotFound
+			_ = ex.backend.UpdateState(ctx)
+			return gerrors.New("no build image found")
+		}
+	}
+
+	if job.BuildPolicy == models.Build || job.BuildPolicy == models.ForceBuild || job.BuildPolicy == models.BuildOnly {
+		err := ex.engine.Build(ctx, buildSpec, imageName, stoppedCh, logs)
 		if err != nil {
 			return gerrors.Wrap(err)
 		}
 		// local backend: store image in daemon cache
 		if !isLocalBackend {
-			if _, err := fmt.Fprintf(ex.streamLogs, "[PREBUILD] Saving image\n"); err != nil {
+			if _, err := fmt.Fprintf(ex.streamLogs, "[BUILD] Saving image\n"); err != nil {
 				return gerrors.Wrap(err)
 			}
 			if err := ex.engine.ExportImageDiff(ctx, imageName, diffPath); err != nil {
@@ -791,11 +798,11 @@ func (ex *Executor) prebuild(ctx context.Context, spec *container.Spec, stoppedC
 			if err != nil {
 				return gerrors.Wrap(err)
 			}
-			log.Trace(ctx, "Putting prebuild image diff", "key", key, "image", imageName, "size", stat.Size())
-			if _, err = fmt.Fprintf(ex.streamLogs, "[PREBUILD] Uploading image: %s\n", humanize.Bytes(uint64(stat.Size()))); err != nil {
+			log.Trace(ctx, "Putting build image diff", "key", key, "image", imageName, "size", stat.Size())
+			if _, err = fmt.Fprintf(ex.streamLogs, "[BUILD] Uploading image: %s\n", humanize.Bytes(uint64(stat.Size()))); err != nil {
 				return gerrors.Wrap(err)
 			}
-			if err = ex.backend.PutPrebuildDiff(ctx, diffPath, key); err != nil {
+			if err = ex.backend.PutBuildDiff(ctx, diffPath, key); err != nil {
 				return gerrors.Wrap(err)
 			}
 		}
@@ -803,12 +810,6 @@ func (ex *Executor) prebuild(ctx context.Context, spec *container.Spec, stoppedC
 	}
 
 	return nil
-}
-
-func mergeSetup(spec *container.Spec, setup []string, commands []string) {
-	merged := append([]string(nil), setup...)
-	merged = append(merged, commands...)
-	spec.Commands = container.ShellCommands(merged)
 }
 
 func uniqueMount(m []mount.Mount) []mount.Mount {

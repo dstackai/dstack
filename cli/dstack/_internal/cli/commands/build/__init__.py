@@ -19,9 +19,9 @@ from dstack._internal.core.error import RepoNotInitializedError
 from dstack._internal.core.job import JobStatus
 
 
-class PrebuildCommand(BasicCommand):
-    NAME = "prebuild"
-    DESCRIPTION = "Prebuild environment"
+class BuildCommand(BasicCommand):
+    NAME = "build"
+    DESCRIPTION = "Build environment"
 
     @check_init
     def _command(self, args: argparse.Namespace):
@@ -33,7 +33,7 @@ class PrebuildCommand(BasicCommand):
         ) = configurations.parse_configuration_file(
             args.working_dir, args.file_name, args.profile_name
         )
-        provider_data["prebuild"] = "prebuild-only"
+        provider_data["build_policy"] = "build-only"
 
         if args.project:
             project_name = args.project
@@ -68,13 +68,13 @@ class PrebuildCommand(BasicCommand):
                 args=args,
             )
             runs = list_runs_hub(hub_client, run_name=run_name)
-            print_runs(runs)
             run = runs[0]
             if run.status == JobStatus.FAILED:
                 console.print("\nProvisioning failed\n")
                 exit(1)
             _poll_run(
                 hub_client,
+                run,
                 jobs,
                 ssh_key=config.repo_user_config.ssh_key_path,
                 watcher=None,

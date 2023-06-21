@@ -136,8 +136,12 @@
         "python": {
           "$ref": "#/definitions/python"
         },
-        "setup": {
-          "description": "The bash commands to pre-build the environment",
+        "build": {
+          "description": "The bash commands to build the environment",
+          "$ref": "#/definitions/_commands"
+        },
+        "init": {
+          "description": "The bash commands to execute on start",
           "$ref": "#/definitions/_commands"
         },
         "cache": {
@@ -175,8 +179,8 @@
         "python": {
           "$ref": "#/definitions/python"
         },
-        "setup": {
-          "description": "The bash commands to pre-build the environment",
+        "build": {
+          "description": "The bash commands to build the environment",
           "$ref": "#/definitions/_commands"
         },
         "commands": {

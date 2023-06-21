@@ -100,7 +100,7 @@ class CodeProvider(Provider):
                 artifact_specs=self.artifact_specs,
                 requirements=self.resources,
                 app_specs=apps,
-                setup=self._setup(),
+                build_commands=self._setup(),
             )
         ]
 
@@ -122,8 +122,8 @@ class CodeProvider(Provider):
             f"/tmp/openvscode-server-v{self.version}-linux-$arch/bin/openvscode-server --install-extension ms-python.python --install-extension ms-toolsai.jupyter",
             "rm /usr/bin/python2*",
         ]
-        if self.setup:
-            commands.extend(self.setup)
+        if self.build_commands:
+            commands.extend(self.build_commands)
         return commands
 
     def _commands(self):
@@ -140,6 +140,7 @@ class CodeProvider(Provider):
                     f"echo '  vscode-insiders://vscode-remote/ssh-remote+{self.run_name}/workflow'",
                 ]
             )
+        commands.extend(self.commands)
         commands.extend(
             [
                 'if [ $(uname -m) = "aarch64" ]; then arch="arm64"; else arch="x64"; fi',

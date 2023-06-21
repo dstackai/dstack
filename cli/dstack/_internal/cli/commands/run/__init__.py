@@ -327,6 +327,8 @@ def _poll_run(
 def _print_failed_run_message(run: RunHead):
     if run.job_heads[0].error_code is JobErrorCode.FAILED_TO_START_DUE_TO_NO_CAPACITY:
         console.print("Provisioning failed due to no capacity\n")
+    elif run.job_heads[0].error_code is JobErrorCode.BUILD_NOT_FOUND:
+        console.print("Build not found. Run `dstack build` or add `--build` flag")
     else:
         console.print("Provisioning failed\n")
 
@@ -409,8 +411,8 @@ def _attach(hub_client: HubClient, job: Job, ssh_key_path: str) -> Dict[int, int
 
 
 def _attach_to_container(hub_client: HubClient, run_name: str, ports_lock: PortsLock):
-    # idle PREBUILDING
-    for run in _poll_run_head(hub_client, run_name, loop_statuses=[JobStatus.PREBUILDING]):
+    # idle BUILDING
+    for run in _poll_run_head(hub_client, run_name, loop_statuses=[JobStatus.BUILDING]):
         pass
     app_ports = ports_lock.release()
     # TODO replace long delay with starting ssh-server in the beginning

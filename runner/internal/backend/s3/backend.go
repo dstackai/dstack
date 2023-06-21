@@ -418,7 +418,7 @@ func (s *S3) GetRepoArchive(ctx context.Context, path, dir string) error {
 	return nil
 }
 
-func (s *S3) GetPrebuildDiff(ctx context.Context, key, dst string) error {
+func (s *S3) GetBuildDiff(ctx context.Context, key, dst string) error {
 	out, err := s.cliS3.cli.GetObject(ctx, &s3.GetObjectInput{
 		Bucket: aws.String(s.bucket),
 		Key:    aws.String(key),
@@ -439,7 +439,7 @@ func (s *S3) GetPrebuildDiff(ctx context.Context, key, dst string) error {
 	return nil
 }
 
-func (s *S3) PutPrebuildDiff(ctx context.Context, src, key string) error {
+func (s *S3) PutBuildDiff(ctx context.Context, src, key string) error {
 	file, err := os.Open(src)
 	if err != nil {
 		return gerrors.Wrap(err)

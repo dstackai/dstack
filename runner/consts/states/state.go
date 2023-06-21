@@ -6,7 +6,7 @@ const (
 	Failed      = "failed"
 	Stopped     = "stopped"
 	Downloading = "downloading"
-	Prebuilding = "prebuilding"
+	Building    = "building"
 	Uploading   = "uploading"
 	Stopping    = "stopping"
 )

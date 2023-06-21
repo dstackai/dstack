@@ -18,9 +18,9 @@ type Job struct {
 	Apps           []App             `yaml:"apps"`
 	Artifacts      []Artifact        `yaml:"artifacts"`
 	Cache          []Cache           `yaml:"cache"`
-	Setup          []string          `yaml:"setup"`
+	BuildCommands  []string          `yaml:"build_commands"`
 	Commands       []string          `yaml:"commands"`
-	Prebuild       PrebuildPolicy    `yaml:"prebuild"`
+	BuildPolicy    BuildPolicy       `yaml:"build_policy"`
 	Entrypoint     []string          `yaml:"entrypoint"`
 	Environment    map[string]string `yaml:"env"`
 	RunEnvironment map[string]string `yaml:"run_env"`
@@ -134,13 +134,13 @@ type RunnerMetadata struct {
 	Status string `yaml:"status"`
 }
 
-type PrebuildPolicy string
+type BuildPolicy string
 
 const (
-	USE_PREBUILD   PrebuildPolicy = "use-prebuild"
-	NO_PREBUILD    PrebuildPolicy = "no-prebuild"
-	FORCE_PREBUILD PrebuildPolicy = "force-prebuild"
-	PREBUILD_ONLY  PrebuildPolicy = "prebuild-only"
+	UseBuild   BuildPolicy = "use-build"
+	Build      BuildPolicy = "build"
+	ForceBuild BuildPolicy = "force-build"
+	BuildOnly  BuildPolicy = "build-only"
 )
 
 func (j *Job) RepoHostNameWithPort() string {

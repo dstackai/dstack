@@ -321,7 +321,7 @@ class HubClient:
         for job in jobs:
             self.submit_job(job)
         if tag_name:
-            self.add_tag_from_run(tag_name, self.run_name, jobs)
+            self.add_tag_from_run(tag_name, run_name, jobs)
         self.update_repo_last_run_at(last_run_at=int(round(time.time() * 1000)))
         return run_name, jobs  # todo return run_head
 
