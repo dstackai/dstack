@@ -318,16 +318,14 @@ func (ex *Executor) runJob(ctx context.Context, erCh chan error, stoppedCh chan 
 	}
 
 	log.Trace(ctx, "Building container", "mode", job.BuildPolicy)
-	if len(job.BuildCommands) > 0 {
-		job.Status = states.Building
-		if err = ex.backend.UpdateState(jctx); err != nil {
-			erCh <- gerrors.Wrap(err)
-			return
-		}
-		if err = ex.build(ctx, spec, stoppedCh, allLogs); err != nil {
-			erCh <- gerrors.Wrap(err)
-			return
-		}
+	job.Status = states.Building
+	if err = ex.backend.UpdateState(jctx); err != nil {
+		erCh <- gerrors.Wrap(err)
+		return
+	}
+	if err = ex.build(ctx, spec, stoppedCh, allLogs); err != nil {
+		erCh <- gerrors.Wrap(err)
+		return
 	}
 
 	if job.BuildPolicy == models.BuildOnly {
@@ -713,13 +711,15 @@ func (ex *Executor) Shutdown(ctx context.Context) {
 func (ex *Executor) build(ctx context.Context, spec *container.Spec, stoppedCh chan struct{}, logs io.Writer) error {
 	job := ex.backend.Job(ctx)
 	_, isLocalBackend := ex.backend.(*localbackend.Local)
+	commands := append([]string{}, job.BuildCommands...)
+	commands = append(commands, job.OptionalBuildCommands...)
 
 	buildSpec := &container.BuildSpec{
 		BaseImageName:      spec.Image,
 		WorkDir:            spec.WorkDir,
 		ConfigurationPath:  job.ConfigurationPath,
 		ConfigurationType:  job.ConfigurationType,
-		Commands:           container.ShellCommands(job.BuildCommands),
+		Commands:           container.ShellCommands(commands),
 		Entrypoint:         spec.Entrypoint,
 		Env:                ex.environment(ctx, false),
 		RegistryAuthBase64: spec.RegistryAuthBase64,
@@ -750,7 +750,7 @@ func (ex *Executor) build(ctx context.Context, spec *container.Spec, stoppedCh c
 				return gerrors.Wrap(err)
 			}
 			if exists {
-				if _, err := fmt.Fprintf(ex.streamLogs, "Using the image from the cache\n"); err != nil {
+				if _, err := fmt.Fprintf(ex.streamLogs, "Using the image from the cache\n\n"); err != nil {
 					return gerrors.Wrap(err)
 				}
 				spec.Image = imageName
@@ -777,7 +777,7 @@ func (ex *Executor) build(ctx context.Context, spec *container.Spec, stoppedCh c
 		if _, err = fmt.Fprintf(ex.streamLogs, "No image is found\n\n"); err != nil {
 			return gerrors.Wrap(err)
 		}
-		if job.BuildPolicy == models.UseBuild {
+		if job.BuildPolicy == models.UseBuild && len(job.BuildCommands) > 0 {
 			job.ErrorCode = errorcodes.BuildNotFound
 			_ = ex.backend.UpdateState(ctx)
 			return gerrors.New("no build image is found")

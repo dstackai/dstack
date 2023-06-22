@@ -208,6 +208,7 @@ class Job(JobHead):
     ssh_key_pub: Optional[str]
     build_policy: Optional[str]
     build_commands: Optional[List[str]]
+    optional_build_commands: Optional[List[str]]
     run_env: Optional[Dict[str, str]]
 
     @root_validator(pre=True)
@@ -309,6 +310,7 @@ class Job(JobHead):
             "instance_type": self.instance_type,
             "build_policy": self.build_policy,
             "build_commands": self.build_commands or [],
+            "optional_build_commands": self.optional_build_commands or [],
             "run_env": self.run_env or {},
         }
         if isinstance(self.repo_data, RemoteRepoData):
@@ -443,6 +445,7 @@ class Job(JobHead):
             instance_type=job_data.get("instance_type") or None,
             build_policy=job_data.get("build_policy") or None,
             build_commands=job_data.get("build_commands") or None,
+            optional_build_commands=job_data.get("optional_build_commands") or None,
             run_env=job_data.get("run_env") or None,
         )
         return job

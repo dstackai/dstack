@@ -2,7 +2,6 @@ import argparse
 import importlib
 import shlex
 import sys
-import tempfile
 import uuid
 from abc import abstractmethod
 from argparse import ArgumentParser, Namespace
@@ -53,6 +52,7 @@ class Provider:
         self.ports: Dict[int, PortMapping] = {}
         self.build_policy: Optional[str] = None
         self.build_commands: List[str] = []
+        self.optional_build_commands: List[str] = []
         self.commands: List[str] = []
 
     # TODO: This is a dirty hack
@@ -139,6 +139,7 @@ class Provider:
 
         self._inject_context()
         self.build_commands = self._get_list_data("build") or []
+        self.optional_build_commands = self._get_list_data("optional_build") or []
         self.commands = self._get_list_data("commands") or []
         self.dep_specs = self._dep_specs(hub_client)
         self.cache_specs = self._cache_specs()
@@ -304,6 +305,7 @@ class Provider:
                 repo_code_filename=repo_code_filename,
                 build_policy=self.build_policy,
                 build_commands=job_spec.build_commands,
+                optional_build_commands=self.optional_build_commands,
                 run_env=job_spec.run_env,
             )
             jobs.append(job)
