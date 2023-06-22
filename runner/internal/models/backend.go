@@ -15,21 +15,22 @@ type Resource struct {
 }
 
 type Job struct {
-	Apps           []App             `yaml:"apps"`
-	Artifacts      []Artifact        `yaml:"artifacts"`
-	Cache          []Cache           `yaml:"cache"`
-	BuildCommands  []string          `yaml:"build_commands"`
-	Commands       []string          `yaml:"commands"`
-	BuildPolicy    BuildPolicy       `yaml:"build_policy"`
-	Entrypoint     []string          `yaml:"entrypoint"`
-	Environment    map[string]string `yaml:"env"`
-	RunEnvironment map[string]string `yaml:"run_env"`
-	HostName       string            `yaml:"host_name"`
-	Image          string            `yaml:"image_name"`
-	JobID          string            `yaml:"job_id"`
-	MasterJobID    string            `yaml:"master_job_id"`
-	Deps           []Dep             `yaml:"deps"`
-	ProviderName   string            `yaml:"provider_name"`
+	Apps                  []App             `yaml:"apps"`
+	Artifacts             []Artifact        `yaml:"artifacts"`
+	Cache                 []Cache           `yaml:"cache"`
+	BuildCommands         []string          `yaml:"build_commands"`
+	OptionalBuildCommands []string          `yaml:"optional_build_commands"`
+	Commands              []string          `yaml:"commands"`
+	BuildPolicy           BuildPolicy       `yaml:"build_policy"`
+	Entrypoint            []string          `yaml:"entrypoint"`
+	Environment           map[string]string `yaml:"env"`
+	RunEnvironment        map[string]string `yaml:"run_env"`
+	HostName              string            `yaml:"host_name"`
+	Image                 string            `yaml:"image_name"`
+	JobID                 string            `yaml:"job_id"`
+	MasterJobID           string            `yaml:"master_job_id"`
+	Deps                  []Dep             `yaml:"deps"`
+	ProviderName          string            `yaml:"provider_name"`
 
 	RepoId      string `yaml:"repo_id"`
 	RepoType    string `yaml:"repo_type"`
