@@ -30,7 +30,7 @@ artifacts.
     Make sure that the bucket is created in the same region where you plan to provision
     infrastructure.
 
-## 3. Set up AWS credentials
+## 3. Set up GCP credentials
 
 `dstack` support two methods to authenticate with GCP: Default credentials and Service account key.
 
