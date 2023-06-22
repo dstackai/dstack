@@ -166,7 +166,8 @@ nav:
               - dstack build: docs/reference/cli/build.md
           - .dstack.yml: docs/reference/dstack.yml.md
           - profiles.yml: docs/reference/profiles.yml.md
-          - Python API: docs/reference/python_api.md
+          - API:
+              - Python: docs/reference/api/python.md
           - Backends:
               - AWS: docs/reference/backends/aws.md
               - Azure: docs/reference/backends/azure.md
