@@ -1,11 +1,10 @@
-# Getting started
+# Introduction
 
-`dstack` makes it very easy for ML engineers to run cost-effectively dev environments and ML tasks
-on any cloud.
+`dstack` makes it very easy for ML teams to automate running dev environments and tasks in their cloud.
 
-## Installation and setup
+## Installation
 
-To use `dstack`, install it with `pip` and start the server.
+To use `dstack`, install it with `pip`, and start the server.
 
 <div class="termy">
 
@@ -18,19 +17,16 @@ The server is available at http://127.0.0.1:3000?token=b934d226-e24a-4eab-eb92b3
 
 </div>
 
-On startup, the server sets up a default project that runs dev environments and tasks locally. 
+On startup, the server sets up a default project that runs everything locally. 
 
-!!! info "Configuring projects"
+!!! info "Projects"
 
-    To run dev environments and tasks in the cloud, log into the UI, create the corresponding project, 
+    To run dev environments and tasks in your cloud, log into the UI, create the corresponding project, 
     and [configure](guides/projects) the CLI to use it.
 
-    [//]: # (TODO: Give an instruction on how to configure a project to run in the cloud without logging into UI)
+## Initialization
 
-## Initializing the repo
-
-To use `dstack` from a folder, you need to initialize it as a `dstack` repo by running the [`dstack
-init`](reference/cli/init.md) command.
+To use `dstack` for your project, make sure to first run the [`dstack init`](reference/cli/init.md) command in the root folder of the project.
 
 <div class="termy">
 
@@ -41,7 +37,7 @@ $ dstack init
 
 </div>
 
-## Defining configurations
+## Configurations
 
 A configuration is a YAML file that describes what you want to run with `dstack`. Configurations can be of two
 types: `dev-environment` and `task`.
@@ -54,8 +50,6 @@ Here's an example of a `dev-environment` configuration:
 
 ```yaml
 type: dev-environment
-setup:
-  - pip install -r requirements.txt
 ide: vscode
 ```
 
@@ -71,11 +65,10 @@ Here's an example of a `task` configuration:
 
 ```yaml
 type: task
-setup:
-  - pip install -r requirements.txt
 ports:
   - 7860
 commands:
+  - pip install -r requirements.txt
   - gradio app.py
 ```
 
@@ -94,7 +87,7 @@ A task can be either a batch job, such as training or fine-tuning a model, or a 
 
 For more details on the syntax of configuration file, refer to the [`.dstack.yml` Reference](reference/dstack.yaml.md).
 
-## Running configurations
+## Running
 
 ### Default configuration
 
@@ -106,13 +99,14 @@ directory which you want to use as a working directory when running the configur
 ```shell
 $ dstack run . 
 
- RUN          WORKFLOW  SUBMITTED  USER   STATUS     INSTANCE 
- fast-moth-1  ssh       now        admin  Submitted  -        
+ RUN          CONFIGURATION  USER   PROJECT  INSTANCE  RESOURCES        SPOT
+ fast-moth-1  .dstack.yml    admin  local    -         5xCPUs, 15987MB  auto  
+
 
 Provisioning and starting SSH tunnel...
 ---> 100%
 
-To open in VS Code Desktop, use one of these links:
+To open in VS Code Desktop, use this link:
   vscode://vscode-remote/ssh-remote+fast-moth-1/workflow
 
 To exit, press Ctrl+C.
@@ -133,8 +127,8 @@ using the `-f` argument:
 ```shell
 $ dstack run . -f app.dstack.yml
 
- RUN             WORKFLOW  SUBMITTED  USER   STATUS     INSTANCE 
- old-lionfish-1  ssh       now        admin  Submitted  -        
+ RUN             CONFIGURATION   USER   PROJECT  INSTANCE  RESOURCES        SPOT
+ old-lionfish-1  app.dstack.yml  admin  local    -         5xCPUs, 15987MB  auto  
 
 Provisioning and starting SSH tunnel...
 ---> 100%
@@ -159,7 +153,7 @@ Launching in *reload mode* on: http://127.0.0.1:7860 (Press CTRL+C to quit)
 
 For more details on how the `dstack run` command works, refer to the [CLI Reference](reference/cli/run.md).
 
-## Defining profiles
+## Profiles
 
 If you have [configured](guides/projects.md) a project that runs dev environments and tasks in the cloud, you can define multiple
 profiles. Each profile can configure the project to use and the resources required for the run.

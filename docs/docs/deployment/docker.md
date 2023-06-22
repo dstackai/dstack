@@ -1,9 +1,8 @@
 # Docker
 
 !!! info "NOTE:"
-    As an alternative to the [`dstack start`](../reference/cli/start.md) command, 
-    you can run the Hub server via Docker. This is recommended if you want to deploy the Hub server in an environment that
-    supports Docker.
+As an alternative to the [`dstack start`](../reference/cli/start.md) command, you can run the `dstack` server via
+Docker. This is recommended if you want to deploy the server in an environment that supports Docker.
 
 Here's how to run `dstack` via Docker:
 
@@ -60,4 +59,4 @@ You can only configure the projects that run dev environments, pipelines, and ap
 
 !!! info "NOTE:"
     If you want `dstack` to run dev environments,
-    pipelines, and apps both locally and in the cloud, it is recommended to start the Hub server using the `dstack start` command.
+    pipelines, and apps both locally and in the cloud, it is recommended to start the server using the `dstack start` command.

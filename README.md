@@ -9,7 +9,7 @@
 </h1>
 
 <h3 align="center">
-Cost-effective ML development in your cloud
+Cost-effective ML development in the cloud
 </h3>
 
 <p align="center">
@@ -23,20 +23,7 @@ Cost-effective ML development in your cloud
 [![PyPI - License](https://img.shields.io/pypi/l/dstack?style=flat-square&color=blue)](https://github.com/dstackai/dstack/blob/master/LICENSE.md)
 </div>
 
-`dstack` is an open-source developer platform that helps manage dev environments and run ML tasks in your cloud.
-
-`dstack` handles the automatic provisioning of cloud resources, including waiting for spot instances if required. It
-runs the script and performs resource cleanup once the training is complete.
-
-**Why use dstack?**
-
-- Define dev environments and tasks declaratively as code and run with one command
-- Save costs by effectively utilizing cloud spot instances
-- Run dev environments and tasks where your data is located
-- No hustle with Kubernetes or custom Docker images
-- Use the same interface to work with any major cloud provider
-
-**🍒 is, `dstack` is 100% open-source and can be self-hosted**
+`dstack` makes it very easy for ML teams to automate running dev environments and tasks in their cloud.
 
 ## Installation and setup
 
@@ -66,8 +53,6 @@ Below is a configuration that runs a dev environment with a pre-built environmen
 
 ```yaml
 type: dev-environment
-setup:
-  - pip install -r requirements.txt
 ide: vscode
 ```
 
@@ -76,11 +61,10 @@ A task can be either a batch job, such as training or fine-tuning a model, or a 
 
 ```yaml
 type: task
-setup:
-  - pip install -r requirements.txt
 ports:
   - 7860
 commands:
+  - pip install -r requirements.txt
   - gradio app.py
 ```
 
@@ -92,14 +76,13 @@ directory with the configuration.
 ```shell
 $ dstack run . 
 
- RUN          WORKFLOW  SUBMITTED  USER   STATUS     INSTANCE 
- fast-moth-1  ssh       now        admin  Submitted  a2-highgpu-1g        
+ RUN          CONFIGURATION  USER   PROJECT  INSTANCE  RESOURCES        SPOT
+ fast-moth-1  .dstack.yml    admin  local    -         5xCPUs, 15987MB  auto  
 
 Starting SSH tunnel...
 
-To open in VS Code Desktop, use one of these links:
+To open in VS Code Desktop, use this link:
   vscode://vscode-remote/ssh-remote+fast-moth-1/workflow
-  vscode-insiders://vscode-remote/ssh-remote+fast-moth-1/workflow
 
 To exit, press Ctrl+C.
 ```

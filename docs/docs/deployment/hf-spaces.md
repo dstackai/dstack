@@ -7,7 +7,7 @@
     and in the cloud.
     
     However, if you want to work as a team and manage cloud credentials in a more secure way, you may consider
-    deploying the Hub server as a Hugging Face Space.
+    deploying the `dstack` server as a Hugging Face Space.
 
 ## Create a space
 
@@ -28,7 +28,7 @@ Once the space is created, click on `Settings` and proceed to configure the visi
 ### Visibility
 
 Ensure that the visibility of the space is set to `Public`. This is a requirement for the `dstack` CLI to access
-the Hub server APIs. Rest assured, the Hub server has its own authentication system and will only allow registered users
+the `dstack` server APIs. Rest assured, the server has its own authentication system and will only allow registered users
 to access it.
 
 ### Secrets
@@ -67,5 +67,5 @@ to persist the state in a cloud object storage of your choice.
 
 Once the settings are configured, you can restart the space and log in as an administrator. From there, you can create
 users, projects, and configure the `dstack` CLI. This allows you to collaborate as a team, running development
-environments, pipelines, and apps securely and conveniently in the cloud without the need to host the Hub server
+environments, pipelines, and apps securely and conveniently in the cloud without the need to host the `dstack` server
 yourself.

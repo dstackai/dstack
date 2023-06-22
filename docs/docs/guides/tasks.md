@@ -1,10 +1,10 @@
-# Dev environments
+# Tasks
 
-A dev environment is a virtual machine pre-configured with hardware resources, source code, dependencies, and an
-IDE.
+A task can be any script you may want to run on demand. For example, it could be a script that trains a model, processes
+data, or runs a web-based app.
 
-Using `dstack`, you can define such a dev environment through a configuration file and provision it with a single
-command.
+Using `dstack`, you can define such a task through a configuration file and run it either locally or in any cloud with a
+single command.
 
 ## Configuration
 
@@ -13,47 +13,44 @@ in any folder but must be named with a suffix `.dstack.yml`.
 
 Here's an example:
 
-<div editor-title=".dstack.yml"> 
+<div editor-title="train.dstack.yml"> 
 
 ```yaml
-type: dev-environment
-ide: vscode
+type: task
+commands:
+  - pip install -r requirements.txt
+  - python train.py
 ```
 
 </div>
 
-## Running a dev environment
+## Running a task
 
 To run a dev environment, use the `dstack run` command followed by the path to the directory you want to use as the
 working directory during development.
 
+If your configuration file has a name different from `.dstack.yml`, pass the path to it using the `-f` argument.
+
 <div class="termy">
 
 ```shell
-$ dstack run . 
+$ dstack run . -f train.dstack.yml
 
- RUN          CONFIGURATION   USER   PROJECT  INSTANCE  RESOURCES        SPOT
- fast-moth-1  app.dstack.yml  admin  local    -         5xCPUs, 15987MB  auto  
- 
-Provisioning and starting SSH tunnel...
+ RUN            CONFIGURATION     USER   PROJECT  INSTANCE  RESOURCES        SPOT
+ wet-mangust-7  train.dstack.yml  admin  local    -         5xCPUs, 15987MB  auto  
+
+Waiting for capacity... To exit, press Ctrl+C...
 ---> 100%
 
-To open in VS Code Desktop, use one of these links:
-  vscode://vscode-remote/ssh-remote+fast-moth-1/workflow
-
-To exit, press Ctrl+C.
+Epoch 0:  100% 1719/1719 [00:18<00:00, 92.32it/s, loss=0.0981, acc=0.969]
+Epoch 1:  100% 1719/1719 [00:18<00:00, 92.32it/s, loss=0.0981, acc=0.969]
+Epoch 2:  100% 1719/1719 [00:18<00:00, 92.32it/s, loss=0.0981, acc=0.969]
 ```
 
 </div>
 
-The `dstack run` command provisions cloud resources, pre-installs the environment, code, and the IDE, and establishes an
-SSH tunnel for secure access. 
-
-To open the dev environment via a desktop IDE, click the URL in the output.
-
-![](/assets/images/dstack-vscode-jupyter.png){ width=800 }
-
-By default, VS Code comes with pre-installed Python and Jupyter extensions.
+This command provisions cloud resources, pre-installs the environment and code, and runs the script. If the task exposes
+any ports, the command will forward them to your local machine for secure and convenient access.
 
 ??? info "Using .gitignore"
     When running a dev environment, `dstack` uses the exact version of code that is present in the folder where you
@@ -63,19 +60,79 @@ By default, VS Code comes with pre-installed Python and Jupyter extensions.
     make sure to create a `.gitignore` file and include these large files or folders that you don't want to include when
     running dev environments or tasks.
 
-!!! info "Default configuration"
-    By default, the `dstack run` command looks for the default configuration file named `.dstack.yml` in the given working
-    directory. If your configuration file is named differently, you can specify a path to it using the `-f` argument.
-
 For more details on the `dstack run` command, refer to the [`dstack run` Reference](../../reference/cli/run.md).
+
+## Args
+
+If you want, it's possible to parametrize tasks with user arguments. Here's an example:
+
+<div editor-title="args.dstack.yml"> 
+
+```yaml
+type: task
+commands:
+  - python train.py ${{ run.args }}
+```
+
+</div>
+
+Now, you can pass your arguments to the `dstack run` command:
+
+<div class="termy">
+
+```shell
+$ dstack run . -f args.dstack.yml --train_batch_size=1 --num_train_epochs=100
+```
+
+</div>
+
+The dstack run command will pass `--train_batch_size=1` and `--num_train_epochs=100` as arguments to `train.py`.
+
+## Ports
+
+A task can expose ports through the `ports` property in `.dstack.yml`, for example, if it is running a web-based app. Here's an example:
+
+<div editor-title="app.dstack.yml"> 
+
+```yaml
+type: task
+ports:
+  - 7860
+commands:
+  - pip install -r requirements.txt
+  - gradio app.py
+```
+
+</div>
+
+
+If you run this configuration, the `dstack run` command will automatically forward the ports to your local machine,
+providing secure and convenient access.
+
+## Reload mode
+
+Some web development frameworks like Gradio, Streamlit, and FastAPI support auto-reloading. With `dstack run`, you can
+enable the reload mode by using the `--reload` argument.
+
+<div class="termy">
+
+```shell
+$ dstack run . -f app.dstack.yml --reload
+```
+
+</div>
+
+This feature allows you to run an app in the cloud while continuing to edit the source code locally and have the app
+reload changes on the fly.
 
 ## Environment
 
 By default, a dev environment includes pre-installed CUDA driver, Python (matching your local version), 
 and Conda (with Miniforge).
 
-To modify the Python version or install additional packages beforehand, you can utilize other YAML properties 
-like `python`, `init`, and `build`. 
+To modify the Python version or install additional packages beforehand, you can use other YAML properties 
+like `python`, `commands`, and `build`.
+For more details on the syntax of `.dstack.yml`, refer to the [Reference](../../reference/dstack.yml).
 
 ### Pre-building the environment
 
@@ -122,8 +179,6 @@ To pre-build the environment you have two options:
 
     If there is no pre-built image, the `dstack run` command will build it and upload it to the storage. If the pre-built
     image is already available, the `dstack run` command will reuse it.
-
-For more details on the syntax of `.dstack.yml`, refer to the [Reference](../../reference/dstack.yml).
 
 ## Profiles
 

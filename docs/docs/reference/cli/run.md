@@ -60,10 +60,11 @@ Retry policy (the arguments are mutually exclusive):
 
 Build policies:
 
-- `--use-build` – Use the build if available, otherwise fail
-- `--build` – Use the build if available, otherwise build first. Then run `commands`
-- `--force-build` – Always build first, save the build, and run `commands`
-- `--build-only` — Just create the build and save it
+[//]: # (- `--use-build` – Use the build if available, otherwise fail)
+- `--build` – If the environment is not pre-built yet, pre-build it. If the environment is already pre-built, reuse it.
+- `--force-build` – Force pre-building the environment, even if it has been pre-built before.
+
+[//]: # (- `--build-only` — Just create the build and save it)
 
 [//]: # (Tags should be dropped)
 
