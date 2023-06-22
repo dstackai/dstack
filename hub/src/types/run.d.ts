@@ -46,7 +46,7 @@ declare interface IRunJobHead {
     workflow_name: null | string,
     provider_name: string,
     status: TRunStatus,
-    error_code: null,
+    error_code: null | string,
     container_exit_code: null,
     submitted_at: number,
     artifact_paths: null,

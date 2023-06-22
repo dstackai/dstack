@@ -204,6 +204,7 @@
       "provider_name": "Provider",
       "status": "Status",
       "submitted_at": "Submitted",
+      "error": "Error",
       "artifacts": "Artifacts",
       "artifacts_count": "Artifacts",
       "hub_user_name": "User",

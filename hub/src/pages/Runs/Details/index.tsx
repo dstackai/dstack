@@ -203,8 +203,18 @@ export const RunDetails: React.FC = () => {
                     <Container header={<Header variant="h2">{t('common.general')}</Header>}>
                         <ColumnLayout columns={4} variant="text-grid">
                             <div>
-                                <Box variant="awsui-key-label">{t('projects.run.workflow_name')}</Box>
-                                <div>{runData.workflow_name ?? runData.provider_name}</div>
+                                <Box variant="awsui-key-label">{t('projects.run.configuration')}</Box>
+                                <div>{runData.job_heads?.[0].configuration_path}</div>
+                            </div>
+
+                            <div>
+                                <Box variant="awsui-key-label">{t('projects.run.instance')}</Box>
+                                <div>{runData.job_heads?.[0].instance_type}</div>
+                            </div>
+
+                            <div>
+                                <Box variant="awsui-key-label">{t('projects.run.hub_user_name')}</Box>
+                                <div>{runData.hub_user_name}</div>
                             </div>
 
                             <div>
@@ -223,8 +233,15 @@ export const RunDetails: React.FC = () => {
 
                             <div>
                                 <Box variant="awsui-key-label">{t('projects.run.artifacts_count')}</Box>
-                                <div>{runData.artifact_heads?.length ?? 0}</div>
+                                <div>{runData.artifact_heads?.length ?? '-'}</div>
                             </div>
+
+                            {runData.job_heads?.[0].error_code && (
+                                <div>
+                                    <Box variant="awsui-key-label">{t('projects.run.error')}</Box>
+                                    <div>{runData.job_heads?.[0].error_code}</div>
+                                </div>
+                            )}
                         </ColumnLayout>
                     </Container>
                 )}
