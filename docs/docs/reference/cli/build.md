@@ -1,14 +1,14 @@
-# dstack prebuild
+# dstack build
 
-This command create prebuild for a given configuration.
+This command creates a build for a given configuration.
 
 ## Usage
 
 <div class="termy">
 
 ```shell
-$ dstack prebuild --help
-Usage: dstack prebuild [--project PROJECT] [--profile PROFILE] [-d] [--reload] WORKING_DIR [ARGS ...]
+$ dstack build --help
+Usage: dstack build [--project PROJECT] [--profile PROFILE] [-d] [--reload] WORKING_DIR [ARGS ...]
 
 Positional Arguments:
   WORKING_DIR          The working directory of the run
