@@ -391,10 +391,10 @@ class Job(JobHead):
                 repo_port=job_data.get("repo_port") or None,
                 repo_user_name=job_data["repo_user_name"],
                 repo_name=job_data["repo_name"],
-                repo_branch=job_data["repo_branch"] or None,
-                repo_hash=job_data["repo_hash"] or None,
-                repo_config_name=job_data["repo_config_name"] or None,
-                repo_config_email=job_data["repo_config_email"] or None,
+                repo_branch=job_data.get("repo_branch") or None,
+                repo_hash=job_data.get("repo_hash") or None,
+                repo_config_name=job_data.get("repo_config_name") or None,
+                repo_config_email=job_data.get("repo_config_email") or None,
             )
         elif job_data["repo_type"] == "local":
             repo_data = LocalRepoData(repo_dir=job_data.get("repo_dir", ""))
