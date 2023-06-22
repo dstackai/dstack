@@ -126,8 +126,6 @@ class Provider:
         self.ssh_key_pub = ssh_key_pub
         self.openssh_server = self.provider_data.get("ssh", self.openssh_server)
         self.build_policy = self.provider_data.get("build_policy")
-        self.build_commands = self._get_list_data("build") or []
-        self.commands = self._get_list_data("commands") or []
 
         self.parse_args()
         self.ports = self.provider_data.get("ports") or {}
@@ -138,7 +136,10 @@ class Provider:
                 raise RepoNotInitializedError(
                     "No valid SSH identity", project_name=hub_client.project
                 )
+
         self._inject_context()
+        self.build_commands = self._get_list_data("build") or []
+        self.commands = self._get_list_data("commands") or []
         self.dep_specs = self._dep_specs(hub_client)
         self.cache_specs = self._cache_specs()
         self.loaded = True
