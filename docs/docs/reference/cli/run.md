@@ -58,12 +58,12 @@ Retry policy (the arguments are mutually exclusive):
 - `--retry` – Retry the run on failure. Use a default retry limit (1h). 
 - `--retry-limit` – Retry the run on failure with a custom retry limit, e.g. 4h or 1d
 
-Prebuild policies:
+Build policies:
 
-- `--no-prebuild` – Run `setup` first, then `commands` if any
-- `--use-prebuild` – Use prebuild if available, otherwise fallback to `no-prebuild`
-- `--force-prebuild` – Create prebuild, save it, and run `commands`
-- `--prebuild-only` — Create prebuild and save it
+- `--use-build` – Use the build if available, otherwise fail
+- `--build` – Use the build if available, otherwise build first. Then run `commands`
+- `--force-build` – Always build first, save the build, and run `commands`
+- `--build-only` — Just create the build and save it
 
 [//]: # (Tags should be dropped)
 

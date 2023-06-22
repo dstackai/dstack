@@ -163,7 +163,7 @@ nav:
               - dstack tags: docs/reference/cli/tags.md
               - dstack secrets: docs/reference/cli/secrets.md
               - dstack prune: docs/reference/cli/prune.md
-              - dstack prebuild: docs/reference/cli/prebuild.md
+              - dstack build: docs/reference/cli/build.md
           - .dstack.yml: docs/reference/dstack.yml.md
           - profiles.yml: docs/reference/profiles.yml.md
           - Python API: docs/reference/python_api.md
