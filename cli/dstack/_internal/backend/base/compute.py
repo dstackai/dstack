@@ -2,6 +2,7 @@ from abc import ABC, abstractmethod
 from functools import cmp_to_key
 from typing import List, Optional
 
+from dstack._internal.core.error import DstackError
 from dstack._internal.core.instance import InstanceType
 from dstack._internal.core.job import Job, Requirements
 from dstack._internal.core.request import RequestHead
@@ -10,7 +11,7 @@ from dstack._internal.core.runners import Resources
 WS_PORT = 10999
 
 
-class ComputeError(Exception):
+class ComputeError(DstackError):
     pass
 
 

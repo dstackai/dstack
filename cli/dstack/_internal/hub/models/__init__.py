@@ -30,7 +30,9 @@ class Member(BaseModel):
     project_role: ProjectRole
 
 
-BackendType = Union[Literal["local"], Literal["aws"], Literal["gcp"], Literal["azure"]]
+BackendType = Union[
+    Literal["local"], Literal["aws"], Literal["gcp"], Literal["azure"], Literal["lambda"]
+]
 
 
 class LocalProjectConfig(BaseModel):
@@ -162,20 +164,30 @@ class AzureProjectConfigWithCreds(AzureProjectConfig):
     credentials: AzureProjectCreds
 
 
+class LambdaProjectConfig(BaseModel):
+    type: Literal["lambda"] = "lambda"
+
+
+class LambdaProjectConfigWithCreds(LambdaProjectConfig):
+    api_key: str
+
+
 AnyProjectConfig = Union[
-    LocalProjectConfig, AWSProjectConfig, GCPProjectConfig, AzureProjectConfig
+    LocalProjectConfig, AWSProjectConfig, GCPProjectConfig, AzureProjectConfig, LambdaProjectConfig
 ]
 AnyProjectConfigWithCredsPartial = Union[
     LocalProjectConfig,
     AWSProjectConfigWithCredsPartial,
     GCPProjectConfigWithCredsPartial,
     AzureProjectConfigWithCredsPartial,
+    LambdaProjectConfig,
 ]
 AnyProjectConfigWithCreds = Union[
     LocalProjectConfig,
     AWSProjectConfigWithCreds,
     GCPProjectConfigWithCreds,
     AzureProjectConfigWithCreds,
+    LambdaProjectConfigWithCreds,
 ]
 
 
@@ -366,10 +378,14 @@ class AzureProjectValues(BaseModel):
     storage_account: Optional[ProjectElement]
 
 
+class LambdaProjectValues(BaseModel):
+    type: Literal["lambda"] = "lambda"
+
+
 class ProjectValues(BaseModel):
-    __root__: Union[None, AWSProjectValues, GCPProjectValues, AzureProjectValues] = Field(
-        ..., discriminator="type"
-    )
+    __root__: Union[
+        None, AWSProjectValues, GCPProjectValues, AzureProjectValues, LambdaProjectValues
+    ] = Field(..., discriminator="type")
 
 
 class UserPatch(BaseModel):
