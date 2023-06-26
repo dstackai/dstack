@@ -161,6 +161,7 @@ def _run_instance(
         file_system_names=[],
     )
     instance_id = instances_ids[0]
+    # instance_id = api_client.list_instances()[0]["id"]
     instance_info = _wait_for_instance(api_client, instance_id)
     hostname = instance_info["ip"]
     _setup_instance(hostname=hostname, user_ssh_key=user_ssh_key)
@@ -211,7 +212,7 @@ def _setup_instance(hostname: str, user_ssh_key: str):
     # so we have to update authorized_keys manually to add the user key
     setup_commands = (
         "chmod +x .dstack/setup_lambda.sh && "
-        ".dstack/setup_lambda.sh && "
+        "RUNNER=1349 .dstack/setup_lambda.sh && "
         f"echo '{user_ssh_key}' >> /home/ubuntu/.ssh/authorized_keys"
     )
     _run_ssh_command(hostname=hostname, commands=setup_commands)

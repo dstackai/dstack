@@ -16,6 +16,6 @@ class AWSStorageConfig(BaseModel):
 
 
 class LambdaConfig(BaseModel):
-    type: Literal["lambda"] = "lambda"
+    backend: Literal["lambda"] = "lambda"
     api_key: str
     storage_config: AWSStorageConfig

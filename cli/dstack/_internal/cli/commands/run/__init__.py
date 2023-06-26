@@ -360,7 +360,7 @@ def _attach(hub_client: HubClient, job: Job, ssh_key_path: str) -> Dict[int, int
             {
                 "HostName": job.host_name,
                 # TODO: use non-root for all backends
-                "User": "ubuntu" if backend_type in ("azure", "gcp") else "root",
+                "User": "ubuntu" if backend_type in ("azure", "gcp", "lambda") else "root",
                 "IdentityFile": ssh_key_path,
                 "StrictHostKeyChecking": "no",
                 "UserKnownHostsFile": "/dev/null",

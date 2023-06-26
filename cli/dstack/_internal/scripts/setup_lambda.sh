@@ -5,6 +5,7 @@ RUNNER_VERSION=${RUNNER_VERSION:-latest}
 function install_nvidia_docker_runtime {
   sudo apt-get update
   sudo apt-get install -y --no-install-recommends nvidia-docker2
+  sudo pkill -SIGHUP dockerd
 }
 
 function install_stgn {
