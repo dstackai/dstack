@@ -165,28 +165,31 @@ def _clone_remote_repo(
 
 
 class _DiffCollector:
-    def __init__(self, update_seconds: float):
-        self.update_seconds = update_seconds
+    def __init__(self, warning_time: float, delay: float = 5):
+        self.warning_time = warning_time
+        self.delay = delay
+        self.warned = False
+        self.start_time = time.monotonic()
         self.buffer = io.StringIO()
-        self.start_time = self.update_time = time.monotonic()
 
     def timeout(self):
         now = time.monotonic()
-        if now - self.update_time > self.update_seconds:
-            elapsed = int(now - self.start_time) // self.update_seconds * self.update_seconds
-            print(f"Git diff elapses more than {elapsed} seconds...")
-            self.update_time = now
-        return self.update_seconds - (now - self.start_time) % self.update_seconds
+        if not self.warned and now > self.start_time + self.warning_time:
+            print("Git diff takes longer than usual. Press Ctrl+C to abort git diff.")
+            print("Tip: exclude unnecessary files with .gitignore")
+            self.warned = True
+        return (
+            self.delay
+            if self.warned
+            else min(self.delay, self.start_time + self.warning_time - now)
+        )
 
     def write(self, v: bytes):
         self.buffer.write(v.decode())
 
     def get(self) -> str:
-        now = time.monotonic()
-        if now - self.start_time > self.update_seconds:
-            print(
-                f"Git diff elapsed {int(now - self.start_time)} seconds, the diff size is {self.buffer.tell()} bytes"
-            )
+        if self.warned:
+            print()
         return self.buffer.getvalue()
 
 
@@ -204,15 +207,17 @@ def _interactive_git_proc(
             continue
 
 
-def _repo_diff_verbose(
-    repo: git.Repo, repo_hash: str, update_seconds: float = 5, update_bytes: int = 10**9
-) -> str:
-    collector = _DiffCollector(update_seconds)
-    _interactive_git_proc(repo.git.diff(repo_hash, as_process=True), collector)
-    for filename in repo.untracked_files:
-        _interactive_git_proc(
-            repo.git.diff("/dev/null", filename, no_index=True, binary=True, as_process=True),
-            collector,
-            ignore_status=True,
-        )
-    return collector.get()
+def _repo_diff_verbose(repo: git.Repo, repo_hash: str, warning_time: float = 5) -> str:
+    collector = _DiffCollector(warning_time)
+    try:
+        _interactive_git_proc(repo.git.diff(repo_hash, as_process=True), collector)
+        for filename in repo.untracked_files:
+            _interactive_git_proc(
+                repo.git.diff("/dev/null", filename, no_index=True, binary=True, as_process=True),
+                collector,
+                ignore_status=True,
+            )
+        return collector.get()
+    except KeyboardInterrupt:
+        print("\nGit diff aborted")
+        exit(1)
