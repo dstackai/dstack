@@ -222,7 +222,7 @@ func (ex *Executor) runJob(ctx context.Context, erCh chan error, stoppedCh chan 
 	jctx := log.AppendArgsCtx(ctx,
 		"run_name", job.RunName,
 		"job_id", job.JobID,
-		"workflow", job.WorkflowName,
+		"configuration", job.ConfigurationPath,
 	)
 	if ex.config.Hostname != nil {
 		job.HostName = *ex.config.Hostname
@@ -480,7 +480,7 @@ func (ex *Executor) processDeps(ctx context.Context) error {
 func (ex *Executor) processCache(ctx context.Context) error {
 	job := ex.backend.Job(ctx)
 	for _, cache := range job.Cache {
-		cacheArt := ex.backend.GetCache(ctx, job.RunName, cache.Path, path.Join("cache", job.RepoId, job.HubUserName, job.WorkflowName, cache.Path))
+		cacheArt := ex.backend.GetCache(ctx, job.RunName, cache.Path, path.Join("cache", job.RepoId, job.HubUserName, models.EscapeHead(job.ConfigurationPath), cache.Path))
 		if cacheArt != nil {
 			ex.cacheArtifacts = append(ex.cacheArtifacts, cacheArt)
 		}
