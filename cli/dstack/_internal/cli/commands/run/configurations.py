@@ -21,6 +21,7 @@ def _init_base_provider_data(configuration_data: Dict[str, Any], provider_data: 
         provider_data["python"] = configuration_data["python"]
     if "env" in configuration_data:
         provider_data["env"] = configuration_data["env"]
+    provider_data["build"] = configuration_data.get("build") or []
 
 
 def _parse_dev_environment_configuration_data(
@@ -29,7 +30,6 @@ def _parse_dev_environment_configuration_data(
     provider_name = "ssh"
     provider_data = {
         "configuration_type": "dev-environment",
-        "build": [],
         "optional_build": [],
         "commands": [],
     }
@@ -47,7 +47,6 @@ def _parse_dev_environment_configuration_data(
             "PATH[/sea_green3], and restarting terminal.[/]\n"
         )
     provider_data["optional_build"].append("pip install -q --no-cache-dir ipykernel")
-    provider_data["build"].extend(configuration_data.get("build") or [])
     provider_data["commands"].extend(configuration_data.get("init") or [])
     return provider_name, provider_data
 
@@ -61,10 +60,8 @@ def _parse_task_configuration_data(
         "configuration_type": "task",
         "commands": [],
     }
-    if "build" in configuration_data:
-        provider_data["build"] = configuration_data["build"] or []
-    provider_data["commands"].extend(configuration_data["commands"])
     _init_base_provider_data(configuration_data, provider_data)
+    provider_data["commands"].extend(configuration_data["commands"])
     return provider_name, provider_data
 
 
