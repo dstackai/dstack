@@ -175,8 +175,11 @@ class _DiffCollector:
     def timeout(self):
         now = time.monotonic()
         if not self.warned and now > self.start_time + self.warning_time:
-            print("Git diff takes longer than usual. Press Ctrl+C to abort git diff.")
-            print("Tip: exclude unnecessary files with .gitignore")
+            print(
+                "Provisioning is taking longer than usual, possibly because of having too many or large local "
+                "files that haven’t been pushed to Git. Tip: Exclude unnecessary files from provisioning "
+                "by using the `.gitignore` file."
+            )
             self.warned = True
         return (
             self.delay
@@ -219,5 +222,5 @@ def _repo_diff_verbose(repo: git.Repo, repo_hash: str, warning_time: float = 5) 
             )
         return collector.get()
     except KeyboardInterrupt:
-        print("\nGit diff aborted")
+        print("\nAborted")
         exit(1)
