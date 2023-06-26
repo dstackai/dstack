@@ -1,4 +1,4 @@
-from typing import Any, List, Optional
+from typing import Any, Dict, List, Optional
 
 import requests
 
@@ -41,6 +41,29 @@ class LambdaAPIClient:
         resp = self._make_request("POST", "/instance-operations/launch", data)
         if resp.ok:
             return resp.json()["data"]["instance_ids"]
+        resp.raise_for_status()
+
+    def terminate_instances(self, instance_ids: List[str]) -> List[str]:
+        data = {"instance_ids": instance_ids}
+        resp = self._make_request("POST", "/instance-operations/terminate", data)
+        if resp.ok:
+            return resp.json()["data"]
+        resp.raise_for_status()
+
+    def list_ssh_keys(self) -> List[Dict]:
+        resp = self._make_request("GET", "/ssh-keys")
+        if resp.ok:
+            return resp.json()["data"]
+        resp.raise_for_status()
+
+    def add_ssh_key(self, name: str, public_key: str) -> List[Dict]:
+        data = {
+            "name": name,
+            "public_key": public_key,
+        }
+        resp = self._make_request("POST", "/ssh-keys", data)
+        if resp.ok:
+            return resp.json()["data"]
         resp.raise_for_status()
 
     def _make_request(self, method: str, path: str, data: Any = None):

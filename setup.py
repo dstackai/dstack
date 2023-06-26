@@ -36,6 +36,7 @@ setup(
     packages=find_packages("cli"),
     package_data={
         "dstack._internal.schemas": ["*.json"],
+        "dstack._internal.scripts": ["*.sh"],
         "dstack._internal.hub": [
             "statics/*",
             "statics/**/*",

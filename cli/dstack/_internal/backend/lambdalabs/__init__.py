@@ -38,7 +38,7 @@ class LambdaBackend(Backend):
         backend_config: LambdaConfig,
     ):
         self.backend_config = backend_config
-        self._compute = LambdaCompute(api_key=self.backend_config.api_key)
+        self._compute = LambdaCompute(lambda_config=self.backend_config)
         self._session = boto3.session.Session(
             region_name=self.backend_config.storage_config.region,
             aws_access_key_id=self.backend_config.storage_config.credentials.access_key,
