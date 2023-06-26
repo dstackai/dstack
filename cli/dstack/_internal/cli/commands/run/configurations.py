@@ -68,11 +68,7 @@ def _parse_task_configuration_data(
 def parse_configuration_file(
     working_dir: str, file_name: Optional[str], profile_name: Optional[str]
 ) -> Tuple[str, str, Dict[str, Any], Optional[str]]:
-    configuration_path = Path(file_name) if file_name else Path(working_dir) / ".dstack.yml"
-    if not file_name and not configuration_path.exists():
-        configuration_path = Path(working_dir) / ".dstack.yaml"
-    if not configuration_path.exists():
-        exit(f"Error: No such configuration file {configuration_path}")
+    configuration_path = get_configuration_path(working_dir, file_name)
     with configuration_path.open("r") as f:
         configuration_data = yaml.load(f, yaml.FullLoader)
     schema = json.loads(
@@ -104,3 +100,12 @@ def parse_configuration_file(
     if not Path(os.getcwd()).samefile(Path(working_dir)):
         provider_data["working_dir"] = str(Path(working_dir))
     return str(configuration_path), provider_name, provider_data, project_name
+
+
+def get_configuration_path(working_dir: str, file_name: str) -> Path:
+    configuration_path = Path(file_name) if file_name else Path(working_dir) / ".dstack.yml"
+    if not file_name and not configuration_path.exists():
+        configuration_path = Path(working_dir) / ".dstack.yaml"
+    if not configuration_path.exists():
+        exit(f"Error: No such configuration file {configuration_path}")
+    return configuration_path

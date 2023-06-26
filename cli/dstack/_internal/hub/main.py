@@ -16,6 +16,7 @@ from dstack._internal.hub.repository.users import UserManager
 from dstack._internal.hub.routers import (
     artifacts,
     backends,
+    configurations,
     jobs,
     link,
     logs,
@@ -27,7 +28,6 @@ from dstack._internal.hub.routers import (
     storage,
     tags,
     users,
-    workflows,
 )
 from dstack._internal.hub.services.backends import local_backend_available
 from dstack._internal.hub.utils import logging
@@ -50,7 +50,7 @@ app.include_router(storage.router)
 app.include_router(tags.router)
 app.include_router(repos.router)
 app.include_router(link.router)
-app.include_router(workflows.router)
+app.include_router(configurations.router)
 
 
 DEFAULT_PROJECT_NAME = "local"

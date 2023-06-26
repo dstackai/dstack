@@ -221,7 +221,9 @@ class Backend(ABC):
         pass
 
     @abstractmethod
-    def delete_workflow_cache(self, repo_id: str, hub_user_name: str, workflow_name: str):
+    def delete_configuration_cache(
+        self, repo_id: str, hub_user_name: str, configuration_path: str
+    ):
         pass
 
     @abstractmethod

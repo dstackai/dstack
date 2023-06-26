@@ -3,6 +3,7 @@ import argparse
 from rich_argparse import RichHelpFormatter
 
 from dstack._internal.cli.commands import BasicCommand
+from dstack._internal.cli.commands.run import configurations
 from dstack._internal.cli.common import add_project_argument, check_init, console
 from dstack._internal.cli.config import get_hub_client
 from dstack.api.hub import HubClient
@@ -19,13 +20,22 @@ class PruneCommand(BasicCommand):
         self._parser: argparse.ArgumentParser
         subparsers = self._parser.add_subparsers(title="entities", dest="entity", required=True)
         cache_cmd = subparsers.add_parser(
-            "cache", help="Workflow cache", formatter_class=RichHelpFormatter
+            "cache", help="Configuration cache", formatter_class=RichHelpFormatter
         )
         add_project_argument(cache_cmd)
         cache_cmd.add_argument(
-            "workflow",
-            metavar="WORKFLOW",
-            help="A workflow name to prune cache",
+            "working_dir",
+            metavar="WORKING_DIR",
+            type=str,
+            help="The working directory of the run",
+        )
+        cache_cmd.add_argument(
+            "-f",
+            "--file",
+            metavar="FILE",
+            help="The path to the run configuration file. Defaults to WORKING_DIR/.dstack.yml.",
+            type=str,
+            dest="file_name",
         )
         cache_cmd.set_defaults(prune_action=self.prune_cache)
 
@@ -36,5 +46,8 @@ class PruneCommand(BasicCommand):
 
     @staticmethod
     def prune_cache(args: argparse.Namespace, hub_client: HubClient):
-        hub_client.delete_workflow_cache(args.workflow)
+        configuration_path = str(
+            configurations.get_configuration_path(args.working_dir, args.file_name)
+        )
+        hub_client.delete_configuration_cache(configuration_path=configuration_path)
         console.print(f"[grey58]Cache pruned[/]")
