@@ -6,6 +6,7 @@ import (
 	"github.com/dstackai/dstack/runner/internal/gerrors"
 	"github.com/dstackai/dstack/runner/internal/log"
 	"io/fs"
+	"os"
 	"path/filepath"
 	"strings"
 	"time"
@@ -16,6 +17,7 @@ const TransferThreads = 10
 type FileInfo struct {
 	Size     int64
 	Modified time.Time
+	Symlink  string
 }
 
 type ObjectInfo struct {
@@ -39,7 +41,14 @@ func SyncDirUpload(ctx context.Context, srcDir string, dstObjects chan ObjectInf
 			return nil
 		}
 		key := strings.TrimPrefix(filepath, srcDir)
-		objectsToUpload[key] = FileInfo{info.Size(), info.ModTime().UTC()}
+		symlink := ""
+		if info.Mode()&os.ModeSymlink == os.ModeSymlink {
+			symlink, err = os.Readlink(filepath)
+			if err != nil {
+				return err
+			}
+		}
+		objectsToUpload[key] = FileInfo{info.Size(), info.ModTime().UTC(), symlink}
 		return nil
 	}); err != nil {
 		return gerrors.Wrap(err)
@@ -52,7 +61,7 @@ func SyncDirUpload(ctx context.Context, srcDir string, dstObjects chan ObjectInf
 			if err := deleteObject(ctx, dstInfo.Key, dstInfo.FileInfo); err != nil {
 				log.Error(ctx, "Failed to delete object", "Key", dstInfo.Key, "err", err)
 			}
-		} else if dstInfo.Size == srcInfo.Size && dstInfo.Modified == srcInfo.Modified {
+		} else if dstInfo.Size == srcInfo.Size && dstInfo.Modified == srcInfo.Modified && dstInfo.Symlink == srcInfo.Symlink {
 			// This won't work with multiple sync uploads. Need to use metadata
 			log.Trace(ctx, "Object metadata is the same", "Key", dstInfo.Key)
 			delete(objectsToUpload, dstInfo.Key)
