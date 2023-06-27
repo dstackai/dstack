@@ -102,9 +102,13 @@ def _create_run(
                 job.error_code = JobErrorCode.INTERRUPTED_BY_NO_CAPACITY
             jobs.update_job(storage, job)
         elif request_head.status == RequestStatus.TERMINATED:
-            job.status = job_head.status = JobStatus.FAILED
-            job.error_code = JobErrorCode.INSTANCE_TERMINATED
-            jobs.update_job(storage, job)
+            # We should check the job status again, to ensure it hasn't been updated just
+            # before the instance was terminated
+            job = jobs.get_job(storage, job_head.repo_ref.repo_id, job_head.job_id)
+            if job.status.is_unfinished():
+                job.status = job_head.status = JobStatus.FAILED
+                job.error_code = JobErrorCode.INSTANCE_TERMINATED
+                jobs.update_job(storage, job)
     run_head = RunHead(
         run_name=job_head.run_name,
         workflow_name=job_head.workflow_name,
@@ -172,8 +176,10 @@ def _update_run(
                     job.error_code = JobErrorCode.INTERRUPTED_BY_NO_CAPACITY
                 jobs.update_job(storage, job)
             elif request_head.status == RequestStatus.TERMINATED:
-                job.status = job_head.status = JobStatus.FAILED
-                job.error_code = JobErrorCode.INSTANCE_TERMINATED
-                jobs.update_job(storage, job)
+                job = jobs.get_job(storage, job_head.repo_ref.repo_id, job_head.job_id)
+                if job.status.is_unfinished():
+                    job.status = job_head.status = JobStatus.FAILED
+                    job.error_code = JobErrorCode.INSTANCE_TERMINATED
+                    jobs.update_job(storage, job)
         run.status = job_head.status
     run.job_heads.append(job_head)
