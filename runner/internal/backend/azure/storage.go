@@ -153,6 +153,7 @@ func (azstorage AzureStorage) DownloadFile(ctx context.Context, key string, dst 
 	defer dstFile.Close()
 	_, err = azstorage.containerClient.NewBlobClient(key).DownloadFile(ctx, dstFile, nil)
 	if err != nil {
+		_ = os.Remove(dst)
 		return gerrors.Wrap(err)
 	}
 	return nil
