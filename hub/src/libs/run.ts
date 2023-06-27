@@ -9,6 +9,7 @@ export const getStatusIconType = (status: IRun['status']): StatusIndicatorProps[
             return 'stopped';
         case 'done':
             return 'success';
+        case 'building':
         case 'running':
         case 'uploading':
         case 'downloading':

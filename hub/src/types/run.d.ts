@@ -24,6 +24,7 @@ declare type TRunStatus =
     | 'submitted'
     | 'downloading'
     | 'running'
+    | 'building'
     | 'uploading'
     | 'stopping'
     | 'stopped'
