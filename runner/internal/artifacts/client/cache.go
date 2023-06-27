@@ -242,6 +242,20 @@ func (c *Copier) Download(ctx context.Context, bucket, remote, local string) {
 			defer c.threads.Release(1)
 			theFilePath := strings.TrimPrefix(file.Key, remote)
 			theFilePath = filepath.Join(local, theFilePath)
+			if file.Size == 0 {
+				symlink, err := c.readSymlink(ctx, bucket, file.Key)
+				if err != nil {
+					log.Error(ctx, "Read symlink", "err", err)
+					errorFound.Store(true)
+					return
+				} else if symlink != "" {
+					if err := os.Symlink(symlink, theFilePath); err != nil {
+						errorFound.Store(true)
+						log.Error(ctx, "Failed to create symlink", "Key", file.Key, "err", err)
+					}
+					return
+				}
+			}
 			if file.Type.IsDir() {
 				log.Trace(ctx, "Make dir", "dir", theFilePath)
 				if err := os.MkdirAll(theFilePath, 0755); err != nil {
@@ -380,11 +394,16 @@ func (c *Copier) SyncDirUpload(ctx context.Context, bucket, srcDir, dstPrefix st
 			if obj.Type.IsDir() {
 				continue
 			}
+			symlink := ""
+			if obj.Size == 0 {
+				symlink, _ = c.readSymlink(ctx, bucket, obj.Key)
+			}
 			dstObjects <- base.ObjectInfo{
 				Key: strings.TrimPrefix(obj.Key, dstPrefix),
 				FileInfo: base.FileInfo{
 					Size:     obj.Size,
 					Modified: *obj.ModTime,
+					Symlink:  symlink,
 				},
 			}
 		}
@@ -411,10 +430,14 @@ func (c *Copier) SyncDirUpload(ctx context.Context, bucket, srcDir, dstPrefix st
 				mimeType = "binary/octet-stream"
 			}
 			key = path.Join(dstPrefix, key)
-			if info.Size < c.pb.size() {
-				err = c.doUpload(ctx, bucket, key, file, mimeType, 1, MIN_SIZE)
+			if info.Symlink != "" {
+				err = c.writeSymlink(ctx, bucket, info.Symlink, key)
 			} else {
-				err = c.doUpload(ctx, bucket, key, file, mimeType, int(info.Size/c.pb.size()), c.pb.size())
+				if info.Size < c.pb.size() {
+					err = c.doUpload(ctx, bucket, key, file, mimeType, 1, MIN_SIZE)
+				} else {
+					err = c.doUpload(ctx, bucket, key, file, mimeType, int(info.Size/c.pb.size()), c.pb.size())
+				}
 			}
 			return err
 		},
@@ -472,4 +495,34 @@ func (c *Copier) doUpload(ctx context.Context, toBucket, toKey string, reader io
 		u.PartSize = batchSize
 	})
 	return err
+}
+
+func (c *Copier) readSymlink(ctx context.Context, bucket, key string) (string, error) {
+	headInput := s3.HeadObjectInput{
+		Bucket: &bucket,
+		Key:    &key,
+	}
+	head, err := c.cli.HeadObject(ctx, &headInput)
+	if err != nil {
+		return "", gerrors.Wrap(err)
+	}
+	symlink, ok := head.Metadata["symlink"]
+	if !ok {
+		return "", nil
+	}
+	return symlink, nil
+}
+
+func (c *Copier) writeSymlink(ctx context.Context, bucket, symlink, key string) error {
+	putInput := s3.PutObjectInput{
+		Bucket: &bucket,
+		Key:    &key,
+		Metadata: map[string]string{
+			"symlink": symlink,
+		},
+	}
+	if _, err := c.cli.PutObject(ctx, &putInput); err != nil {
+		return gerrors.Wrap(err)
+	}
+	return nil
 }
