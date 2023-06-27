@@ -89,7 +89,7 @@ func (l *LambdaBackend) IsInterrupted(ctx context.Context) (bool, error) {
 }
 
 func (l *LambdaBackend) Shutdown(ctx context.Context) error {
-	return nil
+	return l.apiClient.TerminateInstance(ctx, []string{l.storageBackend.State.RequestID})
 }
 
 func (l *LambdaBackend) GetArtifact(ctx context.Context, runName, localPath, remotePath string, mount bool) artifacts.Artifacter {

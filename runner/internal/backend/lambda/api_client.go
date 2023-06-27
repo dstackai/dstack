@@ -15,12 +15,16 @@ type LambdaAPIClient struct {
 	apiKey string
 }
 
+type TerminateInstanceRequest struct {
+	InstanceIDs []string `json:"instance_ids"`
+}
+
 func NewLambdaAPIClient(apiKey string) *LambdaAPIClient {
 	return &LambdaAPIClient{apiKey: apiKey}
 }
 
-func (client *LambdaAPIClient) TerminateInstance(ctx context.Context, instancesIDs []string) error {
-	body, err := json.Marshal(instancesIDs)
+func (client *LambdaAPIClient) TerminateInstance(ctx context.Context, instanceIDs []string) error {
+	body, err := json.Marshal(TerminateInstanceRequest{InstanceIDs: instanceIDs})
 	if err != nil {
 		return gerrors.Wrap(err)
 	}

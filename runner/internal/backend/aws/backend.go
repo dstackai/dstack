@@ -29,10 +29,10 @@ import (
 )
 
 type AWSBackend struct {
+	State     *models.State
 	region    string
 	bucket    string
 	runnerID  string
-	state     *models.State
 	artifacts []artifacts.Artifacter
 	cliS3     *ClientS3
 	cliEC2    *ClientEC2
@@ -89,11 +89,11 @@ func (s *AWSBackend) Init(ctx context.Context, ID string) error {
 		return gerrors.Wrap(err)
 	}
 	log.Trace(ctx, "Unmarshal state")
-	err = yaml.Unmarshal(theFile, &s.state)
+	err = yaml.Unmarshal(theFile, &s.State)
 	if err != nil {
 		return gerrors.Wrap(err)
 	}
-	if s.state == nil {
+	if s.State == nil {
 		return gerrors.New("State is empty. Data not loading")
 	}
 	return nil
@@ -104,25 +104,25 @@ func (s *AWSBackend) Job(ctx context.Context) *models.Job {
 	if s == nil {
 		return new(models.Job)
 	}
-	if s.state == nil {
+	if s.State == nil {
 		log.Trace(ctx, "State not exist")
 		return new(models.Job)
 	}
-	log.Trace(ctx, "Get job", "job ID", s.state.Job.JobID)
-	return s.state.Job
+	log.Trace(ctx, "Get job", "job ID", s.State.Job.JobID)
+	return s.State.Job
 }
 
 func (s *AWSBackend) RefetchJob(ctx context.Context) (*models.Job, error) {
-	log.Trace(ctx, "Refetching job from state", "ID", s.state.Job.JobID)
-	contents, err := s.cliS3.GetFile(ctx, s.bucket, s.state.Job.JobFilepath())
+	log.Trace(ctx, "Refetching job from state", "ID", s.State.Job.JobID)
+	contents, err := s.cliS3.GetFile(ctx, s.bucket, s.State.Job.JobFilepath())
 	if err != nil {
 		return nil, gerrors.Wrap(err)
 	}
-	err = yaml.Unmarshal(contents, &s.state.Job)
+	err = yaml.Unmarshal(contents, &s.State.Job)
 	if err != nil {
 		return nil, gerrors.Wrap(err)
 	}
-	return s.state.Job, nil
+	return s.State.Job, nil
 }
 
 func (s *AWSBackend) UpdateState(ctx context.Context) error {
@@ -130,27 +130,27 @@ func (s *AWSBackend) UpdateState(ctx context.Context) error {
 	if s == nil {
 		return gerrors.New("Backend is nil")
 	}
-	if s.state == nil {
+	if s.State == nil {
 		log.Trace(ctx, "State not exist")
 		return gerrors.Wrap(backend.ErrLoadStateFile)
 	}
 	log.Trace(ctx, "Marshaling job")
-	theFile, err := yaml.Marshal(&s.state.Job)
+	theFile, err := yaml.Marshal(&s.State.Job)
 	if err != nil {
 		return gerrors.Wrap(err)
 	}
-	jobFilepath := s.state.Job.JobFilepath()
+	jobFilepath := s.State.Job.JobFilepath()
 	log.Trace(ctx, "Write to file job", "Path", jobFilepath)
 	err = s.cliS3.PutFile(ctx, s.bucket, jobFilepath, theFile)
 	if err != nil {
 		return gerrors.Wrap(err)
 	}
-	log.Trace(ctx, "Fetching list jobs", "Repo username", s.state.Job.RepoUserName, "Repo name", s.state.Job.RepoName, "Job ID", s.state.Job.JobID)
-	files, err := s.cliS3.ListFile(ctx, s.bucket, s.state.Job.JobHeadFilepathPrefix())
+	log.Trace(ctx, "Fetching list jobs", "Repo username", s.State.Job.RepoUserName, "Repo name", s.State.Job.RepoName, "Job ID", s.State.Job.JobID)
+	files, err := s.cliS3.ListFile(ctx, s.bucket, s.State.Job.JobHeadFilepathPrefix())
 	if err != nil {
 		return gerrors.Wrap(err)
 	}
-	jobHeadFilepath := s.state.Job.JobHeadFilepath()
+	jobHeadFilepath := s.State.Job.JobHeadFilepath()
 	for _, file := range files[:1] {
 		log.Trace(ctx, "Renaming file job", "From", file, "To", jobHeadFilepath)
 		err = s.cliS3.RenameFile(ctx, s.bucket, file, jobHeadFilepath)
@@ -165,7 +165,7 @@ func (s *AWSBackend) CheckStop(ctx context.Context) (bool, error) {
 	if s == nil {
 		return false, gerrors.New("Backend is nil")
 	}
-	if s.state == nil {
+	if s.State == nil {
 		log.Trace(ctx, "State not exist")
 		return false, gerrors.Wrap(backend.ErrLoadStateFile)
 	}
@@ -183,10 +183,10 @@ func (s *AWSBackend) CheckStop(ctx context.Context) (bool, error) {
 }
 
 func (s *AWSBackend) IsInterrupted(ctx context.Context) (bool, error) {
-	if !s.state.Resources.Spot {
+	if !s.State.Resources.Spot {
 		return false, nil
 	}
-	return s.cliEC2.IsInterruptedSpot(ctx, s.state.RequestID)
+	return s.cliEC2.IsInterruptedSpot(ctx, s.State.RequestID)
 }
 
 func (s *AWSBackend) Shutdown(ctx context.Context) error {
@@ -194,15 +194,15 @@ func (s *AWSBackend) Shutdown(ctx context.Context) error {
 	if s == nil {
 		return gerrors.New("Backend is nil")
 	}
-	if s.state.Resources.Spot {
+	if s.State.Resources.Spot {
 		log.Trace(ctx, "Instance interruptible")
-		if err := s.cliEC2.CancelSpot(ctx, s.state.RequestID); err != nil {
+		if err := s.cliEC2.CancelSpot(ctx, s.State.RequestID); err != nil {
 			return gerrors.Wrap(err)
 		}
 		return nil
 	}
 	log.Trace(ctx, "Instance not interruptible")
-	return s.cliEC2.TerminateInstance(ctx, s.state.RequestID)
+	return s.cliEC2.TerminateInstance(ctx, s.State.RequestID)
 
 }
 
@@ -245,23 +245,23 @@ func (s *AWSBackend) Requirements(ctx context.Context) models.Requirements {
 	if s == nil {
 		return models.Requirements{}
 	}
-	if s.state == nil {
+	if s.State == nil {
 		log.Trace(ctx, "State not exist")
 		return models.Requirements{}
 	}
 	log.Trace(ctx, "Return model resource")
-	return s.state.Job.Requirements
+	return s.State.Job.Requirements
 }
 
 func (s *AWSBackend) MasterJob(ctx context.Context) *models.Job {
 	if s == nil {
 		return new(models.Job)
 	}
-	if s.state == nil {
+	if s.State == nil {
 		log.Trace(ctx, "State not exist")
 		return nil
 	}
-	theFile, err := s.cliS3.GetFile(ctx, s.bucket, fmt.Sprintf("jobs/%s/%s.yaml", s.state.Job.RepoId, s.state.Job.MasterJobID))
+	theFile, err := s.cliS3.GetFile(ctx, s.bucket, fmt.Sprintf("jobs/%s/%s.yaml", s.State.Job.RepoId, s.State.Job.MasterJobID))
 	if err != nil {
 		return nil
 	}
@@ -277,7 +277,7 @@ func (s *AWSBackend) CreateLogger(ctx context.Context, logGroup, logName string)
 	if s == nil {
 		return nil
 	}
-	if s.state == nil {
+	if s.State == nil {
 		log.Trace(ctx, "State not exist")
 		return nil
 	}
@@ -285,7 +285,7 @@ func (s *AWSBackend) CreateLogger(ctx context.Context, logGroup, logName string)
 	if s.logger == nil {
 		log.Trace(ctx, "Create Cloudwatch")
 		s.logger, err = NewCloudwatch(&Config{
-			JobID:         s.state.Job.JobID,
+			JobID:         s.State.Job.JobID,
 			Region:        s.region,
 			FlushInterval: 200 * time.Millisecond,
 		})
@@ -340,10 +340,10 @@ func (s *AWSBackend) Secrets(ctx context.Context) (map[string]string, error) {
 	if s == nil {
 		return nil, gerrors.New("Backend is nil")
 	}
-	if s.state == nil {
+	if s.State == nil {
 		return nil, gerrors.New("State is empty")
 	}
-	templatePath := fmt.Sprintf("secrets/%s/l;", s.state.Job.RepoId)
+	templatePath := fmt.Sprintf("secrets/%s/l;", s.State.Job.RepoId)
 	listSecrets, err := s.cliS3.ListFile(ctx, s.bucket, templatePath)
 	if err != nil {
 		return nil, gerrors.Wrap(err)
@@ -352,7 +352,7 @@ func (s *AWSBackend) Secrets(ctx context.Context) (map[string]string, error) {
 	for _, secretPath := range listSecrets {
 		clearName := strings.ReplaceAll(secretPath, templatePath, "")
 		secrets[clearName] = fmt.Sprintf("%s/%s",
-			s.state.Job.RepoId,
+			s.State.Job.RepoId,
 			clearName)
 	}
 	return s.cliSecret.fetchSecret(ctx, s.bucket, secrets)
@@ -364,15 +364,15 @@ func (s *AWSBackend) GitCredentials(ctx context.Context) *models.GitCredentials 
 		log.Error(ctx, "Backend is empty")
 		return nil
 	}
-	if s.state == nil {
+	if s.State == nil {
 		log.Error(ctx, "State is empty")
 		return nil
 	}
-	if s.state.Job == nil {
+	if s.State.Job == nil {
 		log.Error(ctx, "Job is empty")
 		return nil
 	}
-	return s.cliSecret.fetchCredentials(ctx, s.bucket, s.state.Job.RepoId)
+	return s.cliSecret.fetchCredentials(ctx, s.bucket, s.State.Job.RepoId)
 }
 
 func (s *AWSBackend) GetRepoDiff(ctx context.Context, path string) (string, error) {
