@@ -66,6 +66,7 @@ def choose_instance_type(
             spot=spot,
             local=False,
         ),
+        available_regions=instance_type.available_regions,
     )
 
 

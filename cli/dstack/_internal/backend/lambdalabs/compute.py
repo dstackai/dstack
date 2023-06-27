@@ -3,11 +3,13 @@ import os
 import subprocess
 import tempfile
 import time
+from threading import Thread
 from typing import Dict, List, Optional, Tuple
 
 import pkg_resources
 import yaml
 
+from dstack import version
 from dstack._internal.backend.base.compute import WS_PORT, NoCapacityError, choose_instance_type
 from dstack._internal.backend.base.config import BACKEND_CONFIG_FILENAME, RUNNER_CONFIG_FILENAME
 from dstack._internal.backend.base.runners import serialize_runner_yaml
@@ -47,7 +49,7 @@ class LambdaCompute:
     def run_instance(self, job: Job, instance_type: InstanceType) -> str:
         return _run_instance(
             api_client=self.api_client,
-            region_name="us-west-1",
+            region_name=instance_type.available_regions[0],
             instance_type_name=instance_type.instance_name,
             user_ssh_key=job.ssh_key_pub,
             hub_ssh_key=get_hub_ssh_public_key(),
@@ -83,7 +85,8 @@ def _get_instance_info(api_client: LambdaAPIClient, instance_id: str) -> Optiona
 
 def _instance_type_data_to_instance_type(instance_type_data: Dict) -> Optional[InstanceType]:
     instance_type = instance_type_data["instance_type"]
-    regions = instance_type_data["regions_with_capacity_available"]
+    regions_data = instance_type_data["regions_with_capacity_available"]
+    regions = [r["name"] for r in regions_data]
     if len(regions) == 0:
         return None
     instance_type_specs = instance_type["specs"]
@@ -99,6 +102,7 @@ def _instance_type_data_to_instance_type(instance_type_data: Dict) -> Optional[I
             spot=False,
             local=False,
         ),
+        available_regions=regions,
     )
 
 
@@ -163,9 +167,15 @@ def _run_instance(
     instance_id = instances_ids[0]
     # instance_id = api_client.list_instances()[0]["id"]
     instance_info = _wait_for_instance(api_client, instance_id)
-    hostname = instance_info["ip"]
-    _setup_instance(hostname=hostname, user_ssh_key=user_ssh_key)
-    _launch_runner(hostname=hostname, launch_script=launch_script)
+    thread = Thread(
+        target=_start_runner,
+        kwargs={
+            "hostname": instance_info["ip"],
+            "user_ssh_key": user_ssh_key,
+            "launch_script": launch_script,
+        },
+    )
+    thread.start()
     return instance_id
 
 
@@ -202,6 +212,11 @@ def _wait_for_instance(
         time.sleep(_WAIT_FOR_INSTANCE_INTERVAL)
 
 
+def _start_runner(hostname: str, user_ssh_key: str, launch_script: str):
+    _setup_instance(hostname, user_ssh_key)
+    _launch_runner(hostname, launch_script)
+
+
 def _setup_instance(hostname: str, user_ssh_key: str):
     setup_script_path = pkg_resources.resource_filename(
         "dstack._internal", "scripts/setup_lambda.sh"
@@ -212,10 +227,17 @@ def _setup_instance(hostname: str, user_ssh_key: str):
     # so we have to update authorized_keys manually to add the user key
     setup_commands = (
         "chmod +x .dstack/setup_lambda.sh && "
-        "RUNNER=1349 .dstack/setup_lambda.sh && "
+        f"{_get_setup_command()} && "
         f"echo '{user_ssh_key}' >> /home/ubuntu/.ssh/authorized_keys"
     )
     _run_ssh_command(hostname=hostname, commands=setup_commands)
+
+
+def _get_setup_command() -> str:
+    if not version.__is_release__:
+        # TODO: replace with latest after merge
+        return "ENVIRONMENT=stage RUNNER=1351 .dstack/setup_lambda.sh"
+    return f"ENVIRONMENT=prod RUNNER={version.__version__} .dstack/setup_lambda.sh"
 
 
 def _launch_runner(hostname: str, launch_script: str):
