@@ -10,6 +10,7 @@ class AWSStorageConfigCredentials(BaseModel):
 
 
 class AWSStorageConfig(BaseModel):
+    backend: Literal["aws"] = "aws"
     bucket: str
     region: str
     credentials: AWSStorageConfigCredentials

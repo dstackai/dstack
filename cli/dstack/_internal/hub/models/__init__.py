@@ -164,12 +164,35 @@ class AzureProjectConfigWithCreds(AzureProjectConfig):
     credentials: AzureProjectCreds
 
 
+class AWSStorageProjectConfigWithCredsPartial(BaseModel):
+    type: Literal["aws"] = "aws"
+    bucket_name: Optional[str]
+    credentials: Optional[AWSProjectAccessKeyCreds]
+
+
+class AWSStorageProjectConfig(BaseModel):
+    type: Literal["aws"] = "aws"
+    bucket_name: str
+
+
+class AWSStorageProjectConfigWithCreds(AWSStorageProjectConfig):
+    credentials: AWSProjectAccessKeyCreds
+
+
+class LambdaProjectConfigWithCredsPartial(BaseModel):
+    type: Literal["lambda"] = "lambda"
+    api_key: Optional[str]
+    storage_backend: Optional[AWSStorageProjectConfigWithCredsPartial]
+
+
 class LambdaProjectConfig(BaseModel):
     type: Literal["lambda"] = "lambda"
+    storage_backend: AWSStorageProjectConfig
 
 
 class LambdaProjectConfigWithCreds(LambdaProjectConfig):
     api_key: str
+    storage_backend: AWSStorageProjectConfigWithCreds
 
 
 AnyProjectConfig = Union[
@@ -180,7 +203,7 @@ AnyProjectConfigWithCredsPartial = Union[
     AWSProjectConfigWithCredsPartial,
     GCPProjectConfigWithCredsPartial,
     AzureProjectConfigWithCredsPartial,
-    LambdaProjectConfig,
+    LambdaProjectConfigWithCredsPartial,
 ]
 AnyProjectConfigWithCreds = Union[
     LocalProjectConfig,
@@ -378,8 +401,15 @@ class AzureProjectValues(BaseModel):
     storage_account: Optional[ProjectElement]
 
 
+class AWSStorageBackendValues(BaseModel):
+    type: Literal["aws"] = "aws"
+    bucket_name: Optional[ProjectElement]
+
+
 class LambdaProjectValues(BaseModel):
     type: Literal["lambda"] = "lambda"
+    storage_backend_type: ProjectElement
+    storage_backend_values: Optional[AWSStorageBackendValues]
 
 
 class ProjectValues(BaseModel):
