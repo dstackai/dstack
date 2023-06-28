@@ -10,7 +10,7 @@ import pkg_resources
 import yaml
 
 from dstack import version
-from dstack._internal.backend.base.compute import WS_PORT, NoCapacityError, choose_instance_type
+from dstack._internal.backend.base.compute import WS_PORT, choose_instance_type
 from dstack._internal.backend.base.config import BACKEND_CONFIG_FILENAME, RUNNER_CONFIG_FILENAME
 from dstack._internal.backend.base.runners import serialize_runner_yaml
 from dstack._internal.backend.lambdalabs.api_client import LambdaAPIClient
@@ -23,6 +23,75 @@ from dstack._internal.hub.utils.ssh import HUB_PRIVATE_KEY_PATH, get_hub_ssh_pub
 
 _WAIT_FOR_INSTANCE_ATTEMPTS = 120
 _WAIT_FOR_INSTANCE_INTERVAL = 10
+
+
+_INSTANCE_TYPE_TO_GPU_DATA_MAP = {
+    "gpu_1x_h100_pcie": {
+        "name": "H100",
+        "count": 1,
+        "memory_mib": 80 * 1024,
+    },
+    "gpu_8x_a100_80gb_sxm4": {
+        "name": "A100",
+        "count": 8,
+        "memory_mib": 80 * 1024,
+    },
+    "gpu_1x_a10": {
+        "name": "A10",
+        "count": 1,
+        "memory_mib": 24 * 1024,
+    },
+    "gpu_1x_rtx6000": {
+        "name": "RTX6000",
+        "count": 1,
+        "memory_mib": 24 * 1024,
+    },
+    "gpu_1x_a100": {
+        "name": "A100",
+        "count": 1,
+        "memory_mib": 40 * 1024,
+    },
+    "gpu_1x_a100_sxm4": {
+        "name": "A100",
+        "count": 1,
+        "memory_mib": 40 * 1024,
+    },
+    "gpu_2x_a100": {
+        "name": "A100",
+        "count": 2,
+        "memory_mib": 40 * 1024,
+    },
+    "gpu_4x_a100": {
+        "name": "A100",
+        "count": 4,
+        "memory_mib": 40 * 1024,
+    },
+    "gpu_8x_a100": {
+        "name": "A100",
+        "count": 8,
+        "memory_mib": 40 * 1024,
+    },
+    "gpu_1x_a6000": {
+        "name": "A6000",
+        "count": 1,
+        "memory_mib": 48 * 1024,
+    },
+    "gpu_2x_a6000": {
+        "name": "A6000",
+        "count": 2,
+        "memory_mib": 48 * 1024,
+    },
+    "gpu_4x_a6000": {
+        "name": "A6000",
+        "count": 4,
+        "memory_mib": 48 * 1024,
+    },
+    "gpu_8x_v100": {
+        "name": "V100",
+        "count": 8,
+        "memory_mib": 16 * 1024,
+    },
+}
 
 
 class LambdaCompute:
@@ -106,20 +175,6 @@ def _instance_type_data_to_instance_type(instance_type_data: Dict) -> Optional[I
     )
 
 
-_INSTANCE_TYPE_TO_GPU_DATA_MAP = {
-    "gpu_1x_a10": {
-        "name": "A10",
-        "count": 1,
-        "memory_mib": 24 * 1024,
-    },
-    "gpu_1x_rtx6000": {
-        "name": "RTX6000",
-        "count": 1,
-        "memory_mib": 24 * 1024,
-    },
-}
-
-
 def _get_instance_type_gpus(instance_type_name: str) -> Optional[List[Gpu]]:
     gpu_data = _INSTANCE_TYPE_TO_GPU_DATA_MAP.get(instance_type_name)
     if gpu_data is None:
@@ -165,7 +220,6 @@ def _run_instance(
         file_system_names=[],
     )
     instance_id = instances_ids[0]
-    # instance_id = api_client.list_instances()[0]["id"]
     instance_info = _wait_for_instance(api_client, instance_id)
     thread = Thread(
         target=_start_runner,
@@ -236,8 +290,8 @@ def _setup_instance(hostname: str, user_ssh_key: str):
 def _get_setup_command() -> str:
     if not version.__is_release__:
         # TODO: replace with latest after merge
-        return "ENVIRONMENT=stage RUNNER=1351 .dstack/setup_lambda.sh"
-    return f"ENVIRONMENT=prod RUNNER={version.__version__} .dstack/setup_lambda.sh"
+        return "ENVIRONMENT=stage RUNNER_VERSION=1351 .dstack/setup_lambda.sh"
+    return f"ENVIRONMENT=prod RUNNER_VERSION={version.__version__} .dstack/setup_lambda.sh"
 
 
 def _launch_runner(hostname: str, launch_script: str):

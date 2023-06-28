@@ -56,12 +56,7 @@ class LambdaBackend(Backend):
 
     @classmethod
     def load(cls) -> Optional["LambdaBackend"]:
-        config = AWSConfig.load()
-        if config is None:
-            return None
-        return cls(
-            backend_config=config,
-        )
+        return None
 
     def _s3_client(self) -> BaseClient:
         return self._get_client("s3")
