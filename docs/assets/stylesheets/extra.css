@@ -1238,3 +1238,8 @@ div[editor-title] code .editor-title {
 [data-ty].newline, .newline {
     display: block;
 }
+
+img.border {
+    border: 0.25px rgba(0,0,0,0.2) solid;
+    border-radius: 7px;
+}
