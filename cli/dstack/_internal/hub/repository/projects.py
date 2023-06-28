@@ -1,4 +1,3 @@
-import asyncio
 import json
 from typing import List, Optional, Union
 
@@ -162,9 +161,7 @@ async def _info2project(project_info: ProjectInfoWithCreds) -> Project:
         backend=project_info.backend.type,
     )
     configurator = get_configurator(project.backend)
-    config, auth = await run_async(
-        configurator.create_config_auth_data_from_project_config, project_info.backend
-    )
+    config, auth = await run_async(configurator.create_project, project_info.backend)
     project.config = json.dumps(config)
     project.auth = json.dumps(auth)
     return project
@@ -184,7 +181,7 @@ def _project2info(
     configurator = get_configurator(project.backend)
     if configurator is None:
         return None
-    backend = configurator.get_project_config_from_project(project, include_creds=include_creds)
+    backend = configurator.get_project_config(project, include_creds=include_creds)
     if include_creds:
         return ProjectInfoWithCreds(project_name=project.name, backend=backend, members=members)
     return ProjectInfo(project_name=project.name, backend=backend, members=members)
