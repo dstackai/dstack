@@ -3,7 +3,6 @@ from typing import List, Optional
 
 from dstack._internal.hub.models import BackendType
 from dstack._internal.hub.services.backends.base import Configurator
-from dstack._internal.hub.services.backends.lambdalabs.configurator import LambdaConfigurator
 from dstack._internal.hub.services.backends.local.configurator import LocalConfigurator
 
 configurators_classes = []
@@ -12,7 +11,6 @@ try:
     from dstack._internal.hub.services.backends.aws.configurator import AWSConfigurator
 
     configurators_classes.append(AWSConfigurator)
-    configurators_classes.append(LambdaConfigurator)
 except ImportError:
     pass
 
@@ -27,6 +25,13 @@ try:
     from dstack._internal.hub.services.backends.gcp.configurator import GCPConfigurator
 
     configurators_classes.append(GCPConfigurator)
+except ImportError:
+    pass
+
+try:
+    from dstack._internal.hub.services.backends.lambdalabs.configurator import LambdaConfigurator
+
+    configurators_classes.append(LambdaConfigurator)
 except ImportError:
     pass
 
