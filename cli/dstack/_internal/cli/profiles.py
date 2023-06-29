@@ -18,7 +18,7 @@ def load_profiles() -> Optional[Dict[str, Dict[str, Any]]]:
         with profiles_path.open("r") as f:
             profiles = yaml.load(f, yaml.FullLoader)
         schema = json.loads(
-            pkg_resources.resource_string("dstack._internal.schemas", "profiles.json")
+            pkg_resources.resource_string("dstack._internal", "schemas/profiles.json")
         )
         jsonschema.validate(profiles, schema)
         for profile in profiles["profiles"]:

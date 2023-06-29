@@ -23,7 +23,7 @@ def load_workflows(dstack_dir: PathLike, skip_validation_errors: bool = False) -
             continue
         files.append(pathname)
     schema = json.loads(
-        pkg_resources.resource_string("dstack._internal.schemas", "workflows.json")
+        pkg_resources.resource_string("dstack._internal", "schemas/workflows.json")
     )
 
     workflows = []

@@ -72,7 +72,7 @@ def parse_configuration_file(
     with configuration_path.open("r") as f:
         configuration_data = yaml.load(f, yaml.FullLoader)
     schema = json.loads(
-        pkg_resources.resource_string("dstack._internal.schemas", "configuration.json")
+        pkg_resources.resource_string("dstack._internal", "schemas/configuration.json")
     )
     jsonschema.validate(configuration_data, schema)
     configuration_type = configuration_data["type"]
