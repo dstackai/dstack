@@ -296,8 +296,7 @@ def _setup_instance(hostname: str, user_ssh_key: str):
 
 def _get_setup_command() -> str:
     if not version.__is_release__:
-        # TODO: replace with latest after merge
-        return "ENVIRONMENT=stage RUNNER_VERSION=1351 .dstack/setup_lambda.sh"
+        return "ENVIRONMENT=stage RUNNER_VERSION=latest .dstack/setup_lambda.sh"
     return f"ENVIRONMENT=prod RUNNER_VERSION={version.__version__} .dstack/setup_lambda.sh"
 
 
