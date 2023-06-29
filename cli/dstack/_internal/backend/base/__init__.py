@@ -21,10 +21,6 @@ from dstack._internal.utils.common import PathLike
 
 class Backend(ABC):
     NAME = None
-    backend_config: BackendConfig
-    _storage: Storage
-    _compute: Compute
-    _secrets_manager: SecretsManager
 
     def __init__(
         self,

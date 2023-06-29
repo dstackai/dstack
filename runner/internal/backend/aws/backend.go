@@ -1,4 +1,4 @@
-package local
+package aws
 
 import (
 	"context"
@@ -28,11 +28,11 @@ import (
 	"gopkg.in/yaml.v3"
 )
 
-type S3 struct {
+type AWSBackend struct {
+	State     *models.State
 	region    string
 	bucket    string
 	runnerID  string
-	state     *models.State
 	artifacts []artifacts.Artifacter
 	cliS3     *ClientS3
 	cliEC2    *ClientEC2
@@ -62,9 +62,8 @@ func init() {
 	})
 }
 
-func New(region, bucket string) *S3 {
-
-	return &S3{
+func New(region, bucket string) *AWSBackend {
+	return &AWSBackend{
 		region:    region,
 		bucket:    bucket,
 		artifacts: nil,
@@ -74,7 +73,7 @@ func New(region, bucket string) *S3 {
 	}
 }
 
-func (s *S3) Init(ctx context.Context, ID string) error {
+func (s *AWSBackend) Init(ctx context.Context, ID string) error {
 	log.Trace(ctx, "Initialize backend with ID runner", "runner ID", ID)
 	if s == nil {
 		return gerrors.New("Backend is nil")
@@ -90,73 +89,68 @@ func (s *S3) Init(ctx context.Context, ID string) error {
 		return gerrors.Wrap(err)
 	}
 	log.Trace(ctx, "Unmarshal state")
-	err = yaml.Unmarshal(theFile, &s.state)
+	err = yaml.Unmarshal(theFile, &s.State)
 	if err != nil {
 		return gerrors.Wrap(err)
 	}
-	if s.state == nil {
+	if s.State == nil {
 		return gerrors.New("State is empty. Data not loading")
-	}
-	//Update job for local runner
-	if s.state.Resources.Local {
-		s.state.Job.RequestID = fmt.Sprintf("l-%d", os.Getpid())
-		s.state.Job.RunnerID = ID
 	}
 	return nil
 }
 
-func (s *S3) Job(ctx context.Context) *models.Job {
+func (s *AWSBackend) Job(ctx context.Context) *models.Job {
 	log.Trace(ctx, "Getting job from state")
 	if s == nil {
 		return new(models.Job)
 	}
-	if s.state == nil {
+	if s.State == nil {
 		log.Trace(ctx, "State not exist")
 		return new(models.Job)
 	}
-	log.Trace(ctx, "Get job", "job ID", s.state.Job.JobID)
-	return s.state.Job
+	log.Trace(ctx, "Get job", "job ID", s.State.Job.JobID)
+	return s.State.Job
 }
 
-func (s *S3) RefetchJob(ctx context.Context) (*models.Job, error) {
-	log.Trace(ctx, "Refetching job from state", "ID", s.state.Job.JobID)
-	contents, err := s.cliS3.GetFile(ctx, s.bucket, s.state.Job.JobFilepath())
+func (s *AWSBackend) RefetchJob(ctx context.Context) (*models.Job, error) {
+	log.Trace(ctx, "Refetching job from state", "ID", s.State.Job.JobID)
+	contents, err := s.cliS3.GetFile(ctx, s.bucket, s.State.Job.JobFilepath())
 	if err != nil {
 		return nil, gerrors.Wrap(err)
 	}
-	err = yaml.Unmarshal(contents, &s.state.Job)
+	err = yaml.Unmarshal(contents, &s.State.Job)
 	if err != nil {
 		return nil, gerrors.Wrap(err)
 	}
-	return s.state.Job, nil
+	return s.State.Job, nil
 }
 
-func (s *S3) UpdateState(ctx context.Context) error {
+func (s *AWSBackend) UpdateState(ctx context.Context) error {
 	log.Trace(ctx, "Start update state")
 	if s == nil {
 		return gerrors.New("Backend is nil")
 	}
-	if s.state == nil {
+	if s.State == nil {
 		log.Trace(ctx, "State not exist")
 		return gerrors.Wrap(backend.ErrLoadStateFile)
 	}
 	log.Trace(ctx, "Marshaling job")
-	theFile, err := yaml.Marshal(&s.state.Job)
+	theFile, err := yaml.Marshal(&s.State.Job)
 	if err != nil {
 		return gerrors.Wrap(err)
 	}
-	jobFilepath := s.state.Job.JobFilepath()
+	jobFilepath := s.State.Job.JobFilepath()
 	log.Trace(ctx, "Write to file job", "Path", jobFilepath)
 	err = s.cliS3.PutFile(ctx, s.bucket, jobFilepath, theFile)
 	if err != nil {
 		return gerrors.Wrap(err)
 	}
-	log.Trace(ctx, "Fetching list jobs", "Repo username", s.state.Job.RepoUserName, "Repo name", s.state.Job.RepoName, "Job ID", s.state.Job.JobID)
-	files, err := s.cliS3.ListFile(ctx, s.bucket, s.state.Job.JobHeadFilepathPrefix())
+	log.Trace(ctx, "Fetching list jobs", "Repo username", s.State.Job.RepoUserName, "Repo name", s.State.Job.RepoName, "Job ID", s.State.Job.JobID)
+	files, err := s.cliS3.ListFile(ctx, s.bucket, s.State.Job.JobHeadFilepathPrefix())
 	if err != nil {
 		return gerrors.Wrap(err)
 	}
-	jobHeadFilepath := s.state.Job.JobHeadFilepath()
+	jobHeadFilepath := s.State.Job.JobHeadFilepath()
 	for _, file := range files[:1] {
 		log.Trace(ctx, "Renaming file job", "From", file, "To", jobHeadFilepath)
 		err = s.cliS3.RenameFile(ctx, s.bucket, file, jobHeadFilepath)
@@ -167,11 +161,11 @@ func (s *S3) UpdateState(ctx context.Context) error {
 	return nil
 }
 
-func (s *S3) CheckStop(ctx context.Context) (bool, error) {
+func (s *AWSBackend) CheckStop(ctx context.Context) (bool, error) {
 	if s == nil {
 		return false, gerrors.New("Backend is nil")
 	}
-	if s.state == nil {
+	if s.State == nil {
 		log.Trace(ctx, "State not exist")
 		return false, gerrors.Wrap(backend.ErrLoadStateFile)
 	}
@@ -188,34 +182,31 @@ func (s *S3) CheckStop(ctx context.Context) (bool, error) {
 	return false, nil
 }
 
-func (s *S3) IsInterrupted(ctx context.Context) (bool, error) {
-	if !s.state.Resources.Spot {
+func (s *AWSBackend) IsInterrupted(ctx context.Context) (bool, error) {
+	if !s.State.Resources.Spot {
 		return false, nil
 	}
-	return s.cliEC2.IsInterruptedSpot(ctx, s.state.RequestID)
+	return s.cliEC2.IsInterruptedSpot(ctx, s.State.RequestID)
 }
 
-func (s *S3) Shutdown(ctx context.Context) error {
+func (s *AWSBackend) Shutdown(ctx context.Context) error {
 	log.Trace(ctx, "Start shutdown")
 	if s == nil {
 		return gerrors.New("Backend is nil")
 	}
-	if s.state.Resources.Local {
-		return nil
-	}
-	if s.state.Resources.Spot {
+	if s.State.Resources.Spot {
 		log.Trace(ctx, "Instance interruptible")
-		if err := s.cliEC2.CancelSpot(ctx, s.state.RequestID); err != nil {
+		if err := s.cliEC2.CancelSpot(ctx, s.State.RequestID); err != nil {
 			return gerrors.Wrap(err)
 		}
 		return nil
 	}
 	log.Trace(ctx, "Instance not interruptible")
-	return s.cliEC2.TerminateInstance(ctx, s.state.RequestID)
+	return s.cliEC2.TerminateInstance(ctx, s.State.RequestID)
 
 }
 
-func (s *S3) GetArtifact(ctx context.Context, runName, localPath, remotePath string, mount bool) artifacts.Artifacter {
+func (s *AWSBackend) GetArtifact(ctx context.Context, runName, localPath, remotePath string, mount bool) artifacts.Artifacter {
 	if s == nil {
 		return nil
 	}
@@ -240,7 +231,7 @@ func (s *S3) GetArtifact(ctx context.Context, runName, localPath, remotePath str
 	return art
 }
 
-func (s *S3) GetCache(ctx context.Context, runName, localPath, remotePath string) artifacts.Artifacter {
+func (s *AWSBackend) GetCache(ctx context.Context, runName, localPath, remotePath string) artifacts.Artifacter {
 	rootPath := path.Join(s.GetTMPDir(ctx), consts.USER_ARTIFACTS_DIR, runName)
 	art, err := simple.NewSimple(s.bucket, s.region, rootPath, localPath, remotePath, true)
 	if err != nil {
@@ -250,27 +241,27 @@ func (s *S3) GetCache(ctx context.Context, runName, localPath, remotePath string
 	return art
 }
 
-func (s *S3) Requirements(ctx context.Context) models.Requirements {
+func (s *AWSBackend) Requirements(ctx context.Context) models.Requirements {
 	if s == nil {
 		return models.Requirements{}
 	}
-	if s.state == nil {
+	if s.State == nil {
 		log.Trace(ctx, "State not exist")
 		return models.Requirements{}
 	}
 	log.Trace(ctx, "Return model resource")
-	return s.state.Job.Requirements
+	return s.State.Job.Requirements
 }
 
-func (s *S3) MasterJob(ctx context.Context) *models.Job {
+func (s *AWSBackend) MasterJob(ctx context.Context) *models.Job {
 	if s == nil {
 		return new(models.Job)
 	}
-	if s.state == nil {
+	if s.State == nil {
 		log.Trace(ctx, "State not exist")
 		return nil
 	}
-	theFile, err := s.cliS3.GetFile(ctx, s.bucket, fmt.Sprintf("jobs/%s/%s.yaml", s.state.Job.RepoId, s.state.Job.MasterJobID))
+	theFile, err := s.cliS3.GetFile(ctx, s.bucket, fmt.Sprintf("jobs/%s/%s.yaml", s.State.Job.RepoId, s.State.Job.MasterJobID))
 	if err != nil {
 		return nil
 	}
@@ -282,11 +273,11 @@ func (s *S3) MasterJob(ctx context.Context) *models.Job {
 	return masterJob
 }
 
-func (s *S3) CreateLogger(ctx context.Context, logGroup, logName string) io.Writer {
+func (s *AWSBackend) CreateLogger(ctx context.Context, logGroup, logName string) io.Writer {
 	if s == nil {
 		return nil
 	}
-	if s.state == nil {
+	if s.State == nil {
 		log.Trace(ctx, "State not exist")
 		return nil
 	}
@@ -294,7 +285,7 @@ func (s *S3) CreateLogger(ctx context.Context, logGroup, logName string) io.Writ
 	if s.logger == nil {
 		log.Trace(ctx, "Create Cloudwatch")
 		s.logger, err = NewCloudwatch(&Config{
-			JobID:         s.state.Job.JobID,
+			JobID:         s.State.Job.JobID,
 			Region:        s.region,
 			FlushInterval: 200 * time.Millisecond,
 		})
@@ -307,7 +298,7 @@ func (s *S3) CreateLogger(ctx context.Context, logGroup, logName string) io.Writ
 	return s.logger.Build(ctx, logGroup, logName)
 }
 
-func (s *S3) ListSubDir(ctx context.Context, dir string) ([]string, error) {
+func (s *AWSBackend) ListSubDir(ctx context.Context, dir string) ([]string, error) {
 	log.Trace(ctx, "Fetching list sub dir")
 	if s == nil {
 		return nil, gerrors.New("Backend is nil")
@@ -319,7 +310,7 @@ func (s *S3) ListSubDir(ctx context.Context, dir string) ([]string, error) {
 	return listDir, nil
 }
 
-func (s *S3) GetJobByPath(ctx context.Context, path string) (*models.Job, error) {
+func (s *AWSBackend) GetJobByPath(ctx context.Context, path string) (*models.Job, error) {
 	log.Trace(ctx, "Fetching job by path", "Path", path)
 	if s == nil {
 		return nil, gerrors.New("Backend is nil")
@@ -336,7 +327,7 @@ func (s *S3) GetJobByPath(ctx context.Context, path string) (*models.Job, error)
 	return job, nil
 }
 
-func (s *S3) Bucket(ctx context.Context) string {
+func (s *AWSBackend) Bucket(ctx context.Context) string {
 	log.Trace(ctx, "Getting bucket")
 	if s == nil {
 		return ""
@@ -344,15 +335,15 @@ func (s *S3) Bucket(ctx context.Context) string {
 	return s.bucket
 }
 
-func (s *S3) Secrets(ctx context.Context) (map[string]string, error) {
+func (s *AWSBackend) Secrets(ctx context.Context) (map[string]string, error) {
 	log.Trace(ctx, "Getting secrets")
 	if s == nil {
 		return nil, gerrors.New("Backend is nil")
 	}
-	if s.state == nil {
+	if s.State == nil {
 		return nil, gerrors.New("State is empty")
 	}
-	templatePath := fmt.Sprintf("secrets/%s/l;", s.state.Job.RepoId)
+	templatePath := fmt.Sprintf("secrets/%s/l;", s.State.Job.RepoId)
 	listSecrets, err := s.cliS3.ListFile(ctx, s.bucket, templatePath)
 	if err != nil {
 		return nil, gerrors.Wrap(err)
@@ -361,30 +352,30 @@ func (s *S3) Secrets(ctx context.Context) (map[string]string, error) {
 	for _, secretPath := range listSecrets {
 		clearName := strings.ReplaceAll(secretPath, templatePath, "")
 		secrets[clearName] = fmt.Sprintf("%s/%s",
-			s.state.Job.RepoId,
+			s.State.Job.RepoId,
 			clearName)
 	}
 	return s.cliSecret.fetchSecret(ctx, s.bucket, secrets)
 }
 
-func (s *S3) GitCredentials(ctx context.Context) *models.GitCredentials {
+func (s *AWSBackend) GitCredentials(ctx context.Context) *models.GitCredentials {
 	log.Trace(ctx, "Getting credentials")
 	if s == nil {
 		log.Error(ctx, "Backend is empty")
 		return nil
 	}
-	if s.state == nil {
+	if s.State == nil {
 		log.Error(ctx, "State is empty")
 		return nil
 	}
-	if s.state.Job == nil {
+	if s.State.Job == nil {
 		log.Error(ctx, "Job is empty")
 		return nil
 	}
-	return s.cliSecret.fetchCredentials(ctx, s.bucket, s.state.Job.RepoId)
+	return s.cliSecret.fetchCredentials(ctx, s.bucket, s.State.Job.RepoId)
 }
 
-func (s *S3) GetRepoDiff(ctx context.Context, path string) (string, error) {
+func (s *AWSBackend) GetRepoDiff(ctx context.Context, path string) (string, error) {
 	diff, err := s.cliS3.GetFile(ctx, s.bucket, path)
 	if err != nil {
 		return "", gerrors.Wrap(err)
@@ -392,7 +383,7 @@ func (s *S3) GetRepoDiff(ctx context.Context, path string) (string, error) {
 	return string(diff), nil
 }
 
-func (s *S3) GetRepoArchive(ctx context.Context, path, dir string) error {
+func (s *AWSBackend) GetRepoArchive(ctx context.Context, path, dir string) error {
 	archive, err := os.CreateTemp("", "archive-*.tar")
 	if err != nil {
 		return gerrors.Wrap(err)
@@ -408,17 +399,19 @@ func (s *S3) GetRepoArchive(ctx context.Context, path, dir string) error {
 	}
 	defer out.Body.Close()
 	size, err := io.Copy(archive, out.Body)
+	if err != nil {
+		return gerrors.Wrap(err)
+	}
 	if size != out.ContentLength {
 		return gerrors.New("size not equal")
 	}
-
 	if err := repo.ExtractArchive(ctx, archive.Name(), dir); err != nil {
 		return gerrors.Wrap(err)
 	}
 	return nil
 }
 
-func (s *S3) GetBuildDiff(ctx context.Context, key, dst string) error {
+func (s *AWSBackend) GetBuildDiff(ctx context.Context, key, dst string) error {
 	out, err := s.cliS3.cli.GetObject(ctx, &s3.GetObjectInput{
 		Bucket: aws.String(s.bucket),
 		Key:    aws.String(key),
@@ -439,7 +432,7 @@ func (s *S3) GetBuildDiff(ctx context.Context, key, dst string) error {
 	return nil
 }
 
-func (s *S3) PutBuildDiff(ctx context.Context, src, key string) error {
+func (s *AWSBackend) PutBuildDiff(ctx context.Context, src, key string) error {
 	file, err := os.Open(src)
 	if err != nil {
 		return gerrors.Wrap(err)
@@ -456,10 +449,10 @@ func (s *S3) PutBuildDiff(ctx context.Context, src, key string) error {
 	return nil
 }
 
-func (s *S3) GetTMPDir(ctx context.Context) string {
+func (s *AWSBackend) GetTMPDir(ctx context.Context) string {
 	return path.Join(common.HomeDir(), consts.TMP_DIR_PATH)
 }
 
-func (s *S3) GetDockerBindings(ctx context.Context) []mount.Mount {
+func (s *AWSBackend) GetDockerBindings(ctx context.Context) []mount.Mount {
 	return []mount.Mount{}
 }

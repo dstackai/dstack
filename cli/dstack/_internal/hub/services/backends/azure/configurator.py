@@ -52,6 +52,7 @@ from dstack._internal.hub.db.models import Project
 from dstack._internal.hub.models import (
     AzureProjectConfig,
     AzureProjectConfigWithCreds,
+    AzureProjectConfigWithCredsPartial,
     AzureProjectCreds,
     AzureProjectValues,
     ProjectElement,
@@ -89,31 +90,33 @@ class AzureConfigurator(Configurator):
     def get_backend_class(self) -> type:
         return AzureBackend
 
-    def configure_project(self, config_data: Dict) -> AzureProjectValues:
+    def configure_project(
+        self, project_config: AzureProjectConfigWithCredsPartial
+    ) -> AzureProjectValues:
         project_values = AzureProjectValues()
         self.credential = DefaultAzureCredential()
         try:
-            project_values.tenant_id = self._get_tenant_id(
-                default_tenant_id=config_data.get("tenant_id")
+            project_values.tenant_id = self._get_tenant_id_element(
+                selected=project_config.tenant_id
             )
         except ClientAuthenticationError:
             project_values.default_credentials = False
         else:
             project_values.default_credentials = True
 
-        credentials_data = config_data.get("credentials")
-        if credentials_data is None:
+        if project_config.credentials is None:
             return project_values
 
-        if credentials_data["type"] == "client":
+        project_credentials = project_config.credentials.__root__
+        if project_credentials.type == "client":
             self.credential = ClientSecretCredential(
-                tenant_id=config_data.get("tenant_id"),
-                client_id=credentials_data["client_id"],
-                client_secret=credentials_data["client_secret"],
+                tenant_id=project_config.tenant_id,
+                client_id=project_credentials.client_id,
+                client_secret=project_credentials.client_secret,
             )
             try:
-                project_values.tenant_id = self._get_tenant_id(
-                    default_tenant_id=config_data.get("tenant_id")
+                project_values.tenant_id = self._get_tenant_id_element(
+                    selected=project_config.tenant_id
                 )
             except ClientAuthenticationError:
                 self._raise_invalid_credentials_error(
@@ -129,24 +132,22 @@ class AzureConfigurator(Configurator):
         self.tenant_id = project_values.tenant_id.selected
         if self.tenant_id is None:
             return project_values
-        project_values.subscription_id = self._get_subscription_id(
-            default_subscription_id=config_data.get("subscription_id")
+        project_values.subscription_id = self._get_subscription_id_element(
+            selected=project_config.subscription_id
         )
         self.subscription_id = project_values.subscription_id.selected
         if self.subscription_id is None:
             return project_values
-        project_values.location = self._get_location(default_location=config_data.get("location"))
+        project_values.location = self._get_location_element(selected=project_config.location)
         self.location = project_values.location.selected
         if self.location is None:
             return project_values
-        project_values.storage_account = self._get_storage_account(
-            default_storage_account=config_data.get("storage_account")
+        project_values.storage_account = self._get_storage_account_element(
+            selected=project_config.storage_account
         )
         return project_values
 
-    def create_config_auth_data_from_project_config(
-        self, project_config: AzureProjectConfigWithCreds
-    ) -> Tuple[Dict, Dict]:
+    def create_project(self, project_config: AzureProjectConfigWithCreds) -> Tuple[Dict, Dict]:
         self.tenant_id = project_config.tenant_id
         self.subscription_id = project_config.subscription_id
         self.location = project_config.location
@@ -167,7 +168,6 @@ class AzureConfigurator(Configurator):
         self._create_logs_resources()
         self._grant_roles_or_error()
         config_data = {
-            "backend": "azure",
             "tenant_id": self.tenant_id,
             "subscription_id": self.subscription_id,
             "location": self.location,
@@ -180,12 +180,7 @@ class AzureConfigurator(Configurator):
         auth_data = project_config.credentials.__root__.dict()
         return config_data, auth_data
 
-    def get_backend_config_from_hub_config_data(
-        self, project_name: str, config_data: Dict, auth_data: Dict
-    ) -> AzureConfig:
-        return AzureConfig.deserialize({**config_data, "credentials": auth_data})
-
-    def get_project_config_from_project(
+    def get_project_config(
         self, project: Project, include_creds: bool
     ) -> Union[AzureProjectConfig, AzureProjectConfigWithCreds]:
         json_config = json.loads(project.config)
@@ -209,6 +204,22 @@ class AzureConfigurator(Configurator):
             storage_account=storage_account,
         )
 
+    def get_backend(self, project: Project) -> AzureBackend:
+        config_data = json.loads(project.config)
+        auth_data = json.loads(project.auth)
+        config = AzureConfig(
+            tenant_id=config_data["tenant_id"],
+            subscription_id=config_data["subscription_id"],
+            location=config_data["location"],
+            resource_group=config_data["resource_group"],
+            storage_account=config_data["storage_account"],
+            vault_url=config_data["vault_url"],
+            network=config_data["network"],
+            subnet=config_data["subnet"],
+            credentials=auth_data,
+        )
+        return AzureBackend(config)
+
     def _raise_invalid_credentials_error(self, fields: Optional[List[List[str]]] = None):
         raise BackendConfigError(
             "Invalid credentials",
@@ -216,16 +227,16 @@ class AzureConfigurator(Configurator):
             fields=fields,
         )
 
-    def _get_tenant_id(self, default_tenant_id: Optional[str]) -> ProjectElement:
+    def _get_tenant_id_element(self, selected: Optional[str]) -> ProjectElement:
         subscription_client = SubscriptionClient(credential=self.credential)
-        element = ProjectElement(selected=default_tenant_id)
+        element = ProjectElement(selected=selected)
         tenant_ids = []
         for tenant in subscription_client.tenants.list():
             tenant_ids.append(tenant.tenant_id)
             element.values.append(
                 ProjectElementValue(value=tenant.tenant_id, label=tenant.tenant_id)
             )
-        if default_tenant_id is not None and default_tenant_id not in tenant_ids:
+        if selected is not None and selected not in tenant_ids:
             raise BackendConfigError(
                 "Invalid tenant_id", code="invalid_tenant_id", fields=[["tenant_id"]]
             )
@@ -233,9 +244,9 @@ class AzureConfigurator(Configurator):
             element.selected = tenant_ids[0]
         return element
 
-    def _get_subscription_id(self, default_subscription_id: Optional[str]) -> ProjectElement:
+    def _get_subscription_id_element(self, selected: Optional[str]) -> ProjectElement:
         subscription_client = SubscriptionClient(credential=self.credential)
-        element = ProjectElement(selected=default_subscription_id)
+        element = ProjectElement(selected=selected)
         subscription_ids = []
         for subscription in subscription_client.subscriptions.list():
             subscription_ids.append(subscription.subscription_id)
@@ -245,7 +256,7 @@ class AzureConfigurator(Configurator):
                     label=f"{subscription.display_name} ({subscription.subscription_id})",
                 )
             )
-        if default_subscription_id is not None and default_subscription_id not in subscription_ids:
+        if selected is not None and selected not in subscription_ids:
             raise BackendConfigError(
                 "Invalid subscription_id",
                 code="invalid_subscription_id",
@@ -261,12 +272,12 @@ class AzureConfigurator(Configurator):
             )
         return element
 
-    def _get_location(self, default_location: Optional[str]) -> ProjectElement:
-        if default_location is not None and default_location not in LOCATION_VALUES:
+    def _get_location_element(self, selected: Optional[str]) -> ProjectElement:
+        if selected is not None and selected not in LOCATION_VALUES:
             raise BackendConfigError(
                 "Invalid location", code="invalid_location", fields=[["location"]]
             )
-        element = ProjectElement(selected=default_location)
+        element = ProjectElement(selected=selected)
         for l in LOCATIONS:
             element.values.append(
                 ProjectElementValue(
@@ -276,17 +287,17 @@ class AzureConfigurator(Configurator):
             )
         return element
 
-    def _get_storage_account(self, default_storage_account: Optional[str]) -> ProjectElement:
+    def _get_storage_account_element(self, selected: Optional[str]) -> ProjectElement:
         client = StorageManagementClient(
             credential=self.credential, subscription_id=self.subscription_id
         )
-        element = ProjectElement(selected=default_storage_account)
+        element = ProjectElement(selected=selected)
         storage_accounts = []
         for sa in client.storage_accounts.list():
             if sa.provisioning_state == "Succeeded" and sa.location == self.location:
                 storage_accounts.append(sa.name)
                 element.values.append(ProjectElementValue(value=sa.name, label=sa.name))
-        if default_storage_account is not None and default_storage_account not in storage_accounts:
+        if selected is not None and selected not in storage_accounts:
             raise BackendConfigError(
                 "Invalid storage_account",
                 code="invalid_storage_account",

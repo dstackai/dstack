@@ -163,15 +163,15 @@ func (j *Job) JobHeadFilepathPrefix() string {
 
 func (j *Job) JobHeadFilepath() string {
 	appsSlice := make([]string, len(j.Apps))
-	for _, app := range j.Apps {
-		appsSlice = append(appsSlice, app.Name)
+	for i, app := range j.Apps {
+		appsSlice[i] = app.Name
 	}
 	artifactSlice := make([]string, len(j.Artifacts))
-	for _, art := range j.Artifacts {
-		artifactSlice = append(artifactSlice, EscapeHead(art.Path))
+	for i, art := range j.Artifacts {
+		artifactSlice[i] = EscapeHead(art.Path)
 	}
 	return fmt.Sprintf(
-		"jobs/%s/l;%s;%s;%s;%d;%s;%s;%s;%s;%s;%s",
+		"jobs/%s/l;%s;%s;%s;%d;%s;%s;%s;%s;%s;%s;%s",
 		j.RepoId,
 		j.JobID,
 		j.ProviderName,
@@ -183,7 +183,15 @@ func (j *Job) JobHeadFilepath() string {
 		j.TagName,
 		j.InstanceType,
 		EscapeHead(j.ConfigurationPath),
+		j.GetInstanceType(),
 	)
+}
+
+func (j *Job) GetInstanceType() string {
+	if j.Requirements.Spot {
+		return "spot"
+	}
+	return "on-demand"
 }
 
 func (j *Job) SecretsPrefix() string {

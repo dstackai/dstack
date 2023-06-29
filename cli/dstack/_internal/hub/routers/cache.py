@@ -16,13 +16,7 @@ async def get_backend(project: Project) -> Optional[Backend]:
     key = project.name
     if cache.get(key) is not None:
         return cache[key]
-    json_data = json.loads(str(project.config))
-    auth_data = json.loads(str(project.auth))
-    config = configurator.get_backend_config_from_hub_config_data(
-        project.name, json_data, auth_data
-    )
-    backend_cls = configurator.get_backend_class()
-    backend = await run_async(backend_cls, config)
+    backend = await run_async(configurator.get_backend, project)
     cache[key] = backend
     return cache[key]
 

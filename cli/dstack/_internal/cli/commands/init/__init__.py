@@ -1,12 +1,8 @@
-import os
 from argparse import Namespace
 from pathlib import Path
 from typing import Optional
 
 import giturlparse
-from cryptography.hazmat.backends import default_backend as crypto_default_backend
-from cryptography.hazmat.primitives import serialization as crypto_serialization
-from cryptography.hazmat.primitives.asymmetric import rsa
 from git.exc import InvalidGitRepositoryError
 
 from dstack._internal.api.repos import InvalidRepoCredentialsError, get_local_repo_credentials
@@ -16,6 +12,7 @@ from dstack._internal.cli.config import config, get_hub_client
 from dstack._internal.cli.errors import CLIError
 from dstack._internal.core.repo import LocalRepo, RemoteRepo
 from dstack._internal.core.userconfig import RepoUserConfig
+from dstack._internal.utils.crypto import generage_rsa_key_pair
 
 
 class InitCommand(BasicCommand):
@@ -106,29 +103,5 @@ def get_ssh_keypair(
     if dstack_key_path is None:
         return None
     if not dstack_key_path.exists():
-        key = rsa.generate_private_key(
-            backend=crypto_default_backend(), public_exponent=65537, key_size=2048
-        )
-
-        def key_opener(path, flags):
-            return os.open(path, flags, 0o600)
-
-        with open(dstack_key_path, "wb", opener=key_opener) as f:
-            f.write(
-                key.private_bytes(
-                    crypto_serialization.Encoding.PEM,
-                    crypto_serialization.PrivateFormat.PKCS8,
-                    crypto_serialization.NoEncryption(),
-                )
-            )
-        with open(
-            dstack_key_path.with_suffix(dstack_key_path.suffix + ".pub"), "wb", opener=key_opener
-        ) as f:
-            f.write(
-                key.public_key().public_bytes(
-                    crypto_serialization.Encoding.OpenSSH,
-                    crypto_serialization.PublicFormat.OpenSSH,
-                )
-            )
-            f.write(b" dstack\n")
+        generage_rsa_key_pair(private_key_path=dstack_key_path)
     return str(dstack_key_path)
