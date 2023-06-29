@@ -6,14 +6,11 @@ import (
 	"fmt"
 	"github.com/dstackai/dstack/runner/internal/backend/base"
 	"io"
-	"io/ioutil"
 	"os"
 	"path"
 	"strings"
 
 	"github.com/docker/docker/api/types/mount"
-	"github.com/dstackai/dstack/runner/internal/repo"
-
 	"github.com/dstackai/dstack/runner/consts"
 	"github.com/dstackai/dstack/runner/internal/backend"
 	"github.com/dstackai/dstack/runner/internal/common"
@@ -45,7 +42,7 @@ func init() {
 	backend.RegisterBackend("gcp", func(ctx context.Context, pathConfig string) (backend.Backend, error) {
 		configFile := GCPConfigFile{}
 		log.Trace(ctx, "Read config file", "path", pathConfig)
-		fileContent, err := ioutil.ReadFile(pathConfig)
+		fileContent, err := os.ReadFile(pathConfig)
 		if err != nil {
 			return nil, gerrors.Wrap(err)
 		}
@@ -85,17 +82,8 @@ func New(project, zone, bucket string) (*GCPBackend, error) {
 
 func (gbackend *GCPBackend) Init(ctx context.Context, ID string) error {
 	gbackend.runnerID = ID
-	runnerFilepath := fmt.Sprintf("runners/%s.yaml", ID)
-	contents, err := gbackend.storage.GetFile(ctx, runnerFilepath)
-	if err != nil {
+	if err := base.LoadRunnerState(ctx, gbackend.storage, ID, &gbackend.state); err != nil {
 		return gerrors.Wrap(err)
-	}
-	err = yaml.Unmarshal(contents, &gbackend.state)
-	if err != nil {
-		return gerrors.Wrap(err)
-	}
-	if gbackend.state == nil {
-		return gerrors.New("State is empty. Data not loading")
 	}
 	return nil
 }
@@ -107,44 +95,14 @@ func (gbackend *GCPBackend) Job(ctx context.Context) *models.Job {
 }
 
 func (gbackend *GCPBackend) RefetchJob(ctx context.Context) (*models.Job, error) {
-	log.Trace(ctx, "Refetching job from state", "ID", gbackend.state.Job.JobID)
-	contents, err := gbackend.storage.GetFile(ctx, gbackend.state.Job.JobFilepath())
-	if err != nil {
-		return nil, gerrors.Wrap(err)
-	}
-	err = yaml.Unmarshal(contents, &gbackend.state.Job)
-	if err != nil {
+	if err := base.RefetchJob(ctx, gbackend.storage, gbackend.state.Job); err != nil {
 		return nil, gerrors.Wrap(err)
 	}
 	return gbackend.state.Job, nil
 }
 
 func (gbackend *GCPBackend) UpdateState(ctx context.Context) error {
-	log.Trace(ctx, "Marshaling job")
-	contents, err := yaml.Marshal(&gbackend.state.Job)
-	if err != nil {
-		return gerrors.Wrap(err)
-	}
-	jobFilepath := gbackend.state.Job.JobFilepath()
-	log.Trace(ctx, "Write to file job", "Path", jobFilepath)
-	err = gbackend.storage.PutFile(ctx, jobFilepath, contents)
-	if err != nil {
-		return gerrors.Wrap(err)
-	}
-	log.Trace(ctx, "Fetching list jobs", "Repo username", gbackend.state.Job.RepoUserName, "Repo name", gbackend.state.Job.RepoName, "Job ID", gbackend.state.Job.JobID)
-	files, err := gbackend.storage.ListFile(ctx, gbackend.state.Job.JobHeadFilepathPrefix())
-	if err != nil {
-		return gerrors.Wrap(err)
-	}
-	jobHeadFilepath := gbackend.state.Job.JobHeadFilepath()
-	for _, file := range files[:1] {
-		log.Trace(ctx, "Renaming file job", "From", file, "To", jobHeadFilepath)
-		err = gbackend.storage.RenameFile(ctx, file, jobHeadFilepath)
-		if err != nil {
-			return gerrors.Wrap(err)
-		}
-	}
-	return nil
+	return gerrors.Wrap(base.UpdateState(ctx, gbackend.storage, gbackend.state.Job))
 }
 
 func (gbackend *GCPBackend) CheckStop(ctx context.Context) (bool, error) {
@@ -219,18 +177,12 @@ func (gbackend *GCPBackend) CreateLogger(ctx context.Context, logGroup, logName 
 }
 
 func (gbackend *GCPBackend) ListSubDir(ctx context.Context, dir string) ([]string, error) {
-	return gbackend.storage.ListFile(ctx, dir)
+	return base.ListObjects(ctx, gbackend.storage, dir)
 }
 
 func (gbackend *GCPBackend) GetJobByPath(ctx context.Context, path string) (*models.Job, error) {
-	log.Trace(ctx, "Fetching job by path", "Path", path)
-	content, err := gbackend.storage.GetFile(ctx, path)
-	if err != nil {
-		return nil, gerrors.Wrap(err)
-	}
 	job := new(models.Job)
-	err = yaml.Unmarshal(content, &job)
-	if err != nil {
+	if err := base.GetJobByPath(ctx, gbackend.storage, path, job); err != nil {
 		return nil, gerrors.Wrap(err)
 	}
 	return job, nil
@@ -244,7 +196,7 @@ func (gbackend *GCPBackend) Bucket(ctx context.Context) string {
 func (gbackend *GCPBackend) Secrets(ctx context.Context) (map[string]string, error) {
 	log.Trace(ctx, "Getting secrets")
 	prefix := gbackend.state.Job.SecretsPrefix()
-	secretFilenames, err := gbackend.storage.ListFile(ctx, prefix)
+	secretFilenames, err := base.ListObjects(ctx, gbackend.storage, prefix)
 	if err != nil {
 		return nil, gerrors.Wrap(err)
 	}
@@ -273,7 +225,7 @@ func (gbackend *GCPBackend) GitCredentials(ctx context.Context) *models.GitCrede
 }
 
 func (gbackend *GCPBackend) GetRepoDiff(ctx context.Context, path string) (string, error) {
-	diff, err := gbackend.storage.GetFile(ctx, path)
+	diff, err := base.GetObject(ctx, gbackend.storage, path)
 	if err != nil {
 		return "", gerrors.Wrap(err)
 	}
@@ -281,32 +233,17 @@ func (gbackend *GCPBackend) GetRepoDiff(ctx context.Context, path string) (strin
 }
 
 func (gbackend *GCPBackend) GetRepoArchive(ctx context.Context, path, dir string) error {
-	archive, err := os.CreateTemp("", "archive-*.tar")
-	if err != nil {
-		return gerrors.Wrap(err)
-	}
-	defer os.Remove(archive.Name())
-
-	if err := gbackend.storage.downloadFile(ctx, path, archive.Name()); err != nil {
-		return gerrors.Wrap(err)
-	}
-
-	if err := repo.ExtractArchive(ctx, archive.Name(), dir); err != nil {
-		return gerrors.Wrap(err)
-	}
-	return nil
+	return gerrors.Wrap(base.GetRepoArchive(ctx, gbackend.storage, path, dir))
 }
 
 func (gbackend *GCPBackend) GetBuildDiff(ctx context.Context, key, dst string) error {
-	_ = gbackend.storage.downloadFile(ctx, key, dst)
+	_ = base.DownloadFile(ctx, gbackend.storage, key, dst)
 	return nil
 }
 
 func (gbackend *GCPBackend) PutBuildDiff(ctx context.Context, src, key string) error {
-	if err := gbackend.storage.uploadFile(ctx, src, key); err != nil {
-		return gerrors.Wrap(err)
-	}
-	return nil
+	err := base.UploadFile(ctx, gbackend.storage, src, key)
+	return gerrors.Wrap(err)
 }
 
 func (gbackend *GCPBackend) GetTMPDir(ctx context.Context) string {

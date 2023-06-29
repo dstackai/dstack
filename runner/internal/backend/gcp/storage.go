@@ -1,24 +1,14 @@
 package gcp
 
 import (
-	"bytes"
 	"context"
 	"errors"
-	"io"
-	"io/fs"
-	"os"
-	"path"
-	"path/filepath"
-	"strings"
-	"time"
-
 	"github.com/dstackai/dstack/runner/internal/backend/base"
-	"github.com/dstackai/dstack/runner/internal/common"
-	"go.uber.org/atomic"
+	"io"
+	"strings"
 
 	"cloud.google.com/go/storage"
 	"github.com/dstackai/dstack/runner/internal/gerrors"
-	"github.com/dstackai/dstack/runner/internal/log"
 	"google.golang.org/api/iterator"
 )
 
@@ -29,11 +19,6 @@ type GCPStorage struct {
 	bucket     *storage.BucketHandle
 	project    string
 	bucketName string
-}
-
-type FileInfo struct {
-	Size     int64
-	Modified time.Time
 }
 
 func NewGCPStorage(project, bucketName string) (*GCPStorage, error) {
@@ -54,72 +39,86 @@ func NewGCPStorage(project, bucketName string) (*GCPStorage, error) {
 	}, nil
 }
 
-func (gstorage *GCPStorage) GetFile(ctx context.Context, key string) ([]byte, error) {
-	obj := gstorage.bucket.Object(key)
+func (s *GCPStorage) Download(ctx context.Context, key string, writer io.Writer) error {
+	obj := s.bucket.Object(key)
 	reader, err := obj.NewReader(ctx)
 	if err != nil {
-		return nil, gerrors.Wrap(err)
+		return gerrors.Wrap(err)
 	}
-	defer reader.Close()
-	buffer := new(bytes.Buffer)
-	_, err = io.Copy(buffer, reader)
-	if err != nil {
-		return nil, gerrors.Wrap(err)
-	}
-	return buffer.Bytes(), nil
+	_, err = io.Copy(writer, reader)
+	return gerrors.Wrap(err)
 }
 
-func (gstorage *GCPStorage) PutFile(ctx context.Context, key string, contents []byte) error {
-	obj := gstorage.bucket.Object(key)
+func (s *GCPStorage) Upload(ctx context.Context, reader io.Reader, key string) error {
+	obj := s.bucket.Object(key)
 	writer := obj.NewWriter(ctx)
-	reader := bytes.NewReader(contents)
 	_, err := io.Copy(writer, reader)
 	if err != nil {
 		return gerrors.Wrap(err)
 	}
-	return writer.Close()
+	return gerrors.Wrap(writer.Close())
 }
 
-func (gstorage *GCPStorage) ListFile(ctx context.Context, prefix string) ([]string, error) {
-	query := &storage.Query{Prefix: prefix}
-	names := make([]string, 0)
-	it := gstorage.bucket.Objects(ctx, query)
-	for {
-		attrs, err := it.Next()
-		if err == iterator.Done {
-			break
-		}
-		if err != nil {
-			return nil, gerrors.Wrap(err)
-		}
-		names = append(names, attrs.Name)
-	}
-	return names, nil
+func (s *GCPStorage) Delete(ctx context.Context, key string) error {
+	obj := s.bucket.Object(key)
+	return gerrors.Wrap(obj.Delete(ctx))
 }
 
-func (gstorage *GCPStorage) DeleteFile(ctx context.Context, key string) error {
-	obj := gstorage.bucket.Object(key)
-	err := obj.Delete(ctx)
-	return gerrors.Wrap(err)
-}
-
-func (gstorage *GCPStorage) RenameFile(ctx context.Context, oldKey, newKey string) error {
+func (s *GCPStorage) Rename(ctx context.Context, oldKey, newKey string) error {
 	if newKey == oldKey {
 		return nil
 	}
-	src := gstorage.bucket.Object(oldKey)
-	dst := gstorage.bucket.Object(newKey)
+	src := s.bucket.Object(oldKey)
+	dst := s.bucket.Object(newKey)
 	copier := dst.CopierFrom(src)
 	_, err := copier.Run(ctx)
 	if err != nil {
 		return gerrors.Wrap(err)
 	}
-	err = src.Delete(ctx)
-	return gerrors.Wrap(err)
+	return gerrors.Wrap(src.Delete(ctx))
 }
 
-func (gstorage *GCPStorage) GetMetadata(ctx context.Context, key, tag string) (string, error) {
-	obj := gstorage.bucket.Object(key)
+func (s *GCPStorage) CreateSymlink(ctx context.Context, key, symlink string) error {
+	obj := s.bucket.Object(key)
+	writer := obj.NewWriter(ctx)
+	writer.Metadata = map[string]string{
+		"symlink": symlink,
+	}
+	return gerrors.Wrap(writer.Close())
+}
+
+func (s *GCPStorage) List(ctx context.Context, prefix string) (<-chan *base.StorageObject, <-chan error) {
+	it := s.bucket.Objects(ctx, &storage.Query{Prefix: prefix})
+	ch := make(chan *base.StorageObject)
+	errCh := make(chan error, 1)
+	go func() {
+		defer close(ch)
+		defer close(errCh)
+		for {
+			attrs, err := it.Next()
+			if err == iterator.Done {
+				break
+			} else if err != nil {
+				errCh <- gerrors.Wrap(err)
+				return
+			}
+			symlink, ok := attrs.Metadata["symlink"]
+			if !ok {
+				symlink = ""
+			}
+			ch <- &base.StorageObject{
+				Key:     strings.TrimPrefix(attrs.Name, prefix),
+				Size:    attrs.Size,
+				ModTime: attrs.Updated,
+				Symlink: symlink,
+			}
+		}
+	}()
+	return ch, errCh
+}
+
+func (s *GCPStorage) GetMetadata(ctx context.Context, key, tag string) (string, error) {
+	obj := s.bucket.Object(key)
 	attrs, err := obj.Attrs(ctx)
 	if err != nil {
 		return "", gerrors.Wrap(err)
@@ -128,194 +127,4 @@ func (gstorage *GCPStorage) GetMetadata(ctx context.Context, key, tag string) (s
 		return value, nil
 	}
 	return "", gerrors.Wrap(ErrTagNotFound)
-}
-
-func (gstorage *GCPStorage) UploadDir(ctx context.Context, src, dst string) error {
-	semaphore := make(base.Semaphore, base.TransferThreads)
-	errorFound := atomic.NewBool(false)
-	for file := range walkFiles(ctx, src) {
-		key := path.Join(dst, strings.TrimPrefix(file, src))
-		semaphore.Acquire(1)
-		go func(file, key string) {
-			defer semaphore.Release(1)
-			if err := gstorage.uploadFile(ctx, file, key); err != nil {
-				errorFound.Store(true)
-				log.Error(ctx, "Failed to upload file", "Key", key, "err", err)
-			}
-		}(file, key)
-	}
-	semaphore.Acquire(base.TransferThreads) // gather
-	if errorFound.Load() {
-		return errors.New("upload: error occurred")
-	}
-	return nil
-}
-
-func (gstorage *GCPStorage) DownloadDir(ctx context.Context, src, dst string) error {
-	semaphore := make(base.Semaphore, base.TransferThreads)
-	errorFound := atomic.NewBool(false)
-	query := &storage.Query{Prefix: src}
-	it := gstorage.bucket.Objects(ctx, query)
-	for {
-		attrs, err := it.Next()
-		if err == iterator.Done {
-			break
-		}
-		if err != nil {
-			return gerrors.Wrap(err)
-		}
-		dstFilepath := path.Join(dst, strings.TrimPrefix(attrs.Name, src))
-		semaphore.Acquire(1)
-		go func() {
-			defer semaphore.Release(1)
-			if symlink, ok := attrs.Metadata["symlink"]; ok && attrs.Size == 0 && symlink != "" {
-				if err := os.Symlink(symlink, dstFilepath); err != nil {
-					errorFound.Store(true)
-					log.Error(ctx, "Failed to create symlink", "Key", attrs.Name, "err", err)
-				}
-				// can't do os.Chtimes to a symlink, skip
-				return
-			}
-			if err := gstorage.downloadFile(ctx, attrs.Name, dstFilepath); err != nil {
-				errorFound.Store(true)
-				log.Error(ctx, "Failed to download file", "Key", attrs.Name, "err", err)
-			}
-			if err := os.Chtimes(dstFilepath, attrs.Updated, attrs.Updated); err != nil {
-				errorFound.Store(true)
-				log.Error(ctx, "Failed to chtimes", "Path", dstFilepath, "err", err)
-			}
-		}()
-	}
-	semaphore.Acquire(base.TransferThreads)
-	if errorFound.Load() {
-		return errors.New("download: error occurred")
-	}
-	return nil
-}
-
-func (gstorage *GCPStorage) SyncDirUpload(ctx context.Context, srcDir, dstPrefix string) error {
-	srcDir = common.AddTrailingSlash(srcDir)
-	dstPrefix = common.AddTrailingSlash(dstPrefix)
-
-	dstObjects := make(chan base.ObjectInfo)
-	go func() {
-		defer close(dstObjects)
-		query := &storage.Query{Prefix: dstPrefix}
-		it := gstorage.bucket.Objects(ctx, query)
-		for {
-			attrs, err := it.Next()
-			if err == iterator.Done {
-				break
-			}
-			if err != nil {
-				log.Error(ctx, "Iterating objects", "prefix", dstPrefix, "err", err)
-				return
-			}
-			symlink, ok := attrs.Metadata["symlink"]
-			if !ok {
-				symlink = ""
-			}
-			dstObjects <- base.ObjectInfo{
-				Key: strings.TrimPrefix(attrs.Name, dstPrefix),
-				FileInfo: base.FileInfo{
-					Size:     attrs.Size,
-					Modified: attrs.Updated,
-					Symlink:  symlink,
-				},
-			}
-		}
-	}()
-	err := base.SyncDirUpload(
-		ctx, srcDir, dstObjects,
-		func(ctx context.Context, key string, _ base.FileInfo) error {
-			/* delete object */
-			key = path.Join(dstPrefix, key)
-			return gstorage.DeleteFile(ctx, key)
-		},
-		func(ctx context.Context, key string, info base.FileInfo) error {
-			/* upload object */
-			file := path.Join(srcDir, key)
-			key = path.Join(dstPrefix, key)
-			if info.Symlink != "" {
-				return gstorage.writeSymlink(ctx, info.Symlink, key)
-			}
-			return gstorage.uploadFile(ctx, file, key)
-		},
-	)
-	if err != nil {
-		return gerrors.Wrap(err)
-	}
-	return nil
-}
-
-func walkFiles(ctx context.Context, local string) chan string {
-	files := make(chan string)
-	go func() {
-		defer close(files)
-		err := filepath.Walk(local, func(path string, info fs.FileInfo, err error) error {
-			if err != nil {
-				return err
-			}
-			files <- path
-			return nil
-		})
-		if err != nil {
-			log.Error(ctx, "Error while walking files", "err", err)
-		}
-	}()
-	return files
-}
-
-func (gstorage *GCPStorage) uploadFile(ctx context.Context, src, dst string) error {
-	f, err := os.Open(src)
-	if err != nil {
-		return gerrors.Wrap(err)
-	}
-	fileInfo, err := f.Stat()
-	if err != nil {
-		return gerrors.Wrap(err)
-	}
-	if fileInfo.IsDir() {
-		return nil
-	}
-	obj := gstorage.bucket.Object(dst)
-	writer := obj.NewWriter(ctx)
-	_, err = io.Copy(writer, f)
-	if err != nil {
-		return gerrors.Wrap(err)
-	}
-	return writer.Close()
-}
-
-func (gstorage *GCPStorage) downloadFile(ctx context.Context, src, dst string) error {
-	os.MkdirAll(filepath.Dir(dst), 0o755)
-	obj := gstorage.bucket.Object(src)
-	reader, err := obj.NewReader(ctx)
-	if err != nil {
-		return gerrors.Wrap(err)
-	}
-	defer reader.Close()
-	file, err := os.Create(dst)
-	if err != nil {
-		return gerrors.Wrap(err)
-	}
-	defer file.Close()
-	_, err = io.Copy(file, reader)
-	if err != nil {
-		return gerrors.Wrap(err)
-	}
-	return nil
-}
-
-func (gstorage *GCPStorage) writeSymlink(ctx context.Context, symlink, key string) error {
-	obj := gstorage.bucket.Object(key)
-	writer := obj.NewWriter(ctx)
-	writer.Metadata = map[string]string{
-		"symlink": symlink,
-	}
-	err := writer.Close()
-	if err != nil {
-		return gerrors.Wrap(err)
-	}
-	return nil
 }
