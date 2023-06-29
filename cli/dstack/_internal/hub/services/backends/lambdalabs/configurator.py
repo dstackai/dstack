@@ -1,5 +1,5 @@
 import json
-from typing import Dict, Optional, Tuple, Union
+from typing import Dict, List, Optional, Tuple, Union
 
 import botocore
 from boto3.session import Session
@@ -25,9 +25,25 @@ from dstack._internal.hub.models import (
     LambdaProjectValues,
     ProjectElement,
     ProjectElementValue,
-    ProjectValues,
+    ProjectMultiElement,
 )
 from dstack._internal.hub.services.backends.base import BackendConfigError, Configurator
+
+REGIONS = [
+    "us-south-1",
+    "us-west-2",
+    "us-west-1",
+    "us-midwest-1",
+    "us-west-3",
+    "us-east-1",
+    "australia-southeast-1",
+    "europe-central-1",
+    "asia-south-1",
+    "me-west-1",
+    "europe-south-1",
+    "asia-northeast-1",
+    "asia-northeast-1",
+]
 
 
 class LambdaConfigurator(Configurator):
@@ -35,7 +51,7 @@ class LambdaConfigurator(Configurator):
 
     def configure_project(
         self, project_config: LambdaProjectConfigWithCredsPartial
-    ) -> ProjectValues:
+    ) -> LambdaProjectValues:
         selected_storage_backend = None
         if project_config.storage_backend is not None:
             selected_storage_backend = project_config.storage_backend.type
@@ -46,6 +62,7 @@ class LambdaConfigurator(Configurator):
         if project_config.api_key is None:
             return project_values
         self._validate_lambda_api_key(api_key=project_config.api_key)
+        project_values.regions = self._get_regions_element(selected=project_config.regions)
         if (
             project_config.storage_backend is None
             or project_config.storage_backend.credentials is None
@@ -58,6 +75,7 @@ class LambdaConfigurator(Configurator):
 
     def create_project(self, project_config: LambdaProjectConfigWithCreds) -> Tuple[Dict, Dict]:
         config_data = {
+            "regions": project_config.regions,
             "storage_backend": self._get_aws_storage_backend_config_data(
                 project_config.storage_backend
             ),
@@ -75,6 +93,7 @@ class LambdaConfigurator(Configurator):
         if include_creds:
             auth_data = json.loads(project.auth)
             return LambdaProjectConfigWithCreds(
+                regions=config_data["regions"],
                 api_key=auth_data["api_key"],
                 storage_backend=AWSStorageProjectConfigWithCreds(
                     bucket_name=config_data["storage_backend"]["bucket"],
@@ -84,15 +103,17 @@ class LambdaConfigurator(Configurator):
                 ),
             )
         return LambdaProjectConfig(
+            regions=config_data["regions"],
             storage_backend=AWSStorageProjectConfig(
                 bucket_name=config_data["storage_backend"]["bucket"]
-            )
+            ),
         )
 
     def get_backend(self, project: Project) -> LambdaBackend:
         config_data = json.loads(project.config)
         auth_data = json.loads(project.auth)
         config = LambdaConfig(
+            regions=config_data["regions"],
             api_key=auth_data["api_key"],
             storage_config=AWSStorageConfig(
                 bucket=config_data["storage_backend"]["bucket"],
@@ -123,6 +144,21 @@ class LambdaConfigurator(Configurator):
                     fields=[["api_key"]],
                 )
             raise e
+
+    def _get_regions_element(self, selected: Optional[List[str]]) -> ProjectMultiElement:
+        if selected is not None:
+            for r in selected:
+                if r not in REGIONS:
+                    raise BackendConfigError(
+                        "Invalid regions",
+                        code="invalid_regions",
+                        fields=[["regions"]],
+                    )
+        element = ProjectMultiElement(
+            selected=selected or REGIONS,
+            values=[ProjectElementValue(value=r, label=r) for r in REGIONS],
+        )
+        return element
 
     def _get_aws_storage_backend_values(
         self, config: AWSStorageProjectConfigWithCredsPartial

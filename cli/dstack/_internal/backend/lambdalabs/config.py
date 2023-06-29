@@ -1,3 +1,5 @@
+from typing import List
+
 from pydantic import BaseModel
 from typing_extensions import Literal
 
@@ -16,5 +18,6 @@ class AWSStorageConfig(BaseModel):
 
 class LambdaConfig(BaseModel):
     backend: Literal["lambda"] = "lambda"
+    regions: List[str]
     api_key: str
     storage_config: AWSStorageConfig

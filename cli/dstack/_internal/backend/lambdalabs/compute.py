@@ -109,7 +109,7 @@ class LambdaCompute:
         )
 
     def get_instance_type(self, job: Job) -> Optional[InstanceType]:
-        instance_types = _list_instance_types(self.api_client)
+        instance_types = _list_instance_types(self.api_client, self.lambda_config.regions)
         return choose_instance_type(
             instance_types=instance_types,
             requirements=job.requirements,
@@ -118,7 +118,7 @@ class LambdaCompute:
     def run_instance(self, job: Job, instance_type: InstanceType) -> str:
         return _run_instance(
             api_client=self.api_client,
-            region_name=instance_type.available_regions[0],
+            region_name=_get_instance_region(instance_type, self.lambda_config.regions),
             instance_type_name=instance_type.instance_name,
             user_ssh_key=job.ssh_key_pub,
             hub_ssh_key=get_hub_ssh_public_key(),
@@ -133,12 +133,14 @@ class LambdaCompute:
         pass
 
 
-def _list_instance_types(api_client: LambdaAPIClient) -> List[InstanceType]:
+def _list_instance_types(api_client: LambdaAPIClient, regions: List[str]) -> List[InstanceType]:
     instance_types_data = api_client.list_instance_types()
     instance_types = []
     for instance_type_data in instance_types_data.values():
         instance_type = _instance_type_data_to_instance_type(instance_type_data)
-        if instance_type is not None:
+        if instance_type is None:
+            continue
+        if _get_instance_region(instance_type, regions) is not None:
             instance_types.append(instance_type)
     return instance_types
 
@@ -156,8 +158,6 @@ def _instance_type_data_to_instance_type(instance_type_data: Dict) -> Optional[I
     instance_type = instance_type_data["instance_type"]
     regions_data = instance_type_data["regions_with_capacity_available"]
     regions = [r["name"] for r in regions_data]
-    if len(regions) == 0:
-        return None
     instance_type_specs = instance_type["specs"]
     gpus = _get_instance_type_gpus(instance_type["name"])
     if gpus is None:
@@ -183,6 +183,13 @@ def _get_instance_type_gpus(instance_type_name: str) -> Optional[List[Gpu]]:
         Gpu(name=gpu_data["name"], memory_mib=gpu_data["memory_mib"])
         for _ in range(gpu_data["count"])
     ]
+
+
+def _get_instance_region(instance_type: InstanceType, regions: List[str]) -> Optional[str]:
+    for r in instance_type.available_regions:
+        if r in regions:
+            return r
+    return None
 
 
 def _get_instance_name(job: Job) -> str:

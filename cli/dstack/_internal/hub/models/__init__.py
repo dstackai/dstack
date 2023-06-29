@@ -182,11 +182,13 @@ class AWSStorageProjectConfigWithCreds(AWSStorageProjectConfig):
 class LambdaProjectConfigWithCredsPartial(BaseModel):
     type: Literal["lambda"] = "lambda"
     api_key: Optional[str]
+    regions: Optional[List[str]]
     storage_backend: Optional[AWSStorageProjectConfigWithCredsPartial]
 
 
 class LambdaProjectConfig(BaseModel):
     type: Literal["lambda"] = "lambda"
+    regions: List[str]
     storage_backend: AWSStorageProjectConfig
 
 
@@ -352,6 +354,11 @@ class ProjectElement(BaseModel):
     values: List[ProjectElementValue] = []
 
 
+class ProjectMultiElement(BaseModel):
+    selected: List[str]
+    values: List[ProjectElementValue] = []
+
+
 class AWSBucketProjectElementValue(BaseModel):
     name: str
     created: str
@@ -409,6 +416,7 @@ class AWSStorageBackendValues(BaseModel):
 class LambdaProjectValues(BaseModel):
     type: Literal["lambda"] = "lambda"
     storage_backend_type: ProjectElement
+    regions: Optional[ProjectMultiElement]
     storage_backend_values: Optional[AWSStorageBackendValues]
 
 
