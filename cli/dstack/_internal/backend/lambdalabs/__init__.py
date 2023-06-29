@@ -5,7 +5,6 @@ import boto3
 from botocore.client import BaseClient
 
 from dstack._internal.backend.aws import logs
-from dstack._internal.backend.aws.config import AWSConfig
 from dstack._internal.backend.aws.secrets import AWSSecretsManager
 from dstack._internal.backend.aws.storage import AWSStorage
 from dstack._internal.backend.base import Backend
@@ -56,7 +55,10 @@ class LambdaBackend(Backend):
 
     @classmethod
     def load(cls) -> Optional["LambdaBackend"]:
-        return None
+        config = LambdaConfig.load()
+        if config is None:
+            return None
+        return cls(config)
 
     def _s3_client(self) -> BaseClient:
         return self._get_client("s3")
