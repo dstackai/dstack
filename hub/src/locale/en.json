@@ -219,7 +219,8 @@
         "aborting": "Aborting",
         "aborted":  "Aborted",
         "failed": "Failed",
-        "done":  "Done"
+        "done":  "Done",
+        "building":  "Building"
       }
     },
     "tag": {
