@@ -6,6 +6,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"github.com/dstackai/dstack/runner/internal/backend/base"
 	"io"
 	"os"
 	"path"
@@ -25,7 +26,6 @@ import (
 	"github.com/dstackai/dstack/runner/consts"
 	"github.com/dstackai/dstack/runner/consts/errorcodes"
 	"github.com/dstackai/dstack/runner/consts/states"
-	"github.com/dstackai/dstack/runner/internal/artifacts"
 	"github.com/dstackai/dstack/runner/internal/backend"
 	"github.com/dstackai/dstack/runner/internal/container"
 	"github.com/dstackai/dstack/runner/internal/environment"
@@ -41,10 +41,10 @@ type Executor struct {
 	configDir      string
 	config         *Config
 	engine         *container.Engine
-	cacheArtifacts []artifacts.Artifacter
-	artifactsIn    []artifacts.Artifacter
-	artifactsOut   []artifacts.Artifacter
-	artifactsFUSE  []artifacts.Artifacter
+	cacheArtifacts []base.Artifacter
+	artifactsIn    []base.Artifacter
+	artifactsOut   []base.Artifacter
+	artifactsFUSE  []base.Artifacter
 	repo           *repo.Manager
 	portID         string
 	streamLogs     *stream.Server

@@ -1,4 +1,4 @@
-package artifacts
+package base
 
 import (
 	"context"

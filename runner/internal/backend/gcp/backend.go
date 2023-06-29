@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"github.com/dstackai/dstack/runner/internal/backend/base"
 	"io"
 	"io/ioutil"
 	"os"
@@ -14,7 +15,6 @@ import (
 	"github.com/dstackai/dstack/runner/internal/repo"
 
 	"github.com/dstackai/dstack/runner/consts"
-	"github.com/dstackai/dstack/runner/internal/artifacts"
 	"github.com/dstackai/dstack/runner/internal/backend"
 	"github.com/dstackai/dstack/runner/internal/common"
 	"github.com/dstackai/dstack/runner/internal/gerrors"
@@ -188,12 +188,12 @@ func (gbackend *GCPBackend) Shutdown(ctx context.Context) error {
 	return gbackend.logging.client.Close()
 }
 
-func (gbackend *GCPBackend) GetArtifact(ctx context.Context, runName, localPath, remotePath string, mount bool) artifacts.Artifacter {
+func (gbackend *GCPBackend) GetArtifact(ctx context.Context, runName, localPath, remotePath string, mount bool) base.Artifacter {
 	workDir := path.Join(gbackend.GetTMPDir(ctx), consts.USER_ARTIFACTS_DIR, runName)
 	return NewGCPArtifacter(gbackend.storage, workDir, localPath, remotePath, false)
 }
 
-func (gbackend *GCPBackend) GetCache(ctx context.Context, runName, localPath, remotePath string) artifacts.Artifacter {
+func (gbackend *GCPBackend) GetCache(ctx context.Context, runName, localPath, remotePath string) base.Artifacter {
 	workDir := path.Join(gbackend.GetTMPDir(ctx), consts.USER_ARTIFACTS_DIR, runName)
 	return NewGCPArtifacter(gbackend.storage, workDir, localPath, remotePath, true)
 }

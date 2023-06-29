@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"github.com/dstackai/dstack/runner/internal/backend/base"
 	"io"
 	"io/ioutil"
 	"os"
@@ -16,8 +17,6 @@ import (
 
 	"github.com/dstackai/dstack/runner/consts"
 	"github.com/dstackai/dstack/runner/consts/states"
-	"github.com/dstackai/dstack/runner/internal/artifacts"
-	"github.com/dstackai/dstack/runner/internal/artifacts/local"
 	"github.com/dstackai/dstack/runner/internal/backend"
 	"github.com/dstackai/dstack/runner/internal/common"
 	"github.com/dstackai/dstack/runner/internal/gerrors"
@@ -184,10 +183,10 @@ func (l *Local) Shutdown(ctx context.Context) error {
 	return nil
 }
 
-func (l *Local) GetArtifact(ctx context.Context, runName, localPath, remotePath string, _ bool) artifacts.Artifacter {
+func (l *Local) GetArtifact(ctx context.Context, runName, localPath, remotePath string, _ bool) base.Artifacter {
 	rootPath := path.Join(l.GetTMPDir(ctx), consts.USER_ARTIFACTS_DIR, runName)
 	log.Trace(ctx, "Create simple artifact's engine. Local", "Root path", rootPath)
-	art, err := local.NewLocal(l.path, rootPath, localPath, remotePath)
+	art, err := NewLocalArtifacter(l.path, rootPath, localPath, remotePath)
 	if err != nil {
 		log.Error(ctx, "Error create simple engine", "err", err)
 		return nil
@@ -195,7 +194,7 @@ func (l *Local) GetArtifact(ctx context.Context, runName, localPath, remotePath 
 	return art
 }
 
-func (l *Local) GetCache(ctx context.Context, runName, localPath, remotePath string) artifacts.Artifacter {
+func (l *Local) GetCache(ctx context.Context, runName, localPath, remotePath string) base.Artifacter {
 	return l.GetArtifact(ctx, runName, localPath, remotePath, false)
 }
 

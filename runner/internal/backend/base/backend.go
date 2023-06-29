@@ -6,12 +6,15 @@ import (
 	"github.com/dstackai/dstack/runner/internal/gerrors"
 	"github.com/dstackai/dstack/runner/internal/log"
 	"github.com/dstackai/dstack/runner/internal/models"
+	"github.com/dstackai/dstack/runner/internal/repo"
 	"gopkg.in/yaml.v2"
+	"os"
 	"strings"
 )
 
 func LoadRunnerState(ctx context.Context, storage Storage, id string, out interface{}) error {
 	runnerFilepath := fmt.Sprintf("runners/%s.yaml", id)
+	log.Trace(ctx, "Load runner state from the storage", "ID", id)
 	content, err := GetObject(ctx, storage, runnerFilepath)
 	if err != nil {
 		return gerrors.Wrap(err)
@@ -71,6 +74,21 @@ func UpdateState(ctx context.Context, storage Storage, job *models.Job) error {
 		if err = storage.Rename(ctx, file, jobHeadFilepath); err != nil {
 			return gerrors.Wrap(err)
 		}
+	}
+	return nil
+}
+
+func GetRepoArchive(ctx context.Context, storage Storage, path, dir string) error {
+	archive, err := os.CreateTemp("", "archive-*.tar")
+	if err != nil {
+		return gerrors.Wrap(err)
+	}
+	defer func() { _ = os.Remove(archive.Name()) }()
+	if err := DownloadFile(ctx, storage, path, archive.Name()); err != nil {
+		return gerrors.Wrap(err)
+	}
+	if err := repo.ExtractArchive(ctx, archive.Name(), dir); err != nil {
+		return gerrors.Wrap(err)
 	}
 	return nil
 }

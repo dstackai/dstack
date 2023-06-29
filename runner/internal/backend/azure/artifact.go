@@ -2,7 +2,6 @@ package azure
 
 import (
 	"context"
-	"errors"
 	"github.com/dstackai/dstack/runner/internal/backend/base"
 	"os"
 	"path"
@@ -49,7 +48,7 @@ func (azartifacter *AzureArtifacter) AfterRun(ctx context.Context) error {
 func (azartifacter *AzureArtifacter) DockerBindings(workDir string) ([]mount.Mount, error) {
 	cleanPath := filepath.Clean(azartifacter.pathLocal)
 	if path.IsAbs(cleanPath) && path.Dir(cleanPath) == cleanPath {
-		return nil, errors.New("directory needs to be a non-root path")
+		return nil, gerrors.New("directory needs to be a non-root path")
 	}
 	dir := azartifacter.pathLocal
 	if !filepath.IsAbs(azartifacter.pathLocal) {

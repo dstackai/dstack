@@ -13,13 +13,11 @@ import (
 	"github.com/Azure/azure-sdk-for-go/sdk/azidentity"
 	"github.com/docker/docker/api/types/mount"
 	"github.com/dstackai/dstack/runner/consts"
-	"github.com/dstackai/dstack/runner/internal/artifacts"
 	"github.com/dstackai/dstack/runner/internal/backend"
 	"github.com/dstackai/dstack/runner/internal/common"
 	"github.com/dstackai/dstack/runner/internal/gerrors"
 	"github.com/dstackai/dstack/runner/internal/log"
 	"github.com/dstackai/dstack/runner/internal/models"
-	"github.com/dstackai/dstack/runner/internal/repo"
 	"gopkg.in/yaml.v2"
 )
 
@@ -154,12 +152,12 @@ func (azbackend *AzureBackend) Shutdown(ctx context.Context) error {
 	return nil
 }
 
-func (azbackend *AzureBackend) GetArtifact(ctx context.Context, runName, localPath, remotePath string, mount bool) artifacts.Artifacter {
+func (azbackend *AzureBackend) GetArtifact(ctx context.Context, runName, localPath, remotePath string, mount bool) base.Artifacter {
 	workDir := path.Join(azbackend.GetTMPDir(ctx), consts.USER_ARTIFACTS_DIR, runName)
 	return NewAzureArtifacter(azbackend.storage, workDir, localPath, remotePath, false)
 }
 
-func (azbackend *AzureBackend) GetCache(ctx context.Context, runName, localPath, remotePath string) artifacts.Artifacter {
+func (azbackend *AzureBackend) GetCache(ctx context.Context, runName, localPath, remotePath string) base.Artifacter {
 	workDir := path.Join(azbackend.GetTMPDir(ctx), consts.USER_ARTIFACTS_DIR, runName)
 	return NewAzureArtifacter(azbackend.storage, workDir, localPath, remotePath, true)
 }
@@ -235,20 +233,7 @@ func (azbackend *AzureBackend) GetRepoDiff(ctx context.Context, path string) (st
 }
 
 func (azbackend *AzureBackend) GetRepoArchive(ctx context.Context, path, dir string) error {
-	archive, err := os.CreateTemp("", "archive-*.tar")
-	if err != nil {
-		return gerrors.Wrap(err)
-	}
-	defer func() { _ = os.Remove(archive.Name()) }()
-
-	if err := base.DownloadFile(ctx, azbackend.storage, path, archive.Name()); err != nil {
-		return gerrors.Wrap(err)
-	}
-
-	if err := repo.ExtractArchive(ctx, archive.Name(), dir); err != nil {
-		return gerrors.Wrap(err)
-	}
-	return nil
+	return gerrors.Wrap(base.GetRepoArchive(ctx, azbackend.storage, path, dir))
 }
 
 func (azbackend *AzureBackend) GetBuildDiff(ctx context.Context, key, dst string) error {
@@ -257,10 +242,7 @@ func (azbackend *AzureBackend) GetBuildDiff(ctx context.Context, key, dst string
 }
 
 func (azbackend *AzureBackend) PutBuildDiff(ctx context.Context, src, key string) error {
-	if err := base.UploadFile(ctx, azbackend.storage, src, key); err != nil {
-		return gerrors.Wrap(err)
-	}
-	return nil
+	return gerrors.Wrap(base.UploadFile(ctx, azbackend.storage, src, key))
 }
 
 func (azbackend *AzureBackend) GetTMPDir(ctx context.Context) string {

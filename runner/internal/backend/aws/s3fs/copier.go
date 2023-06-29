@@ -1,4 +1,4 @@
-package client
+package s3fs
 
 import (
 	"context"
@@ -83,7 +83,7 @@ type Copier struct {
 	pb         *ProgressBar
 }
 
-func New(region string) *Copier {
+func NewCopier(region string) *Copier {
 	c := new(Copier)
 	ctx := context.TODO()
 	cfg, err := config.LoadDefaultConfig(

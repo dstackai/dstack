@@ -3,6 +3,7 @@ package backend
 import (
 	"context"
 	"errors"
+	"github.com/dstackai/dstack/runner/internal/backend/base"
 	"io"
 	"io/ioutil"
 	"os"
@@ -10,7 +11,6 @@ import (
 	"sync"
 
 	"github.com/docker/docker/api/types/mount"
-	"github.com/dstackai/dstack/runner/internal/artifacts"
 	"github.com/dstackai/dstack/runner/internal/gerrors"
 	"github.com/dstackai/dstack/runner/internal/log"
 	"github.com/dstackai/dstack/runner/internal/models"
@@ -29,8 +29,8 @@ type Backend interface {
 	CheckStop(ctx context.Context) (bool, error)
 	IsInterrupted(ctx context.Context) (bool, error)
 	Shutdown(ctx context.Context) error
-	GetArtifact(ctx context.Context, runName, localPath, remotePath string, fs bool) artifacts.Artifacter
-	GetCache(ctx context.Context, runName, localPath, remotePath string) artifacts.Artifacter
+	GetArtifact(ctx context.Context, runName, localPath, remotePath string, fs bool) base.Artifacter
+	GetCache(ctx context.Context, runName, localPath, remotePath string) base.Artifacter
 	CreateLogger(ctx context.Context, logGroup, logName string) io.Writer
 	ListSubDir(ctx context.Context, dir string) ([]string, error)
 	Bucket(ctx context.Context) string
