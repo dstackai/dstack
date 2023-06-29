@@ -31,6 +31,7 @@ from dstack._internal.hub.routers import (
 )
 from dstack._internal.hub.services.backends import local_backend_available
 from dstack._internal.hub.utils import logging
+from dstack._internal.hub.utils.ssh import generate_hub_ssh_key_pair
 
 logging.configure_root_logger()
 logger = logging.get_logger(__name__)
@@ -65,6 +66,7 @@ async def startup_event():
     url_with_token = f"{url}?token={admin_user.token}"
     create_default_project_config(url, admin_user.token)
     start_background_tasks()
+    generate_hub_ssh_key_pair()
     print(f"The server is available at {url_with_token}")
 
 

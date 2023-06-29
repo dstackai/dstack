@@ -1,4 +1,4 @@
-package local
+package aws
 
 import (
 	"context"

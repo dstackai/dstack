@@ -58,6 +58,13 @@ def get_current_backend() -> Backend:
             raise DstackError(
                 "Dependencies for GCP backend are not installed. Run `pip install dstack[gcp]`."
             )
+    elif current_backend_type == "lambda":
+        try:
+            from dstack._internal.backend.lambdalabs import LambdaBackend as backend_class
+        except ImportError:
+            raise DstackError(
+                "Dependencies for LambdaLabs backend are not installed. Run `pip install dstack[lambda]`."
+            )
     elif current_backend_type == "local":
         from dstack._internal.backend.local import LocalBackend as backend_class
     current_backend = backend_class.load()

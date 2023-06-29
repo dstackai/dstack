@@ -30,7 +30,9 @@ class Member(BaseModel):
     project_role: ProjectRole
 
 
-BackendType = Union[Literal["local"], Literal["aws"], Literal["gcp"], Literal["azure"]]
+BackendType = Union[
+    Literal["local"], Literal["aws"], Literal["gcp"], Literal["azure"], Literal["lambda"]
+]
 
 
 class LocalProjectConfig(BaseModel):
@@ -162,20 +164,55 @@ class AzureProjectConfigWithCreds(AzureProjectConfig):
     credentials: AzureProjectCreds
 
 
+class AWSStorageProjectConfigWithCredsPartial(BaseModel):
+    type: Literal["aws"] = "aws"
+    bucket_name: Optional[str]
+    credentials: Optional[AWSProjectAccessKeyCreds]
+
+
+class AWSStorageProjectConfig(BaseModel):
+    type: Literal["aws"] = "aws"
+    bucket_name: str
+
+
+class AWSStorageProjectConfigWithCreds(AWSStorageProjectConfig):
+    credentials: AWSProjectAccessKeyCreds
+
+
+class LambdaProjectConfigWithCredsPartial(BaseModel):
+    type: Literal["lambda"] = "lambda"
+    api_key: Optional[str]
+    regions: Optional[List[str]]
+    storage_backend: Optional[AWSStorageProjectConfigWithCredsPartial]
+
+
+class LambdaProjectConfig(BaseModel):
+    type: Literal["lambda"] = "lambda"
+    regions: List[str]
+    storage_backend: AWSStorageProjectConfig
+
+
+class LambdaProjectConfigWithCreds(LambdaProjectConfig):
+    api_key: str
+    storage_backend: AWSStorageProjectConfigWithCreds
+
+
 AnyProjectConfig = Union[
-    LocalProjectConfig, AWSProjectConfig, GCPProjectConfig, AzureProjectConfig
+    LocalProjectConfig, AWSProjectConfig, GCPProjectConfig, AzureProjectConfig, LambdaProjectConfig
 ]
 AnyProjectConfigWithCredsPartial = Union[
     LocalProjectConfig,
     AWSProjectConfigWithCredsPartial,
     GCPProjectConfigWithCredsPartial,
     AzureProjectConfigWithCredsPartial,
+    LambdaProjectConfigWithCredsPartial,
 ]
 AnyProjectConfigWithCreds = Union[
     LocalProjectConfig,
     AWSProjectConfigWithCreds,
     GCPProjectConfigWithCreds,
     AzureProjectConfigWithCreds,
+    LambdaProjectConfigWithCreds,
 ]
 
 
@@ -317,6 +354,11 @@ class ProjectElement(BaseModel):
     values: List[ProjectElementValue] = []
 
 
+class ProjectMultiElement(BaseModel):
+    selected: List[str]
+    values: List[ProjectElementValue] = []
+
+
 class AWSBucketProjectElementValue(BaseModel):
     name: str
     created: str
@@ -366,10 +408,22 @@ class AzureProjectValues(BaseModel):
     storage_account: Optional[ProjectElement]
 
 
+class AWSStorageBackendValues(BaseModel):
+    type: Literal["aws"] = "aws"
+    bucket_name: Optional[ProjectElement]
+
+
+class LambdaProjectValues(BaseModel):
+    type: Literal["lambda"] = "lambda"
+    storage_backend_type: ProjectElement
+    regions: Optional[ProjectMultiElement]
+    storage_backend_values: Optional[AWSStorageBackendValues]
+
+
 class ProjectValues(BaseModel):
-    __root__: Union[None, AWSProjectValues, GCPProjectValues, AzureProjectValues] = Field(
-        ..., discriminator="type"
-    )
+    __root__: Union[
+        None, AWSProjectValues, GCPProjectValues, AzureProjectValues, LambdaProjectValues
+    ] = Field(..., discriminator="type")
 
 
 class UserPatch(BaseModel):

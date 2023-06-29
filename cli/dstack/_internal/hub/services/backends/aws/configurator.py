@@ -6,13 +6,13 @@ from boto3.session import Session
 
 from dstack._internal.backend.aws import AwsBackend
 from dstack._internal.backend.aws.config import AWSConfig
-from dstack._internal.backend.base.config import BackendConfig
 from dstack._internal.hub.db.models import Project
 from dstack._internal.hub.models import (
     AWSBucketProjectElement,
     AWSBucketProjectElementValue,
     AWSProjectConfig,
     AWSProjectConfigWithCreds,
+    AWSProjectConfigWithCredsPartial,
     AWSProjectCreds,
     AWSProjectValues,
     ProjectElement,
@@ -20,7 +20,7 @@ from dstack._internal.hub.models import (
 )
 from dstack._internal.hub.services.backends.base import BackendConfigError, Configurator
 
-regions = [
+REGIONS = [
     ("US East, N. Virginia", "us-east-1"),
     ("US East, Ohio", "us-east-2"),
     ("US West, N. California", "us-west-1"),
@@ -38,31 +38,30 @@ regions = [
 class AWSConfigurator(Configurator):
     NAME = "aws"
 
-    def get_backend_class(self) -> type:
-        return AwsBackend
-
-    def configure_project(self, config_data: Dict) -> AWSProjectValues:
-        config = AWSConfig.deserialize(config_data)
-
-        if config.region_name is not None and config.region_name not in {r[1] for r in regions}:
-            raise BackendConfigError(f"Invalid AWS region {config.region_name}")
+    def configure_project(
+        self, project_config: AWSProjectConfigWithCredsPartial
+    ) -> AWSProjectValues:
+        if project_config.region_name is not None and project_config.region_name not in {
+            r[1] for r in REGIONS
+        }:
+            raise BackendConfigError(f"Invalid AWS region {project_config.region_name}")
 
         project_values = AWSProjectValues()
         session = Session()
         if session.region_name is None:
-            session = Session(region_name=config.region_name)
+            session = Session(region_name=project_config.region_name)
 
         project_values.default_credentials = self._valid_credentials(session=session)
 
-        credentials_data = config_data.get("credentials")
-        if credentials_data is None:
+        if project_config.credentials is None:
             return project_values
 
-        if credentials_data["type"] == "access_key":
+        project_credentials = project_config.credentials.__root__
+        if project_credentials.type == "access_key":
             session = Session(
-                region_name=config.region_name,
-                aws_access_key_id=credentials_data["access_key"],
-                aws_secret_access_key=credentials_data["secret_key"],
+                region_name=project_config.region_name,
+                aws_access_key_id=project_credentials.access_key,
+                aws_secret_access_key=project_credentials.secret_key,
             )
             if not self._valid_credentials(session=session):
                 self._raise_invalid_credentials_error(
@@ -74,27 +73,25 @@ class AWSConfigurator(Configurator):
         # TODO validate config values
         project_values.region_name = self._get_hub_regions(default_region=session.region_name)
         project_values.s3_bucket_name = self._get_hub_buckets(
-            session=session, region=config.region_name, default_bucket=config.bucket_name
+            session=session,
+            region=project_config.region_name,
+            default_bucket=project_config.s3_bucket_name,
         )
         project_values.ec2_subnet_id = self._get_hub_subnet(
-            session=session, default_subnet=config.subnet_id
+            session=session, default_subnet=project_config.ec2_subnet_id
         )
         return project_values
 
-    def create_config_auth_data_from_project_config(
-        self, project_config: AWSProjectConfigWithCreds
-    ) -> Tuple[Dict, Dict]:
-        project_config.s3_bucket_name = project_config.s3_bucket_name.replace("s3://", "")
-        config = AWSProjectConfig.parse_obj(project_config).dict()
-        auth = project_config.credentials.__root__.dict()
-        return config, auth
+    def create_project(self, project_config: AWSProjectConfigWithCreds) -> Tuple[Dict, Dict]:
+        config_data = {
+            "region_name": project_config.region_name,
+            "s3_bucket_name": project_config.s3_bucket_name.replace("s3://", ""),
+            "ec2_subnet_id": project_config.ec2_subnet_id,
+        }
+        auth_data = project_config.credentials.__root__.dict()
+        return config_data, auth_data
 
-    def get_backend_config_from_hub_config_data(
-        self, project_name: str, config_data: Dict, auth_data: Dict
-    ) -> BackendConfig:
-        return AWSConfig.deserialize(config_data, auth_data)
-
-    def get_project_config_from_project(
+    def get_project_config(
         self, project: Project, include_creds: bool
     ) -> Union[AWSProjectConfig, AWSProjectConfigWithCreds]:
         json_config = json.loads(project.config)
@@ -117,6 +114,22 @@ class AWSConfigurator(Configurator):
             ec2_subnet_id=ec2_subnet_id,
         )
 
+    def get_backend(self, project: Project) -> AwsBackend:
+        config_data = json.loads(project.config)
+        auth_data = json.loads(project.auth)
+        config = AWSConfig(
+            bucket_name=config_data.get("bucket")
+            or config_data.get("bucket_name")
+            or config_data.get("s3_bucket_name"),
+            region_name=config_data.get("region_name"),
+            profile_name=config_data.get("profile_name"),
+            subnet_id=config_data.get("subnet_id")
+            or config_data.get("ec2_subnet_id")
+            or config_data.get("subnet"),
+            credentials=auth_data,
+        )
+        return AwsBackend(config)
+
     def _valid_credentials(self, session: Session) -> bool:
         sts = session.client("sts")
         try:
@@ -134,7 +147,7 @@ class AWSConfigurator(Configurator):
 
     def _get_hub_regions(self, default_region: Optional[str]) -> ProjectElement:
         element = ProjectElement(selected=default_region)
-        for r in regions:
+        for r in REGIONS:
             element.values.append(ProjectElementValue(value=r[1], label=r[0]))
         return element
 
