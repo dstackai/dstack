@@ -267,5 +267,9 @@ class LambdaBackend(Backend):
     def get_signed_upload_url(self, object_key: str) -> str:
         return self._storage.get_signed_upload_url(object_key)
 
-    def delete_workflow_cache(self, repo_id: str, hub_user_name: str, workflow_name: str):
-        base_cache.delete_workflow_cache(self._storage, repo_id, hub_user_name, workflow_name)
+    def delete_configuration_cache(
+        self, repo_id: str, hub_user_name: str, configuration_path: str
+    ):
+        base_cache.delete_configuration_cache(
+            self._storage, repo_id, hub_user_name, configuration_path
+        )
