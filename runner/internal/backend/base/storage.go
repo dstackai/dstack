@@ -90,11 +90,10 @@ func DownloadDir(ctx context.Context, storage Storage, key, dst string) error {
 // Set delete=true to remove remote objects not presented locally.
 // Set withoutChanges=true to upload all local files without testing for changes.
 func UploadDir(ctx context.Context, storage Storage, src, key string, delete, withoutChanges bool) error {
-	// dependency injection for testing
-	return UploadDirMocked(ctx, storage, src, key, delete, withoutChanges, ListFiles, UploadFile)
+	return uploadDir(ctx, storage, src, key, delete, withoutChanges, ListFiles, UploadFile)
 }
 
-func UploadDirMocked(ctx context.Context, storage Storage, src, key string, delete, withoutChanges bool, srcLister StorageLister, fileUploader FileUploader) error {
+func uploadDir(ctx context.Context, storage Storage, src, key string, delete, withoutChanges bool, filesLister StorageLister, fileUploader FileUploader) error {
 	src = common.AddTrailingSlash(src)
 	key = common.AddTrailingSlash(key)
 
@@ -102,7 +101,7 @@ func UploadDirMocked(ctx context.Context, storage Storage, src, key string, dele
 	uploadQueue := make([]StorageObject, 0)
 
 	objects, objectsErr := storage.List(ctx, key)
-	files, filesErr := srcLister(ctx, src)
+	files, filesErr := filesLister(ctx, src)
 
 	// Match two sorted lists: objects (remote) and files (local)
 	// 1. If the item only exists in objects — delete object
