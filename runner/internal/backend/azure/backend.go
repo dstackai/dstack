@@ -156,12 +156,12 @@ func (azbackend *AzureBackend) Shutdown(ctx context.Context) error {
 
 func (azbackend *AzureBackend) GetArtifact(ctx context.Context, runName, localPath, remotePath string, mount bool) artifacts.Artifacter {
 	workDir := path.Join(azbackend.GetTMPDir(ctx), consts.USER_ARTIFACTS_DIR, runName)
-	return NewAzureArtifacter(azbackend.storage, workDir, localPath, remotePath)
+	return NewAzureArtifacter(azbackend.storage, workDir, localPath, remotePath, false)
 }
 
 func (azbackend *AzureBackend) GetCache(ctx context.Context, runName, localPath, remotePath string) artifacts.Artifacter {
 	workDir := path.Join(azbackend.GetTMPDir(ctx), consts.USER_ARTIFACTS_DIR, runName)
-	return NewAzureArtifacter(azbackend.storage, workDir, localPath, remotePath)
+	return NewAzureArtifacter(azbackend.storage, workDir, localPath, remotePath, true)
 }
 
 func (azbackend *AzureBackend) CreateLogger(ctx context.Context, logGroup, logName string) io.Writer {

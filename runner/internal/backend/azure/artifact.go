@@ -21,7 +21,7 @@ type AzureArtifacter struct {
 	doSync     bool
 }
 
-func NewAzureArtifacter(storage AzureStorage, workDir, pathLocal, pathRemote string) *AzureArtifacter {
+func NewAzureArtifacter(storage AzureStorage, workDir, pathLocal, pathRemote string, doSync bool) *AzureArtifacter {
 	err := os.MkdirAll(path.Join(workDir, pathLocal), 0o755)
 	if err != nil {
 		// XXX: is it better to report failure about making dirs?
@@ -32,7 +32,7 @@ func NewAzureArtifacter(storage AzureStorage, workDir, pathLocal, pathRemote str
 		workDir:    workDir,
 		pathLocal:  pathLocal,
 		pathRemote: pathRemote,
-		doSync:     false,
+		doSync:     doSync,
 	}
 }
 
