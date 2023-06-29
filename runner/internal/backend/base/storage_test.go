@@ -16,9 +16,7 @@ func TestEmptyRemote(t *testing.T) {
 		{Key: "02"},
 		{Key: "03"},
 	})
-	if err := uploadDir(context.TODO(), storage, "src/", "key/", true, false, lister, dummyFileUpload); err != nil {
-		assert.Nil(t, err)
-	}
+	assert.Nil(t, uploadDir(context.TODO(), storage, "src/", "key/", true, false, lister, dummyFileUpload))
 	assert.ElementsMatch(t, []string{"key/01", "key/02", "key/03"}, storage.upload)
 }
 
@@ -29,9 +27,7 @@ func TestEmptyLocal(t *testing.T) {
 		{Key: "03"},
 	})
 	lister := NewMockLister([]StorageObject{})
-	if err := uploadDir(context.TODO(), storage, "src/", "key/", true, false, lister, dummyFileUpload); err != nil {
-		assert.Nil(t, err)
-	}
+	assert.Nil(t, uploadDir(context.TODO(), storage, "src/", "key/", true, false, lister, dummyFileUpload))
 	assert.ElementsMatch(t, []string{"key/01", "key/02", "key/03"}, storage.delete)
 }
 
@@ -46,9 +42,7 @@ func TestOverlap(t *testing.T) {
 		{Key: "03"},
 		{Key: "04"},
 	})
-	if err := uploadDir(context.TODO(), storage, "src/", "key/", true, false, lister, dummyFileUpload); err != nil {
-		assert.Nil(t, err)
-	}
+	assert.Nil(t, uploadDir(context.TODO(), storage, "src/", "key/", true, false, lister, dummyFileUpload))
 	assert.ElementsMatch(t, []string{"key/01"}, storage.delete)
 	assert.ElementsMatch(t, []string{"key/04"}, storage.upload)
 }
@@ -64,9 +58,7 @@ func TestOverlapWithChanges(t *testing.T) {
 		{Key: "03"},
 		{Key: "04"},
 	})
-	if err := uploadDir(context.TODO(), storage, "src/", "key/", true, false, lister, dummyFileUpload); err != nil {
-		assert.Nil(t, err)
-	}
+	assert.Nil(t, uploadDir(context.TODO(), storage, "src/", "key/", true, false, lister, dummyFileUpload))
 	assert.ElementsMatch(t, []string{"key/01"}, storage.delete)
 	assert.ElementsMatch(t, []string{"key/02", "key/04"}, storage.upload)
 }
