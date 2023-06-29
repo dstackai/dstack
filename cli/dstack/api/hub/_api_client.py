@@ -624,11 +624,11 @@ class HubAPIClient:
             return resp.text
         resp.raise_for_status()
 
-    def delete_workflow_cache(self, workflow_name: str):
+    def delete_configuration_cache(self, configuration_path: str):
         url = _project_url(
             url=self.url,
             project=self.project,
-            additional_path=f"/workflows/{workflow_name}/cache/delete",
+            additional_path=f"/configurations/{configuration_path}/cache/delete",
         )
         resp = _make_hub_request(
             requests.post,

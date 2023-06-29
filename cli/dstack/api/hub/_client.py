@@ -257,8 +257,8 @@ class HubClient:
         # /{hub_name}/secrets/delete
         self._api_client.delete_secret(secret_name=secret_name)
 
-    def delete_workflow_cache(self, workflow_name: str):
-        self._api_client.delete_workflow_cache(workflow_name=workflow_name)
+    def delete_configuration_cache(self, configuration_path: str):
+        self._api_client.delete_configuration_cache(configuration_path=configuration_path)
 
     def get_run_plan(
         self,

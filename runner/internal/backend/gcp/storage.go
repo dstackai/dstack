@@ -168,6 +168,14 @@ func (gstorage *GCPStorage) DownloadDir(ctx context.Context, src, dst string) er
 		semaphore.Acquire(1)
 		go func() {
 			defer semaphore.Release(1)
+			if symlink, ok := attrs.Metadata["symlink"]; ok && attrs.Size == 0 && symlink != "" {
+				if err := os.Symlink(symlink, dstFilepath); err != nil {
+					errorFound.Store(true)
+					log.Error(ctx, "Failed to create symlink", "Key", attrs.Name, "err", err)
+				}
+				// can't do os.Chtimes to a symlink, skip
+				return
+			}
 			if err := gstorage.downloadFile(ctx, attrs.Name, dstFilepath); err != nil {
 				errorFound.Store(true)
 				log.Error(ctx, "Failed to download file", "Key", attrs.Name, "err", err)
@@ -203,11 +211,16 @@ func (gstorage *GCPStorage) SyncDirUpload(ctx context.Context, srcDir, dstPrefix
 				log.Error(ctx, "Iterating objects", "prefix", dstPrefix, "err", err)
 				return
 			}
+			symlink, ok := attrs.Metadata["symlink"]
+			if !ok {
+				symlink = ""
+			}
 			dstObjects <- base.ObjectInfo{
 				Key: strings.TrimPrefix(attrs.Name, dstPrefix),
 				FileInfo: base.FileInfo{
 					Size:     attrs.Size,
 					Modified: attrs.Updated,
+					Symlink:  symlink,
 				},
 			}
 		}
@@ -219,10 +232,13 @@ func (gstorage *GCPStorage) SyncDirUpload(ctx context.Context, srcDir, dstPrefix
 			key = path.Join(dstPrefix, key)
 			return gstorage.DeleteFile(ctx, key)
 		},
-		func(ctx context.Context, key string, _ base.FileInfo) error {
+		func(ctx context.Context, key string, info base.FileInfo) error {
 			/* upload object */
 			file := path.Join(srcDir, key)
 			key = path.Join(dstPrefix, key)
+			if info.Symlink != "" {
+				return gstorage.writeSymlink(ctx, info.Symlink, key)
+			}
 			return gstorage.uploadFile(ctx, file, key)
 		},
 	)
@@ -285,6 +301,19 @@ func (gstorage *GCPStorage) downloadFile(ctx context.Context, src, dst string) e
 	}
 	defer file.Close()
 	_, err = io.Copy(file, reader)
+	if err != nil {
+		return gerrors.Wrap(err)
+	}
+	return nil
+}
+
+func (gstorage *GCPStorage) writeSymlink(ctx context.Context, symlink, key string) error {
+	obj := gstorage.bucket.Object(key)
+	writer := obj.NewWriter(ctx)
+	writer.Metadata = map[string]string{
+		"symlink": symlink,
+	}
+	err := writer.Close()
 	if err != nil {
 		return gerrors.Wrap(err)
 	}

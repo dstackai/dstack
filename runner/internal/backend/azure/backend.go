@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"github.com/dstackai/dstack/runner/internal/backend/base"
 	"io"
 	"os"
 	"path"
@@ -88,17 +89,8 @@ func New(config AzureConfig) *AzureBackend {
 
 func (azbackend *AzureBackend) Init(ctx context.Context, ID string) error {
 	azbackend.runnerID = ID
-	runnerFilepath := fmt.Sprintf("runners/%s.yaml", ID)
-	contents, err := azbackend.storage.GetFile(ctx, runnerFilepath)
-	if err != nil {
+	if err := base.LoadRunnerState(ctx, azbackend.storage, ID, &azbackend.state); err != nil {
 		return gerrors.Wrap(err)
-	}
-	err = yaml.Unmarshal(contents, &azbackend.state)
-	if err != nil {
-		return gerrors.Wrap(err)
-	}
-	if azbackend.state == nil {
-		return gerrors.New("State is empty. Data not loading")
 	}
 	ip, err := azbackend.compute.GetInstancePublicIP(ctx, azbackend.state.RequestID)
 	if err != nil {
@@ -115,13 +107,7 @@ func (azbackend *AzureBackend) Job(ctx context.Context) *models.Job {
 }
 
 func (azbackend *AzureBackend) RefetchJob(ctx context.Context) (*models.Job, error) {
-	log.Trace(ctx, "Refetching job from state", "ID", azbackend.state.Job.JobID)
-	contents, err := azbackend.storage.GetFile(ctx, azbackend.state.Job.JobFilepath())
-	if err != nil {
-		return nil, gerrors.Wrap(err)
-	}
-	err = yaml.Unmarshal(contents, &azbackend.state.Job)
-	if err != nil {
+	if err := base.RefetchJob(ctx, azbackend.storage, azbackend.state.Job); err != nil {
 		return nil, gerrors.Wrap(err)
 	}
 	return azbackend.state.Job, nil
@@ -138,35 +124,7 @@ func (azbackend *AzureBackend) Requirements(ctx context.Context) models.Requirem
 }
 
 func (azbackend *AzureBackend) UpdateState(ctx context.Context) error {
-	log.Trace(ctx, "Marshaling job")
-	contents, err := yaml.Marshal(&azbackend.state.Job)
-	if err != nil {
-		return gerrors.Wrap(err)
-	}
-	jobFilepath := azbackend.state.Job.JobFilepath()
-	log.Trace(ctx, "Write to file job", "Path", jobFilepath)
-	err = azbackend.storage.PutFile(ctx, jobFilepath, contents)
-	if err != nil {
-		return gerrors.Wrap(err)
-	}
-	log.Trace(ctx, "Fetching list jobs", "Repo username", azbackend.state.Job.RepoUserName, "Repo name", azbackend.state.Job.RepoName, "Job ID", azbackend.state.Job.JobID)
-	files, err := azbackend.storage.ListFile(ctx, azbackend.state.Job.JobHeadFilepathPrefix())
-	if err != nil {
-		return gerrors.Wrap(err)
-	}
-	if len(files) > 1 {
-		return fmt.Errorf("unexpected blob listing result %s [%d]", strings.Join(files, ","), len(files))
-	}
-	jobHeadFilepath := azbackend.state.Job.JobHeadFilepath()
-	if len(files) == 1 {
-		file := files[0]
-		log.Trace(ctx, "Renaming file job", "From", file, "To", jobHeadFilepath)
-		err = azbackend.storage.RenameFile(ctx, file, jobHeadFilepath)
-		if err != nil {
-			return gerrors.Wrap(err)
-		}
-	}
-	return nil
+	return gerrors.Wrap(base.UpdateState(ctx, azbackend.storage, azbackend.state.Job))
 }
 
 func (azbackend *AzureBackend) CheckStop(ctx context.Context) (bool, error) {
@@ -220,7 +178,7 @@ func (azbackend *AzureBackend) CreateLogger(ctx context.Context, logGroup, logNa
 }
 
 func (azbackend *AzureBackend) ListSubDir(ctx context.Context, dir string) ([]string, error) {
-	return azbackend.storage.ListFile(ctx, dir)
+	return base.ListObjects(ctx, azbackend.storage, dir)
 }
 
 func (azbackend *AzureBackend) Bucket(ctx context.Context) string {
@@ -231,7 +189,7 @@ func (azbackend *AzureBackend) Bucket(ctx context.Context) string {
 func (azbackend *AzureBackend) Secrets(ctx context.Context) (map[string]string, error) {
 	log.Trace(ctx, "Getting secrets")
 	prefix := azbackend.state.Job.SecretsPrefix()
-	secretFilenames, err := azbackend.storage.ListFile(ctx, prefix)
+	secretFilenames, err := base.ListObjects(ctx, azbackend.storage, prefix)
 	if err != nil {
 		return nil, gerrors.Wrap(err)
 	}
@@ -261,21 +219,15 @@ func (azbackend *AzureBackend) GitCredentials(ctx context.Context) *models.GitCr
 }
 
 func (azbackend *AzureBackend) GetJobByPath(ctx context.Context, path string) (*models.Job, error) {
-	log.Trace(ctx, "Fetching job by path", "Path", path)
-	content, err := azbackend.storage.GetFile(ctx, path)
-	if err != nil {
-		return nil, gerrors.Wrap(err)
-	}
 	job := new(models.Job)
-	err = yaml.Unmarshal(content, &job)
-	if err != nil {
+	if err := base.GetJobByPath(ctx, azbackend.storage, path, job); err != nil {
 		return nil, gerrors.Wrap(err)
 	}
 	return job, nil
 }
 
 func (azbackend *AzureBackend) GetRepoDiff(ctx context.Context, path string) (string, error) {
-	diff, err := azbackend.storage.GetFile(ctx, path)
+	diff, err := base.GetObject(ctx, azbackend.storage, path)
 	if err != nil {
 		return "", gerrors.Wrap(err)
 	}
@@ -287,9 +239,9 @@ func (azbackend *AzureBackend) GetRepoArchive(ctx context.Context, path, dir str
 	if err != nil {
 		return gerrors.Wrap(err)
 	}
-	defer os.Remove(archive.Name())
+	defer func() { _ = os.Remove(archive.Name()) }()
 
-	if err := azbackend.storage.DownloadFile(ctx, path, archive.Name()); err != nil {
+	if err := base.DownloadFile(ctx, azbackend.storage, path, archive.Name()); err != nil {
 		return gerrors.Wrap(err)
 	}
 
@@ -300,12 +252,12 @@ func (azbackend *AzureBackend) GetRepoArchive(ctx context.Context, path, dir str
 }
 
 func (azbackend *AzureBackend) GetBuildDiff(ctx context.Context, key, dst string) error {
-	_ = azbackend.storage.DownloadFile(ctx, key, dst)
+	_ = base.DownloadFile(ctx, azbackend.storage, key, dst)
 	return nil
 }
 
 func (azbackend *AzureBackend) PutBuildDiff(ctx context.Context, src, key string) error {
-	if err := azbackend.storage.UploadFile(ctx, src, key); err != nil {
+	if err := base.UploadFile(ctx, azbackend.storage, src, key); err != nil {
 		return gerrors.Wrap(err)
 	}
 	return nil

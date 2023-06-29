@@ -3,6 +3,7 @@ package azure
 import (
 	"context"
 	"errors"
+	"github.com/dstackai/dstack/runner/internal/backend/base"
 	"os"
 	"path"
 	"path/filepath"
@@ -17,6 +18,7 @@ type AzureArtifacter struct {
 	workDir    string
 	pathLocal  string
 	pathRemote string
+	doSync     bool
 }
 
 func NewAzureArtifacter(storage AzureStorage, workDir, pathLocal, pathRemote string) *AzureArtifacter {
@@ -30,17 +32,18 @@ func NewAzureArtifacter(storage AzureStorage, workDir, pathLocal, pathRemote str
 		workDir:    workDir,
 		pathLocal:  pathLocal,
 		pathRemote: pathRemote,
+		doSync:     false,
 	}
 }
 
 func (azartifacter *AzureArtifacter) BeforeRun(ctx context.Context) error {
 	log.Trace(ctx, "Download artifact", "artifact", azartifacter.pathLocal)
-	return gerrors.Wrap(azartifacter.storage.DownloadDir(ctx, azartifacter.pathRemote, path.Join(azartifacter.workDir, azartifacter.pathLocal)))
+	return gerrors.Wrap(base.DownloadDir(ctx, azartifacter.storage, azartifacter.pathRemote, path.Join(azartifacter.workDir, azartifacter.pathLocal)))
 }
 
 func (azartifacter *AzureArtifacter) AfterRun(ctx context.Context) error {
 	log.Trace(ctx, "Upload artifact", "artifact", azartifacter.pathLocal)
-	return gerrors.Wrap(azartifacter.storage.UploadDir(ctx, path.Join(azartifacter.workDir, azartifacter.pathLocal), azartifacter.pathRemote))
+	return gerrors.Wrap(base.UploadDir(ctx, azartifacter.storage, path.Join(azartifacter.workDir, azartifacter.pathLocal), azartifacter.pathRemote, azartifacter.doSync, !azartifacter.doSync))
 }
 
 func (azartifacter *AzureArtifacter) DockerBindings(workDir string) ([]mount.Mount, error) {

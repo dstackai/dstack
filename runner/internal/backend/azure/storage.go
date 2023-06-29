@@ -1,17 +1,14 @@
 package azure
 
 import (
-	"bytes"
 	"context"
 	"errors"
 	"fmt"
-	"io/fs"
-	"os"
-	"path"
-	"path/filepath"
+	"github.com/Azure/azure-sdk-for-go/sdk/azcore"
+	"github.com/dstackai/dstack/runner/internal/backend/base"
+	"io"
 	"strings"
 
-	"github.com/Azure/azure-sdk-for-go/sdk/azcore"
 	"github.com/Azure/azure-sdk-for-go/sdk/storage/azblob"
 	"github.com/Azure/azure-sdk-for-go/sdk/storage/azblob/container"
 	"github.com/dstackai/dstack/runner/internal/gerrors"
@@ -41,57 +38,81 @@ func NewAzureStorage(credential azcore.TokenCredential, account string) (*AzureS
 	}, nil
 }
 
-func (azstorage AzureStorage) GetFile(ctx context.Context, key string) ([]byte, error) {
-	contents := bytes.Buffer{}
-	get, err := azstorage.containerClient.NewBlobClient(key).DownloadStream(ctx, nil)
-	if err != nil {
-		return nil, gerrors.Wrap(err)
-	}
-	retryReader := get.NewRetryReader(ctx, &azblob.RetryReaderOptions{})
-	_, err = contents.ReadFrom(retryReader)
-	if err != nil {
-		return nil, gerrors.Wrap(err)
-	}
-	return contents.Bytes(), nil
-}
-
-func (azstorage AzureStorage) PutFile(ctx context.Context, key string, contents []byte) error {
-	_, err := azstorage.storageClient.UploadBuffer(ctx, azstorage.container, key, contents, nil)
+func (azstorage AzureStorage) Download(ctx context.Context, key string, writer io.Writer) error {
+	stream, err := azstorage.containerClient.NewBlobClient(key).DownloadStream(ctx, nil)
 	if err != nil {
 		return gerrors.Wrap(err)
 	}
-	return nil
+	reader := stream.NewRetryReader(ctx, nil)
+	_, err = io.Copy(writer, reader)
+	return gerrors.Wrap(err)
 }
 
-func (azstorage AzureStorage) ListFile(ctx context.Context, prefix string) ([]string, error) {
-	pager := azstorage.containerClient.NewListBlobsFlatPager(&azblob.ListBlobsFlatOptions{Prefix: &prefix})
-	var result []string
-	for pager.More() {
-		resp, err := pager.NextPage(ctx)
-		if err != nil {
-			return nil, gerrors.Wrap(err)
-		}
-		for _, blob := range resp.Segment.BlobItems {
-			result = append(result, strings.Clone(*blob.Name))
-		}
-	}
-	return result, nil
+func (azstorage AzureStorage) Upload(ctx context.Context, reader io.Reader, key string) error {
+	_, err := azstorage.containerClient.NewBlockBlobClient(key).UploadStream(ctx, reader, nil)
+	return gerrors.Wrap(err)
 }
 
-func (azstorage AzureStorage) RenameFile(ctx context.Context, oldKey, newKey string) error {
+func (azstorage AzureStorage) Delete(ctx context.Context, key string) error {
+	_, err := azstorage.containerClient.NewBlobClient(key).Delete(ctx, nil)
+	return gerrors.Wrap(err)
+}
+
+func (azstorage AzureStorage) Rename(ctx context.Context, oldKey, newKey string) error {
 	if oldKey == newKey {
 		return nil
 	}
-	source := azstorage.containerClient.NewBlobClient(oldKey)
-	_, err := azstorage.containerClient.NewBlobClient(newKey).CopyFromURL(ctx, source.URL(), nil)
+	old := azstorage.containerClient.NewBlobClient(oldKey)
+	_, err := azstorage.containerClient.NewBlobClient(newKey).CopyFromURL(ctx, old.URL(), nil)
 	if err != nil {
 		return gerrors.Wrap(err)
 	}
-	_, err = source.Delete(ctx, nil)
-	if err != nil {
-		return gerrors.Wrap(err)
-	}
-	return nil
+	_, err = old.Delete(ctx, nil)
+	return gerrors.Wrap(err)
+}
+
+func (azstorage AzureStorage) CreateSymlink(ctx context.Context, key, symlink string) error {
+	_, err := azstorage.containerClient.NewBlockBlobClient(key).UploadBuffer(ctx, nil, &azblob.UploadBufferOptions{
+		Metadata: map[string]*string{
+			"symlink": &symlink,
+		},
+	})
+	return gerrors.Wrap(err)
+}
+
+func (azstorage AzureStorage) List(ctx context.Context, prefix string) (<-chan *base.StorageObject, <-chan error) {
+	pager := azstorage.containerClient.NewListBlobsFlatPager(&azblob.ListBlobsFlatOptions{
+		Prefix: &prefix,
+		Include: azblob.ListBlobsInclude{
+			Metadata: true,
+		},
+	})
+	ch := make(chan *base.StorageObject)
+	errCh := make(chan error, 1)
+	go func() {
+		defer close(ch)
+		defer close(errCh)
+		for pager.More() {
+			resp, err := pager.NextPage(ctx)
+			if err != nil {
+				errCh <- gerrors.Wrap(err)
+				return
+			}
+			for _, blob := range resp.Segment.BlobItems {
+				symlink, ok := blob.Metadata["symlink"]
+				if !ok {
+					symlink = new(string)
+				}
+				ch <- &base.StorageObject{
+					Key:     strings.TrimPrefix(*blob.Name, prefix),
+					Size:    *blob.Properties.ContentLength,
+					ModTime: *blob.Properties.LastModified,
+					Symlink: *symlink,
+				}
+			}
+		}
+	}()
+	return ch, errCh
 }
 
 func (azstorage AzureStorage) GetMetadata(ctx context.Context, key string, tag string) (string, error) {
@@ -108,65 +129,6 @@ func (azstorage AzureStorage) GetMetadata(ctx context.Context, key string, tag s
 	return "", gerrors.Wrap(ErrTagNotFound)
 }
 
-func (azstorage AzureStorage) DownloadDir(ctx context.Context, src, dst string) error {
-	files, err := azstorage.ListFile(ctx, src)
-	if err != nil {
-		return gerrors.Wrap(err)
-	}
-	for _, file := range files {
-		dstFilepath := path.Join(dst, strings.TrimPrefix(file, src))
-		os.MkdirAll(filepath.Dir(dstFilepath), 0o755)
-		err = func() error {
-			err = azstorage.DownloadFile(ctx, file, dstFilepath)
-			return err
-		}()
-		if err != nil {
-			return gerrors.Wrap(err)
-		}
-	}
-	return nil
-}
-
-func (azstorage AzureStorage) UploadDir(ctx context.Context, src string, dst string) error {
-	err := filepath.WalkDir(src, func(filePath string, entry fs.DirEntry, err error) error {
-		if err != nil {
-			return gerrors.Wrap(err)
-		}
-		if entry.IsDir() {
-			return nil
-		}
-		key := path.Join(dst, strings.TrimPrefix(filePath, src))
-		return gerrors.Wrap(azstorage.UploadFile(ctx, filePath, key))
-	})
-	return gerrors.Wrap(err)
-}
-
 func getBlobStorageAccountUrl(account string) string {
 	return fmt.Sprintf("https://%s.blob.core.windows.net", account)
-}
-
-func (azstorage AzureStorage) DownloadFile(ctx context.Context, key string, dst string) error {
-	dstFile, err := os.Create(dst)
-	if err != nil {
-		return gerrors.Wrap(err)
-	}
-	defer dstFile.Close()
-	_, err = azstorage.containerClient.NewBlobClient(key).DownloadFile(ctx, dstFile, nil)
-	if err != nil {
-		return gerrors.Wrap(err)
-	}
-	return nil
-}
-
-func (azstorage AzureStorage) UploadFile(ctx context.Context, src string, key string) error {
-	file, err := os.Open(src)
-	if err != nil {
-		return gerrors.Wrap(err)
-	}
-	_, err = azstorage.storageClient.UploadFile(ctx, azstorage.container, key, file, nil)
-	if err != nil {
-		file.Close()
-		return gerrors.Wrap(err)
-	}
-	return gerrors.Wrap(file.Close())
 }
