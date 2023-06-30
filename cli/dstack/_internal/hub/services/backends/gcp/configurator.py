@@ -178,7 +178,7 @@ class GCPConfigurator(Configurator):
             "region": project_config.region,
             "zone": project_config.zone,
             "bucket_name": project_config.bucket_name,
-            "vpc": project_config.bucket_name,
+            "vpc": project_config.vpc,
             "subnet": project_config.subnet,
         }
         return config_data, auth_data

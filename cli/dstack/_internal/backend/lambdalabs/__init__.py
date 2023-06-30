@@ -61,7 +61,7 @@ class LambdaBackend(ComponentBasedBackend):
 
     def create_run(self, repo_id: str) -> str:
         self._logging.create_log_groups_if_not_exist(
-            self._logs_client(), self.backend_config.bucket_name, repo_id
+            self._logs_client(), self.backend_config.storage_config.bucket, repo_id
         )
         return base_runs.create_run(self._storage)
 

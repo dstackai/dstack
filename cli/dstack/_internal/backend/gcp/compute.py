@@ -732,7 +732,7 @@ def _create_firewall_rules(
         A Firewall object.
     """
     firewall_rule = compute_v1.Firewall()
-    firewall_rule.name = f"dstack-runner-allow-incoming-" + network.replace("/", "-")
+    firewall_rule.name = f"dstack-ssh-in-" + network.replace("/", "-")
     firewall_rule.direction = "INGRESS"
 
     allowed_ssh_port = compute_v1.Allowed()
