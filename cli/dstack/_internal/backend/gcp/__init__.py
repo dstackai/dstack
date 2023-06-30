@@ -1,6 +1,5 @@
 import warnings
-from datetime import datetime
-from typing import Generator, Optional
+from typing import Optional
 
 import google.auth
 from google.auth._default import _CLOUD_SDK_CREDENTIALS_WARNING
@@ -13,7 +12,6 @@ from dstack._internal.backend.gcp.config import GCPConfig
 from dstack._internal.backend.gcp.logs import GCPLogging
 from dstack._internal.backend.gcp.secrets import GCPSecretsManager
 from dstack._internal.backend.gcp.storage import GCPStorage
-from dstack._internal.core.log_event import LogEvent
 
 warnings.filterwarnings("ignore", message=_CLOUD_SDK_CREDENTIALS_WARNING)
 
@@ -55,6 +53,9 @@ class GCPBackend(ComponentBasedBackend):
     def secrets_manager(self) -> GCPSecretsManager:
         return self._secrets_manager
 
+    def logging(self) -> GCPLogging:
+        return self._logging
+
     @classmethod
     def load(cls) -> Optional["GCPBackend"]:
         config = GCPConfig.load()
@@ -64,23 +65,4 @@ class GCPBackend(ComponentBasedBackend):
         return cls(
             backend_config=config,
             credentials=credentials,
-        )
-
-    def poll_logs(
-        self,
-        repo_id: str,
-        run_name: str,
-        start_time: datetime,
-        end_time: Optional[datetime] = None,
-        descending: bool = False,
-        diagnose: bool = False,
-    ) -> Generator[LogEvent, None, None]:
-        yield from self._logging.poll_logs(
-            storage=self._storage,
-            repo_id=repo_id,
-            run_name=run_name,
-            start_time=start_time,
-            end_time=end_time,
-            descending=descending,
-            diagnose=diagnose,
         )

@@ -1,9 +1,10 @@
 import json
 import re
 import urllib.parse
-from typing import Any, Dict, Optional
+from abc import ABC, abstractmethod
+from datetime import datetime
+from typing import Any, Dict, Generator, Optional
 
-from dstack._internal.backend.base import jobs
 from dstack._internal.backend.base.storage import Storage
 from dstack._internal.core.job import Job
 from dstack._internal.core.log_event import LogEvent, LogEventSource
@@ -13,6 +14,21 @@ WAIT_N_ONCE_FINISHED = 1
 CHECK_STATUS_EVERY_N = 3
 
 POLL_LOGS_RATE_SECS = 1
+
+
+class Logging(ABC):
+    @abstractmethod
+    def poll_logs(
+        self,
+        storage: Storage,
+        repo_id: str,
+        run_name: str,
+        start_time: datetime,
+        end_time: Optional[datetime],
+        descending: bool,
+        diagnose: bool,
+    ) -> Generator[LogEvent, None, None]:
+        pass
 
 
 def render_log_event(

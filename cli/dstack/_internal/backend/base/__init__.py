@@ -10,6 +10,7 @@ from dstack._internal.backend.base import runs as base_runs
 from dstack._internal.backend.base import secrets as base_secrets
 from dstack._internal.backend.base import tags as base_tags
 from dstack._internal.backend.base.compute import Compute
+from dstack._internal.backend.base.logs import Logging
 from dstack._internal.backend.base.secrets import SecretsManager
 from dstack._internal.backend.base.storage import Storage
 from dstack._internal.core.artifact import Artifact
@@ -243,6 +244,10 @@ class ComponentBasedBackend(Backend):
     def secrets_manager(self) -> SecretsManager:
         pass
 
+    @abstractmethod
+    def logging(self) -> Logging:
+        pass
+
     def predict_instance_type(self, job: Job) -> Optional[InstanceType]:
         return base_jobs.predict_job_instance(self.compute(), job)
 
@@ -286,26 +291,24 @@ class ComponentBasedBackend(Backend):
             interrupted_job_new_status,
         )
 
-    # def poll_logs(
-    #     self,
-    #     repo_id: str,
-    #     run_name: str,
-    #     start_time: datetime,
-    #     end_time: Optional[datetime] = None,
-    #     descending: bool = False,
-    #     diagnose: bool = False,
-    # ) -> Generator[LogEvent, None, None]:
-    #     return logs.poll_logs(
-    #         self.storage(),
-    #         self._logs_client(),
-    #         self.backend_config.bucket_name,
-    #         repo_id,
-    #         run_name,
-    #         start_time,
-    #         end_time,
-    #         descending,
-    #         diagnose,
-    #     )
+    def poll_logs(
+        self,
+        repo_id: str,
+        run_name: str,
+        start_time: datetime,
+        end_time: Optional[datetime] = None,
+        descending: bool = False,
+        diagnose: bool = False,
+    ) -> Generator[LogEvent, None, None]:
+        return self.logging().poll_logs(
+            self.storage(),
+            repo_id,
+            run_name,
+            start_time,
+            end_time,
+            descending,
+            diagnose,
+        )
 
     def list_run_artifact_files(
         self, repo_id: str, run_name: str, prefix: str, recursive: bool = False

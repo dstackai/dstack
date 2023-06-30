@@ -8,13 +8,13 @@ from azure.monitor.query import LogsQueryClient, LogsTable
 
 from dstack._internal.backend.azure.utils import DSTACK_LOGS_TABLE_NAME, get_logs_workspace_name
 from dstack._internal.backend.base import jobs as base_jobs
-from dstack._internal.backend.base.logs import fix_log_event_urls
+from dstack._internal.backend.base.logs import Logging, fix_log_event_urls
 from dstack._internal.backend.base.storage import Storage
 from dstack._internal.core.log_event import LogEvent
 from dstack._internal.utils.common import get_current_datetime
 
 
-class AzureLogging:
+class AzureLogging(Logging):
     def __init__(
         self,
         credential: TokenCredential,

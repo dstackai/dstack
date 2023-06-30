@@ -1,17 +1,15 @@
-from datetime import datetime
-from typing import Generator, Optional
+from typing import Optional
 
 import boto3
 from botocore.client import BaseClient
 
-from dstack._internal.backend.aws import logs
 from dstack._internal.backend.aws.compute import AWSCompute
 from dstack._internal.backend.aws.config import AWSConfig
+from dstack._internal.backend.aws.logs import AWSLogging
 from dstack._internal.backend.aws.secrets import AWSSecretsManager
 from dstack._internal.backend.aws.storage import AWSStorage
 from dstack._internal.backend.base import ComponentBasedBackend
 from dstack._internal.backend.base import runs as base_runs
-from dstack._internal.core.log_event import LogEvent
 
 
 class AwsBackend(ComponentBasedBackend):
@@ -46,6 +44,10 @@ class AwsBackend(ComponentBasedBackend):
             sts_client=self._sts_client(),
             bucket_name=self.backend_config.bucket_name,
         )
+        self._logging = AWSLogging(
+            logs_client=self._logs_client(),
+            bucket_name=self.backend_config.bucket_name,
+        )
 
     @classmethod
     def load(cls) -> Optional["AwsBackend"]:
@@ -64,6 +66,15 @@ class AwsBackend(ComponentBasedBackend):
 
     def secrets_manager(self) -> AWSSecretsManager:
         return self._secrets_manager
+
+    def logging(self) -> AWSLogging:
+        return self._logging
+
+    def create_run(self, repo_id: str) -> str:
+        self._logging.create_log_groups_if_not_exist(
+            self._logs_client(), self.backend_config.bucket_name, repo_id
+        )
+        return base_runs.create_run(self._storage)
 
     def _s3_client(self) -> BaseClient:
         return self._get_client("s3")
@@ -85,30 +96,3 @@ class AwsBackend(ComponentBasedBackend):
 
     def _get_client(self, client_name: str) -> BaseClient:
         return self._session.client(client_name)
-
-    def create_run(self, repo_id: str) -> str:
-        logs.create_log_groups_if_not_exist(
-            self._logs_client(), self.backend_config.bucket_name, repo_id
-        )
-        return base_runs.create_run(self._storage)
-
-    def poll_logs(
-        self,
-        repo_id: str,
-        run_name: str,
-        start_time: datetime,
-        end_time: Optional[datetime] = None,
-        descending: bool = False,
-        diagnose: bool = False,
-    ) -> Generator[LogEvent, None, None]:
-        return logs.poll_logs(
-            self._storage,
-            self._logs_client(),
-            self.backend_config.bucket_name,
-            repo_id,
-            run_name,
-            start_time,
-            end_time,
-            descending,
-            diagnose,
-        )

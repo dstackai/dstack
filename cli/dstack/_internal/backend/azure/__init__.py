@@ -1,5 +1,4 @@
-from datetime import datetime
-from typing import Generator, List, Optional
+from typing import Optional
 
 from azure.core.credentials import TokenCredential
 from azure.identity import ClientSecretCredential, DefaultAzureCredential
@@ -10,7 +9,6 @@ from dstack._internal.backend.azure.logs import AzureLogging
 from dstack._internal.backend.azure.secrets import AzureSecretsManager
 from dstack._internal.backend.azure.storage import AzureStorage
 from dstack._internal.backend.base import ComponentBasedBackend
-from dstack._internal.core.log_event import LogEvent
 
 
 class AzureBackend(ComponentBasedBackend):
@@ -62,21 +60,5 @@ class AzureBackend(ComponentBasedBackend):
     def secrets_manager(self) -> AzureSecretsManager:
         return self._secrets_manager
 
-    def poll_logs(
-        self,
-        repo_id: str,
-        run_name: str,
-        start_time: datetime,
-        end_time: Optional[datetime] = None,
-        descending: bool = False,
-        diagnose: bool = False,
-    ) -> Generator[LogEvent, None, None]:
-        yield from self._logging.poll_logs(
-            storage=self._storage,
-            repo_id=repo_id,
-            run_name=run_name,
-            start_time=start_time,
-            end_time=end_time,
-            descending=descending,
-            diagnose=diagnose,
-        )
+    def logging(self) -> AzureLogging:
+        return self._logging
