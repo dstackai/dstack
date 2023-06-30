@@ -5,7 +5,7 @@ import botocore.exceptions
 from boto3.session import Session
 
 from dstack._internal.backend.aws import AwsBackend
-from dstack._internal.backend.aws.config import AWSConfig
+from dstack._internal.backend.aws.config import DEFAULT_REGION_NAME, AWSConfig
 from dstack._internal.hub.db.models import Project
 from dstack._internal.hub.models import (
     AWSBucketProjectElement,
@@ -49,7 +49,7 @@ class AWSConfigurator(Configurator):
         project_values = AWSProjectValues()
         session = Session()
         if session.region_name is None:
-            session = Session(region_name=project_config.region_name)
+            session = Session(region_name=project_config.region_name or DEFAULT_REGION_NAME)
 
         project_values.default_credentials = self._valid_credentials(session=session)
 
@@ -71,13 +71,15 @@ class AWSConfigurator(Configurator):
             self._raise_invalid_credentials_error(fields=[["credentials"]])
 
         # TODO validate config values
-        project_values.region_name = self._get_hub_regions(default_region=session.region_name)
-        project_values.s3_bucket_name = self._get_hub_buckets(
+        project_values.region_name = self._get_hub_regions_element(
+            default_region=session.region_name
+        )
+        project_values.s3_bucket_name = self._get_hub_buckets_element(
             session=session,
-            region=project_config.region_name,
+            region=session.region_name,
             default_bucket=project_config.s3_bucket_name,
         )
-        project_values.ec2_subnet_id = self._get_hub_subnet(
+        project_values.ec2_subnet_id = self._get_hub_subnet_element(
             session=session, default_subnet=project_config.ec2_subnet_id
         )
         return project_values
@@ -122,7 +124,6 @@ class AWSConfigurator(Configurator):
             or config_data.get("bucket_name")
             or config_data.get("s3_bucket_name"),
             region_name=config_data.get("region_name"),
-            profile_name=config_data.get("profile_name"),
             subnet_id=config_data.get("subnet_id")
             or config_data.get("ec2_subnet_id")
             or config_data.get("subnet"),
@@ -145,13 +146,13 @@ class AWSConfigurator(Configurator):
             fields=fields,
         )
 
-    def _get_hub_regions(self, default_region: Optional[str]) -> ProjectElement:
+    def _get_hub_regions_element(self, default_region: Optional[str]) -> ProjectElement:
         element = ProjectElement(selected=default_region)
         for r in REGIONS:
             element.values.append(ProjectElementValue(value=r[1], label=r[0]))
         return element
 
-    def _get_hub_buckets(
+    def _get_hub_buckets_element(
         self, session: Session, region: str, default_bucket: Optional[str]
     ) -> AWSBucketProjectElement:
         if default_bucket is not None:
@@ -193,7 +194,9 @@ class AWSConfigurator(Configurator):
                 )
             raise e
 
-    def _get_hub_subnet(self, session: Session, default_subnet: Optional[str]) -> ProjectElement:
+    def _get_hub_subnet_element(
+        self, session: Session, default_subnet: Optional[str]
+    ) -> ProjectElement:
         element = ProjectElement(selected=default_subnet)
         _ec2 = session.client("ec2")
         response = _ec2.describe_subnets()

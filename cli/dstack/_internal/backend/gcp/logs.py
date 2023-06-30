@@ -5,7 +5,7 @@ from google.cloud import logging
 from google.oauth2 import service_account
 
 from dstack._internal.backend.base import jobs as base_jobs
-from dstack._internal.backend.base.logs import fix_log_event_urls
+from dstack._internal.backend.base.logs import Logging, fix_log_event_urls
 from dstack._internal.backend.base.storage import Storage
 from dstack._internal.core.job import Job
 from dstack._internal.core.log_event import LogEvent, LogEventSource
@@ -13,7 +13,7 @@ from dstack._internal.core.log_event import LogEvent, LogEventSource
 LOGS_TIME_FORMAT = "%Y-%m-%dT%H:%M:%S.%f%z"
 
 
-class GCPLogging:
+class GCPLogging(Logging):
     def __init__(
         self, project_id: str, bucket_name: str, credentials: Optional[service_account.Credentials]
     ):
