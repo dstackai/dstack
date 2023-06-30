@@ -36,6 +36,9 @@ type Storage interface {
 	List(ctx context.Context, prefix string) (<-chan *StorageObject, <-chan error)
 }
 
+type StorageLister func(ctx context.Context, src string) (<-chan *StorageObject, <-chan error)
+type FileUploader func(ctx context.Context, storage Storage, src, key string) error
+
 func (a StorageObject) Equals(b StorageObject) bool {
 	return a.Key == b.Key && a.Size == b.Size && a.ModTime == b.ModTime && a.Symlink == b.Symlink
 }
@@ -81,79 +84,90 @@ func DownloadDir(ctx context.Context, storage Storage, key, dst string) error {
 	return nil
 }
 
-// UploadDir save local files tree to the Storage
-// If delete is true — files existing only in storage would be deleted
-// If withoutChanges is true — files would always be uploaded despite the same size and modification time
+// UploadDir implements both: coping files from the local file system to the storage
+// and optimally synchronizing file trees based on size and modify date.
+// UploadDir keeps relative symlinks bounded by the src directory as symlinks.
+// Set delete=true to remove remote objects not presented locally.
+// Set withoutChanges=true to upload all local files without testing for changes.
 func UploadDir(ctx context.Context, storage Storage, src, key string, delete, withoutChanges bool) error {
+	return uploadDir(ctx, storage, src, key, delete, withoutChanges, ListFiles, UploadFile)
+}
+
+func uploadDir(ctx context.Context, storage Storage, src, key string, delete, withoutChanges bool, filesLister StorageLister, fileUploader FileUploader) error {
 	src = common.AddTrailingSlash(src)
 	key = common.AddTrailingSlash(key)
+
+	stat := struct{ Delete, NotChanged, Upload int }{}
 	uploadQueue := make([]StorageObject, 0)
-	objects, errCh := storage.List(ctx, key)
-	statDelete := 0
-	statNotChanged := 0
-	if err := filepath.Walk(src, func(filePath string, info fs.FileInfo, err error) error {
-		if err != nil {
-			return gerrors.Wrap(err)
-		}
-		if info.IsDir() {
-			return nil
-		}
-		fileKey, err := filepath.Rel(src, filePath)
-		if err != nil {
-			return gerrors.Wrap(err)
-		}
 
-		var obj *StorageObject
-		for {
-			select {
-			case obj = <-objects:
-			case err = <-errCh:
-				if err != nil {
-					return gerrors.Wrap(err)
+	objects, objectsErr := storage.List(ctx, key)
+	files, filesErr := filesLister(ctx, src)
+
+	// Match two sorted lists: objects (remote) and files (local)
+	// 1. If the item only exists in objects — delete object
+	//      delete=false prohibit deletion
+	// 2. If the item only exists in files — upload file
+	// 3. If the item exists in both lists — compare and upload file
+	//      withoutChanges=true always upload
+	obj, err := objectsListPop(objects, objectsErr)
+	if err != nil {
+		return gerrors.Wrap(err)
+	}
+	file, err := objectsListPop(files, filesErr)
+	if err != nil {
+		return gerrors.Wrap(err)
+	}
+	for obj != nil || file != nil {
+		// 1. Iterate outdated objects
+		for obj != nil {
+			if file == nil || obj.Key < file.Key {
+				if delete {
+					stat.Delete++
+					if err := storage.Delete(ctx, path.Join(key, obj.Key)); err != nil {
+						return gerrors.Wrap(err)
+					}
 				}
+			} else {
 				break
 			}
-			if obj == nil || obj.Key >= fileKey {
-				break
-			}
-			if delete {
-				statDelete++
-				if err := storage.Delete(ctx, path.Join(key, obj.Key)); err != nil {
-					return gerrors.Wrap(err)
-				}
-			}
-		}
-
-		symlink := ""
-		if info.Mode()&os.ModeSymlink == os.ModeSymlink {
-			symlink, err = os.Readlink(filePath)
+			obj, err = objectsListPop(objects, objectsErr)
 			if err != nil {
 				return gerrors.Wrap(err)
 			}
-			rel, err := filepath.Rel(src, filepath.Join(filepath.Dir(filePath), symlink))
-			if err != nil || filepath.IsAbs(symlink) || rel == ".." || strings.HasPrefix(rel, "../") {
-				// upload target file if the symlink points outside the tree
-				symlink = ""
+		}
+		// 3. A match
+		if obj != nil && file != nil && file.Key == obj.Key {
+			if withoutChanges || !obj.Equals(*file) {
+				stat.Upload++
+				uploadQueue = append(uploadQueue, *file)
+			} else {
+				stat.NotChanged++
+			}
+			obj, err = objectsListPop(objects, objectsErr)
+			if err != nil {
+				return gerrors.Wrap(err)
+			}
+			file, err = objectsListPop(files, filesErr)
+			if err != nil {
+				return gerrors.Wrap(err)
 			}
 		}
-		file := StorageObject{
-			Key:     fileKey,
-			Size:    info.Size(),
-			ModTime: info.ModTime(),
-			Symlink: symlink,
+		// 2. Iterate new files
+		for file != nil {
+			if obj == nil || obj.Key > file.Key {
+				stat.Upload++
+				uploadQueue = append(uploadQueue, *file)
+			} else {
+				break
+			}
+			file, err = objectsListPop(files, filesErr)
+			if err != nil {
+				return gerrors.Wrap(err)
+			}
 		}
-
-		if obj == nil || withoutChanges || !obj.Equals(file) {
-			uploadQueue = append(uploadQueue, file)
-		} else {
-			statNotChanged++
-		}
-		return nil
-	}); err != nil {
-		return gerrors.Wrap(err)
 	}
 
-	log.Trace(ctx, "UploadDir stats", "delete", statDelete, "not-changed", statNotChanged, "upload", len(uploadQueue), "src", src, "key", key)
+	log.Trace(ctx, "UploadDir stats", "delete", stat.Delete, "not-changed", stat.NotChanged, "upload", stat.Upload, "src", src, "key", key)
 	g, ctx := errgroup.WithContext(ctx)
 	g.SetLimit(TransferThreads)
 	for _, rFile := range uploadQueue {
@@ -166,7 +180,7 @@ func UploadDir(ctx context.Context, storage Storage, src, key string, delete, wi
 					return gerrors.Wrap(err)
 				}
 			} else {
-				if err := UploadFile(ctx, storage, filePath, objKey); err != nil {
+				if err := fileUploader(ctx, storage, filePath, objKey); err != nil {
 					return gerrors.Wrap(err)
 				}
 			}
@@ -235,4 +249,59 @@ func ListObjects(ctx context.Context, storage Storage, prefix string) ([]string,
 	default:
 	}
 	return list, nil
+}
+
+func ListFiles(ctx context.Context, src string) (<-chan *StorageObject, <-chan error) {
+	ch := make(chan *StorageObject)
+	errCh := make(chan error, 1)
+	go func() {
+		defer close(ch)
+		defer close(errCh)
+		if err := filepath.Walk(src, func(path string, info fs.FileInfo, err error) error {
+			if err != nil {
+				return gerrors.Wrap(err)
+			}
+			if info.IsDir() {
+				return nil
+			}
+			key, err := filepath.Rel(src, path)
+			if err != nil {
+				return gerrors.Wrap(err)
+			}
+			symlink := ""
+			if info.Mode()&os.ModeSymlink == os.ModeSymlink {
+				symlink, err = os.Readlink(path)
+				if err != nil {
+					return gerrors.Wrap(err)
+				}
+				rel, err := filepath.Rel(src, filepath.Join(filepath.Dir(path), symlink))
+				if err != nil || filepath.IsAbs(symlink) || rel == ".." || strings.HasPrefix(rel, "../") {
+					// upload target file if the symlink points outside the tree
+					symlink = ""
+				}
+			}
+			select {
+			case <-ctx.Done():
+				return gerrors.New("context was canceled")
+			case ch <- &StorageObject{
+				Key:     filepath.ToSlash(key),
+				Size:    info.Size(),
+				ModTime: info.ModTime(),
+				Symlink: symlink,
+			}:
+			}
+			return nil
+		}); err != nil {
+			errCh <- err
+		}
+	}()
+	return ch, errCh
+}
+
+func objectsListPop(ch <-chan *StorageObject, errCh <-chan error) (obj *StorageObject, err error) {
+	obj = <-ch
+	if obj == nil {
+		err = gerrors.Wrap(<-errCh)
+	}
+	return
 }

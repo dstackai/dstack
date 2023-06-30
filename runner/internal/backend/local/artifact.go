@@ -3,35 +3,35 @@ package local
 import (
 	"context"
 	"errors"
+	"github.com/dstackai/dstack/runner/internal/backend/base"
 	"os"
 	"path"
 	"path/filepath"
 
 	"github.com/docker/docker/api/types/mount"
-	"github.com/dstackai/dstack/runner/internal/artifacts"
 	"github.com/dstackai/dstack/runner/internal/gerrors"
 	"github.com/dstackai/dstack/runner/internal/log"
 )
 
-var _ artifacts.Artifacter = (*Local)(nil)
+var _ base.Artifacter = (*LocalArtifacter)(nil)
 
-type Local struct {
+type LocalArtifacter struct {
 	path       string
 	workDir    string
 	pathLocal  string
 	pathRemote string
 }
 
-func (s *Local) BeforeRun(ctx context.Context) error {
+func (s *LocalArtifacter) BeforeRun(ctx context.Context) error {
 	return nil
 }
 
-func (s *Local) AfterRun(ctx context.Context) error {
+func (s *LocalArtifacter) AfterRun(ctx context.Context) error {
 	log.Trace(ctx, "Upload artifact", "artifact", s.pathLocal)
 	return nil
 }
 
-func (s *Local) DockerBindings(workDir string) ([]mount.Mount, error) {
+func (s *LocalArtifacter) DockerBindings(workDir string) ([]mount.Mount, error) {
 	cleanPath := filepath.Clean(s.pathLocal)
 	if path.IsAbs(cleanPath) && path.Dir(cleanPath) == cleanPath {
 		return nil, errors.New("directory needs to be a non-root path")
@@ -50,8 +50,8 @@ func (s *Local) DockerBindings(workDir string) ([]mount.Mount, error) {
 	}, nil
 }
 
-func NewLocal(pathRoot, workDir, pathLocal, pathRemote string) (*Local, error) {
-	s := &Local{
+func NewLocalArtifacter(pathRoot, workDir, pathLocal, pathRemote string) (*LocalArtifacter, error) {
+	s := &LocalArtifacter{
 		path:       pathRoot,
 		workDir:    workDir,
 		pathLocal:  pathLocal,

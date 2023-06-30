@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"github.com/dstackai/dstack/runner/internal/backend/base"
 	"os"
 	"os/exec"
 	"path"
@@ -11,13 +12,11 @@ import (
 	"strings"
 
 	"github.com/docker/docker/api/types/mount"
-	"github.com/dstackai/dstack/runner/internal/artifacts"
-	"github.com/dstackai/dstack/runner/internal/artifacts/client"
 	"github.com/dstackai/dstack/runner/internal/gerrors"
 	"github.com/dstackai/dstack/runner/internal/log"
 )
 
-var _ artifacts.Artifacter = (*S3FSCmd)(nil)
+var _ base.Artifacter = (*S3FSCmd)(nil)
 
 type S3FSCmd struct {
 	bucket     string
@@ -27,7 +26,7 @@ type S3FSCmd struct {
 
 	cmd *exec.Cmd
 
-	storage *client.Copier
+	storage *Copier
 }
 
 func (s *S3FSCmd) BeforeRun(ctx context.Context) error {
@@ -130,7 +129,7 @@ func New(ctx context.Context, bucket, region, IAMRole, workDir, localPath, remot
 		pathLocal:  localPath,
 		pathRemote: remotePath,
 		cmd:        cmd,
-		storage:    client.New(region),
+		storage:    NewCopier(region),
 	}
 	err = s.Validate(ctx)
 	if err != nil {

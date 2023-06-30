@@ -3,6 +3,8 @@ package gcp
 import (
 	"context"
 	"errors"
+	"github.com/dstackai/dstack/runner/internal/backend/base"
+	"github.com/dstackai/dstack/runner/internal/gerrors"
 	"os"
 	"path"
 	"path/filepath"
@@ -35,16 +37,12 @@ func NewGCPArtifacter(storage *GCPStorage, workDir, pathLocal, pathRemote string
 
 func (gart *GCPArtifacter) BeforeRun(ctx context.Context) error {
 	log.Trace(ctx, "Download artifact", "artifact", gart.pathLocal)
-	return gart.storage.DownloadDir(ctx, gart.pathRemote, path.Join(gart.workDir, gart.pathLocal))
+	return gerrors.Wrap(base.DownloadDir(ctx, gart.storage, gart.pathRemote, path.Join(gart.workDir, gart.pathLocal)))
 }
 
 func (gart *GCPArtifacter) AfterRun(ctx context.Context) error {
 	log.Trace(ctx, "Upload artifact", "artifact", gart.pathLocal)
-	if gart.doSync {
-		return gart.storage.SyncDirUpload(ctx, path.Join(gart.workDir, gart.pathLocal), gart.pathRemote)
-	} else {
-		return gart.storage.UploadDir(ctx, path.Join(gart.workDir, gart.pathLocal), gart.pathRemote)
-	}
+	return gerrors.Wrap(base.UploadDir(ctx, gart.storage, path.Join(gart.workDir, gart.pathLocal), gart.pathRemote, gart.doSync, !gart.doSync))
 }
 
 func (gart *GCPArtifacter) DockerBindings(workDir string) ([]mount.Mount, error) {

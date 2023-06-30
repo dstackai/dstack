@@ -2,13 +2,13 @@ package lambda
 
 import (
 	"context"
+	"github.com/dstackai/dstack/runner/internal/backend/base"
 	"io"
 	"io/ioutil"
 	"os"
 
 	"github.com/docker/docker/api/types/mount"
 
-	"github.com/dstackai/dstack/runner/internal/artifacts"
 	"github.com/dstackai/dstack/runner/internal/backend"
 	"github.com/dstackai/dstack/runner/internal/backend/aws"
 	"github.com/dstackai/dstack/runner/internal/gerrors"
@@ -92,11 +92,11 @@ func (l *LambdaBackend) Shutdown(ctx context.Context) error {
 	return l.apiClient.TerminateInstance(ctx, []string{l.storageBackend.State.RequestID})
 }
 
-func (l *LambdaBackend) GetArtifact(ctx context.Context, runName, localPath, remotePath string, mount bool) artifacts.Artifacter {
+func (l *LambdaBackend) GetArtifact(ctx context.Context, runName, localPath, remotePath string, mount bool) base.Artifacter {
 	return l.storageBackend.GetArtifact(ctx, runName, localPath, remotePath, mount)
 }
 
-func (l *LambdaBackend) GetCache(ctx context.Context, runName, localPath, remotePath string) artifacts.Artifacter {
+func (l *LambdaBackend) GetCache(ctx context.Context, runName, localPath, remotePath string) base.Artifacter {
 	return l.storageBackend.GetCache(ctx, runName, localPath, remotePath)
 }
 

@@ -2,7 +2,6 @@ package azure
 
 import (
 	"context"
-	"errors"
 	"github.com/dstackai/dstack/runner/internal/backend/base"
 	"os"
 	"path"
@@ -21,7 +20,7 @@ type AzureArtifacter struct {
 	doSync     bool
 }
 
-func NewAzureArtifacter(storage AzureStorage, workDir, pathLocal, pathRemote string) *AzureArtifacter {
+func NewAzureArtifacter(storage AzureStorage, workDir, pathLocal, pathRemote string, doSync bool) *AzureArtifacter {
 	err := os.MkdirAll(path.Join(workDir, pathLocal), 0o755)
 	if err != nil {
 		// XXX: is it better to report failure about making dirs?
@@ -32,7 +31,7 @@ func NewAzureArtifacter(storage AzureStorage, workDir, pathLocal, pathRemote str
 		workDir:    workDir,
 		pathLocal:  pathLocal,
 		pathRemote: pathRemote,
-		doSync:     false,
+		doSync:     doSync,
 	}
 }
 
@@ -49,7 +48,7 @@ func (azartifacter *AzureArtifacter) AfterRun(ctx context.Context) error {
 func (azartifacter *AzureArtifacter) DockerBindings(workDir string) ([]mount.Mount, error) {
 	cleanPath := filepath.Clean(azartifacter.pathLocal)
 	if path.IsAbs(cleanPath) && path.Dir(cleanPath) == cleanPath {
-		return nil, errors.New("directory needs to be a non-root path")
+		return nil, gerrors.New("directory needs to be a non-root path")
 	}
 	dir := azartifacter.pathLocal
 	if !filepath.IsAbs(azartifacter.pathLocal) {
