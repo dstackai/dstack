@@ -166,8 +166,9 @@ class HubAPIClient:
             return
         elif resp.status_code == 400:
             body = resp.json()
-            if body["detail"]["code"] == NoMatchingInstanceError.code:
-                raise HubClientError(body["detail"]["msg"])
+            # if body["detail"]["code"] == NoMatchingInstanceError.code:
+            #     raise HubClientError(body["detail"]["msg"])
+            raise HubClientError(body["detail"]["msg"])
         resp.raise_for_status()
 
     def stop_job(self, job_id: str, abort: bool):
