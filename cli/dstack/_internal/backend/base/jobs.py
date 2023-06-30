@@ -105,7 +105,7 @@ def run_job(
         raise Exception("Can't create a request for a job which status is not SUBMITTED")
     try:
         if check_build and not build_satisfied(storage, job):
-            raise BuildNotFoundError("Build not found. Run `dstack build` or use `--build` flag.")
+            raise BuildNotFoundError("Build not found. Run `dstack build` or add `--build` flag")
         _try_run_job(
             storage=storage,
             compute=compute,

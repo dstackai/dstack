@@ -1,11 +1,13 @@
 from typing import Optional
 
+import dstack._internal.backend.base.jobs as base_jobs
 from dstack._internal.backend.base import ComponentBasedBackend
 from dstack._internal.backend.local.compute import LocalCompute
 from dstack._internal.backend.local.config import LocalConfig
 from dstack._internal.backend.local.logs import LocalLogging
 from dstack._internal.backend.local.secrets import LocalSecretsManager
 from dstack._internal.backend.local.storage import LocalStorage
+from dstack._internal.core.job import Job, JobStatus
 
 
 class LocalBackend(ComponentBasedBackend):
@@ -39,3 +41,8 @@ class LocalBackend(ComponentBasedBackend):
 
     def logging(self) -> LocalLogging:
         return self._logging
+
+    def run_job(self, job: Job, failed_to_start_job_new_status: JobStatus):
+        base_jobs.run_job(
+            self.storage(), self.compute(), job, failed_to_start_job_new_status, check_build=False
+        )
