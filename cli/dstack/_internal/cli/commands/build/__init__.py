@@ -69,9 +69,6 @@ class BuildCommand(BasicCommand):
             )
             runs = list_runs_hub(hub_client, run_name=run_name)
             run = runs[0]
-            if run.status == JobStatus.FAILED:
-                console.print("\nProvisioning failed\n")
-                exit(1)
             _poll_run(
                 hub_client,
                 run,
