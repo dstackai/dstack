@@ -17,6 +17,7 @@ Here's an example:
 
 ```yaml
 type: task
+
 commands:
   - pip install -r requirements.txt
   - python train.py
@@ -60,7 +61,7 @@ any ports, the command will forward them to your local machine for secure and co
     make sure to create a `.gitignore` file and include these large files or folders that you don't want to include when
     running dev environments or tasks.
 
-For more details on the `dstack run` command, refer to the [`dstack run` Reference](../../reference/cli/run.md).
+For more details on the `dstack run` command, refer to the [Reference](../reference/cli/run.md).
 
 ## Args
 
@@ -70,6 +71,7 @@ If you want, it's possible to parametrize tasks with user arguments. Here's an e
 
 ```yaml
 type: task
+
 commands:
   - python train.py ${{ run.args }}
 ```
@@ -92,12 +94,14 @@ The dstack run command will pass `--train_batch_size=1` and `--num_train_epochs=
 
 A task can expose ports through the `ports` property in `.dstack.yml`, for example, if it is running a web-based app. Here's an example:
 
-<div editor-title="app.dstack.yml"> 
+<div editor-title="serve.dstack.yml"> 
 
 ```yaml
 type: task
+
 ports:
   - 7860
+
 commands:
   - pip install -r requirements.txt
   - gradio app.py
@@ -117,7 +121,7 @@ enable the reload mode by using the `--reload` argument.
 <div class="termy">
 
 ```shell
-$ dstack run . -f app.dstack.yml --reload
+$ dstack run . -f serve.dstack.yml --reload
 ```
 
 </div>
@@ -127,12 +131,12 @@ reload changes on the fly.
 
 ## Environment
 
-By default, a dev environment includes pre-installed CUDA driver, Python (matching your local version), 
+By default, a dev environment includes a pre-installed CUDA driver, Python (matching your local version), 
 and Conda (with Miniforge).
 
 To modify the Python version or install additional packages beforehand, you can use other YAML properties 
 like `python`, `commands`, and `build`.
-For more details on the syntax of `.dstack.yml`, refer to the [Reference](../../reference/dstack.yml).
+For more details on the syntax of `.dstack.yml`, refer to the [Reference](../reference/dstack.yml).
 
 ### Pre-building the environment
 
@@ -143,15 +147,17 @@ you can use the `build` property. Here's an example:
 
 ```yaml
 type: task
+
 build:
   - pip install -r requirements.txt
+
 commands:
   - python train.py
 ```
 
 </div>
 
-To pre-build the environment you have two options:
+To pre-build the environment, you have two options:
 
 1. Run the `dstack build` command:
 
@@ -182,7 +188,7 @@ To pre-build the environment you have two options:
 
 ## Profiles
 
-If you [configured](../projects.md) a project that uses a cloud backend, you can define profiles that specify the
+If you [configured](projects.md) a project that uses a cloud backend, you can define profiles that specify the
 project and the cloud resources to be used.
 
 To configure a profile, simply create the `profiles.yml` file in the `.dstack` folder within your project directory. 
@@ -209,4 +215,4 @@ By default, the `dstack run` command uses the default profile.
     You can define multiple profiles according to your needs and use any of them with the `dstack run` command by specifying
     the desired profile using the `--profile` argument.
 
-For more details on the syntax of the `profiles.yml` file, refer to the [`profiles.yml` Reference](../../reference/profiles.yml.md).
+For more details on the syntax of the `profiles.yml` file, refer to the [Reference](../reference/profiles.yml.md).

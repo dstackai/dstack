@@ -170,8 +170,9 @@ nav:
               - Python: docs/reference/api/python.md
           - Backends:
               - AWS: docs/reference/backends/aws.md
-              - Azure: docs/reference/backends/azure.md
               - GCP: docs/reference/backends/gcp.md
+              - Azure: docs/reference/backends/azure.md
+              - Lambda: docs/reference/backends/lambda.md
   - Examples: https://github.com/dstackai/dstack-examples/blob/main/README.md
   - Slack: https://join.slack.com/t/dstackai/shared_invite/zt-xdnsytie-D4qU9BvJP8vkbkHXdi6clQ
   - Blog:
