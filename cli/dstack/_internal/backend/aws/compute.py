@@ -3,6 +3,7 @@ from typing import Optional
 from botocore.client import BaseClient
 
 from dstack._internal.backend.aws import runners
+from dstack._internal.backend.aws.config import AWSConfig
 from dstack._internal.backend.base.compute import Compute
 from dstack._internal.core.instance import InstanceType
 from dstack._internal.core.job import Job
@@ -14,15 +15,11 @@ class AWSCompute(Compute):
         self,
         ec2_client: BaseClient,
         iam_client: BaseClient,
-        bucket_name: str,
-        region_name: str,
-        subnet_id: str,
+        backend_config: AWSConfig,
     ):
         self.ec2_client = ec2_client
         self.iam_client = iam_client
-        self.bucket_name = bucket_name
-        self.region_name = region_name
-        self.subnet_id = subnet_id
+        self.backend_config = backend_config
 
     def get_request_head(self, job: Job, request_id: Optional[str]) -> RequestHead:
         return runners.get_request_head(
@@ -38,12 +35,13 @@ class AWSCompute(Compute):
         )
 
     def run_instance(self, job: Job, instance_type: InstanceType) -> str:
-        return runners.run_instance_retry(
+        return runners.run_instance(
             ec2_client=self.ec2_client,
             iam_client=self.iam_client,
-            bucket_name=self.bucket_name,
-            region_name=self.region_name,
-            subnet_id=self.subnet_id,
+            bucket_name=self.backend_config.bucket_name,
+            region_name=self.backend_config.region_name,
+            extra_regions=self.backend_config.extra_regions,
+            subnet_id=self.backend_config.subnet_id,
             runner_id=job.runner_id,
             instance_type=instance_type,
             spot=job.requirements.spot,

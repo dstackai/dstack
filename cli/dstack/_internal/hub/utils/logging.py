@@ -13,8 +13,8 @@ class AsyncioCancelledErrorFilter(logging.Filter):
         return True
 
 
-def configure_root_logger():
-    logger = logging.getLogger(None)
+def configure_logger():
+    root_logger = logging.getLogger(None)
     handler = logging.StreamHandler(stream=sys.stdout)
     handler.addFilter(AsyncioCancelledErrorFilter())
     formatter = logging.Formatter(
@@ -22,11 +22,7 @@ def configure_root_logger():
         datefmt="%Y-%m-%dT%H:%M:%S",
     )
     handler.setFormatter(formatter)
-    logger.addHandler(handler)
-    logger.setLevel(os.getenv("DSTACK_HUB_ROOT_LOG_LEVEL", "ERROR").upper())
-
-
-def get_logger(name: str) -> logging.Logger:
-    logger = logging.getLogger(name)
-    logger.setLevel(os.getenv("DSTACK_HUB_LOG_LEVEL", "ERROR").upper())
-    return logger
+    root_logger.addHandler(handler)
+    root_logger.setLevel(os.getenv("DSTACK_HUB_ROOT_LOG_LEVEL", "ERROR").upper())
+    dstack_logger = logging.getLogger("dstack")
+    dstack_logger.setLevel(os.getenv("DSTACK_HUB_LOG_LEVEL", "ERROR").upper())

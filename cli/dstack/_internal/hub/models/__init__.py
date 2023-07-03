@@ -44,6 +44,7 @@ class AWSProjectConfigPartial(BaseModel):
     type: Literal["aws"] = "aws"
     region_name: Optional[str]
     region_name_title: Optional[str]
+    extra_regions: Optional[List[str]]
     s3_bucket_name: Optional[str]
     ec2_subnet_id: Optional[str]
 
@@ -52,6 +53,7 @@ class AWSProjectConfig(BaseModel):
     type: Literal["aws"] = "aws"
     region_name: str
     region_name_title: Optional[str]
+    extra_regions: List[str]
     s3_bucket_name: str
     ec2_subnet_id: Optional[str]
 
@@ -374,6 +376,7 @@ class AWSProjectValues(BaseModel):
     type: Literal["aws"] = "aws"
     default_credentials: bool = False
     region_name: Optional[ProjectElement]
+    extra_regions: Optional[ProjectMultiElement]
     s3_bucket_name: Optional[AWSBucketProjectElement]
     ec2_subnet_id: Optional[ProjectElement]
 

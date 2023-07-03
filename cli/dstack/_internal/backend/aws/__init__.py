@@ -34,9 +34,7 @@ class AwsBackend(ComponentBasedBackend):
         self._compute = AWSCompute(
             ec2_client=self._ec2_client(),
             iam_client=self._iam_client(),
-            bucket_name=self.backend_config.bucket_name,
-            region_name=self.backend_config.region_name,
-            subnet_id=self.backend_config.subnet_id,
+            backend_config=self.backend_config,
         )
         self._secrets_manager = AWSSecretsManager(
             secretsmanager_client=self._secretsmanager_client(),
