@@ -3,9 +3,10 @@ from typing import List, Optional, Tuple
 import yaml
 
 from dstack._internal.backend.base import runners
-from dstack._internal.backend.base.build import BuildNotFoundError, build_satisfied
+from dstack._internal.backend.base.build import predict_build_plan
 from dstack._internal.backend.base.compute import Compute, NoCapacityError
 from dstack._internal.backend.base.storage import Storage
+from dstack._internal.core.build import DockerPlatform
 from dstack._internal.core.error import NoMatchingInstanceError
 from dstack._internal.core.instance import InstanceType
 from dstack._internal.core.job import Job, JobErrorCode, JobHead, JobStatus, SpotPolicy
@@ -99,13 +100,10 @@ def run_job(
     compute: Compute,
     job: Job,
     failed_to_start_job_new_status: JobStatus,
-    check_build: bool = True,
 ):
     if job.status != JobStatus.SUBMITTED:
         raise Exception("Can't create a request for a job which status is not SUBMITTED")
     try:
-        if check_build and not build_satisfied(storage, job):
-            raise BuildNotFoundError("Build not found. Run `dstack build` or add `--build` flag")
         _try_run_job(
             storage=storage,
             compute=compute,

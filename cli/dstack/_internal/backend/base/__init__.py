@@ -2,7 +2,9 @@ from abc import ABC, abstractmethod
 from datetime import datetime
 from typing import Generator, List, Optional
 
+import dstack._internal.core.build
 from dstack._internal.backend.base import artifacts as base_artifacts
+from dstack._internal.backend.base import build as base_build
 from dstack._internal.backend.base import cache as base_cache
 from dstack._internal.backend.base import jobs as base_jobs
 from dstack._internal.backend.base import repos as base_repos
@@ -14,6 +16,7 @@ from dstack._internal.backend.base.logs import Logging
 from dstack._internal.backend.base.secrets import SecretsManager
 from dstack._internal.backend.base.storage import Storage
 from dstack._internal.core.artifact import Artifact
+from dstack._internal.core.build import BuildPlan
 from dstack._internal.core.instance import InstanceType
 from dstack._internal.core.job import Job, JobHead, JobStatus
 from dstack._internal.core.log_event import LogEvent
@@ -230,6 +233,10 @@ class Backend(ABC):
     def get_signed_upload_url(self, object_key: str) -> str:
         pass
 
+    @abstractmethod
+    def predict_build_plan(self, job: Job) -> BuildPlan:
+        pass
+
 
 class ComponentBasedBackend(Backend):
     @abstractmethod
@@ -264,6 +271,7 @@ class ComponentBasedBackend(Backend):
         return base_jobs.list_jobs(self.storage(), repo_id, run_name)
 
     def run_job(self, job: Job, failed_to_start_job_new_status: JobStatus):
+        self.predict_build_plan(job)  # raises exception on missing build
         base_jobs.run_job(self.storage(), self.compute(), job, failed_to_start_job_new_status)
 
     def stop_job(self, repo_id: str, abort: bool, job_id: str):
@@ -434,4 +442,9 @@ class ComponentBasedBackend(Backend):
     ):
         base_cache.delete_configuration_cache(
             self.storage(), repo_id, hub_user_name, configuration_path
+        )
+
+    def predict_build_plan(self, job: Job) -> BuildPlan:
+        return base_build.predict_build_plan(
+            self.storage(), job, dstack._internal.core.build.DockerPlatform.amd64
         )
