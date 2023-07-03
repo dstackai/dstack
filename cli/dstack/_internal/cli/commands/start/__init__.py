@@ -9,7 +9,7 @@ from dstack._internal.cli.commands import BasicCommand
 
 class StartCommand(BasicCommand):
     NAME = "start"
-    DESCRIPTION = "Start a hub server"
+    DESCRIPTION = "Start a server"
 
     def __init__(self, parser):
         super(StartCommand, self).__init__(parser)

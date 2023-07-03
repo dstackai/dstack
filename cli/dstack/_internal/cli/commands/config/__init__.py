@@ -8,7 +8,7 @@ from dstack.api.hub import HubClient, HubClientConfig
 
 class ConfigCommand(BasicCommand):
     NAME = "config"
-    DESCRIPTION = "Configure hub"
+    DESCRIPTION = "Configure projects"
 
     def __init__(self, parser):
         super(ConfigCommand, self).__init__(parser)

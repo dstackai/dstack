@@ -21,7 +21,7 @@ from dstack._internal.core.job import JobStatus
 
 class BuildCommand(BasicCommand):
     NAME = "build"
-    DESCRIPTION = "Build environment"
+    DESCRIPTION = "Pre-build the environment"
 
     @check_init
     def _command(self, args: argparse.Namespace):

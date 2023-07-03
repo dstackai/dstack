@@ -11,7 +11,7 @@ from dstack.api.hub import HubClient
 
 class CpCommand(BasicCommand):
     NAME = "cp"
-    DESCRIPTION = "Copy artifact files to a local target path"
+    DESCRIPTION = "Copy artifact files"
 
     def __init__(self, parser):
         super().__init__(parser)

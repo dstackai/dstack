@@ -11,7 +11,7 @@ from dstack.api.hub import HubClient
 
 class PruneCommand(BasicCommand):
     NAME = "prune"
-    DESCRIPTION = "Prunes cache from the storage"
+    DESCRIPTION = "Prune cache"
 
     def __init__(self, parser):
         super().__init__(parser)
