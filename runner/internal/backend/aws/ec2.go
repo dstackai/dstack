@@ -33,13 +33,13 @@ func NewClientEC2(region string) *ClientEC2 {
 
 func (ec *ClientEC2) CancelSpot(ctx context.Context, requestID string) error {
 	log.Trace(ctx, "Cancel spot instance", "ID", requestID)
-	id, err := ec.getInstanceID(ctx)
+	_, err := ec.cli.CancelSpotInstanceRequests(ctx, &ec2.CancelSpotInstanceRequestsInput{
+		SpotInstanceRequestIds: []string{requestID},
+	})
 	if err != nil {
 		return gerrors.Wrap(err)
 	}
-	_, err = ec.cli.CancelSpotInstanceRequests(ctx, &ec2.CancelSpotInstanceRequestsInput{
-		SpotInstanceRequestIds: []string{requestID},
-	})
+	id, err := ec.getInstanceID(ctx)
 	if err != nil {
 		return gerrors.Wrap(err)
 	}

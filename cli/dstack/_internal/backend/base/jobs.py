@@ -219,7 +219,9 @@ def _try_run_job(
     )
     runners.create_runner(storage, runner)
     try:
-        runner.request_id = compute.run_instance(job, instance_type)
+        launched_instance_info = compute.run_instance(job, instance_type)
+        runner.request_id = launched_instance_info.request_id
+        job.location = launched_instance_info.location
     except NoCapacityError:
         if job.spot_policy == SpotPolicy.AUTO and attempt == 0:
             return _try_run_job(

@@ -3,13 +3,14 @@ package base
 import (
 	"context"
 	"fmt"
+	"os"
+	"strings"
+
 	"github.com/dstackai/dstack/runner/internal/gerrors"
 	"github.com/dstackai/dstack/runner/internal/log"
 	"github.com/dstackai/dstack/runner/internal/models"
 	"github.com/dstackai/dstack/runner/internal/repo"
 	"gopkg.in/yaml.v2"
-	"os"
-	"strings"
 )
 
 func LoadRunnerState(ctx context.Context, storage Storage, id string, out interface{}) error {

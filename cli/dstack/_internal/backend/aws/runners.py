@@ -4,13 +4,15 @@ from functools import reduce
 from typing import List, Optional, Tuple
 
 import botocore.exceptions
+from boto3 import Session
 from botocore.client import BaseClient
 
 from dstack import version
+from dstack._internal.backend.aws import utils as aws_utils
 from dstack._internal.backend.base.compute import WS_PORT, NoCapacityError, choose_instance_type
 from dstack._internal.backend.base.config import BACKEND_CONFIG_FILENAME, RUNNER_CONFIG_FILENAME
 from dstack._internal.backend.base.runners import serialize_runner_yaml
-from dstack._internal.core.instance import InstanceType
+from dstack._internal.core.instance import InstanceType, LaunchedInstanceInfo
 from dstack._internal.core.job import Job, Requirements
 from dstack._internal.core.request import RequestHead, RequestStatus
 from dstack._internal.core.runners import Gpu, Resources
@@ -30,7 +32,7 @@ def get_instance_type(
 
 
 def run_instance(
-    ec2_client: BaseClient,
+    session: Session,
     iam_client: BaseClient,
     bucket_name: str,
     region_name: str,
@@ -42,13 +44,26 @@ def run_instance(
     repo_id: str,
     hub_user_name: str,
     ssh_key_pub: str,
-) -> str:
-    regions = [region_name] + extra_regions
+) -> LaunchedInstanceInfo:
+    regions = [region_name]
+    if extra_regions:
+        regions.extend(
+            _get_instance_available_regions(
+                ec2_client=aws_utils.get_ec2_client(session),
+                instance_type=instance_type,
+                extra_regions=extra_regions,
+            )
+        )
     for region in regions:
         try:
-            logger.info("Requesting %s instance in %s...", instance_type.instance_name, region)
+            logger.info(
+                "Requesting %s %s instance in %s...",
+                instance_type.instance_name,
+                "spot" if spot else "",
+                region,
+            )
             request_id = _run_instance_retry(
-                ec2_client=ec2_client,
+                ec2_client=aws_utils.get_ec2_client(session, region_name=region),
                 iam_client=iam_client,
                 bucket_name=bucket_name,
                 region_name=region,
@@ -61,10 +76,10 @@ def run_instance(
                 ssh_key_pub=ssh_key_pub,
             )
             logger.info("Request succeeded")
-            return request_id
+            return LaunchedInstanceInfo(request_id=request_id, location=region)
         except NoCapacityError:
-            logger.info("Failed to request AWS instance in %s", region)
-    logger.info("Failed to request AWS instance")
+            logger.info("Failed to request instance in %s", region)
+    logger.info("Failed to request instance")
     raise NoCapacityError()
 
 
@@ -270,42 +285,19 @@ def _get_instance_types(ec2_client: BaseClient) -> List[InstanceType]:
     return instance_types
 
 
-def _user_data(
-    bucket_name,
-    region_name,
-    runner_id: str,
-    resources: Resources,
-    ssh_key_pub: str,
-    port_range_from: int = 3000,
-    port_range_to: int = 4000,
-) -> str:
-    sysctl_port_range_from = int((port_range_to - port_range_from) / 2) + port_range_from
-    sysctl_port_range_to = port_range_to - 1
-    runner_port_range_from = port_range_from
-    runner_port_range_to = sysctl_port_range_from - 1
-    user_data = f"""#!/bin/bash
-if [ -e "/etc/fuse.conf" ]
-then
-sudo sed "s/# *user_allow_other/user_allow_other/" /etc/fuse.conf > t
-sudo mv t /etc/fuse.conf
-else
-echo "user_allow_other" | sudo tee -a /etc/fuse.conf > /dev/null
-fi
-sudo sysctl -w net.ipv4.ip_local_port_range="{sysctl_port_range_from} ${sysctl_port_range_to}"
-mkdir -p /root/.dstack/
-echo $'{_serialize_config_yaml(bucket_name, region_name)}' > /root/.dstack/{BACKEND_CONFIG_FILENAME}
-echo $'{serialize_runner_yaml(runner_id, resources, runner_port_range_from, runner_port_range_to)}' > /root/.dstack/{RUNNER_CONFIG_FILENAME}
-die() {{ status=$1; shift; echo "FATAL: $*"; exit $status; }}
-EC2_PUBLIC_HOSTNAME="`wget -q -O - http://169.254.169.254/latest/meta-data/public-hostname || die \"wget public-hostname has failed: $?\"`"
-echo "hostname: $EC2_PUBLIC_HOSTNAME" >> /root/.dstack/{RUNNER_CONFIG_FILENAME}
-mkdir ~/.ssh; chmod 700 ~/.ssh; echo "{ssh_key_pub}" > ~/.ssh/authorized_keys; chmod 600 ~/.ssh/authorized_keys
-HOME=/root nohup dstack-runner --log-level 6 start --http-port {WS_PORT} &
-"""
-    return user_data
-
-
-def _serialize_config_yaml(bucket_name: str, region_name: str):
-    return f"backend: aws\\n" f"bucket: {bucket_name}\\n" f"region: {region_name}"
+def _get_instance_available_regions(
+    ec2_client: BaseClient,
+    instance_type: InstanceType,
+    extra_regions: List[str],
+) -> List[str]:
+    resp = ec2_client.get_spot_placement_scores(
+        InstanceTypes=[instance_type.instance_name],
+        TargetCapacity=1,
+        RegionNames=extra_regions,
+    )
+    spot_scores = resp["SpotPlacementScores"]
+    spot_scores = sorted(spot_scores, key=lambda x: -x["Score"])
+    return [s["Region"] for s in spot_scores]
 
 
 def _run_instance_retry(
@@ -376,8 +368,6 @@ def _run_instance(
     ssh_key_pub: str,
 ) -> str:
     launch_specification = {}
-    if not version.__is_release__:
-        launch_specification["KeyName"] = "dstack_victor"
     if spot:
         launch_specification["InstanceMarketOptions"] = {
             "MarketType": "spot",
@@ -439,6 +429,44 @@ def _run_instance(
     else:
         request_id = response["Instances"][0]["InstanceId"]
     return request_id
+
+
+def _user_data(
+    bucket_name,
+    region_name,
+    runner_id: str,
+    resources: Resources,
+    ssh_key_pub: str,
+    port_range_from: int = 3000,
+    port_range_to: int = 4000,
+) -> str:
+    sysctl_port_range_from = int((port_range_to - port_range_from) / 2) + port_range_from
+    sysctl_port_range_to = port_range_to - 1
+    runner_port_range_from = port_range_from
+    runner_port_range_to = sysctl_port_range_from - 1
+    user_data = f"""#!/bin/bash
+if [ -e "/etc/fuse.conf" ]
+then
+sudo sed "s/# *user_allow_other/user_allow_other/" /etc/fuse.conf > t
+sudo mv t /etc/fuse.conf
+else
+echo "user_allow_other" | sudo tee -a /etc/fuse.conf > /dev/null
+fi
+sudo sysctl -w net.ipv4.ip_local_port_range="{sysctl_port_range_from} ${sysctl_port_range_to}"
+mkdir -p /root/.dstack/
+echo $'{_serialize_config_yaml(bucket_name, region_name)}' > /root/.dstack/{BACKEND_CONFIG_FILENAME}
+echo $'{serialize_runner_yaml(runner_id, resources, runner_port_range_from, runner_port_range_to)}' > /root/.dstack/{RUNNER_CONFIG_FILENAME}
+die() {{ status=$1; shift; echo "FATAL: $*"; exit $status; }}
+EC2_PUBLIC_HOSTNAME="`wget -q -O - http://169.254.169.254/latest/meta-data/public-hostname || die \"wget public-hostname has failed: $?\"`"
+echo "hostname: $EC2_PUBLIC_HOSTNAME" >> /root/.dstack/{RUNNER_CONFIG_FILENAME}
+mkdir ~/.ssh; chmod 700 ~/.ssh; echo "{ssh_key_pub}" > ~/.ssh/authorized_keys; chmod 600 ~/.ssh/authorized_keys
+HOME=/root nohup dstack-runner --log-level 6 start --http-port {WS_PORT} &
+"""
+    return user_data
+
+
+def _serialize_config_yaml(bucket_name: str, region_name: str):
+    return f"backend: aws\\n" f"bucket: {bucket_name}\\n" f"region: {region_name}"
 
 
 def _get_security_group_id(ec2_client: BaseClient, bucket_name: str, subnet_id: Optional[str]):

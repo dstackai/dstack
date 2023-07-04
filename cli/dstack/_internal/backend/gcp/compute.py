@@ -16,10 +16,10 @@ from dstack._internal.backend.base.config import BACKEND_CONFIG_FILENAME, RUNNER
 from dstack._internal.backend.base.runners import serialize_runner_yaml
 from dstack._internal.backend.gcp import utils as gcp_utils
 from dstack._internal.backend.gcp.config import GCPConfig
-from dstack._internal.core.instance import InstanceType
+from dstack._internal.core.instance import InstanceType, LaunchedInstanceInfo
 from dstack._internal.core.job import Job, Requirements
 from dstack._internal.core.request import RequestHead, RequestStatus
-from dstack._internal.core.runners import Gpu, Resources
+from dstack._internal.core.runners import Gpu, Resources, Runner
 
 DSTACK_INSTANCE_TAG = "dstack-runner-instance"
 
@@ -97,7 +97,7 @@ class GCPCompute(Compute):
             requirements=job.requirements,
         )
 
-    def run_instance(self, job: Job, instance_type: InstanceType) -> str:
+    def run_instance(self, job: Job, instance_type: InstanceType) -> LaunchedInstanceInfo:
         instance = _launch_instance(
             instances_client=self.instances_client,
             firewalls_client=self.firewalls_client,
@@ -125,20 +125,20 @@ class GCPCompute(Compute):
             ),
             ssh_key_pub=job.ssh_key_pub,
         )
-        return instance.name
+        return LaunchedInstanceInfo(request_id=instance.name, location=self.gcp_config.zone)
 
-    def terminate_instance(self, request_id: str):
+    def terminate_instance(self, runner: Runner):
         _terminate_instance(
             client=self.instances_client,
             gcp_config=self.gcp_config,
-            instance_name=request_id,
+            instance_name=runner.request_id,
         )
 
-    def cancel_spot_request(self, request_id: str):
+    def cancel_spot_request(self, runner: Runner):
         _terminate_instance(
             client=self.instances_client,
             gcp_config=self.gcp_config,
-            instance_name=request_id,
+            instance_name=runner.request_id,
         )
 
 
