@@ -2,6 +2,36 @@ import time
 from typing import Any, List
 
 import botocore.exceptions
+from boto3 import Session
+from botocore.client import BaseClient
+
+
+def get_s3_client(session: Session, **kwargs) -> BaseClient:
+    return _get_client(session, "s3", **kwargs)
+
+
+def get_ec2_client(session: Session, **kwargs) -> BaseClient:
+    return _get_client(session, "ec2", **kwargs)
+
+
+def get_iam_client(session: Session, **kwargs) -> BaseClient:
+    return _get_client(session, "iam", **kwargs)
+
+
+def get_logs_client(session: Session, **kwargs) -> BaseClient:
+    return _get_client(session, "logs", **kwargs)
+
+
+def get_secretsmanager_client(session: Session, **kwargs) -> BaseClient:
+    return _get_client(session, "secretsmanager", **kwargs)
+
+
+def get_sts_client(session: Session, **kwargs) -> BaseClient:
+    return _get_client(session, "sts", **kwargs)
+
+
+def _get_client(session: Session, client_name: str, **kwargs) -> BaseClient:
+    return session.client(client_name, **kwargs)
 
 
 def retry_operation_on_service_errors(

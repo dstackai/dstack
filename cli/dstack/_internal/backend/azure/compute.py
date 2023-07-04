@@ -41,10 +41,10 @@ from dstack._internal.backend.azure.config import AzureConfig
 from dstack._internal.backend.base.compute import WS_PORT, Compute, choose_instance_type
 from dstack._internal.backend.base.config import BACKEND_CONFIG_FILENAME, RUNNER_CONFIG_FILENAME
 from dstack._internal.backend.base.runners import serialize_runner_yaml
-from dstack._internal.core.instance import InstanceType
+from dstack._internal.core.instance import InstanceType, LaunchedInstanceInfo
 from dstack._internal.core.job import Job
 from dstack._internal.core.request import RequestHead, RequestStatus
-from dstack._internal.core.runners import Gpu, Resources
+from dstack._internal.core.runners import Gpu, Resources, Runner
 from dstack._internal.utils.common import removeprefix
 
 
@@ -82,7 +82,7 @@ class AzureCompute(Compute):
         )
         return choose_instance_type(instance_types=instance_types, requirements=job.requirements)
 
-    def run_instance(self, job: Job, instance_type: InstanceType) -> str:
+    def run_instance(self, job: Job, instance_type: InstanceType) -> LaunchedInstanceInfo:
         vm = _launch_instance(
             compute_client=self._compute_client,
             subscription_id=self.azure_config.subscription_id,
@@ -105,7 +105,7 @@ class AzureCompute(Compute):
             ssh_pub_key=job.ssh_key_pub,
             spot=instance_type.resources.spot,
         )
-        return vm.name
+        return LaunchedInstanceInfo(request_id=vm.name, location=self.azure_config.location)
 
     def get_request_head(self, job: Job, request_id: Optional[str]) -> RequestHead:
         if request_id is None:
@@ -125,14 +125,14 @@ class AzureCompute(Compute):
             message=None,
         )
 
-    def cancel_spot_request(self, request_id: str):
-        self.terminate_instance(request_id)
+    def cancel_spot_request(self, runner: Runner):
+        self.terminate_instance(runner.request_id)
 
-    def terminate_instance(self, request_id: str):
+    def terminate_instance(self, runner: Runner):
         _terminate_instance(
             compute_client=self._compute_client,
             resource_group=self.azure_config.resource_group,
-            instance_name=request_id,
+            instance_name=runner.request_id,
         )
 
 

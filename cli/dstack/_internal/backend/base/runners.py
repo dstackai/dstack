@@ -37,9 +37,9 @@ def delete_runner(storage: Storage, runner: Runner):
 def stop_runner(storage: Storage, compute: Compute, runner: Runner):
     if runner.request_id:
         if runner.resources.spot:
-            compute.cancel_spot_request(runner.request_id)
+            compute.cancel_spot_request(runner)
         else:
-            compute.terminate_instance(runner.request_id)
+            compute.terminate_instance(runner)
     delete_runner(storage, runner)
 
 

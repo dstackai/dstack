@@ -113,7 +113,7 @@ def _add_secret(
             {"Key": "dstack_bucket", "Value": bucket_name},
         ],
     )
-    role_name = runners.role_name(iam_client, bucket_name)
+    role_name = runners._get_role_name(iam_client, bucket_name)
     account_id = sts_client.get_caller_identity()["Account"]
     resource_policy = json.dumps(
         {
