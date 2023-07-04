@@ -100,7 +100,9 @@ func (s *LocalStorage) List(ctx context.Context, prefix string) (<-chan *base.St
 			if err != nil {
 				return gerrors.Wrap(err)
 			}
-			// is it working with real paths? and trailing slash?
+			if info.IsDir() {
+				fullKey += "/"
+			}
 			if !strings.HasPrefix(fullKey, prefix) {
 				if info.IsDir() {
 					return filepath.SkipDir
