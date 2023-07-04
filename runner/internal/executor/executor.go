@@ -742,7 +742,7 @@ func (ex *Executor) build(ctx context.Context, spec *container.Spec, stoppedCh c
 				}
 				err = gerrors.Wrap(base.ErrBuildNotFound)
 			} else {
-				_, _ = fmt.Fprintf(ex.streamLogs, "Downloading the image diff (%s)...", humanize.Bytes(uint64(buildInfo.Size)))
+				_, _ = fmt.Fprintf(ex.streamLogs, "Downloading the image diff (%s)...\n", humanize.Bytes(uint64(buildInfo.Size)))
 				if err := ex.backend.GetBuildDiff(ctx, buildInfo.Key, diffPath.Name()); err != nil {
 					return gerrors.Wrap(err)
 				}
@@ -774,7 +774,7 @@ func (ex *Executor) build(ctx context.Context, spec *container.Spec, stoppedCh c
 		}
 		// local backend: store image in daemon cache, put empty diff as head file
 		if !isLocalBackend {
-			_, _ = fmt.Fprintf(ex.streamLogs, "Saving the image...\n")
+			_, _ = fmt.Fprintf(ex.streamLogs, "Saving the image diff...\n")
 			if err := ex.engine.ExportImageDiff(ctx, imageName, diffPath.Name()); err != nil {
 				return gerrors.Wrap(err)
 			}
@@ -788,7 +788,7 @@ func (ex *Executor) build(ctx context.Context, spec *container.Spec, stoppedCh c
 		if err := ex.backend.PutBuildDiff(ctx, diffPath.Name(), buildSpec); err != nil {
 			return gerrors.Wrap(err)
 		}
-		_, _ = fmt.Fprintf(ex.streamLogs, "The image is saved\n")
+		_, _ = fmt.Fprintf(ex.streamLogs, "The image diff is saved\n")
 		spec.Image = imageName
 	}
 
