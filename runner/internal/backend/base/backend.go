@@ -119,10 +119,14 @@ func PutBuildDiff(ctx context.Context, storage Storage, src string, spec *contai
 	newDiffKey := getBuildDiffName(spec)
 	oldDiff, err := GetBuildDiffInfo(ctx, storage, spec)
 	if err == nil {
-		return gerrors.Wrap(storage.Delete(ctx, oldDiff.Key))
+		log.Trace(ctx, "Deleting old build diff", "key", oldDiff.Key)
+		if err = storage.Delete(ctx, oldDiff.Key); err != nil {
+			return gerrors.Wrap(err)
+		}
 	} else if !errors.Is(err, ErrBuildNotFound) {
 		return gerrors.Wrap(err)
 	}
+	log.Trace(ctx, "Uploading new build diff", "key", newDiffKey)
 	return gerrors.Wrap(UploadFile(ctx, storage, src, newDiffKey))
 }
 
