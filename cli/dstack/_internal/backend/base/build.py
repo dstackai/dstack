@@ -47,7 +47,7 @@ def _get_build_head_prefix(job: Job, platform: DockerPlatform) -> str:
         # timestamp_utc
     ]
     parts = ";".join(escape_head(p) for p in parts)
-    return f"builds/{parts};"
+    return f"builds/{job.repo_ref.repo_id}/{parts};"
 
 
 def guess_docker_platform() -> DockerPlatform:

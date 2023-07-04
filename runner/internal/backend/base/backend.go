@@ -132,7 +132,8 @@ func PutBuildDiff(ctx context.Context, storage Storage, src string, spec *contai
 
 func getBuildDiffPrefix(spec *container.BuildSpec) string {
 	return fmt.Sprintf(
-		"builds/%s;%s;%s;%s;%s;",
+		"builds/%s/%s;%s;%s;%s;%s;",
+		spec.RepoId,
 		models.EscapeHead(spec.ConfigurationType),
 		models.EscapeHead(spec.ConfigurationPath),
 		models.EscapeHead(spec.WorkDir),
