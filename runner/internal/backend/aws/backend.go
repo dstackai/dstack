@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"github.com/dstackai/dstack/runner/internal/backend/aws/s3fs"
 	"github.com/dstackai/dstack/runner/internal/backend/base"
+	"github.com/dstackai/dstack/runner/internal/container"
 	"io"
 	"io/ioutil"
 	"path"
@@ -314,13 +315,20 @@ func (s *AWSBackend) GetRepoArchive(ctx context.Context, path, dir string) error
 	return gerrors.Wrap(base.GetRepoArchive(ctx, s.storage, path, dir))
 }
 
-func (s *AWSBackend) GetBuildDiff(ctx context.Context, key, dst string) error {
-	_ = base.DownloadFile(ctx, s.storage, key, dst)
-	return nil
+func (s *AWSBackend) GetBuildDiffInfo(ctx context.Context, spec *container.BuildSpec) (*base.StorageObject, error) {
+	obj, err := base.GetBuildDiffInfo(ctx, s.storage, spec)
+	if err != nil {
+		return nil, gerrors.Wrap(err)
+	}
+	return obj, nil
 }
 
-func (s *AWSBackend) PutBuildDiff(ctx context.Context, src, key string) error {
-	return gerrors.Wrap(base.UploadFile(ctx, s.storage, src, key))
+func (s *AWSBackend) GetBuildDiff(ctx context.Context, key, dst string) error {
+	return gerrors.Wrap(base.DownloadFile(ctx, s.storage, key, dst))
+}
+
+func (s *AWSBackend) PutBuildDiff(ctx context.Context, src string, spec *container.BuildSpec) error {
+	return gerrors.Wrap(base.PutBuildDiff(ctx, s.storage, src, spec))
 }
 
 func (s *AWSBackend) GetTMPDir(ctx context.Context) string {

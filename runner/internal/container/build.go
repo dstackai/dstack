@@ -26,6 +26,7 @@ type BuildSpec struct {
 	BaseImageName      string
 	RegistryAuthBase64 string
 	RepoPath           string
+	Platform           string
 }
 
 func BuildImage(ctx context.Context, client docker.APIClient, spec *BuildSpec, imageName string, stoppedCh chan struct{}, logs io.Writer) error {

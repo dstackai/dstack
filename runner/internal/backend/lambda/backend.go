@@ -3,6 +3,7 @@ package lambda
 import (
 	"context"
 	"github.com/dstackai/dstack/runner/internal/backend/base"
+	"github.com/dstackai/dstack/runner/internal/container"
 	"io"
 	"io/ioutil"
 	"os"
@@ -140,12 +141,20 @@ func (l *LambdaBackend) GetRepoArchive(ctx context.Context, path, dir string) er
 	return l.storageBackend.GetRepoArchive(ctx, path, dir)
 }
 
+func (l *LambdaBackend) GetBuildDiffInfo(ctx context.Context, spec *container.BuildSpec) (*base.StorageObject, error) {
+	obj, err := l.storageBackend.GetBuildDiffInfo(ctx, spec)
+	if err != nil {
+		return nil, gerrors.Wrap(err)
+	}
+	return obj, nil
+}
+
 func (l *LambdaBackend) GetBuildDiff(ctx context.Context, key, dst string) error {
 	return l.storageBackend.GetBuildDiff(ctx, key, dst)
 }
 
-func (l *LambdaBackend) PutBuildDiff(ctx context.Context, src, key string) error {
-	return l.storageBackend.PutBuildDiff(ctx, src, key)
+func (l *LambdaBackend) PutBuildDiff(ctx context.Context, src string, spec *container.BuildSpec) error {
+	return l.storageBackend.PutBuildDiff(ctx, src, spec)
 }
 
 func (l *LambdaBackend) GetTMPDir(ctx context.Context) string {

@@ -710,105 +710,85 @@ func (ex *Executor) Shutdown(ctx context.Context) {
 
 func (ex *Executor) build(ctx context.Context, spec *container.Spec, stoppedCh chan struct{}, logs io.Writer) error {
 	job := ex.backend.Job(ctx)
+	if len(job.BuildCommands) == 0 && len(job.OptionalBuildCommands) == 0 {
+		return nil
+	}
+	secrets, err := ex.backend.Secrets(ctx)
+	if err != nil {
+		return gerrors.Wrap(err)
+	}
+	buildSpec, err := ex.engine.NewBuildSpec(ctx, job, spec, secrets, path.Join(ex.backend.GetTMPDir(ctx), consts.RUNS_DIR, job.RunName, job.JobID))
+	if err != nil {
+		return gerrors.Wrap(err)
+	}
+	imageName := fmt.Sprintf("dstackai/build:%s", buildSpec.Hash())
 	_, isLocalBackend := ex.backend.(*localbackend.Local)
-	commands := append([]string{}, job.BuildCommands...)
-	commands = append(commands, job.OptionalBuildCommands...)
-
-	buildSpec := &container.BuildSpec{
-		BaseImageName:      spec.Image,
-		WorkDir:            spec.WorkDir,
-		ConfigurationPath:  job.ConfigurationPath,
-		ConfigurationType:  job.ConfigurationType,
-		Commands:           container.ShellCommands(commands),
-		Entrypoint:         spec.Entrypoint,
-		Env:                ex.environment(ctx, false),
-		RegistryAuthBase64: spec.RegistryAuthBase64,
-		RepoPath:           path.Join(ex.backend.GetTMPDir(ctx), consts.RUNS_DIR, job.RunName, job.JobID),
-	}
-	buildName, err := ex.engine.GetBuildDigest(ctx, buildSpec)
+	diffPath, err := os.CreateTemp("", "layer*.tar")
 	if err != nil {
 		return gerrors.Wrap(err)
 	}
-
-	tempDir, err := os.MkdirTemp("", "build")
-	if err != nil {
-		return gerrors.Wrap(err)
-	}
-	defer func() { _ = os.RemoveAll(tempDir) }()
-	diffPath := filepath.Join(tempDir, "layer.tar")
-	key := fmt.Sprintf("builds/%s/%s.tar", job.RepoId, buildName)
-	imageName := fmt.Sprintf("dstackai/build:%s", buildName)
+	defer func() { _ = os.Remove(diffPath.Name()) }()
 
 	if job.BuildPolicy == models.UseBuild || job.BuildPolicy == models.Build {
-		log.Trace(ctx, "Trying to fetch build image diff", "key", key, "image", imageName)
-		if _, err := fmt.Fprintf(ex.streamLogs, "Looking for the image...\n"); err != nil {
-			return gerrors.Wrap(err)
-		}
-		if isLocalBackend {
-			exists, err := ex.engine.ImageExists(ctx, imageName)
-			if err != nil {
-				return gerrors.Wrap(err)
-			}
-			if exists {
-				if _, err := fmt.Fprintf(ex.streamLogs, "Using the image from the cache\n\n"); err != nil {
+		buildInfo, err := ex.backend.GetBuildDiffInfo(ctx, buildSpec)
+		if err == nil {
+			if isLocalBackend {
+				if exists, err := ex.engine.ImageExists(ctx, imageName); err != nil {
+					return gerrors.Wrap(err)
+				} else if exists {
+					_, _ = fmt.Fprintf(ex.streamLogs, "The image is loaded\n")
+					spec.Image = imageName
+					return nil
+				}
+				err = gerrors.Wrap(base.ErrBuildNotFound)
+			} else {
+				_, _ = fmt.Fprintf(ex.streamLogs, "Downloading the image diff (%s)...", humanize.Bytes(uint64(buildInfo.Size)))
+				if err := ex.backend.GetBuildDiff(ctx, buildInfo.Key, diffPath.Name()); err != nil {
 					return gerrors.Wrap(err)
 				}
+				_, _ = fmt.Fprintf(ex.streamLogs, "Loading the image diff...\n")
+				if err := ex.engine.ImportImageDiff(ctx, diffPath.Name()); err != nil {
+					return gerrors.Wrap(err)
+				}
+				_, _ = fmt.Fprintf(ex.streamLogs, "The image is loaded\n")
 				spec.Image = imageName
 				return nil
 			}
-		} else {
-			if err := ex.backend.GetBuildDiff(ctx, key, diffPath); err != nil {
-				return gerrors.Wrap(err)
-			}
-			if stat, err := os.Stat(diffPath); err == nil {
-				if _, err = fmt.Fprintf(ex.streamLogs, "Loading the image (%s)...\n", humanize.Bytes(uint64(stat.Size()))); err != nil {
-					return gerrors.Wrap(err)
-				}
-				if err := ex.engine.ImportImageDiff(ctx, diffPath); err != nil {
-					return gerrors.Wrap(err)
-				}
-				if _, err = fmt.Fprintf(ex.streamLogs, "The image is loaded\n\n"); err != nil {
-					return gerrors.Wrap(err)
-				}
-				spec.Image = imageName
-				return nil
-			}
-		}
-		if _, err = fmt.Fprintf(ex.streamLogs, "No image is found\n\n"); err != nil {
+		} else if !errors.Is(err, base.ErrBuildNotFound) {
 			return gerrors.Wrap(err)
 		}
-		if job.BuildPolicy == models.UseBuild && len(job.BuildCommands) > 0 {
-			job.ErrorCode = errorcodes.BuildNotFound
-			_ = ex.backend.UpdateState(ctx)
-			return gerrors.New("no build image is found")
+		// handle ErrBuildNotFound
+		if len(job.BuildCommands) > 0 { // if build is not optional
+			_, _ = fmt.Fprintf(ex.streamLogs, "No image is found\n")
+			if job.BuildPolicy == models.UseBuild {
+				job.ErrorCode = errorcodes.BuildNotFound
+				_ = ex.backend.UpdateState(ctx)
+				return gerrors.Wrap(err)
+			}
 		}
 	}
 
 	if job.BuildPolicy == models.Build || job.BuildPolicy == models.ForceBuild || job.BuildPolicy == models.BuildOnly {
-		err := ex.engine.Build(ctx, buildSpec, imageName, stoppedCh, logs)
-		if err != nil {
+		if err := ex.engine.Build(ctx, buildSpec, imageName, stoppedCh, logs); err != nil {
 			return gerrors.Wrap(err)
 		}
-		// local backend: store image in daemon cache
+		// local backend: store image in daemon cache, put empty diff as head file
 		if !isLocalBackend {
-			if _, err := fmt.Fprintf(ex.streamLogs, "Saving the image...\n"); err != nil {
+			_, _ = fmt.Fprintf(ex.streamLogs, "Saving the image...\n")
+			if err := ex.engine.ExportImageDiff(ctx, imageName, diffPath.Name()); err != nil {
 				return gerrors.Wrap(err)
 			}
-			if err := ex.engine.ExportImageDiff(ctx, imageName, diffPath); err != nil {
-				return gerrors.Wrap(err)
-			}
-			stat, err := os.Stat(diffPath)
+			diffStat, err := os.Stat(diffPath.Name())
 			if err != nil {
 				return gerrors.Wrap(err)
 			}
-			log.Trace(ctx, "Putting build image diff", "key", key, "image", imageName, "size", stat.Size())
-			if _, err = fmt.Fprintf(ex.streamLogs, "Uploading the image (%s)...\n", humanize.Bytes(uint64(stat.Size()))); err != nil {
-				return gerrors.Wrap(err)
-			}
-			if err = ex.backend.PutBuildDiff(ctx, diffPath, key); err != nil {
-				return gerrors.Wrap(err)
-			}
+			log.Trace(ctx, "Putting build image diff", "image", imageName, "size", diffStat.Size())
+			_, _ = fmt.Fprintf(ex.streamLogs, "Uploading the image diff (%s)...\n", humanize.Bytes(uint64(diffStat.Size())))
 		}
+		if err := ex.backend.PutBuildDiff(ctx, diffPath.Name(), buildSpec); err != nil {
+			return gerrors.Wrap(err)
+		}
+		_, _ = fmt.Fprintf(ex.streamLogs, "The image is saved\n")
 		spec.Image = imageName
 	}
 

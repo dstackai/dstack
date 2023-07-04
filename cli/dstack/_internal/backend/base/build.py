@@ -43,11 +43,11 @@ def _get_build_head_prefix(job: Job, platform: DockerPlatform) -> str:
         (Path("/workflow") / (job.working_dir or "")).as_posix(),
         job.image_name,
         platform.value,
-        # timestamp_utc
         # digest
+        # timestamp_utc
     ]
     parts = ";".join(escape_head(p) for p in parts)
-    return f"builds/l;{parts};"
+    return f"builds/{parts};"
 
 
 def guess_docker_platform() -> DockerPlatform:

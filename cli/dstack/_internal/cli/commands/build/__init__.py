@@ -51,7 +51,10 @@ class BuildCommand(BasicCommand):
                 ssh_pub_key = _read_ssh_key_pub(config.repo_user_config.ssh_key_path)
 
             run_plan = hub_client.get_run_plan(
-                provider_name=provider_name, provider_data=provider_data, args=args
+                configuration_path=configuration_path,
+                provider_name=provider_name,
+                provider_data=provider_data,
+                args=args,
             )
             console.print("dstack will execute the following plan:\n")
             _print_run_plan(configuration_path, run_plan)
