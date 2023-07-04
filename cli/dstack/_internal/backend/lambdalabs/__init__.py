@@ -1,8 +1,8 @@
 from typing import Optional
 
 import boto3
-from botocore.client import BaseClient
 
+from dstack._internal.backend.aws import utils as aws_utils
 from dstack._internal.backend.aws.logs import AWSLogging
 from dstack._internal.backend.aws.secrets import AWSSecretsManager
 from dstack._internal.backend.aws.storage import AWSStorage
@@ -27,16 +27,17 @@ class LambdaBackend(ComponentBasedBackend):
             aws_secret_access_key=self.backend_config.storage_config.credentials.secret_key,
         )
         self._storage = AWSStorage(
-            s3_client=self._s3_client(), bucket_name=self.backend_config.storage_config.bucket
+            s3_client=aws_utils.get_s3_client(self._session),
+            bucket_name=self.backend_config.storage_config.bucket,
         )
         self._secrets_manager = AWSSecretsManager(
-            secretsmanager_client=self._secretsmanager_client(),
-            iam_client=self._iam_client(),
-            sts_client=self._sts_client(),
+            secretsmanager_client=aws_utils.get_secretsmanager_client(self._session),
+            iam_client=aws_utils.get_iam_client(self._session),
+            sts_client=aws_utils.get_sts_client(self._session),
             bucket_name=self.backend_config.storage_config.bucket,
         )
         self._logging = AWSLogging(
-            logs_client=self._logs_client(),
+            logs_client=aws_utils.get_logs_client(self._session),
             bucket_name=self.backend_config.storage_config.bucket,
         )
 
@@ -61,27 +62,8 @@ class LambdaBackend(ComponentBasedBackend):
 
     def create_run(self, repo_id: str) -> str:
         self._logging.create_log_groups_if_not_exist(
-            self._logs_client(), self.backend_config.storage_config.bucket, repo_id
+            aws_utils.get_logs_client(self._session),
+            self.backend_config.storage_config.bucket,
+            repo_id,
         )
         return base_runs.create_run(self._storage)
-
-    def _s3_client(self) -> BaseClient:
-        return self._get_client("s3")
-
-    def _ec2_client(self) -> BaseClient:
-        return self._get_client("ec2")
-
-    def _iam_client(self) -> BaseClient:
-        return self._get_client("iam")
-
-    def _logs_client(self) -> BaseClient:
-        return self._get_client("logs")
-
-    def _secretsmanager_client(self) -> BaseClient:
-        return self._get_client("secretsmanager")
-
-    def _sts_client(self) -> BaseClient:
-        return self._get_client("sts")
-
-    def _get_client(self, client_name: str) -> BaseClient:
-        return self._session.client(client_name)

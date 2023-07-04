@@ -15,10 +15,10 @@ from dstack._internal.backend.base.config import BACKEND_CONFIG_FILENAME, RUNNER
 from dstack._internal.backend.base.runners import serialize_runner_yaml
 from dstack._internal.backend.lambdalabs.api_client import LambdaAPIClient
 from dstack._internal.backend.lambdalabs.config import LambdaConfig
-from dstack._internal.core.instance import InstanceType
+from dstack._internal.core.instance import InstanceType, LaunchedInstanceInfo
 from dstack._internal.core.job import Job
 from dstack._internal.core.request import RequestHead, RequestStatus
-from dstack._internal.core.runners import Gpu, Resources
+from dstack._internal.core.runners import Gpu, Resources, Runner
 from dstack._internal.hub.utils.ssh import HUB_PRIVATE_KEY_PATH, get_hub_ssh_public_key
 
 _WAIT_FOR_INSTANCE_ATTEMPTS = 120
@@ -115,21 +115,23 @@ class LambdaCompute:
             requirements=job.requirements,
         )
 
-    def run_instance(self, job: Job, instance_type: InstanceType) -> str:
-        return _run_instance(
+    def run_instance(self, job: Job, instance_type: InstanceType) -> LaunchedInstanceInfo:
+        region = _get_instance_region(instance_type, self.lambda_config.regions)
+        instance_id = _run_instance(
             api_client=self.api_client,
-            region_name=_get_instance_region(instance_type, self.lambda_config.regions),
+            region_name=region,
             instance_type_name=instance_type.instance_name,
             user_ssh_key=job.ssh_key_pub,
             hub_ssh_key=get_hub_ssh_public_key(),
             instance_name=_get_instance_name(job),
             launch_script=_get_launch_script(self.lambda_config, job, instance_type),
         )
+        return LaunchedInstanceInfo(request_id=instance_id, location=region)
 
-    def terminate_instance(self, request_id: str):
-        self.api_client.terminate_instances(instance_ids=[request_id])
+    def terminate_instance(self, runner: Runner):
+        self.api_client.terminate_instances(instance_ids=[runner.request_id])
 
-    def cancel_spot_request(self, request_id: str):
+    def cancel_spot_request(self, runner: Runner):
         pass
 
 

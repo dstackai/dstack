@@ -15,6 +15,7 @@
     })();
 </script>
 <script type="text/javascript">
+/*
     new Termynal('#vscode-command-example',
         {
             lineData: [
@@ -52,6 +53,7 @@
             ]
         }
     );
+*/
     new Termynal('#train-command-example',
         {
             lineData: [
@@ -100,10 +102,10 @@
             ]
         }
     );
-    new Termynal('#app-command-example',
+    new Termynal('#serve-command-example',
         {
             lineData: [
-                {type: 'input', value: 'dstack run . -f app.dstack.yml --reload'},
+                {type: 'input', value: 'dstack run . -f serve.dstack.yml'},
                 {delay: 0, value: ' ', class: 'newline'},
                 {
                     delay: 0,
@@ -132,12 +134,13 @@
                 {delay: 0, value: ' ', class: 'newline'},
                 {
                     delay: 0,
-                    value: 'Launching in *reload mode* on: http://127.0.0.1:7860 (Press CTRL+C to quit)',
+                    value: 'Running on local URL:  http://127.0.0.1:7860',
                     class: 'newline'
                 },
+                {delay: 0, value: ' ', class: 'newline'},
                 {
                     delay: 0,
-                    value: 'Watching: \'/opt/conda/lib/python3.10/site-packages/gradio\', \'/workflow\'',
+                    value: 'To stop, press Ctrl+C.',
                     class: 'newline'
                 },
                 {delay: 0, value: ' ', class: 'newline'},
@@ -152,20 +155,18 @@
     <div class="md-grid md-typeset">
         <div class="tx-landing__hero">
             <div class="tx-landing__hero_text">
-                <h1>Cost-effective ML development in the cloud</h1>
-                <p><strong>dstack</strong> is an open-source tool designed for ML teams
-                    to automate running <strong>dev environments</strong> and <strong>tasks</strong>
-                    in their cloud.
+                <h1>Cost-effective ML workloads in any cloud</h1>
+                <p><strong>dstack</strong> is an open-source tool designed to
+                    enhance the efficiency of running ML workloads in the cloud.
                 </p>
 
-                <p><strong>dstack</strong> simplifies the developer workflow of ML teams while
-                    driving <strong>productivity</strong> and reducing <strong>cloud costs</strong>.</p>
+                <p>Streamline running dev environments, training and serving models while cutting costs.</p>
 
                 <a href="/docs" class="md-button md-button--primary">
                     Docs</a>
 
                 <a href="https://join.slack.com/t/dstackai/shared_invite/zt-xdnsytie-D4qU9BvJP8vkbkHXdi6clQ" target="_blank"
-                   class="md-button md-button-secondary">Join community</a>
+                   class="md-button md-button-secondary slack">Join Slack</a>
             </div>
 
             <div class="tx-landing__hero_image">
@@ -173,26 +174,15 @@
             </div>
         </div>
 
-        <div class="tx-landing__major_feature">
-            <h2>Dev environments with a single command</h2>
-            <div class="section">
-                <div class="block large margin">
-                    <div id="vscode-command-example" data-termynal>
-                    </div>
-                </div>
-                <div class="block">
-                    <div>
-                        <h3>Provision dev environments in your cloud on demand</h3>
-                        <p>Configure the <strong>hardware resources</strong> you need (GPU, memory, etc.) and
-                            indicate whether you want to use <strong>spot</strong> or <strong>on-demand</strong>
-                            instances.</p>
-                        <p>Run the configuration with a single command.</p>
-
-                        <p><strong>dstack</strong> will automatically provision cloud resources,
-                            <strong>fetch</strong> your code, and <strong>forward ports</strong> for secure
-                            and convenient access.</p>
-                    </div>
-                </div>
+        <div class="tx-landing__integrations">
+            <div class="tx-landing__integrations_text">
+                <h2>Leverage multiple clouds to cut costs</h2>
+            </div>
+            <div class="tx-landing__integrations_logos">
+                <img class="logo-xlarge" src="assets/images/aws-logo.svg" title="Amazon Web Services">
+                <img class="logo-large" src="assets/images/gcp-logo.svg" title="Google Cloud Platform">
+                <img class="logo-large" src="assets/images/azure-logo.svg" title="Microsoft Azure">
+                <img class="logo-large" src="assets/images/lambda-logo.svg" title="Lambda Cloud">
             </div>
         </div>
 
@@ -200,12 +190,16 @@
             <div class="section">
                 <div class="block margin">
                     <div>
-                        <h3>Work with dev environments via a desktop IDE of your choice</h3>
-                        <p>Click the <strong>SSH</strong> URL from the output to automatically
-                            open the cloud dev environment in your local <strong>desktop</strong> IDE.</p>
-                        <p>The cloud dev environment is automatically <strong>pre-configured</strong>
-                            with the Python environment, and IDE extensions for working with <strong>Python</strong>
-                            and <strong>Jupyter</strong> notebooks.</p>
+                        <h2>Dev environments</h2>
+                        <p>Configure the hardware <strong>resources</strong>, such as GPU, memory,  specify your
+                            preference for using  <strong>spot</strong> instances.</p>
+
+                        <p><strong>dstack</strong> automatically provisions cloud resources,
+                            <strong>fetches</strong> your code, and <strong>forwards ports</strong> for secure
+                            access.</p>
+
+                        <p>Access the cloud dev environment conveniently using your local <strong>desktop</strong> IDE.
+                        </p>
                     </div>
                 </div>
 
@@ -216,28 +210,22 @@
         </div>
 
         <div class="tx-landing__major_feature">
-            <h2>Run any type of ML task with a single command</h2>
             <div class="section">
-                <div class="block margin">
-                    <div>
-                        <h3>Train models at scale, easily and cost effectively</h3>
-                        <p><strong>dstack</strong> handles the automatic provisioning of cloud resources, including
-                            waiting for <strong>spot instances</strong> if required. It runs the script and performs
-                            resource
-                            cleanup
-                            once the training is complete.</p>
-
-                        <p>If a task is <strong>interrupted</strong>, it is able to resume from where it last stopped.
-                        </p>
-
-                        <p>Use the <strong>dstack</strong> Python API to <strong>store</strong> and
-                            <strong>load</strong>
-                            <strong>artifacts</strong> such as model checkpoints and datasets.</p>
+                <div class="block large margin">
+                    <div id="train-command-example" data-termynal>
                     </div>
                 </div>
+                <div class="block">
+                    <div>
+                        <h2>Training</h2>
+                        <p><strong>Pre-train</strong> and <strong>finetune</strong> your own state-of-the-art models easily and
+                            cost-effectively in any cloud.</p>
 
-                <div class="block large">
-                    <div id="train-command-example" data-termynal>
+                        <p>Have cloud <strong>resources</strong> automatically provisioned based on your
+                            configuration.</p>
+
+                        <p>Access your <strong>data</strong> and store output <strong>artifacts</strong> using
+                            declarative configuration or the Python SDK.</p>
                     </div>
                 </div>
             </div>
@@ -245,31 +233,32 @@
 
         <div class="tx-landing__major_feature">
             <div class="section">
-                <div class="block large margin">
-                    <div id="app-command-example" data-termynal>
-                    </div>
-                </div>
-
-                <div class="block">
+                <div class="block margin">
                     <div>
-                        <h3>Launch ML apps in your cloud with a single command</h3>
-                        <p>Run apps in your cloud for <strong>development</strong> and
-                            <strong>testing purposes</strong> with a single command.</p>
+                        <h2>Serving</h2>
+                        <p>Serve models using <strong>Gradio</strong>, <strong>Streamlit</strong>,
+                            <strong>FastAPI</strong>, <strong>vLLM</strong>, and
+                            other frameworks in any cloud.</p>
 
                         <p>Configure the <strong>hardware resources</strong> you need (GPU, memory, etc.) and
                             indicate whether you want to use <strong>spot</strong> or <strong>on-demand</strong>
                             instances.</p>
 
                         <p><strong>dstack</strong> will automatically provision cloud resources,
-                            and <strong>forward ports</strong> for secure and convenient access.</p>
+                            and forward <strong>ports</strong> for secure and convenient access.</p>
+                    </div>
+                </div>
+
+                <div class="block large">
+                    <div id="serve-command-example" data-termynal>
                     </div>
                 </div>
             </div>
         </div>
 
-        <div class="tx-landing__highlights">
+        <div class="-landing__highlights">
             <div class="tx-landing__highlights_text">
-                <h2>Run ML on any cloud easily and cost-effectively</h2>
+                <h2>Run ML workloads easily and <span style="white-space: nowrap">cost-effectively</span></h2>
             </div>
 
             <div class="tx-landing__highlights_grid">
@@ -280,22 +269,20 @@
                         </svg>
                     </div>
                     <h3>
-                        Faster development
+                        Faster iterations
                     </h3>
 
                     <p>
-                        Define <strong>dev environments</strong> and <strong>tasks</strong> as code.
+                        Define any <strong>workloads</strong> declaratively as code.
                         Run them on demand using the CLI, eliminating the need for cloud UI or proprietary APIs.
                     </p>
                 </div>
                 <div class="feature-cell">
                     <div class="feature-icon">
-                        <svg xmlns="http://www.w3.org/2000/svg" viewBox="-2 -2 27 27">
-                            <path d="M4 1h16a1 1 0 0 1 1 1v4a1 1 0 0 1-1 1H4a1 1 0 0 1-1-1V2a1 1 0 0 1 1-1m0 8h16a1 1 0 0 1 1 1v4a1 1 0 0 1-1 1H4a1 1 0 0 1-1-1v-4a1 1 0 0 1 1-1m0 8h16a1 1 0 0 1 1 1v4a1 1 0 0 1-1 1H4a1 1 0 0 1-1-1v-4a1 1 0 0 1 1-1M9 5h1V3H9v2m0 8h1v-2H9v2m0 8h1v-2H9v2M5 3v2h2V3H5m0 8v2h2v-2H5m0 8v2h2v-2H5Z"></path>
-                        </svg>
+                        <svg xmlns="http://www.w3.org/2000/svg" viewBox="3 3 21 21"><path d="M7 15h2c0 1.08 1.37 2 3 2s3-.92 3-2c0-1.1-1.04-1.5-3.24-2.03C9.64 12.44 7 11.78 7 9c0-1.79 1.47-3.31 3.5-3.82V3h3v2.18C15.53 5.69 17 7.21 17 9h-2c0-1.08-1.37-2-3-2s-3 .92-3 2c0 1.1 1.04 1.5 3.24 2.03C14.36 11.56 17 12.22 17 15c0 1.79-1.47 3.31-3.5 3.82V21h-3v-2.18C8.47 18.31 7 16.79 7 15Z"></path></svg>
                     </div>
                     <h3>
-                        GPU cost optimization
+                        Cost optimization
                     </h3>
 
                     <p>Save costs by effectively utilizing cloud <strong>spot</strong> instances across multiple
@@ -305,9 +292,8 @@
                 </div>
                 <div class="feature-cell">
                     <div class="feature-icon">
-                        <svg xmlns="http://www.w3.org/2000/svg" viewBox="2 2 22 22">
-                            <path
-                                    d="M12 3C7.58 3 4 4.79 4 7s3.58 4 8 4 8-1.79 8-4-3.58-4-8-4M4 9v3c0 2.21 3.58 4 8 4s8-1.79 8-4V9c0 2.21-3.58 4-8 4s-8-1.79-8-4m0 5v3c0 2.21 3.58 4 8 4s8-1.79 8-4v-3c0 2.21-3.58 4-8 4s-8-1.79-8-4Z"></path>
+                        <svg xmlns="http://www.w3.org/2000/svg" viewBox="-2 -2 27 27">
+                            <path d="M4 1h16a1 1 0 0 1 1 1v4a1 1 0 0 1-1 1H4a1 1 0 0 1-1-1V2a1 1 0 0 1 1-1m0 8h16a1 1 0 0 1 1 1v4a1 1 0 0 1-1 1H4a1 1 0 0 1-1-1v-4a1 1 0 0 1 1-1m0 8h16a1 1 0 0 1 1 1v4a1 1 0 0 1-1 1H4a1 1 0 0 1-1-1v-4a1 1 0 0 1 1-1M9 5h1V3H9v2m0 8h1v-2H9v2m0 8h1v-2H9v2M5 3v2h2V3H5m0 8v2h2v-2H5m0 8v2h2v-2H5Z"></path>
                         </svg>
                     </div>
                     <h3>
@@ -342,7 +328,8 @@
                         Cloud-agnostic
                     </h3>
                     <p>Use the same interface to work with any major cloud provider, including
-                        <strong>AWS</strong>, <strong>GCP</strong>, and <strong>Azure</strong>.
+                        <strong>AWS</strong>, <strong>GCP</strong>, <strong>Azure</strong>,
+                        and <strong>Lambda</strong>.
                         Use multiple clouds to optimize costs.
                     </p>
                 </div>
@@ -362,23 +349,12 @@
             </div>
         </div>
 
-        <div class="tx-landing__integrations">
-            <div class="tx-landing__integrations_text">
-                <h2>Use it easily with your cloud account</h2>
-            </div>
-            <div class="tx-landing__integrations_logos">
-                <img class="logo-xlarge" src="assets/images/aws-logo.svg" title="Amazon Web Services">
-                <img class="logo-large" src="assets/images/gcp-logo.svg" title="Google Cloud Platform">
-                <img class="logo-large" src="assets/images/azure-logo.svg" title="Microsoft Azure">
-            </div>
-        </div>
-
         <div class="tx-landing__bottom_cta">
             <div>
-                <h2>Install dstack in under a minute</h2>
+                <h2>Get started in less than a minute</h2>
                 <div class="termy">
                     <pre class="highlight">
-$ pip install "dstack[aws,gcp,azure]"
+$ pip install "dstack[aws,gcp,azure,lambda]"
 $ dstack start
                     </pre>
                 </div>
@@ -391,7 +367,7 @@ $ dstack start
                     Docs</a>
 
                 <a href="https://join.slack.com/t/dstackai/shared_invite/zt-xdnsytie-D4qU9BvJP8vkbkHXdi6clQ" target="_blank"
-                   class="md-button md-button-secondary">Get a demo</a>
+                   class="md-button md-button-secondary slack">Join Slack</a>
             </div>
         </div>
     </div>

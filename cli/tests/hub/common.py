@@ -29,6 +29,7 @@ async def create_project(
     if config is None:
         config = {
             "region_name": "eu-west-1",
+            "extra_regions": [],
             "s3_bucket_name": "dstack-test-eu-west-1",
             "ec2_subnet_id": None,
         }

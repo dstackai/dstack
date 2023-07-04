@@ -1,8 +1,8 @@
 from typing import Optional
 
-import boto3
-from botocore.client import BaseClient
+from boto3 import Session
 
+from dstack._internal.backend.aws import utils as aws_utils
 from dstack._internal.backend.aws.compute import AWSCompute
 from dstack._internal.backend.aws.config import AWSConfig
 from dstack._internal.backend.aws.logs import AWSLogging
@@ -21,31 +21,29 @@ class AwsBackend(ComponentBasedBackend):
     ):
         self.backend_config = backend_config
         if self.backend_config.credentials is not None:
-            self._session = boto3.session.Session(
+            self._session = Session(
                 region_name=self.backend_config.region_name,
                 aws_access_key_id=self.backend_config.credentials.get("access_key"),
                 aws_secret_access_key=self.backend_config.credentials.get("secret_key"),
             )
         else:
-            self._session = boto3.session.Session(region_name=self.backend_config.region_name)
+            self._session = Session(region_name=self.backend_config.region_name)
         self._storage = AWSStorage(
-            s3_client=self._s3_client(), bucket_name=self.backend_config.bucket_name
+            s3_client=aws_utils.get_s3_client(self._session),
+            bucket_name=self.backend_config.bucket_name,
         )
         self._compute = AWSCompute(
-            ec2_client=self._ec2_client(),
-            iam_client=self._iam_client(),
-            bucket_name=self.backend_config.bucket_name,
-            region_name=self.backend_config.region_name,
-            subnet_id=self.backend_config.subnet_id,
+            session=self._session,
+            backend_config=self.backend_config,
         )
         self._secrets_manager = AWSSecretsManager(
-            secretsmanager_client=self._secretsmanager_client(),
-            iam_client=self._iam_client(),
-            sts_client=self._sts_client(),
+            secretsmanager_client=aws_utils.get_secretsmanager_client(self._session),
+            iam_client=aws_utils.get_iam_client(self._session),
+            sts_client=aws_utils.get_sts_client(self._session),
             bucket_name=self.backend_config.bucket_name,
         )
         self._logging = AWSLogging(
-            logs_client=self._logs_client(),
+            logs_client=aws_utils.get_logs_client(self._session),
             bucket_name=self.backend_config.bucket_name,
         )
 
@@ -72,27 +70,6 @@ class AwsBackend(ComponentBasedBackend):
 
     def create_run(self, repo_id: str) -> str:
         self._logging.create_log_groups_if_not_exist(
-            self._logs_client(), self.backend_config.bucket_name, repo_id
+            aws_utils.get_logs_client(self._session), self.backend_config.bucket_name, repo_id
         )
         return base_runs.create_run(self._storage)
-
-    def _s3_client(self) -> BaseClient:
-        return self._get_client("s3")
-
-    def _ec2_client(self) -> BaseClient:
-        return self._get_client("ec2")
-
-    def _iam_client(self) -> BaseClient:
-        return self._get_client("iam")
-
-    def _logs_client(self) -> BaseClient:
-        return self._get_client("logs")
-
-    def _secretsmanager_client(self) -> BaseClient:
-        return self._get_client("secretsmanager")
-
-    def _sts_client(self) -> BaseClient:
-        return self._get_client("sts")
-
-    def _get_client(self, client_name: str) -> BaseClient:
-        return self._session.client(client_name)

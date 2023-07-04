@@ -3,10 +3,10 @@ from functools import cmp_to_key
 from typing import List, Optional
 
 from dstack._internal.core.error import DstackError
-from dstack._internal.core.instance import InstanceType
+from dstack._internal.core.instance import InstanceType, LaunchedInstanceInfo
 from dstack._internal.core.job import Job, Requirements
 from dstack._internal.core.request import RequestHead
-from dstack._internal.core.runners import Resources
+from dstack._internal.core.runners import Resources, Runner
 
 WS_PORT = 10999
 
@@ -29,15 +29,15 @@ class Compute(ABC):
         pass
 
     @abstractmethod
-    def run_instance(self, job: Job, instance_type: InstanceType) -> str:
+    def run_instance(self, job: Job, instance_type: InstanceType) -> LaunchedInstanceInfo:
         pass
 
     @abstractmethod
-    def terminate_instance(self, request_id: str):
+    def terminate_instance(self, runner: Runner):
         pass
 
     @abstractmethod
-    def cancel_spot_request(self, request_id: str):
+    def cancel_spot_request(self, runner: Runner):
         pass
 
 

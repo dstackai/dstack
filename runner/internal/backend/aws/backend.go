@@ -4,14 +4,14 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"github.com/dstackai/dstack/runner/internal/backend/aws/s3fs"
-	"github.com/dstackai/dstack/runner/internal/backend/base"
-	"github.com/dstackai/dstack/runner/internal/container"
 	"io"
 	"io/ioutil"
 	"path"
 	"strings"
 	"time"
+
+	"github.com/dstackai/dstack/runner/internal/backend/aws/s3fs"
+	"github.com/dstackai/dstack/runner/internal/backend/base"
 
 	"github.com/docker/docker/api/types/mount"
 	"github.com/dstackai/dstack/runner/consts"
@@ -79,6 +79,12 @@ func (s *AWSBackend) Init(ctx context.Context, ID string) error {
 	}
 	s.runnerID = ID
 	err := base.LoadRunnerState(ctx, s.storage, ID, &s.State)
+	if err != nil {
+		return gerrors.Wrap(err)
+	}
+	if s.State.Job.Location != "" {
+		s.cliEC2 = NewClientEC2(s.State.Job.Location)
+	}
 	return gerrors.Wrap(err)
 }
 

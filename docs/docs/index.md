@@ -1,4 +1,4 @@
-# Introduction
+# Quickstart
 
 `dstack` makes it very easy for ML teams to automate running dev environments and tasks in their cloud.
 
@@ -9,7 +9,7 @@ To use `dstack`, install it with `pip`, and start the server.
 <div class="termy">
 
 ```shell
-$ pip install "dstack[aws,gcp,azure]"
+$ pip install "dstack[aws,gcp,azure,lambda]"
 $ dstack start
 
 The server is available at http://127.0.0.1:3000?token=b934d226-e24a-4eab-eb92b353b10f
@@ -50,6 +50,10 @@ Here's an example of a `dev-environment` configuration:
 
 ```yaml
 type: dev-environment
+
+init:
+  - pip install -r requirements.txt
+
 ide: vscode
 ```
 
@@ -61,15 +65,17 @@ This configuration runs a dev environment with a pre-built environment to which 
 
 Here's an example of a `task` configuration:
 
-<div editor-title="app.dstack.yml"> 
+<div editor-title="serve.dstack.yml"> 
 
 ```yaml
 type: task
+
 ports:
   - 7860
+
 commands:
   - pip install -r requirements.txt
-  - gradio app.py
+  - python app.py
 ```
 
 </div>
@@ -78,14 +84,14 @@ A task can be either a batch job, such as training or fine-tuning a model, or a 
 
 !!! info "Configuration filename"
     The configuration file must be named with the suffix `.dstack.yml`. For example,
-    you can name the configuration file `.dstack.yml` or `app.dstack.yml`. You can define
+    you can name the configuration file `.dstack.yml` or `serve.dstack.yml`. You can define
     these configurations anywhere within your project. 
     
     Each folder may have one default configuration file named `.dstack.yml`.
 
 [//]: # (TODO: Mention pre-built)
 
-For more details on the syntax of configuration file, refer to the [`.dstack.yml` Reference](reference/dstack.yaml.md).
+For more details on the syntax of configuration file, refer to the [`.dstack.yml` Reference](../docs/reference/dstack.yml.md).
 
 ## Running
 
@@ -125,10 +131,10 @@ using the `-f` argument:
 <div class="termy">
 
 ```shell
-$ dstack run . -f app.dstack.yml
+$ dstack run . -f serve.dstack.yml
 
  RUN             CONFIGURATION   USER   PROJECT  INSTANCE  RESOURCES        SPOT
- old-lionfish-1  app.dstack.yml  admin  local    -         5xCPUs, 15987MB  auto  
+ old-lionfish-1  serve.dstack.yml  admin  local    -         5xCPUs, 15987MB  auto  
 
 Provisioning and starting SSH tunnel...
 ---> 100%
@@ -181,4 +187,4 @@ Now, if you use the `dstack run` command, `dstack` will use the default profile.
     You can define multiple profiles according to your needs and use any of them with the `dstack run` command by specifying
     the desired profile using the `--profile` argument.
 
-For more details on the syntax of the `profiles.yml` file, refer to the [`profiles.yml` Reference](reference/profiles.yml.md).
+For more details on the syntax of the `profiles.yml` file, refer to the [Reference](reference/profiles.yml.md).

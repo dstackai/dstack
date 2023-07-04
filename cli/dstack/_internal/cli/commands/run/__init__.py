@@ -45,7 +45,7 @@ interrupt_count = 0
 
 class RunCommand(BasicCommand):
     NAME = "run"
-    DESCRIPTION = "Run a workflow"
+    DESCRIPTION = "Run a configuration"
 
     def __init__(self, parser):
         super(RunCommand, self).__init__(parser)

@@ -7,7 +7,7 @@ Follow the step-by-step guide below to configure a project with this backend.
 
 ## 1. Create an S3 bucket
 
-First you need to create an S3 bucket. `dstack` will use this bucket to store state and artifacts.
+First, you need to create an S3 bucket. `dstack` will use this bucket to store state and artifacts.
 
 !!! info "NOTE:"
     Make sure that the bucket is created in the same region where you plan to provision

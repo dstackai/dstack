@@ -48,6 +48,7 @@ type Job struct {
 	RepoCodeFilename string `yaml:"repo_code_filename"`
 
 	RequestID         string       `yaml:"request_id"`
+	Location          string       `yaml:"location"`
 	Requirements      Requirements `yaml:"requirements"`
 	RunName           string       `yaml:"run_name"`
 	RunnerID          string       `yaml:"runner_id"`

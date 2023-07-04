@@ -30,10 +30,11 @@ from dstack._internal.hub.routers import (
     users,
 )
 from dstack._internal.hub.services.backends import local_backend_available
-from dstack._internal.hub.utils import logging
+from dstack._internal.hub.utils.logging import configure_logger
 from dstack._internal.hub.utils.ssh import generate_hub_ssh_key_pair
+from dstack._internal.utils import logging
 
-logging.configure_root_logger()
+configure_logger()
 logger = logging.get_logger(__name__)
 
 
@@ -78,7 +79,7 @@ async def app_logging(request: Request, call_next):
     path = request.url.path
     request_dict = {"method": request.method, "path": path}
     if path.startswith("/api/"):
-        logger.info(
+        logger.debug(
             {
                 "request": request_dict,
                 "process_time": process_time,

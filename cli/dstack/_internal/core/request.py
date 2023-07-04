@@ -15,9 +15,3 @@ class RequestHead(BaseModel):
     job_id: str
     status: RequestStatus
     message: Optional[str]
-
-    def __str__(self) -> str:
-        return (
-            f'RequestStatus(job_id="{self.job_id}", status="{self.status.value}", '
-            f'message="{self.message})'
-        )

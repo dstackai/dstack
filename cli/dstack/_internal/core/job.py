@@ -204,6 +204,7 @@ class Job(JobHead):
     app_specs: Optional[List[AppSpec]]
     runner_id: Optional[str]
     request_id: Optional[str]
+    location: Optional[str]
     tag_name: Optional[str]
     ssh_key_pub: Optional[str]
     build_policy: Optional[str]
@@ -304,6 +305,7 @@ class Job(JobHead):
             else [],
             "runner_id": self.runner_id or "",
             "request_id": self.request_id or "",
+            "location": self.location or "",
             "tag_name": self.tag_name or "",
             "ssh_key_pub": self.ssh_key_pub or "",
             "repo_code_filename": self.repo_code_filename,
@@ -440,6 +442,7 @@ class Job(JobHead):
             app_specs=app_specs,
             runner_id=job_data.get("runner_id") or None,
             request_id=job_data.get("request_id") or None,
+            location=job_data.get("location") or None,
             tag_name=job_data.get("tag_name") or None,
             ssh_key_pub=job_data.get("ssh_key_pub") or None,
             instance_type=job_data.get("instance_type") or None,

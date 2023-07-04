@@ -17,7 +17,7 @@ from dstack._internal.utils.crypto import generage_rsa_key_pair
 
 class InitCommand(BasicCommand):
     NAME = "init"
-    DESCRIPTION = "Authorize dstack to access the current Git repo"
+    DESCRIPTION = "Initialize the repo"
 
     def __init__(self, parser):
         super(InitCommand, self).__init__(parser)

@@ -17,6 +17,7 @@ from dstack._internal.hub.models import (
     AWSProjectValues,
     ProjectElement,
     ProjectElementValue,
+    ProjectMultiElement,
 )
 from dstack._internal.hub.services.backends.base import BackendConfigError, Configurator
 
@@ -33,6 +34,7 @@ REGIONS = [
     ("Europe, Paris", "eu-west-3"),
     ("Europe, Stockholm", "eu-north-1"),
 ]
+REGION_VALUES = [r[1] for r in REGIONS]
 
 
 class AWSConfigurator(Configurator):
@@ -41,9 +43,10 @@ class AWSConfigurator(Configurator):
     def configure_project(
         self, project_config: AWSProjectConfigWithCredsPartial
     ) -> AWSProjectValues:
-        if project_config.region_name is not None and project_config.region_name not in {
-            r[1] for r in REGIONS
-        }:
+        if (
+            project_config.region_name is not None
+            and project_config.region_name not in REGION_VALUES
+        ):
             raise BackendConfigError(f"Invalid AWS region {project_config.region_name}")
 
         project_values = AWSProjectValues()
@@ -71,22 +74,25 @@ class AWSConfigurator(Configurator):
             self._raise_invalid_credentials_error(fields=[["credentials"]])
 
         # TODO validate config values
-        project_values.region_name = self._get_hub_regions_element(
-            default_region=session.region_name
+        project_values.region_name = self._get_hub_region_element(selected=session.region_name)
+        project_values.extra_regions = self._get_hub_extra_regions_element(
+            region=session.region_name,
+            selected=project_config.extra_regions or [],
         )
         project_values.s3_bucket_name = self._get_hub_buckets_element(
             session=session,
             region=session.region_name,
-            default_bucket=project_config.s3_bucket_name,
+            selected=project_config.s3_bucket_name,
         )
         project_values.ec2_subnet_id = self._get_hub_subnet_element(
-            session=session, default_subnet=project_config.ec2_subnet_id
+            session=session, selected=project_config.ec2_subnet_id
         )
         return project_values
 
     def create_project(self, project_config: AWSProjectConfigWithCreds) -> Tuple[Dict, Dict]:
         config_data = {
             "region_name": project_config.region_name,
+            "extra_regions": project_config.extra_regions,
             "s3_bucket_name": project_config.s3_bucket_name.replace("s3://", ""),
             "ec2_subnet_id": project_config.ec2_subnet_id,
         }
@@ -100,11 +106,13 @@ class AWSConfigurator(Configurator):
         region_name = json_config["region_name"]
         s3_bucket_name = json_config["s3_bucket_name"]
         ec2_subnet_id = json_config["ec2_subnet_id"]
+        extra_regions = json_config.get("extra_regions", [])
         if include_creds:
             json_auth = json.loads(project.auth)
             return AWSProjectConfigWithCreds(
                 region_name=region_name,
                 region_name_title=region_name,
+                extra_regions=extra_regions,
                 s3_bucket_name=s3_bucket_name,
                 ec2_subnet_id=ec2_subnet_id,
                 credentials=AWSProjectCreds.parse_obj(json_auth),
@@ -112,6 +120,7 @@ class AWSConfigurator(Configurator):
         return AWSProjectConfig(
             region_name=region_name,
             region_name_title=region_name,
+            extra_regions=extra_regions,
             s3_bucket_name=s3_bucket_name,
             ec2_subnet_id=ec2_subnet_id,
         )
@@ -124,6 +133,7 @@ class AWSConfigurator(Configurator):
             or config_data.get("bucket_name")
             or config_data.get("s3_bucket_name"),
             region_name=config_data.get("region_name"),
+            extra_regions=config_data.get("extra_regions", []),
             subnet_id=config_data.get("subnet_id")
             or config_data.get("ec2_subnet_id")
             or config_data.get("subnet"),
@@ -146,18 +156,27 @@ class AWSConfigurator(Configurator):
             fields=fields,
         )
 
-    def _get_hub_regions_element(self, default_region: Optional[str]) -> ProjectElement:
-        element = ProjectElement(selected=default_region)
+    def _get_hub_region_element(self, selected: Optional[str]) -> ProjectElement:
+        element = ProjectElement(selected=selected)
         for r in REGIONS:
-            element.values.append(ProjectElementValue(value=r[1], label=r[0]))
+            element.values.append(ProjectElementValue(value=r[1], label=r[1]))
+        return element
+
+    def _get_hub_extra_regions_element(
+        self, region: str, selected: List[str]
+    ) -> ProjectMultiElement:
+        element = ProjectMultiElement(selected=selected)
+        for r in REGION_VALUES:
+            if r != region:
+                element.values.append(ProjectElementValue(value=r, label=r))
         return element
 
     def _get_hub_buckets_element(
-        self, session: Session, region: str, default_bucket: Optional[str]
+        self, session: Session, region: str, selected: Optional[str]
     ) -> AWSBucketProjectElement:
-        if default_bucket is not None:
-            self._validate_hub_bucket(session=session, region=region, bucket_name=default_bucket)
-        element = AWSBucketProjectElement(selected=default_bucket)
+        if selected is not None:
+            self._validate_hub_bucket(session=session, region=region, bucket_name=selected)
+        element = AWSBucketProjectElement(selected=selected)
         s3_client = session.client("s3")
         response = s3_client.list_buckets()
         for bucket in response["Buckets"]:
@@ -194,10 +213,8 @@ class AWSConfigurator(Configurator):
                 )
             raise e
 
-    def _get_hub_subnet_element(
-        self, session: Session, default_subnet: Optional[str]
-    ) -> ProjectElement:
-        element = ProjectElement(selected=default_subnet)
+    def _get_hub_subnet_element(self, session: Session, selected: Optional[str]) -> ProjectElement:
+        element = ProjectElement(selected=selected)
         _ec2 = session.client("ec2")
         response = _ec2.describe_subnets()
         for subnet in response["Subnets"]:

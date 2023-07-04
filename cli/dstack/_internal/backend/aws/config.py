@@ -1,4 +1,4 @@
-from typing import Dict, Optional
+from typing import Dict, List, Optional
 
 from pydantic import BaseModel
 
@@ -10,6 +10,7 @@ DEFAULT_REGION_NAME = "us-east-1"
 class AWSConfig(BackendConfig, BaseModel):
     bucket_name: str
     region_name: Optional[str] = DEFAULT_REGION_NAME
+    extra_regions: List[str] = []
     subnet_id: Optional[str] = None
     credentials: Optional[Dict] = None
 
@@ -20,6 +21,8 @@ class AWSConfig(BackendConfig, BaseModel):
         }
         if self.region_name:
             config_data["region"] = self.region_name
+        if self.extra_regions:
+            config_data["extra_regions"] = self.extra_regions
         if self.subnet_id:
             config_data["subnet"] = self.subnet_id
         return config_data
@@ -35,5 +38,6 @@ class AWSConfig(BackendConfig, BaseModel):
         return cls(
             bucket_name=bucket_name,
             region_name=config_data.get("region"),
+            extra_regions=config_data.get("extra_regions", []),
             subnet_id=config_data.get("subnet"),
         )
