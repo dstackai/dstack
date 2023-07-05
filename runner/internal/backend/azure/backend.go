@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"github.com/dstackai/dstack/runner/internal/backend/base"
+	"github.com/dstackai/dstack/runner/internal/container"
 	"io"
 	"os"
 	"path"
@@ -236,13 +237,20 @@ func (azbackend *AzureBackend) GetRepoArchive(ctx context.Context, path, dir str
 	return gerrors.Wrap(base.GetRepoArchive(ctx, azbackend.storage, path, dir))
 }
 
-func (azbackend *AzureBackend) GetBuildDiff(ctx context.Context, key, dst string) error {
-	_ = base.DownloadFile(ctx, azbackend.storage, key, dst)
-	return nil
+func (azbackend *AzureBackend) GetBuildDiffInfo(ctx context.Context, spec *container.BuildSpec) (*base.StorageObject, error) {
+	obj, err := base.GetBuildDiffInfo(ctx, azbackend.storage, spec)
+	if err != nil {
+		return nil, gerrors.Wrap(err)
+	}
+	return obj, nil
 }
 
-func (azbackend *AzureBackend) PutBuildDiff(ctx context.Context, src, key string) error {
-	return gerrors.Wrap(base.UploadFile(ctx, azbackend.storage, src, key))
+func (azbackend *AzureBackend) GetBuildDiff(ctx context.Context, key, dst string) error {
+	return gerrors.Wrap(base.DownloadFile(ctx, azbackend.storage, key, dst))
+}
+
+func (azbackend *AzureBackend) PutBuildDiff(ctx context.Context, src string, spec *container.BuildSpec) error {
+	return gerrors.Wrap(base.PutBuildDiff(ctx, azbackend.storage, src, spec))
 }
 
 func (azbackend *AzureBackend) GetTMPDir(ctx context.Context) string {

@@ -1,6 +1,11 @@
 package local
 
 import (
+	"context"
+	"errors"
+	"github.com/dstackai/dstack/runner/internal/backend/base"
+	"io"
+	"io/fs"
 	"os"
 	"path/filepath"
 	"strings"
@@ -16,74 +21,120 @@ func NewLocalStorage(path string) *LocalStorage {
 	return &LocalStorage{basepath: path}
 }
 
-func (lstorage *LocalStorage) GetFile(path string) ([]byte, error) {
-	fullpath := filepath.Join(lstorage.basepath, path)
-	contents, err := os.ReadFile(fullpath)
+func (s *LocalStorage) Download(ctx context.Context, key string, writer io.Writer) error {
+	path := filepath.Join(s.basepath, key)
+	file, err := os.Open(path)
 	if err != nil {
-		return nil, gerrors.Wrap(err)
+		return gerrors.Wrap(err)
 	}
-	return contents, nil
+	defer func() { _ = file.Close() }()
+	_, err = io.Copy(writer, file)
+	return gerrors.Wrap(err)
 }
 
-func (lstorage *LocalStorage) PutFile(path string, contents []byte) error {
-	tmpfile, err := os.CreateTemp(filepath.Join(lstorage.basepath, "tmp"), "job")
+func (s *LocalStorage) Upload(ctx context.Context, reader io.Reader, key string) error {
+	tmpfile, err := os.CreateTemp(filepath.Join(s.basepath, "tmp"), "job")
 	if err != nil {
 		return gerrors.Wrap(err)
 	}
-	_, err = tmpfile.Write(contents)
+	defer func() { _ = os.Remove(tmpfile.Name()) }()
+	_, err = io.Copy(tmpfile, reader)
 	if err != nil {
 		return gerrors.Wrap(err)
 	}
-	err = os.Rename(tmpfile.Name(), filepath.Join(lstorage.basepath, path))
-	if err != nil {
+	dstPath := filepath.Join(s.basepath, key)
+	if err := os.MkdirAll(filepath.Dir(dstPath), 0o755); err != nil {
 		return gerrors.Wrap(err)
 	}
-	return nil
+	return gerrors.Wrap(os.Rename(tmpfile.Name(), dstPath))
 }
 
-func (lstorage *LocalStorage) RenameFile(oldKey, newKey string) error {
+func (s *LocalStorage) Delete(ctx context.Context, key string) error {
+	return gerrors.Wrap(os.Remove(filepath.Join(s.basepath, key)))
+}
+
+func (s *LocalStorage) Rename(ctx context.Context, oldKey, newKey string) error {
 	if oldKey == newKey {
 		return nil
 	}
-	tmpfile, err := os.CreateTemp(filepath.Join(lstorage.basepath, "tmp"), "jobhead")
+
+	reader, err := os.Open(filepath.Join(s.basepath, oldKey))
 	if err != nil {
 		return gerrors.Wrap(err)
 	}
-	contents, err := lstorage.GetFile(oldKey)
-	if err != nil {
+	defer func() { _ = reader.Close() }()
+
+	// Upload will create temp file on the same device and afterward replace newKey with oldKey copy
+	if err = s.Upload(ctx, reader, newKey); err != nil {
 		return gerrors.Wrap(err)
 	}
-	_, err = tmpfile.Write(contents)
-	if err != nil {
-		return gerrors.Wrap(err)
-	}
-	err = tmpfile.Close()
-	if err != nil {
-		return gerrors.Wrap(err)
-	}
-	err = os.Rename(tmpfile.Name(), filepath.Join(lstorage.basepath, newKey))
-	if err != nil {
-		return gerrors.Wrap(err)
-	}
-	err = os.Remove(filepath.Join(lstorage.basepath, oldKey))
-	if err != nil {
-		return gerrors.Wrap(err)
-	}
-	return nil
+	return gerrors.Wrap(os.Remove(filepath.Join(s.basepath, oldKey)))
 }
 
-func (lstorage *LocalStorage) ListFile(prefix string) ([]string, error) {
-	dirpath := filepath.Dir(prefix)
-	filePrefix := filepath.Base(prefix)
-	entries, err := os.ReadDir(filepath.Join(lstorage.basepath, dirpath))
-	if err != nil {
-		return nil, gerrors.Wrap(err)
-	}
-	fileNames := make([]string, 0)
-	for _, entry := range entries {
-		if strings.HasPrefix(entry.Name(), filePrefix) {
-			fileNames = append(fileNames, filepath.Join(dirpath, entry.Name()))
+func (s *LocalStorage) CreateSymlink(ctx context.Context, key, symlink string) error {
+	return gerrors.Wrap(os.Symlink(symlink, key))
+}
+
+func (s *LocalStorage) GetMetadata(ctx context.Context, key, tag string) (string, error) {
+	return "", gerrors.New("not implemented")
+}
+
+func (s *LocalStorage) List(ctx context.Context, prefix string) (<-chan *base.StorageObject, <-chan error) {
+	dirpath := filepath.Dir(filepath.Join(s.basepath, prefix))
+	ch := make(chan *base.StorageObject)
+	errCh := make(chan error, 1)
+	go func() {
+		defer close(ch)
+		defer close(errCh)
+		if _, err := os.Stat(dirpath); errors.Is(err, os.ErrNotExist) {
+			return
 		}
-	}
-	return fileNames, nil
+		if err := filepath.Walk(dirpath, func(path string, info fs.FileInfo, err error) error {
+			if err != nil {
+				return gerrors.Wrap(err)
+			}
+			if dirpath == path { // not interested in parent directory itself
+				return nil
+			}
+			fullKey, err := filepath.Rel(s.basepath, path)
+			if err != nil {
+				return gerrors.Wrap(err)
+			}
+			if info.IsDir() {
+				fullKey += "/"
+			}
+			if !strings.HasPrefix(fullKey, prefix) {
+				if info.IsDir() {
+					return filepath.SkipDir
+				}
+				return nil
+			}
+			if info.IsDir() {
+				return nil
+			}
+
+			symlink := ""
+			if info.Mode()&os.ModeSymlink == os.ModeSymlink {
+				symlink, err = os.Readlink(path)
+				if err != nil {
+					return gerrors.Wrap(err)
+				}
+			}
+			select {
+			case <-ctx.Done():
+				return gerrors.New("context was canceled")
+			case ch <- &base.StorageObject{
+				Key:     strings.TrimPrefix(filepath.ToSlash(fullKey), prefix),
+				Size:    info.Size(),
+				ModTime: info.ModTime(),
+				Symlink: symlink,
+			}:
+			}
+			return nil
+		}); err != nil {
+			errCh <- gerrors.Wrap(err)
+			return
+		}
+	}()
+	return ch, errCh
 }

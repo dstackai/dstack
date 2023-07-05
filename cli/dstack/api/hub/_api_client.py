@@ -5,6 +5,7 @@ from urllib.parse import urlencode, urlparse, urlunparse
 import requests
 
 from dstack._internal.core.artifact import Artifact
+from dstack._internal.core.build import BuildNotFoundError
 from dstack._internal.core.error import NoMatchingInstanceError
 from dstack._internal.core.job import Job, JobHead
 from dstack._internal.core.log_event import LogEvent
@@ -82,6 +83,8 @@ class HubAPIClient:
         elif resp.status_code == 400:
             body = resp.json()
             if body["detail"]["code"] == NoMatchingInstanceError.code:
+                raise HubClientError(body["detail"]["msg"])
+            elif body["detail"]["code"] == BuildNotFoundError.code:
                 raise HubClientError(body["detail"]["msg"])
         resp.raise_for_status()
 
@@ -167,6 +170,8 @@ class HubAPIClient:
         elif resp.status_code == 400:
             body = resp.json()
             if body["detail"]["code"] == NoMatchingInstanceError.code:
+                raise HubClientError(body["detail"]["msg"])
+            elif body["detail"]["code"] == BuildNotFoundError.code:
                 raise HubClientError(body["detail"]["msg"])
         resp.raise_for_status()
 

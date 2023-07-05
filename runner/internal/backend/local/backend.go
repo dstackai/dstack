@@ -2,9 +2,9 @@ package local
 
 import (
 	"context"
-	"errors"
 	"fmt"
 	"github.com/dstackai/dstack/runner/internal/backend/base"
+	"github.com/dstackai/dstack/runner/internal/container"
 	"io"
 	"io/ioutil"
 	"os"
@@ -70,14 +70,7 @@ func New(namespace string) *Local {
 func (l *Local) Init(ctx context.Context, ID string) error {
 	log.Trace(ctx, "Initialize backend with ID runner", "runner ID", ID)
 	l.runnerID = ID
-	pathRunner := filepath.Join("runners", fmt.Sprintf("%s.yaml", ID))
-	log.Trace(ctx, "Fetch local runner state", "path", pathRunner)
-	contents, err := l.storage.GetFile(pathRunner)
-	if err != nil {
-		return gerrors.Wrap(err)
-	}
-	err = yaml.Unmarshal(contents, &l.state)
-	if err != nil {
+	if err := base.LoadRunnerState(ctx, l.storage, ID, &l.state); err != nil {
 		return gerrors.Wrap(err)
 	}
 	return nil
@@ -89,20 +82,14 @@ func (l *Local) Job(ctx context.Context) *models.Job {
 }
 
 func (l *Local) RefetchJob(ctx context.Context) (*models.Job, error) {
-	log.Trace(ctx, "Refetching job from state", "ID", l.state.Job.JobID)
-	contents, err := l.storage.GetFile(l.state.Job.JobFilepath())
-	if err != nil {
-		return nil, gerrors.Wrap(err)
-	}
-	err = yaml.Unmarshal(contents, &l.state.Job)
-	if err != nil {
+	if err := base.RefetchJob(ctx, l.storage, l.state.Job); err != nil {
 		return nil, gerrors.Wrap(err)
 	}
 	return l.state.Job, nil
 }
 
 func (l *Local) MasterJob(ctx context.Context) *models.Job {
-	contents, err := l.storage.GetFile(filepath.Join("jobs", l.state.Job.RepoUserName, l.state.Job.RepoName, fmt.Sprintf("%s.yaml", l.state.Job.MasterJobID)))
+	contents, err := base.GetObject(ctx, l.storage, filepath.Join("jobs", l.state.Job.RepoUserName, l.state.Job.RepoName, fmt.Sprintf("%s.yaml", l.state.Job.MasterJobID)))
 	if err != nil {
 		return nil
 	}
@@ -120,32 +107,7 @@ func (l *Local) Requirements(ctx context.Context) models.Requirements {
 }
 
 func (l *Local) UpdateState(ctx context.Context) error {
-	log.Trace(ctx, "Start update state")
-	log.Trace(ctx, "Marshaling job")
-	contents, err := yaml.Marshal(&l.state.Job)
-	if err != nil {
-		return gerrors.Wrap(err)
-	}
-	jobPath := l.state.Job.JobFilepath()
-	log.Trace(ctx, "Write to file job", "Path", jobPath)
-	err = l.storage.PutFile(jobPath, contents)
-	if err != nil {
-		return gerrors.Wrap(err)
-	}
-	log.Trace(ctx, "Fetching list jobs", "Repo username", l.state.Job.RepoUserName, "Repo name", l.state.Job.RepoName, "Job ID", l.state.Job.JobID)
-	files, err := l.storage.ListFile(l.state.Job.JobHeadFilepathPrefix())
-	if err != nil {
-		return gerrors.Wrap(err)
-	}
-	jobHeadFilepath := l.state.Job.JobHeadFilepath()
-	for _, file := range files[:1] {
-		log.Trace(ctx, "Renaming file job", "From", file, "To", jobHeadFilepath)
-		err = l.storage.RenameFile(file, jobHeadFilepath)
-		if err != nil {
-			return gerrors.Wrap(err)
-		}
-	}
-	return nil
+	return gerrors.Wrap(base.UpdateState(ctx, l.storage, l.state.Job))
 }
 
 func (l *Local) CheckStop(ctx context.Context) (bool, error) {
@@ -209,12 +171,8 @@ func (l *Local) CreateLogger(ctx context.Context, logGroup, logName string) io.W
 }
 
 func (l *Local) GetJobByPath(ctx context.Context, path string) (*models.Job, error) {
-	contents, err := l.storage.GetFile(path)
-	if err != nil {
-		return nil, gerrors.Wrap(err)
-	}
 	job := new(models.Job)
-	if err = yaml.Unmarshal(contents, job); err != nil {
+	if err := base.GetJobByPath(ctx, l.storage, path, job); err != nil {
 		return nil, gerrors.Wrap(err)
 	}
 	return job, nil
@@ -256,11 +214,11 @@ func (l *Local) Bucket(ctx context.Context) string {
 
 func (l *Local) ListSubDir(ctx context.Context, dir string) ([]string, error) {
 	log.Trace(ctx, "Fetching list sub dir")
-	return l.storage.ListFile(dir)
+	return base.ListObjects(ctx, l.storage, dir)
 }
 
 func (l *Local) GetRepoDiff(ctx context.Context, path string) (string, error) {
-	diff, err := l.storage.GetFile(path)
+	diff, err := base.GetObject(ctx, l.storage, path)
 	if err != nil {
 		return "", gerrors.Wrap(err)
 	}
@@ -275,12 +233,20 @@ func (l *Local) GetRepoArchive(ctx context.Context, path, dir string) error {
 	return nil
 }
 
-func (l *Local) GetBuildDiff(ctx context.Context, key, dst string) error {
-	return errors.New("not implemented")
+func (l *Local) GetBuildDiffInfo(ctx context.Context, spec *container.BuildSpec) (*base.StorageObject, error) {
+	obj, err := base.GetBuildDiffInfo(ctx, l.storage, spec)
+	if err != nil {
+		return nil, gerrors.Wrap(err)
+	}
+	return obj, nil
 }
 
-func (l *Local) PutBuildDiff(ctx context.Context, src, key string) error {
-	return errors.New("not implemented")
+func (l *Local) GetBuildDiff(ctx context.Context, key, dst string) error {
+	return gerrors.New("not implemented")
+}
+
+func (l *Local) PutBuildDiff(ctx context.Context, src string, spec *container.BuildSpec) error {
+	return gerrors.Wrap(base.PutBuildDiff(ctx, l.storage, src, spec))
 }
 
 func (l *Local) GetTMPDir(ctx context.Context) string {
