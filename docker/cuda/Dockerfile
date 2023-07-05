@@ -12,16 +12,19 @@ RUN apt-key adv --fetch-keys https://developer.download.nvidia.com/compute/cuda/
     ln -fs /usr/share/zoneinfo/America/New_York /etc/localtime && \
     apt-get install -y tzdata && \
     dpkg-reconfigure --frontend noninteractive tzdata && \
-    apt-get install -y bzip2 ca-certificates curl gcc git libglib2.0-0 libsm6 libxext6 libxrender1 mercurial openssh-server subversion wget && \
+    apt-get install -y bzip2 ca-certificates curl build-essential git libglib2.0-0 libsm6 libxext6 libxrender1 mercurial openssh-server subversion wget && \
     sed -i "s/.*PasswordAuthentication.*/PasswordAuthentication no/g" /etc/ssh/sshd_config && mkdir /run/sshd && \
     mkdir ~/.ssh && chmod 700 ~/.ssh && touch ~/.ssh/authorized_keys && chmod 600 ~/.ssh/authorized_keys && rm /etc/ssh/ssh_host_*
 
 RUN wget -O Miniforge3.sh "https://github.com/conda-forge/miniforge/releases/latest/download/Miniforge3-$(uname)-$(uname -m).sh" && \
-    bash Miniforge3.sh -b -p "/root/conda" && \
+    bash Miniforge3.sh -b -p "/opt/conda" && \
     rm Miniforge3.sh && \
-    ln -s /root/conda/etc/profile.d/conda.sh /etc/profile.d/conda.sh && \
-    chmod +x /root/conda/etc/profile.d/conda.sh && \
-    echo ". /root/conda/etc/profile.d/conda.sh" >> ~/.bashrc && \
-    /root/conda/condabin/conda update conda --all -y && \
-    /root/conda/condabin/conda create --name workflow python=${PYTHON} -y && \
+    ln -s /opt/conda/etc/profile.d/conda.sh /etc/profile.d/conda.sh && \
+    chmod +x /opt/conda/etc/profile.d/conda.sh && \
+    echo ". /opt/conda/etc/profile.d/conda.sh" >> ~/.bashrc && \
+    /opt/conda/condabin/conda update conda --all -y && \
+    /opt/conda/condabin/conda create --name workflow python=${PYTHON} -y && \
+    /opt/conda/condabin/conda config --prepend channels "nvidia/label/cuda-11.4.3" && \
+    /opt/conda/condabin/conda config --set always_yes true && \
+    /opt/conda/condabin/conda clean --all && \
     echo "conda activate workflow" >> ~/.bashrc

@@ -6,7 +6,7 @@ on:
       - '*'
 
 env:
-  IMAGE_VERSION: "0.2"
+  IMAGE_VERSION: "0.3"
 
 jobs:
   cli-test-tag:
