@@ -187,12 +187,20 @@ def _print_run_plan(configuration_file: str, run_plan: RunPlan):
     table.add_column("INSTANCE")
     table.add_column("RESOURCES")
     table.add_column("SPOT POLICY")
+    table.add_column("BUILD")
     job_plan = run_plan.job_plans[0]
     instance = job_plan.instance_type.instance_name or "-"
     instance_info = _format_resources(job_plan.instance_type)
     spot = job_plan.job.spot_policy.value
+    build_plan = job_plan.build_plan.value.title()
     table.add_row(
-        configuration_file, run_plan.hub_user_name, run_plan.project, instance, instance_info, spot
+        configuration_file,
+        run_plan.hub_user_name,
+        run_plan.project,
+        instance,
+        instance_info,
+        spot,
+        build_plan,
     )
     console.print(table)
     console.print()
