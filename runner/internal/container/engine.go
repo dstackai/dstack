@@ -3,8 +3,9 @@ package container
 import (
 	"context"
 	"fmt"
+	"github.com/dstackai/dstack/runner/internal/environment"
+	"github.com/dstackai/dstack/runner/internal/models"
 	"io"
-	"io/ioutil"
 	"os/exec"
 	"runtime"
 	"strings"
@@ -285,7 +286,7 @@ func (r *Engine) pullImageIfAbsent(ctx context.Context, image string, registryAu
 		return gerrors.Wrap(err)
 	}
 	defer func() { _ = reader.Close() }()
-	buf, err := ioutil.ReadAll(reader)
+	buf, err := io.ReadAll(reader)
 	if err != nil {
 		return gerrors.Wrap(err)
 	}
@@ -293,17 +294,45 @@ func (r *Engine) pullImageIfAbsent(ctx context.Context, image string, registryAu
 	return nil
 }
 
-func (r *Engine) GetBuildDigest(ctx context.Context, spec *BuildSpec) (string, error) {
-	err := r.pullImageIfAbsent(ctx, spec.BaseImageName, spec.RegistryAuthBase64)
+func (r *Engine) NewBuildSpec(ctx context.Context, job *models.Job, spec *Spec, secrets map[string]string, repoPath string) (*BuildSpec, error) {
+	err := r.pullImageIfAbsent(ctx, spec.Image, spec.RegistryAuthBase64)
 	if err != nil {
-		return "", gerrors.Wrap(err)
+		return nil, gerrors.Wrap(err)
 	}
-	info, _, err := r.client.ImageInspectWithRaw(ctx, spec.BaseImageName)
+	baseImage, _, err := r.client.ImageInspectWithRaw(ctx, spec.Image)
 	if err != nil {
-		return "", gerrors.Wrap(err)
+		return nil, gerrors.Wrap(err)
 	}
-	spec.BaseImageID = info.ID
-	return spec.Hash(), nil
+	daemonInfo, err := r.client.Info(ctx)
+	if err != nil {
+		return nil, gerrors.Wrap(err)
+	}
+
+	commands := append([]string{}, job.BuildCommands...)
+	commands = append(commands, job.OptionalBuildCommands...)
+	env := environment.New()
+	env.AddMapString(job.Environment)
+	env.AddMapString(secrets)
+
+	buildSpec := &BuildSpec{
+		BaseImageName:      spec.Image,
+		BaseImageID:        baseImage.ID,
+		WorkDir:            spec.WorkDir,
+		ConfigurationPath:  job.ConfigurationPath,
+		ConfigurationType:  job.ConfigurationType,
+		Commands:           ShellCommands(commands),
+		Entrypoint:         spec.Entrypoint,
+		Env:                env.ToSlice(),
+		RegistryAuthBase64: spec.RegistryAuthBase64,
+		RepoPath:           repoPath,
+		RepoId:             job.RepoId,
+	}
+	if daemonInfo.Architecture == "aarch64" {
+		buildSpec.Platform = "arm64"
+	} else {
+		buildSpec.Platform = "amd64"
+	}
+	return buildSpec, nil
 }
 
 func (r *Engine) Build(ctx context.Context, spec *BuildSpec, imageName string, stoppedCh chan struct{}, logs io.Writer) error {

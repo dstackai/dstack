@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"github.com/dstackai/dstack/runner/internal/backend/base"
+	"github.com/dstackai/dstack/runner/internal/container"
 	"io"
 	"os"
 	"path"
@@ -236,14 +237,20 @@ func (gbackend *GCPBackend) GetRepoArchive(ctx context.Context, path, dir string
 	return gerrors.Wrap(base.GetRepoArchive(ctx, gbackend.storage, path, dir))
 }
 
-func (gbackend *GCPBackend) GetBuildDiff(ctx context.Context, key, dst string) error {
-	_ = base.DownloadFile(ctx, gbackend.storage, key, dst)
-	return nil
+func (gbackend *GCPBackend) GetBuildDiffInfo(ctx context.Context, spec *container.BuildSpec) (*base.StorageObject, error) {
+	obj, err := base.GetBuildDiffInfo(ctx, gbackend.storage, spec)
+	if err != nil {
+		return nil, gerrors.Wrap(err)
+	}
+	return obj, nil
 }
 
-func (gbackend *GCPBackend) PutBuildDiff(ctx context.Context, src, key string) error {
-	err := base.UploadFile(ctx, gbackend.storage, src, key)
-	return gerrors.Wrap(err)
+func (gbackend *GCPBackend) GetBuildDiff(ctx context.Context, key, dst string) error {
+	return gerrors.Wrap(base.DownloadFile(ctx, gbackend.storage, key, dst))
+}
+
+func (gbackend *GCPBackend) PutBuildDiff(ctx context.Context, src string, spec *container.BuildSpec) error {
+	return gerrors.Wrap(base.PutBuildDiff(ctx, gbackend.storage, src, spec))
 }
 
 func (gbackend *GCPBackend) GetTMPDir(ctx context.Context) string {

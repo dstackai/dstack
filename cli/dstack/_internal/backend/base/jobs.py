@@ -3,8 +3,10 @@ from typing import List, Optional, Tuple
 import yaml
 
 from dstack._internal.backend.base import runners
+from dstack._internal.backend.base.build import predict_build_plan
 from dstack._internal.backend.base.compute import Compute, NoCapacityError
 from dstack._internal.backend.base.storage import Storage
+from dstack._internal.core.build import DockerPlatform
 from dstack._internal.core.error import NoMatchingInstanceError
 from dstack._internal.core.instance import InstanceType
 from dstack._internal.core.job import Job, JobErrorCode, JobHead, JobStatus, SpotPolicy

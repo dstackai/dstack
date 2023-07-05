@@ -1,11 +1,14 @@
 from typing import Optional
 
 from dstack._internal.backend.base import ComponentBasedBackend
+from dstack._internal.backend.base import build as base_build
 from dstack._internal.backend.local.compute import LocalCompute
 from dstack._internal.backend.local.config import LocalConfig
 from dstack._internal.backend.local.logs import LocalLogging
 from dstack._internal.backend.local.secrets import LocalSecretsManager
 from dstack._internal.backend.local.storage import LocalStorage
+from dstack._internal.core.build import BuildPlan
+from dstack._internal.core.job import Job
 
 
 class LocalBackend(ComponentBasedBackend):
@@ -39,3 +42,7 @@ class LocalBackend(ComponentBasedBackend):
 
     def logging(self) -> LocalLogging:
         return self._logging
+
+    def predict_build_plan(self, job: Job) -> BuildPlan:
+        # guess platform from uname
+        return base_build.predict_build_plan(self.storage(), job, platform=None)

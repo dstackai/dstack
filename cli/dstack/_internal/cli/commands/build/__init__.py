@@ -51,7 +51,10 @@ class BuildCommand(BasicCommand):
                 ssh_pub_key = _read_ssh_key_pub(config.repo_user_config.ssh_key_path)
 
             run_plan = hub_client.get_run_plan(
-                provider_name=provider_name, provider_data=provider_data, args=args
+                configuration_path=configuration_path,
+                provider_name=provider_name,
+                provider_data=provider_data,
+                args=args,
             )
             console.print("dstack will execute the following plan:\n")
             _print_run_plan(configuration_path, run_plan)
@@ -69,9 +72,6 @@ class BuildCommand(BasicCommand):
             )
             runs = list_runs_hub(hub_client, run_name=run_name)
             run = runs[0]
-            if run.status == JobStatus.FAILED:
-                console.print("\nProvisioning failed\n")
-                exit(1)
             _poll_run(
                 hub_client,
                 run,

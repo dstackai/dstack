@@ -2,15 +2,17 @@ package base
 
 import (
 	"context"
+	"errors"
 	"fmt"
-	"os"
-	"strings"
-
+	"github.com/dstackai/dstack/runner/internal/container"
 	"github.com/dstackai/dstack/runner/internal/gerrors"
 	"github.com/dstackai/dstack/runner/internal/log"
 	"github.com/dstackai/dstack/runner/internal/models"
 	"github.com/dstackai/dstack/runner/internal/repo"
 	"gopkg.in/yaml.v2"
+	"os"
+	"strings"
+	"time"
 )
 
 func LoadRunnerState(ctx context.Context, storage Storage, id string, out interface{}) error {
@@ -92,4 +94,59 @@ func GetRepoArchive(ctx context.Context, storage Storage, path, dir string) erro
 		return gerrors.Wrap(err)
 	}
 	return nil
+}
+
+var ErrBuildNotFound = errors.New("build not found")
+
+func GetBuildDiffInfo(ctx context.Context, storage Storage, spec *container.BuildSpec) (*StorageObject, error) {
+	prefix := getBuildDiffPrefix(spec)
+	builds := make([]*StorageObject, 0)
+	ch, errCh := storage.List(ctx, prefix)
+	for item := range ch {
+		item.Key = prefix + item.Key
+		builds = append(builds, item)
+	}
+	if err := <-errCh; err != nil {
+		return nil, gerrors.Wrap(err)
+	}
+	if len(builds) == 1 {
+		return builds[0], nil
+	}
+	return nil, gerrors.Wrap(ErrBuildNotFound)
+}
+
+func PutBuildDiff(ctx context.Context, storage Storage, src string, spec *container.BuildSpec) error {
+	newDiffKey := getBuildDiffName(spec)
+	oldDiff, err := GetBuildDiffInfo(ctx, storage, spec)
+	if err == nil {
+		log.Trace(ctx, "Deleting old build diff", "key", oldDiff.Key)
+		if err = storage.Delete(ctx, oldDiff.Key); err != nil {
+			return gerrors.Wrap(err)
+		}
+	} else if !errors.Is(err, ErrBuildNotFound) {
+		return gerrors.Wrap(err)
+	}
+	log.Trace(ctx, "Uploading new build diff", "key", newDiffKey)
+	return gerrors.Wrap(UploadFile(ctx, storage, src, newDiffKey))
+}
+
+func getBuildDiffPrefix(spec *container.BuildSpec) string {
+	return fmt.Sprintf(
+		"builds/%s/%s;%s;%s;%s;%s;",
+		spec.RepoId,
+		models.EscapeHead(spec.ConfigurationType),
+		models.EscapeHead(spec.ConfigurationPath),
+		models.EscapeHead(spec.WorkDir),
+		models.EscapeHead(spec.BaseImageName),
+		models.EscapeHead(spec.Platform),
+	)
+}
+
+func getBuildDiffName(spec *container.BuildSpec) string {
+	return fmt.Sprintf(
+		"%s%s;%d.tar",
+		getBuildDiffPrefix(spec),
+		models.EscapeHead(spec.Hash()),
+		time.Now().Unix(), // created timestamp
+	)
 }

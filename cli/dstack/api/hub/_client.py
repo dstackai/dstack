@@ -262,6 +262,7 @@ class HubClient:
 
     def get_run_plan(
         self,
+        configuration_path: str,
         provider_name: str,
         provider_data: Optional[Dict[str, Any]] = None,
         args: Optional[argparse.Namespace] = None,
@@ -277,7 +278,7 @@ class HubClient:
             run_name="dry-run",
             ssh_key_pub="",
         )
-        jobs = provider.get_jobs(repo=self.repo)
+        jobs = provider.get_jobs(repo=self.repo, configuration_path=configuration_path)
         run_plan = self._api_client.get_run_plan(jobs)
         return run_plan
 

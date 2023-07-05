@@ -46,7 +46,8 @@ def _parse_dev_environment_configuration_data(
             "sea_green3]Command Palette[/sea_green3], executing [sea_green3]Shell Command: Install 'code' command in "
             "PATH[/sea_green3], and restarting terminal.[/]\n"
         )
-    provider_data["optional_build"].append("pip install -q --no-cache-dir ipykernel")
+    for key in ["optional_build", "commands"]:
+        provider_data[key].append("pip install -q --no-cache-dir ipykernel")
     provider_data["commands"].extend(configuration_data.get("init") or [])
     return provider_name, provider_data
 
