@@ -21,7 +21,7 @@ def main():
         formatter_class=RichHelpFormatter,
         epilog=(
             "Run [bold sea_green3]dstack COMMAND --help[/bold sea_green3] for more information on a particular command.\n\n"
-            "For more details, check https://docs.dstack.ai/reference/cli.\n "
+            "For more details, check https://dstack.ai/docs.\n "
         ),
         add_help=False,
     )

@@ -8,7 +8,7 @@ slug: say-goodbye-to-managed-notebooks
 
 # Say goodbye to managed notebooks! 👋
 
-__Why managed notebooks are losing ground to cloud dev environments__
+__Why managed notebooks are losing ground to cloud dev environments.__
 
 Data science and ML tools have made significant advancements in recent years. This blog post aims to examine the
 advantages of cloud dev environments (CDE) for ML engineers and compare them with web-based managed notebooks.
