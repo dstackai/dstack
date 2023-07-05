@@ -166,7 +166,7 @@ def stop_job(
         if new_status:
             if runner and runner.job.status.is_unfinished() and runner.job.status != new_status:
                 if new_status.is_finished():
-                    runners.stop_runner(storage, compute, runner)
+                    runners.stop_runner(compute, runner)
                 else:
                     runner.job.status = new_status
                     runners.update_runner(storage, runner)

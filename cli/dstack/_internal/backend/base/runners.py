@@ -34,13 +34,12 @@ def delete_runner(storage: Storage, runner: Runner):
     storage.delete_object(_get_runner_filename(runner.runner_id))
 
 
-def stop_runner(storage: Storage, compute: Compute, runner: Runner):
+def stop_runner(compute: Compute, runner: Runner):
     if runner.request_id:
         if runner.resources.spot:
             compute.cancel_spot_request(runner)
         else:
             compute.terminate_instance(runner)
-    delete_runner(storage, runner)
 
 
 def serialize_runner_yaml(
