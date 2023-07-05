@@ -237,6 +237,7 @@ def _run_instance(
             "user_ssh_key": user_ssh_key,
             "launch_script": launch_script,
         },
+        daemon=True,
     )
     thread.start()
     return instance_id
