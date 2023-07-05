@@ -9,7 +9,7 @@
 </h1>
 
 <h3 align="center">
-Cost-effective ML development in the cloud
+Cost-effective ML workloads in any cloud
 </h3>
 
 <p align="center">
@@ -23,18 +23,26 @@ Cost-effective ML development in the cloud
 [![PyPI - License](https://img.shields.io/pypi/l/dstack?style=flat-square&color=blue)](https://github.com/dstackai/dstack/blob/master/LICENSE.md)
 </div>
 
-`dstack` makes it very easy for ML teams to automate running dev environments and tasks in their cloud.
+`dstack` is an open-source tool designed to enhance the efficiency of running ML workloads in the cloud.
 
-## Installation and setup
+## Latest news
 
-To use `dstack`, install it with `pip` and start the Hub application.
+- [2023/07] [dstack 0.10.3: A preview of Lambda Cloud support](https://dstack.ai/blog/2023/07/05/lambda-cloud-support-preview/) (Release)  
+- [2023/06] [Running XGen 7B chatbot in your cloud](https://github.com/dstackai/dstack-examples/wiki/Running-XGen-7B-Chatbot-in-your-cloud) (Example)
+- [2023/06] [Say goodbye to managed notebooks](https://dstack.ai/blog/2023/06/29/say-goodbye-to-managed-notebooks/) (Blog post)
+- [2023/06] [Running LLM as chatbot in your cloud](https://github.com/dstackai/LLM-As-Chatbot/wiki/Running-LLM-As-Chatbot-in-your-cloud) (Example)
+- [2023/06] [dstack 0.10: New configuration format and CLI experience](https://dstack.ai/blog/2023/06/12/new-configuration-format-and-cli-experience/) (Release)
+
+## Installation
+
+To use `dstack`, install it with `pip`, and start the server.
 
 ```shell
-pip install "dstack[aws,gcp,azure]"
+pip install "dstack[aws,gcp,azure,lambda]"
 dstack start
 ```
 
-The server will set up a default project to run dev environments and tasks locally. 
+On startup, the server sets up a default project that runs everything locally. 
 To run dev environments and tasks in the cloud, log into the UI, create the corresponding project,
 and [configure](https://dstack.ai/docs/guides/projects) the CLI to use it.
 
@@ -42,7 +50,7 @@ and [configure](https://dstack.ai/docs/guides/projects) the CLI to use it.
 
 A configuration is a YAML file that describes what you want to run.
 
-> **Note:**
+> **Note**
 > All configuration files must be named with the suffix `.dstack.yml`. For example,
 > you can name the configuration file `.dstack.yml` or `app.dstack.yml`. You can define
 > these configurations anywhere within your project.
@@ -53,6 +61,10 @@ Below is a configuration that runs a dev environment with a pre-built environmen
 
 ```yaml
 type: dev-environment
+
+init:
+  - pip install -r requirements.txt
+
 ide: vscode
 ```
 
@@ -61,11 +73,13 @@ A task can be either a batch job, such as training or fine-tuning a model, or a 
 
 ```yaml
 type: task
+
 ports:
   - 7860
+
 commands:
   - pip install -r requirements.txt
-  - gradio app.py
+  - python app.py
 ```
 
 ## CLI
