@@ -3,7 +3,7 @@ name: Manual Azure build for STGN
 on: [workflow_dispatch]
 
 env:
-  DOCKER_IMAGE_VERSION: "0.2"
+  DOCKER_IMAGE_VERSION: "0.3"
 
 jobs:
   azure-image-build:
