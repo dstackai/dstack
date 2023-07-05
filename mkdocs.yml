@@ -140,6 +140,7 @@ nav:
       - Getting started:
           - Quickstart: docs/index.md
           - Installation:
+              - pip: docs/installation/pip.md
               - Docker: docs/installation/docker.md
               - Hugging Face Spaces: docs/installation/hf-spaces.md
       - Guides:
