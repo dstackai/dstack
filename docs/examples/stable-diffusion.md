@@ -150,7 +150,7 @@ workflows:
 
 !!! info "NOTE:"
     Before running the workflow, make sure that you have set up the Hub application and
-    [created a project](../docs/quick-start.md#create-a-hub-project) that can run workflows in the cloud.
+    [created a project](../docs/index.md#create-a-hub-project) that can run workflows in the cloud.
 
 Once the project is configured, we can use the [`dstack run`](../docs/reference/cli/run.md) command to
 run our workflow.

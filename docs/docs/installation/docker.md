@@ -1,8 +1,8 @@
 # Docker
 
 !!! info "NOTE:"
-As an alternative to the [`dstack start`](../reference/cli/start.md) command, you can run the `dstack` server via
-Docker. This is recommended if you want to deploy the server in an environment that supports Docker.
+    As an alternative to the [`dstack start`](../reference/cli/start.md) command, you can run the `dstack` server via
+    Docker. This is recommended if you want to deploy the server in an environment that supports Docker.
 
 Here's how to run `dstack` via Docker:
 
