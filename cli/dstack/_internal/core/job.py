@@ -18,6 +18,7 @@ from dstack._internal.core.repo import (
     RepoRef,
 )
 
+# todo use Enum
 BuildPolicy = ["use-build", "build", "force-build", "build-only"]
 
 
@@ -131,7 +132,7 @@ class JobErrorCode(str, Enum):
 class JobHead(JobRef):
     job_id: str
     repo_ref: RepoRef
-    hub_user_name: str
+    hub_user_name: str = ""
     run_name: str
     workflow_name: Optional[str]
     provider_name: str
@@ -176,8 +177,8 @@ class Job(JobHead):
     )
     repo_code_filename: Optional[str] = None
     run_name: str
-    workflow_name: Optional[str]
-    provider_name: str
+    workflow_name: Optional[str]  # deprecated
+    provider_name: Optional[str]  # deprecated
     configuration_type: Optional[ConfigurationType]
     configuration_path: Optional[str]
     status: JobStatus
@@ -210,7 +211,7 @@ class Job(JobHead):
     build_policy: Optional[str]
     build_commands: Optional[List[str]]
     optional_build_commands: Optional[List[str]]
-    run_env: Optional[Dict[str, str]]
+    run_env: Optional[Dict[str, str]]  # deprecated
 
     @root_validator(pre=True)
     def preprocess_data(cls, data):

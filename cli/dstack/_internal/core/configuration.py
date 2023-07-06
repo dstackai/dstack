@@ -1,8 +1,9 @@
-from typing import List, Optional, Union
+from typing import Dict, List, Optional, Union
 
 from pydantic import BaseModel, Extra, Field, validator
 from typing_extensions import Annotated, Literal
 
+# todo use Enum
 PythonVersions = Literal["3.7", "3.8", "3.9", "3.10", "3.11"]
 
 
@@ -22,11 +23,13 @@ class Artifact(ForbidExtra):
 
 
 class BaseConfiguration(ForbidExtra):
+    type: Literal["none"]
     image: Optional[str]
+    # todo entrypoint
     registry_auth: Optional[RegistryAuth]
     python: Optional[PythonVersions]
     ports: List[Union[str, int]] = []
-    env: List[str] = []
+    env: Dict[str, str] = {}
     build: List[str] = []
     cache: List[str] = []
 

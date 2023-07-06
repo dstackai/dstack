@@ -117,6 +117,8 @@ class RunCommand(BasicCommand):
         )
         if args.project:
             project_name = args.project
+        if args.help:
+            pass  # todo
         watcher = Watcher(os.getcwd())
         try:
             if args.reload:
