@@ -31,6 +31,9 @@ class JobConfigurator(ABC):
         self.conf = configuration
         self.profile = profile
         self.build_policy = "use-build"
+        # context
+        self.run_name: Optional[str] = None
+        self.ssh_key_pub: Optional[str] = None
 
     def print_help(self, prog: str = "dstack run"):
         parser = self.get_parser(prog)
@@ -67,6 +70,7 @@ class JobConfigurator(ABC):
     def apply_args(self, args: argparse.Namespace):
         if args.spot_policy is not None:
             self.profile.spot_policy = args.spot_policy
+
         if args.retry:
             self.profile.retry_policy.retry = True
         elif args.no_retry:
@@ -74,6 +78,7 @@ class JobConfigurator(ABC):
         elif args.retry_limit:
             self.profile.retry_policy.retry = True
             self.profile.retry_policy.limit = args.retry_limit
+
         if args.build_policy is not None:
             self.build_policy = args.build_policy
 
@@ -100,6 +105,9 @@ class JobConfigurator(ABC):
     def get_jobs(
         self, repo: Repo, run_name: str, repo_code_filename: str, ssh_key_pub: str
     ) -> List[job.Job]:
+        self.run_name = run_name
+        self.ssh_key_pub = ssh_key_pub
+
         created_at = get_milliseconds_since_epoch()
         configured_job = job.Job(
             job_id=f"{run_name},,0",
@@ -139,10 +147,6 @@ class JobConfigurator(ABC):
         pass
 
     @abstractmethod
-    def build_commands(self) -> List[str]:
-        pass
-
-    @abstractmethod
     def optional_build_commands(self) -> List[str]:
         pass
 
@@ -151,8 +155,11 @@ class JobConfigurator(ABC):
         pass
 
     @abstractmethod
-    def dep_specs(self):
+    def dep_specs(self) -> List[job.DepSpec]:
         pass
+
+    def build_commands(self) -> List[str]:
+        return self.conf.build
 
     def entrypoint(self) -> Optional[List[str]]:
         if self.conf.image is None or self.commands():
@@ -202,7 +209,7 @@ class JobConfigurator(ABC):
         if self.conf.python is not None:
             return self.conf.python
         version_info = sys.version_info
-        return f"{version_info.major}.{version_info.minor}"  # todo check is in supported
+        return f"{version_info.major}.{version_info.minor}"  # todo check if is in supported
 
     def ports(self) -> Dict[int, ports.PortMapping]:
         mapping = [ports.PortMapping(p) for p in self.conf.ports]
