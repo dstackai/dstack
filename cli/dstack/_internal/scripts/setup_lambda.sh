@@ -22,7 +22,7 @@ function install_prod {
 
 install_nvidia_docker_runtime
 
-if [[ $ENVIRONMENT == "PROD" ]]; then
+if [[ $ENVIRONMENT == "prod" ]]; then
   install_prod
 else
   install_stgn
