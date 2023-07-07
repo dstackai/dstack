@@ -145,7 +145,7 @@ class AWSConfigurator(Configurator):
         sts = session.client("sts")
         try:
             sts.get_caller_identity()
-        except botocore.exceptions.ClientError:
+        except (botocore.exceptions.ClientError, botocore.exceptions.NoCredentialsError):
             return False
         return True
 
