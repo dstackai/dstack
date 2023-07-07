@@ -163,7 +163,7 @@ class RunCommand(BasicCommand):
                     watcher=watcher,
                 )
         except ValidationError as e:
-            sys.exit(
+            sys.exit(  # todo replace with pydantic
                 f"There a syntax error in one of the files inside the {os.getcwd()}/.dstack/workflows directory:\n\n{e}"
             )
         finally:

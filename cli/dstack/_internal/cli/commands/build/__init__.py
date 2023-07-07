@@ -7,16 +7,11 @@ from rich.prompt import Confirm
 
 from dstack._internal.api.runs import list_runs_hub
 from dstack._internal.cli.commands import BasicCommand
-from dstack._internal.cli.commands.run import (
-    _poll_run,
-    _print_run_plan,
-    _read_ssh_key_pub,
-    configurations,
-)
-from dstack._internal.cli.common import add_project_argument, check_init, console, print_runs
+from dstack._internal.cli.commands.run import _poll_run, _print_run_plan, _read_ssh_key_pub
+from dstack._internal.cli.common import add_project_argument, check_init, console
 from dstack._internal.cli.config import config, get_hub_client
+from dstack._internal.cli.configuration import load_configuration
 from dstack._internal.core.error import RepoNotInitializedError
-from dstack._internal.core.job import JobStatus
 
 
 class BuildCommand(BasicCommand):
@@ -25,18 +20,15 @@ class BuildCommand(BasicCommand):
 
     @check_init
     def _command(self, args: argparse.Namespace):
-        (
-            configuration_path,
-            provider_name,
-            provider_data,
-            project_name,
-        ) = configurations.parse_configuration_file(
-            args.working_dir, args.file_name, args.profile_name
-        )
-        provider_data["build_policy"] = "build-only"
+        configurator = load_configuration(args.working_dir, args.file_name, args.profile_name)
+        configurator.build_policy = "build-only"
 
+        project_name = None
         if args.project:
             project_name = args.project
+        elif configurator.profile.project:
+            project_name = configurator.profile.project
+
         try:
             hub_client = get_hub_client(project_name=project_name)
             if (
@@ -46,29 +38,28 @@ class BuildCommand(BasicCommand):
                 raise RepoNotInitializedError("No credentials", project_name=project_name)
 
             if not config.repo_user_config.ssh_key_path:
-                ssh_pub_key = None
+                ssh_key_pub = None
             else:
-                ssh_pub_key = _read_ssh_key_pub(config.repo_user_config.ssh_key_path)
+                ssh_key_pub = _read_ssh_key_pub(config.repo_user_config.ssh_key_path)
 
-            run_plan = hub_client.get_run_plan(
-                configuration_path=configuration_path,
-                provider_name=provider_name,
-                provider_data=provider_data,
-                args=args,
+            # should we pass args.args here?
+            configurator_args, run_args = configurator.get_parser().parse_known_args(
+                args.args + args.unknown
             )
+            configurator.apply_args(configurator_args)
+
+            run_plan = hub_client.get_run_plan(configurator)
             console.print("dstack will execute the following plan:\n")
-            _print_run_plan(configuration_path, run_plan)
+            _print_run_plan(configurator.configuration_path, run_plan)
             if not args.yes and not Confirm.ask("Continue?"):
                 console.print("\nExiting...")
                 exit(0)
             console.print("\nProvisioning...\n")
 
-            run_name, jobs = hub_client.run_provider(
-                configuration_path=configuration_path,
-                provider_name=provider_name,
-                provider_data=provider_data,
-                ssh_pub_key=ssh_pub_key,
-                args=args,
+            run_name, jobs = hub_client.run_configuration(
+                configurator=configurator,
+                ssh_key_pub=ssh_key_pub,
+                run_args=run_args,
             )
             runs = list_runs_hub(hub_client, run_name=run_name)
             run = runs[0]
@@ -80,7 +71,7 @@ class BuildCommand(BasicCommand):
                 watcher=None,
             )
         except ValidationError as e:
-            sys.exit(
+            sys.exit(  # todo replace with pydantic
                 f"There a syntax error in one of the files inside the {os.getcwd()}/.dstack/workflows directory:\n\n{e}"
             )
 
