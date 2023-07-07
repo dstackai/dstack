@@ -53,5 +53,5 @@ class DevEnvironmentConfigurator(JobConfigurator):
 
     def app_specs(self) -> List[job.AppSpec]:
         specs = super().app_specs()
-        VSCodeDesktopServer.patch_apps(specs)
+        OpenSSHExtension.patch_apps(specs)
         return specs

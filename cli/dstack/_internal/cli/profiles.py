@@ -1,13 +1,15 @@
 import json
 from pathlib import Path
-from typing import Any, Dict, Optional
+from typing import Dict
 
 import jsonschema
 import pkg_resources
 import yaml
 
+from dstack._internal.core.profile import Profile
 
-def load_profiles() -> Optional[Dict[str, Dict[str, Any]]]:
+
+def load_profiles() -> Dict[str, Profile]:
     # NOTE: This only supports local profiles
     profiles_path = Path(".dstack") / "profiles.yml"
     if not profiles_path.exists():
@@ -22,8 +24,11 @@ def load_profiles() -> Optional[Dict[str, Dict[str, Any]]]:
         )
         jsonschema.validate(profiles, schema)
         for profile in profiles["profiles"]:
-            if profile.get("default"):
-                profiles["default"] = profile
-            profiles[profile["name"]] = profile
-    del profiles["profiles"]
+            profile = Profile.parse_obj(profile)
+            if profile.default:
+                profiles[
+                    "default"
+                ] = profile  # we can't have Profile(name="default"), we use the latest default=True
+            profiles[profile.name] = profile
+    del profiles["profiles"]  # we can't have Profile(name="profiles")
     return profiles

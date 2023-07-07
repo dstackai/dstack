@@ -12,14 +12,22 @@ DEFAULT_RETRY_LIMIT = 3600
 
 
 def mem_size(v: Optional[Union[int, str]]) -> Optional[int]:
+    """
+    Converts human-readable sizes (MB and GB) to megabytes
+    >>> mem_size("512MB")
+    512
+    >>> mem_size("1 GB")
+    1024
+    """
+    dec_bin = 1000 / 1024
     if isinstance(v, str):
         m = re.fullmatch(r"(\d+) *([gm]b)?", v.strip().lower())
         if not m:
             raise ValueError(f"Invalid memory size: {v}")
-        v = int(m.group(1))
+        v = int(m.group(1)) * (dec_bin**2)
         if m.group(2) == "gb":
-            v = v * 1024  # todo
-    return v
+            v = v * 1000
+    return int(v)
 
 
 def duration(v: Union[int, str]) -> int:

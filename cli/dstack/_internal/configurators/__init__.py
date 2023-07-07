@@ -38,6 +38,7 @@ class JobConfigurator(ABC):
     def print_help(self, prog: str = "dstack run"):
         parser = self.get_parser(prog)
         parser.print_help()
+        exit(0)
 
     def get_parser(self, prog: Optional[str] = None) -> argparse.ArgumentParser:
         parser = argparse.ArgumentParser(prog=prog, formatter_class=RichHelpFormatter)
@@ -162,7 +163,10 @@ class JobConfigurator(ABC):
         return self.conf.build
 
     def entrypoint(self) -> Optional[List[str]]:
-        if self.conf.image is None or self.commands():
+        # todo custom entrypoint
+        if self.conf.image is None:  # dstackai/miniforge
+            return ["/bin/bash", "-i", "-c"]
+        if self.commands():  # custom docker image with commands
             return ["/bin/sh", "-i", "-c"]
         return None
 
@@ -180,7 +184,7 @@ class JobConfigurator(ABC):
         return self.profile.spot_policy or job.SpotPolicy.AUTO
 
     def retry_policy(self) -> job.RetryPolicy:
-        return job.RetryPolicy.parse_obj(self.profile.retry_policy.dict())
+        return job.RetryPolicy.parse_obj(self.profile.retry_policy)
 
     def cache_specs(self) -> List[job.CacheSpec]:
         return [
@@ -191,7 +195,7 @@ class JobConfigurator(ABC):
     def registry_auth(self) -> Optional[job.RegistryAuth]:
         if self.conf.registry_auth is None:
             return None
-        return job.RegistryAuth.parse_obj(self.conf.registry_auth.dict())
+        return job.RegistryAuth.parse_obj(self.conf.registry_auth)
 
     def app_specs(self) -> List[job.AppSpec]:
         specs = []
@@ -224,7 +228,25 @@ class JobConfigurator(ABC):
         return self.conf.env
 
     def requirements(self) -> job.Requirements:
-        return job.Requirements.parse_obj(self.profile.resources.dict())
+        r = job.Requirements(
+            cpus=self.profile.resources.cpu,
+            memory_mib=self.profile.resources.memory,
+            gpus=None,
+            shm_size_mib=self.profile.resources.shm_size,
+        )
+        if self.profile.resources.gpu:
+            r.gpus = job.GpusRequirements(
+                count=self.profile.resources.gpu.count,
+                memory_mib=self.profile.resources.gpu.memory,
+                name=self.profile.resources.gpu.name,
+            )
+        return r
+
+    @classmethod
+    def join_run_args(cls, args: List[str]) -> str:
+        return " ".join(
+            (arg if " " not in arg else '"%s"' % arg.replace('"', '\\"')) for arg in args
+        )
 
 
 def validate_local_path(path: str, home: Optional[str], working_dir: str) -> str:
