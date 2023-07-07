@@ -53,7 +53,7 @@ class AWSProjectConfig(BaseModel):
     type: Literal["aws"] = "aws"
     region_name: str
     region_name_title: Optional[str]
-    extra_regions: List[str]
+    extra_regions: List[str] = []
     s3_bucket_name: str
     ec2_subnet_id: Optional[str]
 
