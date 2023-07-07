@@ -1,6 +1,7 @@
 from pathlib import Path
 from typing import Optional
 
+import pydantic
 import yaml
 
 from dstack._internal.cli.profiles import load_profiles
@@ -12,23 +13,25 @@ from dstack._internal.core.configuration import (
     TaskConfiguration,
     parse,
 )
-from dstack._internal.core.profile import Profile
 
 
 def load_configuration(
     working_dir: str, configuration_path: Optional[str], profile_name: Optional[str]
 ) -> JobConfigurator:
     configuration_path = resolve_configuration_path(configuration_path, working_dir)
-    configuration = parse(yaml.safe_load(configuration_path.read_text()))
-    # todo handle validation errors
-    profiles = load_profiles()
+    try:
+        configuration = parse(yaml.safe_load(configuration_path.read_text()))
+        profiles = load_profiles()
+    except pydantic.ValidationError as e:
+        exit(e)
+
     if profile_name:
         try:
-            profile = profiles[profile_name]
+            profile = profiles.get(profile_name)
         except KeyError:
             exit(f"Error: No profile `{profile_name}` found")
     else:
-        profile = profiles.get("default", Profile(name="default"))
+        profile = profiles.default()
 
     if isinstance(configuration, DevEnvironmentConfiguration):
         return DevEnvironmentConfigurator(

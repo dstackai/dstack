@@ -1,5 +1,5 @@
 import re
-from typing import Optional, Union
+from typing import List, Optional, Union
 
 from pydantic import validator
 
@@ -82,3 +82,19 @@ class Profile(ForbidExtra):
     spot_policy: Optional[SpotPolicy]
     retry_policy: ProfileRetryPolicy = ProfileRetryPolicy()
     default: bool = False
+
+
+class ProfilesConfig(ForbidExtra):
+    profiles: List[Profile]
+
+    def default(self) -> Profile:
+        for p in self.profiles:
+            if p.default:
+                return p
+        return Profile(name="default")
+
+    def get(self, name: str) -> Profile:
+        for p in self.profiles:
+            if p.name == name:
+                return p
+        raise KeyError(name)

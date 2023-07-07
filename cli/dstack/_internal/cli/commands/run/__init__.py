@@ -10,7 +10,6 @@ from typing import Dict, Iterator, List, Optional
 
 import websocket
 from cursor import cursor
-from jsonschema import ValidationError
 from rich.progress import Progress, SpinnerColumn, TextColumn
 from rich.prompt import Confirm
 from rich.table import Table
@@ -135,7 +134,6 @@ class RunCommand(BasicCommand):
             else:
                 ssh_key_pub = _read_ssh_key_pub(config.repo_user_config.ssh_key_path)
 
-            # should we pass args.args here?
             configurator_args, run_args = configurator.get_parser().parse_known_args(
                 args.args + args.unknown
             )
@@ -164,10 +162,6 @@ class RunCommand(BasicCommand):
                     ssh_key=config.repo_user_config.ssh_key_path,
                     watcher=watcher,
                 )
-        except ValidationError as e:
-            sys.exit(  # todo replace with pydantic
-                f"There a syntax error in one of the files inside the {os.getcwd()}/.dstack/workflows directory:\n\n{e}"
-            )
         finally:
             if watcher.is_alive():
                 watcher.stop()
