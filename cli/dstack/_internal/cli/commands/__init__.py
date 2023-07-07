@@ -12,19 +12,18 @@ class BasicCommand(object):
     DESCRIPTION = "describe the command"
     SUBCOMMANDS = []
 
-    def __init__(self, parser: _SubParsersAction):
+    def __init__(self, parser: _SubParsersAction, store_help: bool = False):
         kwargs = {}
         if self.description:
             kwargs["help"] = self.description
-        self._parser = parser.add_parser(
+        self._parser: argparse.ArgumentParser = parser.add_parser(
             self.name, add_help=False, formatter_class=RichHelpFormatter, **kwargs
         )
+        help_kwargs = dict(action="help", default=argparse.SUPPRESS)
+        if store_help:
+            help_kwargs = dict(action="store_true")
         self._parser.add_argument(
-            "-h",
-            "--help",
-            action="help",
-            default=argparse.SUPPRESS,
-            help="Show this help message and exit",
+            "-h", "--help", help="Show this help message and exit", **help_kwargs
         )
         self._parser.set_defaults(func=self.__command)
 

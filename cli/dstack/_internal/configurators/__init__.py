@@ -35,13 +35,11 @@ class JobConfigurator(ABC):
         self.run_name: Optional[str] = None
         self.ssh_key_pub: Optional[str] = None
 
-    def print_help(self, prog: str = "dstack run"):
-        parser = self.get_parser(prog)
-        parser.print_help()
-        exit(0)
-
-    def get_parser(self, prog: Optional[str] = None) -> argparse.ArgumentParser:
-        parser = argparse.ArgumentParser(prog=prog, formatter_class=RichHelpFormatter)
+    def get_parser(
+        self, prog: Optional[str] = None, parser: Optional[argparse.ArgumentParser] = None
+    ) -> argparse.ArgumentParser:
+        if parser is None:
+            parser = argparse.ArgumentParser(prog=prog, formatter_class=RichHelpFormatter)
 
         spot_group = parser.add_mutually_exclusive_group()
         spot_group.add_argument(

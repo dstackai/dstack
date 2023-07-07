@@ -1,4 +1,5 @@
 import argparse
+import copy
 import os
 import sys
 import threading
@@ -48,7 +49,7 @@ class RunCommand(BasicCommand):
     DESCRIPTION = "Run a configuration"
 
     def __init__(self, parser):
-        super(RunCommand, self).__init__(parser)
+        super().__init__(parser, store_help=True)
 
     def register(self):
         self._parser.add_argument(
@@ -108,8 +109,9 @@ class RunCommand(BasicCommand):
     @check_init
     def _command(self, args: Namespace):
         configurator = load_configuration(args.working_dir, args.file_name, args.profile_name)
-        # if args.help:  # todo
-        #     configurator.print_help(prog="dstack run")
+        if args.help:
+            configurator.get_parser(parser=copy.deepcopy(self._parser)).print_help()
+            exit(0)
 
         project_name = None
         if args.project:
