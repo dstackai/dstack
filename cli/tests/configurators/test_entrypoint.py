@@ -14,7 +14,7 @@ def configure_job(commands: List[str], entrypoint: Optional[str]) -> Job:
         entrypoint=entrypoint,
     )
     repo = RemoteRepo(repo_url="https://github.com/dstackai/dstack-playground.git")
-    configurator = TaskConfigurator(".", ".dstack.yaml", conf, Profile(name="default"))
+    configurator = TaskConfigurator("docker", ".dstack.yaml", conf, Profile(name="default"))
     return configurator.get_jobs(repo, "run-name-1", "code.tar", "key.pub")[0]
 
 
