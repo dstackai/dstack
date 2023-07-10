@@ -7,7 +7,6 @@ from dstack._internal.configurators.extensions.shell import require
 from dstack._internal.configurators.extensions.ssh import SSHd
 from dstack._internal.configurators.extensions.vscode import VSCodeDesktop
 from dstack._internal.core.configuration import DevEnvironmentConfiguration
-from dstack._internal.core.profile import Profile
 from dstack._internal.core.repo import Repo
 from dstack._internal.providers.ports import get_map_to_port
 
@@ -17,17 +16,8 @@ install_ipykernel = f'(pip install -q --no-cache-dir ipykernel 2> /dev/null) || 
 
 class DevEnvironmentConfigurator(JobConfigurator):
     conf: DevEnvironmentConfiguration
-
-    def __init__(
-        self,
-        working_dir: str,
-        configuration_path: str,
-        configuration: DevEnvironmentConfiguration,
-        profile: Profile,
-    ):
-        super().__init__(working_dir, configuration_path, configuration, profile)
-        self.sshd: Optional[SSHd] = None
-        self.ide: Optional[IDEExtension] = None
+    sshd: Optional[SSHd]
+    ide: Optional[IDEExtension]
 
     def get_jobs(
         self, repo: Repo, run_name: str, repo_code_filename: str, ssh_key_pub: str
