@@ -2,25 +2,22 @@ from typing import List, Optional
 
 import dstack._internal.core.job as job
 from dstack._internal.configurators import JobConfigurator
+from dstack._internal.configurators.extensions import IDEExtension
 from dstack._internal.configurators.extensions.shell import require
 from dstack._internal.configurators.extensions.ssh import SSHd
+from dstack._internal.configurators.extensions.vscode import VSCodeDesktop
 from dstack._internal.core.configuration import DevEnvironmentConfiguration
 from dstack._internal.core.profile import Profile
 from dstack._internal.core.repo import Repo
-from dstack._internal.providers.extensions import VSCodeDesktopServer
 from dstack._internal.providers.ports import get_map_to_port
 
 require_sshd = require(["sshd"])
-install_ipykernel = (
-    f'pip install -q --no-cache-dir ipykernel || echo "no pip, ipykernel was not installed"'
-)
-vscode_extensions = ["ms-python.python", "ms-toolsai.jupyter"]
+install_ipykernel = f'(pip install -q --no-cache-dir ipykernel 2> /dev/null) || echo "no pip, ipykernel was not installed"'
 
 
 class DevEnvironmentConfigurator(JobConfigurator):
     conf: DevEnvironmentConfiguration
 
-    # todo handle NoVSCodeVersionError
     def __init__(
         self,
         working_dir: str,
@@ -30,10 +27,14 @@ class DevEnvironmentConfigurator(JobConfigurator):
     ):
         super().__init__(working_dir, configuration_path, configuration, profile)
         self.sshd: Optional[SSHd] = None
+        self.ide: Optional[IDEExtension] = None
 
     def get_jobs(
         self, repo: Repo, run_name: str, repo_code_filename: str, ssh_key_pub: str
     ) -> List[job.Job]:
+        self.ide = VSCodeDesktop(
+            extensions=["ms-python.python", "ms-toolsai.jupyter"], run_name=run_name
+        )
         self.sshd = SSHd(ssh_key_pub)
         self.sshd.map_to_port = get_map_to_port(self.ports(), self.sshd.port)
         return super().get_jobs(repo, run_name, repo_code_filename, ssh_key_pub)
@@ -44,16 +45,14 @@ class DevEnvironmentConfigurator(JobConfigurator):
             require_sshd(commands)
             self.sshd.set_permissions(commands)
         self.sshd.start(commands)
-        VSCodeDesktopServer.patch_commands(commands, vscode_extensions=vscode_extensions)
+        self.ide.install_if_not_found(commands)
         commands.append(install_ipykernel)
         commands.extend(self.conf.init)
+        commands.append("echo ''")
+
+        self.ide.print_readme(commands)
         commands.extend(
             [
-                "echo ''",
-                f"echo To open in VS Code Desktop, use one of these links:",
-                f"echo ''",
-                f"echo '  vscode://vscode-remote/ssh-remote+{self.run_name}/workflow'",
-                "echo ''",
                 f"echo 'To connect via SSH, use: `ssh {self.run_name}`'",
                 "echo ''",
                 "echo -n 'To exit, press Ctrl+C.'",
@@ -66,7 +65,7 @@ class DevEnvironmentConfigurator(JobConfigurator):
         commands = []
         if self.conf.image:
             require_sshd(commands)
-        VSCodeDesktopServer.patch_setup(commands, vscode_extensions=vscode_extensions)
+        self.ide.install(commands)
         commands.append(install_ipykernel)
         return commands
 
