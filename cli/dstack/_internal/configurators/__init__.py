@@ -1,5 +1,6 @@
 import argparse
 import json
+import shlex
 import sys
 import uuid
 from abc import ABC, abstractmethod
@@ -161,7 +162,8 @@ class JobConfigurator(ABC):
         return self.conf.build
 
     def entrypoint(self) -> Optional[List[str]]:
-        # todo custom entrypoint
+        if self.conf.entrypoint is not None:
+            return shlex.split(self.conf.entrypoint)
         if self.conf.image is None:  # dstackai/miniforge
             return ["/bin/bash", "-i", "-c"]
         if self.commands():  # custom docker image with commands
@@ -169,7 +171,7 @@ class JobConfigurator(ABC):
         return None
 
     def home_dir(self) -> Optional[str]:
-        return "/root" if self.conf.image is None else None
+        return self.conf.home_dir
 
     def image_name(self) -> str:
         if self.conf.image is not None:

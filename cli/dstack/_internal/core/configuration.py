@@ -25,7 +25,8 @@ class Artifact(ForbidExtra):
 class BaseConfiguration(ForbidExtra):
     type: Literal["none"]
     image: Optional[str]
-    # todo entrypoint
+    entrypoint: Optional[str]
+    home_dir: str = "/root"
     registry_auth: Optional[RegistryAuth]
     python: Optional[PythonVersions]
     ports: List[Union[str, int]] = []
@@ -33,8 +34,10 @@ class BaseConfiguration(ForbidExtra):
     build: List[str] = []
     cache: List[str] = []
 
-    @validator("python", pre=True)
-    def convert_python(cls, v) -> str:
+    @validator("python", pre=True, always=True)
+    def convert_python(cls, v, values) -> Optional[str]:
+        if v is not None and values.get("image"):
+            raise KeyError("`image` and `python` are mutually exclusive fields")
         if isinstance(v, float):
             v = str(v)
             if v == "3.1":
