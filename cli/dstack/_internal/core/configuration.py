@@ -1,10 +1,16 @@
+from enum import Enum
 from typing import Dict, List, Optional, Union
 
 from pydantic import BaseModel, Extra, Field, validator
 from typing_extensions import Annotated, Literal
 
-# todo use Enum
-PythonVersions = Literal["3.7", "3.8", "3.9", "3.10", "3.11"]
+
+class PythonVersion(str, Enum):
+    PY37 = "3.7"
+    PY38 = "3.8"
+    PY39 = "3.9"
+    PY310 = "3.10"
+    PY311 = "3.11"
 
 
 class ForbidExtra(BaseModel):
@@ -28,20 +34,22 @@ class BaseConfiguration(ForbidExtra):
     entrypoint: Optional[str]
     home_dir: str = "/root"
     registry_auth: Optional[RegistryAuth]
-    python: Optional[PythonVersions]
+    python: Optional[PythonVersion]
     ports: List[Union[str, int]] = []
     env: Dict[str, str] = {}
     build: List[str] = []
     cache: List[str] = []
 
     @validator("python", pre=True, always=True)
-    def convert_python(cls, v, values) -> Optional[str]:
+    def convert_python(cls, v, values) -> Optional[PythonVersion]:
         if v is not None and values.get("image"):
             raise KeyError("`image` and `python` are mutually exclusive fields")
         if isinstance(v, float):
             v = str(v)
             if v == "3.1":
                 v = "3.10"
+        if isinstance(v, str):
+            return PythonVersion(v)
         return v
 
 

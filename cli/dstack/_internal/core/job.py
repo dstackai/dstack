@@ -2,10 +2,11 @@ from abc import abstractmethod
 from enum import Enum
 from typing import Any, Dict, List, Optional, Union
 
-from pydantic import BaseModel, Field, root_validator, validator
+from pydantic import BaseModel, Field, root_validator
 
 from dstack._internal.core.app import AppSpec
 from dstack._internal.core.artifact import ArtifactSpec
+from dstack._internal.core.build import BuildPolicy
 from dstack._internal.core.cache import CacheSpec
 from dstack._internal.core.dependents import DepSpec
 from dstack._internal.core.repo import (
@@ -17,9 +18,6 @@ from dstack._internal.core.repo import (
     RepoData,
     RepoRef,
 )
-
-# todo use Enum
-BuildPolicy = ["use-build", "build", "force-build", "build-only"]
 
 
 class GpusRequirements(BaseModel):
@@ -208,7 +206,7 @@ class Job(JobHead):
     location: Optional[str]
     tag_name: Optional[str]
     ssh_key_pub: Optional[str]
-    build_policy: Optional[str]
+    build_policy: BuildPolicy = BuildPolicy.USE_BUILD
     build_commands: Optional[List[str]]
     optional_build_commands: Optional[List[str]]
     run_env: Optional[Dict[str, str]]  # deprecated
@@ -227,14 +225,6 @@ class Job(JobHead):
             else None
         )
         return data
-
-    @validator("build_policy")
-    def default_build_policy(cls, v: Optional[str]) -> str:
-        if not v:
-            return BuildPolicy[0]
-        if v not in BuildPolicy:
-            raise KeyError(f"Unknown build policy: {v}")
-        return v
 
     def get_instance_spot_type(self) -> str:
         if self.requirements and self.requirements.spot:
@@ -311,7 +301,7 @@ class Job(JobHead):
             "ssh_key_pub": self.ssh_key_pub or "",
             "repo_code_filename": self.repo_code_filename,
             "instance_type": self.instance_type,
-            "build_policy": self.build_policy,
+            "build_policy": self.build_policy.value,
             "build_commands": self.build_commands or [],
             "optional_build_commands": self.optional_build_commands or [],
             "run_env": self.run_env or {},
@@ -447,7 +437,7 @@ class Job(JobHead):
             tag_name=job_data.get("tag_name") or None,
             ssh_key_pub=job_data.get("ssh_key_pub") or None,
             instance_type=job_data.get("instance_type") or None,
-            build_policy=job_data.get("build_policy") or None,
+            build_policy=job_data.get("build_policy") or BuildPolicy.USE_BUILD,
             build_commands=job_data.get("build_commands") or None,
             optional_build_commands=job_data.get("optional_build_commands") or None,
             run_env=job_data.get("run_env") or None,

@@ -11,7 +11,8 @@ from rich_argparse import RichHelpFormatter
 import dstack._internal.core.job as job
 import dstack._internal.providers.ports as ports
 import dstack.version as version
-from dstack._internal.core.configuration import BaseConfiguration
+from dstack._internal.core.build import BuildPolicy
+from dstack._internal.core.configuration import BaseConfiguration, PythonVersion
 from dstack._internal.core.error import DstackError
 from dstack._internal.core.profile import Profile
 from dstack._internal.core.repo import Repo
@@ -31,7 +32,7 @@ class JobConfigurator(ABC):
         self.working_dir = working_dir
         self.conf = configuration
         self.profile = profile
-        self.build_policy = "use-build"
+        self.build_policy = BuildPolicy.USE_BUILD
         # context
         self.run_name: Optional[str] = None
         self.ssh_key_pub: Optional[str] = None
@@ -60,7 +61,7 @@ class JobConfigurator(ABC):
         retry_group.add_argument("--retry-limit", type=str)
 
         build_policy = parser.add_mutually_exclusive_group()
-        for value in job.BuildPolicy:
+        for value in BuildPolicy:
             build_policy.add_argument(
                 f"--{value}", action="store_const", dest="build_policy", const=value
             )
@@ -211,9 +212,9 @@ class JobConfigurator(ABC):
 
     def python(self) -> str:
         if self.conf.python is not None:
-            return self.conf.python
+            return self.conf.python.value
         version_info = sys.version_info
-        return f"{version_info.major}.{version_info.minor}"  # todo check if is in supported
+        return PythonVersion(f"{version_info.major}.{version_info.minor}").value
 
     def ports(self) -> Dict[int, ports.PortMapping]:
         mapping = [ports.PortMapping(p) for p in self.conf.ports]

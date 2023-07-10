@@ -5,7 +5,7 @@ from typing import Optional
 import cpuinfo
 
 from dstack._internal.backend.base.storage import Storage
-from dstack._internal.core.build import BuildNotFoundError, BuildPlan, DockerPlatform
+from dstack._internal.core.build import BuildNotFoundError, BuildPlan, BuildPolicy, DockerPlatform
 from dstack._internal.core.job import Job
 from dstack._internal.utils.escape import escape_head
 
@@ -13,7 +13,7 @@ from dstack._internal.utils.escape import escape_head
 def predict_build_plan(
     storage: Storage, job: Job, platform: Optional[DockerPlatform]
 ) -> BuildPlan:
-    if job.build_policy in ["force-build", "build-only"]:
+    if job.build_policy in [BuildPolicy.FORCE_BUILD, BuildPolicy.BUILD_ONLY]:
         return BuildPlan.yes
 
     if platform is None:
@@ -22,11 +22,11 @@ def predict_build_plan(
         return BuildPlan.use
 
     if job.build_commands:
-        if job.build_policy == "use-build":
+        if job.build_policy == BuildPolicy.USE_BUILD:
             raise BuildNotFoundError("Build not found. Run `dstack build` or add `--build` flag")
         return BuildPlan.yes
 
-    if job.optional_build_commands and job.build_policy == "build":
+    if job.optional_build_commands and job.build_policy == BuildPolicy.BUILD:
         return BuildPlan.yes
     return BuildPlan.no
 

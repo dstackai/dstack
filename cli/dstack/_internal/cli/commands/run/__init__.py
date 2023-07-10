@@ -420,7 +420,6 @@ def _attach_to_container(hub_client: HubClient, run_name: str, ports_lock: Ports
     for run in _poll_run_head(hub_client, run_name, loop_statuses=[JobStatus.BUILDING]):
         pass
     app_ports = ports_lock.release()
-    # TODO replace long delay with starting ssh-server in the beginning
     for delay in range(0, 60 * 10 + 1, POLL_PROVISION_RATE_SECS):  # retry
         time.sleep(POLL_PROVISION_RATE_SECS if delay else 0)  # skip first sleep
         if run_ssh_tunnel(run_name, app_ports):
