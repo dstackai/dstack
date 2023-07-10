@@ -2,10 +2,10 @@ from typing import List, Optional
 
 from dstack._internal.configurators import JobConfigurator, validate_local_path
 from dstack._internal.configurators.extensions.ssh import SSHd
+from dstack._internal.configurators.ports import get_map_to_port
 from dstack._internal.core import job as job
 from dstack._internal.core.configuration import TaskConfiguration
 from dstack._internal.core.repo import Repo
-from dstack._internal.providers.ports import get_map_to_port
 
 
 class TaskConfigurator(JobConfigurator):

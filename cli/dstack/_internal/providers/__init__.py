@@ -9,6 +9,7 @@ from pkgutil import iter_modules
 from typing import Any, Dict, List, Optional, Union
 
 import dstack.api.hub as hub
+from dstack._internal.configurators.ports import PortMapping, merge_ports
 from dstack._internal.core.cache import CacheSpec
 from dstack._internal.core.error import RepoNotInitializedError
 from dstack._internal.core.job import (
@@ -25,7 +26,6 @@ from dstack._internal.core.job import (
     SpotPolicy,
 )
 from dstack._internal.core.repo.base import Repo
-from dstack._internal.providers.ports import PortMapping, merge_ports
 from dstack._internal.utils.common import get_milliseconds_since_epoch, parse_pretty_duration
 from dstack._internal.utils.interpolator import VariablesInterpolator
 

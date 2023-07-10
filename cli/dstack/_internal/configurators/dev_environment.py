@@ -6,9 +6,9 @@ from dstack._internal.configurators.extensions import IDEExtension
 from dstack._internal.configurators.extensions.shell import require
 from dstack._internal.configurators.extensions.ssh import SSHd
 from dstack._internal.configurators.extensions.vscode import VSCodeDesktop
+from dstack._internal.configurators.ports import get_map_to_port
 from dstack._internal.core.configuration import DevEnvironmentConfiguration
 from dstack._internal.core.repo import Repo
-from dstack._internal.providers.ports import get_map_to_port
 
 require_sshd = require(["sshd"])
 install_ipykernel = f'(pip install -q --no-cache-dir ipykernel 2> /dev/null) || echo "no pip, ipykernel was not installed"'

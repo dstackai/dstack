@@ -8,8 +8,8 @@ from typing import Dict, List, Optional
 
 from rich_argparse import RichHelpFormatter
 
+import dstack._internal.configurators.ports as ports
 import dstack._internal.core.job as job
-import dstack._internal.providers.ports as ports
 import dstack.version as version
 from dstack._internal.core.build import BuildPolicy
 from dstack._internal.core.configuration import BaseConfiguration, PythonVersion

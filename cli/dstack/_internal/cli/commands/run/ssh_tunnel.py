@@ -3,7 +3,7 @@ import socket
 import subprocess
 from typing import Dict, List, Optional
 
-from dstack._internal.providers.ports import PortUsedError
+from dstack._internal.configurators.ports import PortUsedError
 
 
 class PortsLock:

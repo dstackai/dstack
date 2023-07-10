@@ -6,11 +6,11 @@ from rich_argparse import RichHelpFormatter
 
 import dstack.api.hub as hub
 from dstack import version
+from dstack._internal.configurators.ports import filter_reserved_ports, get_map_to_port
 from dstack._internal.core.app import AppSpec
 from dstack._internal.core.job import JobSpec
 from dstack._internal.providers import Provider
 from dstack._internal.providers.extensions import OpenSSHExtension
-from dstack._internal.providers.ports import filter_reserved_ports, get_map_to_port
 
 
 class CodeProvider(Provider):
