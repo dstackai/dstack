@@ -41,7 +41,7 @@ BASE_DEPS = [
     "fastapi",
     "starlette>=0.26.0",
     "uvicorn",
-    "pydantic==1.10.10",
+    "pydantic<=1.10.10",
     "sqlalchemy[asyncio]>=2.0.0",
     "websocket-client",
     "cursor",
