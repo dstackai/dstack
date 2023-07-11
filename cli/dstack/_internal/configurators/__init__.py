@@ -61,10 +61,15 @@ class JobConfigurator(ABC):
         retry_group.add_argument("--retry-limit", type=str)
 
         build_policy = parser.add_mutually_exclusive_group()
-        for value in BuildPolicy:
-            build_policy.add_argument(
-                f"--{value}", action="store_const", dest="build_policy", const=value
-            )
+        build_policy.add_argument(
+            "--build", action="store_const", dest="build_policy", const=BuildPolicy.BUILD
+        )
+        build_policy.add_argument(
+            "--force-build",
+            action="store_const",
+            dest="build_policy",
+            const=BuildPolicy.FORCE_BUILD,
+        )
 
         return parser
 
