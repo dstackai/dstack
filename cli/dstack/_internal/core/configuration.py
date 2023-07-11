@@ -52,10 +52,13 @@ class BaseConfiguration(ForbidExtra):
         Field(description="The major version of Python\nMutually exclusive with the image"),
     ]
     ports: Annotated[
-        List[Union[constr(regex=r"^\d+:\d+$"), conint(gt=0, le=65536)]],
+        List[Union[constr(regex=r"^[0-9]+:[0-9]+$"), conint(gt=0, le=65536)]],
         Field(description="Port numbers/mapping to expose"),
     ] = []
-    env: Annotated[Dict[str, str], Field(description="The list of environment variables")] = {}
+    env: Annotated[
+        Union[List[constr(regex=r"^[a-zA-Z_][a-zA-Z0-9_]*=.*$")], Dict[str, str]],
+        Field(description="The mapping or the list of environment variables"),
+    ] = {}
     build: Annotated[
         CommandsList, Field(description="The bash commands to run during build stage")
     ] = []
@@ -73,6 +76,12 @@ class BaseConfiguration(ForbidExtra):
                 v = "3.10"
         if isinstance(v, str):
             return PythonVersion(v)
+        return v
+
+    @validator("env")
+    def convert_env(cls, v) -> Dict[str, str]:
+        if isinstance(v, list):
+            return dict(pair.split(sep="=", maxsplit=1) for pair in v)
         return v
 
 
@@ -98,4 +107,5 @@ class DstackConfiguration(BaseModel):
 
 
 def parse(data: dict) -> Union[DevEnvironmentConfiguration, TaskConfiguration]:
-    return DstackConfiguration.parse_obj(data).__root__
+    conf = DstackConfiguration.parse_obj(data).__root__
+    return conf
