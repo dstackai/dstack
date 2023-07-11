@@ -1,6 +1,6 @@
 import tarfile
 from pathlib import Path
-from typing import Any, BinaryIO, Dict, Optional
+from typing import BinaryIO, Optional
 
 from typing_extensions import Literal
 
@@ -9,7 +9,6 @@ from dstack._internal.utils.common import PathLike
 from dstack._internal.utils.escape import escape_head
 from dstack._internal.utils.hash import get_sha256, slugify
 from dstack._internal.utils.ignore import GitIgnore
-from dstack._internal.utils.workflows import load_workflows
 
 
 class LocalRepoData(RepoData):
@@ -52,9 +51,6 @@ class LocalRepo(Repo):
         if repo_ref is None:
             repo_ref = RepoRef(repo_id=slugify(Path(repo_data.repo_dir).name, repo_data.repo_dir))
         super().__init__(repo_ref, repo_data)
-
-    def get_workflows(self, credentials=None) -> Dict[str, Dict[str, Any]]:
-        return load_workflows(Path(self.repo_data.repo_dir) / ".dstack")
 
 
 class TarIgnore(GitIgnore):

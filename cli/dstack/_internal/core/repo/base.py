@@ -48,7 +48,3 @@ class Repo(ABC):
     @property
     def repo_id(self) -> str:
         return self.repo_ref.repo_id
-
-    @abstractmethod
-    def get_workflows(self, credentials=None) -> Dict[str, Dict[str, Any]]:
-        pass
