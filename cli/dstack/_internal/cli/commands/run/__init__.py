@@ -1,4 +1,5 @@
 import argparse
+import copy
 import os
 import sys
 import threading
@@ -9,7 +10,6 @@ from typing import Dict, Iterator, List, Optional
 
 import websocket
 from cursor import cursor
-from jsonschema import ValidationError
 from rich.progress import Progress, SpinnerColumn, TextColumn
 from rich.prompt import Confirm
 from rich.table import Table
@@ -18,11 +18,11 @@ from websocket import WebSocketApp
 from dstack._internal.api.runs import list_runs_hub
 from dstack._internal.backend.base.logs import fix_urls
 from dstack._internal.cli.commands import BasicCommand
-from dstack._internal.cli.commands.run import configurations
 from dstack._internal.cli.commands.run.ssh_tunnel import PortsLock, run_ssh_tunnel
 from dstack._internal.cli.commands.run.watcher import LocalCopier, SSHCopier, Watcher
 from dstack._internal.cli.common import add_project_argument, check_init, console, print_runs
 from dstack._internal.cli.config import config, get_hub_client
+from dstack._internal.cli.configuration import load_configuration
 from dstack._internal.core.error import RepoNotInitializedError
 from dstack._internal.core.instance import InstanceType
 from dstack._internal.core.job import Job, JobErrorCode, JobHead, JobStatus
@@ -48,7 +48,7 @@ class RunCommand(BasicCommand):
     DESCRIPTION = "Run a configuration"
 
     def __init__(self, parser):
-        super(RunCommand, self).__init__(parser)
+        super().__init__(parser, store_help=True)
 
     def register(self):
         self._parser.add_argument(
@@ -107,16 +107,17 @@ class RunCommand(BasicCommand):
 
     @check_init
     def _command(self, args: Namespace):
-        (
-            configuration_path,
-            provider_name,
-            provider_data,
-            project_name,
-        ) = configurations.parse_configuration_file(
-            args.working_dir, args.file_name, args.profile_name
-        )
+        configurator = load_configuration(args.working_dir, args.file_name, args.profile_name)
+        if args.help:
+            configurator.get_parser(parser=copy.deepcopy(self._parser)).print_help()
+            exit(0)
+
+        project_name = None
         if args.project:
             project_name = args.project
+        elif configurator.profile.project:
+            project_name = configurator.profile.project
+
         watcher = Watcher(os.getcwd())
         try:
             if args.reload:
@@ -129,30 +130,27 @@ class RunCommand(BasicCommand):
                 raise RepoNotInitializedError("No credentials", project_name=project_name)
 
             if not config.repo_user_config.ssh_key_path:
-                ssh_pub_key = None
+                ssh_key_pub = None
             else:
-                ssh_pub_key = _read_ssh_key_pub(config.repo_user_config.ssh_key_path)
+                ssh_key_pub = _read_ssh_key_pub(config.repo_user_config.ssh_key_path)
 
-            run_plan = hub_client.get_run_plan(
-                configuration_path=configuration_path,
-                provider_name=provider_name,
-                provider_data=provider_data,
-                args=args,
+            configurator_args, run_args = configurator.get_parser().parse_known_args(
+                args.args + args.unknown
             )
+            configurator.apply_args(configurator_args)
+
+            run_plan = hub_client.get_run_plan(configurator)
             console.print("dstack will execute the following plan:\n")
-            _print_run_plan(configuration_path, run_plan)
+            _print_run_plan(configurator.configuration_path, run_plan)
             if not args.yes and not Confirm.ask("Continue?"):
                 console.print("\nExiting...")
                 exit(0)
             console.print("\nProvisioning...\n")
 
-            run_name, jobs = hub_client.run_provider(
-                configuration_path=configuration_path,
-                provider_name=provider_name,
-                provider_data=provider_data,
-                ssh_pub_key=ssh_pub_key,
-                tag_name=args.tag_name,
-                args=args,
+            run_name, jobs = hub_client.run_configuration(
+                configurator=configurator,
+                ssh_key_pub=ssh_key_pub,
+                run_args=run_args,
             )
             runs = list_runs_hub(hub_client, run_name=run_name)
             run = runs[0]
@@ -164,10 +162,6 @@ class RunCommand(BasicCommand):
                     ssh_key=config.repo_user_config.ssh_key_path,
                     watcher=watcher,
                 )
-        except ValidationError as e:
-            sys.exit(
-                f"There a syntax error in one of the files inside the {os.getcwd()}/.dstack/workflows directory:\n\n{e}"
-            )
         finally:
             if watcher.is_alive():
                 watcher.stop()
@@ -426,7 +420,6 @@ def _attach_to_container(hub_client: HubClient, run_name: str, ports_lock: Ports
     for run in _poll_run_head(hub_client, run_name, loop_statuses=[JobStatus.BUILDING]):
         pass
     app_ports = ports_lock.release()
-    # TODO replace long delay with starting ssh-server in the beginning
     for delay in range(0, 60 * 10 + 1, POLL_PROVISION_RATE_SECS):  # retry
         time.sleep(POLL_PROVISION_RATE_SECS if delay else 0)  # skip first sleep
         if run_ssh_tunnel(run_name, app_ports):

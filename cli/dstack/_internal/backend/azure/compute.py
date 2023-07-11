@@ -179,7 +179,7 @@ def _vm_type_available(vm_resource: ResourceSku) -> bool:
     return False
 
 
-def _get_gpu_name_memory(vm_name: str) -> Tuple[int, str]:
+def _get_gpu_name_memory(vm_name: str) -> Tuple[str, int]:
     if re.match(r"^Standard_NC\d+ads_A100_v4$", vm_name):
         return "A100", 80 * 1024
     if re.match(r"^Standard_NC\d+as_T4_v3$", vm_name):

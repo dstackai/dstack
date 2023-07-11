@@ -1,17 +1,16 @@
-import argparse
+import copy
 import sys
 import tempfile
 import time
 import urllib.parse
 from datetime import datetime
 from pathlib import Path
-from typing import Any, Dict, Generator, List, Optional, Tuple
+from typing import Generator, List, Optional, Tuple
 
-from dstack._internal import providers
+import dstack._internal.configurators as configurators
 from dstack._internal.api.repos import get_local_repo_credentials
 from dstack._internal.backend.base import artifacts as base_artifacts
 from dstack._internal.core.artifact import Artifact
-from dstack._internal.core.error import NameNotFoundError
 from dstack._internal.core.job import Job, JobHead, JobStatus
 from dstack._internal.core.log_event import LogEvent
 from dstack._internal.core.plan import RunPlan
@@ -21,7 +20,6 @@ from dstack._internal.core.run import RunHead
 from dstack._internal.core.secret import Secret
 from dstack._internal.core.tag import TagHead
 from dstack._internal.hub.models import ProjectInfo
-from dstack._internal.utils.common import merge_workflow_data
 from dstack.api.hub._api_client import HubAPIClient
 from dstack.api.hub._config import HubClientConfig
 from dstack.api.hub._storage import HUBStorage
@@ -260,114 +258,42 @@ class HubClient:
     def delete_configuration_cache(self, configuration_path: str):
         self._api_client.delete_configuration_cache(configuration_path=configuration_path)
 
-    def get_run_plan(
-        self,
-        configuration_path: str,
-        provider_name: str,
-        provider_data: Optional[Dict[str, Any]] = None,
-        args: Optional[argparse.Namespace] = None,
-    ) -> RunPlan:
-        if provider_name not in providers.get_provider_names():
-            raise NameNotFoundError(f"No provider '{provider_name}' is found")
-        provider = providers.load_provider(provider_name)
-        provider.load(
-            hub_client=self,
-            args=args,
-            workflow_name=None,
-            provider_data=provider_data or {},
-            run_name="dry-run",
-            ssh_key_pub="",
+    def get_run_plan(self, configurator: "configurators.JobConfigurator") -> RunPlan:
+        """
+        :param configurator: args must be already applied
+        :return: run plan
+        """
+        jobs = configurator.get_jobs(
+            repo=self.repo, run_name="dry-run", repo_code_filename="", ssh_key_pub=""
         )
-        jobs = provider.get_jobs(repo=self.repo, configuration_path=configuration_path)
         run_plan = self._api_client.get_run_plan(jobs)
         return run_plan
 
-    def run_provider(
+    def run_configuration(
         self,
-        provider_name: str,
-        provider_data: Optional[Dict[str, Any]] = None,
-        configuration_path: Optional[str] = None,
-        tag_name: Optional[str] = None,
-        ssh_pub_key: Optional[str] = None,
-        args: Optional[argparse.Namespace] = None,
+        configurator: "configurators.JobConfigurator",
+        ssh_key_pub: str,
+        run_args: Optional[List[str]] = None,
     ) -> Tuple[str, List[Job]]:
-        """Runs provider by name
-        :return: run_name, jobs
-        """
-        if provider_name not in providers.get_provider_names():
-            raise NameNotFoundError(f"No provider '{provider_name}' is found")
-        provider = providers.load_provider(provider_name)
-
         run_name = self.create_run()
-        provider.load(
-            hub_client=self,
-            args=args,
-            workflow_name=None,
-            provider_data=provider_data or {},
-            run_name=run_name,
-            ssh_key_pub=ssh_pub_key,
-        )  # todo validate data
-        if tag_name:
-            tag_head = self.get_tag_head(tag_name)
-            if tag_head:
-                self.delete_tag_head(tag_head)
+        configurator = copy.deepcopy(configurator)
+        configurator.inject_context(
+            {"run": {"name": run_name, "args": configurator.join_run_args(run_args)}}
+        )
+
+        # todo handle tag_name & dependencies
 
         repo_code_filename = self._upload_code_file()
-        jobs = provider.get_jobs(
+        jobs = configurator.get_jobs(
             repo=self.repo,
-            configuration_path=configuration_path,
+            run_name=run_name,
             repo_code_filename=repo_code_filename,
-            tag_name=tag_name,
+            ssh_key_pub=ssh_key_pub,
         )
         for job in jobs:
             self.submit_job(job)
-        if tag_name:
-            self.add_tag_from_run(tag_name, run_name, jobs)
         self.update_repo_last_run_at(last_run_at=int(round(time.time() * 1000)))
-        return run_name, jobs  # todo return run_head
-
-    def run_workflow(
-        self,
-        workflow_name: str,
-        workflow_data: Optional[Dict[str, Any]] = None,
-        tag_name: Optional[str] = None,
-        ssh_pub_key: Optional[str] = None,
-        args: Optional[argparse.Namespace] = None,
-    ) -> Tuple[str, List[Job]]:
-        """Runs workflow by name
-        :return: run_name, jobs
-        """
-        workflow = self.repo.get_workflows(credentials=self.get_repo_credentials()).get(
-            workflow_name
-        )
-        if workflow is None:
-            raise NameNotFoundError(f"No workflow '{workflow_name}' is found")
-        provider = providers.load_provider(workflow["provider"])
-
-        run_name = self.create_run()
-        provider.load(
-            self,
-            args,
-            workflow_name,
-            merge_workflow_data(workflow, workflow_data),
-            run_name,
-            ssh_pub_key,
-        )
-        if tag_name:
-            tag_head = self.get_tag_head(tag_name)
-            if tag_head:
-                self.delete_tag_head(tag_head)
-
-        repo_code_filename = self._upload_code_file()
-        jobs = provider.get_jobs(
-            repo=self.repo, repo_code_filename=repo_code_filename, tag_name=tag_name
-        )
-        for job in jobs:
-            self.submit_job(job)
-        if tag_name:
-            self.add_tag_from_run(tag_name, self.run_name, jobs)
-        self.update_repo_last_run_at(last_run_at=int(round(time.time() * 1000)))
-        return run_name, jobs  # todo return run_head
+        return run_name, jobs
 
     def _upload_code_file(self) -> str:
         with tempfile.NamedTemporaryFile("w+b") as f:

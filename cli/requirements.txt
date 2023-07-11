@@ -11,7 +11,7 @@ rich-argparse
 fastapi
 starlette
 uvicorn
-pydantic
+pydantic<=1.10.10
 sqlalchemy[asyncio]
 py-cpuinfo
 websocket-client

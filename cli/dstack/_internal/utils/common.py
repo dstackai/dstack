@@ -1,30 +1,15 @@
-import copy
 import os
 import re
 import time
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
-from typing import Any, Dict, Optional, Union
+from typing import Any, Union
 
 PathLike = Union[str, os.PathLike]
 
 
 def get_dstack_dir() -> Path:
     return Path.joinpath(Path.home(), ".dstack")
-
-
-def _quoted(s: Optional[str]) -> str:
-    if s:
-        return f'"{s}"'
-    else:
-        return "None"
-
-
-def _quoted_masked(s: Optional[str]) -> str:
-    if s:
-        return f"\"{'*' * len(s)}\""
-    else:
-        return "None"
 
 
 def pretty_date(time: Any = False):
@@ -137,28 +122,3 @@ def timestamps_in_milliseconds_to_datetime(ts: int) -> datetime:
 def datetime_to_timestamp_in_milliseconds(dt: datetime) -> int:
     milliseconds = dt.microsecond // 1000
     return int(dt.timestamp()) * 1000 + milliseconds
-
-
-def format_list(items: Optional[list], *, formatter=str) -> Optional[str]:
-    if items is None:
-        return None
-    return "[{}]".format(", ".join(formatter(item) for item in items))
-
-
-def merge_workflow_data(
-    data: Dict[str, Any], override: Optional[Dict[str, Any]]
-) -> Dict[str, Any]:
-    override = override or {}
-    result = {}
-    for key in data.keys() | override.keys():
-        if key not in override:
-            result[key] = copy.deepcopy(data[key])
-        elif key not in data:
-            result[key] = copy.deepcopy(override[key])
-        else:
-            a, b = data[key], override[key]
-            if isinstance(a, dict) and isinstance(b, dict):
-                result[key] = merge_workflow_data(a, b)
-            else:
-                result[key] = copy.deepcopy(b)
-    return result

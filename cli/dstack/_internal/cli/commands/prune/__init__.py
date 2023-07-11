@@ -3,9 +3,9 @@ import argparse
 from rich_argparse import RichHelpFormatter
 
 from dstack._internal.cli.commands import BasicCommand
-from dstack._internal.cli.commands.run import configurations
 from dstack._internal.cli.common import add_project_argument, check_init, console
 from dstack._internal.cli.config import get_hub_client
+from dstack._internal.cli.configuration import resolve_configuration_path
 from dstack.api.hub import HubClient
 
 
@@ -46,8 +46,6 @@ class PruneCommand(BasicCommand):
 
     @staticmethod
     def prune_cache(args: argparse.Namespace, hub_client: HubClient):
-        configuration_path = str(
-            configurations.get_configuration_path(args.working_dir, args.file_name)
-        )
+        configuration_path = str(resolve_configuration_path(args.file_name, args.working_dir))
         hub_client.delete_configuration_cache(configuration_path=configuration_path)
         console.print(f"[grey58]Cache pruned[/]")

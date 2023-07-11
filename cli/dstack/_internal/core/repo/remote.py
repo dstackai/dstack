@@ -3,8 +3,7 @@ import os
 import subprocess
 import tempfile
 import time
-from pathlib import Path
-from typing import Any, BinaryIO, Dict, Optional
+from typing import BinaryIO, Optional
 
 import git
 import giturlparse
@@ -16,7 +15,6 @@ from dstack._internal.core.repo.base import Repo, RepoData, RepoInfo, RepoRef
 from dstack._internal.utils.common import PathLike
 from dstack._internal.utils.hash import get_sha256, slugify
 from dstack._internal.utils.ssh import get_host_config, make_ssh_command_for_git
-from dstack._internal.utils.workflows import load_workflows
 
 
 class RemoteRepoCredentials(BaseModel):
@@ -127,19 +125,6 @@ class RemoteRepo(Repo):
         if repo_ref is None:
             repo_ref = RepoRef(repo_id=slugify(repo_data.repo_name, repo_data.path("/")))
         super().__init__(repo_ref, repo_data)
-
-    def get_workflows(
-        self, credentials: Optional[RemoteRepoCredentials] = None
-    ) -> Dict[str, Dict[str, Any]]:
-        if self.local_repo_dir is not None:
-            local_repo_dir = Path(self.local_repo_dir)
-        elif credentials is None:
-            raise RuntimeError("No credentials for remote only repo")
-        else:
-            temp_dir = tempfile.TemporaryDirectory()  # will be removed by garbage collector
-            local_repo_dir = Path(temp_dir.name)
-            _clone_remote_repo(local_repo_dir, self.repo_data, credentials, depth=1)
-        return load_workflows(local_repo_dir / ".dstack")
 
 
 def _clone_remote_repo(

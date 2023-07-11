@@ -149,10 +149,7 @@ class CLIConfigManager:
 
 def get_hub_client(project_name: Optional[str] = None) -> HubClient:
     if project_name is None:
-        profiles = load_profiles()
-        if "default" in profiles:
-            if "project" in profiles["default"]:
-                project_name = profiles["default"]["project"]
+        project_name = load_profiles().default().project
     cli_config_manager = CLIConfigManager()
     project_config = cli_config_manager.get_default_project_config()
     if project_name is not None:
