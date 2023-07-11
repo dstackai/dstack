@@ -2,8 +2,6 @@ from typing import Dict, Optional
 
 from pydantic import BaseModel
 
-from dstack._internal.utils.common import _quoted
-
 
 class AppSpec(BaseModel):
     port: int
