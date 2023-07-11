@@ -1,8 +1,10 @@
 from enum import Enum
 from typing import Dict, List, Optional, Union
 
-from pydantic import BaseModel, Extra, Field, validator
+from pydantic import BaseModel, Extra, Field, conint, constr, validator
 from typing_extensions import Annotated, Literal
+
+CommandsList = List[str]
 
 
 class PythonVersion(str, Enum):
@@ -19,26 +21,47 @@ class ForbidExtra(BaseModel):
 
 
 class RegistryAuth(ForbidExtra):
-    username: Optional[str]
-    password: str
+    username: Annotated[Optional[str], Field(description="Username")]
+    password: Annotated[str, Field(description="Password or access token")]
 
 
 class Artifact(ForbidExtra):
-    path: str
-    mount: bool = False
+    path: Annotated[
+        str, Field(description="The path to the folder that must be stored as an output artifact")
+    ]
+    mount: Annotated[
+        bool,
+        Field(
+            description="Must be set to `true` if the artifact files must be saved in real-time"
+        ),
+    ] = False
 
 
 class BaseConfiguration(ForbidExtra):
     type: Literal["none"]
-    image: Optional[str]
-    entrypoint: Optional[str]
-    home_dir: str = "/root"
-    registry_auth: Optional[RegistryAuth]
-    python: Optional[PythonVersion]
-    ports: List[Union[str, int]] = []
-    env: Dict[str, str] = {}
-    build: List[str] = []
-    cache: List[str] = []
+    image: Annotated[Optional[str], Field(description="The name of the Docker image to run")]
+    entrypoint: Annotated[Optional[str], Field(description="The Docker entrypoint")]
+    home_dir: Annotated[
+        str, Field(description="The absolute path to the home directory inside the container")
+    ] = "/root"
+    registry_auth: Annotated[
+        Optional[RegistryAuth], Field(description="Credentials for pulling a private container")
+    ]
+    python: Annotated[
+        Optional[PythonVersion],
+        Field(description="The major version of Python\nMutually exclusive with the image"),
+    ]
+    ports: Annotated[
+        List[Union[constr(regex=r"^\d+:\d+$"), conint(gt=0, le=65536)]],
+        Field(description="Port numbers/mapping to expose"),
+    ] = []
+    env: Annotated[Dict[str, str], Field(description="The list of environment variables")] = {}
+    build: Annotated[
+        CommandsList, Field(description="The bash commands to run during build stage")
+    ] = []
+    cache: Annotated[
+        List[str], Field(description="The directories to be cached between configuration runs")
+    ] = []
 
     @validator("python", pre=True, always=True)
     def convert_python(cls, v, values) -> Optional[PythonVersion]:
@@ -55,20 +78,23 @@ class BaseConfiguration(ForbidExtra):
 
 class DevEnvironmentConfiguration(BaseConfiguration):
     type: Literal["dev-environment"] = "dev-environment"
-    ide: Literal["vscode"]
-    init: List[str] = []
+    ide: Annotated[Literal["vscode"], Field(description="The IDE to run")]
+    init: Annotated[CommandsList, Field(description="The bash commands to run")] = []
 
 
 class TaskConfiguration(BaseConfiguration):
     type: Literal["task"] = "task"
-    commands: List[str]
-    artifacts: List[Artifact] = []
+    commands: Annotated[CommandsList, Field(description="The bash commands to run")]
+    artifacts: Annotated[List[Artifact], Field(description="The list of output artifacts")] = []
 
 
 class DstackConfiguration(BaseModel):
     __root__: Annotated[
         Union[DevEnvironmentConfiguration, TaskConfiguration], Field(discriminator="type")
     ]
+
+    class Config:
+        schema_extra = {"$schema": "http://json-schema.org/draft-07/schema#"}
 
 
 def parse(data: dict) -> Union[DevEnvironmentConfiguration, TaskConfiguration]:
