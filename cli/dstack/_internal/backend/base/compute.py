@@ -1,7 +1,9 @@
+import os
 from abc import ABC, abstractmethod
 from functools import cmp_to_key
 from typing import List, Optional
 
+import dstack.version as version
 from dstack._internal.core.error import DstackError
 from dstack._internal.core.instance import InstanceType, LaunchedInstanceInfo
 from dstack._internal.core.job import Job, Requirements
@@ -119,3 +121,18 @@ def _matches_requirements(resources: Resources, requirements: Optional[Requireme
         ):
             return False
     return True
+
+
+def get_dstack_runner() -> str:
+    if version.__is_release__:
+        bucket = "dstack-runner-downloads"
+        build = version.__version__
+    else:  # stgn
+        bucket = "dstack-runner-downloads-stgn"
+        build = version.__version__ or os.environ.get("DSTACK_RUNNER_BUILD", None)
+
+    commands = [
+        f'sudo curl --output /usr/local/bin/dstack-runner "https://{bucket}.s3.eu-west-1.amazonaws.com/{build}/binaries/dstack-runner-linux-amd64"',
+        f"sudo chmod +x /usr/local/bin/dstack-runner",
+    ]
+    return "\n".join(commands)

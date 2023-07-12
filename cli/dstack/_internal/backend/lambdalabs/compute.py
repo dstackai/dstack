@@ -10,7 +10,7 @@ import pkg_resources
 import yaml
 
 from dstack import version
-from dstack._internal.backend.base.compute import WS_PORT, choose_instance_type
+from dstack._internal.backend.base.compute import WS_PORT, choose_instance_type, get_dstack_runner
 from dstack._internal.backend.base.config import BACKEND_CONFIG_FILENAME, RUNNER_CONFIG_FILENAME
 from dstack._internal.backend.base.runners import serialize_runner_yaml
 from dstack._internal.backend.lambdalabs.api_client import LambdaAPIClient
@@ -206,6 +206,7 @@ mkdir -p /root/.dstack/
 echo '{config_content}' > /root/.dstack/{BACKEND_CONFIG_FILENAME}
 echo '{runner_content}' > /root/.dstack/{RUNNER_CONFIG_FILENAME}
 echo 'hostname: HOSTNAME_PLACEHOLDER' >> /root/.dstack/{RUNNER_CONFIG_FILENAME}
+{get_dstack_runner()}
 HOME=/root nohup dstack-runner --log-level 6 start --http-port {WS_PORT}
 """
 
