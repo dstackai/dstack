@@ -129,7 +129,7 @@ def get_dstack_runner() -> str:
         build = version.__version__
     else:  # stgn
         bucket = "dstack-runner-downloads-stgn"
-        build = version.__version__ or os.environ.get("DSTACK_RUNNER_BUILD", None)
+        build = version.__version__ or os.environ.get("DSTACK_RUNNER_VERSION", "latest")
 
     commands = [
         f'sudo curl --output /usr/local/bin/dstack-runner "https://{bucket}.s3.eu-west-1.amazonaws.com/{build}/binaries/dstack-runner-linux-amd64"',

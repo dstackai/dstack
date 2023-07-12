@@ -515,7 +515,6 @@ func (ex *Executor) environment(ctx context.Context, includeRun bool) []string {
 		env.AddMapString(job.RunEnvironment)
 		env.AddMapString(cons)
 	}
-	env.AddMapString(job.Environment)
 	secrets, err := ex.backend.Secrets(ctx)
 	if err != nil {
 		log.Error(ctx, "Fail fetching secrets", "err", err)
@@ -629,7 +628,7 @@ func (ex *Executor) newSpec(ctx context.Context, credPath string) (*container.Sp
 		Image:              job.Image,
 		RegistryAuthBase64: makeRegistryAuthBase64(username, password),
 		WorkDir:            path.Join("/workflow", job.WorkingDir),
-		Commands:           container.ShellCommands(job.Commands),
+		Commands:           container.ShellCommands(container.InsertEnvs(job.Commands, job.Environment)),
 		Entrypoint:         job.Entrypoint,
 		Env:                ex.environment(ctx, true),
 		Mounts:             uniqueMount(bindings),
