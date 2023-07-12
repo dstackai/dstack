@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"github.com/docker/docker/api/types/mount"
+	"github.com/docker/docker/pkg/jsonmessage"
 	"github.com/dstackai/dstack/runner/internal/environment"
 	"github.com/dstackai/dstack/runner/internal/models"
 	"io"
@@ -105,7 +106,7 @@ type DockerRuntime struct {
 
 func (r *Engine) Create(ctx context.Context, spec *Spec, logs io.Writer) (*DockerRuntime, error) {
 	log.Trace(ctx, "Start pull image")
-	err := r.pullImageIfAbsent(ctx, spec.Image, spec.RegistryAuthBase64)
+	err := r.pullImageIfAbsent(ctx, spec.Image, spec.RegistryAuthBase64, logs)
 	if err != nil {
 		log.Error(ctx, fmt.Sprintf("failed to download docker image: %s", err))
 		return nil, gerrors.Newf("failed to download docker image: %s", err)
@@ -265,7 +266,7 @@ func (r *DockerRuntime) Stop(ctx context.Context) error {
 	return nil
 }
 
-func (r *Engine) pullImageIfAbsent(ctx context.Context, image string, registryAuthBase64 string) error {
+func (r *Engine) pullImageIfAbsent(ctx context.Context, image string, registryAuthBase64 string, logs io.Writer) error {
 	if image == "" {
 		return gerrors.New("given image value is empty")
 	}
@@ -287,16 +288,23 @@ func (r *Engine) pullImageIfAbsent(ctx context.Context, image string, registryAu
 		return gerrors.Wrap(err)
 	}
 	defer func() { _ = reader.Close() }()
-	buf, err := io.ReadAll(reader)
-	if err != nil {
-		return gerrors.Wrap(err)
+
+	if logs != nil {
+		if err = jsonmessage.DisplayJSONMessagesStream(reader, logs, 0, false, nil); err != nil {
+			return gerrors.Wrap(err)
+		}
+	} else {
+		buf, err := io.ReadAll(reader)
+		if err != nil {
+			return gerrors.Wrap(err)
+		}
+		log.Trace(ctx, "Image pull stdout", "stdout", string(buf))
 	}
-	log.Trace(ctx, "Image pull stdout", "stdout", string(buf))
 	return nil
 }
 
-func (r *Engine) NewBuildSpec(ctx context.Context, job *models.Job, spec *Spec, secrets map[string]string, repoPath string) (*BuildSpec, error) {
-	err := r.pullImageIfAbsent(ctx, spec.Image, spec.RegistryAuthBase64)
+func (r *Engine) NewBuildSpec(ctx context.Context, job *models.Job, spec *Spec, secrets map[string]string, repoPath string, logs io.Writer) (*BuildSpec, error) {
+	err := r.pullImageIfAbsent(ctx, spec.Image, spec.RegistryAuthBase64, logs)
 	if err != nil {
 		return nil, gerrors.Wrap(err)
 	}

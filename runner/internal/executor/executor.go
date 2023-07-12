@@ -308,15 +308,6 @@ func (ex *Executor) runJob(ctx context.Context, erCh chan error, stoppedCh chan 
 	defer func() { _ = fileLog.Close() }()
 	allLogs := io.MultiWriter(logger, ex.streamLogs, fileLog)
 
-	_, isLocalBackend := ex.backend.(*localbackend.Local)
-	if isLocalBackend {
-		err := ex.warnOnLongImagePull(ctx, job.Image)
-		if err != nil {
-			erCh <- gerrors.Wrap(err)
-			return
-		}
-	}
-
 	log.Trace(ctx, "Building container", "mode", job.BuildPolicy)
 	job.Status = states.Building
 	if err = ex.backend.UpdateState(jctx); err != nil {
@@ -716,7 +707,7 @@ func (ex *Executor) build(ctx context.Context, spec *container.Spec, stoppedCh c
 	if err != nil {
 		return gerrors.Wrap(err)
 	}
-	buildSpec, err := ex.engine.NewBuildSpec(ctx, job, spec, secrets, path.Join(ex.backend.GetTMPDir(ctx), consts.RUNS_DIR, job.RunName, job.JobID))
+	buildSpec, err := ex.engine.NewBuildSpec(ctx, job, spec, secrets, path.Join(ex.backend.GetTMPDir(ctx), consts.RUNS_DIR, job.RunName, job.JobID), logs)
 	if err != nil {
 		return gerrors.Wrap(err)
 	}
