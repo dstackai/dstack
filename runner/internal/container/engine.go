@@ -312,7 +312,6 @@ func (r *Engine) NewBuildSpec(ctx context.Context, job *models.Job, spec *Spec, 
 	commands := append([]string{}, job.BuildCommands...)
 	commands = append(commands, job.OptionalBuildCommands...)
 	env := environment.New()
-	env.AddMapString(job.Environment)
 	env.AddMapString(secrets)
 
 	buildSpec := &BuildSpec{
@@ -321,7 +320,7 @@ func (r *Engine) NewBuildSpec(ctx context.Context, job *models.Job, spec *Spec, 
 		WorkDir:            spec.WorkDir,
 		ConfigurationPath:  job.ConfigurationPath,
 		ConfigurationType:  job.ConfigurationType,
-		Commands:           ShellCommands(commands),
+		Commands:           ShellCommands(InsertEnvs(commands, job.Environment)),
 		Entrypoint:         spec.Entrypoint,
 		Env:                env.ToSlice(),
 		RegistryAuthBase64: spec.RegistryAuthBase64,
@@ -451,6 +450,15 @@ func ShellCommands(commands []string) []string {
 		}
 	}
 	return []string{sb.String()}
+}
+
+// InsertEnvs allows interpolation of env variables (e.g. PATH=/foo/bar:$PATH)
+func InsertEnvs(commands []string, envs map[string]string) []string {
+	output := make([]string, 0)
+	for name, val := range envs {
+		output = append(output, fmt.Sprintf("export %s=%s", name, val))
+	}
+	return append(output, commands...)
 }
 
 func BytesToMiB(bytesCount int64) uint64 {
