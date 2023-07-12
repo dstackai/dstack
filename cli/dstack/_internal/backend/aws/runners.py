@@ -9,7 +9,12 @@ from botocore.client import BaseClient
 
 from dstack import version
 from dstack._internal.backend.aws import utils as aws_utils
-from dstack._internal.backend.base.compute import WS_PORT, NoCapacityError, choose_instance_type
+from dstack._internal.backend.base.compute import (
+    WS_PORT,
+    NoCapacityError,
+    choose_instance_type,
+    get_dstack_runner,
+)
 from dstack._internal.backend.base.config import BACKEND_CONFIG_FILENAME, RUNNER_CONFIG_FILENAME
 from dstack._internal.backend.base.runners import serialize_runner_yaml
 from dstack._internal.core.instance import InstanceType, LaunchedInstanceInfo
@@ -460,6 +465,7 @@ die() {{ status=$1; shift; echo "FATAL: $*"; exit $status; }}
 EC2_PUBLIC_HOSTNAME="`wget -q -O - http://169.254.169.254/latest/meta-data/public-hostname || die \"wget public-hostname has failed: $?\"`"
 echo "hostname: $EC2_PUBLIC_HOSTNAME" >> /root/.dstack/{RUNNER_CONFIG_FILENAME}
 mkdir ~/.ssh; chmod 700 ~/.ssh; echo "{ssh_key_pub}" > ~/.ssh/authorized_keys; chmod 600 ~/.ssh/authorized_keys
+{get_dstack_runner()}
 HOME=/root nohup dstack-runner --log-level 6 start --http-port {WS_PORT} &
 """
     return user_data

@@ -11,6 +11,7 @@ from dstack._internal.backend.base.compute import (
     Compute,
     NoCapacityError,
     choose_instance_type,
+    get_dstack_runner,
 )
 from dstack._internal.backend.base.config import BACKEND_CONFIG_FILENAME, RUNNER_CONFIG_FILENAME
 from dstack._internal.backend.base.runners import serialize_runner_yaml
@@ -446,6 +447,7 @@ echo '{config_content}' > /root/.dstack/{BACKEND_CONFIG_FILENAME}
 echo '{runner_content}' > /root/.dstack/{RUNNER_CONFIG_FILENAME}
 EXTERNAL_IP=`curl -H "Metadata-Flavor: Google" http://169.254.169.254/computeMetadata/v1/instance/network-interfaces/0/access-configs/0/external-ip`
 echo "hostname: $EXTERNAL_IP" >> /root/.dstack/{RUNNER_CONFIG_FILENAME}
+{get_dstack_runner()}
 HOME=/root nohup dstack-runner --log-level 6 start --http-port {WS_PORT}
 """
 

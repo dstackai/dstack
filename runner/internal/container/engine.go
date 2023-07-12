@@ -3,6 +3,7 @@ package container
 import (
 	"context"
 	"fmt"
+	"github.com/docker/docker/api/types/mount"
 	"github.com/dstackai/dstack/runner/internal/environment"
 	"github.com/dstackai/dstack/runner/internal/models"
 	"io"
@@ -326,6 +327,7 @@ func (r *Engine) NewBuildSpec(ctx context.Context, job *models.Job, spec *Spec, 
 		RegistryAuthBase64: spec.RegistryAuthBase64,
 		RepoPath:           repoPath,
 		RepoId:             job.RepoId,
+		ShmSize:            spec.ShmSize,
 	}
 	if daemonInfo.Architecture == "aarch64" {
 		buildSpec.Platform = "arm64"
@@ -336,7 +338,59 @@ func (r *Engine) NewBuildSpec(ctx context.Context, job *models.Job, spec *Spec, 
 }
 
 func (r *Engine) Build(ctx context.Context, spec *BuildSpec, imageName string, stoppedCh chan struct{}, logs io.Writer) error {
-	if err := BuildImage(ctx, r.client, spec, imageName, stoppedCh, logs); err != nil {
+	containerSpec := &Spec{
+		Image:              spec.BaseImageName,
+		RegistryAuthBase64: spec.RegistryAuthBase64,
+		WorkDir:            spec.WorkDir,
+		Commands:           spec.Commands,
+		Entrypoint:         spec.Entrypoint,
+		Env:                spec.Env,
+		ShmSize:            spec.ShmSize,
+		Mounts: []mount.Mount{
+			{
+				Type:     mount.TypeBind,
+				Source:   spec.RepoPath,
+				Target:   "/workflow",
+				ReadOnly: true,
+			},
+		},
+	}
+	dockerRuntime, err := r.Create(ctx, containerSpec, logs)
+	if err != nil {
+		return gerrors.Wrap(err)
+	}
+	if err = dockerRuntime.Run(ctx); err != nil {
+		return gerrors.Wrap(err)
+	}
+	defer func() {
+		_ = r.client.ContainerRemove(ctx, dockerRuntime.containerID, types.ContainerRemoveOptions{Force: true})
+	}()
+
+	statusCh, errCh := r.client.ContainerWait(ctx, dockerRuntime.containerID, container.WaitConditionNotRunning)
+	select {
+	// todo timeout
+	case err := <-errCh:
+		if err != nil {
+			return gerrors.Wrap(err)
+		}
+	case <-stoppedCh:
+		err := r.client.ContainerKill(ctx, dockerRuntime.containerID, "SIGTERM")
+		if err != nil {
+			return gerrors.Wrap(err)
+		}
+	case <-statusCh:
+	}
+
+	info, err := r.client.ContainerInspect(ctx, dockerRuntime.containerID)
+	if err != nil {
+		return gerrors.Wrap(err)
+	}
+	if info.State.ExitCode != 0 {
+		return gerrors.Wrap(ContainerExitedError{info.State.ExitCode})
+	}
+	log.Trace(ctx, "Committing build image", "image", imageName)
+	_, err = r.client.ContainerCommit(ctx, dockerRuntime.containerID, types.ContainerCommitOptions{Reference: imageName})
+	if err != nil {
 		return gerrors.Wrap(err)
 	}
 	return nil

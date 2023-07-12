@@ -38,7 +38,12 @@ from azure.mgmt.resource import ResourceManagementClient
 from dstack import version
 from dstack._internal.backend.azure import utils as azure_utils
 from dstack._internal.backend.azure.config import AzureConfig
-from dstack._internal.backend.base.compute import WS_PORT, Compute, choose_instance_type
+from dstack._internal.backend.base.compute import (
+    WS_PORT,
+    Compute,
+    choose_instance_type,
+    get_dstack_runner,
+)
 from dstack._internal.backend.base.config import BACKEND_CONFIG_FILENAME, RUNNER_CONFIG_FILENAME
 from dstack._internal.backend.base.runners import serialize_runner_yaml
 from dstack._internal.core.instance import InstanceType, LaunchedInstanceInfo
@@ -237,6 +242,7 @@ def _get_user_data_script(azure_config: AzureConfig, job: Job, instance_type: In
 mkdir -p /root/.dstack/
 echo '{config_content}' > /root/.dstack/{BACKEND_CONFIG_FILENAME}
 echo '{runner_content}' > /root/.dstack/{RUNNER_CONFIG_FILENAME}
+{get_dstack_runner()}
 HOME=/root nohup dstack-runner --log-level 6 start --http-port {WS_PORT}
 """
 
