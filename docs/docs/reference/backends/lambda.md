@@ -37,7 +37,9 @@ click the `Generate API key` button to create a new API key.
 
 ## 3. Create a project
 
-Now that you have AWS and Lambda credentials set up, log in to the Hub, open the `Projects` page, click `Add`, and select `Lambda` in the `Type` field.
+Now that you set up the Lambda Cloud API key, S3 bucket and AWS credentials, 
+log in to the server UI, open the `Projects` page, click `Add`, and select `Lambda` in
+the `Type` field.
 
 ![](../../../assets/images/dstack-hub-create-lambda-project.png){ width=800 }
 
@@ -45,12 +47,13 @@ Now that you have AWS and Lambda credentials set up, log in to the Hub, open the
 
 The following fields are required:
 
-- `API Key` - (Required) The API key for authenticating `dstack` with Lambda API
-- `Regions` - (Required) The regions where `dstack` will provision compute resources
-- `Storage` - (Required) The storage type that `dstack` will use to store state and artifacts
-- `Access key ID` - (Required) The Access key ID for authenticating `dstack` with S3
-- `Secret access key` - (Required) The Secret access key for authenticating `dstack` with S3
-- `Bucket` - (Required) The storage bucket that `dstack` will use to store state and artifacts
+- `API key` - (Required) The [API key] to authenticate `dstack` with Lambda Cloud
+- `Regions` - (Required) The list of regions where `dstack` may provision infrastructure. It is recommended
+to select as many regions as possible to maximize availability.
+- `Storage` - (Required) The storage provider that `dstack` will use to store the state and artifacts. Currently, only `AWS` is supported.
+- `Access key ID` - (Required) The [Access key ID](#13-create-an-access-key) to authenticate `dstack` with AWS
+- `Secret access key` - (Required) The [Secret access key](#13-create-an-access-key) to authenticate `dstack` with AWS
+- `Bucket` - (Required) The [S3 bucket](#11-create-an-s3-bucket) to store state and artifacts
 
 ## 4. Configure the CLI
 

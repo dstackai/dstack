@@ -176,7 +176,7 @@ You can use default credentials if you don't want to enter and store AWS credent
 
 ## 4. Create a project
 
-Now that you set up the AWS credentials, log in to the `Hub`, open the `Projects` page, click `Add`, and select `AWS` in
+Now that you set up the AWS bucket and credentials, log in to the server UI, open the `Projects` page, click `Add`, and select `AWS` in
 the `Type` field.
 
 ![](../../../assets/images/dstack-hub-create-aws-project.png){ width=800 }
