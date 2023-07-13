@@ -190,6 +190,10 @@ export const GCPBackend: React.FC<IProps> = ({ loading }) => {
             const file = new File([''], fileName, { type: 'text/plain' });
             setFiles([file]);
         }
+
+        return () => {
+            if (requestRef.current) requestRef.current.abort();
+        };
     }, []);
 
     const onChangeFormField = () => {

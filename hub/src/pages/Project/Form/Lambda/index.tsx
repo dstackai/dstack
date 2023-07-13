@@ -1,7 +1,7 @@
 import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { useFormContext } from 'react-hook-form';
 import { useTranslation } from 'react-i18next';
-import { debounce } from 'lodash';
+import { debounce, get as _get } from 'lodash';
 
 import {
     FormInput,
@@ -48,6 +48,13 @@ export const LambdaBackend: React.FC<IProps> = ({ loading }) => {
         if (!backendFormValues.api_key) {
             return;
         }
+
+        if (
+            backendFormValues?.storage_backend?.credentials &&
+            !_get(backendFormValues, FIELD_NAMES.STORAGE_BACKEND.CREDENTIALS.ACCESS_KEY) &&
+            !_get(backendFormValues, FIELD_NAMES.STORAGE_BACKEND.CREDENTIALS.SECRET_KEY)
+        )
+            backendFormValues.storage_backend.credentials = null;
 
         clearErrors('backend');
 
@@ -117,6 +124,10 @@ export const LambdaBackend: React.FC<IProps> = ({ loading }) => {
 
         changeFormHandler().catch(console.log);
         isFirstRender.current = false;
+
+        return () => {
+            if (requestRef.current) requestRef.current.abort();
+        };
     }, []);
 
     const debouncedChangeFormHandler = useCallback(debounce(changeFormHandler, 1000), []);

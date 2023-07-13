@@ -127,6 +127,10 @@ export const AWSBackend: React.FC<IProps> = ({ loading }) => {
 
         changeFormHandler().catch(console.log);
         isFirstRender.current = false;
+
+        return () => {
+            if (requestRef.current) requestRef.current.abort();
+        };
     }, []);
 
     const debouncedChangeFormHandler = useCallback(debounce(changeFormHandler, 1000), []);

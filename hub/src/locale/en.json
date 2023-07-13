@@ -154,8 +154,8 @@
         "regions_description": "Select regions to run workflows and store artifacts",
         "regions_placeholder": "Select regions",
         "storage_backend": {
-          "type": "Type",
-          "type_description": "Type of backend storage",
+          "type": "Storage",
+          "type_description": "Backend storage",
           "type_placeholder": "Select type",
           "credentials": {
             "access_key_id": "Access key ID",

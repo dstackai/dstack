@@ -88,7 +88,6 @@ declare interface IProjectLambdaBackendValues {
         bucket_name: null | {
             selected?: string,
             values: { value: string, label: string}[]
-            // values: TAwsBucket[]
         }
     },
 }

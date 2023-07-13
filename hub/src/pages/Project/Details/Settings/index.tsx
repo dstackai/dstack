@@ -13,7 +13,7 @@ import { useDeleteProjectsMutation, useGetProjectQuery, useUpdateProjectMembersM
 import { selectAuthToken, selectUserData } from 'App/slice';
 
 import { ProjectMembers } from '../../Members';
-import { getProjectRoleByUserName } from '../../utils';
+import { getLambdaStorageTypeLabel, getProjectRoleByUserName } from '../../utils';
 
 import { BackendTypesEnum } from '../../Form/types';
 
@@ -189,7 +189,7 @@ export const ProjectSettings: React.FC = () => {
 
                 <div>
                     <Box variant="awsui-key-label">{t('projects.edit.lambda.storage_backend.type')}</Box>
-                    <div>{data.backend.storage_backend.type}</div>
+                    <div>{getLambdaStorageTypeLabel(data.backend.storage_backend.type)}</div>
                 </div>
 
                 <div>

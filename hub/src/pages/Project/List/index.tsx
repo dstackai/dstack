@@ -8,6 +8,8 @@ import { useBreadcrumbs, useCollection } from 'hooks';
 import { ROUTES } from 'routes';
 import { useGetProjectsQuery } from 'services/project';
 
+import { BackendTypesEnum } from '../Form/types';
+
 interface IProjectSettingsNodeProps {
     settingsKey: string;
     settingsValue: string;
@@ -15,8 +17,11 @@ interface IProjectSettingsNodeProps {
 
 export const ProjectSettingsNode: React.FC<IProjectSettingsNodeProps> = ({ settingsKey, settingsValue }) => {
     return (
-        <div style={{ display: 'flex', justifyContent: 'space-between' }}>
-            <div>{settingsKey}:</div> {settingsValue}
+        <div style={{ display: 'flex', justifyContent: 'space-between', gap: '10px' }}>
+            <div>{settingsKey}:</div>{' '}
+            <span style={{ whiteSpace: 'nowrap', textOverflow: 'ellipsis', overflow: 'hidden' }} title={settingsValue}>
+                {settingsValue}
+            </span>
         </div>
     );
 };
@@ -70,25 +75,35 @@ export const ProjectList: React.FC = () => {
 
     const getProjectSettings = (project: IProject) => {
         switch (project.backend.type) {
-            case 'aws':
+            case BackendTypesEnum.AWS:
                 return (
                     <div>
                         <ProjectSettingsNode settingsKey="Region" settingsValue={project.backend.region_name_title} />
                         <ProjectSettingsNode settingsKey="Bucket" settingsValue={project.backend.s3_bucket_name} />
                     </div>
                 );
-            case 'azure':
+
+            case BackendTypesEnum.AZURE:
                 return (
                     <div>
                         <ProjectSettingsNode settingsKey="Location" settingsValue={project.backend.location} />
                         <ProjectSettingsNode settingsKey="Storage account" settingsValue={project.backend.storage_account} />
                     </div>
                 );
-            case 'gcp':
+
+            case BackendTypesEnum.GCP:
                 return (
                     <div>
                         <ProjectSettingsNode settingsKey="Region" settingsValue={project.backend.region} />
                         <ProjectSettingsNode settingsKey="Bucket" settingsValue={project.backend.bucket_name} />
+                    </div>
+                );
+
+            case BackendTypesEnum.LAMBDA:
+                return (
+                    <div>
+                        <ProjectSettingsNode settingsKey="Regions" settingsValue={project.backend.regions.join(', ')} />
+                        <ProjectSettingsNode settingsKey="Bucket" settingsValue={project.backend.storage_backend.bucket_name} />
                     </div>
                 );
             case 'local':
