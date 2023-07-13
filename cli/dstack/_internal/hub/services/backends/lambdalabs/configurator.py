@@ -42,7 +42,6 @@ REGIONS = [
     "me-west-1",
     "europe-south-1",
     "asia-northeast-1",
-    "asia-northeast-1",
 ]
 
 
@@ -155,7 +154,7 @@ class LambdaConfigurator(Configurator):
                         fields=[["regions"]],
                     )
         element = ProjectMultiElement(
-            selected=selected or REGIONS,
+            selected=selected or [],
             values=[ProjectElementValue(value=r, label=r) for r in REGIONS],
         )
         return element
