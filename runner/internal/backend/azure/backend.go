@@ -172,7 +172,7 @@ func (azbackend *AzureBackend) CreateLogger(ctx context.Context, logGroup, logNa
 		azbackend.config.StorageAccount,
 	)
 	logger := NewAzureLogger(loggingClient, azbackend.state.Job.JobID, logGroup, logName)
-	logger.Launch(ctx)
+	_ = logger.Launch(ctx)
 	return logger
 }
 

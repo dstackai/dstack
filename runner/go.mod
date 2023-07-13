@@ -136,5 +136,3 @@ require (
 	gopkg.in/yaml.v3 v3.0.1
 	modernc.org/sqlite v1.20.3
 )
-
-replace github.com/kahing/goofys => github.com/dstackai/goofys v0.24.1-0.20211210032445-aae1cc43d188

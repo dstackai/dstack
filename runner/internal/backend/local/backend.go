@@ -57,12 +57,12 @@ func init() {
 }
 
 func New(namespace string) *Local {
-	path := filepath.Join(common.HomeDir(), consts.DSTACK_DIR_PATH, LOCAL_BACKEND_DIR, namespace)
+	storagePath := filepath.Join(common.HomeDir(), consts.DSTACK_DIR_PATH, LOCAL_BACKEND_DIR, namespace)
 	return &Local{
 		namespace: namespace,
-		path:      path,
-		storage:   NewLocalStorage(path),
-		cliSecret: NewClientSecret(path),
+		path:      storagePath,
+		storage:   NewLocalStorage(storagePath),
+		cliSecret: NewClientSecret(storagePath),
 	}
 }
 

@@ -71,7 +71,7 @@ func start(logLevel int, httpPort int, configDir string) {
 	if err != nil {
 		return
 	}
-	defer fileLog.Close()
+	defer func() { _ = fileLog.Close() }()
 	log.L.Logger.SetOutput(io.MultiWriter(os.Stdout, fileLog))
 
 	logCtx := log.WithLogger(ctx, log.L)
