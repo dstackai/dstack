@@ -15,6 +15,8 @@ import { selectAuthToken, selectUserData } from 'App/slice';
 import { ProjectMembers } from '../../Members';
 import { getProjectRoleByUserName } from '../../utils';
 
+import { BackendTypesEnum } from '../../Form/types';
+
 import styles from './styles.module.scss';
 
 export const ProjectSettings: React.FC = () => {
@@ -170,6 +172,34 @@ export const ProjectSettings: React.FC = () => {
         );
     };
 
+    const renderLambdaBackendDetails = (): React.ReactNode => {
+        if (!data) return null;
+
+        return (
+            <ColumnLayout columns={4} variant="text-grid">
+                <div>
+                    <Box variant="awsui-key-label">{t('projects.edit.backend_type')}</Box>
+                    <div>{t(`projects.backend_type.${data.backend.type}`)}</div>
+                </div>
+
+                <div>
+                    <Box variant="awsui-key-label">{t('projects.edit.lambda.regions')}</Box>
+                    <div>{data.backend.regions.join(', ')}</div>
+                </div>
+
+                <div>
+                    <Box variant="awsui-key-label">{t('projects.edit.lambda.storage_backend.type')}</Box>
+                    <div>{data.backend.storage_backend.type}</div>
+                </div>
+
+                <div>
+                    <Box variant="awsui-key-label">{t('projects.edit.lambda.storage_backend.s3_bucket_name')}</Box>
+                    <div>{data.backend.storage_backend.bucket_name}</div>
+                </div>
+            </ColumnLayout>
+        );
+    };
+
     const renderLocalBackendDetails = (): React.ReactNode => {
         if (!data) return null;
 
@@ -190,14 +220,17 @@ export const ProjectSettings: React.FC = () => {
 
     const renderBackendDetails = () => {
         switch (data?.backend.type) {
-            case 'aws': {
+            case BackendTypesEnum.AWS: {
                 return renderAwsBackendDetails();
             }
-            case 'azure': {
+            case BackendTypesEnum.AZURE: {
                 return renderAzureBackendDetails();
             }
-            case 'gcp': {
+            case BackendTypesEnum.GCP: {
                 return renderGCPBackendDetails();
+            }
+            case BackendTypesEnum.LAMBDA: {
+                return renderLambdaBackendDetails();
             }
             case 'local': {
                 return renderLocalBackendDetails();
