@@ -12,8 +12,7 @@ from dstack._internal.core.repo import RepoRef
 from dstack._internal.core.run import RunHead
 from dstack._internal.hub.db.models import User
 from dstack._internal.hub.models import RunsDelete, RunsGetPlan, RunsList, RunsStop
-from dstack._internal.hub.routers.cache import get_backend
-from dstack._internal.hub.routers.util import error_detail, get_project
+from dstack._internal.hub.routers.util import error_detail, get_backend, get_project
 from dstack._internal.hub.security.permissions import Authenticated, ProjectMember
 from dstack._internal.hub.utils.common import run_async
 

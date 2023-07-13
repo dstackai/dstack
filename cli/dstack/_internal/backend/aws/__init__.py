@@ -1,5 +1,6 @@
 from typing import Optional
 
+import botocore.exceptions
 from boto3 import Session
 
 from dstack._internal.backend.aws import utils as aws_utils
@@ -10,6 +11,7 @@ from dstack._internal.backend.aws.secrets import AWSSecretsManager
 from dstack._internal.backend.aws.storage import AWSStorage
 from dstack._internal.backend.base import ComponentBasedBackend
 from dstack._internal.backend.base import runs as base_runs
+from dstack._internal.core.error import BackendAuthError
 
 
 class AwsBackend(ComponentBasedBackend):
@@ -46,6 +48,7 @@ class AwsBackend(ComponentBasedBackend):
             logs_client=aws_utils.get_logs_client(self._session),
             bucket_name=self.backend_config.bucket_name,
         )
+        self._check_credentials()
 
     @classmethod
     def load(cls) -> Optional["AwsBackend"]:
@@ -73,3 +76,9 @@ class AwsBackend(ComponentBasedBackend):
             aws_utils.get_logs_client(self._session), self.backend_config.bucket_name, repo_id
         )
         return base_runs.create_run(self._storage)
+
+    def _check_credentials(self):
+        try:
+            self.list_repo_heads()
+        except (botocore.exceptions.ClientError, botocore.exceptions.NoCredentialsError):
+            raise BackendAuthError()

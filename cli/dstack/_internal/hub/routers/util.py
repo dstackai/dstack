@@ -2,8 +2,11 @@ from typing import Dict, Optional
 
 from fastapi import HTTPException, status
 
+from dstack._internal.backend.base import Backend
+from dstack._internal.core.error import BackendAuthError
 from dstack._internal.hub.models import Project
 from dstack._internal.hub.repository.projects import ProjectManager
+from dstack._internal.hub.services.backends import cache as backends_cache
 from dstack._internal.hub.services.backends import get_configurator
 from dstack._internal.hub.services.backends.base import Configurator
 
@@ -17,6 +20,16 @@ async def get_project(project_name: str) -> Project:
         )
     _check_backend_avaialble(project)
     return project
+
+
+async def get_backend(project: Project) -> Optional[Backend]:
+    try:
+        return await backends_cache.get_backend(project)
+    except BackendAuthError:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=error_detail(BackendAuthError.message, code=BackendAuthError.code),
+        )
 
 
 def get_backend_configurator(backend_type: str) -> Configurator:
