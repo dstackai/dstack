@@ -12,7 +12,6 @@ from dstack._internal.hub.models import (
     ProjectValues,
 )
 from dstack._internal.hub.repository.projects import ProjectManager
-from dstack._internal.hub.routers.cache import clear_backend_cache
 from dstack._internal.hub.routers.util import error_detail, get_backend_configurator, get_project
 from dstack._internal.hub.security.permissions import (
     Authenticated,
@@ -21,6 +20,7 @@ from dstack._internal.hub.security.permissions import (
     ensure_user_project_admin,
 )
 from dstack._internal.hub.services.backends.base import BackendConfigError
+from dstack._internal.hub.services.backends.cache import clear_backend_cache
 from dstack._internal.hub.utils.common import run_async
 
 router = APIRouter(prefix="/api/projects", tags=["project"])

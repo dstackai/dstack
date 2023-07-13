@@ -4,8 +4,7 @@ from dstack._internal.core.build import BuildNotFoundError
 from dstack._internal.core.error import NoMatchingInstanceError
 from dstack._internal.core.job import Job, JobStatus
 from dstack._internal.hub.models import StopRunners
-from dstack._internal.hub.routers.cache import get_backend
-from dstack._internal.hub.routers.util import error_detail, get_project
+from dstack._internal.hub.routers.util import error_detail, get_backend, get_project
 from dstack._internal.hub.security.permissions import ProjectMember
 from dstack._internal.hub.utils.common import run_async
 

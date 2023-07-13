@@ -1,6 +1,7 @@
 from typing import Optional
 
 from azure.core.credentials import TokenCredential
+from azure.core.exceptions import ClientAuthenticationError
 from azure.identity import ClientSecretCredential, DefaultAzureCredential
 
 from dstack._internal.backend.azure.compute import AzureCompute
@@ -9,6 +10,7 @@ from dstack._internal.backend.azure.logs import AzureLogging
 from dstack._internal.backend.azure.secrets import AzureSecretsManager
 from dstack._internal.backend.azure.storage import AzureStorage
 from dstack._internal.backend.base import ComponentBasedBackend
+from dstack._internal.core.error import BackendAuthError
 
 
 class AzureBackend(ComponentBasedBackend):
@@ -25,24 +27,27 @@ class AzureBackend(ComponentBasedBackend):
                 )
             else:
                 credential = DefaultAzureCredential()
-        self._secrets_manager = AzureSecretsManager(
-            credential=credential,
-            vault_url=self.backend_config.vault_url,
-        )
-        self._storage = AzureStorage(
-            credential=credential,
-            storage_account=self.backend_config.storage_account,
-        )
-        self._compute = AzureCompute(
-            credential=credential,
-            azure_config=self.backend_config,
-        )
-        self._logging = AzureLogging(
-            credential=credential,
-            subscription_id=self.backend_config.subscription_id,
-            resource_group=self.backend_config.resource_group,
-            storage_account=self.backend_config.storage_account,
-        )
+        try:
+            self._secrets_manager = AzureSecretsManager(
+                credential=credential,
+                vault_url=self.backend_config.vault_url,
+            )
+            self._storage = AzureStorage(
+                credential=credential,
+                storage_account=self.backend_config.storage_account,
+            )
+            self._compute = AzureCompute(
+                credential=credential,
+                azure_config=self.backend_config,
+            )
+            self._logging = AzureLogging(
+                credential=credential,
+                subscription_id=self.backend_config.subscription_id,
+                resource_group=self.backend_config.resource_group,
+                storage_account=self.backend_config.storage_account,
+            )
+        except ClientAuthenticationError:
+            raise BackendAuthError()
 
     @classmethod
     def load(cls) -> Optional["AzureBackend"]:

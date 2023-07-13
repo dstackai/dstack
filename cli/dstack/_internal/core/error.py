@@ -7,8 +7,12 @@ class DstackError(Exception):
 
 
 class BackendError(DstackError):
-    def __init__(self, message: Optional[str] = None):
-        self.message = message
+    pass
+
+
+class BackendAuthError(BackendError):
+    code = "invalid_backend_credentials"
+    message = "Backend credentials are invalid"
 
 
 class NoMatchingInstanceError(BackendError):

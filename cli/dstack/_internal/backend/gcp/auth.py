@@ -5,11 +5,12 @@ from typing import Dict
 import google.auth
 import googleapiclient.discovery
 import googleapiclient.errors
+from google.auth.exceptions import DefaultCredentialsError
 from google.oauth2 import service_account
 
 from dstack._internal.backend.gcp import utils as gcp_utils
 from dstack._internal.backend.gcp.config import GCPConfig
-from dstack._internal.core.error import BackendError
+from dstack._internal.core.error import BackendAuthError, BackendError
 
 
 class NotEnoughPermissionError(BackendError):
@@ -21,7 +22,10 @@ def authenticate(backend_config: GCPConfig):
         return service_account.Credentials.from_service_account_info(
             json.loads(backend_config.credentials["data"])
         )
-    default_credentials, _ = google.auth.default()
+    try:
+        default_credentials, _ = google.auth.default()
+    except DefaultCredentialsError:
+        raise BackendAuthError()
     service_account_email = backend_config.credentials["service_account_email"]
     iam_service = googleapiclient.discovery.build("iam", "v1", credentials=default_credentials)
 

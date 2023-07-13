@@ -1,4 +1,3 @@
-import json
 from typing import Optional
 
 from dstack._internal.backend.base import Backend

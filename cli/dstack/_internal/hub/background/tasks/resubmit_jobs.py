@@ -1,13 +1,17 @@
 from typing import List
 
 from dstack._internal.backend.base import Backend
+from dstack._internal.core.error import BackendAuthError
 from dstack._internal.core.job import JobStatus
 from dstack._internal.hub.db.models import Project
 from dstack._internal.hub.repository.projects import ProjectManager
-from dstack._internal.hub.routers.cache import get_backend
 from dstack._internal.hub.services.backends import get_configurator
+from dstack._internal.hub.services.backends.cache import get_backend
 from dstack._internal.hub.utils.common import run_async
 from dstack._internal.utils.common import get_milliseconds_since_epoch
+from dstack._internal.utils.logging import get_logger
+
+logger = get_logger(__name__)
 
 RESUBMISSION_INTERVAL = 60
 
@@ -19,11 +23,19 @@ async def resubmit_jobs():
 
 async def _resubmit_projects_jobs(projects: List[Project]):
     for project in projects:
-        backend = await get_backend(project)
-        configurator = get_configurator(backend)
+        logger.info("Resubmitting jobs for %s project", project.name)
+        try:
+            backend = await get_backend(project)
+        except BackendAuthError:
+            logger.warning(
+                "Credentials for %s project are invalid. Skipping job resubmission.", project.name
+            )
+            continue
+        configurator = get_configurator(backend.name)
         if configurator is None:
             continue
         await run_async(_resubmit_backend_jobs, backend)
+        logger.info("Finished resubmitting jobs for %s project", project.name)
 
 
 def _resubmit_backend_jobs(backend: Backend):
@@ -59,3 +71,4 @@ def _resubmit_backend_jobs(backend: Backend):
                             job=job,
                             failed_to_start_job_new_status=JobStatus.FAILED,
                         )
+                    logger.info("Resubmitted job %s", job.job_id)
