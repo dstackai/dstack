@@ -27,7 +27,7 @@ func (sm *ClientSecret) fetchSecret(_ context.Context, path string, secrets map[
 	if err != nil {
 		return nil, gerrors.Wrap(err)
 	}
-	defer db.Close()
+	defer func() { _ = db.Close() }()
 	stmt, err := db.Prepare("SELECT secret_string FROM KV WHERE secret_name=?")
 	if err != nil {
 		return nil, gerrors.Wrap(err)
@@ -56,7 +56,7 @@ func (sm *ClientSecret) fetchCredentials(ctx context.Context, repoId string) *mo
 		log.Error(ctx, "Connecting database. Credentials Local", "RepoId", repoId, "err", err)
 		return nil
 	}
-	defer db.Close()
+	defer func() { _ = db.Close() }()
 	rows, err := db.Query("SELECT secret_string FROM KV WHERE secret_name=?", fmt.Sprintf("/dstack/credentials/%s", repoId))
 	if err != nil {
 		log.Error(ctx, "Fetching value credentials Local", "RepoId", repoId, "err", err)

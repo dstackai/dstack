@@ -13,7 +13,7 @@ func ExtractArchive(ctx context.Context, src, dst string) error {
 	if err != nil {
 		return gerrors.Wrap(err)
 	}
-	defer file.Close()
+	defer func() { _ = file.Close() }()
 	log.Trace(ctx, "Extracting archive", "src", src, "dst", dst)
 	if err := extract.Archive(ctx, file, dst, nil); err != nil {
 		return gerrors.Wrap(err)

@@ -6,7 +6,7 @@ import (
 	"fmt"
 	"github.com/dstackai/dstack/runner/internal/container"
 	"io"
-	"io/ioutil"
+	"os"
 	"path"
 	"strings"
 	"time"
@@ -45,7 +45,7 @@ func init() {
 	backend.RegisterBackend("aws", func(ctx context.Context, pathConfig string) (backend.Backend, error) {
 		file := File{}
 		log.Trace(ctx, "Read config file", "path", pathConfig)
-		theConfig, err := ioutil.ReadFile(pathConfig)
+		theConfig, err := os.ReadFile(pathConfig)
 		if err != nil {
 			return nil, gerrors.Wrap(err)
 		}

@@ -6,7 +6,6 @@ import (
 	"github.com/dstackai/dstack/runner/internal/backend/base"
 	"github.com/dstackai/dstack/runner/internal/container"
 	"io"
-	"io/ioutil"
 	"os"
 	"path/filepath"
 	"sync"
@@ -76,7 +75,7 @@ func New(ctx context.Context, path string) (Backend, error) {
 	if _, err := os.Stat(filepath.Join(path)); err != nil {
 		return DefaultBackend, nil
 	}
-	theConfig, err := ioutil.ReadFile(path)
+	theConfig, err := os.ReadFile(path)
 	if err != nil {
 		return nil, gerrors.Wrap(err)
 	}

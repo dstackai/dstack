@@ -6,7 +6,6 @@ import (
 	"github.com/dstackai/dstack/runner/internal/backend/base"
 	"github.com/dstackai/dstack/runner/internal/container"
 	"io"
-	"io/ioutil"
 	"os"
 	"path"
 	"path/filepath"
@@ -43,7 +42,7 @@ const LOCAL_BACKEND_DIR = "local_backend"
 func init() {
 	backend.RegisterBackend("local", func(ctx context.Context, pathConfig string) (backend.Backend, error) {
 		config := LocalConfigFile{}
-		fileContent, err := ioutil.ReadFile(pathConfig)
+		fileContent, err := os.ReadFile(pathConfig)
 		if err != nil {
 			fmt.Println("[ERROR]", err.Error())
 			return nil, err
@@ -58,12 +57,12 @@ func init() {
 }
 
 func New(namespace string) *Local {
-	path := filepath.Join(common.HomeDir(), consts.DSTACK_DIR_PATH, LOCAL_BACKEND_DIR, namespace)
+	storagePath := filepath.Join(common.HomeDir(), consts.DSTACK_DIR_PATH, LOCAL_BACKEND_DIR, namespace)
 	return &Local{
 		namespace: namespace,
-		path:      path,
-		storage:   NewLocalStorage(path),
-		cliSecret: NewClientSecret(path),
+		path:      storagePath,
+		storage:   NewLocalStorage(storagePath),
+		cliSecret: NewClientSecret(storagePath),
 	}
 }
 

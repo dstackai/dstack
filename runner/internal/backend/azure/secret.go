@@ -40,7 +40,9 @@ func (azsecret AzureSecretManager) FetchCredentials(ctx context.Context, repoId 
 	if err != nil {
 		return nil, gerrors.Wrap(err)
 	}
-	json.Unmarshal([]byte(data), &creds)
+	if err = json.Unmarshal([]byte(data), &creds); err != nil {
+		return nil, gerrors.Wrap(err)
+	}
 	return &creds, nil
 }
 

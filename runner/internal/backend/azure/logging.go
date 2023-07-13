@@ -185,7 +185,7 @@ func (azlogger *AzureLogger) doFlush() {
 	if len(azlogger.logBuff) == 0 {
 		return
 	}
-	azlogger.writeLogs(azlogger.logBuff)
+	_ = azlogger.writeLogs(azlogger.logBuff)
 	azlogger.logBuff = azlogger.logBuff[:0]
 }
 
