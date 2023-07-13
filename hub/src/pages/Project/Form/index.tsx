@@ -63,6 +63,7 @@ export const ProjectForm: React.FC<IProps> = ({ initialValues, onCancel, loading
     const { handleSubmit, control, watch, setError, reset, clearErrors } = formMethods;
 
     const backendType = watch('backend.type');
+    const backendTemp = watch('backend');
     const projectNameValue = watch('project_name');
 
     const backendOptions: TBackendOption[] = useMemo(() => {
@@ -113,7 +114,11 @@ export const ProjectForm: React.FC<IProps> = ({ initialValues, onCancel, loading
                 type: value as TProjectBackendType,
             },
         });
+
+        console.log('Reset');
     };
+
+    console.log('backendTemp', backendTemp);
 
     const renderUnsupportedBackedMessage = (backendName: string, backendTypeName: BackendTypesEnum) => {
         return (
