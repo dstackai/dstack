@@ -673,7 +673,7 @@ def _make_hub_request(request_func, host, *args, **kwargs) -> requests.Response:
         elif resp.status_code == 500:
             url = kwargs.get("url")
             raise HubClientError(
-                f"Got 500 Server Error from hub: {url}. Check hub logs for details."
+                f"Got 500 Server Error from hub: {url}. Check server logs for details."
             )
         return resp
     except requests.ConnectionError:
