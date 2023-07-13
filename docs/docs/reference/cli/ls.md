@@ -31,6 +31,6 @@ One of the following arguments is required:
 
 The following arguments are optional:
 
--  `--project PROJECT` – (Optional) The name of the Hub project to execute the command for
+-  `--project PROJECT` – (Optional) The name of the project to execute the command for
 - `-r`, `--recursive` – (Optional) Show all files recursively
 - `SEARCH_PREFIX` – (Optional) Show files starting with prefix

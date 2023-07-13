@@ -38,7 +38,7 @@ Positional Arguments:
   VALUE              The value of the secret
 
 Optional Arguments:
-  --project PROJECT  The name of the Hub project to execute the command for
+  --project PROJECT  The name of the project to execute the command for
   -y, --yes          Don't ask for confirmation
 ```
 
@@ -52,7 +52,7 @@ The following arguments are required:
 
 The following arguments are optional:
 
-- `--project PROJECT` - (Optional) The name of the Hub project to execute the command for
+- `--project PROJECT` - (Optional) The name of the project to execute the command for
 -  `-y`, `--yes` – (Optional) Don't ask for confirmation 
 - `VALUE` – (Optional) The value of the secret. If not specified, dstack prompts the user to enter it via a masked input.
 
@@ -73,7 +73,7 @@ Positional Arguments:
   NAME               The name of the secret
 
 Optional Arguments:
-  --project PROJECT  The name of the Hub project to execute the command for
+  --project PROJECT  The name of the project to execute the command for
   -y, --yes          Don't ask for confirmation
 ```
 
@@ -87,5 +87,5 @@ The following arguments are required:
 
 The following arguments are optional:
 
-- `--project PROJECT` - (Optional) The name of the Hub project to execute the command for
+- `--project PROJECT` - (Optional) The name of the project to execute the command for
 - `-y`, `--yes` – (Optional) Don't ask for confirmation 

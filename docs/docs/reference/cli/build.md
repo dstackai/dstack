@@ -32,5 +32,5 @@ The following arguments are optional:
 
 - `-f FILE`, `--f FILE` – (Optional) The path to the run configuration file. Defaults to `WORKING_DIR/.dstack.yml`.
 - `--project PROJECT` – (Optional) The name of the project
-- `--project PROJECT` – (Optional) The name of the profile
+- `--profile PROFILE` – (Optional) The name of the profile
 - `ARGS` – (Optional) Use `ARGS` to pass custom run arguments

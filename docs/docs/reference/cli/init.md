@@ -17,7 +17,7 @@ $ dstack init --help
 Usage: dstack init [-h] [--project PROJECT] [-t OAUTH_TOKEN] [--git-identity SSH_PRIVATE_KEY] [--ssh-identity SSH_PRIVATE_KEY]
 
 Options:
-  --project PROJECT     The Hub project to execute the command for
+  --project PROJECT     The project to execute the command for
   -t, --token OAUTH_TOKEN
                         An authentication token for Git
   --git-identity SSH_PRIVATE_KEY
@@ -32,7 +32,7 @@ Options:
 
 The following arguments are optional:
 
-- `-project PROJECT` – (Optional) The Hub project to execute the command for
+- `-project PROJECT` – (Optional) The project to execute the command for
 - `-t OAUTH_TOKEN`, `--token OAUTH_TOKEN` – (Optional) An authentication token for GitHub
 - `--git-identity SSH_PRIVATE_KEY` – (Optional) A path to the private SSH key file for non-public repositories
 - `--ssh-identity SSH_PRIVATE_KEY` – (Optional) A path to the private SSH key file for SSH port forwarding 

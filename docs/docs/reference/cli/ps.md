@@ -14,7 +14,7 @@ Positional Arguments:
   RUN                The name of the run
 
 Options:
-  --project PROJECT  The name of the Hub project to execute the command for
+  --project PROJECT  The name of the project to execute the command for
   -a, --all          Show all runs. By default, it only shows unfinished runs or the last finished.
   -v, --verbose      Show more information about runs
   -w, --watch        Watch statuses of runs in realtime
@@ -34,6 +34,6 @@ The following arguments are optional and mutually exclusive:
 
 The following arguments are optional:
 
--  `--project PROJECT` – (Optional) The name of the Hub project to execute the command for
+-  `--project PROJECT` – (Optional) The name of the project to execute the command for
 - `-v`, `--verbose` – (Optional) Show more information about runs
 - `-w`, `--watch` - (Optional) Watch statuses of runs in realtime

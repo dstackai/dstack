@@ -14,7 +14,7 @@ Positional Arguments:
   RUN                The name of the run
 
 Optional Arguments:
-  --project PROJECT  The name of the Hub project to execute the command for
+  --project PROJECT  The name of the project to execute the command for
   -a, --all          Stop all unfinished runs
   -x, --abort        Don't wait for a graceful stop and abort the run immediately
   -y, --yes          Don't ask for confirmation
@@ -31,6 +31,6 @@ One of the following arguments is required:
 
 The following arguments are optional:
 
-- `--project PROJECT` - (Optional) The name of the Hub project to execute the command for
+- `--project PROJECT` - (Optional) The name of the project to execute the command for
 -  `-x`, `--abort` – (Optional) Don't wait for a graceful stop and abort the run immediately 
 -  `-y`, `--yes` – (Optional) Don't ask for confirmation 

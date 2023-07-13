@@ -14,7 +14,7 @@ Positional Arguments:
   RUN                   The name of the run
 
 Optional Arguments:
-  --project PROJECT     The name of the Hub project to execute the command for
+  --project PROJECT     The name of the project to execute the command for
   -d, --diagnose        Show diagnostic logs
   -s, --since SINCE     From what time to begin displaying logs. By default, logs will be
                         displayed starting from 24 hours in the past. The value provided can be an
@@ -32,7 +32,7 @@ The following arguments are required:
 
 The following arguments are optional:
 
-- `--project PROJECT` - (Optional) The name of the Hub project to execute the command for
+- `--project PROJECT` - (Optional) The name of the project to execute the command for
 - `-d`, `--diagnose` - (Optional) Show diagnostic logs
 - `-s SINCE`, `--since SINCE` – (Optional) From what time to begin displaying logs. By default, logs will be displayed
   starting from 24 hours in the past. The value provided can be an ISO 8601 timestamp or a

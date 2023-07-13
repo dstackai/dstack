@@ -31,4 +31,4 @@ The following arguments are required:
 The following arguments are optional:
 
 - `-f FILE`, `--f FILE` – (Optional) The path to the run configuration file. Defaults to `WORKING_DIR/.dstack.yml`.
-- `--project PROJECT` - (Optional) The name of the Hub project to execute the command for
+- `--project PROJECT` - (Optional) The name of the project to execute the command for
