@@ -119,7 +119,7 @@ setup(
     project_urls={
         "Source": "https://github.com/dstackai/dstack",
     },
-    description="dstack is an open-source tool designed to enhance the efficiency of running ML workloads in the cloud.",
+    description="dstack is an open-source tool that simplifies LLM development across multiple clouds.",
     long_description=get_long_description(),
     long_description_content_type="text/markdown",
     python_requires=">=3.7",

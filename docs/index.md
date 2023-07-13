@@ -1,6 +1,6 @@
 ---
 template: home.html
-title: Cost-effective ML development in your cloud
+title: Cost-effective LLM development
 hide:
    - navigation
    - toc

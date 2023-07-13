@@ -3,7 +3,7 @@ site_name: dstack
 site_url: https://dstack.ai
 site_author: dstack GmbH
 site_description: >-
-  dstack is an open-source tool designed to enhance the efficiency of running ML workloads in the cloud.
+  dstack is an open-source tool that simplifies LLM development across multiple clouds.
 
 # Repository
 repo_url: https://github.com/dstackai/dstack
@@ -142,7 +142,7 @@ nav:
           - Installation:
               - pip: docs/installation/pip.md
               - Docker: docs/installation/docker.md
-              - Hugging Face Spaces: docs/installation/hf-spaces.md
+              - HG Spaces: docs/installation/hf-spaces.md
       - Guides:
           - Dev environments: docs/guides/dev-environments.md
           - Tasks: docs/guides/tasks.md

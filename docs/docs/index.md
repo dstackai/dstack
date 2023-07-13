@@ -17,11 +17,9 @@ The server is available at http://127.0.0.1:3000?token=b934d226-e24a-4eab-eb92b3
 
 </div>
 
-On startup, the server sets up a default project that runs everything locally. 
-
 !!! info "Projects"
-
-    To run dev environments and tasks in your cloud, log into the UI, create the corresponding project, 
+    On startup, the server sets up a default project that runs everything locally. 
+    To run workloads in your cloud, log into the UI, create the corresponding project, 
     and [configure](guides/projects) the CLI to use it.
 
 ## Initialization

@@ -9,11 +9,11 @@
 </h1>
 
 <h3 align="center">
-Cost-effective ML workloads in any cloud
+Cost-effective LLM development
 </h3>
 
 <p align="center">
-<a href="https://dstack.ai/docs" target="_blank"><b>Docs</b></a> • 
+<a href="https://dstack.ai/docs" target="_blank"><b>Docs</b></a> •
 <a href="https://dstack.ai/examples/dolly" target="_blank"><b>Examples</b></a> •
 <a href="https://dstack.ai/blog" target="_blank"><b>Blog</b></a> •
 <a href="https://join.slack.com/t/dstackai/shared_invite/zt-xdnsytie-D4qU9BvJP8vkbkHXdi6clQ" target="_blank"><b>Slack</b></a>
@@ -23,7 +23,9 @@ Cost-effective ML workloads in any cloud
 [![PyPI - License](https://img.shields.io/pypi/l/dstack?style=flat-square&color=blue)](https://github.com/dstackai/dstack/blob/master/LICENSE.md)
 </div>
 
-`dstack` is an open-source tool designed to enhance the efficiency of running ML workloads in the cloud.
+`dstack` is an open-source tool that simplifies LLM development across multiple clouds.
+
+It streamlines development and deployment, reduces cloud costs, and frees users from vendor lock-in.
 
 ## Latest news
 
@@ -42,7 +44,7 @@ pip install "dstack[aws,gcp,azure,lambda]"
 dstack start
 ```
 
-On startup, the server sets up a default project that runs everything locally. 
+On startup, the server sets up a default project that runs everything locally.
 To run dev environments and tasks in the cloud, log into the UI, create the corresponding project,
 and [configure](https://dstack.ai/docs/guides/projects) the CLI to use it.
 
@@ -84,7 +86,7 @@ commands:
 
 ## CLI
 
-To run a configuration, use the [`dstack run`](https://dstack.ai/docs/reference/cli/run.md) command and pass the path to the 
+To run a configuration, use the [`dstack run`](https://dstack.ai/docs/reference/cli/run.md) command and pass the path to the
 directory with the configuration.
 
 ```shell
@@ -106,7 +108,7 @@ If you interrupt the run, the cloud resources will be released automatically.
 
 ## Profiles
 
-The `.dstack/profiles.yml` file allows to describe multiple profiles. 
+The `.dstack/profiles.yml` file allows to describe multiple profiles.
 ach profile can configure the project to use and the resources required for the run.
 
 ```yaml
@@ -127,11 +129,11 @@ Otherwise, you can always specify the profile using `--profile PROFILE`.
 
 For additional information and examples, see the following links:
 
-* [Docs](https://dstack.ai/docs)
-* [Examples](https://github.com/dstackai/dstack-examples/blob/main/README.md)
-* [Blog](https://dstack.ai/blog)
-* [Slack](https://join.slack.com/t/dstackai/shared_invite/zt-xdnsytie-D4qU9BvJP8vkbkHXdi6clQ)
- 
-##  Licence
+- [Docs](https://dstack.ai/docs)
+- [Examples](https://github.com/dstackai/dstack-examples/blob/main/README.md)
+- [Blog](https://dstack.ai/blog)
+- [Slack](https://join.slack.com/t/dstackai/shared_invite/zt-xdnsytie-D4qU9BvJP8vkbkHXdi6clQ)
+
+## Licence
 
 [Mozilla Public License 2.0](LICENSE.md)
