@@ -26,6 +26,7 @@ class SSHd:
             [
                 f'echo "{self.key_pub}" >> ~/.ssh/authorized_keys',
                 f"env >> ~/.ssh/environment",
+                f'echo "export PATH=$PATH" >> ~/.profile',
                 f"ssh-keygen -A > /dev/null",
                 f"/usr/sbin/sshd -p {self.port} -o PermitUserEnvironment=yes",
             ]
