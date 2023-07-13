@@ -25,7 +25,7 @@ export const FormMultiselect = <T extends FieldValues>({
             control={control}
             rules={rules}
             render={({ field: { onChange, ...fieldRest }, fieldState: { error } }) => {
-                const selectedOptions = props.options?.filter((i) => fieldRest.value.includes(i.value)) ?? null;
+                const selectedOptions = props.options?.filter((i) => fieldRest.value?.includes(i.value)) ?? null;
 
                 const onChangeSelect: MultiselectProps['onChange'] = (event) => {
                     const value = event.detail.selectedOptions.map((item) => item.value);

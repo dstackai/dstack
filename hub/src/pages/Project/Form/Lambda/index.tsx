@@ -6,7 +6,7 @@ import { debounce, get as _get } from 'lodash';
 import {
     FormInput,
     FormMultiselect,
-    FormMultiselectProps,
+    FormMultiselectOptions,
     FormS3BucketSelector,
     FormSelect,
     FormSelectOptions,
@@ -30,7 +30,7 @@ export const LambdaBackend: React.FC<IProps> = ({ loading }) => {
     const [pushNotification] = useNotifications();
     const { control, getValues, setValue, setError, clearErrors } = useFormContext();
     const [valuesData, setValuesData] = useState<IProjectAwsBackendValues | undefined>();
-    const [regions, setRegions] = useState<FormMultiselectProps>([]);
+    const [regions, setRegions] = useState<FormMultiselectOptions>([]);
     const [buckets, setBuckets] = useState<TAwsBucket[]>([]);
     const [storageBackendType, setStorageBackendType] = useState<FormSelectOptions>([]);
     const lastUpdatedField = useRef<string | null>(null);
@@ -183,6 +183,7 @@ export const LambdaBackend: React.FC<IProps> = ({ loading }) => {
                 onChange={getOnChangeSelectField(FIELD_NAMES.REGIONS)}
                 disabled={getDisabledByFieldName(FIELD_NAMES.REGIONS)}
                 secondaryControl={renderSpinner()}
+                rules={{ required: t('validation.required') }}
                 options={regions}
             />
 
