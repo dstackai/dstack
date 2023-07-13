@@ -154,7 +154,7 @@ class LambdaConfigurator(Configurator):
                         fields=[["regions"]],
                     )
         element = ProjectMultiElement(
-            selected=selected or [],
+            selected=selected or REGIONS,
             values=[ProjectElementValue(value=r, label=r) for r in REGIONS],
         )
         return element
