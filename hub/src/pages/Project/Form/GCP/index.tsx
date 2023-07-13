@@ -9,6 +9,7 @@ import { isRequestFormErrors2, isRequestFormFieldError } from 'libs';
 import { useBackendValuesMutation } from 'services/project';
 import { GCPCredentialTypeEnum } from 'types';
 
+import useIsMounted from '../../../../hooks/useIsMounted';
 import { AREA_HELP, BUCKET_HELP, FIELD_NAMES, REGION_HELP, SERVICE_ACCOUNT_HELP, SUBNET_HELP, ZONE_HELP } from './constants';
 
 import { IProps, VPCSubnetOption } from './types';
@@ -49,6 +50,7 @@ export const GCPBackend: React.FC<IProps> = ({ loading }) => {
     const [pushNotification] = useNotifications();
     const lastUpdatedField = useRef<string | null>(null);
     const isFirstRender = useRef<boolean>(true);
+    const isMounted = useIsMounted();
 
     const [getBackendValues, { isLoading: isLoadingValues }] = useBackendValuesMutation();
     const backendCredentialTypeValue = watch(`backend.${FIELD_NAMES.CREDENTIALS.TYPE}`);
@@ -74,6 +76,8 @@ export const GCPBackend: React.FC<IProps> = ({ loading }) => {
             const request = getBackendValues(backendFormValues);
             requestRef.current = request;
             const response = await request.unwrap();
+
+            if (!isMounted()) return;
 
             setValuesData(response);
 
@@ -190,10 +194,6 @@ export const GCPBackend: React.FC<IProps> = ({ loading }) => {
             const file = new File([''], fileName, { type: 'text/plain' });
             setFiles([file]);
         }
-
-        return () => {
-            if (requestRef.current) requestRef.current.abort();
-        };
     }, []);
 
     const onChangeFormField = () => {

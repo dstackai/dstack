@@ -175,6 +175,8 @@ export const ProjectSettings: React.FC = () => {
     const renderLambdaBackendDetails = (): React.ReactNode => {
         if (!data) return null;
 
+        const regions = data.backend.regions ? data.backend.regions.join(', ') : '';
+
         return (
             <ColumnLayout columns={4} variant="text-grid">
                 <div>
@@ -184,7 +186,9 @@ export const ProjectSettings: React.FC = () => {
 
                 <div>
                     <Box variant="awsui-key-label">{t('projects.edit.lambda.regions')}</Box>
-                    <div>{data.backend.regions.join(', ')}</div>
+                    <div style={{ whiteSpace: 'nowrap', textOverflow: 'ellipsis', overflow: 'hidden' }} title={regions}>
+                        {regions}
+                    </div>
                 </div>
 
                 <div>
