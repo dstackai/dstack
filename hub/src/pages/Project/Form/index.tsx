@@ -25,6 +25,7 @@ import { AWSBackend } from './AWS';
 import { AzureBackend } from './Azure';
 import { BACKEND_TYPE_HELP } from './constants';
 import { GCPBackend } from './GCP';
+import { LambdaBackend } from './Lambda';
 
 import { BackendTypesEnum, IProps, TBackendOption } from './types';
 import { FieldPath } from 'react-hook-form/dist/types/path';
@@ -139,6 +140,9 @@ export const ProjectForm: React.FC<IProps> = ({ initialValues, onCancel, loading
                 case BackendTypesEnum.GCP: {
                     return <GCPBackend loading={loading} />;
                 }
+                case BackendTypesEnum.LAMBDA: {
+                    return <LambdaBackend loading={loading} />;
+                }
                 default:
                     return null;
             }
@@ -152,6 +156,9 @@ export const ProjectForm: React.FC<IProps> = ({ initialValues, onCancel, loading
                 }
                 case BackendTypesEnum.GCP: {
                     return renderUnsupportedBackedMessage('GCP', BackendTypesEnum.GCP);
+                }
+                case BackendTypesEnum.LAMBDA: {
+                    return renderUnsupportedBackedMessage('Lambda', BackendTypesEnum.LAMBDA);
                 }
                 default:
                     return (

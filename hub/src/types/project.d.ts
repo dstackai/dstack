@@ -1,6 +1,6 @@
-declare type TProjectBackendType = 'aws' | 'gcp' | 'azure' | 'local';
+declare type TProjectBackendType = 'aws' | 'gcp' | 'azure' | 'lambda' | 'local';
 
-declare type TProjectBackend = { type: TProjectBackendType } & TProjectBackendAWSWithTitles & TProjectBackendAzure & TProjectBackendGCP & TProjectBackendLocal
+declare type TProjectBackend = { type: TProjectBackendType } & TProjectBackendAWSWithTitles & TProjectBackendAzure & TProjectBackendGCP & TProjectBackendLambda & TProjectBackendLocal
 declare interface IProject {
     project_name: string,
     backend: TProjectBackend,
@@ -73,7 +73,27 @@ declare interface IProjectGCPBackendValues {
     },
 }
 
-declare type TProjectBackendValuesResponse = IProjectAwsBackendValues & IProjectAzureBackendValues & IProjectGCPBackendValues
+declare interface IProjectLambdaBackendValues {
+    regions: null | {
+        selected?: string,
+        values: { value: string, label: string}[]
+    },
+
+    storage_backend_type: null | {
+        selected?: string,
+        values: { value: string, label: string}[]
+    },
+
+    storage_backend_values:  null | {
+        bucket_name: null | {
+            selected?: string,
+            values: { value: string, label: string}[]
+            // values: TAwsBucket[]
+        }
+    },
+}
+
+declare type TProjectBackendValuesResponse = IProjectAwsBackendValues & IProjectAzureBackendValues & IProjectGCPBackendValues & IProjectLambdaBackendValues
 
 enum AWSCredentialTypeEnum {
     DEFAULT = 'default',
@@ -126,6 +146,22 @@ declare interface TProjectBackendGCP {
     bucket_name: string,
     vpc: string,
     subnet: string,
+}
+
+declare interface TProjectBackendLambda {
+    api_key: string,
+    regions: string[],
+
+    storage_backend: {
+        type: 'aws',
+        bucket_name: string,
+
+        credentials: {
+            type: 'access_key',
+            access_key: string
+            secret_key: string
+        }
+    }
 }
 
 declare interface TProjectBackendLocal {

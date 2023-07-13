@@ -9,6 +9,7 @@ export enum BackendTypesEnum {
     AWS = 'aws',
     GCP = 'gcp',
     AZURE = 'azure',
+    LAMBDA = 'lambda',
     LOCAL = 'local',
 }
 

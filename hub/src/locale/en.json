@@ -66,6 +66,8 @@
       "gcp_description": "Run workflows and store data in Google Cloud Platform",
       "azure": "Azure",
       "azure_description": "Run workflows and store data in Microsoft Azure",
+      "lambda": "Lambda",
+      "lambda_description": "Run workflows and store data in Lambda",
       "local": "Local",
       "local_description": "Run workflows and store data locally via Docker"
     },
@@ -144,6 +146,26 @@
         "subnet": "Subnet",
         "subnet_description": "Select a subnet to run workflows in",
         "subnet_placeholder": "Not selected"
+      },
+      "lambda": {
+        "api_key": "Api key",
+        "api_key_description": "Specify the Lambda api key",
+        "regions": "Regions",
+        "regions_description": "Select regions to run workflows and store artifacts",
+        "regions_placeholder": "Select regions",
+        "storage_backend": {
+          "type": "Type",
+          "type_description": "Type of backend storage",
+          "type_placeholder": "Select type",
+          "credentials": {
+            "access_key_id": "Access key ID",
+            "access_key_id_description": "Specify the AWS access key ID",
+            "secret_key_id": "Secret access key",
+            "secret_key_id_description": "Specify the AWS secret access key"
+          },
+          "s3_bucket_name": "Bucket",
+          "s3_bucket_name_description": "Select an S3 bucket to store artifacts"
+        }
       },
       "local": {
         "path": "Files path"
