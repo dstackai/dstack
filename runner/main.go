@@ -6,7 +6,6 @@ import (
 	"fmt"
 	"github.com/dstackai/dstack/runner/internal/ports"
 	"io"
-	"io/ioutil"
 	"math/bits"
 	_ "net/http/pprof"
 	"os"
@@ -49,7 +48,7 @@ func start(logLevel int, httpPort int, configDir string) {
 		fmt.Println(err)
 		return
 	}
-	theConfigFile, err := ioutil.ReadFile(thePathConfig)
+	theConfigFile, err := os.ReadFile(thePathConfig)
 	if err != nil {
 		fmt.Println(err)
 		return
@@ -143,7 +142,7 @@ func check(configDir string) error {
 	if _, err := os.Stat(thePathConfig); os.IsNotExist(err) {
 		return cli.Exit("Failed to load config", 1)
 	}
-	theConfigFile, err := ioutil.ReadFile(thePathConfig)
+	theConfigFile, err := os.ReadFile(thePathConfig)
 	if err != nil {
 		return cli.Exit("Unexpected error, please try to rerun", 1)
 	}
@@ -198,7 +197,7 @@ func check(configDir string) error {
 	if err != nil {
 		return cli.Exit("Unexpected error, please try to rerun", 1)
 	}
-	err = ioutil.WriteFile(thePathConfig, theConfigFile, 0o644)
+	err = os.WriteFile(thePathConfig, theConfigFile, 0o644)
 	if err != nil {
 		return cli.Exit("Unexpected error, please try to rerun", 1)
 	}

@@ -5,7 +5,6 @@ import (
 	"github.com/dstackai/dstack/runner/internal/backend/base"
 	"github.com/dstackai/dstack/runner/internal/container"
 	"io"
-	"io/ioutil"
 	"os"
 
 	"github.com/docker/docker/api/types/mount"
@@ -43,7 +42,7 @@ func init() {
 	backend.RegisterBackend("lambda", func(ctx context.Context, pathConfig string) (backend.Backend, error) {
 		config := LambdaConfig{}
 		log.Trace(ctx, "Read config file", "path", pathConfig)
-		fileContent, err := ioutil.ReadFile(pathConfig)
+		fileContent, err := os.ReadFile(pathConfig)
 		if err != nil {
 			return nil, gerrors.Wrap(err)
 		}

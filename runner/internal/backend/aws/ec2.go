@@ -2,13 +2,12 @@ package aws
 
 import (
 	"context"
-	"io/ioutil"
-
 	"github.com/aws/aws-sdk-go-v2/config"
 	"github.com/aws/aws-sdk-go-v2/feature/ec2/imds"
 	"github.com/aws/aws-sdk-go-v2/service/ec2"
 	"github.com/dstackai/dstack/runner/internal/gerrors"
 	"github.com/dstackai/dstack/runner/internal/log"
+	"io"
 )
 
 type ClientEC2 struct {
@@ -98,7 +97,7 @@ func (ec *ClientEC2) getInstanceID(ctx context.Context) (string, error) {
 	if err != nil {
 		return "", gerrors.Wrap(err)
 	}
-	id, err := ioutil.ReadAll(meta.Content)
+	id, err := io.ReadAll(meta.Content)
 	if err != nil {
 		return "", gerrors.Wrap(err)
 	}

@@ -2,7 +2,6 @@ package executor
 
 import (
 	"context"
-	"io/ioutil"
 	"os"
 	"path/filepath"
 	"strconv"
@@ -29,7 +28,7 @@ func (ex *Executor) loadConfig(configDir string) error {
 		log.Error(context.Background(), "Failed to load config", "err", gerrors.Wrap(err))
 		return err
 	}
-	theConfigFile, err := ioutil.ReadFile(thePathConfig)
+	theConfigFile, err := os.ReadFile(thePathConfig)
 	if err != nil {
 		log.Error(context.Background(), "Unexpected error, please try to rerun", "err", gerrors.Wrap(err))
 		return err

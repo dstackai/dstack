@@ -2,7 +2,6 @@ package repo
 
 import (
 	"context"
-	"io/ioutil"
 	"os"
 	"path"
 	"testing"
@@ -307,7 +306,7 @@ Last line.`
 	for _, c := range cases {
 		cc := c
 		t.Run(c.name, func(t *testing.T) {
-			dir, err := ioutil.TempDir("", "dstack-unit-")
+			dir, err := os.MkdirTemp("", "dstack-unit-")
 			assert.NoError(t, err, "create tmp directory for test")
 			if err != nil {
 				defer func() {
