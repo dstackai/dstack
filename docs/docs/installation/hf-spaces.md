@@ -1,13 +1,11 @@
 # Hugging Face Spaces
 
 !!! info "NOTE:"
-    If you want to use `dstack` alone, it's enough to start the Hub server locally using
-    the [`dstack start`](../reference/cli/start.md)
-    command. It will allow you to run dev environments, pipelines, and apps both locally
-    and in the cloud.
-    
-    However, if you want to work as a team and manage cloud credentials in a more secure way, you may consider
-    deploying the `dstack` server as a Hugging Face Space.
+    If you run the `dstack` server via Docker, it will not allow you to run workloads locally. 
+    To run workloads locally, make sure to use [`pip`](pip.md).
+
+    Running the `dstack` server via Hugging Face Spaces makes sense only if you intend to 
+    deploy the `dstack` server outside of your machine to run workloads in the cloud.
 
 ## Create a space
 
@@ -18,7 +16,7 @@ The easiest way to create a Space to run `dstack` is duplicating the
 [`dstackai/dstack-template`](https://huggingface.co/spaces/dstackai/dstack-template) Space template
 by clicking the button below.
 
-<a href="https://huggingface.co/spaces/dstackai/dstack-template?duplicate=true" 
+<a href="https://huggingface.co/spaces/dstackai/dstack-template?duplicate=true&visibility=public" 
     class="md-button md-button--primary" target="_blank">Create a Space</a>
 
 ## Configure the settings
@@ -40,32 +38,31 @@ the required value.
 
 If you don't do that, dstack will generate it randomly and print it to the `Logs`.
 
-#### Persisting state
-
-If you want the space to maintain the state across restarts, you need to add the secrets that instruct `dstack`
-to persist the state in a cloud object storage of your choice.
-
-- `LITESTREAM_REPLICA_URL` - The url of the cloud object storage.
-  Examples: `s3://<bucket-name>/<path>`, `gcs://<bucket-name>/<path>`, `abs://<storage-account>@<container-name>/<path>`, etc.
-
-??? info "AWS S3"
-    To persist state into an AWS S3 bucket, provide the following environment variables:
-
-    - `AWS_ACCESS_KEY_ID` - The AWS access key ID
-    - `AWS_SECRET_ACCESS_KEY` -  The AWS secret access key
-
-??? info "GCP Storage"
-    To persist state into an AWS S3 bucket, provide one of the following environment variables:
-
-    - `GOOGLE_APPLICATION_CREDENTIALS` - The path to the GCP service account key JSON file
-    - `GOOGLE_APPLICATION_CREDENTIALS_JSON` - The GCP service account key JSON
-
-??? info "Azure Blob Storage"
-    To persist state into an Azure blog storage, provide the following environment variable.
-
-    - `LITESTREAM_AZURE_ACCOUNT_KEY` - The Azure storage account key
-
-Once the settings are configured, you can restart the space and log in as an administrator. From there, you can create
-users, projects, and configure the `dstack` CLI. This allows you to collaborate as a team, running development
-environments, pipelines, and apps securely and conveniently in the cloud without the need to host the `dstack` server
-yourself.
+??? info "Persisting state in a cloud storage"
+    If you want the `dstack` server to persist the state across restarts, you need to add the secrets that instruct `dstack`
+    to persist the state in a cloud object storage of your choice.
+    
+    - `LITESTREAM_REPLICA_URL` - The url of the cloud object storage.
+      Examples: `s3://<bucket-name>/<path>`, `gcs://<bucket-name>/<path>`, `abs://<storage-account>@<container-name>/<path>`, etc.
+    
+    ??? info "AWS S3"
+        To persist state into an AWS S3 bucket, provide the following environment variables:
+    
+        - `AWS_ACCESS_KEY_ID` - The AWS access key ID
+        - `AWS_SECRET_ACCESS_KEY` -  The AWS secret access key
+    
+    ??? info "GCP Storage"
+        To persist state into an AWS S3 bucket, provide one of the following environment variables:
+    
+        - `GOOGLE_APPLICATION_CREDENTIALS` - The path to the GCP service account key JSON file
+        - `GOOGLE_APPLICATION_CREDENTIALS_JSON` - The GCP service account key JSON
+    
+    ??? info "Azure Blob Storage"
+        To persist state into an Azure blog storage, provide the following environment variable.
+    
+        - `LITESTREAM_AZURE_ACCOUNT_KEY` - The Azure storage account key
+    
+    Once the settings are configured, you can restart the space and log in as an administrator. From there, you can create
+    users, projects, and configure the `dstack` CLI. This allows you to collaborate as a team, running development
+    environments, pipelines, and apps securely and conveniently in the cloud without the need to host the `dstack` server
+    yourself.
