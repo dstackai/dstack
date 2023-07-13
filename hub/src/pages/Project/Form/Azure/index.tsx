@@ -10,6 +10,7 @@ import { isRequestFormErrors2, isRequestFormFieldError } from 'libs';
 import { useBackendValuesMutation } from 'services/project';
 import { AzureCredentialTypeEnum } from 'types';
 
+import useIsMounted from '../../../../hooks/useIsMounted';
 import { CREDENTIALS_HELP, FIELD_NAMES, LOCATION_HELP, STORAGE_ACCOUNT_HELP, SUBSCRIPTION_HELP } from './constants';
 
 import { IProps } from './types';
@@ -30,6 +31,7 @@ export const AzureBackend: React.FC<IProps> = ({ loading }) => {
     const [availableDefaultCredentials, setAvailableDefaultCredentials] = useState<boolean | null>(null);
     const lastUpdatedField = useRef<string | null>(null);
     const isFirstRender = useRef<boolean>(true);
+    const isMounted = useIsMounted();
 
     const [getBackendValues, { isLoading: isLoadingValues }] = useBackendValuesMutation();
 
@@ -61,6 +63,9 @@ export const AzureBackend: React.FC<IProps> = ({ loading }) => {
             const request = getBackendValues(backendFormValues);
             requestRef.current = request;
             const response = await request.unwrap();
+
+            if (!isMounted()) return;
+
             setValuesData(response);
             lastUpdatedField.current = null;
 
@@ -130,10 +135,6 @@ export const AzureBackend: React.FC<IProps> = ({ loading }) => {
 
         changeFormHandler().catch(console.log);
         isFirstRender.current = false;
-
-        return () => {
-            if (requestRef.current) requestRef.current.abort();
-        };
     }, []);
 
     const debouncedChangeFormHandler = useCallback(debounce(changeFormHandler, 1000), []);

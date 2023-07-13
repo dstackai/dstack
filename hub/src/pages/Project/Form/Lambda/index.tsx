@@ -6,7 +6,7 @@ import { debounce, get as _get } from 'lodash';
 import {
     FormInput,
     FormMultiselect,
-    FormMultiselectProps,
+    FormMultiselectOptions,
     FormS3BucketSelector,
     FormSelect,
     FormSelectOptions,
@@ -19,6 +19,7 @@ import { useHelpPanel, useNotifications } from 'hooks';
 import { isRequestFormErrors2, isRequestFormFieldError } from 'libs';
 import { useBackendValuesMutation } from 'services/project';
 
+import useIsMounted from '../../../../hooks/useIsMounted';
 import { DEFAULT_HELP, FIELD_NAMES } from './constants';
 
 import { IProps } from './types';
@@ -30,11 +31,12 @@ export const LambdaBackend: React.FC<IProps> = ({ loading }) => {
     const [pushNotification] = useNotifications();
     const { control, getValues, setValue, setError, clearErrors } = useFormContext();
     const [valuesData, setValuesData] = useState<IProjectAwsBackendValues | undefined>();
-    const [regions, setRegions] = useState<FormMultiselectProps>([]);
+    const [regions, setRegions] = useState<FormMultiselectOptions>([]);
     const [buckets, setBuckets] = useState<TAwsBucket[]>([]);
     const [storageBackendType, setStorageBackendType] = useState<FormSelectOptions>([]);
     const lastUpdatedField = useRef<string | null>(null);
     const isFirstRender = useRef<boolean>(true);
+    const isMounted = useIsMounted();
 
     const [getBackendValues, { isLoading: isLoadingValues }] = useBackendValuesMutation();
 
@@ -63,6 +65,8 @@ export const LambdaBackend: React.FC<IProps> = ({ loading }) => {
             requestRef.current = request;
 
             const response = await request.unwrap();
+
+            if (!isMounted()) return;
 
             setValuesData(response);
 
@@ -124,10 +128,6 @@ export const LambdaBackend: React.FC<IProps> = ({ loading }) => {
 
         changeFormHandler().catch(console.log);
         isFirstRender.current = false;
-
-        return () => {
-            if (requestRef.current) requestRef.current.abort();
-        };
     }, []);
 
     const debouncedChangeFormHandler = useCallback(debounce(changeFormHandler, 1000), []);
@@ -183,6 +183,7 @@ export const LambdaBackend: React.FC<IProps> = ({ loading }) => {
                 onChange={getOnChangeSelectField(FIELD_NAMES.REGIONS)}
                 disabled={getDisabledByFieldName(FIELD_NAMES.REGIONS)}
                 secondaryControl={renderSpinner()}
+                rules={{ required: t('validation.required') }}
                 options={regions}
             />
 
