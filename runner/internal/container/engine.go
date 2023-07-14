@@ -3,14 +3,15 @@ package container
 import (
 	"context"
 	"fmt"
-	"github.com/docker/docker/api/types/mount"
-	"github.com/docker/docker/pkg/jsonmessage"
-	"github.com/dstackai/dstack/runner/internal/environment"
-	"github.com/dstackai/dstack/runner/internal/models"
 	"io"
 	"os/exec"
 	"runtime"
 	"strings"
+
+	"github.com/docker/docker/api/types/mount"
+	"github.com/docker/docker/pkg/jsonmessage"
+	"github.com/dstackai/dstack/runner/internal/environment"
+	"github.com/dstackai/dstack/runner/internal/models"
 
 	"github.com/docker/docker/api/types"
 	"github.com/docker/docker/api/types/container"

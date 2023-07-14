@@ -11,7 +11,7 @@ DEFAULT_MEM = "8GB"
 DEFAULT_RETRY_LIMIT = 3600
 
 
-def mem_size(v: Optional[Union[int, str]]) -> Optional[int]:
+def parse_memory(v: Optional[Union[int, str]]) -> Optional[int]:
     """
     Converts human-readable sizes (MB and GB) to megabytes
     >>> mem_size("512MB")
@@ -19,14 +19,13 @@ def mem_size(v: Optional[Union[int, str]]) -> Optional[int]:
     >>> mem_size("1 GB")
     1024
     """
-    dec_bin = 1000 / 1024
     if isinstance(v, str):
-        m = re.fullmatch(r"(\d+) *([gm]b)?", v.strip().lower())
+        m = re.fullmatch(r"(\d+) *([mg]b)?", v.strip().lower())
         if not m:
             raise ValueError(f"Invalid memory size: {v}")
-        v = int(m.group(1)) * (dec_bin**2)
+        v = int(m.group(1))
         if m.group(2) == "gb":
-            v = v * 1000
+            v = v * 1024
     return int(v)
 
 
@@ -52,15 +51,15 @@ class ProfileGPU(ForbidExtra):
     name: Optional[str]
     count: int = 1
     memory: Optional[Union[int, str]]
-    _validate_mem = validator("memory", pre=True, allow_reuse=True)(mem_size)
+    _validate_mem = validator("memory", pre=True, allow_reuse=True)(parse_memory)
 
 
 class ProfileResources(ForbidExtra):
     gpu: Optional[Union[int, ProfileGPU]]
-    memory: Union[int, str] = mem_size(DEFAULT_MEM)
+    memory: Union[int, str] = parse_memory(DEFAULT_MEM)
     shm_size: Optional[Union[int, str]]
     cpu: int = DEFAULT_CPU
-    _validate_mem = validator("memory", "shm_size", pre=True, allow_reuse=True)(mem_size)
+    _validate_mem = validator("memory", "shm_size", pre=True, allow_reuse=True)(parse_memory)
 
     @validator("gpu", pre=True)
     def _validate_gpu(cls, v: Optional[Union[int, ProfileGPU]]) -> Optional[ProfileGPU]:
