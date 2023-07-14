@@ -20,7 +20,7 @@ import { isRequestFormErrors2, isRequestFormFieldError } from 'libs';
 import { useBackendValuesMutation } from 'services/project';
 
 import useIsMounted from '../../../../hooks/useIsMounted';
-import { DEFAULT_HELP, FIELD_NAMES } from './constants';
+import { API_KEY_HELP, REGIONS_HELP, CREDENTIALS_HELP, FIELD_NAMES, STORAGE_HELP, BUCKET_HELP } from './constants';
 
 import { IProps } from './types';
 
@@ -162,7 +162,7 @@ export const LambdaBackend: React.FC<IProps> = ({ loading }) => {
     return (
         <SpaceBetween size="l">
             <FormInput
-                info={<InfoLink onFollow={() => openHelpPanel(DEFAULT_HELP)} />}
+                info={<InfoLink onFollow={() => openHelpPanel(API_KEY_HELP)} />}
                 label={t('projects.edit.lambda.api_key')}
                 description={t('projects.edit.lambda.api_key_description')}
                 control={control}
@@ -174,7 +174,7 @@ export const LambdaBackend: React.FC<IProps> = ({ loading }) => {
             />
 
             <FormMultiselect
-                info={<InfoLink onFollow={() => openHelpPanel(DEFAULT_HELP)} />}
+                info={<InfoLink onFollow={() => openHelpPanel(REGIONS_HELP)} />}
                 label={t('projects.edit.lambda.regions')}
                 description={t('projects.edit.lambda.regions_description')}
                 placeholder={t('projects.edit.lambda.regions_placeholder')}
@@ -188,7 +188,7 @@ export const LambdaBackend: React.FC<IProps> = ({ loading }) => {
             />
 
             <FormSelect
-                info={<InfoLink onFollow={() => openHelpPanel(DEFAULT_HELP)} />}
+                info={<InfoLink onFollow={() => openHelpPanel(STORAGE_HELP)} />}
                 label={t('projects.edit.lambda.storage_backend.type')}
                 description={t('projects.edit.lambda.storage_backend.type_description')}
                 placeholder={t('projects.edit.lambda.storage_backend.type_placeholder')}
@@ -202,7 +202,7 @@ export const LambdaBackend: React.FC<IProps> = ({ loading }) => {
             />
 
             <FormInput
-                info={<InfoLink onFollow={() => openHelpPanel(DEFAULT_HELP)} />}
+                info={<InfoLink onFollow={() => openHelpPanel(CREDENTIALS_HELP)} />}
                 label={t('projects.edit.lambda.storage_backend.credentials.access_key_id')}
                 description={t('projects.edit.lambda.storage_backend.credentials.access_key_id_description')}
                 control={control}
@@ -214,7 +214,7 @@ export const LambdaBackend: React.FC<IProps> = ({ loading }) => {
             />
 
             <FormInput
-                info={<InfoLink onFollow={() => openHelpPanel(DEFAULT_HELP)} />}
+                info={<InfoLink onFollow={() => openHelpPanel(CREDENTIALS_HELP)} />}
                 label={t('projects.edit.lambda.storage_backend.credentials.secret_key_id')}
                 description={t('projects.edit.lambda.storage_backend.credentials.secret_key_id_description')}
                 control={control}
@@ -226,7 +226,7 @@ export const LambdaBackend: React.FC<IProps> = ({ loading }) => {
             />
 
             <FormS3BucketSelector
-                info={<InfoLink onFollow={() => openHelpPanel(DEFAULT_HELP)} />}
+                info={<InfoLink onFollow={() => openHelpPanel(BUCKET_HELP)} />}
                 label={t('projects.edit.lambda.storage_backend.s3_bucket_name')}
                 description={t('projects.edit.lambda.storage_backend.s3_bucket_name_description')}
                 control={control}

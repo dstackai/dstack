@@ -148,14 +148,14 @@
         "subnet_placeholder": "Not selected"
       },
       "lambda": {
-        "api_key": "Api key",
-        "api_key_description": "Specify the Lambda api key",
+        "api_key": "API key",
+        "api_key_description": "Specify the Lambda API key",
         "regions": "Regions",
-        "regions_description": "Select regions to run workflows and store artifacts",
+        "regions_description": "Select regions to run workflows",
         "regions_placeholder": "Select regions",
         "storage_backend": {
           "type": "Storage",
-          "type_description": "Backend storage",
+          "type_description": "Select backend storage",
           "type_placeholder": "Select type",
           "credentials": {
             "access_key_id": "Access key ID",
