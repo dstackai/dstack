@@ -12,12 +12,14 @@ class BackendError(DstackError):
 
 class BackendAuthError(BackendError):
     code = "invalid_backend_credentials"
-    message = "Backend credentials are invalid"
+
+
+class BackendNotAvailableError(BackendError):
+    code = "backend_not_available"
 
 
 class NoMatchingInstanceError(BackendError):
     code = "no_matching_instance"
-    message = "No instance type matching requirements"
 
 
 class RepoNotInitializedError(DstackError):

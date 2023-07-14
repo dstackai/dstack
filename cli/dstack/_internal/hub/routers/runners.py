@@ -26,7 +26,7 @@ async def run_runners(project_name: str, job: Job):
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail=error_detail(
-                NoMatchingInstanceError.message, code=NoMatchingInstanceError.code
+                "No instance type matching requirements", code=NoMatchingInstanceError.code
             ),
         )
     except BuildNotFoundError as e:
