@@ -29,11 +29,10 @@ It streamlines development and deployment, reduces cloud costs, and frees users 
 
 ## Latest news
 
-- [2023/07] [dstack 0.10.3: A preview of Lambda Cloud support](https://dstack.ai/blog/2023/07/05/lambda-cloud-support-preview/) (Release)  
+- [2023/07] 🔥 [Lambda Cloud GA and custom Docker images](https://dstack.ai/blog/2023/07/14/lambda-cloud-ga-and-docker-support/) (Release)  
 - [2023/06] [Running XGen 7B chatbot in your cloud](https://github.com/dstackai/dstack-examples/wiki/Running-XGen-7B-Chatbot-in-your-cloud) (Example)
-- [2023/06] [Say goodbye to managed notebooks](https://dstack.ai/blog/2023/06/29/say-goodbye-to-managed-notebooks/) (Blog post)
 - [2023/06] [Running LLM as chatbot in your cloud](https://github.com/dstackai/LLM-As-Chatbot/wiki/Running-LLM-As-Chatbot-in-your-cloud) (Example)
-- [2023/06] [dstack 0.10: New configuration format and CLI experience](https://dstack.ai/blog/2023/06/12/new-configuration-format-and-cli-experience/) (Release)
+- [2023/06] [New configuration format and CLI experience](https://dstack.ai/blog/2023/06/12/new-configuration-format-and-cli-experience/) (Release)
 
 ## Installation
 
