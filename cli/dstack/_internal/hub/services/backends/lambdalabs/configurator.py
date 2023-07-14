@@ -2,6 +2,7 @@ import json
 from typing import Dict, List, Optional, Tuple, Union
 
 import botocore
+import botocore.exceptions
 from boto3.session import Session
 from requests import HTTPError
 
@@ -192,7 +193,11 @@ class LambdaConfigurator(Configurator):
     ) -> ProjectElement:
         element = ProjectElement(selected=selected)
         s3_client = session.client("s3")
-        response = s3_client.list_buckets()
+        try:
+            response = s3_client.list_buckets()
+        except botocore.exceptions.ClientError:
+            # We'll suggest no buckets if the user has no permission to list them
+            return element
         bucket_names = []
         for bucket in response["Buckets"]:
             bucket_names.append(bucket["Name"])
@@ -226,6 +231,16 @@ class LambdaConfigurator(Configurator):
 
     def _get_aws_bucket_region(self, session: Session, bucket: str) -> str:
         s3_client = session.client("s3")
-        response = s3_client.head_bucket(Bucket=bucket)
+        try:
+            response = s3_client.head_bucket(Bucket=bucket)
+        except botocore.exceptions.ClientError:
+            raise BackendConfigError(
+                "Permissions for getting bucket region are required",
+                code="permissions_error",
+                fields=[
+                    ["storage_backend", "credentials", "access_key"],
+                    ["storage_backend", "credentials", "secret_key"],
+                ],
+            )
         region = response["ResponseMetadata"]["HTTPHeaders"]["x-amz-bucket-region"]
         return region

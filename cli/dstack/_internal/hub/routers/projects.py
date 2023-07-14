@@ -114,9 +114,9 @@ async def update_project(
     configurator = get_backend_configurator(project_info.backend.__root__.type)
     try:
         await run_async(configurator.configure_project, project_info.backend.__root__)
+        await ProjectManager.update_project_from_info(project_info)
     except BackendConfigError as e:
         _error_response_on_config_error(e, path_to_config=["backend"])
-    await ProjectManager.update_project_from_info(project_info)
     clear_backend_cache(project_info.project_name)
     return project_info
 

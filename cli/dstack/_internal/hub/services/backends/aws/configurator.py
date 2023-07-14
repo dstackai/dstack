@@ -174,11 +174,15 @@ class AWSConfigurator(Configurator):
     def _get_hub_buckets_element(
         self, session: Session, region: str, selected: Optional[str]
     ) -> AWSBucketProjectElement:
-        if selected is not None:
+        if selected:
             self._validate_hub_bucket(session=session, region=region, bucket_name=selected)
         element = AWSBucketProjectElement(selected=selected)
         s3_client = session.client("s3")
-        response = s3_client.list_buckets()
+        try:
+            response = s3_client.list_buckets()
+        except botocore.exceptions.ClientError:
+            # We'll suggest no buckets if the user has no permission to list them
+            return element
         for bucket in response["Buckets"]:
             element.values.append(
                 AWSBucketProjectElementValue(

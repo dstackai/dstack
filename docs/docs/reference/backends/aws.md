@@ -38,16 +38,26 @@ services.
         {
           "Effect": "Allow",
           "Action": [
-              "s3:PutObject",
-              "s3:GetObject",
-              "s3:DeleteObject",
-              "s3:ListBucket",
-              "s3:GetLifecycleConfiguration",
-              "s3:PutLifecycleConfiguration",
-              "s3:PutObjectTagging",
-              "s3:GetObjectTagging",
-              "s3:DeleteObjectTagging",
-              "s3:GetBucketAcl"
+            "s3:ListAllMyBuckets",
+            "s3:GetBucketLocation"
+          ],
+          "Resource": [
+            "arn:aws:s3:::*"
+          ]
+        },
+        {
+          "Effect": "Allow",
+          "Action": [
+            "s3:PutObject",
+            "s3:GetObject",
+            "s3:DeleteObject",
+            "s3:ListBucket",
+            "s3:GetLifecycleConfiguration",
+            "s3:PutLifecycleConfiguration",
+            "s3:PutObjectTagging",
+            "s3:GetObjectTagging",
+            "s3:DeleteObjectTagging",
+            "s3:GetBucketAcl"
           ],
           "Resource": [
             "arn:aws:s3:::{bucket_name}",
