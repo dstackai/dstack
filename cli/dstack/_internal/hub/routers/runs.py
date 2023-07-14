@@ -29,11 +29,12 @@ async def get_run_plan(
     for job in body.jobs:
         instance_type = await run_async(backend.predict_instance_type, job)
         if instance_type is None:
+            msg = f"No instance type matching requirements ({job.requirements.pretty_format()})."
+            if backend.name == "local":
+                msg += " Ensure that enough CPU and memory are available for Docker containers or lower the requirements."
             raise HTTPException(
                 status_code=status.HTTP_400_BAD_REQUEST,
-                detail=error_detail(
-                    msg=NoMatchingInstanceError.message, code=NoMatchingInstanceError.code
-                ),
+                detail=error_detail(msg=msg, code=NoMatchingInstanceError.code),
             )
         try:
             build = backend.predict_build_plan(job)

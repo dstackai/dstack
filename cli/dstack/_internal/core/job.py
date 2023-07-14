@@ -54,6 +54,14 @@ class Requirements(BaseModel):
             req_data["local"] = self.local
         return req_data
 
+    def pretty_format(self):
+        res = ""
+        res += f"{self.cpus}xCPUs"
+        res += f", {self.memory_mib}MB"
+        if self.gpus:
+            res += f", {len(self.gpus)}x{self.gpus[0].name}"
+        return res
+
 
 class JobRef(BaseModel):
     @abstractmethod
