@@ -4,7 +4,7 @@ description:  Learn how to elevate your ML workflow with using dev environments 
 slug: embrace-dev-environments
 ---
 
-# Embrace dev environments, leave manual SSH behind
+# Leave manual SSH behind
 
 __Overcoming the limitations of dev environments for ML projects.__
 

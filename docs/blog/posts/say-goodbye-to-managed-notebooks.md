@@ -3,10 +3,9 @@ title: Say goodbye to managed notebooks!
 date: 2023-06-29
 description: Discover how cloud dev environments can benefit ML engineers and why why they are gaining popularity over managed notebooks .
 slug: say-goodbye-to-managed-notebooks
-
 ---
 
-# Say goodbye to managed notebooks! 👋
+# Say goodbye to managed notebooks
 
 __Why managed notebooks are losing ground to cloud dev environments.__
 

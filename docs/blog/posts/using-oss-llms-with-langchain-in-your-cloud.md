@@ -6,9 +6,11 @@ links:
   - LangChain's Hugging Face Pipelines: https://python.langchain.com/en/latest/modules/models/llms/integrations/huggingface_pipelines.html
   - Falcon-7B-Instruct model on Hugging Face: https://huggingface.co/tiiuae/falcon-7b-instruct
   - Dolly 2.0's instruct pipeline: https://huggingface.co/databricks/dolly-v2-12b/raw/main/instruct_pipeline.py
+categories:
+- Tutorials
 ---
 
-# Using OSS LLMs with LangChain in your cloud
+# Using OSS LLMs with LangChain in the cloud
 
 __A tutorial explaining how to build a chatbot using OSS LLMs on your cloud.__
 
