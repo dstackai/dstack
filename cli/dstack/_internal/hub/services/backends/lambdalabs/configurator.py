@@ -127,7 +127,7 @@ class LambdaConfigurator(Configurator):
 
     def _get_storage_backend_type_element(self, selected: Optional[str]) -> ProjectElement:
         element = ProjectElement(
-            values=[ProjectElementValue(value="aws", label="AWS")], selected="aws"
+            values=[ProjectElementValue(value="aws", label="AWS S3")], selected="aws"
         )
         return element
 
@@ -193,11 +193,20 @@ class LambdaConfigurator(Configurator):
         element = ProjectElement(selected=selected)
         s3_client = session.client("s3")
         response = s3_client.list_buckets()
+        bucket_names = []
         for bucket in response["Buckets"]:
+            bucket_names.append(bucket["Name"])
+        if selected is not None and selected not in bucket_names:
+            raise BackendConfigError(
+                f"The bucket {selected} does not exist",
+                code="invalid_bucket",
+                fields=[["storage_backend", "bucket_name"]],
+            )
+        for bucket_name in bucket_names:
             element.values.append(
                 ProjectElementValue(
-                    value=bucket["Name"],
-                    label=bucket["Name"],
+                    value=bucket_name,
+                    label=bucket_name,
                 )
             )
         return element
