@@ -37,38 +37,20 @@ click the `Generate API key` button to create a new API key.
 
 ## 3. Create a project
 
-There is not yet a possibility to create a Lambda project via the UI. Currently, you can only create a Lambda project
-through an API request. Please use the snippet below to create a Lambda project.
+Now that you have AWS and Lambda credentials set up, log in to the Hub, open the `Projects` page, click `Add`, and select `Lambda` in the `Type` field.
 
-<div class="termy">
+![](../../../assets/images/dstack-hub-create-lambda-project.png){ width=800 }
 
-```shell
-$ curl -X POST 'http://127.0.0.1:3000/api/projects' \
-      -H 'Content-Type: application/json' \
-      -H 'Authorization: Bearer &lt;your dstack token&gt;' \
-      -d '{
-          	"project_name": "lambda",
-          	"backend": {
-          		"type": "lambda",
-          		"regions": ["us-west-1"],
-          		"api_key": "&lt;your Lambda API key&gt;",
-          		"storage_backend": {
-          			"type": "aws",
-          			"credentials": {
-          				"access_key": "&lt;your AWS access key&gt;",
-          				"secret_key": "&lt;your AWS secret key&gt;"
-          			},
-          			"bucket_name": "&lt;your S3 bucket name&gt;"
-          		}
-          	},
-          	"members": []
-          }'
-```
+### Fields reference
 
-</div>
+The following fields are required:
 
-!!! info "NOTE:"
-    Ensure that you use your `dstack` token, your Lambda API key, your AWS access key, and your S3 bucket name.
+- `API Key` - (Required) The API key for authenticating `dstack` with Lambda API
+- `Regions` - (Required) The regions where `dstack` will provision compute resources
+- `Storage` - (Required) The storage type that `dstack` will use to store state and artifacts
+- `Access key ID` - (Required) The Access key ID for authenticating `dstack` with S3
+- `Secret access key` - (Required) The Secret access key for authenticating `dstack` with S3
+- `Bucket` - (Required) The storage bucket that `dstack` will use to store state and artifacts
 
 ## 4. Configure the CLI
 
