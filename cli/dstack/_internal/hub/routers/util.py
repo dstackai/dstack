@@ -3,7 +3,7 @@ from typing import Dict, Optional
 from fastapi import HTTPException, status
 
 from dstack._internal.backend.base import Backend
-from dstack._internal.core.error import BackendAuthError
+from dstack._internal.core.error import BackendAuthError, BackendNotAvailableError
 from dstack._internal.hub.models import Project
 from dstack._internal.hub.repository.projects import ProjectManager
 from dstack._internal.hub.services.backends import cache as backends_cache
@@ -28,7 +28,7 @@ async def get_backend(project: Project) -> Optional[Backend]:
     except BackendAuthError:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
-            detail=error_detail(BackendAuthError.message, code=BackendAuthError.code),
+            detail=error_detail("Backend credentials are invalid", code=BackendAuthError.code),
         )
 
 
@@ -37,7 +37,10 @@ def get_backend_configurator(backend_type: str) -> Configurator:
     if configurator is None:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
-            detail=error_detail(f"Backend {backend_type} not available"),
+            detail=error_detail(
+                f"Backend {backend_type} not available. Ensure the dependencies for {backend_type} are installed.",
+                code=BackendNotAvailableError.code,
+            ),
         )
     return configurator
 

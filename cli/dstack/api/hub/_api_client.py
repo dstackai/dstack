@@ -6,7 +6,7 @@ import requests
 
 from dstack._internal.core.artifact import Artifact
 from dstack._internal.core.build import BuildNotFoundError
-from dstack._internal.core.error import NoMatchingInstanceError
+from dstack._internal.core.error import BackendNotAvailableError, NoMatchingInstanceError
 from dstack._internal.core.job import Job, JobHead
 from dstack._internal.core.log_event import LogEvent
 from dstack._internal.core.plan import RunPlan
@@ -675,6 +675,12 @@ def _make_hub_request(request_func, host, *args, **kwargs) -> requests.Response:
             raise HubClientError(
                 f"Got 500 Server Error from hub: {url}. Check server logs for details."
             )
+        elif resp.status_code == 400:
+            body = resp.json()
+            detail = body.get("detail")
+            if detail is not None:
+                if detail.get("code") == BackendNotAvailableError.code:
+                    raise HubClientError(detail["msg"])
         return resp
     except requests.ConnectionError:
         raise HubClientError(f"Cannot connect to hub at {host}")
