@@ -73,9 +73,15 @@
     background: -webkit-linear-gradient(45deg, #0048ff, #ce00ff);
 }
 
+.tx-landing__hero .md-ph-badge {
+    position: relative;
+    top: 0.85rem;
+    display: inline-block;
+}
 .tx-landing__hero .md-button, .tx-landing__bottom_cta .md-button {
     margin-top: 1rem;
-    padding: 0.55em 2em;
+    /*padding: 0.55em 2em;*/
+    padding: 0.345em 2em;
     font-size: 22px;
     font-weight: 300 !important;
     min-width: 200px;
