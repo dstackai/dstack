@@ -62,7 +62,7 @@ class AWSConfigurator(Configurator):
         project_credentials = project_config.credentials.__root__
         if project_credentials.type == "access_key":
             session = Session(
-                region_name=project_config.region_name,
+                region_name=project_config.region_name or DEFAULT_REGION_NAME,
                 aws_access_key_id=project_credentials.access_key,
                 aws_secret_access_key=project_credentials.secret_key,
             )
