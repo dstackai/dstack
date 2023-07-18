@@ -27,6 +27,10 @@ declare interface IProjectAwsBackendValues {
             selected?: string | null,
             values: { value: string, label: string}[]
         } | null,
+        extra_regions: {
+            selected?: string[] | null,
+            values: { value: string, label: string}[]
+        } | null,
 }
 
 declare interface IProjectAzureBackendValues {
@@ -107,6 +111,7 @@ declare interface TProjectBackendAWS {
     region_name: string,
     s3_bucket_name: string,
     ec2_subnet_id: string | null,
+    extra_regions: string[],
 }
 
 enum AzureCredentialTypeEnum {

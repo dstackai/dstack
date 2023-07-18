@@ -1,6 +1,7 @@
 import React, { useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Outlet, useLocation, useNavigate, useParams } from 'react-router-dom';
+import Box from '@cloudscape-design/components/box';
 
 import { Button, ButtonProps, ConfirmationDialog, ContentLayout, DetailsHeader } from 'components';
 
@@ -82,7 +83,13 @@ export const ProjectDetails: React.FC = () => {
                 <Outlet />
             </ContentLayout>
 
-            <ConfirmationDialog visible={showDeleteConfirm} onDiscard={toggleDeleteConfirm} onConfirm={deleteUserHandler} />
+            <ConfirmationDialog
+                visible={showDeleteConfirm}
+                onDiscard={toggleDeleteConfirm}
+                onConfirm={deleteUserHandler}
+                title={t('projects.edit.delete_project_confirm_title')}
+                content={<Box variant="span">{t('projects.edit.delete_project_confirm_message')}</Box>}
+            />
         </>
     );
 };

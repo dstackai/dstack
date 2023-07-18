@@ -9,6 +9,7 @@ export const FIELD_NAMES = {
     REGION_NAME: 'region_name',
     S3_BUCKET_NAME: 's3_bucket_name',
     EC2_SUBNET_ID: 'ec2_subnet_id',
+    EXTRA_REGIONS: 'extra_regions',
 };
 
 export const CREDENTIALS_HELP = {
@@ -75,6 +76,18 @@ export const SUBNET_HELP = {
             <p>
                 Select a <i>Subnet</i> to run workflows in. If no Subnet is specified, <i>dstack Hub</i> will use the default{' '}
                 <i>Subnet</i> configured in your AWS account.
+            </p>
+        </>
+    ),
+};
+
+export const ADDITIONAL_REGIONS_HELP = {
+    header: <h2>Additional regions</h2>,
+    body: (
+        <>
+            <p>
+                dstack will try to provision the instance in additional regions if the primary region has no capacity.{' '}
+                Specifying additional regions increases the chances of provisioning spot instances.
             </p>
         </>
     ),

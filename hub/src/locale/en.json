@@ -81,6 +81,8 @@
       "backend_type_description": "Select a backend type",
       "members_empty_message_title": "No members",
       "members_empty_message_text": "Select project's members",
+      "delete_project_confirm_title": "Delete project",
+      "delete_project_confirm_message": "Are you sure you want to delete this project?",
       "cli": "CLI",
       "aws": {
         "authorization": "Authorization",
@@ -99,7 +101,10 @@
         "s3_bucket_name_description": "Select an S3 bucket to store artifacts",
         "ec2_subnet_id": "Subnet",
         "ec2_subnet_id_description": "Select a subnet to run workflows in",
-        "ec2_subnet_id_placeholder":  "Not selected"
+        "ec2_subnet_id_placeholder":  "Not selected",
+        "extra_regions": "Additional regions",
+        "extra_regions_description": "Select additional regions to run workflows",
+        "extra_regions_placeholder":  "Select regions"
       },
       "azure" : {
         "authorization": "Authorization",
@@ -291,7 +296,7 @@
       "refresh_token_success_notification": "Token rotating is successful",
       "refresh_token_error_notification": "Token rotating error",
       "refresh_token_confirm_title": "Rotate token",
-      "refresh_token_confirm_message": "Do you sure want to rotate token?",
+      "refresh_token_confirm_message": "Are you sure you want to rotate token?",
       "refresh_token_button_label": "Rotate",
       "validation": {
         "user_name_format": "Only letters, numbers, - or _"
@@ -315,7 +320,7 @@
   },
   "confirm_dialog": {
     "title": "Confirm delete",
-    "message": "Do you sure want to delete?"
+    "message": "Are you sure you want to delete?"
   }
 }
 

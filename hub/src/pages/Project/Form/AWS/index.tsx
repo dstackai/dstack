@@ -3,7 +3,17 @@ import { useFormContext } from 'react-hook-form';
 import { useTranslation } from 'react-i18next';
 import { debounce } from 'lodash';
 
-import { FormInput, FormS3BucketSelector, FormSelect, FormSelectOptions, InfoLink, SpaceBetween, Spinner } from 'components';
+import {
+    FormInput,
+    FormMultiselect,
+    FormMultiselectOptions,
+    FormS3BucketSelector,
+    FormSelect,
+    FormSelectOptions,
+    InfoLink,
+    SpaceBetween,
+    Spinner,
+} from 'components';
 
 import { useHelpPanel, useNotifications } from 'hooks';
 import { isRequestFormErrors2, isRequestFormFieldError } from 'libs';
@@ -11,7 +21,7 @@ import { useBackendValuesMutation } from 'services/project';
 import { AWSCredentialTypeEnum } from 'types';
 
 import useIsMounted from '../../../../hooks/useIsMounted';
-import { BUCKET_HELP, CREDENTIALS_HELP, FIELD_NAMES, REGION_HELP, SUBNET_HELP } from './constants';
+import { ADDITIONAL_REGIONS_HELP, BUCKET_HELP, CREDENTIALS_HELP, FIELD_NAMES, REGION_HELP, SUBNET_HELP } from './constants';
 
 import { IProps } from './types';
 
@@ -25,6 +35,7 @@ export const AWSBackend: React.FC<IProps> = ({ loading }) => {
     const [regions, setRegions] = useState<FormSelectOptions>([]);
     const [buckets, setBuckets] = useState<TAwsBucket[]>([]);
     const [subnets, setSubnets] = useState<FormSelectOptions>([]);
+    const [extraRegions, setExtraRegions] = useState<FormMultiselectOptions>([]);
     const [availableDefaultCredentials, setAvailableDefaultCredentials] = useState<null | boolean>(null);
     const lastUpdatedField = useRef<string | null>(null);
     const isFirstRender = useRef<boolean>(true);
@@ -104,6 +115,14 @@ export const AWSBackend: React.FC<IProps> = ({ loading }) => {
 
             if (response.ec2_subnet_id?.selected !== undefined) {
                 setValue(`backend.${FIELD_NAMES.EC2_SUBNET_ID}`, response.ec2_subnet_id.selected ?? '');
+            }
+
+            if (response.extra_regions?.values) {
+                setExtraRegions(response.extra_regions.values);
+            }
+
+            if (response.extra_regions?.selected !== undefined) {
+                setValue(`backend.${FIELD_NAMES.EXTRA_REGIONS}`, response.extra_regions.selected);
             }
         } catch (errorResponse) {
             console.log('fetch backends values error:', errorResponse);
@@ -261,6 +280,19 @@ export const AWSBackend: React.FC<IProps> = ({ loading }) => {
                 onChange={getOnChangeSelectField(FIELD_NAMES.EC2_SUBNET_ID)}
                 options={subnets}
                 secondaryControl={renderSpinner()}
+            />
+
+            <FormMultiselect
+                info={<InfoLink onFollow={() => openHelpPanel(ADDITIONAL_REGIONS_HELP)} />}
+                label={t('projects.edit.aws.extra_regions')}
+                description={t('projects.edit.aws.extra_regions_description')}
+                placeholder={t('projects.edit.aws.extra_regions_placeholder')}
+                control={control}
+                name={`backend.${FIELD_NAMES.EXTRA_REGIONS}`}
+                onChange={getOnChangeSelectField(FIELD_NAMES.EXTRA_REGIONS)}
+                disabled={getDisabledByFieldName(FIELD_NAMES.EXTRA_REGIONS)}
+                secondaryControl={renderSpinner()}
+                options={extraRegions}
             />
         </SpaceBetween>
     );

@@ -81,6 +81,8 @@ export const ProjectSettings: React.FC = () => {
     const renderAwsBackendDetails = (): React.ReactNode => {
         if (!data) return null;
 
+        const extraRegions = data.backend.extra_regions?.join(', ');
+
         return (
             <ColumnLayout columns={4} variant="text-grid">
                 <div>
@@ -100,7 +102,15 @@ export const ProjectSettings: React.FC = () => {
 
                 <div>
                     <Box variant="awsui-key-label">{t('projects.edit.aws.ec2_subnet_id')}</Box>
-                    <div>{data.backend.ec2_subnet_id}</div>
+                    <div>{data.backend.ec2_subnet_id || '-'}</div>
+                </div>
+
+                <div>
+                    <Box variant="awsui-key-label">{t('projects.edit.aws.extra_regions')}</Box>
+
+                    <div style={{ whiteSpace: 'nowrap', textOverflow: 'ellipsis', overflow: 'hidden' }} title={extraRegions}>
+                        {extraRegions || '-'}
+                    </div>
                 </div>
             </ColumnLayout>
         );
