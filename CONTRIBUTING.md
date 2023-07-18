@@ -15,13 +15,13 @@
     ```
 3. Install `dstack` in editable mode:
     ```
-    pip install -e .
+    pip install -e '.[all]'
     ```
 4. Install dev dependencies:
     ```
     pip install -r cli/requirements_dev.txt
     ```
-5. Build the frontend
+5. Build the frontend:
     ```
     ./scripts/build_frontend.sh
     ```

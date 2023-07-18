@@ -95,6 +95,8 @@ GCP_DEPS = [
 
 LAMBDA_DEPS = AWS_DEPS
 
+ALL_DEPS = AWS_DEPS + AZURE_DEPS + GCP_DEPS
+
 setup(
     name="dstack",
     version=get_version(),
@@ -125,6 +127,7 @@ setup(
     python_requires=">=3.7",
     install_requires=BASE_DEPS,
     extras_require={
+        "all": ALL_DEPS,
         "aws": AWS_DEPS,
         "azure": AZURE_DEPS,
         "gcp": GCP_DEPS,
