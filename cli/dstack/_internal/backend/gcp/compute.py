@@ -26,8 +26,16 @@ DSTACK_INSTANCE_TAG = "dstack-runner-instance"
 
 
 _supported_accelerators = [
+    # todo L4
     {"accelerator_name": "nvidia-a100-80gb", "gpu_name": "A100", "memory_mb": 1024 * 80},
     {"accelerator_name": "nvidia-tesla-a100", "gpu_name": "A100", "memory_mb": 1024 * 40},
+    {
+        "accelerator_name": "nvidia-tesla-t4",
+        "gpu_name": "T4",
+        "memory_mb": 1024 * 16,
+        "max_vcpu": 48,
+        "max_ram_mb": 1024 * 312,
+    },
     {
         "accelerator_name": "nvidia-tesla-v100",
         "gpu_name": "V100",
@@ -338,7 +346,12 @@ def _add_gpus_to_instance_type(
         accelerator_types_client=accelerator_types_client,
         project_id=project_id,
         zone=zone,
-        accelerator_families=["nvidia-tesla-v100", "nvidia-tesla-k80", "nvidia-tesla-p100"],
+        accelerator_families=[
+            "nvidia-tesla-t4",
+            "nvidia-tesla-v100",
+            "nvidia-tesla-k80",
+            "nvidia-tesla-p100",
+        ],
     )
     for at in accelerator_types:
         for gpu_count in range(1, at.maximum_cards_per_instance):
