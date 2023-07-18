@@ -206,6 +206,7 @@ class Job(JobHead):
     requirements: Optional[Requirements]
     spot_policy: Optional[SpotPolicy]
     retry_policy: Optional[RetryPolicy]
+    max_duration: Optional[int]
     dep_specs: Optional[List[DepSpec]]
     master_job: Optional[JobRef]
     app_specs: Optional[List[AppSpec]]
@@ -287,6 +288,7 @@ class Job(JobHead):
             "host_name": self.host_name or "",
             "spot_policy": self.spot_policy.value if self.spot_policy else None,
             "retry_policy": self.retry_policy.dict() if self.retry_policy else None,
+            "max_duration": self.max_duration or None,
             "requirements": self.requirements.serialize() if self.requirements else {},
             "deps": deps,
             "master_job_id": self.master_job.get_id() if self.master_job else "",
@@ -435,6 +437,9 @@ class Job(JobHead):
             host_name=job_data.get("host_name") or None,
             spot_policy=SpotPolicy(spot_policy) if spot_policy else None,
             retry_policy=retry_policy,
+            max_duration=int(job_data.get("max_duration"))
+            if job_data.get("max_duration")
+            else None,
             requirements=requirements,
             dep_specs=dep_specs or None,
             master_job=master_job,

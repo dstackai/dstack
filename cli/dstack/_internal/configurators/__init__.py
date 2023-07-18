@@ -14,7 +14,7 @@ import dstack.version as version
 from dstack._internal.core.build import BuildPolicy
 from dstack._internal.core.configuration import BaseConfiguration, PythonVersion
 from dstack._internal.core.error import DstackError
-from dstack._internal.core.profile import Profile
+from dstack._internal.core.profile import Profile, parse_duration, parse_max_duration
 from dstack._internal.core.repo import Repo
 from dstack._internal.utils.common import get_milliseconds_since_epoch
 from dstack._internal.utils.interpolator import VariablesInterpolator
@@ -60,6 +60,8 @@ class JobConfigurator(ABC):
         retry_group.add_argument("--no-retry", action="store_true")
         retry_group.add_argument("--retry-limit", type=str)
 
+        parser.add_argument("--max-duration", type=str)
+
         build_policy = parser.add_mutually_exclusive_group()
         build_policy.add_argument(
             "--build", action="store_const", dest="build_policy", const=BuildPolicy.BUILD
@@ -83,10 +85,13 @@ class JobConfigurator(ABC):
             self.profile.retry_policy.retry = False
         elif args.retry_limit:
             self.profile.retry_policy.retry = True
-            self.profile.retry_policy.limit = args.retry_limit
+            self.profile.retry_policy.limit = parse_duration(args.retry_limit)
 
         if args.build_policy is not None:
             self.build_policy = args.build_policy
+
+        if args.max_duration:
+            self.profile.max_duration = parse_max_duration(args.max_duration)
 
     def inject_context(
         self, namespaces: Dict[str, Dict[str, str]], skip: Optional[List[str]] = None
@@ -142,6 +147,7 @@ class JobConfigurator(ABC):
             dep_specs=self.dep_specs(),
             spot_policy=self.spot_policy(),
             retry_policy=self.retry_policy(),
+            max_duration=self.max_duration(),
             build_policy=self.build_policy,
             requirements=self.requirements(),
             ssh_key_pub=ssh_key_pub,
@@ -162,6 +168,10 @@ class JobConfigurator(ABC):
 
     @abstractmethod
     def dep_specs(self) -> List[job.DepSpec]:
+        pass
+
+    @abstractmethod
+    def default_max_duration(self) -> int:
         pass
 
     def build_commands(self) -> List[str]:
@@ -185,12 +195,6 @@ class JobConfigurator(ABC):
         if self.profile.resources and self.profile.resources.gpu:
             return f"dstackai/miniforge:py{self.python()}-{version.miniforge_image}-cuda-11.4"
         return f"dstackai/miniforge:py{self.python()}-{version.miniforge_image}"
-
-    def spot_policy(self) -> job.SpotPolicy:
-        return self.profile.spot_policy or job.SpotPolicy.AUTO
-
-    def retry_policy(self) -> job.RetryPolicy:
-        return job.RetryPolicy.parse_obj(self.profile.retry_policy)
 
     def cache_specs(self) -> List[job.CacheSpec]:
         return [
@@ -253,6 +257,19 @@ class JobConfigurator(ABC):
         return " ".join(
             (arg if " " not in arg else '"%s"' % arg.replace('"', '\\"')) for arg in args
         )
+
+    def spot_policy(self) -> job.SpotPolicy:
+        return self.profile.spot_policy or job.SpotPolicy.AUTO
+
+    def retry_policy(self) -> job.RetryPolicy:
+        return job.RetryPolicy.parse_obj(self.profile.retry_policy)
+
+    def max_duration(self) -> Optional[int]:
+        if self.profile.max_duration is None:
+            return self.default_max_duration()
+        if self.profile.max_duration < 0:
+            return None
+        return self.profile.max_duration
 
 
 def validate_local_path(path: str, home: Optional[str], working_dir: str) -> str:
