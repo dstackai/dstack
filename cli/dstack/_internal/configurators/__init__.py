@@ -43,6 +43,10 @@ class JobConfigurator(ABC):
         if parser is None:
             parser = argparse.ArgumentParser(prog=prog, formatter_class=RichHelpFormatter)
 
+        parser.add_argument(
+            "-p", "--ports", metavar="PORT", type=port_mapping, nargs=argparse.ONE_OR_MORE
+        )
+
         spot_group = parser.add_mutually_exclusive_group()
         spot_group.add_argument(
             "--spot", action="store_const", dest="spot_policy", const=job.SpotPolicy.SPOT
@@ -76,6 +80,9 @@ class JobConfigurator(ABC):
         return parser
 
     def apply_args(self, args: argparse.Namespace):
+        if args.ports is not None:
+            self.conf.ports = list(ports.merge_ports(self.conf.ports, args.ports).values())
+
         if args.spot_policy is not None:
             self.profile.spot_policy = args.spot_policy
 
@@ -212,8 +219,8 @@ class JobConfigurator(ABC):
         for i, pm in enumerate(ports.filter_reserved_ports(self.ports())):
             specs.append(
                 job.AppSpec(
-                    port=pm.port,
-                    map_to_port=pm.map_to_port,
+                    port=pm.container_port,
+                    map_to_port=pm.local_port,
                     app_name=f"app_{i}",
                 )
             )
@@ -226,13 +233,12 @@ class JobConfigurator(ABC):
         return PythonVersion(f"{version_info.major}.{version_info.minor}").value
 
     def ports(self) -> Dict[int, ports.PortMapping]:
-        mapping = [ports.PortMapping(p) for p in self.conf.ports]
-        ports.unique_ports_constraint([pm.port for pm in mapping])
+        ports.unique_ports_constraint([pm.container_port for pm in self.conf.ports])
         ports.unique_ports_constraint(
-            [pm.map_to_port for pm in mapping if pm.map_to_port is not None],
+            [pm.local_port for pm in self.conf.ports if pm.local_port is not None],
             error="Mapped port {} is already in use",
         )
-        return {pm.port: pm for pm in mapping}
+        return {pm.container_port: pm for pm in self.conf.ports}
 
     def env(self) -> Dict[str, str]:
         return self.conf.env
@@ -288,3 +294,8 @@ def validate_local_path(path: str, home: Optional[str], working_dir: str) -> str
 
 class HomeDirUnsetError(DstackError):
     pass
+
+
+def port_mapping(v: str) -> ports.PortMapping:
+    # argparse uses __name__ for handling ValueError
+    return ports.PortMapping.parse(v)

@@ -1,3 +1,4 @@
+import re
 from enum import Enum
 from typing import Dict, List, Optional, Union
 
@@ -5,6 +6,7 @@ from pydantic import BaseModel, Extra, Field, conint, constr, validator
 from typing_extensions import Annotated, Literal
 
 CommandsList = List[str]
+ValidPort = conint(gt=0, le=65536)
 
 
 class PythonVersion(str, Enum):
@@ -23,6 +25,28 @@ class ForbidExtra(BaseModel):
 class RegistryAuth(ForbidExtra):
     username: Annotated[Optional[str], Field(description="Username")]
     password: Annotated[str, Field(description="Password or access token")]
+
+
+class PortMapping(ForbidExtra):
+    local_port: Optional[ValidPort] = None
+    container_port: ValidPort
+
+    @classmethod
+    def parse(cls, v: str) -> "PortMapping":
+        """
+        Possible values:
+          - 8080
+          - :8080
+          - 80:8080
+        """
+        r = re.search(r"^(?:(\d+)?:)?(\d+)?$", v)
+        if not r:
+            raise ValueError(v)
+        local_port, container_port = r.groups()
+        return PortMapping(
+            local_port=None if local_port is None else int(local_port),
+            container_port=container_port,
+        )
 
 
 class Artifact(ForbidExtra):
@@ -52,7 +76,7 @@ class BaseConfiguration(ForbidExtra):
         Field(description="The major version of Python\nMutually exclusive with the image"),
     ]
     ports: Annotated[
-        List[Union[constr(regex=r"^[0-9]+:[0-9]+$"), conint(gt=0, le=65536)]],
+        List[Union[constr(regex=r"^(?:([0-9]+)?:)?[0-9]+$"), ValidPort, PortMapping]],
         Field(description="Port numbers/mapping to expose"),
     ] = []
     env: Annotated[
@@ -77,6 +101,18 @@ class BaseConfiguration(ForbidExtra):
         if isinstance(v, str):
             return PythonVersion(v)
         return v
+
+    @validator("ports")
+    def convert_ports(cls, v) -> List[PortMapping]:
+        ports = []
+        for i in v:
+            if isinstance(i, int):
+                ports.append(PortMapping(container_port=i))
+            elif isinstance(i, str):
+                ports.append(PortMapping.parse(i))
+            else:
+                ports.append(i)
+        return ports
 
     @validator("env")
     def convert_env(cls, v) -> Dict[str, str]:
