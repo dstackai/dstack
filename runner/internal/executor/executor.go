@@ -6,13 +6,14 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
-	"github.com/dstackai/dstack/runner/internal/backend/base"
 	"io"
 	"os"
 	"path"
 	"path/filepath"
 	"strconv"
 	"time"
+
+	"github.com/dstackai/dstack/runner/internal/backend/base"
 
 	"github.com/dstackai/dstack/runner/internal/models"
 	"github.com/dustin/go-humanize"
@@ -46,7 +47,6 @@ type Executor struct {
 	artifactsOut   []base.Artifacter
 	artifactsFUSE  []base.Artifacter
 	repo           *repo.Manager
-	portID         string
 	streamLogs     *stream.Server
 	stoppedCh      chan struct{}
 }
@@ -142,15 +142,24 @@ func (ex *Executor) Run(ctx context.Context) error {
 			if err != nil {
 				return err
 			}
+			job, err := ex.backend.RefetchJob(runCtx)
+			if err != nil {
+				return gerrors.Wrap(err)
+			}
 			if stopped {
 				log.Info(runCtx, "Stopped")
 				ex.Stop()
 				log.Info(runCtx, "Waiting job end")
 				errRun := <-erCh
-				job, err := ex.backend.RefetchJob(runCtx)
-				if err != nil {
-					return gerrors.Wrap(err)
-				}
+				job.Status = states.Stopped
+				_ = ex.backend.UpdateState(runCtx)
+				return errRun
+			}
+			if job.MaxDurationExceeded() {
+				log.Info(runCtx, "Job max duration exceeded. Stopping...")
+				ex.Stop()
+				log.Info(runCtx, "Waiting job end")
+				errRun := <-erCh
 				job.Status = states.Stopped
 				_ = ex.backend.UpdateState(runCtx)
 				return errRun

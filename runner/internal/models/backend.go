@@ -3,6 +3,7 @@ package models
 import (
 	"fmt"
 	"strings"
+	"time"
 )
 
 type Resource struct {
@@ -54,6 +55,7 @@ type Job struct {
 	RunnerID          string       `yaml:"runner_id"`
 	SpotPolicy        string       `yaml:"spot_policy"`
 	RetryPolicy       RetryPolicy  `yaml:"retry_policy"`
+	MaxDuration       uint64       `yaml:"max_duration,omitempty"`
 	Status            string       `yaml:"status"`
 	ErrorCode         string       `yaml:"error_code,omitempty"`
 	ContainerExitCode string       `yaml:"container_exit_code,omitempty"`
@@ -197,4 +199,12 @@ func (j *Job) GetInstanceType() string {
 
 func (j *Job) SecretsPrefix() string {
 	return fmt.Sprintf("secrets/%s/l;", j.RepoId)
+}
+
+func (j *Job) MaxDurationExceeded() bool {
+	if j.MaxDuration == 0 {
+		return false
+	}
+	now := uint64(time.Now().Unix())
+	return now > j.SubmittedAt/1000+j.MaxDuration
 }

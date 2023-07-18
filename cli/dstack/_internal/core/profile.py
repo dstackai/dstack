@@ -29,13 +29,13 @@ def parse_memory(v: Optional[Union[int, str]]) -> Optional[int]:
     return int(v)
 
 
-def duration(v: Union[int, str]) -> int:
+def parse_duration(v: Union[int, str]) -> int:
     if isinstance(v, int):
         return v
     regex = re.compile(r"(?P<amount>\d+) *(?P<unit>[smhdw])$")
-    re_match = regex.match(duration)
+    re_match = regex.match(v)
     if not re_match:
-        raise ValueError(f"Cannot parse the duration {duration}")
+        raise ValueError(f"Cannot parse the duration {v}")
     amount, unit = int(re_match.group("amount")), re_match.group("unit")
     multiplier = {
         "s": 1,
@@ -45,6 +45,12 @@ def duration(v: Union[int, str]) -> int:
         "w": 7 * 24 * 3600,
     }[unit]
     return amount * multiplier
+
+
+def parse_max_duration(v: Union[int, str]) -> int:
+    if v == "off":
+        return -1
+    return parse_duration(v)
 
 
 class ProfileGPU(ForbidExtra):
@@ -71,7 +77,7 @@ class ProfileResources(ForbidExtra):
 class ProfileRetryPolicy(ForbidExtra):
     retry: bool = False
     limit: Union[int, str] = DEFAULT_RETRY_LIMIT
-    _validate_limit = validator("limit", pre=True, allow_reuse=True)(duration)
+    _validate_limit = validator("limit", pre=True, allow_reuse=True)(parse_duration)
 
 
 class Profile(ForbidExtra):
@@ -80,7 +86,9 @@ class Profile(ForbidExtra):
     resources: ProfileResources = ProfileResources()
     spot_policy: Optional[SpotPolicy]
     retry_policy: ProfileRetryPolicy = ProfileRetryPolicy()
+    max_duration: Optional[Union[int, str]]
     default: bool = False
+    _validate_limit = validator("max_duration", pre=True, allow_reuse=True)(parse_max_duration)
 
 
 class ProfilesConfig(ForbidExtra):

@@ -10,6 +10,8 @@ from dstack._internal.configurators.ports import get_map_to_port
 from dstack._internal.core.configuration import DevEnvironmentConfiguration
 from dstack._internal.core.repo import Repo
 
+DEFAULT_MAX_DURATION_SECONDS = 6 * 3600
+
 require_sshd = require(["sshd"])
 install_ipykernel = f'(pip install -q --no-cache-dir ipykernel 2> /dev/null) || echo "no pip, ipykernel was not installed"'
 
@@ -59,16 +61,19 @@ class DevEnvironmentConfigurator(JobConfigurator):
         commands.append(install_ipykernel)
         return commands
 
+    def default_max_duration(self) -> int:
+        return DEFAULT_MAX_DURATION_SECONDS
+
     def artifact_specs(self) -> List[job.ArtifactSpec]:
         return []  # not available
 
     def dep_specs(self) -> List[job.DepSpec]:
         return []  # not available
 
-    def spot_policy(self) -> job.SpotPolicy:
-        return self.profile.spot_policy or job.SpotPolicy.ONDEMAND
-
     def app_specs(self) -> List[job.AppSpec]:
         specs = super().app_specs()
         self.sshd.add_app(specs)
         return specs
+
+    def spot_policy(self) -> job.SpotPolicy:
+        return self.profile.spot_policy or job.SpotPolicy.ONDEMAND

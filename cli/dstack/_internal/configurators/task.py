@@ -7,6 +7,8 @@ from dstack._internal.core import job as job
 from dstack._internal.core.configuration import TaskConfiguration
 from dstack._internal.core.repo import Repo
 
+DEFAULT_MAX_DURATION_SECONDS = 72 * 3600
+
 
 class TaskConfigurator(JobConfigurator):
     conf: TaskConfiguration
@@ -28,6 +30,9 @@ class TaskConfigurator(JobConfigurator):
 
     def optional_build_commands(self) -> List[str]:
         return []  # not needed
+
+    def default_max_duration(self) -> int:
+        return DEFAULT_MAX_DURATION_SECONDS
 
     def artifact_specs(self) -> List[job.ArtifactSpec]:
         specs = []
