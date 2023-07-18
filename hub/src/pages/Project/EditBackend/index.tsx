@@ -36,7 +36,7 @@ export const ProjectEditBackend: React.FC = () => {
     ]);
 
     const onCancelHandler = () => {
-        navigate(ROUTES.PROJECT.DETAILS.REPOSITORIES.FORMAT(paramProjectName));
+        navigate(ROUTES.PROJECT.DETAILS.SETTINGS.FORMAT(paramProjectName));
     };
 
     const onSubmitHandler = async (data: Partial<IProject>): Promise<IProject> => {
