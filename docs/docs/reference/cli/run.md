@@ -41,8 +41,8 @@ The following arguments are optional:
 - `-d`, `--detach` – (Optional) Run in the detached mode. Means, the command doesn't
   poll logs and run status.
 
-[//]: # (- `-p PORT [PORT ...]`, `--port PORT [PORT ...]` – &#40;Optional&#41; Requests ports or define mappings for them &#40;`APP_PORT:LOCAL_PORT`&#41;)
 [//]: # (- `-t TAG`, `--tag TAG` – &#40;Optional&#41; A tag name. Warning, if the tag exists, it will be overridden.)
+- `-p PORT [PORT ...]`, `--ports PORT [PORT ...]` – (Optional) Requests ports or define mappings for them (`LOCAL_PORT:CONTAINER_PORT`)
 - `ARGS` – (Optional) Use `ARGS` to pass custom run arguments
 
 Spot policy (the arguments are mutually exclusive):

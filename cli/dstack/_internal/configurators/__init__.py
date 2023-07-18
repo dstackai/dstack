@@ -44,7 +44,7 @@ class JobConfigurator(ABC):
             parser = argparse.ArgumentParser(prog=prog, formatter_class=RichHelpFormatter)
 
         parser.add_argument(
-            "-p", "--ports", metavar="PORTS", type=port_mapping, nargs=argparse.ONE_OR_MORE
+            "-p", "--ports", metavar="PORT", type=port_mapping, nargs=argparse.ONE_OR_MORE
         )
 
         spot_group = parser.add_mutually_exclusive_group()
