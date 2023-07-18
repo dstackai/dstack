@@ -2,28 +2,40 @@
 
 Use `yarn` or `npm` to install dependencies:
 
-For `yarn` use: 
 ```shell
 yarn
 ```
 
-For `npm` use:
+or
+
 ```shell
 npm install
 ```
 
-## Running
+## Build
 
-To run the application localy using the `npm run start` command:
+For building the frontend, run:
+
+```shell
+npm run build
+```
+
+Then copy the build directory:
+
+```shell
+cp -r build ../cli/dstack/_internal/hub/statics
+```
+
+## Development
+
+For frontend development, run a `webpack` dev server:
 
 ```shell
 npm run start
 ```
 
-if the application is running in a local environment, it  always uses mocks for api requests.
-
-If you want to build production version, using the `npm run build` command:
+The `webpack` dev server expects the API to be running on `http://127.0.0.1:3001`. So ensure to run the API on port `3001`:
 
 ```shell
-npm run build
+dstack start --port 3001
 ```
