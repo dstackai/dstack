@@ -4,7 +4,12 @@ from rich.prompt import Confirm
 
 from dstack._internal.api.runs import list_runs_hub
 from dstack._internal.cli.commands import BasicCommand
-from dstack._internal.cli.commands.run import _poll_run, _print_run_plan, _read_ssh_key_pub
+from dstack._internal.cli.commands.run import (
+    _poll_run,
+    _print_run_plan,
+    _read_ssh_key_pub,
+    _reserve_ports,
+)
 from dstack._internal.cli.common import add_project_argument, check_init, console
 from dstack._internal.cli.config import config, get_hub_client
 from dstack._internal.cli.configuration import load_configuration
@@ -49,8 +54,14 @@ class BuildCommand(BasicCommand):
         if not args.yes and not Confirm.ask("Continue?"):
             console.print("\nExiting...")
             exit(0)
-        console.print("\nProvisioning...\n")
 
+        ports_locks = None
+        if not args.detach:
+            ports_locks = _reserve_ports(
+                configurator.app_specs(), hub_client.get_project_backend_type() == "local"
+            )
+
+        console.print("\nProvisioning...\n")
         run_name, jobs = hub_client.run_configuration(
             configurator=configurator,
             ssh_key_pub=ssh_key_pub,
@@ -64,6 +75,7 @@ class BuildCommand(BasicCommand):
             jobs,
             ssh_key=config.repo_user_config.ssh_key_path,
             watcher=None,
+            ports_locks=ports_locks,
         )
 
     def __init__(self, parser):
