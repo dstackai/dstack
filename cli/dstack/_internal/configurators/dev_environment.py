@@ -13,7 +13,7 @@ from dstack._internal.core.repo import Repo
 DEFAULT_MAX_DURATION_SECONDS = 6 * 3600
 
 require_sshd = require(["sshd"])
-install_ipykernel = f'(pip install -q --no-cache-dir ipykernel 2> /dev/null) || echo "no pip, ipykernel was not installed"'
+install_ipykernel = f'(pip install --no-cache-dir ipykernel 2> /dev/null) || echo "no pip, ipykernel was not installed"'
 
 
 class DevEnvironmentConfigurator(JobConfigurator):
