@@ -88,14 +88,6 @@ class RunCommand(BasicCommand):
             dest="profile_name",
         )
         self._parser.add_argument(
-            "-t",
-            "--tag",
-            metavar="TAG",
-            help="A tag name. Warning, if the tag exists, " "it will be overridden.",
-            type=str,
-            dest="tag_name",
-        )
-        self._parser.add_argument(
             "args",
             metavar="ARGS",
             nargs=argparse.ZERO_OR_MORE,

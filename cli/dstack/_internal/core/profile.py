@@ -14,9 +14,9 @@ DEFAULT_RETRY_LIMIT = 3600
 def parse_memory(v: Optional[Union[int, str]]) -> Optional[int]:
     """
     Converts human-readable sizes (MB and GB) to megabytes
-    >>> mem_size("512MB")
+    >>> parse_memory("512MB")
     512
-    >>> mem_size("1 GB")
+    >>> parse_memory("1 GB")
     1024
     """
     if isinstance(v, str):
@@ -88,7 +88,9 @@ class Profile(ForbidExtra):
     retry_policy: ProfileRetryPolicy = ProfileRetryPolicy()
     max_duration: Optional[Union[int, str]]
     default: bool = False
-    _validate_limit = validator("max_duration", pre=True, allow_reuse=True)(parse_max_duration)
+    _validate_max_duration = validator("max_duration", pre=True, allow_reuse=True)(
+        parse_max_duration
+    )
 
 
 class ProfilesConfig(ForbidExtra):
