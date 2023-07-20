@@ -144,7 +144,7 @@ class AzureCompute(Compute):
 def _get_instance_types(client: ComputeManagementClient, location: str) -> List[InstanceType]:
     instance_types = []
     vm_series_pattern = re.compile(
-        r"^(Standard_D\d+s_v3|Standard_E\d+(-\d*)?s_v4|Standard_NC\d+|Standard_NC\d+s_v3|Standard_NC\d+as_T4_v3)$"
+        r"^(Standard_D\d+s_v3|Standard_E\d+(-\d*)?s_v4|Standard_NC\d+s_v3|Standard_NC\d+as_T4_v3)$"
     )
     # Only location filter is supported currently in azure API.
     # See: https://learn.microsoft.com/en-us/python/api/azure-mgmt-compute/azure.mgmt.compute.v2021_07_01.operations.resourceskusoperations?view=azure-python#azure-mgmt-compute-v2021-07-01-operations-resourceskusoperations-list
@@ -191,8 +191,6 @@ def _get_gpu_name_memory(vm_name: str) -> Tuple[str, int]:
         return "T4", 16 * 1024
     if re.match(r"^Standard_NC\d+s_v3$", vm_name):
         return "V100", 16 * 1024
-    if re.match(r"^Standard_NC\d+$", vm_name):
-        return "K80", 12 * 1024
 
 
 def _get_instance_name(job: Job) -> str:
