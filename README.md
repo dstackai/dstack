@@ -14,7 +14,7 @@ Cost-effective LLM development
 
 <p align="center">
 <a href="https://dstack.ai/docs" target="_blank"><b>Docs</b></a> •
-<a href="https://dstack.ai/examples/dolly" target="_blank"><b>Examples</b></a> •
+<a href="https://dstack.ai/examples" target="_blank"><b>Examples</b></a> •
 <a href="https://dstack.ai/blog" target="_blank"><b>Blog</b></a> •
 <a href="https://join.slack.com/t/dstackai/shared_invite/zt-xdnsytie-D4qU9BvJP8vkbkHXdi6clQ" target="_blank"><b>Slack</b></a>
 </p>
@@ -29,10 +29,9 @@ It streamlines development and deployment, reduces cloud costs, and frees users 
 
 ## Latest news
 
-- [2023/07] 🔥 [Lambda Cloud GA and custom Docker images](https://dstack.ai/blog/2023/07/14/lambda-cloud-ga-and-docker-support/) (Release)  
-- [2023/06] [Running XGen 7B chatbot in your cloud](https://github.com/dstackai/dstack-examples/wiki/Running-XGen-7B-Chatbot-in-your-cloud) (Example)
-- [2023/06] [Running LLM as chatbot in your cloud](https://github.com/dstackai/LLM-As-Chatbot/wiki/Running-LLM-As-Chatbot-in-your-cloud) (Example)
-- [2023/06] [New configuration format and CLI experience](https://dstack.ai/blog/2023/06/12/new-configuration-format-and-cli-experience/) (Release)
+- [2023/07] [LLM as Chatbot](https://dstack.ai/examples/llmchat) (Example)
+- [2023/07] [Lambda Cloud GA and Docker support](https://dstack.ai/blog/2023/07/14/lambda-cloud-ga-and-docker-support/) (Release)  
+- [2023/06] [New YAML format](https://dstack.ai/blog/2023/06/12/new-configuration-format-and-cli-experience/) (Release)
 
 ## Installation
 
@@ -129,7 +128,7 @@ Otherwise, you can always specify the profile using `--profile PROFILE`.
 For additional information and examples, see the following links:
 
 - [Docs](https://dstack.ai/docs)
-- [Examples](https://github.com/dstackai/dstack-examples/blob/main/README.md)
+- [Examples](https://dstack.ai/examples)
 - [Blog](https://dstack.ai/blog)
 - [Slack](https://join.slack.com/t/dstackai/shared_invite/zt-xdnsytie-D4qU9BvJP8vkbkHXdi6clQ)
 
