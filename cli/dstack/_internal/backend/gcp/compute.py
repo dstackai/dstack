@@ -50,13 +50,6 @@ _supported_accelerators = [
         "max_vcpu": 16,
         "max_ram_mb": 1024 * 104,
     },
-    {
-        "accelerator_name": "nvidia-tesla-k80",
-        "gpu_name": "K80",
-        "memory_mb": 1024 * 12,
-        "max_vcpu": 8,
-        "max_ram_mb": 1024 * 52,
-    },
 ]
 
 
@@ -209,8 +202,8 @@ def _get_nongpu_instance_type(
     machine_types_client: compute_v1.MachineTypesClient,
     project_id: str,
     zone: str,
-    requirements: Requirements,
-) -> List[InstanceType]:
+    requirements: Optional[Requirements],
+) -> Optional[InstanceType]:
     machine_families = ["e2-medium", "e2-standard-*", "e2-highmem-*", "e2-highcpu-*", "m1-*"]
     instance_types = _list_instance_types(
         machine_types_client=machine_types_client,
@@ -340,7 +333,7 @@ def _add_gpus_to_instance_type(
     zone: str,
     instance_type: InstanceType,
     requirements: Requirements,
-) -> bool:
+) -> List[InstanceType]:
     instance_types = []
     accelerator_types = _list_accelerator_types(
         accelerator_types_client=accelerator_types_client,
@@ -349,7 +342,6 @@ def _add_gpus_to_instance_type(
         accelerator_families=[
             "nvidia-tesla-t4",
             "nvidia-tesla-v100",
-            "nvidia-tesla-k80",
             "nvidia-tesla-p100",
         ],
     )
