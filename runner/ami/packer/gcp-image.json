@@ -3,14 +3,13 @@
     "build_id": "{{timestamp}}",
     "build_prefix": "stgn-",
     "docker_version": "20.10.17",
-    "dstack_stage": "STGN",
-    "runner_version": "latest"
+    "dstack_stage": "STGN"
   },
   "builders": [
     {
       "type": "googlecompute",
       "project_id": "dstack",
-      "source_image": "ubuntu-1804-bionic-v20220616",
+      "source_image": "ubuntu-2204-jammy-v20230714",
       "image_name": "{{user `build_prefix`}}dstack-nocuda-{{user `build_id`}}",
       "instance_name": "{{user `build_prefix`}}dstack-nocuda-{{user `build_id`}}",
       "ssh_username": "ubuntu",
@@ -30,14 +29,6 @@
         "provisioners/kernel/apt-packages.sh",
         "provisioners/kernel/kernel-tuning.sh"
       ]
-    },
-    {
-      "type": "shell",
-      "environment_vars": [
-        "DSTACK_STAGE={{user `dstack_stage`}}",
-        "RUNNER_VERSION={{user `runner_version`}}"
-      ],
-      "script": "provisioners/get-dstack-runner.sh"
     },
     {
       "type": "file",
@@ -60,10 +51,6 @@
       "type": "shell",
       "environment_vars": ["IMAGE_VERSION={{user `image_version`}}"],
       "script": "provisioners/docker-image-without-cuda.sh"
-    },
-    {
-      "type": "shell",
-      "inline": ["/usr/local/bin/dstack-runner --version"]
     }
   ]
 }
