@@ -35,10 +35,12 @@ jobs:
         uses: 'google-github-actions/setup-gcloud@v1'
       - name: Download packer
         run: |
-          wget https://releases.hashicorp.com/packer/1.8.0/packer_1.8.0_linux_amd64.zip
-          unzip packer_1.8.0_linux_amd64.zip
+          wget https://releases.hashicorp.com/packer/${{ env.PACKER_VERSION }}/packer_${{ env.PACKER_VERSION }}_linux_amd64.zip
+          unzip packer_${{ env.PACKER_VERSION }}_linux_amd64.zip
           chmod +x packer
           cp -R ami/packer/* .
+        env:
+          PACKER_VERSION: 1.9.2
       - name: Run packer
         run: |
           VERSION=${{ github.run_number }}
