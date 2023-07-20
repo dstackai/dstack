@@ -26,9 +26,9 @@ DSTACK_INSTANCE_TAG = "dstack-runner-instance"
 
 
 _supported_accelerators = [
-    # todo L4
     {"accelerator_name": "nvidia-a100-80gb", "gpu_name": "A100", "memory_mb": 1024 * 80},
     {"accelerator_name": "nvidia-tesla-a100", "gpu_name": "A100", "memory_mb": 1024 * 40},
+    {"accelerator_name": "nvidia-l4", "gpu_name": "L4", "memory_mb": 1024 * 24},
     {
         "accelerator_name": "nvidia-tesla-t4",
         "gpu_name": "T4",
@@ -262,7 +262,7 @@ def _get_gpu_instance_type(
             machine_types_client=machine_types_client,
             project_id=project_id,
             zone=zone,
-            machine_families=["a2-*"],
+            machine_families=["a2-*", "g2-*"],  # A100, L4
         )
     )
     return choose_instance_type(instance_types_with_gpus, requirements)
