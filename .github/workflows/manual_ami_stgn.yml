@@ -15,26 +15,19 @@ jobs:
       AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
     strategy:
       matrix:
-        variants: [ ami-without-cuda, ami-cuda ]
+        variants: [ aws-image, aws-image-cuda ]
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v3
       - name: Download packer
         run: |
-          wget https://releases.hashicorp.com/packer/1.8.0/packer_1.8.0_linux_amd64.zip
-          unzip packer_1.8.0_linux_amd64.zip
+          wget https://releases.hashicorp.com/packer/${{ env.PACKER_VERSION }}/packer_${{ env.PACKER_VERSION }}_linux_amd64.zip
+          unzip packer_${{ env.PACKER_VERSION }}_linux_amd64.zip
           chmod +x packer
           cp -R ami/packer/* .
-      - name: Get runner version from the current branch
-        run: |
-          buildRunNumber=$(gh api -H "Accept: application/vnd.github+json" -H "X-GitHub-Api-Version: 2022-11-28" \
-            "/repos/${{ github.repository }}/actions/runs?branch=${{ github.ref_name }}&status=success" \
-            --jq '[.workflow_runs[] | select(.path==".github/workflows/build.yml")][0].run_number')
-          echo 'RUNNER_VERSION='$(($buildRunNumber + 150))
-          echo 'RUNNER_VERSION='$(($buildRunNumber + 150)) >> $GITHUB_ENV
         env:
-          GITHUB_TOKEN: ${{ secrets.GH_TOKEN }}
+          PACKER_VERSION: 1.9.2
       - name: Run packer
         run: |
           VERSION=${{ github.run_number }}
-          ./packer build -var build_id=$VERSION -var image_version=${{ env.IMAGE_VERSION }} -var runner_version=${{ env.RUNNER_VERSION }} ${{ matrix.variants }}.json
+          ./packer build -var build_id=$VERSION -var image_version=${{ env.IMAGE_VERSION }} ${{ matrix.variants }}.json

@@ -658,7 +658,7 @@ def _get_ami_image(
 ) -> Tuple[str, str]:
     ami_name = "dstack"
     if cuda:
-        ami_name = ami_name + "-cuda-11.4"
+        ami_name = ami_name + "-cuda"
     if not version.__is_release__:
         ami_name = "[stgn] " + ami_name
     ami_name = ami_name + f"-{_version or '*'}"
