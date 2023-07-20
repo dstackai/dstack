@@ -3,6 +3,7 @@
     "build_id": "{{timestamp}}",
     "build_prefix": "stgn-",
     "docker_version": "20.10.17",
+    "cuda_drivers_version": "{{user `cuda_drivers_version`}}",
     "dstack_stage": "STGN"
   },
   "builders": [
@@ -49,7 +50,7 @@
     },
     {
       "type": "shell",
-      "environment_vars": ["CUDA_DRIVERS_VERSION=535.54.03-1"],
+      "environment_vars": ["CUDA_DRIVERS_VERSION={{user `cuda_drivers_version`}}"],
       "script": "provisioners/cuda.sh"
     },
     {
