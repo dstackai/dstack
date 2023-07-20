@@ -254,7 +254,6 @@ def _get_instance_types(ec2_client: BaseClient) -> List[InstanceType]:
                         "t2.small",
                         "c5.*",
                         "m5.*",
-                        "p2.*",
                         "p3.*",
                         "g5.*",
                         "g4dn.*",
