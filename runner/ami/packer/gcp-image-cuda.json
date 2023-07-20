@@ -49,7 +49,7 @@
     },
     {
       "type": "shell",
-      "environment_vars": ["CUDA_DRIVERS_VERSION=535.54.03"],
+      "environment_vars": ["CUDA_DRIVERS_VERSION=535.54.03-1"],
       "script": "provisioners/cuda.sh"
     },
     {

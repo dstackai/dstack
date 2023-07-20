@@ -13,12 +13,12 @@ jobs:
         working-directory: runner
     strategy:
       matrix:
-        variant: [ gcp-image ]  # todo , gcp-image-cuda
+        variant: [ gcp-image, gcp-image-cuda ]
         include:
           - variant: gcp-image
             image_prefix: stgn-dstack-nocuda
-#          - variant: gcp-image-cuda
-#            image_prefix: stgn-dstack-cuda
+          - variant: gcp-image-cuda
+            image_prefix: stgn-dstack-cuda
     runs-on: ubuntu-latest
     permissions:
       contents: 'read'
