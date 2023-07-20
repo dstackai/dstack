@@ -83,7 +83,7 @@ function install_docker_ce {
 
   readonly docker_version=$(apt-cache madison docker-ce | grep $version | head -1 | awk '{print $3}')
   log_info "Installing docker-ce=$docker_version"
-  sudo DEBIAN_FRONTEND=noninteractive apt-get install -y -q docker-ce=$docker_version docker-ce-cli=$docker_version containerd.io docker-compose-plugin
+  sudo DEBIAN_FRONTEND=noninteractive apt-get install -y -q docker-ce=$docker_version docker-ce-cli=$docker_version containerd.io docker-compose-plugin acl
 }
 
 function hold_docker_pkgs {
