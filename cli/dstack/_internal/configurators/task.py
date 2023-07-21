@@ -21,15 +21,18 @@ class TaskConfigurator(JobConfigurator):
         self.sshd.map_to_port = get_map_to_port(self.ports(), self.sshd.port)
         return super().get_jobs(repo, run_name, repo_code_filename, ssh_key_pub)
 
+    def optional_build_commands(self) -> List[str]:
+        return []  # not needed
+
+    def setup(self) -> List[str]:
+        pass
+
     def commands(self) -> List[str]:
         commands = []
         if self.conf.image is None:
             self.sshd.start(commands)
         commands.extend(self.conf.commands)
         return commands
-
-    def optional_build_commands(self) -> List[str]:
-        return []  # not needed
 
     def default_max_duration(self) -> int:
         return DEFAULT_MAX_DURATION_SECONDS
@@ -51,5 +54,5 @@ class TaskConfigurator(JobConfigurator):
     def app_specs(self) -> List[job.AppSpec]:
         specs = super().app_specs()
         if self.conf.image is None:
-            self.sshd.add_app(specs)
+            specs.append(self.sshd.get_app_spec())
         return specs

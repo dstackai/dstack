@@ -3,18 +3,18 @@ from typing import List, Optional, Tuple
 import yaml
 
 from dstack._internal.backend.base import runners
-from dstack._internal.backend.base.build import predict_build_plan
 from dstack._internal.backend.base.compute import Compute, NoCapacityError
 from dstack._internal.backend.base.storage import Storage
-from dstack._internal.core.build import DockerPlatform
-from dstack._internal.core.error import NoMatchingInstanceError
+from dstack._internal.core.error import BackendError, NoMatchingInstanceError
 from dstack._internal.core.instance import InstanceType
 from dstack._internal.core.job import Job, JobErrorCode, JobHead, JobStatus, SpotPolicy
 from dstack._internal.core.repo import RepoRef
-from dstack._internal.core.request import RequestStatus
 from dstack._internal.core.runners import Runner
 from dstack._internal.utils.common import get_milliseconds_since_epoch
 from dstack._internal.utils.escape import escape_head, unescape_head
+from dstack._internal.utils.logging import get_logger
+
+logger = get_logger(__name__)
 
 
 def create_job(
@@ -60,7 +60,7 @@ def list_jobs(storage: Storage, repo_id: str, run_name: str) -> List[Job]:
     return jobs
 
 
-def list_job_head(storage: Storage, repo_id: str, job_id: str) -> Optional[JobHead]:
+def get_job_head(storage: Storage, repo_id: str, job_id: str) -> Optional[JobHead]:
     job_head_key_prefix = _get_job_head_filename_prefix(repo_id, job_id)
     job_head_keys = storage.list_objects(job_head_key_prefix)
     for job_head_key in job_head_keys:
@@ -102,7 +102,7 @@ def run_job(
     failed_to_start_job_new_status: JobStatus,
 ):
     if job.status != JobStatus.SUBMITTED:
-        raise Exception("Can't create a request for a job which status is not SUBMITTED")
+        raise BackendError("Can't create a request for a job which status is not SUBMITTED")
     try:
         _try_run_job(
             storage=storage,
@@ -116,70 +116,52 @@ def run_job(
         raise e
 
 
-def stop_job(
+def restart_job(
     storage: Storage,
     compute: Compute,
-    repo_id: str,
-    job_id: str,
-    abort: bool,
+    job: Job,
 ):
-    # TODO: why checking statuses of job_head, job, runner at the same time
-    job_head = list_job_head(storage, repo_id, job_id)
+    runner = runners.get_runner(storage, job.runner_id)
+    launched_instance_info = compute.restart_instance(job)
+    job.status = JobStatus.RESTARTING
+    job.request_id = runner.request_id = launched_instance_info.request_id
+    runners.update_runner(storage, runner)
+    update_job(storage, job)
+
+
+def stop_job(
+    storage: Storage, compute: Compute, repo_id: str, job_id: str, terminate: str, abort: str
+):
+    logger.info("Stopping job [repo_id=%s job_id=%s]", repo_id, job_id)
+    job_head = get_job_head(storage, repo_id, job_id)
     job = get_job(storage, repo_id, job_id)
-    runner = runners.get_runner(storage, job.runner_id) if job else None
-    request_status = (
-        compute.get_request_head(
-            job, (runner.request_id if runner else None) or job.request_id
-        ).status
-        if job
-        else RequestStatus.TERMINATED
-    )
-    if (
-        job_head
-        and job_head.status.is_unfinished()
-        or job
-        and job.status.is_unfinished()
-        or runner
-        and runner.job.status.is_unfinished()
-        or request_status != RequestStatus.TERMINATED
-    ):
-        if abort:
-            new_status = JobStatus.ABORTED
-        elif (
-            not job_head
-            or job_head.status in [JobStatus.SUBMITTED, JobStatus.DOWNLOADING]
-            or not job
-            or job.status in [JobStatus.SUBMITTED, JobStatus.DOWNLOADING]
-            or request_status == RequestStatus.TERMINATED
-            or not runner
-        ):
-            new_status = JobStatus.STOPPED
-        elif (
-            job_head
-            and job_head.status != JobStatus.UPLOADING
-            or job
-            and job.status != JobStatus.UPLOADING
-        ):
-            new_status = JobStatus.STOPPING
+    if job_head.status.is_finished() and not terminate:
+        return
+    runner = runners.get_runner(storage, job.runner_id)
+    new_status = None
+    if abort:
+        new_status = JobStatus.ABORTED
+    elif job_head.status in [
+        JobStatus.SUBMITTED,
+        JobStatus.RESTARTING,
+        JobStatus.DOWNLOADING,
+        JobStatus.STOPPED,
+    ]:
+        if terminate:
+            new_status = JobStatus.TERMINATED
         else:
-            new_status = None
-        if new_status:
-            if runner and runner.job.status.is_unfinished() and runner.job.status != new_status:
-                if new_status.is_finished():
-                    runners.stop_runner(compute, runner)
-                else:
-                    runner.job.status = new_status
-                    runners.update_runner(storage, runner)
-            if (
-                job_head
-                and job_head.status.is_unfinished()
-                and job_head.status != new_status
-                or job
-                and job.status.is_unfinished()
-                and job.status != new_status
-            ):
-                job.status = new_status
-                update_job(storage, job)
+            new_status = JobStatus.STOPPED
+    elif job_head.status in [JobStatus.BUILDING, JobStatus.RUNNING]:
+        if terminate:
+            new_status = JobStatus.TERMINATING
+        else:
+            new_status = JobStatus.STOPPING
+    if new_status is not None and new_status != job.status:
+        job.status = new_status
+        update_job(storage, job)
+        if new_status.is_finished():
+            # TODO: support both stop and terminate
+            runners.stop_runner(compute, runner)
 
 
 def update_job_submission(job: Job):

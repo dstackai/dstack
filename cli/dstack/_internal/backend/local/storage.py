@@ -7,7 +7,6 @@ import yaml
 
 from dstack._internal.backend.base.storage import Storage
 from dstack._internal.core.storage import StorageFile
-from dstack._internal.utils.common import removeprefix
 
 
 class LocalStorage(Storage):

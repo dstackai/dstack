@@ -97,13 +97,16 @@ class JobStatus(str, Enum):
     UPLOADING = "uploading"
     STOPPING = "stopping"
     STOPPED = "stopped"
+    RESTARTING = "restarting"
+    TERMINATING = "terminating"
+    TERMINATED = "terminated"
     ABORTING = "aborting"
     ABORTED = "aborted"
     FAILED = "failed"
     DONE = "done"
 
     def is_finished(self):
-        return self in [self.STOPPED, self.ABORTED, self.FAILED, self.DONE]
+        return self in [self.STOPPED, self.TERMINATED, self.ABORTED, self.FAILED, self.DONE]
 
     def is_unfinished(self):
         return not self.is_finished()
@@ -195,6 +198,7 @@ class Job(JobHead):
     submission_num: int = 1
     image_name: str
     registry_auth: Optional[RegistryAuth]
+    setup: Optional[List[str]]
     commands: Optional[List[str]]
     entrypoint: Optional[List[str]]
     env: Optional[Dict[str, str]]
@@ -278,6 +282,7 @@ class Job(JobHead):
             "submission_num": self.submission_num,
             "image_name": self.image_name,
             "registry_auth": self.registry_auth.serialize() if self.registry_auth else {},
+            "setup": self.setup or [],
             "commands": self.commands or [],
             "entrypoint": self.entrypoint,
             "env": self.env or {},
@@ -427,6 +432,7 @@ class Job(JobHead):
             submission_num=job_data.get("submission_num") or 1,
             image_name=job_data["image_name"],
             registry_auth=RegistryAuth(**job_data.get("registry_auth", {})),
+            setup=job_data.get("setup"),
             commands=job_data.get("commands") or None,
             entrypoint=job_data.get("entrypoint") or None,
             env=job_data["env"] or None,

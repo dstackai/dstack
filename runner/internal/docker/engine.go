@@ -1,4 +1,4 @@
-package container
+package docker
 
 import (
 	"context"
@@ -85,36 +85,46 @@ func NewEngine(opts ...Option) *Engine {
 	return engine
 }
 
-func (r *Engine) DockerClient() docker.APIClient {
-	return r.client
+func (e *Engine) DockerClient() docker.APIClient {
+	return e.client
 }
 
-func (r *Engine) DockerRuntime() string {
-	return r.runtime
-}
-func (r *Engine) CPU() int {
-	return r.nCpu
-}
-func (r *Engine) MemMiB() uint64 {
-	return r.memTotalMiB
+func (e *Engine) DockerRuntime() string {
+	return e.runtime
 }
 
-type DockerRuntime struct {
+func (e *Engine) CPU() int {
+	return e.nCpu
+}
+
+func (e *Engine) MemMiB() uint64 {
+	return e.memTotalMiB
+}
+
+type Container struct {
 	client      docker.APIClient
 	containerID string
 	logs        io.Writer
 }
 
-func (r *Engine) Create(ctx context.Context, spec *Spec, logs io.Writer) (*DockerRuntime, error) {
+func (e *Engine) Create(ctx context.Context, spec *Spec, logs io.Writer) (*Container, error) {
+	container, err := e.CreateNamed(ctx, spec, "", logs)
+	if err != nil {
+		return nil, gerrors.Wrap(err)
+	}
+	return container, nil
+}
+
+func (e *Engine) CreateNamed(ctx context.Context, spec *Spec, containerName string, logs io.Writer) (*Container, error) {
 	log.Trace(ctx, "Start pull image")
-	err := r.pullImageIfAbsent(ctx, spec.Image, spec.RegistryAuthBase64, logs)
+	err := e.pullImageIfAbsent(ctx, spec.Image, spec.RegistryAuthBase64, logs)
 	if err != nil {
 		log.Error(ctx, fmt.Sprintf("failed to download docker image: %s", err))
 		return nil, gerrors.Newf("failed to download docker image: %s", err)
 	}
 	log.Trace(ctx, "End pull image")
 
-	log.Trace(ctx, "Creating docker container", "image:", spec.Image)
+	log.Trace(ctx, "Creating docker container", "image", spec.Image)
 	log.Trace(ctx, "Container params ", "mounts", spec.Mounts)
 	log.Trace(ctx, "Container command ", "cmd", spec.Commands)
 	log.Trace(ctx, "Container entrypoint ", "entrypoint", spec.Entrypoint)
@@ -141,49 +151,60 @@ func (r *Engine) Create(ctx context.Context, spec *Spec, logs io.Writer) (*Docke
 		PublishAllPorts: true,
 		ShmSize:         spec.ShmSize * 1024 * 1024,
 		Sysctls:         map[string]string{},
-		Runtime:         r.runtime,
+		Runtime:         e.runtime,
 		Mounts:          spec.Mounts,
 	}
-	resp, err := r.client.ContainerCreate(ctx, config, hostConfig, nil, nil, "")
+	resp, err := e.client.ContainerCreate(ctx, config, hostConfig, nil, nil, containerName)
 	if err != nil {
 		log.Error(ctx, fmt.Sprintf("failed to create docker container: %s", err))
 		return nil, gerrors.Wrap(err)
 	}
-	return &DockerRuntime{
-		client:      r.client,
+	return &Container{
+		client:      e.client,
 		containerID: resp.ID,
 		logs:        logs,
 	}, nil
 }
-func (r *DockerRuntime) Run(ctx context.Context) error {
+
+func (e *Engine) Get(ctx context.Context, containerName string, logs io.Writer) (*Container, error) {
+	return &Container{
+		client: e.client,
+		// FIXME: containerName works like containerID for starting container, but it's really not
+		containerID: containerName,
+		logs:        logs,
+	}, nil
+}
+
+func (c *Container) Run(ctx context.Context) error {
 	log.Trace(ctx, "Starting docker container")
-	if err := r.client.ContainerStart(ctx, r.containerID, types.ContainerStartOptions{}); err != nil {
+	if err := c.client.ContainerStart(ctx, c.containerID, types.ContainerStartOptions{}); err != nil {
 		log.Error(ctx, fmt.Sprintf("failed to start docker container: %s", err))
 		return gerrors.Newf("failed to start container: %s", err)
 	}
 
-	if r.logs != nil {
-		err := r.LogsWS(ctx)
+	if c.logs != nil {
+		err := c.LogsWS(ctx)
 		if err != nil {
 			return gerrors.Wrap(err)
 		}
 	}
 	return nil
 }
-func (r *DockerRuntime) Logs(ctx context.Context) error {
+
+func (c *Container) Logs(ctx context.Context) error {
 	opts := types.ContainerLogsOptions{
 		ShowStdout: true,
 		ShowStderr: true,
 		Follow:     true,
 	}
-	logs, err := r.client.ContainerLogs(ctx, r.containerID, opts)
+	logs, err := c.client.ContainerLogs(ctx, c.containerID, opts)
 	if err != nil {
 		log.Error(ctx, fmt.Sprintf("failed to stream container logs: %s", err))
 		return gerrors.Newf("failed to stream container logs: %s", err)
 	}
 	go func() {
 		//_, err = io.Copy(r.logs, logs)
-		_, err = stdcopy.StdCopy(r.logs, r.logs, logs)
+		_, err = stdcopy.StdCopy(c.logs, c.logs, logs)
 		if err != nil {
 			log.Error(ctx, "failed to stream container logs", "err", gerrors.Wrap(err))
 		}
@@ -192,8 +213,8 @@ func (r *DockerRuntime) Logs(ctx context.Context) error {
 	return nil
 }
 
-func (r *DockerRuntime) LogsWS(ctx context.Context) error {
-	logs, err := r.client.ContainerAttach(ctx, r.containerID, types.ContainerAttachOptions{
+func (c *Container) LogsWS(ctx context.Context) error {
+	logs, err := c.client.ContainerAttach(ctx, c.containerID, types.ContainerAttachOptions{
 		Stream: true,
 		Stdout: true,
 		Stderr: true,
@@ -203,8 +224,7 @@ func (r *DockerRuntime) LogsWS(ctx context.Context) error {
 		return gerrors.Wrap(err)
 	}
 	go func() {
-		_, err = io.Copy(r.logs, logs.Reader)
-		//_, err = stdcopy.StdCopy(r.logs, r.logs, logs.Reader)
+		_, err = io.Copy(c.logs, logs.Reader)
 		if err != nil {
 			log.Error(ctx, "failed to stream container logs", "err", gerrors.Wrap(err))
 		}
@@ -213,7 +233,7 @@ func (r *DockerRuntime) LogsWS(ctx context.Context) error {
 	return nil
 }
 
-func (r *DockerRuntime) Wait(ctx context.Context) error {
+func (r *Container) Wait(ctx context.Context) error {
 	wait, werr := r.client.ContainerWait(ctx, r.containerID, "")
 	select {
 	case <-wait:
@@ -237,7 +257,7 @@ func (r *DockerRuntime) Wait(ctx context.Context) error {
 	return nil
 }
 
-func (r *DockerRuntime) ForceStop(ctx context.Context) error {
+func (r *Container) ForceStop(ctx context.Context) error {
 	err := r.client.ContainerKill(ctx, r.containerID, "9")
 	if err != nil {
 		return gerrors.Wrap(err)
@@ -252,27 +272,31 @@ func (r *DockerRuntime) ForceStop(ctx context.Context) error {
 	return nil
 }
 
-func (r *DockerRuntime) Stop(ctx context.Context) error {
-	err := r.client.ContainerKill(ctx, r.containerID, "SIGTERM")
+func (r *Container) Stop(ctx context.Context, remove bool) error {
+	log.Trace(ctx, "Stopping container", "containerID", r.containerID)
+	err := r.client.ContainerStop(ctx, r.containerID, nil)
 	if err != nil {
 		return gerrors.Wrap(err)
 	}
-	removeOpts := types.ContainerRemoveOptions{
-		Force: true,
-	}
-	err = r.client.ContainerRemove(ctx, r.containerID, removeOpts)
-	if err != nil {
-		return gerrors.Wrap(err)
+	if remove {
+		log.Trace(ctx, "Removing container", "containerID", r.containerID)
+		removeOpts := types.ContainerRemoveOptions{
+			Force: true,
+		}
+		err = r.client.ContainerRemove(ctx, r.containerID, removeOpts)
+		if err != nil {
+			return gerrors.Wrap(err)
+		}
 	}
 	return nil
 }
 
-func (r *Engine) pullImageIfAbsent(ctx context.Context, image string, registryAuthBase64 string, logs io.Writer) error {
+func (e *Engine) pullImageIfAbsent(ctx context.Context, image string, registryAuthBase64 string, logs io.Writer) error {
 	if image == "" {
 		return gerrors.New("given image value is empty")
 	}
 
-	summaries, err := r.client.ImageList(ctx, types.ImageListOptions{
+	summaries, err := e.client.ImageList(ctx, types.ImageListOptions{
 		Filters: filters.NewArgs(filters.Arg("reference", image)),
 	})
 	if err != nil {
@@ -282,7 +306,7 @@ func (r *Engine) pullImageIfAbsent(ctx context.Context, image string, registryAu
 	if len(summaries) != 0 {
 		return nil
 	}
-	reader, err := r.client.ImagePull(ctx, image, types.ImagePullOptions{
+	reader, err := e.client.ImagePull(ctx, image, types.ImagePullOptions{
 		RegistryAuth: registryAuthBase64,
 	})
 	if err != nil {
@@ -304,16 +328,16 @@ func (r *Engine) pullImageIfAbsent(ctx context.Context, image string, registryAu
 	return nil
 }
 
-func (r *Engine) NewBuildSpec(ctx context.Context, job *models.Job, spec *Spec, secrets map[string]string, repoPath string, logs io.Writer) (*BuildSpec, error) {
-	err := r.pullImageIfAbsent(ctx, spec.Image, spec.RegistryAuthBase64, logs)
+func (e *Engine) NewBuildSpec(ctx context.Context, job *models.Job, spec *Spec, secrets map[string]string, repoPath string, logs io.Writer) (*BuildSpec, error) {
+	err := e.pullImageIfAbsent(ctx, spec.Image, spec.RegistryAuthBase64, logs)
 	if err != nil {
 		return nil, gerrors.Wrap(err)
 	}
-	baseImage, _, err := r.client.ImageInspectWithRaw(ctx, spec.Image)
+	baseImage, _, err := e.client.ImageInspectWithRaw(ctx, spec.Image)
 	if err != nil {
 		return nil, gerrors.Wrap(err)
 	}
-	daemonInfo, err := r.client.Info(ctx)
+	daemonInfo, err := e.client.Info(ctx)
 	if err != nil {
 		return nil, gerrors.Wrap(err)
 	}
@@ -345,7 +369,7 @@ func (r *Engine) NewBuildSpec(ctx context.Context, job *models.Job, spec *Spec, 
 	return buildSpec, nil
 }
 
-func (r *Engine) Build(ctx context.Context, spec *BuildSpec, imageName string, stoppedCh chan struct{}, logs io.Writer) error {
+func (e *Engine) Build(ctx context.Context, spec *BuildSpec, imageName string, stoppedCh chan bool, logs io.Writer) error {
 	containerSpec := &Spec{
 		Image:              spec.BaseImageName,
 		RegistryAuthBase64: spec.RegistryAuthBase64,
@@ -363,7 +387,7 @@ func (r *Engine) Build(ctx context.Context, spec *BuildSpec, imageName string, s
 			},
 		},
 	}
-	dockerRuntime, err := r.Create(ctx, containerSpec, logs)
+	dockerRuntime, err := e.Create(ctx, containerSpec, logs)
 	if err != nil {
 		return gerrors.Wrap(err)
 	}
@@ -371,10 +395,10 @@ func (r *Engine) Build(ctx context.Context, spec *BuildSpec, imageName string, s
 		return gerrors.Wrap(err)
 	}
 	defer func() {
-		_ = r.client.ContainerRemove(ctx, dockerRuntime.containerID, types.ContainerRemoveOptions{Force: true})
+		_ = e.client.ContainerRemove(ctx, dockerRuntime.containerID, types.ContainerRemoveOptions{Force: true})
 	}()
 
-	statusCh, errCh := r.client.ContainerWait(ctx, dockerRuntime.containerID, container.WaitConditionNotRunning)
+	statusCh, errCh := e.client.ContainerWait(ctx, dockerRuntime.containerID, container.WaitConditionNotRunning)
 	select {
 	// todo timeout
 	case err := <-errCh:
@@ -382,14 +406,14 @@ func (r *Engine) Build(ctx context.Context, spec *BuildSpec, imageName string, s
 			return gerrors.Wrap(err)
 		}
 	case <-stoppedCh:
-		err := r.client.ContainerKill(ctx, dockerRuntime.containerID, "SIGTERM")
+		err := e.client.ContainerKill(ctx, dockerRuntime.containerID, "SIGTERM")
 		if err != nil {
 			return gerrors.Wrap(err)
 		}
 	case <-statusCh:
 	}
 
-	info, err := r.client.ContainerInspect(ctx, dockerRuntime.containerID)
+	info, err := e.client.ContainerInspect(ctx, dockerRuntime.containerID)
 	if err != nil {
 		return gerrors.Wrap(err)
 	}
@@ -397,15 +421,15 @@ func (r *Engine) Build(ctx context.Context, spec *BuildSpec, imageName string, s
 		return gerrors.Wrap(ContainerExitedError{info.State.ExitCode})
 	}
 	log.Trace(ctx, "Committing build image", "image", imageName)
-	_, err = r.client.ContainerCommit(ctx, dockerRuntime.containerID, types.ContainerCommitOptions{Reference: imageName})
+	_, err = e.client.ContainerCommit(ctx, dockerRuntime.containerID, types.ContainerCommitOptions{Reference: imageName})
 	if err != nil {
 		return gerrors.Wrap(err)
 	}
 	return nil
 }
 
-func (r *Engine) ImageExists(ctx context.Context, imageName string) (bool, error) {
-	summaries, err := r.client.ImageList(ctx, types.ImageListOptions{
+func (e *Engine) ImageExists(ctx context.Context, imageName string) (bool, error) {
+	summaries, err := e.client.ImageList(ctx, types.ImageListOptions{
 		Filters: filters.NewArgs(filters.Arg("reference", imageName)),
 	})
 	if err != nil {
@@ -414,24 +438,24 @@ func (r *Engine) ImageExists(ctx context.Context, imageName string) (bool, error
 	return len(summaries) != 0, nil
 }
 
-func (r *Engine) ExportImageDiff(ctx context.Context, imageName, diffPath string) error {
-	if err := Overlay2ExportImageDiff(ctx, r.client, imageName, diffPath); err != nil {
+func (e *Engine) ExportImageDiff(ctx context.Context, imageName, diffPath string) error {
+	if err := Overlay2ExportImageDiff(ctx, e.client, imageName, diffPath); err != nil {
 		return gerrors.Wrap(err)
 	}
 	return nil
 }
 
-func (r *Engine) ImportImageDiff(ctx context.Context, diffPath string) error {
+func (e *Engine) ImportImageDiff(ctx context.Context, diffPath string) error {
 	if err := Overlay2ImportImageDiff(ctx, diffPath); err != nil {
 		return gerrors.Wrap(err)
 	}
-	if err := r.RestartDaemon(ctx); err != nil {
+	if err := e.RestartDaemon(ctx); err != nil {
 		return gerrors.Wrap(err)
 	}
 	return nil
 }
 
-func (r *Engine) RestartDaemon(ctx context.Context) error {
+func (e *Engine) RestartDaemon(ctx context.Context) error {
 	log.Trace(ctx, "Restarting docker daemon")
 	cmd := exec.Command("systemctl", "restart", "docker")
 	if err := cmd.Run(); err != nil {

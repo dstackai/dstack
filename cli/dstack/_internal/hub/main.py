@@ -7,7 +7,7 @@ from rich.prompt import Confirm
 from starlette.responses import HTMLResponse, JSONResponse
 from starlette.staticfiles import StaticFiles
 
-from dstack._internal.cli.config import CLIConfigManager
+from dstack._internal.cli.utils.config import CLIConfigManager
 from dstack._internal.hub.background import start_background_tasks
 from dstack._internal.hub.db.migrate import migrate
 from dstack._internal.hub.db.models import User

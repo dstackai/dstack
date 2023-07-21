@@ -15,7 +15,6 @@ from dstack._internal.core.run import RunHead
 from dstack._internal.core.secret import Secret
 from dstack._internal.core.tag import TagHead
 from dstack._internal.hub.models import (
-    AddTagPath,
     AddTagRun,
     ArtifactsList,
     JobHeadList,
@@ -175,7 +174,20 @@ class HubAPIClient:
                 raise HubClientError(body["detail"]["msg"])
         resp.raise_for_status()
 
-    def stop_job(self, job_id: str, abort: bool):
+    def restart_job(self, job: Job):
+        url = _project_url(
+            url=self.url,
+            project=self.project,
+            additional_path=f"/runners/restart",
+        )
+        resp = _make_hub_request(
+            requests.post, host=self.url, url=url, headers=self._headers(), data=job.json()
+        )
+        if resp.ok:
+            return
+        resp.raise_for_status()
+
+    def stop_job(self, job_id: str, terminate: bool, abort: bool):
         url = _project_url(
             url=self.url,
             project=self.project,
@@ -189,6 +201,7 @@ class HubAPIClient:
             data=StopRunners(
                 repo_id=self.repo.repo_id,
                 job_id=job_id,
+                terminate=terminate,
                 abort=abort,
             ).json(),
         )

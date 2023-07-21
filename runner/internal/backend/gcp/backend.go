@@ -3,22 +3,22 @@ package gcp
 import (
 	"context"
 	"errors"
-	"fmt"
-	"github.com/dstackai/dstack/runner/internal/backend/base"
-	"github.com/dstackai/dstack/runner/internal/container"
 	"io"
 	"os"
 	"path"
 	"strings"
 
 	"github.com/docker/docker/api/types/mount"
+	"gopkg.in/yaml.v2"
+
 	"github.com/dstackai/dstack/runner/consts"
 	"github.com/dstackai/dstack/runner/internal/backend"
+	"github.com/dstackai/dstack/runner/internal/backend/base"
 	"github.com/dstackai/dstack/runner/internal/common"
+	"github.com/dstackai/dstack/runner/internal/docker"
 	"github.com/dstackai/dstack/runner/internal/gerrors"
 	"github.com/dstackai/dstack/runner/internal/log"
 	"github.com/dstackai/dstack/runner/internal/models"
-	"gopkg.in/yaml.v2"
 )
 
 type GCPBackend struct {
@@ -104,20 +104,6 @@ func (gbackend *GCPBackend) RefetchJob(ctx context.Context) (*models.Job, error)
 
 func (gbackend *GCPBackend) UpdateState(ctx context.Context) error {
 	return gerrors.Wrap(base.UpdateState(ctx, gbackend.storage, gbackend.state.Job))
-}
-
-func (gbackend *GCPBackend) CheckStop(ctx context.Context) (bool, error) {
-	runnerFilepath := fmt.Sprintf("runners/%s.yaml", gbackend.runnerID)
-	log.Trace(ctx, "Reading metadata from state file", "path", runnerFilepath)
-	status, err := gbackend.storage.GetMetadata(ctx, runnerFilepath, "status")
-	if err != nil && !errors.Is(err, ErrTagNotFound) {
-		return false, gerrors.Wrap(err)
-	}
-	if status == "stopping" {
-		log.Trace(ctx, "Status equals stopping")
-		return true, nil
-	}
-	return false, nil
 }
 
 func (gbackend *GCPBackend) IsInterrupted(ctx context.Context) (bool, error) {
@@ -237,7 +223,7 @@ func (gbackend *GCPBackend) GetRepoArchive(ctx context.Context, path, dir string
 	return gerrors.Wrap(base.GetRepoArchive(ctx, gbackend.storage, path, dir))
 }
 
-func (gbackend *GCPBackend) GetBuildDiffInfo(ctx context.Context, spec *container.BuildSpec) (*base.StorageObject, error) {
+func (gbackend *GCPBackend) GetBuildDiffInfo(ctx context.Context, spec *docker.BuildSpec) (*base.StorageObject, error) {
 	obj, err := base.GetBuildDiffInfo(ctx, gbackend.storage, spec)
 	if err != nil {
 		return nil, gerrors.Wrap(err)
@@ -249,7 +235,7 @@ func (gbackend *GCPBackend) GetBuildDiff(ctx context.Context, key, dst string) e
 	return gerrors.Wrap(base.DownloadFile(ctx, gbackend.storage, key, dst))
 }
 
-func (gbackend *GCPBackend) PutBuildDiff(ctx context.Context, src string, spec *container.BuildSpec) error {
+func (gbackend *GCPBackend) PutBuildDiff(ctx context.Context, src string, spec *docker.BuildSpec) error {
 	return gerrors.Wrap(base.PutBuildDiff(ctx, gbackend.storage, src, spec))
 }
 

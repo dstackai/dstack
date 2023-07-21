@@ -86,14 +86,16 @@ class HubClient:
     def run_job(self, job: Job, failed_to_start_job_new_status: JobStatus):
         self._api_client.run_job(job=job)
 
-    def stop_job(self, job_id: str, abort: bool):
-        self._api_client.stop_job(job_id=job_id, abort=abort)
+    def restart_job(self, job: Job):
+        self._api_client.restart_job(job)
 
-    def stop_jobs(self, run_name: Optional[str], abort: bool):
+    def stop_job(self, job_id: str, terminate: bool, abort: bool):
+        self._api_client.stop_job(job_id=job_id, terminate=terminate, abort=abort)
+
+    def stop_jobs(self, run_name: Optional[str], terminate: bool, abort: bool):
         job_heads = self.list_job_heads(run_name)
         for job_head in job_heads:
-            if job_head.status.is_unfinished():
-                self.stop_job(job_head.job_id, abort)
+            self.stop_job(job_head.job_id, terminate, abort)
 
     def list_job_heads(
         self, run_name: Optional[str] = None, repo_id: Optional[str] = None

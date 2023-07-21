@@ -6,6 +6,7 @@ from dstack._internal.cli.commands.logs import LogCommand
 from dstack._internal.cli.commands.ls import LsCommand
 from dstack._internal.cli.commands.prune import PruneCommand
 from dstack._internal.cli.commands.ps import PSCommand
+from dstack._internal.cli.commands.restart import RestartCommand
 from dstack._internal.cli.commands.rm import RMCommand
 from dstack._internal.cli.commands.run import RunCommand
 from dstack._internal.cli.commands.secrets import SecretCommand
@@ -22,6 +23,7 @@ commands_classes = [
     BuildCommand,
     PruneCommand,
     PSCommand,
+    RestartCommand,
     RMCommand,
     RunCommand,
     SecretCommand,

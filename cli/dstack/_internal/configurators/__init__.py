@@ -125,7 +125,6 @@ class JobConfigurator(ABC):
     ) -> List[job.Job]:
         self.run_name = run_name
         self.ssh_key_pub = ssh_key_pub
-
         created_at = get_milliseconds_since_epoch()
         configured_job = job.Job(
             job_id=f"{run_name},,0",
@@ -144,6 +143,7 @@ class JobConfigurator(ABC):
             entrypoint=self.entrypoint(),
             build_commands=self.build_commands(),
             optional_build_commands=self.optional_build_commands(),
+            setup=self.setup(),
             commands=self.commands(),
             working_dir=self.working_dir,
             home_dir=self.home_dir(),
@@ -162,11 +162,15 @@ class JobConfigurator(ABC):
         return [configured_job]
 
     @abstractmethod
-    def commands(self) -> List[str]:
+    def optional_build_commands(self) -> List[str]:
         pass
 
     @abstractmethod
-    def optional_build_commands(self) -> List[str]:
+    def setup(self) -> List[str]:
+        pass
+
+    @abstractmethod
+    def commands(self) -> List[str]:
         pass
 
     @abstractmethod

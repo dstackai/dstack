@@ -21,6 +21,7 @@ type Job struct {
 	Cache                 []Cache           `yaml:"cache"`
 	BuildCommands         []string          `yaml:"build_commands"`
 	OptionalBuildCommands []string          `yaml:"optional_build_commands"`
+	Setup                 []string          `yaml:"setup"`
 	Commands              []string          `yaml:"commands"`
 	BuildPolicy           BuildPolicy       `yaml:"build_policy"`
 	Entrypoint            []string          `yaml:"entrypoint"`

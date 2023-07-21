@@ -136,6 +136,9 @@ class GCPCompute(Compute):
         )
         return LaunchedInstanceInfo(request_id=instance.name, location=self.gcp_config.zone)
 
+    def stop_instance(self, runner: Runner):
+        pass
+
     def terminate_instance(self, runner: Runner):
         _terminate_instance(
             client=self.instances_client,

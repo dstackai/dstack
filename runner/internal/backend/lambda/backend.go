@@ -2,19 +2,19 @@ package lambda
 
 import (
 	"context"
-	"github.com/dstackai/dstack/runner/internal/backend/base"
-	"github.com/dstackai/dstack/runner/internal/container"
 	"io"
 	"os"
 
 	"github.com/docker/docker/api/types/mount"
+	"gopkg.in/yaml.v2"
 
 	"github.com/dstackai/dstack/runner/internal/backend"
 	"github.com/dstackai/dstack/runner/internal/backend/aws"
+	"github.com/dstackai/dstack/runner/internal/backend/base"
+	"github.com/dstackai/dstack/runner/internal/docker"
 	"github.com/dstackai/dstack/runner/internal/gerrors"
 	"github.com/dstackai/dstack/runner/internal/log"
 	"github.com/dstackai/dstack/runner/internal/models"
-	"gopkg.in/yaml.v2"
 )
 
 type AWSCredentials struct {
@@ -80,10 +80,6 @@ func (l *LambdaBackend) UpdateState(ctx context.Context) error {
 	return l.storageBackend.UpdateState(ctx)
 }
 
-func (l *LambdaBackend) CheckStop(ctx context.Context) (bool, error) {
-	return l.storageBackend.CheckStop(ctx)
-}
-
 func (l *LambdaBackend) IsInterrupted(ctx context.Context) (bool, error) {
 	return false, nil
 }
@@ -140,7 +136,7 @@ func (l *LambdaBackend) GetRepoArchive(ctx context.Context, path, dir string) er
 	return l.storageBackend.GetRepoArchive(ctx, path, dir)
 }
 
-func (l *LambdaBackend) GetBuildDiffInfo(ctx context.Context, spec *container.BuildSpec) (*base.StorageObject, error) {
+func (l *LambdaBackend) GetBuildDiffInfo(ctx context.Context, spec *docker.BuildSpec) (*base.StorageObject, error) {
 	obj, err := l.storageBackend.GetBuildDiffInfo(ctx, spec)
 	if err != nil {
 		return nil, gerrors.Wrap(err)
@@ -152,7 +148,7 @@ func (l *LambdaBackend) GetBuildDiff(ctx context.Context, key, dst string) error
 	return l.storageBackend.GetBuildDiff(ctx, key, dst)
 }
 
-func (l *LambdaBackend) PutBuildDiff(ctx context.Context, src string, spec *container.BuildSpec) error {
+func (l *LambdaBackend) PutBuildDiff(ctx context.Context, src string, spec *docker.BuildSpec) error {
 	return l.storageBackend.PutBuildDiff(ctx, src, spec)
 }
 

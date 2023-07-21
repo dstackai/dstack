@@ -14,7 +14,7 @@ router = APIRouter(
 
 
 @router.post("/{project_name}/runners/run")
-async def run_runners(project_name: str, job: Job):
+async def run(project_name: str, job: Job):
     project = await get_project(project_name=project_name)
     backend = await get_backend(project)
     failed_to_start_job_new_status = JobStatus.FAILED
@@ -36,8 +36,15 @@ async def run_runners(project_name: str, job: Job):
         )
 
 
-@router.post("/{project_name}/runners/stop")
-async def stop_runners(project_name: str, body: StopRunners):
+@router.post("/{project_name}/runners/restart")
+async def restart(project_name: str, job: Job):
     project = await get_project(project_name=project_name)
     backend = await get_backend(project)
-    await run_async(backend.stop_job, body.repo_id, body.abort, body.job_id)
+    await run_async(backend.restart_job, job)
+
+
+@router.post("/{project_name}/runners/stop")
+async def stop(project_name: str, body: StopRunners):
+    project = await get_project(project_name=project_name)
+    backend = await get_backend(project)
+    await run_async(backend.stop_job, body.repo_id, body.job_id, body.terminate, body.abort)

@@ -1,7 +1,7 @@
 import subprocess
 from typing import List, Optional
 
-from dstack._internal.cli.common import console
+from dstack._internal.cli.utils.common import console
 from dstack._internal.configurators.extensions import IDEExtension
 
 
@@ -11,7 +11,7 @@ class VSCodeDesktop(IDEExtension):
     ):
         self.extensions = extensions
         if version is None:
-            version = self.detect_code_version()
+            version = self._detect_code_version()
         if version is None:
             console.print(
                 "[grey58]Unable to detect the VS Code version and pre-install extensions. "
@@ -21,17 +21,8 @@ class VSCodeDesktop(IDEExtension):
         self.version = version
         self.run_name = run_name
 
-    @classmethod
-    def detect_code_version(cls, exe: str = "code") -> Optional[str]:
-        try:
-            run = subprocess.run([exe, "--version"], capture_output=True)
-        except FileNotFoundError:
-            return None
-        if run.returncode == 0:
-            return run.stdout.decode().split("\n")[1].strip()
-        return None
-
-    def install(self, commands: List[str]):
+    def get_install_commands(self) -> List[str]:
+        commands = []
         if self.version is None:
             return
         url = (
@@ -52,23 +43,32 @@ class VSCodeDesktop(IDEExtension):
         if self.extensions:
             extensions = " ".join(f'--install-extension "{name}"' for name in self.extensions)
             commands.append(f'PATH="$PATH":{target}/bin code-server {extensions}')
+        return commands
 
-    def install_if_not_found(self, commands: List[str]):
+    def get_install_if_not_found_commands(self) -> List[str]:
         if self.version is None:
             return
-        install_commands = []
-        self.install(install_commands)
-        install_commands = " && ".join(install_commands)
+        commands = []
+        install_commands = " && ".join(self.get_install_commands())
         commands.append(
             f'if [ ! -d ~/.vscode-server/bin/"{self.version}" ]; then {install_commands}; fi'
         )
+        return commands
 
-    def print_readme(self, commands: List[str]):
-        commands.extend(
-            [
-                f"echo To open in VS Code Desktop, use link below:",
-                f"echo ''",
-                f"echo '  vscode://vscode-remote/ssh-remote+{self.run_name}/workflow'",
-                f"echo ''",
-            ]
-        )
+    def get_print_readme_commands(self) -> List[str]:
+        return [
+            f"echo To open in VS Code Desktop, use link below:",
+            f"echo ''",
+            f"echo '  vscode://vscode-remote/ssh-remote+{self.run_name}/workflow'",
+            f"echo ''",
+        ]
+
+    @classmethod
+    def _detect_code_version(cls, exe: str = "code") -> Optional[str]:
+        try:
+            run = subprocess.run([exe, "--version"], capture_output=True)
+        except FileNotFoundError:
+            return None
+        if run.returncode == 0:
+            return run.stdout.decode().split("\n")[1].strip()
+        return None

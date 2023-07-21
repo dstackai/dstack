@@ -2,26 +2,25 @@ package aws
 
 import (
 	"context"
-	"errors"
 	"fmt"
-	"github.com/dstackai/dstack/runner/internal/container"
 	"io"
 	"os"
 	"path"
 	"strings"
 	"time"
 
-	"github.com/dstackai/dstack/runner/internal/backend/aws/s3fs"
-	"github.com/dstackai/dstack/runner/internal/backend/base"
-
 	"github.com/docker/docker/api/types/mount"
 	"github.com/dstackai/dstack/runner/consts"
+	"gopkg.in/yaml.v3"
+
 	"github.com/dstackai/dstack/runner/internal/backend"
+	"github.com/dstackai/dstack/runner/internal/backend/aws/s3fs"
+	"github.com/dstackai/dstack/runner/internal/backend/base"
 	"github.com/dstackai/dstack/runner/internal/common"
+	"github.com/dstackai/dstack/runner/internal/docker"
 	"github.com/dstackai/dstack/runner/internal/gerrors"
 	"github.com/dstackai/dstack/runner/internal/log"
 	"github.com/dstackai/dstack/runner/internal/models"
-	"gopkg.in/yaml.v3"
 )
 
 type AWSBackend struct {
@@ -111,27 +110,6 @@ func (s *AWSBackend) RefetchJob(ctx context.Context) (*models.Job, error) {
 
 func (s *AWSBackend) UpdateState(ctx context.Context) error {
 	return gerrors.Wrap(base.UpdateState(ctx, s.storage, s.State.Job))
-}
-
-func (s *AWSBackend) CheckStop(ctx context.Context) (bool, error) {
-	if s == nil {
-		return false, gerrors.New("Backend is nil")
-	}
-	if s.State == nil {
-		log.Trace(ctx, "State not exist")
-		return false, gerrors.Wrap(backend.ErrLoadStateFile)
-	}
-	pathStateFile := fmt.Sprintf("runners/%s.yaml", s.runnerID)
-	log.Trace(ctx, "Reading metadata from state file", "path", pathStateFile)
-	status, err := s.storage.GetMetadata(ctx, pathStateFile, "status")
-	if err != nil && !errors.Is(err, ErrTagNotFound) {
-		return false, gerrors.Wrap(err)
-	}
-	if status == "stopping" {
-		log.Trace(ctx, "Status equals stopping")
-		return true, nil
-	}
-	return false, nil
 }
 
 func (s *AWSBackend) IsInterrupted(ctx context.Context) (bool, error) {
@@ -322,7 +300,7 @@ func (s *AWSBackend) GetRepoArchive(ctx context.Context, path, dir string) error
 	return gerrors.Wrap(base.GetRepoArchive(ctx, s.storage, path, dir))
 }
 
-func (s *AWSBackend) GetBuildDiffInfo(ctx context.Context, spec *container.BuildSpec) (*base.StorageObject, error) {
+func (s *AWSBackend) GetBuildDiffInfo(ctx context.Context, spec *docker.BuildSpec) (*base.StorageObject, error) {
 	obj, err := base.GetBuildDiffInfo(ctx, s.storage, spec)
 	if err != nil {
 		return nil, gerrors.Wrap(err)
@@ -334,7 +312,7 @@ func (s *AWSBackend) GetBuildDiff(ctx context.Context, key, dst string) error {
 	return gerrors.Wrap(base.DownloadFile(ctx, s.storage, key, dst))
 }
 
-func (s *AWSBackend) PutBuildDiff(ctx context.Context, src string, spec *container.BuildSpec) error {
+func (s *AWSBackend) PutBuildDiff(ctx context.Context, src string, spec *docker.BuildSpec) error {
 	return gerrors.Wrap(base.PutBuildDiff(ctx, s.storage, src, spec))
 }
 
