@@ -19,28 +19,28 @@ jobs:
       run:
         working-directory: docker
     runs-on: ubuntu-latest
-#    strategy:
-#      matrix:
-#        python: [ "3.7", "3.8", "3.9", "3.10", "3.11" ]
+    strategy:
+      matrix:
+        python: [ "3.7", "3.8", "3.9", "3.10", "3.11" ]
     steps:
      - name: Checkout repository
        uses: actions/checkout@v3
-#     - name: Set up Docker Buildx
-#       uses: docker/setup-buildx-action@v2
-#     - name: Login to DockerHub
-#       uses: docker/login-action@v2
-#       with:
-#         username: ${{ secrets.DOCKERHUB_USERNAME }}
-#         password: ${{ secrets.DOCKERHUB_TOKEN }}
-#     - name: Set up QEMU
-#       uses: docker/setup-qemu-action@v2
-#     - name: Build and upload to DockerHub
-#       run: |
-#         docker buildx build --platform linux/arm64/v8 --build-arg PYTHON=${{ matrix.python }} --push --provenance=false --tag dstackai/miniforge:py${{ matrix.python }}-${{ inputs.image_version }}-arm64 -f cpu/Dockerfile .
-#         docker buildx build --platform linux/amd64 --build-arg PYTHON=${{ matrix.python }} --push --provenance=false --tag dstackai/miniforge:py${{ matrix.python }}-${{ inputs.image_version }}-amd64 -f cpu/Dockerfile .
-#         docker manifest create dstackai/miniforge:py${{ matrix.python }}-${{ inputs.image_version }} --amend dstackai/miniforge:py${{ matrix.python }}-${{ inputs.image_version }}-arm64 --amend dstackai/miniforge:py${{ matrix.python }}-${{ inputs.image_version }}-amd64
-#         docker manifest push dstackai/miniforge:py${{ matrix.python }}-${{ inputs.image_version }}
-#         docker buildx build --platform linux/amd64 --build-arg PYTHON=${{ matrix.python }} --push --provenance=false --tag dstackai/miniforge:py${{ matrix.python }}-${{ inputs.image_version }}-cuda-11.4 -f cuda/Dockerfile .
+     - name: Set up Docker Buildx
+       uses: docker/setup-buildx-action@v2
+     - name: Login to DockerHub
+       uses: docker/login-action@v2
+       with:
+         username: ${{ secrets.DOCKERHUB_USERNAME }}
+         password: ${{ secrets.DOCKERHUB_TOKEN }}
+     - name: Set up QEMU
+       uses: docker/setup-qemu-action@v2
+     - name: Build and upload to DockerHub
+       run: |
+         docker buildx build --platform linux/arm64/v8 --build-arg PYTHON=${{ matrix.python }} --push --provenance=false --tag dstackai/miniforge:py${{ matrix.python }}-${{ inputs.image_version }}-arm64 -f cpu/Dockerfile .
+         docker buildx build --platform linux/amd64 --build-arg PYTHON=${{ matrix.python }} --push --provenance=false --tag dstackai/miniforge:py${{ matrix.python }}-${{ inputs.image_version }}-amd64 -f cpu/Dockerfile .
+         docker manifest create dstackai/miniforge:py${{ matrix.python }}-${{ inputs.image_version }} --amend dstackai/miniforge:py${{ matrix.python }}-${{ inputs.image_version }}-arm64 --amend dstackai/miniforge:py${{ matrix.python }}-${{ inputs.image_version }}-amd64
+         docker manifest push dstackai/miniforge:py${{ matrix.python }}-${{ inputs.image_version }}
+         docker buildx build --platform linux/amd64 --build-arg PYTHON=${{ matrix.python }} --push --provenance=false --tag dstackai/miniforge:py${{ matrix.python }}-${{ inputs.image_version }}-cuda-11.4 -f cuda/Dockerfile .
 
   build-aws-images:
     defaults:
