@@ -8,11 +8,10 @@
     "instance_type": "c5.large",
     "subnet_id": "subnet-c39cb6a5",
     "docker_version": "20.10.17",
-    "build_id": "{{timestamp}}",
-    "build_prefix": "[stgn] ",
+    "build_prefix": "",
     "ami_regions": "",
-    "dstack_stage": "STGN",
-    "ami_groups": ""
+    "ami_groups": "",
+    "image_version": ""
   },
   "builders": [
     {
@@ -24,7 +23,7 @@
       "source_ami": "{{user `base_ami`}}",
       "instance_type": "{{user `instance_type`}}",
       "ssh_username": "{{user `ssh_username`}}",
-      "ami_name": "{{user `build_prefix`}}dstack-{{user `build_id`}}",
+      "ami_name": "{{user `build_prefix`}}dstack-{{user `image_version`}}",
       "associate_public_ip_address": true,
       "ami_regions": "{{user `ami_regions`}}",
       "ami_groups": "{{user `ami_groups`}}",

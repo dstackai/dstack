@@ -1,18 +1,17 @@
 {
   "variables": {
-    "build_id": "{{timestamp}}",
-    "build_prefix": "stgn-",
+    "build_prefix": "",
     "docker_version": "20.10.17",
-    "cuda_drivers_version": "{{user `cuda_drivers_version`}}",
-    "dstack_stage": "STGN"
+    "cuda_drivers_version": "535.54.03-1",
+    "image_version": ""
   },
   "builders": [
     {
       "type": "googlecompute",
       "project_id": "dstack",
       "source_image": "ubuntu-2204-jammy-v20230714",
-      "image_name": "{{user `build_prefix`}}dstack-cuda-{{user `build_id`}}",
-      "instance_name": "{{user `build_prefix`}}dstack-cuda-{{user `build_id`}}",
+      "image_name": "{{user `build_prefix`}}dstack-cuda-{{user `image_version`}}",
+      "instance_name": "{{user `build_prefix`}}dstack-cuda-{{user `image_version`}}",
       "ssh_username": "ubuntu",
       "zone": "us-central1-a"
     }
