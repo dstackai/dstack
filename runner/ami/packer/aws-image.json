@@ -23,7 +23,7 @@
       "source_ami": "{{user `base_ami`}}",
       "instance_type": "{{user `instance_type`}}",
       "ssh_username": "{{user `ssh_username`}}",
-      "ami_name": "{{user `build_prefix`}}dstack-{{user `image_version`}}",
+      "ami_name": "{{user `build_prefix`}}dstack-{{user `image_version` | clean_resource_name}}",
       "associate_public_ip_address": true,
       "ami_regions": "{{user `ami_regions`}}",
       "ami_groups": "{{user `ami_groups`}}",

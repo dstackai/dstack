@@ -10,7 +10,7 @@
       "project_id": "dstack",
       "source_image": "ubuntu-2204-jammy-v20230714",
       "image_name": "{{user `build_prefix`}}dstack-{{user `image_version` | clean_resource_name}}",
-      "instance_name": "{{user `build_prefix`}}dstack-{{user `image_version`}}",
+      "instance_name": "{{user `build_prefix`}}dstack-{{user `image_version` | clean_resource_name}}",
       "ssh_username": "ubuntu",
       "zone": "us-central1-a"
     }

@@ -19,7 +19,7 @@
     "tenant_id": "{{user `azure_tenant_id`}}",
     "subscription_id": "{{user `azure_subscription_id`}}",
     "managed_image_resource_group_name": "dstack-resources-westeurope",
-    "managed_image_name": "{{user `build_prefix`}}dstack-cuda-{{user `image_version`}}",
+    "managed_image_name": "{{user `build_prefix`}}dstack-cuda-{{user `image_version` | clean_resource_name}}",
     "os_type": "Linux",
     "image_publisher": "canonical",
     "image_offer": "0001-com-ubuntu-server-jammy",
