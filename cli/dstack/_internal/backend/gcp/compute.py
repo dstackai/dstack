@@ -418,14 +418,11 @@ def _get_max_ram_per_accelerator(accelerator_name: str) -> int:
 def _get_image_name(
     images_client: compute_v1.ImagesClient, instance_type: InstanceType
 ) -> Optional[str]:
-    if version.__is_release__:
-        image_prefix = "dstack-"
-    else:
-        image_prefix = "stgn-dstack-"
+    image_prefix = "dstack-"
     if len(instance_type.resources.gpus) > 0:
         image_prefix += "cuda-"
-    else:
-        image_prefix += "nocuda-"
+    image_prefix += version.miniforge_image.replace(".", "-")
+
     list_request = compute_v1.ListImagesRequest()
     list_request.project = "dstack"
     list_request.order_by = "creationTimestamp desc"
