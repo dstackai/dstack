@@ -198,39 +198,22 @@ def _get_instance_name(job: Job) -> str:
     return f"dstack-{job.run_name}"
 
 
-def _get_prod_image_ref(
+def _get_image_ref(
     compute_client: ComputeManagementClient,
     location: str,
     cuda: bool,
 ) -> ImageReference:
+    image_name = "dstack-"
+    if cuda:
+        image_name += "cuda-"
+    image_name += version.miniforge_image
+
     image = compute_client.community_gallery_images.get(
         location=location,
         public_gallery_name="dstack-d5e68bdc-cc66-484a-a485-b54e3683f151",
-        gallery_image_name=f"dstack-{'cuda' if cuda else 'nocuda'}-{version.__version__}",
+        gallery_image_name=image_name,
     )
     return ImageReference(community_gallery_image_id=image.unique_id)
-
-
-def _get_stage_image_ref(
-    compute_client: ComputeManagementClient,
-    location: str,
-    cuda: bool,
-) -> ImageReference:
-    images = compute_client.images.list()
-    image_prefix = "stgn-dstack"
-    if cuda:
-        image_prefix += "-cuda-"
-    else:
-        image_prefix += "-nocuda-"
-
-    images = [im for im in images if im.name.startswith(image_prefix)]
-    sorted_images = sorted(images, key=lambda im: int(removeprefix(im.name, image_prefix)))
-    return ImageReference(id=sorted_images[-1].id)
-
-
-_get_image_ref = _get_prod_image_ref
-if not version.__is_release__:
-    _get_image_ref = _get_stage_image_ref
 
 
 def _get_user_data_script(azure_config: AzureConfig, job: Job, instance_type: InstanceType) -> str:
