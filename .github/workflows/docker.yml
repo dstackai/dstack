@@ -42,65 +42,65 @@ jobs:
 #         docker manifest push dstackai/miniforge:py${{ matrix.python }}-${{ inputs.image_version }}
 #         docker buildx build --platform linux/amd64 --build-arg PYTHON=${{ matrix.python }} --push --provenance=false --tag dstackai/miniforge:py${{ matrix.python }}-${{ inputs.image_version }}-cuda-11.4 -f cuda/Dockerfile .
 
-  build-aws-images:
-    defaults:
-      run:
-        working-directory: runner
-    needs: [ build-docker ]
-    runs-on: ubuntu-latest
-    env:
-      AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
-      AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
-    strategy:
-      matrix:
-        variant: [ "", "-cuda" ]
-    steps:
-      - uses: actions/checkout@v3
-      - name: Download packer
-        run: |
-          wget https://releases.hashicorp.com/packer/${{ env.PACKER_VERSION }}/packer_${{ env.PACKER_VERSION }}_linux_amd64.zip
-          unzip packer_${{ env.PACKER_VERSION }}_linux_amd64.zip
-          chmod +x packer
-          cp -R ami/packer/* .
-      - name: Run packer
-        run: |
-          ./packer build -var-file=versions.json -var-file=aws-vars-prod.json -var image_version=${{ inputs.image_version }} -var build_prefix=${{ inputs.build_prefix }} aws-image${{ matrix.variant }}.json
+#  build-aws-images:
+#    defaults:
+#      run:
+#        working-directory: runner
+#    needs: [ build-docker ]
+#    runs-on: ubuntu-latest
+#    env:
+#      AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
+#      AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+#    strategy:
+#      matrix:
+#        variant: [ "", "-cuda" ]
+#    steps:
+#      - uses: actions/checkout@v3
+#      - name: Download packer
+#        run: |
+#          wget https://releases.hashicorp.com/packer/${{ env.PACKER_VERSION }}/packer_${{ env.PACKER_VERSION }}_linux_amd64.zip
+#          unzip packer_${{ env.PACKER_VERSION }}_linux_amd64.zip
+#          chmod +x packer
+#          cp -R ami/packer/* .
+#      - name: Run packer
+#        run: |
+#          ./packer build -var-file=versions.json -var-file=aws-vars-prod.json -var image_version=${{ inputs.image_version }} -var build_prefix=${{ inputs.build_prefix }} aws-image${{ matrix.variant }}.json
 
-  build-azure-images:
-    defaults:
-      run:
-        working-directory: runner
-    needs: [ build-docker ]
-    runs-on: ubuntu-latest
-    env:
-      AZURE_CLIENT_ID: ${{ secrets.AZURE_CLIENT_ID }}
-      AZURE_CLIENT_SECRET: ${{ secrets.AZURE_CLIENT_SECRET }}
-      AZURE_TENANT_ID: ${{ secrets.AZURE_TENANT_ID }}
-      AZURE_SUBSCRIPTION_ID: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
-      VERSION: ${{ github.run_number }}
-    strategy:
-      matrix:
-        variant: [ "", "-cuda" ]
-    steps:
-      - uses: actions/checkout@v3
-      - uses: Azure/login@v1
-        name: Log in to az
-        with:
-          creds: '{"clientId":"${{ secrets.AZURE_CLIENT_ID }}","clientSecret":"${{ secrets.AZURE_CLIENT_SECRET }}","subscriptionId":"${{ secrets.AZURE_SUBSCRIPTION_ID }}","tenantId":"${{ secrets.AZURE_TENANT_ID }}"}'
-      - name: Download packer
-        run: |
-          wget https://releases.hashicorp.com/packer/${{ env.PACKER_VERSION }}/packer_${{ env.PACKER_VERSION }}_linux_amd64.zip
-          unzip packer_${{ env.PACKER_VERSION }}_linux_amd64.zip
-          chmod +x packer
-          cp -R ami/packer/* .
-      - name: Run packer
-        run: |
-          ./packer build -var-file=versions.json -var image_version=${{ inputs.image_version }} -var build_prefix=${{ inputs.build_prefix }} azure-image${{ matrix.variant }}.json
-      - name: Publish azure image
-        run: |
-          IMAGE_DEFINITION=${{ inputs.build_prefix }}dstack${{ matrix.variant }}-${{ inputs.image_version }}
-          IMAGE_NAME=${{ inputs.build_prefix }}dstack${{ matrix.variant }}-${{ inputs.image_version }}
-          ../scripts/publish_azure_image.sh $IMAGE_DEFINITION $IMAGE_NAME
+#  build-azure-images:
+#    defaults:
+#      run:
+#        working-directory: runner
+#    needs: [ build-docker ]
+#    runs-on: ubuntu-latest
+#    env:
+#      AZURE_CLIENT_ID: ${{ secrets.AZURE_CLIENT_ID }}
+#      AZURE_CLIENT_SECRET: ${{ secrets.AZURE_CLIENT_SECRET }}
+#      AZURE_TENANT_ID: ${{ secrets.AZURE_TENANT_ID }}
+#      AZURE_SUBSCRIPTION_ID: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
+#      VERSION: ${{ github.run_number }}
+#    strategy:
+#      matrix:
+#        variant: [ "", "-cuda" ]
+#    steps:
+#      - uses: actions/checkout@v3
+#      - uses: Azure/login@v1
+#        name: Log in to az
+#        with:
+#          creds: '{"clientId":"${{ secrets.AZURE_CLIENT_ID }}","clientSecret":"${{ secrets.AZURE_CLIENT_SECRET }}","subscriptionId":"${{ secrets.AZURE_SUBSCRIPTION_ID }}","tenantId":"${{ secrets.AZURE_TENANT_ID }}"}'
+#      - name: Download packer
+#        run: |
+#          wget https://releases.hashicorp.com/packer/${{ env.PACKER_VERSION }}/packer_${{ env.PACKER_VERSION }}_linux_amd64.zip
+#          unzip packer_${{ env.PACKER_VERSION }}_linux_amd64.zip
+#          chmod +x packer
+#          cp -R ami/packer/* .
+#      - name: Run packer
+#        run: |
+#          ./packer build -var-file=versions.json -var image_version=${{ inputs.image_version }} -var build_prefix=${{ inputs.build_prefix }} azure-image${{ matrix.variant }}.json
+#      - name: Publish azure image
+#        run: |
+#          IMAGE_DEFINITION=${{ inputs.build_prefix }}dstack${{ matrix.variant }}-${{ inputs.image_version }}
+#          IMAGE_NAME=${{ inputs.build_prefix }}dstack${{ matrix.variant }}-${{ inputs.image_version }}
+#          ../scripts/publish_azure_image.sh $IMAGE_DEFINITION $IMAGE_NAME
 
   build-gcp-images:
     defaults:
@@ -135,4 +135,7 @@ jobs:
           ./packer build -var-file=versions.json -var image_version=${{ inputs.image_version }} -var build_prefix=${{ inputs.build_prefix }} gcp-image${{ matrix.variant }}.json
       - name: Publish images
         run: |
-          gcloud compute images add-iam-policy-binding ${{ inputs.build_prefix }}dstack${{ matrix.variant }}-${{ inputs.image_version }} --member='allAuthenticatedUsers' --role='roles/compute.imageUser'
+          IMAGE_VERSION=${IMAGE_VERSION//./-}
+          gcloud compute images add-iam-policy-binding ${{ inputs.build_prefix }}dstack${{ matrix.variant }}-$IMAGE_VERSION --member='allAuthenticatedUsers' --role='roles/compute.imageUser'
+        env:
+          IMAGE_VERSION: ${{ inputs.image_version }}
