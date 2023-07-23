@@ -1,22 +1,18 @@
-# LLM as Chatbot
-
-![dstack-hub-create-azure-project.png](../assets/images/dstack-llmchat-gallery.png){ width=800 }
+# Chatbot
 
 This [example](https://github.com/deep-diver/LLM-As-Chatbot) is built by Chansung Park. It can run any open-source LLM either as a Gradio chat app or as a Discord bot.
 With `dstack`, you can run this Gradio chat app or Discord bot in any cloud with a single command.
-To give it a try, follow the instructions below.
+To try this example with `dstack`, follow the instructions below.
 
-## 1. Define a profile
+## Prerequisites
 
-??? info "Prerequisites"
-    Before running the example, ensure that you have [installed](../docs/installation/pip.md) `dstack` and [configured a project](../docs/guides/projects.md) 
-    to use your preferred cloud account (AWS, GCP, Azure, or Lambda Cloud).
+!!! info "NOTE:"
+    Before using `dstack` with a particular cloud, make sure to [configure](../docs/guides/projects.md) the corresponding project.
 
-Each LLM model requires specific resources. To inform dstack about the required resources, you need to define a profile
-in the `.dstack/profiles.yaml` file within your project.
+Each LLM model requires specific resources. To inform `dstack` about the required resources, you need to 
+[define](../docs/reference/profiles.yml.md) a profile via the `.dstack/profiles.yaml` file within your project.
 
-Each profile must include the project name, and you have the option to specify the GPU name, its memory, instance type,
-retry policy, and more. Check the [reference](../docs/reference/profiles.yml.md) for more details.
+Below is a profile that will provision a cloud instance with `24GB` of memory and a `T4` GPU in the `gcp` project.
 
 <div editor-title=".dstack/profiles.yml"> 
 
@@ -25,6 +21,7 @@ profiles:
   - name: gcp-t4
     project: gcp
     resources:
+      memory: 24GB
       gpu:
         name: T4
     default: true
@@ -32,9 +29,7 @@ profiles:
 
 </div>
 
-If you use this profile, dstack will utilize the project named `gcp` and a cloud instance that has an NVIDIA T4 GPU.
-
-## 2. Run a Gradio app
+## Run a Gradio app
 
 Here's the configuration that runs the Gradio app:
 
@@ -65,32 +60,19 @@ Here's how you run it with `dstack`:
 
 ```shell
 $ dstack run . -f gradio.dstack.yml
-
-dstack will execute the following plan:
-
-CONFIGURATION      PROJECT  INSTANCE      RESOURCES              SPOT
-gradio.dstack.yml  gcp      n1-highmem-2  2xCPUs, 13312MB, 1xT4  auto
-
-Continue? [y/n]: y
-
-Provisioning and establishing an SSH tunnel...
-
-Running on local URL:  http://127.0.0.1:6006
-
-To interrupt, press Ctrl+C...
 ```
 
 </div>
 
-After you confirm, `dstack` will provision the cloud instance, run the task, and forward the defined ports to your local
+`dstack` will provision the cloud instance, run the task, and forward the defined ports to your local
 machine for secure and convenient access.
 
-![dstack-hub-create-azure-project.png](../assets/images/dstack-llmchat-welcome.png){ width=800 }
+![](../assets/images/dstack-llmchat-gallery.png){ width=800 }
 
 !!! info "NOTE:"
     To use a non-default profile, simply specify its name with `--profile NAME` when using `dstack run`.
 
-## 3. Run a Discord bot
+## Run a Discord bot
 
 Here's the configuration that runs the Gradio app:
 
@@ -130,17 +112,6 @@ Finally, here's how you run it with `dstack`:
 
 ```shell
 $ dstack run . -f discord.dstack.yml
-
-dstack will execute the following plan:
-
-CONFIGURATION       PROJECT  INSTANCE      RESOURCES              SPOT
-discord.dstack.yml  gcp      n1-highmem-2  2xCPUs, 13312MB, 1xT4  auto
-
-Continue? [y/n]: y
-
-Provisioning...
-
-To interrupt, press Ctrl+C...
 ```
 
 </div>
@@ -148,7 +119,7 @@ To interrupt, press Ctrl+C...
 Once you confirm, `dstack` will provision the cloud instance and run the task. Once it's up, you can freely send messages
 to your bot via Discord.
 
-![dstack-hub-create-azure-project.png](../assets/images/dstack-llmchat-discord-chat.png){ width=800 }
+![](../assets/images/dstack-llmchat-discord-chat.png){ width=800 }
 
 For advanced commands supported by the bot, check the [README](https://github.com/deep-diver/LLM-As-Chatbot#discord-bot) file.
 

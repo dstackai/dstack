@@ -173,10 +173,11 @@ nav:
               - GCP: docs/reference/backends/gcp.md
               - Azure: docs/reference/backends/azure.md
               - Lambda: docs/reference/backends/lambda.md
-  - Examples: 
+  - Examples:
     - examples/index.md
     - Examples:
-      - LLM as Chatbot: examples/llmchat.md
+      - vLLM: examples/vllm.md
+      - Chatbot: examples/llmchat.md
   - Blog:
       - blog/index.md
   - Slack: https://join.slack.com/t/dstackai/shared_invite/zt-xdnsytie-D4qU9BvJP8vkbkHXdi6clQ
