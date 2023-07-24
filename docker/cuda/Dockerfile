@@ -1,4 +1,4 @@
-FROM dstackai/cuda:11.4-base-ubuntu20.04
+FROM dstackai/cuda:11.8.0-base-ubuntu20.04
 
 ARG PYTHON
 ENV PYTHON=$PYTHON
@@ -24,7 +24,7 @@ RUN wget -O Miniforge3.sh "https://github.com/conda-forge/miniforge/releases/lat
     echo ". /opt/conda/etc/profile.d/conda.sh" >> ~/.bashrc && \
     /opt/conda/condabin/conda update conda --all -y && \
     /opt/conda/condabin/conda create --name workflow python=${PYTHON} -y && \
-    /opt/conda/condabin/conda config --prepend channels "nvidia/label/cuda-11.4.3" && \
+    /opt/conda/condabin/conda config --prepend channels "nvidia/label/cuda-11.8.0" && \
     /opt/conda/condabin/conda config --set always_yes true && \
     /opt/conda/condabin/conda clean --all && \
     echo "conda activate workflow" >> ~/.bashrc

@@ -200,7 +200,7 @@ class JobConfigurator(ABC):
         if self.conf.image is not None:
             return self.conf.image
         if self.profile.resources and self.profile.resources.gpu:
-            return f"dstackai/miniforge:py{self.python()}-{version.miniforge_image}-cuda-11.4"
+            return f"dstackai/miniforge:py{self.python()}-{version.miniforge_image}-cuda-11.8"
         return f"dstackai/miniforge:py{self.python()}-{version.miniforge_image}"
 
     def cache_specs(self) -> List[job.CacheSpec]:
