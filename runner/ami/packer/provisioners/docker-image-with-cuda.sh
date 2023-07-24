@@ -3,11 +3,11 @@
 set -e
 
 IMAGES="
- dstackai/miniforge:py3.11-${IMAGE_VERSION}-cuda-11.4
- dstackai/miniforge:py3.10-${IMAGE_VERSION}-cuda-11.4
- dstackai/miniforge:py3.9-${IMAGE_VERSION}-cuda-11.4
- dstackai/miniforge:py3.8-${IMAGE_VERSION}-cuda-11.4
- dstackai/miniforge:py3.7-${IMAGE_VERSION}-cuda-11.4
+ dstackai/base:py3.11-${IMAGE_VERSION}-cuda-11.8
+ dstackai/base:py3.10-${IMAGE_VERSION}-cuda-11.8
+ dstackai/base:py3.9-${IMAGE_VERSION}-cuda-11.8
+ dstackai/base:py3.8-${IMAGE_VERSION}-cuda-11.8
+ dstackai/base:py3.7-${IMAGE_VERSION}-cuda-11.8
 "
 echo "START pull image"
 for img in $IMAGES; do

@@ -1,3 +1,3 @@
 __version__ = None
 __is_release__ = False
-miniforge_image = "0.3"
+base_image = "0.4rc2"

@@ -79,10 +79,10 @@ jobs:
       - name: Upload pip package
         run: |
           VERSION=${GITHUB_REF#refs/tags/}
-          MINIFORGE_IMAGE=$(cat cli/dstack/version.py | grep miniforge_image)
+          BASE_IMAGE=$(cat cli/dstack/version.py | grep base_image)
           echo "__version__ = \"$VERSION\"" > cli/dstack/version.py
           echo "__is_release__ = True" >> cli/dstack/version.py
-          echo $MINIFORGE_IMAGE >> cli/dstack/version.py
+          echo $BASE_IMAGE >> cli/dstack/version.py
           cp README.md cli
           python setup.py sdist bdist_wheel
           python -m twine upload --repository pypi --username ${{ secrets.PYPI_USERNAME }} --password ${{ secrets.PYPI_PASSWORD }} dist/*

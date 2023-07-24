@@ -187,7 +187,7 @@ class JobConfigurator(ABC):
     def entrypoint(self) -> Optional[List[str]]:
         if self.conf.entrypoint is not None:
             return shlex.split(self.conf.entrypoint)
-        if self.conf.image is None:  # dstackai/miniforge
+        if self.conf.image is None:  # dstackai/base
             return ["/bin/bash", "-i", "-c"]
         if self.commands():  # custom docker image with commands
             return ["/bin/sh", "-i", "-c"]
@@ -200,8 +200,8 @@ class JobConfigurator(ABC):
         if self.conf.image is not None:
             return self.conf.image
         if self.profile.resources and self.profile.resources.gpu:
-            return f"dstackai/miniforge:py{self.python()}-{version.miniforge_image}-cuda-11.4"
-        return f"dstackai/miniforge:py{self.python()}-{version.miniforge_image}"
+            return f"dstackai/base:py{self.python()}-{version.base_image}-cuda-11.8"
+        return f"dstackai/base:py{self.python()}-{version.base_image}"
 
     def cache_specs(self) -> List[job.CacheSpec]:
         return [
