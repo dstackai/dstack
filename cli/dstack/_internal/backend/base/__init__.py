@@ -283,7 +283,7 @@ class ComponentBasedBackend(Backend):
 
     def stop_job(self, repo_id: str, job_id: str, terminate: bool, abort: bool):
         # If backend does not support stop, terminate the run
-        if self.name != "local":
+        if self.name not in ["gcp", "local"]:
             terminate = True
         base_jobs.stop_job(self.storage(), self.compute(), repo_id, job_id, terminate, abort)
 

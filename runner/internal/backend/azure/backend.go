@@ -131,6 +131,10 @@ func (azbackend *AzureBackend) IsInterrupted(ctx context.Context) (bool, error) 
 	return false, nil
 }
 
+func (azbackend *AzureBackend) Stop(ctx context.Context) error {
+	return nil
+}
+
 func (azbackend *AzureBackend) Shutdown(ctx context.Context) error {
 	log.Trace(ctx, "Starting shutdown")
 	err := azbackend.compute.TerminateInstance(ctx, azbackend.state.RequestID)

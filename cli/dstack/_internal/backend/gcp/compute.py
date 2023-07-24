@@ -136,8 +136,13 @@ class GCPCompute(Compute):
         )
         return LaunchedInstanceInfo(request_id=instance.name, location=self.gcp_config.zone)
 
-    def stop_instance(self, runner: Runner):
-        pass
+    def restart_instance(self, job: Job):
+        _restart_instance(
+            client=self.instances_client,
+            gcp_config=self.gcp_config,
+            instance_name=job.request_id,
+        )
+        return LaunchedInstanceInfo(request_id=job.request_id, location=job.location)
 
     def terminate_instance(self, runner: Runner):
         _terminate_instance(
@@ -766,6 +771,18 @@ def _create_firewall_rules(
 
     operation = firewalls_client.insert(project=project_id, firewall_resource=firewall_rule)
     gcp_utils.wait_for_extended_operation(operation, "firewall rule creation")
+
+
+def _restart_instance(
+    client: compute_v1.InstancesClient, gcp_config: GCPConfig, instance_name: str
+):
+    request = compute_v1.StartInstanceRequest(
+        instance=instance_name,
+        project=gcp_config.project_id,
+        zone=gcp_config.zone,
+    )
+    operation = client.start(request)
+    gcp_utils.wait_for_extended_operation(operation)
 
 
 def _terminate_instance(

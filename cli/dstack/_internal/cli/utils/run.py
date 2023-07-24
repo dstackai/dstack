@@ -35,6 +35,9 @@ POLL_FINISHED_STATE_RATE_SECS = 1
 
 interrupt_count = 0
 
+# Set this env to run cloud runners locally
+ENABLE_LOCAL_CLOUD = os.getenv("DSTACK_ENABLE_LOCAL_CLOUD") is not None
+
 
 def read_ssh_key_pub(key_path: str) -> str:
     path = Path(key_path)
@@ -226,7 +229,7 @@ def _attach(hub_client: HubClient, job: Job, ssh_key_path: str) -> Dict[int, int
     ws_port = int(job.env["WS_LOGS_PORT"])
     host_ports = {ws_port: ws_port}
 
-    if backend_type != "local":
+    if backend_type != "local" and not ENABLE_LOCAL_CLOUD:
         ssh_config_add_host(
             config.ssh_config_path,
             f"{job.run_name}-host",
@@ -266,7 +269,7 @@ def _attach(hub_client: HubClient, job: Job, ssh_key_path: str) -> Dict[int, int
             "ControlMaster": "auto",
             "ControlPersist": "10m",
         }
-        if backend_type != "local":
+        if backend_type != "local" and not ENABLE_LOCAL_CLOUD:
             options["ProxyJump"] = f"{job.run_name}-host"
         ssh_config_add_host(config.ssh_config_path, job.run_name, options)
         del app_ports[openssh_server_port]

@@ -84,6 +84,10 @@ func (l *LambdaBackend) IsInterrupted(ctx context.Context) (bool, error) {
 	return false, nil
 }
 
+func (l *LambdaBackend) Stop(ctx context.Context) error {
+	return nil
+}
+
 func (l *LambdaBackend) Shutdown(ctx context.Context) error {
 	return l.apiClient.TerminateInstance(ctx, []string{l.storageBackend.State.RequestID})
 }

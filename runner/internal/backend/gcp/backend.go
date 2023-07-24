@@ -113,24 +113,14 @@ func (gbackend *GCPBackend) IsInterrupted(ctx context.Context) (bool, error) {
 	return gbackend.compute.IsInterruptedSpot(ctx, gbackend.state.RequestID)
 }
 
+func (gbackend *GCPBackend) Stop(ctx context.Context) error {
+	err := gbackend.compute.StopInstance(ctx, gbackend.state.RequestID)
+	return gerrors.Wrap(err)
+}
+
 func (gbackend *GCPBackend) Shutdown(ctx context.Context) error {
 	err := gbackend.compute.TerminateInstance(ctx, gbackend.state.RequestID)
-	if err != nil {
-		return err
-	}
-	err = gbackend.compute.instancesClient.Close()
-	if err != nil {
-		return err
-	}
-	err = gbackend.storage.client.Close()
-	if err != nil {
-		return err
-	}
-	err = gbackend.secretManager.client.Close()
-	if err != nil {
-		return err
-	}
-	return gbackend.logging.client.Close()
+	return gerrors.Wrap(err)
 }
 
 func (gbackend *GCPBackend) GetArtifact(ctx context.Context, runName, localPath, remotePath string, mount bool) base.Artifacter {
@@ -245,4 +235,20 @@ func (gbackend *GCPBackend) GetTMPDir(ctx context.Context) string {
 
 func (gbackend *GCPBackend) GetDockerBindings(ctx context.Context) []mount.Mount {
 	return []mount.Mount{}
+}
+
+func (gbackend *GCPBackend) cleanup(ctx context.Context) error {
+	err := gbackend.compute.instancesClient.Close()
+	if err != nil {
+		return gerrors.Wrap(err)
+	}
+	err = gbackend.storage.client.Close()
+	if err != nil {
+		return gerrors.Wrap(err)
+	}
+	err = gbackend.secretManager.client.Close()
+	if err != nil {
+		return gerrors.Wrap(err)
+	}
+	return gerrors.Wrap(gbackend.logging.client.Close())
 }

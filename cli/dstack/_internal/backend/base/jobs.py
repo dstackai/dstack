@@ -121,6 +121,7 @@ def restart_job(
     compute: Compute,
     job: Job,
 ):
+    logger.info("Restarting job [repo_id=%s job_id=%s]", job.repo.repo_id, job.job_id)
     runner = runners.get_runner(storage, job.runner_id)
     launched_instance_info = compute.restart_instance(job)
     job.status = JobStatus.RESTARTING
@@ -204,7 +205,7 @@ def _try_run_job(
     runners.create_runner(storage, runner)
     try:
         launched_instance_info = compute.run_instance(job, instance_type)
-        runner.request_id = launched_instance_info.request_id
+        runner.request_id = job.request_id = launched_instance_info.request_id
         job.location = launched_instance_info.location
     except NoCapacityError:
         if job.spot_policy == SpotPolicy.AUTO and attempt == 0:
@@ -218,7 +219,6 @@ def _try_run_job(
         else:
             job.status = failed_to_start_job_new_status
             job.error_code = JobErrorCode.FAILED_TO_START_DUE_TO_NO_CAPACITY
-            job.request_id = runner.request_id if runner else None
             update_job(storage, job)
     else:
         runners.update_runner(storage, runner)

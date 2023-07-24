@@ -119,6 +119,10 @@ func (s *AWSBackend) IsInterrupted(ctx context.Context) (bool, error) {
 	return s.cliEC2.IsInterruptedSpot(ctx, s.State.RequestID)
 }
 
+func (s *AWSBackend) Stop(ctx context.Context) error {
+	return nil
+}
+
 func (s *AWSBackend) Shutdown(ctx context.Context) error {
 	log.Trace(ctx, "Start shutdown")
 	if s == nil {

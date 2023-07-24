@@ -31,6 +31,23 @@ func NewGCPCompute(project, zone string) *GCPCompute {
 	}
 }
 
+func (gcompute *GCPCompute) StopInstance(ctx context.Context, instanceID string) error {
+	log.Trace(ctx, "Stop instance", "ID", instanceID)
+	req := &computepb.StopInstanceRequest{
+		Instance: instanceID,
+		Project:  gcompute.project,
+		Zone:     gcompute.zone,
+	}
+	_, err := gcompute.instancesClient.Stop(ctx, req)
+	if err != nil {
+		if strings.Contains(err.Error(), "Error 404") {
+			return nil
+		}
+		return gerrors.Wrap(err)
+	}
+	return nil
+}
+
 func (gcompute *GCPCompute) TerminateInstance(ctx context.Context, instanceID string) error {
 	log.Trace(ctx, "Terminate instance", "ID", instanceID)
 	req := &computepb.DeleteInstanceRequest{

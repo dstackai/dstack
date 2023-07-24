@@ -227,10 +227,17 @@ func (ex *Executor) Shutdown(ctx context.Context) {
 			panic(r)
 		}
 	}()
+	job := ex.backend.Job(ctx)
+	if job.Status == states.Stopped {
+		err := ex.backend.Stop(ctx)
+		if err != nil {
+			log.Error(ctx, "Shutdown", "err", err)
+		}
+		return
+	}
 	err := ex.backend.Shutdown(ctx)
 	if err != nil {
 		log.Error(ctx, "Shutdown", "err", err)
-		return
 	}
 }
 

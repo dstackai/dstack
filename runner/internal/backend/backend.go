@@ -28,6 +28,7 @@ type Backend interface {
 	Requirements(ctx context.Context) models.Requirements
 	UpdateState(ctx context.Context) error
 	IsInterrupted(ctx context.Context) (bool, error)
+	Stop(ctx context.Context) error
 	Shutdown(ctx context.Context) error
 	GetArtifact(ctx context.Context, runName, localPath, remotePath string, fs bool) base.Artifacter
 	GetCache(ctx context.Context, runName, localPath, remotePath string) base.Artifacter

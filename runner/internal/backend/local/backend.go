@@ -113,8 +113,11 @@ func (l *Local) IsInterrupted(ctx context.Context) (bool, error) {
 	return false, nil
 }
 
+func (l *Local) Stop(ctx context.Context) error {
+	return nil
+}
+
 func (l *Local) Shutdown(ctx context.Context) error {
-	log.Trace(ctx, "Start shutdown")
 	return nil
 }
 
