@@ -421,7 +421,7 @@ def _get_image_name(
     image_prefix = "dstack-"
     if len(instance_type.resources.gpus) > 0:
         image_prefix += "cuda-"
-    image_prefix += version.miniforge_image.replace(".", "-")
+    image_prefix += version.base_image.replace(".", "-")
 
     list_request = compute_v1.ListImagesRequest()
     list_request.project = "dstack"

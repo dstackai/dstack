@@ -206,7 +206,7 @@ def _get_image_ref(
     image_name = "dstack-"
     if cuda:
         image_name += "cuda-"
-    image_name += version.miniforge_image
+    image_name += version.base_image
 
     image = compute_client.community_gallery_images.get(
         location=location,

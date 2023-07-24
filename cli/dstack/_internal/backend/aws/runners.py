@@ -650,7 +650,7 @@ def _get_ami_image(
     image_name = "dstack-"
     if cuda:
         image_name += "cuda-"
-    image_name += version.miniforge_image
+    image_name += version.base_image
 
     response = ec2_client.describe_images(
         Filters=[
