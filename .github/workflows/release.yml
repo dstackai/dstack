@@ -5,9 +5,6 @@ on:
     tags:
       - '*'
 
-env:
-  IMAGE_VERSION: "0.3"
-
 jobs:
   cli-test-tag:
     runs-on: ${{ matrix.os }}
@@ -82,9 +79,10 @@ jobs:
       - name: Upload pip package
         run: |
           VERSION=${GITHUB_REF#refs/tags/}
+          MINIFORGE_IMAGE=$(cat cli/dstack/version.py | grep miniforge_image)
           echo "__version__ = \"$VERSION\"" > cli/dstack/version.py
           echo "__is_release__ = True" >> cli/dstack/version.py
-          echo "miniforge_image = \"${{ env.IMAGE_VERSION }}\"" >> cli/dstack/version.py
+          echo $MINIFORGE_IMAGE >> cli/dstack/version.py
           cp README.md cli
           python setup.py sdist bdist_wheel
           python -m twine upload --repository pypi --username ${{ secrets.PYPI_USERNAME }} --password ${{ secrets.PYPI_PASSWORD }} dist/*
@@ -99,7 +97,7 @@ jobs:
       - name: Set up Go
         uses: actions/setup-go@v3
         with:
-          go-version: 1.19
+          go-version: 1.19.10
       - name: golangci-lint
         uses: golangci/golangci-lint-action@v3
         with:
@@ -133,7 +131,7 @@ jobs:
       - name: Set up Go
         uses: actions/setup-go@v3
         with:
-          go-version: 1.19
+          go-version: 1.19.10
       - name: build
         env:
           GOOS: ${{ matrix.goos }}
@@ -209,133 +207,11 @@ jobs:
           docker manifest create dstackai/dstack:latest --amend dstackai/dstack:$VERSION-arm64 --amend dstackai/dstack:$VERSION-amd64
           docker manifest push dstackai/dstack:latest
 
-  ami-build:
-    defaults:
-      run:
-        working-directory: runner
-    needs:
-      - runner-upload-tag
-      - cli-upload-tag
-      - hub-docker-tag
-    env:
-      AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
-      AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
-    strategy:
-      matrix:
-        variants: [ ami-without-cuda, ami-cuda ]
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v3
-      - name: Download packer
-        run: |
-          wget https://releases.hashicorp.com/packer/1.8.0/packer_1.8.0_linux_amd64.zip
-          unzip packer_1.8.0_linux_amd64.zip
-          chmod +x packer
-          cp -R ami/packer/* .
-      - name: Run packer
-        run: |
-          VERSION=${GITHUB_REF#refs/tags/}
-          ./packer build -var build_id=$VERSION -var build_prefix='' -var image_version=${{ env.IMAGE_VERSION }} -var-file=prod-var.json ${{ matrix.variants }}.json
-
-  gcp-images-build:
-    defaults:
-      run:
-        working-directory: runner
-    needs:
-      - runner-upload-tag
-      - cli-upload-tag
-      - hub-docker-tag
-    strategy:
-      matrix:
-        variant: [ gcp-image, gcp-image-cuda ]
-        include:
-          - variant: gcp-image
-            image_prefix: dstack-nocuda
-          - variant: gcp-image-cuda
-            image_prefix: dstack-cuda
-    runs-on: ubuntu-latest
-    permissions:
-      contents: 'read'
-      id-token: 'write'
-    steps:
-      - uses: actions/checkout@v3
-      - name: 'Authenticate to Google Cloud'
-        uses: 'google-github-actions/auth@v1'
-        with:
-          workload_identity_provider: 'projects/531508670106/locations/global/workloadIdentityPools/github-identity-pool/providers/github-id-provider'
-          service_account: 'github-actions@dstack.iam.gserviceaccount.com'
-          create_credentials_file: true
-      - name: 'Set up Cloud SDK'
-        uses: 'google-github-actions/setup-gcloud@v1'
-      - name: Download packer
-        run: |
-          wget https://releases.hashicorp.com/packer/1.8.0/packer_1.8.0_linux_amd64.zip
-          unzip packer_1.8.0_linux_amd64.zip
-          chmod +x packer
-          cp -R ami/packer/* .
-      - name: Run packer
-        run: |
-          VERSION=${GITHUB_REF#refs/tags/}
-          VERSION=${VERSION//./-}
-          ./packer build -var build_id=$VERSION -var build_prefix='' -var dstack_stage=PROD -var image_version=${{ env.IMAGE_VERSION }} ${{ matrix.variant }}.json
-      - name: Publish image
-        run: |
-          VERSION=${GITHUB_REF#refs/tags/}
-          VERSION=${VERSION//./-}
-          gcloud compute images add-iam-policy-binding ${{ matrix.image_prefix }}-$VERSION --member='allAuthenticatedUsers' --role='roles/compute.imageUser'
-
-  azure-image-build:
-    defaults:
-      run:
-        working-directory: runner
-    needs:
-      - runner-upload-tag
-      - cli-upload-tag
-      - hub-docker-tag
-    env:
-      AZURE_CLIENT_ID: ${{ secrets.AZURE_CLIENT_ID }}
-      AZURE_CLIENT_SECRET: ${{ secrets.AZURE_CLIENT_SECRET }}
-      AZURE_TENANT_ID: ${{ secrets.AZURE_TENANT_ID }}
-      AZURE_SUBSCRIPTION_ID: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
-      VERSION: ${{ github.run_number }}
-    strategy:
-      matrix:
-        variant: [ azure-image, azure-image-cuda ]
-        include:
-          - variant: azure-image
-            image_prefix: dstack-nocuda
-          - variant: azure-image-cuda
-            image_prefix: dstack-cuda
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v3
-      - uses: Azure/login@v1
-        name: Log in to az
-        with:
-          creds: '{"clientId":"${{ secrets.AZURE_CLIENT_ID }}","clientSecret":"${{ secrets.AZURE_CLIENT_SECRET }}","subscriptionId":"${{ secrets.AZURE_SUBSCRIPTION_ID }}","tenantId":"${{ secrets.AZURE_TENANT_ID }}"}'
-      - name: Download packer
-        run: |
-          wget https://releases.hashicorp.com/packer/1.8.0/packer_1.8.0_linux_amd64.zip
-          unzip packer_1.8.0_linux_amd64.zip
-          chmod +x packer
-          cp -R ami/packer/* .
-      - name: Run packer
-        run: |
-          VERSION=${GITHUB_REF#refs/tags/}
-          ./packer build -var build_prefix=${{ matrix.image_prefix }} -var build_id=$VERSION -var image_version=${{ env.IMAGE_VERSION }} ${{ matrix.variant }}.json
-      - name: Publish azure image
-        run: |
-          VERSION=${GITHUB_REF#refs/tags/}
-          IMAGE_DEFINITION=${{ matrix.image_prefix }}-$VERSION
-          IMAGE_NAME=${{ matrix.image_prefix }}-$VERSION
-          ../scripts/publish_azure_image.sh $IMAGE_DEFINITION $IMAGE_NAME
-
   update-get-dstack-tag:
     runs-on: ubuntu-latest
     needs:
-      - ami-build
-      - azure-image-build
-      - gcp-images-build
+      - runner-upload-tag
+      - cli-upload-tag
     env:
       AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
       AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}

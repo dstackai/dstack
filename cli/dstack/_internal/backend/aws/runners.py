@@ -254,7 +254,6 @@ def _get_instance_types(ec2_client: BaseClient) -> List[InstanceType]:
                         "t2.small",
                         "c5.*",
                         "m5.*",
-                        "p2.*",
                         "p3.*",
                         "g5.*",
                         "g4dn.*",
@@ -644,27 +643,18 @@ def _get_role_name(iam_client: BaseClient, bucket_name: str) -> str:
     return _role_name
 
 
-def _get_default_ami_image_version() -> Optional[str]:
-    if version.__is_release__:
-        return version.__version__
-    else:
-        return None
-
-
 def _get_ami_image(
     ec2_client: BaseClient,
     cuda: bool,
-    _version: Optional[str] = _get_default_ami_image_version(),
 ) -> Tuple[str, str]:
-    ami_name = "dstack"
+    image_name = "dstack-"
     if cuda:
-        ami_name = ami_name + "-cuda-11.4"
-    if not version.__is_release__:
-        ami_name = "[stgn] " + ami_name
-    ami_name = ami_name + f"-{_version or '*'}"
+        image_name += "cuda-"
+    image_name += version.miniforge_image
+
     response = ec2_client.describe_images(
         Filters=[
-            {"Name": "name", "Values": [ami_name]},
+            {"Name": "name", "Values": [image_name]},
         ],
     )
     images = list(
@@ -677,7 +667,4 @@ def _get_ami_image(
         ami = next(iter(sorted(images, key=lambda i: i["CreationDate"], reverse=True)))
         return ami["ImageId"], ami["Name"]
     else:
-        if _version:
-            return _get_ami_image(ec2_client, cuda, _version=None)
-        else:
-            raise Exception(f"Can't find an AMI image prefix={ami_name!r}")
+        raise Exception(f"Can't find an AMI image prefix={image_name!r}")

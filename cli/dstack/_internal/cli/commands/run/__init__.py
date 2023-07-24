@@ -412,7 +412,7 @@ def _attach(
         )
         if openssh_server_port is None:
             app_ports = {}
-        host_ports = PortsLock({ws_port: ws_port}).acquire().release()
+        host_ports = PortsLock({ws_port: 0}).acquire().release()
         host_ports.update(host_ports_lock.release())
         for i in range(3):  # retry
             time.sleep(2**i)

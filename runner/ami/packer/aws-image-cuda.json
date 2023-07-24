@@ -4,38 +4,37 @@
     "aws_secret_key": "{{env `AWS_SECRET_ACCESS_KEY`}}",
     "region": "eu-west-1",
     "ssh_username": "ubuntu",
-    "base_ami": "ami-0be0bfd2eb8b14c30",
+    "base_ami": "ami-0cffefff2d52e0a23",
     "instance_type": "c5.large",
     "subnet_id": "subnet-c39cb6a5",
     "docker_version": "20.10.17",
-    "build_id": "{{timestamp}}",
-    "build_prefix": "[stgn] ",
+    "cuda_drivers_version": "535.54.03-1",
+    "build_prefix": "",
     "ami_regions": "",
-    "dstack_stage": "STGN",
     "ami_groups": "",
-    "runner_version": "latest"
+    "image_version": ""
   },
   "builders": [
     {
       "type": "amazon-ebs",
       "access_key": "{{user `aws_access_key`}}",
-      "secret_key": "{{user `aws_secret_key` }}",
-      "region": "{{user `region` }}",
-      "subnet_id": "{{user `subnet_id` }}",
+      "secret_key": "{{user `aws_secret_key`}}",
+      "region": "{{user `region`}}",
+      "subnet_id": "{{user `subnet_id`}}",
       "source_ami": "{{user `base_ami`}}",
-      "instance_type": "{{user `instance_type` }}",
+      "instance_type": "{{user `instance_type`}}",
       "ssh_username": "{{user `ssh_username`}}",
-      "ami_name": "{{user `build_prefix`}}dstack-{{user `build_id`}}",
+      "ami_name": "{{user `build_prefix`}}dstack-cuda-{{user `image_version` | clean_resource_name}}",
       "associate_public_ip_address": true,
       "ami_regions": "{{user `ami_regions`}}",
       "ami_groups": "{{user `ami_groups`}}",
       "tags": {
-        "Name": "DSTACK"
+        "Name": "DSTACK-CUDA"
       },
       "launch_block_device_mappings": [
         {
           "device_name":           "/dev/sda1",
-          "volume_size":           100,
+          "volume_size":           "100",
           "volume_type":           "gp2",
           "delete_on_termination": true
         }
@@ -57,14 +56,6 @@
       ]
     },
     {
-      "type": "shell",
-      "environment_vars": [
-        "DSTACK_STAGE={{user `dstack_stage`}}",
-        "RUNNER_VERSION={{user `runner_version`}}"
-      ],
-      "script": "provisioners/get-dstack-runner.sh"
-    },
-    {
       "type": "file",
       "source": "provisioners/install-docker.sh",
       "destination": "/tmp/install-docker.sh"
@@ -83,12 +74,13 @@
     },
     {
       "type": "shell",
-      "environment_vars": ["IMAGE_VERSION={{user `image_version`}}"],
-      "script": "provisioners/docker-image-without-cuda.sh"
+      "environment_vars": ["CUDA_DRIVERS_VERSION={{user `cuda_drivers_version`}}"],
+      "script": "provisioners/cuda.sh"
     },
     {
       "type": "shell",
-      "inline": ["/usr/local/bin/dstack-runner --version"]
+      "environment_vars": ["IMAGE_VERSION={{user `image_version`}}"],
+      "script": "provisioners/docker-image-with-cuda.sh"
     }
   ]
 }

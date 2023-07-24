@@ -26,9 +26,9 @@ DSTACK_INSTANCE_TAG = "dstack-runner-instance"
 
 
 _supported_accelerators = [
-    # todo L4
     {"accelerator_name": "nvidia-a100-80gb", "gpu_name": "A100", "memory_mb": 1024 * 80},
     {"accelerator_name": "nvidia-tesla-a100", "gpu_name": "A100", "memory_mb": 1024 * 40},
+    {"accelerator_name": "nvidia-l4", "gpu_name": "L4", "memory_mb": 1024 * 24},
     {
         "accelerator_name": "nvidia-tesla-t4",
         "gpu_name": "T4",
@@ -49,13 +49,6 @@ _supported_accelerators = [
         "memory_mb": 1024 * 16,
         "max_vcpu": 16,
         "max_ram_mb": 1024 * 104,
-    },
-    {
-        "accelerator_name": "nvidia-tesla-k80",
-        "gpu_name": "K80",
-        "memory_mb": 1024 * 12,
-        "max_vcpu": 8,
-        "max_ram_mb": 1024 * 52,
     },
 ]
 
@@ -209,8 +202,8 @@ def _get_nongpu_instance_type(
     machine_types_client: compute_v1.MachineTypesClient,
     project_id: str,
     zone: str,
-    requirements: Requirements,
-) -> List[InstanceType]:
+    requirements: Optional[Requirements],
+) -> Optional[InstanceType]:
     machine_families = ["e2-medium", "e2-standard-*", "e2-highmem-*", "e2-highcpu-*", "m1-*"]
     instance_types = _list_instance_types(
         machine_types_client=machine_types_client,
@@ -269,7 +262,7 @@ def _get_gpu_instance_type(
             machine_types_client=machine_types_client,
             project_id=project_id,
             zone=zone,
-            machine_families=["a2-*"],
+            machine_families=["a2-*", "g2-*"],  # A100, L4
         )
     )
     return choose_instance_type(instance_types_with_gpus, requirements)
@@ -340,7 +333,7 @@ def _add_gpus_to_instance_type(
     zone: str,
     instance_type: InstanceType,
     requirements: Requirements,
-) -> bool:
+) -> List[InstanceType]:
     instance_types = []
     accelerator_types = _list_accelerator_types(
         accelerator_types_client=accelerator_types_client,
@@ -349,7 +342,6 @@ def _add_gpus_to_instance_type(
         accelerator_families=[
             "nvidia-tesla-t4",
             "nvidia-tesla-v100",
-            "nvidia-tesla-k80",
             "nvidia-tesla-p100",
         ],
     )
@@ -426,14 +418,11 @@ def _get_max_ram_per_accelerator(accelerator_name: str) -> int:
 def _get_image_name(
     images_client: compute_v1.ImagesClient, instance_type: InstanceType
 ) -> Optional[str]:
-    if version.__is_release__:
-        image_prefix = "dstack-"
-    else:
-        image_prefix = "stgn-dstack-"
+    image_prefix = "dstack-"
     if len(instance_type.resources.gpus) > 0:
         image_prefix += "cuda-"
-    else:
-        image_prefix += "nocuda-"
+    image_prefix += version.miniforge_image.replace(".", "-")
+
     list_request = compute_v1.ListImagesRequest()
     list_request.project = "dstack"
     list_request.order_by = "creationTimestamp desc"
