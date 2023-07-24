@@ -20,10 +20,10 @@ class PortsLock:
             if not local_port:  # None or 0
                 continue
             if local_port in assigned_ports:
-                raise PortUsedError(f"Mapped port {app_port}:{local_port} is already in use")
+                raise PortUsedError(f"Port {local_port} is already in use")
             sock = self._listen(local_port)
             if sock is None:
-                raise PortUsedError(f"Mapped port {app_port}:{local_port} is already in use")
+                raise PortUsedError(f"Port {local_port} is already in use")
             self.sockets[app_port] = sock
             assigned_ports.add(local_port)
 

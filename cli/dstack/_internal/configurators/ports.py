@@ -12,25 +12,21 @@ class PortUsedError(DstackError):
 
 
 def merge_ports(schema: List[PortMapping], args: List[PortMapping]) -> Dict[int, PortMapping]:
-    unique_ports_constraint(
-        [pm.container_port for pm in schema], error="Schema port {} is already in use"
-    )
-    unique_ports_constraint(
-        [pm.container_port for pm in args], error="Args port {} is already in use"
-    )
+    unique_ports_constraint([pm.container_port for pm in schema])
+    unique_ports_constraint([pm.container_port for pm in args])
 
     ports = {pm.container_port: pm for pm in schema}
     for pm in args:  # override schema
         ports[pm.container_port] = pm
 
-    unique_ports_constraint(
-        [pm.local_port for pm in ports.values() if pm.local_port is not None],
-        error="Mapped port {} is already in use",
-    )
+    unique_ports_constraint([pm.local_port for pm in ports.values() if pm.local_port is not None])
     return ports
 
 
-def unique_ports_constraint(ports: List[int], error: str = "Port {} is already in use"):
+def unique_ports_constraint(
+    ports: List[int],
+    error: str = "Port {} is already in use",
+):
     used_ports = set()
     for i in ports:
         if i in used_ports:

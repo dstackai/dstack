@@ -164,7 +164,7 @@ class RunCommand(BasicCommand):
                     ports_locks=ports_locks,
                 )
         except PortUsedError as e:
-            exit(f"{type(e).__name__}: {e}")
+            exit(f"\n{e.message}")
         finally:
             if watcher.is_alive():
                 watcher.stop()

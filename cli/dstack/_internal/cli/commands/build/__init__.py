@@ -78,7 +78,7 @@ class BuildCommand(BasicCommand):
                 ports_locks=ports_locks,
             )
         except PortUsedError as e:
-            exit(f"{type(e).__name__}: {e}")
+            exit(f"\n{e.message}")
 
     def __init__(self, parser):
         super().__init__(parser)
