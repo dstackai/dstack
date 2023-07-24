@@ -407,7 +407,7 @@ def _attach(
                 "UserKnownHostsFile": "/dev/null",
                 "ControlPath": config.ssh_control_path(f"{job.run_name}-host"),
                 "ControlMaster": "auto",
-                "ControlPersist": "10m",
+                "ControlPersist": "yes",
             },
         )
         if openssh_server_port is None:
@@ -431,7 +431,7 @@ def _attach(
             "UserKnownHostsFile": "/dev/null",
             "ControlPath": config.ssh_control_path(job.run_name),
             "ControlMaster": "auto",
-            "ControlPersist": "10m",
+            "ControlPersist": "yes",
         }
         if backend_type != "local":
             options["ProxyJump"] = f"{job.run_name}-host"
