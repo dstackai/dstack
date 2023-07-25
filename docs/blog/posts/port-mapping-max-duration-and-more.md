@@ -48,7 +48,7 @@ $ dstack run . -f serve.dstack.yml --port 3000:7860
 
 </div>
 
-Thi command forwards the traffic to port `3000` on your local machine.
+This command forwards the traffic to port `3000` on your local machine.
 
 ??? info "Port mapping via .dstack.yml"
 
