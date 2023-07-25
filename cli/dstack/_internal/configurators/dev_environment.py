@@ -1,7 +1,7 @@
 from typing import List, Optional
 
 import dstack._internal.core.job as job
-from dstack._internal.configurators import JobConfigurator
+from dstack._internal.configurators import JobConfiguratorWithPorts
 from dstack._internal.configurators.extensions import IDEExtension
 from dstack._internal.configurators.extensions.shell import require
 from dstack._internal.configurators.extensions.ssh import SSHd
@@ -16,7 +16,7 @@ require_sshd = require(["sshd"])
 install_ipykernel = f'(pip install --no-cache-dir ipykernel 2> /dev/null) || echo "no pip, ipykernel was not installed"'
 
 
-class DevEnvironmentConfigurator(JobConfigurator):
+class DevEnvironmentConfigurator(JobConfiguratorWithPorts):
     conf: DevEnvironmentConfiguration
     sshd: Optional[SSHd]
     ide: Optional[IDEExtension]
@@ -61,7 +61,7 @@ class DevEnvironmentConfigurator(JobConfigurator):
         commands.append(install_ipykernel)
         return commands
 
-    def default_max_duration(self) -> int:
+    def default_max_duration(self) -> Optional[int]:
         return DEFAULT_MAX_DURATION_SECONDS
 
     def artifact_specs(self) -> List[job.ArtifactSpec]:

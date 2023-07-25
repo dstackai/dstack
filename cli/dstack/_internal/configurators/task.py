@@ -1,6 +1,6 @@
 from typing import List, Optional
 
-from dstack._internal.configurators import JobConfigurator, validate_local_path
+from dstack._internal.configurators import JobConfiguratorWithPorts, validate_local_path
 from dstack._internal.configurators.extensions.ssh import SSHd
 from dstack._internal.configurators.ports import get_map_to_port
 from dstack._internal.core import job as job
@@ -10,7 +10,7 @@ from dstack._internal.core.repo import Repo
 DEFAULT_MAX_DURATION_SECONDS = 72 * 3600
 
 
-class TaskConfigurator(JobConfigurator):
+class TaskConfigurator(JobConfiguratorWithPorts):
     conf: TaskConfiguration
     sshd: Optional[SSHd]
 
@@ -31,7 +31,7 @@ class TaskConfigurator(JobConfigurator):
     def optional_build_commands(self) -> List[str]:
         return []  # not needed
 
-    def default_max_duration(self) -> int:
+    def default_max_duration(self) -> Optional[int]:
         return DEFAULT_MAX_DURATION_SECONDS
 
     def artifact_specs(self) -> List[job.ArtifactSpec]:

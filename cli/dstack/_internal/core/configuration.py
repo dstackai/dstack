@@ -64,6 +64,14 @@ class Artifact(ForbidExtra):
     ] = False
 
 
+class Gateway(ForbidExtra):
+    hostname: Annotated[str, Field(description="IP address or domain name")]
+    public_port: Annotated[
+        ValidPort, Field(description="The port that the gateway listens to")
+    ] = 80
+    service_port: Annotated[ValidPort, Field(description="The port that the service listens to")]
+
+
 class BaseConfiguration(ForbidExtra):
     type: Literal["none"]
     image: Annotated[Optional[str], Field(description="The name of the Docker image to run")]
@@ -78,10 +86,6 @@ class BaseConfiguration(ForbidExtra):
         Optional[PythonVersion],
         Field(description="The major version of Python\nMutually exclusive with the image"),
     ]
-    ports: Annotated[
-        List[Union[constr(regex=r"^(?:([0-9]+|\*):)?[0-9]+$"), ValidPort, PortMapping]],
-        Field(description="Port numbers/mapping to expose"),
-    ] = []
     env: Annotated[
         Union[List[constr(regex=r"^[a-zA-Z_][a-zA-Z0-9_]*=.*$")], Dict[str, str]],
         Field(description="The mapping or the list of environment variables"),
@@ -105,6 +109,19 @@ class BaseConfiguration(ForbidExtra):
             return PythonVersion(v)
         return v
 
+    @validator("env")
+    def convert_env(cls, v) -> Dict[str, str]:
+        if isinstance(v, list):
+            return dict(pair.split(sep="=", maxsplit=1) for pair in v)
+        return v
+
+
+class BaseConfigurationWithPorts(BaseConfiguration):
+    ports: Annotated[
+        List[Union[constr(regex=r"^(?:([0-9]+|\*):)?[0-9]+$"), ValidPort, PortMapping]],
+        Field(description="Port numbers/mapping to expose"),
+    ] = []
+
     @validator("ports", each_item=True)
     def convert_ports(cls, v) -> PortMapping:
         if isinstance(v, int):
@@ -113,28 +130,29 @@ class BaseConfiguration(ForbidExtra):
             return PortMapping.parse(v)
         return v
 
-    @validator("env")
-    def convert_env(cls, v) -> Dict[str, str]:
-        if isinstance(v, list):
-            return dict(pair.split(sep="=", maxsplit=1) for pair in v)
-        return v
 
-
-class DevEnvironmentConfiguration(BaseConfiguration):
+class DevEnvironmentConfiguration(BaseConfigurationWithPorts):
     type: Literal["dev-environment"] = "dev-environment"
     ide: Annotated[Literal["vscode"], Field(description="The IDE to run")]
     init: Annotated[CommandsList, Field(description="The bash commands to run")] = []
 
 
-class TaskConfiguration(BaseConfiguration):
+class TaskConfiguration(BaseConfigurationWithPorts):
     type: Literal["task"] = "task"
     commands: Annotated[CommandsList, Field(description="The bash commands to run")]
     artifacts: Annotated[List[Artifact], Field(description="The list of output artifacts")] = []
 
 
+class ServiceConfiguration(BaseConfiguration):
+    type: Literal["service"] = "service"
+    commands: Annotated[CommandsList, Field(description="The bash commands to run")]
+    gateway: Annotated[Gateway, Field(description="The gateway to publish the service")]
+
+
 class DstackConfiguration(BaseModel):
     __root__: Annotated[
-        Union[DevEnvironmentConfiguration, TaskConfiguration], Field(discriminator="type")
+        Union[DevEnvironmentConfiguration, TaskConfiguration, ServiceConfiguration],
+        Field(discriminator="type"),
     ]
 
     class Config:

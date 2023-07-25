@@ -12,7 +12,11 @@ import dstack._internal.configurators.ports as ports
 import dstack._internal.core.job as job
 import dstack.version as version
 from dstack._internal.core.build import BuildPolicy
-from dstack._internal.core.configuration import BaseConfiguration, PythonVersion
+from dstack._internal.core.configuration import (
+    BaseConfiguration,
+    BaseConfigurationWithPorts,
+    PythonVersion,
+)
 from dstack._internal.core.error import DstackError
 from dstack._internal.core.profile import Profile, parse_duration, parse_max_duration
 from dstack._internal.core.repo import Repo
@@ -42,10 +46,6 @@ class JobConfigurator(ABC):
     ) -> argparse.ArgumentParser:
         if parser is None:
             parser = argparse.ArgumentParser(prog=prog, formatter_class=RichHelpFormatter)
-
-        parser.add_argument(
-            "-p", "--ports", metavar="PORT", type=port_mapping, nargs=argparse.ONE_OR_MORE
-        )
 
         spot_group = parser.add_mutually_exclusive_group()
         spot_group.add_argument(
@@ -80,9 +80,6 @@ class JobConfigurator(ABC):
         return parser
 
     def apply_args(self, args: argparse.Namespace):
-        if args.ports is not None:
-            self.conf.ports = list(ports.merge_ports(self.conf.ports, args.ports).values())
-
         if args.spot_policy is not None:
             self.profile.spot_policy = args.spot_policy
 
@@ -178,7 +175,11 @@ class JobConfigurator(ABC):
         pass
 
     @abstractmethod
-    def default_max_duration(self) -> int:
+    def default_max_duration(self) -> Optional[int]:
+        pass
+
+    @abstractmethod
+    def ports(self) -> Dict[int, ports.PortMapping]:
         pass
 
     def build_commands(self) -> List[str]:
@@ -232,14 +233,6 @@ class JobConfigurator(ABC):
         version_info = sys.version_info
         return PythonVersion(f"{version_info.major}.{version_info.minor}").value
 
-    def ports(self) -> Dict[int, ports.PortMapping]:
-        ports.unique_ports_constraint([pm.container_port for pm in self.conf.ports])
-        ports.unique_ports_constraint(
-            [pm.local_port for pm in self.conf.ports if pm.local_port is not None],
-            error="Mapped port {} is already in use",
-        )
-        return {pm.container_port: pm for pm in self.conf.ports}
-
     def env(self) -> Dict[str, str]:
         return self.conf.env
 
@@ -276,6 +269,32 @@ class JobConfigurator(ABC):
         if self.profile.max_duration < 0:
             return None
         return self.profile.max_duration
+
+
+class JobConfiguratorWithPorts(JobConfigurator, ABC):
+    conf: BaseConfigurationWithPorts
+
+    def get_parser(
+        self, prog: Optional[str] = None, parser: Optional[argparse.ArgumentParser] = None
+    ) -> argparse.ArgumentParser:
+        parser = super().get_parser(prog, parser)
+        parser.add_argument(
+            "-p", "--ports", metavar="PORT", type=port_mapping, nargs=argparse.ONE_OR_MORE
+        )
+        return parser
+
+    def apply_args(self, args: argparse.Namespace):
+        super().apply_args(args)
+        if args.ports is not None:
+            self.conf.ports = list(ports.merge_ports(self.conf.ports, args.ports).values())
+
+    def ports(self) -> Dict[int, ports.PortMapping]:
+        ports.unique_ports_constraint([pm.container_port for pm in self.conf.ports])
+        ports.unique_ports_constraint(
+            [pm.local_port for pm in self.conf.ports if pm.local_port is not None],
+            error="Mapped port {} is already in use",
+        )
+        return {pm.container_port: pm for pm in self.conf.ports}
 
 
 def validate_local_path(path: str, home: Optional[str], working_dir: str) -> str:

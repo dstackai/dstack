@@ -86,6 +86,7 @@ class JobRefId(JobRef):
 class ConfigurationType(str, Enum):
     DEV_ENVIRONMENT = "dev-environment"
     TASK = "task"
+    SERVICE = "service"
 
 
 class JobStatus(str, Enum):
