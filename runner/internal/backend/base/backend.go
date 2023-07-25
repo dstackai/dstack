@@ -134,7 +134,7 @@ func getBuildDiffPrefix(spec *container.BuildSpec) string {
 	return fmt.Sprintf(
 		"builds/%s/%s;%s;%s;%s;%s;",
 		spec.RepoId,
-		models.EscapeHead(spec.ConfigurationType),
+		models.EscapeHead(string(spec.ConfigurationType)),
 		models.EscapeHead(spec.ConfigurationPath),
 		models.EscapeHead(spec.WorkDir),
 		models.EscapeHead(spec.BaseImageName),

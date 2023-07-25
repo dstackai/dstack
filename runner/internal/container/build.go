@@ -4,13 +4,14 @@ import (
 	"bytes"
 	"crypto/sha256"
 	"fmt"
+	"github.com/dstackai/dstack/runner/internal/models"
 )
 
 type BuildSpec struct {
 	BaseImageID       string
 	WorkDir           string
 	ConfigurationPath string
-	ConfigurationType string
+	ConfigurationType models.ConfigurationType
 
 	Commands           []string
 	Entrypoint         []string
@@ -32,7 +33,7 @@ func (s *BuildSpec) Hash() string {
 	buffer.WriteString("\n")
 	buffer.WriteString(s.ConfigurationPath)
 	buffer.WriteString("\n")
-	buffer.WriteString(s.ConfigurationType)
+	buffer.WriteString(string(s.ConfigurationType))
 	buffer.WriteString("\n")
 	return fmt.Sprintf("%x", sha256.Sum256(buffer.Bytes()))
 }

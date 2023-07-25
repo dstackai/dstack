@@ -22,6 +22,13 @@ from dstack._internal.core.repo import (
 )
 
 
+class Gateway(BaseModel):
+    hostname: str
+    ssh_key: Optional[str]
+    service_port: int
+    public_port: int = 80
+
+
 class GpusRequirements(BaseModel):
     count: Optional[int] = None
     memory_mib: Optional[int] = None
@@ -148,14 +155,6 @@ class RegistryAuth(BaseModel):
     password: Optional[str] = None
 
 
-def check_dict(element: Any, field: str):
-    if type(element) == dict:
-        return element.get(field)
-    if hasattr(element, field):
-        return getattr(element, field)
-    return None
-
-
 class Job(JobHead):
     app_names: Optional[List[str]]
     app_specs: Optional[List[AppSpec]]
@@ -173,6 +172,7 @@ class Job(JobHead):
     entrypoint: Optional[List[str]]
     env: Optional[Dict[str, str]]
     error_code: Optional[JobErrorCode]
+    gateway: Optional[Gateway]
     home_dir: Optional[str]
     host_name: Optional[str]
     hub_user_name: str = ""
@@ -239,3 +239,11 @@ class Job(JobHead):
             return RemoteRepo(repo_ref=self.repo_ref, repo_data=self.repo_data)
         elif isinstance(self.repo_data, LocalRepoData):
             return LocalRepo(repo_ref=self.repo_ref, repo_data=self.repo_data)
+
+
+def check_dict(element: Any, field: str):
+    if type(element) == dict:
+        return element.get(field)
+    if hasattr(element, field):
+        return getattr(element, field)
+    return None

@@ -3,17 +3,23 @@ from typing import List, Optional, Tuple
 import yaml
 
 from dstack._internal.backend.base import runners
-from dstack._internal.backend.base.build import predict_build_plan
 from dstack._internal.backend.base.compute import Compute, NoCapacityError
 from dstack._internal.backend.base.storage import Storage
-from dstack._internal.core.build import DockerPlatform
 from dstack._internal.core.error import NoMatchingInstanceError
 from dstack._internal.core.instance import InstanceType
-from dstack._internal.core.job import Job, JobErrorCode, JobHead, JobStatus, SpotPolicy
+from dstack._internal.core.job import (
+    ConfigurationType,
+    Job,
+    JobErrorCode,
+    JobHead,
+    JobStatus,
+    SpotPolicy,
+)
 from dstack._internal.core.repo import RepoRef
 from dstack._internal.core.request import RequestStatus
 from dstack._internal.core.runners import Runner
 from dstack._internal.utils.common import get_milliseconds_since_epoch
+from dstack._internal.utils.crypto import generate_rsa_key_pair_bytes
 from dstack._internal.utils.escape import escape_head, unescape_head
 
 
@@ -104,6 +110,11 @@ def run_job(
     if job.status != JobStatus.SUBMITTED:
         raise Exception("Can't create a request for a job which status is not SUBMITTED")
     try:
+        if job.configuration_type == ConfigurationType.SERVICE:
+            private_bytes, public_bytes = generate_rsa_key_pair_bytes(comment=job.run_name)
+            # todo push public key to the gateway
+            job.gateway.ssh_key = private_bytes.decode()
+            update_job(storage, job)
         _try_run_job(
             storage=storage,
             compute=compute,

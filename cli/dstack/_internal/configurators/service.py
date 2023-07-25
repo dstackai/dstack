@@ -27,3 +27,6 @@ class ServiceConfigurator(JobConfigurator):
     def ports(self) -> Dict[int, ports.PortMapping]:
         port = self.conf.gateway.service_port
         return {port: ports.PortMapping(container_port=port)}
+
+    def gateway(self) -> Optional[job.Gateway]:
+        return job.Gateway.parse_obj(self.conf.gateway)

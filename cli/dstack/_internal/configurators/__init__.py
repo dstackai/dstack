@@ -125,36 +125,37 @@ class JobConfigurator(ABC):
 
         created_at = get_milliseconds_since_epoch()
         configured_job = job.Job(
-            job_id=f"{run_name},,0",
-            runner_id=uuid.uuid4().hex,
-            repo_ref=repo.repo_ref,
-            repo_data=repo.repo_data,
-            repo_code_filename=repo_code_filename,
-            run_name=run_name,
-            configuration_type=job.ConfigurationType(self.conf.type),
-            configuration_path=self.configuration_path,
-            status=job.JobStatus.SUBMITTED,
-            created_at=created_at,
-            submitted_at=created_at,
-            image_name=self.image_name(),
-            registry_auth=self.registry_auth(),
-            entrypoint=self.entrypoint(),
-            build_commands=self.build_commands(),
-            optional_build_commands=self.optional_build_commands(),
-            commands=self.commands(),
-            working_dir=self.working_dir,
-            home_dir=self.home_dir(),
-            env=self.env(),
-            artifact_specs=self.artifact_specs(),
-            cache_specs=self.cache_specs(),
             app_specs=self.app_specs(),
-            dep_specs=self.dep_specs(),
-            spot_policy=self.spot_policy(),
-            retry_policy=self.retry_policy(),
-            max_duration=self.max_duration(),
+            artifact_specs=self.artifact_specs(),
+            build_commands=self.build_commands(),
             build_policy=self.build_policy,
+            cache_specs=self.cache_specs(),
+            commands=self.commands(),
+            configuration_path=self.configuration_path,
+            configuration_type=job.ConfigurationType(self.conf.type),
+            created_at=created_at,
+            dep_specs=self.dep_specs(),
+            entrypoint=self.entrypoint(),
+            env=self.env(),
+            gateway=self.gateway(),
+            home_dir=self.home_dir(),
+            image_name=self.image_name(),
+            job_id=f"{run_name},,0",
+            max_duration=self.max_duration(),
+            optional_build_commands=self.optional_build_commands(),
+            registry_auth=self.registry_auth(),
+            repo_code_filename=repo_code_filename,
+            repo_data=repo.repo_data,
+            repo_ref=repo.repo_ref,
             requirements=self.requirements(),
+            retry_policy=self.retry_policy(),
+            run_name=run_name,
+            runner_id=uuid.uuid4().hex,
+            spot_policy=self.spot_policy(),
             ssh_key_pub=ssh_key_pub,
+            status=job.JobStatus.SUBMITTED,
+            submitted_at=created_at,
+            working_dir=self.working_dir,
         )
         return [configured_job]
 
@@ -269,6 +270,9 @@ class JobConfigurator(ABC):
         if self.profile.max_duration < 0:
             return None
         return self.profile.max_duration
+
+    def gateway(self) -> Optional[job.Gateway]:
+        return None
 
 
 class JobConfiguratorWithPorts(JobConfigurator, ABC):

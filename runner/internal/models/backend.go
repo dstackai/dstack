@@ -26,13 +26,14 @@ type Job struct {
 	Cache                 []Cache           `yaml:"cache_specs"`
 	Commands              []string          `yaml:"commands,omitempty"`
 	ConfigurationPath     string            `yaml:"configuration_path,omitempty"` // head
-	ConfigurationType     string            `yaml:"configuration_type,omitempty"`
+	ConfigurationType     ConfigurationType `yaml:"configuration_type,omitempty"`
 	ContainerExitCode     string            `yaml:"container_exit_code,omitempty"` // head
 	CreatedAt             uint64            `yaml:"created_at"`
 	Deps                  []Dep             `yaml:"dep_specs,omitempty"`
 	Entrypoint            []string          `yaml:"entrypoint,omitempty"`
 	Environment           map[string]string `yaml:"env,omitempty"`
 	ErrorCode             ErrorCode         `yaml:"error_code,omitempty"` // head
+	Gateway               Gateway           `yaml:"gateway,omitempty"`
 	HomeDir               string            `yaml:"home_dir,omitempty"`
 	HostName              string            `yaml:"host_name,omitempty"`
 	HubUserName           string            `yaml:"hub_user_name"` // head
@@ -131,7 +132,7 @@ type RegistryAuth struct {
 }
 
 type RepoData struct {
-	RepoType string `yaml:"repo_type"`
+	RepoType RepoType `yaml:"repo_type"`
 	// type=remote
 	RepoHostName    string `yaml:"repo_host_name,omitempty"`
 	RepoPort        int    `yaml:"repo_port,omitempty"`
@@ -145,14 +146,23 @@ type RepoData struct {
 	RepoDir string `yaml:"repo_dir"`
 }
 
+type Gateway struct {
+	Hostname    string `yaml:"hostname"`
+	SSHKey      string `yaml:"ssh_key,omitempty"`
+	ServicePort int    `yaml:"service_port"`
+	PublicPort  int    `yaml:"public_port"`
+}
+
 type RunnerMetadata struct {
 	Status string `yaml:"status"`
 }
 
+type ConfigurationType string
 type ErrorCode string
 type SpotPolicy string
 type JobStatus string
 type BuildPolicy string
+type RepoType string
 
 const (
 	UseBuild   BuildPolicy = "use-build"
