@@ -39,20 +39,21 @@ class DevEnvironmentConfigurator(JobConfigurator):
         commands += self.sshd.get_setup_commands()
         commands += self.ide.get_install_if_not_found_commands()
         commands.append(install_ipykernel)
-        return commands
-
-    def commands(self) -> List[str]:
-        commands = []
-        commands += self.sshd.get_start_commands()
-        commands += self.conf.init
+        commands += self.conf.setup
         commands.append("echo ''")
         commands += self.ide.get_print_readme_commands()
         commands += [
             f"echo 'To connect via SSH, use: `ssh {self.run_name}`'",
             "echo ''",
             "echo -n 'To exit, press Ctrl+C.'",
-            "cat",  # idle
         ]
+        return commands
+
+    def commands(self) -> List[str]:
+        commands = []
+        commands += self.sshd.get_start_commands()
+        commands += self.conf.init
+        commands += ["cat"]  # idle
         return commands
 
     def default_max_duration(self) -> int:

@@ -166,7 +166,6 @@ def stop_job(
         job.status = new_status
         update_job(storage, job)
         if new_status.is_finished():
-            # TODO: support both stop and terminate
             runners.stop_runner(compute, runner)
 
 

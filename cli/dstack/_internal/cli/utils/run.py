@@ -104,7 +104,9 @@ def poll_run(
             # idle PENDING and SUBMITTED
             request_errors_printed = False
             for run in _poll_run_head(
-                hub_client, run_name, loop_statuses=[JobStatus.PENDING, JobStatus.SUBMITTED]
+                hub_client,
+                run_name,
+                loop_statuses=[JobStatus.PENDING, JobStatus.SUBMITTED, JobStatus.RESTARTING],
             ):
                 if run.has_request_status([RequestStatus.NO_CAPACITY]):
                     if not request_errors_printed:

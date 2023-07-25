@@ -86,6 +86,7 @@ class BaseConfiguration(ForbidExtra):
     build: Annotated[
         CommandsList, Field(description="The bash commands to run during build stage")
     ] = []
+    setup: Annotated[CommandsList, Field(description="The bash commands to run on the boot")] = []
     cache: Annotated[
         List[str], Field(description="The directories to be cached between configuration runs")
     ] = []

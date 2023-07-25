@@ -38,11 +38,6 @@ class Compute(ABC):
     def run_instance(self, job: Job, instance_type: InstanceType) -> LaunchedInstanceInfo:
         pass
 
-    # @abstractmethod
-    def stop_instance(self, runner: Runner):
-        pass
-
-    # @abstractmethod
     def restart_instance(self, job: Job) -> LaunchedInstanceInfo:
         pass
 

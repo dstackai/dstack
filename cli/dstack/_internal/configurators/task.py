@@ -25,7 +25,9 @@ class TaskConfigurator(JobConfigurator):
         return []  # not needed
 
     def setup(self) -> List[str]:
-        pass
+        commands = []
+        commands += self.conf.setup
+        return commands
 
     def commands(self) -> List[str]:
         commands = []
