@@ -10,8 +10,14 @@ from dstack._internal.cli.commands import BasicCommand
 from dstack._internal.cli.utils.common import add_project_argument, check_init, console
 from dstack._internal.cli.utils.config import config, get_hub_client
 from dstack._internal.cli.utils.configuration import load_configuration
-from dstack._internal.cli.utils.run import poll_run, print_run_plan, read_ssh_key_pub
+from dstack._internal.cli.utils.run import (
+    poll_run,
+    print_run_plan,
+    read_ssh_key_pub,
+    reserve_ports,
+)
 from dstack._internal.cli.utils.watcher import Watcher
+from dstack._internal.configurators.ports import PortUsedError
 from dstack._internal.core.error import RepoNotInitializedError
 
 
@@ -56,14 +62,6 @@ class RunCommand(BasicCommand):
             help="The name of the profile",
             type=str,
             dest="profile_name",
-        )
-        self._parser.add_argument(
-            "-t",
-            "--tag",
-            metavar="TAG",
-            help="A tag name. Warning, if the tag exists, " "it will be overridden.",
-            type=str,
-            dest="tag_name",
         )
         self._parser.add_argument(
             "args",
@@ -117,8 +115,14 @@ class RunCommand(BasicCommand):
             if not args.yes and not Confirm.ask("Continue?"):
                 console.print("\nExiting...")
                 exit(0)
-            console.print("\nProvisioning...\n")
 
+            ports_locks = None
+            if not args.detach:
+                ports_locks = reserve_ports(
+                    configurator.app_specs(), hub_client.get_project_backend_type() == "local"
+                )
+
+            console.print("\nProvisioning...\n")
             run_name, jobs = hub_client.run_configuration(
                 configurator=configurator,
                 ssh_key_pub=ssh_key_pub,
@@ -133,7 +137,10 @@ class RunCommand(BasicCommand):
                     jobs,
                     ssh_key=config.repo_user_config.ssh_key_path,
                     watcher=watcher,
+                    ports_locks=ports_locks,
                 )
+        except PortUsedError as e:
+            exit(f"{type(e).__name__}: {e}")
         finally:
             if watcher.is_alive():
                 watcher.stop()

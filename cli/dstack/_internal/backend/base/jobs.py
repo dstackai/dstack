@@ -7,7 +7,15 @@ from dstack._internal.backend.base.compute import Compute, InstanceNotFoundError
 from dstack._internal.backend.base.storage import Storage
 from dstack._internal.core.error import BackendError, BackendValueError, NoMatchingInstanceError
 from dstack._internal.core.instance import InstanceType
-from dstack._internal.core.job import Job, JobErrorCode, JobHead, JobStatus, SpotPolicy
+from dstack._internal.core.job import (
+    ConfigurationType,
+    Job,
+    JobErrorCode,
+    JobHead,
+    JobStatus,
+    SpotPolicy,
+    TerminationPolicy,
+)
 from dstack._internal.core.repo import RepoRef
 from dstack._internal.core.runners import Runner
 from dstack._internal.utils.common import get_milliseconds_since_epoch
@@ -129,6 +137,7 @@ def restart_job(
         launched_instance_info = compute.restart_instance(job)
     except InstanceNotFoundError:
         raise BackendValueError("Instance not found")
+    job.submitted_at = get_milliseconds_since_epoch()
     job.status = JobStatus.RESTARTING
     job.request_id = runner.request_id = launched_instance_info.request_id
     runners.update_runner(storage, runner)
@@ -141,6 +150,8 @@ def stop_job(
     logger.info("Stopping job [repo_id=%s job_id=%s]", repo_id, job_id)
     job_head = get_job_head(storage, repo_id, job_id)
     job = get_job(storage, repo_id, job_id)
+    if job.termination_policy == TerminationPolicy.TERMINATE:
+        terminate = True
     if job_head.status.is_finished() and not terminate:
         return
     runner = runners.get_runner(storage, job.runner_id)

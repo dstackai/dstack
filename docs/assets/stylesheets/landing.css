@@ -126,7 +126,11 @@
     border-image: linear-gradient(45deg, #0048ff, #ce00ff) 10;
     border-width: 0.75px;
     border-style: solid;
+}
 
+.tx-landing__highlights_grid > a, .tx-landing__highlights_grid > a:hover {
+    text-decoration: none;
+    color: inherit;
 }
 
 @media screen and (min-width: 76.1875em) {

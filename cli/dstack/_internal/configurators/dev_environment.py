@@ -29,16 +29,25 @@ class DevEnvironmentConfigurator(JobConfigurator):
         self.sshd.map_to_port = get_map_to_port(self.ports(), self.sshd.port)
         return super().get_jobs(repo, run_name, repo_code_filename, ssh_key_pub)
 
-    def optional_build_commands(self) -> List[str]:
-        return []
-
-    def setup(self) -> List[str]:
+    def build_commands(self) -> List[str]:
+        if len(self.conf.build) == 0:
+            return []
         commands = []
         if self.conf.image:
             commands += self.sshd.get_required_commands()
         commands += self.sshd.get_setup_commands()
         commands += self.ide.get_install_if_not_found_commands()
         commands.append(install_ipykernel)
+        return self.conf.build + commands
+
+    def setup(self) -> List[str]:
+        commands = []
+        if len(self.conf.build) == 0:
+            if self.conf.image:
+                commands += self.sshd.get_required_commands()
+            commands += self.sshd.get_setup_commands()
+            commands += self.ide.get_install_if_not_found_commands()
+            commands.append(install_ipykernel)
         commands += self.conf.setup
         commands.append("echo ''")
         commands += self.ide.get_print_readme_commands()
@@ -58,6 +67,9 @@ class DevEnvironmentConfigurator(JobConfigurator):
 
     def default_max_duration(self) -> int:
         return DEFAULT_MAX_DURATION_SECONDS
+
+    def termination_policy(self) -> job.TerminationPolicy:
+        return self.profile.termination_policy or job.TerminationPolicy.STOP
 
     def artifact_specs(self) -> List[job.ArtifactSpec]:
         return []  # not available

@@ -56,6 +56,7 @@ type Job struct {
 	RunnerID          string       `yaml:"runner_id"`
 	SpotPolicy        string       `yaml:"spot_policy"`
 	RetryPolicy       RetryPolicy  `yaml:"retry_policy"`
+	TerminationPolicy string       `yaml:"termination_policy"`
 	MaxDuration       uint64       `yaml:"max_duration,omitempty"`
 	Status            string       `yaml:"status"`
 	ErrorCode         string       `yaml:"error_code,omitempty"`

@@ -57,8 +57,8 @@
     new Termynal('#train-command-example',
         {
             lineData: [
-                { type: 'input', value: 'dstack run . -f train.dstack.yml' },
-                { delay: 0, value: ' ', class: 'newline' },
+                {type: 'input', value: 'dstack run . -f train.dstack.yml'},
+                {delay: 0, value: ' ', class: 'newline'},
                 {
                     delay: 0,
                     value: 'RUN            USER   INSTANCE       RESOURCES                 SPOT',
@@ -69,8 +69,8 @@
                     value: 'wet-mangust-7  peter  a2-highgpu-1g  12xCPUs, 87040MB, 1xA100  yes',
                     class: 'newline'
                 },
-                { delay: 0, value: ' ', class: 'newline' },
-                { delay: 0, startDelay: 0, lineDelay: 0, value: 'Continue? ', class: 'no-newline' },
+                {delay: 0, value: ' ', class: 'newline'},
+                {delay: 0, startDelay: 0, lineDelay: 0, value: 'Continue? ', class: 'no-newline'},
                 {
                     type: 'input',
                     startDelay: 0,
@@ -80,9 +80,9 @@
                     value: 'y',
                     class: 'no-newline'
                 },
-                { delay: 0, value: ' ', class: 'newline' },
-                { delay: 0, value: 'Waiting for capacity... To exit, press Ctrl+C.', class: 'newline' },
-                { delay: 5000, value: ' ', class: 'newline' },
+                {delay: 0, value: ' ', class: 'newline'},
+                {delay: 0, value: 'Waiting for capacity... To exit, press Ctrl+C.', class: 'newline'},
+                {delay: 5000, value: ' ', class: 'newline'},
                 {
                     delay: 5000,
                     value: 'Epoch 0:  100% 1719/1719 [00:18<00:00, 92.32it/s, loss=0.0981, acc=0.969]\n',
@@ -98,15 +98,15 @@
                     value: 'Epoch 2:  100% 1719/1719 [00:18<00:00, 92.32it/s, loss=0.0981, acc=0.969]\n',
                     class: 'newline'
                 },
-                { delay: 0, value: ' ', class: 'newline' },
+                {delay: 0, value: ' ', class: 'newline'},
             ]
         }
     );
     new Termynal('#serve-command-example',
         {
             lineData: [
-                { type: 'input', value: 'dstack run . -f serve.dstack.yml' },
-                { delay: 0, value: ' ', class: 'newline' },
+                {type: 'input', value: 'dstack run . -f serve.dstack.yml'},
+                {delay: 0, value: ' ', class: 'newline'},
                 {
                     delay: 0,
                     value: 'RUN           USER   INSTANCE       RESOURCES                 SPOT',
@@ -117,8 +117,8 @@
                     value: 'mean-snail-1  peter  a2-highgpu-1g  12xCPUs, 87040MB, 1xA100  yes',
                     class: 'newline'
                 },
-                { delay: 0, value: ' ', class: 'newline' },
-                { delay: 0, startDelay: 0, lineDelay: 0, value: 'Continue? ', class: 'no-newline' },
+                {delay: 0, value: ' ', class: 'newline'},
+                {delay: 0, startDelay: 0, lineDelay: 0, value: 'Continue? ', class: 'no-newline'},
                 {
                     type: 'input',
                     startDelay: 0,
@@ -128,22 +128,22 @@
                     value: 'y',
                     class: 'no-newline'
                 },
-                { delay: 0, value: ' ', class: 'newline' },
-                { delay: 0, value: 'Provisioning and starting a tunnel...', class: 'newline' },
-                { type: 'progress', progressPercent: 100 },
-                { delay: 0, value: ' ', class: 'newline' },
+                {delay: 0, value: ' ', class: 'newline'},
+                {delay: 0, value: 'Provisioning and starting a tunnel...', class: 'newline'},
+                {type: 'progress', progressPercent: 100},
+                {delay: 0, value: ' ', class: 'newline'},
                 {
                     delay: 0,
                     value: 'Running on local URL:  http://127.0.0.1:7860',
                     class: 'newline'
                 },
-                { delay: 0, value: ' ', class: 'newline' },
+                {delay: 0, value: ' ', class: 'newline'},
                 {
                     delay: 0,
                     value: 'To stop, press Ctrl+C.',
                     class: 'newline'
                 },
-                { delay: 0, value: ' ', class: 'newline' },
+                {delay: 0, value: ' ', class: 'newline'},
             ]
         }
     );
@@ -164,20 +164,20 @@
                 </p>
 
                 <a href="/docs" class="md-button md-button--primary">
-                    Docs</a>
+                    Get started</a>
 
                 <a href="https://join.slack.com/t/dstackai/shared_invite/zt-xdnsytie-D4qU9BvJP8vkbkHXdi6clQ"
-                    target="_blank" class="md-button md-button-secondary slack">Join Slack</a>
+                   target="_blank" class="md-button md-button-secondary slack">Join Slack</a>
             </div>
 
             <div class="tx-landing__hero_image">
-                <img src="assets/images/hero.svg" style="max-width:800px; width:100%" />
+                <img src="assets/images/hero.svg" style="max-width:800px; width:100%"/>
             </div>
         </div>
 
         <div class="tx-landing__integrations">
             <div class="tx-landing__integrations_text">
-                <h2>Leverage multiple clouds to cut costs</h2>
+                <h2>Switch between clouds to cut costs</h2>
             </div>
             <div class="tx-landing__integrations_logos">
                 <img class="logo-xlarge" src="assets/images/aws-logo.svg" title="Amazon Web Services">
@@ -192,13 +192,12 @@
                 <div class="block margin">
                     <div>
                         <h2>Dev environments</h2>
-                        <p>Configure the hardware <strong>resources</strong>, such as GPU, memory, specify your
-                            preference for using <strong>spot</strong> instances.</p>
+                        <p>Configure the hardware <strong>resources</strong> you need (GPU, memory, etc.) and
+                            indicate whether you want to use <strong>spot</strong> or <strong>on-demand</strong>
+                            instances.</p>
 
-                        <p><strong>dstack</strong> automatically provisions cloud resources,
-                            <strong>fetches</strong> your code, and <strong>forwards ports</strong> for secure
-                            access.
-                        </p>
+                        <p><strong>dstack</strong> will automatically provision cloud resources,
+                            and forward <strong>ports</strong> for secure and convenient access.</p>
 
                         <p>Access the cloud dev environment conveniently using your local <strong>desktop</strong> IDE.
                         </p>
@@ -221,11 +220,11 @@
                     <div>
                         <h2>Serving</h2>
                         <p>Serve models using <strong>Gradio</strong>, <strong>Streamlit</strong>,
-                            <strong>FastAPI</strong>, <strong>vLLM</strong>, and
+                            <strong>FastAPI</strong>, <strong>vLLM</strong>, <strong>TGI</strong>, and
                             other frameworks in any cloud.
                         </p>
 
-                        <p>Configure the <strong>hardware resources</strong> you need (GPU, memory, etc.) and
+                        <p>Configure the hardware <strong>resources</strong> you need (GPU, memory, etc.) and
                             indicate whether you want to use <strong>spot</strong> or <strong>on-demand</strong>
                             instances.</p>
 
@@ -245,11 +244,12 @@
                             easily and
                             cost-effectively in any cloud.</p>
 
-                        <p>Have cloud <strong>resources</strong> automatically provisioned based on your
-                            configuration.</p>
+                        <p>Configure the hardware <strong>resources</strong> you need (GPU, memory, etc.) and
+                            indicate whether you want to use <strong>spot</strong> or <strong>on-demand</strong>
+                            instances.</p>
 
-                        <p>Access your <strong>data</strong> and store output <strong>artifacts</strong> using
-                            declarative configuration or the Python SDK.</p>
+                        <p>Access and manage your <strong>data</strong> and <strong>artifacts</strong> using
+                            the built-in Python SDK.</p>
                     </div>
                 </div>
 
@@ -262,112 +262,45 @@
 
         <div class="-landing__highlights">
             <div class="tx-landing__highlights_text">
-                <h2>Run LLM workloads easily and <span style="white-space: nowrap">cost-effectively</span></h2>
+                <h2>Featured examples</h2>
             </div>
 
             <div class="tx-landing__highlights_grid">
-                <div class="feature-cell">
-                    <div class="feature-icon">
-                        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 16 16">
-                            <path
-                                d="m11.28 3.22 4.25 4.25a.75.75 0 0 1 0 1.06l-4.25 4.25a.749.749 0 0 1-1.275-.326.749.749 0 0 1 .215-.734L13.94 8l-3.72-3.72a.749.749 0 0 1 .326-1.275.749.749 0 0 1 .734.215Zm-6.56 0a.751.751 0 0 1 1.042.018.751.751 0 0 1 .018 1.042L2.06 8l3.72 3.72a.749.749 0 0 1-.326 1.275.749.749 0 0 1-.734-.215L.47 8.53a.75.75 0 0 1 0-1.06Z">
-                            </path>
-                        </svg>
-                    </div>
-                    <h3>
-                        Faster iterations
-                    </h3>
+                <a href="examples/vllm">
+                    <div class="feature-cell">
+                        <div class="feature-icon">
+                            <svg xmlns="http://www.w3.org/2000/svg" viewBox="-3 -3 27 27">
+                                <path d="m13.13 22.19-1.63-3.83c1.57-.58 3.04-1.36 4.4-2.27l-2.77 6.1M5.64 12.5l-3.83-1.63 6.1-2.77C7 9.46 6.22 10.93 5.64 12.5M21.61 2.39S16.66.269 11 5.93c-2.19 2.19-3.5 4.6-4.35 6.71-.28.75-.09 1.57.46 2.13l2.13 2.12c.55.56 1.37.74 2.12.46A19.1 19.1 0 0 0 18.07 13c5.66-5.66 3.54-10.61 3.54-10.61m-7.07 7.07c-.78-.78-.78-2.05 0-2.83s2.05-.78 2.83 0c.77.78.78 2.05 0 2.83-.78.78-2.05.78-2.83 0m-5.66 7.07-1.41-1.41 1.41 1.41M6.24 22l3.64-3.64c-.34-.09-.67-.24-.97-.45L4.83 22h1.41M2 22h1.41l4.77-4.76-1.42-1.41L2 20.59V22m0-2.83 4.09-4.08c-.21-.3-.36-.62-.45-.97L2 17.76v1.41Z"></path>
+                            </svg>
+                        </div>
+                        <h3>
+                            vLLM
+                        </h3>
 
-                    <p>
-                        Define any <strong>workloads</strong> declaratively as code.
-                        Run them on demand using the CLI, eliminating the need for cloud UI or proprietary APIs.
-                    </p>
-                </div>
-                <div class="feature-cell">
-                    <div class="feature-icon">
-                        <svg xmlns="http://www.w3.org/2000/svg" viewBox="3 3 21 21">
-                            <path
-                                d="M7 15h2c0 1.08 1.37 2 3 2s3-.92 3-2c0-1.1-1.04-1.5-3.24-2.03C9.64 12.44 7 11.78 7 9c0-1.79 1.47-3.31 3.5-3.82V3h3v2.18C15.53 5.69 17 7.21 17 9h-2c0-1.08-1.37-2-3-2s-3 .92-3 2c0 1.1 1.04 1.5 3.24 2.03C14.36 11.56 17 12.22 17 15c0 1.79-1.47 3.31-3.5 3.82V21h-3v-2.18C8.47 18.31 7 16.79 7 15Z">
-                            </path>
-                        </svg>
+                        <p>
+                            Serve open-source LLMs as OpenAI-compatible APIs with up to 24 times higher throughput using
+                            the vLLM library.
+                        </p>
                     </div>
-                    <h3>
-                        Cost optimization
-                    </h3>
+                </a>
 
-                    <p>Save costs by effectively utilizing cloud <strong>spot</strong> instances across multiple
-                        regions. Automatically
-                        recover from interruptions. Track GPU <strong>usage</strong>, while enforcing limits per
-                        team.</p>
-                </div>
-                <div class="feature-cell">
-                    <div class="feature-icon">
-                        <svg xmlns="http://www.w3.org/2000/svg" viewBox="-2 -2 27 27">
-                            <path
-                                d="M4 1h16a1 1 0 0 1 1 1v4a1 1 0 0 1-1 1H4a1 1 0 0 1-1-1V2a1 1 0 0 1 1-1m0 8h16a1 1 0 0 1 1 1v4a1 1 0 0 1-1 1H4a1 1 0 0 1-1-1v-4a1 1 0 0 1 1-1m0 8h16a1 1 0 0 1 1 1v4a1 1 0 0 1-1 1H4a1 1 0 0 1-1-1v-4a1 1 0 0 1 1-1M9 5h1V3H9v2m0 8h1v-2H9v2m0 8h1v-2H9v2M5 3v2h2V3H5m0 8v2h2v-2H5m0 8v2h2v-2H5Z">
-                            </path>
-                        </svg>
+                <a href="examples/llmchat">
+                    <div class="feature-cell">
+                        <div class="feature-icon">
+                            <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24">
+                                <path d="M12 3c5.5 0 10 3.58 10 8s-4.5 8-10 8c-1.24 0-2.43-.18-3.53-.5C5.55 21 2 21 2 21c2.33-2.33 2.7-3.9 2.75-4.5C3.05 15.07 2 13.13 2 11c0-4.42 4.5-8 10-8m5 9v-2h-2v2h2m-4 0v-2h-2v2h2m-4 0v-2H7v2h2Z"></path>
+                            </svg>
+                        </div>
+                        <h3>
+                            Chatbot
+                        </h3>
+
+                        <p>
+                            Run an open-source LLM of your choice, either as a Gradio app or as a Discord bot, with
+                            internet search capability.
+                        </p>
                     </div>
-                    <h3>
-                        Data-centric approach
-                    </h3>
-                    <p>Run dev environments and tasks where your <strong>data</strong> is located. Eliminate costs
-                        associated
-                        with <strong>ingress</strong> and <strong>egress</strong> data transfers.
-                        Ensure the <strong>security</strong> and <strong>privacy</strong> of your data and models.
-                    </p>
-                </div>
-                <div class="feature-cell">
-                    <div class="feature-icon">
-                        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24">
-                            <path
-                                d="m21.71 20.29-1.42 1.42a1 1 0 0 1-1.41 0L7 9.85A3.81 3.81 0 0 1 6 10a4 4 0 0 1-3.78-5.3l2.54 2.54.53-.53 1.42-1.42.53-.53L4.7 2.22A4 4 0 0 1 10 6a3.81 3.81 0 0 1-.15 1l11.86 11.88a1 1 0 0 1 0 1.41M2.29 18.88a1 1 0 0 0 0 1.41l1.42 1.42a1 1 0 0 0 1.41 0l5.47-5.46-2.83-2.83M20 2l-4 2v2l-2.17 2.17 2 2L18 8h2l2-4Z">
-                            </path>
-                        </svg>
-                    </div>
-                    <h3>
-                        No MLOps is required
-                    </h3>
-                    <p><strong>dstack</strong> integrates with your cloud natively and doesn't require
-                        engineering. No hustle with <strong>Terraform</strong>, <strong>Kubernetes</strong> or custom
-                        <strong>Docker</strong>
-                        images.
-                    </p>
-                </div>
-                <div class="feature-cell">
-                    <div class="feature-icon">
-                        <svg xmlns="http://www.w3.org/2000/svg" viewBox="1 1 23 23">
-                            <path
-                                d="M6.5 20q-2.28 0-3.89-1.57Q1 16.85 1 14.58q0-1.95 1.17-3.48 1.18-1.53 3.08-1.95.63-2.3 2.5-3.72Q9.63 4 12 4q2.93 0 4.96 2.04Q19 8.07 19 11q1.73.2 2.86 1.5 1.14 1.28 1.14 3 0 1.88-1.31 3.19T18.5 20Z">
-                            </path>
-                        </svg>
-                    </div>
-                    <h3>
-                        Cloud-agnostic
-                    </h3>
-                    <p>Use the same interface to work with any major cloud provider, including
-                        <strong>AWS</strong>, <strong>GCP</strong>, <strong>Azure</strong>,
-                        and <strong>Lambda</strong>.
-                        Use multiple clouds to optimize costs.
-                    </p>
-                </div>
-                <div class="feature-cell">
-                    <div class="feature-icon">
-                        <svg xmlns="http://www.w3.org/2000/svg" viewBox="2 2 22 22">
-                            <path
-                                d="M12 2A10 10 0 0 0 2 12c0 4.42 2.87 8.17 6.84 9.5.5.08.66-.23.66-.5v-1.69c-2.77.6-3.36-1.34-3.36-1.34-.46-1.16-1.11-1.47-1.11-1.47-.91-.62.07-.6.07-.6 1 .07 1.53 1.03 1.53 1.03.87 1.52 2.34 1.07 2.91.83.09-.65.35-1.09.63-1.34-2.22-.25-4.55-1.11-4.55-4.92 0-1.11.38-2 1.03-2.71-.1-.25-.45-1.29.1-2.64 0 0 .84-.27 2.75 1.02.79-.22 1.65-.33 2.5-.33.85 0 1.71.11 2.5.33 1.91-1.29 2.75-1.02 2.75-1.02.55 1.35.2 2.39.1 2.64.65.71 1.03 1.6 1.03 2.71 0 3.82-2.34 4.66-4.57 4.91.36.31.69.92.69 1.85V21c0 .27.16.59.67.5C19.14 20.16 22 16.42 22 12A10 10 0 0 0 12 2Z">
-                            </path>
-                        </svg>
-                    </div>
-                    <h3>
-                        Self-hosted
-                    </h3>
-                    <p>Run the <strong>dstack</strong> server on your local machine or easily deploy it, as a
-                        <strong>Docker</strong>
-                        image,
-                        anywhere within your environment, including your own cloud.
-                    </p>
-                </div>
+                </a>
             </div>
         </div>
 
@@ -386,10 +319,10 @@ $ dstack start
                 </p>
 
                 <a href="/docs" class="md-button md-button--primary">
-                    Docs</a>
+                    Get started</a>
 
                 <a href="https://join.slack.com/t/dstackai/shared_invite/zt-xdnsytie-D4qU9BvJP8vkbkHXdi6clQ"
-                    target="_blank" class="md-button md-button-secondary slack">Join Slack</a>
+                   target="_blank" class="md-button md-button-secondary slack">Join Slack</a>
             </div>
         </div>
     </div>

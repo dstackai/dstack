@@ -3,7 +3,7 @@ import sys
 import threading
 import time
 from pathlib import Path
-from typing import Dict, Iterator, List, Optional
+from typing import Dict, Iterator, List, Optional, Tuple
 
 import websocket
 from cursor import cursor
@@ -17,6 +17,7 @@ from dstack._internal.cli.utils.common import console, print_runs
 from dstack._internal.cli.utils.config import config
 from dstack._internal.cli.utils.ssh_tunnel import PortsLock, run_ssh_tunnel
 from dstack._internal.cli.utils.watcher import LocalCopier, SSHCopier, Watcher
+from dstack._internal.core.app import AppSpec
 from dstack._internal.core.instance import InstanceType
 from dstack._internal.core.job import Job, JobErrorCode, JobHead, JobStatus
 from dstack._internal.core.plan import RunPlan
@@ -71,12 +72,41 @@ def print_run_plan(configuration_file: str, run_plan: RunPlan):
     console.print()
 
 
+def reserve_ports(apps: List[AppSpec], local_backend: bool) -> Tuple[PortsLock, PortsLock]:
+    host_ports = {}
+    host_ports_lock = PortsLock()
+    app_ports = {}
+    app_ports_lock = PortsLock()
+    openssh_server_port: Optional[int] = None
+
+    for app in apps:
+        app_ports[app.port] = app.map_to_port or 0
+        if app.app_name == "openssh-server":
+            openssh_server_port = app.port
+    if local_backend and openssh_server_port is None:
+        return host_ports_lock, app_ports_lock
+
+    if not local_backend:
+        if openssh_server_port is None:
+            host_ports.update(app_ports)
+            app_ports = {}
+        host_ports_lock = PortsLock(host_ports).acquire()
+
+    if openssh_server_port is not None:
+        del app_ports[openssh_server_port]
+        if app_ports:
+            app_ports_lock = PortsLock(app_ports).acquire()
+
+    return host_ports_lock, app_ports_lock
+
+
 def poll_run(
     hub_client: HubClient,
     run: RunHead,
     job_heads: List[JobHead],
     ssh_key: Optional[str],
     watcher: Optional[Watcher],
+    ports_locks: Tuple[PortsLock, PortsLock],
 ):
     print_runs([run])
     console.print()
@@ -138,7 +168,7 @@ def poll_run(
 
         # attach to the instance, attach to the container in the background
         jobs = [hub_client.get_job(job_head.job_id) for job_head in job_heads]
-        ports = _attach(hub_client, jobs[0], ssh_key)
+        ports = _attach(hub_client, jobs[0], ssh_key, ports_locks)
         console.print()
         console.print("[grey58]To stop, press Ctrl+C.[/]")
         console.print()
@@ -211,25 +241,29 @@ def _print_failed_run_message(run: RunHead):
         console.print("Provisioning failed\n")
 
 
-def _attach(hub_client: HubClient, job: Job, ssh_key_path: str) -> Dict[int, int]:
+def _attach(
+    hub_client: HubClient, job: Job, ssh_key_path: str, ports_locks: Tuple[PortsLock, PortsLock]
+) -> Dict[int, int]:
     """
     :return: (host tunnel ports, container tunnel ports, ports mapping)
     """
     backend_type = hub_client.get_project_backend_type()
     app_ports = {}
-    openssh_server_port = 0
+    openssh_server_port: Optional[int] = None
     for app in job.app_specs or []:
         app_ports[app.port] = app.map_to_port or 0
         if app.app_name == "openssh-server":
             openssh_server_port = app.port
-    if backend_type == "local" and openssh_server_port == 0:
+    if backend_type == "local" and openssh_server_port is None:
         console.print("Provisioning... It may take up to a minute. [green]✓[/]")
         return {k: v for k, v in app_ports.items() if v != 0}
 
     console.print("Starting SSH tunnel...")
     include_ssh_config(config.ssh_config_path)
     ws_port = int(job.env["WS_LOGS_PORT"])
-    host_ports = {ws_port: ws_port}
+
+    host_ports = {}
+    host_ports_lock, app_ports_lock = ports_locks
 
     if backend_type != "local" and not ENABLE_LOCAL_CLOUD:
         ssh_config_add_host(
@@ -244,14 +278,13 @@ def _attach(hub_client: HubClient, job: Job, ssh_key_path: str) -> Dict[int, int
                 "UserKnownHostsFile": "/dev/null",
                 "ControlPath": config.ssh_control_path(f"{job.run_name}-host"),
                 "ControlMaster": "auto",
-                "ControlPersist": "10m",
+                "ControlPersist": "yes",
             },
         )
-        host_ports[ws_port] = 0  # to map dynamically
-        if openssh_server_port == 0:
-            host_ports.update(app_ports)
+        if openssh_server_port is None:
             app_ports = {}
-        host_ports = PortsLock(host_ports).acquire().release()
+        host_ports = PortsLock({ws_port: 0}).acquire().release()
+        host_ports.update(host_ports_lock.release())
         for i in range(3):  # retry
             time.sleep(2**i)
             if run_ssh_tunnel(f"{job.run_name}-host", host_ports):
@@ -259,7 +292,7 @@ def _attach(hub_client: HubClient, job: Job, ssh_key_path: str) -> Dict[int, int
         else:
             console.print("[warning]Warning: failed to start SSH tunnel[/warning] [red]✗[/]")
 
-    if openssh_server_port != 0:
+    if openssh_server_port is not None:
         options = {
             "HostName": "localhost",
             "Port": app_ports[openssh_server_port] or openssh_server_port,
@@ -269,15 +302,14 @@ def _attach(hub_client: HubClient, job: Job, ssh_key_path: str) -> Dict[int, int
             "UserKnownHostsFile": "/dev/null",
             "ControlPath": config.ssh_control_path(job.run_name),
             "ControlMaster": "auto",
-            "ControlPersist": "10m",
+            "ControlPersist": "yes",
         }
         if backend_type != "local" and not ENABLE_LOCAL_CLOUD:
             options["ProxyJump"] = f"{job.run_name}-host"
         ssh_config_add_host(config.ssh_config_path, job.run_name, options)
         del app_ports[openssh_server_port]
         if app_ports:
-            app_ports_lock = PortsLock(app_ports).acquire()
-            app_ports = app_ports_lock.dict()
+            app_ports.update(app_ports_lock.dict())
             # try to attach in the background
             threading.Thread(
                 target=_attach_to_container,
@@ -305,7 +337,7 @@ def _attach_to_container(hub_client: HubClient, run_name: str, ports_lock: Ports
             "[red]ERROR[/] Can't establish SSH tunnel with the container\n"
             "[grey58]Aborting...[/]"
         )
-        hub_client.terminate_jobs(run_name, abort=True)
+        hub_client.stop_jobs(run_name, abort=True)
         exit(1)
 
 

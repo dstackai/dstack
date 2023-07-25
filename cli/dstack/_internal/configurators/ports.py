@@ -7,10 +7,6 @@ RESERVED_PORTS_START = 10000
 RESERVED_PORTS_END = 10999
 
 
-class PortReservedError(DstackError):
-    pass
-
-
 class PortUsedError(DstackError):
     pass
 

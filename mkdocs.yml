@@ -142,13 +142,15 @@ nav:
           - Installation:
               - pip: docs/installation/pip.md
               - Docker: docs/installation/docker.md
-              - HG Spaces: docs/installation/hf-spaces.md
+              - HF Spaces: docs/installation/hf-spaces.md
       - Guides:
           - Dev environments: docs/guides/dev-environments.md
           - Tasks: docs/guides/tasks.md
 #          - Artifacts: docs/guides/artifacts.md
           - Projects: docs/guides/projects.md
       - Reference:
+          - .dstack.yml: docs/reference/dstack.yml.md
+          - profiles.yml: docs/reference/profiles.yml.md
           - CLI:
               - dstack run: docs/reference/cli/run.md
               - dstack init: docs/reference/cli/init.md
@@ -164,8 +166,6 @@ nav:
               - dstack secrets: docs/reference/cli/secrets.md
               - dstack prune: docs/reference/cli/prune.md
               - dstack build: docs/reference/cli/build.md
-          - .dstack.yml: docs/reference/dstack.yml.md
-          - profiles.yml: docs/reference/profiles.yml.md
           - API:
               - Python: docs/reference/api/python.md
           - Backends:
@@ -173,8 +173,12 @@ nav:
               - GCP: docs/reference/backends/gcp.md
               - Azure: docs/reference/backends/azure.md
               - Lambda: docs/reference/backends/lambda.md
-  - Examples: https://github.com/dstackai/dstack-examples/blob/main/README.md
-  - Slack: https://join.slack.com/t/dstackai/shared_invite/zt-xdnsytie-D4qU9BvJP8vkbkHXdi6clQ
+  - Examples:
+    - examples/index.md
+    - Examples:
+      - vLLM: examples/vllm.md
+      - Chatbot: examples/llmchat.md
   - Blog:
       - blog/index.md
+  - Slack: https://join.slack.com/t/dstackai/shared_invite/zt-xdnsytie-D4qU9BvJP8vkbkHXdi6clQ
   - Twitter: https://twitter.com/dstackai/

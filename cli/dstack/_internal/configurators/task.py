@@ -24,20 +24,29 @@ class TaskConfigurator(JobConfigurator):
     def optional_build_commands(self) -> List[str]:
         return []  # not needed
 
+    def build_commands(self) -> List[str]:
+        return self.conf.build
+
     def setup(self) -> List[str]:
         commands = []
+        if self.conf.image:
+            commands += self.sshd.get_required_commands()
+        commands += self.sshd.get_setup_commands()
         commands += self.conf.setup
         return commands
 
     def commands(self) -> List[str]:
         commands = []
         if self.conf.image is None:
-            self.sshd.start(commands)
-        commands.extend(self.conf.commands)
+            commands += self.sshd.get_start_commands()
+        commands += self.conf.commands
         return commands
 
     def default_max_duration(self) -> int:
         return DEFAULT_MAX_DURATION_SECONDS
+
+    def termination_policy(self) -> job.TerminationPolicy:
+        return self.profile.termination_policy or job.TerminationPolicy.TERMINATE
 
     def artifact_specs(self) -> List[job.ArtifactSpec]:
         specs = []
