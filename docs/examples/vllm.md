@@ -1,4 +1,4 @@
-# vLLM
+# Serving with vLLM
 
 Serving LLMs can be slow, even on expensive hardware. This example demonstrates how to utilize the 
 [`vllm`](https://vllm.ai/) library to serve LLMs with optimized performance.

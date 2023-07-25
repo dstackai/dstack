@@ -3,8 +3,8 @@
 A dev environment is a virtual machine pre-configured with hardware resources, source code, dependencies, and an
 IDE.
 
-Using `dstack`, you can define such a dev environment through a configuration file and provision it with a single
-command.
+With `dstack`, you can define such a dev environment through a configuration file and provision it in any cloud 
+with a single command.
 
 ## Configuration
 
@@ -42,7 +42,7 @@ $ dstack run .
 Provisioning and starting SSH tunnel...
 ---> 100%
 
-To open in VS Code Desktop, use one of these links:
+To open in VS Code Desktop, use this link:
   vscode://vscode-remote/ssh-remote+fast-moth-1/workflow
 
 To exit, press Ctrl+C.
@@ -75,33 +75,35 @@ For more details on the `dstack run` command, refer to the [Reference](../refere
 
 ## Environment
 
-By default, a dev environment includes a pre-installed CUDA driver, Python (matching your local version), 
-and Conda (with Miniforge).
+By default, `dstack` uses its own Docker images to run tasks, which include pre-configured Python, Conda, and essential
+CUDA drivers.
 
-To modify the Python version or install additional packages beforehand, you can utilize other YAML properties 
-like `python`, `init`, and `build`. 
+To change the Python version, modify the `python` property in the configuration. Otherwise, `dstack` will use the version
+you have locally.
 
-### Pre-building the environment
+You can install packages using `pip` and `conda` executables from `commands`.
 
-In case you'd like to pre-build the environment rather than install packaged on every run,
-you can use the `build` property. Here's an example:
+??? info "Build command (experimental)" 
 
-<div editor-title=".dstack.yml"> 
-
-```yaml
-type: dev-environment
-
-build:
-  - pip install -r requirements.txt --no-cache-dir
-
-ide: vscode
-```
-
-</div>
-
-To pre-build the environment, you have two options:
-
-1. Run the `dstack build` command:
+    In case you'd like to pre-build the environment rather than install packaged on every run,
+    you can use the `build` property. Here's an example:
+    
+    <div editor-title=".dstack.yml"> 
+    
+    ```yaml
+    type: dev-environment
+    
+    build:
+      - pip install -r requirements.txt --no-cache-dir
+    
+    ide: vscode
+    ```
+    
+    </div>
+    
+    To pre-build the environment, you have two options:
+    
+    _Option 1. Run the `dstack build` command_
 
     <div class="termy">
     
@@ -115,7 +117,7 @@ To pre-build the environment, you have two options:
     environment. Consequently, when running the `dstack run` command again, it will reuse the pre-built image, leading
     to faster startup times, particularly for complex setups.
 
-2. Use `--build` with `dstack run`
+    _Option 2. Use `--build` with `dstack run`_
 
     <div class="termy">
     
@@ -127,6 +129,31 @@ To pre-build the environment, you have two options:
 
     If there is no pre-built image, the `dstack run` command will build it and upload it to the storage. If the pre-built
     image is already available, the `dstack run` command will reuse it.
+
+??? info "Docker image (experimental)"
+
+    If you prefer to use your custom Docker image, use the `image` property in the configuration.
+
+    However, this requires your image to have `openssh-server` pre-installed. If you want to use a custom Docker
+    image with a dev environment and it does not include `openssh-server`, you can install it using the following 
+    method:
+
+    <div editor-title=".dstack.yml">
+
+    ```yaml
+    type: dev-environment
+    
+    image: ghcr.io/huggingface/text-generation-inference:0.9
+    
+    build:
+      - apt-get update
+      - DEBIAN_FRONTEND=noninteractive apt-get install -y openssh-server
+      - rm -rf /var/lib/apt/lists/*
+ 
+    ide: vscode
+    ```
+
+    </div>
 
 For more details on the syntax of `.dstack.yml`, refer to the [Reference](../reference/dstack.yml).
 

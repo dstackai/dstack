@@ -176,8 +176,8 @@ nav:
   - Examples:
     - examples/index.md
     - Examples:
-      - vLLM: examples/vllm.md
-      - Chatbot: examples/llmchat.md
+      - Serving with vLLM: examples/vllm.md
+      - LLM as Chatbot: examples/llmchat.md
   - Blog:
       - blog/index.md
   - Slack: https://join.slack.com/t/dstackai/shared_invite/zt-xdnsytie-D4qU9BvJP8vkbkHXdi6clQ

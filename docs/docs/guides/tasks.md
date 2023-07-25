@@ -1,14 +1,14 @@
 # Tasks
 
-A task can be any script you may want to run on demand. For example, it could be a script that trains a model, processes
-data, or runs a web-based app.
+A task can be any script that you may want to run on demand. For example, it could be
+a training script, a script that processes data, or a web-based application.
 
-Using `dstack`, you can define such a task through a configuration file and run it either locally or in any cloud with a
+With `dstack`, you can define such a task through a configuration file and run it in any cloud with a
 single command.
 
 ## Configuration
 
-To configure a dev environment, create its configuration file. It can be defined
+To configure a task, create its configuration file. It can be defined
 in any folder but must be named with a suffix `.dstack.yml`.
 
 Here's an example:
@@ -27,7 +27,7 @@ commands:
 
 ## Running a task
 
-To run a dev environment, use the `dstack run` command followed by the path to the directory you want to use as the
+To run a task, use the `dstack run` command followed by the path to the directory you want to use as the
 working directory during development.
 
 If your configuration file has a name different from `.dstack.yml`, pass the path to it using the `-f` argument.
@@ -54,7 +54,7 @@ This command provisions cloud resources, pre-installs the environment and code, 
 any ports, the command will forward them to your local machine for secure and convenient access.
 
 ??? info "Using .gitignore"
-    When running a dev environment, `dstack` uses the exact version of code that is present in the folder where you
+    When running a task, `dstack` uses the exact version of code that is present in the folder where you
     use the `dstack run` command.
 
     If your folder has large files or folders, this may affect the performance of the `dstack run` command. To avoid this,
@@ -62,33 +62,6 @@ any ports, the command will forward them to your local machine for secure and co
     running dev environments or tasks.
 
 For more details on the `dstack run` command, refer to the [Reference](../reference/cli/run.md).
-
-## Args
-
-If you want, it's possible to parametrize tasks with user arguments. Here's an example:
-
-<div editor-title="args.dstack.yml"> 
-
-```yaml
-type: task
-
-commands:
-  - python train.py ${{ run.args }}
-```
-
-</div>
-
-Now, you can pass your arguments to the `dstack run` command:
-
-<div class="termy">
-
-```shell
-$ dstack run . -f args.dstack.yml --train_batch_size=1 --num_train_epochs=100
-```
-
-</div>
-
-The dstack run command will pass `--train_batch_size=1` and `--num_train_epochs=100` as arguments to `train.py`.
 
 ## Ports
 
@@ -109,57 +82,78 @@ commands:
 
 </div>
 
+When you run it with `dstack run`, by default, `dstack` forwards the traffic 
+from the specified port to the same port on your local machine.  
 
-If you run this configuration, the `dstack run` command will automatically forward the ports to your local machine,
-providing secure and convenient access.
+However, you have the option to override the local machine's port for traffic forwarding.
 
-## Reload mode
+??? info "Port mapping"
 
-Some web development frameworks like Gradio, Streamlit, and FastAPI support auto-reloading. With `dstack run`, you can
-enable the reload mode by using the `--reload` argument.
+    To run the configuration above with traffic available on port `3000` locally, use the following command:
 
-<div class="termy">
+    <div class="termy">
 
-```shell
-$ dstack run . -f serve.dstack.yml --reload
-```
+    ```shell
+    $ dstack run . -f serve.dstack.yml --port 3000:7860
+    ```
 
-</div>
+    </div>
 
-This feature allows you to run an app in the cloud while continuing to edit the source code locally and have the app
-reload changes on the fly.
+    Alternatively, instead of using `--port` in the CLI, you can hardcode the local ports directly 
+    into the configuration:
+
+    <div editor-title="serve.dstack.yml"> 
+
+    ```yaml
+    type: task
+    
+    ports:
+      - 3000:7860
+    
+    commands:
+      - pip install -r requirements.txt
+      - gradio app.py
+    ```
+    
+    </div>
+
+    Now, even without using `--port` with your `dstack run` command, the traffic will be available on port `3000` 
+    on your local machine.
 
 ## Environment
 
-By default, a dev environment includes a pre-installed CUDA driver, Python (matching your local version), 
-and Conda (with Miniforge).
+By default, `dstack` uses its own Docker images to run tasks, which include pre-configured Python, Conda, and essential
+CUDA drivers.
 
-To modify the Python version or install additional packages beforehand, you can use other YAML properties 
-like `python`, `commands`, and `build`.
-For more details on the syntax of `.dstack.yml`, refer to the [Reference](../reference/dstack.yml).
+To change the Python version, modify the `python` property in the configuration. Otherwise, `dstack` will use the version
+you have locally.
 
-### Pre-building the environment
+You can install packages using `pip` and `conda` executables from `init`.
 
-In case you'd like to pre-build the environment rather than install packaged on every run,
-you can use the `build` property. Here's an example:
+If you prefer to use your custom Docker image, use the `image` property in the configuration.
 
-<div editor-title="train.dstack.yml"> 
+??? info "Build command (experimental)"
 
-```yaml
-type: task
+    In case you'd like to pre-build the environment rather than install packaged on every run,
+    you can use the `build` property. Here's an example:
+    
+    <div editor-title="train.dstack.yml"> 
+    
+    ```yaml
+    type: task
+    
+    build:
+      - pip install -r requirements.txt
+    
+    commands:
+      - python train.py
+    ```
+    
+    </div>
 
-build:
-  - pip install -r requirements.txt
-
-commands:
-  - python train.py
-```
-
-</div>
-
-To pre-build the environment, you have two options:
-
-1. Run the `dstack build` command:
+    To pre-build the environment, you have two options:
+    
+    _Option 1. Run the `dstack build` command_
 
     <div class="termy">
     
@@ -173,7 +167,7 @@ To pre-build the environment, you have two options:
     environment. Consequently, when running the `dstack run` command again, it will reuse the pre-built image, leading
     to faster startup times, particularly for complex setups.
 
-2. Use `--build` with `dstack run`
+    _Option 2. Use `--build` with `dstack run`_
 
     <div class="termy">
     
@@ -216,3 +210,46 @@ By default, the `dstack run` command uses the default profile.
     the desired profile using the `--profile` argument.
 
 For more details on the syntax of the `profiles.yml` file, refer to the [Reference](../reference/profiles.yml.md).
+
+## Args
+
+If you want, it's possible to parametrize tasks with user arguments. Here's an example:
+
+<div editor-title="args.dstack.yml"> 
+
+```yaml
+type: task
+
+commands:
+  - python train.py ${{ run.args }}
+```
+
+</div>
+
+Now, you can pass your arguments to the `dstack run` command:
+
+<div class="termy">
+
+```shell
+$ dstack run . -f args.dstack.yml --train_batch_size=1 --num_train_epochs=100
+```
+
+</div>
+
+The `dstack run` command will pass `--train_batch_size=1` and `--num_train_epochs=100` as arguments to `train.py`.
+
+## Reload mode
+
+Some web development frameworks like Gradio, Streamlit, and FastAPI support auto-reloading. With `dstack run`, you can
+enable the reload mode by using the `--reload` argument.
+
+<div class="termy">
+
+```shell
+$ dstack run . -f serve.dstack.yml --reload
+```
+
+</div>
+
+This feature allows you to run an app in the cloud while continuing to edit the source code locally and have the app
+reload changes on the fly.
