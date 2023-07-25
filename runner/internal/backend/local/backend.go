@@ -88,7 +88,7 @@ func (l *Local) RefetchJob(ctx context.Context) (*models.Job, error) {
 }
 
 func (l *Local) MasterJob(ctx context.Context) *models.Job {
-	contents, err := base.GetObject(ctx, l.storage, filepath.Join("jobs", l.state.Job.RepoUserName, l.state.Job.RepoName, fmt.Sprintf("%s.yaml", l.state.Job.MasterJobID)))
+	contents, err := base.GetObject(ctx, l.storage, filepath.Join("jobs", l.state.Job.RepoData.RepoUserName, l.state.Job.RepoData.RepoName, fmt.Sprintf("%s.yaml", l.state.Job.MasterJobID)))
 	if err != nil {
 		return nil
 	}
@@ -179,12 +179,12 @@ func (l *Local) GetJobByPath(ctx context.Context, path string) (*models.Job, err
 
 func (l *Local) GitCredentials(ctx context.Context) *models.GitCredentials {
 	log.Trace(ctx, "Getting credentials")
-	return l.cliSecret.fetchCredentials(ctx, l.state.Job.RepoId)
+	return l.cliSecret.fetchCredentials(ctx, l.state.Job.RepoRef.RepoId)
 }
 
 func (l *Local) Secrets(ctx context.Context) (map[string]string, error) {
 	log.Trace(ctx, "Getting secrets")
-	templatePath := fmt.Sprintf("secrets/%s", l.state.Job.RepoId)
+	templatePath := fmt.Sprintf("secrets/%s", l.state.Job.RepoRef.RepoId)
 	if _, err := os.Stat(filepath.Join(l.path, templatePath)); err != nil {
 		return map[string]string{}, nil
 	}
@@ -200,7 +200,7 @@ func (l *Local) Secrets(ctx context.Context) (map[string]string, error) {
 		if strings.HasPrefix(file.Name(), "l;") {
 			clearName := strings.ReplaceAll(file.Name(), "l;", "")
 			secrets[clearName] = fmt.Sprintf("%s/%s",
-				l.state.Job.RepoId,
+				l.state.Job.RepoRef.RepoId,
 				clearName)
 		}
 	}

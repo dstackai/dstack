@@ -195,7 +195,7 @@ func (azbackend *AzureBackend) Secrets(ctx context.Context) (map[string]string, 
 	secrets := make(map[string]string, 0)
 	for _, secretFilename := range secretFilenames {
 		secretName := strings.ReplaceAll(secretFilename, prefix, "")
-		secretValue, err := azbackend.secretManager.FetchSecret(ctx, azbackend.state.Job.RepoId, secretName)
+		secretValue, err := azbackend.secretManager.FetchSecret(ctx, azbackend.state.Job.RepoRef.RepoId, secretName)
 		if err != nil {
 			if errors.Is(err, ErrSecretNotFound) {
 				continue
@@ -209,7 +209,7 @@ func (azbackend *AzureBackend) Secrets(ctx context.Context) (map[string]string, 
 
 func (azbackend *AzureBackend) GitCredentials(ctx context.Context) *models.GitCredentials {
 	log.Trace(ctx, "Getting credentials")
-	creds, err := azbackend.secretManager.FetchCredentials(ctx, azbackend.state.Job.RepoId)
+	creds, err := azbackend.secretManager.FetchCredentials(ctx, azbackend.state.Job.RepoRef.RepoId)
 	if err != nil {
 		log.Error(ctx, "Getting credentials failure: %+v", err)
 		return nil

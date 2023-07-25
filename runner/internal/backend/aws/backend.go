@@ -213,7 +213,7 @@ func (s *AWSBackend) MasterJob(ctx context.Context) *models.Job {
 		log.Trace(ctx, "State not exist")
 		return nil
 	}
-	theFile, err := base.GetObject(ctx, s.storage, fmt.Sprintf("jobs/%s/%s.yaml", s.State.Job.RepoId, s.State.Job.MasterJobID))
+	theFile, err := base.GetObject(ctx, s.storage, fmt.Sprintf("jobs/%s/%s.yaml", s.State.Job.RepoRef.RepoId, s.State.Job.MasterJobID))
 	if err != nil {
 		return nil
 	}
@@ -287,7 +287,7 @@ func (s *AWSBackend) Secrets(ctx context.Context) (map[string]string, error) {
 	for _, secretPath := range listSecrets {
 		clearName := strings.ReplaceAll(secretPath, prefix, "")
 		secrets[clearName] = fmt.Sprintf("%s/%s",
-			s.State.Job.RepoId,
+			s.State.Job.RepoRef.RepoId,
 			clearName)
 	}
 	return s.cliSecret.fetchSecret(ctx, s.bucket, secrets)
@@ -307,7 +307,7 @@ func (s *AWSBackend) GitCredentials(ctx context.Context) *models.GitCredentials 
 		log.Error(ctx, "Job is empty")
 		return nil
 	}
-	return s.cliSecret.fetchCredentials(ctx, s.bucket, s.State.Job.RepoId)
+	return s.cliSecret.fetchCredentials(ctx, s.bucket, s.State.Job.RepoRef.RepoId)
 }
 
 func (s *AWSBackend) GetRepoDiff(ctx context.Context, path string) (string, error) {

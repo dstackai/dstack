@@ -334,7 +334,7 @@ func (r *Engine) NewBuildSpec(ctx context.Context, job *models.Job, spec *Spec, 
 		Env:                env.ToSlice(),
 		RegistryAuthBase64: spec.RegistryAuthBase64,
 		RepoPath:           repoPath,
-		RepoId:             job.RepoId,
+		RepoId:             job.RepoRef.RepoId,
 		ShmSize:            spec.ShmSize,
 	}
 	if daemonInfo.Architecture == "aarch64" {
