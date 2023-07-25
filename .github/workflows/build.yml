@@ -4,13 +4,13 @@ on:
   push:
     branches:
       - 'master'
+    paths-ignore:
+      - 'docs/**'
+      - 'mkdocs.yml'
   pull_request:
     branches:
       - 'master'
   workflow_dispatch:
-
-env:
-  IMAGE_VERSION: "0.3"
 
 jobs:
   python-lint:
@@ -106,9 +106,10 @@ jobs:
       - name: Upload pip package
         run: |
           VERSION=$((${{ github.run_number }} + 150))
+          BASE_IMAGE=$(cat cli/dstack/version.py | grep base_image)
           echo "__version__ = \"$VERSION\"" > cli/dstack/version.py
           echo "__is_release__ = False" >> cli/dstack/version.py
-          echo "miniforge_image = \"${{ env.IMAGE_VERSION }}\"" >> cli/dstack/version.py
+          echo $BASE_IMAGE >> cli/dstack/version.py
           cp README.md cli
           python setup.py sdist bdist_wheel
           python -m twine upload --repository testpypi --username ${{ secrets.TESTPYPI_USERNAME }} --password ${{ secrets.TESTPYPI_PASSWORD }} dist/*

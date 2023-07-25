@@ -32,7 +32,7 @@ Once the project is configured, feel free to run dev environments and tasks in L
 
 ## Custom Docker images
 
-By default, `dstack` uses its own base [Docker images](https://hub.docker.com/r/dstackai/miniforge/tags) to run 
+By default, `dstack` uses its own base [Docker images](https://hub.docker.com/r/dstackai/base/tags) to run 
 dev environments and tasks. These base images come pre-configured with Python, Conda, and essential CUDA drivers. 
 However, there may be times when you need additional
 dependencies that you don't want to install every time you run your dev environment or task.
@@ -64,6 +64,8 @@ commands:
     image with a dev environment and it does not include `openssh-server`, you can install it using the following 
     method:
 
+    <div editor-title=".dstack.yml">
+
     ```yaml
     type: dev-environment
     
@@ -76,6 +78,8 @@ commands:
  
     ide: vscode
     ```
+    
+    </div>
 
 The [documentation](../../docs/index.md) and [examples](https://github.com/dstackai/dstack-examples/blob/main/README.md)
 are updated to reflect the changes in the release.

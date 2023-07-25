@@ -7,11 +7,9 @@
     "azure_subscription_id": "{{env `AZURE_SUBSCRIPTION_ID`}}",
     "azure_location": "westeurope",
     "azure_vm_size": "Standard_DS1_v2",
-    "build_id": "{{timestamp}}",
-    "build_prefix": "dstack-nocuda",
+    "build_prefix": "",
     "docker_version": "20.10.17",
-    "dstack_stage": "STGN",
-    "runner_version": "latest"
+    "image_version": ""
   },
   "builders": [{
     "type": "azure-arm",
@@ -20,11 +18,11 @@
     "tenant_id": "{{user `azure_tenant_id`}}",
     "subscription_id": "{{user `azure_subscription_id`}}",
     "managed_image_resource_group_name": "dstack-resources-westeurope",
-    "managed_image_name": "{{user `build_prefix`}}-{{user `build_id`}}",
+    "managed_image_name": "{{user `build_prefix`}}dstack-{{user `image_version` | clean_resource_name}}",
     "os_type": "Linux",
-    "image_publisher": "Canonical",
-    "image_offer": "UbuntuServer",
-    "image_sku": "18.04-DAILY-LTS",
+    "image_publisher": "canonical",
+    "image_offer": "0001-com-ubuntu-server-jammy",
+    "image_sku": "22_04-lts",
     "azure_tags": {
         "Name": "DSTACK"
     },
@@ -44,14 +42,6 @@
         "provisioners/kernel/apt-packages.sh",
         "provisioners/kernel/kernel-tuning.sh"
       ]
-    },
-    {
-      "type": "shell",
-      "environment_vars": [
-        "DSTACK_STAGE={{user `dstack_stage`}}",
-        "RUNNER_VERSION={{user `runner_version`}}"
-      ],
-      "script": "provisioners/get-dstack-runner.sh"
     },
     {
       "type": "file",
@@ -76,11 +66,6 @@
       "type": "shell",
       "environment_vars": ["IMAGE_VERSION={{user `image_version`}}"],
       "script": "provisioners/docker-image-without-cuda.sh"
-    },
-    {
-      "type": "shell",
-      "inline_shebang": "/bin/sh -x",
-      "inline": ["/usr/local/bin/dstack-runner --version"]
     },
     {
       "type": "shell",

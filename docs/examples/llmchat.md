@@ -1,4 +1,4 @@
-# Chatbot
+# LLM as Chatbot
 
 This [example](https://github.com/deep-diver/LLM-As-Chatbot) is built by Chansung Park. It can run any open-source LLM either as a Gradio chat app or as a Discord bot.
 With `dstack`, you can run this Gradio chat app or Discord bot in any cloud with a single command.

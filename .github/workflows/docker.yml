@@ -1,19 +1,27 @@
-name: Build Docker
+name: Build Docker & cloud images
 
-on: [workflow_dispatch]
+on:
+  workflow_dispatch:
+    inputs:
+      image_version:
+        description: "Docker image version"
+        required: true
+      build_prefix:
+        description: "Cloud images prefix"
+        default: ""
 
 env:
-  IMAGE_VERSION: "0.3"
+  PACKER_VERSION: "1.9.2"
 
 jobs:
   build-docker:
-    strategy:
-      matrix:
-        python: [ "3.7", "3.8", "3.9", "3.10", "3.11" ]
     defaults:
       run:
         working-directory: docker
     runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        python: [ "3.7", "3.8", "3.9", "3.10", "3.11" ]
     steps:
      - name: Checkout repository
        uses: actions/checkout@v3
@@ -28,8 +36,106 @@ jobs:
        uses: docker/setup-qemu-action@v2
      - name: Build and upload to DockerHub
        run: |
-         docker buildx build --platform linux/arm64/v8 --build-arg PYTHON=${{ matrix.python }} --push --provenance=false --tag dstackai/miniforge:py${{ matrix.python }}-${{ env.IMAGE_VERSION }}-arm64 -f cpu/Dockerfile .
-         docker buildx build --platform linux/amd64 --build-arg PYTHON=${{ matrix.python }} --push --provenance=false --tag dstackai/miniforge:py${{ matrix.python }}-${{ env.IMAGE_VERSION }}-amd64 -f cpu/Dockerfile .
-         docker manifest create dstackai/miniforge:py${{ matrix.python }}-${{ env.IMAGE_VERSION }} --amend dstackai/miniforge:py${{ matrix.python }}-${{ env.IMAGE_VERSION }}-arm64 --amend dstackai/miniforge:py${{ matrix.python }}-${{ env.IMAGE_VERSION }}-amd64
-         docker manifest push dstackai/miniforge:py${{ matrix.python }}-${{ env.IMAGE_VERSION }}
-         docker buildx build --platform linux/amd64 --build-arg PYTHON=${{ matrix.python }} --push --provenance=false --tag dstackai/miniforge:py${{ matrix.python }}-${{ env.IMAGE_VERSION }}-cuda-11.4 -f cuda/Dockerfile .
+         docker buildx build --platform linux/arm64/v8 --build-arg PYTHON=${{ matrix.python }} --push --provenance=false --tag dstackai/base:py${{ matrix.python }}-${{ inputs.image_version }}-arm64 -f cpu/Dockerfile .
+         docker buildx build --platform linux/amd64 --build-arg PYTHON=${{ matrix.python }} --push --provenance=false --tag dstackai/base:py${{ matrix.python }}-${{ inputs.image_version }}-amd64 -f cpu/Dockerfile .
+         docker manifest create dstackai/base:py${{ matrix.python }}-${{ inputs.image_version }} --amend dstackai/base:py${{ matrix.python }}-${{ inputs.image_version }}-arm64 --amend dstackai/base:py${{ matrix.python }}-${{ inputs.image_version }}-amd64
+         docker manifest push dstackai/base:py${{ matrix.python }}-${{ inputs.image_version }}
+         docker buildx build --platform linux/amd64 --build-arg PYTHON=${{ matrix.python }} --push --provenance=false --tag dstackai/base:py${{ matrix.python }}-${{ inputs.image_version }}-cuda-11.8 -f cuda/Dockerfile .
+
+  build-aws-images:
+    defaults:
+      run:
+        working-directory: runner
+    needs: [ build-docker ]
+    runs-on: ubuntu-latest
+    env:
+      AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
+      AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+    strategy:
+      matrix:
+        variant: [ "", "-cuda" ]
+    steps:
+      - uses: actions/checkout@v3
+      - name: Download packer
+        run: |
+          wget https://releases.hashicorp.com/packer/${{ env.PACKER_VERSION }}/packer_${{ env.PACKER_VERSION }}_linux_amd64.zip
+          unzip packer_${{ env.PACKER_VERSION }}_linux_amd64.zip
+          chmod +x packer
+          cp -R ami/packer/* .
+      - name: Run packer
+        run: |
+          ./packer build -var-file=versions.json -var-file=aws-vars-prod.json -var image_version=${{ inputs.image_version }} -var build_prefix=${{ inputs.build_prefix }} aws-image${{ matrix.variant }}.json
+
+  build-azure-images:
+    defaults:
+      run:
+        working-directory: runner
+    needs: [ build-docker ]
+    runs-on: ubuntu-latest
+    env:
+      AZURE_CLIENT_ID: ${{ secrets.AZURE_CLIENT_ID }}
+      AZURE_CLIENT_SECRET: ${{ secrets.AZURE_CLIENT_SECRET }}
+      AZURE_TENANT_ID: ${{ secrets.AZURE_TENANT_ID }}
+      AZURE_SUBSCRIPTION_ID: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
+      VERSION: ${{ github.run_number }}
+    strategy:
+      matrix:
+        variant: [ "", "-cuda" ]
+    steps:
+      - uses: actions/checkout@v3
+      - uses: Azure/login@v1
+        name: Log in to az
+        with:
+          creds: '{"clientId":"${{ secrets.AZURE_CLIENT_ID }}","clientSecret":"${{ secrets.AZURE_CLIENT_SECRET }}","subscriptionId":"${{ secrets.AZURE_SUBSCRIPTION_ID }}","tenantId":"${{ secrets.AZURE_TENANT_ID }}"}'
+      - name: Download packer
+        run: |
+          wget https://releases.hashicorp.com/packer/${{ env.PACKER_VERSION }}/packer_${{ env.PACKER_VERSION }}_linux_amd64.zip
+          unzip packer_${{ env.PACKER_VERSION }}_linux_amd64.zip
+          chmod +x packer
+          cp -R ami/packer/* .
+      - name: Run packer
+        run: |
+          ./packer build -var-file=versions.json -var image_version=${{ inputs.image_version }} -var build_prefix=${{ inputs.build_prefix }} azure-image${{ matrix.variant }}.json
+      - name: Publish azure image
+        run: |
+          IMAGE_DEFINITION=${{ inputs.build_prefix }}dstack${{ matrix.variant }}-${{ inputs.image_version }}
+          IMAGE_NAME=${{ inputs.build_prefix }}dstack${{ matrix.variant }}-${{ inputs.image_version }}
+          ../scripts/publish_azure_image.sh $IMAGE_DEFINITION $IMAGE_NAME
+
+  build-gcp-images:
+    defaults:
+      run:
+        working-directory: runner
+    needs: [ build-docker ]
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        variant: [ "", "-cuda" ]
+    permissions:
+      contents: 'read'
+      id-token: 'write'
+    steps:
+      - uses: actions/checkout@v3
+      - name: 'Authenticate to Google Cloud'
+        uses: 'google-github-actions/auth@v1'
+        with:
+          workload_identity_provider: 'projects/531508670106/locations/global/workloadIdentityPools/github-identity-pool/providers/github-id-provider'
+          service_account: 'github-actions@dstack.iam.gserviceaccount.com'
+          create_credentials_file: true
+      - name: 'Set up Cloud SDK'
+        uses: 'google-github-actions/setup-gcloud@v1'
+      - name: Download packer
+        run: |
+          wget https://releases.hashicorp.com/packer/${{ env.PACKER_VERSION }}/packer_${{ env.PACKER_VERSION }}_linux_amd64.zip
+          unzip packer_${{ env.PACKER_VERSION }}_linux_amd64.zip
+          chmod +x packer
+          cp -R ami/packer/* .
+      - name: Run packer
+        run: |
+          ./packer build -var-file=versions.json -var image_version=${{ inputs.image_version }} -var build_prefix=${{ inputs.build_prefix }} gcp-image${{ matrix.variant }}.json
+      - name: Publish images
+        run: |
+          IMAGE_VERSION=${IMAGE_VERSION//./-}
+          gcloud compute images add-iam-policy-binding ${{ inputs.build_prefix }}dstack${{ matrix.variant }}-$IMAGE_VERSION --member='allAuthenticatedUsers' --role='roles/compute.imageUser'
+        env:
+          IMAGE_VERSION: ${{ inputs.image_version }}

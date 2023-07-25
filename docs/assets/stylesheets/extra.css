@@ -98,7 +98,7 @@
     border-radius: 6px;
 }
 
-[dir=ltr] .md-typeset :is(.admonition,details) :is(p,div):not([class*="admonition-title"]) {
+[dir=ltr] .md-typeset :is(.admonition,details) :is(p,div):not(.admonition-title):not(.highlight) {
     padding-left: 32px;
 }
 

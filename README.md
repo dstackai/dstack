@@ -29,6 +29,8 @@ It streamlines development and deployment, reduces cloud costs, and frees users 
 
 ## Latest news
 
+- [2023/07] [Port mapping, max duration, and more](https://dstack.ai/examples/vllm) (Release)
+- [2023/07] [Serving with vLLM](https://dstack.ai/examples/vllm) (Example)
 - [2023/07] [LLM as Chatbot](https://dstack.ai/examples/llmchat) (Example)
 - [2023/07] [Lambda Cloud GA and Docker support](https://dstack.ai/blog/2023/07/14/lambda-cloud-ga-and-docker-support/) (Release)  
 - [2023/06] [New YAML format](https://dstack.ai/blog/2023/06/12/new-configuration-format-and-cli-experience/) (Release)

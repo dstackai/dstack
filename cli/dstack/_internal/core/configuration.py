@@ -36,17 +36,20 @@ class PortMapping(ForbidExtra):
         """
         Possible values:
           - 8080
-          - :8080
           - 80:8080
+          - *:8080
         """
-        r = re.search(r"^(?:(\d+)?:)?(\d+)?$", v)
+        r = re.search(r"^(?:(\d+|\*):)?(\d+)?$", v)
         if not r:
             raise ValueError(v)
         local_port, container_port = r.groups()
-        return PortMapping(
-            local_port=None if local_port is None else int(local_port),
-            container_port=container_port,
-        )
+        if local_port is None:  # identity mapping by default
+            local_port = int(container_port)
+        elif local_port == "*":
+            local_port = None
+        else:
+            local_port = int(local_port)
+        return PortMapping(local_port=local_port, container_port=int(container_port))
 
 
 class Artifact(ForbidExtra):
@@ -76,7 +79,7 @@ class BaseConfiguration(ForbidExtra):
         Field(description="The major version of Python\nMutually exclusive with the image"),
     ]
     ports: Annotated[
-        List[Union[constr(regex=r"^(?:([0-9]+)?:)?[0-9]+$"), ValidPort, PortMapping]],
+        List[Union[constr(regex=r"^(?:([0-9]+|\*):)?[0-9]+$"), ValidPort, PortMapping]],
         Field(description="Port numbers/mapping to expose"),
     ] = []
     env: Annotated[
@@ -103,17 +106,13 @@ class BaseConfiguration(ForbidExtra):
             return PythonVersion(v)
         return v
 
-    @validator("ports")
-    def convert_ports(cls, v) -> List[PortMapping]:
-        ports = []
-        for i in v:
-            if isinstance(i, int):
-                ports.append(PortMapping(container_port=i))
-            elif isinstance(i, str):
-                ports.append(PortMapping.parse(i))
-            else:
-                ports.append(i)
-        return ports
+    @validator("ports", each_item=True)
+    def convert_ports(cls, v) -> PortMapping:
+        if isinstance(v, int):
+            return PortMapping(local_port=v, container_port=v)
+        elif isinstance(v, str):
+            return PortMapping.parse(v)
+        return v
 
     @validator("env")
     def convert_env(cls, v) -> Dict[str, str]:

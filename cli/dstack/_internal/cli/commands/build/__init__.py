@@ -13,6 +13,7 @@ from dstack._internal.cli.utils.run import (
     read_ssh_key_pub,
     reserve_ports,
 )
+from dstack._internal.configurators.ports import PortUsedError
 from dstack._internal.core.error import RepoNotInitializedError
 
 

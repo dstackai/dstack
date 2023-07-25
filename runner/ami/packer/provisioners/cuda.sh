@@ -9,10 +9,11 @@ sudo DEBIAN_FRONTEND=noninteractive apt-get install -y linux-headers-$(uname -r)
 ARCH=$(uname -m)
 CUDA_DISTRO=$(. /etc/os-release;echo $ID$VERSION_ID | sed -e 's/\.//g')
 
-wget https://developer.download.nvidia.com/compute/cuda/repos/$CUDA_DISTRO/$ARCH/cuda-$CUDA_DISTRO.pin
-sudo mv cuda-$CUDA_DISTRO.pin /etc/apt/preferences.d/cuda-repository-pin-600
-sudo apt-key adv --fetch-keys https://developer.download.nvidia.com/compute/cuda/repos/$CUDA_DISTRO/$ARCH/3bf863cc.pub
-echo "deb https://developer.download.nvidia.com/compute/cuda/repos/$CUDA_DISTRO/$ARCH /" | sudo tee /etc/apt/sources.list.d/cuda.list
+# based on https://docs.nvidia.com/datacenter/tesla/tesla-installation-notes/index.html#ubuntu-lts
+wget https://developer.download.nvidia.com/compute/cuda/repos/$CUDA_DISTRO/$ARCH/cuda-keyring_1.0-1_all.deb
+sudo dpkg -i cuda-keyring_1.0-1_all.deb
+rm cuda-keyring_1.0-1_all.deb
+
 sudo apt-get update
 sudo DEBIAN_FRONTEND=noninteractive apt-get install -y --no-install-recommends \
 	 cuda-drivers=$CUDA_DRIVERS_VERSION

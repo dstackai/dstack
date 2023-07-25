@@ -1,18 +1,17 @@
 {
   "variables": {
-    "build_id": "{{timestamp}}",
-    "build_prefix": "stgn-",
+    "build_prefix": "",
     "docker_version": "20.10.17",
-    "dstack_stage": "STGN",
-    "runner_version": "latest"
+    "cuda_drivers_version": "535.54.03-1",
+    "image_version": ""
   },
   "builders": [
     {
       "type": "googlecompute",
       "project_id": "dstack",
-      "source_image": "ubuntu-1804-bionic-v20220616",
-      "image_name": "{{user `build_prefix`}}dstack-cuda-{{user `build_id`}}",
-      "instance_name": "{{user `build_prefix`}}dstack-cuda-{{user `build_id`}}",
+      "source_image": "ubuntu-2204-jammy-v20230714",
+      "image_name": "{{user `build_prefix`}}dstack-cuda-{{user `image_version` | clean_resource_name}}",
+      "instance_name": "{{user `build_prefix`}}dstack-cuda-{{user `image_version` | clean_resource_name}}",
       "ssh_username": "ubuntu",
       "zone": "us-central1-a"
     }
@@ -30,14 +29,6 @@
         "provisioners/kernel/apt-packages.sh",
         "provisioners/kernel/kernel-tuning.sh"
       ]
-    },
-    {
-      "type": "shell",
-      "environment_vars": [
-        "DSTACK_STAGE={{user `dstack_stage`}}",
-        "RUNNER_VERSION={{user `runner_version`}}"
-      ],
-      "script": "provisioners/get-dstack-runner.sh"
     },
     {
       "type": "file",
@@ -58,17 +49,13 @@
     },
     {
       "type": "shell",
-      "environment_vars": ["CUDA_DRIVERS_VERSION=470.199.02-1"],
+      "environment_vars": ["CUDA_DRIVERS_VERSION={{user `cuda_drivers_version`}}"],
       "script": "provisioners/cuda.sh"
     },
     {
       "type": "shell",
       "environment_vars": ["IMAGE_VERSION={{user `image_version`}}"],
       "script": "provisioners/docker-image-with-cuda.sh"
-    },
-    {
-      "type": "shell",
-      "inline": ["/usr/local/bin/dstack-runner --version"]
     }
   ]
 }

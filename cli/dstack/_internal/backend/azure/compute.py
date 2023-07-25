@@ -144,7 +144,7 @@ class AzureCompute(Compute):
 def _get_instance_types(client: ComputeManagementClient, location: str) -> List[InstanceType]:
     instance_types = []
     vm_series_pattern = re.compile(
-        r"^(Standard_D\d+s_v3|Standard_E\d+(-\d*)?s_v4|Standard_NC\d+|Standard_NC\d+s_v3|Standard_NC\d+as_T4_v3)$"
+        r"^(Standard_D\d+s_v3|Standard_E\d+(-\d*)?s_v4|Standard_NC\d+s_v3|Standard_NC\d+as_T4_v3)$"
     )
     # Only location filter is supported currently in azure API.
     # See: https://learn.microsoft.com/en-us/python/api/azure-mgmt-compute/azure.mgmt.compute.v2021_07_01.operations.resourceskusoperations?view=azure-python#azure-mgmt-compute-v2021-07-01-operations-resourceskusoperations-list
@@ -191,8 +191,6 @@ def _get_gpu_name_memory(vm_name: str) -> Tuple[str, int]:
         return "T4", 16 * 1024
     if re.match(r"^Standard_NC\d+s_v3$", vm_name):
         return "V100", 16 * 1024
-    if re.match(r"^Standard_NC\d+$", vm_name):
-        return "K80", 12 * 1024
 
 
 def _get_instance_name(job: Job) -> str:
@@ -200,39 +198,22 @@ def _get_instance_name(job: Job) -> str:
     return f"dstack-{job.run_name}"
 
 
-def _get_prod_image_ref(
+def _get_image_ref(
     compute_client: ComputeManagementClient,
     location: str,
     cuda: bool,
 ) -> ImageReference:
+    image_name = "dstack-"
+    if cuda:
+        image_name += "cuda-"
+    image_name += version.base_image
+
     image = compute_client.community_gallery_images.get(
         location=location,
         public_gallery_name="dstack-d5e68bdc-cc66-484a-a485-b54e3683f151",
-        gallery_image_name=f"dstack-{'cuda' if cuda else 'nocuda'}-{version.__version__}",
+        gallery_image_name=image_name,
     )
     return ImageReference(community_gallery_image_id=image.unique_id)
-
-
-def _get_stage_image_ref(
-    compute_client: ComputeManagementClient,
-    location: str,
-    cuda: bool,
-) -> ImageReference:
-    images = compute_client.images.list()
-    image_prefix = "stgn-dstack"
-    if cuda:
-        image_prefix += "-cuda-"
-    else:
-        image_prefix += "-nocuda-"
-
-    images = [im for im in images if im.name.startswith(image_prefix)]
-    sorted_images = sorted(images, key=lambda im: int(removeprefix(im.name, image_prefix)))
-    return ImageReference(id=sorted_images[-1].id)
-
-
-_get_image_ref = _get_prod_image_ref
-if not version.__is_release__:
-    _get_image_ref = _get_stage_image_ref
 
 
 def _get_user_data_script(azure_config: AzureConfig, job: Job, instance_type: InstanceType) -> str:

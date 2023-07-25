@@ -20,7 +20,7 @@ var ServerUrl = "https://api.stgn.dstack.ai"
 
 // GPU constants
 const (
-	NVIDIA_CUDA_IMAGE        = "dstackai/cuda:11.1-base-ubuntu20.04"
+	NVIDIA_CUDA_IMAGE        = "dstackai/cuda:11.8.0-base-ubuntu20.04"
 	NVIDIA_SMI_CMD           = "nvidia-smi --query-gpu=name,memory.total --format=csv,noheader"
 	NVIDIA_RUNTIME           = "nvidia"
 	NVIDIA_DRIVER_INIT_ERROR = "stderr: nvidia-container-cli: initialization error: nvml error: driver not loaded: unknown"
