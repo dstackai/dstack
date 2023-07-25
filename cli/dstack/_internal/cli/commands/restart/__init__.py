@@ -28,6 +28,8 @@ class RestartCommand(BasicCommand):
             console.print(f"Cannot find the run '{args.run_name}'")
             exit(1)
 
+        console.print("\nRestarting instance...\n")
+
         for job in jobs:
             hub_client.restart_job(job)
 

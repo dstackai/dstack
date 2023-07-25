@@ -10,6 +10,10 @@ class BackendError(DstackError):
     pass
 
 
+class BackendValueError(BackendError):
+    code = "backend_value_error"
+
+
 class BackendAuthError(BackendError):
     code = "invalid_backend_credentials"
 

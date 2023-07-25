@@ -3,9 +3,9 @@ from typing import List, Optional, Tuple
 import yaml
 
 from dstack._internal.backend.base import runners
-from dstack._internal.backend.base.compute import Compute, NoCapacityError
+from dstack._internal.backend.base.compute import Compute, InstanceNotFoundError, NoCapacityError
 from dstack._internal.backend.base.storage import Storage
-from dstack._internal.core.error import BackendError, NoMatchingInstanceError
+from dstack._internal.core.error import BackendError, BackendValueError, NoMatchingInstanceError
 from dstack._internal.core.instance import InstanceType
 from dstack._internal.core.job import Job, JobErrorCode, JobHead, JobStatus, SpotPolicy
 from dstack._internal.core.repo import RepoRef
@@ -122,8 +122,13 @@ def restart_job(
     job: Job,
 ):
     logger.info("Restarting job [repo_id=%s job_id=%s]", job.repo.repo_id, job.job_id)
+    if job.status != JobStatus.STOPPED:
+        raise BackendValueError("Cannot restart job which status is not stopped")
     runner = runners.get_runner(storage, job.runner_id)
-    launched_instance_info = compute.restart_instance(job)
+    try:
+        launched_instance_info = compute.restart_instance(job)
+    except InstanceNotFoundError:
+        raise BackendValueError("Instance not found")
     job.status = JobStatus.RESTARTING
     job.request_id = runner.request_id = launched_instance_info.request_id
     runners.update_runner(storage, runner)

@@ -9,6 +9,7 @@ from dstack import version
 from dstack._internal.backend.base.compute import (
     WS_PORT,
     Compute,
+    InstanceNotFoundError,
     NoCapacityError,
     choose_instance_type,
     get_dstack_runner,
@@ -462,14 +463,21 @@ def _get_instance_name(job: Job) -> str:
 def _get_user_data_script(gcp_config: GCPConfig, job: Job, instance_type: InstanceType) -> str:
     config_content = gcp_config.serialize_yaml().replace("\n", "\\n")
     runner_content = serialize_runner_yaml(job.runner_id, instance_type.resources, 3000, 4000)
-    return f"""#!/bin/sh
-mkdir -p /root/.dstack/
-echo '{config_content}' > /root/.dstack/{BACKEND_CONFIG_FILENAME}
-echo '{runner_content}' > /root/.dstack/{RUNNER_CONFIG_FILENAME}
-EXTERNAL_IP=`curl -H "Metadata-Flavor: Google" http://169.254.169.254/computeMetadata/v1/instance/network-interfaces/0/access-configs/0/external-ip`
-echo "hostname: $EXTERNAL_IP" >> /root/.dstack/{RUNNER_CONFIG_FILENAME}
-{get_dstack_runner()}
-HOME=/root nohup dstack-runner --log-level 6 start --http-port {WS_PORT}
+    return f"""#cloud-config
+
+cloud_final_modules:
+- [scripts-user, always]
+
+runcmd:
+    - |
+        if [ ! -f /root/.dstack/booted ]; then
+            mkdir -p /root/.dstack/
+            echo '{config_content}' > /root/.dstack/{BACKEND_CONFIG_FILENAME}
+            echo '{runner_content}' > /root/.dstack/{RUNNER_CONFIG_FILENAME}
+            {get_dstack_runner()}
+            touch /root/.dstack/booted
+        fi
+        HOME=/root nohup dstack-runner --log-level 6 start --http-port {WS_PORT}
 """
 
 
@@ -781,7 +789,10 @@ def _restart_instance(
         project=gcp_config.project_id,
         zone=gcp_config.zone,
     )
-    operation = client.start(request)
+    try:
+        operation = client.start(request)
+    except google.api_core.exceptions.NotFound:
+        raise InstanceNotFoundError()
     gcp_utils.wait_for_extended_operation(operation)
 
 

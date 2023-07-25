@@ -86,6 +86,12 @@ func (gbackend *GCPBackend) Init(ctx context.Context, ID string) error {
 	if err := base.LoadRunnerState(ctx, gbackend.storage, ID, &gbackend.state); err != nil {
 		return gerrors.Wrap(err)
 	}
+	ip, err := gbackend.compute.GetInstancePublicIP(ctx, gbackend.state.RequestID)
+	if err != nil {
+		return gerrors.Wrap(err)
+	}
+	log.Trace(ctx, "Setting GCP instance IP", "ip", ip)
+	gbackend.state.Job.HostName = ip
 	return nil
 }
 

@@ -6,7 +6,11 @@ import requests
 
 from dstack._internal.core.artifact import Artifact
 from dstack._internal.core.build import BuildNotFoundError
-from dstack._internal.core.error import BackendNotAvailableError, NoMatchingInstanceError
+from dstack._internal.core.error import (
+    BackendNotAvailableError,
+    BackendValueError,
+    NoMatchingInstanceError,
+)
 from dstack._internal.core.job import Job, JobHead
 from dstack._internal.core.log_event import LogEvent
 from dstack._internal.core.plan import RunPlan
@@ -693,6 +697,8 @@ def _make_hub_request(request_func, host, *args, **kwargs) -> requests.Response:
             detail = body.get("detail")
             if detail is not None:
                 if detail.get("code") == BackendNotAvailableError.code:
+                    raise HubClientError(detail["msg"])
+                elif detail.get("code") == BackendValueError.code:
                     raise HubClientError(detail["msg"])
         return resp
     except requests.ConnectionError:

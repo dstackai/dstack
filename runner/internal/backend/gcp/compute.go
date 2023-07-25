@@ -31,6 +31,21 @@ func NewGCPCompute(project, zone string) *GCPCompute {
 	}
 }
 
+func (gcompute *GCPCompute) GetInstancePublicIP(ctx context.Context, instanceID string) (string, error) {
+	log.Trace(ctx, "Getting GCP instance IP", "instanceID", instanceID)
+	req := &computepb.GetInstanceRequest{
+		Instance: instanceID,
+		Project:  gcompute.project,
+		Zone:     gcompute.zone,
+	}
+	instance, err := gcompute.instancesClient.Get(ctx, req)
+	if err != nil {
+		return "", gerrors.Wrap(err)
+	}
+	ip := instance.NetworkInterfaces[0].AccessConfigs[0].NatIP
+	return *ip, nil
+}
+
 func (gcompute *GCPCompute) StopInstance(ctx context.Context, instanceID string) error {
 	log.Trace(ctx, "Stop instance", "ID", instanceID)
 	req := &computepb.StopInstanceRequest{
