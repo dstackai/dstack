@@ -3,8 +3,8 @@ import sys
 
 from rich_argparse import RichHelpFormatter
 
-from dstack._internal.cli.common import check_cli_errors
 from dstack._internal.cli.handlers import cli_initialize
+from dstack._internal.cli.utils.common import check_cli_errors
 from dstack.version import __version__ as version
 
 

@@ -3,8 +3,8 @@ from argparse import Namespace
 from rich.prompt import Confirm
 
 from dstack._internal.cli.commands import BasicCommand
-from dstack._internal.cli.common import add_project_argument, check_init, console
-from dstack._internal.cli.config import config, get_hub_client
+from dstack._internal.cli.utils.common import add_project_argument, check_init, console
+from dstack._internal.cli.utils.config import config, get_hub_client
 from dstack._internal.utils.ssh import ssh_config_remove_host
 
 
@@ -35,6 +35,12 @@ class StopCommand(BasicCommand):
             action="store_true",
         )
         self._parser.add_argument(
+            "-t",
+            "--terminate",
+            help="Force termination",
+            action="store_true",
+        )
+        self._parser.add_argument(
             "-x",
             "--abort",
             help="Don't wait for a graceful stop and abort the run immediately",
@@ -48,7 +54,7 @@ class StopCommand(BasicCommand):
     @check_init
     def _command(self, args: Namespace):
         if not args.run_name and not args.all:
-            console.print("Specify a run name or use --all to stop all workflows")
+            console.print("Specify a run name or use --all to stop all runs")
             exit(1)
         if (
             args.run_name
@@ -62,8 +68,7 @@ class StopCommand(BasicCommand):
                 console.print(f"Cannot find the run '{args.run_name}'")
                 exit(1)
             for job_head in job_heads:
-                if job_head.status.is_unfinished():
-                    hub_client.stop_job(job_head.job_id, args.abort)
+                hub_client.stop_job(job_head.job_id, terminate=args.terminate, abort=args.abort)
             ssh_config_remove_host(config.ssh_config_path, f"{args.run_name}-host")
             ssh_config_remove_host(config.ssh_config_path, args.run_name)
             console.print(f"[grey58]OK[/]")

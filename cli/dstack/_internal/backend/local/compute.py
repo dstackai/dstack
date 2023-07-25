@@ -28,6 +28,10 @@ class LocalCompute(Compute):
         pid = runners.start_runner_process(self.backend_config, job.runner_id)
         return LaunchedInstanceInfo(request_id=pid, location=None)
 
+    def restart_instance(self, job: Job):
+        pid = runners.start_runner_process(self.backend_config, job.runner_id)
+        return LaunchedInstanceInfo(request_id=pid, location=None)
+
     def terminate_instance(self, runner: Runner):
         runners.stop_process(runner.request_id)
 

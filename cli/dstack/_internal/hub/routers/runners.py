@@ -1,7 +1,7 @@
 from fastapi import APIRouter, Depends, HTTPException, status
 
 from dstack._internal.core.build import BuildNotFoundError
-from dstack._internal.core.error import NoMatchingInstanceError
+from dstack._internal.core.error import BackendValueError, NoMatchingInstanceError
 from dstack._internal.core.job import Job, JobStatus
 from dstack._internal.hub.models import StopRunners
 from dstack._internal.hub.routers.util import error_detail, get_backend, get_project
@@ -14,7 +14,7 @@ router = APIRouter(
 
 
 @router.post("/{project_name}/runners/run")
-async def run_runners(project_name: str, job: Job):
+async def run(project_name: str, job: Job):
     project = await get_project(project_name=project_name)
     backend = await get_backend(project)
     failed_to_start_job_new_status = JobStatus.FAILED
@@ -36,8 +36,21 @@ async def run_runners(project_name: str, job: Job):
         )
 
 
-@router.post("/{project_name}/runners/stop")
-async def stop_runners(project_name: str, body: StopRunners):
+@router.post("/{project_name}/runners/restart")
+async def restart(project_name: str, job: Job):
     project = await get_project(project_name=project_name)
     backend = await get_backend(project)
-    await run_async(backend.stop_job, body.repo_id, body.abort, body.job_id)
+    try:
+        await run_async(backend.restart_job, job)
+    except BackendValueError as e:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=error_detail(e.message, code=e.code),
+        )
+
+
+@router.post("/{project_name}/runners/stop")
+async def stop(project_name: str, body: StopRunners):
+    project = await get_project(project_name=project_name)
+    backend = await get_backend(project)
+    await run_async(backend.stop_job, body.repo_id, body.job_id, body.terminate, body.abort)

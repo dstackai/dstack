@@ -4,8 +4,6 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"github.com/dstackai/dstack/runner/internal/backend/base"
-	"github.com/dstackai/dstack/runner/internal/container"
 	"io"
 	"os"
 	"path"
@@ -13,13 +11,16 @@ import (
 
 	"github.com/Azure/azure-sdk-for-go/sdk/azidentity"
 	"github.com/docker/docker/api/types/mount"
+	"gopkg.in/yaml.v2"
+
 	"github.com/dstackai/dstack/runner/consts"
 	"github.com/dstackai/dstack/runner/internal/backend"
+	"github.com/dstackai/dstack/runner/internal/backend/base"
 	"github.com/dstackai/dstack/runner/internal/common"
+	"github.com/dstackai/dstack/runner/internal/docker"
 	"github.com/dstackai/dstack/runner/internal/gerrors"
 	"github.com/dstackai/dstack/runner/internal/log"
 	"github.com/dstackai/dstack/runner/internal/models"
-	"gopkg.in/yaml.v2"
 )
 
 type AzureConfig struct {
@@ -126,22 +127,12 @@ func (azbackend *AzureBackend) UpdateState(ctx context.Context) error {
 	return gerrors.Wrap(base.UpdateState(ctx, azbackend.storage, azbackend.state.Job))
 }
 
-func (azbackend *AzureBackend) CheckStop(ctx context.Context) (bool, error) {
-	runnerFilepath := fmt.Sprintf("runners/%s.yaml", azbackend.runnerID)
-	log.Trace(ctx, "Reading metadata from state file", "path", runnerFilepath)
-	status, err := azbackend.storage.GetMetadata(ctx, runnerFilepath, "status")
-	if err != nil && !errors.Is(err, ErrTagNotFound) {
-		return false, gerrors.Wrap(err)
-	}
-	if status == "stopping" {
-		log.Trace(ctx, "Status equals stopping")
-		return true, nil
-	}
+func (azbackend *AzureBackend) IsInterrupted(ctx context.Context) (bool, error) {
 	return false, nil
 }
 
-func (azbackend *AzureBackend) IsInterrupted(ctx context.Context) (bool, error) {
-	return false, nil
+func (azbackend *AzureBackend) Stop(ctx context.Context) error {
+	return nil
 }
 
 func (azbackend *AzureBackend) Shutdown(ctx context.Context) error {
@@ -237,7 +228,7 @@ func (azbackend *AzureBackend) GetRepoArchive(ctx context.Context, path, dir str
 	return gerrors.Wrap(base.GetRepoArchive(ctx, azbackend.storage, path, dir))
 }
 
-func (azbackend *AzureBackend) GetBuildDiffInfo(ctx context.Context, spec *container.BuildSpec) (*base.StorageObject, error) {
+func (azbackend *AzureBackend) GetBuildDiffInfo(ctx context.Context, spec *docker.BuildSpec) (*base.StorageObject, error) {
 	obj, err := base.GetBuildDiffInfo(ctx, azbackend.storage, spec)
 	if err != nil {
 		return nil, gerrors.Wrap(err)
@@ -249,7 +240,7 @@ func (azbackend *AzureBackend) GetBuildDiff(ctx context.Context, key, dst string
 	return gerrors.Wrap(base.DownloadFile(ctx, azbackend.storage, key, dst))
 }
 
-func (azbackend *AzureBackend) PutBuildDiff(ctx context.Context, src string, spec *container.BuildSpec) error {
+func (azbackend *AzureBackend) PutBuildDiff(ctx context.Context, src string, spec *docker.BuildSpec) error {
 	return gerrors.Wrap(base.PutBuildDiff(ctx, azbackend.storage, src, spec))
 }
 

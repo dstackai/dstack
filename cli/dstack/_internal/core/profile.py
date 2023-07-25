@@ -4,7 +4,7 @@ from typing import List, Optional, Union
 from pydantic import validator
 
 from dstack._internal.core.configuration import ForbidExtra
-from dstack._internal.core.job import SpotPolicy
+from dstack._internal.core.job import SpotPolicy, TerminationPolicy
 
 DEFAULT_CPU = 2
 DEFAULT_MEM = "8GB"
@@ -86,6 +86,7 @@ class Profile(ForbidExtra):
     resources: ProfileResources = ProfileResources()
     spot_policy: Optional[SpotPolicy]
     retry_policy: ProfileRetryPolicy = ProfileRetryPolicy()
+    termination_policy: Optional[TerminationPolicy]
     max_duration: Optional[Union[int, str]]
     default: bool = False
     _validate_max_duration = validator("max_duration", pre=True, allow_reuse=True)(

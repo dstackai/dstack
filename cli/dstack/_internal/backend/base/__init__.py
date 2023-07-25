@@ -73,7 +73,11 @@ class Backend(ABC):
         pass
 
     @abstractmethod
-    def stop_job(self, repo_id: str, abort: bool, job_id: str):
+    def restart_job(self, job: Job):
+        pass
+
+    @abstractmethod
+    def stop_job(self, repo_id: str, job_id: str, terminate: bool, abort: bool):
         pass
 
     @abstractmethod
@@ -274,8 +278,14 @@ class ComponentBasedBackend(Backend):
         self.predict_build_plan(job)  # raises exception on missing build
         base_jobs.run_job(self.storage(), self.compute(), job, failed_to_start_job_new_status)
 
-    def stop_job(self, repo_id: str, abort: bool, job_id: str):
-        base_jobs.stop_job(self.storage(), self.compute(), repo_id, job_id, abort)
+    def restart_job(self, job: Job):
+        base_jobs.restart_job(self.storage(), self.compute(), job)
+
+    def stop_job(self, repo_id: str, job_id: str, terminate: bool, abort: bool):
+        # If backend does not support stop, terminate the run
+        if self.name not in ["gcp", "local"]:
+            terminate = True
+        base_jobs.stop_job(self.storage(), self.compute(), repo_id, job_id, terminate, abort)
 
     def list_job_heads(self, repo_id: str, run_name: Optional[str] = None) -> List[JobHead]:
         return base_jobs.list_job_heads(self.storage(), repo_id, run_name)

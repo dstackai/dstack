@@ -4,7 +4,7 @@ from functools import cmp_to_key
 from typing import List, Optional
 
 import dstack.version as version
-from dstack._internal.core.error import DstackError
+from dstack._internal.core.error import BackendError
 from dstack._internal.core.instance import InstanceType, LaunchedInstanceInfo
 from dstack._internal.core.job import Job, Requirements
 from dstack._internal.core.request import RequestHead
@@ -13,11 +13,15 @@ from dstack._internal.core.runners import Resources, Runner
 WS_PORT = 10999
 
 
-class ComputeError(DstackError):
+class ComputeError(BackendError):
     pass
 
 
 class NoCapacityError(ComputeError):
+    pass
+
+
+class InstanceNotFoundError(ComputeError):
     pass
 
 
@@ -32,6 +36,9 @@ class Compute(ABC):
 
     @abstractmethod
     def run_instance(self, job: Job, instance_type: InstanceType) -> LaunchedInstanceInfo:
+        pass
+
+    def restart_instance(self, job: Job) -> LaunchedInstanceInfo:
         pass
 
     @abstractmethod
@@ -135,4 +142,4 @@ def get_dstack_runner() -> str:
         f'sudo curl --output /usr/local/bin/dstack-runner "https://{bucket}.s3.eu-west-1.amazonaws.com/{build}/binaries/dstack-runner-linux-amd64"',
         f"sudo chmod +x /usr/local/bin/dstack-runner",
     ]
-    return "\n".join(commands)
+    return " && ".join(commands)

@@ -4,31 +4,35 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"github.com/dstackai/dstack/runner/internal/container"
+	"os"
+	"strings"
+	"time"
+
+	"github.com/dstackai/dstack/runner/internal/docker"
 	"github.com/dstackai/dstack/runner/internal/gerrors"
 	"github.com/dstackai/dstack/runner/internal/log"
 	"github.com/dstackai/dstack/runner/internal/models"
 	"github.com/dstackai/dstack/runner/internal/repo"
 	"gopkg.in/yaml.v2"
-	"os"
-	"strings"
-	"time"
 )
 
-func LoadRunnerState(ctx context.Context, storage Storage, id string, out interface{}) error {
+func LoadRunnerState(ctx context.Context, storage Storage, id string, state **models.State) error {
 	runnerFilepath := fmt.Sprintf("runners/%s.yaml", id)
 	log.Trace(ctx, "Load runner state from the storage", "ID", id)
 	content, err := GetObject(ctx, storage, runnerFilepath)
 	if err != nil {
 		return gerrors.Wrap(err)
 	}
-	err = yaml.Unmarshal(content, out)
+	err = yaml.Unmarshal(content, state)
 	if err != nil {
 		return gerrors.Wrap(err)
 	}
-	if out == nil {
+	if state == nil {
 		return gerrors.New("State is empty. Data not loading")
 	}
+	// Hack to get relevant job data (state.Job).
+	// Runner file may contain outdated job data.
+	RefetchJob(ctx, storage, (*state).Job)
 	return nil
 }
 
@@ -98,7 +102,7 @@ func GetRepoArchive(ctx context.Context, storage Storage, path, dir string) erro
 
 var ErrBuildNotFound = errors.New("build not found")
 
-func GetBuildDiffInfo(ctx context.Context, storage Storage, spec *container.BuildSpec) (*StorageObject, error) {
+func GetBuildDiffInfo(ctx context.Context, storage Storage, spec *docker.BuildSpec) (*StorageObject, error) {
 	prefix := getBuildDiffPrefix(spec)
 	builds := make([]*StorageObject, 0)
 	ch, errCh := storage.List(ctx, prefix)
@@ -115,7 +119,7 @@ func GetBuildDiffInfo(ctx context.Context, storage Storage, spec *container.Buil
 	return nil, gerrors.Wrap(ErrBuildNotFound)
 }
 
-func PutBuildDiff(ctx context.Context, storage Storage, src string, spec *container.BuildSpec) error {
+func PutBuildDiff(ctx context.Context, storage Storage, src string, spec *docker.BuildSpec) error {
 	newDiffKey := getBuildDiffName(spec)
 	oldDiff, err := GetBuildDiffInfo(ctx, storage, spec)
 	if err == nil {
@@ -130,7 +134,7 @@ func PutBuildDiff(ctx context.Context, storage Storage, src string, spec *contai
 	return gerrors.Wrap(UploadFile(ctx, storage, src, newDiffKey))
 }
 
-func getBuildDiffPrefix(spec *container.BuildSpec) string {
+func getBuildDiffPrefix(spec *docker.BuildSpec) string {
 	return fmt.Sprintf(
 		"builds/%s/%s;%s;%s;%s;%s;",
 		spec.RepoId,
@@ -142,7 +146,7 @@ func getBuildDiffPrefix(spec *container.BuildSpec) string {
 	)
 }
 
-func getBuildDiffName(spec *container.BuildSpec) string {
+func getBuildDiffName(spec *docker.BuildSpec) string {
 	return fmt.Sprintf(
 		"%s%s;%d.tar",
 		getBuildDiffPrefix(spec),

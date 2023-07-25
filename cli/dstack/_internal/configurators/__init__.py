@@ -125,7 +125,6 @@ class JobConfigurator(ABC):
     ) -> List[job.Job]:
         self.run_name = run_name
         self.ssh_key_pub = ssh_key_pub
-
         created_at = get_milliseconds_since_epoch()
         configured_job = job.Job(
             job_id=f"{run_name},,0",
@@ -143,7 +142,7 @@ class JobConfigurator(ABC):
             registry_auth=self.registry_auth(),
             entrypoint=self.entrypoint(),
             build_commands=self.build_commands(),
-            optional_build_commands=self.optional_build_commands(),
+            setup=self.setup(),
             commands=self.commands(),
             working_dir=self.working_dir,
             home_dir=self.home_dir(),
@@ -156,17 +155,22 @@ class JobConfigurator(ABC):
             retry_policy=self.retry_policy(),
             max_duration=self.max_duration(),
             build_policy=self.build_policy,
+            termination_policy=self.termination_policy(),
             requirements=self.requirements(),
             ssh_key_pub=ssh_key_pub,
         )
         return [configured_job]
 
     @abstractmethod
-    def commands(self) -> List[str]:
+    def build_commands(self) -> List[str]:
         pass
 
     @abstractmethod
-    def optional_build_commands(self) -> List[str]:
+    def setup(self) -> List[str]:
+        pass
+
+    @abstractmethod
+    def commands(self) -> List[str]:
         pass
 
     @abstractmethod
@@ -181,8 +185,9 @@ class JobConfigurator(ABC):
     def default_max_duration(self) -> int:
         pass
 
-    def build_commands(self) -> List[str]:
-        return self.conf.build
+    @abstractmethod
+    def termination_policy(self) -> job.TerminationPolicy:
+        pass
 
     def entrypoint(self) -> Optional[List[str]]:
         if self.conf.entrypoint is not None:

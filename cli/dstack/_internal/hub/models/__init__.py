@@ -259,6 +259,7 @@ class StopRunners(BaseModel):
     repo_id: str
     job_id: str
     abort: bool
+    terminate: Optional[bool] = False
 
 
 class SaveRepoCredentials(BaseModel):

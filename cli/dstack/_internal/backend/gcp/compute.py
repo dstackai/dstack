@@ -1,4 +1,5 @@
 import re
+import time
 from typing import Dict, List, Optional
 
 import google.api_core.exceptions
@@ -9,6 +10,7 @@ from dstack import version
 from dstack._internal.backend.base.compute import (
     WS_PORT,
     Compute,
+    InstanceNotFoundError,
     NoCapacityError,
     choose_instance_type,
     get_dstack_runner,
@@ -17,10 +19,14 @@ from dstack._internal.backend.base.config import BACKEND_CONFIG_FILENAME, RUNNER
 from dstack._internal.backend.base.runners import serialize_runner_yaml
 from dstack._internal.backend.gcp import utils as gcp_utils
 from dstack._internal.backend.gcp.config import GCPConfig
+from dstack._internal.core.error import BackendValueError
 from dstack._internal.core.instance import InstanceType, LaunchedInstanceInfo
 from dstack._internal.core.job import Job, Requirements
 from dstack._internal.core.request import RequestHead, RequestStatus
 from dstack._internal.core.runners import Gpu, Resources, Runner
+from dstack._internal.utils.logging import get_logger
+
+logger = get_logger(__name__)
 
 DSTACK_INSTANCE_TAG = "dstack-runner-instance"
 
@@ -129,6 +135,14 @@ class GCPCompute(Compute):
         )
         return LaunchedInstanceInfo(request_id=instance.name, location=self.gcp_config.zone)
 
+    def restart_instance(self, job: Job):
+        _restart_instance(
+            client=self.instances_client,
+            gcp_config=self.gcp_config,
+            instance_name=job.request_id,
+        )
+        return LaunchedInstanceInfo(request_id=job.request_id, location=job.location)
+
     def terminate_instance(self, runner: Runner):
         _terminate_instance(
             client=self.instances_client,
@@ -169,10 +183,7 @@ def _get_instance_status(
         operations = zone_operations_client.list(list_operations_request)
         if len(list(operations)) > 0:
             return RequestStatus.NO_CAPACITY
-
-    if instance.status in ["PROVISIONING", "STAGING", "RUNNING"]:
-        return RequestStatus.RUNNING
-    return RequestStatus.TERMINATED
+    return RequestStatus.RUNNING
 
 
 def _choose_instance_type(
@@ -443,14 +454,21 @@ def _get_instance_name(job: Job) -> str:
 def _get_user_data_script(gcp_config: GCPConfig, job: Job, instance_type: InstanceType) -> str:
     config_content = gcp_config.serialize_yaml().replace("\n", "\\n")
     runner_content = serialize_runner_yaml(job.runner_id, instance_type.resources, 3000, 4000)
-    return f"""#!/bin/sh
-mkdir -p /root/.dstack/
-echo '{config_content}' > /root/.dstack/{BACKEND_CONFIG_FILENAME}
-echo '{runner_content}' > /root/.dstack/{RUNNER_CONFIG_FILENAME}
-EXTERNAL_IP=`curl -H "Metadata-Flavor: Google" http://169.254.169.254/computeMetadata/v1/instance/network-interfaces/0/access-configs/0/external-ip`
-echo "hostname: $EXTERNAL_IP" >> /root/.dstack/{RUNNER_CONFIG_FILENAME}
-{get_dstack_runner()}
-HOME=/root nohup dstack-runner --log-level 6 start --http-port {WS_PORT}
+    return f"""#cloud-config
+
+cloud_final_modules:
+- [scripts-user, always]
+
+runcmd:
+    - |
+        if [ ! -f /root/.dstack/booted ]; then
+            mkdir -p /root/.dstack/
+            echo '{config_content}' > /root/.dstack/{BACKEND_CONFIG_FILENAME}
+            echo '{runner_content}' > /root/.dstack/{RUNNER_CONFIG_FILENAME}
+            {get_dstack_runner()}
+            touch /root/.dstack/booted
+        fi
+        HOME=/root nohup dstack-runner --log-level 6 start --http-port {WS_PORT}
 """
 
 
@@ -752,6 +770,35 @@ def _create_firewall_rules(
 
     operation = firewalls_client.insert(project=project_id, firewall_resource=firewall_rule)
     gcp_utils.wait_for_extended_operation(operation, "firewall rule creation")
+
+
+RESTART_ATTEMPTS = 5
+RESTART_WAIT = 5
+
+
+def _restart_instance(
+    client: compute_v1.InstancesClient, gcp_config: GCPConfig, instance_name: str
+):
+    request = compute_v1.StartInstanceRequest(
+        instance=instance_name,
+        project=gcp_config.project_id,
+        zone=gcp_config.zone,
+    )
+    for _ in range(RESTART_ATTEMPTS):
+        try:
+            operation = client.start(request)
+        except google.api_core.exceptions.NotFound:
+            raise InstanceNotFoundError()
+        try:
+            gcp_utils.wait_for_extended_operation(operation)
+            return
+        except google.api_core.exceptions.BadRequest:
+            logger.warning(
+                "Start instance request failed. Instance may still be transitioning to stopped state. Reattempting..."
+            )
+            time.sleep(RESTART_WAIT)
+            continue
+    raise BackendValueError("Failed to restart instance. Try later.")
 
 
 def _terminate_instance(

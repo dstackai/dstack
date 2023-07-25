@@ -97,13 +97,16 @@ class JobStatus(str, Enum):
     UPLOADING = "uploading"
     STOPPING = "stopping"
     STOPPED = "stopped"
+    RESTARTING = "restarting"
+    TERMINATING = "terminating"
+    TERMINATED = "terminated"
     ABORTING = "aborting"
     ABORTED = "aborted"
     FAILED = "failed"
     DONE = "done"
 
     def is_finished(self):
-        return self in [self.STOPPED, self.ABORTED, self.FAILED, self.DONE]
+        return self in [self.STOPPED, self.TERMINATED, self.ABORTED, self.FAILED, self.DONE]
 
     def is_unfinished(self):
         return not self.is_finished()
@@ -118,6 +121,11 @@ class SpotPolicy(str, Enum):
 class RetryPolicy(BaseModel):
     retry: bool
     limit: Optional[int]
+
+
+class TerminationPolicy(str, Enum):
+    STOP = "stop"
+    TERMINATE = "terminate"
 
 
 class JobErrorCode(str, Enum):
@@ -195,6 +203,7 @@ class Job(JobHead):
     submission_num: int = 1
     image_name: str
     registry_auth: Optional[RegistryAuth]
+    setup: Optional[List[str]]
     commands: Optional[List[str]]
     entrypoint: Optional[List[str]]
     env: Optional[Dict[str, str]]
@@ -206,6 +215,7 @@ class Job(JobHead):
     requirements: Optional[Requirements]
     spot_policy: Optional[SpotPolicy]
     retry_policy: Optional[RetryPolicy]
+    termination_policy: Optional[TerminationPolicy]
     max_duration: Optional[int]
     dep_specs: Optional[List[DepSpec]]
     master_job: Optional[JobRef]
@@ -278,6 +288,7 @@ class Job(JobHead):
             "submission_num": self.submission_num,
             "image_name": self.image_name,
             "registry_auth": self.registry_auth.serialize() if self.registry_auth else {},
+            "setup": self.setup or [],
             "commands": self.commands or [],
             "entrypoint": self.entrypoint,
             "env": self.env or {},
@@ -288,6 +299,9 @@ class Job(JobHead):
             "host_name": self.host_name or "",
             "spot_policy": self.spot_policy.value if self.spot_policy else None,
             "retry_policy": self.retry_policy.dict() if self.retry_policy else None,
+            "termination_policy": self.termination_policy.value
+            if self.termination_policy
+            else None,
             "max_duration": self.max_duration or None,
             "requirements": self.requirements.serialize() if self.requirements else {},
             "deps": deps,
@@ -352,6 +366,7 @@ class Job(JobHead):
         retry_policy = None
         if job_data.get("retry_policy") is not None:
             retry_policy = RetryPolicy.parse_obj(job_data.get("retry_policy"))
+        termination_policy = job_data.get("termination_policy")
         dep_specs = []
         if job_data.get("deps"):
             for dep in job_data["deps"]:
@@ -427,6 +442,7 @@ class Job(JobHead):
             submission_num=job_data.get("submission_num") or 1,
             image_name=job_data["image_name"],
             registry_auth=RegistryAuth(**job_data.get("registry_auth", {})),
+            setup=job_data.get("setup"),
             commands=job_data.get("commands") or None,
             entrypoint=job_data.get("entrypoint") or None,
             env=job_data["env"] or None,
@@ -437,6 +453,9 @@ class Job(JobHead):
             host_name=job_data.get("host_name") or None,
             spot_policy=SpotPolicy(spot_policy) if spot_policy else None,
             retry_policy=retry_policy,
+            termination_policy=TerminationPolicy(termination_policy)
+            if termination_policy
+            else None,
             max_duration=int(job_data.get("max_duration"))
             if job_data.get("max_duration")
             else None,

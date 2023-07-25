@@ -3,19 +3,19 @@ package local
 import (
 	"context"
 	"fmt"
-	"github.com/dstackai/dstack/runner/internal/backend/base"
-	"github.com/dstackai/dstack/runner/internal/container"
 	"io"
 	"os"
 	"path"
 	"path/filepath"
 	"strings"
 
+	"github.com/dstackai/dstack/runner/internal/backend/base"
+	"github.com/dstackai/dstack/runner/internal/docker"
+
 	"github.com/docker/docker/api/types/mount"
 	"github.com/dstackai/dstack/runner/internal/repo"
 
 	"github.com/dstackai/dstack/runner/consts"
-	"github.com/dstackai/dstack/runner/consts/states"
 	"github.com/dstackai/dstack/runner/internal/backend"
 	"github.com/dstackai/dstack/runner/internal/common"
 	"github.com/dstackai/dstack/runner/internal/gerrors"
@@ -109,38 +109,15 @@ func (l *Local) UpdateState(ctx context.Context) error {
 	return gerrors.Wrap(base.UpdateState(ctx, l.storage, l.state.Job))
 }
 
-func (l *Local) CheckStop(ctx context.Context) (bool, error) {
-	pathStateFile := fmt.Sprintf("runners/m;%s.yaml", l.runnerID)
-	log.Trace(ctx, "Reading metadata from state file", "path", pathStateFile)
-	if _, err := os.Stat(filepath.Join(l.path, pathStateFile)); err == nil {
-		file, err := os.Open(filepath.Join(l.path, pathStateFile))
-		if err != nil {
-			return false, gerrors.Wrap(err)
-		}
-		body, err := io.ReadAll(file)
-		if err != nil {
-			return false, gerrors.Wrap(err)
-		}
-		metadata := new(models.RunnerMetadata)
-		if err = yaml.Unmarshal(body, metadata); err != nil {
-			return false, gerrors.Wrap(err)
-		}
-		if metadata.Status == states.Stopping {
-			log.Trace(ctx, "Status equals stopping")
-			return true, nil
-		}
-		log.Trace(ctx, "Metadata", "status", string(body))
-		return false, nil
-	}
-	return false, nil
-}
-
 func (l *Local) IsInterrupted(ctx context.Context) (bool, error) {
 	return false, nil
 }
 
+func (l *Local) Stop(ctx context.Context) error {
+	return nil
+}
+
 func (l *Local) Shutdown(ctx context.Context) error {
-	log.Trace(ctx, "Start shutdown")
 	return nil
 }
 
@@ -232,7 +209,7 @@ func (l *Local) GetRepoArchive(ctx context.Context, path, dir string) error {
 	return nil
 }
 
-func (l *Local) GetBuildDiffInfo(ctx context.Context, spec *container.BuildSpec) (*base.StorageObject, error) {
+func (l *Local) GetBuildDiffInfo(ctx context.Context, spec *docker.BuildSpec) (*base.StorageObject, error) {
 	obj, err := base.GetBuildDiffInfo(ctx, l.storage, spec)
 	if err != nil {
 		return nil, gerrors.Wrap(err)
@@ -244,7 +221,7 @@ func (l *Local) GetBuildDiff(ctx context.Context, key, dst string) error {
 	return gerrors.New("not implemented")
 }
 
-func (l *Local) PutBuildDiff(ctx context.Context, src string, spec *container.BuildSpec) error {
+func (l *Local) PutBuildDiff(ctx context.Context, src string, spec *docker.BuildSpec) error {
 	return gerrors.Wrap(base.PutBuildDiff(ctx, l.storage, src, spec))
 }
 
