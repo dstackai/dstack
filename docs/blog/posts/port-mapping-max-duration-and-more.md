@@ -115,6 +115,10 @@ Imagine the amount of money your team can save with this minor configuration.
 With the CUDA version updated to 11.8, `dstack` now supports additional GPU types, including `NVIDIA T4` 
 and `NVIDIA L4`. These GPUs are highly efficient for LLM development, offering excellent performance at low costs!
 
+If you are using a custom Docker image, you can now utilize a CUDA version up to 12.2.
+
+Last but not least, the K80 GPU is no longer supported.
+
 ## Examples
 
 Make sure to check the new page with [examples](../../examples/index.md).
