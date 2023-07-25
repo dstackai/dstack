@@ -121,12 +121,18 @@ func (gbackend *GCPBackend) IsInterrupted(ctx context.Context) (bool, error) {
 
 func (gbackend *GCPBackend) Stop(ctx context.Context) error {
 	err := gbackend.compute.StopInstance(ctx, gbackend.state.RequestID)
-	return gerrors.Wrap(err)
+	if err != nil {
+		return gerrors.Wrap(err)
+	}
+	return gerrors.Wrap(gbackend.cleanup(ctx))
 }
 
 func (gbackend *GCPBackend) Shutdown(ctx context.Context) error {
 	err := gbackend.compute.TerminateInstance(ctx, gbackend.state.RequestID)
-	return gerrors.Wrap(err)
+	if err != nil {
+		return gerrors.Wrap(err)
+	}
+	return gerrors.Wrap(gbackend.cleanup(ctx))
 }
 
 func (gbackend *GCPBackend) GetArtifact(ctx context.Context, runName, localPath, remotePath string, mount bool) base.Artifacter {
