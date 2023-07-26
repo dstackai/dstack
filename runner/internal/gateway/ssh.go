@@ -5,6 +5,7 @@ import (
 	"github.com/dstackai/dstack/runner/internal/gerrors"
 	"os"
 	"os/exec"
+	"path"
 	"path/filepath"
 	"strings"
 )
@@ -69,7 +70,7 @@ func (c *SSHControl) mkTempDir() error {
 }
 
 func (c *SSHControl) Publish(localPort, publicPort string) error {
-	// running tunnel in background
+	// run tunnel in background
 	_, err := c.exec([]string{
 		"-f", "-N",
 		"-R", fmt.Sprintf("%s/http.sock:localhost:%s", c.remoteTempDir, localPort),
@@ -78,7 +79,7 @@ func (c *SSHControl) Publish(localPort, publicPort string) error {
 		return gerrors.Wrap(err)
 	}
 	// \\n will be converted to \n by remote printf
-	nginxConf := strings.ReplaceAll(fmt.Sprintf(nginxConfFmt, c.remoteTempDir, c.hostname, publicPort), "\n", "\\n")
+	nginxConf := strings.ReplaceAll(fmt.Sprintf(nginxConfFmt, c.hostname, publicPort, c.remoteTempDir, path.Base(c.remoteTempDir)), "\n", "\\n")
 	script := []string{
 		fmt.Sprintf("sudo chown -R %s:www-data %s", c.user, c.remoteTempDir),
 		fmt.Sprintf("chmod 0770 %s", c.remoteTempDir),
@@ -93,20 +94,24 @@ func (c *SSHControl) Publish(localPort, publicPort string) error {
 
 func (c *SSHControl) Cleanup() {
 	// todo cleanup remote
-	// todo kill ssh control
+	_ = exec.Command("ssh", "-o", "ControlPath="+c.controlPath, "-O", "exit", c.hostname).Run()
 	_ = os.RemoveAll(c.localTempDir)
 }
 
-var nginxConfFmt = `upstream tunnel {
-  server unix:%s/http.sock;
+// 1: hostname
+// 2: port
+// 3: temp dir
+// 4: upstream name
+var nginxConfFmt = `upstream %[4]s {
+  server unix:%[3]s/http.sock;
 }
 
 server {
-  server_name %s;
-  listen      %s;
+  server_name %[1]s;
+  listen      %[2]s;
   
   location / {
-    proxy_pass       http://tunnel;
+    proxy_pass       http://%[4]s;
     proxy_set_header X-Real-IP $remote_addr;
     proxy_set_header Host      $host;
   }
