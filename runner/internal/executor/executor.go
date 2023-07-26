@@ -6,6 +6,8 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"github.com/docker/go-connections/nat"
+	"github.com/dstackai/dstack/runner/internal/gateway"
 	"io"
 	"os"
 	"path"
@@ -340,6 +342,27 @@ func (ex *Executor) runJob(ctx context.Context, erCh chan error, stoppedCh chan 
 		erCh <- gerrors.Wrap(err)
 		return
 	}
+
+	var gatewayControl *gateway.SSHControl
+	if job.ConfigurationType == "service" {
+		binding, ok := spec.BindingPorts[nat.Port(fmt.Sprintf("%d/tcp", job.Gateway.ServicePort))]
+		if !ok {
+			erCh <- gerrors.Newf("gateway: job doesn't expose port %d", job.Gateway.ServicePort)
+			return
+		}
+		localPort := binding[0].HostPort
+		gatewayControl, err = gateway.NewSSHControl(job.Gateway.Hostname, job.Gateway.SSHKey)
+		if err != nil {
+			erCh <- gerrors.Wrap(err)
+			return
+		}
+		defer gatewayControl.Cleanup()
+		if err := gatewayControl.Publish(localPort, strconv.Itoa(job.Gateway.PublicPort)); err != nil {
+			erCh <- gerrors.Wrap(err)
+			return
+		}
+	}
+
 	if err = ex.processJob(ctx, spec, stoppedCh, allLogs); err != nil {
 		erCh <- gerrors.Wrap(err)
 		return
