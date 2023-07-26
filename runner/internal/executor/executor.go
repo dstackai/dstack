@@ -686,12 +686,15 @@ func buildSetupCommands(setup []string) []string {
 		return []string{}
 	}
 	joinedSetupCommands := docker.ShellCommands(setup)[0]
+	dstackDir := filepath.Join("~", consts.DSTACK_DIR_PATH)
+	setupCompletedFilepath := filepath.Join(dstackDir, consts.SETUP_COMPLETED_FILE_NAME)
 	res := []string{
 		fmt.Sprintf(
-			"([ -f %s ] || (%s && touch %s))",
-			consts.SETUP_COMPLETED_FILE_PATH,
+			"([ -f %s ] || (%s && mkdir -p %s &&  touch %s))",
+			setupCompletedFilepath,
 			joinedSetupCommands,
-			consts.SETUP_COMPLETED_FILE_PATH,
+			dstackDir,
+			setupCompletedFilepath,
 		),
 	}
 	return res

@@ -11,7 +11,7 @@ const FUSE_DIR = "fuse"
 const RUNS_DIR = "runs"
 
 const FILE_LOCK_FULL_DOWNLOAD = ".lock.full"
-const SETUP_COMPLETED_FILE_PATH = DSTACK_DIR_PATH + "/.setup_completed"
+const SETUP_COMPLETED_FILE_NAME = ".setup_completed"
 
 // ServerUrl A default build-time variable. The value is overridden via ldflags.
 var ServerUrl = "https://api.stgn.dstack.ai"
