@@ -4,7 +4,7 @@ from operator import attrgetter
 from typing import List, Optional, Tuple
 
 from azure.core.credentials import TokenCredential
-from azure.core.exceptions import ResourceNotFoundError
+from azure.core.exceptions import ResourceExistsError, ResourceNotFoundError
 from azure.mgmt.authorization import AuthorizationManagementClient
 from azure.mgmt.compute import ComputeManagementClient
 from azure.mgmt.compute.models import (
@@ -41,6 +41,7 @@ from dstack._internal.backend.azure.config import AzureConfig
 from dstack._internal.backend.base.compute import (
     WS_PORT,
     Compute,
+    NoCapacityError,
     choose_instance_type,
     get_dstack_runner,
 )
@@ -50,7 +51,6 @@ from dstack._internal.core.instance import InstanceType, LaunchedInstanceInfo
 from dstack._internal.core.job import Job
 from dstack._internal.core.request import RequestHead, RequestStatus
 from dstack._internal.core.runners import Gpu, Resources, Runner
-from dstack._internal.utils.common import removeprefix
 
 
 class AzureCompute(Compute):
@@ -130,9 +130,6 @@ class AzureCompute(Compute):
             message=None,
         )
 
-    def cancel_spot_request(self, runner: Runner):
-        self.terminate_instance(runner.request_id)
-
     def terminate_instance(self, runner: Runner):
         _terminate_instance(
             compute_client=self._compute_client,
@@ -140,11 +137,14 @@ class AzureCompute(Compute):
             instance_name=runner.request_id,
         )
 
+    def cancel_spot_request(self, runner: Runner):
+        self.terminate_instance(runner)
+
 
 def _get_instance_types(client: ComputeManagementClient, location: str) -> List[InstanceType]:
     instance_types = []
     vm_series_pattern = re.compile(
-        r"^(Standard_D\d+s_v3|Standard_E\d+(-\d*)?s_v4|Standard_NC\d+s_v3|Standard_NC\d+as_T4_v3)$"
+        r"^(Standard_D\d+s_v3|Standard_E\d+(-\d*)?s_v4|Standard_NC\d+s_v3|Standard_NC\d+as_T4_v3|Standard_NV\d+(ads|adms)_A10_v5)$"
     )
     # Only location filter is supported currently in azure API.
     # See: https://learn.microsoft.com/en-us/python/api/azure-mgmt-compute/azure.mgmt.compute.v2021_07_01.operations.resourceskusoperations?view=azure-python#azure-mgmt-compute-v2021-07-01-operations-resourceskusoperations-list
@@ -191,6 +191,10 @@ def _get_gpu_name_memory(vm_name: str) -> Tuple[str, int]:
         return "T4", 16 * 1024
     if re.match(r"^Standard_NC\d+s_v3$", vm_name):
         return "V100", 16 * 1024
+    m = re.match(r"^Standard_NV(\d)+(ads|adms)_A10_v5$", vm_name)
+    if m:
+        num = int(m.group(1))
+        return "A10", 24 * num // 36 * 1024
 
 
 def _get_instance_name(job: Job) -> str:
@@ -244,81 +248,88 @@ def _launch_instance(
     ssh_pub_key: str,
     spot: bool,
 ) -> VirtualMachine:
-    vm: VirtualMachine = compute_client.virtual_machines.begin_create_or_update(
-        resource_group,
-        instance_name,
-        VirtualMachine(
-            location=location,
-            hardware_profile=HardwareProfile(vm_size=vm_size),
-            storage_profile=StorageProfile(
-                image_reference=image_reference,
-                os_disk=OSDisk(
-                    create_option=DiskCreateOptionTypes.FROM_IMAGE,
-                    managed_disk=ManagedDiskParameters(
-                        storage_account_type=StorageAccountTypes.STANDARD_SSD_LRS
-                    ),
-                    disk_size_gb=100,
-                    delete_option="Delete",
-                ),
-            ),
-            os_profile=OSProfile(
-                computer_name="runnervm",
-                admin_username="ubuntu",
-                linux_configuration=LinuxConfiguration(
-                    ssh=SshConfiguration(
-                        public_keys=[
-                            SshPublicKey(
-                                path="/home/ubuntu/.ssh/authorized_keys",
-                                key_data=ssh_pub_key,
-                            )
-                        ]
-                    )
-                ),
-            ),
-            network_profile=NetworkProfile(
-                network_api_version=NetworkManagementClient.DEFAULT_API_VERSION,
-                network_interface_configurations=[
-                    VirtualMachineNetworkInterfaceConfiguration(
-                        name="nic_config",
-                        network_security_group=SubResource(
-                            id=azure_utils.get_network_security_group_id(
-                                subscription_id,
-                                resource_group,
-                                network_security_group,
-                            )
+    try:
+        poller = compute_client.virtual_machines.begin_create_or_update(
+            resource_group,
+            instance_name,
+            VirtualMachine(
+                location=location,
+                hardware_profile=HardwareProfile(vm_size=vm_size),
+                storage_profile=StorageProfile(
+                    image_reference=image_reference,
+                    os_disk=OSDisk(
+                        create_option=DiskCreateOptionTypes.FROM_IMAGE,
+                        managed_disk=ManagedDiskParameters(
+                            storage_account_type=StorageAccountTypes.STANDARD_SSD_LRS
                         ),
-                        ip_configurations=[
-                            VirtualMachineNetworkInterfaceIPConfiguration(
-                                name="ip_config",
-                                subnet=SubResource(
-                                    id=azure_utils.get_subnet_id(
-                                        subscription_id,
-                                        resource_group,
-                                        network,
-                                        subnet,
-                                    )
-                                ),
-                                public_ip_address_configuration=VirtualMachinePublicIPAddressConfiguration(
-                                    name="public_ip_config",
-                                ),
-                            )
-                        ],
-                    )
-                ],
+                        disk_size_gb=100,
+                        delete_option="Delete",
+                    ),
+                ),
+                os_profile=OSProfile(
+                    computer_name="runnervm",
+                    admin_username="ubuntu",
+                    linux_configuration=LinuxConfiguration(
+                        ssh=SshConfiguration(
+                            public_keys=[
+                                SshPublicKey(
+                                    path="/home/ubuntu/.ssh/authorized_keys",
+                                    key_data=ssh_pub_key,
+                                )
+                            ]
+                        )
+                    ),
+                ),
+                network_profile=NetworkProfile(
+                    network_api_version=NetworkManagementClient.DEFAULT_API_VERSION,
+                    network_interface_configurations=[
+                        VirtualMachineNetworkInterfaceConfiguration(
+                            name="nic_config",
+                            network_security_group=SubResource(
+                                id=azure_utils.get_network_security_group_id(
+                                    subscription_id,
+                                    resource_group,
+                                    network_security_group,
+                                )
+                            ),
+                            ip_configurations=[
+                                VirtualMachineNetworkInterfaceIPConfiguration(
+                                    name="ip_config",
+                                    subnet=SubResource(
+                                        id=azure_utils.get_subnet_id(
+                                            subscription_id,
+                                            resource_group,
+                                            network,
+                                            subnet,
+                                        )
+                                    ),
+                                    public_ip_address_configuration=VirtualMachinePublicIPAddressConfiguration(
+                                        name="public_ip_config",
+                                    ),
+                                )
+                            ],
+                        )
+                    ],
+                ),
+                priority="Spot" if spot else "Regular",
+                eviction_policy="Delete" if spot else None,
+                identity=VirtualMachineIdentity(
+                    type=ResourceIdentityType.USER_ASSIGNED,
+                    user_assigned_identities={
+                        azure_utils.get_managed_identity_id(
+                            subscription_id, resource_group, managed_identity
+                        ): UserAssignedIdentitiesValue()
+                    },
+                ),
+                user_data=base64.b64encode(user_data.encode()).decode(),
             ),
-            priority="Spot" if spot else "Regular",
-            eviction_policy="Delete" if spot else None,
-            identity=VirtualMachineIdentity(
-                type=ResourceIdentityType.USER_ASSIGNED,
-                user_assigned_identities={
-                    azure_utils.get_managed_identity_id(
-                        subscription_id, resource_group, managed_identity
-                    ): UserAssignedIdentitiesValue()
-                },
-            ),
-            user_data=base64.b64encode(user_data.encode()).decode(),
-        ),
-    ).result()
+        )
+    except ResourceExistsError as e:
+        # May occur if no quota or quota exceeded
+        if e.error.code in ["SkuNotAvailable", "OperationNotAllowed"]:
+            raise NoCapacityError()
+        raise e
+    vm = poller.result()
     return vm
 
 
