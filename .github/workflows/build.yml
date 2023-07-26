@@ -231,12 +231,16 @@ jobs:
       - name: Install dstack
         run: pip install .
       - name: Generate json schema
-        run: python -c "from dstack._internal.core.configuration import DstackConfiguration; print(DstackConfiguration.schema_json(indent=2))" > configuration.json
+        run: |
+          python -c "from dstack._internal.core.configuration import DstackConfiguration; print(DstackConfiguration.schema_json(indent=2))" > configuration.json
+          python -c "from dstack._internal.core.profile import ProfilesConfig; print(ProfilesConfig.schema_json(indent=2))" > profiles.json
       - name: Upload json schema to S3
         run: |
           VERSION=$((${{ github.run_number }} + 150))
           aws s3 cp configuration.json "s3://dstack-runner-downloads-stgn/$VERSION/schemas/configuration.json" --acl public-read
           aws s3 cp configuration.json "s3://dstack-runner-downloads-stgn/latest/schemas/configuration.json" --acl public-read
+          aws s3 cp profiles.json "s3://dstack-runner-downloads-stgn/$VERSION/schemas/profiles.json" --acl public-read
+          aws s3 cp profiles.json "s3://dstack-runner-downloads-stgn/latest/schemas/profiles.json" --acl public-read
 
   # cli-integration-tests:
   #   needs: [ runner-upload-master ]

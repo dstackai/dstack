@@ -1,7 +1,8 @@
 import re
 from typing import List, Optional, Union
 
-from pydantic import validator
+from pydantic import Field, validator
+from typing_extensions import Annotated
 
 from dstack._internal.core.configuration import ForbidExtra
 from dstack._internal.core.job import SpotPolicy, TerminationPolicy
@@ -56,14 +57,25 @@ def parse_max_duration(v: Union[int, str]) -> int:
 class ProfileGPU(ForbidExtra):
     name: Optional[str]
     count: int = 1
-    memory: Optional[Union[int, str]]
+    memory: Annotated[
+        Optional[Union[int, str]],
+        Field(description='The minimum size of GPU memory (e.g., "16GB")'),
+    ]
     _validate_mem = validator("memory", pre=True, allow_reuse=True)(parse_memory)
 
 
 class ProfileResources(ForbidExtra):
     gpu: Optional[Union[int, ProfileGPU]]
-    memory: Union[int, str] = parse_memory(DEFAULT_MEM)
-    shm_size: Optional[Union[int, str]]
+    memory: Annotated[
+        Union[int, str], Field(description='The minimum size of RAM memory (e.g., "16GB")')
+    ] = parse_memory(DEFAULT_MEM)
+    shm_size: Annotated[
+        Optional[Union[int, str]],
+        Field(
+            description='The size of shared memory (e.g., "8GB"). If you are using parallel communicating processes ('
+            "e.g., dataloaders in PyTorch), you may need to configure this."
+        ),
+    ]
     cpu: int = DEFAULT_CPU
     _validate_mem = validator("memory", "shm_size", pre=True, allow_reuse=True)(parse_memory)
 
@@ -75,8 +87,11 @@ class ProfileResources(ForbidExtra):
 
 
 class ProfileRetryPolicy(ForbidExtra):
-    retry: bool = False
-    limit: Union[int, str] = DEFAULT_RETRY_LIMIT
+    retry: Annotated[bool, Field(description="Whether to retry the run on failure or not")] = False
+    limit: Annotated[
+        Union[int, str],
+        Field(description="The maximum period of retrying the run, e.g., 4h or 1d"),
+    ] = DEFAULT_RETRY_LIMIT
     _validate_limit = validator("limit", pre=True, allow_reuse=True)(parse_duration)
 
 
@@ -84,10 +99,25 @@ class Profile(ForbidExtra):
     name: str
     project: Optional[str]
     resources: ProfileResources = ProfileResources()
-    spot_policy: Optional[SpotPolicy]
-    retry_policy: ProfileRetryPolicy = ProfileRetryPolicy()
-    termination_policy: Optional[TerminationPolicy]
-    max_duration: Optional[Union[int, str]]
+    spot_policy: Annotated[
+        Optional[SpotPolicy],
+        Field(
+            description="The policy for provisioning spot or on-demand instances: spot, on-demand, or auto"
+        ),
+    ]
+    retry_policy: Annotated[
+        ProfileRetryPolicy, Field(description="The policy for re-submitting the run")
+    ] = ProfileRetryPolicy()
+    termination_policy: Annotated[
+        Optional[TerminationPolicy],
+        Field(description="(Experimental) The policy for terminating the run"),
+    ]
+    max_duration: Annotated[
+        Optional[Union[int, str]],
+        Field(
+            description="The maximum duration of a run (e.g., 2h, 1d, etc). After it elapses, the run is forced to stop"
+        ),
+    ]
     default: bool = False
     _validate_max_duration = validator("max_duration", pre=True, allow_reuse=True)(
         parse_max_duration
