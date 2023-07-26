@@ -89,9 +89,10 @@ async def stop_runs(project_name: str, body: RunsStop):
     for run_head in run_heads:
         for job_head in run_head.job_heads:
             await run_async(
-                backend.terminate_job,
+                backend.stop_job,
                 body.repo_id,
                 job_head.job_id,
+                False,
                 body.abort,
             )
 

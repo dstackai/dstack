@@ -177,7 +177,8 @@ def stop_job(
         job.status = new_status
         update_job(storage, job)
         if new_status.is_finished():
-            runners.stop_runner(compute, runner)
+            if runner is not None:
+                runners.stop_runner(compute, runner)
 
 
 def update_job_submission(job: Job):

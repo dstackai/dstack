@@ -28,6 +28,8 @@ declare type TRunStatus =
     | 'uploading'
     | 'stopping'
     | 'stopped'
+    | 'terminating'
+    | 'terminated'
     | 'aborting'
     | 'aborted'
     | 'failed'
