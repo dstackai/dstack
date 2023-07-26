@@ -28,7 +28,9 @@ async def get_backend(project: Project) -> Optional[Backend]:
     except BackendAuthError:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
-            detail=error_detail("Backend credentials are invalid", code=BackendAuthError.code),
+            detail=error_detail(
+                f"Backend credentials for {project.name} are invalid", code=BackendAuthError.code
+            ),
         )
 
 

@@ -11,15 +11,39 @@ from dstack._internal.core.plan import JobPlan, RunPlan
 from dstack._internal.core.repo import RepoRef
 from dstack._internal.core.run import RunHead
 from dstack._internal.hub.db.models import User
-from dstack._internal.hub.models import RunsDelete, RunsGetPlan, RunsList, RunsStop
+from dstack._internal.hub.models import RunInfo, RunsDelete, RunsGetPlan, RunsList, RunsStop
+from dstack._internal.hub.repository.projects import ProjectManager
 from dstack._internal.hub.routers.util import error_detail, get_backend, get_project
 from dstack._internal.hub.security.permissions import Authenticated, ProjectMember
 from dstack._internal.hub.utils.common import run_async
 
-router = APIRouter(prefix="/api/project", tags=["runs"], dependencies=[Depends(ProjectMember())])
+root_router = APIRouter(prefix="/api/runs", tags=["runs"], dependencies=[Depends(Authenticated())])
+project_router = APIRouter(
+    prefix="/api/project", tags=["runs"], dependencies=[Depends(ProjectMember())]
+)
 
 
-@router.post("/{project_name}/runs/get_plan")
+@root_router.post("/list")
+async def list_all_runs() -> List[RunInfo]:
+    projects = await ProjectManager.list()
+    run_infos = []
+    for project in projects:
+        backend = await get_backend(project)
+        repo_heads = await run_async(backend.list_repo_heads)
+        for repo_head in repo_heads:
+            run_heads = await run_async(
+                backend.list_run_heads,
+                repo_head.repo_id,
+                None,
+                False,
+                JobStatus.PENDING,
+            )
+            for run_head in run_heads:
+                run_infos.append(RunInfo(project=project.name, repo=repo_head, run_head=run_head))
+    return run_infos
+
+
+@project_router.post("/{project_name}/runs/get_plan")
 async def get_run_plan(
     project_name: str, body: RunsGetPlan, user: User = Depends(Authenticated())
 ) -> RunPlan:
@@ -48,7 +72,7 @@ async def get_run_plan(
     return run_plan
 
 
-@router.post(
+@project_router.post(
     "/{project_name}/runs/create",
     response_model=str,
     response_class=PlainTextResponse,
@@ -60,7 +84,7 @@ async def create_run(project_name: str, repo_ref: RepoRef) -> str:
     return run_name
 
 
-@router.post(
+@project_router.post(
     "/{project_name}/runs/list",
 )
 async def list_runs(project_name: str, body: RunsList) -> List[RunHead]:
@@ -76,7 +100,7 @@ async def list_runs(project_name: str, body: RunsList) -> List[RunHead]:
     return run_heads
 
 
-@router.post(
+@project_router.post(
     "/{project_name}/runs/stop",
 )
 async def stop_runs(project_name: str, body: RunsStop):
@@ -97,7 +121,7 @@ async def stop_runs(project_name: str, body: RunsStop):
             )
 
 
-@router.post(
+@project_router.post(
     "/{project_name}/runs/delete",
 )
 async def delete_runs(project_name: str, body: RunsDelete):

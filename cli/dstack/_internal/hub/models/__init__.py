@@ -6,6 +6,8 @@ from typing_extensions import Literal
 
 from dstack._internal.core.job import Job
 from dstack._internal.core.repo import RemoteRepoCredentials, RepoSpec
+from dstack._internal.core.repo.head import RepoHead
+from dstack._internal.core.run import RunHead
 from dstack._internal.core.secret import Secret
 from dstack._internal.hub.security.utils import GlobalRole, ProjectRole
 
@@ -299,6 +301,12 @@ class RunsStop(BaseModel):
 class RunsDelete(BaseModel):
     repo_id: str
     run_names: List[str]
+
+
+class RunInfo(BaseModel):
+    project: str
+    repo: RepoHead
+    run_head: RunHead
 
 
 class JobHeadList(BaseModel):
