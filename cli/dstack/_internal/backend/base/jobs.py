@@ -2,6 +2,7 @@ from typing import List, Optional, Tuple
 
 import yaml
 
+import dstack._internal.backend.base.gateway as gateway
 from dstack._internal.backend.base import runners
 from dstack._internal.backend.base.compute import Compute, NoCapacityError
 from dstack._internal.backend.base.storage import Storage
@@ -112,7 +113,7 @@ def run_job(
     try:
         if job.configuration_type == ConfigurationType.SERVICE:
             private_bytes, public_bytes = generate_rsa_key_pair_bytes(comment=job.run_name)
-            # todo push public key to the gateway
+            gateway.ssh_copy_id(job.gateway.hostname, public_bytes)
             job.gateway.ssh_key = private_bytes.decode()
             update_job(storage, job)
         _try_run_job(
