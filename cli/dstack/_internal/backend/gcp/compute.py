@@ -539,7 +539,7 @@ def _launch_instance(
         disk_size_gb=100,
         boot=True,
         source_image=f"projects/dstack/global/images/{image_name}",
-        auto_delete=False,
+        auto_delete=True,
     )
     instance = _create_instance(
         instances_client=instances_client,
