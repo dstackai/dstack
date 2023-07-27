@@ -57,7 +57,9 @@ class InitCommand(BasicCommand):
             try:
                 repo_credentials = get_local_repo_credentials(
                     repo_data=repo.repo_data,
-                    identity_file=os.path.expanduser(args.git_identity_file),
+                    identity_file=os.path.expanduser(args.git_identity_file)
+                    if args.git_identity_file
+                    else None,
                     oauth_token=args.gh_token,
                     original_hostname=giturlparse.parse(repo.repo_url).resource,
                 )
