@@ -89,6 +89,10 @@ class Backend(ABC):
         pass
 
     @abstractmethod
+    def delete_run_jobs(self, repo_id: str, run_name: str):
+        pass
+
+    @abstractmethod
     def list_run_heads(
         self,
         repo_id: str,
@@ -262,8 +266,8 @@ class ComponentBasedBackend(Backend):
     def predict_instance_type(self, job: Job) -> Optional[InstanceType]:
         return base_jobs.predict_job_instance(self.compute(), job)
 
-    def create_run(self, repo_id: str) -> str:
-        return base_runs.create_run(self.storage())
+    def create_run(self, repo_id: str, run_name: Optional[str]) -> str:
+        return base_runs.create_run(self.storage(), run_name)
 
     def create_job(self, job: Job):
         base_jobs.create_job(self.storage(), job)
@@ -292,6 +296,9 @@ class ComponentBasedBackend(Backend):
 
     def delete_job_head(self, repo_id: str, job_id: str):
         base_jobs.delete_job_head(self.storage(), repo_id, job_id)
+
+    def delete_run_jobs(self, repo_id: str, run_name: str):
+        base_jobs.delete_jobs(self.storage(), repo_id, run_name)
 
     def list_run_heads(
         self,

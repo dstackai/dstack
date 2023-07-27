@@ -28,6 +28,7 @@ psutil
 cryptography
 filelock
 watchfiles
+docker
 
 # AWS
 boto3

@@ -1,14 +1,14 @@
 import itertools
-from datetime import timedelta
+from datetime import datetime, timedelta, timezone
 from typing import List
 
 from fastapi import APIRouter, Depends
 
+from dstack._internal.core.job import Job
 from dstack._internal.core.log_event import LogEvent
 from dstack._internal.hub.models import PollLogs
-from dstack._internal.hub.routers.util import get_backend, get_project
+from dstack._internal.hub.routers.util import call_backend, get_backend, get_project
 from dstack._internal.hub.security.permissions import ProjectMember
-from dstack._internal.hub.utils.common import run_async
 from dstack._internal.utils.common import get_current_datetime
 
 router = APIRouter(prefix="/api/project", tags=["logs"], dependencies=[Depends(ProjectMember())])
@@ -20,10 +20,19 @@ router = APIRouter(prefix="/api/project", tags=["logs"], dependencies=[Depends(P
 async def poll_logs(project_name: str, body: PollLogs) -> List[LogEvent]:
     project = await get_project(project_name=project_name)
     backend = await get_backend(project)
+    jobs = await call_backend(backend.list_jobs, body.repo_id, body.run_name)
+    if len(jobs) == 0:
+        return None
+
     start_time = body.start_time
     if start_time is None:
         start_time = get_current_datetime() - timedelta(days=30)
-    logs_generator = await run_async(
+    # logs older than job_start_time may contain logs for overridden runs
+    job: Job = jobs[0]
+    job_start_time = datetime.fromtimestamp(job.created_at / 1000, timezone.utc)
+    start_time = max(job_start_time, start_time)
+
+    logs_generator = await call_backend(
         backend.poll_logs,
         body.repo_id,
         body.run_name,

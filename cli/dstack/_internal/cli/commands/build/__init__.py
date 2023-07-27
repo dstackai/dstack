@@ -39,13 +39,13 @@ class BuildCommand(BasicCommand):
             type=str,
             dest="file_name",
         )
-        add_project_argument(self._parser)
         self._parser.add_argument(
             "-y",
             "--yes",
             help="Do not ask for plan confirmation",
             action="store_true",
         )
+        add_project_argument(self._parser)
         self._parser.add_argument(
             "--profile",
             metavar="PROFILE",

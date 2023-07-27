@@ -1,4 +1,5 @@
-from typing import List
+import re
+from typing import List, Optional
 
 import yaml
 
@@ -7,29 +8,20 @@ from dstack._internal.backend.base.compute import Compute
 from dstack._internal.backend.base.storage import Storage
 from dstack._internal.core.app import AppHead
 from dstack._internal.core.artifact import ArtifactHead
+from dstack._internal.core.error import BackendValueError
 from dstack._internal.core.job import JobErrorCode, JobHead, JobStatus
 from dstack._internal.core.run import RequestStatus, RunHead, generate_remote_run_name_prefix
 
 
-def create_run(
-    storage: Storage,
-) -> str:
-    name = generate_remote_run_name_prefix()
-    run_name_index = _next_run_name_index(storage, name)
-    run_name = f"{name}-{run_name_index}"
-    return run_name
-
-
-def _next_run_name_index(storage: Storage, run_name: str) -> int:
-    count = 0
-    key = f"run_names/{run_name}.yaml"
+def create_run(storage: Storage, run_name: Optional[str]) -> str:
+    if run_name is None:
+        return _generate_random_run_name(storage)
+    _validate_run_name(run_name)
+    key = _get_run_name_filename(run_name)
     obj = storage.get_object(key)
     if obj is None:
         storage.put_object(key=key, content=yaml.dump({"count": 1}))
-        return 1
-    count = yaml.load(obj, yaml.FullLoader)["count"]
-    storage.put_object(key=key, content=yaml.dump({"count": count + 1}))
-    return count + 1
+    return run_name
 
 
 def get_run_heads(
@@ -53,6 +45,33 @@ def get_run_heads(
             )
     run_heads = list(sorted(runs_by_id.values(), key=lambda r: r.submitted_at, reverse=True))
     return run_heads
+
+
+def _generate_random_run_name(storage: Storage):
+    name = generate_remote_run_name_prefix()
+    run_name_index = _next_run_name_index(storage, name)
+    return f"{name}-{run_name_index}"
+
+
+def _next_run_name_index(storage: Storage, run_name: str) -> int:
+    count = 0
+    key = _get_run_name_filename(run_name)
+    obj = storage.get_object(key)
+    if obj is None:
+        storage.put_object(key=key, content=yaml.dump({"count": 1}))
+        return 1
+    count = yaml.load(obj, yaml.FullLoader)["count"]
+    storage.put_object(key=key, content=yaml.dump({"count": count + 1}))
+    return count + 1
+
+
+def _validate_run_name(run_name: str):
+    if re.match(r"^[a-zA-Z0-9_-]{5,100}$", run_name) is None:
+        raise BackendValueError(
+            "Invalid run name. "
+            "Run name may include alphanumeric characters, dashes, and underscores, "
+            "and its length should be between 5 and 100 characters."
+        )
 
 
 def _create_run(
@@ -183,3 +202,7 @@ def _update_run(
                     jobs.update_job(storage, job)
         run.status = job_head.status
     run.job_heads.append(job_head)
+
+
+def _get_run_name_filename(run_name: str) -> str:
+    return f"run_names/{run_name}.yaml"

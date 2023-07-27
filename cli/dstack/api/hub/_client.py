@@ -67,8 +67,8 @@ class HubClient:
     def _get_project_info(self) -> ProjectInfo:
         return self._api_client.get_project_info()
 
-    def create_run(self) -> str:
-        return self._api_client.create_run()
+    def create_run(self, run_name: Optional[str]) -> str:
+        return self._api_client.create_run(run_name)
 
     def create_job(self, job: Job):
         self._api_client.create_job(job=job)
@@ -112,7 +112,7 @@ class HubClient:
                 job_heads.append(job_head)
             else:
                 if run_name:
-                    sys.exit("The run is not finished yet. Stop the run first.")
+                    raise HubClientError("The run is not finished yet. Stop the run first.")
         for job_head in job_heads:
             self.delete_job_head(job_head.job_id)
 
@@ -127,6 +127,9 @@ class HubClient:
             run_name=run_name,
             include_request_heads=include_request_heads,
         )
+
+    def delete_run(self, run_name: str):
+        self._api_client.delete_runs([run_name])
 
     def poll_logs(
         self,
@@ -275,9 +278,10 @@ class HubClient:
         self,
         configurator: "configurators.JobConfigurator",
         ssh_key_pub: str,
+        run_name: Optional[str] = None,
         run_args: Optional[List[str]] = None,
     ) -> Tuple[str, List[Job]]:
-        run_name = self.create_run()
+        run_name = self.create_run(run_name)
         configurator = copy.deepcopy(configurator)
         configurator.inject_context(
             {"run": {"name": run_name, "args": configurator.join_run_args(run_args)}}

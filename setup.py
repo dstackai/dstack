@@ -59,6 +59,7 @@ BASE_DEPS = [
     "grpcio>=1.50",  # indirect
     "filelock",
     "watchfiles",
+    "docker>=6.0.0",
 ]
 
 AWS_DEPS = [

@@ -8,18 +8,24 @@ This command runs a given configuration.
 
 ```shell
 $ dstack run --help
-Usage: dstack run [--project PROJECT] [--profile PROFILE] [-d] [--reload] WORKING_DIR [ARGS ...]
+Usage: dstack run [-h] [-f FILE] [-n NAME] [-y] [-d] [--project PROJECT] [--profile PROFILE]
+                  [--reload]
+                  WORKING_DIR [ARGS ...]
 
 Positional Arguments:
-  WORKING_DIR          The working directory of the run
-  ARGS                 Run arguments
+  WORKING_DIR           The working directory of the run
+  ARGS                  Run arguments
 
 Options:
-  --f FILE             The path to the run configuration file. Defaults to WORKING_DIR/.dstack.yml.
-  --project PROJECT    The name of the project
-  --profile PROFILE    The name of the profile
-  -d, --detach         Do not poll logs and run status
-  --reload             Enable auto-reload
+  -h, --help            Show this help message and exit
+  -f, --file FILE       The path to the run configuration file. Defaults to
+                        WORKING_DIR/.dstack.yml.
+  -n, --name NAME       The name of the run. If not specified, a random name is assigned.
+  -y, --yes             Do not ask for plan confirmation
+  -d, --detach          Do not poll logs and run status
+  --reload              Enable auto-reload
+  --project PROJECT     The name of the project
+  --profile PROFILE     The name of the profile
 ```
 
 </div>
@@ -35,11 +41,12 @@ The following arguments are required:
 The following arguments are optional:
 
 - `-f FILE`, `--f FILE` – (Optional) The path to the run configuration file. Defaults to `WORKING_DIR/.dstack.yml`.
+- `-n NAME`, `--name NAME` - (Optional) The name of the run. If not specified, a random name is assigned.
+- `-y`, `--yes` - (Optional) Do not ask for plan confirmation
+- `-d`, `--detach` – (Optional) Run in the detached mode to disable logs and run status polling. By default, the run is in the attached mode, so the logs are printed in real-time.
+- `--reload` – (Optional) Enable auto-reload 
 - `--project PROJECT` – (Optional) The name of the project
 - `--profile PROJECT` – (Optional) The name of the profile
-- `--reload` – (Optional) Enable auto-reload 
-- `-d`, `--detach` – (Optional) Run in the detached mode. Means, the command doesn't
-  poll logs and run status.
 
 [//]: # (- `-t TAG`, `--tag TAG` – &#40;Optional&#41; A tag name. Warning, if the tag exists, it will be overridden.)
 - `-p PORT [PORT ...]`, `--ports PORT [PORT ...]` – (Optional) Requests ports or define mappings for them (`LOCAL_PORT:CONTAINER_PORT`)
@@ -69,4 +76,4 @@ Build policies:
 [//]: # (Tags should be dropped)
 
 !!! info "NOTE:"
-    By default, it runs it in the attached mode, so you'll see the output in real-time.
+    By default, the run is in the attached mode, so you'll see the output in real-time.
