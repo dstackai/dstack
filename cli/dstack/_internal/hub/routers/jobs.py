@@ -5,9 +5,8 @@ from fastapi import APIRouter, Depends
 from dstack._internal.core.job import Job, JobHead
 from dstack._internal.hub.db.models import User
 from dstack._internal.hub.models import JobHeadList, JobsGet, JobsList
-from dstack._internal.hub.routers.util import get_backend, get_project
+from dstack._internal.hub.routers.util import call_backend, get_backend, get_project
 from dstack._internal.hub.security.permissions import Authenticated, ProjectMember
-from dstack._internal.hub.utils.common import run_async
 
 router = APIRouter(prefix="/api/project", tags=["jobs"], dependencies=[Depends(ProjectMember())])
 
@@ -17,7 +16,7 @@ async def create_job(project_name: str, job: Job, user: User = Depends(Authentic
     project = await get_project(project_name=project_name)
     backend = await get_backend(project)
     job.hub_user_name = user.name
-    await run_async(backend.create_job, job)
+    await call_backend(backend.create_job, job)
     return job
 
 
@@ -25,7 +24,7 @@ async def create_job(project_name: str, job: Job, user: User = Depends(Authentic
 async def get_job(project_name: str, body: JobsGet) -> Job:
     project = await get_project(project_name=project_name)
     backend = await get_backend(project)
-    job = await run_async(backend.get_job, body.repo_id, body.job_id)
+    job = await call_backend(backend.get_job, body.repo_id, body.job_id)
     return job
 
 
@@ -33,7 +32,7 @@ async def get_job(project_name: str, body: JobsGet) -> Job:
 async def list_job(project_name: str, body: JobsList) -> List[Job]:
     project = await get_project(project_name=project_name)
     backend = await get_backend(project)
-    jobs = await run_async(backend.list_jobs, body.repo_id, body.run_name)
+    jobs = await call_backend(backend.list_jobs, body.repo_id, body.run_name)
     return jobs
 
 
@@ -41,7 +40,7 @@ async def list_job(project_name: str, body: JobsList) -> List[Job]:
 async def list_job_heads(project_name: str, body: JobHeadList) -> List[JobHead]:
     project = await get_project(project_name=project_name)
     backend = await get_backend(project)
-    job_heads = await run_async(backend.list_job_heads, body.repo_id, body.run_name)
+    job_heads = await call_backend(backend.list_job_heads, body.repo_id, body.run_name)
     return job_heads
 
 
@@ -49,4 +48,4 @@ async def list_job_heads(project_name: str, body: JobHeadList) -> List[JobHead]:
 async def delete_job(project_name: str, body: JobsGet):
     project = await get_project(project_name=project_name)
     backend = await get_backend(project)
-    await run_async(backend.delete_job_head, body.repo_id, body.job_id)
+    await call_backend(backend.delete_job_head, body.repo_id, body.job_id)

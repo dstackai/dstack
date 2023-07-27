@@ -46,7 +46,7 @@ def get_local_repo_credentials(
 
     if identity_file is not None:  # must fail if key is invalid
         try:  # user provided ssh key
-            return test_remote_repo_credentials(
+            return check_remote_repo_credentials(
                 repo_data, RepoProtocol.SSH, identity_file=identity_file
             )
         except GitCommandError:
@@ -54,7 +54,7 @@ def get_local_repo_credentials(
 
     if oauth_token is not None:
         try:  # user provided oauth token
-            return test_remote_repo_credentials(
+            return check_remote_repo_credentials(
                 repo_data, RepoProtocol.HTTPS, oauth_token=oauth_token
             )
         except GitCommandError:
@@ -63,7 +63,7 @@ def get_local_repo_credentials(
     identities = get_host_config(original_hostname or repo_data.repo_host_name).get("identityfile")
     if identities:  # must fail if key is invalid
         try:  # key from ssh config
-            return test_remote_repo_credentials(
+            return check_remote_repo_credentials(
                 repo_data, RepoProtocol.SSH, identity_file=identities[0]
             )
         except GitCommandError:
@@ -75,7 +75,7 @@ def get_local_repo_credentials(
         oauth_token = gh_hosts.get(repo_data.repo_host_name, {}).get("oauth_token")
         if oauth_token is not None:
             try:  # token from gh config
-                return test_remote_repo_credentials(
+                return check_remote_repo_credentials(
                     repo_data, RepoProtocol.HTTPS, oauth_token=oauth_token
                 )
             except GitCommandError:
@@ -83,14 +83,14 @@ def get_local_repo_credentials(
 
     if os.path.exists(default_ssh_key):
         try:  # default user key
-            return test_remote_repo_credentials(
+            return check_remote_repo_credentials(
                 repo_data, RepoProtocol.SSH, identity_file=default_ssh_key
             )
         except GitCommandError:
             pass
 
 
-def test_remote_repo_credentials(
+def check_remote_repo_credentials(
     repo_data: RemoteRepoData,
     protocol: RepoProtocol,
     *,

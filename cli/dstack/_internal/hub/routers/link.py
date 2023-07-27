@@ -4,9 +4,8 @@ from fastapi.security.http import HTTPAuthorizationCredentials, HTTPBearer
 
 from dstack._internal.backend.local import LocalBackend
 from dstack._internal.hub.models import StorageLink
-from dstack._internal.hub.routers.util import get_backend, get_project
+from dstack._internal.hub.routers.util import call_backend, get_backend, get_project
 from dstack._internal.hub.security.permissions import ProjectMember
-from dstack._internal.hub.utils.common import run_async
 
 router = APIRouter(prefix="/api/project", tags=["link"], dependencies=[Depends(ProjectMember())])
 
@@ -31,7 +30,7 @@ async def link_upload(
                 token=token.credentials,
             )
         )
-    url = await run_async(backend.get_signed_upload_url, body.object_key)
+    url = await call_backend(backend.get_signed_upload_url, body.object_key)
     return url
 
 
@@ -56,5 +55,5 @@ async def link_download(
                 token=token.credentials,
             )
         )
-    url = await run_async(backend.get_signed_download_url, body.object_key)
+    url = await call_backend(backend.get_signed_download_url, body.object_key)
     return url

@@ -4,9 +4,8 @@ from fastapi import APIRouter, Depends, HTTPException, status
 
 from dstack._internal.core.repo import RemoteRepoCredentials, RepoHead, RepoRef
 from dstack._internal.hub.models import RepoHeadGet, ReposDelete, ReposUpdate, SaveRepoCredentials
-from dstack._internal.hub.routers.util import error_detail, get_backend, get_project
+from dstack._internal.hub.routers.util import call_backend, error_detail, get_backend, get_project
 from dstack._internal.hub.security.permissions import ProjectMember
-from dstack._internal.hub.utils.common import run_async
 
 router = APIRouter(prefix="/api/project", tags=["repos"], dependencies=[Depends(ProjectMember())])
 
@@ -15,7 +14,7 @@ router = APIRouter(prefix="/api/project", tags=["repos"], dependencies=[Depends(
 async def list_repo_heads(project_name: str) -> List[RepoHead]:
     project = await get_project(project_name=project_name)
     backend = await get_backend(project)
-    repo_heads = await run_async(backend.list_repo_heads)
+    repo_heads = await call_backend(backend.list_repo_heads)
     return repo_heads
 
 
@@ -23,7 +22,7 @@ async def list_repo_heads(project_name: str) -> List[RepoHead]:
 async def get_repo_head(project_name: str, body: RepoHeadGet) -> RepoHead:
     project = await get_project(project_name=project_name)
     backend = await get_backend(project)
-    repo_heads = await run_async(backend.list_repo_heads)
+    repo_heads = await call_backend(backend.list_repo_heads)
     for repo_head in repo_heads:
         if repo_head.repo_id == body.repo_id:
             return repo_head
@@ -37,7 +36,7 @@ async def get_repo_head(project_name: str, body: RepoHeadGet) -> RepoHead:
 async def save_repo_credentials(project_name: str, body: SaveRepoCredentials):
     project = await get_project(project_name=project_name)
     backend = await get_backend(project)
-    await run_async(backend.save_repo_credentials, body.repo_id, body.repo_credentials)
+    await call_backend(backend.save_repo_credentials, body.repo_id, body.repo_credentials)
 
 
 @router.post(
@@ -46,7 +45,7 @@ async def save_repo_credentials(project_name: str, body: SaveRepoCredentials):
 async def get_repo_credentials(project_name: str, repo_ref: RepoRef) -> RemoteRepoCredentials:
     project = await get_project(project_name=project_name)
     backend = await get_backend(project)
-    repo_credentials = await run_async(backend.get_repo_credentials, repo_ref.repo_id)
+    repo_credentials = await call_backend(backend.get_repo_credentials, repo_ref.repo_id)
     if repo_credentials is None:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
@@ -59,7 +58,7 @@ async def get_repo_credentials(project_name: str, repo_ref: RepoRef) -> RemoteRe
 async def update_repo(project_name: str, body: ReposUpdate):
     project = await get_project(project_name=project_name)
     backend = await get_backend(project)
-    await run_async(backend.update_repo_last_run_at, body.repo_spec, body.last_run_at)
+    await call_backend(backend.update_repo_last_run_at, body.repo_spec, body.last_run_at)
 
 
 @router.post("/{project_name}/repos/delete")
@@ -67,4 +66,4 @@ async def delete_repos(project_name: str, body: ReposDelete):
     project = await get_project(project_name=project_name)
     backend = await get_backend(project)
     for repo_id in body.repo_ids:
-        await run_async(backend.delete_repo, repo_id)
+        await call_backend(backend.delete_repo, repo_id)

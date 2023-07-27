@@ -19,6 +19,7 @@ from dstack._internal.cli.utils.run import (
 from dstack._internal.cli.utils.watcher import Watcher
 from dstack._internal.configurators.ports import PortUsedError
 from dstack._internal.core.error import RepoNotInitializedError
+from dstack.api.hub import HubClient
 
 
 class RunCommand(BasicCommand):
@@ -26,7 +27,7 @@ class RunCommand(BasicCommand):
     DESCRIPTION = "Run a configuration"
 
     def __init__(self, parser):
-        super().__init__(parser, store_help=True)
+        super().__init__(parser, store_help=False)
 
     def register(self):
         self._parser.add_argument(
@@ -44,6 +45,11 @@ class RunCommand(BasicCommand):
             dest="file_name",
         )
         self._parser.add_argument(
+            "-n",
+            "--name",
+            help="The name of the run. If not specified, a random name is assigned.",
+        )
+        self._parser.add_argument(
             "-y",
             "--yes",
             help="Do not ask for plan confirmation",
@@ -54,6 +60,11 @@ class RunCommand(BasicCommand):
             "--detach",
             help="Do not poll logs and run status",
             action="store_true",
+        )
+        self._parser.add_argument(
+            "--reload",
+            action="store_true",
+            help="Enable auto-reload",
         )
         add_project_argument(self._parser)
         self._parser.add_argument(
@@ -68,11 +79,6 @@ class RunCommand(BasicCommand):
             metavar="ARGS",
             nargs=argparse.ZERO_OR_MORE,
             help="Run arguments",
-        )
-        self._parser.add_argument(
-            "--reload",
-            action="store_true",
-            help="Enable auto-reload",
         )
 
     @check_init
@@ -98,6 +104,9 @@ class RunCommand(BasicCommand):
                 and not hub_client.get_repo_credentials()
             ):
                 raise RepoNotInitializedError("No credentials", project_name=project_name)
+
+            if args.name:
+                _check_run_name(hub_client, args.name)
 
             if not config.repo_user_config.ssh_key_path:
                 ssh_key_pub = None
@@ -126,6 +135,7 @@ class RunCommand(BasicCommand):
             run_name, jobs = hub_client.run_configuration(
                 configurator=configurator,
                 ssh_key_pub=ssh_key_pub,
+                run_name=args.name,
                 run_args=run_args,
             )
             runs = list_runs_hub(hub_client, run_name=run_name)
@@ -145,3 +155,12 @@ class RunCommand(BasicCommand):
             if watcher.is_alive():
                 watcher.stop()
                 watcher.join()
+
+
+def _check_run_name(hub_client: HubClient, run_name: str):
+    runs = list_runs_hub(hub_client, run_name=run_name)
+    if len(runs) == 0:
+        return
+    if not Confirm.ask(f"[red]Run {run_name} already exist. Override?[/]"):
+        exit(0)
+    hub_client.delete_run(run_name)

@@ -32,7 +32,6 @@ class LsCommand(BasicCommand):
             nargs="?",
             default="",
         )
-
         self._parser.add_argument(
             "-r", "--recursive", help="Show all files recursively", action="store_true"
         )

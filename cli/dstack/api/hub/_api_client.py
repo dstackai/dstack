@@ -27,6 +27,8 @@ from dstack._internal.hub.models import (
     PollLogs,
     ProjectInfo,
     ReposUpdate,
+    RunsCreate,
+    RunsDelete,
     RunsGetPlan,
     RunsList,
     SaveRepoCredentials,
@@ -91,7 +93,7 @@ class HubAPIClient:
                 raise HubClientError(body["detail"]["msg"])
         resp.raise_for_status()
 
-    def create_run(self) -> str:
+    def create_run(self, run_name: str) -> str:
         url = _project_url(
             url=self.url,
             project=self.project,
@@ -102,7 +104,7 @@ class HubAPIClient:
             host=self.url,
             url=url,
             headers=self._headers(),
-            data=self.repo.repo_ref.json(),
+            data=RunsCreate(repo_ref=self.repo.repo_ref, run_name=run_name).json(),
         )
         if resp.ok:
             return resp.text
@@ -375,6 +377,26 @@ class HubAPIClient:
         if resp.ok:
             body = resp.json()
             return [RunHead.parse_obj(run) for run in body]
+        resp.raise_for_status()
+
+    def delete_runs(self, run_names: List[str]):
+        url = _project_url(
+            url=self.url,
+            project=self.project,
+            additional_path=f"/runs/delete",
+        )
+        resp = _make_hub_request(
+            requests.post,
+            host=self.url,
+            url=url,
+            headers=self._headers(),
+            data=RunsDelete(
+                repo_id=self.repo.repo_id,
+                run_names=run_names,
+            ).json(),
+        )
+        if resp.ok:
+            return
         resp.raise_for_status()
 
     def update_repo_last_run_at(self, last_run_at: int):

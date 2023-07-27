@@ -96,6 +96,13 @@ def delete_job_head(storage: Storage, repo_id: str, job_id: str):
         storage.delete_object(job_head_key)
 
 
+def delete_jobs(storage: Storage, repo_id: str, run_name: str):
+    job_key_run_prefix = _get_jobs_filenames_prefix(repo_id, run_name)
+    jobs_keys = storage.list_objects(job_key_run_prefix)
+    for job_key in jobs_keys:
+        storage.delete_object(job_key)
+
+
 def predict_job_instance(
     compute: Compute,
     job: Job,
@@ -176,9 +183,9 @@ def stop_job(
     if new_status is not None and new_status != job.status:
         job.status = new_status
         update_job(storage, job)
-        if new_status.is_finished():
+        if new_status in [JobStatus.TERMINATED, JobStatus.ABORTED]:
             if runner is not None:
-                runners.stop_runner(compute, runner)
+                runners.terminate_runner(compute, runner)
 
 
 def update_job_submission(job: Job):

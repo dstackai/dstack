@@ -34,6 +34,7 @@ class LocalCompute(Compute):
 
     def terminate_instance(self, runner: Runner):
         runners.stop_process(runner.request_id)
+        runners.remove_container(runner.job.run_name)
 
     def cancel_spot_request(self, runner: Runner):
-        runners.stop_process(runner.request_id)
+        pass

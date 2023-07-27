@@ -42,7 +42,6 @@ def main():
     subparsers = parser.add_subparsers(metavar="COMMAND")
 
     cli_initialize(parser=subparsers)
-
     if len(sys.argv) < 2:
         parser.print_help()
         exit(0)

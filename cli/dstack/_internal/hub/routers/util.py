@@ -3,12 +3,17 @@ from typing import Dict, Optional
 from fastapi import HTTPException, status
 
 from dstack._internal.backend.base import Backend
-from dstack._internal.core.error import BackendAuthError, BackendNotAvailableError
+from dstack._internal.core.error import (
+    BackendAuthError,
+    BackendNotAvailableError,
+    BackendValueError,
+)
 from dstack._internal.hub.models import Project
 from dstack._internal.hub.repository.projects import ProjectManager
 from dstack._internal.hub.services.backends import cache as backends_cache
 from dstack._internal.hub.services.backends import get_configurator
 from dstack._internal.hub.services.backends.base import Configurator
+from dstack._internal.hub.utils.common import run_async
 
 
 async def get_project(project_name: str) -> Project:
@@ -57,3 +62,13 @@ def error_detail(msg: str, code: Optional[str] = None, **kwargs) -> Dict:
         "code": code,
         **kwargs,
     }
+
+
+async def call_backend(func, *args):
+    try:
+        return await run_async(func, *args)
+    except BackendValueError as e:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=error_detail(e.message, code=e.code),
+        )
