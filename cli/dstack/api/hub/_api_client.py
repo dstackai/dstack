@@ -718,6 +718,8 @@ def _make_hub_request(request_func, host, *args, **kwargs) -> requests.Response:
             body = resp.json()
             detail = body.get("detail")
             if detail is not None:
+                if isinstance(detail, list):
+                    detail = detail[0]
                 if detail.get("code") == BackendNotAvailableError.code:
                     raise HubClientError(detail["msg"])
                 elif detail.get("code") == BackendValueError.code:

@@ -84,9 +84,6 @@ class RunCommand(BasicCommand):
     @check_init
     def _command(self, args: Namespace):
         configurator = load_configuration(args.working_dir, args.file_name, args.profile_name)
-        if args.help:
-            configurator.get_parser(parser=copy.deepcopy(self._parser)).print_help()
-            exit(0)
 
         project_name = None
         if args.project:

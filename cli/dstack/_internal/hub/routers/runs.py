@@ -173,5 +173,5 @@ async def _get_run_head(backend: Backend, repo_id: str, run_name: str) -> RunHea
         return run_head
     raise HTTPException(
         status_code=status.HTTP_400_BAD_REQUEST,
-        detail=[error_detail(f"Run {run_name} not found", code="run_not_found")],
+        detail=[error_detail(f"Run {run_name} not found", code=BackendValueError.code)],
     )

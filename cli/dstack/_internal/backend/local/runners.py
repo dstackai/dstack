@@ -11,6 +11,7 @@ import docker.errors
 import psutil
 import requests
 import yaml
+from docker.models.containers import Container
 from psutil import NoSuchProcess
 from tqdm import tqdm
 
@@ -217,10 +218,15 @@ def is_running(request_id: str) -> bool:
         return False
 
 
-def remove_container(container_name: str):
+def get_container(container_name: str) -> Optional[Container]:
     client = docker.from_env()
     try:
-        container = client.containers.get(container_name)
+        return client.containers.get(container_name)
     except docker.errors.NotFound:
-        return
-    container.remove()
+        return None
+
+
+def remove_container(container_name: str):
+    container = get_container(container_name)
+    if container is not None:
+        container.remove()

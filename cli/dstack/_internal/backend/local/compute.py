@@ -3,6 +3,7 @@ from typing import Optional
 from dstack._internal.backend.base.compute import Compute, choose_instance_type
 from dstack._internal.backend.local import runners
 from dstack._internal.backend.local.config import LocalConfig
+from dstack._internal.core.error import BackendValueError
 from dstack._internal.core.instance import InstanceType, LaunchedInstanceInfo
 from dstack._internal.core.job import Job
 from dstack._internal.core.request import RequestHead
@@ -29,6 +30,8 @@ class LocalCompute(Compute):
         return LaunchedInstanceInfo(request_id=pid, location=None)
 
     def restart_instance(self, job: Job):
+        if runners.get_container(job.run_name) is None:
+            raise BackendValueError("Container not found")
         pid = runners.start_runner_process(self.backend_config, job.runner_id)
         return LaunchedInstanceInfo(request_id=pid, location=None)
 
