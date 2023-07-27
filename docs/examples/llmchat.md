@@ -29,7 +29,7 @@ profiles:
 
 </div>
 
-## Run a Gradio app
+## Running a Gradio app
 
 Here's the configuration that runs the Gradio app:
 
@@ -72,7 +72,7 @@ machine for secure and convenient access.
 !!! info "NOTE:"
     To use a non-default profile, simply specify its name with `--profile NAME` when using `dstack run`.
 
-## Run a Discord bot
+## Running a Discord bot
 
 Here's the configuration that runs the Gradio app:
 

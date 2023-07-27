@@ -38,7 +38,7 @@ profiles:
 
 </div>
 
-## Run an endpoint
+## Running an endpoint
 
 Here's the configuration that runs an LLM as an OpenAI-compatible endpoint:
 
@@ -69,7 +69,7 @@ Here's how you run it with `dstack`:
 <div class="termy">
 
 ```shell
-$ dstack run . -f vllm/serve.dstack.yml
+$ dstack run . -f vllm/serve.dstack.yml --port 8000:8000
 ```
 
 </div>
@@ -82,14 +82,14 @@ Now, you can query the endpoint in the same format as OpenAI API:
 <div class="termy">
 
 ```shell
-$ curl http://localhost:8000/v1/completions \
-      -H "Content-Type: application/json" \
-      -d '{
+$ curl -X POST --location http://127.0.0.1:8000/v1/completions \
+    -H "Content-Type: application/json" \
+    -d '{
           "model": "facebook/opt-125m",
           "prompt": "San Francisco is a",
           "max_tokens": 7,
           "temperature": 0
-      }'
+        }'
 ```
 
 </div>
