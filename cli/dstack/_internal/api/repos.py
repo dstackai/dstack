@@ -1,4 +1,5 @@
 import os
+from pathlib import Path
 from typing import Optional
 
 import git
@@ -50,7 +51,10 @@ def get_local_repo_credentials(
                 repo_data, RepoProtocol.SSH, identity_file=identity_file
             )
         except GitCommandError:
-            pass
+            url = repo_data.make_url(RepoProtocol.SSH)
+            raise InvalidRepoCredentialsError(
+                f"Can't access `{url}` using the `{identity_file}` private SSH key"
+            )
 
     if oauth_token is not None:
         try:  # user provided oauth token
@@ -58,7 +62,9 @@ def get_local_repo_credentials(
                 repo_data, RepoProtocol.HTTPS, oauth_token=oauth_token
             )
         except GitCommandError:
-            pass
+            url = repo_data.make_url(RepoProtocol.SSH, oauth_token)
+            masked = len(oauth_token[:-4]) * "*" + oauth_token[-4:]
+            raise InvalidRepoCredentialsError(f"Can't access `{url}` using the `{masked}` token")
 
     identities = get_host_config(original_hostname or repo_data.repo_host_name).get("identityfile")
     if identities:  # must fail if key is invalid
@@ -67,7 +73,10 @@ def get_local_repo_credentials(
                 repo_data, RepoProtocol.SSH, identity_file=identities[0]
             )
         except GitCommandError:
-            pass
+            url = repo_data.make_url(RepoProtocol.SSH, oauth_token)
+            raise InvalidRepoCredentialsError(
+                f"Can't access `{url}` using the `{identities[0]}` SSH private key"
+            )
 
     if os.path.exists(gh_config_path):
         with open(gh_config_path, "r") as f:
@@ -89,6 +98,10 @@ def get_local_repo_credentials(
         except GitCommandError:
             pass
 
+    raise InvalidRepoCredentialsError(
+        "No valid default Git credentials found: ensure passing a valid `--token` or `--git-identity` to `dstack init`."
+    )
+
 
 def test_remote_repo_credentials(
     repo_data: RemoteRepoData,
@@ -102,9 +115,13 @@ def test_remote_repo_credentials(
         git.cmd.Git().ls_remote(url, env=dict(GIT_TERMINAL_PROMPT="0"))
         return RemoteRepoCredentials(protocol=protocol, oauth_token=oauth_token, private_key=None)
     elif protocol == RepoProtocol.SSH:
+        if not Path(identity_file).exists():
+            raise InvalidRepoCredentialsError(f"The {identity_file} private SSH key doesn't exist")
+        if not os.access(identity_file, os.R_OK):
+            raise InvalidRepoCredentialsError(f"Can't access the {identity_file} private SSH key")
         if not try_ssh_key_passphrase(identity_file):
             raise InvalidRepoCredentialsError(
-                f"Repo SSH key must be passphrase-less: {identity_file}"
+                f"Can't access `{url}`: the {identity_file} private SSH key must passphrase-less"
             )
         with open(identity_file, "r") as f:
             private_key = f.read()
