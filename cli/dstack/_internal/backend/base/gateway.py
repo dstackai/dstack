@@ -1,9 +1,27 @@
 import subprocess
+import time
 from typing import List, Optional
 
+from dstack._internal.backend.base.compute import Compute
+from dstack._internal.backend.base.head import list_head_objects, put_head_object
+from dstack._internal.backend.base.storage import Storage
 from dstack._internal.core.error import DstackError
+from dstack._internal.core.gateway import GatewayHead
 from dstack._internal.hub.utils.ssh import HUB_PRIVATE_KEY_PATH
 from dstack._internal.utils.common import PathLike
+from dstack._internal.utils.random_names import generate_name
+
+
+def create_gateway(compute: Compute, storage: Storage, ssh_key_pub: str) -> GatewayHead:
+    # todo generate while instance name is not unique
+    instance_name = f"dstack-gateway-{generate_name()}"
+    head = compute.create_gateway(instance_name, ssh_key_pub)
+    put_head_object(storage, head)
+    return head
+
+
+def list_gateways(storage: Storage) -> List[GatewayHead]:
+    return list_head_objects(storage, GatewayHead)
 
 
 def ssh_copy_id(

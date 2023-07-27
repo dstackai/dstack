@@ -11,6 +11,7 @@ import dstack._internal.configurators as configurators
 from dstack._internal.api.repos import get_local_repo_credentials
 from dstack._internal.backend.base import artifacts as base_artifacts
 from dstack._internal.core.artifact import Artifact
+from dstack._internal.core.gateway import GatewayHead
 from dstack._internal.core.job import Job, JobHead, JobStatus
 from dstack._internal.core.log_event import LogEvent
 from dstack._internal.core.plan import RunPlan
@@ -301,3 +302,9 @@ class HubClient:
             f.seek(0)
             self._storage.upload_file(f.name, repo_code_filename, lambda _: ...)
         return repo_code_filename
+
+    def create_gateway(self) -> GatewayHead:
+        return self._api_client.create_gateway()
+
+    def list_gateways(self) -> List[GatewayHead]:
+        return self._api_client.list_gateways()

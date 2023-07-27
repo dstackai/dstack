@@ -3,10 +3,12 @@ from typing import Dict, Generator, List, Optional
 from urllib.parse import urlencode, urlparse, urlunparse
 
 import requests
+from pydantic import parse_obj_as
 
 from dstack._internal.core.artifact import Artifact
 from dstack._internal.core.build import BuildNotFoundError
 from dstack._internal.core.error import BackendNotAvailableError, NoMatchingInstanceError
+from dstack._internal.core.gateway import GatewayHead
 from dstack._internal.core.job import Job, JobHead
 from dstack._internal.core.log_event import LogEvent
 from dstack._internal.core.plan import RunPlan
@@ -645,6 +647,30 @@ class HubAPIClient:
         if resp.ok:
             return
         resp.raise_for_status()
+
+    def create_gateway(self) -> GatewayHead:
+        url = _project_url(url=self.url, project=self.project, additional_path="/gateways/create")
+        resp = _make_hub_request(
+            requests.post,
+            host=self.url,
+            url=url,
+            headers=self._headers(),
+        )
+        if not resp.ok:
+            resp.raise_for_status()
+        return GatewayHead.parse_obj(resp.json())
+
+    def list_gateways(self) -> List[GatewayHead]:
+        url = _project_url(url=self.url, project=self.project, additional_path="/gateways")
+        resp = _make_hub_request(
+            requests.get,
+            host=self.url,
+            url=url,
+            headers=self._headers(),
+        )
+        if not resp.ok:
+            resp.raise_for_status()
+        return parse_obj_as(List[GatewayHead], resp.json())
 
 
 def _project_url(url: str, project: str, additional_path: str, query: Optional[dict] = None):

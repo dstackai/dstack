@@ -17,6 +17,7 @@ from dstack._internal.hub.routers import (
     artifacts,
     backends,
     configurations,
+    gateways,
     jobs,
     link,
     logs,
@@ -53,6 +54,7 @@ app.include_router(tags.router)
 app.include_router(repos.router)
 app.include_router(link.router)
 app.include_router(configurations.router)
+app.include_router(gateways.router)
 
 
 DEFAULT_PROJECT_NAME = "local"
