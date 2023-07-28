@@ -1,3 +1,4 @@
+import json
 from datetime import datetime
 from typing import Dict, Generator, List, Optional
 from urllib.parse import urlencode, urlparse, urlunparse
@@ -695,9 +696,13 @@ class HubAPIClient:
             url=url,
             headers=self._headers(),
         )
-        if not resp.ok:
-            resp.raise_for_status()
-        return GatewayHead.parse_obj(resp.json())
+        if resp.ok:
+            return GatewayHead.parse_obj(resp.json())
+        if resp.status_code == 400:
+            body = resp.json()
+            if body["detail"]["code"] == "not_implemented":
+                raise HubClientError(body["detail"]["msg"])
+        resp.raise_for_status()
 
     def list_gateways(self) -> List[GatewayHead]:
         url = _project_url(url=self.url, project=self.project, additional_path="/gateways")
@@ -710,6 +715,17 @@ class HubAPIClient:
         if not resp.ok:
             resp.raise_for_status()
         return parse_obj_as(List[GatewayHead], resp.json())
+
+    def delete_gateway(self, instance_name: str):
+        url = _project_url(url=self.url, project=self.project, additional_path="/gateways/delete")
+        resp = _make_hub_request(
+            requests.post,
+            host=self.url,
+            url=url,
+            headers=self._headers(),
+            data=json.dumps(instance_name),
+        )
+        resp.raise_for_status()
 
 
 def _project_url(url: str, project: str, additional_path: str, query: Optional[dict] = None):

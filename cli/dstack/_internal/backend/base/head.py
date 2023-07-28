@@ -13,3 +13,7 @@ def put_head_object(storage: Storage, head: BaseHead) -> str:
 def list_head_objects(storage: Storage, cls: Type[T]) -> List[T]:
     keys = storage.list_objects(cls.prefix())
     return [cls.decode(key) for key in keys]
+
+
+def delete_head_object(storage, head: BaseHead):
+    storage.delete_object(head.encode())

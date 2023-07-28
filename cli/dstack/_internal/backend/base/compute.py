@@ -54,6 +54,10 @@ class Compute(ABC):
         # todo make abstract & implement for each backend
         raise NotImplementedError()
 
+    def delete_instance(self, instance_name: str):
+        # todo make abstract & implement for each backend
+        raise NotImplementedError()
+
 
 def choose_instance_type(
     instance_types: List[InstanceType],

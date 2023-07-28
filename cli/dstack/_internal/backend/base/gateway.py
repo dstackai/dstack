@@ -3,7 +3,11 @@ import time
 from typing import List, Optional
 
 from dstack._internal.backend.base.compute import Compute
-from dstack._internal.backend.base.head import list_head_objects, put_head_object
+from dstack._internal.backend.base.head import (
+    delete_head_object,
+    list_head_objects,
+    put_head_object,
+)
 from dstack._internal.backend.base.storage import Storage
 from dstack._internal.core.error import DstackError
 from dstack._internal.core.gateway import GatewayHead
@@ -22,6 +26,15 @@ def create_gateway(compute: Compute, storage: Storage, ssh_key_pub: str) -> Gate
 
 def list_gateways(storage: Storage) -> List[GatewayHead]:
     return list_head_objects(storage, GatewayHead)
+
+
+def delete_gateway(compute: Compute, storage: Storage, instance_name: str):
+    heads = list_gateways(storage)
+    for head in heads:
+        if head.instance_name != instance_name:
+            continue
+        compute.delete_instance(instance_name)
+        delete_head_object(storage, head)
 
 
 def ssh_copy_id(

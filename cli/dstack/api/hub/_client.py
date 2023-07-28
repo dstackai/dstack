@@ -316,3 +316,6 @@ class HubClient:
 
     def list_gateways(self) -> List[GatewayHead]:
         return self._api_client.list_gateways()
+
+    def delete_gateway(self, instance_name: str):
+        self._api_client.delete_gateway(instance_name)

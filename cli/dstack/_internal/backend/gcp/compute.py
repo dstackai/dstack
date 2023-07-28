@@ -181,6 +181,13 @@ class GCPCompute(Compute):
             internal_ip=instance.network_interfaces[0].network_i_p,
         )
 
+    def delete_instance(self, instance_name: str):
+        _terminate_instance(
+            client=self.instances_client,
+            gcp_config=self.gcp_config,
+            instance_name=instance_name,
+        )
+
 
 def _get_instance_status(
     instances_client: compute_v1.InstancesClient,
