@@ -45,11 +45,14 @@ class Backend(ABC):
         pass
 
     @abstractmethod
-    def create_run(self, repo_id: str) -> str:
+    def create_run(self, repo_id: str, run_name: Optional[str]) -> str:
         pass
 
     @abstractmethod
-    def create_job(self, job: Job):
+    def create_job(
+        self,
+        job: Job,
+    ):
         pass
 
     def submit_job(self, job: Job, failed_to_start_job_new_status: JobStatus = JobStatus.FAILED):

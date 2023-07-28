@@ -14,6 +14,7 @@ import dstack.version as version
 from dstack._internal.core.build import BuildPolicy
 from dstack._internal.core.configuration import BaseConfiguration, PythonVersion
 from dstack._internal.core.error import DstackError
+from dstack._internal.core.plan import RunPlan
 from dstack._internal.core.profile import Profile, parse_duration, parse_max_duration
 from dstack._internal.core.repo import Repo
 from dstack._internal.utils.common import get_milliseconds_since_epoch
@@ -121,7 +122,12 @@ class JobConfigurator(ABC):
         self.conf = type(self.conf).parse_obj(conf)
 
     def get_jobs(
-        self, repo: Repo, run_name: str, repo_code_filename: str, ssh_key_pub: str
+        self,
+        repo: Repo,
+        run_name: str,
+        repo_code_filename: str,
+        ssh_key_pub: str,
+        run_plan: Optional[RunPlan] = None,
     ) -> List[job.Job]:
         self.run_name = run_name
         self.ssh_key_pub = ssh_key_pub
@@ -138,7 +144,7 @@ class JobConfigurator(ABC):
             status=job.JobStatus.SUBMITTED,
             created_at=created_at,
             submitted_at=created_at,
-            image_name=self.image_name(),
+            image_name=self.image_name(run_plan),
             registry_auth=self.registry_auth(),
             entrypoint=self.entrypoint(),
             build_commands=self.build_commands(),
@@ -201,11 +207,12 @@ class JobConfigurator(ABC):
     def home_dir(self) -> Optional[str]:
         return self.conf.home_dir
 
-    def image_name(self) -> str:
+    def image_name(self, run_plan: Optional[RunPlan]) -> Optional[str]:
         if self.conf.image is not None:
             return self.conf.image
-        if self.profile.resources and self.profile.resources.gpu:
-            return f"dstackai/base:py{self.python()}-{version.base_image}-cuda-11.8"
+        if run_plan is not None:
+            if len(run_plan.job_plans[0].instance_type.resources.gpus) > 0:
+                return f"dstackai/base:py{self.python()}-{version.base_image}-cuda-11.8"
         return f"dstackai/base:py{self.python()}-{version.base_image}"
 
     def cache_specs(self) -> List[job.CacheSpec]:
