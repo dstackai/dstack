@@ -9,6 +9,7 @@ from dstack._internal.backend.base.storage import Storage
 from dstack._internal.core.error import BackendError, BackendValueError, NoMatchingInstanceError
 from dstack._internal.core.instance import InstanceType
 from dstack._internal.core.job import (
+    ConfigurationType,
     Job,
     JobErrorCode,
     JobHead,
