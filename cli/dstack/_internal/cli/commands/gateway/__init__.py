@@ -40,7 +40,7 @@ class GatewayCommand(BasicCommand):
         )
         add_project_argument(delete_gateway_parser)
         delete_gateway_parser.add_argument(
-            "-y", "--yes", action="store_true", help="Confirm deletion"
+            "-y", "--yes", action="store_true", help="Don't ask for confirmation"
         )
         delete_gateway_parser.add_argument(
             "instance_name", metavar="NAME", type=str, help="The name of the gateway"
