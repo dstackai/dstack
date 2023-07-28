@@ -1,7 +1,7 @@
 from typing import List, Optional
 
 import dstack._internal.core.job as job
-from dstack._internal.configurators import JobConfigurator
+from dstack._internal.configurators import JobConfiguratorWithPorts
 from dstack._internal.configurators.extensions import IDEExtension
 from dstack._internal.configurators.extensions.ssh import SSHd
 from dstack._internal.configurators.extensions.vscode import VSCodeDesktop
@@ -15,7 +15,7 @@ DEFAULT_MAX_DURATION_SECONDS = 6 * 3600
 install_ipykernel = f'(pip install -q --no-cache-dir ipykernel 2> /dev/null) || echo "no pip, ipykernel was not installed"'
 
 
-class DevEnvironmentConfigurator(JobConfigurator):
+class DevEnvironmentConfigurator(JobConfiguratorWithPorts):
     conf: DevEnvironmentConfiguration
     sshd: Optional[SSHd]
     ide: Optional[IDEExtension]
@@ -71,7 +71,7 @@ class DevEnvironmentConfigurator(JobConfigurator):
         commands += ["cat"]  # idle
         return commands
 
-    def default_max_duration(self) -> int:
+    def default_max_duration(self) -> Optional[int]:
         return DEFAULT_MAX_DURATION_SECONDS
 
     def termination_policy(self) -> job.TerminationPolicy:

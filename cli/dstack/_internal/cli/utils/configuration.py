@@ -7,9 +7,11 @@ import yaml
 from dstack._internal.cli.profiles import load_profiles
 from dstack._internal.configurators import JobConfigurator
 from dstack._internal.configurators.dev_environment import DevEnvironmentConfigurator
+from dstack._internal.configurators.service import ServiceConfigurator
 from dstack._internal.configurators.task import TaskConfigurator
 from dstack._internal.core.configuration import (
     DevEnvironmentConfiguration,
+    ServiceConfiguration,
     TaskConfiguration,
     parse,
 )
@@ -39,6 +41,9 @@ def load_configuration(
         )
     elif isinstance(configuration, TaskConfiguration):
         return TaskConfigurator(working_dir, str(configuration_path), configuration, profile)
+    elif isinstance(configuration, ServiceConfiguration):
+        return ServiceConfigurator(working_dir, str(configuration_path), configuration, profile)
+
     exit(f"Unsupported configuration {type(configuration)}")
 
 

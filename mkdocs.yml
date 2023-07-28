@@ -166,6 +166,7 @@ nav:
               - dstack secrets: docs/reference/cli/secrets.md
               - dstack prune: docs/reference/cli/prune.md
               - dstack build: docs/reference/cli/build.md
+              - dstack gateway: docs/reference/cli/gateway.md
           - API:
               - Python: docs/reference/api/python.md
           - Backends:

@@ -192,7 +192,7 @@ func (gbackend *GCPBackend) Secrets(ctx context.Context) (map[string]string, err
 	secrets := make(map[string]string, 0)
 	for _, secretFilename := range secretFilenames {
 		secretName := strings.ReplaceAll(secretFilename, prefix, "")
-		secretValue, err := gbackend.secretManager.FetchSecret(ctx, gbackend.state.Job.RepoId, secretName)
+		secretValue, err := gbackend.secretManager.FetchSecret(ctx, gbackend.state.Job.RepoRef.RepoId, secretName)
 		if err != nil {
 			if errors.Is(err, ErrSecretNotFound) {
 				continue
@@ -206,7 +206,7 @@ func (gbackend *GCPBackend) Secrets(ctx context.Context) (map[string]string, err
 
 func (gbackend *GCPBackend) GitCredentials(ctx context.Context) *models.GitCredentials {
 	log.Trace(ctx, "Getting credentials")
-	creds, err := gbackend.secretManager.FetchCredentials(ctx, gbackend.state.Job.RepoId)
+	creds, err := gbackend.secretManager.FetchCredentials(ctx, gbackend.state.Job.RepoRef.RepoId)
 	if err != nil {
 		return nil
 	}

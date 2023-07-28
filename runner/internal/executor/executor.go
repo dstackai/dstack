@@ -6,6 +6,8 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"github.com/docker/go-connections/nat"
+	"github.com/dstackai/dstack/runner/internal/gateway"
 	"io"
 	"os"
 	"path"
@@ -102,12 +104,12 @@ func (ex *Executor) Init(ctx context.Context, configDir string) error {
 	}
 
 	for _, artifact := range job.Artifacts {
-		artOut := ex.backend.GetArtifact(ctx, job.RunName, artifact.Path, path.Join("artifacts", job.RepoId, job.JobID, artifact.Path), artifact.Mount)
+		artOut := ex.backend.GetArtifact(ctx, job.RunName, artifact.Path, path.Join("artifacts", job.RepoRef.RepoId, job.JobID, artifact.Path), artifact.Mount)
 		if artOut != nil {
 			ex.artifactsOut = append(ex.artifactsOut, artOut)
 		}
 		if artifact.Mount {
-			art := ex.backend.GetArtifact(ctx, job.RunName, artifact.Path, path.Join("artifacts", job.RepoId, job.JobID, artifact.Path), artifact.Mount)
+			art := ex.backend.GetArtifact(ctx, job.RunName, artifact.Path, path.Join("artifacts", job.RepoRef.RepoId, job.JobID, artifact.Path), artifact.Mount)
 			if art != nil {
 				ex.artifactsFUSE = append(ex.artifactsFUSE, art)
 			}
@@ -259,8 +261,8 @@ func (ex *Executor) runJob(ctx context.Context, erCh chan error, stoppedCh chan 
 		}
 	}()
 
-	logger := ex.backend.CreateLogger(ctx, fmt.Sprintf("/dstack/jobs/%s/%s", ex.backend.Bucket(ctx), job.RepoId), job.RunName)
-	logGroup := fmt.Sprintf("/jobs/%s", job.RepoId)
+	logger := ex.backend.CreateLogger(ctx, fmt.Sprintf("/dstack/jobs/%s/%s", ex.backend.Bucket(ctx), job.RepoRef.RepoId), job.RunName)
+	logGroup := fmt.Sprintf("/jobs/%s", job.RepoRef.RepoId)
 	fileLog, err := createLocalLog(filepath.Join(ex.configDir, "logs", logGroup), job.RunName)
 	if err != nil {
 		erCh <- gerrors.Wrap(err)
@@ -286,7 +288,7 @@ func (ex *Executor) startJob(ctx context.Context, erCh chan error, stoppedCh cha
 	}
 
 	var err error
-	switch job.RepoType {
+	switch job.RepoData.RepoType {
 	case "remote":
 		log.Trace(ctx, "Fetching git repository")
 		if err = ex.prepareGit(ctx); err != nil {
@@ -300,7 +302,7 @@ func (ex *Executor) startJob(ctx context.Context, erCh chan error, stoppedCh cha
 			return
 		}
 	default:
-		log.Error(ctx, "Unknown RepoType", "RepoType", job.RepoType)
+		log.Error(ctx, "Unknown RepoType", "RepoType", job.RepoData.RepoType)
 	}
 
 	if job.BuildPolicy != models.BuildOnly {
@@ -379,6 +381,27 @@ func (ex *Executor) startJob(ctx context.Context, erCh chan error, stoppedCh cha
 		erCh <- gerrors.Wrap(err)
 		return
 	}
+
+	var gatewayControl *gateway.SSHControl
+	if job.ConfigurationType == "service" {
+		binding, ok := spec.BindingPorts[nat.Port(fmt.Sprintf("%d/tcp", job.Gateway.ServicePort))]
+		if !ok {
+			erCh <- gerrors.Newf("gateway: job doesn't expose port %d", job.Gateway.ServicePort)
+			return
+		}
+		localPort := binding[0].HostPort
+		gatewayControl, err = gateway.NewSSHControl(job.Gateway.Hostname, job.Gateway.SSHKey)
+		if err != nil {
+			erCh <- gerrors.Wrap(err)
+			return
+		}
+		defer gatewayControl.Cleanup()
+		if err := gatewayControl.Publish(localPort, strconv.Itoa(job.Gateway.PublicPort)); err != nil {
+			erCh <- gerrors.Wrap(err)
+			return
+		}
+	}
+
 	container, err := ex.engine.CreateNamed(ctx, spec, job.RunName, allLogs)
 	if err != nil {
 		erCh <- gerrors.Wrap(err)
@@ -425,7 +448,7 @@ func (ex *Executor) prepareGit(ctx context.Context) error {
 		}
 
 	}
-	ex.repo = repo.NewManager(ctx, fmt.Sprintf(consts.REPO_HTTPS_URL, job.RepoHostNameWithPort(), job.RepoUserName, job.RepoName), job.RepoBranch, job.RepoHash).WithLocalPath(dir)
+	ex.repo = repo.NewManager(ctx, fmt.Sprintf(consts.REPO_HTTPS_URL, job.RepoHostNameWithPort(), job.RepoData.RepoUserName, job.RepoData.RepoName), job.RepoData.RepoBranch, job.RepoData.RepoHash).WithLocalPath(dir)
 	cred := ex.backend.GitCredentials(ctx)
 	if cred != nil {
 		log.Trace(ctx, "Credentials is not empty")
@@ -447,7 +470,7 @@ func (ex *Executor) prepareGit(ctx context.Context) error {
 			if cred.Passphrase != nil {
 				password = *cred.Passphrase
 			}
-			ex.repo = repo.NewManager(ctx, fmt.Sprintf(consts.REPO_GIT_URL, job.RepoHostNameWithPort(), job.RepoUserName, job.RepoName), job.RepoBranch, job.RepoHash).WithLocalPath(dir)
+			ex.repo = repo.NewManager(ctx, fmt.Sprintf(consts.REPO_GIT_URL, job.RepoHostNameWithPort(), job.RepoData.RepoUserName, job.RepoData.RepoName), job.RepoData.RepoBranch, job.RepoData.RepoHash).WithLocalPath(dir)
 			ex.repo.WithSSHAuth(*cred.PrivateKey, password)
 		default:
 			log.Error(ctx, "Unsupported protocol", "protocol", cred.Protocol)
@@ -458,7 +481,7 @@ func (ex *Executor) prepareGit(ctx context.Context) error {
 		log.Trace(ctx, "GIT checkout error", "err", err, "GIT URL", ex.repo.URL())
 		return gerrors.Wrap(err)
 	}
-	if err := ex.repo.SetConfig(job.RepoConfigName, job.RepoConfigEmail); err != nil {
+	if err := ex.repo.SetConfig(job.RepoData.RepoConfigName, job.RepoData.RepoConfigEmail); err != nil {
 		return gerrors.Wrap(err)
 	}
 
@@ -505,7 +528,7 @@ func (ex *Executor) processDeps(ctx context.Context) error {
 				return gerrors.Wrap(err)
 			}
 			for _, artifact := range jobDep.Artifacts {
-				artIn := ex.backend.GetArtifact(ctx, jobDep.RunName, artifact.Path, path.Join("artifacts", jobDep.RepoId, jobDep.JobID, artifact.Path), artifact.Mount)
+				artIn := ex.backend.GetArtifact(ctx, jobDep.RunName, artifact.Path, path.Join("artifacts", jobDep.RepoRef.RepoId, jobDep.JobID, artifact.Path), artifact.Mount)
 				if artIn != nil {
 					ex.artifactsIn = append(ex.artifactsIn, artIn)
 				}
@@ -518,7 +541,7 @@ func (ex *Executor) processDeps(ctx context.Context) error {
 func (ex *Executor) processCache(ctx context.Context) error {
 	job := ex.backend.Job(ctx)
 	for _, cache := range job.Cache {
-		cacheArt := ex.backend.GetCache(ctx, job.RunName, cache.Path, path.Join("cache", job.RepoId, job.HubUserName, models.EscapeHead(job.ConfigurationPath), cache.Path))
+		cacheArt := ex.backend.GetCache(ctx, job.RunName, cache.Path, path.Join("cache", job.RepoRef.RepoId, job.HubUserName, models.EscapeHead(job.ConfigurationPath), cache.Path))
 		if cacheArt != nil {
 			ex.cacheArtifacts = append(ex.cacheArtifacts, cacheArt)
 		}
@@ -564,7 +587,7 @@ func (ex *Executor) newSpec(ctx context.Context, credPath string) (*docker.Spec,
 		}
 		bindings = append(bindings, art...)
 	}
-	if job.RepoType == "remote" && job.HomeDir != "" {
+	if job.RepoData.RepoType == "remote" && job.HomeDir != "" {
 		cred := ex.backend.GitCredentials(ctx)
 		if cred != nil {
 			log.Trace(ctx, "Trying to mount git credentials")
@@ -580,7 +603,7 @@ func (ex *Executor) newSpec(ctx context.Context, credPath string) (*docker.Spec,
 			case "https":
 				if cred.OAuthToken != nil {
 					credMountPath = path.Join(job.HomeDir, ".config/gh/hosts.yml")
-					ghHost := fmt.Sprintf("%s:\n  oauth_token: \"%s\"\n", job.RepoHostName, *cred.OAuthToken)
+					ghHost := fmt.Sprintf("%s:\n  oauth_token: \"%s\"\n", job.RepoData.RepoHostName, *cred.OAuthToken)
 					if err := os.WriteFile(credPath, []byte(ghHost), 0644); err != nil {
 						log.Error(ctx, "Failed writing credentials", "err", err)
 					}
@@ -652,7 +675,7 @@ func (ex *Executor) environment(ctx context.Context, includeRun bool) []string {
 	if includeRun {
 		cons := make(map[string]string)
 		cons["PYTHONUNBUFFERED"] = "1"
-		cons["DSTACK_REPO"] = job.RepoId
+		cons["DSTACK_REPO"] = job.RepoRef.RepoId
 		cons["JOB_ID"] = job.JobID
 
 		cons["RUN_NAME"] = job.RunName
@@ -668,7 +691,6 @@ func (ex *Executor) environment(ctx context.Context, includeRun bool) []string {
 			cons["MASTER_JOB_ID"] = master.JobID
 			cons["MASTER_JOB_HOSTNAME"] = master.HostName
 		}
-		env.AddMapString(job.RunEnvironment)
 		env.AddMapString(cons)
 	}
 	secrets, err := ex.backend.Secrets(ctx)
@@ -734,7 +756,7 @@ func (ex *Executor) runContainer(ctx context.Context, container *docker.Containe
 
 func (ex *Executor) build(ctx context.Context, spec *docker.Spec, stoppedCh chan bool, logs io.Writer) error {
 	job := ex.backend.Job(ctx)
-	if len(job.BuildCommands) == 0 && len(job.OptionalBuildCommands) == 0 {
+	if len(job.BuildCommands) == 0 {
 		return nil
 	}
 	secrets, err := ex.backend.Secrets(ctx)

@@ -1,6 +1,7 @@
 from dstack._internal.cli.commands.build import BuildCommand
 from dstack._internal.cli.commands.config import ConfigCommand
 from dstack._internal.cli.commands.cp import CpCommand
+from dstack._internal.cli.commands.gateway import GatewayCommand
 from dstack._internal.cli.commands.init import InitCommand
 from dstack._internal.cli.commands.logs import LogCommand
 from dstack._internal.cli.commands.ls import LsCommand
@@ -15,15 +16,16 @@ from dstack._internal.cli.commands.stop import StopCommand
 from dstack._internal.cli.commands.tags import TAGCommand
 
 commands_classes = [
+    BuildCommand,
     ConfigCommand,
     CpCommand,
+    GatewayCommand,
     InitCommand,
     LogCommand,
     LsCommand,
-    BuildCommand,
-    PruneCommand,
     PSCommand,
     RestartCommand,
+    PruneCommand,
     RMCommand,
     RunCommand,
     SecretCommand,

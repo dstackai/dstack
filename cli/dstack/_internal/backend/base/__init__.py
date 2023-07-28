@@ -2,6 +2,7 @@ from abc import ABC, abstractmethod
 from datetime import datetime
 from typing import Generator, List, Optional
 
+import dstack._internal.backend.base.gateway as gateway
 import dstack._internal.core.build
 from dstack._internal.backend.base import artifacts as base_artifacts
 from dstack._internal.backend.base import build as base_build
@@ -17,6 +18,7 @@ from dstack._internal.backend.base.secrets import SecretsManager
 from dstack._internal.backend.base.storage import Storage
 from dstack._internal.core.artifact import Artifact
 from dstack._internal.core.build import BuildPlan
+from dstack._internal.core.gateway import GatewayHead
 from dstack._internal.core.instance import InstanceType
 from dstack._internal.core.job import Job, JobHead, JobStatus
 from dstack._internal.core.log_event import LogEvent
@@ -248,6 +250,18 @@ class Backend(ABC):
     def predict_build_plan(self, job: Job) -> BuildPlan:
         pass
 
+    @abstractmethod
+    def create_gateway(self, ssh_key_pub: str) -> GatewayHead:
+        pass
+
+    @abstractmethod
+    def list_gateways(self) -> List[GatewayHead]:
+        pass
+
+    @abstractmethod
+    def delete_gateway(self, instance_name: str):
+        pass
+
 
 class ComponentBasedBackend(Backend):
     @abstractmethod
@@ -468,3 +482,12 @@ class ComponentBasedBackend(Backend):
         return base_build.predict_build_plan(
             self.storage(), job, dstack._internal.core.build.DockerPlatform.amd64
         )
+
+    def create_gateway(self, ssh_key_pub: str) -> GatewayHead:
+        return gateway.create_gateway(self.compute(), self.storage(), ssh_key_pub)
+
+    def list_gateways(self) -> List[GatewayHead]:
+        return gateway.list_gateways(self.storage())
+
+    def delete_gateway(self, instance_name: str):
+        gateway.delete_gateway(self.compute(), self.storage(), instance_name)

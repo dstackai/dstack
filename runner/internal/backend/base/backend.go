@@ -66,7 +66,7 @@ func UpdateState(ctx context.Context, storage Storage, job *models.Job) error {
 		return gerrors.Wrap(err)
 	}
 	// should it be a job.HubUserName?
-	log.Trace(ctx, "Fetching list jobs", "Repo username", job.RepoUserName, "Repo name", job.RepoName, "Job ID", job.JobID)
+	log.Trace(ctx, "Fetching list jobs", "Repo username", job.RepoData.RepoUserName, "Repo name", job.RepoData.RepoName, "Job ID", job.JobID)
 	files, err := ListObjects(ctx, storage, job.JobHeadFilepathPrefix())
 	if err != nil {
 		return gerrors.Wrap(err)
@@ -138,7 +138,7 @@ func getBuildDiffPrefix(spec *docker.BuildSpec) string {
 	return fmt.Sprintf(
 		"builds/%s/%s;%s;%s;%s;%s;",
 		spec.RepoId,
-		models.EscapeHead(spec.ConfigurationType),
+		models.EscapeHead(string(spec.ConfigurationType)),
 		models.EscapeHead(spec.ConfigurationPath),
 		models.EscapeHead(spec.WorkDir),
 		models.EscapeHead(spec.BaseImageName),

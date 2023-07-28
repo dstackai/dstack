@@ -1,7 +1,7 @@
 # .dstack.yml
 
-Configurations are YAML files that describe what you want to run with `dstack`. Configurations can be of two
-types: `dev-environment` and `task`.
+Configurations are YAML files that describe what you want to run with `dstack`. Configurations can be of three
+types: `dev-environment`, `task`, and `service`.
 
 !!! info "Filename"
     The configuration file must be named with the suffix `.dstack.yml`. For example,
@@ -12,12 +12,12 @@ types: `dev-environment` and `task`.
 
 Below is a full reference of all available properties.
 
-- `type` - (Required) The type of the configurations. Can be `dev-environment` or `task`.
+- `type` - (Required) The type of the configurations. Can be `dev-environment`, `task`, or `service`.
 - `image` - (Optional) The name of the Docker image.
 - `entrypoint` - (Optional) The Docker entrypoint.
 - `build` - (Optional) The list of bash commands to build the environment.
 - `ide` - (Required if `type` is `dev-environment`). Can be `vscode`.
-- `ports` - (Optional) The list of port numbers to expose.
+- `ports` - (Optional) The list of port numbers to expose (only for `dev-environment` and `task`).
 - `env` - (Optional) The mapping or the list of environment variables (e.g. `PYTHONPATH: src` or `PYTHONPATH=src`).
 - `registry_auth` - (Optional) Credentials to pull the private Docker image.
     - `username` - (Required) Username.
@@ -26,6 +26,9 @@ Below is a full reference of all available properties.
 - `commands` - (Required if `type` is `task`). The list of bash commands to run as a task.
 - `python` - (Optional) The major version of Python to pre-install (e.g., `"3.11"`). Defaults to the current version installed locally. Mutually exclusive with `image`. 
 - `cache` - (Optional) The directories to be cached between runs.
+- `gateway` - (Required if `type` is `service`) Gateway configuration.
+    - `hostname` (Required) The address or the domain pointing to the gateway.
+    - `service_port` (Required) The application port.
 
 [//]: # (- `home_dir` - &#40;Optional&#41; The absolute path to the home directory inside the container)
 

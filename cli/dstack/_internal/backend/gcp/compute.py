@@ -6,6 +6,7 @@ import google.api_core.exceptions
 from google.cloud import compute_v1
 from google.oauth2 import service_account
 
+import dstack._internal.backend.gcp.gateway as gateway
 from dstack import version
 from dstack._internal.backend.base.compute import (
     WS_PORT,
@@ -20,6 +21,7 @@ from dstack._internal.backend.base.runners import serialize_runner_yaml
 from dstack._internal.backend.gcp import utils as gcp_utils
 from dstack._internal.backend.gcp.config import GCPConfig
 from dstack._internal.core.error import BackendValueError
+from dstack._internal.core.gateway import GatewayHead
 from dstack._internal.core.instance import InstanceType, LaunchedInstanceInfo
 from dstack._internal.core.job import Job, Requirements
 from dstack._internal.core.request import RequestHead, RequestStatus
@@ -155,6 +157,35 @@ class GCPCompute(Compute):
             client=self.instances_client,
             gcp_config=self.gcp_config,
             instance_name=runner.request_id,
+        )
+
+    def create_gateway(self, instance_name: str, ssh_key_pub: str) -> GatewayHead:
+        instance = gateway.create_gateway_instance(
+            instances_client=self.instances_client,
+            firewalls_client=self.firewalls_client,
+            project_id=self.gcp_config.project_id,
+            network=_get_network_resource(self.gcp_config.vpc),
+            subnet=_get_subnet_resource(self.gcp_config.region, self.gcp_config.subnet),
+            zone=self.gcp_config.zone,
+            instance_name=instance_name,
+            service_account=self.credentials.service_account_email,
+            labels=dict(
+                role="gateway",
+                owner="dstack",
+            ),
+            ssh_key_pub=ssh_key_pub,
+        )
+        return GatewayHead(
+            instance_name=instance_name,
+            external_ip=instance.network_interfaces[0].access_configs[0].nat_i_p,
+            internal_ip=instance.network_interfaces[0].network_i_p,
+        )
+
+    def delete_instance(self, instance_name: str):
+        _terminate_instance(
+            client=self.instances_client,
+            gcp_config=self.gcp_config,
+            instance_name=instance_name,
         )
 
 
@@ -740,7 +771,7 @@ def _create_firewall_rules(
     network: str = "global/networks/default",
 ):
     """
-    Creates a simple firewall rule allowing for incoming HTTP and HTTPS access from the entire Internet.
+    Creates a simple firewall rule allowing for incoming SSH access from the entire Internet.
 
     Args:
         project_id: project ID or project number of the Cloud project you want to use.
