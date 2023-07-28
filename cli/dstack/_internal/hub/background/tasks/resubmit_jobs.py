@@ -31,7 +31,7 @@ async def _resubmit_projects_jobs(projects: List[Project]):
                 "Credentials for %s project are invalid. Skipping job resubmission.", project.name
             )
             continue
-        if backend is None or get_configurator(backend.name) is None:
+        if backend is None:
             logger.warning(
                 "Missing dependencies for %s. Skipping job resubmission.", project.backend
             )
