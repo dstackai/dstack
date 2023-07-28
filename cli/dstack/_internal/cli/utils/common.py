@@ -68,8 +68,11 @@ _status_colors = {
     JobStatus.UPLOADING: "dark_sea_green4",
     JobStatus.DONE: "grey74",
     JobStatus.FAILED: "red",
-    JobStatus.STOPPED: "grey58",
     JobStatus.STOPPING: "yellow",
+    JobStatus.STOPPED: "yellow",
+    JobStatus.RESTARTING: "yellow",
+    JobStatus.TERMINATING: "grey58",
+    JobStatus.TERMINATED: "grey58",
     JobStatus.ABORTING: "yellow",
     JobStatus.ABORTED: "grey58",
 }

@@ -1,3 +1,4 @@
+import os
 from argparse import Namespace
 from pathlib import Path
 from typing import Optional
@@ -7,9 +8,9 @@ from git.exc import InvalidGitRepositoryError
 
 from dstack._internal.api.repos import InvalidRepoCredentialsError, get_local_repo_credentials
 from dstack._internal.cli.commands import BasicCommand
-from dstack._internal.cli.common import add_project_argument, console
-from dstack._internal.cli.config import config, get_hub_client
 from dstack._internal.cli.errors import CLIError
+from dstack._internal.cli.utils.common import add_project_argument, console
+from dstack._internal.cli.utils.config import config, get_hub_client
 from dstack._internal.core.repo import LocalRepo, RemoteRepo
 from dstack._internal.core.userconfig import RepoUserConfig
 from dstack._internal.utils.crypto import generate_rsa_key_pair
@@ -56,7 +57,9 @@ class InitCommand(BasicCommand):
             try:
                 repo_credentials = get_local_repo_credentials(
                     repo_data=repo.repo_data,
-                    identity_file=args.git_identity_file,
+                    identity_file=os.path.expanduser(args.git_identity_file)
+                    if args.git_identity_file
+                    else None,
                     oauth_token=args.gh_token,
                     original_hostname=giturlparse.parse(repo.repo_url).resource,
                 )

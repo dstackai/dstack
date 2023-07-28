@@ -4,7 +4,6 @@ import (
 	"bytes"
 	"context"
 	"fmt"
-	"github.com/dstackai/dstack/runner/internal/ports"
 	"io"
 	"math/bits"
 	_ "net/http/pprof"
@@ -18,6 +17,8 @@ import (
 	"syscall"
 	"time"
 
+	"github.com/dstackai/dstack/runner/internal/ports"
+
 	"github.com/dstackai/dstack/runner/consts"
 	"github.com/dstackai/dstack/runner/internal/backend"
 	_ "github.com/dstackai/dstack/runner/internal/backend/aws"
@@ -25,7 +26,7 @@ import (
 	_ "github.com/dstackai/dstack/runner/internal/backend/gcp"
 	_ "github.com/dstackai/dstack/runner/internal/backend/lambda"
 	_ "github.com/dstackai/dstack/runner/internal/backend/local"
-	"github.com/dstackai/dstack/runner/internal/container"
+	"github.com/dstackai/dstack/runner/internal/docker"
 	"github.com/dstackai/dstack/runner/internal/executor"
 	"github.com/dstackai/dstack/runner/internal/log"
 	"github.com/dstackai/dstack/runner/internal/models"
@@ -151,14 +152,14 @@ func check(configDir string) error {
 	}
 
 	config.Resources = new(models.Resource)
-	engine := container.NewEngine()
+	engine := docker.NewEngine()
 	if engine == nil {
 		return cli.Exit("Docker is not installed", 1)
 	}
 	config.Resources.CPUs, config.Resources.Memory = engine.CPU(), engine.MemMiB()
 	if engine.DockerRuntime() == consts.NVIDIA_RUNTIME {
 		var logger bytes.Buffer
-		docker, err := engine.Create(ctx, &container.Spec{
+		docker, err := engine.Create(ctx, &docker.Spec{
 			Image:    consts.NVIDIA_CUDA_IMAGE,
 			Commands: strings.Split(consts.NVIDIA_SMI_CMD, " "),
 		}, &logger)

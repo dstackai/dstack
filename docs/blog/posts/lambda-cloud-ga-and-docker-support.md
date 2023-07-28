@@ -64,6 +64,8 @@ commands:
     image with a dev environment and it does not include `openssh-server`, you can install it using the following 
     method:
 
+    <div editor-title=".dstack.yml">
+
     ```yaml
     type: dev-environment
     
@@ -76,6 +78,8 @@ commands:
  
     ide: vscode
     ```
+    
+    </div>
 
 The [documentation](../../docs/index.md) and [examples](https://github.com/dstackai/dstack-examples/blob/main/README.md)
 are updated to reflect the changes in the release.

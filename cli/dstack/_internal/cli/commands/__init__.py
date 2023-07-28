@@ -3,8 +3,8 @@ from argparse import Namespace, _SubParsersAction
 
 from rich_argparse import RichHelpFormatter
 
-from dstack._internal.cli.common import check_cli_errors
-from dstack._internal.cli.updates import check_for_updates
+from dstack._internal.cli.utils.common import check_cli_errors
+from dstack._internal.cli.utils.updates import check_for_updates
 
 
 class BasicCommand(object):

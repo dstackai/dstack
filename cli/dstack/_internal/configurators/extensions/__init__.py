@@ -1,18 +1,16 @@
 from abc import ABC, abstractmethod
-from typing import Callable, List
-
-CommandsExtension = Callable[[List[str]], None]
+from typing import List
 
 
 class IDEExtension(ABC):
     @abstractmethod
-    def install(self, commands: List[str]):
+    def get_install_commands(self) -> List[str]:
         pass
 
     @abstractmethod
-    def install_if_not_found(self, commands: List[str]):
+    def get_install_if_not_found_commands(self) -> List[str]:
         pass
 
     @abstractmethod
-    def print_readme(self, commands: List[str]):
+    def get_print_readme_commands(self) -> List[str]:
         pass

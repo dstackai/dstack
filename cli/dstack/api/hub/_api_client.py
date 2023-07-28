@@ -7,7 +7,11 @@ from pydantic import parse_obj_as
 
 from dstack._internal.core.artifact import Artifact
 from dstack._internal.core.build import BuildNotFoundError
-from dstack._internal.core.error import BackendNotAvailableError, NoMatchingInstanceError
+from dstack._internal.core.error import (
+    BackendNotAvailableError,
+    BackendValueError,
+    NoMatchingInstanceError,
+)
 from dstack._internal.core.gateway import GatewayHead
 from dstack._internal.core.job import Job, JobHead
 from dstack._internal.core.log_event import LogEvent
@@ -17,7 +21,6 @@ from dstack._internal.core.run import RunHead
 from dstack._internal.core.secret import Secret
 from dstack._internal.core.tag import TagHead
 from dstack._internal.hub.models import (
-    AddTagPath,
     AddTagRun,
     ArtifactsList,
     JobHeadList,
@@ -26,6 +29,8 @@ from dstack._internal.hub.models import (
     PollLogs,
     ProjectInfo,
     ReposUpdate,
+    RunsCreate,
+    RunsDelete,
     RunsGetPlan,
     RunsList,
     SaveRepoCredentials,
@@ -90,7 +95,7 @@ class HubAPIClient:
                 raise HubClientError(body["detail"]["msg"])
         resp.raise_for_status()
 
-    def create_run(self) -> str:
+    def create_run(self, run_name: str) -> str:
         url = _project_url(
             url=self.url,
             project=self.project,
@@ -101,7 +106,7 @@ class HubAPIClient:
             host=self.url,
             url=url,
             headers=self._headers(),
-            data=self.repo.repo_ref.json(),
+            data=RunsCreate(repo_ref=self.repo.repo_ref, run_name=run_name).json(),
         )
         if resp.ok:
             return resp.text
@@ -177,7 +182,20 @@ class HubAPIClient:
                 raise HubClientError(body["detail"]["msg"])
         resp.raise_for_status()
 
-    def stop_job(self, job_id: str, abort: bool):
+    def restart_job(self, job: Job):
+        url = _project_url(
+            url=self.url,
+            project=self.project,
+            additional_path=f"/runners/restart",
+        )
+        resp = _make_hub_request(
+            requests.post, host=self.url, url=url, headers=self._headers(), data=job.json()
+        )
+        if resp.ok:
+            return
+        resp.raise_for_status()
+
+    def stop_job(self, job_id: str, terminate: bool, abort: bool):
         url = _project_url(
             url=self.url,
             project=self.project,
@@ -191,6 +209,7 @@ class HubAPIClient:
             data=StopRunners(
                 repo_id=self.repo.repo_id,
                 job_id=job_id,
+                terminate=terminate,
                 abort=abort,
             ).json(),
         )
@@ -360,6 +379,26 @@ class HubAPIClient:
         if resp.ok:
             body = resp.json()
             return [RunHead.parse_obj(run) for run in body]
+        resp.raise_for_status()
+
+    def delete_runs(self, run_names: List[str]):
+        url = _project_url(
+            url=self.url,
+            project=self.project,
+            additional_path=f"/runs/delete",
+        )
+        resp = _make_hub_request(
+            requests.post,
+            host=self.url,
+            url=url,
+            headers=self._headers(),
+            data=RunsDelete(
+                repo_id=self.repo.repo_id,
+                run_names=run_names,
+            ).json(),
+        )
+        if resp.ok:
+            return
         resp.raise_for_status()
 
     def update_repo_last_run_at(self, last_run_at: int):
@@ -705,7 +744,11 @@ def _make_hub_request(request_func, host, *args, **kwargs) -> requests.Response:
             body = resp.json()
             detail = body.get("detail")
             if detail is not None:
+                if isinstance(detail, list):
+                    detail = detail[0]
                 if detail.get("code") == BackendNotAvailableError.code:
+                    raise HubClientError(detail["msg"])
+                elif detail.get("code") == BackendValueError.code:
                     raise HubClientError(detail["msg"])
         return resp
     except requests.ConnectionError:

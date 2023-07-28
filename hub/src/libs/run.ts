@@ -5,7 +5,7 @@ export const getStatusIconType = (status: IRun['status']): StatusIndicatorProps[
         case 'failed':
             return 'error';
         case 'aborted':
-        case 'stopped':
+        case 'terminated':
             return 'stopped';
         case 'done':
             return 'success';
@@ -13,9 +13,12 @@ export const getStatusIconType = (status: IRun['status']): StatusIndicatorProps[
         case 'running':
         case 'uploading':
         case 'downloading':
+        case 'stopping':
+        case 'terminating':
             return 'in-progress';
         case 'submitted':
         case 'pending':
+        case 'stopped':
             return 'pending';
         default:
             return 'stopped';

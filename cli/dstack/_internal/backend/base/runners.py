@@ -16,25 +16,24 @@ def get_runner(storage: Storage, runner_id: str) -> Optional[Runner]:
 
 
 def create_runner(storage: Storage, runner: Runner):
-    metadata = None
-    if runner.job.status == JobStatus.STOPPING:
-        metadata = {"status": "stopping"}
     storage.put_object(
         key=_get_runner_filename(runner.runner_id),
         content=yaml.dump(runner.serialize()),
-        metadata=metadata,
     )
 
 
 def update_runner(storage: Storage, runner: Runner):
-    create_runner(storage, runner)
+    storage.put_object(
+        key=_get_runner_filename(runner.runner_id),
+        content=yaml.dump(runner.serialize()),
+    )
 
 
 def delete_runner(storage: Storage, runner: Runner):
     storage.delete_object(_get_runner_filename(runner.runner_id))
 
 
-def stop_runner(compute: Compute, runner: Runner):
+def terminate_runner(compute: Compute, runner: Runner):
     if runner.request_id:
         if runner.resources.spot:
             compute.cancel_spot_request(runner)

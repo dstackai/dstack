@@ -7,11 +7,15 @@ from pathlib import Path
 from typing import Optional
 
 import cpuinfo
+import docker.errors
 import psutil
 import requests
 import yaml
+from docker.models.containers import Container
 from psutil import NoSuchProcess
 from tqdm import tqdm
+
+import docker
 
 from dstack import version
 from dstack._internal.backend.base.config import BACKEND_CONFIG_FILENAME, RUNNER_CONFIG_FILENAME
@@ -212,3 +216,17 @@ def is_running(request_id: str) -> bool:
         return True
     except NoSuchProcess:
         return False
+
+
+def get_container(container_name: str) -> Optional[Container]:
+    client = docker.from_env()
+    try:
+        return client.containers.get(container_name)
+    except docker.errors.NotFound:
+        return None
+
+
+def remove_container(container_name: str):
+    container = get_container(container_name)
+    if container is not None:
+        container.remove()

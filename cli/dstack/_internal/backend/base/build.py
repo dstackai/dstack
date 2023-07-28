@@ -26,8 +26,6 @@ def predict_build_plan(
             raise BuildNotFoundError("Build not found. Run `dstack build` or add `--build` flag")
         return BuildPlan.yes
 
-    if job.optional_build_commands and job.build_policy == BuildPolicy.BUILD:
-        return BuildPlan.yes
     return BuildPlan.no
 
 

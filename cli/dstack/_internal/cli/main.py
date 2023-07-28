@@ -3,8 +3,8 @@ import sys
 
 from rich_argparse import RichHelpFormatter
 
-from dstack._internal.cli.common import check_cli_errors
 from dstack._internal.cli.handlers import cli_initialize
+from dstack._internal.cli.utils.common import check_cli_errors
 from dstack.version import __version__ as version
 
 
@@ -42,7 +42,6 @@ def main():
     subparsers = parser.add_subparsers(metavar="COMMAND")
 
     cli_initialize(parser=subparsers)
-
     if len(sys.argv) < 2:
         parser.print_help()
         exit(0)

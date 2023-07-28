@@ -9,6 +9,7 @@ from dstack._internal.api.repos import load_repo
 from dstack._internal.cli.errors import CLIError
 from dstack._internal.cli.profiles import load_profiles
 from dstack._internal.core.error import RepoNotInitializedError
+from dstack._internal.core.repo.remote import RepoError
 from dstack._internal.core.userconfig import RepoUserConfig
 from dstack._internal.utils.common import get_dstack_dir
 from dstack.api.hub import HubClient, HubClientConfig
@@ -165,7 +166,10 @@ def get_hub_client(project_name: Optional[str] = None) -> HubClient:
                 f"No default project is configured. Call `dstack start` or `dstack config`."
             )
     repo_config = _read_repo_config_or_error_with_project_name(project_name)
-    repo = load_repo(repo_config)
+    try:
+        repo = load_repo(repo_config)
+    except RepoError as e:
+        raise CLIError(e.message)
     hub_client_config = HubClientConfig(url=project_config.url, token=project_config.token)
     hub_client = HubClient(config=hub_client_config, project=project_config.name, repo=repo)
     return hub_client

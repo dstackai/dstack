@@ -122,7 +122,6 @@ class JobConfigurator(ABC):
     ) -> List[job.Job]:
         self.run_name = run_name
         self.ssh_key_pub = ssh_key_pub
-
         created_at = get_milliseconds_since_epoch()
         configured_job = job.Job(
             app_specs=self.app_specs(),
@@ -142,7 +141,6 @@ class JobConfigurator(ABC):
             image_name=self.image_name(),
             job_id=f"{run_name},,0",
             max_duration=self.max_duration(),
-            optional_build_commands=self.optional_build_commands(),
             registry_auth=self.registry_auth(),
             repo_code_filename=repo_code_filename,
             repo_data=repo.repo_data,
@@ -151,6 +149,7 @@ class JobConfigurator(ABC):
             retry_policy=self.retry_policy(),
             run_name=run_name,
             runner_id=uuid.uuid4().hex,
+            setup=self.setup(),
             spot_policy=self.spot_policy(),
             ssh_key_pub=ssh_key_pub,
             status=job.JobStatus.SUBMITTED,
@@ -160,11 +159,15 @@ class JobConfigurator(ABC):
         return [configured_job]
 
     @abstractmethod
-    def commands(self) -> List[str]:
+    def build_commands(self) -> List[str]:
         pass
 
     @abstractmethod
-    def optional_build_commands(self) -> List[str]:
+    def setup(self) -> List[str]:
+        pass
+
+    @abstractmethod
+    def commands(self) -> List[str]:
         pass
 
     @abstractmethod
@@ -183,8 +186,9 @@ class JobConfigurator(ABC):
     def ports(self) -> Dict[int, ports.PortMapping]:
         pass
 
-    def build_commands(self) -> List[str]:
-        return self.conf.build
+    @abstractmethod
+    def termination_policy(self) -> job.TerminationPolicy:
+        pass
 
     def entrypoint(self) -> Optional[List[str]]:
         if self.conf.entrypoint is not None:

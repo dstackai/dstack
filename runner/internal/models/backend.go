@@ -17,51 +17,52 @@ type Resource struct {
 
 type Job struct {
 	// apply omitempty to every Optional[] in pydantic model
-	AppNames              []string          `yaml:"app_names,omitempty"` // head
-	Apps                  []App             `yaml:"app_specs,omitempty"`
-	ArtifactPaths         []string          `yaml:"artifact_paths,omitempty"` // head
-	Artifacts             []Artifact        `yaml:"artifact_specs,omitempty"`
-	BuildCommands         []string          `yaml:"build_commands,omitempty"`
-	BuildPolicy           BuildPolicy       `yaml:"build_policy"`
-	Cache                 []Cache           `yaml:"cache_specs"`
-	Commands              []string          `yaml:"commands,omitempty"`
-	ConfigurationPath     string            `yaml:"configuration_path,omitempty"` // head
-	ConfigurationType     ConfigurationType `yaml:"configuration_type,omitempty"`
-	ContainerExitCode     string            `yaml:"container_exit_code,omitempty"` // head
-	CreatedAt             uint64            `yaml:"created_at"`
-	Deps                  []Dep             `yaml:"dep_specs,omitempty"`
-	Entrypoint            []string          `yaml:"entrypoint,omitempty"`
-	Environment           map[string]string `yaml:"env,omitempty"`
-	ErrorCode             ErrorCode         `yaml:"error_code,omitempty"` // head
-	Gateway               Gateway           `yaml:"gateway,omitempty"`
-	HomeDir               string            `yaml:"home_dir,omitempty"`
-	HostName              string            `yaml:"host_name,omitempty"`
-	HubUserName           string            `yaml:"hub_user_name"` // head
-	Image                 string            `yaml:"image_name"`
-	InstanceSpotType      string            `yaml:"instance_spot_type,omitempty"` // head
-	InstanceType          string            `yaml:"instance_type,omitempty"`      // head
-	JobID                 string            `yaml:"job_id"`                       // head
-	Location              string            `yaml:"location,omitempty"`
-	MasterJobID           string            `yaml:"master_job,omitempty"`
-	MaxDuration           uint64            `yaml:"max_duration,omitempty"`
-	OptionalBuildCommands []string          `yaml:"optional_build_commands,omitempty"`
-	ProviderName          string            `yaml:"provider_name,omitempty"` // deprecated, head
-	RegistryAuth          RegistryAuth      `yaml:"registry_auth,omitempty"`
-	RepoCodeFilename      string            `yaml:"repo_code_filename,omitempty"`
-	RepoData              RepoData          `yaml:"repo_data"`
-	RepoRef               RepoRef           `yaml:"repo_ref"` // head
-	RequestID             string            `yaml:"request_id,omitempty"`
-	Requirements          Requirements      `yaml:"requirements,omitempty"`
-	RetryPolicy           RetryPolicy       `yaml:"retry_policy,omitempty"`
-	RunName               string            `yaml:"run_name"` // head
-	RunnerID              string            `yaml:"runner_id,omitempty"`
-	SpotPolicy            SpotPolicy        `yaml:"spot_policy,omitempty"`
-	Status                JobStatus         `yaml:"status"` // head
-	SubmissionNum         int               `yaml:"submission_num"`
-	SubmittedAt           uint64            `yaml:"submitted_at"`            // head
-	TagName               string            `yaml:"tag_name,omitempty"`      // head
-	WorkflowName          string            `yaml:"workflow_name,omitempty"` // deprecated, head
-	WorkingDir            string            `yaml:"working_dir,omitempty"`
+	AppNames          []string          `yaml:"app_names,omitempty"` // head
+	Apps              []App             `yaml:"app_specs,omitempty"`
+	ArtifactPaths     []string          `yaml:"artifact_paths,omitempty"` // head
+	Artifacts         []Artifact        `yaml:"artifact_specs,omitempty"`
+	BuildCommands     []string          `yaml:"build_commands,omitempty"`
+	BuildPolicy       BuildPolicy       `yaml:"build_policy"`
+	Cache             []Cache           `yaml:"cache_specs"`
+	Commands          []string          `yaml:"commands,omitempty"`
+	ConfigurationPath string            `yaml:"configuration_path,omitempty"` // head
+	ConfigurationType ConfigurationType `yaml:"configuration_type,omitempty"`
+	ContainerExitCode string            `yaml:"container_exit_code,omitempty"` // head
+	CreatedAt         uint64            `yaml:"created_at"`
+	Deps              []Dep             `yaml:"dep_specs,omitempty"`
+	Entrypoint        []string          `yaml:"entrypoint,omitempty"`
+	Environment       map[string]string `yaml:"env,omitempty"`
+	ErrorCode         ErrorCode         `yaml:"error_code,omitempty"` // head
+	Gateway           Gateway           `yaml:"gateway,omitempty"`
+	HomeDir           string            `yaml:"home_dir,omitempty"`
+	HostName          string            `yaml:"host_name,omitempty"`
+	HubUserName       string            `yaml:"hub_user_name"` // head
+	Image             string            `yaml:"image_name"`
+	InstanceSpotType  string            `yaml:"instance_spot_type,omitempty"` // head
+	InstanceType      string            `yaml:"instance_type,omitempty"`      // head
+	JobID             string            `yaml:"job_id"`                       // head
+	Location          string            `yaml:"location,omitempty"`
+	MasterJobID       string            `yaml:"master_job,omitempty"`
+	MaxDuration       uint64            `yaml:"max_duration,omitempty"`
+	ProviderName      string            `yaml:"provider_name,omitempty"` // deprecated, head
+	RegistryAuth      RegistryAuth      `yaml:"registry_auth,omitempty"`
+	RepoCodeFilename  string            `yaml:"repo_code_filename,omitempty"`
+	RepoData          RepoData          `yaml:"repo_data"`
+	RepoRef           RepoRef           `yaml:"repo_ref"` // head
+	RequestID         string            `yaml:"request_id,omitempty"`
+	Requirements      Requirements      `yaml:"requirements,omitempty"`
+	RetryPolicy       RetryPolicy       `yaml:"retry_policy,omitempty"`
+	RunName           string            `yaml:"run_name"` // head
+	RunnerID          string            `yaml:"runner_id,omitempty"`
+	Setup             []string          `yaml:"setup"`
+	SpotPolicy        SpotPolicy        `yaml:"spot_policy,omitempty"`
+	Status            JobStatus         `yaml:"status"` // head
+	SubmissionNum     int               `yaml:"submission_num"`
+	SubmittedAt       uint64            `yaml:"submitted_at"`       // head
+	TagName           string            `yaml:"tag_name,omitempty"` // head
+	TerminationPolicy string            `yaml:"termination_policy,omitempty"`
+	WorkflowName      string            `yaml:"workflow_name,omitempty"` // deprecated, head
+	WorkingDir        string            `yaml:"working_dir,omitempty"`
 }
 
 type RepoRef struct {
@@ -160,6 +161,7 @@ type RunnerMetadata struct {
 type ConfigurationType string
 type ErrorCode string
 type SpotPolicy string
+type TerminationPolicy string
 type JobStatus string
 type BuildPolicy string
 type RepoType string

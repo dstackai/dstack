@@ -12,9 +12,6 @@ class ServiceConfigurator(JobConfigurator):
     def commands(self) -> List[str]:
         return self.conf.commands
 
-    def optional_build_commands(self) -> List[str]:
-        return []  # not needed
-
     def artifact_specs(self) -> List[job.ArtifactSpec]:
         return []  # not implemented
 
@@ -30,3 +27,12 @@ class ServiceConfigurator(JobConfigurator):
 
     def gateway(self) -> Optional[job.Gateway]:
         return job.Gateway.parse_obj(self.conf.gateway)
+
+    def build_commands(self) -> List[str]:
+        return self.conf.build
+
+    def setup(self) -> List[str]:
+        return self.conf.setup
+
+    def termination_policy(self) -> job.TerminationPolicy:
+        return self.profile.termination_policy or job.TerminationPolicy.TERMINATE

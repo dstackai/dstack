@@ -7,7 +7,7 @@ from rich.prompt import Confirm
 from starlette.responses import HTMLResponse, JSONResponse
 from starlette.staticfiles import StaticFiles
 
-from dstack._internal.cli.config import CLIConfigManager
+from dstack._internal.cli.utils.config import CLIConfigManager
 from dstack._internal.hub.background import start_background_tasks
 from dstack._internal.hub.db.migrate import migrate
 from dstack._internal.hub.db.models import User
@@ -43,7 +43,8 @@ app = FastAPI(docs_url="/api/docs")
 app.include_router(users.router)
 app.include_router(backends.router)
 app.include_router(projects.router)
-app.include_router(runs.router)
+app.include_router(runs.root_router)
+app.include_router(runs.project_router)
 app.include_router(jobs.router)
 app.include_router(runners.router)
 app.include_router(secrets.router)

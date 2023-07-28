@@ -1,8 +1,8 @@
 from argparse import Namespace
 
 from dstack._internal.cli.commands import BasicCommand
-from dstack._internal.cli.common import console
-from dstack._internal.cli.config import CLIConfigManager
+from dstack._internal.cli.utils.common import console
+from dstack._internal.cli.utils.config import CLIConfigManager
 from dstack.api.hub import HubClient, HubClientConfig
 
 

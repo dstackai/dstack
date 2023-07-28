@@ -5,13 +5,13 @@ from rich.live import Live
 
 from dstack._internal.api.runs import list_runs_hub
 from dstack._internal.cli.commands import BasicCommand
-from dstack._internal.cli.common import (
+from dstack._internal.cli.utils.common import (
     add_project_argument,
     check_init,
     generate_runs_table,
     print_runs,
 )
-from dstack._internal.cli.config import get_hub_client
+from dstack._internal.cli.utils.config import get_hub_client
 
 LIVE_PROVISION_INTERVAL_SECS = 2
 

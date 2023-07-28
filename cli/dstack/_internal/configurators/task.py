@@ -21,18 +21,29 @@ class TaskConfigurator(JobConfiguratorWithPorts):
         self.sshd.map_to_port = get_map_to_port(self.ports(), self.sshd.port)
         return super().get_jobs(repo, run_name, repo_code_filename, ssh_key_pub)
 
+    def build_commands(self) -> List[str]:
+        return self.conf.build
+
+    def setup(self) -> List[str]:
+        commands = []
+        if self.conf.image:
+            commands += self.sshd.get_required_commands()
+        commands += self.sshd.get_setup_commands()
+        commands += self.conf.setup
+        return commands
+
     def commands(self) -> List[str]:
         commands = []
         if self.conf.image is None:
-            self.sshd.start(commands)
-        commands.extend(self.conf.commands)
+            commands += self.sshd.get_start_commands()
+        commands += self.conf.commands
         return commands
-
-    def optional_build_commands(self) -> List[str]:
-        return []  # not needed
 
     def default_max_duration(self) -> Optional[int]:
         return DEFAULT_MAX_DURATION_SECONDS
+
+    def termination_policy(self) -> job.TerminationPolicy:
+        return self.profile.termination_policy or job.TerminationPolicy.TERMINATE
 
     def artifact_specs(self) -> List[job.ArtifactSpec]:
         specs = []
@@ -51,5 +62,5 @@ class TaskConfigurator(JobConfiguratorWithPorts):
     def app_specs(self) -> List[job.AppSpec]:
         specs = super().app_specs()
         if self.conf.image is None:
-            self.sshd.add_app(specs)
+            specs.append(self.sshd.get_app_spec())
         return specs

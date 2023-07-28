@@ -3,12 +3,13 @@ package backend
 import (
 	"context"
 	"errors"
-	"github.com/dstackai/dstack/runner/internal/backend/base"
-	"github.com/dstackai/dstack/runner/internal/container"
 	"io"
 	"os"
 	"path/filepath"
 	"sync"
+
+	"github.com/dstackai/dstack/runner/internal/backend/base"
+	"github.com/dstackai/dstack/runner/internal/docker"
 
 	"github.com/docker/docker/api/types/mount"
 	"github.com/dstackai/dstack/runner/internal/gerrors"
@@ -26,8 +27,8 @@ type Backend interface {
 	MasterJob(ctx context.Context) *models.Job
 	Requirements(ctx context.Context) models.Requirements
 	UpdateState(ctx context.Context) error
-	CheckStop(ctx context.Context) (bool, error)
 	IsInterrupted(ctx context.Context) (bool, error)
+	Stop(ctx context.Context) error
 	Shutdown(ctx context.Context) error
 	GetArtifact(ctx context.Context, runName, localPath, remotePath string, fs bool) base.Artifacter
 	GetCache(ctx context.Context, runName, localPath, remotePath string) base.Artifacter
@@ -39,9 +40,9 @@ type Backend interface {
 	GetJobByPath(ctx context.Context, path string) (*models.Job, error)
 	GetRepoDiff(ctx context.Context, path string) (string, error)
 	GetRepoArchive(ctx context.Context, path, dst string) error
-	GetBuildDiffInfo(ctx context.Context, spec *container.BuildSpec) (*base.StorageObject, error)
+	GetBuildDiffInfo(ctx context.Context, spec *docker.BuildSpec) (*base.StorageObject, error)
 	GetBuildDiff(ctx context.Context, key, dst string) error
-	PutBuildDiff(ctx context.Context, src string, spec *container.BuildSpec) error
+	PutBuildDiff(ctx context.Context, src string, spec *docker.BuildSpec) error
 	GetTMPDir(ctx context.Context) string
 	GetDockerBindings(ctx context.Context) []mount.Mount
 }

@@ -3,8 +3,8 @@ from argparse import Namespace
 from rich_argparse import RichHelpFormatter
 
 from dstack._internal.cli.commands import BasicCommand
-from dstack._internal.cli.common import add_project_argument, check_init
-from dstack._internal.cli.config import get_hub_client
+from dstack._internal.cli.utils.common import add_project_argument, check_init
+from dstack._internal.cli.utils.config import get_hub_client
 from dstack.api.hub import HubClient
 
 

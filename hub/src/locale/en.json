@@ -243,6 +243,8 @@
         "uploading":  "Uploading",
         "stopping": "Stopping",
         "stopped":  "Stopped",
+        "terminating": "Terminating",
+        "terminated":  "Terminated",
         "aborting": "Aborting",
         "aborted":  "Aborted",
         "failed": "Failed",

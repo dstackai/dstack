@@ -10,11 +10,16 @@ import giturlparse
 from pydantic import BaseModel, Field
 from typing_extensions import Literal
 
+from dstack._internal.core.error import DstackError
 from dstack._internal.core.repo import RepoProtocol
 from dstack._internal.core.repo.base import Repo, RepoData, RepoInfo, RepoRef
 from dstack._internal.utils.common import PathLike
 from dstack._internal.utils.hash import get_sha256, slugify
 from dstack._internal.utils.ssh import get_host_config, make_ssh_command_for_git
+
+
+class RepoError(DstackError):
+    pass
 
 
 class RemoteRepoCredentials(BaseModel):
@@ -109,7 +114,7 @@ class RemoteRepo(Repo):
             repo = git.Repo(self.local_repo_dir)
             tracking_branch = repo.active_branch.tracking_branch()
             if tracking_branch is None:
-                raise ValueError("No remote branch is configured")
+                raise RepoError("No remote branch is configured")
             self.repo_url = repo.remote(tracking_branch.remote_name).url
             repo_data = RemoteRepoData.from_url(self.repo_url, parse_ssh_config=True)
             repo_data.repo_branch = tracking_branch.remote_head
@@ -120,7 +125,7 @@ class RemoteRepo(Repo):
         elif self.repo_url is not None:
             repo_data = RemoteRepoData.from_url(self.repo_url, parse_ssh_config=True)
         elif repo_data is None:
-            raise ValueError("No remote repo data provided")
+            raise RepoError("No remote repo data provided")
 
         if repo_ref is None:
             repo_ref = RepoRef(repo_id=slugify(repo_data.repo_name, repo_data.path("/")))
@@ -162,7 +167,7 @@ class _DiffCollector:
         if not self.warned and now > self.start_time + self.warning_time:
             print(
                 "Provisioning is taking longer than usual, possibly because of having too many or large local "
-                "files that haven’t been pushed to Git. Tip: Exclude unnecessary files from provisioning "
+                "files that haven't been pushed to Git. Tip: Exclude unnecessary files from provisioning "
                 "by using the `.gitignore` file."
             )
             self.warned = True

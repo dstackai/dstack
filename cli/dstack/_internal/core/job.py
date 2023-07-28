@@ -87,13 +87,16 @@ class JobStatus(str, Enum):
     UPLOADING = "uploading"
     STOPPING = "stopping"
     STOPPED = "stopped"
+    RESTARTING = "restarting"
+    TERMINATING = "terminating"
+    TERMINATED = "terminated"
     ABORTING = "aborting"
     ABORTED = "aborted"
     FAILED = "failed"
     DONE = "done"
 
     def is_finished(self):
-        return self in [self.STOPPED, self.ABORTED, self.FAILED, self.DONE]
+        return self in [self.STOPPED, self.TERMINATED, self.ABORTED, self.FAILED, self.DONE]
 
     def is_unfinished(self):
         return not self.is_finished()
@@ -108,6 +111,11 @@ class SpotPolicy(str, Enum):
 class RetryPolicy(BaseModel):
     retry: bool
     limit: Optional[int]
+
+
+class TerminationPolicy(str, Enum):
+    STOP = "stop"
+    TERMINATE = "terminate"
 
 
 class JobErrorCode(str, Enum):
@@ -183,7 +191,6 @@ class Job(JobHead):
     location: Optional[str]
     master_job: Optional[str]  # not implemented
     max_duration: Optional[int]
-    optional_build_commands: Optional[List[str]]
     provider_name: Optional[str] = ""  # deprecated
     registry_auth: Optional[RegistryAuth]
     repo_code_filename: Optional[str]
@@ -196,12 +203,14 @@ class Job(JobHead):
     retry_policy: Optional[RetryPolicy]
     run_name: str
     runner_id: Optional[str]
+    setup: Optional[List[str]]
     spot_policy: Optional[SpotPolicy]
     ssh_key_pub: Optional[str]
     status: JobStatus
     submission_num: int = 1
     submitted_at: int
     tag_name: Optional[str]
+    termination_policy: Optional[TerminationPolicy]
     workflow_name: Optional[str] = ""  # deprecated
     working_dir: Optional[str]
 

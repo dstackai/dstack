@@ -3,8 +3,8 @@ from argparse import Namespace
 from dstack._internal.api.artifacts import download_artifact_files_hub
 from dstack._internal.api.runs import RunNotFoundError, TagNotFoundError, get_tagged_run_name_hub
 from dstack._internal.cli.commands import BasicCommand
-from dstack._internal.cli.common import add_project_argument, check_init, console
-from dstack._internal.cli.config import get_hub_client
+from dstack._internal.cli.utils.common import add_project_argument, check_init, console
+from dstack._internal.cli.utils.config import get_hub_client
 from dstack._internal.core.error import DstackError
 from dstack.api.hub import HubClient
 
