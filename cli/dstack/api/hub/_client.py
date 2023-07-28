@@ -281,6 +281,7 @@ class HubClient:
         ssh_key_pub: str,
         run_name: Optional[str] = None,
         run_args: Optional[List[str]] = None,
+        run_plan: Optional[RunPlan] = None,
     ) -> Tuple[str, List[Job]]:
         run_name = self.create_run(run_name)
         configurator = copy.deepcopy(configurator)
@@ -296,6 +297,7 @@ class HubClient:
             run_name=run_name,
             repo_code_filename=repo_code_filename,
             ssh_key_pub=ssh_key_pub,
+            run_plan=run_plan,
         )
         for job in jobs:
             self.submit_job(job)

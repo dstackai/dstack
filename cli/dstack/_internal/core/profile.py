@@ -63,6 +63,10 @@ class ProfileGPU(ForbidExtra):
     ]
     _validate_mem = validator("memory", pre=True, allow_reuse=True)(parse_memory)
 
+    @validator("name")
+    def _validate_name(name: str):
+        return name.upper()
+
 
 class ProfileResources(ForbidExtra):
     gpu: Optional[Union[int, ProfileGPU]]

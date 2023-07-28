@@ -134,6 +134,7 @@ class RunCommand(BasicCommand):
                 ssh_key_pub=ssh_key_pub,
                 run_name=args.name,
                 run_args=run_args,
+                run_plan=run_plan,
             )
             runs = list_runs_hub(hub_client, run_name=run_name)
             run = runs[0]
