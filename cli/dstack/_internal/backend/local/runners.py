@@ -229,4 +229,4 @@ def get_container(container_name: str) -> Optional[Container]:
 def remove_container(container_name: str):
     container = get_container(container_name)
     if container is not None:
-        container.remove()
+        container.remove(force=True)
