@@ -23,9 +23,9 @@ def list_runs_hub(hub_client: HubClient, run_name: str = "", all: bool = False) 
 def _get_runs_hub(hub_client: HubClient, run_name: str = "", all: bool = False) -> List[RunHead]:
     runs = hub_client.list_run_heads(run_name)
     if not all:
-        unfinished = any(run.status.is_unfinished() for run in runs)
-        if unfinished:
-            runs = list(filter(lambda r: r.status.is_unfinished(), runs))
+        active = any(run.status.is_active() for run in runs)
+        if active:
+            runs = list(filter(lambda r: r.status.is_active(), runs))
         else:
             runs = runs[:1]
     return runs

@@ -101,6 +101,9 @@ class JobStatus(str, Enum):
     def is_unfinished(self):
         return not self.is_finished()
 
+    def is_active(self):
+        return self.is_unfinished() or self == self.STOPPED
+
 
 class SpotPolicy(str, Enum):
     SPOT = "spot"

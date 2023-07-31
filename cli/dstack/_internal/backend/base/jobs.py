@@ -34,7 +34,7 @@ def create_job(
     create_head: bool = True,
 ):
     if create_head:
-        storage.put_object(key=_get_job_head_filename(job), content="")
+        storage.put_object(key=_get_job_head_filename_from_job(job), content="")
 
     storage.put_object(
         key=_get_job_filename(job.repo_ref.repo_id, job.job_id), content=yaml.dump(job.serialize())
@@ -57,7 +57,7 @@ def update_job(storage: Storage, job: Job):
     job_keys = storage.list_objects(job_head_key_prefix)
     for key in job_keys:
         storage.delete_object(key)
-    storage.put_object(key=_get_job_head_filename(job), content="")
+    storage.put_object(key=_get_job_head_filename_from_job(job), content="")
     storage.put_object(
         key=_get_job_filename(job.repo_ref.repo_id, job.job_id), content=yaml.dump(job.serialize())
     )
@@ -167,14 +167,13 @@ def stop_job(
 ):
     logger.info("Stopping job [repo_id=%s job_id=%s]", repo_id, job_id)
     job_head = get_job_head(storage, repo_id, job_id)
-    job = get_job(storage, repo_id, job_id)
-    if job is None:
+    if job_head.status.is_finished() and not job_head.status == JobStatus.STOPPED:
         return
-    if job.termination_policy == TerminationPolicy.TERMINATE:
+    job = get_job(storage, repo_id, job_id)
+    if job is not None and job.termination_policy == TerminationPolicy.TERMINATE:
         terminate = True
     if job_head.status.is_finished() and not terminate:
         return
-    runner = runners.get_runner(storage, job.runner_id)
     new_status = None
     if abort:
         new_status = JobStatus.ABORTED
@@ -193,12 +192,18 @@ def stop_job(
             new_status = JobStatus.TERMINATING
         else:
             new_status = JobStatus.STOPPING
-    if new_status is not None and new_status != job.status:
-        job.status = new_status
-        update_job(storage, job)
-        if new_status in [JobStatus.TERMINATED, JobStatus.ABORTED]:
-            if runner is not None:
-                runners.terminate_runner(compute, runner)
+    if new_status is not None and new_status != job_head.status:
+        if job is not None:
+            job.status = new_status
+            update_job(storage, job)
+            runner = runners.get_runner(storage, job.runner_id)
+            if new_status in [JobStatus.TERMINATED, JobStatus.ABORTED]:
+                if runner is not None:
+                    runners.terminate_runner(compute, runner)
+        else:
+            # If job file is deleted/corrupted, we'll update the job head only.
+            job_head.status = new_status
+            _update_job_head(storage, job_head)
 
 
 def update_job_submission(job: Job):
@@ -261,6 +266,14 @@ def _try_run_job(
         update_job(storage, job)
 
 
+def _update_job_head(storage: Storage, job_head: JobHead):
+    job_head_key_prefix = _get_job_head_filename_prefix(job_head.repo_ref.repo_id, job_head.job_id)
+    job_keys = storage.list_objects(job_head_key_prefix)
+    for key in job_keys:
+        storage.delete_object(key)
+    storage.put_object(key=_get_job_head_filename_from_job_head(job_head), content="")
+
+
 def _get_jobs_dir(repo_id: str) -> str:
     return f"jobs/{repo_id}/"
 
@@ -283,7 +296,7 @@ def _get_job_head_filename_prefix(repo_id: str, job_id: str) -> str:
     return key
 
 
-def _get_job_head_filename(job: Job) -> str:
+def _get_job_head_filename_from_job(job: Job) -> str:
     prefix = _get_jobs_dir(job.repo_ref.repo_id)
     key = (
         f"{prefix}l;"
@@ -298,6 +311,25 @@ def _get_job_head_filename(job: Job) -> str:
         f"{job.instance_type or ''};"
         f"{escape_head(job.configuration_path)};"
         f"{job.get_instance_spot_type()}"
+    )
+    return key
+
+
+def _get_job_head_filename_from_job_head(job_head: JobHead) -> str:
+    prefix = _get_jobs_dir(job_head.repo_ref.repo_id)
+    key = (
+        f"{prefix}l;"
+        f"{job_head.job_id};"
+        f"{job_head.provider_name};"
+        f"{job_head.hub_user_name};"
+        f"{job_head.submitted_at};"
+        f"{job_head.status.value},{job_head.error_code.value if job_head.error_code else ''},{job_head.container_exit_code or ''};"
+        f"{','.join([escape_head(artifact_path) for artifact_path in (job_head.artifact_paths or [])])};"
+        f"{','.join([app_name for app_name in (job_head.app_names or [])])};"
+        f"{job_head.tag_name or ''};"
+        f"{job_head.instance_type or ''};"
+        f"{escape_head(job_head.configuration_path)};"
+        f"{job_head.instance_spot_type}"
     )
     return key
 
