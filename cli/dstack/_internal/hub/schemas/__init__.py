@@ -22,12 +22,6 @@ class UserInfoWithToken(UserInfo):
     token: Optional[str]
 
 
-class Project(BaseModel):
-    name: str
-    backend: str
-    config: str
-
-
 class Member(BaseModel):
     user_name: str
     project_role: ProjectRole
@@ -245,6 +239,89 @@ class ProjectInfoWithCreds(BaseModel):
     members: List[Member] = []
 
 
+class ProjectElementValue(BaseModel):
+    value: str
+    label: str
+
+
+class ProjectElement(BaseModel):
+    selected: Optional[str]
+    values: List[ProjectElementValue] = []
+
+
+class ProjectMultiElement(BaseModel):
+    selected: List[str]
+    values: List[ProjectElementValue] = []
+
+
+class AWSBucketProjectElementValue(BaseModel):
+    name: str
+    created: str
+    region: str
+
+
+class AWSBucketProjectElement(BaseModel):
+    selected: Optional[str]
+    values: List[AWSBucketProjectElementValue] = []
+
+
+class AWSProjectValues(BaseModel):
+    type: Literal["aws"] = "aws"
+    default_credentials: bool = False
+    region_name: Optional[ProjectElement]
+    extra_regions: Optional[ProjectMultiElement]
+    s3_bucket_name: Optional[AWSBucketProjectElement]
+    ec2_subnet_id: Optional[ProjectElement]
+
+
+class GCPVPCSubnetProjectElementValue(BaseModel):
+    label: Optional[str]
+    vpc: Optional[str]
+    subnet: Optional[str]
+
+
+class GCPVPCSubnetProjectElement(BaseModel):
+    selected: Optional[str]
+    values: List[GCPVPCSubnetProjectElementValue] = []
+
+
+class GCPProjectValues(BaseModel):
+    type: Literal["gcp"] = "gcp"
+    default_credentials: bool = False
+    area: Optional[ProjectElement]
+    region: Optional[ProjectElement]
+    zone: Optional[ProjectElement]
+    bucket_name: Optional[ProjectElement]
+    vpc_subnet: Optional[GCPVPCSubnetProjectElement]
+
+
+class AzureProjectValues(BaseModel):
+    type: Literal["azure"] = "azure"
+    default_credentials: bool = False
+    tenant_id: Optional[ProjectElement]
+    subscription_id: Optional[ProjectElement]
+    location: Optional[ProjectElement]
+    storage_account: Optional[ProjectElement]
+
+
+class AWSStorageBackendValues(BaseModel):
+    type: Literal["aws"] = "aws"
+    bucket_name: Optional[ProjectElement]
+
+
+class LambdaProjectValues(BaseModel):
+    type: Literal["lambda"] = "lambda"
+    storage_backend_type: ProjectElement
+    regions: Optional[ProjectMultiElement]
+    storage_backend_values: Optional[AWSStorageBackendValues]
+
+
+class ProjectValues(BaseModel):
+    __root__: Union[
+        None, AWSProjectValues, GCPProjectValues, AzureProjectValues, LambdaProjectValues
+    ] = Field(..., discriminator="type")
+
+
 class AddTagRun(BaseModel):
     repo_id: str
     tag_name: str
@@ -359,89 +436,6 @@ class StorageLink(BaseModel):
 
 class ProjectDelete(BaseModel):
     projects: List[str] = []
-
-
-class ProjectElementValue(BaseModel):
-    value: str
-    label: str
-
-
-class ProjectElement(BaseModel):
-    selected: Optional[str]
-    values: List[ProjectElementValue] = []
-
-
-class ProjectMultiElement(BaseModel):
-    selected: List[str]
-    values: List[ProjectElementValue] = []
-
-
-class AWSBucketProjectElementValue(BaseModel):
-    name: str
-    created: str
-    region: str
-
-
-class AWSBucketProjectElement(BaseModel):
-    selected: Optional[str]
-    values: List[AWSBucketProjectElementValue] = []
-
-
-class AWSProjectValues(BaseModel):
-    type: Literal["aws"] = "aws"
-    default_credentials: bool = False
-    region_name: Optional[ProjectElement]
-    extra_regions: Optional[ProjectMultiElement]
-    s3_bucket_name: Optional[AWSBucketProjectElement]
-    ec2_subnet_id: Optional[ProjectElement]
-
-
-class GCPVPCSubnetProjectElementValue(BaseModel):
-    label: Optional[str]
-    vpc: Optional[str]
-    subnet: Optional[str]
-
-
-class GCPVPCSubnetProjectElement(BaseModel):
-    selected: Optional[str]
-    values: List[GCPVPCSubnetProjectElementValue] = []
-
-
-class GCPProjectValues(BaseModel):
-    type: Literal["gcp"] = "gcp"
-    default_credentials: bool = False
-    area: Optional[ProjectElement]
-    region: Optional[ProjectElement]
-    zone: Optional[ProjectElement]
-    bucket_name: Optional[ProjectElement]
-    vpc_subnet: Optional[GCPVPCSubnetProjectElement]
-
-
-class AzureProjectValues(BaseModel):
-    type: Literal["azure"] = "azure"
-    default_credentials: bool = False
-    tenant_id: Optional[ProjectElement]
-    subscription_id: Optional[ProjectElement]
-    location: Optional[ProjectElement]
-    storage_account: Optional[ProjectElement]
-
-
-class AWSStorageBackendValues(BaseModel):
-    type: Literal["aws"] = "aws"
-    bucket_name: Optional[ProjectElement]
-
-
-class LambdaProjectValues(BaseModel):
-    type: Literal["lambda"] = "lambda"
-    storage_backend_type: ProjectElement
-    regions: Optional[ProjectMultiElement]
-    storage_backend_values: Optional[AWSStorageBackendValues]
-
-
-class ProjectValues(BaseModel):
-    __root__: Union[
-        None, AWSProjectValues, GCPProjectValues, AzureProjectValues, LambdaProjectValues
-    ] = Field(..., discriminator="type")
 
 
 class UserPatch(BaseModel):

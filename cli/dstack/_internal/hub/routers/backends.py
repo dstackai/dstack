@@ -2,7 +2,7 @@ from typing import List
 
 from fastapi import APIRouter, Depends
 
-from dstack._internal.hub.models import BackendType
+from dstack._internal.hub.schemas import BackendType
 from dstack._internal.hub.security.permissions import Authenticated
 from dstack._internal.hub.services.backends import list_avaialble_backend_types
 

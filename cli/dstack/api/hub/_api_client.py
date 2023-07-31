@@ -21,7 +21,7 @@ from dstack._internal.core.repo import RemoteRepoCredentials, Repo, RepoHead, Re
 from dstack._internal.core.run import RunHead
 from dstack._internal.core.secret import Secret
 from dstack._internal.core.tag import TagHead
-from dstack._internal.hub.models import (
+from dstack._internal.hub.schemas import (
     AddTagRun,
     ArtifactsList,
     JobHeadList,

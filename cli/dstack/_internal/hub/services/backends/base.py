@@ -3,7 +3,7 @@ from typing import Dict, List, Tuple, Union
 
 from dstack._internal.backend.base import Backend
 from dstack._internal.hub.db.models import Project
-from dstack._internal.hub.models import (
+from dstack._internal.hub.schemas import (
     AnyProjectConfig,
     AnyProjectConfigWithCreds,
     AnyProjectConfigWithCredsPartial,

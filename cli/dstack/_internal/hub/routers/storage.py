@@ -7,8 +7,8 @@ from typing_extensions import Annotated
 
 from dstack._internal.backend.base import Backend
 from dstack._internal.backend.local import LocalBackend
-from dstack._internal.hub.models import FileObject
 from dstack._internal.hub.routers.util import error_detail, get_backend, get_project
+from dstack._internal.hub.schemas import FileObject
 from dstack._internal.hub.security.permissions import ProjectMember
 
 

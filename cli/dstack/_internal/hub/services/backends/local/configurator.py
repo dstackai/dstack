@@ -3,7 +3,7 @@ from typing import Dict, Tuple
 from dstack._internal.backend.local import LocalBackend
 from dstack._internal.backend.local.config import LocalConfig
 from dstack._internal.hub.db.models import Project
-from dstack._internal.hub.models import LocalProjectConfig, ProjectValues
+from dstack._internal.hub.schemas import LocalProjectConfig, ProjectValues
 from dstack._internal.hub.services.backends.base import Configurator
 
 

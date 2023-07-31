@@ -20,7 +20,7 @@ from dstack._internal.core.repo.remote import RemoteRepo
 from dstack._internal.core.run import RunHead
 from dstack._internal.core.secret import Secret
 from dstack._internal.core.tag import TagHead
-from dstack._internal.hub.models import ProjectInfo
+from dstack._internal.hub.schemas import ProjectInfo
 from dstack.api.hub._api_client import HubAPIClient
 from dstack.api.hub._config import HubClientConfig
 from dstack.api.hub._storage import HUBStorage

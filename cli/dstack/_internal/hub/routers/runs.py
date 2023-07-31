@@ -10,14 +10,6 @@ from dstack._internal.core.job import JobStatus
 from dstack._internal.core.plan import JobPlan, RunPlan
 from dstack._internal.core.run import RunHead
 from dstack._internal.hub.db.models import User
-from dstack._internal.hub.models import (
-    RunInfo,
-    RunsCreate,
-    RunsDelete,
-    RunsGetPlan,
-    RunsList,
-    RunsStop,
-)
 from dstack._internal.hub.repository.projects import ProjectManager
 from dstack._internal.hub.routers.util import (
     call_backend,
@@ -25,6 +17,14 @@ from dstack._internal.hub.routers.util import (
     get_backend,
     get_backend_if_available,
     get_project,
+)
+from dstack._internal.hub.schemas import (
+    RunInfo,
+    RunsCreate,
+    RunsDelete,
+    RunsGetPlan,
+    RunsList,
+    RunsStop,
 )
 from dstack._internal.hub.security.permissions import Authenticated, ProjectMember
 from dstack._internal.utils.logging import get_logger

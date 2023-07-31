@@ -13,7 +13,7 @@ from dstack._internal.backend.gcp import auth as gcp_auth
 from dstack._internal.backend.gcp import utils as gcp_utils
 from dstack._internal.backend.gcp.config import GCPConfig
 from dstack._internal.hub.db.models import Project
-from dstack._internal.hub.models import (
+from dstack._internal.hub.schemas import (
     GCPProjectConfig,
     GCPProjectConfigWithCreds,
     GCPProjectConfigWithCredsPartial,

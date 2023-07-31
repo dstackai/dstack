@@ -14,7 +14,7 @@ from dstack._internal.backend.lambdalabs.config import (
     LambdaConfig,
 )
 from dstack._internal.hub.db.models import Project
-from dstack._internal.hub.models import (
+from dstack._internal.hub.schemas import (
     AWSProjectAccessKeyCreds,
     AWSStorageBackendValues,
     AWSStorageProjectConfig,

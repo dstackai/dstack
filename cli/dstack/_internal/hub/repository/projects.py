@@ -6,9 +6,9 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
 from dstack._internal.hub.db import reuse_or_make_session
-from dstack._internal.hub.db.models import Member as MemberDB
+from dstack._internal.hub.db.models import Member as DBMember
 from dstack._internal.hub.db.models import Project, User
-from dstack._internal.hub.models import (
+from dstack._internal.hub.schemas import (
     LocalProjectConfig,
     Member,
     ProjectInfo,
@@ -116,10 +116,10 @@ class ProjectManager:
     @reuse_or_make_session
     async def get_member(
         user: User, project: Project, session: Optional[AsyncSession] = None
-    ) -> Optional[MemberDB]:
+    ) -> Optional[DBMember]:
         query = await session.execute(
-            select(MemberDB).where(
-                MemberDB.project_name == project.name, MemberDB.user_name == user.name
+            select(DBMember).where(
+                DBMember.project_name == project.name, DBMember.user_name == user.name
             )
         )
         return query.scalars().unique().first()
@@ -128,7 +128,7 @@ class ProjectManager:
     @reuse_or_make_session
     async def set_members(
         project: Project, members: List[Member], session: Optional[AsyncSession] = None
-    ) -> Optional[MemberDB]:
+    ) -> Optional[DBMember]:
         await ProjectManager._clear_member(project, session=session)
         for member in members:
             await ProjectManager._add_member(project=project, member=member)
@@ -139,7 +139,7 @@ class ProjectManager:
         project: Project, member: Member, session: Optional[AsyncSession] = None
     ):
         session.add(
-            MemberDB(
+            DBMember(
                 project_name=project.name,
                 user_name=member.user_name,
                 project_role=member.project_role,
@@ -150,7 +150,7 @@ class ProjectManager:
     @staticmethod
     @reuse_or_make_session
     async def _clear_member(project: Project, session: Optional[AsyncSession] = None):
-        await session.execute(delete(MemberDB).where(MemberDB.project_name == project.name))
+        await session.execute(delete(DBMember).where(DBMember.project_name == project.name))
         await session.commit()
 
 

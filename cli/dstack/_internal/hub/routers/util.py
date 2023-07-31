@@ -8,7 +8,7 @@ from dstack._internal.core.error import (
     BackendNotAvailableError,
     BackendValueError,
 )
-from dstack._internal.hub.models import Project
+from dstack._internal.hub.db.models import Project
 from dstack._internal.hub.repository.projects import ProjectManager
 from dstack._internal.hub.services.backends import cache as backends_cache
 from dstack._internal.hub.services.backends import get_configurator

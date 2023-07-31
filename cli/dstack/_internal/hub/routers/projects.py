@@ -3,7 +3,9 @@ from typing import List, Tuple
 from fastapi import APIRouter, Body, Depends, HTTPException, status
 
 from dstack._internal.hub.db.models import Project, User
-from dstack._internal.hub.models import (
+from dstack._internal.hub.repository.projects import ProjectManager
+from dstack._internal.hub.routers.util import error_detail, get_backend_configurator, get_project
+from dstack._internal.hub.schemas import (
     Member,
     ProjectConfigWithCredsPartial,
     ProjectDelete,
@@ -11,8 +13,6 @@ from dstack._internal.hub.models import (
     ProjectInfoWithCreds,
     ProjectValues,
 )
-from dstack._internal.hub.repository.projects import ProjectManager
-from dstack._internal.hub.routers.util import error_detail, get_backend_configurator, get_project
 from dstack._internal.hub.security.permissions import (
     Authenticated,
     ProjectAdmin,

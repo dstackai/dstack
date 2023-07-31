@@ -7,7 +7,7 @@ from boto3.session import Session
 from dstack._internal.backend.aws import AwsBackend
 from dstack._internal.backend.aws.config import DEFAULT_REGION_NAME, AWSConfig
 from dstack._internal.hub.db.models import Project
-from dstack._internal.hub.models import (
+from dstack._internal.hub.schemas import (
     AWSBucketProjectElement,
     AWSBucketProjectElementValue,
     AWSProjectConfig,
