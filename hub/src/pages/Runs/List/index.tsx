@@ -171,19 +171,28 @@ export const RunList: React.FC = () => {
 
     const isDisabledAbortButton = useMemo<boolean>(() => {
         return (
-            !selectedItems?.length || selectedItems.some((item) => !isAvailableAbortingForRun(item)) || isStopping || isDeleting
+            !selectedItems?.length ||
+            selectedItems.some((item) => !isAvailableAbortingForRun(item.status)) ||
+            isStopping ||
+            isDeleting
         );
     }, [selectedItems, isStopping, isDeleting]);
 
     const isDisabledStopButton = useMemo<boolean>(() => {
         return (
-            !selectedItems?.length || selectedItems.some((item) => !isAvailableStoppingForRun(item)) || isStopping || isDeleting
+            !selectedItems?.length ||
+            selectedItems.some((item) => !isAvailableStoppingForRun(item.status)) ||
+            isStopping ||
+            isDeleting
         );
     }, [selectedItems, isStopping, isDeleting]);
 
     const isDisabledDeleteButton = useMemo<boolean>(() => {
         return (
-            !selectedItems?.length || selectedItems.some((item) => !isAvailableDeletingForRun(item)) || isStopping || isDeleting
+            !selectedItems?.length ||
+            selectedItems.some((item) => !isAvailableDeletingForRun(item.status)) ||
+            isStopping ||
+            isDeleting
         );
     }, [selectedItems, isStopping, isDeleting]);
 

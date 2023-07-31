@@ -50,4 +50,9 @@ export const API = {
         SECRET_DELETE: (projectName: IProject['project_name'], secretName: ISecret['secret_name']) =>
             `${API.BASE()}/project/${projectName}/secrets/${secretName}/delete`,
     },
+
+    RUNS: {
+        BASE: () => `${API.BASE()}/runs`,
+        LIST: () => `${API.RUNS.BASE()}/list`,
+    },
 };

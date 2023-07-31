@@ -57,24 +57,51 @@ declare interface IRunJobHead {
     app_names: string[]
 }
 
-declare interface IRun {
+declare interface IRunAppHad {
+    job_id: string
+    artifact_path: string
+}
+
+declare interface IRunArtifactHad {
+    job_id: string
+    artifact_path: string
+}
+
+declare interface IRunRepo {
+    repo_id: string,
+    last_run_at: number,
+    tags_count: number,
+    repo_info: {
+        repo_type: string,
+        "repo_host_name": string,
+        "repo_port": number | null,
+        "repo_user_name": string,
+        "repo_name": string
+    }
+}
+
+declare interface IRunHead {
     run_name: string,
     workflow_name: string | null,
     provider_name: string | null,
-    repo_user_id: string,
+    configuration_path: string,
     hub_user_name: string,
-    artifact_heads: null | {
-        job_id: string
-        artifact_path: string
-    }[],
+    artifact_heads: IRunArtifactHad[] | null,
     status: TRunStatus,
     submitted_at: number,
     tag_name: string | null,
-    "app_heads": null |
-    {
-        job_id: string
-        artifact_path: string
-    }[],
+    app_heads: IRunAppHad[] | null,
     request_heads: string | null,
     job_heads: IRunJobHead[]
+}
+
+declare interface IRunListItem {
+    project: string,
+    repo: IRunRepo;
+    run_head: IRunHead
+}
+
+declare interface IRun extends Omit<IRunHead, 'configuration_path'> {
+    repo: IRunRepo,
+    repo_user_id: string,
 }
