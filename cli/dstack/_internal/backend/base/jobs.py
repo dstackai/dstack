@@ -1,6 +1,7 @@
 from typing import List, Optional, Tuple
 
 import yaml
+from pydantic import ValidationError
 
 import dstack._internal.backend.base.gateway as gateway
 from dstack._internal.backend.base import runners
@@ -44,7 +45,10 @@ def get_job(storage: Storage, repo_id: str, job_id: str) -> Optional[Job]:
     obj = storage.get_object(_get_job_filename(repo_id, job_id))
     if obj is None:
         return None
-    job = Job.unserialize(yaml.load(obj, yaml.FullLoader))
+    try:
+        job = Job.unserialize(yaml.load(obj, yaml.FullLoader))
+    except ValidationError:
+        return None
     return job
 
 
@@ -164,6 +168,8 @@ def stop_job(
     logger.info("Stopping job [repo_id=%s job_id=%s]", repo_id, job_id)
     job_head = get_job_head(storage, repo_id, job_id)
     job = get_job(storage, repo_id, job_id)
+    if job is None:
+        return
     if job.termination_policy == TerminationPolicy.TERMINATE:
         terminate = True
     if job_head.status.is_finished() and not terminate:
