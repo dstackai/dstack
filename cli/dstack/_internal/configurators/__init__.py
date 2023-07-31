@@ -160,6 +160,7 @@ class JobConfigurator(ABC):
             ssh_key_pub=ssh_key_pub,
             status=job.JobStatus.SUBMITTED,
             submitted_at=created_at,
+            termination_policy=self.termination_policy(),
             working_dir=self.working_dir,
         )
         return [configured_job]
