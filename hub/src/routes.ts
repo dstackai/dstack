@@ -62,6 +62,10 @@ export const ROUTES = {
         },
     },
 
+    RUNS: {
+        LIST: '/runs',
+    },
+
     USER: {
         LIST: '/users',
         ADD: '/users/add',

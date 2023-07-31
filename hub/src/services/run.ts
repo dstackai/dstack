@@ -4,15 +4,42 @@ import { fetchBaseQuery } from '@reduxjs/toolkit/query/react';
 
 import fetchBaseQueryHeaders from 'libs/fetchBaseQueryHeaders';
 
+const reduceInvalidateTagsFromRunNames = (names: IRun['run_name'][]) => {
+    return names.reduce((accumulator, runName: string) => {
+        // eslint-disable-next-line @typescript-eslint/ban-ts-comment
+        // @ts-ignore
+        accumulator.push({ type: 'Runs', id: runName });
+        // eslint-disable-next-line @typescript-eslint/ban-ts-comment
+        // @ts-ignore
+        accumulator.push({ type: 'AllRuns', id: runName });
+
+        return accumulator;
+    }, []);
+};
+
 export const runApi = createApi({
     reducerPath: 'runApi',
     baseQuery: fetchBaseQuery({
         prepareHeaders: fetchBaseQueryHeaders,
     }),
 
-    tagTypes: ['Runs'],
+    tagTypes: ['Runs', 'AllRuns'],
 
     endpoints: (builder) => ({
+        getAllRuns: builder.query<IRunListItem[], void>({
+            query: () => {
+                return {
+                    url: API.RUNS.LIST(),
+                    method: 'POST',
+                };
+            },
+
+            providesTags: (result) =>
+                result
+                    ? [...result.map(({ run_head }) => ({ type: 'AllRuns' as const, id: run_head.run_name })), 'AllRuns']
+                    : ['AllRuns'],
+        }),
+
         getRuns: builder.query<IRun[], TRunsRequestParams>({
             query: ({ name, ...body }) => {
                 return {
@@ -37,7 +64,13 @@ export const runApi = createApi({
 
             transformResponse: (response: IRun[]) => response[0],
 
-            providesTags: (result) => (result ? [{ type: 'Runs' as const, id: result?.run_name }] : []),
+            providesTags: (result) =>
+                result
+                    ? [
+                          { type: 'Runs' as const, id: result?.run_name },
+                          { type: 'AllRuns' as const, id: result?.run_name },
+                      ]
+                    : [],
         }),
 
         stopRuns: builder.mutation<void, TStopRunsRequestParams>({
@@ -47,8 +80,7 @@ export const runApi = createApi({
                 body,
             }),
 
-            invalidatesTags: (result, error, params) =>
-                params.run_names.map((run: string) => ({ type: 'Runs' as const, id: run })),
+            invalidatesTags: (result, error, params) => reduceInvalidateTagsFromRunNames(params.run_names),
         }),
 
         deleteRuns: builder.mutation<void, TDeleteRunsRequestParams>({
@@ -58,10 +90,9 @@ export const runApi = createApi({
                 body,
             }),
 
-            invalidatesTags: (result, error, params) =>
-                params.run_names.map((run: string) => ({ type: 'Runs' as const, id: run })),
+            invalidatesTags: (result, error, params) => reduceInvalidateTagsFromRunNames(params.run_names),
         }),
     }),
 });
 
-export const { useGetRunsQuery, useGetRunQuery, useStopRunsMutation, useDeleteRunsMutation } = runApi;
+export const { useGetAllRunsQuery, useGetRunsQuery, useGetRunQuery, useStopRunsMutation, useDeleteRunsMutation } = runApi;
