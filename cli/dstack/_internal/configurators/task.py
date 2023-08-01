@@ -32,6 +32,8 @@ class TaskConfigurator(JobConfiguratorWithPorts):
 
     def setup(self) -> List[str]:
         commands = []
+        if self.conf.image is None:
+            commands += self.sshd.get_setup_commands()
         commands += self.conf.setup
         return commands
 
