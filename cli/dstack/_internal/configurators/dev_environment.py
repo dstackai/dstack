@@ -1,12 +1,13 @@
 from typing import List, Optional
 
 import dstack._internal.core.job as job
-from dstack._internal.configurators import JobConfigurator
+from dstack._internal.configurators import JobConfiguratorWithPorts
 from dstack._internal.configurators.extensions import IDEExtension
 from dstack._internal.configurators.extensions.ssh import SSHd
 from dstack._internal.configurators.extensions.vscode import VSCodeDesktop
 from dstack._internal.configurators.ports import get_map_to_port
 from dstack._internal.core.configuration import DevEnvironmentConfiguration
+from dstack._internal.core.plan import RunPlan
 from dstack._internal.core.repo import Repo
 
 DEFAULT_MAX_DURATION_SECONDS = 6 * 3600
@@ -14,20 +15,25 @@ DEFAULT_MAX_DURATION_SECONDS = 6 * 3600
 install_ipykernel = f'(pip install -q --no-cache-dir ipykernel 2> /dev/null) || echo "no pip, ipykernel was not installed"'
 
 
-class DevEnvironmentConfigurator(JobConfigurator):
+class DevEnvironmentConfigurator(JobConfiguratorWithPorts):
     conf: DevEnvironmentConfiguration
     sshd: Optional[SSHd]
     ide: Optional[IDEExtension]
 
     def get_jobs(
-        self, repo: Repo, run_name: str, repo_code_filename: str, ssh_key_pub: str
+        self,
+        repo: Repo,
+        run_name: str,
+        repo_code_filename: str,
+        ssh_key_pub: str,
+        run_plan: Optional[RunPlan] = None,
     ) -> List[job.Job]:
         self.ide = VSCodeDesktop(
             extensions=["ms-python.python", "ms-toolsai.jupyter"], run_name=run_name
         )
         self.sshd = SSHd(ssh_key_pub)
         self.sshd.map_to_port = get_map_to_port(self.ports(), self.sshd.port)
-        return super().get_jobs(repo, run_name, repo_code_filename, ssh_key_pub)
+        return super().get_jobs(repo, run_name, repo_code_filename, ssh_key_pub, run_plan)
 
     def build_commands(self) -> List[str]:
         if len(self.conf.build) == 0:
@@ -65,7 +71,7 @@ class DevEnvironmentConfigurator(JobConfigurator):
         commands += ["cat"]  # idle
         return commands
 
-    def default_max_duration(self) -> int:
+    def default_max_duration(self) -> Optional[int]:
         return DEFAULT_MAX_DURATION_SECONDS
 
     def termination_policy(self) -> job.TerminationPolicy:

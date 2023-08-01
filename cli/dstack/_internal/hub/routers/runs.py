@@ -19,8 +19,18 @@ from dstack._internal.hub.models import (
     RunsStop,
 )
 from dstack._internal.hub.repository.projects import ProjectManager
-from dstack._internal.hub.routers.util import call_backend, error_detail, get_backend, get_project
+from dstack._internal.hub.routers.util import (
+    call_backend,
+    error_detail,
+    get_backend,
+    get_backend_if_available,
+    get_project,
+)
 from dstack._internal.hub.security.permissions import Authenticated, ProjectMember
+from dstack._internal.utils.logging import get_logger
+
+logger = get_logger(__name__)
+
 
 root_router = APIRouter(prefix="/api/runs", tags=["runs"], dependencies=[Depends(Authenticated())])
 project_router = APIRouter(
@@ -33,7 +43,15 @@ async def list_all_runs() -> List[RunInfo]:
     projects = await ProjectManager.list()
     run_infos = []
     for project in projects:
-        backend = await get_backend(project)
+        backend = await get_backend_if_available(project)
+        if backend is None:
+            logger.warning(
+                "Missing dependencies for %s backend. "
+                "%s runs are not included in the response.",
+                project.backend,
+                project.name,
+            )
+            continue
         repo_heads = await call_backend(backend.list_repo_heads)
         for repo_head in repo_heads:
             run_heads = await call_backend(

@@ -12,8 +12,13 @@ import dstack._internal.configurators.ports as ports
 import dstack._internal.core.job as job
 import dstack.version as version
 from dstack._internal.core.build import BuildPolicy
-from dstack._internal.core.configuration import BaseConfiguration, PythonVersion
+from dstack._internal.core.configuration import (
+    BaseConfiguration,
+    BaseConfigurationWithPorts,
+    PythonVersion,
+)
 from dstack._internal.core.error import DstackError
+from dstack._internal.core.plan import RunPlan
 from dstack._internal.core.profile import Profile, parse_duration, parse_max_duration
 from dstack._internal.core.repo import Repo
 from dstack._internal.utils.common import get_milliseconds_since_epoch
@@ -42,10 +47,6 @@ class JobConfigurator(ABC):
     ) -> argparse.ArgumentParser:
         if parser is None:
             parser = argparse.ArgumentParser(prog=prog, formatter_class=RichHelpFormatter)
-
-        parser.add_argument(
-            "-p", "--ports", metavar="PORT", type=port_mapping, nargs=argparse.ONE_OR_MORE
-        )
 
         spot_group = parser.add_mutually_exclusive_group()
         spot_group.add_argument(
@@ -80,9 +81,6 @@ class JobConfigurator(ABC):
         return parser
 
     def apply_args(self, args: argparse.Namespace):
-        if args.ports is not None:
-            self.conf.ports = list(ports.merge_ports(self.conf.ports, args.ports).values())
-
         if args.spot_policy is not None:
             self.profile.spot_policy = args.spot_policy
 
@@ -121,43 +119,49 @@ class JobConfigurator(ABC):
         self.conf = type(self.conf).parse_obj(conf)
 
     def get_jobs(
-        self, repo: Repo, run_name: str, repo_code_filename: str, ssh_key_pub: str
+        self,
+        repo: Repo,
+        run_name: str,
+        repo_code_filename: str,
+        ssh_key_pub: str,
+        run_plan: Optional[RunPlan] = None,
     ) -> List[job.Job]:
         self.run_name = run_name
         self.ssh_key_pub = ssh_key_pub
         created_at = get_milliseconds_since_epoch()
         configured_job = job.Job(
-            job_id=f"{run_name},,0",
-            runner_id=uuid.uuid4().hex,
-            repo_ref=repo.repo_ref,
-            repo_data=repo.repo_data,
-            repo_code_filename=repo_code_filename,
-            run_name=run_name,
-            configuration_type=job.ConfigurationType(self.conf.type),
-            configuration_path=self.configuration_path,
-            status=job.JobStatus.SUBMITTED,
-            created_at=created_at,
-            submitted_at=created_at,
-            image_name=self.image_name(),
-            registry_auth=self.registry_auth(),
-            entrypoint=self.entrypoint(),
-            build_commands=self.build_commands(),
-            setup=self.setup(),
-            commands=self.commands(),
-            working_dir=self.working_dir,
-            home_dir=self.home_dir(),
-            env=self.env(),
-            artifact_specs=self.artifact_specs(),
-            cache_specs=self.cache_specs(),
             app_specs=self.app_specs(),
-            dep_specs=self.dep_specs(),
-            spot_policy=self.spot_policy(),
-            retry_policy=self.retry_policy(),
-            max_duration=self.max_duration(),
+            artifact_specs=self.artifact_specs(),
+            build_commands=self.build_commands(),
             build_policy=self.build_policy,
-            termination_policy=self.termination_policy(),
+            cache_specs=self.cache_specs(),
+            commands=self.commands(),
+            configuration_path=self.configuration_path,
+            configuration_type=job.ConfigurationType(self.conf.type),
+            created_at=created_at,
+            dep_specs=self.dep_specs(),
+            entrypoint=self.entrypoint(),
+            env=self.env(),
+            gateway=self.gateway(),
+            home_dir=self.home_dir(),
+            image_name=self.image_name(run_plan),
+            job_id=f"{run_name},,0",
+            max_duration=self.max_duration(),
+            registry_auth=self.registry_auth(),
+            repo_code_filename=repo_code_filename,
+            repo_data=repo.repo_data,
+            repo_ref=repo.repo_ref,
             requirements=self.requirements(),
+            retry_policy=self.retry_policy(),
+            run_name=run_name,
+            runner_id=uuid.uuid4().hex,
+            setup=self.setup(),
+            spot_policy=self.spot_policy(),
             ssh_key_pub=ssh_key_pub,
+            status=job.JobStatus.SUBMITTED,
+            submitted_at=created_at,
+            termination_policy=self.termination_policy(),
+            working_dir=self.working_dir,
         )
         return [configured_job]
 
@@ -182,7 +186,11 @@ class JobConfigurator(ABC):
         pass
 
     @abstractmethod
-    def default_max_duration(self) -> int:
+    def default_max_duration(self) -> Optional[int]:
+        pass
+
+    @abstractmethod
+    def ports(self) -> Dict[int, ports.PortMapping]:
         pass
 
     @abstractmethod
@@ -201,11 +209,12 @@ class JobConfigurator(ABC):
     def home_dir(self) -> Optional[str]:
         return self.conf.home_dir
 
-    def image_name(self) -> str:
+    def image_name(self, run_plan: Optional[RunPlan]) -> Optional[str]:
         if self.conf.image is not None:
             return self.conf.image
-        if self.profile.resources and self.profile.resources.gpu:
-            return f"dstackai/base:py{self.python()}-{version.base_image}-cuda-11.8"
+        if run_plan is not None:
+            if len(run_plan.job_plans[0].instance_type.resources.gpus) > 0:
+                return f"dstackai/base:py{self.python()}-{version.base_image}-cuda-11.8"
         return f"dstackai/base:py{self.python()}-{version.base_image}"
 
     def cache_specs(self) -> List[job.CacheSpec]:
@@ -236,14 +245,6 @@ class JobConfigurator(ABC):
             return self.conf.python.value
         version_info = sys.version_info
         return PythonVersion(f"{version_info.major}.{version_info.minor}").value
-
-    def ports(self) -> Dict[int, ports.PortMapping]:
-        ports.unique_ports_constraint([pm.container_port for pm in self.conf.ports])
-        ports.unique_ports_constraint(
-            [pm.local_port for pm in self.conf.ports if pm.local_port is not None],
-            error="Mapped port {} is already in use",
-        )
-        return {pm.container_port: pm for pm in self.conf.ports}
 
     def env(self) -> Dict[str, str]:
         return self.conf.env
@@ -281,6 +282,35 @@ class JobConfigurator(ABC):
         if self.profile.max_duration < 0:
             return None
         return self.profile.max_duration
+
+    def gateway(self) -> Optional[job.Gateway]:
+        return None
+
+
+class JobConfiguratorWithPorts(JobConfigurator, ABC):
+    conf: BaseConfigurationWithPorts
+
+    def get_parser(
+        self, prog: Optional[str] = None, parser: Optional[argparse.ArgumentParser] = None
+    ) -> argparse.ArgumentParser:
+        parser = super().get_parser(prog, parser)
+        parser.add_argument(
+            "-p", "--ports", metavar="PORT", type=port_mapping, nargs=argparse.ONE_OR_MORE
+        )
+        return parser
+
+    def apply_args(self, args: argparse.Namespace):
+        super().apply_args(args)
+        if args.ports is not None:
+            self.conf.ports = list(ports.merge_ports(self.conf.ports, args.ports).values())
+
+    def ports(self) -> Dict[int, ports.PortMapping]:
+        ports.unique_ports_constraint([pm.container_port for pm in self.conf.ports])
+        ports.unique_ports_constraint(
+            [pm.local_port for pm in self.conf.ports if pm.local_port is not None],
+            error="Mapped port {} is already in use",
+        )
+        return {pm.container_port: pm for pm in self.conf.ports}
 
 
 def validate_local_path(path: str, home: Optional[str], working_dir: str) -> str:

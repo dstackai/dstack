@@ -1,9 +1,12 @@
 from typing import List, Optional, Tuple
 
 import yaml
+from pydantic import ValidationError
 
+import dstack._internal.backend.base.gateway as gateway
 from dstack._internal.backend.base import runners
 from dstack._internal.backend.base.compute import Compute, InstanceNotFoundError, NoCapacityError
+from dstack._internal.backend.base.secrets import SecretsManager
 from dstack._internal.backend.base.storage import Storage
 from dstack._internal.core.error import BackendError, BackendValueError, NoMatchingInstanceError
 from dstack._internal.core.instance import InstanceType
@@ -19,6 +22,7 @@ from dstack._internal.core.job import (
 from dstack._internal.core.repo import RepoRef
 from dstack._internal.core.runners import Runner
 from dstack._internal.utils.common import get_milliseconds_since_epoch
+from dstack._internal.utils.crypto import generate_rsa_key_pair_bytes
 from dstack._internal.utils.escape import escape_head, unescape_head
 from dstack._internal.utils.logging import get_logger
 
@@ -31,7 +35,7 @@ def create_job(
     create_head: bool = True,
 ):
     if create_head:
-        storage.put_object(key=_get_job_head_filename(job), content="")
+        storage.put_object(key=_get_job_head_filename_from_job(job), content="")
 
     storage.put_object(
         key=_get_job_filename(job.repo_ref.repo_id, job.job_id), content=yaml.dump(job.serialize())
@@ -42,7 +46,10 @@ def get_job(storage: Storage, repo_id: str, job_id: str) -> Optional[Job]:
     obj = storage.get_object(_get_job_filename(repo_id, job_id))
     if obj is None:
         return None
-    job = Job.unserialize(yaml.load(obj, yaml.FullLoader))
+    try:
+        job = Job.unserialize(yaml.load(obj, yaml.FullLoader))
+    except ValidationError:
+        return None
     return job
 
 
@@ -51,7 +58,7 @@ def update_job(storage: Storage, job: Job):
     job_keys = storage.list_objects(job_head_key_prefix)
     for key in job_keys:
         storage.delete_object(key)
-    storage.put_object(key=_get_job_head_filename(job), content="")
+    storage.put_object(key=_get_job_head_filename_from_job(job), content="")
     storage.put_object(
         key=_get_job_filename(job.repo_ref.repo_id, job.job_id), content=yaml.dump(job.serialize())
     )
@@ -113,12 +120,24 @@ def predict_job_instance(
 def run_job(
     storage: Storage,
     compute: Compute,
+    secrets_manager: SecretsManager,
     job: Job,
     failed_to_start_job_new_status: JobStatus,
 ):
     if job.status != JobStatus.SUBMITTED:
         raise BackendError("Can't create a request for a job which status is not SUBMITTED")
     try:
+        if job.configuration_type == ConfigurationType.SERVICE:
+            job.gateway.hostname = gateway.resolve_hostname(
+                secrets_manager, job.repo_ref.repo_id, job.gateway.hostname
+            )
+            private_bytes, public_bytes = generate_rsa_key_pair_bytes(comment=job.run_name)
+            job.gateway.sock_path = gateway.publish(
+                job.gateway.hostname, job.gateway.public_port, public_bytes
+            )
+            job.gateway.ssh_key = private_bytes.decode()
+            update_job(storage, job)
+
         _try_run_job(
             storage=storage,
             compute=compute,
@@ -152,16 +171,17 @@ def restart_job(
 
 
 def stop_job(
-    storage: Storage, compute: Compute, repo_id: str, job_id: str, terminate: str, abort: str
+    storage: Storage, compute: Compute, repo_id: str, job_id: str, terminate: bool, abort: bool
 ):
     logger.info("Stopping job [repo_id=%s job_id=%s]", repo_id, job_id)
     job_head = get_job_head(storage, repo_id, job_id)
+    if job_head.status.is_finished() and not job_head.status == JobStatus.STOPPED:
+        return
     job = get_job(storage, repo_id, job_id)
-    if job.termination_policy == TerminationPolicy.TERMINATE:
+    if job is not None and job.termination_policy == TerminationPolicy.TERMINATE:
         terminate = True
     if job_head.status.is_finished() and not terminate:
         return
-    runner = runners.get_runner(storage, job.runner_id)
     new_status = None
     if abort:
         new_status = JobStatus.ABORTED
@@ -180,12 +200,18 @@ def stop_job(
             new_status = JobStatus.TERMINATING
         else:
             new_status = JobStatus.STOPPING
-    if new_status is not None and new_status != job.status:
-        job.status = new_status
-        update_job(storage, job)
-        if new_status in [JobStatus.TERMINATED, JobStatus.ABORTED]:
-            if runner is not None:
-                runners.terminate_runner(compute, runner)
+    if new_status is not None and new_status != job_head.status:
+        if job is not None:
+            job.status = new_status
+            update_job(storage, job)
+            runner = runners.get_runner(storage, job.runner_id)
+            if new_status in [JobStatus.TERMINATED, JobStatus.ABORTED]:
+                if runner is not None:
+                    runners.terminate_runner(compute, runner)
+        else:
+            # If job file is deleted/corrupted, we'll update the job head only.
+            job_head.status = new_status
+            _update_job_head(storage, job_head)
 
 
 def update_job_submission(job: Job):
@@ -248,6 +274,14 @@ def _try_run_job(
         update_job(storage, job)
 
 
+def _update_job_head(storage: Storage, job_head: JobHead):
+    job_head_key_prefix = _get_job_head_filename_prefix(job_head.repo_ref.repo_id, job_head.job_id)
+    job_keys = storage.list_objects(job_head_key_prefix)
+    for key in job_keys:
+        storage.delete_object(key)
+    storage.put_object(key=_get_job_head_filename_from_job_head(job_head), content="")
+
+
 def _get_jobs_dir(repo_id: str) -> str:
     return f"jobs/{repo_id}/"
 
@@ -270,7 +304,7 @@ def _get_job_head_filename_prefix(repo_id: str, job_id: str) -> str:
     return key
 
 
-def _get_job_head_filename(job: Job) -> str:
+def _get_job_head_filename_from_job(job: Job) -> str:
     prefix = _get_jobs_dir(job.repo_ref.repo_id)
     key = (
         f"{prefix}l;"
@@ -285,6 +319,25 @@ def _get_job_head_filename(job: Job) -> str:
         f"{job.instance_type or ''};"
         f"{escape_head(job.configuration_path)};"
         f"{job.get_instance_spot_type()}"
+    )
+    return key
+
+
+def _get_job_head_filename_from_job_head(job_head: JobHead) -> str:
+    prefix = _get_jobs_dir(job_head.repo_ref.repo_id)
+    key = (
+        f"{prefix}l;"
+        f"{job_head.job_id};"
+        f"{job_head.provider_name};"
+        f"{job_head.hub_user_name};"
+        f"{job_head.submitted_at};"
+        f"{job_head.status.value},{job_head.error_code.value if job_head.error_code else ''},{job_head.container_exit_code or ''};"
+        f"{','.join([escape_head(artifact_path) for artifact_path in (job_head.artifact_paths or [])])};"
+        f"{','.join([app_name for app_name in (job_head.app_names or [])])};"
+        f"{job_head.tag_name or ''};"
+        f"{job_head.instance_type or ''};"
+        f"{escape_head(job_head.configuration_path)};"
+        f"{job_head.instance_spot_type}"
     )
     return key
 

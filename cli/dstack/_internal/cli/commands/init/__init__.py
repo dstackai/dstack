@@ -13,7 +13,7 @@ from dstack._internal.cli.utils.common import add_project_argument, console
 from dstack._internal.cli.utils.config import config, get_hub_client
 from dstack._internal.core.repo import LocalRepo, RemoteRepo
 from dstack._internal.core.userconfig import RepoUserConfig
-from dstack._internal.utils.crypto import generage_rsa_key_pair
+from dstack._internal.utils.crypto import generate_rsa_key_pair
 
 
 class InitCommand(BasicCommand):
@@ -106,5 +106,5 @@ def get_ssh_keypair(
     if dstack_key_path is None:
         return None
     if not dstack_key_path.exists():
-        generage_rsa_key_pair(private_key_path=dstack_key_path)
+        generate_rsa_key_pair(private_key_path=dstack_key_path)
     return str(dstack_key_path)

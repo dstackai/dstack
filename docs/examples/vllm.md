@@ -69,7 +69,7 @@ Here's how you run it with `dstack`:
 <div class="termy">
 
 ```shell
-$ dstack run . -f vllm/serve.dstack.yml --port 8000:8000
+$ dstack run . -f vllm/serve.dstack.yml --ports 8000:8000
 ```
 
 </div>

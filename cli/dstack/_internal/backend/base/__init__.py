@@ -2,6 +2,7 @@ from abc import ABC, abstractmethod
 from datetime import datetime
 from typing import Generator, List, Optional
 
+import dstack._internal.backend.base.gateway as gateway
 import dstack._internal.core.build
 from dstack._internal.backend.base import artifacts as base_artifacts
 from dstack._internal.backend.base import build as base_build
@@ -17,6 +18,7 @@ from dstack._internal.backend.base.secrets import SecretsManager
 from dstack._internal.backend.base.storage import Storage
 from dstack._internal.core.artifact import Artifact
 from dstack._internal.core.build import BuildPlan
+from dstack._internal.core.gateway import GatewayHead
 from dstack._internal.core.instance import InstanceType
 from dstack._internal.core.job import Job, JobHead, JobStatus
 from dstack._internal.core.log_event import LogEvent
@@ -45,11 +47,14 @@ class Backend(ABC):
         pass
 
     @abstractmethod
-    def create_run(self, repo_id: str) -> str:
+    def create_run(self, repo_id: str, run_name: Optional[str]) -> str:
         pass
 
     @abstractmethod
-    def create_job(self, job: Job):
+    def create_job(
+        self,
+        job: Job,
+    ):
         pass
 
     def submit_job(self, job: Job, failed_to_start_job_new_status: JobStatus = JobStatus.FAILED):
@@ -245,6 +250,18 @@ class Backend(ABC):
     def predict_build_plan(self, job: Job) -> BuildPlan:
         pass
 
+    @abstractmethod
+    def create_gateway(self, ssh_key_pub: str) -> GatewayHead:
+        pass
+
+    @abstractmethod
+    def list_gateways(self) -> List[GatewayHead]:
+        pass
+
+    @abstractmethod
+    def delete_gateway(self, instance_name: str):
+        pass
+
 
 class ComponentBasedBackend(Backend):
     @abstractmethod
@@ -280,7 +297,13 @@ class ComponentBasedBackend(Backend):
 
     def run_job(self, job: Job, failed_to_start_job_new_status: JobStatus):
         self.predict_build_plan(job)  # raises exception on missing build
-        base_jobs.run_job(self.storage(), self.compute(), job, failed_to_start_job_new_status)
+        base_jobs.run_job(
+            self.storage(),
+            self.compute(),
+            self.secrets_manager(),
+            job,
+            failed_to_start_job_new_status,
+        )
 
     def restart_job(self, job: Job):
         base_jobs.restart_job(self.storage(), self.compute(), job)
@@ -465,3 +488,12 @@ class ComponentBasedBackend(Backend):
         return base_build.predict_build_plan(
             self.storage(), job, dstack._internal.core.build.DockerPlatform.amd64
         )
+
+    def create_gateway(self, ssh_key_pub: str) -> GatewayHead:
+        return gateway.create_gateway(self.compute(), self.storage(), ssh_key_pub)
+
+    def list_gateways(self) -> List[GatewayHead]:
+        return gateway.list_gateways(self.storage())
+
+    def delete_gateway(self, instance_name: str):
+        gateway.delete_gateway(self.compute(), self.storage(), instance_name)

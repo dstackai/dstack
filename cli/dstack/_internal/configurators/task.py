@@ -1,37 +1,39 @@
 from typing import List, Optional
 
-from dstack._internal.configurators import JobConfigurator, validate_local_path
+from dstack._internal.configurators import JobConfiguratorWithPorts, validate_local_path
 from dstack._internal.configurators.extensions.ssh import SSHd
 from dstack._internal.configurators.ports import get_map_to_port
 from dstack._internal.core import job as job
 from dstack._internal.core.configuration import TaskConfiguration
+from dstack._internal.core.plan import RunPlan
 from dstack._internal.core.repo import Repo
 
 DEFAULT_MAX_DURATION_SECONDS = 72 * 3600
 
 
-class TaskConfigurator(JobConfigurator):
+class TaskConfigurator(JobConfiguratorWithPorts):
     conf: TaskConfiguration
     sshd: Optional[SSHd]
 
     def get_jobs(
-        self, repo: Repo, run_name: str, repo_code_filename: str, ssh_key_pub: str
+        self,
+        repo: Repo,
+        run_name: str,
+        repo_code_filename: str,
+        ssh_key_pub: str,
+        run_plan: Optional[RunPlan] = None,
     ) -> List[job.Job]:
         self.sshd = SSHd(ssh_key_pub)
         self.sshd.map_to_port = get_map_to_port(self.ports(), self.sshd.port)
-        return super().get_jobs(repo, run_name, repo_code_filename, ssh_key_pub)
-
-    def optional_build_commands(self) -> List[str]:
-        return []  # not needed
+        return super().get_jobs(repo, run_name, repo_code_filename, ssh_key_pub, run_plan)
 
     def build_commands(self) -> List[str]:
         return self.conf.build
 
     def setup(self) -> List[str]:
         commands = []
-        if self.conf.image:
-            commands += self.sshd.get_required_commands()
-        commands += self.sshd.get_setup_commands()
+        if self.conf.image is None:
+            commands += self.sshd.get_setup_commands()
         commands += self.conf.setup
         return commands
 
@@ -42,7 +44,7 @@ class TaskConfigurator(JobConfigurator):
         commands += self.conf.commands
         return commands
 
-    def default_max_duration(self) -> int:
+    def default_max_duration(self) -> Optional[int]:
         return DEFAULT_MAX_DURATION_SECONDS
 
     def termination_policy(self) -> job.TerminationPolicy:

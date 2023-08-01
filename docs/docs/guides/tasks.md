@@ -94,12 +94,12 @@ However, you have the option to override the local machine's port for traffic fo
     <div class="termy">
 
     ```shell
-    $ dstack run . -f serve.dstack.yml --port 3000:7860
+    $ dstack run . -f serve.dstack.yml --ports 3000:7860
     ```
 
     </div>
 
-    Alternatively, instead of using `--port` in the CLI, you can hardcode the local ports directly 
+    Alternatively, instead of using `--ports` in the CLI, you can hardcode the local ports directly 
     into the configuration:
 
     <div editor-title="serve.dstack.yml"> 
@@ -117,7 +117,7 @@ However, you have the option to override the local machine's port for traffic fo
     
     </div>
 
-    Now, even without using `--port` with your `dstack run` command, the traffic will be available on port `3000` 
+    Now, even without using `--ports` with your `dstack run` command, the traffic will be available on port `3000` 
     on your local machine.
 
 ## Environment

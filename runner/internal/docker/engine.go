@@ -342,8 +342,6 @@ func (e *Engine) NewBuildSpec(ctx context.Context, job *models.Job, spec *Spec, 
 		return nil, gerrors.Wrap(err)
 	}
 
-	commands := append([]string{}, job.BuildCommands...)
-	commands = append(commands, job.OptionalBuildCommands...)
 	env := environment.New()
 	env.AddMapString(secrets)
 
@@ -353,12 +351,12 @@ func (e *Engine) NewBuildSpec(ctx context.Context, job *models.Job, spec *Spec, 
 		WorkDir:            spec.WorkDir,
 		ConfigurationPath:  job.ConfigurationPath,
 		ConfigurationType:  job.ConfigurationType,
-		Commands:           ShellCommands(InsertEnvs(commands, job.Environment)),
+		Commands:           ShellCommands(InsertEnvs(job.BuildCommands, job.Environment)),
 		Entrypoint:         spec.Entrypoint,
 		Env:                env.ToSlice(),
 		RegistryAuthBase64: spec.RegistryAuthBase64,
 		RepoPath:           repoPath,
-		RepoId:             job.RepoId,
+		RepoId:             job.RepoRef.RepoId,
 		ShmSize:            spec.ShmSize,
 	}
 	if daemonInfo.Architecture == "aarch64" {

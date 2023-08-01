@@ -63,6 +63,10 @@ class ProfileGPU(ForbidExtra):
     ]
     _validate_mem = validator("memory", pre=True, allow_reuse=True)(parse_memory)
 
+    @validator("name")
+    def _validate_name(name: str):
+        return name.upper()
+
 
 class ProfileResources(ForbidExtra):
     gpu: Optional[Union[int, ProfileGPU]]
@@ -126,6 +130,9 @@ class Profile(ForbidExtra):
 
 class ProfilesConfig(ForbidExtra):
     profiles: List[Profile]
+
+    class Config:
+        schema_extra = {"$schema": "http://json-schema.org/draft-07/schema#"}
 
     def default(self) -> Profile:
         for p in self.profiles:

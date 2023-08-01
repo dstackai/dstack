@@ -60,10 +60,10 @@ class LambdaBackend(ComponentBasedBackend):
     def logging(self) -> AWSLogging:
         return self._logging
 
-    def create_run(self, repo_id: str) -> str:
+    def create_run(self, repo_id: str, run_name: Optional[str]) -> str:
         self._logging.create_log_groups_if_not_exist(
             aws_utils.get_logs_client(self._session),
             self.backend_config.storage_config.bucket,
             repo_id,
         )
-        return base_runs.create_run(self._storage)
+        return base_runs.create_run(self._storage, run_name)
