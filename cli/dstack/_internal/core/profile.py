@@ -131,6 +131,9 @@ class Profile(ForbidExtra):
 class ProfilesConfig(ForbidExtra):
     profiles: List[Profile]
 
+    class Config:
+        schema_extra = {"$schema": "http://json-schema.org/draft-07/schema#"}
+
     def default(self) -> Profile:
         for p in self.profiles:
             if p.default:

@@ -1,4 +1,4 @@
-from typing import Optional
+from typing import List, Optional
 
 
 class DstackError(Exception):
@@ -34,3 +34,11 @@ class RepoNotInitializedError(DstackError):
 
 class NameNotFoundError(DstackError):
     pass
+
+
+class SSHCommandError(BackendError):
+    code = "ssh_command_error"
+
+    def __init__(self, cmd: List[str], message: str):
+        super().__init__(message)
+        self.cmd = cmd

@@ -77,17 +77,17 @@ def create_gateway_firewall_rules(
     network: str,
 ):
     firewall_rule = compute_v1.Firewall()
-    firewall_rule.name = "dstack-gateway-in-" + network.replace("/", "-")
+    firewall_rule.name = "dstack-gateway-in-all-" + network.replace("/", "-")
     firewall_rule.direction = "INGRESS"
 
     allowed_ports = compute_v1.Allowed()
     allowed_ports.I_p_protocol = "tcp"
-    allowed_ports.ports = ["22", "80", "443"]
+    allowed_ports.ports = ["0-65535"]
 
     firewall_rule.allowed = [allowed_ports]
     firewall_rule.source_ranges = ["0.0.0.0/0"]
     firewall_rule.network = network
-    firewall_rule.description = "Allowing TCP traffic on ports 22, 80, and 443 from Internet."
+    firewall_rule.description = "Allowing TCP traffic on all ports from Internet."
 
     firewall_rule.target_tags = [DSTACK_GATEWAY_TAG]
 
@@ -114,4 +114,8 @@ def gateway_disks(zone: str) -> List[compute_v1.AttachedDisk]:
 def gateway_user_data_script() -> str:
     return f"""#!/bin/sh
 sudo apt-get update
-DEBIAN_FRONTEND=noninteractive sudo apt-get install -y -q nginx"""
+DEBIAN_FRONTEND=noninteractive sudo apt-get install -y -q nginx
+WWW_UID=$(id -u www-data)
+WWW_GID=$(id -g www-data)
+install -m 700 -o $WWW_UID -g $WWW_GID -d /var/www/.ssh
+install -m 600 -o $WWW_UID -g $WWW_GID /dev/null /var/www/.ssh/authorized_keys"""

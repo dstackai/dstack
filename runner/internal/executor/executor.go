@@ -396,7 +396,7 @@ func (ex *Executor) startJob(ctx context.Context, erCh chan error, stoppedCh cha
 			return
 		}
 		defer gatewayControl.Cleanup()
-		if err := gatewayControl.Publish(localPort, strconv.Itoa(job.Gateway.PublicPort)); err != nil {
+		if err := gatewayControl.Publish(localPort, job.Gateway.SockPath); err != nil {
 			erCh <- gerrors.Wrap(err)
 			return
 		}
