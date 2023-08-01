@@ -3,7 +3,7 @@ from typing import List
 from fastapi import APIRouter, Body, Depends, HTTPException, status
 
 from dstack._internal.core.gateway import GatewayHead
-from dstack._internal.hub.routers.util import error_detail, get_backend, get_project
+from dstack._internal.hub.routers.util import error_detail, get_backends, get_project
 from dstack._internal.hub.security.permissions import ProjectAdmin, ProjectMember
 from dstack._internal.hub.utils.common import run_async
 from dstack._internal.hub.utils.ssh import get_hub_ssh_public_key

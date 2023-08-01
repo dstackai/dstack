@@ -41,8 +41,9 @@ logger = logging.get_logger(__name__)
 
 app = FastAPI(docs_url="/api/docs")
 app.include_router(users.router)
-app.include_router(backends.router)
 app.include_router(projects.router)
+app.include_router(backends.root_router)
+app.include_router(backends.project_router)
 app.include_router(runs.root_router)
 app.include_router(runs.project_router)
 app.include_router(jobs.router)
@@ -58,7 +59,7 @@ app.include_router(configurations.router)
 app.include_router(gateways.router)
 
 
-DEFAULT_PROJECT_NAME = "local"
+DEFAULT_PROJECT_NAME = "main"
 
 
 @app.on_event("startup")
@@ -104,12 +105,10 @@ async def update_admin_user() -> User:
 
 
 async def create_default_project(user: User):
-    if not local_backend_available():
-        return
     default_project = await ProjectManager.get(DEFAULT_PROJECT_NAME)
     if default_project is not None:
         return
-    await ProjectManager.create_local_project(user=user, project_name=DEFAULT_PROJECT_NAME)
+    await ProjectManager.create(user=user, project_name=DEFAULT_PROJECT_NAME, members=[])
 
 
 def create_default_project_config(url: str, token: str):

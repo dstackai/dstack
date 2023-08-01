@@ -32,12 +32,12 @@ BackendType = Union[
 ]
 
 
-class LocalProjectConfig(BaseModel):
+class LocalBackendConfig(BaseModel):
     type: Literal["local"] = "local"
     path: Optional[str]
 
 
-class AWSProjectConfigPartial(BaseModel):
+class AWSBackendConfigPartial(BaseModel):
     type: Literal["aws"] = "aws"
     region_name: Optional[str]
     region_name_title: Optional[str]
@@ -46,7 +46,7 @@ class AWSProjectConfigPartial(BaseModel):
     ec2_subnet_id: Optional[str]
 
 
-class AWSProjectConfig(BaseModel):
+class AWSBackendConfig(BaseModel):
     type: Literal["aws"] = "aws"
     region_name: str
     region_name_title: Optional[str]
@@ -55,31 +55,31 @@ class AWSProjectConfig(BaseModel):
     ec2_subnet_id: Optional[str]
 
 
-class AWSProjectDefaultCreds(BaseModel):
+class AWSBackendDefaultCreds(BaseModel):
     type: Literal["default"] = "default"
 
 
-class AWSProjectAccessKeyCreds(BaseModel):
+class AWSBackendAccessKeyCreds(BaseModel):
     type: Literal["access_key"] = "access_key"
     access_key: str
     secret_key: str
 
 
-class AWSProjectCreds(BaseModel):
-    __root__: Union[AWSProjectAccessKeyCreds, AWSProjectDefaultCreds] = Field(
+class AWSBackendCreds(BaseModel):
+    __root__: Union[AWSBackendAccessKeyCreds, AWSBackendDefaultCreds] = Field(
         ..., discriminator="type"
     )
 
 
-class AWSProjectConfigWithCredsPartial(AWSProjectConfigPartial):
-    credentials: Optional[AWSProjectCreds]
+class AWSBackendConfigWithCredsPartial(AWSBackendConfigPartial):
+    credentials: Optional[AWSBackendCreds]
 
 
-class AWSProjectConfigWithCreds(AWSProjectConfig):
-    credentials: AWSProjectCreds
+class AWSBackendConfigWithCreds(AWSBackendConfig):
+    credentials: AWSBackendCreds
 
 
-class GCPProjectConfigPartial(BaseModel):
+class GCPBackendConfigPartial(BaseModel):
     type: Literal["gcp"] = "gcp"
     area: Optional[str]
     region: Optional[str]
@@ -89,7 +89,7 @@ class GCPProjectConfigPartial(BaseModel):
     subnet: Optional[str]
 
 
-class GCPProjectConfig(BaseModel):
+class GCPBackendConfig(BaseModel):
     type: Literal["gcp"] = "gcp"
     area: str
     region: str
@@ -99,31 +99,31 @@ class GCPProjectConfig(BaseModel):
     subnet: str
 
 
-class GCPProjectDefaultCreds(BaseModel):
+class GCPBackendDefaultCreds(BaseModel):
     type: Literal["default"] = "default"
 
 
-class GCPProjectServiceAccountCreds(BaseModel):
+class GCPBackendServiceAccountCreds(BaseModel):
     type: Literal["service_account"] = "service_account"
     filename: str
     data: str
 
 
-class GCPProjectCreds(BaseModel):
-    __root__: Union[GCPProjectServiceAccountCreds, GCPProjectDefaultCreds] = Field(
+class GCPBackendCreds(BaseModel):
+    __root__: Union[GCPBackendServiceAccountCreds, GCPBackendDefaultCreds] = Field(
         ..., discriminator="type"
     )
 
 
-class GCPProjectConfigWithCredsPartial(GCPProjectConfigPartial):
-    credentials: Optional[GCPProjectCreds]
+class GCPBackendConfigWithCredsPartial(GCPBackendConfigPartial):
+    credentials: Optional[GCPBackendCreds]
 
 
-class GCPProjectConfigWithCreds(GCPProjectConfig):
-    credentials: GCPProjectCreds
+class GCPBackendConfigWithCreds(GCPBackendConfig):
+    credentials: GCPBackendCreds
 
 
-class AzureProjectConfigPartial(BaseModel):
+class AzureBackendConfigPartial(BaseModel):
     type: Literal["azure"] = "azure"
     tenant_id: Optional[str]
     subscription_id: Optional[str]
@@ -131,27 +131,27 @@ class AzureProjectConfigPartial(BaseModel):
     storage_account: Optional[str]
 
 
-class AzureProjectClientCreds(BaseModel):
+class AzureBackendClientCreds(BaseModel):
     type: Literal["client"] = "client"
     client_id: str
     client_secret: str
 
 
-class AzureProjectDefaultCreds(BaseModel):
+class AzureBackendDefaultCreds(BaseModel):
     type: Literal["default"] = "default"
 
 
-class AzureProjectCreds(BaseModel):
-    __root__: Union[AzureProjectClientCreds, AzureProjectDefaultCreds] = Field(
+class AzureBackendCreds(BaseModel):
+    __root__: Union[AzureBackendClientCreds, AzureBackendDefaultCreds] = Field(
         ..., discriminator="type"
     )
 
 
-class AzureProjectConfigWithCredsPartial(AzureProjectConfigPartial):
-    credentials: Optional[AzureProjectCreds]
+class AzureBackendConfigWithCredsPartial(AzureBackendConfigPartial):
+    credentials: Optional[AzureBackendCreds]
 
 
-class AzureProjectConfig(BaseModel):
+class AzureBackendConfig(BaseModel):
     type: Literal["azure"] = "azure"
     tenant_id: str
     subscription_id: str
@@ -159,167 +159,176 @@ class AzureProjectConfig(BaseModel):
     storage_account: str
 
 
-class AzureProjectConfigWithCreds(AzureProjectConfig):
-    credentials: AzureProjectCreds
+class AzureBackendConfigWithCreds(AzureBackendConfig):
+    credentials: AzureBackendCreds
 
 
-class AWSStorageProjectConfigWithCredsPartial(BaseModel):
+class AWSStorageBackendConfigWithCredsPartial(BaseModel):
     type: Literal["aws"] = "aws"
     bucket_name: Optional[str]
-    credentials: Optional[AWSProjectAccessKeyCreds]
+    credentials: Optional[AWSBackendAccessKeyCreds]
 
 
-class AWSStorageProjectConfig(BaseModel):
+class AWSStorageBackendConfig(BaseModel):
     type: Literal["aws"] = "aws"
     bucket_name: str
 
 
-class AWSStorageProjectConfigWithCreds(AWSStorageProjectConfig):
-    credentials: AWSProjectAccessKeyCreds
+class AWSStorageBackendConfigWithCreds(AWSStorageBackendConfig):
+    credentials: AWSBackendAccessKeyCreds
 
 
-class LambdaProjectConfigWithCredsPartial(BaseModel):
+class LambdaBackendConfigWithCredsPartial(BaseModel):
     type: Literal["lambda"] = "lambda"
     api_key: Optional[str]
     regions: Optional[List[str]]
-    storage_backend: Optional[AWSStorageProjectConfigWithCredsPartial]
+    storage_backend: Optional[AWSStorageBackendConfigWithCredsPartial]
 
 
-class LambdaProjectConfig(BaseModel):
+class LambdaBackendConfig(BaseModel):
     type: Literal["lambda"] = "lambda"
     regions: List[str]
-    storage_backend: AWSStorageProjectConfig
+    storage_backend: AWSStorageBackendConfig
 
 
-class LambdaProjectConfigWithCreds(LambdaProjectConfig):
+class LambdaBackendConfigWithCreds(LambdaBackendConfig):
     api_key: str
-    storage_backend: AWSStorageProjectConfigWithCreds
+    storage_backend: AWSStorageBackendConfigWithCreds
 
 
-AnyProjectConfig = Union[
-    LocalProjectConfig, AWSProjectConfig, GCPProjectConfig, AzureProjectConfig, LambdaProjectConfig
+AnyBackendConfig = Union[
+    LocalBackendConfig, AWSBackendConfig, GCPBackendConfig, AzureBackendConfig, LambdaBackendConfig
 ]
-AnyProjectConfigWithCredsPartial = Union[
-    LocalProjectConfig,
-    AWSProjectConfigWithCredsPartial,
-    GCPProjectConfigWithCredsPartial,
-    AzureProjectConfigWithCredsPartial,
-    LambdaProjectConfigWithCredsPartial,
+AnyBackendConfigWithCredsPartial = Union[
+    LocalBackendConfig,
+    AWSBackendConfigWithCredsPartial,
+    GCPBackendConfigWithCredsPartial,
+    AzureBackendConfigWithCredsPartial,
+    LambdaBackendConfigWithCredsPartial,
 ]
-AnyProjectConfigWithCreds = Union[
-    LocalProjectConfig,
-    AWSProjectConfigWithCreds,
-    GCPProjectConfigWithCreds,
-    AzureProjectConfigWithCreds,
-    LambdaProjectConfigWithCreds,
+AnyBackendConfigWithCreds = Union[
+    LocalBackendConfig,
+    AWSBackendConfigWithCreds,
+    GCPBackendConfigWithCreds,
+    AzureBackendConfigWithCreds,
+    LambdaBackendConfigWithCreds,
 ]
 
 
-class ProjectConfig(BaseModel):
-    __root__: AnyProjectConfig = Field(..., discriminator="type")
+class BackendInfo(BaseModel):
+    __root__: AnyBackendConfig = Field(..., discriminator="type")
 
 
-class ProjectConfigWithCredsPartial(BaseModel):
-    __root__: AnyProjectConfigWithCredsPartial = Field(..., discriminator="type")
+class BackendConfigWithCredsPartial(BaseModel):
+    __root__: AnyBackendConfigWithCredsPartial = Field(..., discriminator="type")
 
 
-class ProjectConfigWithCreds(BaseModel):
-    __root__: AnyProjectConfigWithCreds = Field(..., discriminator="type")
+class BackendConfigWithCreds(BaseModel):
+    __root__: AnyBackendConfigWithCreds = Field(..., discriminator="type")
 
 
-class ProjectInfo(BaseModel):
-    project_name: str
-    backend: ProjectConfig
-    members: List[Member] = []
+class BackendInfo(BaseModel):
+    name: str
+    config: AnyBackendConfig = Field(..., discriminator="type")
 
 
-class ProjectInfoWithCreds(BaseModel):
-    project_name: str
-    backend: ProjectConfigWithCreds
-    members: List[Member] = []
+class BackendInfoWithCreds(BaseModel):
+    name: str
+    config: AnyBackendConfigWithCreds = Field(..., discriminator="type")
 
 
-class ProjectElementValue(BaseModel):
+class BackendElementValue(BaseModel):
     value: str
     label: str
 
 
-class ProjectElement(BaseModel):
+class BackendElement(BaseModel):
     selected: Optional[str]
-    values: List[ProjectElementValue] = []
+    values: List[BackendElementValue] = []
 
 
-class ProjectMultiElement(BaseModel):
+class BackendMultiElement(BaseModel):
     selected: List[str]
-    values: List[ProjectElementValue] = []
+    values: List[BackendElementValue] = []
 
 
-class AWSBucketProjectElementValue(BaseModel):
+class AWSBucketBackendElementValue(BaseModel):
     name: str
     created: str
     region: str
 
 
-class AWSBucketProjectElement(BaseModel):
+class AWSBucketBackendElement(BaseModel):
     selected: Optional[str]
-    values: List[AWSBucketProjectElementValue] = []
+    values: List[AWSBucketBackendElementValue] = []
 
 
-class AWSProjectValues(BaseModel):
+class AWSBackendValues(BaseModel):
     type: Literal["aws"] = "aws"
     default_credentials: bool = False
-    region_name: Optional[ProjectElement]
-    extra_regions: Optional[ProjectMultiElement]
-    s3_bucket_name: Optional[AWSBucketProjectElement]
-    ec2_subnet_id: Optional[ProjectElement]
+    region_name: Optional[BackendElement]
+    extra_regions: Optional[BackendMultiElement]
+    s3_bucket_name: Optional[AWSBucketBackendElement]
+    ec2_subnet_id: Optional[BackendElement]
 
 
-class GCPVPCSubnetProjectElementValue(BaseModel):
+class GCPVPCSubnetBackendElementValue(BaseModel):
     label: Optional[str]
     vpc: Optional[str]
     subnet: Optional[str]
 
 
-class GCPVPCSubnetProjectElement(BaseModel):
+class GCPVPCSubnetBackendElement(BaseModel):
     selected: Optional[str]
-    values: List[GCPVPCSubnetProjectElementValue] = []
+    values: List[GCPVPCSubnetBackendElementValue] = []
 
 
-class GCPProjectValues(BaseModel):
+class GCPBackendValues(BaseModel):
     type: Literal["gcp"] = "gcp"
     default_credentials: bool = False
-    area: Optional[ProjectElement]
-    region: Optional[ProjectElement]
-    zone: Optional[ProjectElement]
-    bucket_name: Optional[ProjectElement]
-    vpc_subnet: Optional[GCPVPCSubnetProjectElement]
+    area: Optional[BackendElement]
+    region: Optional[BackendElement]
+    zone: Optional[BackendElement]
+    bucket_name: Optional[BackendElement]
+    vpc_subnet: Optional[GCPVPCSubnetBackendElement]
 
 
-class AzureProjectValues(BaseModel):
+class AzureBackendValues(BaseModel):
     type: Literal["azure"] = "azure"
     default_credentials: bool = False
-    tenant_id: Optional[ProjectElement]
-    subscription_id: Optional[ProjectElement]
-    location: Optional[ProjectElement]
-    storage_account: Optional[ProjectElement]
+    tenant_id: Optional[BackendElement]
+    subscription_id: Optional[BackendElement]
+    location: Optional[BackendElement]
+    storage_account: Optional[BackendElement]
 
 
 class AWSStorageBackendValues(BaseModel):
     type: Literal["aws"] = "aws"
-    bucket_name: Optional[ProjectElement]
+    bucket_name: Optional[BackendElement]
 
 
-class LambdaProjectValues(BaseModel):
+class LambdaBackendValues(BaseModel):
     type: Literal["lambda"] = "lambda"
-    storage_backend_type: ProjectElement
-    regions: Optional[ProjectMultiElement]
+    storage_backend_type: BackendElement
+    regions: Optional[BackendMultiElement]
     storage_backend_values: Optional[AWSStorageBackendValues]
 
 
-class ProjectValues(BaseModel):
+class BackendValues(BaseModel):
     __root__: Union[
-        None, AWSProjectValues, GCPProjectValues, AzureProjectValues, LambdaProjectValues
+        None, AWSBackendValues, GCPBackendValues, AzureBackendValues, LambdaBackendValues
     ] = Field(..., discriminator="type")
+
+
+class ProjectInfo(BaseModel):
+    project_name: str
+    backends: List[BackendInfo]
+    members: List[Member] = []
+
+
+class ProjectCreate(BaseModel):
+    project_name: str
+    members: List[Member] = []
 
 
 class AddTagRun(BaseModel):
@@ -388,8 +397,10 @@ class RunsDelete(BaseModel):
 
 class RunInfo(BaseModel):
     project: str
-    repo: RepoHead
+    repo_id: str
+    backend: str
     run_head: RunHead
+    repo: Optional[RepoHead]
 
 
 class JobHeadList(BaseModel):
@@ -434,8 +445,12 @@ class StorageLink(BaseModel):
     object_key: str
 
 
-class ProjectDelete(BaseModel):
+class ProjectsDelete(BaseModel):
     projects: List[str] = []
+
+
+class BackendsDelete(BaseModel):
+    backends: List[str] = []
 
 
 class UserPatch(BaseModel):

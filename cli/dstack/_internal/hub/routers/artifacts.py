@@ -3,7 +3,7 @@ from typing import List
 from fastapi import APIRouter, Depends
 
 from dstack._internal.core.artifact import Artifact
-from dstack._internal.hub.routers.util import call_backend, get_backend, get_project
+from dstack._internal.hub.routers.util import call_backend, get_backends, get_project
 from dstack._internal.hub.schemas import ArtifactsList
 from dstack._internal.hub.security.permissions import ProjectMember
 

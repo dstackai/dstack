@@ -11,13 +11,7 @@ from dstack._internal.core.plan import JobPlan, RunPlan
 from dstack._internal.core.run import RunHead
 from dstack._internal.hub.db.models import User
 from dstack._internal.hub.repository.projects import ProjectManager
-from dstack._internal.hub.routers.util import (
-    call_backend,
-    error_detail,
-    get_backend,
-    get_backend_if_available,
-    get_project,
-)
+from dstack._internal.hub.routers.util import call_backend, error_detail, get_backends, get_project
 from dstack._internal.hub.schemas import (
     RunInfo,
     RunsCreate,
@@ -41,28 +35,29 @@ project_router = APIRouter(
 @root_router.post("/list")
 async def list_all_runs() -> List[RunInfo]:
     projects = await ProjectManager.list()
+    # TODO sort
     run_infos = []
     for project in projects:
-        backend = await get_backend_if_available(project)
-        if backend is None:
-            logger.warning(
-                "Missing dependencies for %s backend. "
-                "%s runs are not included in the response.",
-                project.backend,
-                project.name,
-            )
-            continue
-        repo_heads = await call_backend(backend.list_repo_heads)
-        for repo_head in repo_heads:
-            run_heads = await call_backend(
-                backend.list_run_heads,
-                repo_head.repo_id,
-                None,
-                False,
-                JobStatus.PENDING,
-            )
-            for run_head in run_heads:
-                run_infos.append(RunInfo(project=project.name, repo=repo_head, run_head=run_head))
+        backends = await get_backends(project)
+        for db_backend, backend in backends:
+            repo_heads = await call_backend(backend.list_repo_heads)
+            for repo_head in repo_heads:
+                run_heads = await call_backend(
+                    backend.list_run_heads,
+                    repo_head.repo_id,
+                    None,
+                    False,
+                    JobStatus.PENDING,
+                )
+                for run_head in run_heads:
+                    run_info = RunInfo(
+                        project=project.name,
+                        repo_id=repo_head.repo_id,
+                        backend=db_backend.name,
+                        run_head=run_head,
+                        repo=repo_head,
+                    )
+                    run_infos.append(run_info)
     return run_infos
 
 
@@ -110,17 +105,28 @@ async def create_run(project_name: str, body: RunsCreate) -> str:
 @project_router.post(
     "/{project_name}/runs/list",
 )
-async def list_runs(project_name: str, body: RunsList) -> List[RunHead]:
+async def list_runs(project_name: str, body: RunsList) -> List[RunInfo]:
     project = await get_project(project_name=project_name)
-    backend = await get_backend(project)
-    run_heads = await call_backend(
-        backend.list_run_heads,
-        body.repo_id,
-        body.run_name,
-        body.include_request_heads,
-        JobStatus.PENDING,
-    )
-    return run_heads
+    backends = await get_backends(project)
+    # TODO sort
+    run_infos = []
+    for db_backend, backend in backends:
+        run_heads = await call_backend(
+            backend.list_run_heads,
+            body.repo_id,
+            body.run_name,
+            body.include_request_heads,
+            JobStatus.PENDING,
+        )
+        for run_head in run_heads:
+            run_info = RunInfo(
+                project=project.name,
+                repo_id=body.repo_id,
+                backend=db_backend.name,
+                run_head=run_head,
+            )
+            run_infos.append(run_info)
+    return run_infos
 
 
 @project_router.post(

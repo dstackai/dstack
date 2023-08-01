@@ -1,12 +1,10 @@
 from typing import List
 
 from dstack._internal.backend.base import Backend
-from dstack._internal.core.error import BackendAuthError
 from dstack._internal.core.job import JobStatus
 from dstack._internal.hub.db.models import Project
 from dstack._internal.hub.repository.projects import ProjectManager
-from dstack._internal.hub.services.backends import get_configurator
-from dstack._internal.hub.services.backends.cache import get_backend
+from dstack._internal.hub.services.backends.cache import get_backends
 from dstack._internal.hub.utils.common import run_async
 from dstack._internal.utils.common import get_milliseconds_since_epoch
 from dstack._internal.utils.logging import get_logger
@@ -24,19 +22,11 @@ async def resubmit_jobs():
 async def _resubmit_projects_jobs(projects: List[Project]):
     for project in projects:
         logger.info("Resubmitting jobs for %s project", project.name)
-        try:
-            backend = await get_backend(project)
-        except BackendAuthError:
-            logger.warning(
-                "Credentials for %s project are invalid. Skipping job resubmission.", project.name
-            )
-            continue
-        if backend is None:
-            logger.warning(
-                "Missing dependencies for %s. Skipping job resubmission.", project.backend
-            )
-            continue
-        await run_async(_resubmit_backend_jobs, backend)
+        backends = await get_backends(project)
+        for db_backend, backend in backends:
+            logger.info("Resubmitting jobs for %s backend", db_backend.name)
+            await run_async(_resubmit_backend_jobs, backend)
+            logger.info("Finished resubmitting jobs for %s backend", db_backend.name)
         logger.info("Finished resubmitting jobs for %s project", project.name)
 
 

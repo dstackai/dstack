@@ -6,13 +6,15 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
 from dstack._internal.hub.db import reuse_or_make_session
+from dstack._internal.hub.db.models import Backend
 from dstack._internal.hub.db.models import Member as DBMember
 from dstack._internal.hub.db.models import Project, User
 from dstack._internal.hub.schemas import (
-    LocalProjectConfig,
+    AnyBackendConfigWithCreds,
+    BackendInfo,
+    BackendInfoWithCreds,
     Member,
     ProjectInfo,
-    ProjectInfoWithCreds,
 )
 from dstack._internal.hub.security.utils import ROLE_ADMIN
 from dstack._internal.hub.services.backends import get_configurator
@@ -21,42 +23,24 @@ from dstack._internal.hub.utils.common import run_async
 
 class ProjectManager:
     @staticmethod
-    async def get_project_info_with_creds(project: Project) -> Optional[ProjectInfoWithCreds]:
-        return _project2info(project=project, include_creds=True)
-
-    @staticmethod
     async def get_project_info(project: Project) -> Optional[ProjectInfo]:
-        return _project2info(project=project, include_creds=False)
+        return await _project_to_project_info(project=project)
 
     @staticmethod
     @reuse_or_make_session
-    async def create_project_from_info(
-        user: User, project_info: ProjectInfoWithCreds, session: Optional[AsyncSession] = None
+    async def create(
+        user: User,
+        project_name: str,
+        members: List[Member],
+        session: Optional[AsyncSession] = None,
     ):
-        project = await _info2project(project_info)
-        await ProjectManager.create(project, session=session)
+        project = Project(name=project_name)
+        await ProjectManager._create(project, session=session)
         await ProjectManager._add_member(
-            project, Member(user_name=user.name, project_role=ROLE_ADMIN)
+            project=project,
+            member=Member(user_name=user.name, project_role=ROLE_ADMIN),
+            session=session,
         )
-
-    @staticmethod
-    @reuse_or_make_session
-    async def create_local_project(
-        user: User, project_name: str, session: Optional[AsyncSession] = None
-    ):
-        project_info = ProjectInfoWithCreds(
-            project_name=project_name, backend=LocalProjectConfig()
-        )
-        await ProjectManager.create_project_from_info(
-            user=user, project_info=project_info, session=session
-        )
-
-    @staticmethod
-    async def update_project_from_info(
-        project_info: ProjectInfoWithCreds, session: Optional[AsyncSession] = None
-    ):
-        project = await _info2project(project_info)
-        await ProjectManager.update(project, session=session)
 
     @staticmethod
     @reuse_or_make_session
@@ -65,7 +49,7 @@ class ProjectManager:
         projects = query.scalars().unique().all()
         projects_info = []
         for project in projects:
-            project_info = _project2info(project=project)
+            project_info = await _project_to_project_info(project=project)
             if project_info is not None:
                 projects_info.append(project_info)
         return projects_info
@@ -85,26 +69,6 @@ class ProjectManager:
         query = await session.execute(select(Project).options(selectinload(Project.members)))
         projects = query.scalars().unique().all()
         return projects
-
-    @staticmethod
-    @reuse_or_make_session
-    async def create(project: Project, session: Optional[AsyncSession] = None):
-        session.add(project)
-        await session.commit()
-
-    @staticmethod
-    @reuse_or_make_session
-    async def update(project: Project, session: Optional[AsyncSession] = None):
-        await session.execute(
-            update(Project)
-            .where(Project.name == project.name)
-            .values(
-                backend=project.backend,
-                config=project.config,
-                auth=project.auth,
-            )
-        )
-        await session.commit()
 
     @staticmethod
     @reuse_or_make_session
@@ -131,7 +95,83 @@ class ProjectManager:
     ) -> Optional[DBMember]:
         await ProjectManager._clear_member(project, session=session)
         for member in members:
-            await ProjectManager._add_member(project=project, member=member)
+            await ProjectManager._add_member(project=project, member=member, session=session)
+
+    @staticmethod
+    @reuse_or_make_session
+    async def list_backend_infos(
+        project: Project, session: Optional[AsyncSession] = None
+    ) -> List[BackendInfo]:
+        backend_infos = []
+        for backend in project.backends:
+            backend_info = await _backend_to_backend_info(backend=backend)
+            if backend_info is not None:
+                backend_infos.append(backend_info)
+        return backend_infos
+
+    @staticmethod
+    @reuse_or_make_session
+    async def get_backend_info(
+        project: Project, backend_name: str, session: Optional[AsyncSession] = None
+    ) -> Optional[BackendInfoWithCreds]:
+        backend = await ProjectManager._get_backend(
+            project=project, backend_name=backend_name, session=session
+        )
+        backend_info = await _backend_to_backend_info(backend=backend, include_creds=True)
+        return backend_info
+
+    @staticmethod
+    @reuse_or_make_session
+    async def get_backend(
+        project: Project, backend_name: str, session: Optional[AsyncSession] = None
+    ) -> Optional[Backend]:
+        backend = await ProjectManager._get_backend(
+            project=project, backend_name=backend_name, session=session
+        )
+        return backend
+
+    @staticmethod
+    @reuse_or_make_session
+    async def create_backend(
+        project: Project,
+        backend_config: AnyBackendConfigWithCreds,
+        session: Optional[AsyncSession] = None,
+    ):
+        backend = await _backend_config_to_backend(
+            project_name=project.name, backend_config=backend_config
+        )
+        await ProjectManager._create_backend(backend=backend, session=session)
+
+    @staticmethod
+    @reuse_or_make_session
+    async def update_backend(
+        project: Project,
+        backend_config: AnyBackendConfigWithCreds,
+        session: Optional[AsyncSession] = None,
+    ):
+        backend = await _backend_config_to_backend(
+            project_name=project.name, backend_config=backend_config
+        )
+        await ProjectManager._update_backend(backend=backend, session=session)
+
+    @staticmethod
+    @reuse_or_make_session
+    async def delete_backend(
+        project: Project, backend_name: str, session: Optional[AsyncSession] = None
+    ):
+        await session.execute(
+            delete(Backend).where(
+                Backend.project_name == project.name,
+                Backend.name == backend_name,
+            )
+        )
+        await session.commit()
+
+    @staticmethod
+    @reuse_or_make_session
+    async def _create(project: Project, session: Optional[AsyncSession] = None):
+        session.add(project)
+        await session.commit()
 
     @staticmethod
     @reuse_or_make_session
@@ -153,24 +193,74 @@ class ProjectManager:
         await session.execute(delete(DBMember).where(DBMember.project_name == project.name))
         await session.commit()
 
+    @staticmethod
+    @reuse_or_make_session
+    async def _get_backend(
+        project: Project, backend_name: str, session: Optional[AsyncSession] = None
+    ) -> Optional[Backend]:
+        query = await session.execute(
+            select(Backend).where(
+                Backend.project_name == project.name, Backend.name == backend_name
+            )
+        )
+        return query.scalars().unique().first()
 
-async def _info2project(project_info: ProjectInfoWithCreds) -> Project:
-    project_info.backend = project_info.backend.__root__
-    project = Project(
-        name=project_info.project_name,
-        backend=project_info.backend.type,
+    @staticmethod
+    @reuse_or_make_session
+    async def _create_backend(backend: Backend, session: Optional[AsyncSession] = None):
+        session.add(backend)
+        await session.commit()
+
+    @staticmethod
+    @reuse_or_make_session
+    async def _update_backend(backend: Backend, session: Optional[AsyncSession] = None):
+        session.execute(
+            update(Backend)
+            .where(Backend.project_name == backend.project_name, Backend.name == backend.name)
+            .values(
+                config=backend.config,
+                auth=backend.auth,
+            )
+        )
+        await session.commit()
+
+
+async def _backend_config_to_backend(
+    project_name: str, backend_config: AnyBackendConfigWithCreds
+) -> Backend:
+    backend = Backend(
+        project_name=project_name,
+        name=backend_config.type,
+        type=backend_config.type,
     )
-    configurator = get_configurator(project.backend)
-    config, auth = await run_async(configurator.create_project, project_info.backend)
-    project.config = json.dumps(config)
-    project.auth = json.dumps(auth)
-    return project
+    configurator = get_configurator(backend_config.type)
+    config, auth = await run_async(configurator.create_backend, project_name, backend_config)
+    backend.config = json.dumps(config)
+    backend.auth = json.dumps(auth)
+    return backend
 
 
-def _project2info(
-    project: Project, include_creds: bool = False
-) -> Union[ProjectInfo, ProjectInfoWithCreds, None]:
+async def _backend_to_backend_info(
+    backend: Backend, include_creds: bool = False
+) -> Union[BackendInfo, BackendInfoWithCreds, None]:
+    configurator = get_configurator(backend.type)
+    if configurator is None:
+        return None
+    backend_config = configurator.get_backend_config(backend, include_creds=include_creds)
+    if include_creds:
+        return BackendInfoWithCreds(
+            name=backend.name,
+            config=backend_config,
+        )
+    return BackendInfo(
+        name=backend.name,
+        config=backend_config,
+    )
+
+
+async def _project_to_project_info(project: Project) -> Optional[ProjectInfo]:
     members = []
+    backend_infos = []
     for member in project.members:
         members.append(
             Member(
@@ -178,10 +268,9 @@ def _project2info(
                 project_role=member.project_role,
             )
         )
-    configurator = get_configurator(project.backend)
-    if configurator is None:
-        return None
-    backend = configurator.get_project_config(project, include_creds=include_creds)
-    if include_creds:
-        return ProjectInfoWithCreds(project_name=project.name, backend=backend, members=members)
-    return ProjectInfo(project_name=project.name, backend=backend, members=members)
+    for backend in project.backends:
+        backend_info = await _backend_to_backend_info(backend=backend, include_creds=False)
+        if backend_info is None:
+            continue
+        backend_infos.append(backend_info)
+    return ProjectInfo(project_name=project.name, backends=backend_infos, members=members)

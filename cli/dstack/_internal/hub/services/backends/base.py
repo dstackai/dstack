@@ -2,12 +2,12 @@ from abc import ABC, abstractmethod
 from typing import Dict, List, Tuple, Union
 
 from dstack._internal.backend.base import Backend
-from dstack._internal.hub.db.models import Project
+from dstack._internal.hub.db.models import Backend as DBBackend
 from dstack._internal.hub.schemas import (
-    AnyProjectConfig,
-    AnyProjectConfigWithCreds,
-    AnyProjectConfigWithCredsPartial,
-    ProjectValues,
+    AnyBackendConfig,
+    AnyBackendConfigWithCreds,
+    AnyBackendConfigWithCredsPartial,
+    BackendValues,
 )
 
 
@@ -22,19 +22,21 @@ class Configurator(ABC):
     NAME = None
 
     @abstractmethod
-    def configure_project(self, project_config: AnyProjectConfigWithCredsPartial) -> ProjectValues:
+    def configure_backend(self, backend_config: AnyBackendConfigWithCredsPartial) -> BackendValues:
         pass
 
     @abstractmethod
-    def create_project(self, project_config: AnyProjectConfigWithCreds) -> Tuple[Dict, Dict]:
+    def create_backend(
+        self, project_name: str, backend_config: AnyBackendConfigWithCreds
+    ) -> Tuple[Dict, Dict]:
         pass
 
     @abstractmethod
-    def get_project_config(
-        self, project: Project, include_creds: bool
-    ) -> Union[AnyProjectConfig, AnyProjectConfigWithCreds]:
+    def get_backend_config(
+        self, db_backend: DBBackend, include_creds: bool
+    ) -> Union[AnyBackendConfig, AnyBackendConfigWithCreds]:
         pass
 
     @abstractmethod
-    def get_backend(self, project: Project) -> Backend:
+    def get_backend(self, db_backend: DBBackend) -> Backend:
         pass

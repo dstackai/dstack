@@ -4,7 +4,7 @@ from fastapi import APIRouter, Depends, HTTPException, status
 
 from dstack._internal.core.repo import RepoRef
 from dstack._internal.core.secret import Secret
-from dstack._internal.hub.routers.util import call_backend, error_detail, get_backend, get_project
+from dstack._internal.hub.routers.util import call_backend, error_detail, get_backends, get_project
 from dstack._internal.hub.schemas import SecretAddUpdate
 from dstack._internal.hub.security.permissions import ProjectMember
 

@@ -3,7 +3,7 @@ from fastapi import APIRouter, Depends, HTTPException, status
 from dstack._internal.core.build import BuildNotFoundError
 from dstack._internal.core.error import NoMatchingInstanceError
 from dstack._internal.core.job import Job, JobStatus
-from dstack._internal.hub.routers.util import call_backend, error_detail, get_backend, get_project
+from dstack._internal.hub.routers.util import call_backend, error_detail, get_backends, get_project
 from dstack._internal.hub.schemas import StopRunners
 from dstack._internal.hub.security.permissions import ProjectMember
 

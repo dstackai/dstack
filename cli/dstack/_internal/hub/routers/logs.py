@@ -6,7 +6,7 @@ from fastapi import APIRouter, Depends
 
 from dstack._internal.core.job import Job
 from dstack._internal.core.log_event import LogEvent
-from dstack._internal.hub.routers.util import call_backend, get_backend, get_project
+from dstack._internal.hub.routers.util import call_backend, get_backends, get_project
 from dstack._internal.hub.schemas import PollLogs
 from dstack._internal.hub.security.permissions import ProjectMember
 from dstack._internal.utils.common import get_current_datetime

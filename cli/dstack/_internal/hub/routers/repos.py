@@ -3,7 +3,7 @@ from typing import List
 from fastapi import APIRouter, Depends, HTTPException, status
 
 from dstack._internal.core.repo import RemoteRepoCredentials, RepoHead, RepoRef
-from dstack._internal.hub.routers.util import call_backend, error_detail, get_backend, get_project
+from dstack._internal.hub.routers.util import call_backend, error_detail, get_backends, get_project
 from dstack._internal.hub.schemas import RepoHeadGet, ReposDelete, ReposUpdate, SaveRepoCredentials
 from dstack._internal.hub.security.permissions import ProjectMember
 
@@ -13,9 +13,13 @@ router = APIRouter(prefix="/api/project", tags=["repos"], dependencies=[Depends(
 @router.post("/{project_name}/repos/heads/list")
 async def list_repo_heads(project_name: str) -> List[RepoHead]:
     project = await get_project(project_name=project_name)
-    backend = await get_backend(project)
-    repo_heads = await call_backend(backend.list_repo_heads)
-    return repo_heads
+    backends = await get_backends(project)
+    # TODO merge
+    all_repo_heads = []
+    for _, backend in backends:
+        repo_heads = await call_backend(backend.list_repo_heads)
+        all_repo_heads += repo_heads
+    return all_repo_heads
 
 
 @router.post("/{project_name}/repos/heads/get")

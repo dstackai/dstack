@@ -1,13 +1,10 @@
-from typing import Dict, Optional
+from typing import Dict, List, Optional, Tuple
 
 from fastapi import HTTPException, status
 
 from dstack._internal.backend.base import Backend
-from dstack._internal.core.error import (
-    BackendAuthError,
-    BackendNotAvailableError,
-    BackendValueError,
-)
+from dstack._internal.core.error import BackendNotAvailableError, BackendValueError
+from dstack._internal.hub.db.models import Backend as DBBackend
 from dstack._internal.hub.db.models import Project
 from dstack._internal.hub.repository.projects import ProjectManager
 from dstack._internal.hub.services.backends import cache as backends_cache
@@ -23,27 +20,11 @@ async def get_project(project_name: str) -> Project:
             status_code=status.HTTP_404_NOT_FOUND,
             detail=error_detail("Project not found"),
         )
-    _check_backend_avaialble(project)
     return project
 
 
-async def get_backend(project: Project) -> Backend:
-    backend = await get_backend_if_available(project)
-    if backend is not None:
-        return backend
-    _raise_backend_not_available_error(project.backend)
-
-
-async def get_backend_if_available(project: Project) -> Optional[Backend]:
-    try:
-        return await backends_cache.get_backend(project)
-    except BackendAuthError:
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail=error_detail(
-                f"Backend credentials for {project.name} are invalid", code=BackendAuthError.code
-            ),
-        )
+async def get_backends(project: Project) -> List[Tuple[DBBackend, Backend]]:
+    return await backends_cache.get_backends(project)
 
 
 def get_backend_configurator(backend_type: str) -> Configurator:
