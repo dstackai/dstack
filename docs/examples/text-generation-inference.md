@@ -122,8 +122,7 @@ ide: vscode
 </div>
 
 !!! info "Limitations"
-
-Since version 1.0.0, TGI has [changed](https://github.com/huggingface/text-generation-inference/issues/726) 
-the license and restricted the use of TGI for commercial purposes. 
+    Since version 1.0.0, TGI has [changed](https://github.com/huggingface/text-generation-inference/issues/726) 
+    the license and restricted the use of TGI for commercial purposes. 
 
 [Source code](https://github.com/dstackai/dstack-examples){ .md-button .md-button--github }
