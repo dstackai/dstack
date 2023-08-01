@@ -1,5 +1,7 @@
 # Quickstart
 
+:material-palette:
+
 `dstack` makes it very easy for ML teams to automate running dev environments and tasks in their cloud.
 
 ## Installation
