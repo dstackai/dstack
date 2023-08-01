@@ -9,11 +9,13 @@ from dstack._internal.backend.base.head import (
     list_head_objects,
     put_head_object,
 )
+from dstack._internal.backend.base.secrets import SecretsManager
 from dstack._internal.backend.base.storage import Storage
-from dstack._internal.core.error import DstackError
+from dstack._internal.core.error import SSHCommandError
 from dstack._internal.core.gateway import GatewayHead
 from dstack._internal.hub.utils.ssh import HUB_PRIVATE_KEY_PATH
-from dstack._internal.utils.common import PathLike
+from dstack._internal.utils.common import PathLike, removeprefix
+from dstack._internal.utils.interpolator import VariablesInterpolator
 from dstack._internal.utils.random_names import generate_name
 
 
@@ -36,6 +38,17 @@ def delete_gateway(compute: Compute, storage: Storage, instance_name: str):
             continue
         compute.delete_instance(instance_name)
         delete_head_object(storage, head)
+
+
+def resolve_hostname(secrets_manager: SecretsManager, repo_id: str, hostname: str) -> str:
+    secrets = {}
+    _, missed = VariablesInterpolator({}).interpolate(hostname, return_missing=True)
+    for ns_name in missed:
+        name = removeprefix(ns_name, "secrets.")
+        value = secrets_manager.get_secret(repo_id, name)
+        if value is not None:
+            secrets[name] = value.secret_value
+    return VariablesInterpolator({"secrets": secrets}).interpolate(hostname)
 
 
 def publish(
@@ -63,18 +76,18 @@ def exec_ssh_command(
         args += ["-i", id_rsa]
     args += [
         "-o",
-        "StrictHostKeyChecking=accept-new",
+        "StrictHostKeyChecking=no",
+        "-o",
+        "UserKnownHostsFile=/dev/null",
         f"{user}@{hostname}",
         command,
     ]
+    if not hostname:  # ssh hangs indefinitely with empty hostname
+        raise SSHCommandError(
+            args, "ssh: Could not connect to the gateway, because hostname is empty"
+        )
     proc = subprocess.Popen(args, stdin=stdin, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
     stdout, stderr = proc.communicate()
     if proc.returncode != 0:
         raise SSHCommandError(args, stderr.decode())
     return stdout
-
-
-class SSHCommandError(DstackError):
-    def __init__(self, cmd: List[str], message: str):
-        super().__init__(message)
-        self.cmd = cmd

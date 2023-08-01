@@ -19,7 +19,7 @@ def main():
     # detect conflicts
     conf_path = Path("/etc/nginx/sites-enabled") / f"{args.port}-{args.hostname}.conf"
     if conf_path.exists() and is_conf_active(conf_path):
-        exit(f"{args.hostname}:{args.port} is still in use")
+        exit(f"Could not start the service, because {args.hostname}:{args.port} is in use")
 
     # create temp dir for socket
     temp_dir = tempfile.mkdtemp(prefix="dstack-")

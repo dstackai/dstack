@@ -297,7 +297,13 @@ class ComponentBasedBackend(Backend):
 
     def run_job(self, job: Job, failed_to_start_job_new_status: JobStatus):
         self.predict_build_plan(job)  # raises exception on missing build
-        base_jobs.run_job(self.storage(), self.compute(), job, failed_to_start_job_new_status)
+        base_jobs.run_job(
+            self.storage(),
+            self.compute(),
+            self.secrets_manager(),
+            job,
+            failed_to_start_job_new_status,
+        )
 
     def restart_job(self, job: Job):
         base_jobs.restart_job(self.storage(), self.compute(), job)

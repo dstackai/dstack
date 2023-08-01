@@ -6,6 +6,7 @@ from pydantic import ValidationError
 import dstack._internal.backend.base.gateway as gateway
 from dstack._internal.backend.base import runners
 from dstack._internal.backend.base.compute import Compute, InstanceNotFoundError, NoCapacityError
+from dstack._internal.backend.base.secrets import SecretsManager
 from dstack._internal.backend.base.storage import Storage
 from dstack._internal.core.error import BackendError, BackendValueError, NoMatchingInstanceError
 from dstack._internal.core.instance import InstanceType
@@ -119,6 +120,7 @@ def predict_job_instance(
 def run_job(
     storage: Storage,
     compute: Compute,
+    secrets_manager: SecretsManager,
     job: Job,
     failed_to_start_job_new_status: JobStatus,
 ):
@@ -126,12 +128,16 @@ def run_job(
         raise BackendError("Can't create a request for a job which status is not SUBMITTED")
     try:
         if job.configuration_type == ConfigurationType.SERVICE:
+            job.gateway.hostname = gateway.resolve_hostname(
+                secrets_manager, job.repo_ref.repo_id, job.gateway.hostname
+            )
             private_bytes, public_bytes = generate_rsa_key_pair_bytes(comment=job.run_name)
             job.gateway.sock_path = gateway.publish(
                 job.gateway.hostname, job.gateway.public_port, public_bytes
             )
             job.gateway.ssh_key = private_bytes.decode()
             update_job(storage, job)
+
         _try_run_job(
             storage=storage,
             compute=compute,
@@ -165,7 +171,7 @@ def restart_job(
 
 
 def stop_job(
-    storage: Storage, compute: Compute, repo_id: str, job_id: str, terminate: str, abort: str
+    storage: Storage, compute: Compute, repo_id: str, job_id: str, terminate: bool, abort: bool
 ):
     logger.info("Stopping job [repo_id=%s job_id=%s]", repo_id, job_id)
     job_head = get_job_head(storage, repo_id, job_id)
