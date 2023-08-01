@@ -64,14 +64,6 @@ class Artifact(ForbidExtra):
     ] = False
 
 
-class Gateway(ForbidExtra):
-    hostname: Annotated[str, Field(description="IP address or domain name")]
-    public_port: Annotated[
-        ValidPort, Field(description="The port that the gateway listens to")
-    ] = 80
-    service_port: Annotated[ValidPort, Field(description="The port that the service listens to")]
-
-
 class BaseConfiguration(ForbidExtra):
     type: Literal["none"]
     image: Annotated[Optional[str], Field(description="The name of the Docker image to run")]
@@ -119,7 +111,7 @@ class BaseConfiguration(ForbidExtra):
 
 class BaseConfigurationWithPorts(BaseConfiguration):
     ports: Annotated[
-        List[Union[constr(regex=r"^(?:([0-9]+|\*):)?[0-9]+$"), ValidPort, PortMapping]],
+        List[Union[ValidPort, constr(regex=r"^(?:[0-9]+|\*):[0-9]+$"), PortMapping]],
         Field(description="Port numbers/mapping to expose"),
     ] = []
 
@@ -147,7 +139,21 @@ class TaskConfiguration(BaseConfigurationWithPorts):
 class ServiceConfiguration(BaseConfiguration):
     type: Literal["service"] = "service"
     commands: Annotated[CommandsList, Field(description="The bash commands to run")]
-    gateway: Annotated[Gateway, Field(description="The gateway to publish the service")]
+    port: Annotated[
+        Union[ValidPort, constr(regex=r"^[0-9]+:[0-9]+$"), PortMapping],
+        Field(description="The port, that application listens to or the mapping"),
+    ]
+    gateway: Annotated[
+        str, Field(description="The gateway IP address or domain to publish the service")
+    ]
+
+    @validator("port")
+    def convert_port(cls, v) -> PortMapping:
+        if isinstance(v, int):
+            return PortMapping(local_port=80, container_port=v)
+        elif isinstance(v, str):
+            return PortMapping.parse(v)
+        return v
 
 
 class DstackConfiguration(BaseModel):

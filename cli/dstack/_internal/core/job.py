@@ -24,9 +24,9 @@ from dstack._internal.core.repo import (
 
 class Gateway(BaseModel):
     hostname: str
-    ssh_key: Optional[str]
     service_port: int
     public_port: int = 80
+    ssh_key: Optional[str]
     sock_path: Optional[str]
 
 

@@ -22,11 +22,15 @@ class ServiceConfigurator(JobConfigurator):
         return None  # infinite
 
     def ports(self) -> Dict[int, ports.PortMapping]:
-        port = self.conf.gateway.service_port
+        port = self.conf.port.container_port
         return {port: ports.PortMapping(container_port=port)}
 
     def gateway(self) -> Optional[job.Gateway]:
-        return job.Gateway.parse_obj(self.conf.gateway)
+        return job.Gateway(
+            hostname=self.conf.gateway,
+            service_port=self.conf.port.container_port,
+            public_port=self.conf.port.local_port,
+        )
 
     def build_commands(self) -> List[str]:
         return self.conf.build
