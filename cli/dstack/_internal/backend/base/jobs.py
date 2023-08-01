@@ -127,7 +127,9 @@ def run_job(
     try:
         if job.configuration_type == ConfigurationType.SERVICE:
             private_bytes, public_bytes = generate_rsa_key_pair_bytes(comment=job.run_name)
-            gateway.ssh_copy_id(job.gateway.hostname, public_bytes)
+            job.gateway.sock_path = gateway.publish(
+                job.gateway.hostname, job.gateway.public_port, public_bytes
+            )
             job.gateway.ssh_key = private_bytes.decode()
             update_job(storage, job)
         _try_run_job(

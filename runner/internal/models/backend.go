@@ -152,6 +152,7 @@ type Gateway struct {
 	SSHKey      string `yaml:"ssh_key,omitempty"`
 	ServicePort int    `yaml:"service_port"`
 	PublicPort  int    `yaml:"public_port"`
+	SockPath    string `yaml:"sock_path,omitempty"`
 }
 
 type RunnerMetadata struct {

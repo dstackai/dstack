@@ -27,6 +27,7 @@ class Gateway(BaseModel):
     ssh_key: Optional[str]
     service_port: int
     public_port: int = 80
+    sock_path: Optional[str]
 
 
 class GpusRequirements(BaseModel):

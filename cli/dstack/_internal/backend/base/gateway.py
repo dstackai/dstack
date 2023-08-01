@@ -1,6 +1,7 @@
 import subprocess
-import time
 from typing import List, Optional
+
+import pkg_resources
 
 from dstack._internal.backend.base.compute import Compute
 from dstack._internal.backend.base.head import (
@@ -37,17 +38,26 @@ def delete_gateway(compute: Compute, storage: Storage, instance_name: str):
         delete_head_object(storage, head)
 
 
-def ssh_copy_id(
+def publish(
     hostname: str,
-    public_key: bytes,
+    port: int,
+    ssh_key: bytes,
     user: str = "ubuntu",
     id_rsa: Optional[PathLike] = HUB_PRIVATE_KEY_PATH,
-):
-    command = f"echo '{public_key.decode()}' >> ~/.ssh/authorized_keys"
-    exec_ssh_command(hostname, command, user=user, id_rsa=id_rsa)
+) -> str:
+    command = ["sudo", "python3", "-", hostname, str(port), f'"{ssh_key.decode().strip()}"']
+    with open(
+        pkg_resources.resource_filename("dstack._internal", "scripts/gateway_publish.py"), "r"
+    ) as f:
+        output = exec_ssh_command(
+            hostname, command=" ".join(command), user=user, id_rsa=id_rsa, stdin=f
+        )
+    return output.decode().strip()
 
 
-def exec_ssh_command(hostname: str, command: str, user: str, id_rsa: Optional[PathLike]) -> bytes:
+def exec_ssh_command(
+    hostname: str, command: str, user: str, id_rsa: Optional[PathLike], stdin=None
+) -> bytes:
     args = ["ssh"]
     if id_rsa is not None:
         args += ["-i", id_rsa]
@@ -57,7 +67,7 @@ def exec_ssh_command(hostname: str, command: str, user: str, id_rsa: Optional[Pa
         f"{user}@{hostname}",
         command,
     ]
-    proc = subprocess.Popen(args, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+    proc = subprocess.Popen(args, stdin=stdin, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
     stdout, stderr = proc.communicate()
     if proc.returncode != 0:
         raise SSHCommandError(args, stderr.decode())
