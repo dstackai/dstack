@@ -1,9 +1,7 @@
 .selectFilters {
     --select-width: calc((688px - 3 * 20px) / 2);
-
     display: flex;
     gap: 20px;
-    margin-top: 16px;
 
     .select {
         width: var(--select-width, 30%);

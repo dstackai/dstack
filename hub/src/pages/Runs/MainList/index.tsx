@@ -1,6 +1,6 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { get as _get, uniqBy as _uniqBy } from 'lodash';
+import { /*get as _get,*/ sortBy as _sortBy, uniqBy as _uniqBy } from 'lodash';
 import { format } from 'date-fns';
 
 import {
@@ -15,7 +15,7 @@ import {
     SpaceBetween,
     StatusIndicator,
     Table,
-    TextFilter,
+    // TextFilter,
     Toggle,
 } from 'components';
 
@@ -30,13 +30,13 @@ import { isAvailableAbortingForRun, isAvailableDeletingForRun, isAvailableStoppi
 
 import styles from './styles.module.scss';
 
-export const SEARCHABLE_COLUMNS = [
-    'run_head.run_name',
-    'run_head.job_heads.[0].configuration_path',
-    'run_head.job_heads.[0].instance_type',
-    'run_head.hub_user_name',
-    'run_head.status',
-];
+// export const SEARCHABLE_COLUMNS = [
+//     'run_head.run_name',
+//     'run_head.job_heads.[0].configuration_path',
+//     'run_head.job_heads.[0].instance_type',
+//     'run_head.hub_user_name',
+//     'run_head.status',
+// ];
 
 export const List: React.FC = () => {
     const { t } = useTranslation();
@@ -67,6 +67,16 @@ export const List: React.FC = () => {
             ),
         },
         {
+            id: 'project',
+            header: `${t('projects.run.project')}`,
+            cell: (item: IRunListItem) => item.project,
+        },
+        {
+            id: 'repo',
+            header: `${t('projects.run.repo')}`,
+            cell: (item: IRunListItem) => item.repo.repo_info.repo_name,
+        },
+        {
             id: 'configuration',
             header: `${t('projects.run.configuration')}`,
             cell: (item: IRunListItem) => item.run_head.job_heads?.[0].configuration_path,
@@ -95,11 +105,11 @@ export const List: React.FC = () => {
             header: t('projects.run.submitted_at'),
             cell: (item: IRunListItem) => format(new Date(item.run_head.submitted_at), DATE_TIME_FORMAT),
         },
-        {
-            id: 'artifacts',
-            header: t('projects.run.artifacts_count'),
-            cell: (item: IRunListItem) => item.run_head.artifact_heads?.length ?? '-',
-        },
+        // {
+        //     id: 'artifacts',
+        //     header: t('projects.run.artifacts_count'),
+        //     cell: (item: IRunListItem) => item.run_head.artifact_heads?.length ?? '-',
+        // },
     ];
 
     useEffect(() => {
@@ -130,28 +140,39 @@ export const List: React.FC = () => {
         );
     };
 
-    const { items, actions, filteredItemsCount, collectionProps, filterProps, paginationProps } = useCollection(data ?? [], {
-        filtering: {
-            empty: renderEmptyMessage(),
-            noMatch: renderNoMatchMessage(),
+    const sortedData = useMemo(() => {
+        if (!data) return [];
 
-            filteringFunction: (runItem, filteringText) => {
-                const filteringTextLowerCase = filteringText.toLowerCase();
+        return _sortBy(data, [(i) => -i.run_head.submitted_at]);
+    }, [data]);
 
-                if (selectedProject?.value && runItem.project !== selectedProject.value) return false;
+    const { items, actions, /*filteredItemsCount,*/ collectionProps, filterProps, paginationProps } = useCollection(
+        sortedData ?? [],
+        {
+            filtering: {
+                empty: renderEmptyMessage(),
+                noMatch: renderNoMatchMessage(),
 
-                if (selectedRepo?.value && runItem.repo.repo_id !== selectedRepo.value) return false;
+                filteringFunction: (runItem /*, filteringText*/) => {
+                    // const filteringTextLowerCase = filteringText.toLowerCase();
 
-                if (onlyActive && !unfinishedRuns.includes(runItem.run_head.status)) return false;
+                    if (selectedProject?.value && runItem.project !== selectedProject.value) return false;
 
-                return SEARCHABLE_COLUMNS.map((key) => _get(runItem, key)).some(
-                    (value) => typeof value === 'string' && value.toLowerCase().indexOf(filteringTextLowerCase) > -1,
-                );
+                    if (selectedRepo?.value && runItem.repo.repo_id !== selectedRepo.value) return false;
+
+                    if (onlyActive && !unfinishedRuns.includes(runItem.run_head.status)) return false;
+
+                    // return SEARCHABLE_COLUMNS.map((key) => _get(runItem, key)).some(
+                    //     (value) => typeof value === 'string' && value.toLowerCase().indexOf(filteringTextLowerCase) > -1,
+                    // );
+
+                    return true;
+                },
             },
+            pagination: { pageSize: 20 },
+            selection: {},
         },
-        pagination: { pageSize: 20 },
-        selection: {},
-    });
+    );
 
     const { selectedItems } = collectionProps;
 
@@ -299,13 +320,12 @@ export const List: React.FC = () => {
             }
             filter={
                 <div>
-                    <TextFilter
-                        {...filterProps}
-                        filteringPlaceholder={t('projects.run.search_placeholder')}
-                        countText={t('common.match_count_with_value', { count: filteredItemsCount })}
-                        disabled={isLoading}
-                    />
-
+                    {/*<TextFilter*/}
+                    {/*    {...filterProps}*/}
+                    {/*    filteringPlaceholder={t('projects.run.search_placeholder')}*/}
+                    {/*    countText={t('common.match_count_with_value', { count: filteredItemsCount })}*/}
+                    {/*    disabled={isLoading}*/}
+                    {/*/>*/}
                     <div className={styles.selectFilters}>
                         <div className={styles.select}>
                             <FormField label={t('projects.run.project')}>
