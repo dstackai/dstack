@@ -374,7 +374,7 @@ class RunsGetPlan(BaseModel):
 
 
 class RunsCreate(BaseModel):
-    repo_ref: RepoRef
+    repo_id: str
     run_name: Optional[str]
 
 

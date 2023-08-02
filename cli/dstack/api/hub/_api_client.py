@@ -31,6 +31,7 @@ from dstack._internal.hub.schemas import (
     PollLogs,
     ProjectInfo,
     ReposUpdate,
+    RunInfo,
     RunsCreate,
     RunsDelete,
     RunsGetPlan,
@@ -359,11 +360,11 @@ class HubAPIClient:
             return
         resp.raise_for_status()
 
-    def list_run_heads(
+    def list_runs(
         self,
         run_name: Optional[str] = None,
         include_request_heads: bool = True,
-    ) -> List[RunHead]:
+    ) -> List[RunInfo]:
         url = _project_url(
             url=self.url,
             project=self.project,
@@ -382,7 +383,7 @@ class HubAPIClient:
         )
         if resp.ok:
             body = resp.json()
-            return [RunHead.parse_obj(run) for run in body]
+            return [RunInfo.parse_obj(run) for run in body]
         resp.raise_for_status()
 
     def delete_runs(self, run_names: List[str]):

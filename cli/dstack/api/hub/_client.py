@@ -75,7 +75,7 @@ class HubClient:
         self._api_client.create_job(job=job)
 
     def submit_job(self, job: Job, failed_to_start_job_new_status: JobStatus = JobStatus.FAILED):
-        self.create_job(job)
+        # self.create_job(job)
         self.run_job(job, failed_to_start_job_new_status)
 
     def get_job(self, job_id: str, repo_id: Optional[str] = None) -> Optional[Job]:
@@ -117,14 +117,14 @@ class HubClient:
         for job_head in job_heads:
             self.delete_job_head(job_head.job_id)
 
-    def list_run_heads(
+    def list_runs(
         self,
         run_name: Optional[str] = None,
         include_request_heads: bool = True,
         interrupted_job_new_status: JobStatus = JobStatus.FAILED,
         repo_id: Optional[str] = None,
     ) -> List[RunHead]:
-        return self._api_client.list_run_heads(
+        return self._api_client.list_runs(
             run_name=run_name,
             include_request_heads=include_request_heads,
         )

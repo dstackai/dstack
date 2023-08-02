@@ -21,7 +21,7 @@ def list_runs_hub(hub_client: HubClient, run_name: str = "", all: bool = False) 
 
 
 def _get_runs_hub(hub_client: HubClient, run_name: str = "", all: bool = False) -> List[RunHead]:
-    runs = hub_client.list_run_heads(run_name)
+    runs = [r.run_head for r in hub_client.list_runs(run_name)]
     if not all:
         active = any(run.status.is_active() for run in runs)
         if active:

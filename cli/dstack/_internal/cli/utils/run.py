@@ -145,7 +145,7 @@ def poll_run(
         console.print("[grey58]To stop, press Ctrl+C.[/]")
         console.print()
 
-        run = hub_client.list_run_heads(run_name)[0]
+        run = hub_client.list_runs(run_name)[0]
         if run.status.is_unfinished() or run.status == JobStatus.DONE:
             if watcher is not None and watcher.is_alive():  # reload is enabled
                 if hub_client.get_project_backend_type() == "local":
@@ -390,7 +390,7 @@ def _poll_run_head(
     loop_statuses: Optional[List[JobStatus]] = None,
 ) -> Iterator[RunHead]:
     while True:
-        run_heads = hub_client.list_run_heads(run_name)
+        run_heads = hub_client.list_runs(run_name)
         if len(run_heads) == 0:
             time.sleep(rate / 2)
             continue
