@@ -1,5 +1,6 @@
 import base64
 import re
+from collections import namedtuple
 from operator import attrgetter
 from typing import List, Optional, Tuple
 
@@ -54,6 +55,20 @@ from dstack._internal.core.instance import InstanceType, LaunchedInstanceInfo
 from dstack._internal.core.job import Job
 from dstack._internal.core.request import RequestHead, RequestStatus
 from dstack._internal.core.runners import Gpu, Resources, Runner
+
+VMSeries = namedtuple("VMSeries", ["pattern", "gpu_name", "gpu_memory"])
+vm_series = [
+    VMSeries(r"D(\d+)s_v3", None, None),  # Dsv3-series
+    VMSeries(r"E(\d+)i?s_v4", None, None),  # Esv4-series
+    VMSeries(r"E(\d+)-(\d+)s_v4", None, None),  # Esv4-series (constrained vCPU)
+    VMSeries(r"NC(\d+)s_v3", "V100", 16 * 1024),  # NCv3-series [V100 16GB]
+    VMSeries(r"NC(\d+)as_T4_v3", "T4", 16 * 1024),  # NCasT4_v3-series [T4]
+    VMSeries(r"ND(\d+)rs_v2", "V100", 32 * 1024),  # NDv2-series [8xV100 32GB]
+    VMSeries(r"NV(\d+)adm?s_A10_v5", "A10", 24 * 1024),  # NVadsA10 v5-series [A10]
+    VMSeries(r"NC(\d+)ads_A100_v4", "A100", 80 * 1024),  # NC A100 v4-series [A100 80GB]
+    VMSeries(r"ND(\d+)asr_v4", "A100", 40 * 1024),  # ND A100 v4-series [8xA100 40GB]
+    VMSeries(r"ND(\d+)amsr_A100_v4", "A100", 80 * 1024),  # NDm A100 v4-series [8xA100 80GB]
+]
 
 
 class AzureCompute(Compute):
@@ -184,7 +199,7 @@ class AzureCompute(Compute):
 def _get_instance_types(client: ComputeManagementClient, location: str) -> List[InstanceType]:
     instance_types = []
     vm_series_pattern = re.compile(
-        r"^(Standard_D\d+s_v3|Standard_E\d+(-\d*)?s_v4|Standard_NC\d+s_v3|Standard_NC\d+as_T4_v3|Standard_NV\d+(ads|adms)_A10_v5)$"
+        f"^Standard_({'|'.join(series.pattern for series in vm_series)})$"
     )
     # Only location filter is supported currently in azure API.
     # See: https://learn.microsoft.com/en-us/python/api/azure-mgmt-compute/azure.mgmt.compute.v2021_07_01.operations.resourceskusoperations?view=azure-python#azure-mgmt-compute-v2021-07-01-operations-resourceskusoperations-list
@@ -225,16 +240,13 @@ def _vm_type_available(vm_resource: ResourceSku) -> bool:
 
 
 def _get_gpu_name_memory(vm_name: str) -> Tuple[str, int]:
-    if re.match(r"^Standard_NC\d+ads_A100_v4$", vm_name):
-        return "A100", 80 * 1024
-    if re.match(r"^Standard_NC\d+as_T4_v3$", vm_name):
-        return "T4", 16 * 1024
-    if re.match(r"^Standard_NC\d+s_v3$", vm_name):
-        return "V100", 16 * 1024
-    m = re.match(r"^Standard_NV(\d)+(ads|adms)_A10_v5$", vm_name)
-    if m:
-        num = int(m.group(1))
-        return "A10", 24 * num // 36 * 1024
+    for pattern, gpu_name, gpu_memory in vm_series:
+        m = re.match(f"^Standard_{pattern}$", vm_name)
+        if m is None:
+            continue
+        if gpu_name == "A10":  # A10 could be shared (minimal is 1/6 for Standard_NV6ads_A10_v5)
+            gpu_memory = (gpu_memory * int(m.group(1))) // 36
+        return gpu_name, gpu_memory
 
 
 def _get_instance_name(job: Job) -> str:
