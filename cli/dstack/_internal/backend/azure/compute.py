@@ -34,7 +34,9 @@ from azure.mgmt.compute.models import (
 from azure.mgmt.keyvault import KeyVaultManagementClient
 from azure.mgmt.network import NetworkManagementClient
 from azure.mgmt.resource import ResourceManagementClient
+from msrestazure.tools import parse_resource_id
 
+import dstack._internal.backend.azure.gateway as gateway
 from dstack import version
 from dstack._internal.backend.azure import utils as azure_utils
 from dstack._internal.backend.azure.config import AzureConfig
@@ -47,6 +49,7 @@ from dstack._internal.backend.base.compute import (
 )
 from dstack._internal.backend.base.config import BACKEND_CONFIG_FILENAME, RUNNER_CONFIG_FILENAME
 from dstack._internal.backend.base.runners import serialize_runner_yaml
+from dstack._internal.core.gateway import GatewayHead
 from dstack._internal.core.instance import InstanceType, LaunchedInstanceInfo
 from dstack._internal.core.job import Job
 from dstack._internal.core.request import RequestHead, RequestStatus
@@ -139,6 +142,43 @@ class AzureCompute(Compute):
 
     def cancel_spot_request(self, runner: Runner):
         self.terminate_instance(runner)
+
+    def create_gateway(self, instance_name: str, ssh_key_pub: str) -> GatewayHead:
+        vm = gateway.create_gateway(
+            compute_client=self._compute_client,
+            network_client=self._network_client,
+            subscription_id=self.azure_config.subscription_id,
+            location=self.azure_config.location,
+            resource_group=self.azure_config.resource_group,
+            network=self.azure_config.network,
+            subnet=self.azure_config.subnet,
+            instance_name=instance_name,
+            ssh_key_pub=ssh_key_pub,
+        )
+        interface = gateway.get_network_interface(
+            network_client=self._network_client,
+            resource_group=self.azure_config.resource_group,
+            interface=parse_resource_id(vm.network_profile.network_interfaces[0].id)[
+                "resource_name"
+            ],
+        )
+        public_ip = gateway.get_public_ip(
+            network_client=self._network_client,
+            resource_group=self.azure_config.resource_group,
+            public_ip=interface.ip_configurations[0].public_ip_address.name,
+        )
+        return GatewayHead(
+            instance_name=instance_name,
+            external_ip=public_ip.ip_address,
+            internal_ip=interface.ip_configurations[0].private_ip_address,
+        )
+
+    def delete_instance(self, instance_name: str):
+        _terminate_instance(
+            compute_client=self._compute_client,
+            resource_group=self.azure_config.resource_group,
+            instance_name=instance_name,
+        )
 
 
 def _get_instance_types(client: ComputeManagementClient, location: str) -> List[InstanceType]:

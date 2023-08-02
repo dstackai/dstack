@@ -51,11 +51,9 @@ class Compute(ABC):
         pass
 
     def create_gateway(self, instance_name: str, ssh_key_pub: str) -> GatewayHead:
-        # todo make abstract & implement for each backend
         raise NotImplementedError()
 
     def delete_instance(self, instance_name: str):
-        # todo make abstract & implement for each backend
         raise NotImplementedError()
 
 
