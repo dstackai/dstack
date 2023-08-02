@@ -113,6 +113,7 @@ class CLIConfigManager:
             self.config = CLIConfig()
 
     def save(self):
+        self.dstack_dir.mkdir(parents=True, exist_ok=True)
         with open(self.config_filepath, "w+") as f:
             f.write(yaml.dump(self.config.dict()))
 
