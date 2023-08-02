@@ -6,7 +6,7 @@ import App from 'App';
 import { Logout } from 'App/Logout';
 import { ProjectAdd, ProjectDetails, ProjectEditBackend, ProjectList, ProjectSettings } from 'pages/Project';
 import { RepositoryDetails, RepositoryList, RepositorySettings } from 'pages/Repositories';
-import { Artifacts as RunArtifacts, Logs as RunLogs, RunDetails, RunList } from 'pages/Runs';
+import { Artifacts as RunArtifacts, List as MainRunList, Logs as RunLogs, RunDetails, RunList } from 'pages/Runs';
 import { TagDetails, TagList } from 'pages/Tags';
 import { UserAdd, UserDetails, UserEdit, UserList } from 'pages/User';
 
@@ -22,7 +22,7 @@ export const router = createBrowserRouter([
             // hubs
             {
                 path: ROUTES.BASE,
-                element: <Navigate replace to={ROUTES.PROJECT.LIST} />,
+                element: <Navigate replace to={ROUTES.RUNS.LIST} />,
             },
             {
                 path: ROUTES.PROJECT.LIST,
@@ -97,7 +97,14 @@ export const router = createBrowserRouter([
                 path: ROUTES.PROJECT.ADD,
                 element: <ProjectAdd />,
             },
-            // members
+
+            // Runs
+            {
+                path: ROUTES.RUNS.LIST,
+                element: <MainRunList />,
+            },
+
+            // Users
             {
                 path: ROUTES.USER.LIST,
                 element: <UserList />,

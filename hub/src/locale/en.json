@@ -39,6 +39,7 @@
 
   "navigation": {
     "settings": "Settings",
+    "runs": "Runs",
     "projects": "Projects",
     "users": "Users"
   },
@@ -223,6 +224,11 @@
       "empty_message_text": "No runs to display.",
       "nomatch_message_title": "No matches",
       "nomatch_message_text": "We can't find a match.",
+      "project": "Project",
+      "repo": "Repository",
+      "project_placeholder": "Filtering by project",
+      "repo_placeholder": "Filtering by repository",
+      "active_only": "Active runs",
       "log": "Logs",
       "run_name": "Name",
       "workflow_name": "Workflow",
@@ -235,6 +241,7 @@
       "artifacts": "Artifacts",
       "artifacts_count": "Artifacts",
       "hub_user_name": "User",
+
       "statuses": {
         "pending": "Pending",
         "submitted": "Submitted",

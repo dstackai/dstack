@@ -70,7 +70,7 @@ Here's how you run it with `dstack`:
 <div class="termy">
 
 ```shell
-$ dstack run . -f text-generation-inference/serve.dstack.yml --port 8000:8000
+$ dstack run . -f text-generation-inference/serve.dstack.yml --ports 8000:8000
 ```
 
 </div>
@@ -83,7 +83,7 @@ Now, you can query the endpoint:
 <div class="termy">
 
 ```shell
-$ curl -X POST --location http://127.0.0.1:8080/generate \
+$ curl -X POST --location http://127.0.0.1:8000/generate \
     -H 'Content-Type: application/json' \
     -d '{
           "inputs": "What is Deep Learning?",
@@ -120,5 +120,9 @@ ide: vscode
 ```
 
 </div>
+
+!!! info "Limitations"
+    Since version 1.0.0, TGI has [changed](https://github.com/huggingface/text-generation-inference/issues/726) 
+    the license and restricted the use of TGI for commercial purposes. 
 
 [Source code](https://github.com/dstackai/dstack-examples){ .md-button .md-button--github }

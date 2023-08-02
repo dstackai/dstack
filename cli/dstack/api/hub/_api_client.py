@@ -12,6 +12,7 @@ from dstack._internal.core.error import (
     BackendNotAvailableError,
     BackendValueError,
     NoMatchingInstanceError,
+    SSHCommandError,
 )
 from dstack._internal.core.gateway import GatewayHead
 from dstack._internal.core.job import Job, JobHead
@@ -177,9 +178,11 @@ class HubAPIClient:
             return
         elif resp.status_code == 400:
             body = resp.json()
-            if body["detail"]["code"] == NoMatchingInstanceError.code:
-                raise HubClientError(body["detail"]["msg"])
-            elif body["detail"]["code"] == BuildNotFoundError.code:
+            if body["detail"]["code"] in (
+                NoMatchingInstanceError.code,
+                BuildNotFoundError.code,
+                SSHCommandError.code,
+            ):
                 raise HubClientError(body["detail"]["msg"])
         resp.raise_for_status()
 

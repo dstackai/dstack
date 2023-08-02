@@ -1,6 +1,7 @@
 import subprocess
-import time
 from typing import List, Optional
+
+import pkg_resources
 
 from dstack._internal.backend.base.compute import Compute
 from dstack._internal.backend.base.head import (
@@ -8,11 +9,13 @@ from dstack._internal.backend.base.head import (
     list_head_objects,
     put_head_object,
 )
+from dstack._internal.backend.base.secrets import SecretsManager
 from dstack._internal.backend.base.storage import Storage
-from dstack._internal.core.error import DstackError
+from dstack._internal.core.error import SSHCommandError
 from dstack._internal.core.gateway import GatewayHead
 from dstack._internal.hub.utils.ssh import HUB_PRIVATE_KEY_PATH
-from dstack._internal.utils.common import PathLike
+from dstack._internal.utils.common import PathLike, removeprefix
+from dstack._internal.utils.interpolator import VariablesInterpolator
 from dstack._internal.utils.random_names import generate_name
 
 
@@ -37,34 +40,54 @@ def delete_gateway(compute: Compute, storage: Storage, instance_name: str):
         delete_head_object(storage, head)
 
 
-def ssh_copy_id(
+def resolve_hostname(secrets_manager: SecretsManager, repo_id: str, hostname: str) -> str:
+    secrets = {}
+    _, missed = VariablesInterpolator({}).interpolate(hostname, return_missing=True)
+    for ns_name in missed:
+        name = removeprefix(ns_name, "secrets.")
+        value = secrets_manager.get_secret(repo_id, name)
+        if value is not None:
+            secrets[name] = value.secret_value
+    return VariablesInterpolator({"secrets": secrets}).interpolate(hostname)
+
+
+def publish(
     hostname: str,
-    public_key: bytes,
+    port: int,
+    ssh_key: bytes,
     user: str = "ubuntu",
     id_rsa: Optional[PathLike] = HUB_PRIVATE_KEY_PATH,
-):
-    command = f"echo '{public_key.decode()}' >> ~/.ssh/authorized_keys"
-    exec_ssh_command(hostname, command, user=user, id_rsa=id_rsa)
+) -> str:
+    command = ["sudo", "python3", "-", hostname, str(port), f'"{ssh_key.decode().strip()}"']
+    with open(
+        pkg_resources.resource_filename("dstack._internal", "scripts/gateway_publish.py"), "r"
+    ) as f:
+        output = exec_ssh_command(
+            hostname, command=" ".join(command), user=user, id_rsa=id_rsa, stdin=f
+        )
+    return output.decode().strip()
 
 
-def exec_ssh_command(hostname: str, command: str, user: str, id_rsa: Optional[PathLike]) -> bytes:
+def exec_ssh_command(
+    hostname: str, command: str, user: str, id_rsa: Optional[PathLike], stdin=None
+) -> bytes:
     args = ["ssh"]
     if id_rsa is not None:
         args += ["-i", id_rsa]
     args += [
         "-o",
-        "StrictHostKeyChecking=accept-new",
+        "StrictHostKeyChecking=no",
+        "-o",
+        "UserKnownHostsFile=/dev/null",
         f"{user}@{hostname}",
         command,
     ]
-    proc = subprocess.Popen(args, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+    if not hostname:  # ssh hangs indefinitely with empty hostname
+        raise SSHCommandError(
+            args, "ssh: Could not connect to the gateway, because hostname is empty"
+        )
+    proc = subprocess.Popen(args, stdin=stdin, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
     stdout, stderr = proc.communicate()
     if proc.returncode != 0:
         raise SSHCommandError(args, stderr.decode())
     return stdout
-
-
-class SSHCommandError(DstackError):
-    def __init__(self, cmd: List[str], message: str):
-        super().__init__(message)
-        self.cmd = cmd
