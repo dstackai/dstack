@@ -3,16 +3,21 @@ from typing import List, Optional
 
 from dstack._internal.cli.utils.common import console
 from dstack._internal.configurators.extensions import IDEExtension
+from dstack._internal.core.plan import RunPlan
 
 
 class VSCodeDesktop(IDEExtension):
     def __init__(
-        self, extensions: List[str], version: Optional[str] = None, run_name: Optional[str] = None
+        self,
+        extensions: List[str],
+        version: Optional[str] = None,
+        run_name: Optional[str] = None,
+        run_plan: Optional[RunPlan] = None,
     ):
         self.extensions = extensions
         if version is None:
             version = self._detect_code_version()
-        if version is None:
+        if version is None and run_plan is None:
             console.print(
                 "[grey58]Unable to detect the VS Code version and pre-install extensions. "
                 "Fix by opening [sea_green3]Command Palette[/sea_green3], executing [sea_green3]Shell Command: "

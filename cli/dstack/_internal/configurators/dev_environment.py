@@ -29,7 +29,9 @@ class DevEnvironmentConfigurator(JobConfiguratorWithPorts):
         run_plan: Optional[RunPlan] = None,
     ) -> List[job.Job]:
         self.ide = VSCodeDesktop(
-            extensions=["ms-python.python", "ms-toolsai.jupyter"], run_name=run_name
+            extensions=["ms-python.python", "ms-toolsai.jupyter"],
+            run_name=run_name,
+            run_plan=run_plan,
         )
         self.sshd = SSHd(ssh_key_pub)
         self.sshd.map_to_port = get_map_to_port(self.ports(), self.sshd.port)
