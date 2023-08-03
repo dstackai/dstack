@@ -33,7 +33,7 @@ env:
 
 jobs:
   build-docker:
-    if: ${{ inputs.build_docker == 'true' }}
+    if: inputs.build_docker
     defaults:
       run:
         working-directory: docker
@@ -63,7 +63,7 @@ jobs:
 
   build-aws-images:
     needs: build-docker
-    if: ${{ always() && inputs.build_aws == 'true' }}
+    if: ${{ always() && inputs.build_aws }}
     defaults:
       run:
         working-directory: runner
@@ -88,7 +88,7 @@ jobs:
 
   build-azure-images:
     needs: build-docker
-    if: ${{ always() && inputs.build_azure == 'true' }}
+    if: ${{ always() && inputs.build_azure }}
     defaults:
       run:
         working-directory: runner
@@ -125,7 +125,7 @@ jobs:
 
   build-gcp-images:
     needs: build-docker
-    if: ${{ always() && inputs.build_gcp == 'true' }}
+    if: ${{ always() && inputs.build_gcp }}
     defaults:
       run:
         working-directory: runner
