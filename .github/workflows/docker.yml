@@ -6,15 +6,34 @@ on:
       image_version:
         description: "Docker image version"
         required: true
-      build_prefix:
-        description: "Cloud images prefix"
-        default: ""
+      staging:
+        description: "Staging build"
+        type: boolean
+        default: false
+      build_docker:
+        description: "Build docker images"
+        type: boolean
+        default: true
+      build_aws:
+        description: "Build AWS images"
+        type: boolean
+        default: true
+      build_azure:
+        description: "Build Azure images"
+        type: boolean
+        default: true
+      build_gcp:
+        description: "Build GCP images"
+        type: boolean
+        default: true
 
 env:
   PACKER_VERSION: "1.9.2"
+  BUILD_PREFIX: ${{ inputs.staging && format('stgn-{0}-', github.run_number) || '' }}
 
 jobs:
   build-docker:
+    if: ${{ inputs.build_docker == 'true' }}
     defaults:
       run:
         working-directory: docker
@@ -43,10 +62,11 @@ jobs:
          docker buildx build --platform linux/amd64 --build-arg PYTHON=${{ matrix.python }} --push --provenance=false --tag dstackai/base:py${{ matrix.python }}-${{ inputs.image_version }}-cuda-11.8 -f cuda/Dockerfile .
 
   build-aws-images:
+    needs: build-docker
+    if: ${{ always() && inputs.build_aws == 'true' }}
     defaults:
       run:
         working-directory: runner
-    needs: [ build-docker ]
     runs-on: ubuntu-latest
     env:
       AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
@@ -64,13 +84,14 @@ jobs:
           cp -R ami/packer/* .
       - name: Run packer
         run: |
-          ./packer build -var-file=versions.json -var-file=aws-vars-prod.json -var image_version=${{ inputs.image_version }} -var build_prefix=${{ inputs.build_prefix }} aws-image${{ matrix.variant }}.json
+          ./packer build -var-file=versions.json -var-file=aws-vars-prod.json -var image_version=${{ inputs.image_version }} -var build_prefix=$BUILD_PREFIX aws-image${{ matrix.variant }}.json
 
   build-azure-images:
+    needs: build-docker
+    if: ${{ always() && inputs.build_azure == 'true' }}
     defaults:
       run:
         working-directory: runner
-    needs: [ build-docker ]
     runs-on: ubuntu-latest
     env:
       AZURE_CLIENT_ID: ${{ secrets.AZURE_CLIENT_ID }}
@@ -95,18 +116,19 @@ jobs:
           cp -R ami/packer/* .
       - name: Run packer
         run: |
-          ./packer build -var-file=versions.json -var image_version=${{ inputs.image_version }} -var build_prefix=${{ inputs.build_prefix }} azure-image${{ matrix.variant }}.json
+          ./packer build -var-file=versions.json -var image_version=${{ inputs.image_version }} -var build_prefix=$BUILD_PREFIX azure-image${{ matrix.variant }}.json
       - name: Publish azure image
         run: |
-          IMAGE_DEFINITION=${{ inputs.build_prefix }}dstack${{ matrix.variant }}-${{ inputs.image_version }}
-          IMAGE_NAME=${{ inputs.build_prefix }}dstack${{ matrix.variant }}-${{ inputs.image_version }}
+          IMAGE_DEFINITION=$BUILD_PREFIXdstack${{ matrix.variant }}-${{ inputs.image_version }}
+          IMAGE_NAME=$BUILD_PREFIXdstack${{ matrix.variant }}-${{ inputs.image_version }}
           ../scripts/publish_azure_image.sh $IMAGE_DEFINITION $IMAGE_NAME
 
   build-gcp-images:
+    needs: build-docker
+    if: ${{ always() && inputs.build_gcp == 'true' }}
     defaults:
       run:
         working-directory: runner
-    needs: [ build-docker ]
     runs-on: ubuntu-latest
     strategy:
       matrix:
@@ -132,10 +154,10 @@ jobs:
           cp -R ami/packer/* .
       - name: Run packer
         run: |
-          ./packer build -var-file=versions.json -var image_version=${{ inputs.image_version }} -var build_prefix=${{ inputs.build_prefix }} gcp-image${{ matrix.variant }}.json
+          ./packer build -var-file=versions.json -var image_version=${{ inputs.image_version }} -var build_prefix=$BUILD_PREFIX gcp-image${{ matrix.variant }}.json
       - name: Publish images
         run: |
           IMAGE_VERSION=${IMAGE_VERSION//./-}
-          gcloud compute images add-iam-policy-binding ${{ inputs.build_prefix }}dstack${{ matrix.variant }}-$IMAGE_VERSION --member='allAuthenticatedUsers' --role='roles/compute.imageUser'
+          gcloud compute images add-iam-policy-binding $BUILD_PREFIXdstack${{ matrix.variant }}-$IMAGE_VERSION --member='allAuthenticatedUsers' --role='roles/compute.imageUser'
         env:
           IMAGE_VERSION: ${{ inputs.image_version }}
