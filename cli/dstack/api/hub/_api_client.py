@@ -109,7 +109,7 @@ class HubAPIClient:
             host=self.url,
             url=url,
             headers=self._headers(),
-            data=RunsCreate(repo_ref=self.repo.repo_ref, run_name=run_name).json(),
+            data=RunsCreate(repo_id=self.repo.repo_id, run_name=run_name).json(),
         )
         if resp.ok:
             return resp.text
@@ -641,7 +641,7 @@ class HubAPIClient:
                 start_time = logs[-1].timestamp
             prev_event_id = logs[-1].event_id
 
-    def upload_file(self, dest_path: str) -> Optional[str]:
+    def upload_file(self, backend: str, dest_path: str) -> Optional[str]:
         url = _project_url(
             url=self.url,
             project=self.project,
@@ -652,13 +652,16 @@ class HubAPIClient:
             host=self.url,
             url=url,
             headers=self._headers(),
-            data=StorageLink(object_key=dest_path).json(),
+            data=StorageLink(
+                backend=backend,
+                object_key=dest_path,
+            ).json(),
         )
         if resp.ok:
             return resp.text
         resp.raise_for_status()
 
-    def download_file(self, dest_path: str) -> Optional[str]:
+    def download_file(self, backend: str, dest_path: str) -> Optional[str]:
         url = _project_url(
             url=self.url,
             project=self.project,
@@ -669,7 +672,10 @@ class HubAPIClient:
             host=self.url,
             url=url,
             headers=self._headers(),
-            data=StorageLink(object_key=dest_path).json(),
+            data=StorageLink(
+                backend=backend,
+                object_key=dest_path,
+            ).json(),
         )
         if resp.ok:
             return resp.text

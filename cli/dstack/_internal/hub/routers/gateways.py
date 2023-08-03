@@ -17,7 +17,7 @@ router = APIRouter(
 async def gateways_create(project_name: str) -> GatewayHead:
     project = await get_project(project_name=project_name)
     backends = await get_backends(project)
-    for backend in backends:
+    for _, backend in backends:
         try:
             return await call_backend(backend.create_gateway, get_hub_ssh_public_key())
         except NotImplementedError:

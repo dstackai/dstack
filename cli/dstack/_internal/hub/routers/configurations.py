@@ -18,7 +18,8 @@ async def delete_configuration_cache(
     user: User = Depends(Authenticated()),
 ):
     project = await get_project(project_name=project_name)
-    backend = await get_backend(project)
-    await call_backend(
-        backend.delete_configuration_cache, repo_ref.repo_id, user.name, configuration_path
-    )
+    backends = await get_backends(project)
+    for _, backend in backends:
+        await call_backend(
+            backend.delete_configuration_cache, repo_ref.repo_id, user.name, configuration_path
+        )

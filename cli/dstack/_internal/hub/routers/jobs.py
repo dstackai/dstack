@@ -23,9 +23,9 @@ router = APIRouter(prefix="/api/project", tags=["jobs"], dependencies=[Depends(P
 async def get_job(project_name: str, body: JobsGet) -> Job:
     project = await get_project(project_name=project_name)
     backends = await get_backends(project)
-    for backend in backends:
+    for _, backend in backends:
         job = await call_backend(backend.get_job, body.repo_id, body.job_id)
-        if job is None:
+        if job is not None:
             return job
     raise HTTPException(
         status_code=status.HTTP_404_NOT_FOUND,

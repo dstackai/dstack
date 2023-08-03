@@ -9,25 +9,27 @@ from dstack._internal.core.error import RepoNotInitializedError
 from dstack._internal.core.job import JobErrorCode, JobStatus
 from dstack._internal.core.request import RequestStatus
 from dstack._internal.core.run import RunHead
+from dstack._internal.hub.schemas import RunInfo
 from dstack._internal.utils.common import pretty_date
 from dstack.api.hub.errors import HubClientError
 
 console = Console()
 
 
-def print_runs(runs: List[RunHead], include_configuration: bool = False, verbose: bool = False):
+def print_runs(runs: List[RunInfo], include_configuration: bool = False, verbose: bool = False):
     table = generate_runs_table(runs, include_configuration=include_configuration, verbose=verbose)
     console.print(table)
 
 
 def generate_runs_table(
-    runs: List[RunHead], include_configuration: bool = False, verbose: bool = False
+    runs: List[RunInfo], include_configuration: bool = False, verbose: bool = False
 ) -> Table:
     table = Table(box=None)
     table.add_column("RUN", style="bold", no_wrap=True)
     if include_configuration:
         table.add_column("CONFIGURATION", style="grey58")
     table.add_column("USER", style="grey58", no_wrap=True, max_width=16)
+    table.add_column("BACKEND", style="grey58", no_wrap=True, max_width=16)
     table.add_column("INSTANCE", no_wrap=True)
     table.add_column("SPOT", no_wrap=True)
     table.add_column("STATUS", no_wrap=True)
@@ -36,7 +38,8 @@ def generate_runs_table(
         table.add_column("TAG", style="bold yellow", no_wrap=True)
         table.add_column("ERROR", no_wrap=True)
 
-    for run in runs:
+    for run_info in runs:
+        run = run_info.run_head
         submitted_at = pretty_date(round(run.submitted_at / 1000))
         row = [_status_color(run, run.run_name, True, False)]
         if include_configuration:
@@ -44,6 +47,7 @@ def generate_runs_table(
         row.extend(
             [
                 _status_color(run, run.hub_user_name or "", False, False),
+                run_info.backend,
                 _pretty_print_instance_type(run),
                 _pretty_print_spot(run),
                 _pretty_print_status(run),

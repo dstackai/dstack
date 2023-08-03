@@ -23,6 +23,7 @@ from dstack._internal.core.job import Job, JobErrorCode, JobHead, JobStatus
 from dstack._internal.core.plan import RunPlan
 from dstack._internal.core.request import RequestStatus
 from dstack._internal.core.run import RunHead
+from dstack._internal.hub.schemas import RunInfo
 from dstack._internal.utils.ssh import (
     include_ssh_config,
     ssh_config_add_host,
@@ -50,9 +51,10 @@ def print_run_plan(configuration_file: str, run_plan: RunPlan):
     table.add_column("CONFIGURATION", style="grey58")
     table.add_column("USER", style="grey58", no_wrap=True, max_width=16)
     table.add_column("PROJECT", style="grey58", no_wrap=True, max_width=16)
+    table.add_column("BACKEND", style="grey58", no_wrap=True, max_width=16)
     table.add_column("INSTANCE")
     table.add_column("RESOURCES")
-    table.add_column("SPOT POLICY")
+    table.add_column("SPOT")
     table.add_column("BUILD")
     job_plan = run_plan.job_plans[0]
     instance = job_plan.instance_type.instance_name or "-"
@@ -63,6 +65,7 @@ def print_run_plan(configuration_file: str, run_plan: RunPlan):
         configuration_file,
         run_plan.hub_user_name,
         run_plan.project,
+        job_plan.backend,
         instance,
         instance_info,
         spot,
@@ -74,14 +77,15 @@ def print_run_plan(configuration_file: str, run_plan: RunPlan):
 
 def poll_run(
     hub_client: HubClient,
-    run: RunHead,
+    run_info: RunInfo,
     job_heads: List[JobHead],
     ssh_key: Optional[str],
     watcher: Optional[Watcher],
     ports_locks: Tuple[PortsLock, PortsLock],
 ):
-    print_runs([run])
+    print_runs([run_info])
     console.print()
+    run = run_info.run_head
     if run.status == JobStatus.FAILED:
         _print_failed_run_message(run)
         exit(1)
@@ -140,15 +144,15 @@ def poll_run(
 
         # attach to the instance, attach to the container in the background
         jobs = [hub_client.get_job(job_head.job_id) for job_head in job_heads]
-        ports = _attach(hub_client, jobs[0], ssh_key, ports_locks)
+        ports = _attach(hub_client, run_info, jobs[0], ssh_key, ports_locks)
         console.print()
         console.print("[grey58]To stop, press Ctrl+C.[/]")
         console.print()
 
-        run = hub_client.list_runs(run_name)[0]
+        run = hub_client.list_runs(run_name)[0].run_head
         if run.status.is_unfinished() or run.status == JobStatus.DONE:
             if watcher is not None and watcher.is_alive():  # reload is enabled
-                if hub_client.get_project_backend_type() == "local":
+                if run_info.backend == "local":
                     watcher.start_copier(
                         LocalCopier,
                         dst_root=os.path.expanduser(
@@ -236,12 +240,16 @@ def reserve_ports(apps: List[AppSpec], local_backend: bool) -> Tuple[PortsLock, 
 
 
 def _attach(
-    hub_client: HubClient, job: Job, ssh_key_path: str, ports_locks: Tuple[PortsLock, PortsLock]
+    hub_client: HubClient,
+    run_info: RunInfo,
+    job: Job,
+    ssh_key_path: str,
+    ports_locks: Tuple[PortsLock, PortsLock],
 ) -> Dict[int, int]:
     """
     :return: ports_mapping
     """
-    backend_type = hub_client.get_project_backend_type()
+    backend_type = run_info.backend
     app_ports = {app.port: app.map_to_port or 0 for app in job.app_specs or []}
     host_ports = {}
     ssh_server_port = get_ssh_server_port(job.app_specs or [])
@@ -390,7 +398,8 @@ def _poll_run_head(
     loop_statuses: Optional[List[JobStatus]] = None,
 ) -> Iterator[RunHead]:
     while True:
-        run_heads = hub_client.list_runs(run_name)
+        run_infos = hub_client.list_runs(run_name)
+        run_heads = [r.run_head for r in run_infos]
         if len(run_heads) == 0:
             time.sleep(rate / 2)
             continue

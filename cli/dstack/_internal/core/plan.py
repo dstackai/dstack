@@ -9,6 +9,7 @@ from dstack._internal.core.job import Job
 
 class JobPlan(BaseModel):
     job: Job
+    backend: str
     instance_type: InstanceType
     build_plan: BuildPlan
 

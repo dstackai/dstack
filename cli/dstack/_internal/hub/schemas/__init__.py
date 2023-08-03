@@ -442,6 +442,7 @@ class PollLogs(BaseModel):
 
 
 class StorageLink(BaseModel):
+    backend: str
     object_key: str
 
 

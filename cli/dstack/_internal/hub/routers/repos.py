@@ -41,7 +41,7 @@ async def get_repo_head(project_name: str, body: RepoHeadGet) -> RepoHead:
 async def save_repo_credentials(project_name: str, body: SaveRepoCredentials):
     project = await get_project(project_name=project_name)
     backends = await get_backends(project)
-    for backend in backends:
+    for _, backend in backends:
         await call_backend(backend.save_repo_credentials, body.repo_id, body.repo_credentials)
 
 

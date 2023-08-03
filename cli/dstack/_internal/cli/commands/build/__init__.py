@@ -97,7 +97,8 @@ class BuildCommand(BasicCommand):
                 exit(0)
 
             ports_locks = reserve_ports(
-                configurator.app_specs(), hub_client.get_project_backend_type() == "local"
+                apps=configurator.app_specs(),
+                local_backend=run_plan.job_plans[0].backend == "local",
             )
 
             console.print("\nProvisioning...\n")

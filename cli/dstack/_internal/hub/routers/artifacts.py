@@ -15,7 +15,7 @@ router = APIRouter(
 @router.post("/{project_name}/artifacts/list")
 async def list_artifacts(project_name: str, body: ArtifactsList) -> List[Artifact]:
     project = await get_project(project_name=project_name)
-    backend = await get_run_backend(project, body.repo_id, body.run_name)
+    _, backend = await get_run_backend(project, body.repo_id, body.run_name)
     artifacts = await call_backend(
         backend.list_run_artifact_files,
         body.repo_id,

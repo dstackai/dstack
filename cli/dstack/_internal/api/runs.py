@@ -2,8 +2,8 @@ from typing import List, Optional, Tuple
 
 from dstack._internal.backend.base import Backend
 from dstack._internal.core.error import DstackError
-from dstack._internal.core.run import RunHead
 from dstack._internal.core.tag import TagHead
+from dstack._internal.hub.schemas import RunInfo
 from dstack.api.hub import HubClient
 
 
@@ -15,17 +15,17 @@ class TagNotFoundError(DstackError):
     pass
 
 
-def list_runs_hub(hub_client: HubClient, run_name: str = "", all: bool = False) -> List[RunHead]:
+def list_runs_hub(hub_client: HubClient, run_name: str = "", all: bool = False) -> List[RunInfo]:
     runs = [run for run in _get_runs_hub(hub_client, run_name, all)]
-    return list(sorted(runs, key=lambda r: -r.submitted_at))
+    return list(sorted(runs, key=lambda r: -r.run_head.submitted_at))
 
 
-def _get_runs_hub(hub_client: HubClient, run_name: str = "", all: bool = False) -> List[RunHead]:
-    runs = [r.run_head for r in hub_client.list_runs(run_name)]
+def _get_runs_hub(hub_client: HubClient, run_name: str = "", all: bool = False) -> List[RunInfo]:
+    runs = hub_client.list_runs(run_name)
     if not all:
-        active = any(run.status.is_active() for run in runs)
+        active = any(run.run_head.status.is_active() for run in runs)
         if active:
-            runs = list(filter(lambda r: r.status.is_active(), runs))
+            runs = list(filter(lambda r: r.run_head.status.is_active(), runs))
         else:
             runs = runs[:1]
     return runs

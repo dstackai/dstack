@@ -24,7 +24,7 @@ router = APIRouter(prefix="/api/project", tags=["logs"], dependencies=[Depends(P
 )
 async def poll_logs(project_name: str, body: PollLogs) -> List[LogEvent]:
     project = await get_project(project_name=project_name)
-    backend = await get_run_backend(project, body.repo_id, body.run_name)
+    _, backend = await get_run_backend(project, body.repo_id, body.run_name)
     jobs = await call_backend(backend.list_jobs, body.repo_id, body.run_name)
     if len(jobs) == 0:
         return None

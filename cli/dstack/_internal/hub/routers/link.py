@@ -3,7 +3,12 @@ from fastapi.responses import PlainTextResponse
 from fastapi.security.http import HTTPAuthorizationCredentials, HTTPBearer
 
 from dstack._internal.backend.local import LocalBackend
-from dstack._internal.hub.routers.util import call_backend, get_backends, get_project
+from dstack._internal.hub.routers.util import (
+    call_backend,
+    get_backend_by_type,
+    get_backends,
+    get_project,
+)
 from dstack._internal.hub.schemas import StorageLink
 from dstack._internal.hub.security.permissions import ProjectMember
 
@@ -22,7 +27,7 @@ async def link_upload(
     token: HTTPAuthorizationCredentials = Security(HTTPBearer()),
 ):
     project = await get_project(project_name=project_name)
-    backend = await get_backend(project)
+    _, backend = await get_backend_by_type(project, body.backend)
     if isinstance(backend, LocalBackend):
         return str(
             request.url_for("put_file", project_name=project_name).replace_query_params(
@@ -46,7 +51,7 @@ async def link_download(
     token: HTTPAuthorizationCredentials = Security(HTTPBearer()),
 ):
     project = await get_project(project_name=project_name)
-    backend = await get_backend(project)
+    _, backend = await get_backend_by_type(project, body.backend)
     if isinstance(backend, LocalBackend):
         print(request.url_for("download_file", project_name=project_name))
         return str(

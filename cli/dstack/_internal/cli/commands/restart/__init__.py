@@ -24,15 +24,18 @@ class RestartCommand(BasicCommand):
     @check_init
     def _command(self, args: Namespace):
         hub_client = get_hub_client(project_name=args.project)
-        jobs = hub_client.list_jobs(args.run_name)
-        if len(jobs) == 0:
+
+        runs = list_runs_hub(hub_client, run_name=args.run_name)
+        if len(runs) == 0:
             console.print(f"Cannot find the run '{args.run_name}'")
             exit(1)
 
+        jobs = hub_client.list_jobs(args.run_name)
         job = jobs[0]
         try:
             ports_locks = reserve_ports(
-                job.app_specs, hub_client.get_project_backend_type() == "local"
+                apps=job.app_specs,
+                local_backend=runs[0].backend == "local",
             )
         except PortUsedError as e:
             console.print(e)

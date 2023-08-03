@@ -20,7 +20,7 @@ from dstack._internal.core.repo.remote import RemoteRepo
 from dstack._internal.core.run import RunHead
 from dstack._internal.core.secret import Secret
 from dstack._internal.core.tag import TagHead
-from dstack._internal.hub.schemas import ProjectInfo
+from dstack._internal.hub.schemas import ProjectInfo, RunInfo
 from dstack.api.hub._api_client import HubAPIClient
 from dstack.api.hub._config import HubClientConfig
 from dstack.api.hub._storage import HUBStorage
@@ -123,7 +123,7 @@ class HubClient:
         include_request_heads: bool = True,
         interrupted_job_new_status: JobStatus = JobStatus.FAILED,
         repo_id: Optional[str] = None,
-    ) -> List[RunHead]:
+    ) -> List[RunInfo]:
         return self._api_client.list_runs(
             run_name=run_name,
             include_request_heads=include_request_heads,
@@ -291,7 +291,7 @@ class HubClient:
 
         # todo handle tag_name & dependencies
 
-        repo_code_filename = self._upload_code_file()
+        repo_code_filename = self._upload_code_file(run_plan.job_plans[0].backend)
         jobs = configurator.get_jobs(
             repo=self.repo,
             run_name=run_name,
@@ -304,11 +304,11 @@ class HubClient:
         self.update_repo_last_run_at(last_run_at=int(round(time.time() * 1000)))
         return run_name, jobs
 
-    def _upload_code_file(self) -> str:
+    def _upload_code_file(self, backend: str) -> str:
         with tempfile.NamedTemporaryFile("w+b") as f:
             repo_code_filename = self.repo.repo_data.write_code_file(f)
             f.seek(0)
-            self._storage.upload_file(f.name, repo_code_filename, lambda _: ...)
+            self._storage.upload_file(backend, f.name, repo_code_filename, lambda _: ...)
         return repo_code_filename
 
     def create_gateway(self) -> GatewayHead:

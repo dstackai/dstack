@@ -68,7 +68,7 @@ async def get_run_plan(
     backends = await get_backends(project)
     job_plans = []
     for job in body.jobs:
-        for _, backend in backends:
+        for db_backend, backend in backends:
             instance_type = await call_backend(backend.predict_instance_type, job)
             if instance_type is not None:
                 try:
@@ -78,7 +78,10 @@ async def get_run_plan(
                         status_code=status.HTTP_400_BAD_REQUEST,
                         detail=error_detail(msg=e.message, code=e.code),
                     )
-                job_plans.append(JobPlan(job=job, instance_type=instance_type, build_plan=build))
+                job_plan = JobPlan(
+                    backend=db_backend.type, job=job, instance_type=instance_type, build_plan=build
+                )
+                job_plans.append(job_plan)
                 break
     if len(job_plans) == 0:
         msg = f"No instance type matching requirements ({job.requirements.pretty_format()})"

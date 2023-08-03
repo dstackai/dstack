@@ -26,7 +26,7 @@ async def run(project_name: str, job: Job):
     failed_to_start_job_new_status = JobStatus.FAILED
     if job.retry_policy.retry:
         failed_to_start_job_new_status = JobStatus.PENDING
-    for backend in backends:
+    for _, backend in backends:
         try:
             await call_backend(backend.run_job, job, failed_to_start_job_new_status)
             return
@@ -53,12 +53,12 @@ async def run(project_name: str, job: Job):
 @router.post("/{project_name}/runners/restart")
 async def restart(project_name: str, job: Job):
     project = await get_project(project_name=project_name)
-    backend = await get_run_backend(project, job.repo.repo_id, job.run_name)
+    _, backend = await get_run_backend(project, job.repo.repo_id, job.run_name)
     await call_backend(backend.restart_job, job)
 
 
 @router.post("/{project_name}/runners/stop")
 async def stop(project_name: str, body: StopRunners):
     project = await get_project(project_name=project_name)
-    backend = await get_job_backend(project, body.repo_id, body.job_id)
+    _, backend = await get_job_backend(project, body.repo_id, body.job_id)
     await call_backend(backend.stop_job, body.repo_id, body.job_id, body.terminate, body.abort)
