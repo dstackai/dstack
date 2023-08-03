@@ -146,6 +146,7 @@ nav:
       - Guides:
           - Dev environments: docs/guides/dev-environments.md
           - Tasks: docs/guides/tasks.md
+          - Services: docs/guides/services.md
 #          - Artifacts: docs/guides/artifacts.md
           - Projects: docs/guides/projects.md
       - Reference:
