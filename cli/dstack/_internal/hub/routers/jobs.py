@@ -10,15 +10,6 @@ from dstack._internal.hub.security.permissions import ProjectMember
 router = APIRouter(prefix="/api/project", tags=["jobs"], dependencies=[Depends(ProjectMember())])
 
 
-# @router.post("/{project_name}/jobs/create")
-# async def create_job(project_name: str, job: Job, user: User = Depends(Authenticated())) -> Job:
-#     project = await get_project(project_name=project_name)
-#     backend = await get_backend(project)
-#     job.hub_user_name = user.name
-#     await call_backend(backend.create_job, job)
-#     return job
-
-
 @router.post("/{project_name}/jobs/get")
 async def get_job(project_name: str, body: JobsGet) -> Job:
     project = await get_project(project_name=project_name)

@@ -2,7 +2,7 @@ import re
 from typing import List, Optional, Union
 
 from pydantic import Field, validator
-from typing_extensions import Annotated
+from typing_extensions import Annotated, Literal
 
 from dstack._internal.core.configuration import ForbidExtra
 from dstack._internal.core.job import SpotPolicy, TerminationPolicy
@@ -10,6 +10,15 @@ from dstack._internal.core.job import SpotPolicy, TerminationPolicy
 DEFAULT_CPU = 2
 DEFAULT_MEM = "8GB"
 DEFAULT_RETRY_LIMIT = 3600
+
+
+BackendType = Union[
+    Literal["local"],
+    Literal["aws"],
+    Literal["azure"],
+    Literal["gcp"],
+    Literal["lambda"],
+]
 
 
 def parse_memory(v: Optional[Union[int, str]]) -> Optional[int]:
@@ -101,7 +110,7 @@ class ProfileRetryPolicy(ForbidExtra):
 
 class Profile(ForbidExtra):
     name: str
-    project: Optional[str]
+    backends: Optional[List[BackendType]]
     resources: ProfileResources = ProfileResources()
     spot_policy: Annotated[
         Optional[SpotPolicy],

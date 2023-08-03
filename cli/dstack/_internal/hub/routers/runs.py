@@ -70,6 +70,8 @@ async def get_run_plan(
     local_backend = False
     for job in body.jobs:
         for db_backend, backend in backends:
+            if body.backends is not None and db_backend.type not in body.backends:
+                continue
             instance_type = await call_backend(backend.predict_instance_type, job)
             if instance_type is not None:
                 if db_backend.type == "local":

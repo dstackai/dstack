@@ -161,7 +161,6 @@ nav:
               - dstack logs: docs/reference/cli/logs.md
               - dstack stop: docs/reference/cli/stop.md
               - dstack rm: docs/reference/cli/rm.md
-              - dstack cp: docs/reference/cli/cp.md
               - dstack tags: docs/reference/cli/tags.md
               - dstack secrets: docs/reference/cli/secrets.md
               - dstack prune: docs/reference/cli/prune.md

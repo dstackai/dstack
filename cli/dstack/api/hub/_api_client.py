@@ -32,6 +32,7 @@ from dstack._internal.hub.schemas import (
     ProjectInfo,
     ReposUpdate,
     RunInfo,
+    RunRunners,
     RunsCreate,
     RunsDelete,
     RunsGetPlan,
@@ -74,7 +75,7 @@ class HubAPIClient:
             return ProjectInfo.parse_obj(resp.json())
         resp.raise_for_status()
 
-    def get_run_plan(self, jobs: List[Job]) -> RunPlan:
+    def get_run_plan(self, jobs: List[Job], backends: Optional[List[str]]) -> RunPlan:
         url = _project_url(
             url=self.url,
             project=self.project,
@@ -85,7 +86,7 @@ class HubAPIClient:
             host=self.url,
             url=url,
             headers=self._headers(),
-            data=RunsGetPlan(jobs=jobs).json(),
+            data=RunsGetPlan(jobs=jobs, backends=backends).json(),
         )
         if resp.ok:
             body = resp.json()
@@ -166,14 +167,18 @@ class HubAPIClient:
             return [Job.parse_obj(job) for job in body]
         resp.raise_for_status()
 
-    def run_job(self, job: Job):
+    def run_job(self, job: Job, backends: Optional[List[str]]):
         url = _project_url(
             url=self.url,
             project=self.project,
             additional_path=f"/runners/run",
         )
         resp = _make_hub_request(
-            requests.post, host=self.url, url=url, headers=self._headers(), data=job.json()
+            requests.post,
+            host=self.url,
+            url=url,
+            headers=self._headers(),
+            data=RunRunners(job=job, backends=backends).json(),
         )
         if resp.ok:
             return

@@ -6,8 +6,9 @@ Profiles are defined in the `.dstack/profiles.yml` file within your project dire
 
 Below is a full reference of all available properties.
 
-- `profiles` (Required) - The root property (of an `array` type)
+- `profiles` - (Required) The root property (of an `array` type)
     - `name` - (Required) The name of the profile
+    - `backends` - (Optional) A list of backends that will be tried for provisioning. Supported backends are `local`, `aws`, `azure`, `gcp`, and `lambda`. If not specified, all configured backends are tried.
     - `resources` - (Optional) The minimum required resources
         - `memory` - (Optional) The minimum size of RAM memory (e.g., `"16GB"`). 
         - `gpu` - (Optional) The minimum number of GPUs, their model name and memory

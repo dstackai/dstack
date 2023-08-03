@@ -28,7 +28,11 @@ class Member(BaseModel):
 
 
 BackendType = Union[
-    Literal["local"], Literal["aws"], Literal["gcp"], Literal["azure"], Literal["lambda"]
+    Literal["local"],
+    Literal["aws"],
+    Literal["azure"],
+    Literal["gcp"],
+    Literal["lambda"],
 ]
 
 
@@ -344,6 +348,11 @@ class AddTagPath(BaseModel):
     local_dirs: List[str]
 
 
+class RunRunners(BaseModel):
+    job: Job
+    backends: Optional[List[str]]
+
+
 class StopRunners(BaseModel):
     repo_id: str
     job_id: str
@@ -371,6 +380,7 @@ class ReposDelete(BaseModel):
 
 class RunsGetPlan(BaseModel):
     jobs: List[Job]
+    backends: Optional[List[str]]
 
 
 class RunsCreate(BaseModel):

@@ -31,8 +31,8 @@ class HubClient:
     def __init__(
         self,
         config: HubClientConfig,
-        project: Optional[str] = None,
-        repo: Optional[Repo] = None,
+        repo: Repo,
+        project: str,
         repo_credentials: Optional[RemoteRepoCredentials] = None,
         auto_init: bool = False,
     ):
@@ -51,40 +51,21 @@ class HubClient:
 
     @staticmethod
     def validate_config(config: HubClientConfig, project: str):
-        project_info = HubAPIClient(
+        HubAPIClient(
             url=config.url, token=config.token, project=project, repo=None
         ).get_project_info()
-        if project_info.backend.__root__.type == "local":
-            hostname = urllib.parse.urlparse(config.url).hostname
-            if hostname not in ["localhost", "127.0.0.1"]:
-                raise HubClientError(
-                    "Projects with local backend hosted on remote Hub are not yet supported. "
-                    "Consider starting Hub locally if you need to use local backend."
-                )
-
-    def get_project_backend_type(self) -> str:
-        return self._get_project_info().backend.__root__.type
-
-    def _get_project_info(self) -> ProjectInfo:
-        return self._api_client.get_project_info()
 
     def create_run(self, run_name: Optional[str]) -> str:
         return self._api_client.create_run(run_name)
 
-    def create_job(self, job: Job):
-        self._api_client.create_job(job=job)
-
-    def submit_job(self, job: Job, failed_to_start_job_new_status: JobStatus = JobStatus.FAILED):
-        self.run_job(job, failed_to_start_job_new_status)
-
-    def get_job(self, job_id: str, repo_id: Optional[str] = None) -> Optional[Job]:
+    def get_job(self, job_id: str) -> Optional[Job]:
         return self._api_client.get_job(job_id=job_id)
 
-    def list_jobs(self, run_name: str, repo_id: Optional[str] = None) -> List[Job]:
+    def list_jobs(self, run_name: str) -> List[Job]:
         return self._api_client.list_jobs(run_name=run_name)
 
-    def run_job(self, job: Job, failed_to_start_job_new_status: JobStatus):
-        self._api_client.run_job(job=job)
+    def run_job(self, job: Job, backends: Optional[List[str]]):
+        self._api_client.run_job(job=job, backends=backends)
 
     def restart_job(self, job: Job):
         self._api_client.restart_job(job)
@@ -97,12 +78,10 @@ class HubClient:
         for job_head in job_heads:
             self.stop_job(job_head.job_id, terminate, abort)
 
-    def list_job_heads(
-        self, run_name: Optional[str] = None, repo_id: Optional[str] = None
-    ) -> List[JobHead]:
+    def list_job_heads(self, run_name: Optional[str] = None) -> List[JobHead]:
         return self._api_client.list_job_heads(run_name=run_name)
 
-    def delete_job_head(self, job_id: str, repo_id: Optional[str] = None):
+    def delete_job_head(self, job_id: str):
         self._api_client.delete_job_head(job_id=job_id)
 
     def delete_job_heads(self, run_name: Optional[str]):
@@ -138,7 +117,6 @@ class HubClient:
         end_time: Optional[datetime] = None,
         descending: bool = False,
         diagnose: bool = False,
-        repo_id: Optional[str] = None,
     ) -> Generator[LogEvent, None, None]:
         return self._api_client.poll_logs(
             run_name=run_name,
@@ -153,7 +131,6 @@ class HubClient:
         run_name: str,
         prefix: str = "",
         recursive: bool = False,
-        repo_id: Optional[str] = None,
     ) -> List[Artifact]:
         return self._api_client.list_run_artifact_files(
             run_name=run_name, prefix=prefix, recursive=recursive
@@ -261,9 +238,12 @@ class HubClient:
         :return: run plan
         """
         jobs = configurator.get_jobs(
-            repo=self.repo, run_name="dry-run", repo_code_filename="", ssh_key_pub=""
+            repo=self.repo,
+            run_name="dry-run",
+            repo_code_filename="",
+            ssh_key_pub="",
         )
-        run_plan = self._api_client.get_run_plan(jobs)
+        run_plan = self._api_client.get_run_plan(jobs, configurator.profile.backends)
         return run_plan
 
     def run_configuration(
@@ -292,7 +272,7 @@ class HubClient:
                 run_plan=run_plan,
             )
             for job in jobs:
-                self.submit_job(job)
+                self.run_job(job, configurator.profile.backends)
             run_info = self.list_runs(run_name)[0]
             self._storage.upload_file(run_info.backend, f.name, repo_code_filename, lambda _: ...)
         self.update_repo_last_run_at(last_run_at=int(round(time.time() * 1000)))

@@ -2,7 +2,7 @@ from fastapi import APIRouter, Depends, HTTPException, status
 
 from dstack._internal.core.build import BuildNotFoundError
 from dstack._internal.core.error import NoMatchingInstanceError, SSHCommandError
-from dstack._internal.core.job import Job, JobErrorCode, JobStatus
+from dstack._internal.core.job import Job, JobStatus
 from dstack._internal.hub.routers.util import (
     call_backend,
     error_detail,
@@ -11,7 +11,7 @@ from dstack._internal.hub.routers.util import (
     get_project,
     get_run_backend,
 )
-from dstack._internal.hub.schemas import StopRunners
+from dstack._internal.hub.schemas import RunRunners, StopRunners
 from dstack._internal.hub.security.permissions import ProjectMember
 
 router = APIRouter(
@@ -20,15 +20,17 @@ router = APIRouter(
 
 
 @router.post("/{project_name}/runners/run")
-async def run(project_name: str, job: Job):
+async def run(project_name: str, body: RunRunners):
     project = await get_project(project_name=project_name)
     backends = await get_backends(project)
     failed_to_start_job_new_status = JobStatus.FAILED
-    if job.retry_policy.retry:
+    if body.job.retry_policy.retry:
         failed_to_start_job_new_status = JobStatus.PENDING
-    for _, backend in backends:
+    for db_backend, backend in backends:
+        if body.backends is not None and db_backend.type not in body.backends:
+            continue
         try:
-            await call_backend(backend.run_job, job, failed_to_start_job_new_status)
+            await call_backend(backend.run_job, body.job, failed_to_start_job_new_status)
             return
         except NoMatchingInstanceError:
             continue

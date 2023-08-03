@@ -17,9 +17,11 @@ from dstack._internal.cli.utils.common import console, print_runs
 from dstack._internal.cli.utils.config import config
 from dstack._internal.cli.utils.ssh_tunnel import PortsLock, run_ssh_tunnel
 from dstack._internal.cli.utils.watcher import LocalCopier, SSHCopier, Watcher
+from dstack._internal.configurators import JobConfigurator
 from dstack._internal.core.app import AppSpec
 from dstack._internal.core.job import Job, JobErrorCode, JobHead, JobStatus
 from dstack._internal.core.plan import RunPlan
+from dstack._internal.core.profile import Profile
 from dstack._internal.core.request import RequestStatus
 from dstack._internal.core.run import RunHead
 from dstack._internal.hub.schemas import RunInfo
@@ -45,17 +47,18 @@ def read_ssh_key_pub(key_path: str) -> str:
     return path.with_suffix(path.suffix + ".pub").read_text().strip("\n")
 
 
-def print_run_plan(configuration_file: str, run_plan: RunPlan):
+def print_run_plan(configurator: JobConfigurator, run_plan: RunPlan):
     table = Table(box=None)
     table.add_column("CONFIGURATION", style="grey58")
+    table.add_column("PROFILE", style="grey58", no_wrap=True, max_width=16)
     table.add_column("USER", style="grey58", no_wrap=True, max_width=16)
     table.add_column("PROJECT", style="grey58", no_wrap=True, max_width=16)
     table.add_column("SPOT")
-    table.add_column("BUILD")
     job_plan = run_plan.job_plans[0]
     spot = job_plan.job.spot_policy.value
     table.add_row(
-        configuration_file,
+        configurator.configuration_path,
+        configurator.profile.name,
         run_plan.hub_user_name,
         run_plan.project,
         spot,

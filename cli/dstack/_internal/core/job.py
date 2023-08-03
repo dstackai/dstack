@@ -49,7 +49,7 @@ class Requirements(BaseModel):
         res += f"{self.cpus}xCPUs"
         res += f", {self.memory_mib}MB"
         if self.gpus:
-            res += f", {self.gpus.count}x{self.gpus.name}"
+            res += f", {self.gpus.count}x{self.gpus.name or 'GPU'}"
         return res
 
 
