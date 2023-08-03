@@ -9,7 +9,6 @@ from dstack._internal.core.job import Job
 
 class JobPlan(BaseModel):
     job: Job
-    backend: str
     instance_type: InstanceType
     build_plan: BuildPlan
 
@@ -17,4 +16,5 @@ class JobPlan(BaseModel):
 class RunPlan(BaseModel):
     project: str
     hub_user_name: str
+    local_backend: bool
     job_plans: List[JobPlan]

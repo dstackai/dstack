@@ -1,5 +1,4 @@
 import argparse
-import copy
 import os
 from argparse import Namespace
 
@@ -126,7 +125,7 @@ class RunCommand(BasicCommand):
             if not args.detach:
                 ports_locks = reserve_ports(
                     apps=configurator.app_specs(),
-                    local_backend=run_plan.job_plans[0].backend == "local",
+                    local_backend=run_plan.local_backend,
                 )
 
             console.print("\nProvisioning...\n")

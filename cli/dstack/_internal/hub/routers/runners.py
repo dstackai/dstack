@@ -2,7 +2,7 @@ from fastapi import APIRouter, Depends, HTTPException, status
 
 from dstack._internal.core.build import BuildNotFoundError
 from dstack._internal.core.error import NoMatchingInstanceError, SSHCommandError
-from dstack._internal.core.job import Job, JobStatus
+from dstack._internal.core.job import Job, JobErrorCode, JobStatus
 from dstack._internal.hub.routers.util import (
     call_backend,
     error_detail,
@@ -44,9 +44,7 @@ async def run(project_name: str, job: Job):
             )
     raise HTTPException(
         status_code=status.HTTP_400_BAD_REQUEST,
-        detail=error_detail(
-            "No instance type matching requirements", code=NoMatchingInstanceError.code
-        ),
+        detail=error_detail("Run failed due to no capacity", code=NoMatchingInstanceError.code),
     )
 
 

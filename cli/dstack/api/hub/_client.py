@@ -75,7 +75,6 @@ class HubClient:
         self._api_client.create_job(job=job)
 
     def submit_job(self, job: Job, failed_to_start_job_new_status: JobStatus = JobStatus.FAILED):
-        # self.create_job(job)
         self.run_job(job, failed_to_start_job_new_status)
 
     def get_job(self, job_id: str, repo_id: Optional[str] = None) -> Optional[Job]:
@@ -141,7 +140,6 @@ class HubClient:
         diagnose: bool = False,
         repo_id: Optional[str] = None,
     ) -> Generator[LogEvent, None, None]:
-        # /{hub_name}/logs/poll
         return self._api_client.poll_logs(
             run_name=run_name,
             start_time=start_time,
@@ -157,7 +155,6 @@ class HubClient:
         recursive: bool = False,
         repo_id: Optional[str] = None,
     ) -> List[Artifact]:
-        # /{hub_name}/artifacts/list
         return self._api_client.list_run_artifact_files(
             run_name=run_name, prefix=prefix, recursive=recursive
         )
@@ -168,7 +165,6 @@ class HubClient:
         output_dir: Optional[str],
         files_path: Optional[str] = None,
     ):
-        # /{hub_name}/artifacts/download
         artifacts = self.list_run_artifact_files(run_name=run_name, recursive=True)
         base_artifacts.download_run_artifact_files(
             storage=self._storage,
@@ -185,7 +181,6 @@ class HubClient:
         artifact_path: str,
         local_path: Path,
     ):
-        # /{hub_name}/artifacts/upload
         base_artifacts.upload_job_artifact_files(
             storage=self._storage,
             repo_id=self.repo.repo_id,
@@ -212,15 +207,12 @@ class HubClient:
         )
 
     def add_tag_from_local_dirs(self, tag_name: str, local_dirs: List[str]):
-        # /{hub_name}/tags/add
         return self._api_client.add_tag_from_local_dirs(tag_name=tag_name, local_dirs=local_dirs)
 
     def delete_tag_head(self, tag_head: TagHead):
-        # /{hub_name}/tags/delete
         return self._api_client.delete_tag_head(tag_head=tag_head)
 
     def update_repo_last_run_at(self, last_run_at: int):
-        # /{hub_name}/repos/update
         return self._api_client.update_repo_last_run_at(last_run_at=last_run_at)
 
     def list_repo_heads(self) -> List[RepoHead]:
@@ -258,7 +250,6 @@ class HubClient:
         self._api_client.update_secret(secret=secret)
 
     def delete_secret(self, secret_name: str):
-        # /{hub_name}/secrets/delete
         self._api_client.delete_secret(secret_name=secret_name)
 
     def delete_configuration_cache(self, configuration_path: str):
@@ -289,27 +280,23 @@ class HubClient:
             {"run": {"name": run_name, "args": configurator.join_run_args(run_args)}}
         )
 
-        # todo handle tag_name & dependencies
+        # Todo handle tag_name & dependencies
 
-        repo_code_filename = self._upload_code_file(run_plan.job_plans[0].backend)
-        jobs = configurator.get_jobs(
-            repo=self.repo,
-            run_name=run_name,
-            repo_code_filename=repo_code_filename,
-            ssh_key_pub=ssh_key_pub,
-            run_plan=run_plan,
-        )
-        for job in jobs:
-            self.submit_job(job)
-        self.update_repo_last_run_at(last_run_at=int(round(time.time() * 1000)))
-        return run_name, jobs
-
-    def _upload_code_file(self, backend: str) -> str:
         with tempfile.NamedTemporaryFile("w+b") as f:
             repo_code_filename = self.repo.repo_data.write_code_file(f)
-            f.seek(0)
-            self._storage.upload_file(backend, f.name, repo_code_filename, lambda _: ...)
-        return repo_code_filename
+            jobs = configurator.get_jobs(
+                repo=self.repo,
+                run_name=run_name,
+                repo_code_filename=repo_code_filename,
+                ssh_key_pub=ssh_key_pub,
+                run_plan=run_plan,
+            )
+            for job in jobs:
+                self.submit_job(job)
+            run_info = self.list_runs(run_name)[0]
+            self._storage.upload_file(run_info.backend, f.name, repo_code_filename, lambda _: ...)
+        self.update_repo_last_run_at(last_run_at=int(round(time.time() * 1000)))
+        return run_name, jobs
 
     def create_gateway(self) -> GatewayHead:
         return self._api_client.create_gateway()

@@ -27,7 +27,7 @@ async def poll_logs(project_name: str, body: PollLogs) -> List[LogEvent]:
     _, backend = await get_run_backend(project, body.repo_id, body.run_name)
     jobs = await call_backend(backend.list_jobs, body.repo_id, body.run_name)
     if len(jobs) == 0:
-        return None
+        return []
 
     start_time = body.start_time
     if start_time is None:

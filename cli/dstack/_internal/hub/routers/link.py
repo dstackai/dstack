@@ -53,7 +53,6 @@ async def link_download(
     project = await get_project(project_name=project_name)
     _, backend = await get_backend_by_type(project, body.backend)
     if isinstance(backend, LocalBackend):
-        print(request.url_for("download_file", project_name=project_name))
         return str(
             request.url_for("download_file", project_name=project_name).replace_query_params(
                 key=body.object_key,

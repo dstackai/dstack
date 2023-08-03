@@ -18,7 +18,6 @@ from dstack._internal.cli.utils.config import config
 from dstack._internal.cli.utils.ssh_tunnel import PortsLock, run_ssh_tunnel
 from dstack._internal.cli.utils.watcher import LocalCopier, SSHCopier, Watcher
 from dstack._internal.core.app import AppSpec
-from dstack._internal.core.instance import InstanceType
 from dstack._internal.core.job import Job, JobErrorCode, JobHead, JobStatus
 from dstack._internal.core.plan import RunPlan
 from dstack._internal.core.request import RequestStatus
@@ -51,25 +50,15 @@ def print_run_plan(configuration_file: str, run_plan: RunPlan):
     table.add_column("CONFIGURATION", style="grey58")
     table.add_column("USER", style="grey58", no_wrap=True, max_width=16)
     table.add_column("PROJECT", style="grey58", no_wrap=True, max_width=16)
-    table.add_column("BACKEND", style="grey58", no_wrap=True, max_width=16)
-    table.add_column("INSTANCE")
-    table.add_column("RESOURCES")
     table.add_column("SPOT")
     table.add_column("BUILD")
     job_plan = run_plan.job_plans[0]
-    instance = job_plan.instance_type.instance_name or "-"
-    instance_info = _format_resources(job_plan.instance_type)
     spot = job_plan.job.spot_policy.value
-    build_plan = job_plan.build_plan.value.title()
     table.add_row(
         configuration_file,
         run_plan.hub_user_name,
         run_plan.project,
-        job_plan.backend,
-        instance,
-        instance_info,
         spot,
-        build_plan,
     )
     console.print(table)
     console.print()
@@ -197,17 +186,6 @@ def poll_run(
         _ask_on_interrupt(hub_client, run_name)
 
 
-def _format_resources(instance_type: InstanceType) -> str:
-    instance_info = ""
-    instance_info += f"{instance_type.resources.cpus}xCPUs"
-    instance_info += f", {instance_type.resources.memory_mib}MB"
-    if instance_type.resources.gpus:
-        instance_info += (
-            f", {len(instance_type.resources.gpus)}x{instance_type.resources.gpus[0].name}"
-        )
-    return instance_info
-
-
 def _print_failed_run_message(run: RunHead):
     if run.job_heads[0].error_code is JobErrorCode.FAILED_TO_START_DUE_TO_NO_CAPACITY:
         console.print("Provisioning failed due to no capacity\n")
@@ -225,7 +203,7 @@ def reserve_ports(apps: List[AppSpec], local_backend: bool) -> Tuple[PortsLock, 
     ssh_server_port = get_ssh_server_port(apps)
 
     if not local_backend and ssh_server_port is None:
-        # cloud backand without ssh in the container: use a host ssh tunnel
+        # cloud backend without ssh in the container: use a host ssh tunnel
         return PortsLock(app_ports).acquire(), PortsLock()
 
     if ssh_server_port is not None:

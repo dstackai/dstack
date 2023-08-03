@@ -67,10 +67,13 @@ async def get_run_plan(
     project = await get_project(project_name=project_name)
     backends = await get_backends(project)
     job_plans = []
+    local_backend = False
     for job in body.jobs:
         for db_backend, backend in backends:
             instance_type = await call_backend(backend.predict_instance_type, job)
             if instance_type is not None:
+                if db_backend.type == "local":
+                    local_backend = True
                 try:
                     build = await call_backend(backend.predict_build_plan, job)
                 except BuildNotFoundError as e:
@@ -78,9 +81,7 @@ async def get_run_plan(
                         status_code=status.HTTP_400_BAD_REQUEST,
                         detail=error_detail(msg=e.message, code=e.code),
                     )
-                job_plan = JobPlan(
-                    backend=db_backend.type, job=job, instance_type=instance_type, build_plan=build
-                )
+                job_plan = JobPlan(job=job, instance_type=instance_type, build_plan=build)
                 job_plans.append(job_plan)
                 break
     if len(job_plans) == 0:
@@ -89,7 +90,12 @@ async def get_run_plan(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail=error_detail(msg=msg, code=NoMatchingInstanceError.code),
         )
-    run_plan = RunPlan(project=project_name, hub_user_name=user.name, job_plans=job_plans)
+    run_plan = RunPlan(
+        project=project_name,
+        hub_user_name=user.name,
+        job_plans=job_plans,
+        local_backend=local_backend,
+    )
     return run_plan
 
 
