@@ -266,7 +266,7 @@ def _get_image_ref(
 
     image = compute_client.community_gallery_images.get(
         location=location,
-        public_gallery_name="dstack-d5e68bdc-cc66-484a-a485-b54e3683f151",
+        public_gallery_name="dstack-ebac134d-04b9-4c2b-8b6c-ad3e73904aa7",  # Gen2
         gallery_image_name=image_name,
     )
     return ImageReference(community_gallery_image_id=image.unique_id)
