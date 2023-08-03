@@ -118,6 +118,7 @@ jobs:
         run: |
           ./packer build -var-file=versions.json -var image_version=${{ inputs.image_version }} -var build_prefix=$BUILD_PREFIX azure-image${{ matrix.variant }}.json
       - name: Publish azure image
+#        if: ${{ !inputs.staging }}
         run: |
           IMAGE_DEFINITION=${BUILD_PREFIX}dstack${{ matrix.variant }}-${{ inputs.image_version }}
           IMAGE_NAME=${BUILD_PREFIX}dstack${{ matrix.variant }}-${{ inputs.image_version }}

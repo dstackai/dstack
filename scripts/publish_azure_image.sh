@@ -1,4 +1,4 @@
-#/bin/bash
+#!/bin/bash
 
 image_definition=$1
 image_name=$2
@@ -10,7 +10,7 @@ exit 1
 fi
 
 resource_group=dstack-resources-westeurope
-gallery_name=dstack_gallery_westeurope
+gallery_name=dstack_gallery_westeurope_gen2
 
 function get_image_definition {
     az sig image-definition show \
