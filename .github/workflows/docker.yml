@@ -29,7 +29,7 @@ on:
 
 env:
   PACKER_VERSION: "1.9.2"
-  BUILD_PREFIX: ${{ inputs.staging && format('stgn-{0}-', github.run_number) || '' }}
+  BUILD_PREFIX: ${{ inputs.staging && format('stgn-{0}-', github.run_number) || '' }}  # staging ? prefix : ''
 
 jobs:
   build-docker:
@@ -63,7 +63,7 @@ jobs:
 
   build-aws-images:
     needs: build-docker
-    if: ${{ always() && inputs.build_aws }}
+    if: always() && inputs.build_aws && (needs.build-docker.result == 'success' || needs.build-docker.result == 'skipped')
     defaults:
       run:
         working-directory: runner
@@ -88,7 +88,7 @@ jobs:
 
   build-azure-images:
     needs: build-docker
-    if: ${{ always() && inputs.build_azure }}
+    if: always() && inputs.build_azure && (needs.build-docker.result == 'success' || needs.build-docker.result == 'skipped')
     defaults:
       run:
         working-directory: runner
@@ -119,13 +119,13 @@ jobs:
           ./packer build -var-file=versions.json -var image_version=${{ inputs.image_version }} -var build_prefix=$BUILD_PREFIX azure-image${{ matrix.variant }}.json
       - name: Publish azure image
         run: |
-          IMAGE_DEFINITION=$BUILD_PREFIXdstack${{ matrix.variant }}-${{ inputs.image_version }}
-          IMAGE_NAME=$BUILD_PREFIXdstack${{ matrix.variant }}-${{ inputs.image_version }}
+          IMAGE_DEFINITION=${BUILD_PREFIX}dstack${{ matrix.variant }}-${{ inputs.image_version }}
+          IMAGE_NAME=${BUILD_PREFIX}dstack${{ matrix.variant }}-${{ inputs.image_version }}
           ../scripts/publish_azure_image.sh $IMAGE_DEFINITION $IMAGE_NAME
 
   build-gcp-images:
     needs: build-docker
-    if: ${{ always() && inputs.build_gcp }}
+    if: always() && inputs.build_gcp && (needs.build-docker.result == 'success' || needs.build-docker.result == 'skipped')
     defaults:
       run:
         working-directory: runner
@@ -158,6 +158,6 @@ jobs:
       - name: Publish images
         run: |
           IMAGE_VERSION=${IMAGE_VERSION//./-}
-          gcloud compute images add-iam-policy-binding $BUILD_PREFIXdstack${{ matrix.variant }}-$IMAGE_VERSION --member='allAuthenticatedUsers' --role='roles/compute.imageUser'
+          gcloud compute images add-iam-policy-binding ${BUILD_PREFIX}dstack${{ matrix.variant }}-$IMAGE_VERSION --member='allAuthenticatedUsers' --role='roles/compute.imageUser'
         env:
           IMAGE_VERSION: ${{ inputs.image_version }}
