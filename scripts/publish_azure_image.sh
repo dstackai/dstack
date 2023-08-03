@@ -32,7 +32,8 @@ function create_image_definition() {
         --offer dstack \
         --sku $image_definition \
         --os-type Linux \
-        --os-state generalized
+        --os-state generalized \
+        --hyper-v-generation V2
 }
 
 function create_image_version() {
