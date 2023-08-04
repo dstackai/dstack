@@ -57,6 +57,7 @@ async def list_all_runs() -> List[RunInfo]:
                         repo=repo_head,
                     )
                     run_infos.append(run_info)
+    run_infos = sorted(run_infos, key=lambda x: -x.run_head.submitted_at)
     return run_infos
 
 
@@ -136,6 +137,7 @@ async def list_runs(project_name: str, body: RunsList) -> List[RunInfo]:
                 run_head=run_head,
             )
             run_infos.append(run_info)
+    run_infos = sorted(run_infos, key=lambda x: -x.run_head.submitted_at)
     return run_infos
 
 

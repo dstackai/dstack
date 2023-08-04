@@ -16,11 +16,6 @@ class TagNotFoundError(DstackError):
 
 
 def list_runs_hub(hub_client: HubClient, run_name: str = "", all: bool = False) -> List[RunInfo]:
-    runs = [run for run in _get_runs_hub(hub_client, run_name, all)]
-    return list(sorted(runs, key=lambda r: -r.run_head.submitted_at))
-
-
-def _get_runs_hub(hub_client: HubClient, run_name: str = "", all: bool = False) -> List[RunInfo]:
     runs = hub_client.list_runs(run_name)
     if not all:
         active = any(run.run_head.status.is_active() for run in runs)
