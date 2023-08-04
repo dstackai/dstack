@@ -16,10 +16,24 @@ import (
 	"gopkg.in/yaml.v2"
 )
 
+const LOAD_STATE_ATTEMPTS = 10
+const LOAD_STATE_WAIT_TIME = time.Second * 5
+
 func LoadRunnerState(ctx context.Context, storage Storage, id string, state **models.State) error {
 	runnerFilepath := fmt.Sprintf("runners/%s.yaml", id)
 	log.Trace(ctx, "Load runner state from the storage", "ID", id)
-	content, err := GetObject(ctx, storage, runnerFilepath)
+	// Runner file may not exist yet, wait for it.
+	var err error
+	var content []byte
+	for i := 1; i <= LOAD_STATE_ATTEMPTS; i++ {
+		content, err = GetObject(ctx, storage, runnerFilepath)
+		if err != nil {
+			log.Trace(ctx, "Error when loading runner state", "err", err)
+			time.Sleep(LOAD_STATE_WAIT_TIME)
+			continue
+		}
+		break
+	}
 	if err != nil {
 		return gerrors.Wrap(err)
 	}
