@@ -181,6 +181,7 @@ nav:
   - Examples:
     - examples/index.md
     - Examples:
+      - Fine-tuning Llama 2: examples/finetuning-llama-2.md
       - Serving SDXL with FastAPI: examples/stable-diffusion-xl.md
       - Serving LLMs with vLLM: examples/vllm.md
       - Serving LLMs with TGI: examples/text-generation-inference.md
