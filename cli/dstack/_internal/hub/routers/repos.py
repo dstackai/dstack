@@ -14,12 +14,12 @@ router = APIRouter(prefix="/api/project", tags=["repos"], dependencies=[Depends(
 async def list_repo_heads(project_name: str) -> List[RepoHead]:
     project = await get_project(project_name=project_name)
     backends = await get_backends(project)
-    # TODO merge
-    all_repo_heads = []
+    repo_id_to_repo_head_map = {}
     for _, backend in backends:
         repo_heads = await call_backend(backend.list_repo_heads)
-        all_repo_heads += repo_heads
-    return all_repo_heads
+        for repo_head in repo_heads:
+            repo_id_to_repo_head_map[repo_head.repo_id] = repo_head
+    return sorted(repo_id_to_repo_head_map.values(), key=lambda x: x.repo_id)
 
 
 @router.post("/{project_name}/repos/heads/get")
