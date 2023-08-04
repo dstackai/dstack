@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"net/http"
 	"sync"
+	"time"
 
 	"github.com/dstackai/dstack/runner/internal/gerrors"
 	"github.com/dstackai/dstack/runner/internal/log"
@@ -106,6 +107,7 @@ func (s *Server) getLogs(w http.ResponseWriter, r *http.Request) {
 		}
 		if currentPos == len(s.buf) {
 			s.mu.RUnlock()
+			time.Sleep(time.Millisecond * 100)
 			continue
 		}
 		_ = connection.WriteMessage(websocket.BinaryMessage, s.buf[currentPos])
