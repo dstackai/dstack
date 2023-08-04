@@ -214,7 +214,7 @@ class ProjectManager:
     @staticmethod
     @reuse_or_make_session
     async def _update_backend(backend: Backend, session: Optional[AsyncSession] = None):
-        session.execute(
+        await session.execute(
             update(Backend)
             .where(Backend.project_name == backend.project_name, Backend.name == backend.name)
             .values(
