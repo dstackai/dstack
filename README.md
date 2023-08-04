@@ -57,7 +57,7 @@ A configuration is a YAML file that describes what you want to run.
 > you can name the configuration file `.dstack.yml` or `app.dstack.yml`. You can define
 > these configurations anywhere within your project.
 
-Configurations can be of two types: `dev-environment` and `task`.
+Configurations can be of three types: `dev-environment`, `task`, and `service`.
 
 Below is a configuration that runs a dev environment with a pre-built environment to which you can connect via VS Code Desktop.
 
@@ -82,6 +82,17 @@ ports:
 commands:
   - pip install -r requirements.txt
   - python app.py
+```
+
+A service configuration makes a web application available through the gateway.
+Below is a configuration for a simple web server.
+
+```yaml
+type: service
+gateway: my.domain.com
+port: 80:8000
+commands:
+  - python -m http.server 8000
 ```
 
 ## CLI
