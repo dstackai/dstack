@@ -1,6 +1,6 @@
 # type: service (.dstack.yml)
 
-Service allows to run an application and expose it over HTTP to global internet through the gateway.
+Service allows running an application and exposing it over HTTP to the global internet through the gateway.
 
 !!! info "Filename"
     The configuration file must be named with the suffix `.dstack.yml`. For example,
@@ -23,8 +23,8 @@ Service allows to run an application and expose it over HTTP to global internet 
 ## Custom docker image properties:
 
 - `image` - (Optional) The docker image. Mutually exclusive with `python` property.
-- `entrypoint` - (Optional) The docker entrypoint to interpret the commands (typically `/bin/bash -i -c`).
-- `registry_auth` - (Optional) The credentials to pull the image from private registry.
+- `entrypoint` - (Optional) The docker entry point to interpret the commands (typically `/bin/bash -i -c`).
+- `registry_auth` - (Optional) The credentials to pull the image from the private registry.
     - `username` - The username. Supports secrets interpolation `${{ secrets.GHCR_USER }}`.
     - `password` - The password or token. Supports secrets interpolation `${{ secrets.GHCR_TOKEN }}`.
 - `home_dir` - (Optional) The home directory inside the container. Defaults to `/root`.
@@ -32,10 +32,10 @@ Service allows to run an application and expose it over HTTP to global internet 
 ## Optimization properties:
 
 - `cache` - (Optional) The list of directories to cache between the environment restarts. Both absolute and relative paths are supported.
-- `build` - (Optional) The list of commands to run during build stage. You must call `dstack build` first or use flag `dstack run --build`.
+- `build` - (Optional) The list of commands to run during the build stage. You must call `dstack build` first or use the flag `dstack run --build`.
 
 !!! info "Note"
-    Build is an experimental feature. Performance gain depends on the type of workloads and specific cloud provider.
+    The build is an experimental feature. Performance gain depends on the type of workload and specific cloud provider.
 
 ## Examples:
 
