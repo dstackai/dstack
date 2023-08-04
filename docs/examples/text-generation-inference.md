@@ -1,4 +1,4 @@
-# Serving with TGI
+# Serving LLMs with TGI
 
 Serving LLMs can be slow, even on expensive hardware. This example demonstrates how to utilize
 [Text Generation Inference](https://github.com/huggingface/text-generation-inference) (TGI) to serve LLMs with

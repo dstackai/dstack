@@ -181,9 +181,9 @@ nav:
   - Examples:
     - examples/index.md
     - Examples:
-      - SDXL with FastAPI: examples/stable-diffusion-xl.md
-      - Serving with TGI: examples/text-generation-inference.md
-      - Serving with vLLM: examples/vllm.md
+      - Serving SDXL with FastAPI: examples/stable-diffusion-xl.md
+      - Serving LLMs with vLLM: examples/vllm.md
+      - Serving LLMs with TGI: examples/text-generation-inference.md
       - LLM as Chatbot: examples/llmchat.md
   - Blog:
       - blog/index.md

@@ -1,4 +1,4 @@
-# SDXL with FastAPI
+# Serving SDXL with FastAPI
 
 Stable Diffusion XL (SDXL) 1.0 is the latest version of the open-source model that is capable 
 of generating high-quality images from text.
