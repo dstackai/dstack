@@ -49,7 +49,9 @@ The following arguments are optional:
 - `--profile PROJECT` – (Optional) The name of the profile
 
 [//]: # (- `-t TAG`, `--tag TAG` – &#40;Optional&#41; A tag name. Warning, if the tag exists, it will be overridden.)
-- `-p PORT [PORT ...]`, `--ports PORT [PORT ...]` – (Optional) Requests ports or define mappings for them (`LOCAL_PORT:CONTAINER_PORT`)
+- `-p PORT`, `--port PORT` – (Optional) Requests port or define mapping (`LOCAL_PORT:CONTAINER_PORT`)
+- `-e ENV`, `--env ENV` – (Optional) Set environment variable (`NAME=value`)
+- `--gpu` – (Optional) Request a GPU for the run. Specify any: name, count, memory (`NAME:COUNT:MEMORY` or `NAME` or `COUNT:MEMORY`, etc...)
 - `ARGS` – (Optional) Use `ARGS` to pass custom run arguments
 
 Spot policy (the arguments are mutually exclusive):
