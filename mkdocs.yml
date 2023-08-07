@@ -75,6 +75,7 @@ plugins:
         'tutorials/stable-diffusion.md': 'examples/stable-diffusion.md'
         'tutorials/tensorboard.md': 'examples/tensorboard.md'
         'tutorials/wandb.md': 'examples/wandb.md'
+        'docs/guides/projects.md': 'docs/projects.md'
   - typeset
 
 # Extensions
@@ -143,12 +144,12 @@ nav:
               - pip: docs/installation/pip.md
               - Docker: docs/installation/docker.md
               - HF Spaces: docs/installation/hf-spaces.md
+          - Projects: docs/projects.md
       - Guides:
           - Dev environments: docs/guides/dev-environments.md
           - Tasks: docs/guides/tasks.md
           - Services: docs/guides/services.md
 #          - Artifacts: docs/guides/artifacts.md
-          - Projects: docs/guides/projects.md
       - Reference:
           - .dstack.yml:
               - "type: dev-environment": docs/reference/configurations/dev-environment.md
