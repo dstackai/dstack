@@ -1,10 +1,11 @@
 import argparse
 import json
+import re
 import shlex
 import sys
 import uuid
 from abc import ABC, abstractmethod
-from typing import Dict, List, Optional
+from typing import Dict, List, Optional, Tuple
 
 from rich_argparse import RichHelpFormatter
 
@@ -48,6 +49,10 @@ class JobConfigurator(ABC):
         if parser is None:
             parser = argparse.ArgumentParser(prog=prog, formatter_class=RichHelpFormatter)
 
+        parser.add_argument(
+            "-e", "--env", type=env_var, action="append", help="Environmental variable"
+        )
+
         spot_group = parser.add_mutually_exclusive_group()
         spot_group.add_argument(
             "--spot", action="store_const", dest="spot_policy", const=job.SpotPolicy.SPOT
@@ -81,6 +86,10 @@ class JobConfigurator(ABC):
         return parser
 
     def apply_args(self, args: argparse.Namespace):
+        if args.env is not None:
+            for key, value in args.env:
+                self.conf.env[key] = value
+
         if args.spot_policy is not None:
             self.profile.spot_policy = args.spot_policy
 
@@ -295,14 +304,14 @@ class JobConfiguratorWithPorts(JobConfigurator, ABC):
     ) -> argparse.ArgumentParser:
         parser = super().get_parser(prog, parser)
         parser.add_argument(
-            "-p", "--ports", metavar="PORT", type=port_mapping, nargs=argparse.ONE_OR_MORE
+            "-p", "--port", type=port_mapping, action="append", help="Exposed port or mapping"
         )
         return parser
 
     def apply_args(self, args: argparse.Namespace):
         super().apply_args(args)
-        if args.ports is not None:
-            self.conf.ports = list(ports.merge_ports(self.conf.ports, args.ports).values())
+        if args.port is not None:
+            self.conf.ports = list(ports.merge_ports(self.conf.ports, args.port).values())
 
     def ports(self) -> Dict[int, ports.PortMapping]:
         ports.unique_ports_constraint([pm.container_port for pm in self.conf.ports])
@@ -334,3 +343,11 @@ class HomeDirUnsetError(DstackError):
 def port_mapping(v: str) -> ports.PortMapping:
     # argparse uses __name__ for handling ValueError
     return ports.PortMapping.parse(v)
+
+
+def env_var(v: str) -> Tuple[str, str]:
+    r = re.match(r"^([a-zA-Z_][a-zA-Z0-9_]*)=(.*)$", v)
+    if r is None:
+        raise ValueError(v)
+    key, value = r.groups()
+    return key, value
