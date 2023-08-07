@@ -12,6 +12,6 @@ types: `dev-environment`, `task`, and `service`.
 
 Read more about configuration types:
 
-* type: [dev-environment](configurations/dev-environment.md)
-* type: [task](configurations/task.md)
-* type: [service](configurations/service.md)
+* [`type: dev-environment`](dev-environment.md)
+* [`type: task`](task.md)
+* [`type: service`](service.md)

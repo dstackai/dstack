@@ -152,9 +152,9 @@ nav:
 #          - Artifacts: docs/guides/artifacts.md
       - Reference:
           - .dstack.yml:
-              - "type: dev-environment": docs/reference/configurations/dev-environment.md
-              - "type: task": docs/reference/configurations/task.md
-              - "type: service": docs/reference/configurations/service.md
+              - "type: dev-environment": docs/reference/dstack.yml/dev-environment.md
+              - "type: task": docs/reference/dstack.yml/task.md
+              - "type: service": docs/reference/dstack.yml/service.md
           - profiles.yml: docs/reference/profiles.yml.md
           - CLI:
               - dstack run: docs/reference/cli/run.md
