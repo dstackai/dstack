@@ -33,7 +33,7 @@ class ProjectManager:
         project_name: str,
         members: List[Member],
         session: Optional[AsyncSession] = None,
-    ):
+    ) -> Project:
         project = Project(name=project_name)
         await ProjectManager._create(project, session=session)
         await ProjectManager._add_member(
@@ -41,6 +41,7 @@ class ProjectManager:
             member=Member(user_name=user.name, project_role=ROLE_ADMIN),
             session=session,
         )
+        return project
 
     @staticmethod
     @reuse_or_make_session

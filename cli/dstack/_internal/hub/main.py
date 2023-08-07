@@ -30,6 +30,7 @@ from dstack._internal.hub.routers import (
     tags,
     users,
 )
+from dstack._internal.hub.schemas import LocalBackendConfig
 from dstack._internal.hub.services.backends import local_backend_available
 from dstack._internal.hub.utils.logging import configure_logger
 from dstack._internal.hub.utils.ssh import generate_hub_ssh_key_pair
@@ -106,17 +107,23 @@ async def update_admin_user() -> User:
 
 async def create_default_project(user: User):
     default_project = await ProjectManager.get(DEFAULT_PROJECT_NAME)
-    if default_project is not None:
-        return
-    await ProjectManager.create(user=user, project_name=DEFAULT_PROJECT_NAME, members=[])
+    if default_project is None:
+        default_project = await ProjectManager.create(
+            user=user, project_name=DEFAULT_PROJECT_NAME, members=[]
+        )
+    backend = await ProjectManager.get_backend(project=default_project, backend_name="local")
+    if backend is None:
+        backend = await ProjectManager.create_backend(
+            project=default_project, backend_config=LocalBackendConfig()
+        )
 
 
 def create_default_project_config(url: str, token: str):
     cli_config_manager = CLIConfigManager()
     default_project_config = cli_config_manager.get_default_project_config()
     project_config = cli_config_manager.get_project_config(DEFAULT_PROJECT_NAME)
-    # "default" is old name for "local"
-    default = default_project_config is None or default_project_config.name == "default"
+    # "default", "local" are old default project names
+    default = default_project_config is None or default_project_config.name in ["default", "local"]
     if project_config is None or default_project_config is None:
         cli_config_manager.configure_project(
             name=DEFAULT_PROJECT_NAME, url=url, token=token, default=default
