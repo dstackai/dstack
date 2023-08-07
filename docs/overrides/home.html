@@ -15,45 +15,6 @@
     })();
 </script>
 <script type="text/javascript">
-    /*
-        new Termynal('#vscode-command-example',
-            {
-                lineData: [
-                    {type: 'input', value: 'dstack run .'},
-                    {delay: 0, value: ' ', class: 'newline'},
-                    {
-                        delay: 0,
-                        value: 'RUN                 USER   INSTANCE       RESOURCES                 SPOT',
-                        class: 'newline'
-                    },
-                    {
-                        delay: 0,
-                        value: 'honest-jellyfish-1  peter  a2-highgpu-1g  12xCPUs, 87040MB, 1xA100  yes',
-                        class: 'newline'
-                    },
-                    {delay: 0, value: ' ', class: 'newline'},
-                    {delay: 0, startDelay: 0, lineDelay: 0, value: 'Continue? ', class: 'no-newline'},
-                    {
-                        type: 'input',
-                        startDelay: 0,
-                        lineDelay: 0,
-                        typeDelay: 1000,
-                        prompt: '[y/n]',
-                        value: 'y',
-                        class: 'no-newline'
-                    },
-                    {delay: 0, value: ' ', class: 'newline'},
-                    {delay: 0, value: 'Provisioning and starting a tunnel...', class: 'newline'},
-                    {type: 'progress', progressPercent: 100},
-                    {delay: 0, value: ' ', class: 'newline'},
-                    {delay: 0, value: 'To open in VS Code Desktop, use this link:', class: 'newline'},
-                    {delay: 0, value: '  vscode://vscode-remote/ssh-remote+turtle-11/workflow', class: 'newline'},
-                    {delay: 0, value: ' ', class: 'newline'},
-                    {delay: 0, value: 'To exit, press Ctrl+C.\n', class: 'no-newline'},
-                ]
-            }
-        );
-    */
     new Termynal('#train-command-example',
         {
             lineData: [
@@ -129,18 +90,18 @@
                     class: 'no-newline'
                 },
                 {delay: 0, value: ' ', class: 'newline'},
-                {delay: 0, value: 'Provisioning and starting a tunnel...', class: 'newline'},
+                {delay: 0, value: 'Provisioning...', class: 'newline'},
                 {type: 'progress', progressPercent: 100},
                 {delay: 0, value: ' ', class: 'newline'},
                 {
                     delay: 0,
-                    value: 'Running on local URL:  http://127.0.0.1:7860',
+                    value: 'Serving HTTP on http://98.71.213.179:80',
                     class: 'newline'
                 },
                 {delay: 0, value: ' ', class: 'newline'},
                 {
                     delay: 0,
-                    value: 'To stop, press Ctrl+C.',
+                    value: 'To exit, press Ctrl+C.',
                     class: 'newline'
                 },
                 {delay: 0, value: ' ', class: 'newline'},
@@ -156,12 +117,11 @@
         <div class="tx-landing__hero">
             <div class="tx-landing__hero_text">
                 <h1>Cost-effective LLM development</h1>
-                <p><strong>dstack</strong> is an open-source tool that simplifies LLM development across multiple
-                    clouds.
+                <p><strong>dstack</strong> is an open-source tool that streamlines LLM development
+                    and deployment across multiple clouds.
                 </p>
 
-                <p>It streamlines development and deployment, reduces cloud costs, and frees users from vendor lock-in.
-                </p>
+                <p>It helps reduce cloud costs, improve availability, and frees you from cloud vendor lock-in.</p>
 
                 <a href="/docs" class="md-button md-button--primary">
                     Get started</a>
@@ -177,7 +137,7 @@
 
         <div class="tx-landing__integrations">
             <div class="tx-landing__integrations_text">
-                <h2>Switch between clouds to cut costs</h2>
+                <h2>Optimize costs and availability through multi-cloud</h2>
             </div>
             <div class="tx-landing__integrations_logos">
                 <img class="logo-xlarge" src="assets/images/aws-logo.svg" title="Amazon Web Services">
@@ -192,14 +152,17 @@
                 <div class="block margin">
                     <div>
                         <h2>Dev environments</h2>
-                        <p>Configure the hardware <strong>resources</strong> you need (GPU, memory, etc.) and
-                            indicate whether you want to use <strong>spot</strong> or <strong>on-demand</strong>
-                            instances.</p>
+                        <p>A dev environment is a virtual machine with pre-configured hardware resources, source code,
+                            and an IDE.</p>
 
-                        <p><strong>dstack</strong> will automatically provision cloud resources,
-                            and forward <strong>ports</strong> for secure and convenient access.</p>
+                        <p>With <strong>dstack</strong>, you can easily define and provision this environment in any
+                            cloud using a configuration file and a single command.</p>
 
-                        <p>Access the cloud dev environment conveniently using your local <strong>desktop</strong> IDE.
+                        <p>Conveniently access the cloud dev environment from your desktop IDE.</p>
+
+                        <p>
+                            <a href="https://dstack.ai/docs/guides/dev-environments" target="_blank"
+                               class="md-button md-button-secondary">Learn more</a>
                         </p>
                     </div>
                 </div>
@@ -213,23 +176,25 @@
         <div class="tx-landing__major_feature">
             <div class="section">
                 <div class="block large margin">
-                    <div id="serve-command-example" data-termynal>
+                    <div id="train-command-example" data-termynal>
                     </div>
                 </div>
                 <div class="block">
                     <div>
-                        <h2>Serving</h2>
-                        <p>Serve models using <strong>Gradio</strong>, <strong>Streamlit</strong>,
-                            <strong>FastAPI</strong>, <strong>vLLM</strong>, <strong>TGI</strong>, and
-                            other frameworks in any cloud.
+                        <h2>Tasks</h2>
+                        <p>A task can be a training script, a script that processes data, or even a web-based
+                            application.</p>
+
+                        <p>With <strong>dstack</strong>, you can define such a task through a configuration file and run
+                            it in any cloud with a single command.</p>
+
+                        <p>If your task exposes ports, <strong>dstack</strong>
+                            forwards the traffic to your local machine for secure and convenient access.</p>
+
+                        <p>
+                            <a href="https://dstack.ai/docs/guides/tasks" target="_blank"
+                               class="md-button md-button-secondary">Learn more</a>
                         </p>
-
-                        <p>Configure the hardware <strong>resources</strong> you need (GPU, memory, etc.) and
-                            indicate whether you want to use <strong>spot</strong> or <strong>on-demand</strong>
-                            instances.</p>
-
-                        <p><strong>dstack</strong> will automatically provision cloud resources,
-                            and forward <strong>ports</strong> for secure and convenient access.</p>
                     </div>
                 </div>
             </div>
@@ -239,22 +204,23 @@
             <div class="section">
                 <div class="block margin">
                     <div>
-                        <h2>Training</h2>
-                        <p><strong>Pre-train</strong> and <strong>finetune</strong> your own state-of-the-art models
-                            easily and
-                            cost-effectively in any cloud.</p>
+                        <h2>Services</h2>
 
-                        <p>Configure the hardware <strong>resources</strong> you need (GPU, memory, etc.) and
-                            indicate whether you want to use <strong>spot</strong> or <strong>on-demand</strong>
-                            instances.</p>
+                        <p>A service is an application that is accessible through a public endpoint
+                            managed by <strong>dstack</strong>.</p>
 
-                        <p>Access and manage your <strong>data</strong> and <strong>artifacts</strong> using
-                            the built-in Python SDK.</p>
+                        <p>Using <strong>dstack</strong>, you can define such a service through a configuration file and
+                            have it automatically deployed in any cloud of your choice.</p>
                     </div>
+
+                    <p>
+                        <a href="https://dstack.ai/docs/guides/services" target="_blank"
+                           class="md-button md-button-secondary">Learn more</a>
+                    </p>
                 </div>
 
                 <div class="block large">
-                    <div id="train-command-example" data-termynal>
+                    <div id="serve-command-example" data-termynal>
                     </div>
                 </div>
             </div>
@@ -370,8 +336,8 @@ $ dstack start
                     </pre>
                 </div>
                 <p class="tx-landing__bottom_cta_text">
-                    And you're <strong>done</strong>! Now you can run dev environments and tasks
-                    both <strong>locally</strong> and in <strong>your cloud</strong>.
+                    And you're <strong>done</strong>! Now you can run dev environments, tasks,
+                    and services, in <strong>multiple clouds</strong>.
                 </p>
 
                 <a href="/docs" class="md-button md-button--primary">

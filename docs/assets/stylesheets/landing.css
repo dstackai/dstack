@@ -58,7 +58,7 @@
     }
 }
 
-.tx-landing__hero .md-button.slack:before, .tx-landing__bottom_cta .md-button.slack:before {
+.tx-container .md-button.slack:before {
     position: relative;
     top: 5px;
     content: '';
@@ -73,7 +73,7 @@
     background: -webkit-linear-gradient(45deg, #0048ff, #ce00ff);
 }
 
-.tx-landing__hero .md-button, .tx-landing__bottom_cta .md-button {
+.tx-container .md-button {
     margin-top: 1rem;
     padding: 0.55em 2em;
     font-size: 22px;
@@ -85,11 +85,11 @@
     margin-right: 15px;
 }
 
-.tx-landing__hero .md-button--primary, .tx-landing__bottom_cta .md-button--primary {
+.tx-container .md-button--primary {
     background: -webkit-linear-gradient(45deg, #002aff, #002aff, #e165fe);
 }
 
-.tx-landing__hero .md-button-secondary, .tx-landing__bottom_cta .md-button-secondary {
+.tx-container .md-button-secondary {
     border-image: linear-gradient(45deg, #0048ff, #ce00ff) 10;
     border-width: 1px;
     border-style: solid;
@@ -98,7 +98,7 @@
     -webkit-text-fill-color: transparent;
 }
 
-.tx-landing__hero .md-button-secondary:hover, .tx-landing__bottom_cta .md-button-secondary:hover {
+.tx-container .md-button-secondary:hover {
     background: -webkit-linear-gradient(45deg, #0048ff, #ce00ff);
     -webkit-background-clip: text;
     -webkit-text-fill-color: transparent;

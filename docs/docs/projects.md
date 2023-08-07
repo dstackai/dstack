@@ -40,7 +40,7 @@ For instructions specific to a particular cloud, please refer to the relevant se
     To use Lambda, you will need an S3 bucket for storing state and artifacts, along with AWS credentials and a Lambda Cloud
     API key.
 
-    [Learn more →]( ../reference/backends/lambda.md){ .md-button .md-button--primary }
+    [Learn more →](reference/backends/lambda.md){ .md-button .md-button--primary }
 
 ## Configuring the CLI
 

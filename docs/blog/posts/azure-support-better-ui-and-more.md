@@ -41,7 +41,7 @@ Secondly, with the new update, you now have the ability to browse the logs and a
 
 Last but not least, with the update, we have reworked the [documentation](../../docs/index.md) to provide a greater
 emphasis on specific use cases: [dev environments](../../docs/guides/dev-environments.md), 
-[pipelines](../../docs/guides/pipelines.md), and [apps](../../docs/guides/apps.md).
+[tasks](../../docs/guides/tasks.md), and [services](../../docs/guides/services.md).
 
 ## Try it out
 

@@ -89,8 +89,8 @@ GCP, and Azure.
 You are encouraged to report any bugs, suggest new features, and provide feedback to improve Hub
 through [GitHub issues](https://github.com/dstackai/dstack/issues/new/choose).
 
-If you wish to have `dstack` support additional workflow [providers](../../docs/reference/providers/bash.md) or
-cloud backends,
-and are willing to contribute to the cause, please get in touch with us
-through [Slack](https://join.slack.com/t/dstackai/shared_invite/zt-xdnsytie-D4qU9BvJP8vkbkHXdi6clQ)
-or [Twitter](https://twitter.com/dstackai).
+[//]: # (If you wish to have `dstack` support additional workflow [providers]&#40;../../docs/reference/providers/bash.md&#41; or)
+[//]: # (cloud backends,)
+[//]: # (and are willing to contribute to the cause, please get in touch with us)
+[//]: # (through [Slack]&#40;https://join.slack.com/t/dstackai/shared_invite/zt-xdnsytie-D4qU9BvJP8vkbkHXdi6clQ&#41;)
+[//]: # (or [Twitter]&#40;https://twitter.com/dstackai&#41;.)

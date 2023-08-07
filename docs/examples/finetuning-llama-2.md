@@ -191,7 +191,7 @@ if __name__ == "__main__":
 ## Defining a profile
 
 !!! info "NOTE:"
-    Before using `dstack` with a particular cloud, make sure to [configure](../docs/guides/projects.md) the corresponding project.
+    Before using `dstack` with a particular cloud, make sure to [configure](../docs/projects.md) the corresponding project.
 
 The `llama-2-7b-chat-hf` model requires at least `14GB` in full precision (not counting the overhead). Considering that we
 plan to use the QLoRA and quantization techniques, an `NVIDIA T4` GPU may be sufficient.

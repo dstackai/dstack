@@ -1,6 +1,6 @@
 # Dev environments
 
-A dev environment is a virtual machine pre-configured with hardware resources, source code, dependencies, and an
+A dev environment is a virtual machine pre-configured with hardware resources, source code, environment, and an
 IDE.
 
 With `dstack`, you can define such a dev environment through a configuration file and provision it in any cloud 
@@ -29,7 +29,7 @@ ide: vscode
 ## Running a dev environment
 
 To run a dev environment, use the `dstack run` command followed by the path to the directory you want to use as the
-working directory during development.
+working directory.
 
 <div class="termy">
 
@@ -155,11 +155,11 @@ You can install packages using `pip` and `conda` executables from `commands`.
 
     </div>
 
-For more details on the syntax of `.dstack.yml`, refer to the [Reference](../reference/dstack.yml).
+For more details on the syntax of `.dstack.yml`, refer to the [Reference](../reference/dstack.yml/dev-environment.md).
 
 ## Profiles
 
-If you [configured](projects.md) a project that uses a cloud backend, you can define profiles that specify the
+If you [configured](../projects.md) a project that uses a cloud backend, you can define profiles that specify the
 project and the cloud resources to be used.
 
 To configure a profile, simply create the `profiles.yml` file in the `.dstack` folder within your project directory. 

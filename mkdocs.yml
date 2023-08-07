@@ -3,7 +3,7 @@ site_name: dstack
 site_url: https://dstack.ai
 site_author: dstack GmbH
 site_description: >-
-  dstack is an open-source tool that simplifies LLM development across multiple clouds.
+  dstack is an open-source tool that streamlines LLM development and deployment across multiple clouds.
 
 # Repository
 repo_url: https://github.com/dstackai/dstack
@@ -71,10 +71,7 @@ plugins:
         'quickstart.md': 'docs/index.md'
         'docs/quick-start.md': 'docs/index.md'
         'docs/installation/index.md': 'docs/index.md'
-        'tutorials/dolly.md': 'examples/dolly.md'
         'tutorials/stable-diffusion.md': 'examples/stable-diffusion.md'
-        'tutorials/tensorboard.md': 'examples/tensorboard.md'
-        'tutorials/wandb.md': 'examples/wandb.md'
         'docs/guides/projects.md': 'docs/projects.md'
   - typeset
 

@@ -148,7 +148,7 @@ The code for the endpoints is ready. Now, let's explore how to use dstack to ser
 ## Defining a profile
 
 !!! info "NOTE:"
-    Before using `dstack` with a particular cloud, make sure to [configure](../docs/guides/projects.md) the corresponding project.
+    Before using `dstack` with a particular cloud, make sure to [configure](../docs/projects.md) the corresponding project.
 
 SDXL requires at least `12GB` of GPU memory and at least `16GB` of RAM. 
 To inform `dstack` about the required resources, you need to 
