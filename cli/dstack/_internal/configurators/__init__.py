@@ -1,17 +1,17 @@
 import argparse
 import json
-import re
 import shlex
 import sys
 import uuid
 from abc import ABC, abstractmethod
-from typing import Dict, List, Optional, Tuple
+from typing import Dict, List, Optional
 
 from rich_argparse import RichHelpFormatter
 
 import dstack._internal.configurators.ports as ports
 import dstack._internal.core.job as job
 import dstack.version as version
+from dstack._internal.configurators.cli import env_var, gpu_resource, port_mapping
 from dstack._internal.core.build import BuildPolicy
 from dstack._internal.core.configuration import (
     BaseConfiguration,
@@ -20,7 +20,7 @@ from dstack._internal.core.configuration import (
 )
 from dstack._internal.core.error import DstackError
 from dstack._internal.core.plan import RunPlan
-from dstack._internal.core.profile import Profile, parse_duration, parse_max_duration
+from dstack._internal.core.profile import Profile, ProfileGPU, parse_duration, parse_max_duration
 from dstack._internal.core.repo import Repo
 from dstack._internal.utils.common import get_milliseconds_since_epoch
 from dstack._internal.utils.interpolator import VariablesInterpolator
@@ -51,6 +51,13 @@ class JobConfigurator(ABC):
 
         parser.add_argument(
             "-e", "--env", type=env_var, action="append", help="Environmental variable"
+        )
+
+        parser.add_argument(
+            "--gpu",
+            metavar="NAME:COUNT:MEMORY",
+            type=gpu_resource,
+            help="Request a GPU for the run",
         )
 
         spot_group = parser.add_mutually_exclusive_group()
@@ -89,6 +96,11 @@ class JobConfigurator(ABC):
         if args.env is not None:
             for key, value in args.env:
                 self.conf.env[key] = value
+
+        if args.gpu is not None:
+            gpu = (self.profile.resources.gpu or ProfileGPU()).dict(exclude_defaults=True)
+            gpu.update(args.gpu)
+            self.profile.resources.gpu = ProfileGPU.parse_obj(gpu)
 
         if args.spot_policy is not None:
             self.profile.spot_policy = args.spot_policy
@@ -338,16 +350,3 @@ def validate_local_path(path: str, home: Optional[str], working_dir: str) -> str
 
 class HomeDirUnsetError(DstackError):
     pass
-
-
-def port_mapping(v: str) -> ports.PortMapping:
-    # argparse uses __name__ for handling ValueError
-    return ports.PortMapping.parse(v)
-
-
-def env_var(v: str) -> Tuple[str, str]:
-    r = re.match(r"^([a-zA-Z_][a-zA-Z0-9_]*)=(.*)$", v)
-    if r is None:
-        raise ValueError(v)
-    key, value = r.groups()
-    return key, value
