@@ -91,3 +91,17 @@ def exec_ssh_command(
     if proc.returncode != 0:
         raise SSHCommandError(args, stderr.decode())
     return stdout
+
+
+def setup_nginx_certbot() -> str:
+    lines = [
+        "sudo apt-get update",
+        "DEBIAN_FRONTEND=noninteractive sudo apt-get install -y -q nginx",
+        "sudo snap install --classic certbot",
+        "sudo ln -s /snap/bin/certbot /usr/bin/certbot",
+        "WWW_UID=$(id -u www-data)",
+        "WWW_GID=$(id -g www-data)",
+        "install -m 700 -o $WWW_UID -g $WWW_GID -d /var/www/.ssh",
+        "install -m 600 -o $WWW_UID -g $WWW_GID /dev/null /var/www/.ssh/authorized_keys",
+    ]
+    return "\n".join(lines)

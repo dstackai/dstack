@@ -27,6 +27,18 @@ def main():
     sock_path = Path(temp_dir) / "http.sock"
     print(sock_path)
 
+    # issue ssl certificate
+    ssl = {}
+    if not is_ip_address(args.hostname):
+        run_certbot(args.hostname)
+        ssl = {
+            "listen": f"{args.port} ssl",
+            "ssl_certificate": f"/etc/letsencrypt/live/{args.hostname}/fullchain.pem",
+            "ssl_certificate_key": f"/etc/letsencrypt/live/{args.hostname}/privkey.pem",
+            "include": "/etc/letsencrypt/options-ssl-nginx.conf",
+            "ssl_dhparam": "/etc/letsencrypt/ssl-dhparams.pem",
+        }
+
     # write nginx configuration
     upstream = Path(temp_dir).name
     conf = format_nginx_conf(
@@ -42,6 +54,7 @@ def main():
                     "proxy_set_header X-Real-IP": "$remote_addr",
                     "proxy_set_header Host": "$host",
                 },
+                **ssl,
             },
         }
     )
@@ -93,6 +106,27 @@ def add_ssh_key(ssh_key: str):
         exit(f"{authorized_keys} doesn't exist")
     with authorized_keys.open("a") as f:
         print(f'command="/bin/true" {ssh_key}', file=f)
+
+
+def run_certbot(hostname: str):
+    args = [
+        "certbot",
+        "certonly",
+        "--non-interactive",
+        "--agree-tos",
+        "--register-unsafely-without-email",
+        "--nginx",
+        "--domain",
+        hostname,
+    ]
+    proc = subprocess.Popen(args, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+    stdout, stderr = proc.communicate()
+    if proc.returncode != 0:
+        exit(f"Certbot failed:\n{stderr.decode()}")
+
+
+def is_ip_address(hostname: str) -> bool:
+    return re.match(r"^\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3}\$", hostname) is not None
 
 
 if __name__ == "__main__":
