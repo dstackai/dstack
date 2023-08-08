@@ -1,3 +1,4 @@
+import re
 import subprocess
 from typing import List, Optional
 
@@ -13,8 +14,10 @@ from dstack._internal.backend.base.secrets import SecretsManager
 from dstack._internal.backend.base.storage import Storage
 from dstack._internal.core.error import SSHCommandError
 from dstack._internal.core.gateway import GatewayHead
+from dstack._internal.core.job import Job
 from dstack._internal.hub.utils.ssh import HUB_PRIVATE_KEY_PATH
 from dstack._internal.utils.common import PathLike, removeprefix
+from dstack._internal.utils.crypto import generate_rsa_key_pair_bytes
 from dstack._internal.utils.interpolator import VariablesInterpolator
 from dstack._internal.utils.random_names import generate_name
 
@@ -55,10 +58,13 @@ def publish(
     hostname: str,
     port: int,
     ssh_key: bytes,
+    secure: bool,
     user: str = "ubuntu",
     id_rsa: Optional[PathLike] = HUB_PRIVATE_KEY_PATH,
 ) -> str:
     command = ["sudo", "python3", "-", hostname, str(port), f'"{ssh_key.decode().strip()}"']
+    if secure:
+        command.append("--secure")
     with open(
         pkg_resources.resource_filename("dstack._internal", "scripts/gateway_publish.py"), "r"
     ) as f:
@@ -105,3 +111,22 @@ def setup_nginx_certbot() -> str:
         "install -m 600 -o $WWW_UID -g $WWW_GID /dev/null /var/www/.ssh/authorized_keys",
     ]
     return "\n".join(lines)
+
+
+def is_ip_address(hostname: str) -> bool:
+    return re.match(r"^\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3}$", hostname) is not None
+
+
+def setup_service_job(job: Job, secrets_manager: SecretsManager) -> Job:
+    job.gateway.hostname = resolve_hostname(
+        secrets_manager, job.repo_ref.repo_id, job.gateway.hostname
+    )
+    secure = not is_ip_address(job.gateway.hostname)
+    if secure and job.gateway.public_port == 80:
+        job.gateway.public_port = 443
+    private_bytes, public_bytes = generate_rsa_key_pair_bytes(comment=job.run_name)
+    job.gateway.sock_path = publish(
+        job.gateway.hostname, job.gateway.public_port, public_bytes, secure=secure
+    )
+    job.gateway.ssh_key = private_bytes.decode()
+    return job

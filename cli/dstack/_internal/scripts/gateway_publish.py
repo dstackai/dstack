@@ -14,6 +14,7 @@ def main():
     parser.add_argument("hostname", help="IP address or domain name")
     parser.add_argument("port", type=int, help="Public port")
     parser.add_argument("ssh_key", help="Public ssh key")
+    parser.add_argument("--secure", action="store_true", help="Listen SSL")
     args = parser.parse_args()
 
     # detect conflicts
@@ -29,7 +30,7 @@ def main():
 
     # issue ssl certificate
     ssl = {}
-    if not is_ip_address(args.hostname):
+    if args.secure:
         run_certbot(args.hostname)
         ssl = {
             "listen": f"{args.port} ssl",
@@ -37,6 +38,7 @@ def main():
             "ssl_certificate_key": f"/etc/letsencrypt/live/{args.hostname}/privkey.pem",
             "include": "/etc/letsencrypt/options-ssl-nginx.conf",
             "ssl_dhparam": "/etc/letsencrypt/ssl-dhparams.pem",
+            "error_page 497": "301 =307 https://$host:$server_port$request_uri",
         }
 
     # write nginx configuration
@@ -123,10 +125,6 @@ def run_certbot(hostname: str):
     stdout, stderr = proc.communicate()
     if proc.returncode != 0:
         exit(f"Certbot failed:\n{stderr.decode()}")
-
-
-def is_ip_address(hostname: str) -> bool:
-    return re.match(r"^\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3}\$", hostname) is not None
 
 
 if __name__ == "__main__":
