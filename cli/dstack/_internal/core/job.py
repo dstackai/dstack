@@ -26,6 +26,7 @@ class Gateway(BaseModel):
     hostname: str
     service_port: int
     public_port: int = 80
+    secure: bool = False
     ssh_key: Optional[str]
     sock_path: Optional[str]
 

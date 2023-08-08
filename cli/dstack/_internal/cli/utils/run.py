@@ -346,12 +346,14 @@ def _run_container_ssh_tunnel(hub_client: HubClient, run_name: str, ports_lock: 
 
 def _poll_logs_ws(hub_client: HubClient, job: Job, ports: Dict[int, int]):
     hostname = "127.0.0.1"
+    secure = False
     if job.configuration_type == ConfigurationType.SERVICE:
         hostname = job.gateway.hostname
+        secure = job.gateway.secure
         ports = {**ports, job.gateway.service_port: job.gateway.public_port}
 
     def on_message(ws: WebSocketApp, message):
-        message = fix_urls(message, job, ports, hostname=hostname)
+        message = fix_urls(message, job, ports, hostname=hostname, secure=secure)
         sys.stdout.buffer.write(message)
         sys.stdout.buffer.flush()
 

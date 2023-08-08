@@ -1,5 +1,6 @@
 import os
 import time
+from contextlib import asynccontextmanager
 
 import pkg_resources
 from fastapi import FastAPI, Request
@@ -39,7 +40,14 @@ configure_logger()
 logger = logging.get_logger(__name__)
 
 
-app = FastAPI(docs_url="/api/docs")
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    scheduler = start_background_tasks()
+    yield
+    scheduler.shutdown()
+
+
+app = FastAPI(docs_url="/api/docs", lifespan=lifespan)
 app.include_router(users.router)
 app.include_router(backends.router)
 app.include_router(projects.router)
@@ -69,7 +77,6 @@ async def startup_event():
     url = f"http://{os.getenv('DSTACK_HUB_HOST')}:{os.getenv('DSTACK_HUB_PORT')}"
     url_with_token = f"{url}?token={admin_user.token}"
     create_default_project_config(url, admin_user.token)
-    start_background_tasks()
     generate_hub_ssh_key_pair()
     print(f"The server is available at {url_with_token}")
 

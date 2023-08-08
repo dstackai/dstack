@@ -4,6 +4,7 @@ import google.api_core.exceptions
 from google.cloud import compute_v1
 
 import dstack._internal.backend.gcp.utils as gcp_utils
+from dstack._internal.backend.base.gateway import setup_nginx_certbot
 
 DSTACK_GATEWAY_TAG = "dstack-gateway"
 
@@ -113,9 +114,4 @@ def gateway_disks(zone: str) -> List[compute_v1.AttachedDisk]:
 
 def gateway_user_data_script() -> str:
     return f"""#!/bin/sh
-sudo apt-get update
-DEBIAN_FRONTEND=noninteractive sudo apt-get install -y -q nginx
-WWW_UID=$(id -u www-data)
-WWW_GID=$(id -g www-data)
-install -m 700 -o $WWW_UID -g $WWW_GID -d /var/www/.ssh
-install -m 600 -o $WWW_UID -g $WWW_GID /dev/null /var/www/.ssh/authorized_keys"""
+{setup_nginx_certbot()}"""

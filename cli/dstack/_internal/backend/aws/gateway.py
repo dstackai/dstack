@@ -3,6 +3,8 @@ from typing import Optional
 
 from botocore.client import BaseClient
 
+from dstack._internal.backend.base.gateway import setup_nginx_certbot
+
 
 def create_gateway_instance(
     ec2_client: BaseClient,
@@ -149,14 +151,9 @@ def get_instance_id(ec2_client: BaseClient, instance_name: str) -> str:
 
 def gateway_user_data_script(ssh_key_pub: str) -> str:
     return f"""#!/bin/bash
-sudo apt-get update
-DEBIAN_FRONTEND=noninteractive sudo apt-get install -y -q nginx
+{setup_nginx_certbot()}
 UBUNTU_UID=$(id -u ubuntu)
 UBUNTU_GID=$(id -g ubuntu)
 install -m 700 -o $UBUNTU_UID -g $UBUNTU_GID -d /home/ubuntu/.ssh
 install -m 600 -o $UBUNTU_UID -g $UBUNTU_GID /dev/null /home/ubuntu/.ssh/authorized_keys
-echo "{ssh_key_pub}" > /home/ubuntu/.ssh/authorized_keys
-WWW_UID=$(id -u www-data)
-WWW_GID=$(id -g www-data)
-install -m 700 -o $WWW_UID -g $WWW_GID -d /var/www/.ssh
-install -m 600 -o $WWW_UID -g $WWW_GID /dev/null /var/www/.ssh/authorized_keys"""
+echo "{ssh_key_pub}" > /home/ubuntu/.ssh/authorized_keys"""

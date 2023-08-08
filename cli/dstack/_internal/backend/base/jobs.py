@@ -22,7 +22,6 @@ from dstack._internal.core.job import (
 from dstack._internal.core.repo import RepoRef
 from dstack._internal.core.runners import Runner
 from dstack._internal.utils.common import get_milliseconds_since_epoch
-from dstack._internal.utils.crypto import generate_rsa_key_pair_bytes
 from dstack._internal.utils.escape import escape_head, unescape_head
 from dstack._internal.utils.logging import get_logger
 
@@ -128,14 +127,7 @@ def run_job(
         raise BackendError("Can't create a request for a job which status is not SUBMITTED")
     try:
         if job.configuration_type == ConfigurationType.SERVICE:
-            job.gateway.hostname = gateway.resolve_hostname(
-                secrets_manager, job.repo_ref.repo_id, job.gateway.hostname
-            )
-            private_bytes, public_bytes = generate_rsa_key_pair_bytes(comment=job.run_name)
-            job.gateway.sock_path = gateway.publish(
-                job.gateway.hostname, job.gateway.public_port, public_bytes
-            )
-            job.gateway.ssh_key = private_bytes.decode()
+            job = gateway.setup_service_job(job, secrets_manager)
             update_job(storage, job)
 
         _try_run_job(
