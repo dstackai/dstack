@@ -13,12 +13,10 @@ export const API = {
     PROJECTS: {
         BASE: () => `${API.BASE()}/projects`,
         LIST: () => `${API.PROJECTS.BASE()}/list`,
-        DETAILS: (name: IProject['project_name']) => `${API.PROJECTS.BASE()}/${name}`,
-        DETAILS_WITH_CONFIG: (name: IProject['project_name']) => `${API.PROJECTS.DETAILS(name)}/config_info`,
+        CREATE: () => `${API.PROJECTS.BASE()}/create`,
+        DELETE: () => `${API.PROJECTS.BASE()}/delete`,
+        DETAILS: (name: IProject['project_name']) => `${API.PROJECTS.BASE()}/${name}/info`,
         MEMBERS: (name: IProject['project_name']) => `${API.PROJECTS.DETAILS(name)}/members`,
-        BACKEND_VALUES: () => `${API.PROJECTS.BASE()}/backends/values`,
-
-        BACKEND_TYPES: () => `${API.BASE()}/backends/list`,
 
         // Repos
         REPOS: (projectName: IProject['project_name']) => `${API.BASE()}/project/${projectName}/repos`,
@@ -49,6 +47,22 @@ export const API = {
         SECRET_UPDATE: (projectName: IProject['project_name']) => `${API.BASE()}/project/${projectName}/secrets/update`,
         SECRET_DELETE: (projectName: IProject['project_name'], secretName: ISecret['secret_name']) =>
             `${API.BASE()}/project/${projectName}/secrets/${secretName}/delete`,
+    },
+
+    BACKENDS: {
+        BASE: () => `${API.BASE()}/backends`,
+        LIST_TYPES: () => `${API.BACKENDS.BASE()}/list_types`,
+        CONFIG_VALUES: () => `${API.BACKENDS.BASE()}/config_values`,
+    },
+
+    PROJECT_BACKENDS: {
+        BASE: (projectName: IProject['project_name']) => `${API.BASE()}/project/${projectName}/backends`,
+        LIST: (projectName: IProject['project_name']) => `${API.PROJECT_BACKENDS.BASE(projectName)}/list`,
+        CREATE: (projectName: IProject['project_name']) => `${API.PROJECT_BACKENDS.BASE(projectName)}/create`,
+        UPDATE: (projectName: IProject['project_name']) => `${API.PROJECT_BACKENDS.BASE(projectName)}/update`,
+        DELETE: (projectName: IProject['project_name']) => `${API.PROJECT_BACKENDS.BASE(projectName)}/delete`,
+        BACKEND_CONFIG_INFO: (projectName: IProject['project_name'], backendName: string) =>
+            `${API.PROJECT_BACKENDS.BASE(projectName)}/${backendName}/config_info`,
     },
 
     RUNS: {

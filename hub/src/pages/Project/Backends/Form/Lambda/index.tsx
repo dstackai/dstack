@@ -16,11 +16,11 @@ import {
 } from 'components';
 
 import { useHelpPanel, useNotifications } from 'hooks';
+import useIsMounted from 'hooks/useIsMounted';
 import { isRequestFormErrors2, isRequestFormFieldError } from 'libs';
-import { useBackendValuesMutation } from 'services/project';
+import { useBackendValuesMutation } from 'services/backend';
 
-import useIsMounted from '../../../../hooks/useIsMounted';
-import { API_KEY_HELP, REGIONS_HELP, CREDENTIALS_HELP, FIELD_NAMES, STORAGE_HELP, BUCKET_HELP } from './constants';
+import { API_KEY_HELP, BUCKET_HELP, CREDENTIALS_HELP, FIELD_NAMES, REGIONS_HELP, STORAGE_HELP } from './constants';
 
 import { IProps } from './types';
 
@@ -30,7 +30,7 @@ export const LambdaBackend: React.FC<IProps> = ({ loading }) => {
     const { t } = useTranslation();
     const [pushNotification] = useNotifications();
     const { control, getValues, setValue, setError, clearErrors } = useFormContext();
-    const [valuesData, setValuesData] = useState<IProjectAwsBackendValues | undefined>();
+    const [valuesData, setValuesData] = useState<IAwsBackendValues | undefined>();
     const [regions, setRegions] = useState<FormMultiselectOptions>([]);
     const [buckets, setBuckets] = useState<TAwsBucket[]>([]);
     const [storageBackendType, setStorageBackendType] = useState<FormSelectOptions>([]);
@@ -45,23 +45,23 @@ export const LambdaBackend: React.FC<IProps> = ({ loading }) => {
     const [openHelpPanel] = useHelpPanel();
 
     const changeFormHandler = async () => {
-        const backendFormValues = getValues('backend');
+        const formValues = getValues();
 
-        if (!backendFormValues.api_key) {
+        if (!formValues.api_key) {
             return;
         }
 
         if (
-            backendFormValues?.storage_backend?.credentials &&
-            !_get(backendFormValues, FIELD_NAMES.STORAGE_BACKEND.CREDENTIALS.ACCESS_KEY) &&
-            !_get(backendFormValues, FIELD_NAMES.STORAGE_BACKEND.CREDENTIALS.SECRET_KEY)
+            formValues?.storage_backend?.credentials &&
+            !_get(formValues, FIELD_NAMES.STORAGE_BACKEND.CREDENTIALS.ACCESS_KEY) &&
+            !_get(formValues, FIELD_NAMES.STORAGE_BACKEND.CREDENTIALS.SECRET_KEY)
         )
-            backendFormValues.storage_backend.credentials = null;
+            formValues.storage_backend.credentials = null;
 
-        clearErrors('backend');
+        clearErrors();
 
         try {
-            const request = getBackendValues(backendFormValues);
+            const request = getBackendValues(formValues);
             requestRef.current = request;
 
             const response = await request.unwrap();
@@ -77,7 +77,7 @@ export const LambdaBackend: React.FC<IProps> = ({ loading }) => {
             }
 
             if (response.regions?.selected !== undefined) {
-                setValue(`backend.${FIELD_NAMES.REGIONS}`, response.regions.selected);
+                setValue(FIELD_NAMES.REGIONS, response.regions.selected);
             }
 
             if (response.storage_backend_type?.values) {
@@ -85,7 +85,7 @@ export const LambdaBackend: React.FC<IProps> = ({ loading }) => {
             }
 
             if (response.storage_backend_type?.selected !== undefined) {
-                setValue(`backend.${FIELD_NAMES.STORAGE_BACKEND.TYPE}`, response.storage_backend_type.selected);
+                setValue(FIELD_NAMES.STORAGE_BACKEND.TYPE, response.storage_backend_type.selected);
             }
 
             if (response.storage_backend_values?.bucket_name?.values) {
@@ -97,10 +97,7 @@ export const LambdaBackend: React.FC<IProps> = ({ loading }) => {
             }
 
             if (response.storage_backend_values?.bucket_name?.selected !== undefined) {
-                setValue(
-                    `backend.${FIELD_NAMES.STORAGE_BACKEND.BUCKET_NAME}`,
-                    response.storage_backend_values.bucket_name.selected,
-                );
+                setValue(FIELD_NAMES.STORAGE_BACKEND.BUCKET_NAME, response.storage_backend_values.bucket_name.selected);
             }
         } catch (errorResponse) {
             console.log('fetch backends values error:', errorResponse);
@@ -111,7 +108,7 @@ export const LambdaBackend: React.FC<IProps> = ({ loading }) => {
             if (isRequestFormErrors2(errorRequestData)) {
                 errorRequestData.detail.forEach((error) => {
                     if (isRequestFormFieldError(error)) {
-                        setError(`backend.${error.loc.join('.')}`, { type: 'custom', message: error.msg });
+                        setError(error.loc.join('.'), { type: 'custom', message: error.msg });
                     } else {
                         pushNotification({
                             type: 'error',
@@ -166,7 +163,7 @@ export const LambdaBackend: React.FC<IProps> = ({ loading }) => {
                 label={t('projects.edit.lambda.api_key')}
                 description={t('projects.edit.lambda.api_key_description')}
                 control={control}
-                name={`backend.${FIELD_NAMES.API_KEY}`}
+                name={FIELD_NAMES.API_KEY}
                 onChange={onChangeCredentialField}
                 disabled={loading}
                 rules={{ required: t('validation.required') }}
@@ -179,7 +176,7 @@ export const LambdaBackend: React.FC<IProps> = ({ loading }) => {
                 description={t('projects.edit.lambda.regions_description')}
                 placeholder={t('projects.edit.lambda.regions_placeholder')}
                 control={control}
-                name={`backend.${FIELD_NAMES.REGIONS}`}
+                name={FIELD_NAMES.REGIONS}
                 onChange={getOnChangeSelectField(FIELD_NAMES.REGIONS)}
                 disabled={getDisabledByFieldName(FIELD_NAMES.REGIONS)}
                 secondaryControl={renderSpinner()}
@@ -193,7 +190,7 @@ export const LambdaBackend: React.FC<IProps> = ({ loading }) => {
                 description={t('projects.edit.lambda.storage_backend.type_description')}
                 placeholder={t('projects.edit.lambda.storage_backend.type_placeholder')}
                 control={control}
-                name={`backend.${FIELD_NAMES.STORAGE_BACKEND.TYPE}`}
+                name={FIELD_NAMES.STORAGE_BACKEND.TYPE}
                 disabled={getDisabledByFieldName(FIELD_NAMES.STORAGE_BACKEND.TYPE)}
                 onChange={getOnChangeSelectField(FIELD_NAMES.STORAGE_BACKEND.TYPE)}
                 options={storageBackendType}
@@ -206,7 +203,7 @@ export const LambdaBackend: React.FC<IProps> = ({ loading }) => {
                 label={t('projects.edit.lambda.storage_backend.credentials.access_key_id')}
                 description={t('projects.edit.lambda.storage_backend.credentials.access_key_id_description')}
                 control={control}
-                name={`backend.${FIELD_NAMES.STORAGE_BACKEND.CREDENTIALS.ACCESS_KEY}`}
+                name={FIELD_NAMES.STORAGE_BACKEND.CREDENTIALS.ACCESS_KEY}
                 onChange={onChangeCredentialField}
                 rules={{ required: t('validation.required') }}
                 disabled={getDisabledByFieldName(FIELD_NAMES.STORAGE_BACKEND.CREDENTIALS.ACCESS_KEY)}
@@ -218,7 +215,7 @@ export const LambdaBackend: React.FC<IProps> = ({ loading }) => {
                 label={t('projects.edit.lambda.storage_backend.credentials.secret_key_id')}
                 description={t('projects.edit.lambda.storage_backend.credentials.secret_key_id_description')}
                 control={control}
-                name={`backend.${FIELD_NAMES.STORAGE_BACKEND.CREDENTIALS.SECRET_KEY}`}
+                name={FIELD_NAMES.STORAGE_BACKEND.CREDENTIALS.SECRET_KEY}
                 onChange={onChangeCredentialField}
                 rules={{ required: t('validation.required') }}
                 disabled={getDisabledByFieldName(FIELD_NAMES.STORAGE_BACKEND.CREDENTIALS.SECRET_KEY)}
@@ -230,7 +227,7 @@ export const LambdaBackend: React.FC<IProps> = ({ loading }) => {
                 label={t('projects.edit.lambda.storage_backend.s3_bucket_name')}
                 description={t('projects.edit.lambda.storage_backend.s3_bucket_name_description')}
                 control={control}
-                name={`backend.${FIELD_NAMES.STORAGE_BACKEND.BUCKET_NAME}`}
+                name={FIELD_NAMES.STORAGE_BACKEND.BUCKET_NAME}
                 selectableItemsTypes={['buckets']}
                 disabled={getDisabledByFieldName(FIELD_NAMES.STORAGE_BACKEND.BUCKET_NAME)}
                 rules={{ required: t('validation.required') }}

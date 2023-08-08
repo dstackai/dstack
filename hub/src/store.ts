@@ -3,6 +3,7 @@ import { configureStore } from '@reduxjs/toolkit';
 import notificationsReducer from 'components/Notifications/slice';
 
 import { artifactApi } from 'services/artifact';
+import { backendApi } from 'services/backend';
 import { projectApi } from 'services/project';
 import { runApi } from 'services/run';
 import { secretApi } from 'services/secret';
@@ -16,6 +17,7 @@ export const store = configureStore({
         app: appReducer,
         notifications: notificationsReducer,
         [projectApi.reducerPath]: projectApi.reducer,
+        [backendApi.reducerPath]: backendApi.reducer,
         [runApi.reducerPath]: runApi.reducer,
         [artifactApi.reducerPath]: artifactApi.reducer,
         [tagApi.reducerPath]: tagApi.reducer,
@@ -28,6 +30,7 @@ export const store = configureStore({
             serializableCheck: false,
         })
             .concat(projectApi.middleware)
+            .concat(backendApi.middleware)
             .concat(runApi.middleware)
             .concat(artifactApi.middleware)
             .concat(tagApi.middleware)

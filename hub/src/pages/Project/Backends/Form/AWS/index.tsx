@@ -16,11 +16,11 @@ import {
 } from 'components';
 
 import { useHelpPanel, useNotifications } from 'hooks';
+import useIsMounted from 'hooks/useIsMounted';
 import { isRequestFormErrors2, isRequestFormFieldError } from 'libs';
-import { useBackendValuesMutation } from 'services/project';
+import { useBackendValuesMutation } from 'services/backend';
 import { AWSCredentialTypeEnum } from 'types';
 
-import useIsMounted from '../../../../hooks/useIsMounted';
 import { ADDITIONAL_REGIONS_HELP, BUCKET_HELP, CREDENTIALS_HELP, FIELD_NAMES, REGION_HELP, SUBNET_HELP } from './constants';
 
 import { IProps } from './types';
@@ -31,7 +31,7 @@ export const AWSBackend: React.FC<IProps> = ({ loading }) => {
     const { t } = useTranslation();
     const [pushNotification] = useNotifications();
     const { control, getValues, setValue, setError, clearErrors, watch } = useFormContext();
-    const [valuesData, setValuesData] = useState<IProjectAwsBackendValues | undefined>();
+    const [valuesData, setValuesData] = useState<IAwsBackendValues | undefined>();
     const [regions, setRegions] = useState<FormSelectOptions>([]);
     const [buckets, setBuckets] = useState<TAwsBucket[]>([]);
     const [subnets, setSubnets] = useState<FormSelectOptions>([]);
@@ -47,30 +47,30 @@ export const AWSBackend: React.FC<IProps> = ({ loading }) => {
 
     const [openHelpPanel] = useHelpPanel();
 
-    const backendCredentialTypeValue = watch(`backend.${FIELD_NAMES.CREDENTIALS.TYPE}`);
-    const backendAccessKeyValue = watch(`backend.${FIELD_NAMES.CREDENTIALS.ACCESS_KEY}`);
-    const backendSecretKeyValue = watch(`backend.${FIELD_NAMES.CREDENTIALS.SECRET_KEY}`);
+    const credentialTypeValue = watch(FIELD_NAMES.CREDENTIALS.TYPE);
+    const accessKeyValue = watch(FIELD_NAMES.CREDENTIALS.ACCESS_KEY);
+    const secretKeyValue = watch(FIELD_NAMES.CREDENTIALS.SECRET_KEY);
 
     const changeFormHandler = async () => {
-        let backendFormValues = getValues('backend');
+        let formValues = getValues();
 
         if (
-            backendFormValues.credentials?.type === AWSCredentialTypeEnum.ACCESS_KEY &&
-            (!backendFormValues.credentials?.secret_key || !backendFormValues.credentials?.access_key)
+            formValues.credentials?.type === AWSCredentialTypeEnum.ACCESS_KEY &&
+            (!formValues.credentials?.secret_key || !formValues.credentials?.access_key)
         ) {
             return;
         }
 
-        if (!backendFormValues.credentials?.type) {
-            const { credentials, ...otherValues } = backendFormValues;
+        if (!formValues.credentials?.type) {
+            const { credentials, ...otherValues } = formValues;
 
-            backendFormValues = otherValues;
+            formValues = otherValues;
         }
 
-        clearErrors('backend');
+        clearErrors();
 
         try {
-            const request = getBackendValues(backendFormValues);
+            const request = getBackendValues(formValues);
             requestRef.current = request;
 
             const response = await request.unwrap();
@@ -84,9 +84,9 @@ export const AWSBackend: React.FC<IProps> = ({ loading }) => {
             setAvailableDefaultCredentials(response.default_credentials);
 
             // select authorization option
-            if (!backendFormValues?.credentials?.type) {
+            if (!formValues?.credentials?.type) {
                 setValue(
-                    `backend.${FIELD_NAMES.CREDENTIALS.TYPE}`,
+                    FIELD_NAMES.CREDENTIALS.TYPE,
                     response.default_credentials ? AWSCredentialTypeEnum.DEFAULT : AWSCredentialTypeEnum.ACCESS_KEY,
                 );
 
@@ -98,7 +98,7 @@ export const AWSBackend: React.FC<IProps> = ({ loading }) => {
             }
 
             if (response.region_name?.selected !== undefined) {
-                setValue(`backend.${FIELD_NAMES.REGION_NAME}`, response.region_name.selected);
+                setValue(FIELD_NAMES.REGION_NAME, response.region_name.selected);
             }
 
             if (response.s3_bucket_name?.values) {
@@ -106,7 +106,7 @@ export const AWSBackend: React.FC<IProps> = ({ loading }) => {
             }
 
             if (response.s3_bucket_name?.selected !== undefined) {
-                setValue(`backend.${FIELD_NAMES.S3_BUCKET_NAME}`, response.s3_bucket_name.selected);
+                setValue(FIELD_NAMES.S3_BUCKET_NAME, response.s3_bucket_name.selected);
             }
 
             if (response.ec2_subnet_id?.values) {
@@ -114,7 +114,7 @@ export const AWSBackend: React.FC<IProps> = ({ loading }) => {
             }
 
             if (response.ec2_subnet_id?.selected !== undefined) {
-                setValue(`backend.${FIELD_NAMES.EC2_SUBNET_ID}`, response.ec2_subnet_id.selected ?? '');
+                setValue(FIELD_NAMES.EC2_SUBNET_ID, response.ec2_subnet_id.selected ?? '');
             }
 
             if (response.extra_regions?.values) {
@@ -122,7 +122,7 @@ export const AWSBackend: React.FC<IProps> = ({ loading }) => {
             }
 
             if (response.extra_regions?.selected !== undefined) {
-                setValue(`backend.${FIELD_NAMES.EXTRA_REGIONS}`, response.extra_regions.selected);
+                setValue(FIELD_NAMES.EXTRA_REGIONS, response.extra_regions.selected);
             }
         } catch (errorResponse) {
             console.log('fetch backends values error:', errorResponse);
@@ -133,7 +133,7 @@ export const AWSBackend: React.FC<IProps> = ({ loading }) => {
             if (isRequestFormErrors2(errorRequestData)) {
                 errorRequestData.detail.forEach((error) => {
                     if (isRequestFormFieldError(error)) {
-                        setError(`backend.${error.loc.join('.')}`, { type: 'custom', message: error.msg });
+                        setError(error.loc.join('.'), { type: 'custom', message: error.msg });
                     } else {
                         pushNotification({
                             type: 'error',
@@ -175,12 +175,10 @@ export const AWSBackend: React.FC<IProps> = ({ loading }) => {
     };
 
     const getDisabledByFieldName = (fieldName: string) => {
-        let disabledField = loading || !backendCredentialTypeValue || !valuesData;
+        let disabledField = loading || !credentialTypeValue || !valuesData;
 
         disabledField =
-            disabledField ||
-            (backendCredentialTypeValue === AWSCredentialTypeEnum.ACCESS_KEY &&
-                (!backendAccessKeyValue || !backendSecretKeyValue));
+            disabledField || (credentialTypeValue === AWSCredentialTypeEnum.ACCESS_KEY && (!accessKeyValue || !secretKeyValue));
 
         disabledField = disabledField || (lastUpdatedField.current !== fieldName && isLoadingValues);
 
@@ -192,8 +190,8 @@ export const AWSBackend: React.FC<IProps> = ({ loading }) => {
             <FormSelect
                 label={t('projects.edit.aws.authorization')}
                 control={control}
-                name={`backend.${FIELD_NAMES.CREDENTIALS.TYPE}`}
-                onChange={getOnChangeSelectField(`backend.${FIELD_NAMES.CREDENTIALS.TYPE}`)}
+                name={FIELD_NAMES.CREDENTIALS.TYPE}
+                onChange={getOnChangeSelectField(FIELD_NAMES.CREDENTIALS.TYPE)}
                 disabled={loading || availableDefaultCredentials === null}
                 secondaryControl={availableDefaultCredentials === null && renderSpinner(true)}
                 options={[
@@ -209,14 +207,14 @@ export const AWSBackend: React.FC<IProps> = ({ loading }) => {
                 ]}
             />
 
-            {backendCredentialTypeValue === AWSCredentialTypeEnum.ACCESS_KEY && (
+            {credentialTypeValue === AWSCredentialTypeEnum.ACCESS_KEY && (
                 <>
                     <FormInput
                         info={<InfoLink onFollow={() => openHelpPanel(CREDENTIALS_HELP)} />}
                         label={t('projects.edit.aws.access_key_id')}
                         description={t('projects.edit.aws.access_key_id_description')}
                         control={control}
-                        name={`backend.${FIELD_NAMES.CREDENTIALS.ACCESS_KEY}`}
+                        name={FIELD_NAMES.CREDENTIALS.ACCESS_KEY}
                         onChange={onChangeCredentialField}
                         disabled={loading}
                         rules={{ required: t('validation.required') }}
@@ -228,7 +226,7 @@ export const AWSBackend: React.FC<IProps> = ({ loading }) => {
                         label={t('projects.edit.aws.secret_key_id')}
                         description={t('projects.edit.aws.secret_key_id_description')}
                         control={control}
-                        name={`backend.${FIELD_NAMES.CREDENTIALS.SECRET_KEY}`}
+                        name={FIELD_NAMES.CREDENTIALS.SECRET_KEY}
                         onChange={onChangeCredentialField}
                         disabled={loading}
                         rules={{ required: t('validation.required') }}
@@ -243,7 +241,7 @@ export const AWSBackend: React.FC<IProps> = ({ loading }) => {
                 description={t('projects.edit.aws.region_name_description')}
                 placeholder={t('projects.edit.aws.region_name_placeholder')}
                 control={control}
-                name={`backend.${FIELD_NAMES.REGION_NAME}`}
+                name={FIELD_NAMES.REGION_NAME}
                 disabled={getDisabledByFieldName(FIELD_NAMES.REGION_NAME)}
                 onChange={getOnChangeSelectField(FIELD_NAMES.REGION_NAME)}
                 options={regions}
@@ -256,7 +254,7 @@ export const AWSBackend: React.FC<IProps> = ({ loading }) => {
                 label={t('projects.edit.aws.s3_bucket_name')}
                 description={t('projects.edit.aws.s3_bucket_name_description')}
                 control={control}
-                name={`backend.${FIELD_NAMES.S3_BUCKET_NAME}`}
+                name={FIELD_NAMES.S3_BUCKET_NAME}
                 selectableItemsTypes={['buckets']}
                 disabled={getDisabledByFieldName(FIELD_NAMES.S3_BUCKET_NAME)}
                 rules={{ required: t('validation.required') }}
@@ -275,7 +273,7 @@ export const AWSBackend: React.FC<IProps> = ({ loading }) => {
                 description={t('projects.edit.aws.ec2_subnet_id_description')}
                 placeholder={t('projects.edit.aws.ec2_subnet_id_placeholder')}
                 control={control}
-                name={`backend.${FIELD_NAMES.EC2_SUBNET_ID}`}
+                name={FIELD_NAMES.EC2_SUBNET_ID}
                 disabled={getDisabledByFieldName(FIELD_NAMES.EC2_SUBNET_ID)}
                 onChange={getOnChangeSelectField(FIELD_NAMES.EC2_SUBNET_ID)}
                 options={subnets}
@@ -288,7 +286,7 @@ export const AWSBackend: React.FC<IProps> = ({ loading }) => {
                 description={t('projects.edit.aws.extra_regions_description')}
                 placeholder={t('projects.edit.aws.extra_regions_placeholder')}
                 control={control}
-                name={`backend.${FIELD_NAMES.EXTRA_REGIONS}`}
+                name={FIELD_NAMES.EXTRA_REGIONS}
                 onChange={getOnChangeSelectField(FIELD_NAMES.EXTRA_REGIONS)}
                 disabled={getDisabledByFieldName(FIELD_NAMES.EXTRA_REGIONS)}
                 secondaryControl={renderSpinner()}

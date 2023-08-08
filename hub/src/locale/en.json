@@ -44,6 +44,24 @@
     "users": "Users"
   },
 
+  "backend": {
+    "page_title_one": "Backend",
+    "page_title_other": "Backends",
+    "add_page_title_one": "Add backend",
+    "type": {
+      "aws": "AWS",
+      "aws_description": "Run workflows and store data in Amazon Web Services ",
+      "gcp": "GCP",
+      "gcp_description": "Run workflows and store data in Google Cloud Platform",
+      "azure": "Azure",
+      "azure_description": "Run workflows and store data in Microsoft Azure",
+      "lambda": "Lambda",
+      "lambda_description": "Run workflows and store data in Lambda",
+      "local": "Local",
+      "local_description": "Run workflows and store data locally via Docker"
+    }
+  },
+
   "projects": {
     "page_title": "Projects",
     "search_placeholder": "Find projects",
@@ -60,21 +78,8 @@
       "backend": "Backend",
       "settings": "Settings"
     },
-    "backend_type": {
-      "aws": "AWS",
-      "aws_description": "Run workflows and store data in Amazon Web Services ",
-      "gcp": "GCP",
-      "gcp_description": "Run workflows and store data in Google Cloud Platform",
-      "azure": "Azure",
-      "azure_description": "Run workflows and store data in Microsoft Azure",
-      "lambda": "Lambda",
-      "lambda_description": "Run workflows and store data in Lambda",
-      "local": "Local",
-      "local_description": "Run workflows and store data locally via Docker"
-    },
     "edit": {
       "general": "General",
-      "edit_backend": "Edit backend",
       "project_name": "Project name",
       "project_name_description": "Only latin characters, dashes, underscores, and digits",
       "backend": "Backend",
