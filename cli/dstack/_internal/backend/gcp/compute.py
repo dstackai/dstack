@@ -77,6 +77,7 @@ class GCPCompute(Compute):
             credentials=self.credentials
         )
         self.zone_operations_client = compute_v1.ZoneOperationsClient(credentials=self.credentials)
+        self.regions_client = compute_v1.RegionsClient(credentials=self.credentials)
 
     def get_request_head(self, job: Job, request_id: Optional[str]) -> RequestHead:
         if request_id is None:
@@ -89,7 +90,7 @@ class GCPCompute(Compute):
             instances_client=self.instances_client,
             zone_operations_client=self.zone_operations_client,
             project_id=self.gcp_config.project_id,
-            zone=self.gcp_config.zone,
+            zone=job.location,
             instance_name=request_id,
         )
         return RequestHead(
@@ -108,39 +109,21 @@ class GCPCompute(Compute):
         )
 
     def run_instance(self, job: Job, instance_type: InstanceType) -> LaunchedInstanceInfo:
-        instance = _launch_instance(
+        return _run_instance(
             instances_client=self.instances_client,
             firewalls_client=self.firewalls_client,
-            project_id=self.gcp_config.project_id,
-            zone=self.gcp_config.zone,
-            network=_get_network_resource(self.gcp_config.vpc),
-            subnet=_get_subnet_resource(self.gcp_config.region, self.gcp_config.subnet),
-            machine_type=instance_type.instance_name,
-            image_name=_get_image_name(
-                images_client=self.images_client,
-                instance_type=instance_type,
-            ),
-            instance_name=_get_instance_name(job),
-            user_data_script=_get_user_data_script(self.gcp_config, job, instance_type),
-            service_account=self.credentials.service_account_email,
-            spot=instance_type.resources.spot,
-            accelerators=_get_accelerator_configs(
-                project_id=self.gcp_config.project_id,
-                zone=self.gcp_config.zone,
-                instance_type=instance_type,
-            ),
-            labels=_get_labels(
-                bucket=self.gcp_config.bucket_name,
-                job=job,
-            ),
-            ssh_key_pub=job.ssh_key_pub,
+            images_client=self.images_client,
+            regions_client=self.regions_client,
+            credentials=self.credentials,
+            gcp_config=self.gcp_config,
+            job=job,
+            instance_type=instance_type,
         )
-        return LaunchedInstanceInfo(request_id=instance.name, location=self.gcp_config.zone)
 
     def restart_instance(self, job: Job):
         _restart_instance(
             client=self.instances_client,
-            gcp_config=self.gcp_config,
+            gcp_config=_change_config_zone(self.gcp_config, job.location),
             instance_name=job.request_id,
         )
         return LaunchedInstanceInfo(request_id=job.request_id, location=job.location)
@@ -148,14 +131,14 @@ class GCPCompute(Compute):
     def terminate_instance(self, runner: Runner):
         _terminate_instance(
             client=self.instances_client,
-            gcp_config=self.gcp_config,
+            gcp_config=_change_config_zone(self.gcp_config, runner.job.location),
             instance_name=runner.request_id,
         )
 
     def cancel_spot_request(self, runner: Runner):
         _terminate_instance(
             client=self.instances_client,
-            gcp_config=self.gcp_config,
+            gcp_config=_change_config_zone(self.gcp_config, runner.job.location),
             instance_name=runner.request_id,
         )
 
@@ -187,6 +170,13 @@ class GCPCompute(Compute):
             gcp_config=self.gcp_config,
             instance_name=instance_name,
         )
+
+
+def _change_config_zone(config: GCPConfig, zone: str) -> GCPConfig:
+    new_config = config.copy()
+    new_config.zone = zone
+    new_config.region = gcp_utils.get_zone_region(zone)
+    return new_config
 
 
 def _get_instance_status(
@@ -538,6 +528,87 @@ def _get_labels(bucket: str, job: Job) -> Dict[str, str]:
     if gcp_utils.is_valid_label_value(dstack_user_name):
         labels["dstack_user_name"] = dstack_user_name
     return labels
+
+
+def _run_instance(
+    instances_client: compute_v1.InstancesClient,
+    firewalls_client: compute_v1.FirewallsClient,
+    images_client: compute_v1.ImagesClient,
+    regions_client: compute_v1.RegionsClient,
+    credentials: service_account.Credentials,
+    gcp_config: GCPConfig,
+    job: Job,
+    instance_type: InstanceType,
+) -> LaunchedInstanceInfo:
+    zones = _get_zones(
+        regions_client=regions_client,
+        project_id=gcp_config.project_id,
+        primary_region=gcp_config.region,
+        primary_zone=gcp_config.zone,
+        extra_regions=gcp_config.extra_regions,
+    )
+    for zone in zones:
+        try:
+            logger.info(
+                "Requesting %s %s instance in %s...",
+                instance_type.instance_name,
+                "spot" if job.requirements.spot else "",
+                zone,
+            )
+            instance = _launch_instance(
+                instances_client=instances_client,
+                firewalls_client=firewalls_client,
+                project_id=gcp_config.project_id,
+                zone=zone,
+                network=_get_network_resource(gcp_config.vpc),
+                subnet=_get_subnet_resource(gcp_utils.get_zone_region(zone), gcp_config.subnet),
+                machine_type=instance_type.instance_name,
+                image_name=_get_image_name(
+                    images_client=images_client,
+                    instance_type=instance_type,
+                ),
+                instance_name=_get_instance_name(job),
+                user_data_script=_get_user_data_script(
+                    gcp_config=_change_config_zone(gcp_config, zone),
+                    job=job,
+                    instance_type=instance_type,
+                ),
+                service_account=credentials.service_account_email,
+                spot=instance_type.resources.spot,
+                accelerators=_get_accelerator_configs(
+                    project_id=gcp_config.project_id,
+                    zone=zone,
+                    instance_type=instance_type,
+                ),
+                labels=_get_labels(
+                    bucket=gcp_config.bucket_name,
+                    job=job,
+                ),
+                ssh_key_pub=job.ssh_key_pub,
+            )
+            logger.info("Request succeeded")
+            return LaunchedInstanceInfo(request_id=instance.name, location=zone)
+        except NoCapacityError:
+            logger.info("Failed to request instance in %s", zone)
+    raise NoCapacityError()
+
+
+def _get_zones(
+    regions_client: compute_v1.RegionsClient,
+    project_id: str,
+    primary_region: str,
+    primary_zone: str,
+    extra_regions: List[str],
+) -> List[str]:
+    regions = regions_client.list(project=project_id)
+    region_name_to_zones_map = {
+        r.name: [gcp_utils.get_resource_name(z) for z in r.zones] for r in regions
+    }
+    zones = region_name_to_zones_map[primary_region]
+    zones = sorted(zones, key=lambda x: x != primary_zone)
+    for extra_region in extra_regions:
+        zones += region_name_to_zones_map[extra_region]
+    return zones
 
 
 def _launch_instance(

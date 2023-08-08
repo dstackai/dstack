@@ -91,6 +91,7 @@ class GCPBackendConfigPartial(BaseModel):
     bucket_name: Optional[str]
     vpc: Optional[str]
     subnet: Optional[str]
+    extra_regions: Optional[List[str]]
 
 
 class GCPBackendConfig(BaseModel):
@@ -101,6 +102,7 @@ class GCPBackendConfig(BaseModel):
     bucket_name: str
     vpc: str
     subnet: str
+    extra_regions: List[str] = []
 
 
 class GCPBackendDefaultCreds(BaseModel):
@@ -252,7 +254,7 @@ class BackendElement(BaseModel):
 
 
 class BackendMultiElement(BaseModel):
-    selected: List[str]
+    selected: List[str] = []
     values: List[BackendElementValue] = []
 
 
@@ -295,6 +297,7 @@ class GCPBackendValues(BaseModel):
     zone: Optional[BackendElement]
     bucket_name: Optional[BackendElement]
     vpc_subnet: Optional[GCPVPCSubnetBackendElement]
+    extra_regions: Optional[BackendMultiElement]
 
 
 class AzureBackendValues(BaseModel):

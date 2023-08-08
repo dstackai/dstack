@@ -43,7 +43,7 @@ async def get_run_backend(
 ) -> Optional[Tuple[DBBackend, Backend]]:
     backends = await backends_cache.get_backends(project)
     for db_backend, backend in backends:
-        run_head = await call_backend(backend.list_run_heads, repo_id, run_name)
+        run_head = await call_backend(backend.get_run_head, repo_id, run_name)
         if run_head is not None:
             return db_backend, backend
     return None

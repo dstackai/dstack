@@ -1,4 +1,4 @@
-from typing import Dict, Optional
+from typing import Dict, List, Optional
 
 from pydantic import BaseModel, ValidationError
 from typing_extensions import Literal
@@ -14,6 +14,7 @@ class GCPConfig(BackendConfig, BaseModel):
     bucket_name: str
     vpc: str
     subnet: str
+    extra_regions: List[str] = []
     credentials_file: Optional[str] = None
     credentials: Optional[Dict] = None
 
@@ -26,6 +27,7 @@ class GCPConfig(BackendConfig, BaseModel):
             "bucket": self.bucket_name,
             "vpc": self.vpc,
             "subnet": self.subnet,
+            "extra_regions": self.extra_regions,
         }
         if self.credentials_file is not None:
             res["credentials_file"] = self.credentials_file

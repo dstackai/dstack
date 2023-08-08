@@ -16,6 +16,7 @@ from dstack._internal.hub.db.models import Backend as DBBackend
 from dstack._internal.hub.schemas import (
     BackendElement,
     BackendElementValue,
+    BackendMultiElement,
     GCPBackendConfig,
     GCPBackendConfigWithCreds,
     GCPBackendConfigWithCredsPartial,
@@ -157,6 +158,10 @@ class GCPConfigurator(Configurator):
             selected_vpc=backend_config.vpc,
             selected_subnet=backend_config.subnet,
         )
+        backend_values.extra_regions = self._get_hub_extra_regions_element(
+            region=backend_values.region.selected,
+            region_names=list(regions.keys()),
+        )
         return backend_values
 
     def create_backend(
@@ -179,6 +184,7 @@ class GCPConfigurator(Configurator):
             "bucket_name": backend_config.bucket_name,
             "vpc": backend_config.vpc,
             "subnet": backend_config.subnet,
+            "extra_regions": backend_config.extra_regions,
         }
         return config_data, auth_data
 
@@ -192,6 +198,7 @@ class GCPConfigurator(Configurator):
         bucket_name = config_data["bucket_name"]
         vpc = config_data["vpc"]
         subnet = config_data["subnet"]
+        extra_regions = config_data.get("extra_regions", [])
         if include_creds:
             auth_data = json.loads(db_backend.auth)
             return GCPBackendConfigWithCreds(
@@ -202,6 +209,7 @@ class GCPConfigurator(Configurator):
                 bucket_name=bucket_name,
                 vpc=vpc,
                 subnet=subnet,
+                extra_regions=extra_regions,
             )
         return GCPBackendConfig(
             area=area,
@@ -210,6 +218,7 @@ class GCPConfigurator(Configurator):
             bucket_name=bucket_name,
             vpc=vpc,
             subnet=subnet,
+            extra_regions=extra_regions,
         )
 
     def get_backend(self, db_backend: DBBackend) -> GCPBackend:
@@ -227,6 +236,7 @@ class GCPConfigurator(Configurator):
             bucket_name=config_data["bucket_name"],
             vpc=config_data["vpc"],
             subnet=config_data["subnet"],
+            extra_regions=config_data.get("extra_regions", []),
             credentials=auth_data,
         )
         return GCPBackend(config)
@@ -337,6 +347,17 @@ class GCPConfigurator(Configurator):
                     else f"No preference (default)",
                 )
             )
+        return element
+
+    def _get_hub_extra_regions_element(
+        self, region: str, region_names: List[str]
+    ) -> BackendMultiElement:
+        element = BackendMultiElement()
+        for region_name in region_names:
+            if region_name == region:
+                continue
+            element.values.append(BackendElementValue(value=region_name, label=region_name))
+            element.selected.append(region_name)
         return element
 
     def _auth(self, credentials_data: Dict):

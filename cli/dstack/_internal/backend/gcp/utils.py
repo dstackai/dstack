@@ -72,3 +72,7 @@ def get_service_account_email(project_id: str, name: str) -> str:
 
 def get_service_account_resource(project_id: str, email: str) -> str:
     return f"projects/{project_id}/serviceAccounts/{email}"
+
+
+def get_zone_region(zone: str) -> str:
+    return zone.rsplit(sep="-", maxsplit=1)[0]
