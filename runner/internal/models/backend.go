@@ -149,9 +149,10 @@ type RepoData struct {
 
 type Gateway struct {
 	Hostname    string `yaml:"hostname"`
-	SSHKey      string `yaml:"ssh_key,omitempty"`
 	ServicePort int    `yaml:"service_port"`
 	PublicPort  int    `yaml:"public_port"`
+	Secure      bool   `yaml:"secure"`
+	SSHKey      string `yaml:"ssh_key,omitempty"`
 	SockPath    string `yaml:"sock_path,omitempty"`
 }
 

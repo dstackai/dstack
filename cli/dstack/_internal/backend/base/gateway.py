@@ -121,12 +121,12 @@ def setup_service_job(job: Job, secrets_manager: SecretsManager) -> Job:
     job.gateway.hostname = resolve_hostname(
         secrets_manager, job.repo_ref.repo_id, job.gateway.hostname
     )
-    secure = not is_ip_address(job.gateway.hostname)
-    if secure and job.gateway.public_port == 80:
+    job.gateway.secure = not is_ip_address(job.gateway.hostname)
+    if job.gateway.secure and job.gateway.public_port == 80:
         job.gateway.public_port = 443
     private_bytes, public_bytes = generate_rsa_key_pair_bytes(comment=job.run_name)
     job.gateway.sock_path = publish(
-        job.gateway.hostname, job.gateway.public_port, public_bytes, secure=secure
+        job.gateway.hostname, job.gateway.public_port, public_bytes, secure=job.gateway.secure
     )
     job.gateway.ssh_key = private_bytes.decode()
     return job

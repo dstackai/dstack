@@ -6,7 +6,7 @@ from datetime import datetime
 from typing import Any, Dict, Generator, Optional
 
 from dstack._internal.backend.base.storage import Storage
-from dstack._internal.core.job import Job
+from dstack._internal.core.job import ConfigurationType, Job
 from dstack._internal.core.log_event import LogEvent, LogEventSource
 
 WAIT_N_ONCE_FINISHED = 1
@@ -58,7 +58,13 @@ def fix_log_event_urls(log_event: LogEvent, jobs_map: Dict[str, Job]) -> LogEven
     return log_event
 
 
-def fix_urls(log: bytes, job: Job, ports: Dict[int, int], hostname: Optional[str] = None) -> bytes:
+def fix_urls(
+    log: bytes,
+    job: Job,
+    ports: Dict[int, int],
+    hostname: Optional[str] = None,
+    secure: bool = False,
+) -> bytes:
     if not (job.host_name and job.app_specs):
         return log
 
@@ -75,8 +81,11 @@ def fix_urls(log: bytes, job: Job, ports: Dict[int, int], hostname: Optional[str
         qs = {k: v[0] for k, v in urllib.parse.parse_qs(url.query).items()}
         if app_spec.url_query_params is not None:
             qs.update({k.encode(): v.encode() for k, v in app_spec.url_query_params.items()})
+        omit_port = (not secure and local_port == 80) or (secure and local_port == 443)
         url = url._replace(
-            netloc=f"{hostname}:{local_port}".encode(), query=urllib.parse.urlencode(qs).encode()
+            scheme=("https" if secure else "http").encode(),
+            netloc=(hostname if omit_port else f"{hostname}:{local_port}").encode(),
+            query=urllib.parse.urlencode(qs).encode(),
         )
         return url.geturl()
 
