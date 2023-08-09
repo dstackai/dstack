@@ -205,18 +205,35 @@ To inform `dstack` about the required resources, you need to
 profiles:
   - name: gcp-t4
     project: gcp
+    
     resources:
       memory: 24GB
       gpu:
         name: T4
+        
+    spot_policy: auto
+    retry_policy:
+      limit: 30min
+    max_duration: 1d
+      
     default: true
 ```
 
 </div>
 
-## Running the training
+!!! info "Using spot instances"
+    If `spot_policy` is set to `auto`, `dstack` prioritizes spot instances.
+    If these are unavailable, it uses `on-demand` instances. To cut costs, set `spot_policy` to `spot`.
+    
+    If `dstack` can't find capacity, an error displays. To enable continuous capacity search, use `retry_policy` with a 
+    `limit`. For example, setting it to `30min` makes `dstack` search for capacity for 30 minutes.
 
-Here's the configuration that runs the training via `dstack`:
+    Note that spot instances are significantly cheaper but can be interrupted. Your code should ideally 
+    handle interruptions and resume work from saved checkpoints.
+
+## Running the task
+
+Here's the configuration that runs the training task via `dstack`:
 
 <div editor-title="llama-2/train.dstack.yml"> 
 
@@ -227,8 +244,13 @@ env:
   # (Required) Specify your Hugging Face token to publish the fine-tuned model
   - HUGGING_FACE_HUB_TOKEN=
 
+ports:
+  - 6006
+
 commands:
-  - pip install -r llama-2/requirements.txt
+  - echo "Installing requirements..."
+  - pip -q install -r llama-2/requirements.txt
+  - tensorboard --logdir results/runs &
   - python llama-2/train.py --merge_and_push ${{ run.args }}
 ```
 
@@ -240,12 +262,25 @@ Here's how you run it with `dstack`:
 
 ```shell
 $ dstack run . -f llama-2/train.dstack.yml --num_train_epochs 10 
+
+Installing requirements...
+TensorBoard 2.14.0 at http://127.0.0.1:6006/ (Press CTRL+C to quit)
+{'loss': 1.3491, 'learning_rate': 0.0002, 'epoch': 0.1}
+{'loss': 1.6299, 'learning_rate': 0.0002, 'epoch': 0.2}
+{'loss': 1.2071, 'learning_rate': 0.0002, 'epoch': 0.3}
 ```
 
 </div>
 
 `dstack` will provision the cloud instance corresponding to the configured project and profile, run the training, and
 tear down the cloud instance once the training is complete.
+
+??? info "Tensorboard"
+    Since we've executed `tensorboard` within our task and configured its port using `ports`,
+    you can access it using the URL provided in the output. `dstack` automatically forwards
+    the configured port to your local machine.
+
+    ![](images/finetuning-llama-2/tensorboard.png)
 
 !!! info "Source code"
     The complete and ready-to-run code for the example is available in our [GitHub repo](https://github.com/dstackai/dstack-examples).

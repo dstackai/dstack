@@ -194,17 +194,33 @@ Here's an example:
 
 ```yaml
 profiles:
-  - name: gpu-large
+  - name: gcp-t4
     project: gcp
+    
     resources:
-       memory: 48GB
-       gpu:
-         memory: 24GB
+      memory: 24GB
+      gpu:
+        name: T4
+        
     spot_policy: auto
+    retry_policy:
+      limit: 30min
+    max_duration: 1d
+      
     default: true
 ```
 
 </div>
+
+!!! info "Using spot instances"
+    If `spot_policy` is set to `auto`, `dstack` prioritizes spot instances.
+    If these are unavailable, it uses `on-demand` instances. To cut costs, set `spot_policy` to `spot`.
+    
+    If `dstack` can't find capacity, an error displays. To enable continuous capacity search, use `retry_policy` with a 
+    `limit`. For example, setting it to `30min` makes `dstack` search for capacity for 30 minutes.
+
+    Note that spot instances are significantly cheaper but can be interrupted. Your code should ideally 
+    handle interruptions and resume work from saved checkpoints.
 
 By default, the `dstack run` command uses the default profile.
 

@@ -169,16 +169,28 @@ Here's an example:
 
 ```yaml
 profiles:
-  - name: gpu-large
+  - name: gcp-large
     project: gcp
+    
     resources:
-       memory: 48GB
-       gpu:
-         memory: 24GB
+      memory: 24GB
+      gpu:
+        name: 48GB
+        
+    spot_policy: auto
+    max_duration: 1d
+      
     default: true
 ```
 
 </div>
+
+!!! info "Using spot instances"
+    If `spot_policy` is set to `auto`, `dstack` prioritizes spot instances.
+    If these are unavailable, it uses `on-demand` instances. To cut costs, set `spot_policy` to `spot`.
+    
+    Note that spot instances are significantly cheaper but can be interrupted. Your code should ideally 
+    handle interruptions and resume work from saved checkpoints.
 
 By default, the `dstack run` command uses the default profile.
 
