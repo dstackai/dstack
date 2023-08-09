@@ -1,4 +1,4 @@
-from typing import Dict, Optional
+from typing import Dict, List, Optional
 
 from pydantic import BaseModel, ValidationError
 from typing_extensions import Literal
@@ -14,8 +14,11 @@ class AzureConfig(BackendConfig, BaseModel):
     resource_group: str
     storage_account: str
     vault_url: str
-    network: str
-    subnet: str
+    extra_locations: List[str]
+    # network and subnet are location-dependent.
+    # Hub selects them dynamically when provisioning.
+    network: Optional[str]
+    subnet: Optional[str]
     credentials: Optional[Dict] = None
 
     def serialize(self) -> Dict:

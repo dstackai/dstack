@@ -28,14 +28,12 @@ async def get_backends(project: Project) -> List[Tuple[DBBackend, Backend]]:
     return await backends_cache.get_backends(project)
 
 
-async def get_backend_by_type(
-    project: Project, backend_type: str
-) -> Optional[Tuple[DBBackend, Backend]]:
+async def get_backend_by_type(project: Project, backend_type: str) -> Tuple[DBBackend, Backend]:
     backends = await backends_cache.get_backends(project)
     for db_backend, backend in backends:
         if db_backend.type == backend_type:
             return db_backend, backend
-    return None
+    _raise_backend_not_available_error(backend_type)
 
 
 async def get_run_backend(

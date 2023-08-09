@@ -51,6 +51,9 @@ from dstack._internal.core.instance import InstanceType, LaunchedInstanceInfo
 from dstack._internal.core.job import Job
 from dstack._internal.core.request import RequestHead, RequestStatus
 from dstack._internal.core.runners import Gpu, Resources, Runner
+from dstack._internal.utils.logging import get_logger
+
+logger = get_logger(__name__)
 
 
 class AzureCompute(Compute):
@@ -88,29 +91,12 @@ class AzureCompute(Compute):
         return choose_instance_type(instance_types=instance_types, requirements=job.requirements)
 
     def run_instance(self, job: Job, instance_type: InstanceType) -> LaunchedInstanceInfo:
-        vm = _launch_instance(
+        return _run_instance(
             compute_client=self._compute_client,
-            subscription_id=self.azure_config.subscription_id,
-            location=self.azure_config.location,
-            resource_group=self.azure_config.resource_group,
-            network_security_group=azure_utils.DSTACK_NETWORK_SECURITY_GROUP,
-            network=self.azure_config.network,
-            subnet=self.azure_config.subnet,
-            managed_identity=azure_utils.get_runner_managed_identity_name(
-                self.azure_config.storage_account
-            ),
-            image_reference=_get_image_ref(
-                self._compute_client,
-                self.azure_config.location,
-                len(instance_type.resources.gpus) > 0,
-            ),
-            vm_size=instance_type.instance_name,
-            instance_name=_get_instance_name(job),
-            user_data=_get_user_data_script(self.azure_config, job, instance_type),
-            ssh_pub_key=job.ssh_key_pub,
-            spot=instance_type.resources.spot,
+            azure_config=self.azure_config,
+            job=job,
+            instance_type=instance_type,
         )
-        return LaunchedInstanceInfo(request_id=vm.name, location=self.azure_config.location)
 
     def get_request_head(self, job: Job, request_id: Optional[str]) -> RequestHead:
         if request_id is None:
@@ -197,6 +183,63 @@ def _get_gpu_name_memory(vm_name: str) -> Tuple[str, int]:
         return "A10", 24 * num // 36 * 1024
 
 
+def _run_instance(
+    compute_client: ComputeManagementClient,
+    azure_config: AzureConfig,
+    job: Job,
+    instance_type: InstanceType,
+) -> LaunchedInstanceInfo:
+    locations = [azure_config.location] + azure_config.extra_locations
+    for location in locations:
+        logger.info(
+            "Requesting %s %s instance in %s...",
+            instance_type.instance_name,
+            "spot" if instance_type.resources.spot else "",
+            location,
+        )
+        try:
+            vm = _launch_instance(
+                compute_client=compute_client,
+                subscription_id=azure_config.subscription_id,
+                location=location,
+                resource_group=azure_config.resource_group,
+                network_security_group=azure_utils.get_default_network_security_group_name(
+                    storage_account=azure_config.storage_account, location=location
+                ),
+                network=azure_utils.get_default_network_name(
+                    storage_account=azure_config.storage_account,
+                    location=location,
+                ),
+                subnet=azure_utils.get_default_subnet_name(
+                    storage_account=azure_config.storage_account,
+                    location=location,
+                ),
+                managed_identity=azure_utils.get_runner_managed_identity_name(
+                    storage_account=azure_config.storage_account
+                ),
+                image_reference=_get_image_ref(
+                    compute_client=compute_client,
+                    location=location,
+                    cuda=len(instance_type.resources.gpus) > 0,
+                ),
+                vm_size=instance_type.instance_name,
+                instance_name=_get_instance_name(job),
+                user_data=_get_user_data_script(
+                    azure_config=_config_with_location(azure_config, location),
+                    job=job,
+                    instance_type=instance_type,
+                ),
+                ssh_pub_key=job.ssh_key_pub,
+                spot=instance_type.resources.spot,
+            )
+            logger.info("Request succeeded")
+            return LaunchedInstanceInfo(request_id=vm.name, location=location)
+        except NoCapacityError:
+            logger.info("Failed to request instance in %s", location)
+    logger.info("Failed to request instance")
+    raise NoCapacityError()
+
+
 def _get_instance_name(job: Job) -> str:
     # TODO support multiple jobs per run
     return f"dstack-{job.run_name}"
@@ -218,6 +261,14 @@ def _get_image_ref(
         gallery_image_name=image_name,
     )
     return ImageReference(community_gallery_image_id=image.unique_id)
+
+
+def _config_with_location(config: AzureConfig, location: str) -> AzureConfig:
+    new_config = config.copy()
+    new_config.location = location
+    new_config.network = azure_utils.get_default_network_name(config.storage_account, location)
+    new_config.subnet = azure_utils.get_default_subnet_name(config.storage_account, location)
+    return new_config
 
 
 def _get_user_data_script(azure_config: AzureConfig, job: Job, instance_type: InstanceType) -> str:

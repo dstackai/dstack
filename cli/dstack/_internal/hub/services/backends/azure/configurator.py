@@ -1,5 +1,6 @@
 import json
 import os
+from concurrent.futures import ThreadPoolExecutor
 from typing import Dict, List, Optional, Tuple, Union
 from uuid import UUID, uuid5
 
@@ -57,6 +58,7 @@ from dstack._internal.hub.schemas import (
     AzureBackendValues,
     BackendElement,
     BackendElementValue,
+    BackendMultiElement,
 )
 from dstack._internal.hub.services.backends.azure.azure_identity_credential_adapter import (
     AzureIdentityCredentialAdapter,
@@ -142,6 +144,9 @@ class AzureConfigurator(Configurator):
         backend_values.storage_account = self._get_storage_account_element(
             selected=backend_config.storage_account
         )
+        backend_values.extra_locations = self._get_extra_locations_element(
+            location=backend_config.location
+        )
         return backend_values
 
     def create_backend(
@@ -151,6 +156,7 @@ class AzureConfigurator(Configurator):
         self.subscription_id = backend_config.subscription_id
         self.location = backend_config.location
         self.storage_account = backend_config.storage_account
+        self.extra_locations = backend_config.extra_locations
         if backend_config.credentials.__root__.type == "client":
             self.credential = ClientSecretCredential(
                 tenant_id=backend_config.tenant_id,
@@ -163,7 +169,7 @@ class AzureConfigurator(Configurator):
         self._create_storage_container()
         self.vault_url = self._create_key_vault()
         self.runner_principal_id = self._create_runner_managed_identity()
-        self.network, self.subnet = self._create_network_resources()
+        self._create_network_resources()
         self._create_logs_resources()
         self._grant_roles_or_error()
         config_data = {
@@ -173,8 +179,7 @@ class AzureConfigurator(Configurator):
             "resource_group": self.resource_group,
             "storage_account": self.storage_account,
             "vault_url": self.vault_url,
-            "network": self.network,
-            "subnet": self.subnet,
+            "extra_locations": self.extra_locations,
         }
         auth_data = backend_config.credentials.__root__.dict()
         return config_data, auth_data
@@ -187,6 +192,7 @@ class AzureConfigurator(Configurator):
         subscription_id = json_config["subscription_id"]
         location = json_config["location"]
         storage_account = json_config["storage_account"]
+        extra_locations = json_config.get("extra_locations", [])
         if include_creds:
             auth_config = json.loads(db_backend.auth)
             return AzureBackendConfigWithCreds(
@@ -194,6 +200,7 @@ class AzureConfigurator(Configurator):
                 subscription_id=subscription_id,
                 location=location,
                 storage_account=storage_account,
+                extra_locations=extra_locations,
                 credentials=AzureBackendCreds.parse_obj(auth_config),
             )
         return AzureBackendConfig(
@@ -201,6 +208,7 @@ class AzureConfigurator(Configurator):
             subscription_id=subscription_id,
             location=location,
             storage_account=storage_account,
+            extra_locations=extra_locations,
         )
 
     def get_backend(self, db_backend: DBBackend) -> AzureBackend:
@@ -213,8 +221,7 @@ class AzureConfigurator(Configurator):
             resource_group=config_data["resource_group"],
             storage_account=config_data["storage_account"],
             vault_url=config_data["vault_url"],
-            network=config_data["network"],
-            subnet=config_data["subnet"],
+            extra_locations=config_data.get("extra_locations", []),
             credentials=auth_data,
         )
         return AzureBackend(config)
@@ -306,6 +313,15 @@ class AzureConfigurator(Configurator):
             element.selected = storage_accounts[0]
         return element
 
+    def _get_extra_locations_element(self, location: str) -> BackendMultiElement:
+        element = BackendMultiElement()
+        for l in LOCATION_VALUES:
+            if l == location:
+                continue
+            element.values.append(BackendElementValue(value=l, label=l))
+            element.selected.append(l)
+        return element
+
     def _get_resource_group(self) -> str:
         client = StorageManagementClient(
             credential=self.credential, subscription_id=self.subscription_id
@@ -363,25 +379,28 @@ class AzureConfigurator(Configurator):
             name=azure_utils.get_runner_managed_identity_name(self.storage_account),
         )
 
-    def _create_network_resources(self) -> Tuple[str, str]:
-        network_manager = NetworkManager(
-            credential=self.credential, subscription_id=self.subscription_id
-        )
-        network = network_manager.create_virtual_network(
-            resource_group=self.resource_group,
-            location=self.location,
-            name=azure_utils.get_default_network_name(self.storage_account),
-        )
-        subnet = network_manager.create_subnet(
-            resource_group=self.resource_group,
-            network=network,
-            name=azure_utils.get_default_subnet_name(self.storage_account),
-        )
-        network_manager.create_network_security_group(
-            resource_group=self.resource_group,
-            location=self.location,
-        )
-        return network, subnet
+    def _create_network_resources(self):
+        def func(location: str):
+            network_manager = NetworkManager(
+                credential=self.credential, subscription_id=self.subscription_id
+            )
+            network_manager.create_virtual_network(
+                resource_group=self.resource_group,
+                location=location,
+                name=azure_utils.get_default_network_name(self.storage_account, location),
+                subnet_name=azure_utils.get_default_subnet_name(self.storage_account, location),
+            )
+            network_manager.create_network_security_group(
+                resource_group=self.resource_group,
+                location=location,
+                name=azure_utils.get_default_network_security_group_name(
+                    self.storage_account, location
+                ),
+            )
+
+        with ThreadPoolExecutor(max_workers=8) as executor:
+            for location in [self.location] + self.extra_locations:
+                executor.submit(func, location)
 
     def _create_logs_resources(self):
         logs_manager = LogsManager(
@@ -607,53 +626,37 @@ class NetworkManager:
         self,
         resource_group: str,
         name: str,
+        subnet_name: str,
         location: str,
-    ):
+    ) -> Tuple[str, str]:
         network: VirtualNetwork = self.network_client.virtual_networks.begin_create_or_update(
             resource_group_name=resource_group,
             virtual_network_name=name,
             parameters=VirtualNetwork(
-                location=location, address_space=AddressSpace(address_prefixes=["10.0.0.0/16"])
+                location=location,
+                address_space=AddressSpace(address_prefixes=["10.0.0.0/16"]),
+                subnets=[
+                    Subnet(
+                        name=subnet_name,
+                        address_prefix="10.0.0.0/20",
+                    )
+                ],
             ),
         ).result()
-        return network.name
-
-    def create_subnet(
-        self,
-        resource_group: str,
-        network: str,
-        name: str,
-    ):
-        subnet: Subnet = self.network_client.subnets.begin_create_or_update(
-            resource_group_name=resource_group,
-            virtual_network_name=network,
-            subnet_name=name,
-            subnet_parameters=Subnet(address_prefix="10.0.0.0/20"),
-        ).result()
-        return subnet.name
+        return network.name, subnet_name
 
     def create_network_security_group(
         self,
         resource_group: str,
         location: str,
+        name: str,
     ):
         self.network_client.network_security_groups.begin_create_or_update(
             resource_group_name=resource_group,
-            network_security_group_name=azure_utils.DSTACK_NETWORK_SECURITY_GROUP,
+            network_security_group_name=name,
             parameters=NetworkSecurityGroup(
                 location=location,
                 security_rules=[
-                    SecurityRule(
-                        name="runner_service",
-                        protocol=SecurityRuleProtocol.TCP,
-                        source_address_prefix="Internet",
-                        source_port_range="*",
-                        destination_address_prefix="*",
-                        destination_port_range="3000-4000",
-                        access=SecurityRuleAccess.ALLOW,
-                        priority=101,
-                        direction=SecurityRuleDirection.INBOUND,
-                    ),
                     SecurityRule(
                         name="runner_ssh",
                         protocol=SecurityRuleProtocol.TCP,

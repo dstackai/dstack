@@ -123,7 +123,7 @@ class GCPCompute(Compute):
     def restart_instance(self, job: Job):
         _restart_instance(
             client=self.instances_client,
-            gcp_config=_change_config_zone(self.gcp_config, job.location),
+            gcp_config=_config_with_zone(self.gcp_config, job.location),
             instance_name=job.request_id,
         )
         return LaunchedInstanceInfo(request_id=job.request_id, location=job.location)
@@ -131,14 +131,14 @@ class GCPCompute(Compute):
     def terminate_instance(self, runner: Runner):
         _terminate_instance(
             client=self.instances_client,
-            gcp_config=_change_config_zone(self.gcp_config, runner.job.location),
+            gcp_config=_config_with_zone(self.gcp_config, runner.job.location),
             instance_name=runner.request_id,
         )
 
     def cancel_spot_request(self, runner: Runner):
         _terminate_instance(
             client=self.instances_client,
-            gcp_config=_change_config_zone(self.gcp_config, runner.job.location),
+            gcp_config=_config_with_zone(self.gcp_config, runner.job.location),
             instance_name=runner.request_id,
         )
 
@@ -172,7 +172,7 @@ class GCPCompute(Compute):
         )
 
 
-def _change_config_zone(config: GCPConfig, zone: str) -> GCPConfig:
+def _config_with_zone(config: GCPConfig, zone: str) -> GCPConfig:
     new_config = config.copy()
     new_config.zone = zone
     new_config.region = gcp_utils.get_zone_region(zone)
@@ -569,7 +569,7 @@ def _run_instance(
                 ),
                 instance_name=_get_instance_name(job),
                 user_data_script=_get_user_data_script(
-                    gcp_config=_change_config_zone(gcp_config, zone),
+                    gcp_config=_config_with_zone(gcp_config, zone),
                     job=job,
                     instance_type=instance_type,
                 ),

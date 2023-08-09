@@ -135,6 +135,7 @@ class AzureBackendConfigPartial(BaseModel):
     subscription_id: Optional[str]
     location: Optional[str]
     storage_account: Optional[str]
+    extra_locations: Optional[List[str]]
 
 
 class AzureBackendClientCreds(BaseModel):
@@ -163,6 +164,7 @@ class AzureBackendConfig(BaseModel):
     subscription_id: str
     location: str
     storage_account: str
+    extra_locations: List[str] = []
 
 
 class AzureBackendConfigWithCreds(AzureBackendConfig):
@@ -307,6 +309,7 @@ class AzureBackendValues(BaseModel):
     subscription_id: Optional[BackendElement]
     location: Optional[BackendElement]
     storage_account: Optional[BackendElement]
+    extra_locations: Optional[BackendMultiElement]
 
 
 class AWSStorageBackendValues(BaseModel):

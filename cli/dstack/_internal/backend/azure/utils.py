@@ -1,6 +1,5 @@
 DSTACK_CONTAINER_NAME = "dstack-container"
 DSTACK_LOGS_TABLE_NAME = "dstack_logs_CL"
-DSTACK_NETWORK_SECURITY_GROUP = "dstack-network-security-group"
 
 
 def get_resource_group_id(subscription_id: str, resource_group: str) -> str:
@@ -57,12 +56,16 @@ def get_key_vault_name(storage_account: str) -> str:
     return storage_account
 
 
-def get_default_network_name(storage_account: str) -> str:
-    return f"{storage_account}-default-network"
+def get_default_network_name(storage_account: str, location: str) -> str:
+    return f"{storage_account}-{location}-default-network"
 
 
-def get_default_subnet_name(storage_account: str) -> str:
-    return f"{storage_account}-default-subnet"
+def get_default_subnet_name(storage_account: str, location: str) -> str:
+    return f"{storage_account}-{location}-default-subnet"
+
+
+def get_default_network_security_group_name(storage_account: str, location: str) -> str:
+    return f"{storage_account}-{location}-default-security-group"
 
 
 def get_logs_workspace_name(storage_account: str) -> str:
