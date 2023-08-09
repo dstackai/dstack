@@ -1,20 +1,22 @@
-import React, { useCallback, useMemo } from 'react';
+import React, { useCallback } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useNavigate, useParams } from 'react-router-dom';
 import { debounce } from 'lodash';
 
-import { Box, Button, Container, Header, Loader, Popover, SpaceBetween, StatusIndicator } from 'components';
+import { Box, Button, ColumnLayout, Container, Header, Loader, Popover, SpaceBetween, StatusIndicator } from 'components';
 
 import { useAppSelector, useBreadcrumbs, useNotifications } from 'hooks';
 import { copyToClipboard } from 'libs';
 import { ROUTES } from 'routes';
-import { useGetProjectBackendsQuery } from 'services/backend';
-import { useDeleteProjectsMutation, useGetProjectQuery, useUpdateProjectMembersMutation } from 'services/project';
+import { useDeleteProjectBackendMutation, useGetProjectBackendsQuery } from 'services/backend';
+import { useGetProjectQuery, useUpdateProjectMembersMutation } from 'services/project';
 
 import { selectAuthToken, selectUserData } from 'App/slice';
 
 import { ProjectMembers } from '../../Members';
-import { getProjectRoleByUserName } from '../../utils';
+import { getLambdaStorageTypeLabel } from '../../utils';
+
+import { BackendTypesEnum } from '../../Backends/Form/types';
 
 import styles from './styles.module.scss';
 
@@ -22,22 +24,18 @@ export const ProjectSettings: React.FC = () => {
     const { t } = useTranslation();
     const params = useParams();
     const userData = useAppSelector(selectUserData);
-    const userName = userData?.user_name ?? '';
     const userGlobalRole = userData?.global_role ?? '';
     const paramProjectName = params.name ?? '';
     const navigate = useNavigate();
     const { data, isLoading } = useGetProjectQuery({ name: paramProjectName });
     const { data: backendsData, isLoading: isLoadingBackends } = useGetProjectBackendsQuery({ projectName: paramProjectName });
     const [updateProjectMembers] = useUpdateProjectMembersMutation();
-    const [, { isLoading: isDeleting }] = useDeleteProjectsMutation();
+    const [deleteBackend, { isLoading: isDeleting, originalArgs: deleteArgs }] = useDeleteProjectBackendMutation();
+
     const currentUserToken = useAppSelector(selectAuthToken);
     const [pushNotification] = useNotifications();
 
     const isLoadingPage = isLoading || !data || isLoadingBackends;
-
-    const isDisabledButtons = useMemo<boolean>(() => {
-        return isDeleting || !data || (getProjectRoleByUserName(data, userName) !== 'admin' && userGlobalRole !== 'admin');
-    }, [data, userName, userGlobalRole]);
 
     useBreadcrumbs([
         {
@@ -76,212 +74,239 @@ export const ProjectSettings: React.FC = () => {
 
     const debouncedMembersHandler = useCallback(debounce(changeMembersHandler, 1000), []);
 
-    const addBackendHandler = () => {
-        navigate(ROUTES.PROJECT.BACKEND.ADD.FORMAT(paramProjectName));
+    const renderAwsBackendDetails = (backend: IBackendAWSWithTitles): React.ReactNode => {
+        if (!data) return null;
+
+        const extraRegions = backend.extra_regions?.join(', ');
+
+        return (
+            <ColumnLayout columns={4} variant="text-grid">
+                <div>
+                    <Box variant="awsui-key-label">{t('projects.edit.backend_type')}</Box>
+                    <div>{t(`backend.type.${backend.type}`)}</div>
+                </div>
+
+                <div>
+                    <Box variant="awsui-key-label">{t('projects.edit.aws.region_name')}</Box>
+                    <div>{backend.region_name_title}</div>
+                </div>
+
+                <div>
+                    <Box variant="awsui-key-label">{t('projects.edit.aws.s3_bucket_name')}</Box>
+                    <div>{backend.s3_bucket_name}</div>
+                </div>
+
+                <div>
+                    <Box variant="awsui-key-label">{t('projects.edit.aws.ec2_subnet_id')}</Box>
+                    <div>{backend.ec2_subnet_id || '-'}</div>
+                </div>
+
+                <div>
+                    <Box variant="awsui-key-label">{t('projects.edit.aws.extra_regions')}</Box>
+
+                    <div style={{ whiteSpace: 'nowrap', textOverflow: 'ellipsis', overflow: 'hidden' }} title={extraRegions}>
+                        {extraRegions || '-'}
+                    </div>
+                </div>
+            </ColumnLayout>
+        );
     };
 
-    // const renderAwsBackendDetails = (): React.ReactNode => {
-    //     if (!data) return null;
-    //
-    //     const extraRegions = data.backend.extra_regions?.join(', ');
-    //
-    //     return (
-    //         <ColumnLayout columns={4} variant="text-grid">
-    //             <div>
-    //                 <Box variant="awsui-key-label">{t('projects.edit.backend_type')}</Box>
-    //                 <div>{t(`projects.backend_type.${data.backend.type}`)}</div>
-    //             </div>
-    //
-    //             <div>
-    //                 <Box variant="awsui-key-label">{t('projects.edit.aws.region_name')}</Box>
-    //                 <div>{data.backend.region_name_title}</div>
-    //             </div>
-    //
-    //             <div>
-    //                 <Box variant="awsui-key-label">{t('projects.edit.aws.s3_bucket_name')}</Box>
-    //                 <div>{data.backend.s3_bucket_name}</div>
-    //             </div>
-    //
-    //             <div>
-    //                 <Box variant="awsui-key-label">{t('projects.edit.aws.ec2_subnet_id')}</Box>
-    //                 <div>{data.backend.ec2_subnet_id || '-'}</div>
-    //             </div>
-    //
-    //             <div>
-    //                 <Box variant="awsui-key-label">{t('projects.edit.aws.extra_regions')}</Box>
-    //
-    //                 <div style={{ whiteSpace: 'nowrap', textOverflow: 'ellipsis', overflow: 'hidden' }} title={extraRegions}>
-    //                     {extraRegions || '-'}
-    //                 </div>
-    //             </div>
-    //         </ColumnLayout>
-    //     );
-    // };
-    //
-    // const renderAzureBackendDetails = (): React.ReactNode => {
-    //     if (!data) return null;
-    //
-    //     return (
-    //         <ColumnLayout columns={4} variant="text-grid">
-    //             <div>
-    //                 <Box variant="awsui-key-label">{t('projects.edit.backend_type')}</Box>
-    //                 <div>{t(`projects.backend_type.${data.backend.type}`)}</div>
-    //             </div>
-    //
-    //             <div>
-    //                 <Box variant="awsui-key-label">{t('projects.edit.azure.location')}</Box>
-    //                 <div>{data.backend.location}</div>
-    //             </div>
-    //
-    //             <div>
-    //                 <Box variant="awsui-key-label">{t('projects.edit.azure.storage_account')}</Box>
-    //                 <div>{data.backend.storage_account}</div>
-    //             </div>
-    //         </ColumnLayout>
-    //     );
-    // };
-    //
-    // const renderGCPBackendDetails = (): React.ReactNode => {
-    //     if (!data) return null;
-    //
-    //     return (
-    //         <ColumnLayout columns={4} variant="text-grid">
-    //             <div>
-    //                 <Box variant="awsui-key-label">{t('projects.edit.backend_type')}</Box>
-    //                 <div>{t(`projects.backend_type.${data.backend.type}`)}</div>
-    //             </div>
-    //
-    //             <div>
-    //                 <Box variant="awsui-key-label">{t('projects.edit.gcp.area')}</Box>
-    //                 <div>{data.backend.area}</div>
-    //             </div>
-    //
-    //             <div>
-    //                 <Box variant="awsui-key-label">{t('projects.edit.gcp.region')}</Box>
-    //                 <div>{data.backend.region}</div>
-    //             </div>
-    //
-    //             <div>
-    //                 <Box variant="awsui-key-label">{t('projects.edit.gcp.zone')}</Box>
-    //                 <div>{data.backend.zone}</div>
-    //             </div>
-    //
-    //             <div>
-    //                 <Box variant="awsui-key-label">{t('projects.edit.gcp.bucket_name')}</Box>
-    //                 <div>{data.backend.bucket_name}</div>
-    //             </div>
-    //
-    //             <div>
-    //                 <Box variant="awsui-key-label">{t('projects.edit.gcp.vpc')}</Box>
-    //                 <div>{data.backend.vpc}</div>
-    //             </div>
-    //
-    //             <div>
-    //                 <Box variant="awsui-key-label">{t('projects.edit.gcp.subnet')}</Box>
-    //                 <div>{data.backend.subnet}</div>
-    //             </div>
-    //         </ColumnLayout>
-    //     );
-    // };
-    //
-    // const renderLambdaBackendDetails = (): React.ReactNode => {
-    //     if (!data) return null;
-    //
-    //     const regions = data.backend.regions ? data.backend.regions.join(', ') : '';
-    //
-    //     return (
-    //         <ColumnLayout columns={4} variant="text-grid">
-    //             <div>
-    //                 <Box variant="awsui-key-label">{t('projects.edit.backend_type')}</Box>
-    //                 <div>{t(`projects.backend_type.${data.backend.type}`)}</div>
-    //             </div>
-    //
-    //             <div>
-    //                 <Box variant="awsui-key-label">{t('projects.edit.lambda.regions')}</Box>
-    //                 <div style={{ whiteSpace: 'nowrap', textOverflow: 'ellipsis', overflow: 'hidden' }} title={regions}>
-    //                     {regions}
-    //                 </div>
-    //             </div>
-    //
-    //             <div>
-    //                 <Box variant="awsui-key-label">{t('projects.edit.lambda.storage_backend.type')}</Box>
-    //                 <div>{getLambdaStorageTypeLabel(data.backend.storage_backend.type)}</div>
-    //             </div>
-    //
-    //             <div>
-    //                 <Box variant="awsui-key-label">{t('projects.edit.lambda.storage_backend.s3_bucket_name')}</Box>
-    //                 <div>{data.backend.storage_backend.bucket_name}</div>
-    //             </div>
-    //         </ColumnLayout>
-    //     );
-    // };
-    //
-    // const renderLocalBackendDetails = (): React.ReactNode => {
-    //     if (!data) return null;
-    //
-    //     return (
-    //         <ColumnLayout variant="text-grid">
-    //             <div>
-    //                 <Box variant="awsui-key-label">{t('projects.edit.backend_type')}</Box>
-    //                 <div>{t(`projects.backend_type.${data.backend.type}`)}</div>
-    //             </div>
-    //
-    //             <div>
-    //                 <Box variant="awsui-key-label">{t('projects.edit.local.path')}</Box>
-    //                 <div>{data.backend.path}</div>
-    //             </div>
-    //         </ColumnLayout>
-    //     );
-    // };
+    const renderAzureBackendDetails = (backend: IBackendAzure): React.ReactNode => {
+        if (!data) return null;
 
-    // const renderBackendDetails = () => {
-    //     switch (data?.backend.type) {
-    //         case BackendTypesEnum.AWS: {
-    //             return renderAwsBackendDetails();
-    //         }
-    //         case BackendTypesEnum.AZURE: {
-    //             return renderAzureBackendDetails();
-    //         }
-    //         case BackendTypesEnum.GCP: {
-    //             return renderGCPBackendDetails();
-    //         }
-    //         case BackendTypesEnum.LAMBDA: {
-    //             return renderLambdaBackendDetails();
-    //         }
-    //         case 'local': {
-    //             return renderLocalBackendDetails();
-    //         }
-    //         default:
-    //             return null;
-    //     }
-    // };
+        return (
+            <ColumnLayout columns={4} variant="text-grid">
+                <div>
+                    <Box variant="awsui-key-label">{t('projects.edit.backend_type')}</Box>
+                    <div>{t(`backend.type.${backend.type}`)}</div>
+                </div>
+
+                <div>
+                    <Box variant="awsui-key-label">{t('projects.edit.azure.location')}</Box>
+                    <div>{backend.location}</div>
+                </div>
+
+                <div>
+                    <Box variant="awsui-key-label">{t('projects.edit.azure.storage_account')}</Box>
+                    <div>{backend.storage_account}</div>
+                </div>
+            </ColumnLayout>
+        );
+    };
+
+    const renderGCPBackendDetails = (backend: IBackendGCP): React.ReactNode => {
+        if (!data) return null;
+
+        return (
+            <ColumnLayout columns={4} variant="text-grid">
+                <div>
+                    <Box variant="awsui-key-label">{t('projects.edit.backend_type')}</Box>
+                    <div>{t(`backend.type.${backend.type}`)}</div>
+                </div>
+
+                <div>
+                    <Box variant="awsui-key-label">{t('projects.edit.gcp.area')}</Box>
+                    <div>{backend.area}</div>
+                </div>
+
+                <div>
+                    <Box variant="awsui-key-label">{t('projects.edit.gcp.region')}</Box>
+                    <div>{backend.region}</div>
+                </div>
+
+                <div>
+                    <Box variant="awsui-key-label">{t('projects.edit.gcp.zone')}</Box>
+                    <div>{backend.zone}</div>
+                </div>
+
+                <div>
+                    <Box variant="awsui-key-label">{t('projects.edit.gcp.bucket_name')}</Box>
+                    <div>{backend.bucket_name}</div>
+                </div>
+
+                <div>
+                    <Box variant="awsui-key-label">{t('projects.edit.gcp.vpc')}</Box>
+                    <div>{backend.vpc}</div>
+                </div>
+
+                <div>
+                    <Box variant="awsui-key-label">{t('projects.edit.gcp.subnet')}</Box>
+                    <div>{backend.subnet}</div>
+                </div>
+            </ColumnLayout>
+        );
+    };
+
+    const renderLambdaBackendDetails = (backend: IBackendLambda): React.ReactNode => {
+        if (!data) return null;
+
+        const regions = backend.regions ? backend.regions.join(', ') : '';
+
+        return (
+            <ColumnLayout columns={4} variant="text-grid">
+                <div>
+                    <Box variant="awsui-key-label">{t('projects.edit.backend_type')}</Box>
+                    <div>{t(`backend.type.${backend.type}`)}</div>
+                </div>
+
+                <div>
+                    <Box variant="awsui-key-label">{t('projects.edit.lambda.regions')}</Box>
+                    <div style={{ whiteSpace: 'nowrap', textOverflow: 'ellipsis', overflow: 'hidden' }} title={regions}>
+                        {regions}
+                    </div>
+                </div>
+
+                <div>
+                    <Box variant="awsui-key-label">{t('projects.edit.lambda.storage_backend.type')}</Box>
+                    <div>{getLambdaStorageTypeLabel(backend.storage_backend.type)}</div>
+                </div>
+
+                <div>
+                    <Box variant="awsui-key-label">{t('projects.edit.lambda.storage_backend.s3_bucket_name')}</Box>
+                    <div>{backend.storage_backend.bucket_name}</div>
+                </div>
+            </ColumnLayout>
+        );
+    };
+
+    const renderLocalBackendDetails = (backend: IBackendLocal): React.ReactNode => {
+        if (!data) return null;
+
+        return (
+            <ColumnLayout variant="text-grid">
+                <div>
+                    <Box variant="awsui-key-label">{t('projects.edit.backend_type')}</Box>
+                    <div>{t(`backend.type.${backend.type}`)}</div>
+                </div>
+
+                <div>
+                    <Box variant="awsui-key-label">{t('projects.edit.local.path')}</Box>
+                    <div>{backend.path}</div>
+                </div>
+            </ColumnLayout>
+        );
+    };
+
+    const renderBackendDetails = (backend: IProjectBackend) => {
+        switch (backend.config.type) {
+            case BackendTypesEnum.AWS: {
+                return renderAwsBackendDetails(backend.config);
+            }
+            case BackendTypesEnum.AZURE: {
+                return renderAzureBackendDetails(backend.config);
+            }
+            case BackendTypesEnum.GCP: {
+                return renderGCPBackendDetails(backend.config);
+            }
+            case BackendTypesEnum.LAMBDA: {
+                return renderLambdaBackendDetails(backend.config);
+            }
+            case 'local': {
+                return renderLocalBackendDetails(backend.config);
+            }
+            default:
+                return null;
+        }
+    };
+
+    const goToBackendDetails = (backendName: IProjectBackend['name']) => {
+        navigate(ROUTES.PROJECT.BACKEND.EDIT.FORMAT(paramProjectName, backendName));
+    };
+
+    const getDeleteBackendAction = (backendName: IProjectBackend['name']) => () => {
+        deleteBackend({
+            projectName: paramProjectName,
+            backends: [backendName],
+        });
+    };
+
+    if (isLoadingPage)
+        return (
+            <Container>
+                <Loader />
+            </Container>
+        );
 
     return (
         <>
-            {isLoadingPage && (
-                <Container>
-                    <Loader />
-                </Container>
-            )}
-
-            {data && (
+            {data && backendsData && (
                 <SpaceBetween size="l">
-                    <Container
-                        header={
-                            <Header
-                                variant="h2"
-                                actions={
-                                    <Button onClick={addBackendHandler} disabled={isDisabledButtons}>
-                                        {t('common.add')}
-                                    </Button>
+                    {backendsData.map((backend) => {
+                        const isDisabledButtons = isDeleting && deleteArgs?.backends.includes(backend.name);
+
+                        return (
+                            <Container
+                                key={backend.name}
+                                header={
+                                    <Header
+                                        variant="h2"
+                                        actions={
+                                            <SpaceBetween direction="horizontal" size="s">
+                                                <Button
+                                                    disabled={isDisabledButtons}
+                                                    onClick={() => goToBackendDetails(backend.name)}
+                                                >
+                                                    {t('common.edit')}
+                                                </Button>
+
+                                                <Button
+                                                    disabled={isDisabledButtons}
+                                                    onClick={getDeleteBackendAction(backend.name)}
+                                                >
+                                                    {t('common.delete')}
+                                                </Button>
+                                            </SpaceBetween>
+                                        }
+                                    >
+                                        {backend.name}
+                                    </Header>
                                 }
                             >
-                                {t('backend.page_title_other')}
-                            </Header>
-                        }
-                    >
-                        {/*{renderBackendDetails()}*/}
-                    </Container>
+                                {renderBackendDetails(backend)}
+                            </Container>
+                        );
+                    })}
 
                     <Container
                         header={

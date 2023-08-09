@@ -47,7 +47,8 @@
   "backend": {
     "page_title_one": "Backend",
     "page_title_other": "Backends",
-    "add_page_title_one": "Add backend",
+    "add_backend": "Add backend",
+    "edit_backend": "Edit backend",
     "type": {
       "aws": "AWS",
       "aws_description": "Run workflows and store data in Amazon Web Services ",
@@ -59,6 +60,14 @@
       "lambda_description": "Run workflows and store data in Lambda",
       "local": "Local",
       "local_description": "Run workflows and store data locally via Docker"
+    },
+
+    "edit": {
+      "success_notification": "Project updating is successful"
+    },
+
+    "create": {
+      "success_notification": "Project is created"
     }
   },
 
@@ -187,7 +196,6 @@
         "role": "Project role"
       },
       "error_notification": "Update project error",
-      "success_notification": "Project updating is successful",
       "validation": {
         "user_name_format": "Only letters, numbers, - or _"
       }

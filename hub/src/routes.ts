@@ -63,7 +63,8 @@ export const ROUTES = {
             },
             EDIT: {
                 TEMPLATE: `/projects/:name/backends/:backend`,
-                FORMAT: (name: string, backend: string) => buildRoute(ROUTES.PROJECT.BACKEND.EDIT.TEMPLATE, { name, backend }),
+                FORMAT: (name: string, backendName: string) =>
+                    buildRoute(ROUTES.PROJECT.BACKEND.EDIT.TEMPLATE, { name, backend: backendName }),
             },
         },
     },

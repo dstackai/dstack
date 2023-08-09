@@ -57,6 +57,10 @@ export const ProjectDetails: React.FC = () => {
         navigate(ROUTES.PROJECT.DETAILS.SETTINGS.FORMAT(paramProjectName));
     };
 
+    const addBackendHandler = () => {
+        navigate(ROUTES.PROJECT.BACKEND.ADD.FORMAT(paramProjectName));
+    };
+
     const isSettingsPage = pathname === ROUTES.PROJECT.DETAILS.SETTINGS.FORMAT(paramProjectName);
 
     return (
@@ -68,14 +72,22 @@ export const ProjectDetails: React.FC = () => {
                         deleteAction={isSettingsPage ? toggleDeleteConfirm : undefined}
                         deleteDisabled={isDisabledButtons}
                         actionButtons={
-                            !isSettingsPage ? (
-                                <Button
-                                    href={ROUTES.PROJECT.DETAILS.SETTINGS.FORMAT(paramProjectName)}
-                                    onClick={goToProjectSettings}
-                                >
-                                    {t('common.settings')}
-                                </Button>
-                            ) : null
+                            <>
+                                {isSettingsPage && (
+                                    <Button onClick={addBackendHandler} disabled={isDisabledButtons}>
+                                        {t('backend.add_backend')}
+                                    </Button>
+                                )}
+
+                                {!isSettingsPage ? (
+                                    <Button
+                                        href={ROUTES.PROJECT.DETAILS.SETTINGS.FORMAT(paramProjectName)}
+                                        onClick={goToProjectSettings}
+                                    >
+                                        {t('common.settings')}
+                                    </Button>
+                                ) : null}
+                            </>
                         }
                     />
                 }

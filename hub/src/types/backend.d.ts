@@ -131,8 +131,8 @@ declare interface IBackendAWSWithTitles extends IBackendAWS {
     region_name_title: string,
 }
 
-declare type TBackendConfig = IBackendAWS | IBackendAzure | IBackendGCP | IBackendLambda | IBackendLocal
-declare interface IBackend {
+declare type TBackendConfig = IBackendAWSWithTitles | IBackendAzure | IBackendGCP | IBackendLambda | IBackendLocal
+declare interface IProjectBackend {
     name: string
     config: TBackendConfig
 }

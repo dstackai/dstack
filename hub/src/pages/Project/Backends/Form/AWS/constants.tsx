@@ -92,5 +92,3 @@ export const ADDITIONAL_REGIONS_HELP = {
         </>
     ),
 };
-
-//  \`backend\.\$\{([A-z\_\.]*)\}`

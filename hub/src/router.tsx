@@ -5,7 +5,7 @@ import { Navigate } from 'react-router-dom';
 import App from 'App';
 import { Logout } from 'App/Logout';
 import { ProjectAdd, ProjectDetails, ProjectList, ProjectSettings } from 'pages/Project';
-import { BackendAdd } from 'pages/Project/Backends';
+import { BackendAdd, BackendEdit } from 'pages/Project/Backends';
 import { RepositoryDetails, RepositoryList, RepositorySettings } from 'pages/Repositories';
 import { Artifacts as RunArtifacts, List as MainRunList, Logs as RunLogs, RunDetails, RunList } from 'pages/Runs';
 import { TagDetails, TagList } from 'pages/Tags';
@@ -45,6 +45,11 @@ export const router = createBrowserRouter([
                     {
                         path: ROUTES.PROJECT.BACKEND.ADD.TEMPLATE,
                         element: <BackendAdd />,
+                    },
+
+                    {
+                        path: ROUTES.PROJECT.BACKEND.EDIT.TEMPLATE,
+                        element: <BackendEdit />,
                     },
                 ],
             },

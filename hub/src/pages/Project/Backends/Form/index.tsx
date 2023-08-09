@@ -37,7 +37,7 @@ export const BackendForm: React.FC<IProps> = ({ initialValues, onCancel, loading
 
     const backendOptions: TBackendOption[] = useMemo(() => {
         return Object.values(BackendTypesEnum).map((type) => {
-            const disabled: boolean = loading || !backendTypesData;
+            const disabled: boolean = !!initialValues || loading || !backendTypesData;
 
             return {
                 label: t(`backend.type.${type}`),
