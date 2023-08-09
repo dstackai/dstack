@@ -38,6 +38,8 @@ peft==0.4.0
 bitsandbytes==0.40.2
 transformers==4.31.0
 trl==0.4.7
+scipy
+tensorboard
 ```
 
 </div>
@@ -102,6 +104,7 @@ def create_and_prepare_trainer(model, tokenizer, dataset, args):
         warmup_ratio=args.warmup_ratio,
         group_by_length=args.group_by_length,
         lr_scheduler_type=args.lr_scheduler_type,
+        report_to="tensorboard",
     )
 
     peft_config = LoraConfig(
