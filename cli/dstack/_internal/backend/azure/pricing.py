@@ -3,26 +3,15 @@ from typing import Dict, Optional
 
 import requests
 
-from dstack._internal.backend.base.pricing import BasePricing, RegionSpot
+from dstack._internal.backend.base.pricing import DEFAULT_TTL, BasePricing
 from dstack._internal.core.instance import InstanceType
-
-DEFAULT_TTL = 24 * 60 * 60  # 24 hours
 
 
 class AzurePricing(BasePricing):
     def __init__(self):
+        super().__init__()
         self.endpoint = "https://prices.azure.com/api/retail/prices"
-        # instance -> { region_spot -> price }
-        self.cache: Dict[str, Dict[RegionSpot, float]] = {}
         self.last_updated: Dict[str, float] = {}
-
-    def _put_instance(self, item: dict):
-        name = item["armSkuName"]
-        spot = "Spot" in item["meterName"]
-        region = item["armRegionName"]
-        if name not in self.cache:
-            self.cache[name] = {}
-        self.cache[name][(region, spot)] = item["retailPrice"]
 
     def _fetch(self, query: str, ttl: int = DEFAULT_TTL):
         now = time.time()
@@ -34,16 +23,15 @@ class AzurePricing(BasePricing):
         data = r.json()
         while True:
             for item in data["Items"]:
-                self._put_instance(item)
+                region_spot = (item["armRegionName"], "Spot" in item["meterName"])
+                self.cache[item["armSkuName"]][region_spot] = item["retailPrice"]
             next_page = data["NextPageLink"]
             if not next_page:
                 break
             data = requests.get(next_page).json()
         self.last_updated[query] = now
 
-    def estimate_instance(
-        self, instance: InstanceType, spot: Optional[bool] = None
-    ) -> Dict[RegionSpot, float]:
+    def fetch(self, instance: InstanceType, spot: Optional[bool]):
         filters = [
             "serviceName eq 'Virtual Machines'",
             "priceType eq 'Consumption'",
@@ -62,9 +50,3 @@ class AzurePricing(BasePricing):
                 )
             )
         self._fetch(" and ".join(filters))
-        return {
-            (r, s): v
-            for (r, s), v in self.cache[instance.instance_name].items()
-            if (not instance.available_regions or r in instance.available_regions)
-            and (spot is None or spot is s)
-        }
