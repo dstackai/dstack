@@ -240,6 +240,9 @@ Here's the configuration that runs the training task via `dstack`:
 ```yaml
 type: task
 
+# (Optional) When not specified, your local Python version is used
+python: "3.11"
+
 env: 
   # (Required) Specify your Hugging Face token to publish the fine-tuned model
   - HUGGING_FACE_HUB_TOKEN=
