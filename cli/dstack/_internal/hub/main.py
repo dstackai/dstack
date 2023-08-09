@@ -1,5 +1,6 @@
 import os
 import time
+from contextlib import asynccontextmanager
 
 import pkg_resources
 from fastapi import FastAPI, Request
@@ -31,7 +32,6 @@ from dstack._internal.hub.routers import (
     users,
 )
 from dstack._internal.hub.schemas import LocalBackendConfig
-from dstack._internal.hub.services.backends import local_backend_available
 from dstack._internal.hub.utils.logging import configure_logger
 from dstack._internal.hub.utils.ssh import generate_hub_ssh_key_pair
 from dstack._internal.utils import logging
@@ -40,7 +40,22 @@ configure_logger()
 logger = logging.get_logger(__name__)
 
 
-app = FastAPI(docs_url="/api/docs")
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    await migrate()
+    admin_user = await update_admin_user()
+    await create_default_project(admin_user)
+    scheduler = start_background_tasks()
+    url = f"http://{os.getenv('DSTACK_HUB_HOST')}:{os.getenv('DSTACK_HUB_PORT')}"
+    url_with_token = f"{url}?token={admin_user.token}"
+    create_default_project_config(url, admin_user.token)
+    generate_hub_ssh_key_pair()
+    print(f"The server is available at {url_with_token}")
+    yield
+    scheduler.shutdown()
+
+
+app = FastAPI(docs_url="/api/docs", lifespan=lifespan)
 app.include_router(users.router)
 app.include_router(projects.router)
 app.include_router(backends.root_router)
@@ -61,19 +76,6 @@ app.include_router(gateways.router)
 
 
 DEFAULT_PROJECT_NAME = "main"
-
-
-@app.on_event("startup")
-async def startup_event():
-    await migrate()
-    admin_user = await update_admin_user()
-    await create_default_project(admin_user)
-    url = f"http://{os.getenv('DSTACK_HUB_HOST')}:{os.getenv('DSTACK_HUB_PORT')}"
-    url_with_token = f"{url}?token={admin_user.token}"
-    create_default_project_config(url, admin_user.token)
-    start_background_tasks()
-    generate_hub_ssh_key_pair()
-    print(f"The server is available at {url_with_token}")
 
 
 @app.middleware("http")

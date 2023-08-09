@@ -53,7 +53,7 @@ command.
 If you have specific commands that need to be executed before the dev environment starts, you can now use
 the `init` property in YAML.
 
-You can find more details on the updated syntax of `.dstack.yml` in the [Reference](../../docs/reference/dstack.yml.md)
+You can find more details on the updated syntax of `.dstack.yml` in the [Reference](../../docs/reference/dstack.yml/index.md)
 section.
 
 ## Spot and retry policies

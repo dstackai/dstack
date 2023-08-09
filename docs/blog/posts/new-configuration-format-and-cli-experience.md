@@ -26,7 +26,7 @@ The format of the YAML files has been entirely reworked.
 Now you can put them anywhere within your project.
 The configuration file must be named with the suffix `.dstack.yml` (e.g. `.dstack.yml` or `app.dstack.yml`.) 
 
-2. **Type:** The format of the files has been [changed](../../docs/reference/dstack.yml.md). 
+2. **Type:** The format of the files has been [changed](../../docs/reference/dstack.yml/index.md). 
     The `provider` property has been replaced with `type` that supports two possible values: `dev-environment` and `task`.
     
     ### Dev environments

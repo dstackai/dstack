@@ -1,8 +1,6 @@
 # Quickstart
 
-:material-palette:
-
-`dstack` makes it very easy for ML teams to automate running dev environments and tasks in their cloud.
+`dstack` is an open-source tool that streamlines LLM development and deployment across multiple clouds.
 
 ## Installation
 
@@ -22,7 +20,7 @@ The server is available at http://127.0.0.1:3000?token=b934d226-e24a-4eab-eb92b3
 !!! info "Projects"
     On startup, the server sets up a default project that runs everything locally. 
     To run workloads in your cloud, log into the UI, create the corresponding project, 
-    and [configure](guides/projects) the CLI to use it.
+    and [configure](projects.md) the CLI to use it.
 
 ## Initialization
 
@@ -91,7 +89,7 @@ A task can be either a batch job, such as training or fine-tuning a model, or a 
 
 [//]: # (TODO: Mention pre-built)
 
-For more details on the syntax of configuration file, refer to the [`.dstack.yml` Reference](../docs/reference/dstack.yml.md).
+For more details on the syntax of configuration file, refer to the [`.dstack.yml` Reference](../docs/reference/dstack.yml/index.md).
 
 ## Running
 
@@ -161,7 +159,7 @@ For more details on how the `dstack run` command works, refer to the [CLI Refere
 
 ## Profiles
 
-If you have [configured](guides/projects.md) a project that runs dev environments and tasks in the cloud, you can define multiple
+If you have [configured](projects.md) a project that runs dev environments and tasks in the cloud, you can define multiple
 profiles. Each profile can configure the project to use and the resources required for the run.
 
 To define profiles, create the `profiles.yml` file in the `.dstack` folder within your project directory. Here's an example:

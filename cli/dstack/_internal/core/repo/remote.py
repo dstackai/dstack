@@ -119,8 +119,10 @@ class RemoteRepo(Repo):
             repo_data = RemoteRepoData.from_url(self.repo_url, parse_ssh_config=True)
             repo_data.repo_branch = tracking_branch.remote_head
             repo_data.repo_hash = tracking_branch.commit.hexsha
-            repo_data.repo_config_name = repo.config_reader().get_value("user", "name")
-            repo_data.repo_config_email = repo.config_reader().get_value("user", "email")
+            repo_data.repo_config_name = repo.config_reader().get_value("user", "name", "") or None
+            repo_data.repo_config_email = (
+                repo.config_reader().get_value("user", "email", "") or None
+            )
             repo_data.repo_diff = _repo_diff_verbose(repo, repo_data.repo_hash)
         elif self.repo_url is not None:
             repo_data = RemoteRepoData.from_url(self.repo_url, parse_ssh_config=True)

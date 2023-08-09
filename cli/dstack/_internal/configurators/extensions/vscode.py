@@ -3,16 +3,21 @@ from typing import List, Optional
 
 from dstack._internal.cli.utils.common import console
 from dstack._internal.configurators.extensions import IDEExtension
+from dstack._internal.core.plan import RunPlan
 
 
 class VSCodeDesktop(IDEExtension):
     def __init__(
-        self, extensions: List[str], version: Optional[str] = None, run_name: Optional[str] = None
+        self,
+        extensions: List[str],
+        version: Optional[str] = None,
+        run_name: Optional[str] = None,
+        run_plan: Optional[RunPlan] = None,
     ):
         self.extensions = extensions
         if version is None:
             version = self._detect_code_version()
-        if version is None:
+        if version is None and run_plan is None:
             console.print(
                 "[grey58]Unable to detect the VS Code version and pre-install extensions. "
                 "Fix by opening [sea_green3]Command Palette[/sea_green3], executing [sea_green3]Shell Command: "
@@ -23,36 +28,32 @@ class VSCodeDesktop(IDEExtension):
 
     def get_install_commands(self) -> List[str]:
         commands = []
-        if self.version is None:
-            return
-        url = (
-            f"https://update.code.visualstudio.com/commit:{self.version}/server-linux-$arch/stable"
-        )
-        archive = "vscode-server-linux-$arch.tar.gz"
-        target = f'~/.vscode-server/bin/"{self.version}"'
-        commands.extend(
-            [
-                f'if [ $(uname -m) = "aarch64" ]; then arch="arm64"; else arch="x64"; fi',
-                f"mkdir -p /tmp",
-                f'wget -q --show-progress "{url}" -O "/tmp/{archive}"',
-                f"mkdir -vp {target}",
-                f'tar --no-same-owner -xz --strip-components=1 -C {target} -f "/tmp/{archive}"',
-                f'rm "/tmp/{archive}"',
-            ]
-        )
-        if self.extensions:
-            extensions = " ".join(f'--install-extension "{name}"' for name in self.extensions)
-            commands.append(f'PATH="$PATH":{target}/bin code-server {extensions}')
+        if self.version is not None:
+            url = f"https://update.code.visualstudio.com/commit:{self.version}/server-linux-$arch/stable"
+            archive = "vscode-server-linux-$arch.tar.gz"
+            target = f'~/.vscode-server/bin/"{self.version}"'
+            commands.extend(
+                [
+                    f'if [ $(uname -m) = "aarch64" ]; then arch="arm64"; else arch="x64"; fi',
+                    f"mkdir -p /tmp",
+                    f'wget -q --show-progress "{url}" -O "/tmp/{archive}"',
+                    f"mkdir -vp {target}",
+                    f'tar --no-same-owner -xz --strip-components=1 -C {target} -f "/tmp/{archive}"',
+                    f'rm "/tmp/{archive}"',
+                ]
+            )
+            if self.extensions:
+                extensions = " ".join(f'--install-extension "{name}"' for name in self.extensions)
+                commands.append(f'PATH="$PATH":{target}/bin code-server {extensions}')
         return commands
 
     def get_install_if_not_found_commands(self) -> List[str]:
-        if self.version is None:
-            return
         commands = []
-        install_commands = " && ".join(self.get_install_commands())
-        commands.append(
-            f'if [ ! -d ~/.vscode-server/bin/"{self.version}" ]; then {install_commands}; fi'
-        )
+        if self.version is not None:
+            install_commands = " && ".join(self.get_install_commands())
+            commands.append(
+                f'if [ ! -d ~/.vscode-server/bin/"{self.version}" ]; then {install_commands}; fi'
+            )
         return commands
 
     def get_print_readme_commands(self) -> List[str]:

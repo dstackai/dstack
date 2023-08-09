@@ -23,13 +23,15 @@ Cost-effective LLM development
 [![PyPI - License](https://img.shields.io/pypi/l/dstack?style=flat-square&color=blue)](https://github.com/dstackai/dstack/blob/master/LICENSE.md)
 </div>
 
-`dstack` is an open-source tool that simplifies LLM development across multiple clouds.
+`dstack` is an open-source tool that streamlines LLM development and deployment across multiple clouds.
 
-It streamlines development and deployment, reduces cloud costs, and frees users from vendor lock-in.
+It helps reduce cloud costs, improve availability, and frees you from cloud vendor lock-in.
 
 ## Latest news
 
-- [2023/07] [Port mapping, max duration, and more](https://dstack.ai/examples/vllm) (Release)
+- [2023/08] [Fine-tuning with Llama 2](https://dstack.ai/examples/finetuning-llama-2) (Example)
+- [2023/08] [An early preview of services](https://dstack.ai/blog/2023/08/07/services-preview) (Release)
+- [2023/07] [Port mapping, max duration, and more](https://dstack.ai/blog/2023/07/25/port-mapping-max-duration-and-more) (Release)
 - [2023/07] [Serving with vLLM](https://dstack.ai/examples/vllm) (Example)
 - [2023/07] [LLM as Chatbot](https://dstack.ai/examples/llmchat) (Example)
 - [2023/07] [Lambda Cloud GA and Docker support](https://dstack.ai/blog/2023/07/14/lambda-cloud-ga-and-docker-support/) (Release)  
@@ -44,9 +46,8 @@ pip install "dstack[aws,gcp,azure,lambda]"
 dstack start
 ```
 
-On startup, the server sets up a default project that runs everything locally.
-To run dev environments and tasks in the cloud, log into the UI, create the corresponding project,
-and [configure](https://dstack.ai/docs/guides/projects) the CLI to use it.
+To run dev environments, tasks, and services in the cloud, log into the UI, and
+configure create the [corresponding project](https://dstack.ai/docs/projects).
 
 ## Configurations
 
@@ -57,9 +58,12 @@ A configuration is a YAML file that describes what you want to run.
 > you can name the configuration file `.dstack.yml` or `app.dstack.yml`. You can define
 > these configurations anywhere within your project.
 
-Configurations can be of two types: `dev-environment` and `task`.
+Configurations can be of three types: `dev-environment`, `task`, and `service`.
 
-Below is a configuration that runs a dev environment with a pre-built environment to which you can connect via VS Code Desktop.
+### Dev environments
+
+A dev environment is a virtual machine with a pre-configured IDE.
+Here's an example of such a configuration:
 
 ```yaml
 type: dev-environment
@@ -70,46 +74,52 @@ init:
 ide: vscode
 ```
 
-Here's an example of a task configuration.
+### Tasks
+
 A task can be either a batch job, such as training or fine-tuning a model, or a web application.
+Here's an example of a task configuration.
 
 ```yaml
 type: task
 
-ports:
-  - 7860
-
 commands:
   - pip install -r requirements.txt
-  - python app.py
+  - python train.py
+```
+
+### Services
+
+A service is an application that is accessible through a public endpoint
+managed by `dstack`.
+Here's an example of service:
+
+```yaml
+type: service
+
+gateway: ${{ secrets.GATEWAY_ADDRESS }}
+
+port: 8000
+
+commands:
+  - python -m http.server 8000
 ```
 
 ## CLI
 
-To run a configuration, use the [`dstack run`](https://dstack.ai/docs/reference/cli/run.md) command and pass the path to the
-directory with the configuration.
+To run a configuration, use the [`dstack run`](https://dstack.ai/docs/reference/cli/run.md) command followed by 
+working directory and the path to the configuration file.
 
 ```shell
-$ dstack run . 
-
- RUN          CONFIGURATION  USER   PROJECT  INSTANCE  RESOURCES        SPOT
- fast-moth-1  .dstack.yml    admin  local    -         5xCPUs, 15987MB  auto  
-
-Starting SSH tunnel...
-
-To open in VS Code Desktop, use this link:
-  vscode://vscode-remote/ssh-remote+fast-moth-1/workflow
-
-To exit, press Ctrl+C.
+dstack run . -f serve.dstack.yml
 ```
 
-The CLI automatically provisions the required cloud resources and forwards the ports to your local machine.
-If you interrupt the run, the cloud resources will be released automatically.
+`dstack` automatically provisions cloud resources based on the settings
+of the configured project.
 
 ## Profiles
 
-The `.dstack/profiles.yml` file allows to describe multiple profiles.
-ach profile can configure the project to use and the resources required for the run.
+The `.dstack/profiles.yml` file allows describing multiple profiles.
+Each profile can specify the project to use and the resources required for the run.
 
 ```yaml
 profiles:
@@ -119,11 +129,12 @@ profiles:
        memory: 48GB
        gpu:
          memory: 24GB
+    spot_policy: auto
     default: true
 ```
 
 If you have configured the default profile, the `dstack run` command will use it automatically.
-Otherwise, you can always specify the profile using `--profile PROFILE`.
+Otherwise, you can always pass the profile using `--profile` to `dstack run`.
 
 ## More information
 

@@ -1,4 +1,4 @@
-#/bin/bash
+#!/bin/bash
 
 image_definition=$1
 image_name=$2
@@ -10,7 +10,7 @@ exit 1
 fi
 
 resource_group=dstack-resources-westeurope
-gallery_name=dstack_gallery_westeurope
+gallery_name=dstack_gallery_westeurope_gen2
 
 function get_image_definition {
     az sig image-definition show \
@@ -32,7 +32,8 @@ function create_image_definition() {
         --offer dstack \
         --sku $image_definition \
         --os-type Linux \
-        --os-state generalized
+        --os-state generalized \
+        --hyper-v-generation V2
 }
 
 function create_image_version() {

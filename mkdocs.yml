@@ -3,7 +3,7 @@ site_name: dstack
 site_url: https://dstack.ai
 site_author: dstack GmbH
 site_description: >-
-  dstack is an open-source tool that simplifies LLM development across multiple clouds.
+  dstack is an open-source tool that streamlines LLM development and deployment across multiple clouds.
 
 # Repository
 repo_url: https://github.com/dstackai/dstack
@@ -71,10 +71,8 @@ plugins:
         'quickstart.md': 'docs/index.md'
         'docs/quick-start.md': 'docs/index.md'
         'docs/installation/index.md': 'docs/index.md'
-        'tutorials/dolly.md': 'examples/dolly.md'
         'tutorials/stable-diffusion.md': 'examples/stable-diffusion.md'
-        'tutorials/tensorboard.md': 'examples/tensorboard.md'
-        'tutorials/wandb.md': 'examples/wandb.md'
+        'docs/guides/projects.md': 'docs/projects.md'
   - typeset
 
 # Extensions
@@ -143,13 +141,17 @@ nav:
               - pip: docs/installation/pip.md
               - Docker: docs/installation/docker.md
               - HF Spaces: docs/installation/hf-spaces.md
+          - Projects: docs/projects.md
       - Guides:
           - Dev environments: docs/guides/dev-environments.md
           - Tasks: docs/guides/tasks.md
+          - Services: docs/guides/services.md
 #          - Artifacts: docs/guides/artifacts.md
-          - Projects: docs/guides/projects.md
       - Reference:
-          - .dstack.yml: docs/reference/dstack.yml.md
+          - .dstack.yml:
+              - "type: dev-environment": docs/reference/dstack.yml/dev-environment.md
+              - "type: task": docs/reference/dstack.yml/task.md
+              - "type: service": docs/reference/dstack.yml/service.md
           - profiles.yml: docs/reference/profiles.yml.md
           - CLI:
               - dstack run: docs/reference/cli/run.md
@@ -176,9 +178,10 @@ nav:
   - Examples:
     - examples/index.md
     - Examples:
-      - SDXL with FastAPI: examples/stable-diffusion-xl.md
-      - Serving with TGI: examples/text-generation-inference.md
-      - Serving with vLLM: examples/vllm.md
+      - Fine-tuning Llama 2: examples/finetuning-llama-2.md
+      - Serving SDXL with FastAPI: examples/stable-diffusion-xl.md
+      - Serving LLMs with vLLM: examples/vllm.md
+      - Serving LLMs with TGI: examples/text-generation-inference.md
       - LLM as Chatbot: examples/llmchat.md
   - Blog:
       - blog/index.md

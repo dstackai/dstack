@@ -17,4 +17,4 @@ On startup, the server sets up a default project that runs everything locally.
 
 !!! info "Projects"
     To run dev environments and tasks in your cloud, log into the UI, create the corresponding project, 
-    and [configure](../guides/projects.md) the CLI to use it.
+    and [configure](../projects.md) the CLI to use it.

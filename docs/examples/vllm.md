@@ -1,4 +1,4 @@
-# Serving with vLLM
+# Serving LLMs with vLLM
 
 Serving LLMs can be slow, even on expensive hardware. This example demonstrates how to utilize the 
 [`vllm`](https://vllm.ai/) library to serve LLMs with optimized performance.
@@ -16,7 +16,7 @@ To try `vllm` with `dstack`, follow the instructions below.
 ## Prerequisites
 
 !!! info "NOTE:"
-    Before using `dstack` with a particular cloud, make sure to [configure](../docs/guides/projects.md) the corresponding project.
+    Before using `dstack` with a particular cloud, make sure to [configure](../docs/projects.md) the corresponding project.
 
 Each LLM model requires specific resources. To inform `dstack` about the required resources, you need to 
 [define](../docs/reference/profiles.yml.md) a profile via the `.dstack/profiles.yaml` file within your project.

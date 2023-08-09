@@ -19,7 +19,8 @@ from dstack._internal.cli.utils.ssh_tunnel import PortsLock, run_ssh_tunnel
 from dstack._internal.cli.utils.watcher import LocalCopier, SSHCopier, Watcher
 from dstack._internal.configurators import JobConfigurator
 from dstack._internal.core.app import AppSpec
-from dstack._internal.core.job import Job, JobErrorCode, JobHead, JobStatus
+from dstack._internal.core.instance import InstanceType
+from dstack._internal.core.job import ConfigurationType, Job, JobErrorCode, JobHead, JobStatus
 from dstack._internal.core.plan import RunPlan
 from dstack._internal.core.profile import Profile
 from dstack._internal.core.request import RequestStatus
@@ -334,8 +335,15 @@ def _run_container_ssh_tunnel(hub_client: HubClient, run_name: str, ports_lock: 
 
 
 def _poll_logs_ws(hub_client: HubClient, job: Job, ports: Dict[int, int]):
+    hostname = "127.0.0.1"
+    secure = False
+    if job.configuration_type == ConfigurationType.SERVICE:
+        hostname = job.gateway.hostname
+        secure = job.gateway.secure
+        ports = {**ports, job.gateway.service_port: job.gateway.public_port}
+
     def on_message(ws: WebSocketApp, message):
-        message = fix_urls(message, job, ports, hostname="127.0.0.1")
+        message = fix_urls(message, job, ports, hostname=hostname, secure=secure)
         sys.stdout.buffer.write(message)
         sys.stdout.buffer.flush()
 

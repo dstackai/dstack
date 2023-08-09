@@ -25,10 +25,12 @@ commands:
 
 </div>
 
+For more details on the syntax of `.dstack.yml`, refer to the [Reference](../reference/dstack.yml/task.md).
+
 ## Running a task
 
 To run a task, use the `dstack run` command followed by the path to the directory you want to use as the
-working directory during development.
+working directory.
 
 If your configuration file has a name different from `.dstack.yml`, pass the path to it using the `-f` argument.
 
@@ -182,7 +184,7 @@ If you prefer to use your custom Docker image, use the `image` property in the c
 
 ## Profiles
 
-If you [configured](projects.md) a project that uses a cloud backend, you can define profiles that specify the
+If you [configured](../projects.md) a project that uses a cloud backend, you can define profiles that specify the
 project and the cloud resources to be used.
 
 To configure a profile, simply create the `profiles.yml` file in the `.dstack` folder within your project directory. 
@@ -198,6 +200,7 @@ profiles:
        memory: 48GB
        gpu:
          memory: 24GB
+    spot_policy: auto
     default: true
 ```
 

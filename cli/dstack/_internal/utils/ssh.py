@@ -1,6 +1,7 @@
 import os
 import re
 import subprocess
+import sys
 from pathlib import Path
 
 from filelock import FileLock
@@ -27,7 +28,7 @@ def try_ssh_key_passphrase(identity_file: PathLike, passphrase: str = "") -> boo
     r = subprocess.run(
         ["ssh-keygen", "-y", "-P", passphrase, "-f", identity_file],
         stdout=subprocess.DEVNULL,
-        stderr=subprocess.DEVNULL,
+        stderr=sys.stdout.buffer,
     )
     return r.returncode == 0
 

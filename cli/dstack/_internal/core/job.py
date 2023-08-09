@@ -26,6 +26,7 @@ class Gateway(BaseModel):
     hostname: str
     service_port: int
     public_port: int = 80
+    secure: bool = False
     ssh_key: Optional[str]
     sock_path: Optional[str]
 
@@ -50,6 +51,8 @@ class Requirements(BaseModel):
         res += f", {self.memory_mib}MB"
         if self.gpus:
             res += f", {self.gpus.count}x{self.gpus.name or 'GPU'}"
+            if self.gpus.memory_mib:
+                res += f" {self.gpus.memory_mib / 1024:g}GB"
         return res
 
 

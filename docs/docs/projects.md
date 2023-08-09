@@ -1,9 +1,9 @@
 # Projects
 
-A project allows you to configure where to run dev environments, pipelines, and apps, as well as manage users that 
+A project allows you to configure where to run dev environments, tasks, and services, as well as manage users that 
 access it.
 
-At startup, `dstack` sets up a default project for local execution. To run dev environments, pipelines, and apps in your
+At startup, `dstack` sets up a default project for local execution. To run dev environments, tasks, and services in your
 desired cloud account (AWS, GCP, Azure, etc.), you must create the corresponding project and configure the `dstack` CLI to use it.
 
 !!! info "NOTE:"
@@ -13,7 +13,7 @@ desired cloud account (AWS, GCP, Azure, etc.), you must create the corresponding
 
 To create a new project, log in to the Hub application, open the `Projects` page, and click the `Add` button.
 
-![](../../assets/images/dstack-hub-create-project.png){ width=800 }
+![](../assets/images/dstack-hub-create-project.png){ width=800 }
 
 Then, you need to select the type of backend where you want to provision infrastructure and store data, and provide the corresponding backend settings.
 For instructions specific to a particular cloud, please refer to the relevant sections below.
@@ -22,31 +22,31 @@ For instructions specific to a particular cloud, please refer to the relevant se
     To use AWS, you will require an S3 bucket for storing state and artifacts, as well as credentials to access the 
     corresponding cloud services.
 
-    [Learn more →](../reference/backends/aws.md){ .md-button .md-button--primary }
+    [Learn more →](reference/backends/aws.md){ .md-button .md-button--primary }
 
 ??? info "GCP"
     To use GCP, you will require a cloud bucket for storing state and artifacts, as well as a
     service account to access the corresponding cloud services.
 
-    [Learn more →](../reference/backends/gcp.md){ .md-button .md-button--primary }
+    [Learn more →](reference/backends/gcp.md){ .md-button .md-button--primary }
 
 ??? info "Azure"
     To use Azure, you will require a storage account for storing state and artifacts, as well as Azure AD app credentials
     to access the corresponding cloud services.
 
-    [Learn more →](../reference/backends/azure.md){ .md-button .md-button--primary }
+    [Learn more →](reference/backends/azure.md){ .md-button .md-button--primary }
 
 ??? info "Lambda"
     To use Lambda, you will need an S3 bucket for storing state and artifacts, along with AWS credentials and a Lambda Cloud
     API key.
 
-    [Learn more →]( ../reference/backends/lambda.md){ .md-button .md-button--primary }
+    [Learn more →](reference/backends/lambda.md){ .md-button .md-button--primary }
 
 ## Configuring the CLI
 
 Once you have created the project, you will find the `CLI` code snippet in its `Settings`. 
 
-![](../../assets/images/dstack-hub-view-project.png){ width=800 }
+![](../assets/images/dstack-hub-view-project.png){ width=800 }
 
 Execute this code in the terminal to configure the project with the CLI.
 

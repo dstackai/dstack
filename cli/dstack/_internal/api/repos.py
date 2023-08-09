@@ -121,7 +121,7 @@ def check_remote_repo_credentials(
             raise InvalidRepoCredentialsError(f"Can't access the {identity_file} private SSH key")
         if not try_ssh_key_passphrase(identity_file):
             raise InvalidRepoCredentialsError(
-                f"Can't access `{url}`: the {identity_file} private SSH key must passphrase-less"
+                f"Can't access `{url}`: ensure the `{identity_file}` private SSH key is valid and passphrase-free"
             )
         with open(identity_file, "r") as f:
             private_key = f.read()

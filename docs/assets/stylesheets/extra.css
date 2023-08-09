@@ -1197,11 +1197,11 @@ html .md-footer-meta.md-typeset a:is(:focus,:hover) {
     padding-right: 10px;
 }
 
-[data-md-color-primary=white] .md-button:hover {
+/*[data-md-color-primary=white] .md-button:hover {
     background: inherit;
     color: inherit;
     border-color: inherit;
-}
+}*/
 
 /*
 [data-md-color-primary=white] .md-button--primary:hover {
