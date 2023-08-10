@@ -165,9 +165,9 @@ export const RunDetails: React.FC = () => {
             });
     };
 
-    const isDisabledAbortButton = !runData || !isAvailableAbortingForRun(runData) || isStopping || isDeleting;
-    const isDisabledStopButton = !runData || !isAvailableStoppingForRun(runData) || isStopping || isDeleting;
-    const isDisabledDeleteButton = !runData || !isAvailableDeletingForRun(runData) || isStopping || isDeleting;
+    const isDisabledAbortButton = !runData || !isAvailableAbortingForRun(runData.run_head.status) || isStopping || isDeleting;
+    const isDisabledStopButton = !runData || !isAvailableStoppingForRun(runData.run_head.status) || isStopping || isDeleting;
+    const isDisabledDeleteButton = !runData || !isAvailableDeletingForRun(runData.run_head.status) || isStopping || isDeleting;
 
     return (
         <div className={styles.page}>
@@ -204,42 +204,37 @@ export const RunDetails: React.FC = () => {
                         <ColumnLayout columns={4} variant="text-grid">
                             <div>
                                 <Box variant="awsui-key-label">{t('projects.run.configuration')}</Box>
-                                <div>{runData.job_heads?.[0].configuration_path}</div>
+                                <div>{runData.run_head.job_heads?.[0].configuration_path}</div>
                             </div>
 
                             <div>
                                 <Box variant="awsui-key-label">{t('projects.run.instance')}</Box>
-                                <div>{runData.job_heads?.[0].instance_type}</div>
+                                <div>{runData.run_head.job_heads?.[0].instance_type}</div>
                             </div>
 
                             <div>
                                 <Box variant="awsui-key-label">{t('projects.run.hub_user_name')}</Box>
-                                <div>{runData.hub_user_name}</div>
+                                <div>{runData.run_head.hub_user_name}</div>
                             </div>
 
                             <div>
                                 <Box variant="awsui-key-label">{t('projects.run.status')}</Box>
                                 <div>
-                                    <StatusIndicator type={getStatusIconType(runData.status)}>
-                                        {t(`projects.run.statuses.${runData.status}`)}
+                                    <StatusIndicator type={getStatusIconType(runData.run_head.status)}>
+                                        {t(`projects.run.statuses.${runData.run_head.status}`)}
                                     </StatusIndicator>
                                 </div>
                             </div>
 
                             <div>
                                 <Box variant="awsui-key-label">{t('projects.run.submitted_at')}</Box>
-                                <div>{format(new Date(runData.submitted_at), DATE_TIME_FORMAT)}</div>
+                                <div>{format(new Date(runData.run_head.submitted_at), DATE_TIME_FORMAT)}</div>
                             </div>
 
-                            <div>
-                                <Box variant="awsui-key-label">{t('projects.run.artifacts_count')}</Box>
-                                <div>{runData.artifact_heads?.length ?? '-'}</div>
-                            </div>
-
-                            {runData.job_heads?.[0].error_code && (
+                            {runData.run_head.job_heads?.[0].error_code && (
                                 <div>
                                     <Box variant="awsui-key-label">{t('projects.run.error')}</Box>
-                                    <div>{runData.job_heads?.[0].error_code}</div>
+                                    <div>{runData.run_head.job_heads?.[0].error_code}</div>
                                 </div>
                             )}
                         </ColumnLayout>

@@ -1,34 +1,19 @@
-import React, { useMemo } from 'react';
+import React from 'react';
 import { useTranslation } from 'react-i18next';
 import { useParams } from 'react-router-dom';
-import { format } from 'date-fns';
 
-import {
-    Button,
-    Header,
-    ListEmptyMessage,
-    NavigateLink,
-    Pagination,
-    SpaceBetween,
-    StatusIndicator,
-    Table,
-    TextFilter,
-} from 'components';
+import { Button, Header, ListEmptyMessage, Pagination, SpaceBetween, Table, TextFilter } from 'components';
 
-import { DATE_TIME_FORMAT } from 'consts';
-import { useCollection, useNotifications } from 'hooks';
-import { getStatusIconType } from 'libs/run';
-import { ROUTES } from 'routes';
-import { useDeleteRunsMutation, useGetRunsQuery, useStopRunsMutation } from 'services/run';
+import { useCollection } from 'hooks';
+import { useGetRunsQuery } from 'services/run';
 
-import { isAvailableAbortingForRun, isAvailableDeletingForRun, isAvailableStoppingForRun } from '../utils';
+import { useAbortRuns, useColumnsDefinitions, useDeleteRuns, useDisabledStatesForButtons, useStopRuns } from './hooks';
 
 export const RunList: React.FC = () => {
     const { t } = useTranslation();
     const params = useParams();
     const paramProjectName = params.name ?? '';
     const paramRepoId = params.repoId ?? '';
-    const [pushNotification] = useNotifications();
 
     const { data, isLoading } = useGetRunsQuery(
         {
@@ -41,54 +26,11 @@ export const RunList: React.FC = () => {
         },
     );
 
-    const [stopRun, { isLoading: isStopping }] = useStopRunsMutation();
-    const [deleteRun, { isLoading: isDeleting }] = useDeleteRunsMutation();
+    const { stopRuns, isStopping } = useStopRuns();
+    const { abortRuns, isAborting } = useAbortRuns();
+    const { deleteRuns, isDeleting } = useDeleteRuns();
 
-    const COLUMN_DEFINITIONS = [
-        {
-            id: 'run_name',
-            header: t('projects.run.run_name'),
-            cell: (item: IRun) => (
-                <NavigateLink href={ROUTES.PROJECT.DETAILS.RUNS.DETAILS.FORMAT(paramProjectName, paramRepoId, item.run_name)}>
-                    {item.run_name}
-                </NavigateLink>
-            ),
-        },
-        {
-            id: 'configuration',
-            header: `${t('projects.run.configuration')}`,
-            cell: (item: IRun) => item.job_heads?.[0].configuration_path,
-        },
-        {
-            id: 'instance',
-            header: `${t('projects.run.instance')}`,
-            cell: (item: IRun) => item.job_heads?.[0].instance_type,
-        },
-        {
-            id: 'hub_user_name',
-            header: `${t('projects.run.hub_user_name')}`,
-            cell: (item: IRun) => item.hub_user_name,
-        },
-        {
-            id: 'status',
-            header: t('projects.run.status'),
-            cell: (item: IRun) => (
-                <StatusIndicator type={getStatusIconType(item.status)}>
-                    {t(`projects.run.statuses.${item.status}`)}
-                </StatusIndicator>
-            ),
-        },
-        {
-            id: 'submitted_at',
-            header: t('projects.run.submitted_at'),
-            cell: (item: IRun) => format(new Date(item.submitted_at), DATE_TIME_FORMAT),
-        },
-        {
-            id: 'artifacts',
-            header: t('projects.run.artifacts_count'),
-            cell: (item: IRun) => item.artifact_heads?.length ?? '-',
-        },
-    ];
+    const { columns } = useColumnsDefinitions();
     const renderEmptyMessage = (): React.ReactNode => {
         return (
             <ListEmptyMessage title={t('projects.run.empty_message_title')} message={t('projects.run.empty_message_text')} />
@@ -117,89 +59,32 @@ export const RunList: React.FC = () => {
     const abortClickHandle = () => {
         if (!selectedItems?.length) return;
 
-        stopRun({
-            name: paramProjectName,
-            repo_id: paramRepoId,
-            run_names: selectedItems.map((item) => item.run_name),
-            abort: true,
-        })
-            .unwrap()
-            .then(() => actions.setSelectedItems([]))
-            .catch((error) => {
-                pushNotification({
-                    type: 'error',
-                    content: t('common.server_error', { error: error?.error }),
-                });
-            });
+        abortRuns([...selectedItems]).then(() => actions.setSelectedItems([]));
     };
 
     const stopClickHandle = () => {
         if (!selectedItems?.length) return;
 
-        stopRun({
-            name: paramProjectName,
-            repo_id: paramRepoId,
-            run_names: selectedItems.map((item) => item.run_name),
-            abort: false,
-        })
-            .unwrap()
-            .then(() => actions.setSelectedItems([]))
-            .catch((error) => {
-                pushNotification({
-                    type: 'error',
-                    content: t('common.server_error', { error: error?.error }),
-                });
-            });
+        stopRuns([...selectedItems]).then(() => actions.setSelectedItems([]));
     };
 
     const deleteClickHandle = () => {
         if (!selectedItems?.length) return;
 
-        deleteRun({
-            name: paramProjectName,
-            repo_id: paramRepoId,
-            run_names: selectedItems.map((item) => item.run_name),
-        })
-            .unwrap()
-            .catch((error) => {
-                pushNotification({
-                    type: 'error',
-                    content: t('common.server_error', { error: error?.error }),
-                });
-            });
+        deleteRuns([...selectedItems]).catch(console.log);
     };
 
-    const isDisabledAbortButton = useMemo<boolean>(() => {
-        return (
-            !selectedItems?.length ||
-            selectedItems.some((item) => !isAvailableAbortingForRun(item.status)) ||
-            isStopping ||
-            isDeleting
-        );
-    }, [selectedItems, isStopping, isDeleting]);
-
-    const isDisabledStopButton = useMemo<boolean>(() => {
-        return (
-            !selectedItems?.length ||
-            selectedItems.some((item) => !isAvailableStoppingForRun(item.status)) ||
-            isStopping ||
-            isDeleting
-        );
-    }, [selectedItems, isStopping, isDeleting]);
-
-    const isDisabledDeleteButton = useMemo<boolean>(() => {
-        return (
-            !selectedItems?.length ||
-            selectedItems.some((item) => !isAvailableDeletingForRun(item.status)) ||
-            isStopping ||
-            isDeleting
-        );
-    }, [selectedItems, isStopping, isDeleting]);
+    const { isDisabledAbortButton, isDisabledStopButton, isDisabledDeleteButton } = useDisabledStatesForButtons({
+        selectedRuns: selectedItems,
+        isStopping,
+        isAborting,
+        isDeleting,
+    });
 
     return (
         <Table
             {...collectionProps}
-            columnDefinitions={COLUMN_DEFINITIONS}
+            columnDefinitions={columns}
             items={items}
             loading={isLoading}
             loadingText={t('common.loading')}

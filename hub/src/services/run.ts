@@ -40,7 +40,7 @@ export const runApi = createApi({
                     : ['AllRuns'],
         }),
 
-        getRuns: builder.query<IRun[], TRunsRequestParams>({
+        getRuns: builder.query<IRunListItem[], TRunsRequestParams>({
             query: ({ name, ...body }) => {
                 return {
                     url: API.PROJECTS.RUNS_LIST(name),
@@ -50,10 +50,12 @@ export const runApi = createApi({
             },
 
             providesTags: (result) =>
-                result ? [...result.map(({ run_name }) => ({ type: 'Runs' as const, id: run_name })), 'Runs'] : ['Runs'],
+                result
+                    ? [...result.map(({ run_head: { run_name } }) => ({ type: 'Runs' as const, id: run_name })), 'Runs']
+                    : ['Runs'],
         }),
 
-        getRun: builder.query<IRun | undefined, TRunsRequestParams>({
+        getRun: builder.query<IRunListItem | undefined, TRunsRequestParams>({
             query: ({ name, ...body }) => {
                 return {
                     url: API.PROJECTS.RUNS_LIST(name),
@@ -62,13 +64,13 @@ export const runApi = createApi({
                 };
             },
 
-            transformResponse: (response: IRun[]) => response[0],
+            transformResponse: (response: IRunListItem[]) => response[0],
 
             providesTags: (result) =>
                 result
                     ? [
-                          { type: 'Runs' as const, id: result?.run_name },
-                          { type: 'AllRuns' as const, id: result?.run_name },
+                          { type: 'Runs' as const, id: result?.run_head.run_name },
+                          { type: 'AllRuns' as const, id: result?.run_head.run_name },
                       ]
                     : [],
         }),

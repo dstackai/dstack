@@ -97,7 +97,9 @@ declare interface IRunHead {
 
 declare interface IRunListItem {
     project: string,
-    repo: IRunRepo;
+    repo_id: null | string,
+    backend: TBackendType,
+    repo: null | IRunRepo;
     run_head: IRunHead
 }
 
@@ -105,3 +107,4 @@ declare interface IRun extends Omit<IRunHead, 'configuration_path'> {
     repo: IRunRepo,
     repo_user_id: string,
 }
+
