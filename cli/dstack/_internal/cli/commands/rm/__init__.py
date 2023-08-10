@@ -37,12 +37,12 @@ class RMCommand(BasicCommand):
             and (args.yes or Confirm.ask(f"[red]Delete the run '{args.run_name}'?[/]"))
         ) or (args.all and (args.yes or Confirm.ask("[red]Delete all runs?[/]"))):
             hub_client = get_hub_client(project_name=args.project)
-            run_heads = hub_client.list_runs(args.run_name)
-            if len(run_heads) == 0 and args.run_name:
+            run_infos = hub_client.list_runs(args.run_name)
+            if len(run_infos) == 0 and args.run_name:
                 console.print(f"Cannot find the run '{args.run_name}'")
                 exit(1)
-            for run_head in run_heads:
-                hub_client.delete_run(run_head.run_name)
+            for run_info in run_infos:
+                hub_client.delete_run(run_info.run_head.run_name)
             console.print(f"[grey58]OK[/]")
         else:
             if not args.run_name and not args.all:
