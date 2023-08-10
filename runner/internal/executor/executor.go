@@ -6,14 +6,15 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
-	"github.com/docker/go-connections/nat"
-	"github.com/dstackai/dstack/runner/internal/gateway"
 	"io"
 	"os"
 	"path"
 	"path/filepath"
 	"strconv"
 	"time"
+
+	"github.com/docker/go-connections/nat"
+	"github.com/dstackai/dstack/runner/internal/gateway"
 
 	"github.com/dstackai/dstack/runner/internal/backend/base"
 
@@ -143,6 +144,14 @@ func (ex *Executor) Run(ctx context.Context) error {
 			if err != nil {
 				return gerrors.Wrap(err)
 			}
+			if job.MaxDurationExceeded() {
+				log.Info(runCtx, "Job max duration exceeded")
+				if job.TerminationPolicy == consts.STOP_POLICY {
+					job.Status = states.Stopping
+				} else {
+					job.Status = states.Terminating
+				}
+			}
 			if job.Status == states.Stopping {
 				log.Info(runCtx, "Stopped")
 				ex.Stop(false)
@@ -157,15 +166,6 @@ func (ex *Executor) Run(ctx context.Context) error {
 				log.Info(runCtx, "Waiting job end")
 				errRun := <-erCh
 				job.Status = states.Terminated
-				_ = ex.backend.UpdateState(runCtx)
-				return errRun
-			}
-			if job.MaxDurationExceeded() {
-				log.Info(runCtx, "Job max duration exceeded. Stopping...")
-				ex.Stop(false)
-				log.Info(runCtx, "Waiting job end")
-				errRun := <-erCh
-				job.Status = states.Stopped
 				_ = ex.backend.UpdateState(runCtx)
 				return errRun
 			}

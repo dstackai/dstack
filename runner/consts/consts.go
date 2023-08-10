@@ -39,3 +39,8 @@ const DELAY_READ_STATUS = 5 * time.Second
 
 const REPO_HTTPS_URL = "https://%s/%s/%s.git"
 const REPO_GIT_URL = "git@%s:%s/%s.git"
+
+const (
+	TERMINATE_POLICY = "terminate"
+	STOP_POLICY      = "stop"
+)
