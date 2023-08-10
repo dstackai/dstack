@@ -69,8 +69,13 @@ $ dstack secrets add GATEWAY_ADDRESS 98.71.213.179
     can use the gateway created in AWS, GCP, or Azure. Just make sure to create a secret in Lambda Cloud that
     references the correct gateway address.
 
-For more details, check the [`dstack gateway`](../reference/cli/gateway.md) 
-and [`dstack secrets`](../reference/cli/secrets.md) commands' reference pages.
+For more details, check the [`dstack gateway`](../reference/cli/gateway.md) and [`dstack secrets`](../reference/cli/secrets.md) commands' reference pages.
+
+## Custom domains
+
+You can use a custom domain with your service. To do this, create an `A` DNS record that points to the gateway
+address (e.g. `98.71.213.179`). Then, instead of using the gateway address (`98.71.213.179`), 
+specify your domain name as the `GATEWAY_ADDRESS` secret.
 
 ## Running a service
 
@@ -98,12 +103,7 @@ Serving HTTP on http://98.71.213.179:80/ ...
 This command deploys the service, and forwards the traffic to the gateway, 
 providing you with a public endpoint.
 
-??? info "Endpoint URL"
-    By default, the public endpoint URL is `<gateway address>:80`. If you want to run multiple services on the same gateway,
-    you have two options. You can either map a custom domain to the gateway address (and pass it to the secret), or you can
-    configure a custom port mapping in YAML (instead of `8000`, specify `<gateway port>:8000`).
-
-??? info "Using .gitignore"
+??? info ".gitignore"
     When running a service, `dstack` uses the exact version of code that is present in the folder where you
     use the `dstack run` command.
 
@@ -112,6 +112,16 @@ providing you with a public endpoint.
     running dev environments or tasks.
 
 For more details on the `dstack run` command, refer to the [Reference](../reference/cli/run.md).
+
+## Endpoint URL
+
+By default, the public endpoint URL is `http://<gateway address>`. If you want to run multiple services on the same gateway,
+currently, the best approach is to use [custom domains](#custom-domains).
+For development purposes, it may be enough to use a custom port mapping in YAML (instead of `8000`,
+specify `<gateway port>:8000`).
+
+!!! info "HTTPS"
+    HTTPS support is scheduled to be included in the 0.11 release of `dstack` (planned for August 2023).
 
 ## Profiles
 
@@ -140,7 +150,7 @@ profiles:
 
 </div>
 
-!!! info "Using spot instances"
+!!! info "Spot instances"
     If `spot_policy` is set to `auto`, `dstack` prioritizes spot instances.
     If these are unavailable, it uses `on-demand` instances. To cut costs, set `spot_policy` to `spot`.
 

@@ -35,14 +35,14 @@ $ dstack init
 
 </div>
 
-## Configurations
+## Configuration files
 
-A configuration is a YAML file that describes what you want to run with `dstack`. Configurations can be of two
-types: `dev-environment` and `task`.
+A configuration is a YAML file that describes what you want to run with `dstack`. Configurations can be of three
+types: `dev-environment`, `task`, and `service`.
 
 ### Dev environments
 
-Here's an example of a `dev-environment` configuration:
+A dev environment is a virtual machine pre-configured an IDE.
 
 <div editor-title=".dstack.yml"> 
 
@@ -57,11 +57,11 @@ ide: vscode
 
 </div>
 
-This configuration runs a dev environment with a pre-built environment to which you can connect via VS Code Desktop.
+Once it's live, you can open it in your local VS Code by clicking the provided URL in the output.
 
 ### Tasks
 
-Here's an example of a `task` configuration:
+A task can be any script that you may want to run on demand: a batch job, or a web application.
 
 <div editor-title="serve.dstack.yml"> 
 
@@ -78,16 +78,38 @@ commands:
 
 </div>
 
-A task can be either a batch job, such as training or fine-tuning a model, or a web application.
+While the task runs in the cloud, the CLI forwards traffic, allowing you to access the application from your local
+machine. 
 
-!!! info "Configuration filename"
-    The configuration file must be named with the suffix `.dstack.yml`. For example,
-    you can name the configuration file `.dstack.yml` or `serve.dstack.yml`. You can define
-    these configurations anywhere within your project. 
-    
-    Each folder may have one default configuration file named `.dstack.yml`.
+### Services
 
-[//]: # (TODO: Mention pre-built)
+A service is an application that is accessible through a public endpoint.
+
+<div editor-title="deploy.dstack.yml"> 
+
+```yaml
+type: service
+
+gateway: ${{ secrets.GATEWAY_ADDRESS }}
+
+port: 7860
+
+commands:
+  - pip install -r requirements.txt
+  - python app.py
+```
+
+</div>
+
+Once the service is up, `dstack` makes it accessible from the Internet through
+the [gateway](guides/services.md#configuring-a-gateway).
+
+[//]: # (!!! info "Configuration filename")
+[//]: # (    The configuration file must be named with the suffix `.dstack.yml`. For example,)
+[//]: # (    you can name the configuration file `.dstack.yml` or `serve.dstack.yml`. You can define)
+[//]: # (    these configurations anywhere within your project. )
+[//]: # (    )
+[//]: # (    Each folder may have one default configuration file named `.dstack.yml`.)
 
 For more details on the syntax of configuration file, refer to the [`.dstack.yml` Reference](../docs/reference/dstack.yml/index.md).
 
@@ -147,7 +169,7 @@ Launching in *reload mode* on: http://127.0.0.1:7860 (Press CTRL+C to quit)
 !!! info "Port forwarding"
     By default, `dstack` forwards the ports used by dev environments and tasks to your local machine for convenient access.
 
-??? info "Using .gitignore"
+??? info ".gitignore"
     When running dev environments or tasks, `dstack` uses the exact version of code that is present in the folder where you
     use the `dstack run` command.
 
@@ -168,16 +190,33 @@ To define profiles, create the `profiles.yml` file in the `.dstack` folder withi
 
 ```yaml
 profiles:
-  - name: gpu-large
+  - name: gcp-t4
     project: gcp
+    
     resources:
-       memory: 48GB
-       gpu:
-         memory: 24GB
+      memory: 24GB
+      gpu:
+        name: T4
+        
+    spot_policy: auto
+    retry_policy:
+      limit: 30min
+    max_duration: 1d
+      
     default: true
 ```
 
 </div>
+
+!!! info "Spot instances"
+    If `spot_policy` is set to `auto`, `dstack` prioritizes spot instances.
+    If these are unavailable, it uses `on-demand` instances. To cut costs, set `spot_policy` to `spot`.
+    
+    If `dstack` can't find capacity, an error displays. To enable continuous capacity search, use `retry_policy` with a 
+    `limit`. For example, setting it to `30min` makes `dstack` search for capacity for 30 minutes.
+
+    Note that spot instances are significantly cheaper but can be interrupted. Your code should ideally 
+    handle interruptions and resume work from saved checkpoints.
 
 Now, if you use the `dstack run` command, `dstack` will use the default profile.
 

@@ -59,7 +59,7 @@ To open the dev environment via a desktop IDE, click the URL in the output.
 
 By default, VS Code comes with pre-installed Python and Jupyter extensions.
 
-??? info "Using .gitignore"
+??? info ".gitignore"
     When running a dev environment, `dstack` uses the exact version of code that is present in the folder where you
     use the `dstack run` command.
 
@@ -185,7 +185,7 @@ profiles:
 
 </div>
 
-!!! info "Using spot instances"
+!!! info "Spot instances"
     If `spot_policy` is set to `auto`, `dstack` prioritizes spot instances.
     If these are unavailable, it uses `on-demand` instances. To cut costs, set `spot_policy` to `spot`.
     

@@ -224,7 +224,7 @@ profiles:
 
 </div>
 
-!!! info "Using spot instances"
+!!! info "Spot instances"
     If `spot_policy` is set to `auto`, `dstack` prioritizes spot instances.
     If these are unavailable, it uses `on-demand` instances. To cut costs, set `spot_policy` to `spot`.
     

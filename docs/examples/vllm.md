@@ -13,7 +13,7 @@ GPU parallelism, streaming output, OpenAI-compatibility, and more.
 
 To try `vllm` with `dstack`, follow the instructions below.
 
-## Prerequisites
+## Defining a profile
 
 !!! info "NOTE:"
     Before using `dstack` with a particular cloud, make sure to [configure](../docs/projects.md) the corresponding project.
@@ -29,23 +29,46 @@ Below is a profile that will provision a cloud instance with `24GB` of memory an
 profiles:
   - name: gcp-t4
     project: gcp
+    
     resources:
       memory: 24GB
       gpu:
         name: T4
+     
+    spot_policy: auto   
+      
     default: true
 ```
 
 </div>
 
+!!! info "Spot instances"
+    If `spot_policy` is set to `auto`, `dstack` prioritizes spot instances.
+    If these are unavailable, it uses `on-demand` instances. To cut costs, set `spot_policy` to `spot`.
+
 ## Running an endpoint
 
-Here's the configuration that runs an LLM as an OpenAI-compatible endpoint:
+??? info "Tasks"
+    If you want to serve an application for development purposes only, you can use 
+    [tasks](../docs/guides/services.md). 
+    In this scenario, while the application runs in the cloud, 
+    it is accessible from your local machine only.
+
+For production purposes, the optimal approach to serve an application is by using 
+[services](../docs/guides/services.md). In this case, the application can be accessed through a public endpoint.
+
+Here's the configuration that uses services to run an LLM as an OpenAI-compatible endpoint:
 
 <div editor-title="vllm/serve.dstack.yml"> 
 
 ```yaml
-type: task
+type: service
+
+# (Optional) If not specified, it will use your local version
+python: "3.11"
+
+# (Required) Create a gateway using `dstack gateway create` and set its address with `dstack secrets add`.
+gateway: ${{ secrets.GATEWAY_ADDRESS }}
 
 env:
   # (Required) Specify the name of the model
@@ -53,8 +76,7 @@ env:
   # (Optional) Specify your Hugging Face token
   - HUGGING_FACE_HUB_TOKEN=
 
-ports:
-  - 8000
+port: 8000
 
 commands:
   - conda install cuda # Required since vLLM will rebuild the CUDA kernel
@@ -64,25 +86,50 @@ commands:
 
 </div>
 
-Here's how you run it with `dstack`:
+Before you can run a service, you have to ensure that there is a gateway configured for your project.
+
+??? info "Gateways"
+    To create a gateway, use the `dstack gateway create` command:
+    
+    <div class="termy">
+    
+    ```shell
+    $ dstack gateway create
+    
+    Creating gateway...
+    
+     NAME                        ADDRESS    
+     dstack-gateway-fast-walrus  98.71.213.179 
+    
+    ```
+    
+    </div>
+    
+    Once the gateway is up, create a secret with the gateway's address.
+    
+    <div class="termy">
+    
+    ```shell
+    $ dstack secrets add GATEWAY_ADDRESS 98.71.213.179
+    ```
+    </div>
+
+After the gateway is configured, go ahead run the service.
 
 <div class="termy">
 
 ```shell
-$ dstack run . -f vllm/serve.dstack.yml --ports 8000:8000
+$ dstack run . -f vllm/serve.dstack.yml
 ```
 
 </div>
 
-`dstack` will provision the cloud instance, run the task, and forward the defined ports to your local
-machine for secure and convenient access.
-
-Now, you can query the endpoint in the same format as OpenAI API:
+Once the service is up, you can query the endpoint using the gateway address:
 
 <div class="termy">
 
 ```shell
-$ curl -X POST --location http://127.0.0.1:8000/v1/completions \
+$ curl -X POST --location http://98.71.213.179/v1/completions \
     -H "Content-Type: application/json" \
     -d '{
           "model": "facebook/opt-125m",
@@ -93,6 +140,11 @@ $ curl -X POST --location http://127.0.0.1:8000/v1/completions \
 ```
 
 </div>
+
+??? info "Custom domains"
+    You can use a custom domain with your service. To do this, create an `A` DNS record that points to the gateway
+    address (e.g. `98.71.213.179`). Then, instead of using the gateway address (`98.71.213.179`), 
+    specify your domain name as the `GATEWAY_ADDRESS` secret.
 
 For more details on how `vllm` works, check their [documentation](https://vllm.readthedocs.io/).
 

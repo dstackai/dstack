@@ -55,7 +55,7 @@ Epoch 2:  100% 1719/1719 [00:18<00:00, 92.32it/s, loss=0.0981, acc=0.969]
 This command provisions cloud resources, pre-installs the environment and code, and runs the script. If the task exposes
 any ports, the command will forward them to your local machine for secure and convenient access.
 
-??? info "Using .gitignore"
+??? info ".gitignore"
     When running a task, `dstack` uses the exact version of code that is present in the folder where you
     use the `dstack run` command.
 
@@ -212,7 +212,7 @@ profiles:
 
 </div>
 
-!!! info "Using spot instances"
+!!! info "Spot instances"
     If `spot_policy` is set to `auto`, `dstack` prioritizes spot instances.
     If these are unavailable, it uses `on-demand` instances. To cut costs, set `spot_policy` to `spot`.
     
