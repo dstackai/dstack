@@ -20,7 +20,7 @@ from dstack._internal.core.repo.remote import RemoteRepo
 from dstack._internal.core.run import RunHead
 from dstack._internal.core.secret import Secret
 from dstack._internal.core.tag import TagHead
-from dstack._internal.hub.models import ProjectInfo
+from dstack._internal.hub.schemas import ProjectInfo, RunInfo
 from dstack.api.hub._api_client import HubAPIClient
 from dstack.api.hub._config import HubClientConfig
 from dstack.api.hub._storage import HUBStorage
@@ -31,8 +31,8 @@ class HubClient:
     def __init__(
         self,
         config: HubClientConfig,
-        project: Optional[str] = None,
-        repo: Optional[Repo] = None,
+        repo: Repo,
+        project: str,
         repo_credentials: Optional[RemoteRepoCredentials] = None,
         auto_init: bool = False,
     ):
@@ -51,41 +51,21 @@ class HubClient:
 
     @staticmethod
     def validate_config(config: HubClientConfig, project: str):
-        project_info = HubAPIClient(
+        HubAPIClient(
             url=config.url, token=config.token, project=project, repo=None
         ).get_project_info()
-        if project_info.backend.__root__.type == "local":
-            hostname = urllib.parse.urlparse(config.url).hostname
-            if hostname not in ["localhost", "127.0.0.1"]:
-                raise HubClientError(
-                    "Projects with local backend hosted on remote Hub are not yet supported. "
-                    "Consider starting Hub locally if you need to use local backend."
-                )
-
-    def get_project_backend_type(self) -> str:
-        return self._get_project_info().backend.__root__.type
-
-    def _get_project_info(self) -> ProjectInfo:
-        return self._api_client.get_project_info()
 
     def create_run(self, run_name: Optional[str]) -> str:
         return self._api_client.create_run(run_name)
 
-    def create_job(self, job: Job):
-        self._api_client.create_job(job=job)
-
-    def submit_job(self, job: Job, failed_to_start_job_new_status: JobStatus = JobStatus.FAILED):
-        self.create_job(job)
-        self.run_job(job, failed_to_start_job_new_status)
-
-    def get_job(self, job_id: str, repo_id: Optional[str] = None) -> Optional[Job]:
+    def get_job(self, job_id: str) -> Optional[Job]:
         return self._api_client.get_job(job_id=job_id)
 
-    def list_jobs(self, run_name: str, repo_id: Optional[str] = None) -> List[Job]:
+    def list_jobs(self, run_name: str) -> List[Job]:
         return self._api_client.list_jobs(run_name=run_name)
 
-    def run_job(self, job: Job, failed_to_start_job_new_status: JobStatus):
-        self._api_client.run_job(job=job)
+    def run_job(self, job: Job, backends: Optional[List[str]]):
+        self._api_client.run_job(job=job, backends=backends)
 
     def restart_job(self, job: Job):
         self._api_client.restart_job(job)
@@ -98,12 +78,10 @@ class HubClient:
         for job_head in job_heads:
             self.stop_job(job_head.job_id, terminate, abort)
 
-    def list_job_heads(
-        self, run_name: Optional[str] = None, repo_id: Optional[str] = None
-    ) -> List[JobHead]:
+    def list_job_heads(self, run_name: Optional[str] = None) -> List[JobHead]:
         return self._api_client.list_job_heads(run_name=run_name)
 
-    def delete_job_head(self, job_id: str, repo_id: Optional[str] = None):
+    def delete_job_head(self, job_id: str):
         self._api_client.delete_job_head(job_id=job_id)
 
     def delete_job_heads(self, run_name: Optional[str]):
@@ -117,14 +95,14 @@ class HubClient:
         for job_head in job_heads:
             self.delete_job_head(job_head.job_id)
 
-    def list_run_heads(
+    def list_runs(
         self,
         run_name: Optional[str] = None,
         include_request_heads: bool = True,
         interrupted_job_new_status: JobStatus = JobStatus.FAILED,
         repo_id: Optional[str] = None,
-    ) -> List[RunHead]:
-        return self._api_client.list_run_heads(
+    ) -> List[RunInfo]:
+        return self._api_client.list_runs(
             run_name=run_name,
             include_request_heads=include_request_heads,
         )
@@ -139,9 +117,7 @@ class HubClient:
         end_time: Optional[datetime] = None,
         descending: bool = False,
         diagnose: bool = False,
-        repo_id: Optional[str] = None,
     ) -> Generator[LogEvent, None, None]:
-        # /{hub_name}/logs/poll
         return self._api_client.poll_logs(
             run_name=run_name,
             start_time=start_time,
@@ -155,9 +131,7 @@ class HubClient:
         run_name: str,
         prefix: str = "",
         recursive: bool = False,
-        repo_id: Optional[str] = None,
     ) -> List[Artifact]:
-        # /{hub_name}/artifacts/list
         return self._api_client.list_run_artifact_files(
             run_name=run_name, prefix=prefix, recursive=recursive
         )
@@ -168,7 +142,6 @@ class HubClient:
         output_dir: Optional[str],
         files_path: Optional[str] = None,
     ):
-        # /{hub_name}/artifacts/download
         artifacts = self.list_run_artifact_files(run_name=run_name, recursive=True)
         base_artifacts.download_run_artifact_files(
             storage=self._storage,
@@ -185,7 +158,6 @@ class HubClient:
         artifact_path: str,
         local_path: Path,
     ):
-        # /{hub_name}/artifacts/upload
         base_artifacts.upload_job_artifact_files(
             storage=self._storage,
             repo_id=self.repo.repo_id,
@@ -212,15 +184,12 @@ class HubClient:
         )
 
     def add_tag_from_local_dirs(self, tag_name: str, local_dirs: List[str]):
-        # /{hub_name}/tags/add
         return self._api_client.add_tag_from_local_dirs(tag_name=tag_name, local_dirs=local_dirs)
 
     def delete_tag_head(self, tag_head: TagHead):
-        # /{hub_name}/tags/delete
         return self._api_client.delete_tag_head(tag_head=tag_head)
 
     def update_repo_last_run_at(self, last_run_at: int):
-        # /{hub_name}/repos/update
         return self._api_client.update_repo_last_run_at(last_run_at=last_run_at)
 
     def list_repo_heads(self) -> List[RepoHead]:
@@ -258,7 +227,6 @@ class HubClient:
         self._api_client.update_secret(secret=secret)
 
     def delete_secret(self, secret_name: str):
-        # /{hub_name}/secrets/delete
         self._api_client.delete_secret(secret_name=secret_name)
 
     def delete_configuration_cache(self, configuration_path: str):
@@ -270,9 +238,12 @@ class HubClient:
         :return: run plan
         """
         jobs = configurator.get_jobs(
-            repo=self.repo, run_name="dry-run", repo_code_filename="", ssh_key_pub=""
+            repo=self.repo,
+            run_name="dry-run",
+            repo_code_filename="",
+            ssh_key_pub="",
         )
-        run_plan = self._api_client.get_run_plan(jobs)
+        run_plan = self._api_client.get_run_plan(jobs, configurator.profile.backends)
         return run_plan
 
     def run_configuration(
@@ -289,27 +260,23 @@ class HubClient:
             {"run": {"name": run_name, "args": configurator.join_run_args(run_args)}}
         )
 
-        # todo handle tag_name & dependencies
+        # Todo handle tag_name & dependencies
 
-        repo_code_filename = self._upload_code_file()
-        jobs = configurator.get_jobs(
-            repo=self.repo,
-            run_name=run_name,
-            repo_code_filename=repo_code_filename,
-            ssh_key_pub=ssh_key_pub,
-            run_plan=run_plan,
-        )
-        for job in jobs:
-            self.submit_job(job)
-        self.update_repo_last_run_at(last_run_at=int(round(time.time() * 1000)))
-        return run_name, jobs
-
-    def _upload_code_file(self) -> str:
         with tempfile.NamedTemporaryFile("w+b") as f:
             repo_code_filename = self.repo.repo_data.write_code_file(f)
-            f.seek(0)
-            self._storage.upload_file(f.name, repo_code_filename, lambda _: ...)
-        return repo_code_filename
+            jobs = configurator.get_jobs(
+                repo=self.repo,
+                run_name=run_name,
+                repo_code_filename=repo_code_filename,
+                ssh_key_pub=ssh_key_pub,
+                run_plan=run_plan,
+            )
+            for job in jobs:
+                self.run_job(job, configurator.profile.backends)
+            run_info = self.list_runs(run_name)[0]
+            self._storage.upload_file(run_info.backend, f.name, repo_code_filename, lambda _: ...)
+        self.update_repo_last_run_at(last_run_at=int(round(time.time() * 1000)))
+        return run_name, jobs
 
     def create_gateway(self) -> GatewayHead:
         return self._api_client.create_gateway()

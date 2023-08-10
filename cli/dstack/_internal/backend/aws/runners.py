@@ -60,13 +60,13 @@ def run_instance(
             )
         )
     for region in regions:
+        logger.info(
+            "Requesting %s %s instance in %s...",
+            instance_type.instance_name,
+            "spot" if spot else "",
+            region,
+        )
         try:
-            logger.info(
-                "Requesting %s %s instance in %s...",
-                instance_type.instance_name,
-                "spot" if spot else "",
-                region,
-            )
             request_id = _run_instance_retry(
                 ec2_client=aws_utils.get_ec2_client(session, region_name=region),
                 iam_client=iam_client,

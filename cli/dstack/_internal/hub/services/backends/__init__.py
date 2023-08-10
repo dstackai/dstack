@@ -1,7 +1,7 @@
 import subprocess
 from typing import List, Optional
 
-from dstack._internal.hub.models import BackendType
+from dstack._internal.hub.schemas import BackendType
 from dstack._internal.hub.services.backends.base import Configurator
 from dstack._internal.hub.services.backends.local.configurator import LocalConfigurator
 

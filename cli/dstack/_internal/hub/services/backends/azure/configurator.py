@@ -1,5 +1,6 @@
 import json
 import os
+from concurrent.futures import ThreadPoolExecutor
 from typing import Dict, List, Optional, Tuple, Union
 from uuid import UUID, uuid5
 
@@ -48,15 +49,16 @@ from azure.mgmt.subscription import SubscriptionClient
 from dstack._internal.backend.azure import AzureBackend
 from dstack._internal.backend.azure import utils as azure_utils
 from dstack._internal.backend.azure.config import AzureConfig
-from dstack._internal.hub.db.models import Project
-from dstack._internal.hub.models import (
-    AzureProjectConfig,
-    AzureProjectConfigWithCreds,
-    AzureProjectConfigWithCredsPartial,
-    AzureProjectCreds,
-    AzureProjectValues,
-    ProjectElement,
-    ProjectElementValue,
+from dstack._internal.hub.db.models import Backend as DBBackend
+from dstack._internal.hub.schemas import (
+    AzureBackendConfig,
+    AzureBackendConfigWithCreds,
+    AzureBackendConfigWithCredsPartial,
+    AzureBackendCreds,
+    AzureBackendValues,
+    BackendElement,
+    BackendElementValue,
+    BackendMultiElement,
 )
 from dstack._internal.hub.services.backends.azure.azure_identity_credential_adapter import (
     AzureIdentityCredentialAdapter,
@@ -87,36 +89,33 @@ LOCATION_VALUES = [l[1] for l in LOCATIONS]
 class AzureConfigurator(Configurator):
     NAME = "azure"
 
-    def get_backend_class(self) -> type:
-        return AzureBackend
-
-    def configure_project(
-        self, project_config: AzureProjectConfigWithCredsPartial
-    ) -> AzureProjectValues:
-        project_values = AzureProjectValues()
+    def configure_backend(
+        self, backend_config: AzureBackendConfigWithCredsPartial
+    ) -> AzureBackendValues:
+        backend_values = AzureBackendValues()
         self.credential = DefaultAzureCredential()
         try:
-            project_values.tenant_id = self._get_tenant_id_element(
-                selected=project_config.tenant_id
+            backend_values.tenant_id = self._get_tenant_id_element(
+                selected=backend_config.tenant_id
             )
         except ClientAuthenticationError:
-            project_values.default_credentials = False
+            backend_values.default_credentials = False
         else:
-            project_values.default_credentials = True
+            backend_values.default_credentials = True
 
-        if project_config.credentials is None:
-            return project_values
+        if backend_config.credentials is None:
+            return backend_values
 
-        project_credentials = project_config.credentials.__root__
+        project_credentials = backend_config.credentials.__root__
         if project_credentials.type == "client":
             self.credential = ClientSecretCredential(
-                tenant_id=project_config.tenant_id,
+                tenant_id=backend_config.tenant_id,
                 client_id=project_credentials.client_id,
                 client_secret=project_credentials.client_secret,
             )
             try:
-                project_values.tenant_id = self._get_tenant_id_element(
-                    selected=project_config.tenant_id
+                backend_values.tenant_id = self._get_tenant_id_element(
+                    selected=backend_config.tenant_id
                 )
             except ClientAuthenticationError:
                 self._raise_invalid_credentials_error(
@@ -126,37 +125,43 @@ class AzureConfigurator(Configurator):
                         ["credentials", "client_secret"],
                     ]
                 )
-        elif not project_values.default_credentials:
+        elif not backend_values.default_credentials:
             self._raise_invalid_credentials_error(fields=[["credentials"]])
 
-        self.tenant_id = project_values.tenant_id.selected
+        self.tenant_id = backend_values.tenant_id.selected
         if self.tenant_id is None:
-            return project_values
-        project_values.subscription_id = self._get_subscription_id_element(
-            selected=project_config.subscription_id
+            return backend_values
+        backend_values.subscription_id = self._get_subscription_id_element(
+            selected=backend_config.subscription_id
         )
-        self.subscription_id = project_values.subscription_id.selected
+        self.subscription_id = backend_values.subscription_id.selected
         if self.subscription_id is None:
-            return project_values
-        project_values.location = self._get_location_element(selected=project_config.location)
-        self.location = project_values.location.selected
+            return backend_values
+        backend_values.location = self._get_location_element(selected=backend_config.location)
+        self.location = backend_values.location.selected
         if self.location is None:
-            return project_values
-        project_values.storage_account = self._get_storage_account_element(
-            selected=project_config.storage_account
+            return backend_values
+        backend_values.storage_account = self._get_storage_account_element(
+            selected=backend_config.storage_account
         )
-        return project_values
+        backend_values.extra_locations = self._get_extra_locations_element(
+            location=backend_config.location
+        )
+        return backend_values
 
-    def create_project(self, project_config: AzureProjectConfigWithCreds) -> Tuple[Dict, Dict]:
-        self.tenant_id = project_config.tenant_id
-        self.subscription_id = project_config.subscription_id
-        self.location = project_config.location
-        self.storage_account = project_config.storage_account
-        if project_config.credentials.__root__.type == "client":
+    def create_backend(
+        self, project_name: str, backend_config: AzureBackendConfigWithCreds
+    ) -> Tuple[Dict, Dict]:
+        self.tenant_id = backend_config.tenant_id
+        self.subscription_id = backend_config.subscription_id
+        self.location = backend_config.location
+        self.storage_account = backend_config.storage_account
+        self.extra_locations = backend_config.extra_locations
+        if backend_config.credentials.__root__.type == "client":
             self.credential = ClientSecretCredential(
-                tenant_id=project_config.tenant_id,
-                client_id=project_config.credentials.__root__.client_id,
-                client_secret=project_config.credentials.__root__.client_secret,
+                tenant_id=backend_config.tenant_id,
+                client_id=backend_config.credentials.__root__.client_id,
+                client_secret=backend_config.credentials.__root__.client_secret,
             )
         else:
             self.credential = DefaultAzureCredential()
@@ -164,7 +169,7 @@ class AzureConfigurator(Configurator):
         self._create_storage_container()
         self.vault_url = self._create_key_vault()
         self.runner_principal_id = self._create_runner_managed_identity()
-        self.network, self.subnet = self._create_network_resources()
+        self._create_network_resources()
         self._create_logs_resources()
         self._grant_roles_or_error()
         config_data = {
@@ -174,39 +179,41 @@ class AzureConfigurator(Configurator):
             "resource_group": self.resource_group,
             "storage_account": self.storage_account,
             "vault_url": self.vault_url,
-            "network": self.network,
-            "subnet": self.subnet,
+            "extra_locations": self.extra_locations,
         }
-        auth_data = project_config.credentials.__root__.dict()
+        auth_data = backend_config.credentials.__root__.dict()
         return config_data, auth_data
 
-    def get_project_config(
-        self, project: Project, include_creds: bool
-    ) -> Union[AzureProjectConfig, AzureProjectConfigWithCreds]:
-        json_config = json.loads(project.config)
+    def get_backend_config(
+        self, db_backend: DBBackend, include_creds: bool
+    ) -> Union[AzureBackendConfig, AzureBackendConfigWithCreds]:
+        json_config = json.loads(db_backend.config)
         tenant_id = json_config["tenant_id"]
         subscription_id = json_config["subscription_id"]
         location = json_config["location"]
         storage_account = json_config["storage_account"]
+        extra_locations = json_config.get("extra_locations", [])
         if include_creds:
-            auth_config = json.loads(project.auth)
-            return AzureProjectConfigWithCreds(
+            auth_config = json.loads(db_backend.auth)
+            return AzureBackendConfigWithCreds(
                 tenant_id=tenant_id,
                 subscription_id=subscription_id,
                 location=location,
                 storage_account=storage_account,
-                credentials=AzureProjectCreds.parse_obj(auth_config),
+                extra_locations=extra_locations,
+                credentials=AzureBackendCreds.parse_obj(auth_config),
             )
-        return AzureProjectConfig(
+        return AzureBackendConfig(
             tenant_id=tenant_id,
             subscription_id=subscription_id,
             location=location,
             storage_account=storage_account,
+            extra_locations=extra_locations,
         )
 
-    def get_backend(self, project: Project) -> AzureBackend:
-        config_data = json.loads(project.config)
-        auth_data = json.loads(project.auth)
+    def get_backend(self, db_backend: DBBackend) -> AzureBackend:
+        config_data = json.loads(db_backend.config)
+        auth_data = json.loads(db_backend.auth)
         config = AzureConfig(
             tenant_id=config_data["tenant_id"],
             subscription_id=config_data["subscription_id"],
@@ -214,8 +221,7 @@ class AzureConfigurator(Configurator):
             resource_group=config_data["resource_group"],
             storage_account=config_data["storage_account"],
             vault_url=config_data["vault_url"],
-            network=config_data["network"],
-            subnet=config_data["subnet"],
+            extra_locations=config_data.get("extra_locations", []),
             credentials=auth_data,
         )
         return AzureBackend(config)
@@ -227,14 +233,14 @@ class AzureConfigurator(Configurator):
             fields=fields,
         )
 
-    def _get_tenant_id_element(self, selected: Optional[str]) -> ProjectElement:
+    def _get_tenant_id_element(self, selected: Optional[str]) -> BackendElement:
         subscription_client = SubscriptionClient(credential=self.credential)
-        element = ProjectElement(selected=selected)
+        element = BackendElement(selected=selected)
         tenant_ids = []
         for tenant in subscription_client.tenants.list():
             tenant_ids.append(tenant.tenant_id)
             element.values.append(
-                ProjectElementValue(value=tenant.tenant_id, label=tenant.tenant_id)
+                BackendElementValue(value=tenant.tenant_id, label=tenant.tenant_id)
             )
         if selected is not None and selected not in tenant_ids:
             raise BackendConfigError(
@@ -244,14 +250,14 @@ class AzureConfigurator(Configurator):
             element.selected = tenant_ids[0]
         return element
 
-    def _get_subscription_id_element(self, selected: Optional[str]) -> ProjectElement:
+    def _get_subscription_id_element(self, selected: Optional[str]) -> BackendElement:
         subscription_client = SubscriptionClient(credential=self.credential)
-        element = ProjectElement(selected=selected)
+        element = BackendElement(selected=selected)
         subscription_ids = []
         for subscription in subscription_client.subscriptions.list():
             subscription_ids.append(subscription.subscription_id)
             element.values.append(
-                ProjectElementValue(
+                BackendElementValue(
                     value=subscription.subscription_id,
                     label=f"{subscription.display_name} ({subscription.subscription_id})",
                 )
@@ -272,31 +278,31 @@ class AzureConfigurator(Configurator):
             )
         return element
 
-    def _get_location_element(self, selected: Optional[str]) -> ProjectElement:
+    def _get_location_element(self, selected: Optional[str]) -> BackendElement:
         if selected is not None and selected not in LOCATION_VALUES:
             raise BackendConfigError(
                 "Invalid location", code="invalid_location", fields=[["location"]]
             )
-        element = ProjectElement(selected=selected)
+        element = BackendElement(selected=selected)
         for l in LOCATIONS:
             element.values.append(
-                ProjectElementValue(
+                BackendElementValue(
                     value=l[1],
                     label=f"{l[0]} [{l[1]}]",
                 )
             )
         return element
 
-    def _get_storage_account_element(self, selected: Optional[str]) -> ProjectElement:
+    def _get_storage_account_element(self, selected: Optional[str]) -> BackendElement:
         client = StorageManagementClient(
             credential=self.credential, subscription_id=self.subscription_id
         )
-        element = ProjectElement(selected=selected)
+        element = BackendElement(selected=selected)
         storage_accounts = []
         for sa in client.storage_accounts.list():
             if sa.provisioning_state == "Succeeded" and sa.location == self.location:
                 storage_accounts.append(sa.name)
-                element.values.append(ProjectElementValue(value=sa.name, label=sa.name))
+                element.values.append(BackendElementValue(value=sa.name, label=sa.name))
         if selected is not None and selected not in storage_accounts:
             raise BackendConfigError(
                 "Invalid storage_account",
@@ -305,6 +311,15 @@ class AzureConfigurator(Configurator):
             )
         if len(storage_accounts) == 1:
             element.selected = storage_accounts[0]
+        return element
+
+    def _get_extra_locations_element(self, location: str) -> BackendMultiElement:
+        element = BackendMultiElement()
+        for l in LOCATION_VALUES:
+            if l == location:
+                continue
+            element.values.append(BackendElementValue(value=l, label=l))
+            element.selected.append(l)
         return element
 
     def _get_resource_group(self) -> str:
@@ -364,25 +379,28 @@ class AzureConfigurator(Configurator):
             name=azure_utils.get_runner_managed_identity_name(self.storage_account),
         )
 
-    def _create_network_resources(self) -> Tuple[str, str]:
-        network_manager = NetworkManager(
-            credential=self.credential, subscription_id=self.subscription_id
-        )
-        network = network_manager.create_virtual_network(
-            resource_group=self.resource_group,
-            location=self.location,
-            name=azure_utils.get_default_network_name(self.storage_account),
-        )
-        subnet = network_manager.create_subnet(
-            resource_group=self.resource_group,
-            network=network,
-            name=azure_utils.get_default_subnet_name(self.storage_account),
-        )
-        network_manager.create_network_security_group(
-            resource_group=self.resource_group,
-            location=self.location,
-        )
-        return network, subnet
+    def _create_network_resources(self):
+        def func(location: str):
+            network_manager = NetworkManager(
+                credential=self.credential, subscription_id=self.subscription_id
+            )
+            network_manager.create_virtual_network(
+                resource_group=self.resource_group,
+                location=location,
+                name=azure_utils.get_default_network_name(self.storage_account, location),
+                subnet_name=azure_utils.get_default_subnet_name(self.storage_account, location),
+            )
+            network_manager.create_network_security_group(
+                resource_group=self.resource_group,
+                location=location,
+                name=azure_utils.get_default_network_security_group_name(
+                    self.storage_account, location
+                ),
+            )
+
+        with ThreadPoolExecutor(max_workers=8) as executor:
+            for location in [self.location] + self.extra_locations:
+                executor.submit(func, location)
 
     def _create_logs_resources(self):
         logs_manager = LogsManager(
@@ -608,53 +626,37 @@ class NetworkManager:
         self,
         resource_group: str,
         name: str,
+        subnet_name: str,
         location: str,
-    ):
+    ) -> Tuple[str, str]:
         network: VirtualNetwork = self.network_client.virtual_networks.begin_create_or_update(
             resource_group_name=resource_group,
             virtual_network_name=name,
             parameters=VirtualNetwork(
-                location=location, address_space=AddressSpace(address_prefixes=["10.0.0.0/16"])
+                location=location,
+                address_space=AddressSpace(address_prefixes=["10.0.0.0/16"]),
+                subnets=[
+                    Subnet(
+                        name=subnet_name,
+                        address_prefix="10.0.0.0/20",
+                    )
+                ],
             ),
         ).result()
-        return network.name
-
-    def create_subnet(
-        self,
-        resource_group: str,
-        network: str,
-        name: str,
-    ):
-        subnet: Subnet = self.network_client.subnets.begin_create_or_update(
-            resource_group_name=resource_group,
-            virtual_network_name=network,
-            subnet_name=name,
-            subnet_parameters=Subnet(address_prefix="10.0.0.0/20"),
-        ).result()
-        return subnet.name
+        return network.name, subnet_name
 
     def create_network_security_group(
         self,
         resource_group: str,
         location: str,
+        name: str,
     ):
         self.network_client.network_security_groups.begin_create_or_update(
             resource_group_name=resource_group,
-            network_security_group_name=azure_utils.DSTACK_NETWORK_SECURITY_GROUP,
+            network_security_group_name=name,
             parameters=NetworkSecurityGroup(
                 location=location,
                 security_rules=[
-                    SecurityRule(
-                        name="runner_service",
-                        protocol=SecurityRuleProtocol.TCP,
-                        source_address_prefix="Internet",
-                        source_port_range="*",
-                        destination_address_prefix="*",
-                        destination_port_range="3000-4000",
-                        access=SecurityRuleAccess.ALLOW,
-                        priority=101,
-                        direction=SecurityRuleDirection.INBOUND,
-                    ),
                     SecurityRule(
                         name="runner_ssh",
                         protocol=SecurityRuleProtocol.TCP,

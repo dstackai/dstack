@@ -13,20 +13,20 @@ from dstack._internal.backend.lambdalabs.config import (
     AWSStorageConfigCredentials,
     LambdaConfig,
 )
-from dstack._internal.hub.db.models import Project
-from dstack._internal.hub.models import (
-    AWSProjectAccessKeyCreds,
+from dstack._internal.hub.db.models import Backend as DBBackend
+from dstack._internal.hub.schemas import (
+    AWSBackendAccessKeyCreds,
+    AWSStorageBackendConfig,
+    AWSStorageBackendConfigWithCreds,
+    AWSStorageBackendConfigWithCredsPartial,
     AWSStorageBackendValues,
-    AWSStorageProjectConfig,
-    AWSStorageProjectConfigWithCreds,
-    AWSStorageProjectConfigWithCredsPartial,
-    LambdaProjectConfig,
-    LambdaProjectConfigWithCreds,
-    LambdaProjectConfigWithCredsPartial,
-    LambdaProjectValues,
-    ProjectElement,
-    ProjectElementValue,
-    ProjectMultiElement,
+    BackendElement,
+    BackendElementValue,
+    BackendMultiElement,
+    LambdaBackendConfig,
+    LambdaBackendConfigWithCreds,
+    LambdaBackendConfigWithCredsPartial,
+    LambdaBackendValues,
 )
 from dstack._internal.hub.services.backends.base import BackendConfigError, Configurator
 
@@ -49,69 +49,71 @@ REGIONS = [
 class LambdaConfigurator(Configurator):
     NAME = "lambda"
 
-    def configure_project(
-        self, project_config: LambdaProjectConfigWithCredsPartial
-    ) -> LambdaProjectValues:
+    def configure_backend(
+        self, backend_config: LambdaBackendConfigWithCredsPartial
+    ) -> LambdaBackendValues:
         selected_storage_backend = None
-        if project_config.storage_backend is not None:
-            selected_storage_backend = project_config.storage_backend.type
+        if backend_config.storage_backend is not None:
+            selected_storage_backend = backend_config.storage_backend.type
         storage_backend_type = self._get_storage_backend_type_element(
             selected=selected_storage_backend
         )
-        project_values = LambdaProjectValues(storage_backend_type=storage_backend_type)
-        if project_config.api_key is None:
-            return project_values
-        self._validate_lambda_api_key(api_key=project_config.api_key)
-        project_values.regions = self._get_regions_element(selected=project_config.regions)
+        backend_values = LambdaBackendValues(storage_backend_type=storage_backend_type)
+        if backend_config.api_key is None:
+            return backend_values
+        self._validate_lambda_api_key(api_key=backend_config.api_key)
+        backend_values.regions = self._get_regions_element(selected=backend_config.regions)
         if (
-            project_config.storage_backend is None
-            or project_config.storage_backend.credentials is None
+            backend_config.storage_backend is None
+            or backend_config.storage_backend.credentials is None
         ):
-            return project_values
-        project_values.storage_backend_values = self._get_aws_storage_backend_values(
-            project_config.storage_backend
+            return backend_values
+        backend_values.storage_backend_values = self._get_aws_storage_backend_values(
+            backend_config.storage_backend
         )
-        return project_values
+        return backend_values
 
-    def create_project(self, project_config: LambdaProjectConfigWithCreds) -> Tuple[Dict, Dict]:
+    def create_backend(
+        self, project_name: str, backend_config: LambdaBackendConfigWithCreds
+    ) -> Tuple[Dict, Dict]:
         config_data = {
-            "regions": project_config.regions,
+            "regions": backend_config.regions,
             "storage_backend": self._get_aws_storage_backend_config_data(
-                project_config.storage_backend
+                backend_config.storage_backend
             ),
         }
         auth_data = {
-            "api_key": project_config.api_key,
-            "storage_backend": {"credentials": project_config.storage_backend.credentials.dict()},
+            "api_key": backend_config.api_key,
+            "storage_backend": {"credentials": backend_config.storage_backend.credentials.dict()},
         }
         return config_data, auth_data
 
-    def get_project_config(
-        self, project: Project, include_creds: bool
-    ) -> Union[LambdaProjectConfig, LambdaProjectConfigWithCreds]:
-        config_data = json.loads(project.config)
+    def get_backend_config(
+        self, db_backend: DBBackend, include_creds: bool
+    ) -> Union[LambdaBackendConfig, LambdaBackendConfigWithCreds]:
+        config_data = json.loads(db_backend.config)
         if include_creds:
-            auth_data = json.loads(project.auth)
-            return LambdaProjectConfigWithCreds(
+            auth_data = json.loads(db_backend.auth)
+            return LambdaBackendConfigWithCreds(
                 regions=config_data["regions"],
                 api_key=auth_data["api_key"],
-                storage_backend=AWSStorageProjectConfigWithCreds(
+                storage_backend=AWSStorageBackendConfigWithCreds(
                     bucket_name=config_data["storage_backend"]["bucket"],
-                    credentials=AWSProjectAccessKeyCreds.parse_obj(
+                    credentials=AWSBackendAccessKeyCreds.parse_obj(
                         auth_data["storage_backend"]["credentials"]
                     ),
                 ),
             )
-        return LambdaProjectConfig(
+        return LambdaBackendConfig(
             regions=config_data["regions"],
-            storage_backend=AWSStorageProjectConfig(
+            storage_backend=AWSStorageBackendConfig(
                 bucket_name=config_data["storage_backend"]["bucket"]
             ),
         )
 
-    def get_backend(self, project: Project) -> LambdaBackend:
-        config_data = json.loads(project.config)
-        auth_data = json.loads(project.auth)
+    def get_backend(self, db_backend: DBBackend) -> LambdaBackend:
+        config_data = json.loads(db_backend.config)
+        auth_data = json.loads(db_backend.auth)
         config = LambdaConfig(
             regions=config_data["regions"],
             api_key=auth_data["api_key"],
@@ -126,9 +128,9 @@ class LambdaConfigurator(Configurator):
         )
         return LambdaBackend(config)
 
-    def _get_storage_backend_type_element(self, selected: Optional[str]) -> ProjectElement:
-        element = ProjectElement(
-            values=[ProjectElementValue(value="aws", label="AWS S3")], selected="aws"
+    def _get_storage_backend_type_element(self, selected: Optional[str]) -> BackendElement:
+        element = BackendElement(
+            values=[BackendElementValue(value="aws", label="AWS S3")], selected="aws"
         )
         return element
 
@@ -145,7 +147,7 @@ class LambdaConfigurator(Configurator):
                 )
             raise e
 
-    def _get_regions_element(self, selected: Optional[List[str]]) -> ProjectMultiElement:
+    def _get_regions_element(self, selected: Optional[List[str]]) -> BackendMultiElement:
         if selected is not None:
             for r in selected:
                 if r not in REGIONS:
@@ -154,14 +156,14 @@ class LambdaConfigurator(Configurator):
                         code="invalid_regions",
                         fields=[["regions"]],
                     )
-        element = ProjectMultiElement(
+        element = BackendMultiElement(
             selected=selected or REGIONS,
-            values=[ProjectElementValue(value=r, label=r) for r in REGIONS],
+            values=[BackendElementValue(value=r, label=r) for r in REGIONS],
         )
         return element
 
     def _get_aws_storage_backend_values(
-        self, config: AWSStorageProjectConfigWithCredsPartial
+        self, config: AWSStorageBackendConfigWithCredsPartial
     ) -> AWSStorageBackendValues:
         session = Session(
             aws_access_key_id=config.credentials.access_key,
@@ -190,8 +192,8 @@ class LambdaConfigurator(Configurator):
 
     def _get_aws_bucket_element(
         self, session: Session, selected: Optional[str] = None
-    ) -> ProjectElement:
-        element = ProjectElement(selected=selected)
+    ) -> BackendElement:
+        element = BackendElement(selected=selected)
         s3_client = session.client("s3")
         try:
             response = s3_client.list_buckets()
@@ -209,7 +211,7 @@ class LambdaConfigurator(Configurator):
             )
         for bucket_name in bucket_names:
             element.values.append(
-                ProjectElementValue(
+                BackendElementValue(
                     value=bucket_name,
                     label=bucket_name,
                 )
@@ -217,7 +219,7 @@ class LambdaConfigurator(Configurator):
         return element
 
     def _get_aws_storage_backend_config_data(
-        self, config: AWSStorageProjectConfigWithCreds
+        self, config: AWSStorageBackendConfigWithCreds
     ) -> Dict:
         session = Session(
             aws_access_key_id=config.credentials.access_key,

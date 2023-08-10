@@ -31,7 +31,7 @@ from dstack._internal.hub.routers import (
     tags,
     users,
 )
-from dstack._internal.hub.services.backends import local_backend_available
+from dstack._internal.hub.schemas import LocalBackendConfig
 from dstack._internal.hub.utils.logging import configure_logger
 from dstack._internal.hub.utils.ssh import generate_hub_ssh_key_pair
 from dstack._internal.utils import logging
@@ -42,15 +42,24 @@ logger = logging.get_logger(__name__)
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
+    await migrate()
+    admin_user = await update_admin_user()
+    await create_default_project(admin_user)
     scheduler = start_background_tasks()
+    url = f"http://{os.getenv('DSTACK_HUB_HOST')}:{os.getenv('DSTACK_HUB_PORT')}"
+    url_with_token = f"{url}?token={admin_user.token}"
+    create_default_project_config(url, admin_user.token)
+    generate_hub_ssh_key_pair()
+    print(f"The server is available at {url_with_token}")
     yield
     scheduler.shutdown()
 
 
 app = FastAPI(docs_url="/api/docs", lifespan=lifespan)
 app.include_router(users.router)
-app.include_router(backends.router)
 app.include_router(projects.router)
+app.include_router(backends.root_router)
+app.include_router(backends.project_router)
 app.include_router(runs.root_router)
 app.include_router(runs.project_router)
 app.include_router(jobs.router)
@@ -66,19 +75,7 @@ app.include_router(configurations.router)
 app.include_router(gateways.router)
 
 
-DEFAULT_PROJECT_NAME = "local"
-
-
-@app.on_event("startup")
-async def startup_event():
-    await migrate()
-    admin_user = await update_admin_user()
-    await create_default_project(admin_user)
-    url = f"http://{os.getenv('DSTACK_HUB_HOST')}:{os.getenv('DSTACK_HUB_PORT')}"
-    url_with_token = f"{url}?token={admin_user.token}"
-    create_default_project_config(url, admin_user.token)
-    generate_hub_ssh_key_pair()
-    print(f"The server is available at {url_with_token}")
+DEFAULT_PROJECT_NAME = "main"
 
 
 @app.middleware("http")
@@ -111,20 +108,24 @@ async def update_admin_user() -> User:
 
 
 async def create_default_project(user: User):
-    if not local_backend_available():
-        return
     default_project = await ProjectManager.get(DEFAULT_PROJECT_NAME)
-    if default_project is not None:
-        return
-    await ProjectManager.create_local_project(user=user, project_name=DEFAULT_PROJECT_NAME)
+    if default_project is None:
+        default_project = await ProjectManager.create(
+            user=user, project_name=DEFAULT_PROJECT_NAME, members=[]
+        )
+    backend = await ProjectManager.get_backend(project=default_project, backend_name="local")
+    if backend is None:
+        backend = await ProjectManager.create_backend(
+            project=default_project, backend_config=LocalBackendConfig()
+        )
 
 
 def create_default_project_config(url: str, token: str):
     cli_config_manager = CLIConfigManager()
     default_project_config = cli_config_manager.get_default_project_config()
     project_config = cli_config_manager.get_project_config(DEFAULT_PROJECT_NAME)
-    # "default" is old name for "local"
-    default = default_project_config is None or default_project_config.name == "default"
+    # "default", "local" are old default project names
+    default = default_project_config is None or default_project_config.name in ["default", "local"]
     if project_config is None or default_project_config is None:
         cli_config_manager.configure_project(
             name=DEFAULT_PROJECT_NAME, url=url, token=token, default=default

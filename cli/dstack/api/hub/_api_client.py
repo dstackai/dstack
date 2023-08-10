@@ -22,7 +22,7 @@ from dstack._internal.core.repo import RemoteRepoCredentials, Repo, RepoHead, Re
 from dstack._internal.core.run import RunHead
 from dstack._internal.core.secret import Secret
 from dstack._internal.core.tag import TagHead
-from dstack._internal.hub.models import (
+from dstack._internal.hub.schemas import (
     AddTagRun,
     ArtifactsList,
     JobHeadList,
@@ -31,6 +31,8 @@ from dstack._internal.hub.models import (
     PollLogs,
     ProjectInfo,
     ReposUpdate,
+    RunInfo,
+    RunRunners,
     RunsCreate,
     RunsDelete,
     RunsGetPlan,
@@ -73,7 +75,7 @@ class HubAPIClient:
             return ProjectInfo.parse_obj(resp.json())
         resp.raise_for_status()
 
-    def get_run_plan(self, jobs: List[Job]) -> RunPlan:
+    def get_run_plan(self, jobs: List[Job], backends: Optional[List[str]]) -> RunPlan:
         url = _project_url(
             url=self.url,
             project=self.project,
@@ -84,7 +86,7 @@ class HubAPIClient:
             host=self.url,
             url=url,
             headers=self._headers(),
-            data=RunsGetPlan(jobs=jobs).json(),
+            data=RunsGetPlan(jobs=jobs, backends=backends).json(),
         )
         if resp.ok:
             body = resp.json()
@@ -108,7 +110,7 @@ class HubAPIClient:
             host=self.url,
             url=url,
             headers=self._headers(),
-            data=RunsCreate(repo_ref=self.repo.repo_ref, run_name=run_name).json(),
+            data=RunsCreate(repo_id=self.repo.repo_id, run_name=run_name).json(),
         )
         if resp.ok:
             return resp.text
@@ -165,14 +167,18 @@ class HubAPIClient:
             return [Job.parse_obj(job) for job in body]
         resp.raise_for_status()
 
-    def run_job(self, job: Job):
+    def run_job(self, job: Job, backends: Optional[List[str]]):
         url = _project_url(
             url=self.url,
             project=self.project,
             additional_path=f"/runners/run",
         )
         resp = _make_hub_request(
-            requests.post, host=self.url, url=url, headers=self._headers(), data=job.json()
+            requests.post,
+            host=self.url,
+            url=url,
+            headers=self._headers(),
+            data=RunRunners(job=job, backends=backends).json(),
         )
         if resp.ok:
             return
@@ -359,11 +365,11 @@ class HubAPIClient:
             return
         resp.raise_for_status()
 
-    def list_run_heads(
+    def list_runs(
         self,
         run_name: Optional[str] = None,
         include_request_heads: bool = True,
-    ) -> List[RunHead]:
+    ) -> List[RunInfo]:
         url = _project_url(
             url=self.url,
             project=self.project,
@@ -382,7 +388,7 @@ class HubAPIClient:
         )
         if resp.ok:
             body = resp.json()
-            return [RunHead.parse_obj(run) for run in body]
+            return [RunInfo.parse_obj(run) for run in body]
         resp.raise_for_status()
 
     def delete_runs(self, run_names: List[str]):
@@ -640,7 +646,7 @@ class HubAPIClient:
                 start_time = logs[-1].timestamp
             prev_event_id = logs[-1].event_id
 
-    def upload_file(self, dest_path: str) -> Optional[str]:
+    def upload_file(self, backend: str, dest_path: str) -> Optional[str]:
         url = _project_url(
             url=self.url,
             project=self.project,
@@ -651,13 +657,16 @@ class HubAPIClient:
             host=self.url,
             url=url,
             headers=self._headers(),
-            data=StorageLink(object_key=dest_path).json(),
+            data=StorageLink(
+                backend=backend,
+                object_key=dest_path,
+            ).json(),
         )
         if resp.ok:
             return resp.text
         resp.raise_for_status()
 
-    def download_file(self, dest_path: str) -> Optional[str]:
+    def download_file(self, backend: str, dest_path: str) -> Optional[str]:
         url = _project_url(
             url=self.url,
             project=self.project,
@@ -668,7 +677,10 @@ class HubAPIClient:
             host=self.url,
             url=url,
             headers=self._headers(),
-            data=StorageLink(object_key=dest_path).json(),
+            data=StorageLink(
+                backend=backend,
+                object_key=dest_path,
+            ).json(),
         )
         if resp.ok:
             return resp.text

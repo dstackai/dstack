@@ -1,20 +1,19 @@
 import os
-from abc import ABC
-from typing import Callable, Dict, List, Optional
+from typing import Callable
 
 import requests
 
-from dstack._internal.backend.base.storage import SIGNED_URL_EXPIRATION, CloudStorage
-from dstack._internal.core.storage import StorageFile
 from dstack.api.hub._api_client import HubAPIClient
 
 
-class HUBStorage(CloudStorage, ABC):
+class HUBStorage:
     def __init__(self, _client: HubAPIClient):
         self._client = _client
 
-    def upload_file(self, source_path: str, dest_path: str, callback: Callable[[int], None]):
-        url = self._client.upload_file(dest_path=dest_path)
+    def upload_file(
+        self, backend: str, source_path: str, dest_path: str, callback: Callable[[int], None]
+    ):
+        url = self._client.upload_file(backend=backend, dest_path=dest_path)
         if not (url is None):
             with open(source_path, "rb") as f:
                 headers = {}
@@ -28,7 +27,9 @@ class HUBStorage(CloudStorage, ABC):
                     file_stat = os.stat(source_path)
                     callback(file_stat.st_size)
 
-    def download_file(self, source_path: str, dest_path: str, callback: Callable[[int], None]):
+    def download_file(
+        self, backend: str, source_path: str, dest_path: str, callback: Callable[[int], None]
+    ):
         url = self._client.download_file(dest_path=source_path)
         if not (url is None):
             resp = requests.get(url)
@@ -38,24 +39,3 @@ class HUBStorage(CloudStorage, ABC):
                 content_length = resp.headers.get("content-length", None)
                 if not (content_length is None) and content_length.isdigit():
                     callback(int(content_length))
-
-    def put_object(self, key: str, content: str, metadata: Optional[Dict] = None):
-        pass
-
-    def get_object(self, key: str) -> Optional[str]:
-        pass
-
-    def delete_object(self, key: str):
-        pass
-
-    def list_objects(self, keys_prefix: str) -> List[str]:
-        pass
-
-    def list_files(self, dirpath: str) -> List[StorageFile]:
-        pass
-
-    def get_signed_download_url(self, key: str) -> str:
-        pass
-
-    def get_signed_upload_url(self, key: str) -> str:
-        pass

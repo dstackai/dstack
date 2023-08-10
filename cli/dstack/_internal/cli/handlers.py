@@ -18,7 +18,7 @@ from dstack._internal.cli.commands.tags import TAGCommand
 commands_classes = [
     BuildCommand,
     ConfigCommand,
-    CpCommand,
+    # CpCommand,
     GatewayCommand,
     InitCommand,
     LogCommand,

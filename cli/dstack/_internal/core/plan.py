@@ -16,4 +16,5 @@ class JobPlan(BaseModel):
 class RunPlan(BaseModel):
     project: str
     hub_user_name: str
+    local_backend: bool
     job_plans: List[JobPlan]

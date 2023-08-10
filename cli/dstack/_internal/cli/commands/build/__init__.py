@@ -68,8 +68,6 @@ class BuildCommand(BasicCommand):
         project_name = None
         if args.project:
             project_name = args.project
-        elif configurator.profile.project:
-            project_name = configurator.profile.project
 
         try:
             hub_client = get_hub_client(project_name=project_name)
@@ -91,13 +89,14 @@ class BuildCommand(BasicCommand):
 
             run_plan = hub_client.get_run_plan(configurator)
             console.print("dstack will execute the following plan:\n")
-            print_run_plan(configurator.configuration_path, run_plan)
+            print_run_plan(configurator, run_plan)
             if not args.yes and not Confirm.ask("Continue?"):
                 console.print("\nExiting...")
                 exit(0)
 
             ports_locks = reserve_ports(
-                configurator.app_specs(), hub_client.get_project_backend_type() == "local"
+                apps=configurator.app_specs(),
+                local_backend=run_plan.local_backend,
             )
 
             console.print("\nProvisioning...\n")

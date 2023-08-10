@@ -6,18 +6,19 @@ from boto3.session import Session
 
 from dstack._internal.backend.aws import AwsBackend
 from dstack._internal.backend.aws.config import DEFAULT_REGION_NAME, AWSConfig
+from dstack._internal.hub.db.models import Backend as DBBackend
 from dstack._internal.hub.db.models import Project
-from dstack._internal.hub.models import (
-    AWSBucketProjectElement,
-    AWSBucketProjectElementValue,
-    AWSProjectConfig,
-    AWSProjectConfigWithCreds,
-    AWSProjectConfigWithCredsPartial,
-    AWSProjectCreds,
-    AWSProjectValues,
-    ProjectElement,
-    ProjectElementValue,
-    ProjectMultiElement,
+from dstack._internal.hub.schemas import (
+    AWSBackendConfig,
+    AWSBackendConfigWithCreds,
+    AWSBackendConfigWithCredsPartial,
+    AWSBackendCreds,
+    AWSBackendValues,
+    AWSBucketBackendElement,
+    AWSBucketBackendElementValue,
+    BackendElement,
+    BackendElementValue,
+    BackendMultiElement,
 )
 from dstack._internal.hub.services.backends.base import BackendConfigError, Configurator
 
@@ -40,29 +41,29 @@ REGION_VALUES = [r[1] for r in REGIONS]
 class AWSConfigurator(Configurator):
     NAME = "aws"
 
-    def configure_project(
-        self, project_config: AWSProjectConfigWithCredsPartial
-    ) -> AWSProjectValues:
+    def configure_backend(
+        self, backend_config: AWSBackendConfigWithCredsPartial
+    ) -> AWSBackendValues:
         if (
-            project_config.region_name is not None
-            and project_config.region_name not in REGION_VALUES
+            backend_config.region_name is not None
+            and backend_config.region_name not in REGION_VALUES
         ):
-            raise BackendConfigError(f"Invalid AWS region {project_config.region_name}")
+            raise BackendConfigError(f"Invalid AWS region {backend_config.region_name}")
 
-        project_values = AWSProjectValues()
+        backend_values = AWSBackendValues()
         session = Session()
         if session.region_name is None:
-            session = Session(region_name=project_config.region_name or DEFAULT_REGION_NAME)
+            session = Session(region_name=backend_config.region_name or DEFAULT_REGION_NAME)
 
-        project_values.default_credentials = self._valid_credentials(session=session)
+        backend_values.default_credentials = self._valid_credentials(session=session)
 
-        if project_config.credentials is None:
-            return project_values
+        if backend_config.credentials is None:
+            return backend_values
 
-        project_credentials = project_config.credentials.__root__
+        project_credentials = backend_config.credentials.__root__
         if project_credentials.type == "access_key":
             session = Session(
-                region_name=project_config.region_name or DEFAULT_REGION_NAME,
+                region_name=backend_config.region_name or DEFAULT_REGION_NAME,
                 aws_access_key_id=project_credentials.access_key,
                 aws_secret_access_key=project_credentials.secret_key,
             )
@@ -70,54 +71,56 @@ class AWSConfigurator(Configurator):
                 self._raise_invalid_credentials_error(
                     fields=[["credentials", "access_key"], ["credentials", "secret_key"]]
                 )
-        elif not project_values.default_credentials:
+        elif not backend_values.default_credentials:
             self._raise_invalid_credentials_error(fields=[["credentials"]])
 
         # TODO validate config values
-        project_values.region_name = self._get_hub_region_element(selected=session.region_name)
-        project_values.extra_regions = self._get_hub_extra_regions_element(
+        backend_values.region_name = self._get_hub_region_element(selected=session.region_name)
+        backend_values.extra_regions = self._get_hub_extra_regions_element(
             region=session.region_name,
-            selected=project_config.extra_regions or [],
+            selected=backend_config.extra_regions or [],
         )
-        project_values.s3_bucket_name = self._get_hub_buckets_element(
+        backend_values.s3_bucket_name = self._get_hub_buckets_element(
             session=session,
             region=session.region_name,
-            selected=project_config.s3_bucket_name,
+            selected=backend_config.s3_bucket_name,
         )
-        project_values.ec2_subnet_id = self._get_hub_subnet_element(
-            session=session, selected=project_config.ec2_subnet_id
+        backend_values.ec2_subnet_id = self._get_hub_subnet_element(
+            session=session, selected=backend_config.ec2_subnet_id
         )
-        return project_values
+        return backend_values
 
-    def create_project(self, project_config: AWSProjectConfigWithCreds) -> Tuple[Dict, Dict]:
+    def create_backend(
+        self, project_name: str, backend_config: AWSBackendConfigWithCreds
+    ) -> Tuple[Dict, Dict]:
         config_data = {
-            "region_name": project_config.region_name,
-            "extra_regions": project_config.extra_regions,
-            "s3_bucket_name": project_config.s3_bucket_name.replace("s3://", ""),
-            "ec2_subnet_id": project_config.ec2_subnet_id,
+            "region_name": backend_config.region_name,
+            "extra_regions": backend_config.extra_regions,
+            "s3_bucket_name": backend_config.s3_bucket_name.replace("s3://", ""),
+            "ec2_subnet_id": backend_config.ec2_subnet_id,
         }
-        auth_data = project_config.credentials.__root__.dict()
+        auth_data = backend_config.credentials.__root__.dict()
         return config_data, auth_data
 
-    def get_project_config(
-        self, project: Project, include_creds: bool
-    ) -> Union[AWSProjectConfig, AWSProjectConfigWithCreds]:
-        json_config = json.loads(project.config)
+    def get_backend_config(
+        self, db_backend: DBBackend, include_creds: bool
+    ) -> Union[AWSBackendConfig, AWSBackendConfigWithCreds]:
+        json_config = json.loads(db_backend.config)
         region_name = json_config["region_name"]
         s3_bucket_name = json_config["s3_bucket_name"]
         ec2_subnet_id = json_config["ec2_subnet_id"]
         extra_regions = json_config.get("extra_regions", [])
         if include_creds:
-            json_auth = json.loads(project.auth)
-            return AWSProjectConfigWithCreds(
+            json_auth = json.loads(db_backend.auth)
+            return AWSBackendConfigWithCreds(
                 region_name=region_name,
                 region_name_title=region_name,
                 extra_regions=extra_regions,
                 s3_bucket_name=s3_bucket_name,
                 ec2_subnet_id=ec2_subnet_id,
-                credentials=AWSProjectCreds.parse_obj(json_auth),
+                credentials=AWSBackendCreds.parse_obj(json_auth),
             )
-        return AWSProjectConfig(
+        return AWSBackendConfig(
             region_name=region_name,
             region_name_title=region_name,
             extra_regions=extra_regions,
@@ -125,9 +128,9 @@ class AWSConfigurator(Configurator):
             ec2_subnet_id=ec2_subnet_id,
         )
 
-    def get_backend(self, project: Project) -> AwsBackend:
-        config_data = json.loads(project.config)
-        auth_data = json.loads(project.auth)
+    def get_backend(self, db_backend: DBBackend) -> AwsBackend:
+        config_data = json.loads(db_backend.config)
+        auth_data = json.loads(db_backend.auth)
         config = AWSConfig(
             bucket_name=config_data.get("bucket")
             or config_data.get("bucket_name")
@@ -156,27 +159,27 @@ class AWSConfigurator(Configurator):
             fields=fields,
         )
 
-    def _get_hub_region_element(self, selected: Optional[str]) -> ProjectElement:
-        element = ProjectElement(selected=selected)
+    def _get_hub_region_element(self, selected: Optional[str]) -> BackendElement:
+        element = BackendElement(selected=selected)
         for r in REGIONS:
-            element.values.append(ProjectElementValue(value=r[1], label=r[1]))
+            element.values.append(BackendElementValue(value=r[1], label=r[1]))
         return element
 
     def _get_hub_extra_regions_element(
         self, region: str, selected: List[str]
-    ) -> ProjectMultiElement:
-        element = ProjectMultiElement(selected=selected)
+    ) -> BackendMultiElement:
+        element = BackendMultiElement(selected=selected)
         for r in REGION_VALUES:
             if r != region:
-                element.values.append(ProjectElementValue(value=r, label=r))
+                element.values.append(BackendElementValue(value=r, label=r))
         return element
 
     def _get_hub_buckets_element(
         self, session: Session, region: str, selected: Optional[str]
-    ) -> AWSBucketProjectElement:
+    ) -> AWSBucketBackendElement:
         if selected:
             self._validate_hub_bucket(session=session, region=region, bucket_name=selected)
-        element = AWSBucketProjectElement(selected=selected)
+        element = AWSBucketBackendElement(selected=selected)
         s3_client = session.client("s3")
         try:
             response = s3_client.list_buckets()
@@ -185,7 +188,7 @@ class AWSConfigurator(Configurator):
             return element
         for bucket in response["Buckets"]:
             element.values.append(
-                AWSBucketProjectElementValue(
+                AWSBucketBackendElementValue(
                     name=bucket["Name"],
                     created=bucket["CreationDate"].strftime("%d.%m.%Y %H:%M:%S"),
                     region=region,
@@ -217,13 +220,13 @@ class AWSConfigurator(Configurator):
                 )
             raise e
 
-    def _get_hub_subnet_element(self, session: Session, selected: Optional[str]) -> ProjectElement:
-        element = ProjectElement(selected=selected)
+    def _get_hub_subnet_element(self, session: Session, selected: Optional[str]) -> BackendElement:
+        element = BackendElement(selected=selected)
         _ec2 = session.client("ec2")
         response = _ec2.describe_subnets()
         for subnet in response["Subnets"]:
             element.values.append(
-                ProjectElementValue(
+                BackendElementValue(
                     value=subnet["SubnetId"],
                     label=subnet["SubnetId"],
                 )

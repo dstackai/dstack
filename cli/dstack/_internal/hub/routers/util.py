@@ -1,14 +1,12 @@
-from typing import Dict, Optional
+from typing import Dict, List, Optional, Tuple
 
 from fastapi import HTTPException, status
 
 from dstack._internal.backend.base import Backend
-from dstack._internal.core.error import (
-    BackendAuthError,
-    BackendNotAvailableError,
-    BackendValueError,
-)
-from dstack._internal.hub.models import Project
+from dstack._internal.core.error import BackendNotAvailableError, BackendValueError
+from dstack._internal.core.job import Job
+from dstack._internal.hub.db.models import Backend as DBBackend
+from dstack._internal.hub.db.models import Project
 from dstack._internal.hub.repository.projects import ProjectManager
 from dstack._internal.hub.services.backends import cache as backends_cache
 from dstack._internal.hub.services.backends import get_configurator
@@ -23,27 +21,42 @@ async def get_project(project_name: str) -> Project:
             status_code=status.HTTP_404_NOT_FOUND,
             detail=error_detail("Project not found"),
         )
-    _check_backend_avaialble(project)
     return project
 
 
-async def get_backend(project: Project) -> Backend:
-    backend = await get_backend_if_available(project)
-    if backend is not None:
-        return backend
-    _raise_backend_not_available_error(project.backend)
+async def get_backends(project: Project) -> List[Tuple[DBBackend, Backend]]:
+    return await backends_cache.get_backends(project)
 
 
-async def get_backend_if_available(project: Project) -> Optional[Backend]:
-    try:
-        return await backends_cache.get_backend(project)
-    except BackendAuthError:
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail=error_detail(
-                f"Backend credentials for {project.name} are invalid", code=BackendAuthError.code
-            ),
-        )
+async def get_backend_by_type(project: Project, backend_type: str) -> Tuple[DBBackend, Backend]:
+    backends = await backends_cache.get_backends(project)
+    for db_backend, backend in backends:
+        if db_backend.type == backend_type:
+            return db_backend, backend
+    _raise_backend_not_available_error(backend_type)
+
+
+async def get_run_backend(
+    project: Project, repo_id: str, run_name: str
+) -> Optional[Tuple[DBBackend, Backend]]:
+    backends = await backends_cache.get_backends(project)
+    for db_backend, backend in backends:
+        run_head = await call_backend(backend.get_run_head, repo_id, run_name)
+        if run_head is not None:
+            return db_backend, backend
+    return None
+
+
+async def get_job_backend(
+    project: Project, repo_id: str, job_id: str
+) -> Optional[Tuple[DBBackend, Backend]]:
+    backends = await backends_cache.get_backends(project)
+    for db_backend, backend in backends:
+        job_heads = await call_backend(backend.list_job_heads, repo_id)
+        job_ids = [job_head.job_id for job_head in job_heads]
+        if job_id in job_ids:
+            return db_backend, backend
+    return None
 
 
 def get_backend_configurator(backend_type: str) -> Configurator:
@@ -69,10 +82,6 @@ async def call_backend(func, *args):
             status_code=status.HTTP_400_BAD_REQUEST,
             detail=error_detail(e.message, code=e.code),
         )
-
-
-def _check_backend_avaialble(project: Project):
-    get_backend_configurator(project.backend)
 
 
 def _raise_backend_not_available_error(backend_type: str):

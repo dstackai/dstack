@@ -1,7 +1,7 @@
 import json
 from typing import Dict, Optional
 
-from dstack._internal.hub.db.models import Project, User
+from dstack._internal.hub.db.models import Backend, Project, User
 from dstack._internal.hub.repository.projects import ProjectManager
 from dstack._internal.hub.repository.users import UserManager
 
@@ -22,10 +22,18 @@ async def create_user(
 
 async def create_project(
     name: str = "test_project",
-    backend: str = "aws",
+) -> Project:
+    project = Project(name=name)
+    await ProjectManager._create(project)
+    return project
+
+
+async def create_backend(
+    project_name: str,
+    backend_type: str = "aws",
     config: Optional[Dict] = None,
     auth: Optional[Dict] = None,
-) -> Project:
+) -> Backend:
     if config is None:
         config = {
             "region_name": "eu-west-1",
@@ -39,11 +47,12 @@ async def create_project(
             "access_key": "test_access_key",
             "secret_key": "test_secret_key",
         }
-    project = Project(
-        name=name,
-        backend=backend,
+    backend = Backend(
+        project_name=project_name,
+        type=backend_type,
+        name=backend_type,
         config=json.dumps(config),
         auth=json.dumps(auth),
     )
-    await ProjectManager.create(project)
-    return project
+    await ProjectManager._create_backend(backend)
+    return backend

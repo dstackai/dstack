@@ -8,8 +8,6 @@ import { useBreadcrumbs, useCollection } from 'hooks';
 import { ROUTES } from 'routes';
 import { useGetProjectsQuery } from 'services/project';
 
-import { BackendTypesEnum } from '../Form/types';
-
 interface IProjectSettingsNodeProps {
     settingsKey: string;
     settingsValue: string;
@@ -73,44 +71,6 @@ export const ProjectList: React.FC = () => {
         return `(${data.length})`;
     };
 
-    const getProjectSettings = (project: IProject) => {
-        switch (project.backend.type) {
-            case BackendTypesEnum.AWS:
-                return (
-                    <div>
-                        <ProjectSettingsNode settingsKey="Region" settingsValue={project.backend.region_name_title} />
-                        <ProjectSettingsNode settingsKey="Bucket" settingsValue={project.backend.s3_bucket_name} />
-                    </div>
-                );
-
-            case BackendTypesEnum.AZURE:
-                return (
-                    <div>
-                        <ProjectSettingsNode settingsKey="Location" settingsValue={project.backend.location} />
-                        <ProjectSettingsNode settingsKey="Storage account" settingsValue={project.backend.storage_account} />
-                    </div>
-                );
-
-            case BackendTypesEnum.GCP:
-                return (
-                    <div>
-                        <ProjectSettingsNode settingsKey="Region" settingsValue={project.backend.region} />
-                        <ProjectSettingsNode settingsKey="Bucket" settingsValue={project.backend.bucket_name} />
-                    </div>
-                );
-
-            case BackendTypesEnum.LAMBDA:
-                return (
-                    <div>
-                        <ProjectSettingsNode settingsKey="Regions" settingsValue={project.backend.regions.join(', ')} />
-                        <ProjectSettingsNode settingsKey="Bucket" settingsValue={project.backend.storage_backend.bucket_name} />
-                    </div>
-                );
-            case 'local':
-                return '-';
-        }
-    };
-
     return (
         <>
             <Cards
@@ -125,19 +85,6 @@ export const ProjectList: React.FC = () => {
                             {project.project_name}
                         </NavigateLink>
                     ),
-
-                    sections: [
-                        {
-                            id: 'type',
-                            header: t('projects.card.backend'),
-                            content: (project) => t(`projects.backend_type.${project.backend.type}`),
-                        },
-                        {
-                            id: 'settings',
-                            header: t('projects.card.settings'),
-                            content: getProjectSettings,
-                        },
-                    ],
                 }}
                 items={items}
                 loading={isLoading}

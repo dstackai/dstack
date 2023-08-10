@@ -6,8 +6,8 @@ from fastapi import APIRouter, Depends
 
 from dstack._internal.core.job import Job
 from dstack._internal.core.log_event import LogEvent
-from dstack._internal.hub.models import PollLogs
-from dstack._internal.hub.routers.util import call_backend, get_backend, get_project
+from dstack._internal.hub.routers.util import call_backend, get_project, get_run_backend
+from dstack._internal.hub.schemas import PollLogs
 from dstack._internal.hub.security.permissions import ProjectMember
 from dstack._internal.utils.common import get_current_datetime
 
@@ -19,10 +19,10 @@ router = APIRouter(prefix="/api/project", tags=["logs"], dependencies=[Depends(P
 )
 async def poll_logs(project_name: str, body: PollLogs) -> List[LogEvent]:
     project = await get_project(project_name=project_name)
-    backend = await get_backend(project)
+    _, backend = await get_run_backend(project, body.repo_id, body.run_name)
     jobs = await call_backend(backend.list_jobs, body.repo_id, body.run_name)
     if len(jobs) == 0:
-        return None
+        return []
 
     start_time = body.start_time
     if start_time is None:

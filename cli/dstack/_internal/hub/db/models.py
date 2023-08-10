@@ -43,11 +43,22 @@ class Member(Base):
     project_role: Mapped[str] = mapped_column(String(100))
 
 
+class Backend(Base):
+    __tablename__ = "backends"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    project_name: Mapped[str] = mapped_column(ForeignKey("projects.name", ondelete="CASCADE"))
+    project: Mapped["Project"] = relationship()
+    name: Mapped[str] = mapped_column(String(50))
+    type: Mapped[str] = mapped_column(String(30))
+
+    config: Mapped[str] = mapped_column(String(2000))
+    auth: Mapped[str] = mapped_column(String(2000))
+
+
 class Project(Base):
     __tablename__ = "projects"
 
     name: Mapped[str] = mapped_column(String(50), primary_key=True)
-    backend: Mapped[str] = mapped_column(String(30))
-    config: Mapped[str] = mapped_column(String(300))
-    auth: Mapped[str] = mapped_column(String(300))
     members: Mapped[List[Member]] = relationship(back_populates="project", lazy="selectin")
+    backends: Mapped[List[Backend]] = relationship(back_populates="project", lazy="selectin")

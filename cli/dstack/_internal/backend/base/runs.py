@@ -13,7 +13,11 @@ from dstack._internal.core.job import JobErrorCode, JobHead, JobStatus
 from dstack._internal.core.run import RequestStatus, RunHead, generate_remote_run_name_prefix
 
 
-def create_run(storage: Storage, run_name: Optional[str]) -> str:
+def generate_run_name(storage: Storage, backend_type: str, run_name: Optional[str]) -> str:
+    r
+
+
+def create_run(storage: Storage, run_name: str) -> str:
     if run_name is None:
         return _generate_random_run_name(storage)
     _validate_run_name(run_name)

@@ -26,9 +26,7 @@ export const REGIONS_HELP = {
     header: <h2>Regions</h2>,
     body: (
         <>
-            <p>
-                Select Lambda regions that will be used to provision compute resources.
-            </p>
+            <p>Select Lambda regions that will be used to provision compute resources.</p>
         </>
     ),
 };
@@ -37,9 +35,7 @@ export const STORAGE_HELP = {
     header: <h2>Storage</h2>,
     body: (
         <>
-            <p>
-                Select storage type that will be used for storing workflow metadata and artifacts.
-            </p>
+            <p>Select storage type that will be used for storing workflow metadata and artifacts.</p>
         </>
     ),
 };
@@ -50,8 +46,8 @@ export const CREDENTIALS_HELP = {
         <>
             <p>
                 To use AWS S3 as a storage for Lambda, you'll need to create an IAM user in your AWS account, grant this user
-                permissions to perform actions on S3, create credentials for that user, and specify them here as the Access key ID and{' '}
-                Secret access key.
+                permissions to perform actions on S3, create credentials for that user, and specify them here as the Access key
+                ID and Secret access key.
             </p>
         </>
     ),
@@ -75,9 +71,7 @@ export const BUCKET_HELP = {
     header: <h2>Bucket</h2>,
     body: (
         <>
-            <p>
-                Select an S3 bucket that will be used for storing workflow metadata and artifacts.
-            </p>
+            <p>Select an S3 bucket that will be used for storing workflow metadata and artifacts.</p>
         </>
     ),
 };

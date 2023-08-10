@@ -47,10 +47,6 @@ class Backend(ABC):
         pass
 
     @abstractmethod
-    def create_run(self, repo_id: str, run_name: Optional[str]) -> str:
-        pass
-
-    @abstractmethod
     def create_job(
         self,
         job: Job,
@@ -282,9 +278,6 @@ class ComponentBasedBackend(Backend):
 
     def predict_instance_type(self, job: Job) -> Optional[InstanceType]:
         return base_jobs.predict_job_instance(self.compute(), job)
-
-    def create_run(self, repo_id: str, run_name: Optional[str]) -> str:
-        return base_runs.create_run(self.storage(), run_name)
 
     def create_job(self, job: Job):
         base_jobs.create_job(self.storage(), job)

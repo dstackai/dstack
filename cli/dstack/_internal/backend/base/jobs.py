@@ -123,8 +123,6 @@ def run_job(
     job: Job,
     failed_to_start_job_new_status: JobStatus,
 ):
-    if job.status != JobStatus.SUBMITTED:
-        raise BackendError("Can't create a request for a job which status is not SUBMITTED")
     try:
         if job.configuration_type == ConfigurationType.SERVICE:
             job = gateway.setup_service_job(job, secrets_manager)
@@ -137,8 +135,6 @@ def run_job(
             failed_to_start_job_new_status=failed_to_start_job_new_status,
         )
     except Exception as e:
-        job.status = JobStatus.FAILED
-        update_job(storage, job)
         raise e
 
 
@@ -234,9 +230,6 @@ def _try_run_job(
                 attempt=attempt + 1,
             )
         else:
-            job.status = JobStatus.FAILED
-            job.error_code = JobErrorCode.NO_INSTANCE_MATCHING_REQUIREMENTS
-            update_job(storage, job)
             raise NoMatchingInstanceError()
     job.instance_type = instance_type.instance_name
     update_job(storage, job)
@@ -258,9 +251,7 @@ def _try_run_job(
                 attempt=attempt + 1,
             )
         else:
-            job.status = failed_to_start_job_new_status
-            job.error_code = JobErrorCode.FAILED_TO_START_DUE_TO_NO_CAPACITY
-            update_job(storage, job)
+            raise NoMatchingInstanceError()
     else:
         runners.update_runner(storage, runner)
         update_job(storage, job)

@@ -5,9 +5,9 @@ from typing import List
 from fastapi import APIRouter, Depends, HTTPException, status
 
 from dstack._internal.hub.db.models import User
-from dstack._internal.hub.models import DeleteUsers, UserInfo, UserInfoWithToken, UserPatch
 from dstack._internal.hub.repository.users import UserManager
 from dstack._internal.hub.routers.util import error_detail
+from dstack._internal.hub.schemas import DeleteUsers, UserInfo, UserInfoWithToken, UserPatch
 from dstack._internal.hub.security.permissions import Authenticated, GlobalAdmin, raise_forbidden
 from dstack._internal.hub.security.utils import ROLE_ADMIN
 

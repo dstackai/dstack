@@ -7,8 +7,13 @@ from typing_extensions import Annotated
 
 from dstack._internal.backend.base import Backend
 from dstack._internal.backend.local import LocalBackend
-from dstack._internal.hub.models import FileObject
-from dstack._internal.hub.routers.util import error_detail, get_backend, get_project
+from dstack._internal.hub.routers.util import (
+    error_detail,
+    get_backend_by_type,
+    get_backends,
+    get_project,
+)
+from dstack._internal.hub.schemas import FileObject
 from dstack._internal.hub.security.permissions import ProjectMember
 
 
@@ -26,7 +31,7 @@ router = APIRouter(
 @router.put("/{project_name}/storage/upload", response_model=FileObject)
 async def put_file(project_name: str, key: Annotated[str, Query()], request: Request):
     project = await get_project(project_name=project_name)
-    backend = await get_backend(project)
+    _, backend = await get_backend_by_type(project, "local")
     _check_backend_local(backend)
     root_path = Path(backend._storage.root_path).resolve()
     target_path = (root_path / key).resolve()
@@ -47,7 +52,7 @@ async def put_file(project_name: str, key: Annotated[str, Query()], request: Req
 @router.get("/{project_name}/storage/download", response_model=FileObject)
 async def download_file(project_name: str, key: Annotated[str, Query()], request: Request):
     project = await get_project(project_name=project_name)
-    backend = await get_backend(project)
+    _, backend = await get_backend_by_type(project, "local")
     _check_backend_local(backend)
     root_path = Path(backend._storage.root_path).resolve()
     target_path = (root_path / key).resolve()
