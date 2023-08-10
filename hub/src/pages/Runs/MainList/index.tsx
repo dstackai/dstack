@@ -1,32 +1,26 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { /*get as _get,*/ sortBy as _sortBy, uniqBy as _uniqBy } from 'lodash';
-import { format } from 'date-fns';
 
 import {
     Button,
     FormField,
     Header,
     ListEmptyMessage,
-    NavigateLink,
     Pagination,
     SelectCSD,
     SelectCSDProps,
     SpaceBetween,
-    StatusIndicator,
     Table,
     // TextFilter,
     Toggle,
 } from 'components';
 
-import { DATE_TIME_FORMAT } from 'consts';
-import { useCollection, useNotifications } from 'hooks';
-import { getStatusIconType } from 'libs/run';
-import { ROUTES } from 'routes';
-import { useDeleteRunsMutation, useGetAllRunsQuery, useStopRunsMutation } from 'services/run';
+import { useCollection } from 'hooks';
+import { useGetAllRunsQuery } from 'services/run';
 
 import { unfinishedRuns } from '../constants';
-import { isAvailableAbortingForRun, isAvailableDeletingForRun, isAvailableStoppingForRun } from '../utils';
+import { useAbortRuns, useColumnsDefinitions, useDeleteRuns, useDisabledStatesForButtons, useStopRuns } from '../List/hooks';
 
 import styles from './styles.module.scss';
 
@@ -40,7 +34,6 @@ import styles from './styles.module.scss';
 
 export const List: React.FC = () => {
     const { t } = useTranslation();
-    const [pushNotification] = useNotifications();
     const [selectedProject, setSelectedProject] = useState<SelectCSDProps.Option | null>(null);
     const [selectedRepo, setSelectedRepo] = useState<SelectCSDProps.Option | null>(null);
     const [onlyActive, setOnlyActive] = useState<boolean>(false);
@@ -51,66 +44,11 @@ export const List: React.FC = () => {
         pollingInterval: 10000,
     });
 
-    const [stopRun, { isLoading: isStopping }] = useStopRunsMutation();
-    const [deleteRun, { isLoading: isDeleting }] = useDeleteRunsMutation();
+    const { stopRuns, isStopping } = useStopRuns();
+    const { abortRuns, isAborting } = useAbortRuns();
+    const { deleteRuns, isDeleting } = useDeleteRuns();
 
-    const COLUMN_DEFINITIONS = [
-        {
-            id: 'run_name',
-            header: t('projects.run.run_name'),
-            cell: (item: IRunListItem) => (
-                <NavigateLink
-                    href={ROUTES.PROJECT.DETAILS.RUNS.DETAILS.FORMAT(item.project, item.repo.repo_id, item.run_head.run_name)}
-                >
-                    {item.run_head.run_name}
-                </NavigateLink>
-            ),
-        },
-        {
-            id: 'project',
-            header: `${t('projects.run.project')}`,
-            cell: (item: IRunListItem) => item.project,
-        },
-        {
-            id: 'repo',
-            header: `${t('projects.run.repo')}`,
-            cell: (item: IRunListItem) => item.repo.repo_info.repo_name,
-        },
-        {
-            id: 'configuration',
-            header: `${t('projects.run.configuration')}`,
-            cell: (item: IRunListItem) => item.run_head.job_heads?.[0].configuration_path,
-        },
-        {
-            id: 'instance',
-            header: `${t('projects.run.instance')}`,
-            cell: (item: IRunListItem) => item.run_head.job_heads?.[0].instance_type,
-        },
-        {
-            id: 'hub_user_name',
-            header: `${t('projects.run.hub_user_name')}`,
-            cell: (item: IRunListItem) => item.run_head.hub_user_name,
-        },
-        {
-            id: 'status',
-            header: t('projects.run.status'),
-            cell: (item: IRunListItem) => (
-                <StatusIndicator type={getStatusIconType(item.run_head.status)}>
-                    {t(`projects.run.statuses.${item.run_head.status}`)}
-                </StatusIndicator>
-            ),
-        },
-        {
-            id: 'submitted_at',
-            header: t('projects.run.submitted_at'),
-            cell: (item: IRunListItem) => format(new Date(item.run_head.submitted_at), DATE_TIME_FORMAT),
-        },
-        // {
-        //     id: 'artifacts',
-        //     header: t('projects.run.artifacts_count'),
-        //     cell: (item: IRunListItem) => item.run_head.artifact_heads?.length ?? '-',
-        // },
-    ];
+    const { columns } = useColumnsDefinitions();
 
     useEffect(() => {
         if (data && isFirstRunsFetchRef.current) {
@@ -158,7 +96,7 @@ export const List: React.FC = () => {
 
                     if (selectedProject?.value && runItem.project !== selectedProject.value) return false;
 
-                    if (selectedRepo?.value && runItem.repo.repo_id !== selectedRepo.value) return false;
+                    if (selectedRepo?.value && runItem.repo_id !== selectedRepo.value) return false;
 
                     if (onlyActive && !unfinishedRuns.includes(runItem.run_head.status)) return false;
 
@@ -176,6 +114,13 @@ export const List: React.FC = () => {
 
     const { selectedItems } = collectionProps;
 
+    const { isDisabledAbortButton, isDisabledStopButton, isDisabledDeleteButton } = useDisabledStatesForButtons({
+        selectedRuns: selectedItems,
+        isStopping,
+        isAborting,
+        isDeleting,
+    });
+
     const projectOptions = useMemo<SelectCSDProps.Options>(() => {
         if (!data?.length) return [];
 
@@ -189,7 +134,7 @@ export const List: React.FC = () => {
         if (!data?.length) return [];
 
         return _uniqBy(
-            data.map((run) => ({ label: run.repo.repo_info.repo_name, value: run.repo.repo_id })),
+            data.map((run) => ({ label: run.repo?.repo_info.repo_name ?? 'No repo', value: run.repo?.repo_id ?? '-' })),
             (option) => option.value,
         );
     }, [data]);
@@ -197,92 +142,20 @@ export const List: React.FC = () => {
     const abortClickHandle = () => {
         if (!selectedItems?.length) return;
 
-        Promise.all(
-            selectedItems.map((item) =>
-                stopRun({
-                    name: item.project,
-                    repo_id: item.repo.repo_id,
-                    run_names: [item.run_head.run_name],
-                    abort: true,
-                }).unwrap(),
-            ),
-        )
-            .then(() => actions.setSelectedItems([]))
-            .catch((error) => {
-                pushNotification({
-                    type: 'error',
-                    content: t('common.server_error', { error: error?.error }),
-                });
-            });
+        abortRuns([...selectedItems]).then(() => actions.setSelectedItems([]));
     };
 
     const stopClickHandle = () => {
         if (!selectedItems?.length) return;
 
-        Promise.all(
-            selectedItems.map((item) =>
-                stopRun({
-                    name: item.project,
-                    repo_id: item.repo.repo_id,
-                    run_names: [item.run_head.run_name],
-                    abort: false,
-                }).unwrap(),
-            ),
-        )
-            .then(() => actions.setSelectedItems([]))
-            .catch((error) => {
-                pushNotification({
-                    type: 'error',
-                    content: t('common.server_error', { error: error?.error }),
-                });
-            });
+        stopRuns([...selectedItems]).then(() => actions.setSelectedItems([]));
     };
 
     const deleteClickHandle = () => {
         if (!selectedItems?.length) return;
 
-        Promise.all(
-            selectedItems.map((item) =>
-                deleteRun({
-                    name: item.project,
-                    repo_id: item.repo.repo_id,
-                    run_names: [item.run_head.run_name],
-                }).unwrap(),
-            ),
-        ).catch((error) => {
-            pushNotification({
-                type: 'error',
-                content: t('common.server_error', { error: error?.error }),
-            });
-        });
+        deleteRuns([...selectedItems]).catch(console.log);
     };
-
-    const isDisabledAbortButton = useMemo<boolean>(() => {
-        return (
-            !selectedItems?.length ||
-            selectedItems.some((item) => !isAvailableAbortingForRun(item.run_head.status)) ||
-            isStopping ||
-            isDeleting
-        );
-    }, [selectedItems, isStopping, isDeleting]);
-
-    const isDisabledStopButton = useMemo<boolean>(() => {
-        return (
-            !selectedItems?.length ||
-            selectedItems.some((item) => !isAvailableStoppingForRun(item.run_head.status)) ||
-            isStopping ||
-            isDeleting
-        );
-    }, [selectedItems, isStopping, isDeleting]);
-
-    const isDisabledDeleteButton = useMemo<boolean>(() => {
-        return (
-            !selectedItems?.length ||
-            selectedItems.some((item) => !isAvailableDeletingForRun(item.run_head.status)) ||
-            isStopping ||
-            isDeleting
-        );
-    }, [selectedItems, isStopping, isDeleting]);
 
     const isDisabledClearFilter = !selectedProject && !selectedRepo && !filterProps.filteringText && !onlyActive;
 
@@ -290,7 +163,7 @@ export const List: React.FC = () => {
         <Table
             {...collectionProps}
             variant="full-page"
-            columnDefinitions={COLUMN_DEFINITIONS}
+            columnDefinitions={columns}
             items={items}
             loading={isLoading}
             loadingText={t('common.loading')}
