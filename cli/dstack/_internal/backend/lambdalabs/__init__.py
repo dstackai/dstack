@@ -10,6 +10,7 @@ from dstack._internal.backend.base import ComponentBasedBackend
 from dstack._internal.backend.base import runs as base_runs
 from dstack._internal.backend.lambdalabs.compute import LambdaCompute
 from dstack._internal.backend.lambdalabs.config import LambdaConfig
+from dstack._internal.core.job import Job, JobStatus
 
 
 class LambdaBackend(ComponentBasedBackend):
@@ -59,6 +60,14 @@ class LambdaBackend(ComponentBasedBackend):
 
     def logging(self) -> AWSLogging:
         return self._logging
+
+    def run_job(self, job: Job, failed_to_start_job_new_status: JobStatus):
+        self._logging.create_log_groups_if_not_exist(
+            aws_utils.get_logs_client(self._session),
+            self.backend_config.storage_config.bucket,
+            job.repo_ref.repo_id,
+        )
+        super().run_job(job, failed_to_start_job_new_status)
 
     def create_run(self, repo_id: str, run_name: Optional[str]) -> str:
         self._logging.create_log_groups_if_not_exist(
