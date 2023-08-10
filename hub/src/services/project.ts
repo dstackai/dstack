@@ -17,6 +17,7 @@ export const projectApi = createApi({
             query: () => {
                 return {
                     url: API.PROJECTS.LIST(),
+                    method: 'POST',
                 };
             },
 
@@ -30,16 +31,7 @@ export const projectApi = createApi({
             query: ({ name }) => {
                 return {
                     url: API.PROJECTS.DETAILS(name),
-                };
-            },
-
-            providesTags: (result) => (result ? [{ type: 'Projects' as const, id: result.project_name }] : []),
-        }),
-
-        getProjectWithConfigInfo: builder.query<IProject, { name: IProject['project_name'] }>({
-            query: ({ name }) => {
-                return {
-                    url: API.PROJECTS.DETAILS_WITH_CONFIG(name),
+                    method: 'POST',
                 };
             },
 
@@ -48,7 +40,7 @@ export const projectApi = createApi({
 
         createProject: builder.mutation<IProject, IProject>({
             query: (project) => ({
-                url: API.PROJECTS.BASE(),
+                url: API.PROJECTS.CREATE(),
                 method: 'POST',
                 body: project,
             }),
@@ -86,21 +78,6 @@ export const projectApi = createApi({
             }),
 
             invalidatesTags: () => ['Projects'],
-        }),
-
-        getBackendTypes: builder.query<TProjectBackendType[], void>({
-            query: () => ({
-                url: API.PROJECTS.BACKEND_TYPES(),
-                method: 'POST',
-            }),
-        }),
-
-        backendValues: builder.mutation<TProjectBackendValuesResponse, Partial<TProjectBackend>>({
-            query: (data) => ({
-                url: API.PROJECTS.BACKEND_VALUES(),
-                method: 'POST',
-                body: data,
-            }),
         }),
 
         //     Repos queries
@@ -157,13 +134,10 @@ export const projectApi = createApi({
 export const {
     useGetProjectsQuery,
     useGetProjectQuery,
-    useGetProjectWithConfigInfoQuery,
     useCreateProjectMutation,
     useUpdateProjectMutation,
     useUpdateProjectMembersMutation,
     useDeleteProjectsMutation,
-    useGetBackendTypesQuery,
-    useBackendValuesMutation,
     useGetProjectReposQuery,
     useGetProjectRepoQuery,
     useDeleteProjectRepoMutation,

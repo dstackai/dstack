@@ -2,6 +2,6 @@ export const getProjectRoleByUserName = (project: IProject, userName: IProjectMe
     return project.members.find((m) => m.user_name === userName)?.project_role ?? null;
 };
 
-export const getLambdaStorageTypeLabel = (type: TProjectBackendLambda['storage_backend']['type']) => {
+export const getLambdaStorageTypeLabel = (type: IBackendLambda['storage_backend']['type']) => {
     return { aws: 'AWS S3' }[type];
 };

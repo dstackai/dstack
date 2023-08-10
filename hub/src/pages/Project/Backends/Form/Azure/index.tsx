@@ -6,11 +6,11 @@ import { debounce } from 'lodash';
 import { FormInput, FormSelect, FormSelectOptions, InfoLink, SpaceBetween, Spinner } from 'components';
 
 import { useHelpPanel, useNotifications } from 'hooks';
+import useIsMounted from 'hooks/useIsMounted';
 import { isRequestFormErrors2, isRequestFormFieldError } from 'libs';
-import { useBackendValuesMutation } from 'services/project';
+import { useBackendValuesMutation } from 'services/backend';
 import { AzureCredentialTypeEnum } from 'types';
 
-import useIsMounted from '../../../../hooks/useIsMounted';
 import { CREDENTIALS_HELP, FIELD_NAMES, LOCATION_HELP, STORAGE_ACCOUNT_HELP, SUBSCRIPTION_HELP } from './constants';
 
 import { IProps } from './types';
@@ -23,7 +23,7 @@ export const AzureBackend: React.FC<IProps> = ({ loading }) => {
     const { t } = useTranslation();
     const [pushNotification] = useNotifications();
     const { control, getValues, setValue, setError, clearErrors, watch } = useFormContext();
-    const [valuesData, setValuesData] = useState<IProjectAzureBackendValues | undefined>();
+    const [valuesData, setValuesData] = useState<IAzureBackendValues | undefined>();
     const [subscriptionIds, setSubscriptionIds] = useState<FormSelectOptions>([]);
     const [tenantIds, setTenantIds] = useState<FormSelectOptions>([]);
     const [locations, setLocations] = useState<FormSelectOptions>([]);
@@ -39,28 +39,28 @@ export const AzureBackend: React.FC<IProps> = ({ loading }) => {
 
     const [openHelpPanel] = useHelpPanel();
 
-    const tenantIdValue = watch(`backend.${FIELD_NAMES.TENANT_ID}`);
-    const clientIdValue = watch(`backend.${FIELD_NAMES.CREDENTIALS.CLIENT_ID}`);
-    const clientSecretValue = watch(`backend.${FIELD_NAMES.CREDENTIALS.CLIENT_SECRET}`);
-    const credentialTypeValue = watch(`backend.${FIELD_NAMES.CREDENTIALS.TYPE}`);
+    const tenantIdValue = watch(FIELD_NAMES.TENANT_ID);
+    const clientIdValue = watch(FIELD_NAMES.CREDENTIALS.CLIENT_ID);
+    const clientSecretValue = watch(FIELD_NAMES.CREDENTIALS.CLIENT_SECRET);
+    const credentialTypeValue = watch(FIELD_NAMES.CREDENTIALS.TYPE);
 
     const changeFormHandler = async () => {
-        const backendFormValues = getValues('backend');
-        const backendCredentials = backendFormValues?.credentials ?? {};
+        const formValues = getValues();
+        const backendCredentials = formValues?.credentials ?? {};
 
         if (
             backendCredentials.type === AzureCredentialTypeEnum.CLIENT &&
-            (!backendFormValues.tenant_id || !backendCredentials.client_id || !backendCredentials.client_secret)
+            (!formValues.tenant_id || !backendCredentials.client_id || !backendCredentials.client_secret)
         ) {
             return;
         }
 
-        if (backendFormValues?.credentials && !backendFormValues.credentials.type) delete backendFormValues.credentials;
+        if (formValues?.credentials && !formValues.credentials.type) delete formValues.credentials;
 
-        clearErrors('backend');
+        clearErrors();
 
         try {
-            const request = getBackendValues(backendFormValues);
+            const request = getBackendValues(formValues);
             requestRef.current = request;
             const response = await request.unwrap();
 
@@ -74,7 +74,7 @@ export const AzureBackend: React.FC<IProps> = ({ loading }) => {
             // select authorization option
             if (!backendCredentials.type) {
                 setValue(
-                    `backend.${FIELD_NAMES.CREDENTIALS.TYPE}`,
+                    FIELD_NAMES.CREDENTIALS.TYPE,
                     response.default_credentials ? AzureCredentialTypeEnum.DEFAULT : AzureCredentialTypeEnum.CLIENT,
                 );
 
@@ -83,7 +83,7 @@ export const AzureBackend: React.FC<IProps> = ({ loading }) => {
 
             // TENANT_ID available for only client credentials type
             if (response.tenant_id?.selected) {
-                setValue(`backend.${FIELD_NAMES.TENANT_ID}`, response.tenant_id.selected);
+                setValue(FIELD_NAMES.TENANT_ID, response.tenant_id.selected);
             }
 
             if (response.tenant_id?.values) {
@@ -95,19 +95,19 @@ export const AzureBackend: React.FC<IProps> = ({ loading }) => {
             }
 
             if (response.subscription_id?.selected !== undefined) {
-                setValue(`backend.${FIELD_NAMES.SUBSCRIPTION_ID}`, response.subscription_id.selected);
+                setValue(FIELD_NAMES.SUBSCRIPTION_ID, response.subscription_id.selected);
             }
             if (response.location?.values) {
                 setLocations(response.location.values);
             }
             if (response.location?.selected !== undefined) {
-                setValue(`backend.${FIELD_NAMES.LOCATION}`, response.location.selected);
+                setValue(FIELD_NAMES.LOCATION, response.location.selected);
             }
             if (response.storage_account?.values) {
                 setStorageAccounts(response.storage_account.values);
             }
             if (response.storage_account?.selected !== undefined) {
-                setValue(`backend.${FIELD_NAMES.STORAGE_ACCOUNT}`, response.storage_account.selected);
+                setValue(FIELD_NAMES.STORAGE_ACCOUNT, response.storage_account.selected);
             }
         } catch (errorResponse) {
             console.log('fetch backends values error:', errorResponse);
@@ -118,7 +118,7 @@ export const AzureBackend: React.FC<IProps> = ({ loading }) => {
             if (isRequestFormErrors2(errorRequestData)) {
                 errorRequestData.detail.forEach((error) => {
                     if (isRequestFormFieldError(error)) {
-                        setError(`backend.${error.loc.join('.')}`, { type: 'custom', message: error.msg });
+                        setError(error.loc.join('.'), { type: 'custom', message: error.msg });
                     } else {
                         pushNotification({
                             type: 'error',
@@ -159,7 +159,7 @@ export const AzureBackend: React.FC<IProps> = ({ loading }) => {
 
     const clearFields = (startIndex: number) => {
         for (let i = startIndex; i < FIELDS_QUEUE.length; i++) {
-            setValue(`backend.${FIELDS_QUEUE[i]}`, null);
+            setValue(FIELDS_QUEUE[i], null);
         }
     };
 
@@ -197,7 +197,7 @@ export const AzureBackend: React.FC<IProps> = ({ loading }) => {
                 disabledField = disabledField || !locations.length;
                 break;
             case FIELD_NAMES.STORAGE_ACCOUNT:
-                disabledField = disabledField || !getValues('backend').location;
+                disabledField = disabledField || !getValues().location;
                 break;
         }
 
@@ -212,7 +212,7 @@ export const AzureBackend: React.FC<IProps> = ({ loading }) => {
                     label={t('projects.edit.azure.tenant_id')}
                     description={t('projects.edit.azure.tenant_id_description')}
                     control={control}
-                    name={`backend.${FIELD_NAMES.TENANT_ID}`}
+                    name={FIELD_NAMES.TENANT_ID}
                     onChange={onChangeCredentialField}
                     disabled={loading}
                     rules={{ required: t('validation.required') }}
@@ -227,7 +227,7 @@ export const AzureBackend: React.FC<IProps> = ({ loading }) => {
                     description={t('projects.edit.azure.tenant_id_description')}
                     placeholder={t('projects.edit.azure.tenant_id_placeholder')}
                     control={control}
-                    name={`backend.${FIELD_NAMES.TENANT_ID}`}
+                    name={FIELD_NAMES.TENANT_ID}
                     disabled={loading}
                     onChange={getOnChangeSelectField(FIELD_NAMES.TENANT_ID)}
                     options={tenantIds}
@@ -243,7 +243,7 @@ export const AzureBackend: React.FC<IProps> = ({ loading }) => {
             <FormSelect
                 label={t('projects.edit.azure.authorization')}
                 control={control}
-                name={`backend.${FIELD_NAMES.CREDENTIALS.TYPE}`}
+                name={FIELD_NAMES.CREDENTIALS.TYPE}
                 onChange={onChangeCredentialsTypeField}
                 disabled={loading || availableDefaultCredentials === null}
                 secondaryControl={availableDefaultCredentials === null && renderSpinner(true)}
@@ -269,7 +269,7 @@ export const AzureBackend: React.FC<IProps> = ({ loading }) => {
                         label={t('projects.edit.azure.client_id')}
                         description={t('projects.edit.azure.client_id_description')}
                         control={control}
-                        name={`backend.${FIELD_NAMES.CREDENTIALS.CLIENT_ID}`}
+                        name={FIELD_NAMES.CREDENTIALS.CLIENT_ID}
                         onChange={onChangeCredentialField}
                         disabled={loading}
                         rules={{ required: t('validation.required') }}
@@ -281,7 +281,7 @@ export const AzureBackend: React.FC<IProps> = ({ loading }) => {
                         label={t('projects.edit.azure.client_secret')}
                         description={t('projects.edit.azure.client_secret_description')}
                         control={control}
-                        name={`backend.${FIELD_NAMES.CREDENTIALS.CLIENT_SECRET}`}
+                        name={FIELD_NAMES.CREDENTIALS.CLIENT_SECRET}
                         onChange={onChangeCredentialField}
                         disabled={loading}
                         rules={{ required: t('validation.required') }}
@@ -296,7 +296,7 @@ export const AzureBackend: React.FC<IProps> = ({ loading }) => {
                 description={t('projects.edit.azure.subscription_id_description')}
                 placeholder={t('projects.edit.azure.subscription_id_placeholder')}
                 control={control}
-                name={`backend.${FIELD_NAMES.SUBSCRIPTION_ID}`}
+                name={FIELD_NAMES.SUBSCRIPTION_ID}
                 disabled={getDisabledByFieldName(FIELD_NAMES.SUBSCRIPTION_ID)}
                 onChange={getOnChangeSelectField(FIELD_NAMES.SUBSCRIPTION_ID)}
                 options={subscriptionIds}
@@ -310,7 +310,7 @@ export const AzureBackend: React.FC<IProps> = ({ loading }) => {
                 description={t('projects.edit.azure.location_description')}
                 placeholder={t('projects.edit.azure.location_placeholder')}
                 control={control}
-                name={`backend.${FIELD_NAMES.LOCATION}`}
+                name={FIELD_NAMES.LOCATION}
                 disabled={getDisabledByFieldName(FIELD_NAMES.LOCATION)}
                 onChange={getOnChangeSelectField(FIELD_NAMES.LOCATION)}
                 options={locations}
@@ -324,7 +324,7 @@ export const AzureBackend: React.FC<IProps> = ({ loading }) => {
                 description={t('projects.edit.azure.storage_account_description')}
                 placeholder={t('projects.edit.azure.storage_account_placeholder')}
                 control={control}
-                name={`backend.${FIELD_NAMES.STORAGE_ACCOUNT}`}
+                name={FIELD_NAMES.STORAGE_ACCOUNT}
                 disabled={getDisabledByFieldName(FIELD_NAMES.STORAGE_ACCOUNT)}
                 onChange={getOnChangeSelectField(FIELD_NAMES.STORAGE_ACCOUNT)}
                 options={storageAccounts}

@@ -44,6 +44,33 @@
     "users": "Users"
   },
 
+  "backend": {
+    "page_title_one": "Backend",
+    "page_title_other": "Backends",
+    "add_backend": "Add backend",
+    "edit_backend": "Edit backend",
+    "type": {
+      "aws": "AWS",
+      "aws_description": "Run workflows and store data in Amazon Web Services ",
+      "gcp": "GCP",
+      "gcp_description": "Run workflows and store data in Google Cloud Platform",
+      "azure": "Azure",
+      "azure_description": "Run workflows and store data in Microsoft Azure",
+      "lambda": "Lambda",
+      "lambda_description": "Run workflows and store data in Lambda",
+      "local": "Local",
+      "local_description": "Run workflows and store data locally via Docker"
+    },
+
+    "edit": {
+      "success_notification": "Project updating is successful"
+    },
+
+    "create": {
+      "success_notification": "Project is created"
+    }
+  },
+
   "projects": {
     "page_title": "Projects",
     "search_placeholder": "Find projects",
@@ -60,21 +87,8 @@
       "backend": "Backend",
       "settings": "Settings"
     },
-    "backend_type": {
-      "aws": "AWS",
-      "aws_description": "Run workflows and store data in Amazon Web Services ",
-      "gcp": "GCP",
-      "gcp_description": "Run workflows and store data in Google Cloud Platform",
-      "azure": "Azure",
-      "azure_description": "Run workflows and store data in Microsoft Azure",
-      "lambda": "Lambda",
-      "lambda_description": "Run workflows and store data in Lambda",
-      "local": "Local",
-      "local_description": "Run workflows and store data locally via Docker"
-    },
     "edit": {
       "general": "General",
-      "edit_backend": "Edit backend",
       "project_name": "Project name",
       "project_name_description": "Only latin characters, dashes, underscores, and digits",
       "backend": "Backend",
@@ -182,7 +196,6 @@
         "role": "Project role"
       },
       "error_notification": "Update project error",
-      "success_notification": "Project updating is successful",
       "validation": {
         "user_name_format": "Only letters, numbers, - or _"
       }
