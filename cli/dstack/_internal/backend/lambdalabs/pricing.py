@@ -1,6 +1,6 @@
-from typing import Optional
+from typing import List, Optional
 
-from dstack._internal.backend.base.pricing import BasePricing
+from dstack._internal.backend.base.pricing import Pricing
 from dstack._internal.core.instance import InstanceType
 
 """
@@ -32,7 +32,10 @@ PRICES = {
 }
 
 
-class LambdaPricing(BasePricing):
-    def fetch(self, instance: InstanceType, spot: Optional[bool]):
-        for region in instance.available_regions:
-            self.cache[instance.instance_name][(region, False)] = PRICES[instance.instance_name]
+class LambdaPricing(Pricing):
+    def fetch(self, instances: List[InstanceType], spot: Optional[bool]):
+        for instance in instances:
+            for region in instance.available_regions:
+                self.registry[instance.instance_name][(region, False)] = PRICES[
+                    instance.instance_name
+                ]

@@ -198,6 +198,7 @@ class Job(JobHead):
     location: Optional[str]
     master_job: Optional[str]  # not implemented
     max_duration: Optional[int]
+    price: Optional[float]
     provider_name: Optional[str] = ""  # deprecated
     registry_auth: Optional[RegistryAuth]
     repo_code_filename: Optional[str]

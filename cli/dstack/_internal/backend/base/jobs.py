@@ -9,7 +9,7 @@ from dstack._internal.backend.base.compute import Compute, InstanceNotFoundError
 from dstack._internal.backend.base.secrets import SecretsManager
 from dstack._internal.backend.base.storage import Storage
 from dstack._internal.core.error import BackendError, BackendValueError, NoMatchingInstanceError
-from dstack._internal.core.instance import InstanceType
+from dstack._internal.core.instance import InstanceOffer, InstanceType
 from dstack._internal.core.job import (
     ConfigurationType,
     Job,
@@ -122,6 +122,7 @@ def run_job(
     secrets_manager: SecretsManager,
     job: Job,
     failed_to_start_job_new_status: JobStatus,
+    offer: Optional[InstanceOffer] = None,
 ):
     try:
         if job.configuration_type == ConfigurationType.SERVICE:
@@ -133,6 +134,7 @@ def run_job(
             compute=compute,
             job=job,
             failed_to_start_job_new_status=failed_to_start_job_new_status,
+            offer=offer,
         )
     except Exception as e:
         raise e
@@ -213,13 +215,21 @@ def _try_run_job(
     compute: Compute,
     job: Job,
     failed_to_start_job_new_status: JobStatus,
+    offer: Optional[InstanceOffer] = None,
     attempt: int = 0,
 ):
-    spot = (
-        job.spot_policy is SpotPolicy.SPOT or job.spot_policy is SpotPolicy.AUTO and attempt == 0
-    )
-    job.requirements.spot = spot
-    instance_type = compute.get_instance_type(job)
+    if offer is None:
+        spot = (
+            job.spot_policy is SpotPolicy.SPOT
+            or job.spot_policy is SpotPolicy.AUTO
+            and attempt == 0
+        )
+        job.requirements.spot = spot
+        instance_type = compute.get_instance_type(job)
+    else:
+        job.requirements.spot = offer.spot
+        instance_type = offer.instance_type
+        # todo set price in job
     if instance_type is None:
         if job.spot_policy == SpotPolicy.AUTO and attempt == 0:
             return _try_run_job(
@@ -238,11 +248,12 @@ def _try_run_job(
     )
     runners.create_runner(storage, runner)
     try:
+        # todo use offer.region
         launched_instance_info = compute.run_instance(job, instance_type)
         runner.request_id = job.request_id = launched_instance_info.request_id
         job.location = launched_instance_info.location
     except NoCapacityError:
-        if job.spot_policy == SpotPolicy.AUTO and attempt == 0:
+        if offer is None and job.spot_policy == SpotPolicy.AUTO and attempt == 0:
             return _try_run_job(
                 storage=storage,
                 compute=compute,

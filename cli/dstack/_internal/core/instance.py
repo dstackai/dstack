@@ -1,3 +1,4 @@
+from dataclasses import dataclass
 from typing import List, Optional
 
 from pydantic import BaseModel
@@ -14,3 +15,11 @@ class InstanceType(BaseModel):
 class LaunchedInstanceInfo(BaseModel):
     request_id: str
     location: Optional[str] = None
+
+
+@dataclass(frozen=True)
+class InstanceOffer:
+    instance_type: InstanceType
+    region: str
+    spot: bool
+    price: float

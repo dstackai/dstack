@@ -12,15 +12,16 @@ from dstack._internal.backend.base import repos as base_repos
 from dstack._internal.backend.base import runs as base_runs
 from dstack._internal.backend.base import secrets as base_secrets
 from dstack._internal.backend.base import tags as base_tags
-from dstack._internal.backend.base.compute import Compute
+from dstack._internal.backend.base.compute import Compute, _matches_requirements
 from dstack._internal.backend.base.logs import Logging
+from dstack._internal.backend.base.pricing import Pricing
 from dstack._internal.backend.base.secrets import SecretsManager
 from dstack._internal.backend.base.storage import Storage
 from dstack._internal.core.artifact import Artifact
 from dstack._internal.core.build import BuildPlan
 from dstack._internal.core.gateway import GatewayHead
-from dstack._internal.core.instance import InstanceType
-from dstack._internal.core.job import Job, JobHead, JobStatus
+from dstack._internal.core.instance import InstanceOffer, InstanceType
+from dstack._internal.core.job import Job, JobHead, JobStatus, Requirements, SpotPolicy
 from dstack._internal.core.log_event import LogEvent
 from dstack._internal.core.repo import RemoteRepoCredentials, RepoHead, RepoSpec
 from dstack._internal.core.repo.base import Repo
@@ -70,7 +71,12 @@ class Backend(ABC):
         pass
 
     @abstractmethod
-    def run_job(self, job: Job, failed_to_start_job_new_status: JobStatus):
+    def run_job(
+        self,
+        job: Job,
+        failed_to_start_job_new_status: JobStatus,
+        offer: Optional[InstanceOffer] = None,
+    ):
         pass
 
     @abstractmethod
@@ -258,6 +264,12 @@ class Backend(ABC):
     def delete_gateway(self, instance_name: str):
         pass
 
+    @abstractmethod
+    def get_instance_candidates(
+        self, requirements: Requirements, spot_policy: SpotPolicy
+    ) -> List[InstanceOffer]:
+        pass
+
 
 class ComponentBasedBackend(Backend):
     @abstractmethod
@@ -276,6 +288,10 @@ class ComponentBasedBackend(Backend):
     def logging(self) -> Logging:
         pass
 
+    @abstractmethod
+    def pricing(self) -> Pricing:
+        pass
+
     def predict_instance_type(self, job: Job) -> Optional[InstanceType]:
         return base_jobs.predict_job_instance(self.compute(), job)
 
@@ -288,7 +304,12 @@ class ComponentBasedBackend(Backend):
     def list_jobs(self, repo_id: str, run_name: str) -> List[Job]:
         return base_jobs.list_jobs(self.storage(), repo_id, run_name)
 
-    def run_job(self, job: Job, failed_to_start_job_new_status: JobStatus):
+    def run_job(
+        self,
+        job: Job,
+        failed_to_start_job_new_status: JobStatus,
+        offer: Optional[InstanceOffer] = None,
+    ):
         self.predict_build_plan(job)  # raises exception on missing build
         base_jobs.run_job(
             self.storage(),
@@ -296,6 +317,7 @@ class ComponentBasedBackend(Backend):
             self.secrets_manager(),
             job,
             failed_to_start_job_new_status,
+            offer=offer,
         )
 
     def restart_job(self, job: Job):
@@ -490,3 +512,13 @@ class ComponentBasedBackend(Backend):
 
     def delete_gateway(self, instance_name: str):
         gateway.delete_gateway(self.compute(), self.storage(), instance_name)
+
+    def get_instance_candidates(
+        self, requirements: Requirements, spot_policy: SpotPolicy
+    ) -> List[InstanceOffer]:
+        spot_query = {SpotPolicy.SPOT: True, SpotPolicy.ONDEMAND: False, SpotPolicy.AUTO: None}[
+            spot_policy
+        ]
+        instances = self.compute().get_supported_instances()
+        instances = [i for i in instances if _matches_requirements(i.resources, requirements)]
+        return self.pricing().get_prices(instances, spot_query)

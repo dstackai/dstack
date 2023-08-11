@@ -1,11 +1,11 @@
 import re
 from collections import defaultdict
-from typing import Dict, Optional
+from typing import Dict, List, Optional
 
 import google.cloud.billing_v1 as billing_v1
 from google.oauth2 import service_account
 
-from dstack._internal.backend.base.pricing import BasePricing, RegionSpot
+from dstack._internal.backend.base.pricing import Pricing, RegionSpot
 from dstack._internal.core.instance import InstanceType
 
 COMPUTE_SERVICE = "services/6F81-5844-456A"
@@ -25,7 +25,7 @@ GPU_FAMILIES = {
 }
 
 
-class GCPPricing(BasePricing):
+class GCPPricing(Pricing):
     def __init__(self, credentials: Optional[service_account.Credentials] = None):
         super().__init__()
         self.client = billing_v1.CloudCatalogClient(credentials=credentials)
@@ -34,6 +34,7 @@ class GCPPricing(BasePricing):
             "core": defaultdict(dict),
             "gpu": defaultdict(dict),
         }
+        self.last_updated = 0
 
     def _fetch_families(self):
         skus = self.client.list_skus(parent=COMPUTE_SERVICE)
@@ -62,27 +63,38 @@ class GCPPricing(BasePricing):
                     sku.pricing_info[0].pricing_expression.tiered_rates[0].unit_price.nanos / 1e9
                 )
 
-    def fetch(self, instance: InstanceType, spot: Optional[bool]):
-        # todo cache
-        self._fetch_families()
+    def fetch(self, instances: List[InstanceType], spot: Optional[bool]):
+        if self._need_update("families"):
+            self._fetch_families()
 
-        vm_family = instance.instance_name.split("-")[0]
-        gpu_family = None if not instance.resources.gpus else instance.resources.gpus[0].name
-        region_spots = self.family_cache["core"].get(vm_family, {}).keys()
-        region_spots &= self.family_cache["ram"].get(vm_family, {}).keys()
-        if gpu_family:
-            region_spots &= self.family_cache["gpu"].get(gpu_family, {}).keys()
+        for instance in instances:
+            if not self._need_update(self.instance_key(instance)):
+                return
 
-        for region_spot in region_spots:
-            cost = instance.resources.cpus * self.family_cache["core"][vm_family][region_spot]
-            cost += (
-                instance.resources.memory_mib
-                / 1024
-                * self.family_cache["ram"][vm_family][region_spot]
-            )
+            vm_family = instance.instance_name.split("-")[0]
+            gpu_family = None if not instance.resources.gpus else instance.resources.gpus[0].name
+            region_spots = self.family_cache["core"].get(vm_family, {}).keys()
+            region_spots &= self.family_cache["ram"].get(vm_family, {}).keys()
             if gpu_family:
+                region_spots &= self.family_cache["gpu"].get(gpu_family, {}).keys()
+
+            for region_spot in region_spots:
+                cost = instance.resources.cpus * self.family_cache["core"][vm_family][region_spot]
                 cost += (
-                    len(instance.resources.gpus)
-                    * self.family_cache["gpu"][gpu_family][region_spot]
+                    instance.resources.memory_mib
+                    / 1024
+                    * self.family_cache["ram"][vm_family][region_spot]
                 )
-            self.cache[instance.instance_name][region_spot] = cost
+                if gpu_family:
+                    cost += (
+                        len(instance.resources.gpus)
+                        * self.family_cache["gpu"][gpu_family][region_spot]
+                    )
+                self.registry[self.instance_key(instance)][region_spot] = cost
+
+    @classmethod
+    def instance_key(cls, instance: InstanceType) -> str:
+        if instance.resources.gpus:
+            gpu = instance.resources.gpus[0]
+            return f"{instance.instance_name}-{len(instance.resources.gpus)}x{gpu.name}-{gpu.memory_mib}"
+        return instance.instance_name

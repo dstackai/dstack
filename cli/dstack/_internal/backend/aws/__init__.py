@@ -7,11 +7,13 @@ from dstack._internal.backend.aws import utils as aws_utils
 from dstack._internal.backend.aws.compute import AWSCompute
 from dstack._internal.backend.aws.config import AWSConfig
 from dstack._internal.backend.aws.logs import AWSLogging
+from dstack._internal.backend.aws.pricing import AWSPricing
 from dstack._internal.backend.aws.secrets import AWSSecretsManager
 from dstack._internal.backend.aws.storage import AWSStorage
 from dstack._internal.backend.base import ComponentBasedBackend
 from dstack._internal.backend.base import runs as base_runs
 from dstack._internal.core.error import BackendAuthError
+from dstack._internal.core.instance import InstanceOffer
 from dstack._internal.core.job import Job, JobStatus
 
 
@@ -49,6 +51,7 @@ class AwsBackend(ComponentBasedBackend):
             logs_client=aws_utils.get_logs_client(self._session),
             bucket_name=self.backend_config.bucket_name,
         )
+        self._pricing = AWSPricing(session=self._session)
         self._check_credentials()
 
     @classmethod
@@ -72,13 +75,21 @@ class AwsBackend(ComponentBasedBackend):
     def logging(self) -> AWSLogging:
         return self._logging
 
-    def run_job(self, job: Job, failed_to_start_job_new_status: JobStatus):
+    def pricing(self) -> AWSPricing:
+        return self._pricing
+
+    def run_job(
+        self,
+        job: Job,
+        failed_to_start_job_new_status: JobStatus,
+        offer: Optional[InstanceOffer] = None,
+    ):
         self._logging.create_log_groups_if_not_exist(
             aws_utils.get_logs_client(self._session),
             self.backend_config.bucket_name,
             job.repo_ref.repo_id,
         )
-        super().run_job(job, failed_to_start_job_new_status)
+        super().run_job(job, failed_to_start_job_new_status, offer=offer)
 
     def create_run(self, repo_id: str, run_name: Optional[str]) -> str:
         self._logging.create_log_groups_if_not_exist(

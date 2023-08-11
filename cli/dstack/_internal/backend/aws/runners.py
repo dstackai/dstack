@@ -52,6 +52,7 @@ def run_instance(
 ) -> LaunchedInstanceInfo:
     regions = [region_name]
     if extra_regions:
+        # todo use single region, because hub handles multi-region & multi-cloud
         regions.extend(
             _get_instance_available_regions(
                 ec2_client=aws_utils.get_ec2_client(session),

@@ -44,6 +44,7 @@ type Job struct {
 	Location          string            `yaml:"location,omitempty"`
 	MasterJobID       string            `yaml:"master_job,omitempty"`
 	MaxDuration       uint64            `yaml:"max_duration,omitempty"`
+	Price             float64           `yaml:"price,omitempty"`
 	ProviderName      string            `yaml:"provider_name,omitempty"` // deprecated, head
 	RegistryAuth      RegistryAuth      `yaml:"registry_auth,omitempty"`
 	RepoCodeFilename  string            `yaml:"repo_code_filename,omitempty"`

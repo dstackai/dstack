@@ -108,6 +108,16 @@ class AzureCompute(Compute):
         )
         return choose_instance_type(instance_types=instance_types, requirements=job.requirements)
 
+    def get_supported_instances(self) -> List[InstanceType]:
+        instances = {}
+        for location in [self.azure_config.location]:
+            for i in _get_instance_types(client=self._compute_client, location=location):
+                if i.instance_name not in instances:
+                    instances[i.instance_name] = i
+                    i.available_regions = []
+                instances[i.instance_name].available_regions.append(location)
+        return list(instances.values())
+
     def run_instance(self, job: Job, instance_type: InstanceType) -> LaunchedInstanceInfo:
         return _run_instance(
             compute_client=self._compute_client,
