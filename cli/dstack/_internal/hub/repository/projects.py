@@ -141,6 +141,8 @@ class ProjectManager:
         backend = await _backend_config_to_backend(
             project_name=project.name, backend_config=backend_config
         )
+        if backend is None:
+            return
         await ProjectManager._create_backend(backend=backend, session=session)
 
     @staticmethod
@@ -228,13 +230,15 @@ class ProjectManager:
 
 async def _backend_config_to_backend(
     project_name: str, backend_config: AnyBackendConfigWithCreds
-) -> Backend:
+) -> Optional[Backend]:
     backend = Backend(
         project_name=project_name,
         name=backend_config.type,
         type=backend_config.type,
     )
     configurator = get_configurator(backend_config.type)
+    if configurator is None:
+        return None
     config, auth = await run_async(configurator.create_backend, project_name, backend_config)
     backend.config = json.dumps(config)
     backend.auth = json.dumps(auth)
