@@ -19,6 +19,7 @@ declare interface IAzureBackendValues {
     subscription_id: TBackendValueField,
     location: TBackendValueField,
     storage_account: TBackendValueField,
+    extra_locations: TBackendValueField,
 }
 
 declare interface TVPCSubnetValue { label: string, vpc: string, subnet: string}
@@ -29,6 +30,7 @@ declare interface IGCPBackendValues {
     region: TBackendValueField,
     vpc_subnet: TBackendValueField<TVPCSubnetValue[]>
     zone: TBackendValueField,
+    extra_regions: TBackendValueField,
 }
 
 declare interface ILambdaBackendValues {
@@ -82,6 +84,7 @@ declare interface IBackendAzure {
     subscription_id: string,
     location: string,
     storage_account: string,
+    extra_locations: string[],
 }
 
 enum GCPCredentialTypeEnum {
@@ -103,6 +106,7 @@ declare interface IBackendGCP {
     bucket_name: string,
     vpc: string,
     subnet: string,
+    extra_regions: string[],
 }
 
 declare interface IBackendLambda {

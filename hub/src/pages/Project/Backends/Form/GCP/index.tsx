@@ -2,7 +2,17 @@ import React, { useEffect, useRef, useState } from 'react';
 import { useFormContext } from 'react-hook-form';
 import { useTranslation } from 'react-i18next';
 
-import { FileUploader, FormS3BucketSelector, FormSelect, FormSelectOptions, InfoLink, SpaceBetween, Spinner } from 'components';
+import {
+    FileUploader,
+    FormMultiselect,
+    FormMultiselectOptions,
+    FormS3BucketSelector,
+    FormSelect,
+    FormSelectOptions,
+    InfoLink,
+    SpaceBetween,
+    Spinner,
+} from 'components';
 
 import { useHelpPanel, useNotifications } from 'hooks';
 import useIsMounted from 'hooks/useIsMounted';
@@ -10,7 +20,16 @@ import { isRequestFormErrors2, isRequestFormFieldError } from 'libs';
 import { useBackendValuesMutation } from 'services/backend';
 import { GCPCredentialTypeEnum } from 'types';
 
-import { AREA_HELP, BUCKET_HELP, FIELD_NAMES, REGION_HELP, SERVICE_ACCOUNT_HELP, SUBNET_HELP, ZONE_HELP } from './constants';
+import {
+    ADDITIONAL_REGIONS_HELP,
+    AREA_HELP,
+    BUCKET_HELP,
+    FIELD_NAMES,
+    REGION_HELP,
+    SERVICE_ACCOUNT_HELP,
+    SUBNET_HELP,
+    ZONE_HELP,
+} from './constants';
 
 import { IProps, VPCSubnetOption } from './types';
 
@@ -45,6 +64,7 @@ export const GCPBackend: React.FC<IProps> = ({ loading }) => {
     const [zoneOptions, setZoneOptions] = useState<FormSelectOptions>([]);
     const [bucketNameOptions, setBucketNameOptions] = useState<TAwsBucket[]>([]);
     const [subnetOptions, setSubnetOptions] = useState<VPCSubnetOption[]>([]);
+    const [extraRegions, setExtraRegions] = useState<FormMultiselectOptions>([]);
     const [availableDefaultCredentials, setAvailableDefaultCredentials] = useState<boolean | null>(null);
     const requestRef = useRef<null | ReturnType<typeof getBackendValues>>(null);
     const [pushNotification] = useNotifications();
@@ -153,6 +173,14 @@ export const GCPBackend: React.FC<IProps> = ({ loading }) => {
                     vpc: valueItem.vpc,
                     subnet: valueItem.subnet,
                 });
+            }
+
+            if (response.extra_regions?.values) {
+                setExtraRegions(response.extra_regions.values);
+            }
+
+            if (response.extra_regions?.selected !== undefined) {
+                setValue(FIELD_NAMES.EXTRA_REGIONS, response.extra_regions.selected);
             }
         } catch (errorResponse) {
             console.log('fetch backends values error:', errorResponse);
@@ -402,6 +430,19 @@ export const GCPBackend: React.FC<IProps> = ({ loading }) => {
                     disabled={getDisabledByFieldName(FIELD_NAMES.VPC_SUBNET)}
                     rules={{ required: t('validation.required') }}
                     secondaryControl={renderSpinner()}
+                />
+
+                <FormMultiselect
+                    info={<InfoLink onFollow={() => openHelpPanel(ADDITIONAL_REGIONS_HELP)} />}
+                    label={t('projects.edit.gcp.extra_regions')}
+                    description={t('projects.edit.gcp.extra_regions_description')}
+                    placeholder={t('projects.edit.gcp.extra_regions_placeholder')}
+                    control={control}
+                    name={FIELD_NAMES.EXTRA_REGIONS}
+                    onChange={getOnChangeSelectFormField(FIELD_NAMES.EXTRA_REGIONS)}
+                    disabled={getDisabledByFieldName(FIELD_NAMES.EXTRA_REGIONS)}
+                    secondaryControl={renderSpinner()}
+                    options={extraRegions}
                 />
             </SpaceBetween>
         </>

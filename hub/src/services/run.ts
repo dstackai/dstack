@@ -93,6 +93,43 @@ export const runApi = createApi({
             }),
 
             invalidatesTags: (result, error, params) => reduceInvalidateTagsFromRunNames(params.run_names),
+
+            async onQueryStarted({ run_names, name, repo_id }, { dispatch, queryFulfilled }) {
+                const patchGetRunResult = dispatch(
+                    runApi.util.updateQueryData('getRuns', { name, repo_id, include_request_heads: true }, (draftRuns) => {
+                        run_names.forEach((runName) => {
+                            const index = draftRuns.findIndex((run) => {
+                                return run.run_head.run_name === runName && run.project === name && run.repo_id === repo_id;
+                            });
+
+                            if (index >= 0) {
+                                draftRuns.splice(index, 1);
+                            }
+                        });
+                    }),
+                );
+
+                const patchGetAllRunResult = dispatch(
+                    runApi.util.updateQueryData('getAllRuns', undefined, (draftRuns) => {
+                        run_names.forEach((runName) => {
+                            const index = draftRuns.findIndex((run) => {
+                                return run.run_head.run_name === runName && run.project === name && run.repo_id === repo_id;
+                            });
+
+                            if (index >= 0) {
+                                draftRuns.splice(index, 1);
+                            }
+                        });
+                    }),
+                );
+
+                try {
+                    await queryFulfilled;
+                } catch (e) {
+                    patchGetRunResult.undo();
+                    patchGetAllRunResult.undo();
+                }
+            },
         }),
     }),
 });

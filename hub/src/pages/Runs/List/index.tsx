@@ -15,16 +15,11 @@ export const RunList: React.FC = () => {
     const paramProjectName = params.name ?? '';
     const paramRepoId = params.repoId ?? '';
 
-    const { data, isLoading } = useGetRunsQuery(
-        {
-            name: paramProjectName,
-            repo_id: paramRepoId,
-            include_request_heads: true,
-        },
-        {
-            pollingInterval: 10000,
-        },
-    );
+    const { data, isLoading } = useGetRunsQuery({
+        name: paramProjectName,
+        repo_id: paramRepoId,
+        include_request_heads: true,
+    });
 
     const { stopRuns, isStopping } = useStopRuns();
     const { abortRuns, isAborting } = useAbortRuns();

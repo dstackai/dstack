@@ -140,7 +140,10 @@
         "location_placeholder": "Not selected",
         "storage_account":  "Storage account",
         "storage_account_description":  "Select an Azure storage account to store artifacts",
-        "storage_account_placeholder":  "Not selected"
+        "storage_account_placeholder":  "Not selected",
+        "extra_locations": "Additional locations",
+        "extra_locations_description": "Select additional locations to run workflows",
+        "extra_locations_placeholder":  "Select locations"
       },
       "gcp": {
         "authorization": "Authorization",
@@ -165,7 +168,10 @@
         "vpc_placeholder": "VPC placeholder",
         "subnet": "Subnet",
         "subnet_description": "Select a subnet to run workflows in",
-        "subnet_placeholder": "Not selected"
+        "subnet_placeholder": "Not selected",
+        "extra_regions": "Additional regions",
+        "extra_regions_description": "Select additional regions to run workflows",
+        "extra_regions_placeholder":  "Select regions"
       },
       "lambda": {
         "api_key": "API key",
