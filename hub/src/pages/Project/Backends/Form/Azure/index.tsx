@@ -3,7 +3,16 @@ import { useFormContext } from 'react-hook-form';
 import { useTranslation } from 'react-i18next';
 import { debounce } from 'lodash';
 
-import { FormInput, FormSelect, FormSelectOptions, InfoLink, SpaceBetween, Spinner } from 'components';
+import {
+    FormInput,
+    FormMultiselect,
+    FormMultiselectOptions,
+    FormSelect,
+    FormSelectOptions,
+    InfoLink,
+    SpaceBetween,
+    Spinner,
+} from 'components';
 
 import { useHelpPanel, useNotifications } from 'hooks';
 import useIsMounted from 'hooks/useIsMounted';
@@ -11,7 +20,14 @@ import { isRequestFormErrors2, isRequestFormFieldError } from 'libs';
 import { useBackendValuesMutation } from 'services/backend';
 import { AzureCredentialTypeEnum } from 'types';
 
-import { CREDENTIALS_HELP, FIELD_NAMES, LOCATION_HELP, STORAGE_ACCOUNT_HELP, SUBSCRIPTION_HELP } from './constants';
+import {
+    ADDITIONAL_LOCATIONS_HELP,
+    CREDENTIALS_HELP,
+    FIELD_NAMES,
+    LOCATION_HELP,
+    STORAGE_ACCOUNT_HELP,
+    SUBSCRIPTION_HELP,
+} from './constants';
 
 import { IProps } from './types';
 
@@ -28,6 +44,7 @@ export const AzureBackend: React.FC<IProps> = ({ loading }) => {
     const [tenantIds, setTenantIds] = useState<FormSelectOptions>([]);
     const [locations, setLocations] = useState<FormSelectOptions>([]);
     const [storageAccounts, setStorageAccounts] = useState<FormSelectOptions>([]);
+    const [extraLocations, setExtraLocations] = useState<FormMultiselectOptions>([]);
     const [availableDefaultCredentials, setAvailableDefaultCredentials] = useState<boolean | null>(null);
     const lastUpdatedField = useRef<string | null>(null);
     const isFirstRender = useRef<boolean>(true);
@@ -108,6 +125,14 @@ export const AzureBackend: React.FC<IProps> = ({ loading }) => {
             }
             if (response.storage_account?.selected !== undefined) {
                 setValue(FIELD_NAMES.STORAGE_ACCOUNT, response.storage_account.selected);
+            }
+
+            if (response.extra_locations?.values) {
+                setExtraLocations(response.extra_locations.values);
+            }
+
+            if (response.extra_locations?.selected !== undefined) {
+                setValue(FIELD_NAMES.EXTRA_LOCATIONS, response.extra_locations.selected);
             }
         } catch (errorResponse) {
             console.log('fetch backends values error:', errorResponse);
@@ -329,6 +354,19 @@ export const AzureBackend: React.FC<IProps> = ({ loading }) => {
                 onChange={getOnChangeSelectField(FIELD_NAMES.STORAGE_ACCOUNT)}
                 options={storageAccounts}
                 secondaryControl={renderSpinner()}
+            />
+
+            <FormMultiselect
+                info={<InfoLink onFollow={() => openHelpPanel(ADDITIONAL_LOCATIONS_HELP)} />}
+                label={t('projects.edit.azure.extra_locations')}
+                description={t('projects.edit.azure.extra_locations_description')}
+                placeholder={t('projects.edit.azure.extra_locations_placeholder')}
+                control={control}
+                name={FIELD_NAMES.EXTRA_LOCATIONS}
+                onChange={getOnChangeSelectField(FIELD_NAMES.EXTRA_LOCATIONS)}
+                disabled={getDisabledByFieldName(FIELD_NAMES.EXTRA_LOCATIONS)}
+                secondaryControl={renderSpinner()}
+                options={extraLocations}
             />
         </SpaceBetween>
     );
