@@ -66,9 +66,9 @@ class HubAPIClient:
 
     def get_project_info(self) -> ProjectInfo:
         resp = _make_hub_request(
-            requests.get,
+            requests.post,
             host=self.url,
-            url=f"{self.url}/api/projects/{self.project}",
+            url=f"{self.url}/api/projects/{self.project}/info",
             headers=self._headers(),
         )
         if resp.ok:
