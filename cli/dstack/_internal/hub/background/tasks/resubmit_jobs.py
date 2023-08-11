@@ -1,5 +1,7 @@
 from typing import List
 
+import google.api_core.exceptions
+
 from dstack._internal.backend.base import Backend
 from dstack._internal.core.job import JobStatus
 from dstack._internal.hub.db.models import Project
@@ -25,7 +27,12 @@ async def _resubmit_projects_jobs(projects: List[Project]):
         backends = await get_backends(project)
         for db_backend, backend in backends:
             logger.info("Resubmitting jobs for %s backend", db_backend.name)
-            await run_async(_resubmit_backend_jobs, backend)
+            try:
+                await run_async(_resubmit_backend_jobs, backend)
+            except google.api_core.exceptions.RetryError as e:
+                logger.warning(
+                    "Error when resubmitting jobs for %s backend: %s", db_backend.name, e.message
+                )
             logger.info("Finished resubmitting jobs for %s backend", db_backend.name)
         logger.info("Finished resubmitting jobs for %s project", project.name)
 
