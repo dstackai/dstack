@@ -1,13 +1,17 @@
+import asyncio
 from typing import List, Optional
 
 from fastapi import APIRouter, Depends, HTTPException, status
 from fastapi.responses import PlainTextResponse
 
+from dstack._internal.backend.base import Backend
 from dstack._internal.core.build import BuildNotFoundError
 from dstack._internal.core.error import BackendValueError, NoMatchingInstanceError
 from dstack._internal.core.job import JobStatus
 from dstack._internal.core.plan import JobPlan, RunPlan
+from dstack._internal.core.repo.head import RepoHead
 from dstack._internal.core.run import generate_remote_run_name_prefix
+from dstack._internal.hub.db.models import Backend as DBBackend
 from dstack._internal.hub.db.models import Project, User
 from dstack._internal.hub.repository.projects import ProjectManager
 from dstack._internal.hub.routers.util import call_backend, error_detail, get_backends, get_project
@@ -33,30 +37,38 @@ project_router = APIRouter(
 
 @root_router.post("/list")
 async def list_all_runs() -> List[RunInfo]:
+    async def get_run_infos(
+        project: Project, db_backend: DBBackend, backend: Backend, repo_head: RepoHead
+    ) -> List[RunInfo]:
+        run_infos = []
+        run_heads = await call_backend(
+            backend.list_run_heads,
+            repo_head.repo_id,
+            None,
+            False,
+            JobStatus.PENDING,
+        )
+        for run_head in run_heads:
+            run_info = RunInfo(
+                project=project.name,
+                repo_id=repo_head.repo_id,
+                backend=db_backend.name,
+                run_head=run_head,
+                repo=repo_head,
+            )
+            run_infos.append(run_info)
+        return run_infos
+
     projects = await ProjectManager.list()
-    # TODO sort
-    run_infos = []
+    coros = []
     for project in projects:
         backends = await get_backends(project)
         for db_backend, backend in backends:
             repo_heads = await call_backend(backend.list_repo_heads)
             for repo_head in repo_heads:
-                run_heads = await call_backend(
-                    backend.list_run_heads,
-                    repo_head.repo_id,
-                    None,
-                    False,
-                    JobStatus.PENDING,
-                )
-                for run_head in run_heads:
-                    run_info = RunInfo(
-                        project=project.name,
-                        repo_id=repo_head.repo_id,
-                        backend=db_backend.name,
-                        run_head=run_head,
-                        repo=repo_head,
-                    )
-                    run_infos.append(run_info)
+                coros.append(get_run_infos(project, db_backend, backend, repo_head))
+    res = await asyncio.gather(*coros)
+    run_infos = [run_info for l in res for run_info in l]
     run_infos = sorted(run_infos, key=lambda x: -x.run_head.submitted_at)
     return run_infos
 
