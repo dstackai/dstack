@@ -21,5 +21,4 @@ class LaunchedInstanceInfo(BaseModel):
 class InstanceOffer:
     instance_type: InstanceType
     region: str
-    spot: bool
     price: float

@@ -227,9 +227,9 @@ def _try_run_job(
         job.requirements.spot = spot
         instance_type = compute.get_instance_type(job)
     else:
-        job.requirements.spot = offer.spot
+        job.requirements.spot = offer.instance_type.resources.spot
         instance_type = offer.instance_type
-        # todo set price in job
+        job.price = offer.price
     if instance_type is None:
         if job.spot_policy == SpotPolicy.AUTO and attempt == 0:
             return _try_run_job(

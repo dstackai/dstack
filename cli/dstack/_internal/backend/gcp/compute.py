@@ -115,7 +115,14 @@ class GCPCompute(Compute):
             "g2-*",
         ]
         instances = {}
-        for zone in [self.gcp_config.zone]:
+        zones = _get_zones(
+            regions_client=self.regions_client,
+            project_id=self.gcp_config.project_id,
+            primary_region=self.gcp_config.region,
+            primary_zone=self.gcp_config.zone,
+            extra_regions=self.gcp_config.extra_regions,
+        )
+        for zone in zones:
             region = zone[:-2]
             instance_types = _list_instance_types(
                 machine_types_client=self.machine_types_client,

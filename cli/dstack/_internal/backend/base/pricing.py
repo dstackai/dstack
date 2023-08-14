@@ -24,6 +24,7 @@ class Pricing(ABC):
 
     @abstractmethod
     def fetch(self, instances: List[InstanceType], spot: Optional[bool]):
+        # ignores instances[i].resources.spot
         pass
 
     def get_prices(
@@ -38,7 +39,9 @@ class Pricing(ABC):
                     continue
                 if not self.spot_match(spot, is_spot):
                     continue
-                offers.append(InstanceOffer(instance, region, spot, price))
+                i = instance.copy(deep=True)
+                i.resources.spot = is_spot
+                offers.append(InstanceOffer(i, region, price))
         return offers
 
     @classmethod
