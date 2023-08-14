@@ -2,6 +2,7 @@ package azure
 
 import (
 	"context"
+	"github.com/Azure/azure-sdk-for-go/sdk/azcore/to"
 	"strings"
 
 	"github.com/Azure/azure-sdk-for-go/sdk/azidentity"
@@ -45,16 +46,11 @@ func (azcompute AzureCompute) GetInstancePublicIP(ctx context.Context, requestID
 	}
 	interfaceID := *resp.VirtualMachine.Properties.NetworkProfile.NetworkInterfaces[0].ID
 	interfaceName := getNetworkInterfaceName(interfaceID)
-	networkInterface, err := azcompute.interfacesClient.Get(ctx, azcompute.resourceGroup, interfaceName, nil)
+	networkInterface, err := azcompute.interfacesClient.Get(ctx, azcompute.resourceGroup, interfaceName, &armnetwork.InterfacesClientGetOptions{Expand: to.Ptr("IPConfigurations/PublicIPAddress")})
 	if err != nil {
 		return "", gerrors.Wrap(err)
 	}
-	ipAddressName := *networkInterface.Properties.IPConfigurations[0].Properties.PublicIPAddress.Name
-	ipAddress, err := azcompute.ipAddressClient.Get(ctx, azcompute.resourceGroup, ipAddressName, nil)
-	if err != nil {
-		return "", gerrors.Wrap(err)
-	}
-	return *ipAddress.Properties.IPAddress, nil
+	return *networkInterface.Properties.IPConfigurations[0].Properties.PublicIPAddress.Properties.IPAddress, nil
 }
 
 func (azcompute AzureCompute) TerminateInstance(ctx context.Context, requestID string) error {
