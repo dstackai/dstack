@@ -123,7 +123,6 @@ class GCPCompute(Compute):
             extra_regions=self.gcp_config.extra_regions,
         )
         for zone in zones:
-            region = zone[:-2]
             instance_types = _list_instance_types(
                 machine_types_client=self.machine_types_client,
                 project_id=self.gcp_config.project_id,
@@ -134,7 +133,7 @@ class GCPCompute(Compute):
                 if i.instance_name not in instances:
                     instances[i.instance_name] = i
                     i.available_regions = []
-                instances[i.instance_name].available_regions.append(region)
+                instances[i.instance_name].available_regions.append(zone)
 
             n1_instance_types = _list_instance_types(
                 machine_types_client=self.machine_types_client,
@@ -160,7 +159,7 @@ class GCPCompute(Compute):
                 if name not in instances:
                     instances[name] = i
                     i.available_regions = []
-                instances[name].available_regions.append(region)
+                instances[name].available_regions.append(zone)
         return list(instances.values())
 
     def run_instance(self, job: Job, instance_type: InstanceType) -> LaunchedInstanceInfo:
