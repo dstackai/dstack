@@ -37,26 +37,27 @@ _supported_accelerators = [
     {"accelerator_name": "nvidia-a100-80gb", "gpu_name": "A100", "memory_mb": 1024 * 80},
     {"accelerator_name": "nvidia-tesla-a100", "gpu_name": "A100", "memory_mb": 1024 * 40},
     {"accelerator_name": "nvidia-l4", "gpu_name": "L4", "memory_mb": 1024 * 24},
+    # Limits from https://cloud.google.com/compute/docs/gpus
     {
         "accelerator_name": "nvidia-tesla-t4",
         "gpu_name": "T4",
         "memory_mb": 1024 * 16,
-        "max_vcpu": 48,
-        "max_ram_mb": 1024 * 312,
+        "max_vcpu": {1: 48, 2: 48, 4: 96},
+        "max_ram_mb": {1: 312 * 1024, 2: 312 * 1024, 4: 624 * 1024},
     },
     {
         "accelerator_name": "nvidia-tesla-v100",
         "gpu_name": "V100",
         "memory_mb": 1024 * 16,
-        "max_vcpu": 12,
-        "max_ram_mb": 1024 * 78,
+        "max_vcpu": {1: 12, 2: 24, 4: 48, 8: 96},
+        "max_ram_mb": {1: 78 * 1024, 2: 156 * 1024, 4: 312 * 1024, 8: 624 * 1024},
     },
     {
         "accelerator_name": "nvidia-tesla-p100",
         "gpu_name": "P100",
         "memory_mb": 1024 * 16,
-        "max_vcpu": 16,
-        "max_ram_mb": 1024 * 104,
+        "max_vcpu": {1: 16, 2: 32, 4: 64},  # 4: 96
+        "max_ram_mb": {1: 104 * 1024, 2: 208 * 1024, 4: 208 * 1024},  # 4: 624
     },
 ]
 
@@ -108,16 +109,71 @@ class GCPCompute(Compute):
             requirements=job.requirements,
         )
 
-    def run_instance(self, job: Job, instance_type: InstanceType) -> LaunchedInstanceInfo:
+    def get_supported_instances(self) -> List[InstanceType]:
+        vm_families = ["e2-medium", "e2-standard-*", "e2-highmem-*", "e2-highcpu-*", "m1-*"] + [
+            "a2-*",
+            "g2-*",
+        ]
+        instances = {}
+        zones = _get_zones(
+            regions_client=self.regions_client,
+            project_id=self.gcp_config.project_id,
+            primary_region=self.gcp_config.region,
+            primary_zone=self.gcp_config.zone,
+            extra_regions=self.gcp_config.extra_regions,
+        )
+        for zone in zones:
+            instance_types = _list_instance_types(
+                machine_types_client=self.machine_types_client,
+                project_id=self.gcp_config.project_id,
+                zone=zone,
+                machine_families=vm_families,
+            )
+            for i in instance_types:
+                if i.instance_name not in instances:
+                    instances[i.instance_name] = i
+                    i.available_regions = []
+                instances[i.instance_name].available_regions.append(zone)
+
+            n1_instance_types = _list_instance_types(
+                machine_types_client=self.machine_types_client,
+                project_id=self.gcp_config.project_id,
+                zone=zone,
+                machine_families=["n1-*"],
+            )
+            n1_instance_types = [
+                # skip shared-core instances
+                i
+                for i in n1_instance_types
+                if i.instance_name not in ("n1-standard-1", "n1-highcpu-2")
+            ]
+            accelerator_types = _list_accelerator_types(
+                accelerator_types_client=self.accelerator_types_client,
+                project_id=self.gcp_config.project_id,
+                zone=zone,
+                accelerator_families=["nvidia-tesla-t4", "nvidia-tesla-v100", "nvidia-tesla-p100"],
+            )
+            for i in _instances_x_accelerators(n1_instance_types, accelerator_types):
+                gpu = i.resources.gpus[0]
+                name = f"{i.instance_name}-{len(i.resources.gpus)}x{gpu.name}-{gpu.memory_mib}"
+                if name not in instances:
+                    instances[name] = i
+                    i.available_regions = []
+                instances[name].available_regions.append(zone)
+        return list(instances.values())
+
+    def run_instance(
+        self, job: Job, instance_type: InstanceType, region: Optional[str] = None
+    ) -> LaunchedInstanceInfo:
         return _run_instance(
             instances_client=self.instances_client,
             firewalls_client=self.firewalls_client,
             images_client=self.images_client,
-            regions_client=self.regions_client,
             credentials=self.credentials,
             gcp_config=self.gcp_config,
             job=job,
             instance_type=instance_type,
+            zone=region or self.gcp_config.zone,
         )
 
     def restart_instance(self, job: Job):
@@ -366,7 +422,6 @@ def _add_gpus_to_instance_type(
     instance_type: InstanceType,
     requirements: Requirements,
 ) -> List[InstanceType]:
-    instance_types = []
     accelerator_types = _list_accelerator_types(
         accelerator_types_client=accelerator_types_client,
         project_id=project_id,
@@ -377,34 +432,42 @@ def _add_gpus_to_instance_type(
             "nvidia-tesla-p100",
         ],
     )
-    for at in accelerator_types:
-        for gpu_count in range(1, at.maximum_cards_per_instance):
-            max_vcpu = _get_max_vcpu_per_accelerator(at.name) * gpu_count
-            max_ram_mb = _get_max_ram_per_accelerator(at.name) * gpu_count
-            if (
-                max_vcpu < instance_type.resources.cpus
-                or max_ram_mb < instance_type.resources.memory_mib
-            ):
+    return _instances_x_accelerators([instance_type], accelerator_types)
+
+
+def _instances_x_accelerators(
+    instances: List[InstanceType], accelerators: List[compute_v1.AcceleratorType]
+) -> List[InstanceType]:
+    pow2 = [2**i for i in range(4)]
+    combined = []
+    for accelerator in accelerators:
+        for count in pow2:
+            if count > accelerator.maximum_cards_per_instance:
                 continue
-            instance_types.append(
-                InstanceType(
-                    instance_name=instance_type.instance_name,
-                    resources=Resources(
-                        cpus=instance_type.resources.cpus,
-                        memory_mib=instance_type.resources.memory_mib,
-                        spot=instance_type.resources.spot,
-                        local=instance_type.resources.local,
-                        gpus=[
-                            Gpu(
-                                name=_accelerator_name_to_gpu_name(at.name),
-                                memory_mib=_get_gpu_memory(at.name),
-                            )
-                            for _ in range(gpu_count)
-                        ],
-                    ),
-                )
-            )
-    return instance_types
+            max_vcpu = _get_max_vcpu_per_accelerator(accelerator.name, count)
+            max_ram_mb = _get_max_ram_per_accelerator(accelerator.name, count)
+            for instance in instances:
+                if (
+                    max_vcpu < instance.resources.cpus
+                    or max_ram_mb < instance.resources.memory_mib
+                ):
+                    continue
+                combined.append(_attach_accelerator(instance, accelerator, count))
+    return combined
+
+
+def _attach_accelerator(
+    instance: InstanceType, accelerator: compute_v1.AcceleratorType, count: int
+) -> InstanceType:
+    data = instance.dict()
+    data["resources"]["gpus"] = [
+        Gpu(
+            name=_accelerator_name_to_gpu_name(accelerator.name),
+            memory_mib=_get_gpu_memory(accelerator.name),
+        )
+        for _ in range(count)
+    ]
+    return InstanceType.parse_obj(data)
 
 
 def _list_accelerator_types(
@@ -435,16 +498,16 @@ def _gpu_to_accelerator_name(gpu: Gpu) -> str:
             return acc["accelerator_name"]
 
 
-def _get_max_vcpu_per_accelerator(accelerator_name: str) -> int:
+def _get_max_vcpu_per_accelerator(accelerator_name: str, count: int) -> int:
     for acc in _supported_accelerators:
         if acc["accelerator_name"] == accelerator_name:
-            return acc["max_vcpu"]
+            return acc["max_vcpu"][count]
 
 
-def _get_max_ram_per_accelerator(accelerator_name: str) -> int:
+def _get_max_ram_per_accelerator(accelerator_name: str, count: int) -> int:
     for acc in _supported_accelerators:
         if acc["accelerator_name"] == accelerator_name:
-            return acc["max_ram_mb"]
+            return acc["max_ram_mb"][count]
 
 
 def _get_image_name(
@@ -529,62 +592,54 @@ def _run_instance(
     instances_client: compute_v1.InstancesClient,
     firewalls_client: compute_v1.FirewallsClient,
     images_client: compute_v1.ImagesClient,
-    regions_client: compute_v1.RegionsClient,
     credentials: service_account.Credentials,
     gcp_config: GCPConfig,
     job: Job,
     instance_type: InstanceType,
+    zone: str,
 ) -> LaunchedInstanceInfo:
-    zones = _get_zones(
-        regions_client=regions_client,
-        project_id=gcp_config.project_id,
-        primary_region=gcp_config.region,
-        primary_zone=gcp_config.zone,
-        extra_regions=gcp_config.extra_regions,
-    )
-    for zone in zones:
-        try:
-            logger.info(
-                "Requesting %s %s instance in %s...",
-                instance_type.instance_name,
-                "spot" if job.requirements.spot else "",
-                zone,
-            )
-            instance = _launch_instance(
-                instances_client=instances_client,
-                firewalls_client=firewalls_client,
+    try:
+        logger.info(
+            "Requesting %s %s instance in %s...",
+            instance_type.instance_name,
+            "spot" if job.requirements.spot else "",
+            zone,
+        )
+        instance = _launch_instance(
+            instances_client=instances_client,
+            firewalls_client=firewalls_client,
+            project_id=gcp_config.project_id,
+            zone=zone,
+            network=_get_network_resource(gcp_config.vpc),
+            subnet=_get_subnet_resource(gcp_utils.get_zone_region(zone), gcp_config.subnet),
+            machine_type=instance_type.instance_name,
+            image_name=_get_image_name(
+                images_client=images_client,
+                instance_type=instance_type,
+            ),
+            instance_name=job.instance_name,
+            user_data_script=_get_user_data_script(
+                gcp_config=_config_with_zone(gcp_config, zone),
+                job=job,
+                instance_type=instance_type,
+            ),
+            service_account=credentials.service_account_email,
+            spot=instance_type.resources.spot,
+            accelerators=_get_accelerator_configs(
                 project_id=gcp_config.project_id,
                 zone=zone,
-                network=_get_network_resource(gcp_config.vpc),
-                subnet=_get_subnet_resource(gcp_utils.get_zone_region(zone), gcp_config.subnet),
-                machine_type=instance_type.instance_name,
-                image_name=_get_image_name(
-                    images_client=images_client,
-                    instance_type=instance_type,
-                ),
-                instance_name=job.instance_name,
-                user_data_script=_get_user_data_script(
-                    gcp_config=_config_with_zone(gcp_config, zone),
-                    job=job,
-                    instance_type=instance_type,
-                ),
-                service_account=credentials.service_account_email,
-                spot=instance_type.resources.spot,
-                accelerators=_get_accelerator_configs(
-                    project_id=gcp_config.project_id,
-                    zone=zone,
-                    instance_type=instance_type,
-                ),
-                labels=_get_labels(
-                    bucket=gcp_config.bucket_name,
-                    job=job,
-                ),
-                ssh_key_pub=job.ssh_key_pub,
-            )
-            logger.info("Request succeeded")
-            return LaunchedInstanceInfo(request_id=instance.name, location=zone)
-        except NoCapacityError:
-            logger.info("Failed to request instance in %s", zone)
+                instance_type=instance_type,
+            ),
+            labels=_get_labels(
+                bucket=gcp_config.bucket_name,
+                job=job,
+            ),
+            ssh_key_pub=job.ssh_key_pub,
+        )
+        logger.info("Request succeeded")
+        return LaunchedInstanceInfo(request_id=instance.name, location=zone)
+    except NoCapacityError:
+        logger.info("Failed to request instance in %s", zone)
     raise NoCapacityError()
 
 

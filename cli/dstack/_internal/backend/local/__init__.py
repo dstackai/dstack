@@ -5,6 +5,7 @@ from dstack._internal.backend.base import build as base_build
 from dstack._internal.backend.local.compute import LocalCompute
 from dstack._internal.backend.local.config import LocalConfig
 from dstack._internal.backend.local.logs import LocalLogging
+from dstack._internal.backend.local.pricing import LocalPricing
 from dstack._internal.backend.local.secrets import LocalSecretsManager
 from dstack._internal.backend.local.storage import LocalStorage
 from dstack._internal.core.build import BuildPlan
@@ -23,6 +24,7 @@ class LocalBackend(ComponentBasedBackend):
         self._compute = LocalCompute(self.backend_config)
         self._secrets_manager = LocalSecretsManager(self.backend_config.backend_dir)
         self._logging = LocalLogging(self.backend_config)
+        self._pricing = LocalPricing()
 
     @classmethod
     def load(cls) -> Optional["LocalBackend"]:
@@ -42,6 +44,9 @@ class LocalBackend(ComponentBasedBackend):
 
     def logging(self) -> LocalLogging:
         return self._logging
+
+    def pricing(self) -> LocalPricing:
+        return self._pricing
 
     def predict_build_plan(self, job: Job) -> BuildPlan:
         # guess platform from uname

@@ -7,6 +7,7 @@ from azure.identity import ClientSecretCredential, DefaultAzureCredential
 from dstack._internal.backend.azure.compute import AzureCompute
 from dstack._internal.backend.azure.config import AzureConfig
 from dstack._internal.backend.azure.logs import AzureLogging
+from dstack._internal.backend.azure.pricing import AzurePricing
 from dstack._internal.backend.azure.secrets import AzureSecretsManager
 from dstack._internal.backend.azure.storage import AzureStorage
 from dstack._internal.backend.base import ComponentBasedBackend
@@ -46,6 +47,7 @@ class AzureBackend(ComponentBasedBackend):
                 resource_group=self.backend_config.resource_group,
                 storage_account=self.backend_config.storage_account,
             )
+            self._pricing = AzurePricing()
         except ClientAuthenticationError:
             raise BackendAuthError()
 
@@ -67,3 +69,6 @@ class AzureBackend(ComponentBasedBackend):
 
     def logging(self) -> AzureLogging:
         return self._logging
+
+    def pricing(self) -> AzurePricing:
+        return self._pricing

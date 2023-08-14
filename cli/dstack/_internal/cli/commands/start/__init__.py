@@ -25,7 +25,7 @@ class StartCommand(BasicCommand):
             host=args.host,
             port=args.port,
             reload=version.__version__ is None,
-            log_level="error",
+            log_level="info" if version.__version__ is None else "error",
         )
 
     def register(self):

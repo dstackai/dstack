@@ -36,7 +36,13 @@ class Compute(ABC):
         pass
 
     @abstractmethod
-    def run_instance(self, job: Job, instance_type: InstanceType) -> LaunchedInstanceInfo:
+    def get_supported_instances(self) -> List[InstanceType]:
+        pass
+
+    @abstractmethod
+    def run_instance(
+        self, job: Job, instance_type: InstanceType, region: Optional[str] = None
+    ) -> LaunchedInstanceInfo:
         pass
 
     def restart_instance(self, job: Job) -> LaunchedInstanceInfo:

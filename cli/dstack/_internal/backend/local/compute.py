@@ -1,4 +1,6 @@
-from typing import Optional
+import functools
+import uuid
+from typing import List, Optional
 
 from dstack._internal.backend.base.compute import Compute, choose_instance_type
 from dstack._internal.backend.local import runners
@@ -25,7 +27,14 @@ class LocalCompute(Compute):
         )
         return instance_type
 
-    def run_instance(self, job: Job, instance_type: InstanceType) -> LaunchedInstanceInfo:
+    @functools.lru_cache()
+    def get_supported_instances(self) -> List[InstanceType]:
+        resources = runners.check_runner_resources(self.backend_config, uuid.uuid4().hex)
+        return [InstanceType(instance_name="", resources=resources, available_regions=[""])]
+
+    def run_instance(
+        self, job: Job, instance_type: InstanceType, region: Optional[str] = None
+    ) -> LaunchedInstanceInfo:
         pid = runners.start_runner_process(self.backend_config, job.runner_id)
         return LaunchedInstanceInfo(request_id=pid, location=None)
 

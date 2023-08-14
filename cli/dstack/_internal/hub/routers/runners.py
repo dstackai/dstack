@@ -1,3 +1,5 @@
+import logging
+
 from fastapi import APIRouter, Depends, HTTPException, status
 
 from dstack._internal.core.build import BuildNotFoundError
@@ -7,13 +9,16 @@ from dstack._internal.hub.routers.util import (
     call_backend,
     error_detail,
     get_backends,
+    get_instance_candidates,
     get_job_backend,
     get_project,
     get_run_backend,
 )
 from dstack._internal.hub.schemas import RunRunners, StopRunners
 from dstack._internal.hub.security.permissions import ProjectMember
+from dstack._internal.utils.logging import get_logger
 
+logger = get_logger(__name__)
 router = APIRouter(
     prefix="/api/project", tags=["runners"], dependencies=[Depends(ProjectMember())]
 )
@@ -26,11 +31,23 @@ async def run(project_name: str, body: RunRunners):
     failed_to_start_job_new_status = JobStatus.FAILED
     if body.job.retry_policy.retry:
         failed_to_start_job_new_status = JobStatus.PENDING
-    for db_backend, backend in backends:
-        if body.backends is not None and db_backend.type not in body.backends:
-            continue
+
+    candidates = await get_instance_candidates(
+        [
+            backend
+            for db_backend, backend in backends
+            if not body.backends or db_backend.type in body.backends
+        ],
+        body.job,
+    )
+    candidates.sort(key=lambda i: i[1].price)
+
+    for backend, offer in candidates:
+        logger.info(
+            f"Trying {offer.instance_type.instance_name} in {backend.name} for ${offer.price:.4} per hour"
+        )
         try:
-            await call_backend(backend.run_job, body.job, failed_to_start_job_new_status)
+            await call_backend(backend.run_job, body.job, failed_to_start_job_new_status, offer)
             return
         except NoMatchingInstanceError:
             continue

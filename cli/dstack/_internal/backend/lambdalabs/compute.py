@@ -115,8 +115,12 @@ class LambdaCompute:
             requirements=job.requirements,
         )
 
-    def run_instance(self, job: Job, instance_type: InstanceType) -> LaunchedInstanceInfo:
-        region = _get_instance_region(instance_type, self.lambda_config.regions)
+    def get_supported_instances(self) -> List[InstanceType]:
+        return _list_instance_types(self.api_client, self.lambda_config.regions)
+
+    def run_instance(
+        self, job: Job, instance_type: InstanceType, region: Optional[str] = None
+    ) -> LaunchedInstanceInfo:
         instance_id = _run_instance(
             api_client=self.api_client,
             region_name=region,

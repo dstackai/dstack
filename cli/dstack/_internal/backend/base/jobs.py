@@ -9,7 +9,7 @@ from dstack._internal.backend.base.compute import Compute, InstanceNotFoundError
 from dstack._internal.backend.base.secrets import SecretsManager
 from dstack._internal.backend.base.storage import Storage
 from dstack._internal.core.error import BackendError, BackendValueError, NoMatchingInstanceError
-from dstack._internal.core.instance import InstanceType
+from dstack._internal.core.instance import InstanceOffer, InstanceType
 from dstack._internal.core.job import (
     ConfigurationType,
     Job,
@@ -122,6 +122,7 @@ def run_job(
     secrets_manager: SecretsManager,
     job: Job,
     failed_to_start_job_new_status: JobStatus,
+    offer: Optional[InstanceOffer] = None,
 ):
     try:
         if job.configuration_type == ConfigurationType.SERVICE:
@@ -133,6 +134,7 @@ def run_job(
             compute=compute,
             job=job,
             failed_to_start_job_new_status=failed_to_start_job_new_status,
+            offer=offer,
         )
     except Exception as e:
         raise e
@@ -213,13 +215,21 @@ def _try_run_job(
     compute: Compute,
     job: Job,
     failed_to_start_job_new_status: JobStatus,
+    offer: Optional[InstanceOffer] = None,
     attempt: int = 0,
 ):
-    spot = (
-        job.spot_policy is SpotPolicy.SPOT or job.spot_policy is SpotPolicy.AUTO and attempt == 0
-    )
-    job.requirements.spot = spot
-    instance_type = compute.get_instance_type(job)
+    if offer is None:
+        spot = (
+            job.spot_policy is SpotPolicy.SPOT
+            or job.spot_policy is SpotPolicy.AUTO
+            and attempt == 0
+        )
+        job.requirements.spot = spot
+        instance_type = compute.get_instance_type(job)
+    else:
+        job.requirements.spot = offer.instance_type.resources.spot
+        instance_type = offer.instance_type
+        job.price = offer.price
     if instance_type is None:
         if job.spot_policy == SpotPolicy.AUTO and attempt == 0:
             return _try_run_job(
@@ -238,11 +248,11 @@ def _try_run_job(
     )
     runners.create_runner(storage, runner)
     try:
-        launched_instance_info = compute.run_instance(job, instance_type)
+        launched_instance_info = compute.run_instance(job, instance_type, region=offer.region)
         runner.request_id = job.request_id = launched_instance_info.request_id
         job.location = launched_instance_info.location
     except NoCapacityError:
-        if job.spot_policy == SpotPolicy.AUTO and attempt == 0:
+        if offer is None and job.spot_policy == SpotPolicy.AUTO and attempt == 0:
             return _try_run_job(
                 storage=storage,
                 compute=compute,
@@ -301,7 +311,8 @@ def _get_job_head_filename_from_job(job: Job) -> str:
         f"{job.tag_name or ''};"
         f"{job.instance_type or ''};"
         f"{escape_head(job.configuration_path)};"
-        f"{job.get_instance_spot_type()}"
+        f"{job.get_instance_spot_type()};"
+        f"{job.price or ''}"
     )
     return key
 
@@ -320,14 +331,16 @@ def _get_job_head_filename_from_job_head(job_head: JobHead) -> str:
         f"{job_head.tag_name or ''};"
         f"{job_head.instance_type or ''};"
         f"{escape_head(job_head.configuration_path)};"
-        f"{job_head.instance_spot_type}"
+        f"{job_head.instance_spot_type};"
+        f"{job_head.price or ''}"
     )
     return key
 
 
 def _parse_job_head_key(repo_id: str, full_key: str) -> JobHead:
-    tokens = full_key[len(_get_jobs_dir(repo_id)) :].split(";")
-    tokens.extend([""] * (12 - len(tokens)))  # pad with empty tokens
+    head_size = 13
+    tokens = full_key[len(_get_jobs_dir(repo_id)) :].split(";")[:head_size]  # strip extra tokens
+    tokens.extend([""] * (head_size - len(tokens)))  # pad with empty tokens
     (
         _,
         job_id,
@@ -341,6 +354,7 @@ def _parse_job_head_key(repo_id: str, full_key: str) -> JobHead:
         instance_type,
         configuration_path,
         instance_spot_type,
+        price,
     ) = tokens
     run_name, workflow_name, job_index = tuple(job_id.split(","))
     status, error_code, container_exit_code = _parse_job_status_info(status_info)
@@ -363,6 +377,7 @@ def _parse_job_head_key(repo_id: str, full_key: str) -> JobHead:
         instance_type=instance_type or None,
         configuration_path=unescape_head(configuration_path),
         instance_spot_type=instance_spot_type or None,
+        price=float(price) if price else None,
     )
 
 

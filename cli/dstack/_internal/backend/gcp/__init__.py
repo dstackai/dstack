@@ -10,6 +10,7 @@ from dstack._internal.backend.gcp.auth import authenticate
 from dstack._internal.backend.gcp.compute import GCPCompute
 from dstack._internal.backend.gcp.config import GCPConfig
 from dstack._internal.backend.gcp.logs import GCPLogging
+from dstack._internal.backend.gcp.pricing import GCPPricing
 from dstack._internal.backend.gcp.secrets import GCPSecretsManager
 from dstack._internal.backend.gcp.storage import GCPStorage
 
@@ -43,6 +44,7 @@ class GCPBackend(ComponentBasedBackend):
             bucket_name=self.backend_config.bucket_name,
             credentials=credentials,
         )
+        self._pricing = GCPPricing(credentials=credentials)
 
     def storage(self) -> GCPStorage:
         return self._storage
@@ -55,6 +57,9 @@ class GCPBackend(ComponentBasedBackend):
 
     def logging(self) -> GCPLogging:
         return self._logging
+
+    def pricing(self) -> GCPPricing:
+        return self._pricing
 
     @classmethod
     def load(cls) -> Optional["GCPBackend"]:

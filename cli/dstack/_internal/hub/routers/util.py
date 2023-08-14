@@ -1,9 +1,11 @@
+import asyncio
 from typing import Dict, List, Optional, Tuple
 
 from fastapi import HTTPException, status
 
 from dstack._internal.backend.base import Backend
 from dstack._internal.core.error import BackendNotAvailableError, BackendValueError
+from dstack._internal.core.instance import InstanceOffer
 from dstack._internal.core.job import Job
 from dstack._internal.hub.db.models import Backend as DBBackend
 from dstack._internal.hub.db.models import Project
@@ -92,3 +94,20 @@ def _raise_backend_not_available_error(backend_type: str):
             code=BackendNotAvailableError.code,
         ),
     )
+
+
+async def get_instance_candidates(
+    backends: List[Backend], job: Job
+) -> List[Tuple[Backend, InstanceOffer]]:
+    """
+    Returns the unsorted list of instances, satisfying minimal resource requirements
+    """
+    candidates = []
+    tasks = [
+        run_async(backend.get_instance_candidates, job.requirements, job.spot_policy)
+        for backend in backends
+    ]
+    for backend, backend_candidates in zip(backends, await asyncio.gather(*tasks)):
+        for instance in backend_candidates:
+            candidates.append((backend, instance))
+    return candidates
