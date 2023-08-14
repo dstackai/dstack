@@ -92,7 +92,7 @@ func (azbackend *AzureBackend) Init(ctx context.Context, ID string) error {
 	if err := base.LoadRunnerState(ctx, azbackend.storage, ID, &azbackend.state); err != nil {
 		return gerrors.Wrap(err)
 	}
-	ip, err := azbackend.compute.GetInstancePublicIP(ctx, azbackend.state.RequestID)
+	ip, err := azbackend.compute.GetInstancePublicIP(ctx, azbackend.state.Job.InstanceName)
 	if err != nil {
 		return gerrors.Wrap(err)
 	}
@@ -137,7 +137,7 @@ func (azbackend *AzureBackend) Stop(ctx context.Context) error {
 
 func (azbackend *AzureBackend) Shutdown(ctx context.Context) error {
 	log.Trace(ctx, "Starting shutdown")
-	err := azbackend.compute.TerminateInstance(ctx, azbackend.state.RequestID)
+	err := azbackend.compute.TerminateInstance(ctx, azbackend.state.Job.InstanceName)
 	if err != nil {
 		return gerrors.Wrap(err)
 	}

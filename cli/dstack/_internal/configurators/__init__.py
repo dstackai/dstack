@@ -166,6 +166,7 @@ class JobConfigurator(ABC):
             gateway=self.gateway(),
             home_dir=self.home_dir(),
             image_name=self.image_name(run_plan),
+            instance_name=f"dstack-{run_name}",
             job_id=f"{run_name},,0",
             max_duration=self.max_duration(),
             registry_auth=self.registry_auth(),

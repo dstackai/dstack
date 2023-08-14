@@ -86,7 +86,7 @@ func (gbackend *GCPBackend) Init(ctx context.Context, ID string) error {
 	if err := base.LoadRunnerState(ctx, gbackend.storage, ID, &gbackend.state); err != nil {
 		return gerrors.Wrap(err)
 	}
-	ip, err := gbackend.compute.GetInstancePublicIP(ctx, gbackend.state.RequestID)
+	ip, err := gbackend.compute.GetInstancePublicIP(ctx, gbackend.state.Job.InstanceName)
 	if err != nil {
 		return gerrors.Wrap(err)
 	}
@@ -116,11 +116,11 @@ func (gbackend *GCPBackend) IsInterrupted(ctx context.Context) (bool, error) {
 	if !gbackend.state.Resources.Spot {
 		return false, nil
 	}
-	return gbackend.compute.IsInterruptedSpot(ctx, gbackend.state.RequestID)
+	return gbackend.compute.IsInterruptedSpot(ctx, gbackend.state.Job.InstanceName)
 }
 
 func (gbackend *GCPBackend) Stop(ctx context.Context) error {
-	err := gbackend.compute.StopInstance(ctx, gbackend.state.RequestID)
+	err := gbackend.compute.StopInstance(ctx, gbackend.state.Job.InstanceName)
 	if err != nil {
 		return gerrors.Wrap(err)
 	}
@@ -128,7 +128,7 @@ func (gbackend *GCPBackend) Stop(ctx context.Context) error {
 }
 
 func (gbackend *GCPBackend) Shutdown(ctx context.Context) error {
-	err := gbackend.compute.TerminateInstance(ctx, gbackend.state.RequestID)
+	err := gbackend.compute.TerminateInstance(ctx, gbackend.state.Job.InstanceName)
 	if err != nil {
 		return gerrors.Wrap(err)
 	}

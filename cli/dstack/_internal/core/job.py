@@ -192,6 +192,7 @@ class Job(JobHead):
     host_name: Optional[str]
     hub_user_name: str = ""
     image_name: str
+    instance_name: Optional[str]
     instance_spot_type: Optional[str]
     instance_type: Optional[str]
     job_id: str
