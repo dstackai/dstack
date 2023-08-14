@@ -70,8 +70,8 @@ export const projectApi = createApi({
 
         deleteProjects: builder.mutation<void, IProject['project_name'][]>({
             query: (projectNames) => ({
-                url: API.PROJECTS.BASE(),
-                method: 'DELETE',
+                url: API.PROJECTS.DELETE(),
+                method: 'POST',
                 body: {
                     projects: projectNames,
                 },

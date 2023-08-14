@@ -39,6 +39,7 @@ async def create_project(
             ],
         )
     await ProjectManager.create(user=user, project_name=body.project_name, members=body.members)
+    project = await ProjectManager.get(name=body.project_name)
     return await ProjectManager.get_project_info(project)
 
 
