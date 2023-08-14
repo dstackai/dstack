@@ -41,7 +41,6 @@ def run_instance(
     iam_client: BaseClient,
     bucket_name: str,
     region_name: str,
-    extra_regions: List[str],
     subnet_id: Optional[str],
     runner_id: str,
     instance_type: InstanceType,
@@ -50,41 +49,30 @@ def run_instance(
     hub_user_name: str,
     ssh_key_pub: str,
 ) -> LaunchedInstanceInfo:
-    regions = [region_name]
-    if extra_regions:
-        # todo use single region, because hub handles multi-region & multi-cloud
-        regions.extend(
-            _get_instance_available_regions(
-                ec2_client=aws_utils.get_ec2_client(session),
-                instance_type=instance_type,
-                extra_regions=extra_regions,
-            )
+    logger.info(
+        "Requesting %s %s instance in %s...",
+        instance_type.instance_name,
+        "spot" if spot else "",
+        region_name,
+    )
+    try:
+        request_id = _run_instance_retry(
+            ec2_client=aws_utils.get_ec2_client(session, region_name=region_name),
+            iam_client=iam_client,
+            bucket_name=bucket_name,
+            region_name=region_name,
+            subnet_id=subnet_id,
+            runner_id=runner_id,
+            instance_type=instance_type,
+            spot=spot,
+            repo_id=repo_id,
+            hub_user_name=hub_user_name,
+            ssh_key_pub=ssh_key_pub,
         )
-    for region in regions:
-        logger.info(
-            "Requesting %s %s instance in %s...",
-            instance_type.instance_name,
-            "spot" if spot else "",
-            region,
-        )
-        try:
-            request_id = _run_instance_retry(
-                ec2_client=aws_utils.get_ec2_client(session, region_name=region),
-                iam_client=iam_client,
-                bucket_name=bucket_name,
-                region_name=region,
-                subnet_id=subnet_id,
-                runner_id=runner_id,
-                instance_type=instance_type,
-                spot=spot,
-                repo_id=repo_id,
-                hub_user_name=hub_user_name,
-                ssh_key_pub=ssh_key_pub,
-            )
-            logger.info("Request succeeded")
-            return LaunchedInstanceInfo(request_id=request_id, location=region)
-        except NoCapacityError:
-            logger.info("Failed to request instance in %s", region)
+        logger.info("Request succeeded")
+        return LaunchedInstanceInfo(request_id=request_id, location=region_name)
+    except NoCapacityError:
+        logger.info("Failed to request instance in %s", region_name)
     logger.info("Failed to request instance")
     raise NoCapacityError()
 

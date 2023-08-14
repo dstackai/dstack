@@ -110,7 +110,7 @@ class AzureCompute(Compute):
 
     def get_supported_instances(self) -> List[InstanceType]:
         instances = {}
-        for location in [self.azure_config.location] + self.azure_config.extra_locations:
+        for location in [self.azure_config.location, *self.azure_config.extra_locations]:
             for i in _get_instance_types(client=self._compute_client, location=location):
                 if i.instance_name not in instances:
                     instances[i.instance_name] = i
@@ -118,12 +118,15 @@ class AzureCompute(Compute):
                 instances[i.instance_name].available_regions.append(location)
         return list(instances.values())
 
-    def run_instance(self, job: Job, instance_type: InstanceType) -> LaunchedInstanceInfo:
+    def run_instance(
+        self, job: Job, instance_type: InstanceType, region: Optional[str] = None
+    ) -> LaunchedInstanceInfo:
         return _run_instance(
             compute_client=self._compute_client,
             azure_config=self.azure_config,
             job=job,
             instance_type=instance_type,
+            location=region or self.azure_config.location,
         )
 
     def get_request_head(self, job: Job, request_id: Optional[str]) -> RequestHead:
@@ -250,54 +253,53 @@ def _run_instance(
     azure_config: AzureConfig,
     job: Job,
     instance_type: InstanceType,
+    location: str,
 ) -> LaunchedInstanceInfo:
-    locations = [azure_config.location] + azure_config.extra_locations
-    for location in locations:
-        logger.info(
-            "Requesting %s %s instance in %s...",
-            instance_type.instance_name,
-            "spot" if instance_type.resources.spot else "",
-            location,
-        )
-        try:
-            vm = _launch_instance(
-                compute_client=compute_client,
-                subscription_id=azure_config.subscription_id,
+    logger.info(
+        "Requesting %s %s instance in %s...",
+        instance_type.instance_name,
+        "spot" if instance_type.resources.spot else "",
+        location,
+    )
+    try:
+        vm = _launch_instance(
+            compute_client=compute_client,
+            subscription_id=azure_config.subscription_id,
+            location=location,
+            resource_group=azure_config.resource_group,
+            network_security_group=azure_utils.get_default_network_security_group_name(
+                storage_account=azure_config.storage_account, location=location
+            ),
+            network=azure_utils.get_default_network_name(
+                storage_account=azure_config.storage_account,
                 location=location,
-                resource_group=azure_config.resource_group,
-                network_security_group=azure_utils.get_default_network_security_group_name(
-                    storage_account=azure_config.storage_account, location=location
-                ),
-                network=azure_utils.get_default_network_name(
-                    storage_account=azure_config.storage_account,
-                    location=location,
-                ),
-                subnet=azure_utils.get_default_subnet_name(
-                    storage_account=azure_config.storage_account,
-                    location=location,
-                ),
-                managed_identity=azure_utils.get_runner_managed_identity_name(
-                    storage_account=azure_config.storage_account
-                ),
-                image_reference=_get_image_ref(
-                    compute_client=compute_client,
-                    location=location,
-                    cuda=len(instance_type.resources.gpus) > 0,
-                ),
-                vm_size=instance_type.instance_name,
-                instance_name=job.instance_name,
-                user_data=_get_user_data_script(
-                    azure_config=_config_with_location(azure_config, location),
-                    job=job,
-                    instance_type=instance_type,
-                ),
-                ssh_pub_key=job.ssh_key_pub,
-                spot=instance_type.resources.spot,
-            )
-            logger.info("Request succeeded")
-            return LaunchedInstanceInfo(request_id=vm.name, location=location)
-        except NoCapacityError:
-            logger.info("Failed to request instance in %s", location)
+            ),
+            subnet=azure_utils.get_default_subnet_name(
+                storage_account=azure_config.storage_account,
+                location=location,
+            ),
+            managed_identity=azure_utils.get_runner_managed_identity_name(
+                storage_account=azure_config.storage_account
+            ),
+            image_reference=_get_image_ref(
+                compute_client=compute_client,
+                location=location,
+                cuda=len(instance_type.resources.gpus) > 0,
+            ),
+            vm_size=instance_type.instance_name,
+            instance_name=job.instance_name,
+            user_data=_get_user_data_script(
+                azure_config=_config_with_location(azure_config, location),
+                job=job,
+                instance_type=instance_type,
+            ),
+            ssh_pub_key=job.ssh_key_pub,
+            spot=instance_type.resources.spot,
+        )
+        logger.info("Request succeeded")
+        return LaunchedInstanceInfo(request_id=vm.name, location=location)
+    except NoCapacityError:
+        logger.info("Failed to request instance in %s", location)
     logger.info("Failed to request instance")
     raise NoCapacityError()
 

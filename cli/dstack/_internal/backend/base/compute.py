@@ -40,7 +40,9 @@ class Compute(ABC):
         pass
 
     @abstractmethod
-    def run_instance(self, job: Job, instance_type: InstanceType) -> LaunchedInstanceInfo:
+    def run_instance(
+        self, job: Job, instance_type: InstanceType, region: Optional[str] = None
+    ) -> LaunchedInstanceInfo:
         pass
 
     def restart_instance(self, job: Job) -> LaunchedInstanceInfo:

@@ -248,8 +248,7 @@ def _try_run_job(
     )
     runners.create_runner(storage, runner)
     try:
-        # todo use offer.region
-        launched_instance_info = compute.run_instance(job, instance_type)
+        launched_instance_info = compute.run_instance(job, instance_type, region=offer.region)
         runner.request_id = job.request_id = launched_instance_info.request_id
         job.location = launched_instance_info.location
     except NoCapacityError:
@@ -339,8 +338,9 @@ def _get_job_head_filename_from_job_head(job_head: JobHead) -> str:
 
 
 def _parse_job_head_key(repo_id: str, full_key: str) -> JobHead:
-    tokens = full_key[len(_get_jobs_dir(repo_id)) :].split(";")
-    tokens.extend([""] * (13 - len(tokens)))  # pad with empty tokens
+    head_size = 13
+    tokens = full_key[len(_get_jobs_dir(repo_id)) :].split(";")[:head_size]  # strip extra tokens
+    tokens.extend([""] * (head_size - len(tokens)))  # pad with empty tokens
     (
         _,
         job_id,

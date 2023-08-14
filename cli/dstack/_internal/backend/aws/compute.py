@@ -47,13 +47,14 @@ class AWSCompute(Compute):
                 instances[i.instance_name].available_regions.append(region)
         return list(instances.values())
 
-    def run_instance(self, job: Job, instance_type: InstanceType) -> LaunchedInstanceInfo:
+    def run_instance(
+        self, job: Job, instance_type: InstanceType, region: Optional[str] = None
+    ) -> LaunchedInstanceInfo:
         return runners.run_instance(
             session=self.session,
             iam_client=self.iam_client,
             bucket_name=self.backend_config.bucket_name,
-            region_name=self.backend_config.region_name,
-            extra_regions=self.backend_config.extra_regions,
+            region_name=region or self.backend_config.region_name,
             subnet_id=self.backend_config.subnet_id,
             runner_id=job.runner_id,
             instance_type=instance_type,

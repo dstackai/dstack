@@ -32,7 +32,9 @@ class LocalCompute(Compute):
         resources = runners.check_runner_resources(self.backend_config, uuid.uuid4().hex)
         return [InstanceType(instance_name="", resources=resources, available_regions=[""])]
 
-    def run_instance(self, job: Job, instance_type: InstanceType) -> LaunchedInstanceInfo:
+    def run_instance(
+        self, job: Job, instance_type: InstanceType, region: Optional[str] = None
+    ) -> LaunchedInstanceInfo:
         pid = runners.start_runner_process(self.backend_config, job.runner_id)
         return LaunchedInstanceInfo(request_id=pid, location=None)
 

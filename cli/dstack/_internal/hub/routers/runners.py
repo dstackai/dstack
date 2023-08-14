@@ -41,7 +41,6 @@ async def run(project_name: str, body: RunRunners):
         body.job,
     )
     candidates.sort(key=lambda i: i[1].price)
-    print(*candidates[:5], sep="\n")
 
     for backend, offer in candidates:
         logger.info(
