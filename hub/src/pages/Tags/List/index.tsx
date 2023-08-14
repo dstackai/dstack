@@ -14,15 +14,10 @@ export const TagList: React.FC = () => {
     const paramProjectName = params.name ?? '';
     const paramRepoId = params.repoId ?? '';
 
-    const { data, isLoading } = useGetTagsQuery(
-        {
-            project_name: paramProjectName,
-            repo_id: paramRepoId,
-        },
-        {
-            pollingInterval: 10000,
-        },
-    );
+    const { data, isLoading } = useGetTagsQuery({
+        project_name: paramProjectName,
+        repo_id: paramRepoId,
+    });
 
     const COLUMN_DEFINITIONS = [
         {

@@ -22,12 +22,7 @@ export const RepositoryList: React.FC = () => {
         setShowConfirmDelete((val) => !val);
     };
 
-    const { data, isLoading } = useGetProjectReposQuery(
-        { name: paramProjectName },
-        {
-            pollingInterval: 10000,
-        },
-    );
+    const { data, isLoading } = useGetProjectReposQuery({ name: paramProjectName });
 
     const [deleteRepos, { isLoading: isDeletingRepos }] = useDeleteProjectRepoMutation();
 

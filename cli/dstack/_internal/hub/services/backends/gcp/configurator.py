@@ -161,6 +161,7 @@ class GCPConfigurator(Configurator):
         backend_values.extra_regions = self._get_hub_extra_regions_element(
             region=backend_values.region.selected,
             region_names=list(regions.keys()),
+            selected_regions=backend_config.extra_regions or [],
         )
         return backend_values
 
@@ -350,14 +351,17 @@ class GCPConfigurator(Configurator):
         return element
 
     def _get_hub_extra_regions_element(
-        self, region: str, region_names: List[str]
+        self,
+        region: str,
+        region_names: List[str],
+        selected_regions: List[str],
     ) -> BackendMultiElement:
         element = BackendMultiElement()
         for region_name in region_names:
             if region_name == region:
                 continue
             element.values.append(BackendElementValue(value=region_name, label=region_name))
-            element.selected.append(region_name)
+        element.selected = selected_regions
         return element
 
     def _auth(self, credentials_data: Dict):

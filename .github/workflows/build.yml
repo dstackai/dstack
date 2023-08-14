@@ -128,6 +128,18 @@ jobs:
           VERSION=$((${{ github.run_number }} + 150))
           echo $VERSION | aws s3 cp - s3://get-dstack/stgn-cli/latest-version --acl public-read
 
+  restart-hf-space-master:
+    runs-on: ubuntu-latest
+    needs:
+      - update-get-dstack-master
+    env:
+      HUGGING_FACE_HUB_TOKEN: ${{ secrets.HUGGING_FACE_HUB_TOKEN }}
+    steps:
+      - name: Restart the `dstack-stgn` Space
+        run: |
+          pip install huggingface_hub
+          python -c "from huggingface_hub import HfApi; hf_api = HfApi(); hf_api.pause_space('dstackai/dstack-stgn'); hf_api.restart_space('dstackai/dstack-stgn');"
+
   runner-test-master:
     defaults:
       run:

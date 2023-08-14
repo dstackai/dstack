@@ -21,7 +21,7 @@ pygtail
 aiosqlite
 packaging
 alembic
-apscheduler
+apscheduler==3.10.1
 typing-extensions
 file-read-backwards
 psutil

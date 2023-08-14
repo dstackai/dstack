@@ -145,7 +145,8 @@ class AzureConfigurator(Configurator):
             selected=backend_config.storage_account
         )
         backend_values.extra_locations = self._get_extra_locations_element(
-            location=backend_config.location
+            location=backend_config.location,
+            selected_locations=backend_config.extra_locations or [],
         )
         return backend_values
 
@@ -313,13 +314,15 @@ class AzureConfigurator(Configurator):
             element.selected = storage_accounts[0]
         return element
 
-    def _get_extra_locations_element(self, location: str) -> BackendMultiElement:
+    def _get_extra_locations_element(
+        self, location: str, selected_locations: List[str]
+    ) -> BackendMultiElement:
         element = BackendMultiElement()
         for l in LOCATION_VALUES:
             if l == location:
                 continue
             element.values.append(BackendElementValue(value=l, label=l))
-            element.selected.append(l)
+        element.selected = selected_locations
         return element
 
     def _get_resource_group(self) -> str:

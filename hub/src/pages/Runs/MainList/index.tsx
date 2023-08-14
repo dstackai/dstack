@@ -40,9 +40,7 @@ export const List: React.FC = () => {
 
     const isFirstRunsFetchRef = useRef(true);
 
-    const { data, isLoading } = useGetAllRunsQuery(undefined, {
-        pollingInterval: 10000,
-    });
+    const { data, isLoading } = useGetAllRunsQuery();
 
     const { stopRuns, isStopping } = useStopRuns();
     const { abortRuns, isAborting } = useAbortRuns();

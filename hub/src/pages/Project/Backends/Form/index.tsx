@@ -36,8 +36,8 @@ export const BackendForm: React.FC<IProps> = ({ initialValues, onCancel, loading
     const backendType = watch('type');
 
     const backendOptions: TBackendOption[] = useMemo(() => {
-        return Object.values(BackendTypesEnum).map((type) => {
-            const disabled: boolean = !!initialValues || loading || !backendTypesData;
+        let options = Object.values(BackendTypesEnum).map((type) => {
+            const disabled: boolean = loading || !backendTypesData;
 
             return {
                 label: t(`backend.type.${type}`),
@@ -46,7 +46,13 @@ export const BackendForm: React.FC<IProps> = ({ initialValues, onCancel, loading
                 disabled,
             };
         });
-    }, [backendTypesData, loading]);
+
+        if (initialValues?.type) {
+            options = options.filter((option) => option.value === initialValues.type);
+        }
+
+        return options;
+    }, [backendTypesData, initialValues, loading]);
 
     const onSubmit = (data: TBackendConfig) => {
         if (data.type === 'aws' && data.ec2_subnet_id === '') data.ec2_subnet_id = null;
@@ -169,7 +175,13 @@ export const BackendForm: React.FC<IProps> = ({ initialValues, onCancel, loading
 
                     <SpaceBetween size="l">
                         <Grid gridDefinition={[{ colspan: 8 }]}>
-                            <FormTiles control={control} onChange={onChangeBackendType} name="type" items={backendOptions} />
+                            <FormTiles
+                                columns={3}
+                                control={control}
+                                onChange={onChangeBackendType}
+                                name="type"
+                                items={backendOptions}
+                            />
                         </Grid>
 
                         {renderBackendFields()}
