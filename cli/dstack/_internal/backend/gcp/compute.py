@@ -467,11 +467,6 @@ def _get_image_name(
     return None
 
 
-def _get_instance_name(job: Job) -> str:
-    # TODO support multiple jobs per run
-    return f"dstack-{job.run_name}"
-
-
 def _get_user_data_script(gcp_config: GCPConfig, job: Job, instance_type: InstanceType) -> str:
     config_content = gcp_config.serialize_yaml().replace("\n", "\\n")
     runner_content = serialize_runner_yaml(job.runner_id, instance_type.resources, 3000, 4000)
@@ -567,7 +562,7 @@ def _run_instance(
                     images_client=images_client,
                     instance_type=instance_type,
                 ),
-                instance_name=_get_instance_name(job),
+                instance_name=job.instance_name,
                 user_data_script=_get_user_data_script(
                     gcp_config=_config_with_zone(gcp_config, zone),
                     job=job,

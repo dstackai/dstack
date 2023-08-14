@@ -402,7 +402,7 @@ func (ex *Executor) startJob(ctx context.Context, erCh chan error, stoppedCh cha
 		}
 	}
 
-	container, err := ex.engine.CreateNamed(ctx, spec, job.RunName, allLogs)
+	container, err := ex.engine.CreateNamed(ctx, spec, job.InstanceName, allLogs)
 	if err != nil {
 		erCh <- gerrors.Wrap(err)
 		return
