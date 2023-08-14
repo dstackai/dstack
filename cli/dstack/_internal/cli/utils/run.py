@@ -196,7 +196,9 @@ def _print_failed_run_message(run: RunHead):
     elif run.job_heads[0].error_code is JobErrorCode.BUILD_NOT_FOUND:
         console.print("Build not found. Run `dstack build` or add `--build` flag")
     else:
-        console.print("Provisioning failed\n")
+        console.print(
+            f"Provisioning failed.\nTo see runner logs, run `dstack logs --diagnose {run.run_name}`.\n"
+        )
 
 
 def reserve_ports(apps: List[AppSpec], local_backend: bool) -> Tuple[PortsLock, PortsLock]:
