@@ -44,7 +44,7 @@ type Job struct {
 	Location          string            `yaml:"location,omitempty"`
 	MasterJobID       string            `yaml:"master_job,omitempty"`
 	MaxDuration       uint64            `yaml:"max_duration,omitempty"`
-	Price             float64           `yaml:"price,omitempty"`
+	Price             float64           `yaml:"price,omitempty"`         // head
 	ProviderName      string            `yaml:"provider_name,omitempty"` // deprecated, head
 	RegistryAuth      RegistryAuth      `yaml:"registry_auth,omitempty"`
 	RepoCodeFilename  string            `yaml:"repo_code_filename,omitempty"`
@@ -200,8 +200,12 @@ func (j *Job) JobHeadFilepath() string {
 	for i, art := range j.Artifacts {
 		artifactSlice[i] = EscapeHead(art.Path)
 	}
+	price := ""
+	if j.Price > 0 {
+		price = fmt.Sprintf("%f", j.Price)
+	}
 	return fmt.Sprintf(
-		"jobs/%s/l;%s;%s;%s;%d;%s;%s;%s;%s;%s;%s;%s",
+		"jobs/%s/l;%s;%s;%s;%d;%s;%s;%s;%s;%s;%s;%s;%s",
 		j.RepoRef.RepoId,
 		j.JobID,
 		"", // ProviderName
@@ -214,6 +218,7 @@ func (j *Job) JobHeadFilepath() string {
 		j.InstanceType,
 		EscapeHead(j.ConfigurationPath),
 		j.GetInstanceType(),
+		price,
 	)
 }
 

@@ -312,7 +312,8 @@ def _get_job_head_filename_from_job(job: Job) -> str:
         f"{job.tag_name or ''};"
         f"{job.instance_type or ''};"
         f"{escape_head(job.configuration_path)};"
-        f"{job.get_instance_spot_type()}"
+        f"{job.get_instance_spot_type()};"
+        f"{job.price or ''}"
     )
     return key
 
@@ -331,14 +332,15 @@ def _get_job_head_filename_from_job_head(job_head: JobHead) -> str:
         f"{job_head.tag_name or ''};"
         f"{job_head.instance_type or ''};"
         f"{escape_head(job_head.configuration_path)};"
-        f"{job_head.instance_spot_type}"
+        f"{job_head.instance_spot_type};"
+        f"{job_head.price or ''}"
     )
     return key
 
 
 def _parse_job_head_key(repo_id: str, full_key: str) -> JobHead:
     tokens = full_key[len(_get_jobs_dir(repo_id)) :].split(";")
-    tokens.extend([""] * (12 - len(tokens)))  # pad with empty tokens
+    tokens.extend([""] * (13 - len(tokens)))  # pad with empty tokens
     (
         _,
         job_id,
@@ -352,6 +354,7 @@ def _parse_job_head_key(repo_id: str, full_key: str) -> JobHead:
         instance_type,
         configuration_path,
         instance_spot_type,
+        price,
     ) = tokens
     run_name, workflow_name, job_index = tuple(job_id.split(","))
     status, error_code, container_exit_code = _parse_job_status_info(status_info)
@@ -374,6 +377,7 @@ def _parse_job_head_key(repo_id: str, full_key: str) -> JobHead:
         instance_type=instance_type or None,
         configuration_path=unescape_head(configuration_path),
         instance_spot_type=instance_spot_type or None,
+        price=float(price) if price else None,
     )
 
 

@@ -157,6 +157,7 @@ class JobHead(JobRef):
     app_names: Optional[List[str]]
     instance_type: Optional[str]
     instance_spot_type: Optional[str]
+    price: Optional[float]
 
     def get_id(self) -> Optional[str]:
         return self.job_id

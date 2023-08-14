@@ -32,6 +32,7 @@ def generate_runs_table(
     table.add_column("BACKEND", style="grey58", no_wrap=True, max_width=16)
     table.add_column("INSTANCE", no_wrap=True)
     table.add_column("SPOT", no_wrap=True)
+    table.add_column("PRICE", no_wrap=True)
     table.add_column("STATUS", no_wrap=True)
     table.add_column("SUBMITTED", style="grey58", no_wrap=True)
     if verbose:
@@ -50,6 +51,7 @@ def generate_runs_table(
                 run_info.backend,
                 _pretty_print_instance_type(run),
                 _pretty_print_spot(run),
+                _pretty_print_price(run),
                 _pretty_print_status(run),
                 _status_color(run, submitted_at, False, False),
             ]
@@ -128,6 +130,15 @@ def _pretty_print_instance_type(run: RunHead) -> str:
         if job.instance_type
     ] or [_status_color(run, "-", False, False)]
     return "\n".join(instances)
+
+
+def _pretty_print_price(run: RunHead) -> str:
+    prices = [
+        _status_color(run, f"{job.price:.4g} $/h", False, False)
+        for job in run.job_heads
+        if job.price is not None
+    ] or [_status_color(run, "-", False, False)]
+    return "\n".join(prices)
 
 
 def check_init(func):
