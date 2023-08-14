@@ -285,7 +285,7 @@ def _run_instance(
                     cuda=len(instance_type.resources.gpus) > 0,
                 ),
                 vm_size=instance_type.instance_name,
-                instance_name=_get_instance_name(job),
+                instance_name=job.instance_name,
                 user_data=_get_user_data_script(
                     azure_config=_config_with_location(azure_config, location),
                     job=job,
@@ -300,11 +300,6 @@ def _run_instance(
             logger.info("Failed to request instance in %s", location)
     logger.info("Failed to request instance")
     raise NoCapacityError()
-
-
-def _get_instance_name(job: Job) -> str:
-    # TODO support multiple jobs per run
-    return f"dstack-{job.run_name}"
 
 
 def _get_image_ref(

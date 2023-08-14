@@ -38,6 +38,7 @@ type Job struct {
 	HostName          string            `yaml:"host_name,omitempty"`
 	HubUserName       string            `yaml:"hub_user_name"` // head
 	Image             string            `yaml:"image_name"`
+	InstanceName      string            `yaml:"instance_name"`
 	InstanceSpotType  string            `yaml:"instance_spot_type,omitempty"` // head
 	InstanceType      string            `yaml:"instance_type,omitempty"`      // head
 	JobID             string            `yaml:"job_id"`                       // head
