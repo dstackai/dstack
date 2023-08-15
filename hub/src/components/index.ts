@@ -59,5 +59,6 @@ export { Notifications } from './Notifications';
 export { ConfirmationDialog } from './ConfirmationDialog';
 export { FileUploader } from './FileUploader';
 export { InfoLink } from './InfoLink';
+export { ButtonWithConfirmation } from './ButtonWithConfirmation';
 export { Tabs } from './Tabs';
 export type { IProps as TabsProps } from './Tabs';

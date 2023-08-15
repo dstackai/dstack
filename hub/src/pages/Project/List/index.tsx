@@ -1,32 +1,32 @@
-import React from 'react';
+import React, { useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useNavigate } from 'react-router-dom';
 
-import { Button, Cards, Header, ListEmptyMessage, NavigateLink, Pagination, SpaceBetween, TextFilter } from 'components';
+import {
+    Button,
+    ButtonWithConfirmation,
+    Header,
+    ListEmptyMessage,
+    Pagination,
+    SpaceBetween,
+    Table,
+    TextFilter,
+} from 'components';
 
 import { useBreadcrumbs, useCollection } from 'hooks';
 import { ROUTES } from 'routes';
 import { useGetProjectsQuery } from 'services/project';
 
-interface IProjectSettingsNodeProps {
-    settingsKey: string;
-    settingsValue: string;
-}
-
-export const ProjectSettingsNode: React.FC<IProjectSettingsNodeProps> = ({ settingsKey, settingsValue }) => {
-    return (
-        <div style={{ display: 'flex', justifyContent: 'space-between', gap: '10px' }}>
-            <div>{settingsKey}:</div>{' '}
-            <span style={{ whiteSpace: 'nowrap', textOverflow: 'ellipsis', overflow: 'hidden' }} title={settingsValue}>
-                {settingsValue}
-            </span>
-        </div>
-    );
-};
+import { useCheckAvailableProjectPermission } from '../hooks/useCheckAvailableProjectPermission';
+import { useDeleteProject } from '../hooks/useDeleteProject';
+import { useColumnsDefinitions } from './hooks';
 
 export const ProjectList: React.FC = () => {
     const { t } = useTranslation();
+
     const { isLoading, data } = useGetProjectsQuery();
+    const { isAvailableDeletingPermission } = useCheckAvailableProjectPermission();
+    const { deleteProject, deleteProjects, isDeleting } = useDeleteProject();
     const navigate = useNavigate();
 
     useBreadcrumbs([
@@ -65,6 +65,25 @@ export const ProjectList: React.FC = () => {
         selection: {},
     });
 
+    const { selectedItems } = collectionProps;
+
+    const deleteSelectedProjects = () => {
+        if (!selectedItems?.length) return;
+
+        deleteProjects([...selectedItems]).catch(console.log);
+    };
+
+    const { columns } = useColumnsDefinitions({
+        loading: isLoading || isDeleting,
+        onDeleteClick: deleteProject,
+    });
+
+    const isDisabledDeleteSelected = useMemo(() => {
+        if (!selectedItems?.length || isDeleting) return true;
+
+        return !selectedItems.every(isAvailableDeletingPermission);
+    }, [selectedItems]);
+
     const renderCounter = () => {
         if (!data?.length) return '';
 
@@ -73,28 +92,31 @@ export const ProjectList: React.FC = () => {
 
     return (
         <>
-            <Cards
+            <Table
                 {...collectionProps}
                 variant="full-page"
-                cardDefinition={{
-                    header: (project) => (
-                        <NavigateLink
-                            fontSize="heading-m"
-                            href={ROUTES.PROJECT.DETAILS.REPOSITORIES.FORMAT(project.project_name)}
-                        >
-                            {project.project_name}
-                        </NavigateLink>
-                    ),
-                }}
+                columnDefinitions={columns}
                 items={items}
                 loading={isLoading}
-                loadingText="Loading"
+                loadingText={t('common.loading')}
+                selectionType="multi"
+                stickyHeader={true}
                 header={
                     <Header
                         variant="awsui-h1-sticky"
                         counter={renderCounter()}
                         actions={
                             <SpaceBetween size="xs" direction="horizontal">
+                                <ButtonWithConfirmation
+                                    disabled={isDisabledDeleteSelected}
+                                    formAction="none"
+                                    onClick={deleteSelectedProjects}
+                                    confirmTitle={t('projects.edit.delete_projects_confirm_title')}
+                                    confirmContent={t('projects.edit.delete_projects_confirm_message')}
+                                >
+                                    {t('common.delete')}
+                                </ButtonWithConfirmation>
+
                                 <Button onClick={addProjectHandler}>{t('common.add')}</Button>
                             </SpaceBetween>
                         }

@@ -98,6 +98,8 @@
       "members_empty_message_text": "Select project's members",
       "delete_project_confirm_title": "Delete project",
       "delete_project_confirm_message": "Are you sure you want to delete this project?",
+      "delete_projects_confirm_title": "Delete projects",
+      "delete_projects_confirm_message": "Are you sure you want to delete these projects?",
       "cli": "CLI",
       "aws": {
         "authorization": "Authorization",
