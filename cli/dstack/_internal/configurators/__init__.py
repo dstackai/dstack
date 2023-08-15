@@ -107,7 +107,7 @@ class JobConfigurator(ABC):
             self.profile.resources.gpu = ProfileGPU.parse_obj(gpu)
 
         if args.max_price is not None:
-            self.profile.resources.max_price = args.max_price
+            self.profile.max_price = args.max_price
 
         if args.spot_policy is not None:
             self.profile.spot_policy = args.spot_policy
@@ -284,7 +284,7 @@ class JobConfigurator(ABC):
             memory_mib=self.profile.resources.memory,
             gpus=None,
             shm_size_mib=self.profile.resources.shm_size,
-            max_price=self.profile.resources.max_price,
+            max_price=self.profile.max_price,
         )
         if self.profile.resources.gpu:
             r.gpus = job.GpusRequirements(
