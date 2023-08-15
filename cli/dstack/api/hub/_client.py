@@ -1,11 +1,9 @@
 import copy
-import sys
 import tempfile
 import time
-import urllib.parse
 from datetime import datetime
 from pathlib import Path
-from typing import Generator, List, Optional, Tuple
+from typing import Dict, Generator, List, Optional, Tuple
 
 import dstack._internal.configurators as configurators
 from dstack._internal.api.repos import get_local_repo_credentials
@@ -17,10 +15,9 @@ from dstack._internal.core.log_event import LogEvent
 from dstack._internal.core.plan import RunPlan
 from dstack._internal.core.repo import RemoteRepoCredentials, Repo, RepoHead
 from dstack._internal.core.repo.remote import RemoteRepo
-from dstack._internal.core.run import RunHead
 from dstack._internal.core.secret import Secret
 from dstack._internal.core.tag import TagHead
-from dstack._internal.hub.schemas import ProjectInfo, RunInfo
+from dstack._internal.hub.schemas import RunInfo
 from dstack.api.hub._api_client import HubAPIClient
 from dstack.api.hub._config import HubClientConfig
 from dstack.api.hub._storage import HUBStorage
@@ -278,11 +275,11 @@ class HubClient:
         self.update_repo_last_run_at(last_run_at=int(round(time.time() * 1000)))
         return run_name, jobs
 
-    def create_gateway(self) -> GatewayHead:
-        return self._api_client.create_gateway()
+    def create_gateway(self, backend: str) -> GatewayHead:
+        return self._api_client.create_gateway(backend=backend)
 
-    def list_gateways(self) -> List[GatewayHead]:
+    def list_gateways(self) -> Dict[str, List[GatewayHead]]:
         return self._api_client.list_gateways()
 
-    def delete_gateway(self, instance_name: str):
-        self._api_client.delete_gateway(instance_name)
+    def delete_gateway(self, instance_name: str, backend: str):
+        self._api_client.delete_gateway(instance_name, backend=backend)

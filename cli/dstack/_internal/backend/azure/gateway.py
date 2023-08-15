@@ -177,13 +177,9 @@ def gateway_network_security_group(
 def get_network_interface(
     network_client: NetworkManagementClient, resource_group: str, interface: str
 ) -> NetworkInterface:
-    return network_client.network_interfaces.get(resource_group, interface)
-
-
-def get_public_ip(
-    network_client: NetworkManagementClient, resource_group: str, public_ip: str
-) -> PublicIPAddress:
-    return network_client.public_ip_addresses.get(resource_group, public_ip)
+    return network_client.network_interfaces.get(
+        resource_group, interface, expand="IPConfigurations/PublicIPAddress"
+    )
 
 
 def gateway_user_data_script() -> str:

@@ -484,3 +484,8 @@ class DeleteUsers(BaseModel):
 
 class FileObject(BaseModel):
     object_key: str
+
+
+class GatewayDelete(BaseModel):
+    instance_name: str
+    backend: str

@@ -7,14 +7,14 @@ Gateway makes running jobs (`type: service`) accessible from the public internet
 
 ## dstack gateway list
 
-The `dstack gateway list` command displays the names and addresses of the gateways configured in the selected project.
+The `dstack gateway list` command displays the names and addresses of the gateways configured in the project.
 
 ### Usage
 
 <div class="termy">
 
 ```shell
-$ dstack gateway list --project gcp
+$ dstack gateway list
 ```
 
 </div>
@@ -34,6 +34,7 @@ Usage: dstack gateway create [-h] [--project PROJECT]
 Optional Arguments:
   -h, --help         show this help message and exit
   --project PROJECT  The name of the project
+  --backend {aws,gcp,azure}
 ```
 
 </div>
@@ -43,6 +44,7 @@ Optional Arguments:
 The following arguments are optional:
 
 - `--project PROJECT` - (Optional) The name of the project to execute the command for
+- `--backend {aws,gcp,azure}` - (Optional) The cloud provider to use for the gateway
 
 
 ## dstack gateway delete
