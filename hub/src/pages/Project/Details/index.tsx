@@ -1,21 +1,20 @@
-import React, { useMemo, useState } from 'react';
+import React, { useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Outlet, useLocation, useNavigate, useParams } from 'react-router-dom';
-import Box from '@cloudscape-design/components/box';
 
-import { Button, ButtonProps, ConfirmationDialog, ContentLayout, DetailsHeader } from 'components';
+import { Button, ButtonProps, ButtonWithConfirmation, ContentLayout, DetailsHeader } from 'components';
 
-import { useAppSelector, useNotifications } from 'hooks';
+import { useAppSelector } from 'hooks';
 import { ROUTES } from 'routes';
-import { useDeleteProjectsMutation, useGetProjectQuery } from 'services/project';
+import { useGetProjectQuery } from 'services/project';
 
 import { selectUserData } from 'App/slice';
 
-import { getProjectRoleByUserName } from '../utils';
+import { useCheckAvailableProjectPermission } from '../hooks/useCheckAvailableProjectPermission';
+import { useDeleteProject } from '../hooks/useDeleteProject';
 
 export const ProjectDetails: React.FC = () => {
     const { t } = useTranslation();
-    const [showDeleteConfirm, setShowConfirmDelete] = useState(false);
     const { pathname } = useLocation();
     const params = useParams();
     const userData = useAppSelector(selectUserData);
@@ -24,31 +23,18 @@ export const ProjectDetails: React.FC = () => {
     const paramProjectName = params.name ?? '';
     const navigate = useNavigate();
     const { data } = useGetProjectQuery({ name: paramProjectName });
-    const [deleteProjects, { isLoading: isDeleting }] = useDeleteProjectsMutation();
-    const [pushNotification] = useNotifications();
+    const { deleteProject, isDeleting } = useDeleteProject();
+
+    const { isAvailableDeletingPermission } = useCheckAvailableProjectPermission();
 
     const isDisabledButtons = useMemo<boolean>(() => {
-        return isDeleting || !data || (getProjectRoleByUserName(data, userName) !== 'admin' && userGlobalRole !== 'admin');
+        return isDeleting || !data || !isAvailableDeletingPermission(data);
     }, [data, userName, userGlobalRole]);
 
-    const toggleDeleteConfirm = () => {
-        setShowConfirmDelete((val) => !val);
-    };
-
-    const deleteUserHandler = () => {
+    const deleteProjectHandler = () => {
         if (!data) return;
 
-        deleteProjects([paramProjectName])
-            .unwrap()
-            .then(() => navigate(ROUTES.PROJECT.LIST))
-            .catch((error) => {
-                pushNotification({
-                    type: 'error',
-                    content: t('common.server_error', { error: error?.error }),
-                });
-            });
-
-        setShowConfirmDelete(false);
+        deleteProject(data).then(() => navigate(ROUTES.PROJECT.LIST));
     };
 
     const goToProjectSettings: ButtonProps['onClick'] = (event) => {
@@ -69,10 +55,20 @@ export const ProjectDetails: React.FC = () => {
                 header={
                     <DetailsHeader
                         title={paramProjectName}
-                        deleteAction={isSettingsPage ? toggleDeleteConfirm : undefined}
-                        deleteDisabled={isDisabledButtons}
                         actionButtons={
                             <>
+                                {isSettingsPage && (
+                                    <ButtonWithConfirmation
+                                        disabled={isDisabledButtons}
+                                        formAction="none"
+                                        onClick={deleteProjectHandler}
+                                        confirmTitle={t('projects.edit.delete_project_confirm_title')}
+                                        confirmContent={t('projects.edit.delete_project_confirm_message')}
+                                    >
+                                        {t('common.delete')}
+                                    </ButtonWithConfirmation>
+                                )}
+
                                 {isSettingsPage && (
                                     <Button onClick={addBackendHandler} disabled={isDisabledButtons}>
                                         {t('backend.add_backend')}
@@ -94,14 +90,6 @@ export const ProjectDetails: React.FC = () => {
             >
                 <Outlet />
             </ContentLayout>
-
-            <ConfirmationDialog
-                visible={showDeleteConfirm}
-                onDiscard={toggleDeleteConfirm}
-                onConfirm={deleteUserHandler}
-                title={t('projects.edit.delete_project_confirm_title')}
-                content={<Box variant="span">{t('projects.edit.delete_project_confirm_message')}</Box>}
-            />
         </>
     );
 };

@@ -1,11 +1,13 @@
 import { ReactNode } from 'react';
 
+import { ButtonProps } from 'components';
+
 export interface IProps {
     title?: string;
     content?: ReactNode;
     visible?: boolean;
-    onDiscard?: () => void;
-    onConfirm?: () => void;
+    onDiscard: ButtonProps['onClick'];
+    onConfirm: ButtonProps['onClick'];
 
     cancelButtonLabel?: string;
     confirmButtonLabel?: string;

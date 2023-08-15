@@ -45,7 +45,7 @@ export const projectApi = createApi({
                 body: project,
             }),
 
-            invalidatesTags: (result) => [{ type: 'Projects' as const, id: result?.project_name }],
+            invalidatesTags: () => ['Projects'],
         }),
 
         updateProject: builder.mutation<IProject, Partial<IProject> & Pick<IProject, 'project_name'>>({
