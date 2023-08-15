@@ -60,6 +60,10 @@ class JobConfigurator(ABC):
             help="Request a GPU for the run",
         )
 
+        parser.add_argument(
+            "--max-price", metavar="PRICE", type=float, help="Maximum price per hour, $"
+        )
+
         spot_group = parser.add_mutually_exclusive_group()
         spot_group.add_argument(
             "--spot", action="store_const", dest="spot_policy", const=job.SpotPolicy.SPOT
@@ -101,6 +105,9 @@ class JobConfigurator(ABC):
             gpu = (self.profile.resources.gpu or ProfileGPU()).dict(exclude_defaults=True)
             gpu.update(args.gpu)
             self.profile.resources.gpu = ProfileGPU.parse_obj(gpu)
+
+        if args.max_price is not None:
+            self.profile.resources.max_price = args.max_price
 
         if args.spot_policy is not None:
             self.profile.spot_policy = args.spot_policy
@@ -277,6 +284,7 @@ class JobConfigurator(ABC):
             memory_mib=self.profile.resources.memory,
             gpus=None,
             shm_size_mib=self.profile.resources.shm_size,
+            max_price=self.profile.resources.max_price,
         )
         if self.profile.resources.gpu:
             r.gpus = job.GpusRequirements(

@@ -1,7 +1,7 @@
 import re
 from typing import List, Optional, Union
 
-from pydantic import Field, validator
+from pydantic import Field, confloat, validator
 from typing_extensions import Annotated, Literal
 
 from dstack._internal.core.configuration import ForbidExtra
@@ -90,6 +90,9 @@ class ProfileResources(ForbidExtra):
         ),
     ]
     cpu: int = DEFAULT_CPU
+    max_price: Annotated[
+        Optional[confloat(gt=0.0)], Field(description="The maximum price per hour, $")
+    ]
     _validate_mem = validator("memory", "shm_size", pre=True, allow_reuse=True)(parse_memory)
 
     @validator("gpu", pre=True)

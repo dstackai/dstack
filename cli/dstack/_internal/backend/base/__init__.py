@@ -521,4 +521,7 @@ class ComponentBasedBackend(Backend):
         ]
         instances = self.compute().get_supported_instances()
         instances = [i for i in instances if _matches_requirements(i.resources, requirements)]
-        return self.pricing().get_prices(instances, spot_query)
+        offers = self.pricing().get_prices(instances, spot_query)
+        if requirements.max_price is not None:
+            offers = [o for o in offers if o.price <= requirements.max_price]
+        return offers
