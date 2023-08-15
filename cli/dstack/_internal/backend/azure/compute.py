@@ -164,8 +164,14 @@ class AzureCompute(Compute):
             subscription_id=self.azure_config.subscription_id,
             location=self.azure_config.location,
             resource_group=self.azure_config.resource_group,
-            network=self.azure_config.network,
-            subnet=self.azure_config.subnet,
+            network=azure_utils.get_default_network_name(
+                storage_account=self.azure_config.storage_account,
+                location=self.azure_config.location,
+            ),
+            subnet=azure_utils.get_default_subnet_name(
+                storage_account=self.azure_config.storage_account,
+                location=self.azure_config.location,
+            ),
             instance_name=instance_name,
             ssh_key_pub=ssh_key_pub,
         )
@@ -176,14 +182,10 @@ class AzureCompute(Compute):
                 "resource_name"
             ],
         )
-        public_ip = gateway.get_public_ip(
-            network_client=self._network_client,
-            resource_group=self.azure_config.resource_group,
-            public_ip=interface.ip_configurations[0].public_ip_address.name,
-        )
+        public_ip = interface.ip_configurations[0].public_ip_address.ip_address
         return GatewayHead(
             instance_name=instance_name,
-            external_ip=public_ip.ip_address,
+            external_ip=public_ip,
             internal_ip=interface.ip_configurations[0].private_ip_address,
         )
 

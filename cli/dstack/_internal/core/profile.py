@@ -90,9 +90,6 @@ class ProfileResources(ForbidExtra):
         ),
     ]
     cpu: int = DEFAULT_CPU
-    max_price: Annotated[
-        Optional[confloat(gt=0.0)], Field(description="The maximum price per hour, $")
-    ]
     _validate_mem = validator("memory", "shm_size", pre=True, allow_reuse=True)(parse_memory)
 
     @validator("gpu", pre=True)
@@ -133,6 +130,9 @@ class Profile(ForbidExtra):
         Field(
             description="The maximum duration of a run (e.g., 2h, 1d, etc). After it elapses, the run is forced to stop"
         ),
+    ]
+    max_price: Annotated[
+        Optional[confloat(gt=0.0)], Field(description="The maximum price per hour, $")
     ]
     default: bool = False
     _validate_max_duration = validator("max_duration", pre=True, allow_reuse=True)(

@@ -19,13 +19,13 @@ from dstack._internal.core.job import Job, JobHead
 from dstack._internal.core.log_event import LogEvent
 from dstack._internal.core.plan import RunPlan
 from dstack._internal.core.repo import RemoteRepoCredentials, Repo, RepoHead, RepoSpec
-from dstack._internal.core.run import RunHead
 from dstack._internal.core.secret import Secret
 from dstack._internal.core.tag import TagHead
 from dstack._internal.hub.schemas import (
     AddTagRun,
     ArtifactsList,
     BackendInfo,
+    GatewayDelete,
     JobHeadList,
     JobsGet,
     JobsList,
@@ -721,13 +721,14 @@ class HubAPIClient:
             return
         resp.raise_for_status()
 
-    def create_gateway(self) -> GatewayHead:
+    def create_gateway(self, backend: str) -> GatewayHead:
         url = _project_url(url=self.url, project=self.project, additional_path="/gateways/create")
         resp = _make_hub_request(
             requests.post,
             host=self.url,
             url=url,
             headers=self._headers(),
+            data=json.dumps(backend),
         )
         if resp.ok:
             return GatewayHead.parse_obj(resp.json())
@@ -737,7 +738,7 @@ class HubAPIClient:
                 raise HubClientError(body["detail"]["msg"])
         resp.raise_for_status()
 
-    def list_gateways(self) -> List[GatewayHead]:
+    def list_gateways(self) -> Dict[str, List[GatewayHead]]:
         url = _project_url(url=self.url, project=self.project, additional_path="/gateways")
         resp = _make_hub_request(
             requests.get,
@@ -747,16 +748,16 @@ class HubAPIClient:
         )
         if not resp.ok:
             resp.raise_for_status()
-        return parse_obj_as(List[GatewayHead], resp.json())
+        return parse_obj_as(Dict[str, List[GatewayHead]], resp.json())
 
-    def delete_gateway(self, instance_name: str):
+    def delete_gateway(self, instance_name: str, backend: str):
         url = _project_url(url=self.url, project=self.project, additional_path="/gateways/delete")
         resp = _make_hub_request(
             requests.post,
             host=self.url,
             url=url,
             headers=self._headers(),
-            data=json.dumps(instance_name),
+            data=GatewayDelete(instance_name=instance_name, backend=backend).json(),
         )
         resp.raise_for_status()
 
