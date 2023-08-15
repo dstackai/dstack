@@ -44,7 +44,7 @@ def create_gateway_instance(
                 },
             }
         ],
-        ImageId="ami-0cffefff2d52e0a23",  # Ubuntu 22.04 LTS
+        ImageId=gateway_image_id(ec2_client),
         InstanceType=machine_type,
         MinCount=1,
         MaxCount=1,
@@ -120,6 +120,23 @@ def gateway_security_group_id(
         ],
     )
     return security_group_id
+
+
+def gateway_image_id(ec2_client: BaseClient) -> str:
+    response = ec2_client.describe_images(
+        Filters=[
+            {
+                "Name": "name",
+                "Values": ["ubuntu/images/hvm-ssd/ubuntu-jammy-22.04-amd64-server-*"],
+            },
+            {
+                "Name": "owner-alias",
+                "Values": ["amazon"],
+            },
+        ],
+    )
+    image = sorted(response["Images"], key=lambda i: i["CreationDate"], reverse=True)[0]
+    return image["ImageId"]
 
 
 def wait_till_running(
