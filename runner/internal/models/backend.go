@@ -96,12 +96,13 @@ type App struct {
 }
 
 type Requirements struct {
-	GPUs    GPU   `yaml:"gpus,omitempty"`
-	CPUs    int   `yaml:"cpus,omitempty"`
-	Memory  int   `yaml:"memory_mib,omitempty"`
-	Spot    bool  `yaml:"spot,omitempty"`
-	ShmSize int64 `yaml:"shm_size_mib,omitempty"`
-	Local   bool  `json:"local"`
+	GPUs     GPU     `yaml:"gpus,omitempty"`
+	CPUs     int     `yaml:"cpus,omitempty"`
+	Memory   int     `yaml:"memory_mib,omitempty"`
+	Spot     bool    `yaml:"spot,omitempty"`
+	ShmSize  int64   `yaml:"shm_size_mib,omitempty"`
+	MaxPrice float64 `yaml:"max_price,omitempty"`
+	Local    bool    `json:"local"`
 }
 
 type GPU struct {

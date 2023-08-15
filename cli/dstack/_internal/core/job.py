@@ -32,18 +32,19 @@ class Gateway(BaseModel):
 
 
 class GpusRequirements(BaseModel):
-    count: Optional[int] = None
-    memory_mib: Optional[int] = None
-    name: Optional[str] = None
+    count: Optional[int]
+    memory_mib: Optional[int]
+    name: Optional[str]
 
 
 class Requirements(BaseModel):
-    cpus: Optional[int] = None
-    memory_mib: Optional[int] = None
-    gpus: Optional[GpusRequirements] = None
-    shm_size_mib: Optional[int] = None
-    spot: Optional[bool] = None
-    local: Optional[bool] = None
+    cpus: Optional[int]
+    memory_mib: Optional[int]
+    gpus: Optional[GpusRequirements]
+    shm_size_mib: Optional[int]
+    spot: Optional[bool]
+    local: Optional[bool]
+    max_price: Optional[float]
 
     def pretty_format(self):
         res = ""
@@ -53,6 +54,8 @@ class Requirements(BaseModel):
             res += f", {self.gpus.count}x{self.gpus.name or 'GPU'}"
             if self.gpus.memory_mib:
                 res += f" {self.gpus.memory_mib / 1024:g}GB"
+        if self.max_price is not None:
+            res += f" under ${self.max_price:g} per hour"
         return res
 
 

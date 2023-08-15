@@ -21,7 +21,7 @@ class AWSPricing(Pricing):
     def __init__(self, session: boto3.Session):
         super().__init__()
         self.session = session
-        self.pricing_client = self.session.client("pricing")
+        self.pricing_client = self.session.client("pricing", region_name="us-east-1")
 
     def _fetch_ondemand(self, attributes: Dict[str, str]):
         def get_ondemand_price(terms: dict) -> Dict[str, str]:
