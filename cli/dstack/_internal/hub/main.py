@@ -31,7 +31,6 @@ from dstack._internal.hub.routers import (
     tags,
     users,
 )
-from dstack._internal.hub.schemas import LocalBackendConfig
 from dstack._internal.hub.utils.logging import configure_logger
 from dstack._internal.hub.utils.ssh import generate_hub_ssh_key_pair
 from dstack._internal.utils import logging
@@ -46,11 +45,20 @@ async def lifespan(app: FastAPI):
     admin_user = await update_admin_user()
     await create_default_project(admin_user)
     scheduler = start_background_tasks()
-    url = f"http://{os.getenv('DSTACK_HUB_HOST')}:{os.getenv('DSTACK_HUB_PORT')}"
-    url_with_token = f"{url}?token={admin_user.token}"
-    create_default_project_config(url, admin_user.token)
+    base_url = f"http://{os.getenv('DSTACK_HUB_HOST')}:{os.getenv('DSTACK_HUB_PORT')}"
+    url = f"{base_url}?token={admin_user.token}"
+    create_default_project_config(base_url, admin_user.token)
     generate_hub_ssh_key_pair()
-    print(f"The server is available at {url_with_token}")
+    print(f"\nThe server is available at {url}")
+    add_backend_url = (
+        f"{base_url}/projects/{DEFAULT_PROJECT_NAME}/backends/add?token={admin_user.token}"
+    )
+    print(
+        "\nTo start using dstack:\n"
+        f"\n    1. Configure one or more clouds at {add_backend_url}."
+        "\n    2. Initialize a repo with `dstack init`."
+        "\n    3. Define and run a dev enviroment, a task, or a service. For details, see https://dstack.ai/docs/.\n"
+    )
     yield
     scheduler.shutdown()
 
@@ -107,17 +115,14 @@ async def update_admin_user() -> User:
     return admin_user
 
 
-async def create_default_project(user: User):
+async def create_default_project(user: User) -> bool:
     default_project = await ProjectManager.get(DEFAULT_PROJECT_NAME)
-    if default_project is None:
-        default_project = await ProjectManager.create(
-            user=user, project_name=DEFAULT_PROJECT_NAME, members=[]
-        )
-    backend = await ProjectManager.get_backend(project=default_project, backend_name="local")
-    if backend is None:
-        backend = await ProjectManager.create_backend(
-            project=default_project, backend_config=LocalBackendConfig()
-        )
+    if default_project is not None:
+        return False
+    default_project = await ProjectManager.create(
+        user=user, project_name=DEFAULT_PROJECT_NAME, members=[]
+    )
+    return True
 
 
 def create_default_project_config(url: str, token: str):

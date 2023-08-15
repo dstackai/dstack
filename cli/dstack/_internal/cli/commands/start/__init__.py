@@ -20,12 +20,13 @@ class StartCommand(BasicCommand):
         os.environ["DSTACK_HUB_LOG_LEVEL"] = args.log_level
         if args.token:
             os.environ["DSTACK_HUB_ADMIN_TOKEN"] = args.token
+        uvicorn_log_level = os.getenv("DSTACK_HUB_UVICORN_LOG_LEVEL", "error")
         uvicorn.run(
             "dstack._internal.hub.main:app",
             host=args.host,
             port=args.port,
             reload=version.__version__ is None,
-            log_level="info" if version.__version__ is None else "error",
+            log_level=uvicorn_log_level,
         )
 
     def register(self):
