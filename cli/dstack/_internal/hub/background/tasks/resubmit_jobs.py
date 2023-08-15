@@ -23,18 +23,18 @@ async def resubmit_jobs():
 
 async def _resubmit_projects_jobs(projects: List[Project]):
     for project in projects:
-        logger.info("Resubmitting jobs for %s project", project.name)
+        logger.debug("Resubmitting jobs for %s project", project.name)
         backends = await get_backends(project)
         for db_backend, backend in backends:
-            logger.info("Resubmitting jobs for %s backend", db_backend.name)
+            logger.debug("Resubmitting jobs for %s backend", db_backend.name)
             try:
                 await run_async(_resubmit_backend_jobs, backend)
             except google.api_core.exceptions.RetryError as e:
                 logger.warning(
                     "Error when resubmitting jobs for %s backend: %s", db_backend.name, e.message
                 )
-            logger.info("Finished resubmitting jobs for %s backend", db_backend.name)
-        logger.info("Finished resubmitting jobs for %s project", project.name)
+            logger.debug("Finished resubmitting jobs for %s backend", db_backend.name)
+        logger.debug("Finished resubmitting jobs for %s project", project.name)
 
 
 def _resubmit_backend_jobs(backend: Backend):

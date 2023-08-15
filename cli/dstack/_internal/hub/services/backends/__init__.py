@@ -49,10 +49,6 @@ def local_backend_available() -> bool:
     return docker_available
 
 
-if local_backend_available():
-    configurators_classes.append(LocalConfigurator)
-
-
 backend_type_to_configurator_class_map = {c.NAME: c for c in configurators_classes}
 
 

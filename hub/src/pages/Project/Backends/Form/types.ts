@@ -7,10 +7,9 @@ export interface IProps {
 
 export enum BackendTypesEnum {
     AWS = 'aws',
-    GCP = 'gcp',
     AZURE = 'azure',
+    GCP = 'gcp',
     LAMBDA = 'lambda',
-    LOCAL = 'local',
 }
 
 export type TBackendOption = { label: string; value: TBackendType; description: string; disabled?: boolean };
