@@ -80,6 +80,14 @@ class InitCommand(BasicCommand):
             )
         )
         hub_client = get_hub_client(project_name=args.project)
+        backends = hub_client.list_backends()
+        if len(backends) == 0:
+            add_backends_url = (
+                f"{hub_client.client_config.url}/projects/{hub_client.project}/backends/add"
+            )
+            raise CLIError(
+                f"No backends configured. To configure a backend, open {add_backends_url}"
+            )
         if repo_credentials is not None:
             hub_client.save_repo_credentials(repo_credentials)
         console.print(f"[green]OK[/]")

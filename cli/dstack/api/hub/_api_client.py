@@ -25,6 +25,7 @@ from dstack._internal.core.tag import TagHead
 from dstack._internal.hub.schemas import (
     AddTagRun,
     ArtifactsList,
+    BackendInfo,
     JobHeadList,
     JobsGet,
     JobsList,
@@ -73,6 +74,23 @@ class HubAPIClient:
         )
         if resp.ok:
             return ProjectInfo.parse_obj(resp.json())
+        resp.raise_for_status()
+
+    def list_backends(self) -> List[BackendInfo]:
+        url = _project_url(
+            url=self.url,
+            project=self.project,
+            additional_path=f"/backends/list",
+        )
+        resp = _make_hub_request(
+            requests.post,
+            host=self.url,
+            url=url,
+            headers=self._headers(),
+        )
+        if resp.ok:
+            body = resp.json()
+            return [BackendInfo.parse_obj(i) for i in body]
         resp.raise_for_status()
 
     def get_run_plan(self, jobs: List[Job], backends: Optional[List[str]]) -> RunPlan:

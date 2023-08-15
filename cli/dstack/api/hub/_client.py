@@ -20,7 +20,7 @@ from dstack._internal.core.repo.remote import RemoteRepo
 from dstack._internal.core.run import RunHead
 from dstack._internal.core.secret import Secret
 from dstack._internal.core.tag import TagHead
-from dstack._internal.hub.schemas import ProjectInfo, RunInfo
+from dstack._internal.hub.schemas import BackendInfo, ProjectInfo, RunInfo
 from dstack.api.hub._api_client import HubAPIClient
 from dstack.api.hub._config import HubClientConfig
 from dstack.api.hub._storage import HUBStorage
@@ -38,12 +38,12 @@ class HubClient:
     ):
         self.project = project
         self.repo = repo
+        self.client_config = config
         self._repo_credentials = repo_credentials
         self._auto_init = auto_init
-        self._client_config = config
         self._api_client = HubAPIClient(
-            url=self._client_config.url,
-            token=self._client_config.token,
+            url=self.client_config.url,
+            token=self.client_config.token,
             project=self.project,
             repo=self.repo,
         )
@@ -54,6 +54,9 @@ class HubClient:
         HubAPIClient(
             url=config.url, token=config.token, project=project, repo=None
         ).get_project_info()
+
+    def list_backends(self) -> List[BackendInfo]:
+        return self._api_client.list_backends()
 
     def create_run(self, run_name: Optional[str]) -> str:
         return self._api_client.create_run(run_name)
