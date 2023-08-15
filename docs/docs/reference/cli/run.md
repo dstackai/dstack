@@ -52,6 +52,7 @@ The following arguments are optional:
 - `-p PORT`, `--port PORT` – (Optional) Requests port or define mapping (`LOCAL_PORT:CONTAINER_PORT`)
 - `-e ENV`, `--env ENV` – (Optional) Set environment variable (`NAME=value`)
 - `--gpu` – (Optional) Request a GPU for the run. Specify any: name, count, memory (`NAME:COUNT:MEMORY` or `NAME` or `COUNT:MEMORY`, etc...)
+- `--max-price` – (Optional) Maximum price per hour, $
 - `ARGS` – (Optional) Use `ARGS` to pass custom run arguments
 
 Spot policy (the arguments are mutually exclusive):
