@@ -170,7 +170,7 @@ func (ex *Executor) Run(ctx context.Context) error {
 				return errRun
 			}
 		case <-ctx.Done():
-			log.Info(runCtx, "Stopped")
+			log.Info(runCtx, "Terminated")
 			ex.Stop(true)
 			log.Info(runCtx, "Waiting job end")
 			errRun := <-erCh
@@ -178,7 +178,7 @@ func (ex *Executor) Run(ctx context.Context) error {
 			if err != nil {
 				return gerrors.Wrap(err)
 			}
-			job.Status = states.Stopped
+			job.Status = states.Terminated
 			_ = ex.backend.UpdateState(runCtx)
 			return errRun
 		case errRun := <-erCh:

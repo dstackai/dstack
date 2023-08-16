@@ -59,7 +59,7 @@ func New(config LambdaConfig) *LambdaBackend {
 	_ = os.Setenv("AWS_ACCESS_KEY_ID", config.StorageConfig.Credentials.AccessKey)
 	_ = os.Setenv("AWS_SECRET_ACCESS_KEY", config.StorageConfig.Credentials.SecretKey)
 	return &LambdaBackend{
-		storageBackend: aws.New(config.StorageConfig.Region, config.StorageConfig.Bucket),
+		storageBackend: aws.New(config.StorageConfig.Region, config.StorageConfig.Bucket, "lambda"),
 		apiClient:      NewLambdaAPIClient(config.ApiKey),
 	}
 }

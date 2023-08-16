@@ -4,10 +4,6 @@ import (
 	"bufio"
 	"bytes"
 	"context"
-	"github.com/dstackai/dstack/runner/internal/common"
-	"github.com/dstackai/dstack/runner/internal/gerrors"
-	"github.com/dstackai/dstack/runner/internal/log"
-	"golang.org/x/sync/errgroup"
 	"io"
 	"io/fs"
 	"os"
@@ -15,6 +11,11 @@ import (
 	"path/filepath"
 	"strings"
 	"time"
+
+	"github.com/dstackai/dstack/runner/internal/common"
+	"github.com/dstackai/dstack/runner/internal/gerrors"
+	"github.com/dstackai/dstack/runner/internal/log"
+	"golang.org/x/sync/errgroup"
 )
 
 type StorageObject struct {
@@ -299,12 +300,16 @@ func ListFiles(ctx context.Context, src string) (<-chan *StorageObject, <-chan e
 }
 
 func AddNamespace(namespace, key string) string {
+	if strings.HasPrefix(key, namespace) {
+		return key
+	}
 	return path.Join(namespace, key)
 }
 
 func DropNamespace(namespace, key string) string {
-	key = strings.Trim(key, namespace)
-	return strings.Trim(key, "/")
+	key = strings.TrimPrefix(key, namespace)
+	key = strings.TrimPrefix(key, "/")
+	return key
 }
 
 func objectsListPop(ch <-chan *StorageObject, errCh <-chan error) (obj *StorageObject, err error) {

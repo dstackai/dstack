@@ -4,41 +4,45 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"io"
+	"strings"
+
 	"github.com/aws/aws-sdk-go-v2/aws"
 	"github.com/aws/aws-sdk-go-v2/config"
 	"github.com/aws/aws-sdk-go-v2/feature/s3/manager"
 	"github.com/aws/aws-sdk-go-v2/service/s3"
 	"github.com/dstackai/dstack/runner/internal/backend/base"
 	"github.com/dstackai/dstack/runner/internal/gerrors"
-	"io"
-	"strings"
 )
 
 var ErrTagNotFound = errors.New("tag not found")
 
 type AWSStorage struct {
-	s3       *s3.Client
-	bucket   *string
-	uploader *manager.Uploader
+	s3        *s3.Client
+	bucket    *string
+	namespace string
+	uploader  *manager.Uploader
 	//downloader *manager.Downloader
 }
 
-func NewAWSStorage(region, bucket string) (*AWSStorage, error) {
+func NewAWSStorage(region, bucket, namespace string) (*AWSStorage, error) {
 	cfg, err := config.LoadDefaultConfig(context.TODO(), config.WithRegion(region))
 	if err != nil {
 		return nil, gerrors.Wrap(err)
 	}
 	client := s3.NewFromConfig(cfg)
 	storage := &AWSStorage{
-		s3:       client,
-		bucket:   aws.String(bucket),
-		uploader: manager.NewUploader(client), // todo
+		s3:        client,
+		bucket:    aws.String(bucket),
+		namespace: namespace,
+		uploader:  manager.NewUploader(client), // todo
 		//downloader: manager.NewDownloader(client),  // todo
 	}
 	return storage, nil
 }
 
 func (s *AWSStorage) Download(ctx context.Context, key string, writer io.Writer) error {
+	key = base.AddNamespace(s.namespace, key)
 	out, err := s.s3.GetObject(ctx, &s3.GetObjectInput{
 		Bucket: s.bucket,
 		Key:    aws.String(key),
@@ -53,6 +57,7 @@ func (s *AWSStorage) Download(ctx context.Context, key string, writer io.Writer)
 }
 
 func (s *AWSStorage) Upload(ctx context.Context, reader io.Reader, key string) error {
+	key = base.AddNamespace(s.namespace, key)
 	_, err := s.uploader.Upload(ctx, &s3.PutObjectInput{
 		Bucket: s.bucket,
 		Key:    aws.String(key),
@@ -62,6 +67,7 @@ func (s *AWSStorage) Upload(ctx context.Context, reader io.Reader, key string) e
 }
 
 func (s *AWSStorage) Delete(ctx context.Context, key string) error {
+	key = base.AddNamespace(s.namespace, key)
 	_, err := s.s3.DeleteObject(ctx, &s3.DeleteObjectInput{
 		Bucket: s.bucket,
 		Key:    aws.String(key),
@@ -70,6 +76,8 @@ func (s *AWSStorage) Delete(ctx context.Context, key string) error {
 }
 
 func (s *AWSStorage) Rename(ctx context.Context, oldKey, newKey string) error {
+	oldKey = base.AddNamespace(s.namespace, oldKey)
+	newKey = base.AddNamespace(s.namespace, newKey)
 	if oldKey == newKey {
 		return nil
 	}
@@ -85,6 +93,7 @@ func (s *AWSStorage) Rename(ctx context.Context, oldKey, newKey string) error {
 }
 
 func (s *AWSStorage) CreateSymlink(ctx context.Context, key, symlink string) error {
+	key = base.AddNamespace(s.namespace, key)
 	_, err := s.s3.PutObject(ctx, &s3.PutObjectInput{
 		Bucket: s.bucket,
 		Key:    aws.String(key),
@@ -96,6 +105,7 @@ func (s *AWSStorage) CreateSymlink(ctx context.Context, key, symlink string) err
 }
 
 func (s *AWSStorage) GetMetadata(ctx context.Context, key, tag string) (string, error) {
+	key = base.AddNamespace(s.namespace, key)
 	out, err := s.s3.HeadObject(ctx, &s3.HeadObjectInput{
 		Bucket: s.bucket,
 		Key:    aws.String(key),
@@ -110,6 +120,7 @@ func (s *AWSStorage) GetMetadata(ctx context.Context, key, tag string) (string, 
 }
 
 func (s *AWSStorage) List(ctx context.Context, prefix string) (<-chan *base.StorageObject, <-chan error) {
+	prefix = base.AddNamespace(s.namespace, prefix)
 	pager := s3.NewListObjectsV2Paginator(s.s3, &s3.ListObjectsV2Input{
 		Bucket: s.bucket,
 		Prefix: aws.String(prefix),

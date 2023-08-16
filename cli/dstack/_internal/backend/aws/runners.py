@@ -45,6 +45,7 @@ def run_instance(
     runner_id: str,
     instance_type: InstanceType,
     spot: bool,
+    instance_name: str,
     repo_id: str,
     hub_user_name: str,
     ssh_key_pub: str,
@@ -65,6 +66,7 @@ def run_instance(
             runner_id=runner_id,
             instance_type=instance_type,
             spot=spot,
+            instance_name=instance_name,
             repo_id=repo_id,
             hub_user_name=hub_user_name,
             ssh_key_pub=ssh_key_pub,
@@ -302,6 +304,7 @@ def _run_instance_retry(
     runner_id: str,
     instance_type: InstanceType,
     spot: bool,
+    instance_name: str,
     repo_id: str,
     hub_user_name: str,
     ssh_key_pub: str,
@@ -317,6 +320,7 @@ def _run_instance_retry(
             runner_id,
             instance_type,
             spot,
+            instance_name,
             repo_id,
             hub_user_name,
             ssh_key_pub,
@@ -335,6 +339,7 @@ def _run_instance_retry(
                     runner_id,
                     instance_type,
                     spot,
+                    instance_name,
                     repo_id,
                     hub_user_name,
                     ssh_key_pub,
@@ -356,6 +361,7 @@ def _run_instance(
     runner_id: str,
     instance_type: InstanceType,
     spot: bool,
+    instance_name: str,
     repo_id: str,
     hub_user_name: str,
     ssh_key_pub: str,
@@ -383,6 +389,7 @@ def _run_instance(
             _get_security_group_id(ec2_client, bucket_name, subnet_id)
         ]
     tags = [
+        {"Key": "Name", "Value": instance_name},
         {"Key": "owner", "Value": "dstack"},
         {"Key": "dstack_bucket", "Value": bucket_name},
         {"Key": "dstack_repo", "Value": repo_id},
@@ -425,8 +432,8 @@ def _run_instance(
 
 
 def _user_data(
-    bucket_name,
-    region_name,
+    bucket_name: str,
+    region_name: str,
     runner_id: str,
     resources: Resources,
     ssh_key_pub: str,
