@@ -107,7 +107,12 @@ setup(
     package_dir={"": "cli"},
     packages=find_packages("cli"),
     package_data={
-        "dstack._internal": ["schemas/*.json", "scripts/*.sh", "scripts/*.py"],
+        "dstack._internal": [
+            "schemas/*.json",
+            "scripts/*.sh",
+            "scripts/*.py",
+            "backend/resources/*.csv",
+        ],
         "dstack._internal.hub": [
             "statics/*",
             "statics/**/*",

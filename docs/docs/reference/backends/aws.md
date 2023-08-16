@@ -110,6 +110,7 @@ services.
             "ec2:DescribeImages",
             "ec2:DescribeInstances",
             "ec2:DescribeSpotInstanceRequests",
+            "ec2:DescribeSpotPriceHistory",
             "ec2:RunInstances",
             "ec2:CreateTags",
             "ec2:CreateSecurityGroup",

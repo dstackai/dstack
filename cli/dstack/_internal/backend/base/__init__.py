@@ -29,6 +29,9 @@ from dstack._internal.core.run import RunHead
 from dstack._internal.core.secret import Secret
 from dstack._internal.core.tag import TagHead
 from dstack._internal.utils.common import PathLike
+from dstack._internal.utils.logging import get_logger
+
+logger = get_logger(__name__)
 
 
 class Backend(ABC):
@@ -519,9 +522,17 @@ class ComponentBasedBackend(Backend):
         spot_query = {SpotPolicy.SPOT: True, SpotPolicy.ONDEMAND: False, SpotPolicy.AUTO: None}[
             spot_policy
         ]
+
+        start = datetime.now()
         instances = self.compute().get_supported_instances()
+        logger.debug("[%s] got supported instances in %s", self.name, datetime.now() - start)
+
         instances = [i for i in instances if _matches_requirements(i.resources, requirements)]
+
+        start = datetime.now()
         offers = self.pricing().get_prices(instances, spot_query)
+        logger.debug("[%s] got prices in %s", self.name, datetime.now() - start)
+
         if requirements.max_price is not None:
             offers = [o for o in offers if o.price <= requirements.max_price]
         return offers
