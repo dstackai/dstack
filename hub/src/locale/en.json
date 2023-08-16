@@ -49,6 +49,8 @@
     "page_title_other": "Backends",
     "add_backend": "Add backend",
     "edit_backend": "Edit backend",
+    "empty_message_title": "No backends",
+    "empty_message_text": "No backends to display.",
     "type": {
       "aws": "AWS",
       "aws_description": "Run workflows and store data in Amazon Web Services ",
@@ -62,8 +64,19 @@
       "local_description": "Run workflows and store data locally via Docker"
     },
 
+    "table": {
+      "region": "Region/Location",
+      "bucket": "Bucket",
+      "extra_regions": "Extra Region/Extra Locations",
+      "subnet": "Subnet"
+    },
+
     "edit": {
-      "success_notification": "Project updating is successful"
+      "success_notification": "Project updating is successful",
+      "delete_backend_confirm_title": "Delete backend",
+      "delete_backend_confirm_message": "Are you sure you want to delete this backend?",
+      "delete_backends_confirm_title": "Delete backends",
+      "delete_backends_confirm_message": "Are you sure you want to delete these backends?"
     },
 
     "create": {

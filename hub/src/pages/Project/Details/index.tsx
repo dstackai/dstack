@@ -4,11 +4,8 @@ import { Outlet, useLocation, useNavigate, useParams } from 'react-router-dom';
 
 import { Button, ButtonProps, ButtonWithConfirmation, ContentLayout, DetailsHeader } from 'components';
 
-import { useAppSelector } from 'hooks';
 import { ROUTES } from 'routes';
 import { useGetProjectQuery } from 'services/project';
-
-import { selectUserData } from 'App/slice';
 
 import { useCheckAvailableProjectPermission } from '../hooks/useCheckAvailableProjectPermission';
 import { useDeleteProject } from '../hooks/useDeleteProject';
@@ -17,9 +14,6 @@ export const ProjectDetails: React.FC = () => {
     const { t } = useTranslation();
     const { pathname } = useLocation();
     const params = useParams();
-    const userData = useAppSelector(selectUserData);
-    const userName = userData?.user_name ?? '';
-    const userGlobalRole = userData?.global_role ?? '';
     const paramProjectName = params.name ?? '';
     const navigate = useNavigate();
     const { data } = useGetProjectQuery({ name: paramProjectName });
@@ -29,7 +23,7 @@ export const ProjectDetails: React.FC = () => {
 
     const isDisabledButtons = useMemo<boolean>(() => {
         return isDeleting || !data || !isAvailableDeletingPermission(data);
-    }, [data, userName, userGlobalRole]);
+    }, [data, isDeleting]);
 
     const deleteProjectHandler = () => {
         if (!data) return;
@@ -41,10 +35,6 @@ export const ProjectDetails: React.FC = () => {
         event.preventDefault();
 
         navigate(ROUTES.PROJECT.DETAILS.SETTINGS.FORMAT(paramProjectName));
-    };
-
-    const addBackendHandler = () => {
-        navigate(ROUTES.PROJECT.BACKEND.ADD.FORMAT(paramProjectName));
     };
 
     const isSettingsPage = pathname === ROUTES.PROJECT.DETAILS.SETTINGS.FORMAT(paramProjectName);
@@ -67,12 +57,6 @@ export const ProjectDetails: React.FC = () => {
                                     >
                                         {t('common.delete')}
                                     </ButtonWithConfirmation>
-                                )}
-
-                                {isSettingsPage && (
-                                    <Button onClick={addBackendHandler} disabled={isDisabledButtons}>
-                                        {t('backend.add_backend')}
-                                    </Button>
                                 )}
 
                                 {!isSettingsPage ? (

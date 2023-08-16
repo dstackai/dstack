@@ -12,5 +12,9 @@ export const useCheckAvailableProjectPermission = () => {
         return getProjectRoleByUserName(project, userName) === 'admin' || userGlobalRole === 'admin';
     };
 
-    return { isAvailableDeletingPermission } as const;
+    const isAvailableAddProjectPermission = (project: IProject) => {
+        return getProjectRoleByUserName(project, userName) === 'admin' || userGlobalRole === 'admin';
+    };
+
+    return { isAvailableDeletingPermission, isAvailableAddProjectPermission } as const;
 };
