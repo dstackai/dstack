@@ -135,10 +135,10 @@ jobs:
     env:
       HUGGING_FACE_HUB_TOKEN: ${{ secrets.HUGGING_FACE_HUB_TOKEN }}
     steps:
+      - name: Waiting for 30 seconds for the new version to become available
+        run: sleep 30
       - name: Restart the `dstack-stgn` Space
         run: |
-          echo "Waiting for 10 seconds for the new version to become available..."
-          sleep 10
           VERSION=$((${{ github.run_number }} + 150))
           pip install huggingface_hub
           python -c "from huggingface_hub import HfApi; hf_api = HfApi(); hf_api.add_space_secret('dstackai/dstack-stgn', 'DSTACK_VERSION', '$VERSION'); hf_api.pause_space('dstackai/dstack-stgn'); hf_api.restart_space('dstackai/dstack-stgn');"
