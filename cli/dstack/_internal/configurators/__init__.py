@@ -61,7 +61,10 @@ class JobConfigurator(ABC):
         )
 
         parser.add_argument(
-            "--max-price", metavar="PRICE", type=float, help="Maximum price per hour, $"
+            "--max-price",
+            metavar="PRICE",
+            type=float,
+            help="The maximum price per hour, in dollars",
         )
 
         spot_group = parser.add_mutually_exclusive_group()

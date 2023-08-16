@@ -132,7 +132,7 @@ class Profile(ForbidExtra):
         ),
     ]
     max_price: Annotated[
-        Optional[confloat(gt=0.0)], Field(description="The maximum price per hour, $")
+        Optional[confloat(gt=0.0)], Field(description="The maximum price per hour, in dollars")
     ]
     default: bool = False
     _validate_max_duration = validator("max_duration", pre=True, allow_reuse=True)(
