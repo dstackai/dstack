@@ -51,9 +51,9 @@ class JobConfigurator(ABC):
 
         parser.add_argument(
             "--backend",
-            help="The backends that will be tried for provisioning",
-            nargs="*",
+            action="append",
             dest="backends",
+            help="The backends that will be tried for provisioning",
         )
 
         parser.add_argument(
@@ -107,7 +107,7 @@ class JobConfigurator(ABC):
         return parser
 
     def apply_args(self, args: argparse.Namespace):
-        if len(args.backends) > 0:
+        if args.backends is not None:
             self.profile.backends = args.backends
 
         if args.env is not None:
