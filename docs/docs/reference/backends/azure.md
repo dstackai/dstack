@@ -1,15 +1,15 @@
 # Azure
 
-The `Azure` backend type allows to provision infrastructure and store state and artifacts in
+The `Azure` backend type allows provisioning infrastructure and storing artifacts in
 an Azure account.
 
-Follow the step-by-step guide below to configure a project with this backend.
+Follow the step-by-step guide below to configure this backend in your project.
 
-## 1. Create a resource group
+## Create a resource group
 
 First, create a new Azure resource group. All resource created by `dstack` will belong to this group.
 
-## 2. Create a storage account
+## Create a storage account
 
 Next, create an Azure storage account in the newly created resource group. `dstack` will use this storage account to store metadata and artifacts.
 
@@ -17,7 +17,7 @@ Next, create an Azure storage account in the newly created resource group. `dsta
     Make sure that the storage account is created in the same region where you plan to provision
     infrastructure.
 
-## 3. Set up Azure credentials
+## Set up Azure credentials
 
 `dstack` support two methods to authenticate with Azure: Default credentials and Client secret.
 
@@ -36,14 +36,14 @@ To create new application credentials using the Azure CLI, run:
 az ad sp create-for-rbac --name dstack-app --role Owner --scopes /subscriptions/$SUBSCRIPTION_ID --query "{ client_id: appId, client_secret: password, tenant_id: tenant }"
 ```
 
-## 4. Create a project
+## Configure the backend
 
-Now that you have the credentials set up, log in to the Hub, open the `Projects` page, click `Add`, and select `Azure` in
-the `Type` field.
+Now, log in to the UI, open the project's settings,
+click `Edit`, then click `Add backend`, and select `Azure` in the `Type` field.
 
-![](../../../assets/images/dstack-hub-create-azure-project.png){ width=800 }
+[//]: # (![]&#40;../../../assets/images/dstack-hub-create-azure-project.png&#41;{ width=800 })
 
-It may take up to a minute to set up Azure resource after saving the project settings.
+It may take up to a minute to set up Azure resource after saving the backend settings.
 
 ### Fields reference
 
@@ -58,10 +58,3 @@ The following fields are optional:
 
 - `Client ID` - (Optional) The Client ID to authenticate `dstack`
 - `Client Secret` - (Optional) The Client secret to authenticate `dstack`
-
-## 5. Configure the CLI
-
-!!! info "NOTE:"
-    Once you have created the project, feel free to use the CLI code snippet to configure it for use with the created project.
-
-    [Learn more →](../../../guides/projects#configuring-the-cli){ .md-button .md-button--primary }

@@ -4,10 +4,7 @@ This [example](https://github.com/deep-diver/LLM-As-Chatbot) is built by Chansun
 With `dstack`, you can run this Gradio chat app or Discord bot in any cloud with a single command.
 To try this example with `dstack`, follow the instructions below.
 
-## Prerequisites
-
-!!! info "NOTE:"
-    Before using `dstack` with a particular cloud, make sure to [configure](../docs/projects.md) the corresponding project.
+## Define a profile
 
 Each LLM model requires specific resources. To inform `dstack` about the required resources, you need to 
 [define](../docs/reference/profiles.yml.md) a profile via the `.dstack/profiles.yaml` file within your project.
@@ -18,18 +15,21 @@ Below is a profile that will provision a cloud instance with `24GB` of memory an
 
 ```yaml
 profiles:
-  - name: gcp-t4
-    project: gcp
+  - name: t4-serve
+    
     resources:
       memory: 24GB
       gpu:
         name: T4
+        
+    spot_policy: auto # (Optional) Use spot instances if available
+        
     default: true
 ```
 
 </div>
 
-## Running a Gradio app
+## Run the app
 
 Here's the configuration that runs the Gradio app:
 
@@ -69,10 +69,7 @@ machine for secure and convenient access.
 
 ![](../assets/images/dstack-llmchat-gallery.png){ width=800 }
 
-!!! info "NOTE:"
-    To use a non-default profile, simply specify its name with `--profile NAME` when using `dstack run`.
-
-## Running a Discord bot
+## Run the Discord bot
 
 Here's the configuration that runs the Gradio app:
 
@@ -103,8 +100,6 @@ commands:
     Portal](https://discord.com/developers/docs/intro). If you haven't set up a Discord Bot on the portal yet, 
     follow the [How to Create a Discord Bot Account](https://www.freecodecamp.org/news/create-a-discord-bot-with-python/) 
     section of the tutorial from freeCodeCamp.
-
-  
 
 Finally, here's how you run it with `dstack`:
 

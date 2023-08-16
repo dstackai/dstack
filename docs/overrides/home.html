@@ -116,12 +116,13 @@
     <div class="md-grid md-typeset">
         <div class="tx-landing__hero">
             <div class="tx-landing__hero_text">
-                <h1>Cost-effective LLM development</h1>
-                <p><strong>dstack</strong> is an open-source tool that streamlines LLM development
-                    and deployment across multiple clouds.
+                <h1>Orchestrating LLM workloads across multiple clouds</h1>
+                <p><strong>dstack</strong> is an open-source tool that enables the execution of LLM workloads
+                    across multiple cloud GPU providers – ensuring the best GPU price and availability.
                 </p>
 
-                <p>It helps reduce cloud costs, improve availability, and frees you from cloud vendor lock-in.</p>
+                <p>Deploy run <strong>tasks</strong>, <strong>services</strong>, and provision
+                    <strong>dev environments</strong>in a cost-effective manner across multiple cloud GPU providers.</p>
 
                 <a href="/docs" class="md-button md-button--primary">
                     Get started</a>
@@ -137,7 +138,7 @@
 
         <div class="tx-landing__integrations">
             <div class="tx-landing__integrations_text">
-                <h2>Optimize costs and availability through multi-cloud</h2>
+                <h2>Optimal price and availability across multiple GPU providers</h2>
             </div>
             <div class="tx-landing__integrations_logos">
                 <img class="logo-xlarge" src="assets/images/aws-logo.svg" title="Amazon Web Services">
@@ -150,25 +151,23 @@
         <div class="tx-landing__major_feature">
             <div class="section">
                 <div class="block margin">
-                    <div>
-                        <h2>Dev environments</h2>
-                        <p>A dev environment is a virtual machine with pre-configured hardware resources, source code,
-                            and an IDE.</p>
+                    <h2>Training</h2>
 
-                        <p>With <strong>dstack</strong>, you can easily define and provision this environment in any
-                            cloud using a configuration file and a single command.</p>
+                    <p>Using <strong>dstack</strong>, you can define <strong>tasks</strong> and execute them across
+                        multiple cloud GPU providers, ensuring the best GPU price and availability.</p>
 
-                        <p>Conveniently access the cloud dev environment from your desktop IDE.</p>
+                    <p><strong>Tasks</strong> facilitate cost-effective on-demand execution of batch jobs and web apps.
+                    </p>
 
-                        <p>
-                            <a href="https://dstack.ai/docs/guides/dev-environments" target="_blank"
-                               class="md-button md-button-secondary">Learn more</a>
-                        </p>
-                    </div>
+                    <p>
+                        <a href="https://dstack.ai/docs/guides/tasks" target="_blank"
+                           class="md-button md-button-secondary">Learn more</a>
+                    </p>
                 </div>
 
                 <div class="block large">
-                    <img src="assets/images/dstack-vscode-jupyter.png" alt="">
+                    <div id="train-command-example" data-termynal>
+                    </div>
                 </div>
             </div>
         </div>
@@ -176,26 +175,22 @@
         <div class="tx-landing__major_feature">
             <div class="section">
                 <div class="block large margin">
-                    <div id="train-command-example" data-termynal>
+                    <div id="serve-command-example" data-termynal>
                     </div>
                 </div>
                 <div class="block">
-                    <div>
-                        <h2>Tasks</h2>
-                        <p>A task can be a training script, a script that processes data, or even a web-based
-                            application.</p>
+                    <h2>Inference</h2>
 
-                        <p>With <strong>dstack</strong>, you can define such a task through a configuration file and run
-                            it in any cloud with a single command.</p>
+                    <p>Using <strong>dstack</strong>, you can define and deploy <strong>services</strong> using multiple
+                        cloud GPU
+                        providers, ensuring the best prices and availability.</p>
 
-                        <p>If your task exposes ports, <strong>dstack</strong>
-                            forwards the traffic to your local machine for secure and convenient access.</p>
+                    <p><strong>Services</strong> enable cost-effective deployment of models and web apps.</p>
 
-                        <p>
-                            <a href="https://dstack.ai/docs/guides/tasks" target="_blank"
-                               class="md-button md-button-secondary">Learn more</a>
-                        </p>
-                    </div>
+                    <p>
+                        <a href="https://dstack.ai/docs/guides/services" target="_blank"
+                           class="md-button md-button-secondary">Learn more</a>
+                    </p>
                 </div>
             </div>
         </div>
@@ -203,25 +198,20 @@
         <div class="tx-landing__major_feature">
             <div class="section">
                 <div class="block margin">
-                    <div>
-                        <h2>Services</h2>
+                    <h2>Dev environments</h2>
+                    <p>Using <strong>dstack</strong>, provisioning dev environments over multiple GPU cloud
+                        providers becomes effortless, ensuring the best prices and availability.</p>
 
-                        <p>A service is an application that is accessible through a public endpoint
-                            managed by <strong>dstack</strong>.</p>
-
-                        <p>Using <strong>dstack</strong>, you can define such a service through a configuration file and
-                            have it automatically deployed in any cloud of your choice.</p>
-                    </div>
+                    <p>Dev environments are easily accessible through your local desktop IDE.</p>
 
                     <p>
-                        <a href="https://dstack.ai/docs/guides/services" target="_blank"
+                        <a href="https://dstack.ai/docs/guides/dev-environments" target="_blank"
                            class="md-button md-button-secondary">Learn more</a>
                     </p>
                 </div>
 
                 <div class="block large">
-                    <div id="serve-command-example" data-termynal>
-                    </div>
+                    <img src="assets/images/dstack-vscode-jupyter.png" alt="">
                 </div>
             </div>
         </div>
@@ -333,11 +323,13 @@
                     <pre class="highlight">
 $ pip install "dstack[aws,gcp,azure,lambda]"
 $ dstack start
+
+The server is available at http://127.0.0.1:3000?token=b934d226-e24a-4eab-eb92b353b10f
                     </pre>
                 </div>
                 <p class="tx-landing__bottom_cta_text">
-                    And you're <strong>done</strong>! Now you can run dev environments, tasks,
-                    and services, in <strong>multiple clouds</strong>.
+                    Now you can log in, configure clouds, and you're all set! It's ready to run
+                    <strong>dev environments</strong>, <strong>tasks</strong>, and <strong>services</strong>.
                 </p>
 
                 <a href="/docs" class="md-button md-button--primary">

@@ -1,10 +1,10 @@
 # GCP
 
-The GCP backend type allows to provision infrastructure and store state and artifacts in a GCP account.
+The GCP backend type allows provisioning infrastructure and storing artifacts in a GCP account.
 
-Follow the step-by-step guide below to configure a project with this backend.
+Follow the step-by-step guide below to configure this backend in your project.
 
-## 1. Enable APIs
+## Enable APIs
 
 First, ensure that the required APIs are [enabled](https://cloud.google.com/endpoints/docs/openapi/enable-api) in your GCP project.
 
@@ -21,7 +21,7 @@ First, ensure that the required APIs are [enabled](https://cloud.google.com/endp
     storage.googleapis.com 
     ```
 
-## 2. Create a storage bucket
+## Create a storage bucket
 
 Once the APIs are enabled, proceed and create a storage bucket. `dstack` will use this bucket to store state and
 artifacts.
@@ -30,7 +30,7 @@ artifacts.
     Make sure that the bucket is created in the same region where you plan to provision
     infrastructure.
 
-## 3. Set up GCP credentials
+## Set up GCP credentials
 
 `dstack` support two methods to authenticate with GCP: Default credentials and Service account key.
 
@@ -48,12 +48,12 @@ and `Logging Admin`.
 Once the service account is set up, [create a key](https://cloud.google.com/iam/docs/keys-create-delete) for it and
 download the corresponding JSON file.
 
-## 5. Create a project
+## Configure the backend
 
-Now that you have GCP credentials set up, log in to the Hub, open the `Projects` page, click `Add`, and select `GCP` in
-the `Type` field.
+Now, log in to the UI, open the project's settings,
+click `Edit`, then click `Add backend`, and select `GCP` in the `Type` field.
 
-![](../../../assets/images/dstack-hub-create-gcp-project.png){ width=800 }
+[//]: # (![]&#40;../../../assets/images/dstack-hub-create-gcp-project.png&#41;{ width=800 })
 
 ### Fields reference
 
@@ -69,10 +69,3 @@ The following arguments are optional:
 - `Service account` - (Optional) The JSON file of the [service account key](#4-create-a-service-account-key) to authenticate `dstack` 
 - `Subnet` - (Optional) The VPC subnet where `dstack` will provision infrastructure. If
   not specified, `dstack` will use the default VPC and subnet.
-
-## 6. Configure the CLI
-
-!!! info "NOTE:"
-    Once you have created the project, feel free to use the CLI code snippet to configure it for use with the created project.
-
-    [Learn more →](../../../guides/projects#configuring-the-cli){ .md-button .md-button--primary }

@@ -1,16 +1,14 @@
 # Services
 
-A service is an application that is accessible through a public endpoint managed by `dstack`.
+A service is an application that is accessible through a public endpoint.
 
-Using `dstack`, you can define such a service through a configuration file and have it
-automatically deployed in any cloud of your choice.
+Using `dstack`, you can define such a service through a configuration file and run it on the
+configured clouds that offer the best price and availability.
 
-## Configuration
+## Define a configuration
 
 To configure a service, create its configuration file. It can be defined
 in any folder but must be named with a suffix `.dstack.yml`.
-
-Here's an example:
 
 <div editor-title="serve.dstack.yml"> 
 
@@ -19,145 +17,216 @@ type: service
 
 gateway: ${{ secrets.GATEWAY_ADDRESS }}
 
-port: 8000
+port: 7860
+
+python: "3.11" # (Optional) If not specified, your local version is used.
 
 commands:
-  - python -m http.server 8000
+  - pip install -r requirements
+  - python app.py
 ```
 
 </div>
 
-For more details on the syntax of the `dstack.yml` file, refer to the [Reference](../reference/dstack.yml/service.md).
+Before running a service, you need to configure a gateway address to run the service on.
 
-## Configuring a gateway
+??? info "Gateway"
 
-Before you can run a service, you have to configure a gateway.
+    ### Configure a gateway address 
 
-First, you have to create a gateway in a project of your choice using the `dstack gateway create` command:
+    First, you have to create a gateway in one of the clouds of your choice.
+    
+    <div class="termy">
+    
+    ```shell
+    $ dstack gateway create --backend aws
+    
+    Creating gateway...
+    
+     BACKEND  NAME                        ADDRESS    
+     aws      dstack-gateway-fast-walrus  98.71.213.179  
+    ```
+    
+    </div>
 
-<div class="termy">
+    Once the gateway is up, create a secret with the gateway's address.
+    
+    <div class="termy">
+    
+    ```shell
+    $ dstack secrets add GATEWAY_ADDRESS 98.71.213.179
+    ```
+    </div>
+    
+    ### Configure a domain and enable HTTPS (optional)
+    
+    By default, if you run the service, it will be available at `http://<gateway address>`.
+    
+    If you wish to enable HTTPS and run multiple services on the same gateway, the best approach is to configure a wildcard
+    domain.
 
-```shell
-$ dstack gateway create
+    To do this, go to your domain provider, and create a wildcard `A` DNS record (e.g. `*.mydomain.com`) pointing to the 
+    address of the gateway (e.g. `98.71.213.179`).
+     
+    Now, replace the value of the `GATEWAY_ADDRESS` secret with the subdomain to which you want to deploy your service.
+    
+    <div class="termy">
+    
+    ```shell
+    $ dstack secrets add GATEWAY_ADDRESS `myservice.mydomain.com`
+    ```
+    </div>
+    
+    If you are using a domain name as the gateway address for your service, dstack enables HTTPS automatically using [Let's
+    Encrypt](https://letsencrypt.org/).
+    
+    For more details on the [`dstack gateway`](../reference/cli/gateway.md) and [`dstack secrets`](../reference/cli/secrets.md) 
+    commands, refer to their reference pages.
 
-Creating gateway...
+### Configure the environment
 
- NAME                        ADDRESS    
- dstack-gateway-fast-walrus  98.71.213.179 
+By default, `dstack` uses its own Docker images to run services, which are pre-configured with Python, Conda, and essential CUDA drivers.
 
-```
+You can install packages using `pip` and `conda` executables from `commands`.
 
-</div>
+??? info "Docker image"
+    If you prefer to use your custom Docker image, use the `image` property in the configuration.
 
-!!! info "NOTE:"
-    You can use the `--project` argument to indicate the project.
-    Only AWS, GCP, and Azure projects allow creating gateways.
+    <div editor-title="serve.dstack.yml">
 
-Once the gateway is up, go ahead and create a secret with the gateway's address.
+    ```yaml
+    type: service
 
-<div class="termy">
+    gateway: ${{ secrets.GATEWAY_ADDRESS }}
+    
+    port: 7860
+    
+    image: nvcr.io/nvidia/pytorch:22.12-py3
+    
+    commands:
+      - pip install -r requirements.txt
+      - python app.py
+    ```
 
-```shell
-$ dstack secrets add GATEWAY_ADDRESS 98.71.213.179
-```
-</div>
+    </div>
 
-!!! info "NOTE:"
-    You can use the `--project` argument to indicate the project.
+??? info "Build command (experimental)" 
 
-    If you plan to run services in Lambda Cloud, you
-    can use the gateway created in AWS, GCP, or Azure. Just make sure to create a secret in Lambda Cloud that
-    references the correct gateway address.
+    In case you'd like to pre-build the environment rather than install packaged on every run,
+    you can use the `build` property. Here's an example:
+    
+    <div editor-title="serve.dstack.yml"> 
+    
+    ```yaml
+    type: service
 
-For more details, check the [`dstack gateway`](../reference/cli/gateway.md) and [`dstack secrets`](../reference/cli/secrets.md) commands' reference pages.
+    gateway: ${{ secrets.GATEWAY_ADDRESS }}
+    
+    port: 7860
 
-## Custom domains
+    python: "3.11" # (Optional) If not specified, your local version is used.
+    
+    build:
+      - pip install -r requirements.txt
+    
+    commands:
+      - python app.py
+    ```
+    
+    </div>
 
-You can use a custom domain with your service. To do this, create an `A` DNS record that points to the gateway
-address (e.g. `98.71.213.179`). Then, instead of using the gateway address (`98.71.213.179`), 
-specify your domain name as the `GATEWAY_ADDRESS` secret.
+    In this case, you have to pass `--build` to `dstack run`.
 
-## Running a service
+    <div class="termy">
+    
+    ```shell
+    $ dstack run . -f serve.dstack.yml --build
+    ```
+    
+    </div>
+
+    If there is no pre-built image, the `dstack run` command will build it and upload it to the storage. If the pre-built
+    image is already available, the `dstack run` command will reuse it.
+
+The `.dstack.yml` has many other properties. To view them all, refer to the [Reference](../reference/dstack.yml/service.md).
+
+## Run the configuration
 
 To run a service, use the `dstack run` command followed by the path to the directory you want to use as the
 working directory.
 
-If your configuration file has a name different from `.dstack.yml`, pass the path to it using the `-f` argument.
+If the configuration file is named other than `.dstack.yml`, pass its path via the `-f` argument.
 
 <div class="termy">
 
 ```shell
 $ dstack run . -f serve.dstack.yml
 
- RUN           CONFIGURATION     USER   PROJECT  INSTANCE  RESOURCES        SPOT
- yellow-cat-1  serve.dstack.yml  admin  local    -         5xCPUs, 15987MB  auto  
+ RUN           CONFIGURATION     USER   BACKEND  INSTANCE  RESOURCES        SPOT
+ yellow-cat-1  serve.dstack.yml  admin  aws      -         5xCPUs, 15987MB  auto  
 
 Provisioning...
 ---> 100%
 
-Serving HTTP on http://98.71.213.179:80/ ...
+Serving HTTP on https://myservice.mydomain.com ...
 ```
 
 </div>
 
-This command deploys the service, and forwards the traffic to the gateway, 
-providing you with a public endpoint.
+This command deploys the service, and forwards the traffic to the gateway address.
 
-??? info ".gitignore"
-    When running a service, `dstack` uses the exact version of code that is present in the folder where you
-    use the `dstack run` command.
+### Configure resources, price, etc
 
-    If your folder has large files or folders, this may affect the performance of the `dstack run` command. To avoid this,
-    make sure to create a `.gitignore` file and include these large files or folders that you don't want to include when
-    running dev environments or tasks.
+For every run, you can specify hardware resources like memory and GPU, along with various run policies (e.g., maximum
+hourly price, use of spot instances, etc.).
 
-For more details on the `dstack run` command, refer to the [Reference](../reference/cli/run.md).
+| Example                     | Description                                |
+|-----------------------------|--------------------------------------------|
+| `dstack run . --gpu A10`    | Use an instance with `NVIDIA A10` GPU      |
+| `dstack run . --gpu A100:8` | Use an instance with 8 `NVIDIA A100` GPUs  |
+| `dstack run . --gpu 24GB`   | Use an instance with a GPU that has `24GB` |
 
-## Endpoint URL
+The `dstack run` command has many options. To view them, refer to the [Reference](../reference/cli/run.md).
 
-By default, the public endpoint URL is `http://<gateway address>`. If you want to run multiple services on the same gateway,
-currently, the best approach is to use [custom domains](#custom-domains).
-For development purposes, it may be enough to use a custom port mapping in YAML (instead of `8000`,
-specify `<gateway port>:8000`).
+??? info "Profiles"
+    ### Configure profiles (optional) 
 
-!!! info "HTTPS"
-    HTTPS support is scheduled to be included in the 0.11 release of `dstack` (planned for August 2023).
-
-## Profiles
-
-If you [configured](../projects.md) a project that uses a cloud backend, you can define profiles that specify the
-project and the cloud resources to be used.
-
-To configure a profile, simply create the `profiles.yml` file in the `.dstack` folder within your project directory. 
-Here's an example:
-
-<div editor-title=".dstack/profiles.yml"> 
-
-```yaml
-profiles:
-  - name: gcp-large
-    project: gcp
+    Instead of configuring resources, price, and policies through `dstack run`, you can use profiles. To set up a profile, 
+    create the `.dstack/profiles.yml` file in the root folder of the project. 
     
-    resources:
-      memory: 24GB
-      gpu:
-        memory: 48GB
-        
-    spot_policy: auto
-      
-    default: true
-```
+    <div editor-title=".dstack/profiles.yml"> 
+    
+    ```yaml
+    profiles:
+      - name: large
 
-</div>
+        resources:
+          memory: 24GB  # (Optional) The minimum amount of RAM memory
+          gpu:
+            memory: 48GB  # (Optional) The minimum amount of GPU memory 
+            
+        max_price: 1.5 # (Optional) The maximim price per instance, in dollards.
 
-!!! info "Spot instances"
-    If `spot_policy` is set to `auto`, `dstack` prioritizes spot instances.
-    If these are unavailable, it uses `on-demand` instances. To cut costs, set `spot_policy` to `spot`.
+        max_duration: 1d # (Optional) The maximum duration of the run.
 
-By default, the `dstack run` command uses the default profile.
+        spot_policy: auto # (Optional) The spot policy. Supports `spot`, `on-demand, and `auto`.
 
-!!! info "Multiple profiles"
-    You can define multiple profiles according to your needs and use any of them with the `dstack run` command by specifying
-    the desired profile using the `--profile` argument.
+        backends: [azure, lambda]  # (Optional) Use only listed backends 
 
-For more details on the syntax of the `profiles.yml` file, refer to the [Reference](../reference/profiles.yml.md).
+        default: true # (Optional)
+    ```
+    
+    </div>
+
+    #### Spot instances
+
+    If `spot_policy` is set to `auto`, `dstack` gives priority to spot instances. If unavailable, it uses on-demand instances. 
+    To reduce costs, set `spot_policy` to `spot`. Keep in mind that spot instances are much cheaper but may be interrupted. 
+    Your code should handle interruptions and resume from saved checkpoints.
+
+    #### Default profile
+    
+    By default, the `dstack run` command uses the default profile. You 
+    can override it by passing the `--profile` argument to the `dstack run` command.
+    
+    For more details on the syntax of the `profiles.yml` file, refer to the [Reference](../reference/profiles.yml.md).

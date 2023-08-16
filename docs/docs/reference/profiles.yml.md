@@ -22,7 +22,7 @@ Below is a full reference of all available properties.
         - `retry` - (Optional) Whether to retry the run on failure or not. Default to `false`
         - `limit` - (Optional) The maximum period of retrying the run, e.g., `4h` or `1d`. Defaults to `1h` if `retry` is `true`.
     - `max_duration` - (Optional) The maximum duration of a run (e.g., `2h`, `1d`, etc). After it elapses, the run is forced to stop. Protects from running idle instances. Defaults to `6h` for dev environments and to `72h` for tasks. Use `max_duration: off` to disable maximum run duration.
-    - `max_price` - (Optional) Maximum price per hour, $
+    - `max_price` - (Optional) The maximum price per hour, in dollars
 
 [//]: # (TODO: Add examples)
 

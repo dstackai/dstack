@@ -1,24 +1,24 @@
 # Dev environments
 
-A dev environment is a virtual machine pre-configured with hardware resources, source code, environment, and an
-IDE.
+A dev environment is a cloud instance pre-configured with hardware resources, source code, an environment, and
+an IDE.
 
-With `dstack`, you can define such a dev environment through a configuration file and provision it in any cloud 
-with a single command.
+Using `dstack`, you can define such a dev environment through a configuration file and provision it on one of the
+configured clouds that offer the best price and availability.
 
-## Configuration
+## Define a configuration
 
 To configure a dev environment, create its configuration file. It can be defined
 in any folder but must be named with a suffix `.dstack.yml`.
-
-Here's an example:
 
 <div editor-title=".dstack.yml"> 
 
 ```yaml
 type: dev-environment
 
-init:
+python: "3.11" # (Optional) If not specified, your local version is used.
+
+setup: # (Optional) Executed once at the first startup.
   - pip install -r requirements.txt
 
 ide: vscode
@@ -26,112 +26,13 @@ ide: vscode
 
 </div>
 
-## Running a dev environment
+### Configure the environment
 
-To run a dev environment, use the `dstack run` command followed by the path to the directory you want to use as the
-working directory.
+By default, `dstack` uses its own Docker images to run dev environments, which are pre-configured with Python, Conda, and essential CUDA drivers.
 
-<div class="termy">
-
-```shell
-$ dstack run . 
-
- RUN          CONFIGURATION   USER   PROJECT  INSTANCE  RESOURCES        SPOT
- fast-moth-1  app.dstack.yml  admin  local    -         5xCPUs, 15987MB  auto  
- 
-Provisioning and starting SSH tunnel...
----> 100%
-
-To open in VS Code Desktop, use this link:
-  vscode://vscode-remote/ssh-remote+fast-moth-1/workflow
-
-To exit, press Ctrl+C.
-```
-
-</div>
-
-The `dstack run` command provisions cloud resources, pre-installs the environment, code, and the IDE, and establishes an
-SSH tunnel for secure access. 
-
-To open the dev environment via a desktop IDE, click the URL in the output.
-
-![](../../assets/images/dstack-vscode-jupyter.png){ width=800 }
-
-By default, VS Code comes with pre-installed Python and Jupyter extensions.
-
-??? info ".gitignore"
-    When running a dev environment, `dstack` uses the exact version of code that is present in the folder where you
-    use the `dstack run` command.
-
-    If your folder has large files or folders, this may affect the performance of the `dstack run` command. To avoid this,
-    make sure to create a `.gitignore` file and include these large files or folders that you don't want to include when
-    running dev environments or tasks.
-
-!!! info "Default configuration"
-    By default, the `dstack run` command looks for the default configuration file named `.dstack.yml` in the given working
-    directory. If your configuration file is named differently, you can specify a path to it using the `-f` argument.
-
-For more details on the `dstack run` command, refer to the [Reference](../reference/cli/run.md).
-
-## Environment
-
-By default, `dstack` uses its own Docker images to run tasks, which include pre-configured Python, Conda, and essential
-CUDA drivers.
-
-To change the Python version, modify the `python` property in the configuration. Otherwise, `dstack` will use the version
-you have locally.
-
-You can install packages using `pip` and `conda` executables from `commands`.
-
-??? info "Build command (experimental)" 
-
-    In case you'd like to pre-build the environment rather than install packaged on every run,
-    you can use the `build` property. Here's an example:
-    
-    <div editor-title=".dstack.yml"> 
-    
-    ```yaml
-    type: dev-environment
-    
-    build:
-      - pip install -r requirements.txt --no-cache-dir
-    
-    ide: vscode
-    ```
-    
-    </div>
-    
-    To pre-build the environment, you have two options:
-    
-    _Option 1. Run the `dstack build` command_
-
-    <div class="termy">
-    
-    ```shell
-    $ dstack build .
-    ```
-    
-    </div>
-    
-    Similar to the `dstack run` command, `dstack build` also provisions cloud resources and uses them to pre-build the
-    environment. Consequently, when running the `dstack run` command again, it will reuse the pre-built image, leading
-    to faster startup times, particularly for complex setups.
-
-    _Option 2. Use `--build` with `dstack run`_
-
-    <div class="termy">
-    
-    ```shell
-    $ dstack run . --build
-    ```
-    
-    </div>
-
-    If there is no pre-built image, the `dstack run` command will build it and upload it to the storage. If the pre-built
-    image is already available, the `dstack run` command will reuse it.
+You can install packages using `pip` and `conda` executables from `setup`.
 
 ??? info "Docker image (experimental)"
-
     If you prefer to use your custom Docker image, use the `image` property in the configuration.
 
     However, this requires your image to have `openssh-server` pre-installed. If you want to use a custom Docker
@@ -155,47 +56,126 @@ You can install packages using `pip` and `conda` executables from `commands`.
 
     </div>
 
-For more details on the syntax of `.dstack.yml`, refer to the [Reference](../reference/dstack.yml/dev-environment.md).
+??? info "Build command (experimental)" 
 
-## Profiles
-
-If you [configured](../projects.md) a project that uses a cloud backend, you can define profiles that specify the
-project and the cloud resources to be used.
-
-To configure a profile, simply create the `profiles.yml` file in the `.dstack` folder within your project directory. 
-Here's an example:
-
-<div editor-title=".dstack/profiles.yml"> 
-
-```yaml
-profiles:
-  - name: gcp-large
-    project: gcp
+    In case you'd like to pre-build the environment rather than install packaged on every run,
+    you can use the `build` property. Here's an example:
     
-    resources:
-      memory: 24GB
-      gpu:
-        name: 48GB
-        
-    spot_policy: auto
-    max_duration: 1d
-      
-    default: true
+    <div editor-title=".dstack.yml"> 
+    
+    ```yaml
+    type: dev-environment
+
+    python: "3.11" # (Optional) If not specified, your local version is used.
+    
+    build:
+      - pip install -r requirements.txt --no-cache-dir
+    
+    ide: vscode
+    ```
+    
+    </div>
+
+    In this case, you have to pass `--build` to `dstack run`.
+
+    <div class="termy">
+    
+    ```shell
+    $ dstack run . --build
+    ```
+    
+    </div>
+
+    If there is no pre-built image, the `dstack run` command will build it and upload it to the storage. If the pre-built
+    image is already available, the `dstack run` command will reuse it.
+
+The `.dstack.yml` has many other properties. To view them all, refer to the [Reference](../reference/dstack.yml/dev-environment.md).
+
+## Run the configuration
+
+To run a dev environment, use the `dstack run` command followed by the path to the directory you want to use as the
+working directory.
+
+<div class="termy">
+
+```shell
+$ dstack run . 
+
+ RUN          CONFIGURATION   USER   BACKEND  INSTANCE  RESOURCES        SPOT
+ fast-moth-1  app.dstack.yml  admin  aws      -         5xCPUs, 15987MB  auto  
+ 
+Provisioning and starting SSH tunnel...
+---> 100%
+
+To open in VS Code Desktop, use this link:
+  vscode://vscode-remote/ssh-remote+fast-moth-1/workflow
+
+To exit, press Ctrl+C.
 ```
 
 </div>
 
-!!! info "Spot instances"
-    If `spot_policy` is set to `auto`, `dstack` prioritizes spot instances.
-    If these are unavailable, it uses `on-demand` instances. To cut costs, set `spot_policy` to `spot`.
+The `dstack run` command provisions cloud resources, pre-installs the environment, code, and the IDE, and establishes an
+SSH tunnel for secure access. 
+
+To open the dev environment via a desktop IDE, click the URL in the output.
+
+![](../../assets/images/dstack-vscode-jupyter.png){ width=800 }
+
+By default, VS Code comes with pre-installed Python and Jupyter extensions.
+
+### Configure resources, price, etc
+
+For every run, you can specify hardware resources like memory and GPU, along with various run policies (e.g., maximum
+hourly price, use of spot instances, etc.).
+
+| Example                     | Description                                |
+|-----------------------------|--------------------------------------------|
+| `dstack run . --gpu A10`    | Use an instance with `NVIDIA A10` GPU      |
+| `dstack run . --gpu A100:8` | Use an instance with 8 `NVIDIA A100` GPUs  |
+| `dstack run . --gpu 24GB`   | Use an instance with a GPU that has `24GB` |
+
+The `dstack run` command has many options. To view them, refer to the [Reference](../reference/cli/run.md).
+
+??? info "Profiles"
+    ### Configure profiles (optional)
+
+    Instead of configuring resources, price, and policies through `dstack run`, you can use profiles. To set up a profile, 
+    create the `.dstack/profiles.yml` file in the root folder of the project. 
     
-    Note that spot instances are significantly cheaper but can be interrupted. Your code should ideally 
-    handle interruptions and resume work from saved checkpoints.
+    <div editor-title=".dstack/profiles.yml"> 
+    
+    ```yaml
+    profiles:
+      - name: large
 
-By default, the `dstack run` command uses the default profile.
+        resources:
+          memory: 24GB  # (Optional) The minimum amount of RAM memory
+          gpu:
+            memory: 48GB  # (Optional) The minimum amount of GPU memory 
+            
+        max_price: 1.5 # (Optional) The maximim price per instance, in dollards.
 
-!!! info "Multiple profiles"
-    You can define multiple profiles according to your needs and use any of them with the `dstack run` command by specifying
-    the desired profile using the `--profile` argument.
+        max_duration: 1d # (Optional) The maximum duration of the run.
 
-For more details on the syntax of the `profiles.yml` file, refer to the [Reference](../reference/profiles.yml.md).
+        spot_policy: auto # (Optional) The spot policy. Supports `spot`, `on-demand, and `auto`.
+
+        backends: [azure, lambda]  # (Optional) Use only listed backends 
+
+        default: true # (Optional)
+    ```
+    
+    </div>
+
+    #### Spot instances
+
+    If `spot_policy` is set to `auto`, `dstack` gives priority to spot instances. If unavailable, it uses on-demand instances. 
+    To reduce costs, set `spot_policy` to `spot`. Keep in mind that spot instances are much cheaper but may be interrupted. 
+    Your code should handle interruptions and resume from saved checkpoints.
+
+    #### Default profile
+    
+    By default, the `dstack run` command uses the default profile. You 
+    can override it by passing the `--profile` argument to the `dstack run` command.
+    
+    For more details on the syntax of the `profiles.yml` file, refer to the [Reference](../reference/profiles.yml.md).

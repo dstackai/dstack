@@ -8,19 +8,18 @@ This command runs a given configuration.
 
 ```shell
 $ dstack run --help
-Usage: dstack run [-h] [-f FILE] [-n NAME] [-y] [-d] [--project PROJECT] [--profile PROFILE]
-                  [--reload]
-                  WORKING_DIR [ARGS ...]
+Usage: dstack run [-h] [-f FILE] [-n NAME] [-y] [-d] [--project PROJECT] 
+                  [--profile PROFILE] [--reload] WORKING_DIR [ARGS ...]
 
 Positional Arguments:
   WORKING_DIR           The working directory of the run
   ARGS                  Run arguments
 
 Options:
-  -h, --help            Show this help message and exit
   -f, --file FILE       The path to the run configuration file. Defaults to
                         WORKING_DIR/.dstack.yml.
-  -n, --name NAME       The name of the run. If not specified, a random name is assigned.
+  -n, --name NAME       The name of the run.
+                        If not specified, a random name is assigned.
   -y, --yes             Do not ask for plan confirmation
   -d, --detach          Do not poll logs and run status
   --reload              Enable auto-reload
@@ -29,6 +28,20 @@ Options:
 ```
 
 </div>
+
+[//]: # (TODO: Document `--port`, `--env`, `--gpu`, etc.)
+
+!!! info "Default configuration"
+    By default, the `dstack run` command looks for the default configuration file named `.dstack.yml` in the given working
+    directory. If your configuration file is named differently, you can specify a path to it using the `-f` argument.
+
+??? info ".gitignore"
+    When running dev environments or tasks, `dstack` uses the exact version of code that is present in the folder where you
+    use the `dstack run` command.
+
+    If your folder has large files or folders, this may affect the performance of the `dstack run` command. To avoid this,
+    make sure to create a `.gitignore` file and include these large files or folders that you don't want to include when
+    running dev environments or tasks.
 
 [//]: # (TODO: Ports aren't part of the `dstack run --help` output)
 
@@ -50,10 +63,10 @@ The following arguments are optional:
 
 [//]: # (- `-t TAG`, `--tag TAG` – &#40;Optional&#41; A tag name. Warning, if the tag exists, it will be overridden.)
 - `--backend [BACKEND ...]` – (Optional) Backend(s) to consider for provisioning
-- `-p PORT`, `--port PORT` – (Optional) Requests port or define mapping (`LOCAL_PORT:CONTAINER_PORT`)
+- `-p PORT`, `--port PORT` – (Optional) Requests port or define mapping (`EXTERNAL_PORT:INTERNAL_PORT`)
 - `-e ENV`, `--env ENV` – (Optional) Set environment variable (`NAME=value`)
 - `--gpu` – (Optional) Request a GPU for the run. Specify any: name, count, memory (`NAME:COUNT:MEMORY` or `NAME` or `COUNT:MEMORY`, etc...)
-- `--max-price` – (Optional) Maximum price per hour, $
+- `--max-price` – (Optional) The maximum price per hour, in dollars
 - `ARGS` – (Optional) Use `ARGS` to pass custom run arguments
 
 Spot policy (the arguments are mutually exclusive):
@@ -79,5 +92,6 @@ Build policies:
 
 [//]: # (Tags should be dropped)
 
-!!! info "NOTE:"
-    By default, the run is in the attached mode, so you'll see the output in real-time.
+[//]: # (!!! info "NOTE:")
+[//]: # (    By default, the run is in the attached mode, so you'll see the output in real-time.)
+

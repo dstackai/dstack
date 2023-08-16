@@ -6,7 +6,9 @@ of generating high-quality images from text.
 This example demonstrates how to use `dstack` to serve SDXL as a REST endpoint in a cloud of your choice for image
 generation and refinement.
 
-## Defining endpoints
+## Define endpoints
+
+### Requirements
 
 Here's the list of libraries that our example will require:
 
@@ -26,6 +28,9 @@ uvicorn
 </div>
 
 Let's walk through the code of the example.
+
+### Load the model
+
 First of all, let's load the base SDXL model using the `diffusers` library.
 
 ```python
@@ -41,6 +46,8 @@ base = StableDiffusionXLPipeline.from_pretrained(
 )
 base.to("cuda")
 ```
+
+### Define the generate endpoint
 
 Now that the model is loaded, let's define the FastAPI app and the `/generate` REST endpoint that will accept a prompt and
 generate an image.
@@ -84,6 +91,8 @@ async def generate(request: GenerateRequest):
     return ImageResponse(id=id)
 ```
 
+### Define the download endpoint
+
 Notice that the endpoint only returns the ID of the image. To download images by ID, we'll define another endpoint:
 
 ```python
@@ -99,6 +108,8 @@ def download(id: str):
 ```
 
 That's it. Once we run the application, we can already utilize the `/generate` and `/download` endpoints.
+
+### Define the refine endpoint
 
 Since SDXL allows refining images, let's define the refine endpoint to accept the image ID and the refinement prompt.
 
@@ -145,10 +156,7 @@ async def refine(request: RefineRequest):
 
 The code for the endpoints is ready. Now, let's explore how to use `dstack` to serve it on a cloud account of your choice.
 
-## Defining a profile
-
-!!! info "NOTE:"
-    Before using `dstack` with a particular cloud, make sure to [configure](../docs/projects.md) the corresponding project.
+## Define a profile
 
 SDXL requires at least `12GB` of GPU memory and at least `16GB` of RAM. 
 To inform `dstack` about the required resources, you need to 
@@ -158,26 +166,21 @@ To inform `dstack` about the required resources, you need to
 
 ```yaml
 profiles:
-  - name: gcp-sdxl
-    project: gcp
+  - name: xs-serve
     
     resources:
       memory: 16GB
       gpu:
         memory: 12GB
         
-    spot_policy: auto
+    spot_policy: auto # (Optional) Use spot instances if available
       
     default: true
 ```
 
 </div>
 
-!!! info "Spot instances"
-    If `spot_policy` is set to `auto`, `dstack` prioritizes spot instances.
-    If these are unavailable, it uses `on-demand` instances. To cut costs, set `spot_policy` to `spot`. 
-
-## Serving endpoints
+## Serve the endpoints
 
 ??? info "Tasks"
     If you want to serve an application for development purposes only, you can use 
@@ -215,17 +218,17 @@ commands:
 Before you can run a service, you have to ensure that there is a gateway configured for your project.
 
 ??? info "Gateways"
-    To create a gateway, use the `dstack gateway create` command:
+    First, you have to create a gateway in one of the clouds of your choice.
     
     <div class="termy">
     
     ```shell
-    $ dstack gateway create
+    $ dstack gateway create --backend aws
     
     Creating gateway...
     
-     NAME                        ADDRESS    
-     dstack-gateway-fast-walrus  98.71.213.179 
+     BACKEND    NAME                        ADDRESS    
+     aws        dstack-gateway-fast-walrus  98.71.213.179 
     
     ```
     
@@ -262,10 +265,8 @@ $ curl -X POST --location http://98.71.213.179/generate \
 
 </div>
 
-??? info "Custom domains"
-    You can use a custom domain with your service. To do this, create an `A` DNS record that points to the gateway
-    address (e.g. `98.71.213.179`). Then, instead of using the gateway address (`98.71.213.179`), 
-    specify your domain name as the `GATEWAY_ADDRESS` secret.
+!!! info "Configure a domain and enable HTTPS"
+    Please refer to the [services](../docs/guides/services.md#configure-a-domain-and-enable-https-optional) guide to learn how to configure a custom domain and enable HTTPS.
 
 For more details on SDXL, check its [documentation](https://huggingface.co/docs/diffusers/api/pipelines/stable_diffusion/stable_diffusion_xl) on Hugging Face's website.
 

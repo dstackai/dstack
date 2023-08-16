@@ -1,12 +1,5 @@
 # Hugging Face Spaces
 
-!!! info "NOTE:"
-    If you run the `dstack` server via Docker, it will not allow you to run workloads locally. 
-    To run workloads locally, make sure to use [`pip`](pip.md).
-
-    Running the `dstack` server via Hugging Face Spaces makes sense only if you intend to 
-    deploy the `dstack` server outside of your machine to run workloads in the cloud.
-
 ## Create a space
 
 !!! info "NOTE:"

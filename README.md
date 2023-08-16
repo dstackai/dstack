@@ -9,7 +9,7 @@
 </h1>
 
 <h3 align="center">
-Cost-effective LLM development
+Orchestrating LLM workloads across multiple clouds
 </h3>
 
 <p align="center">
@@ -23,9 +23,11 @@ Cost-effective LLM development
 [![PyPI - License](https://img.shields.io/pypi/l/dstack?style=flat-square&color=blue)](https://github.com/dstackai/dstack/blob/master/LICENSE.md)
 </div>
 
-`dstack` is an open-source tool that streamlines LLM development and deployment across multiple clouds.
+`dstack` is an open-source tool that enables the execution of LLM workloads
+across multiple cloud GPU providers – ensuring the best GPU price and availability.
 
-It helps reduce cloud costs, improve availability, and frees you from cloud vendor lock-in.
+Deploy services, run tasks, and provision dev environments
+in a cost-effective manner across multiple cloud GPU providers.
 
 ## Latest news
 
@@ -33,9 +35,6 @@ It helps reduce cloud costs, improve availability, and frees you from cloud vend
 - [2023/08] [An early preview of services](https://dstack.ai/blog/2023/08/07/services-preview) (Release)
 - [2023/07] [Port mapping, max duration, and more](https://dstack.ai/blog/2023/07/25/port-mapping-max-duration-and-more) (Release)
 - [2023/07] [Serving with vLLM](https://dstack.ai/examples/vllm) (Example)
-- [2023/07] [LLM as Chatbot](https://dstack.ai/examples/llmchat) (Example)
-- [2023/07] [Lambda Cloud GA and Docker support](https://dstack.ai/blog/2023/07/14/lambda-cloud-ga-and-docker-support/) (Release)  
-- [2023/06] [New YAML format](https://dstack.ai/blog/2023/06/12/new-configuration-format-and-cli-experience/) (Release)
 
 ## Installation
 
@@ -45,11 +44,14 @@ To use `dstack`, install it with `pip`, and start the server.
 pip install "dstack[aws,gcp,azure,lambda]"
 dstack start
 ```
+## Configure backends
 
-To run dev environments, tasks, and services in the cloud, log into the UI, and
-configure create the [corresponding project](https://dstack.ai/docs/projects).
+Upon startup, the server sets up the default project called `main`. Prior to using `dstack`, you must log in to the
+UI, open the project's settings, and configure cloud backends 
+(e.g., [AWS](https://dstack.ai/docs/reference/backends/aws), [GCP](https://dstack.ai/docs/reference/backends/gcp), [Azure](https://dstack.ai/docs/reference/backends/azure), 
+[Lambda](https://dstack.ai/docs/reference/backends/lambda), etc.).
 
-## Configurations
+## Define a configuration
 
 A configuration is a YAML file that describes what you want to run.
 
@@ -63,12 +65,13 @@ Configurations can be of three types: `dev-environment`, `task`, and `service`.
 ### Dev environments
 
 A dev environment is a virtual machine with a pre-configured IDE.
-Here's an example of such a configuration:
 
 ```yaml
 type: dev-environment
 
-init:
+python: "3.11" # (Optional) If not specified, your local version is used
+
+setup: # (Optional) Executed once at the first startup
   - pip install -r requirements.txt
 
 ide: vscode
@@ -77,32 +80,41 @@ ide: vscode
 ### Tasks
 
 A task can be either a batch job, such as training or fine-tuning a model, or a web application.
-Here's an example of a task configuration.
 
 ```yaml
 type: task
 
+python: "3.11" # (Optional) If not specified, your local version is used
+
+ports:
+  - 7860
+
 commands:
   - pip install -r requirements.txt
-  - python train.py
+  - python app.py
 ```
+
+While the task runs in the cloud, the CLI forwards traffic, allowing you to access the application from your local
+machine.
 
 ### Services
 
-A service is an application that is accessible through a public endpoint
-managed by `dstack`.
-Here's an example of service:
+A service is an application that is accessible through a public endpoint.
 
 ```yaml
 type: service
 
 gateway: ${{ secrets.GATEWAY_ADDRESS }}
 
-port: 8000
+port: 7860
 
 commands:
-  - python -m http.server 8000
+  - pip install -r requirements.txt
+  - python app.py
 ```
+
+Once the service is up, `dstack` makes it accessible from the Internet through
+the [gateway](https://dstack.ai/docs/guides/services.md#configure-a-gateway-address).
 
 ## CLI
 
@@ -113,28 +125,17 @@ working directory and the path to the configuration file.
 dstack run . -f serve.dstack.yml
 ```
 
-`dstack` automatically provisions cloud resources based on the settings
-of the configured project.
+`dstack` automatically provisions cloud resources based in the 
+configured clouds that offer the best price and availability.
 
-## Profiles
+For every run, you can specify hardware resources like memory and GPU, along with various run policies (e.g., maximum
+hourly price, use of spot instances, etc.).
 
-The `.dstack/profiles.yml` file allows describing multiple profiles.
-Each profile can specify the project to use and the resources required for the run.
-
-```yaml
-profiles:
-  - name: gpu-large
-    project: gcp
-    resources:
-       memory: 48GB
-       gpu:
-         memory: 24GB
-    spot_policy: auto
-    default: true
-```
-
-If you have configured the default profile, the `dstack run` command will use it automatically.
-Otherwise, you can always pass the profile using `--profile` to `dstack run`.
+| Example                     | Description                                |
+|-----------------------------|--------------------------------------------|
+| `dstack run . --gpu A10`    | Use an instance with `NVIDIA A10` GPU      |
+| `dstack run . --gpu A100:8` | Use an instance with 8 `NVIDIA A100` GPUs  |
+| `dstack run . --gpu 24GB`   | Use an instance with a GPU that has `24GB` |
 
 ## More information
 

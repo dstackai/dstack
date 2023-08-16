@@ -1,6 +1,6 @@
 ---
 template: home.html
-title: Cost-effective LLM development
+title: Orchestrating LLM workloads across multiple clouds
 hide:
    - navigation
    - toc
