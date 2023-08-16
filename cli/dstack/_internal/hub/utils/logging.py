@@ -23,6 +23,6 @@ def configure_logger():
     )
     handler.setFormatter(formatter)
     root_logger.addHandler(handler)
-    root_logger.setLevel(os.getenv("DSTACK_HUB_ROOT_LOG_LEVEL", "ERROR").upper())
+    root_logger.setLevel(os.getenv("DSTACK_SERVER_ROOT_LOG_LEVEL", "ERROR").upper())
     dstack_logger = logging.getLogger("dstack")
-    dstack_logger.setLevel(os.getenv("DSTACK_HUB_LOG_LEVEL", "ERROR").upper())
+    dstack_logger.setLevel(os.getenv("DSTACK_SERVER_LOG_LEVEL", "ERROR").upper())

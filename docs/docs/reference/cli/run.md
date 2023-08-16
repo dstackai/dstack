@@ -46,9 +46,10 @@ The following arguments are optional:
 - `-d`, `--detach` – (Optional) Run in the detached mode to disable logs and run status polling. By default, the run is in the attached mode, so the logs are printed in real-time.
 - `--reload` – (Optional) Enable auto-reload 
 - `--project PROJECT` – (Optional) The name of the project
-- `--profile PROJECT` – (Optional) The name of the profile
+- `--profile PROFILE` – (Optional) The name of the profile
 
 [//]: # (- `-t TAG`, `--tag TAG` – &#40;Optional&#41; A tag name. Warning, if the tag exists, it will be overridden.)
+- `--backend [BACKEND ...]` – (Optional) Backend(s) to consider for provisioning
 - `-p PORT`, `--port PORT` – (Optional) Requests port or define mapping (`LOCAL_PORT:CONTAINER_PORT`)
 - `-e ENV`, `--env ENV` – (Optional) Set environment variable (`NAME=value`)
 - `--gpu` – (Optional) Request a GPU for the run. Specify any: name, count, memory (`NAME:COUNT:MEMORY` or `NAME` or `COUNT:MEMORY`, etc...)

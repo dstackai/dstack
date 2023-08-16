@@ -6,7 +6,7 @@ Here's how to run the `dstack` server via Docker:
 
 ```shell
 $ docker run --name dstack -p &lt;port-on-host&gt;:3000 \ 
-  -v &ltpath-to-data-directory&gt;:/root/.dstack/hub \
+  -v ~/dstack/server:/root/.dstack/server \
   dstackai/dstack
 ```
 
@@ -23,13 +23,13 @@ $ docker run --name dstack -p &lt;port-on-host&gt;:3000 \
 
 Here's the list of environment variables which you can override:
 
-- `DSTACK_HUB_ADMIN_TOKEN` – (Optional) The default token of the `admin` user. By default, it's generated randomly
+- `DSTACK_SERVER_ADMIN_TOKEN` – (Optional) The default token of the `admin` user. By default, it's generated randomly
   at the first startup.
-- `DSTACK_HUB_DATA` – (Optional) The path to the directory where the Hub server stores the state. Defaults to `~/.dstack/hub/data`.
+- `DSTACK_SERVER_DATA` – (Optional) The path to the directory where the `dstack`server stores the state. Defaults to `~/.dstack/server`.
 
 ??? info "Persisting state in a cloud storage"
 
-    By default, `dstack` saves state in a local directory (see `DSTACK_HUB_DATA`).
+    By default, `dstack` saves state in a local directory (see `DSTACK_SERVER_DATA`).
     If you want to persist state automatically to a cloud object storage, you can configure the following environment
     variables.
     

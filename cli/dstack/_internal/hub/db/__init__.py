@@ -1,5 +1,3 @@
-import os
-from pathlib import Path
 from typing import Optional
 
 from sqlalchemy import event
@@ -8,7 +6,9 @@ from sqlalchemy.ext.asyncio import AsyncSession, create_async_engine
 from sqlalchemy.orm import sessionmaker
 from sqlalchemy.pool import ConnectionPoolEntry
 
-data_path = os.getenv("DSTACK_HUB_DATA") or Path.home() / ".dstack" / "hub" / "data2"
+from dstack._internal.hub.utils.common import get_server_dir_path
+
+data_path = get_server_dir_path() / "data"
 if not data_path.exists():
     data_path.mkdir(parents=True, exist_ok=True)
 
