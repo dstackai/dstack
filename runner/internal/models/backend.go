@@ -2,6 +2,7 @@ package models
 
 import (
 	"fmt"
+	"strconv"
 	"strings"
 	"time"
 )
@@ -204,7 +205,7 @@ func (j *Job) JobHeadFilepath() string {
 	}
 	price := ""
 	if j.Price > 0 {
-		price = fmt.Sprintf("%f", j.Price)
+		price = strconv.FormatFloat(j.Price, 'f', -1, 64)
 	}
 	return fmt.Sprintf(
 		"jobs/%s/l;%s;%s;%s;%d;%s;%s;%s;%s;%s;%s;%s;%s",

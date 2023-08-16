@@ -3,9 +3,10 @@ package gcp
 import (
 	"context"
 	"errors"
-	"github.com/dstackai/dstack/runner/internal/backend/base"
 	"io"
 	"strings"
+
+	"github.com/dstackai/dstack/runner/internal/backend/base"
 
 	"cloud.google.com/go/storage"
 	"github.com/dstackai/dstack/runner/internal/gerrors"
@@ -19,9 +20,10 @@ type GCPStorage struct {
 	bucket     *storage.BucketHandle
 	project    string
 	bucketName string
+	namespace  string
 }
 
-func NewGCPStorage(project, bucketName string) (*GCPStorage, error) {
+func NewGCPStorage(project, bucketName, namespace string) (*GCPStorage, error) {
 	ctx := context.TODO()
 	client, err := storage.NewClient(ctx)
 	if err != nil {
@@ -36,10 +38,12 @@ func NewGCPStorage(project, bucketName string) (*GCPStorage, error) {
 		bucket:     bucket,
 		project:    project,
 		bucketName: bucketName,
+		namespace:  namespace,
 	}, nil
 }
 
 func (s *GCPStorage) Download(ctx context.Context, key string, writer io.Writer) error {
+	key = base.AddNamespace(s.namespace, key)
 	obj := s.bucket.Object(key)
 	reader, err := obj.NewReader(ctx)
 	if err != nil {
@@ -50,6 +54,7 @@ func (s *GCPStorage) Download(ctx context.Context, key string, writer io.Writer)
 }
 
 func (s *GCPStorage) Upload(ctx context.Context, reader io.Reader, key string) error {
+	key = base.AddNamespace(s.namespace, key)
 	obj := s.bucket.Object(key)
 	writer := obj.NewWriter(ctx)
 	_, err := io.Copy(writer, reader)
@@ -60,11 +65,14 @@ func (s *GCPStorage) Upload(ctx context.Context, reader io.Reader, key string) e
 }
 
 func (s *GCPStorage) Delete(ctx context.Context, key string) error {
+	key = base.AddNamespace(s.namespace, key)
 	obj := s.bucket.Object(key)
 	return gerrors.Wrap(obj.Delete(ctx))
 }
 
 func (s *GCPStorage) Rename(ctx context.Context, oldKey, newKey string) error {
+	oldKey = base.AddNamespace(s.namespace, oldKey)
+	newKey = base.AddNamespace(s.namespace, newKey)
 	if newKey == oldKey {
 		return nil
 	}
@@ -79,6 +87,7 @@ func (s *GCPStorage) Rename(ctx context.Context, oldKey, newKey string) error {
 }
 
 func (s *GCPStorage) CreateSymlink(ctx context.Context, key, symlink string) error {
+	key = base.AddNamespace(s.namespace, key)
 	obj := s.bucket.Object(key)
 	writer := obj.NewWriter(ctx)
 	writer.Metadata = map[string]string{
@@ -88,6 +97,7 @@ func (s *GCPStorage) CreateSymlink(ctx context.Context, key, symlink string) err
 }
 
 func (s *GCPStorage) List(ctx context.Context, prefix string) (<-chan *base.StorageObject, <-chan error) {
+	prefix = base.AddNamespace(s.namespace, prefix)
 	it := s.bucket.Objects(ctx, &storage.Query{Prefix: prefix})
 	ch := make(chan *base.StorageObject)
 	errCh := make(chan error, 1)
@@ -118,6 +128,7 @@ func (s *GCPStorage) List(ctx context.Context, prefix string) (<-chan *base.Stor
 }
 
 func (s *GCPStorage) GetMetadata(ctx context.Context, key, tag string) (string, error) {
+	key = base.AddNamespace(s.namespace, key)
 	obj := s.bucket.Object(key)
 	attrs, err := obj.Attrs(ctx)
 	if err != nil {

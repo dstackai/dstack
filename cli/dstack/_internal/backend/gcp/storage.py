@@ -5,7 +5,12 @@ from typing import Callable, Dict, List, Optional
 from google.cloud import exceptions, storage
 from google.oauth2 import service_account
 
-from dstack._internal.backend.base.storage import SIGNED_URL_EXPIRATION, CloudStorage
+from dstack._internal.backend.base.storage import (
+    SIGNED_URL_EXPIRATION,
+    CloudStorage,
+    add_namespace,
+    drop_namespace,
+)
 from dstack._internal.core.storage import StorageFile
 
 
@@ -19,9 +24,14 @@ class BucketNotFoundError(GCPStorageError):
 
 class GCPStorage(CloudStorage):
     def __init__(
-        self, project_id: str, bucket_name: str, credentials: Optional[service_account.Credentials]
+        self,
+        project_id: str,
+        bucket_name: str,
+        namespace: str,
+        credentials: Optional[service_account.Credentials],
     ):
         self.bucket_name = bucket_name
+        self.namespace = namespace
         self.storage_client = storage.Client(project=project_id, credentials=credentials)
         self.bucket = self._get_bucket(self.bucket_name)
         if self.bucket is None:
@@ -31,11 +41,13 @@ class GCPStorage(CloudStorage):
         self.bucket = self._get_or_create_bucket(self.bucket_name)
 
     def put_object(self, key: str, content: str, metadata: Optional[Dict] = None):
+        key = add_namespace(self.namespace, key)
         blob = self.bucket.blob(key)
         blob.metadata = metadata
         blob.upload_from_string(content)
 
     def get_object(self, key: str) -> Optional[str]:
+        key = add_namespace(self.namespace, key)
         blob = self.bucket.blob(key)
         try:
             return blob.download_as_text()
@@ -43,6 +55,7 @@ class GCPStorage(CloudStorage):
             return None
 
     def delete_object(self, key: str):
+        key = add_namespace(self.namespace, key)
         try:
             self.bucket.delete_blob(key)
         except exceptions.NotFound:
@@ -50,11 +63,13 @@ class GCPStorage(CloudStorage):
 
     def list_objects(self, keys_prefix: str) -> List[str]:
         # TODO pagination
+        keys_prefix = add_namespace(self.namespace, keys_prefix)
         blobs = self.bucket.client.list_blobs(self.bucket.name, prefix=keys_prefix)
-        object_names = [blob.name for blob in blobs]
+        object_names = [drop_namespace(self.namespace, blob.name) for blob in blobs]
         return object_names
 
     def list_files(self, prefix: str, recursive: bool) -> List[StorageFile]:
+        prefix = add_namespace(self.namespace, prefix)
         delimiter = "/"
         if recursive:
             delimiter = None
@@ -62,34 +77,38 @@ class GCPStorage(CloudStorage):
         files = []
         for blob in blobs:
             file = StorageFile(
-                filepath=blob.name,
+                filepath=drop_namespace(self.namespace, blob.name),
                 filesize_in_bytes=blob.size,
             )
             files.append(file)
         for dirname in blobs.prefixes:
             file = StorageFile(
-                filepath=dirname,
+                filepath=drop_namespace(self.namespace, dirname),
                 filesize_in_bytes=None,
             )
             files.append(file)
         return files
 
     def download_file(self, source_path: str, dest_path: str, callback: Callable[[int], None]):
+        source_path = add_namespace(self.namespace, source_path)
         blob = self.bucket.blob(source_path)
         blob.download_to_filename(dest_path)
         callback(os.path.getsize(dest_path))
 
     def upload_file(self, source_path: str, dest_path: str, callback: Callable[[int], None]):
+        dest_path = add_namespace(self.namespace, dest_path)
         blob = self.bucket.blob(dest_path)
         blob.upload_from_filename(source_path)
         callback(os.path.getsize(source_path))
 
     def get_signed_download_url(self, key: str) -> str:
+        key = add_namespace(self.namespace, key)
         blob = self.bucket.blob(key)
         url = blob.generate_signed_url(expiration=timedelta(seconds=SIGNED_URL_EXPIRATION))
         return url
 
     def get_signed_upload_url(self, key: str) -> str:
+        key = add_namespace(self.namespace, key)
         blob = self.bucket.blob(key)
         url = blob.generate_signed_url(
             expiration=timedelta(seconds=SIGNED_URL_EXPIRATION),

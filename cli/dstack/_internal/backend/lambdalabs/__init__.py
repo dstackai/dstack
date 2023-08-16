@@ -32,6 +32,7 @@ class LambdaBackend(ComponentBasedBackend):
         self._storage = AWSStorage(
             s3_client=aws_utils.get_s3_client(self._session),
             bucket_name=self.backend_config.storage_config.bucket,
+            namespace=self.name,
         )
         self._secrets_manager = AWSSecretsManager(
             secretsmanager_client=aws_utils.get_secretsmanager_client(self._session),

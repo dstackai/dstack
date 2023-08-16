@@ -26,10 +26,10 @@ to access it.
 
 #### Token
 
-If you want to configure the value of the default token for the admin user, add the `DSTACK_ADMIN_TOKEN` secret with
+If you want to configure the value of the default token for the admin user, add the `DSTACK_SERVER_ADMIN_TOKEN` secret with
 the required value.
 
-If you don't do that, dstack will generate it randomly and print it to the `Logs`.
+If you don't do that, `dstack` will generate it randomly and print it to the `Logs`.
 
 ??? info "Persisting state in a cloud storage"
     If you want the `dstack` server to persist the state across restarts, you need to add the secrets that instruct `dstack`

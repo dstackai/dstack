@@ -16,7 +16,7 @@ from dstack._internal.backend.azure.utils import (
     DSTACK_CONTAINER_NAME,
     get_blob_storage_account_url,
 )
-from dstack._internal.backend.base.storage import CloudStorage
+from dstack._internal.backend.base.storage import CloudStorage, add_namespace, drop_namespace
 from dstack._internal.core.storage import StorageFile
 from dstack._internal.utils.common import get_current_datetime
 
@@ -26,8 +26,10 @@ class AzureStorage(CloudStorage):
         self,
         credential: TokenCredential,
         storage_account: str,
+        namespace: str,
     ):
         self.storage_account = storage_account
+        self.namespace = namespace
         self.storage_account_url = get_blob_storage_account_url(storage_account)
         self._blob_service_client = BlobServiceClient(
             credential=credential,
@@ -38,17 +40,20 @@ class AzureStorage(CloudStorage):
         )
 
     def upload_file(self, source_path: str, dest_path: str, callback: Callable[[int], None]):
+        dest_path = add_namespace(self.namespace, dest_path)
         with open(source_path, "rb") as f:
             self._container_client.upload_blob(dest_path, f, overwrite=True)
         callback(os.path.getsize(source_path))
 
     def download_file(self, source_path: str, dest_path: str, callback: Callable[[int], None]):
+        source_path = add_namespace(self.namespace, source_path)
         downloader = self._container_client.download_blob(source_path)
         with open(dest_path, "wb+") as f:
             downloader.readinto(f)
         callback(os.path.getsize(dest_path))
 
     def list_files(self, prefix: str, recursive: bool) -> List[StorageFile]:
+        prefix = add_namespace(self.namespace, prefix)
         delimiter = "/"
         if recursive:
             delimiter = ""
@@ -58,24 +63,27 @@ class AzureStorage(CloudStorage):
         files = []
         for blob in blobs:
             file = StorageFile(
-                filepath=blob.name,
+                filepath=drop_namespace(self.namespace, blob.name),
                 filesize_in_bytes=blob.get("size"),
             )
             files.append(file)
         return files
 
     def list_objects(self, keys_prefix: str) -> List[str]:
+        keys_prefix = add_namespace(self.namespace, keys_prefix)
         blobs_list = self._container_client.list_blobs(name_starts_with=keys_prefix)
-        object_names = [blob.name for blob in blobs_list]
+        object_names = [drop_namespace(self.namespace, blob.name) for blob in blobs_list]
         return object_names
 
     def delete_object(self, key: str):
+        key = add_namespace(self.namespace, key)
         try:
             self._container_client.delete_blob(key)
         except ResourceNotFoundError:
             pass
 
     def get_object(self, key: str) -> Optional[str]:
+        key = add_namespace(self.namespace, key)
         blob_client = self._container_client.get_blob_client(key)
         try:
             return blob_client.download_blob().read()
@@ -83,6 +91,7 @@ class AzureStorage(CloudStorage):
             return None
 
     def put_object(self, key: str, content: str, metadata: Optional[Dict] = None):
+        key = add_namespace(self.namespace, key)
         blob_client = self._container_client.get_blob_client(key)
         blob_client.upload_blob(
             data=content.encode(),
@@ -92,6 +101,7 @@ class AzureStorage(CloudStorage):
         )
 
     def get_signed_download_url(self, key: str) -> str:
+        key = add_namespace(self.namespace, key)
         user_delegation_key = self._blob_service_client.get_user_delegation_key(
             key_start_time=get_current_datetime(),
             key_expiry_time=get_current_datetime() + timedelta(hours=1),
@@ -108,6 +118,7 @@ class AzureStorage(CloudStorage):
         return url
 
     def get_signed_upload_url(self, key: str) -> str:
+        key = add_namespace(self.namespace, key)
         user_delegation_key = self._blob_service_client.get_user_delegation_key(
             key_start_time=get_current_datetime(),
             key_expiry_time=get_current_datetime() + timedelta(hours=1),

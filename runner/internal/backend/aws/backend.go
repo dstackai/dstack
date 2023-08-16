@@ -53,12 +53,12 @@ func init() {
 		if err != nil {
 			return nil, gerrors.Wrap(err)
 		}
-		return New(file.Region, file.Bucket), nil
+		return New(file.Region, file.Bucket, "aws"), nil
 	})
 }
 
-func New(region, bucket string) *AWSBackend {
-	storage, err := NewAWSStorage(region, bucket)
+func New(region, bucket, namespace string) *AWSBackend {
+	storage, err := NewAWSStorage(region, bucket, namespace)
 	if err != nil {
 		fmt.Printf("Initialization storage service failure: %+v", err)
 		return nil

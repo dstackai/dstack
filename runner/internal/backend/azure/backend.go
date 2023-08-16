@@ -63,7 +63,7 @@ func New(config AzureConfig) *AzureBackend {
 		fmt.Printf("Authentication failure: %+v", err)
 		return nil
 	}
-	storage, err := NewAzureStorage(credential, config.StorageAccount)
+	storage, err := NewAzureStorage(credential, config.StorageAccount, "azure")
 	if err != nil {
 		fmt.Printf("Initialization blob service failure: %+v", err)
 		return nil

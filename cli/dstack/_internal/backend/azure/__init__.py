@@ -36,6 +36,7 @@ class AzureBackend(ComponentBasedBackend):
             self._storage = AzureStorage(
                 credential=credential,
                 storage_account=self.backend_config.storage_account,
+                namespace=self.name,
             )
             self._compute = AzureCompute(
                 credential=credential,

@@ -31,6 +31,7 @@ class GCPBackend(ComponentBasedBackend):
         self._storage = GCPStorage(
             project_id=self.backend_config.project_id,
             bucket_name=self.backend_config.bucket_name,
+            namespace=self.name,
             credentials=credentials,
         )
         self._compute = GCPCompute(gcp_config=self.backend_config, credentials=credentials)

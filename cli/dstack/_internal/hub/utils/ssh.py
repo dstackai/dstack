@@ -1,9 +1,8 @@
-from pathlib import Path
-
+from dstack._internal.hub.utils.common import get_server_dir_path
 from dstack._internal.utils.crypto import generate_rsa_key_pair
 
-HUB_PRIVATE_KEY_PATH = Path.home() / ".dstack" / "hub" / "ssh" / "hub_ssh_key"
-HUB_PUBLIC_KEY_PATH = Path.home() / ".dstack" / "hub" / "ssh" / "hub_ssh_key.pub"
+HUB_PRIVATE_KEY_PATH = get_server_dir_path() / "ssh" / "hub_ssh_key"
+HUB_PUBLIC_KEY_PATH = get_server_dir_path() / "ssh" / "hub_ssh_key.pub"
 
 
 def generate_hub_ssh_key_pair():

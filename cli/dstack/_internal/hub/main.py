@@ -45,7 +45,7 @@ async def lifespan(app: FastAPI):
     admin_user = await update_admin_user()
     await create_default_project(admin_user)
     scheduler = start_background_tasks()
-    base_url = f"http://{os.getenv('DSTACK_HOST')}:{os.getenv('DSTACK_PORT')}"
+    base_url = f"http://{os.getenv('DSTACK_SERVER_HOST')}:{os.getenv('DSTACK_SERVER_PORT')}"
     url = f"{base_url}?token={admin_user.token}"
     create_default_project_config(base_url, admin_user.token)
     generate_hub_ssh_key_pair()
@@ -107,10 +107,10 @@ async def update_admin_user() -> User:
     admin_user = await UserManager.get_user_by_name("admin")
     if admin_user is None:
         admin_user = await UserManager.create_admin()
-    elif os.getenv("DSTACK_ADMIN_TOKEN") is not None and admin_user.token != os.getenv(
-        "DSTACK_ADMIN_TOKEN"
+    elif os.getenv("DSTACK_SERVER_ADMIN_TOKEN") is not None and admin_user.token != os.getenv(
+        "DSTACK_SERVER_ADMIN_TOKEN"
     ):
-        admin_user.token = os.getenv("DSTACK_ADMIN_TOKEN")
+        admin_user.token = os.getenv("DSTACK_SERVER_ADMIN_TOKEN")
         await UserManager.save(admin_user)
     return admin_user
 

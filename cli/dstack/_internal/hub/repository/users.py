@@ -16,7 +16,7 @@ class UserManager:
     async def create_admin(session: Optional[AsyncSession] = None) -> User:
         admin_user = User(
             name="admin",
-            token=os.getenv("DSTACK_ADMIN_TOKEN") or str(uuid.uuid4()),
+            token=os.getenv("DSTACK_SERVER_ADMIN_TOKEN") or str(uuid.uuid4()),
             global_role=ROLE_ADMIN,
         )
         await UserManager.save(admin_user, session=session)

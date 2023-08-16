@@ -36,6 +36,7 @@ class AwsBackend(ComponentBasedBackend):
         self._storage = AWSStorage(
             s3_client=aws_utils.get_s3_client(self._session),
             bucket_name=self.backend_config.bucket_name,
+            namespace=self.name,
         )
         self._compute = AWSCompute(
             session=self._session,
