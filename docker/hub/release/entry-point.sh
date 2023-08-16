@@ -1,3 +1,6 @@
+#!/bin/bash
+set -e
+
 if [ -n "${GOOGLE_APPLICATION_CREDENTIALS_JSON}" ]; then
   GOOGLE_APPLICATION_CREDENTIALS_DIR="${HOME}/.config/gcloud/"
   mkdir -p "${GOOGLE_APPLICATION_CREDENTIALS_DIR}"

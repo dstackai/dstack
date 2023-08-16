@@ -137,8 +137,9 @@ jobs:
     steps:
       - name: Restart the `dstack-stgn` Space
         run: |
+          VERSION=$((${{ github.run_number }} + 150))
           pip install huggingface_hub
-          python -c "from huggingface_hub import HfApi; hf_api = HfApi(); hf_api.pause_space('dstackai/dstack-stgn'); hf_api.restart_space('dstackai/dstack-stgn');"
+          python -c "from huggingface_hub import HfApi; hf_api = HfApi(); hf_api.add_space_secret('dstackai/dstack-stgn', 'DSTACK_VERSION', '$VERSION'); hf_api.pause_space('dstackai/dstack-stgn'); hf_api.restart_space('dstackai/dstack-stgn');"
 
   runner-test-master:
     defaults:
