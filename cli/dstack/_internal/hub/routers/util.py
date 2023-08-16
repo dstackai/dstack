@@ -26,8 +26,17 @@ async def get_project(project_name: str) -> Project:
     return project
 
 
-async def get_backends(project: Project) -> List[Tuple[DBBackend, Backend]]:
-    return await backends_cache.get_backends(project)
+async def get_backends(
+    project: Project, selected_backends: Optional[List[str]] = None
+) -> List[Tuple[DBBackend, Backend]]:
+    backends = await backends_cache.get_backends(project)
+    if not selected_backends:
+        return backends
+    return [
+        (db_backend, backend)
+        for db_backend, backend in backends
+        if db_backend.type in selected_backends
+    ]
 
 
 async def get_backend_by_type(project: Project, backend_type: str) -> Tuple[DBBackend, Backend]:
