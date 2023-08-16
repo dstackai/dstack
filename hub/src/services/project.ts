@@ -30,7 +30,7 @@ export const projectApi = createApi({
         getProject: builder.query<IProject, { name: IProject['project_name'] }>({
             query: ({ name }) => {
                 return {
-                    url: API.PROJECTS.DETAILS(name),
+                    url: API.PROJECTS.DETAILS_INFO(name),
                     method: 'POST',
                 };
             },
@@ -50,7 +50,7 @@ export const projectApi = createApi({
 
         updateProject: builder.mutation<IProject, Partial<IProject> & Pick<IProject, 'project_name'>>({
             query: (project) => ({
-                url: API.PROJECTS.DETAILS(project.project_name),
+                url: API.PROJECTS.DETAILS_INFO(project.project_name),
                 method: 'PATCH',
                 body: project,
             }),

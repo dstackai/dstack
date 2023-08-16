@@ -22,7 +22,9 @@ export const useColumnsDefinitions = () => {
                     >
                         {item.run_head.run_name}
                     </NavigateLink>
-                ) : null;
+                ) : (
+                    item.run_head.run_name
+                );
             },
         },
         {
@@ -33,7 +35,15 @@ export const useColumnsDefinitions = () => {
         {
             id: 'repo',
             header: `${t('projects.run.repo')}`,
-            cell: (item: IRunListItem) => item.repo_id,
+            cell: (item: IRunListItem) => {
+                return item.repo_id !== null ? (
+                    <NavigateLink href={ROUTES.PROJECT.DETAILS.REPOSITORIES.DETAILS.FORMAT(item.project, item.repo_id)}>
+                        {item.repo_id}
+                    </NavigateLink>
+                ) : (
+                    item.repo_id ?? ''
+                );
+            },
         },
         {
             id: 'configuration',

@@ -15,7 +15,8 @@ export const API = {
         LIST: () => `${API.PROJECTS.BASE()}/list`,
         CREATE: () => `${API.PROJECTS.BASE()}/create`,
         DELETE: () => `${API.PROJECTS.BASE()}/delete`,
-        DETAILS: (name: IProject['project_name']) => `${API.PROJECTS.BASE()}/${name}/info`,
+        DETAILS: (name: IProject['project_name']) => `${API.PROJECTS.BASE()}/${name}`,
+        DETAILS_INFO: (name: IProject['project_name']) => `${API.PROJECTS.DETAILS(name)}/info`,
         MEMBERS: (name: IProject['project_name']) => `${API.PROJECTS.DETAILS(name)}/members`,
 
         // Repos
