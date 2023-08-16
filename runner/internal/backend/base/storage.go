@@ -298,6 +298,15 @@ func ListFiles(ctx context.Context, src string) (<-chan *StorageObject, <-chan e
 	return ch, errCh
 }
 
+func AddNamespace(namespace, key string) string {
+	return path.Join(namespace, key)
+}
+
+func DropNamespace(namespace, key string) string {
+	key = strings.Trim(key, namespace)
+	return strings.Trim(key, "/")
+}
+
 func objectsListPop(ch <-chan *StorageObject, errCh <-chan error) (obj *StorageObject, err error) {
 	obj = <-ch
 	if obj == nil {

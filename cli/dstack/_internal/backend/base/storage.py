@@ -1,7 +1,9 @@
+import os
 from abc import ABC, abstractmethod
 from typing import Callable, Dict, List, Optional
 
 from dstack._internal.core.storage import StorageFile
+from dstack._internal.utils.common import removeprefix
 
 SIGNED_URL_EXPIRATION = 3600
 
@@ -59,3 +61,13 @@ class CloudStorage(Storage):
     @abstractmethod
     def get_signed_upload_url(self, key: str) -> str:
         pass
+
+
+def add_namespace(namespace: str, key: str) -> str:
+    return os.path.join(namespace, key)
+
+
+def drop_namespace(namespace: str, key: str) -> str:
+    key = removeprefix(key, namespace)
+    key = removeprefix(key, "/")
+    return key

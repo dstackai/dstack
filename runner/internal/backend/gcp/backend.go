@@ -57,7 +57,7 @@ func init() {
 }
 
 func New(project, zone, bucket string) (*GCPBackend, error) {
-	storage, err := NewGCPStorage(project, bucket)
+	storage, err := NewGCPStorage(project, bucket, "gcp")
 	if err != nil {
 		return nil, gerrors.Wrap(err)
 	}
