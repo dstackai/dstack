@@ -7,6 +7,6 @@ fi
 if [[ -z "${LITESTREAM_REPLICA_URL}" ]]; then
   dstack start --host 0.0.0.0
 else
-  litestream restore -if-replica-exists -o ${HOME}/.dstack/hub/data2/sqlite.db ${LITESTREAM_REPLICA_URL}
-  litestream replicate -exec "dstack start --host 0.0.0.0" ${HOME}/.dstack/hub/data2/sqlite.db ${LITESTREAM_REPLICA_URL}
+  litestream restore -if-replica-exists -o ${HOME}/.dstack/server/data/sqlite.db ${LITESTREAM_REPLICA_URL}
+  litestream replicate -exec "dstack start --host 0.0.0.0" ${HOME}/.dstack/server/data/sqlite.db ${LITESTREAM_REPLICA_URL}
 fi
