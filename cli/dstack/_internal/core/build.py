@@ -22,4 +22,5 @@ class BuildPlan(str, Enum):
 
 
 class BuildNotFoundError(DstackError):
+    message = "Build not found. Run `dstack build` or add `--build` flag"
     code = "build_not_found"

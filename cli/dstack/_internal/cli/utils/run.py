@@ -49,22 +49,65 @@ def read_ssh_key_pub(key_path: str) -> str:
 
 
 def print_run_plan(configurator: JobConfigurator, run_plan: RunPlan):
-    table = Table(box=None)
-    table.add_column("CONFIGURATION", style="grey58")
-    table.add_column("PROFILE", style="grey58", no_wrap=True, max_width=16)
-    table.add_column("USER", style="grey58", no_wrap=True, max_width=16)
-    table.add_column("PROJECT", style="grey58", no_wrap=True, max_width=16)
-    table.add_column("SPOT")
     job_plan = run_plan.job_plans[0]
-    spot = job_plan.job.spot_policy.value
-    table.add_row(
-        configurator.configuration_path,
-        configurator.profile.name,
-        run_plan.hub_user_name,
-        run_plan.project,
-        spot,
-    )
-    console.print(table)
+    requirements = job_plan.job.requirements
+
+    props = Table(box=None, show_header=False)  # todo 2 pair of columns
+
+    props.add_row("Configuration", configurator.configuration_path)
+    props.add_row("User", run_plan.hub_user_name)
+    props.add_row("Project", run_plan.project)
+
+    props.add_row("CPU", f"{requirements.cpus}")
+    props.add_row("RAM", f"{requirements.memory_mib / 1024:g}GB")
+    if requirements.gpus:
+        gpu = f"{requirements.gpus.count}x{requirements.gpus.name or 'GPU'}"
+        if requirements.gpus.memory_mib:
+            gpu += f" ({requirements.gpus.memory_mib / 1024:g}GB)"
+        props.add_row("GPU", gpu)
+
+    props.add_row("Max price", f"${requirements.max_price:g}" if requirements.max_price else "-")
+    props.add_row("Spot policy", job_plan.job.spot_policy.value)
+    if job_plan.job.retry_policy and job_plan.job.retry_policy.retry:
+        limit = job_plan.job.retry_policy.limit
+        props.add_row("Retry policy", f"{limit / 3600:g}h" if limit else "yes")
+    if job_plan.job.termination_policy:
+        props.add_row("Termination policy", job_plan.job.termination_policy.value)
+    if job_plan.job.max_duration:
+        props.add_row("Max duration", f"{job_plan.job.max_duration / 3600:g}h")
+
+    candidates = Table(box=None)
+    candidates.add_column("#")
+    candidates.add_column("BACKEND")
+    candidates.add_column("REGION")
+    candidates.add_column("INSTANCE")
+    candidates.add_column("RESOURCES")
+    candidates.add_column("SPOT")
+    candidates.add_column("PRICE")
+
+    for i, c in enumerate(job_plan.candidates, start=1):
+        r = c.instance.resources
+        resources = f"{r.cpus}xCPUs, {r.memory_mib / 1024:g}GB"
+        if r.gpus:
+            resources += (
+                f", {len(r.gpus)}x{r.gpus[0].name or 'GPU'} ({r.gpus[0].memory_mib / 1024:g}GB)"
+            )
+        candidates.add_row(
+            f"{i}",
+            c.backend,
+            c.region,
+            c.instance.instance_name,
+            resources,
+            "yes" if r.spot else "",
+            f"${c.price:g}",
+            style=None if i == 1 else "grey58",
+        )
+    if len(job_plan.candidates) == 3:
+        candidates.add_row("", "...", style="grey58")
+
+    console.print(props)
+    console.print()
+    console.print(candidates)
     console.print()
 
 

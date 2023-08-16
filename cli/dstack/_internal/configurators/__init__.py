@@ -255,7 +255,7 @@ class JobConfigurator(ABC):
         if self.conf.image is not None:
             return self.conf.image
         if run_plan is not None:
-            if len(run_plan.job_plans[0].instance_type.resources.gpus) > 0:
+            if len(run_plan.job_plans[0].candidates[0].instance.resources.gpus) > 0:
                 return f"dstackai/base:py{self.python()}-{version.base_image}-cuda-11.8"
         return f"dstackai/base:py{self.python()}-{version.base_image}"
 

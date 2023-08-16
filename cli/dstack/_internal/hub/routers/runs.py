@@ -5,8 +5,8 @@ from fastapi import APIRouter, Depends, HTTPException, status
 from fastapi.responses import PlainTextResponse
 
 from dstack._internal.backend.base import Backend
-from dstack._internal.core.build import BuildNotFoundError
 from dstack._internal.core.error import BackendValueError, NoMatchingInstanceError
+from dstack._internal.core.instance import InstanceCandidate
 from dstack._internal.core.job import JobStatus
 from dstack._internal.core.plan import JobPlan, RunPlan
 from dstack._internal.core.repo.head import RepoHead
@@ -14,7 +14,13 @@ from dstack._internal.core.run import generate_remote_run_name_prefix
 from dstack._internal.hub.db.models import Backend as DBBackend
 from dstack._internal.hub.db.models import Project, User
 from dstack._internal.hub.repository.projects import ProjectManager
-from dstack._internal.hub.routers.util import call_backend, error_detail, get_backends, get_project
+from dstack._internal.hub.routers.util import (
+    call_backend,
+    error_detail,
+    get_backends,
+    get_instance_candidates,
+    get_project,
+)
 from dstack._internal.hub.schemas import (
     RunInfo,
     RunsCreate,
@@ -78,38 +84,39 @@ async def get_run_plan(
     project_name: str, body: RunsGetPlan, user: User = Depends(Authenticated())
 ) -> RunPlan:
     project = await get_project(project_name=project_name)
-    backends = await get_backends(project)
+    backends = await get_backends(project, selected_backends=body.backends)
+    backends = [backend for _, backend in backends]
+
+    job_candidates = [(job, get_instance_candidates(backends, job)) for job in body.jobs]
     job_plans = []
-    local_backend = False
-    for job in body.jobs:
-        for db_backend, backend in backends:
-            if body.backends is not None and db_backend.type not in body.backends:
-                continue
-            instance_type = await call_backend(backend.predict_instance_type, job)
-            if instance_type is not None:
-                if db_backend.type == "local":
-                    local_backend = True
-                try:
-                    build = await call_backend(backend.predict_build_plan, job)
-                except BuildNotFoundError as e:
-                    raise HTTPException(
-                        status_code=status.HTTP_400_BAD_REQUEST,
-                        detail=error_detail(msg=e.message, code=e.code),
-                    )
-                job_plan = JobPlan(job=job, instance_type=instance_type, build_plan=build)
-                job_plans.append(job_plan)
-                break
-    if len(job_plans) == 0:
-        msg = f"No available instance type matching requirements ({job.requirements.pretty_format()})"
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail=error_detail(msg=msg, code=NoMatchingInstanceError.code),
+    for job, candidates in job_candidates:
+        candidates = await candidates
+        if not candidates:
+            msg = f"No available instance type matching requirements ({job.requirements.pretty_format()})"
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail=error_detail(msg=msg, code=NoMatchingInstanceError.code),
+            )
+        candidates.sort(key=lambda i: i[1].price)
+
+        job_plan = JobPlan(
+            job=job,
+            candidates=[
+                InstanceCandidate(
+                    backend=backend.name,
+                    region=offer.region,
+                    instance=offer.instance_type,
+                    price=offer.price,
+                )
+                for backend, offer in candidates[:3]
+            ],
         )
+        job_plans.append(job_plan)
+
     run_plan = RunPlan(
         project=project_name,
         hub_user_name=user.name,
         job_plans=job_plans,
-        local_backend=local_backend,
     )
     return run_plan
 

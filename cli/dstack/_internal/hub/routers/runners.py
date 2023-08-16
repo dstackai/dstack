@@ -32,6 +32,7 @@ async def run(project_name: str, body: RunRunners):
     if body.job.retry_policy.retry:
         failed_to_start_job_new_status = JobStatus.PENDING
 
+    # todo use run plan?
     start = datetime.datetime.now()
     candidates = await get_instance_candidates(
         [

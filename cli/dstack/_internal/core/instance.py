@@ -22,3 +22,10 @@ class InstanceOffer:
     instance_type: InstanceType
     region: str
     price: float
+
+
+class InstanceCandidate(BaseModel):
+    backend: str
+    region: str
+    instance: InstanceType
+    price: float
