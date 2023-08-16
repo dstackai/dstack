@@ -1,4 +1,4 @@
-import logging
+import datetime
 
 from fastapi import APIRouter, Depends, HTTPException, status
 
@@ -32,6 +32,7 @@ async def run(project_name: str, body: RunRunners):
     if body.job.retry_policy.retry:
         failed_to_start_job_new_status = JobStatus.PENDING
 
+    start = datetime.datetime.now()
     candidates = await get_instance_candidates(
         [
             backend
@@ -41,10 +42,19 @@ async def run(project_name: str, body: RunRunners):
         body.job,
     )
     candidates.sort(key=lambda i: i[1].price)
+    logger.debug(
+        f"Found %d instance candidates in %s",
+        len(candidates),
+        str(datetime.datetime.now() - start),
+    )
 
     for backend, offer in candidates:
         logger.info(
-            f"Trying {offer.instance_type.instance_name} in {backend.name} for ${offer.price:.4} per hour"
+            "Trying %s in %s/%s for $%0.4f per hour",
+            offer.instance_type.instance_name,
+            backend.name,
+            offer.region,
+            offer.price,
         )
         try:
             await call_backend(backend.run_job, body.job, failed_to_start_job_new_status, offer)

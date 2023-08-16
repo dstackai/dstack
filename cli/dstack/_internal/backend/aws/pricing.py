@@ -1,9 +1,11 @@
+import csv
 import datetime
 import json
 from collections import defaultdict
-from typing import Dict, List, Optional
+from typing import Dict, Iterable, List, Optional
 
 import boto3
+import pkg_resources
 from botocore.exceptions import ClientError, EndpointConnectionError
 
 import dstack._internal.backend.aws.utils as aws_utils
@@ -14,7 +16,6 @@ from dstack._internal.core.instance import InstanceType
 class AWSPricing(Pricing):
     """
     Required IAM policies:
-      * pricing:GetProducts
       * ec2:DescribeSpotPriceHistory
     """
 
@@ -23,36 +24,17 @@ class AWSPricing(Pricing):
         self.session = session
         self.pricing_client = self.session.client("pricing", region_name="us-east-1")
 
-    def _fetch_ondemand(self, attributes: Dict[str, str]):
-        def get_ondemand_price(terms: dict) -> Dict[str, str]:
-            for _, term in terms["OnDemand"].items():
-                for _, dim in term["priceDimensions"].items():
-                    return dim["pricePerUnit"]
-
-        pages = self.pricing_client.get_paginator("get_products").paginate(
-            ServiceCode="AmazonEC2",
-            Filters=[
-                {
-                    "Type": "TERM_MATCH",
-                    "Field": key,
-                    "Value": value,
-                }
-                for key, value in attributes.items()
-            ],
+    def _fetch_ondemand(self):
+        pricing_path = pkg_resources.resource_filename(
+            "dstack._internal.backend", "resources/aws_pricing_ondemand.csv"
         )
-        for page in pages:
-            for raw_item in page["PriceList"]:
-                item = json.loads(raw_item)
-                attrs = item["product"]["attributes"]
-                if "Usage" not in attrs["usagetype"] or attrs["tenancy"] == "Host":
-                    continue
-                if "OnDemand" not in item["terms"]:
-                    continue
-                price = get_ondemand_price(item["terms"])
-                if "USD" in price:
-                    self.registry[attrs["instanceType"]][(attrs["regionCode"], False)] = float(
-                        price["USD"]
-                    )
+        with open(pricing_path, "r", newline="") as f:
+            reader: Iterable[Dict[str, str]] = csv.DictReader(f)
+            for row in reader:
+                is_spot = {"True": True, "False": False}[row["spot"]]
+                self.registry[row["instance_name"]][(row["location"], is_spot)] = float(
+                    row["price"]
+                )
 
     def _fetch_spot(self, instances: List[InstanceType]):
         regions = set(region for i in instances for region in i.available_regions)
@@ -90,14 +72,8 @@ class AWSPricing(Pricing):
                 pass
 
     def fetch(self, instances: List[InstanceType], spot: Optional[bool]):
-        for instance in instances:
-            if self._need_update(f"ondemand-{instance.instance_name}"):
-                self._fetch_ondemand(
-                    {
-                        "instanceType": instance.instance_name,
-                        "tenancy": "Shared",  # todo: is not valid for Dedicated VPC
-                        "operatingSystem": "Linux",
-                    }
-                )
+        if spot is not True:
+            if self._need_update(f"ondemand"):
+                self._fetch_ondemand()
         if spot is not False:
             self._fetch_spot(instances)
