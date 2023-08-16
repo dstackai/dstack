@@ -14,10 +14,7 @@ GPU parallelism, streaming output, quantization, water-marking, and more.
 
 To try TGI with `dstack`, follow the instructions below.
 
-## Defining a profile
-
-!!! info "NOTE:"
-    Before using `dstack` with a particular cloud, make sure to [configure](../docs/projects.md) the corresponding project.
+## Define a profile
 
 Each LLM model requires specific resources. To inform `dstack` about the required resources, you need to 
 [define](../docs/reference/profiles.yml.md) a profile via the `.dstack/profiles.yaml` file within your project.
@@ -28,7 +25,7 @@ Below is a profile that will provision a cloud instance with `24GB` of memory an
 
 ```yaml
 profiles:
-  - name: gcp-a10
+  - name: a10-serve
     project: gcp
     
     resources:
@@ -36,18 +33,14 @@ profiles:
       gpu:
         name: A10
      
-    spot_policy: auto   
+    spot_policy: auto  # (Optional) Use spot instances if available
       
     default: true
 ```
 
 </div>
 
-!!! info "Spot instances"
-    If `spot_policy` is set to `auto`, `dstack` prioritizes spot instances.
-    If these are unavailable, it uses `on-demand` instances. To cut costs, set `spot_policy` to `spot`.
-
-## Running an endpoint
+## Serve the endpoint
 
 ??? info "Tasks"
     If you want to serve an application for development purposes only, you can use 
@@ -88,17 +81,17 @@ commands:
 Before you can run a service, you have to ensure that there is a gateway configured for your project.
 
 ??? info "Gateways"
-    To create a gateway, use the `dstack gateway create` command:
+    First, you have to create a gateway in one of the clouds of your choice.
     
     <div class="termy">
     
     ```shell
-    $ dstack gateway create
+    $ dstack gateway create --backend aws
     
     Creating gateway...
     
-     NAME                        ADDRESS    
-     dstack-gateway-fast-walrus  98.71.213.179 
+     BACKEND    NAME                        ADDRESS    
+     aws        dstack-gateway-fast-walrus  98.71.213.179 
     
     ```
     
@@ -142,10 +135,8 @@ $ curl -X POST --location http://98.71.213.179/generate \
 
 </div>
 
-??? info "Custom domains"
-    You can use a custom domain with your service. To do this, create an `A` DNS record that points to the gateway
-    address (e.g. `98.71.213.179`). Then, instead of using the gateway address (`98.71.213.179`), 
-    specify your domain name as the `GATEWAY_ADDRESS` secret.
+!!! info "Configure a domain and enable HTTPS"
+    Please refer to the [services](../docs/guides/services.md#configure-a-domain-and-enable-https-optional) guide to learn how to configure a custom domain and enable HTTPS.
 
 For more details on how `text-generation-inference` works, check their [repo](https://github.com/huggingface/text-generation-inference).
 

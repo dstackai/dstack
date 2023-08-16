@@ -71,7 +71,7 @@ plugins:
         'quickstart.md': 'docs/index.md'
         'docs/quick-start.md': 'docs/index.md'
         'docs/installation/index.md': 'docs/index.md'
-        'tutorials/stable-diffusion.md': 'examples/stable-diffusion.md'
+        'tutorials/stable-diffusion.md': 'examples/stable-diffusion-xl.md'
         'docs/guides/projects.md': 'docs/projects.md'
   - typeset
 
@@ -99,11 +99,12 @@ markdown_extensions:
   - pymdownx.tasklist:
       custom_checkbox: true
   - toc:
-      toc_depth: 2
+      toc_depth: 3
       permalink: true
   - attr_list
   - md_in_html
   - footnotes
+  - tables
 
 # Customization
 extra_css:
@@ -141,7 +142,7 @@ nav:
               - pip: docs/installation/pip.md
               - Docker: docs/installation/docker.md
               - HF Spaces: docs/installation/hf-spaces.md
-          - Projects: docs/projects.md
+#          - Projects: docs/projects.md
       - Guides:
           - Dev environments: docs/guides/dev-environments.md
           - Tasks: docs/guides/tasks.md

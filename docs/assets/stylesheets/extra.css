@@ -98,7 +98,7 @@
     border-radius: 6px;
 }
 
-[dir=ltr] .md-typeset :is(.admonition,details) :is(p,div):not(.admonition-title):not(.highlight) {
+[dir=ltr] .md-typeset :is(.admonition,details) :is(.highlight,.termy,.md-typeset__table,p,h4,h3):not(.admonition-title) {
     padding-left: 32px;
 }
 
@@ -627,7 +627,7 @@ body {
 }
 
 .md-sidebar--secondary .md-nav__item {
-    padding-left: 0;
+    padding-left: 0.6rem;
 }
 
 .md-sidebar--secondary .md-nav__item .md-nav__link--passed {

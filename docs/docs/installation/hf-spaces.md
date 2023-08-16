@@ -1,12 +1,5 @@
 # Hugging Face Spaces
 
-!!! info "NOTE:"
-    If you run the `dstack` server via Docker, it will not allow you to run workloads locally. 
-    To run workloads locally, make sure to use [`pip`](pip.md).
-
-    Running the `dstack` server via Hugging Face Spaces makes sense only if you intend to 
-    deploy the `dstack` server outside of your machine to run workloads in the cloud.
-
 ## Create a space
 
 !!! info "NOTE:"
@@ -33,7 +26,7 @@ to access it.
 
 #### Token
 
-If you want to configure the value of the default token for the admin user, add the `DSTACK_HUB_ADMIN_TOKEN` secret with
+If you want to configure the value of the default token for the admin user, add the `DSTACK_ADMIN_TOKEN` secret with
 the required value.
 
 If you don't do that, dstack will generate it randomly and print it to the `Logs`.

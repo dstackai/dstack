@@ -1,22 +1,21 @@
 # Tasks
 
-A task can be any script that you may want to run on demand. For example, it could be
-a training script, a script that processes data, or a web-based application.
+A task can be any batch job or a web application that you may want to run on demand.
 
-With `dstack`, you can define such a task through a configuration file and run it in any cloud with a
-single command.
+With `dstack`, you can define such a task through a configuration file and run it on one of the
+configured clouds that offer the best price and availability.
 
-## Configuration
+## Define a configuration
 
 To configure a task, create its configuration file. It can be defined
 in any folder but must be named with a suffix `.dstack.yml`.
-
-Here's an example:
 
 <div editor-title="train.dstack.yml"> 
 
 ```yaml
 type: task
+
+python: "3.11" # (Optional) If not specified, your local version is used.
 
 commands:
   - pip install -r requirements.txt
@@ -25,22 +24,101 @@ commands:
 
 </div>
 
-For more details on the syntax of `.dstack.yml`, refer to the [Reference](../reference/dstack.yml/task.md).
+### Forward ports
 
-## Running a task
+A task can configure ports to allow `dstack` to forward them to your local machine, enabling secure access from your local
+machine while the CLI is attached.
+
+<div editor-title="serve.dstack.yml"> 
+
+```yaml
+type: task
+
+ports:
+  - 7860
+
+python: "3.11" # (Optional) If not specified, your local version is used.
+
+commands:
+  - pip install -r requirements.txt
+  - gradio app.py
+```
+
+</div>
+
+### Configure the environment
+
+By default, `dstack` uses its own Docker images to run tasks, which are pre-configured with Python, Conda, and essential CUDA drivers.
+
+You can install packages using `pip` and `conda` executables from `commands`.
+
+??? info "Docker image"
+    If you prefer to use your custom Docker image, use the `image` property in the configuration.
+
+    <div editor-title=".dstack.yml">
+
+    ```yaml
+    type: task
+    
+    image: nvcr.io/nvidia/pytorch:22.12-py3
+    
+    commands:
+      - pip install -r requirements.txt 
+      - python train.py
+    ```
+
+    </div>
+
+??? info "Build command (experimental)" 
+
+    In case you'd like to pre-build the environment rather than install packaged on every run,
+    you can use the `build` property. Here's an example:
+    
+    <div editor-title="train.dstack.yml"> 
+    
+    ```yaml
+    type: task
+
+    python: "3.11" # (Optional) If not specified, your local version is used.
+    
+    build:
+      - pip install -r requirements.txt
+    
+    commands:
+      - python train.py
+    ```
+    
+    </div>
+
+    In this case, you have to pass `--build` to `dstack run`.
+
+    <div class="termy">
+    
+    ```shell
+    $ dstack run . -f train.dstack.yml --build
+    ```
+    
+    </div>
+
+    If there is no pre-built image, the `dstack run` command will build it and upload it to the storage. If the pre-built
+    image is already available, the `dstack run` command will reuse it.
+
+The `.dstack.yml` has many other properties. To view them all, refer to the [Reference](../reference/dstack.yml/task.md).
+
+## Run the task
 
 To run a task, use the `dstack run` command followed by the path to the directory you want to use as the
 working directory.
 
-If your configuration file has a name different from `.dstack.yml`, pass the path to it using the `-f` argument.
+If the configuration file is named other than `.dstack.yml`, pass its path via the `-f` argument.
 
 <div class="termy">
 
 ```shell
 $ dstack run . -f train.dstack.yml
 
- RUN            CONFIGURATION     USER   PROJECT  INSTANCE  RESOURCES        SPOT
- wet-mangust-7  train.dstack.yml  admin  local    -         5xCPUs, 15987MB  auto  
+ RUN            CONFIGURATION     USER   BACKEND  INSTANCE  RESOURCES        SPOT
+ wet-mangust-7  train.dstack.yml  admin  aws      -         5xCPUs, 15987MB  auto  
 
 Waiting for capacity... To exit, press Ctrl+C...
 ---> 100%
@@ -52,57 +130,24 @@ Epoch 2:  100% 1719/1719 [00:18<00:00, 92.32it/s, loss=0.0981, acc=0.969]
 
 </div>
 
-This command provisions cloud resources, pre-installs the environment and code, and runs the script. If the task exposes
-any ports, the command will forward them to your local machine for secure and convenient access.
-
-??? info ".gitignore"
-    When running a task, `dstack` uses the exact version of code that is present in the folder where you
-    use the `dstack run` command.
-
-    If your folder has large files or folders, this may affect the performance of the `dstack run` command. To avoid this,
-    make sure to create a `.gitignore` file and include these large files or folders that you don't want to include when
-    running dev environments or tasks.
-
-For more details on the `dstack run` command, refer to the [Reference](../reference/cli/run.md).
-
-## Ports
-
-A task can expose ports through the `ports` property in `.dstack.yml`, for example, if it is running a web-based app. Here's an example:
-
-<div editor-title="serve.dstack.yml"> 
-
-```yaml
-type: task
-
-ports:
-  - 7860
-
-commands:
-  - pip install -r requirements.txt
-  - gradio app.py
-```
-
-</div>
-
-When you run it with `dstack run`, by default, `dstack` forwards the traffic 
-from the specified port to the same port on your local machine.  
-
-However, you have the option to override the local machine's port for traffic forwarding.
+The `dstack run` command provisions cloud resources, pre-installs the environment, code, runs the task, and establishes an
+SSH tunnel for secure access.
 
 ??? info "Port mapping"
-
-    To run the configuration above with traffic available on port `3000` locally, use the following command:
-
+    If you've configured ports, the CLI forwards them to your local machine, using the same port numbers. 
+    Yet, you can choose to override the local ports if needed.
+    
+    The following command will make the application available on `http://127.0.0.1:3000`.
+    
     <div class="termy">
-
+    
     ```shell
-    $ dstack run . -f serve.dstack.yml --ports 3000:7860
+    $ dstack run . -f serve.dstack.yml --port 3000:7860
     ```
-
+    
     </div>
 
-    Alternatively, instead of using `--ports` in the CLI, you can hardcode the local ports directly 
-    into the configuration:
+    Alternatively, you can hardcode the port mapping directly into the configuration (not recommended):
 
     <div editor-title="serve.dstack.yml"> 
 
@@ -119,118 +164,7 @@ However, you have the option to override the local machine's port for traffic fo
     
     </div>
 
-    Now, even without using `--ports` with your `dstack run` command, the traffic will be available on port `3000` 
-    on your local machine.
-
-## Environment
-
-By default, `dstack` uses its own Docker images to run tasks, which include pre-configured Python, Conda, and essential
-CUDA drivers.
-
-To change the Python version, modify the `python` property in the configuration. Otherwise, `dstack` will use the version
-you have locally.
-
-You can install packages using `pip` and `conda` executables from `init`.
-
-If you prefer to use your custom Docker image, use the `image` property in the configuration.
-
-??? info "Build command (experimental)"
-
-    In case you'd like to pre-build the environment rather than install packaged on every run,
-    you can use the `build` property. Here's an example:
-    
-    <div editor-title="train.dstack.yml"> 
-    
-    ```yaml
-    type: task
-    
-    build:
-      - pip install -r requirements.txt
-    
-    commands:
-      - python train.py
-    ```
-    
-    </div>
-
-    To pre-build the environment, you have two options:
-    
-    _Option 1. Run the `dstack build` command_
-
-    <div class="termy">
-    
-    ```shell
-    $ dstack build . -f train.dstack.yml
-    ```
-    
-    </div>
-    
-    Similar to the `dstack run` command, `dstack build` also provisions cloud resources and uses them to pre-build the
-    environment. Consequently, when running the `dstack run` command again, it will reuse the pre-built image, leading
-    to faster startup times, particularly for complex setups.
-
-    _Option 2. Use `--build` with `dstack run`_
-
-    <div class="termy">
-    
-    ```shell
-    $ dstack run . -f train.dstack.yml --build
-    ```
-    
-    </div>
-
-    If there is no pre-built image, the `dstack run` command will build it and upload it to the storage. If the pre-built
-    image is already available, the `dstack run` command will reuse it.
-
-## Profiles
-
-If you [configured](../projects.md) a project that uses a cloud backend, you can define profiles that specify the
-project and the cloud resources to be used.
-
-To configure a profile, simply create the `profiles.yml` file in the `.dstack` folder within your project directory. 
-Here's an example:
-
-<div editor-title=".dstack/profiles.yml"> 
-
-```yaml
-profiles:
-  - name: gcp-t4
-    project: gcp
-    
-    resources:
-      memory: 24GB
-      gpu:
-        name: T4
-        
-    spot_policy: auto
-    retry_policy:
-      limit: 30min
-    max_duration: 1d
-      
-    default: true
-```
-
-</div>
-
-!!! info "Spot instances"
-    If `spot_policy` is set to `auto`, `dstack` prioritizes spot instances.
-    If these are unavailable, it uses `on-demand` instances. To cut costs, set `spot_policy` to `spot`.
-    
-    If `dstack` can't find capacity, an error displays. To enable continuous capacity search, use `retry_policy` with a 
-    `limit`. For example, setting it to `30min` makes `dstack` search for capacity for 30 minutes.
-
-    Note that spot instances are significantly cheaper but can be interrupted. Your code should ideally 
-    handle interruptions and resume work from saved checkpoints.
-
-By default, the `dstack run` command uses the default profile.
-
-!!! info "Multiple profiles"
-    You can define multiple profiles according to your needs and use any of them with the `dstack run` command by specifying
-    the desired profile using the `--profile` argument.
-
-For more details on the syntax of the `profiles.yml` file, refer to the [Reference](../reference/profiles.yml.md).
-
-## Args
+### Parametrize tasks
 
 If you want, it's possible to parametrize tasks with user arguments. Here's an example:
 
@@ -257,18 +191,82 @@ $ dstack run . -f args.dstack.yml --train_batch_size=1 --num_train_epochs=100
 
 The `dstack run` command will pass `--train_batch_size=1` and `--num_train_epochs=100` as arguments to `train.py`.
 
-## Reload mode
+### Configure resources, price, etc
 
-Some web development frameworks like Gradio, Streamlit, and FastAPI support auto-reloading. With `dstack run`, you can
-enable the reload mode by using the `--reload` argument.
+For every run, you can specify hardware resources like memory and GPU, along with various run policies (e.g., maximum
+hourly price, use of spot instances, etc.).
 
-<div class="termy">
+| Example                     | Description                                |
+|-----------------------------|--------------------------------------------|
+| `dstack run . --gpu A10`    | Use an instance with `NVIDIA A10` GPU      |
+| `dstack run . --gpu A100:8` | Use an instance with 8 `NVIDIA A100` GPUs  |
+| `dstack run . --gpu 24GB`   | Use an instance with a GPU that has `24GB` |
 
-```shell
-$ dstack run . -f serve.dstack.yml --reload
-```
+The `dstack run` command has many options. To view them, refer to the [Reference](../reference/cli/run.md).
 
-</div>
+??? info "Profiles"
+    ### Configure profiles (optional)
 
-This feature allows you to run an app in the cloud while continuing to edit the source code locally and have the app
-reload changes on the fly.
+    Instead of configuring resources, price, and policies through `dstack run`, you can use profiles. To set up a profile, 
+    create the `.dstack/profiles.yml` file in the root folder of the project. 
+    
+    <div editor-title=".dstack/profiles.yml"> 
+    
+    ```yaml
+    profiles:
+      - name: large
+
+        resources:
+          memory: 24GB  # (Optional) The minimum amount of RAM memory
+          gpu:
+            memory: 48GB  # (Optional) The minimum amount of GPU memory 
+
+        retry_policy: # (Optional)
+          limit: 30min
+            
+        max_price: 1.5 # (Optional) The maximim price per instance, in dollards.
+
+        max_duration: 1d # (Optional) The maximum duration of the run.
+
+        spot_policy: auto # (Optional) The spot policy. Supports `spot`, `on-demand, and `auto`.
+
+        backends: [azure, lambda]  # (Optional) Use only listed backends 
+
+        default: true # (Optional)
+    ```
+    
+    </div>
+
+    #### Spot instances
+
+    If `spot_policy` is set to `auto`, `dstack` gives priority to spot instances. If unavailable, it uses on-demand instances. 
+    To reduce costs, set `spot_policy` to `spot`. Keep in mind that spot instances are much cheaper but may be interrupted. 
+    Your code should handle interruptions and resume from saved checkpoints.
+
+    #### Retry policy
+
+    If `dstack` can't find capacity, an error displays. To enable continuous capacity search, use `retry_policy` with a 
+    `limit`. For example, setting it to `30min` makes `dstack` search for capacity for 30 minutes.
+
+    #### Default profile
+    
+    By default, the `dstack run` command uses the default profile. You 
+    can override it by passing the `--profile` argument to the `dstack run` command.
+    
+    For more details on the syntax of the `profiles.yml` file, refer to the [Reference](../reference/profiles.yml.md).
+
+??? info "Reload mode (experimental)"
+
+    Some web development frameworks like Gradio, Streamlit, and FastAPI support auto-reloading. With `dstack run`, you can
+    enable the reload mode by using the `--reload` argument.
+    
+    <div class="termy">
+    
+    ```shell
+    $ dstack run . -f serve.dstack.yml --reload
+    ```
+    
+    </div>
+    
+    This feature allows you to run an app in the cloud while continuing to edit the source code locally and have the app
+    reload changes on the fly.

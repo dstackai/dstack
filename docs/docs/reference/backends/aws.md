@@ -1,11 +1,10 @@
 # AWS
 
-The `AWS` backend type allows to provision infrastructure and store state and artifacts in
-an AWS account.
+The `AWS` backend type allows provisioning infrastructure and storing artifacts in an AWS account.
 
-Follow the step-by-step guide below to configure a project with this backend.
+Follow the step-by-step guide below to configure this backend in your project.
 
-## 1. Create an S3 bucket
+## Create an S3 bucket
 
 First, you need to create an S3 bucket. `dstack` will use this bucket to store state and artifacts.
 
@@ -13,7 +12,7 @@ First, you need to create an S3 bucket. `dstack` will use this bucket to store s
     Make sure that the bucket is created in the same region where you plan to provision
     infrastructure.
 
-## 2. Create an IAM user
+## Create an IAM user
 
 The next step is to [create an IAM user](https://docs.aws.amazon.com/IAM/latest/UserGuide/id_users_create.html) and 
 grant this user permissions to perform actions on the `s3`, `logs`, `secretsmanager`, `ec2`, and `iam`
@@ -168,7 +167,7 @@ services.
     }
     ```
 
-## 3. Set up AWS credentials
+## Set up AWS credentials
 
 `dstack` support two methods to authenticate with AWS: Default credentials and Access key.
 
@@ -184,12 +183,12 @@ You can use default credentials if you don't want to enter and store AWS credent
 [follow this guide](https://docs.aws.amazon.com/cli/latest/userguide/cli-authentication-user.html#cli-authentication-user-get). Once the access key is created, make sure to download the `.csv` file containing your IAM user's
 `Access key ID` and `Secret access key`.
 
-## 4. Create a project
+## Configure the backend
 
-Now that you set up the AWS bucket and credentials, log in to the server UI, open the `Projects` page, click `Add`, and select `AWS` in
-the `Type` field.
+Now, log in to the UI, open the project's settings,
+click `Edit`, then click `Add backend`, and select `AWS` in the `Type` field.
 
-![](../../../assets/images/dstack-hub-create-aws-project.png){ width=800 }
+[//]: # (![]&#40;../../../assets/images/dstack-hub-create-aws-project.png&#41;{ width=800 })
 
 ### Fields reference
 
@@ -204,12 +203,5 @@ The following arguments are optional:
 - `Secret access key` - (Optional) The [Secret access key](#3-create-an-access-key) to authenticate `dstack`
 - `Subnet` - (Optional) The EC2 subnet is required to provision infrastructure using a non-default VPC and subnet. If
   not specified, dstack will use the default VPC and subnet.
-
-## 5. Configure the CLI
-
-!!! info "NOTE:"
-    Once you have created the project, feel free to use the CLI code snippet to configure it for use with the created project.
-
-    [Learn more →](../../../guides/projects#configuring-the-cli){ .md-button .md-button--primary }
 
 [//]: # (TODO: Mention on how to manage EC2 quotas)

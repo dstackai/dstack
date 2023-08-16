@@ -13,8 +13,6 @@ The server is available at http://127.0.0.1:3000?token=b934d226-e24a-4eab-eb92b3
 
 </div>
 
-On startup, the server sets up a default project that runs everything locally.
-
-!!! info "Projects"
-    To run dev environments and tasks in your cloud, log into the UI, create the corresponding project, 
-    and [configure](../projects.md) the CLI to use it.
+!!! info "Configure clouds"
+    Upon startup, the server sets up the default project called `main`. Prior to using `dstack`, you must log in to the
+    UI, open the project's settings, and configure cloud backends (e.g., AWS, GCP, Azure, Lambda Cloud, etc.).
