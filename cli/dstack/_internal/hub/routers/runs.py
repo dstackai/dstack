@@ -100,7 +100,7 @@ async def get_run_plan(
                 job_plans.append(job_plan)
                 break
     if len(job_plans) == 0:
-        msg = f"No instance type matching requirements ({job.requirements.pretty_format()})"
+        msg = f"No available instance type matching requirements ({job.requirements.pretty_format()})"
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail=error_detail(msg=msg, code=NoMatchingInstanceError.code),

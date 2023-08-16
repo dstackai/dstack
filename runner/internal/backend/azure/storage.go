@@ -4,10 +4,11 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"github.com/Azure/azure-sdk-for-go/sdk/azcore"
-	"github.com/dstackai/dstack/runner/internal/backend/base"
 	"io"
 	"strings"
+
+	"github.com/Azure/azure-sdk-for-go/sdk/azcore"
+	"github.com/dstackai/dstack/runner/internal/backend/base"
 
 	"github.com/Azure/azure-sdk-for-go/sdk/storage/azblob"
 	"github.com/Azure/azure-sdk-for-go/sdk/storage/azblob/container"
@@ -22,9 +23,10 @@ type AzureStorage struct {
 	storageClient   *azblob.Client
 	containerClient *container.Client
 	container       string
+	namespace       string
 }
 
-func NewAzureStorage(credential azcore.TokenCredential, account string) (*AzureStorage, error) {
+func NewAzureStorage(credential azcore.TokenCredential, account, namespace string) (*AzureStorage, error) {
 	storageClient, err := azblob.NewClient(getBlobStorageAccountUrl(account), credential, nil)
 	if err != nil {
 		fmt.Printf("Initialization blob service failure: %+v", err)
@@ -35,10 +37,12 @@ func NewAzureStorage(credential azcore.TokenCredential, account string) (*AzureS
 		storageClient:   storageClient,
 		containerClient: containerClient,
 		container:       DSTACK_CONTAINER_NAME,
+		namespace:       namespace,
 	}, nil
 }
 
 func (azstorage AzureStorage) Download(ctx context.Context, key string, writer io.Writer) error {
+	key = base.AddNamespace(azstorage.namespace, key)
 	stream, err := azstorage.containerClient.NewBlobClient(key).DownloadStream(ctx, nil)
 	if err != nil {
 		return gerrors.Wrap(err)
@@ -49,16 +53,20 @@ func (azstorage AzureStorage) Download(ctx context.Context, key string, writer i
 }
 
 func (azstorage AzureStorage) Upload(ctx context.Context, reader io.Reader, key string) error {
+	key = base.AddNamespace(azstorage.namespace, key)
 	_, err := azstorage.containerClient.NewBlockBlobClient(key).UploadStream(ctx, reader, nil)
 	return gerrors.Wrap(err)
 }
 
 func (azstorage AzureStorage) Delete(ctx context.Context, key string) error {
+	key = base.AddNamespace(azstorage.namespace, key)
 	_, err := azstorage.containerClient.NewBlobClient(key).Delete(ctx, nil)
 	return gerrors.Wrap(err)
 }
 
 func (azstorage AzureStorage) Rename(ctx context.Context, oldKey, newKey string) error {
+	oldKey = base.AddNamespace(azstorage.namespace, oldKey)
+	newKey = base.AddNamespace(azstorage.namespace, newKey)
 	if oldKey == newKey {
 		return nil
 	}
@@ -72,6 +80,7 @@ func (azstorage AzureStorage) Rename(ctx context.Context, oldKey, newKey string)
 }
 
 func (azstorage AzureStorage) CreateSymlink(ctx context.Context, key, symlink string) error {
+	key = base.AddNamespace(azstorage.namespace, key)
 	_, err := azstorage.containerClient.NewBlockBlobClient(key).UploadBuffer(ctx, nil, &azblob.UploadBufferOptions{
 		Metadata: map[string]*string{
 			"symlink": &symlink,
@@ -81,6 +90,7 @@ func (azstorage AzureStorage) CreateSymlink(ctx context.Context, key, symlink st
 }
 
 func (azstorage AzureStorage) List(ctx context.Context, prefix string) (<-chan *base.StorageObject, <-chan error) {
+	prefix = base.AddNamespace(azstorage.namespace, prefix)
 	pager := azstorage.containerClient.NewListBlobsFlatPager(&azblob.ListBlobsFlatOptions{
 		Prefix: &prefix,
 		Include: azblob.ListBlobsInclude{
@@ -116,6 +126,7 @@ func (azstorage AzureStorage) List(ctx context.Context, prefix string) (<-chan *
 }
 
 func (azstorage AzureStorage) GetMetadata(ctx context.Context, key string, tag string) (string, error) {
+	key = base.AddNamespace(azstorage.namespace, key)
 	properties, err := azstorage.containerClient.NewBlobClient(key).GetProperties(ctx, nil)
 	if err != nil {
 		return "", gerrors.Wrap(err)

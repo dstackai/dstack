@@ -50,6 +50,13 @@ class JobConfigurator(ABC):
             parser = argparse.ArgumentParser(prog=prog, formatter_class=RichHelpFormatter)
 
         parser.add_argument(
+            "--backend",
+            help="The backends that will be tried for provisioning",
+            nargs="*",
+            dest="backends",
+        )
+
+        parser.add_argument(
             "-e", "--env", type=env_var, action="append", help="Environmental variable"
         )
 
@@ -97,6 +104,9 @@ class JobConfigurator(ABC):
         return parser
 
     def apply_args(self, args: argparse.Namespace):
+        if len(args.backends) > 0:
+            self.profile.backends = args.backends
+
         if args.env is not None:
             for key, value in args.env:
                 self.conf.env[key] = value
