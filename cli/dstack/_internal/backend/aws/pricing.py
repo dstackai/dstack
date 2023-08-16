@@ -26,7 +26,7 @@ class AWSPricing(Pricing):
 
     def _fetch_ondemand(self):
         pricing_path = pkg_resources.resource_filename(
-            "dstack._internal", "backend/resources/aws_pricing_ondemand.csv"
+            "dstack._internal.backend", "resources/aws_pricing_ondemand.csv"
         )
         with open(pricing_path, "r", newline="") as f:
             reader: Iterable[Dict[str, str]] = csv.DictReader(f)

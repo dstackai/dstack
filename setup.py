@@ -111,12 +111,14 @@ setup(
             "schemas/*.json",
             "scripts/*.sh",
             "scripts/*.py",
-            "backend/resources/*.csv",
         ],
         "dstack._internal.hub": [
             "statics/*",
             "statics/**/*",
             "statics/**/**/*",
+        ],
+        "dstack._internal.backend": [
+            "resources/*.csv",
         ],
     },
     include_package_data=True,
