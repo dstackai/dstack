@@ -62,7 +62,7 @@ def print_run_plan(configurator: JobConfigurator, run_plan: RunPlan, candidates_
             req.memory_mib / 1024,
             req.gpus.count,
             req.gpus.name,
-            req.gpus.memory_mib / 1024,
+            req.gpus.memory_mib / 1024 if req.gpus.memory_mib else None,
         )
     else:
         resources = pretty_format_resources(req.cpus, req.memory_mib / 1024)
@@ -507,5 +507,7 @@ def pretty_format_resources(
 ) -> str:
     s = f"{cpu}xCPUs, {memory:g}GB"
     if gpu_count:
-        s += f", {gpu_count}x{gpu_name or 'GPU'} ({gpu_memory:g}GB)"
+        s += f", {gpu_count}x{gpu_name or 'GPU'}"
+        if gpu_memory:
+            s += f" ({gpu_memory:g}GB)"
     return s
