@@ -50,31 +50,52 @@ def read_ssh_key_pub(key_path: str) -> str:
 
 def print_run_plan(configurator: JobConfigurator, run_plan: RunPlan, candidates_limit: int = 3):
     job_plan = run_plan.job_plans[0]
-    requirements = job_plan.job.requirements
 
     props = Table(box=None, show_header=False)  # todo 2 pair of columns
+    props.add_column(no_wrap=True)  # key
+    props.add_column()  # value
+    props.add_column(style="grey58")  # separator
+    props.add_column(no_wrap=True)  # key
+    props.add_column()  # value
 
-    props.add_row("Configuration", configurator.configuration_path)
-    props.add_row("User", run_plan.hub_user_name)
-    props.add_row("Project", run_plan.project)
+    sep = "|"
+    req = job_plan.job.requirements
+    if req.gpus:
+        resources = pretty_format_resources(
+            req.cpus,
+            req.memory_mib / 1024,
+            req.gpus.count,
+            req.gpus.name,
+            req.gpus.memory_mib / 1024,
+        )
+    else:
+        resources = pretty_format_resources(req.cpus, req.memory_mib / 1024)
+    max_price = f"${req.max_price:g}" if req.max_price else "-"
+    max_duration = f"{job_plan.job.max_duration / 3600:g}h" if job_plan.job.max_duration else "-"
+    retry_policy = job_plan.job.retry_policy
+    retry_policy = (
+        (f"{retry_policy.limit / 3600:g}h" if retry_policy.limit else "yes")
+        if retry_policy
+        else "no"
+    )
+    termination_policy = (
+        job_plan.job.termination_policy.value if job_plan.job.termination_policy else "-"
+    )
 
-    props.add_row("CPU", f"{requirements.cpus}")
-    props.add_row("RAM", f"{requirements.memory_mib / 1024:g}GB")
-    if requirements.gpus:
-        gpu = f"{requirements.gpus.count}x{requirements.gpus.name or 'GPU'}"
-        if requirements.gpus.memory_mib:
-            gpu += f" ({requirements.gpus.memory_mib / 1024:g}GB)"
-        props.add_row("GPU", gpu)
+    def h(s: str) -> str:
+        return f"[bold]{s}[/bold]"
 
-    props.add_row("Max price", f"${requirements.max_price:g}" if requirements.max_price else "-")
-    props.add_row("Spot policy", job_plan.job.spot_policy.value)
-    if job_plan.job.retry_policy and job_plan.job.retry_policy.retry:
-        limit = job_plan.job.retry_policy.limit
-        props.add_row("Retry policy", f"{limit / 3600:g}h" if limit else "yes")
-    if job_plan.job.termination_policy:
-        props.add_row("Termination policy", job_plan.job.termination_policy.value)
-    if job_plan.job.max_duration:
-        props.add_row("Max duration", f"{job_plan.job.max_duration / 3600:g}h")
+    props.add_row(
+        h("Configuration"), configurator.configuration_path, sep, h("Project"), run_plan.project
+    )
+    props.add_row("", "", sep, h("User"), run_plan.hub_user_name)
+    props.add_row(
+        h("Min resources"), resources, sep, h("Spot policy"), job_plan.job.spot_policy.value
+    )
+    props.add_row(h("Max price"), max_price, sep, h("Retry policy"), retry_policy)
+    props.add_row(
+        h("Max duration"), max_duration, sep, h("Termination policy"), termination_policy
+    )
 
     candidates = Table(box=None)
     candidates.add_column("#")
@@ -89,11 +110,16 @@ def print_run_plan(configurator: JobConfigurator, run_plan: RunPlan, candidates_
 
     for i, c in enumerate(job_plan.candidates, start=1):
         r = c.instance.resources
-        resources = f"{r.cpus}xCPUs, {r.memory_mib / 1024:g}GB"
         if r.gpus:
-            resources += (
-                f", {len(r.gpus)}x{r.gpus[0].name or 'GPU'} ({r.gpus[0].memory_mib / 1024:g}GB)"
+            resources = pretty_format_resources(
+                r.cpus,
+                r.memory_mib / 1024,
+                len(r.gpus),
+                r.gpus[0].name,
+                r.gpus[0].memory_mib / 1024,
             )
+        else:
+            resources = pretty_format_resources(r.cpus, r.memory_mib / 1024)
         candidates.add_row(
             f"{i}",
             c.backend,
@@ -476,3 +502,16 @@ def get_ssh_server_port(apps: List[AppSpec]) -> Optional[int]:
         if app.app_name == "openssh-server":
             return app.port
     return None
+
+
+def pretty_format_resources(
+    cpu: int,
+    memory: float,
+    gpu_count: Optional[int] = None,
+    gpu_name: Optional[str] = None,
+    gpu_memory: Optional[float] = None,
+) -> str:
+    s = f"{cpu}xCPUs, {memory:g}GB"
+    if gpu_count:
+        s += f", {gpu_count}x{gpu_name or 'GPU'} ({gpu_memory:g}GB)"
+    return s
