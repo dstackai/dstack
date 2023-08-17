@@ -65,10 +65,8 @@
     },
 
     "table": {
-      "region": "Region/Location",
-      "bucket": "Bucket",
-      "extra_regions": "Extra Region/Extra Locations",
-      "subnet": "Subnet"
+      "region": "Region",
+      "bucket": "Storage"
     },
 
     "edit": {
@@ -124,17 +122,14 @@
         "secret_key": "Secret key",
         "secret_key_id": "Secret access key",
         "secret_key_id_description": "Specify the AWS secret access key",
-        "region_name":  "Region",
-        "region_name_description":  "Select a region to run workflows and store artifacts",
-        "region_name_placeholder": "Not selected",
+        "regions":  "Regions",
+        "regions_description":  "Select regions to run workflows and store artifacts",
+        "regions_placeholder": "Not selected",
         "s3_bucket_name": "Bucket",
         "s3_bucket_name_description": "Select an S3 bucket to store artifacts",
         "ec2_subnet_id": "Subnet",
         "ec2_subnet_id_description": "Select a subnet to run workflows in",
-        "ec2_subnet_id_placeholder":  "Not selected",
-        "extra_regions": "Additional regions",
-        "extra_regions_description": "Select additional regions to run workflows",
-        "extra_regions_placeholder":  "Select regions"
+        "ec2_subnet_id_placeholder":  "Not selected"
       },
       "azure" : {
         "authorization": "Authorization",
@@ -150,15 +145,13 @@
         "subscription_id": "Subscription ID",
         "subscription_id_description": "Select an Azure subscription ID",
         "subscription_id_placeholder": "Not selected",
-        "location": "Location",
-        "location_description": "Select an Azure location to run workflows and store artifacts",
-        "location_placeholder": "Not selected",
+        "locations": "Locations",
+        "locations_description": "Select locations to run workflows",
+        "locations_placeholder":  "Select locations",
         "storage_account":  "Storage account",
         "storage_account_description":  "Select an Azure storage account to store artifacts",
-        "storage_account_placeholder":  "Not selected",
-        "extra_locations": "Additional locations",
-        "extra_locations_description": "Select additional locations to run workflows",
-        "extra_locations_placeholder":  "Select locations"
+        "storage_account_placeholder":  "Not selected"
+
       },
       "gcp": {
         "authorization": "Authorization",
@@ -166,15 +159,9 @@
         "service_account": "Service account key",
         "credentials_description": "Credentials description",
         "credentials_placeholder": "Credentials placeholder",
-        "area": "Location",
-        "area_description": "Select a location to run workflows and store artifacts",
-        "area_placeholder": "Not selected",
-        "region": "Region",
-        "region_description": "Select a region to run workflows and store artifacts",
-        "region_placeholder": "Not selected",
-        "zone": "Zone",
-        "zone_description": "Select a zone to run workflows and store artifacts",
-        "zone_placeholder": "Not selected",
+        "regions": "Regions",
+        "regions_description": "Select regions to run workflows and store artifacts",
+        "regions_placeholder": "Not selected",
         "bucket_name": "Bucket",
         "bucket_name_description": "Select a storage bucket to store artifacts",
         "bucket_name_placeholder": "Not selected",
@@ -183,10 +170,7 @@
         "vpc_placeholder": "VPC placeholder",
         "subnet": "Subnet",
         "subnet_description": "Select a subnet to run workflows in",
-        "subnet_placeholder": "Not selected",
-        "extra_regions": "Additional regions",
-        "extra_regions_description": "Select additional regions to run workflows",
-        "extra_regions_placeholder":  "Select regions"
+        "subnet_placeholder": "Not selected"
       },
       "lambda": {
         "api_key": "API key",

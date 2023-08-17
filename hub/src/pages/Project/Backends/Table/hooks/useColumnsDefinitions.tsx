@@ -19,12 +19,36 @@ export const useColumnsDefinitions = ({ loading, onDeleteClick, onEditClick }: h
 
     const getRegionByBackendType = (backend: IProjectBackend) => {
         switch (backend.config.type) {
-            case BackendTypesEnum.AWS:
-                return backend.config.region_name_title;
-            case BackendTypesEnum.AZURE:
-                return backend.config.location;
-            case BackendTypesEnum.GCP:
-                return backend.config.region;
+            case BackendTypesEnum.AWS: {
+                const regions = backend.config.regions?.join(', ');
+
+                return (
+                    <div className={styles.ellipsisCell} title={regions}>
+                        {regions}
+                    </div>
+                );
+            }
+
+            case BackendTypesEnum.AZURE: {
+                const locations = backend.config.locations?.join(', ');
+
+                return (
+                    <div className={styles.ellipsisCell} title={locations}>
+                        {locations}
+                    </div>
+                );
+            }
+
+            case BackendTypesEnum.GCP: {
+                const regions = backend.config.regions?.join(', ');
+
+                return (
+                    <div className={styles.ellipsisCell} title={regions}>
+                        {regions}
+                    </div>
+                );
+            }
+
             case BackendTypesEnum.LAMBDA: {
                 const regions = backend.config?.regions.join(', ') ?? '-';
                 return (
@@ -42,58 +66,12 @@ export const useColumnsDefinitions = ({ loading, onDeleteClick, onEditClick }: h
         switch (backend.config.type) {
             case BackendTypesEnum.AWS:
                 return backend.config.s3_bucket_name;
+            case BackendTypesEnum.AZURE:
+                return backend.config.storage_account;
             case BackendTypesEnum.GCP:
                 return backend.config.bucket_name;
             case BackendTypesEnum.LAMBDA:
                 return backend.config.storage_backend.bucket_name;
-            default:
-                return '-';
-        }
-    };
-
-    const getSubnetByBackendType = (backend: IProjectBackend) => {
-        switch (backend.config.type) {
-            case BackendTypesEnum.AWS:
-                return backend.config.ec2_subnet_id;
-            case BackendTypesEnum.GCP:
-                return backend.config.subnet;
-            default:
-                return '-';
-        }
-    };
-
-    const getExtraRegionsByBackendType = (backend: IProjectBackend) => {
-        switch (backend.config.type) {
-            case BackendTypesEnum.AWS: {
-                const extraRegions = backend.config.extra_regions?.join(', ');
-
-                return (
-                    <div className={styles.ellipsisCell} title={extraRegions}>
-                        {extraRegions}
-                    </div>
-                );
-            }
-
-            case BackendTypesEnum.AZURE: {
-                const extraLocations = backend.config.extra_locations?.join(', ');
-
-                return (
-                    <div className={styles.ellipsisCell} title={extraLocations}>
-                        {extraLocations}
-                    </div>
-                );
-            }
-
-            case BackendTypesEnum.GCP: {
-                const extraRegions = backend.config.extra_regions?.join(', ');
-
-                return (
-                    <div className={styles.ellipsisCell} title={extraRegions}>
-                        {extraRegions}
-                    </div>
-                );
-            }
-
             default:
                 return '-';
         }
@@ -116,26 +94,11 @@ export const useColumnsDefinitions = ({ loading, onDeleteClick, onEditClick }: h
             {
                 id: 'bucket',
                 header: t('backend.table.bucket'),
-                cell: getBucketByBackendType,
-            },
 
-            {
-                id: 'subnet',
-                header: t('backend.table.subnet'),
-                cell: getSubnetByBackendType,
-            },
-
-            {
-                id: 'extra_regions',
-                header: t('backend.table.extra_regions'),
-                cell: getExtraRegionsByBackendType,
-            },
-
-            {
-                id: 'actions',
-                header: '',
                 cell: (backend: IProjectBackend) => (
                     <div className={styles.cell}>
+                        <div>{getBucketByBackendType(backend)}</div>
+
                         <div className={styles.contextMenu}>
                             {onEditClick && (
                                 <Button

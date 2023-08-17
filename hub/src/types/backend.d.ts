@@ -1,40 +1,37 @@
 declare type TBackendType = 'aws' | 'gcp' | 'azure' | 'lambda' | 'local';
 
-type TBackendValueField<TValuesType = { value: string, label: string}[]> = {
-    selected?: string,
+type TBackendValueField<TSelectedType = string, TValuesType = { value: string, label: string}[]> = {
+    selected?: TSelectedType,
     values: TValuesType
 } | null;
 
 
 declare interface IAwsBackendValues {
     default_credentials: boolean
-    region_name: TBackendValueField,
-    s3_bucket_name: TBackendValueField<TAwsBucket[]>,
+    regions: TBackendValueField<string[]>,
+    s3_bucket_name: TBackendValueField<string, TAwsBucket[]>,
     ec2_subnet_id: TBackendValueField,
-    extra_regions: TBackendValueField,
 }
 
 declare interface IAzureBackendValues {
+    default_credentials: boolean,
     tenant_id: TBackendValueField,
     subscription_id: TBackendValueField,
-    location: TBackendValueField,
+    locations: TBackendValueField<string[]>,
     storage_account: TBackendValueField,
-    extra_locations: TBackendValueField,
 }
 
 declare interface TVPCSubnetValue { label: string, vpc: string, subnet: string}
 
 declare interface IGCPBackendValues {
-    area: TBackendValueField,
+    default_credentials: boolean,
     bucket_name: TBackendValueField,
-    region: TBackendValueField,
-    vpc_subnet: TBackendValueField<TVPCSubnetValue[]>
-    zone: TBackendValueField,
-    extra_regions: TBackendValueField,
+    regions: TBackendValueField<string[]>,
+    vpc_subnet: TBackendValueField<string, TVPCSubnetValue[]>
 }
 
 declare interface ILambdaBackendValues {
-    regions: TBackendValueField,
+    regions: TBackendValueField<string[]>,
     storage_backend_type: TBackendValueField,
     storage_backend_values:  null | {
         bucket_name: TBackendValueField
@@ -61,10 +58,9 @@ declare interface IBackendAWS {
         access_key: string,
         secret_key: string,
     } | {type: AWSCredentialTypeEnum.DEFAULT},
-    region_name: string,
+    regions: string[],
     s3_bucket_name: string,
     ec2_subnet_id: string | null,
-    extra_regions: string[],
 }
 
 enum AzureCredentialTypeEnum {
@@ -75,16 +71,14 @@ enum AzureCredentialTypeEnum {
 declare interface IBackendAzure {
     type: 'azure',
     tenant_id: string,
-
     credentials: {
         type: AzureCredentialTypeEnum.CLIENT,
         client_id?: string,
         client_secret?: string,
     } | {type: AzureCredentialTypeEnum.DEFAULT}
     subscription_id: string,
-    location: string,
+    locations: string[],
     storage_account: string,
-    extra_locations: string[],
 }
 
 enum GCPCredentialTypeEnum {
@@ -100,13 +94,10 @@ declare interface IBackendGCP {
         data?: string,
     } | {type: GCPCredentialTypeEnum.DEFAULT},
     credentials_filename?: string,
-    area: string,
-    region: string,
-    zone: string,
+    regions: string[],
     bucket_name: string,
     vpc: string,
     subnet: string,
-    extra_regions: string[],
 }
 
 declare interface IBackendLambda {
@@ -131,11 +122,7 @@ declare interface IBackendLocal {
     path: string
 }
 
-declare interface IBackendAWSWithTitles extends IBackendAWS {
-    region_name_title: string,
-}
-
-declare type TBackendConfig = IBackendAWSWithTitles | IBackendAzure | IBackendGCP | IBackendLambda | IBackendLocal
+declare type TBackendConfig = IBackendAWS | IBackendAzure | IBackendGCP | IBackendLambda | IBackendLocal
 declare interface IProjectBackend {
     name: string
     config: TBackendConfig

@@ -6,10 +6,9 @@ export const FIELD_NAMES = {
         ACCESS_KEY: 'credentials.access_key',
         SECRET_KEY: 'credentials.secret_key',
     },
-    REGION_NAME: 'region_name',
+    REGIONS: 'regions',
     S3_BUCKET_NAME: 's3_bucket_name',
     EC2_SUBNET_ID: 'ec2_subnet_id',
-    EXTRA_REGIONS: 'extra_regions',
 };
 
 export const CREDENTIALS_HELP = {
@@ -40,15 +39,15 @@ export const CREDENTIALS_HELP = {
     ),
 };
 
-export const REGION_HELP = {
-    header: <h2>Region</h2>,
+export const REGIONS_HELP = {
+    header: <h2>Regions</h2>,
     body: (
         <>
             <p>
-                Select a <i>Region</i> that <i>dstack Hub</i> will use to create resources in your AWS account.
+                Select <i>Regions</i> that <i>dstack Hub</i> will use to create resources in your AWS account.
             </p>
             <p>
-                The selected <i>Region</i> will be used to run workflows and store artifacts.
+                The selected <i>Regions</i> will be used to run workflows and store artifacts.
             </p>
         </>
     ),
