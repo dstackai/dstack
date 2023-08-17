@@ -108,7 +108,7 @@ async def get_run_plan(
                     instance=offer.instance_type,
                     price=offer.price,
                 )
-                for backend, offer in candidates[:3]
+                for backend, offer in candidates[:50]
             ],
         )
         job_plans.append(job_plan)

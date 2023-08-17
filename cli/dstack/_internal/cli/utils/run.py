@@ -48,7 +48,7 @@ def read_ssh_key_pub(key_path: str) -> str:
     return path.with_suffix(path.suffix + ".pub").read_text().strip("\n")
 
 
-def print_run_plan(configurator: JobConfigurator, run_plan: RunPlan):
+def print_run_plan(configurator: JobConfigurator, run_plan: RunPlan, candidates_limit: int = 3):
     job_plan = run_plan.job_plans[0]
     requirements = job_plan.job.requirements
 
@@ -85,6 +85,8 @@ def print_run_plan(configurator: JobConfigurator, run_plan: RunPlan):
     candidates.add_column("SPOT")
     candidates.add_column("PRICE")
 
+    job_plan.candidates = job_plan.candidates[:candidates_limit]
+
     for i, c in enumerate(job_plan.candidates, start=1):
         r = c.instance.resources
         resources = f"{r.cpus}xCPUs, {r.memory_mib / 1024:g}GB"
@@ -98,11 +100,11 @@ def print_run_plan(configurator: JobConfigurator, run_plan: RunPlan):
             c.region,
             c.instance.instance_name,
             resources,
-            "yes" if r.spot else "",
+            "yes" if r.spot else "no",
             f"${c.price:g}",
             style=None if i == 1 else "grey58",
         )
-    if len(job_plan.candidates) == 3:
+    if len(job_plan.candidates) == candidates_limit:
         candidates.add_row("", "...", style="grey58")
 
     console.print(props)

@@ -63,6 +63,7 @@ The following arguments are optional:
 
 [//]: # (- `-t TAG`, `--tag TAG` – &#40;Optional&#41; A tag name. Warning, if the tag exists, it will be overridden.)
 - `--backend [BACKEND ...]` – (Optional) Backend(s) to consider for provisioning
+- `--max-offers MAX_OFFERS` – (Optional) The maximum number of best offers shown in run plan
 - `-p PORT`, `--port PORT` – (Optional) Requests port or define mapping (`EXTERNAL_PORT:INTERNAL_PORT`)
 - `-e ENV`, `--env ENV` – (Optional) Set environment variable (`NAME=value`)
 - `--gpu` – (Optional) Request a GPU for the run. Specify any: name, count, memory (`NAME:COUNT:MEMORY` or `NAME` or `COUNT:MEMORY`, etc...)

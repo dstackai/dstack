@@ -74,6 +74,12 @@ class RunCommand(BasicCommand):
             dest="profile_name",
         )
         self._parser.add_argument(
+            "--max-offers",
+            help="The maximum number of best offers shown in run plan",
+            type=int,
+            default=3,
+        )
+        self._parser.add_argument(
             "args",
             metavar="ARGS",
             nargs=argparse.ZERO_OR_MORE,
@@ -114,7 +120,7 @@ class RunCommand(BasicCommand):
 
             run_plan = hub_client.get_run_plan(configurator)
             console.print("dstack will execute the following plan:\n")
-            print_run_plan(configurator, run_plan)
+            print_run_plan(configurator, run_plan, args.max_offers)
             if not args.yes and not Confirm.ask("Continue?"):
                 console.print("\nExiting...")
                 exit(0)
