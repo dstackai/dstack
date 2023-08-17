@@ -84,6 +84,7 @@ LOCATIONS = [
     ("(South America) Brazil South", "brazilsouth"),
 ]
 LOCATION_VALUES = [l[1] for l in LOCATIONS]
+DEFAULT_LOCATION = "eastus"
 
 
 class AzureConfigurator(Configurator):
@@ -137,16 +138,14 @@ class AzureConfigurator(Configurator):
         self.subscription_id = backend_values.subscription_id.selected
         if self.subscription_id is None:
             return backend_values
-        backend_values.location = self._get_location_element(selected=backend_config.location)
         self.location = backend_values.location.selected
         if self.location is None:
             return backend_values
         backend_values.storage_account = self._get_storage_account_element(
             selected=backend_config.storage_account
         )
-        backend_values.extra_locations = self._get_extra_locations_element(
-            location=backend_config.location,
-            selected_locations=backend_config.extra_locations or [],
+        backend_values.locations = self._get_locations_element(
+            selected=backend_config.extra_locations or [DEFAULT_LOCATION],
         )
         return backend_values
 
@@ -191,38 +190,40 @@ class AzureConfigurator(Configurator):
         json_config = json.loads(db_backend.config)
         tenant_id = json_config["tenant_id"]
         subscription_id = json_config["subscription_id"]
-        location = json_config["location"]
         storage_account = json_config["storage_account"]
-        extra_locations = json_config.get("extra_locations", [])
+        if locations is None:
+            # old location format
+            locations = json_config.get("extra_locations", []) + [json_config.get("location")]
         if include_creds:
             auth_config = json.loads(db_backend.auth)
             return AzureBackendConfigWithCreds(
                 tenant_id=tenant_id,
                 subscription_id=subscription_id,
-                location=location,
                 storage_account=storage_account,
-                extra_locations=extra_locations,
+                locations=locations,
                 credentials=AzureBackendCreds.parse_obj(auth_config),
             )
         return AzureBackendConfig(
             tenant_id=tenant_id,
             subscription_id=subscription_id,
-            location=location,
             storage_account=storage_account,
-            extra_locations=extra_locations,
+            locations=locations,
         )
 
     def get_backend(self, db_backend: DBBackend) -> AzureBackend:
         config_data = json.loads(db_backend.config)
         auth_data = json.loads(db_backend.auth)
+        locations = config_data.get("locations")
+        if locations is None:
+            # old location format
+            locations = config_data.get("extra_locations", []) + [config_data.get("location")]
         config = AzureConfig(
             tenant_id=config_data["tenant_id"],
             subscription_id=config_data["subscription_id"],
-            location=config_data["location"],
             resource_group=config_data["resource_group"],
             storage_account=config_data["storage_account"],
             vault_url=config_data["vault_url"],
-            extra_locations=config_data.get("extra_locations", []),
+            locations=locations,
             credentials=auth_data,
         )
         return AzureBackend(config)
@@ -279,21 +280,6 @@ class AzureConfigurator(Configurator):
             )
         return element
 
-    def _get_location_element(self, selected: Optional[str]) -> BackendElement:
-        if selected is not None and selected not in LOCATION_VALUES:
-            raise BackendConfigError(
-                "Invalid location", code="invalid_location", fields=[["location"]]
-            )
-        element = BackendElement(selected=selected)
-        for l in LOCATIONS:
-            element.values.append(
-                BackendElementValue(
-                    value=l[1],
-                    label=f"{l[0]} [{l[1]}]",
-                )
-            )
-        return element
-
     def _get_storage_account_element(self, selected: Optional[str]) -> BackendElement:
         client = StorageManagementClient(
             credential=self.credential, subscription_id=self.subscription_id
@@ -314,15 +300,11 @@ class AzureConfigurator(Configurator):
             element.selected = storage_accounts[0]
         return element
 
-    def _get_extra_locations_element(
-        self, location: str, selected_locations: List[str]
-    ) -> BackendMultiElement:
+    def _get_locations_element(self, selected: List[str]) -> BackendMultiElement:
         element = BackendMultiElement()
         for l in LOCATION_VALUES:
-            if l == location:
-                continue
             element.values.append(BackendElementValue(value=l, label=l))
-        element.selected = selected_locations
+        element.selected = selected
         return element
 
     def _get_resource_group(self) -> str:

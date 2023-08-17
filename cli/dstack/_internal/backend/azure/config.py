@@ -10,13 +10,12 @@ class AzureConfig(BackendConfig, BaseModel):
     backend: Literal["azure"] = "azure"
     tenant_id: str
     subscription_id: str
-    location: str
     resource_group: str
     storage_account: str
     vault_url: str
-    extra_locations: List[str]
-    # network and subnet are location-dependent.
-    # Hub selects them dynamically when provisioning.
+    locations: List[str]
+    # set dynamically
+    location: Optional[str]
     network: Optional[str]
     subnet: Optional[str]
     credentials: Optional[Dict] = None

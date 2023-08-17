@@ -110,7 +110,7 @@ class AzureCompute(Compute):
 
     def get_supported_instances(self) -> List[InstanceType]:
         instances = {}
-        for location in [self.azure_config.location, *self.azure_config.extra_locations]:
+        for location in self.azure_config.locations:
             for i in _get_instance_types(client=self._compute_client, location=location):
                 if i.instance_name not in instances:
                     instances[i.instance_name] = i

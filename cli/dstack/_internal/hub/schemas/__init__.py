@@ -123,9 +123,8 @@ class AzureBackendConfigPartial(BaseModel):
     type: Literal["azure"] = "azure"
     tenant_id: Optional[str]
     subscription_id: Optional[str]
-    location: Optional[str]
     storage_account: Optional[str]
-    extra_locations: Optional[List[str]]
+    locations: Optional[List[str]]
 
 
 class AzureBackendClientCreds(BaseModel):
@@ -152,9 +151,8 @@ class AzureBackendConfig(BaseModel):
     type: Literal["azure"] = "azure"
     tenant_id: str
     subscription_id: str
-    location: str
     storage_account: str
-    extra_locations: List[str] = []
+    locations: List[str]
 
 
 class AzureBackendConfigWithCreds(AzureBackendConfig):
@@ -293,9 +291,8 @@ class AzureBackendValues(BaseModel):
     default_credentials: bool = False
     tenant_id: Optional[BackendElement]
     subscription_id: Optional[BackendElement]
-    location: Optional[BackendElement]
     storage_account: Optional[BackendElement]
-    extra_locations: Optional[BackendMultiElement]
+    locations: Optional[BackendMultiElement]
 
 
 class AWSStorageBackendValues(BaseModel):

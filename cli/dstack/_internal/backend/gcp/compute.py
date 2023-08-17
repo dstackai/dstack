@@ -118,9 +118,7 @@ class GCPCompute(Compute):
         zones = _get_zones(
             regions_client=self.regions_client,
             project_id=self.gcp_config.project_id,
-            primary_region=self.gcp_config.region,
-            primary_zone=self.gcp_config.zone,
-            extra_regions=self.gcp_config.extra_regions,
+            regions=self.gcp_config.regions,
         )
         for zone in zones:
             instance_types = _list_instance_types(
@@ -646,18 +644,10 @@ def _run_instance(
 def _get_zones(
     regions_client: compute_v1.RegionsClient,
     project_id: str,
-    primary_region: str,
-    primary_zone: str,
-    extra_regions: List[str],
+    regions: List[str],
 ) -> List[str]:
     regions = regions_client.list(project=project_id)
-    region_name_to_zones_map = {
-        r.name: [gcp_utils.get_resource_name(z) for z in r.zones] for r in regions
-    }
-    zones = region_name_to_zones_map[primary_region]
-    zones = sorted(zones, key=lambda x: x != primary_zone)
-    for extra_region in extra_regions:
-        zones += region_name_to_zones_map[extra_region]
+    zones = [gcp_utils.get_resource_name(z) for r in regions for z in r.zones]
     return zones
 
 
