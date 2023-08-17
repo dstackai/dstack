@@ -191,6 +191,7 @@ class AzureConfigurator(Configurator):
         tenant_id = json_config["tenant_id"]
         subscription_id = json_config["subscription_id"]
         storage_account = json_config["storage_account"]
+        locations = json_config.get("locations")
         if locations is None:
             # old location format
             locations = json_config.get("extra_locations", []) + [json_config.get("location")]
