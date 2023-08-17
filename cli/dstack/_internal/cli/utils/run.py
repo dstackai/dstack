@@ -85,10 +85,7 @@ def print_run_plan(configurator: JobConfigurator, run_plan: RunPlan, candidates_
     props.add_row(th("Project"), run_plan.project)
     props.add_row(th("User"), run_plan.hub_user_name)
     props.add_row(th("Min resources"), resources)
-    props.add_row(
-        th("Max price"),
-        max_price,
-    )
+    props.add_row(th("Max price"), max_price)
     props.add_row(th("Max duration"), max_duration)
     props.add_row(th("Spot policy"), job_plan.job.spot_policy.value)
     props.add_row(th("Retry policy"), retry_policy)
