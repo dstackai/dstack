@@ -43,18 +43,14 @@ class LocalBackendConfig(BaseModel):
 
 class AWSBackendConfigPartial(BaseModel):
     type: Literal["aws"] = "aws"
-    region_name: Optional[str]
-    region_name_title: Optional[str]
-    extra_regions: Optional[List[str]]
+    regions: Optional[List[str]]
     s3_bucket_name: Optional[str]
     ec2_subnet_id: Optional[str]
 
 
 class AWSBackendConfig(BaseModel):
     type: Literal["aws"] = "aws"
-    region_name: str
-    region_name_title: Optional[str]
-    extra_regions: List[str] = []
+    regions: List[str]
     s3_bucket_name: str
     ec2_subnet_id: Optional[str]
 
@@ -274,8 +270,7 @@ class AWSBucketBackendElement(BaseModel):
 class AWSBackendValues(BaseModel):
     type: Literal["aws"] = "aws"
     default_credentials: bool = False
-    region_name: Optional[BackendElement]
-    extra_regions: Optional[BackendMultiElement]
+    regions: Optional[BackendMultiElement]
     s3_bucket_name: Optional[AWSBucketBackendElement]
     ec2_subnet_id: Optional[BackendElement]
 

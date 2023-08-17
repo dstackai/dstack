@@ -5,9 +5,8 @@ import botocore.exceptions
 from boto3.session import Session
 
 from dstack._internal.backend.aws import AwsBackend
-from dstack._internal.backend.aws.config import DEFAULT_REGION_NAME, AWSConfig
+from dstack._internal.backend.aws.config import DEFAULT_REGION, AWSConfig
 from dstack._internal.hub.db.models import Backend as DBBackend
-from dstack._internal.hub.db.models import Project
 from dstack._internal.hub.schemas import (
     AWSBackendConfig,
     AWSBackendConfigWithCreds,
@@ -44,16 +43,10 @@ class AWSConfigurator(Configurator):
     def configure_backend(
         self, backend_config: AWSBackendConfigWithCredsPartial
     ) -> AWSBackendValues:
-        if (
-            backend_config.region_name is not None
-            and backend_config.region_name not in REGION_VALUES
-        ):
-            raise BackendConfigError(f"Invalid AWS region {backend_config.region_name}")
-
         backend_values = AWSBackendValues()
         session = Session()
         if session.region_name is None:
-            session = Session(region_name=backend_config.region_name or DEFAULT_REGION_NAME)
+            session = Session(region_name=DEFAULT_REGION)
 
         backend_values.default_credentials = self._valid_credentials(session=session)
 
@@ -63,7 +56,7 @@ class AWSConfigurator(Configurator):
         project_credentials = backend_config.credentials.__root__
         if project_credentials.type == "access_key":
             session = Session(
-                region_name=backend_config.region_name or DEFAULT_REGION_NAME,
+                region_name=DEFAULT_REGION,
                 aws_access_key_id=project_credentials.access_key,
                 aws_secret_access_key=project_credentials.secret_key,
             )
@@ -74,15 +67,11 @@ class AWSConfigurator(Configurator):
         elif not backend_values.default_credentials:
             self._raise_invalid_credentials_error(fields=[["credentials"]])
 
-        # TODO validate config values
-        backend_values.region_name = self._get_hub_region_element(selected=session.region_name)
-        backend_values.extra_regions = self._get_hub_extra_regions_element(
-            region=session.region_name,
-            selected=backend_config.extra_regions or [],
+        backend_values.regions = self._get_hub_regions_element(
+            selected=backend_config.regions or [DEFAULT_REGION]
         )
         backend_values.s3_bucket_name = self._get_hub_buckets_element(
             session=session,
-            region=session.region_name,
             selected=backend_config.s3_bucket_name,
         )
         backend_values.ec2_subnet_id = self._get_hub_subnet_element(
@@ -94,8 +83,7 @@ class AWSConfigurator(Configurator):
         self, project_name: str, backend_config: AWSBackendConfigWithCreds
     ) -> Tuple[Dict, Dict]:
         config_data = {
-            "region_name": backend_config.region_name,
-            "extra_regions": backend_config.extra_regions,
+            "regions": backend_config.regions,
             "s3_bucket_name": backend_config.s3_bucket_name.replace("s3://", ""),
             "ec2_subnet_id": backend_config.ec2_subnet_id,
         }
@@ -106,41 +94,36 @@ class AWSConfigurator(Configurator):
         self, db_backend: DBBackend, include_creds: bool
     ) -> Union[AWSBackendConfig, AWSBackendConfigWithCreds]:
         json_config = json.loads(db_backend.config)
-        region_name = json_config["region_name"]
+        regions = json_config.get("regions") or (
+            json_config.get("extra_regions", []) + [json_config.get("region_name")]
+        )
         s3_bucket_name = json_config["s3_bucket_name"]
         ec2_subnet_id = json_config["ec2_subnet_id"]
-        extra_regions = json_config.get("extra_regions", [])
         if include_creds:
             json_auth = json.loads(db_backend.auth)
             return AWSBackendConfigWithCreds(
-                region_name=region_name,
-                region_name_title=region_name,
-                extra_regions=extra_regions,
+                regions=regions,
                 s3_bucket_name=s3_bucket_name,
                 ec2_subnet_id=ec2_subnet_id,
                 credentials=AWSBackendCreds.parse_obj(json_auth),
             )
         return AWSBackendConfig(
-            region_name=region_name,
-            region_name_title=region_name,
-            extra_regions=extra_regions,
+            regions=regions,
             s3_bucket_name=s3_bucket_name,
             ec2_subnet_id=ec2_subnet_id,
         )
 
     def get_backend(self, db_backend: DBBackend) -> AwsBackend:
-        config_data = json.loads(db_backend.config)
-        auth_data = json.loads(db_backend.auth)
+        json_config = json.loads(db_backend.config)
+        json_auth = json.loads(db_backend.auth)
+        regions = json_config.get("regions") or (
+            json_config.get("extra_regions", []) + [json_config.get("region_name")]
+        )
         config = AWSConfig(
-            bucket_name=config_data.get("bucket")
-            or config_data.get("bucket_name")
-            or config_data.get("s3_bucket_name"),
-            region_name=config_data.get("region_name"),
-            extra_regions=config_data.get("extra_regions", []),
-            subnet_id=config_data.get("subnet_id")
-            or config_data.get("ec2_subnet_id")
-            or config_data.get("subnet"),
-            credentials=auth_data,
+            bucket_name=json_config.get("s3_bucket_name"),
+            regions=regions,
+            subnet_id=json_config.get("ec2_subnet_id"),
+            credentials=json_auth,
         )
         return AwsBackend(config)
 
@@ -159,26 +142,24 @@ class AWSConfigurator(Configurator):
             fields=fields,
         )
 
-    def _get_hub_region_element(self, selected: Optional[str]) -> BackendElement:
-        element = BackendElement(selected=selected)
-        for r in REGIONS:
-            element.values.append(BackendElementValue(value=r[1], label=r[1]))
-        return element
-
-    def _get_hub_extra_regions_element(
-        self, region: str, selected: List[str]
-    ) -> BackendMultiElement:
+    def _get_hub_regions_element(self, selected: List[str]) -> BackendMultiElement:
+        for r in selected:
+            if r not in REGION_VALUES:
+                raise BackendConfigError(
+                    f"The region {r} is invalid",
+                    code="invalid_region",
+                    fields=[["regions"]],
+                )
         element = BackendMultiElement(selected=selected)
         for r in REGION_VALUES:
-            if r != region:
-                element.values.append(BackendElementValue(value=r, label=r))
+            element.values.append(BackendElementValue(value=r, label=r))
         return element
 
     def _get_hub_buckets_element(
-        self, session: Session, region: str, selected: Optional[str]
+        self, session: Session, selected: Optional[str]
     ) -> AWSBucketBackendElement:
         if selected:
-            self._validate_hub_bucket(session=session, region=region, bucket_name=selected)
+            self._validate_hub_bucket(session=session, bucket_name=selected)
         element = AWSBucketBackendElement(selected=selected)
         s3_client = session.client("s3")
         try:
@@ -191,22 +172,15 @@ class AWSConfigurator(Configurator):
                 AWSBucketBackendElementValue(
                     name=bucket["Name"],
                     created=bucket["CreationDate"].strftime("%d.%m.%Y %H:%M:%S"),
-                    region=region,
+                    region="",
                 )
             )
         return element
 
-    def _validate_hub_bucket(self, session: Session, region: str, bucket_name: str):
+    def _validate_hub_bucket(self, session: Session, bucket_name: str):
         s3_client = session.client("s3")
         try:
-            response = s3_client.head_bucket(Bucket=bucket_name)
-            bucket_region = response["ResponseMetadata"]["HTTPHeaders"]["x-amz-bucket-region"]
-            if bucket_region.lower() != region:
-                raise BackendConfigError(
-                    "The bucket belongs to another AWS region",
-                    code="invalid_bucket",
-                    fields=[["s3_bucket_name"]],
-                )
+            s3_client.head_bucket(Bucket=bucket_name)
         except botocore.exceptions.ClientError as e:
             if (
                 hasattr(e, "response")

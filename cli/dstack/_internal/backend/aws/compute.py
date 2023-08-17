@@ -39,7 +39,7 @@ class AWSCompute(Compute):
 
     def get_supported_instances(self) -> List[InstanceType]:
         instances = {}
-        for region in [self.backend_config.region_name, *self.backend_config.extra_regions]:
+        for region in self.backend_config.regions:
             for i in runners._get_instance_types(self._get_ec2_client(region=region)):
                 if i.instance_name not in instances:
                     instances[i.instance_name] = i
@@ -54,7 +54,7 @@ class AWSCompute(Compute):
             session=self.session,
             iam_client=self.iam_client,
             bucket_name=self.backend_config.bucket_name,
-            region_name=region or self.backend_config.region_name,
+            region_name=region or self.backend_config.region,
             subnet_id=self.backend_config.subnet_id,
             runner_id=job.runner_id,
             instance_type=instance_type,
