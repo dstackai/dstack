@@ -57,7 +57,7 @@ async def lifespan(app: FastAPI):
         "\nTo start using dstack:\n"
         f"\n    1. Configure one or more clouds at {add_backend_url}."
         "\n    2. Initialize a repo with `dstack init`."
-        "\n    3. Define and run a dev enviroment, a task, or a service. For details, see https://dstack.ai/docs/.\n"
+        "\n    3. Define and run a dev environment, a task, or a service. For details, see https://dstack.ai/docs/.\n"
     )
     yield
     scheduler.shutdown()

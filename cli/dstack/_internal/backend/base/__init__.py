@@ -78,6 +78,7 @@ class Backend(ABC):
         self,
         job: Job,
         failed_to_start_job_new_status: JobStatus,
+        project_private_key: str,
         offer: Optional[InstanceOffer] = None,
     ):
         pass
@@ -311,6 +312,7 @@ class ComponentBasedBackend(Backend):
         self,
         job: Job,
         failed_to_start_job_new_status: JobStatus,
+        project_private_key: str,
         offer: Optional[InstanceOffer] = None,
     ):
         self.predict_build_plan(job)  # raises exception on missing build
@@ -320,6 +322,7 @@ class ComponentBasedBackend(Backend):
             self.secrets_manager(),
             job,
             failed_to_start_job_new_status,
+            project_private_key=project_private_key,
             offer=offer,
         )
 

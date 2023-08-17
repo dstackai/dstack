@@ -58,7 +58,13 @@ async def run(project_name: str, body: RunRunners):
             offer.price,
         )
         try:
-            await call_backend(backend.run_job, body.job, failed_to_start_job_new_status, offer)
+            await call_backend(
+                backend.run_job,
+                body.job,
+                failed_to_start_job_new_status,
+                project.ssh_private_key,
+                offer,
+            )
             return
         except NoMatchingInstanceError:
             continue

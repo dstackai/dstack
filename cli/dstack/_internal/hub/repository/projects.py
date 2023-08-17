@@ -19,6 +19,7 @@ from dstack._internal.hub.schemas import (
 from dstack._internal.hub.security.utils import ROLE_ADMIN
 from dstack._internal.hub.services.backends import get_configurator
 from dstack._internal.hub.utils.common import run_async
+from dstack._internal.utils.crypto import generate_rsa_key_pair_bytes
 
 
 class ProjectManager:
@@ -34,7 +35,14 @@ class ProjectManager:
         members: List[Member],
         session: Optional[AsyncSession] = None,
     ) -> Project:
-        project = Project(name=project_name)
+        private_bytes, public_bytes = await run_async(
+            generate_rsa_key_pair_bytes, f"{project_name}@dstack"
+        )
+        project = Project(
+            name=project_name,
+            ssh_private_key=private_bytes.decode(),
+            ssh_public_key=public_bytes.decode(),
+        )
         await ProjectManager._create(project, session=session)
         await ProjectManager._add_member(
             project=project,
