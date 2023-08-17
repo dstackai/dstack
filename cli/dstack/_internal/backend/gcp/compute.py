@@ -79,6 +79,7 @@ class GCPCompute(Compute):
         )
         self.zone_operations_client = compute_v1.ZoneOperationsClient(credentials=self.credentials)
         self.regions_client = compute_v1.RegionsClient(credentials=self.credentials)
+        self._supported_instances_cache: Optional[List[InstanceType]] = None
 
     def get_request_head(self, job: Job, request_id: Optional[str]) -> RequestHead:
         if request_id is None:
@@ -110,6 +111,8 @@ class GCPCompute(Compute):
         )
 
     def get_supported_instances(self) -> List[InstanceType]:
+        if self._supported_instances_cache is not None:
+            return self._supported_instances_cache
         vm_families = ["e2-medium", "e2-standard-*", "e2-highmem-*", "e2-highcpu-*", "m1-*"] + [
             "a2-*",
             "g2-*",
@@ -160,7 +163,8 @@ class GCPCompute(Compute):
                     instances[name] = i
                     i.available_regions = []
                 instances[name].available_regions.append(zone)
-        return list(instances.values())
+        self._supported_instances_cache = list(instances.values())
+        return self._supported_instances_cache
 
     def run_instance(
         self, job: Job, instance_type: InstanceType, region: Optional[str] = None
