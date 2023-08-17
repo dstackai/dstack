@@ -72,6 +72,7 @@ class LambdaBackend(ComponentBasedBackend):
         self,
         job: Job,
         failed_to_start_job_new_status: JobStatus,
+        project_private_key: str,
         offer: Optional[InstanceOffer] = None,
     ):
         self._logging.create_log_groups_if_not_exist(
@@ -79,7 +80,12 @@ class LambdaBackend(ComponentBasedBackend):
             self.backend_config.storage_config.bucket,
             job.repo_ref.repo_id,
         )
-        super().run_job(job, failed_to_start_job_new_status, offer=offer)
+        super().run_job(
+            job,
+            failed_to_start_job_new_status,
+            project_private_key=project_private_key,
+            offer=offer,
+        )
 
     def create_run(self, repo_id: str, run_name: Optional[str]) -> str:
         self._logging.create_log_groups_if_not_exist(

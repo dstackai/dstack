@@ -1,5 +1,7 @@
 import re
 import subprocess
+import time
+from tempfile import NamedTemporaryFile
 from typing import List, Optional
 
 import pkg_resources
@@ -15,7 +17,6 @@ from dstack._internal.backend.base.storage import Storage
 from dstack._internal.core.error import SSHCommandError
 from dstack._internal.core.gateway import GatewayHead
 from dstack._internal.core.job import Job
-from dstack._internal.hub.utils.ssh import HUB_PRIVATE_KEY_PATH
 from dstack._internal.utils.common import PathLike, removeprefix
 from dstack._internal.utils.crypto import generate_rsa_key_pair_bytes
 from dstack._internal.utils.interpolator import VariablesInterpolator
@@ -59,17 +60,18 @@ def publish(
     port: int,
     ssh_key: bytes,
     secure: bool,
+    project_private_key: str,
     user: str = "ubuntu",
-    id_rsa: Optional[PathLike] = HUB_PRIVATE_KEY_PATH,
 ) -> str:
     command = ["sudo", "python3", "-", hostname, str(port), f'"{ssh_key.decode().strip()}"']
     if secure:
         command.append("--secure")
-    with open(
-        pkg_resources.resource_filename("dstack._internal", "scripts/gateway_publish.py"), "r"
-    ) as f:
+    script_path = pkg_resources.resource_filename("dstack._internal", "scripts/gateway_publish.py")
+    with open(script_path, "r") as script, NamedTemporaryFile("w") as id_rsa:
+        id_rsa.write(project_private_key)
+        id_rsa.flush()
         output = exec_ssh_command(
-            hostname, command=" ".join(command), user=user, id_rsa=id_rsa, stdin=f
+            hostname, command=" ".join(command), user=user, id_rsa=id_rsa.name, stdin=script
         )
     return output.decode().strip()
 
@@ -117,7 +119,7 @@ def is_ip_address(hostname: str) -> bool:
     return re.match(r"^\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3}$", hostname) is not None
 
 
-def setup_service_job(job: Job, secrets_manager: SecretsManager) -> Job:
+def setup_service_job(job: Job, secrets_manager: SecretsManager, project_private_key: str) -> Job:
     job.gateway.hostname = resolve_hostname(
         secrets_manager, job.repo_ref.repo_id, job.gateway.hostname
     )
@@ -126,7 +128,11 @@ def setup_service_job(job: Job, secrets_manager: SecretsManager) -> Job:
         job.gateway.public_port = 443
     private_bytes, public_bytes = generate_rsa_key_pair_bytes(comment=job.run_name)
     job.gateway.sock_path = publish(
-        job.gateway.hostname, job.gateway.public_port, public_bytes, secure=job.gateway.secure
+        job.gateway.hostname,
+        job.gateway.public_port,
+        public_bytes,
+        project_private_key=project_private_key,
+        secure=job.gateway.secure,
     )
     job.gateway.ssh_key = private_bytes.decode()
     return job
