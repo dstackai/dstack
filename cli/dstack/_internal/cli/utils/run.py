@@ -51,14 +51,10 @@ def read_ssh_key_pub(key_path: str) -> str:
 def print_run_plan(configurator: JobConfigurator, run_plan: RunPlan, candidates_limit: int = 3):
     job_plan = run_plan.job_plans[0]
 
-    props = Table(box=None, show_header=False)  # todo 2 pair of columns
-    props.add_column(no_wrap=True)  # key
-    props.add_column()  # value
-    props.add_column(style="grey58")  # separator
+    props = Table(box=None, show_header=False)
     props.add_column(no_wrap=True)  # key
     props.add_column()  # value
 
-    sep = "|"
     req = job_plan.job.requirements
     if req.gpus:
         resources = pretty_format_resources(
@@ -75,27 +71,28 @@ def print_run_plan(configurator: JobConfigurator, run_plan: RunPlan, candidates_
     retry_policy = job_plan.job.retry_policy
     retry_policy = (
         (f"{retry_policy.limit / 3600:g}h" if retry_policy.limit else "yes")
-        if retry_policy
+        if retry_policy.retry
         else "no"
     )
     termination_policy = (
         job_plan.job.termination_policy.value if job_plan.job.termination_policy else "-"
     )
 
-    def h(s: str) -> str:
+    def th(s: str) -> str:
         return f"[bold]{s}[/bold]"
 
+    props.add_row(th("Configuration"), configurator.configuration_path)
+    props.add_row(th("Project"), run_plan.project)
+    props.add_row(th("User"), run_plan.hub_user_name)
+    props.add_row(th("Min resources"), resources)
     props.add_row(
-        h("Configuration"), configurator.configuration_path, sep, h("Project"), run_plan.project
+        th("Max price"),
+        max_price,
     )
-    props.add_row("", "", sep, h("User"), run_plan.hub_user_name)
-    props.add_row(
-        h("Min resources"), resources, sep, h("Spot policy"), job_plan.job.spot_policy.value
-    )
-    props.add_row(h("Max price"), max_price, sep, h("Retry policy"), retry_policy)
-    props.add_row(
-        h("Max duration"), max_duration, sep, h("Termination policy"), termination_policy
-    )
+    props.add_row(th("Max duration"), max_duration)
+    props.add_row(th("Spot policy"), job_plan.job.spot_policy.value)
+    props.add_row(th("Retry policy"), retry_policy)
+    props.add_row(th("Termination policy"), termination_policy)
 
     candidates = Table(box=None)
     candidates.add_column("#")
