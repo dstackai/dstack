@@ -77,7 +77,7 @@ class DevEnvironmentConfigurator(JobConfiguratorWithPorts):
         return DEFAULT_MAX_DURATION_SECONDS
 
     def termination_policy(self) -> job.TerminationPolicy:
-        return self.profile.termination_policy or job.TerminationPolicy.STOP
+        return self.profile.termination_policy or job.TerminationPolicy.TERMINATE
 
     def artifact_specs(self) -> List[job.ArtifactSpec]:
         return []  # not available
