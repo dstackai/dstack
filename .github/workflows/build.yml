@@ -135,8 +135,8 @@ jobs:
     env:
       HUGGING_FACE_HUB_TOKEN: ${{ secrets.HUGGING_FACE_HUB_TOKEN }}
     steps:
-      - name: Waiting for 30 seconds for the new version to become available
-        run: sleep 30
+      - name: Waiting for 1 minute for the new version to become available
+        run: sleep 60
       - name: Restart the `dstack-stgn` Space
         run: |
           VERSION=$((${{ github.run_number }} + 150))
