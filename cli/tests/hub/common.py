@@ -23,7 +23,7 @@ async def create_user(
 async def create_project(
     name: str = "test_project",
 ) -> Project:
-    project = Project(name=name)
+    project = Project(name=name, ssh_private_key="", ssh_public_key="")
     await ProjectManager._create(project)
     return project
 
