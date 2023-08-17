@@ -101,16 +101,14 @@ working directory.
 ```shell
 $ dstack run . 
 
- RUN          CONFIGURATION   USER   BACKEND  INSTANCE  RESOURCES        SPOT
- fast-moth-1  app.dstack.yml  admin  aws      -         5xCPUs, 15987MB  auto  
+ RUN          CONFIGURATION   BACKEND  RESOURCES        SPOT  PRICE
+ fast-moth-1  app.dstack.yml  aws      5xCPUs, 15987MB  yes   $0.0547 
  
 Provisioning and starting SSH tunnel...
 ---> 100%
 
 To open in VS Code Desktop, use this link:
   vscode://vscode-remote/ssh-remote+fast-moth-1/workflow
-
-To exit, press Ctrl+C.
 ```
 
 </div>

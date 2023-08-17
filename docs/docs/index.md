@@ -20,12 +20,12 @@ The server is available at http://127.0.0.1:3000?token=b934d226-e24a-4eab-eb92b3
 
 ## Configure backends
 
-Upon startup, the server sets up the default project called `main`. Prior to using `dstack`, you must log in to the
-UI, open the project's settings, and configure cloud backends 
-(e.g., [AWS](reference/backends/aws.md), [GCP](reference/backends/gcp.md), [Azure](reference/backends/azure.md), 
-[Lambda](reference/backends/lambda.md), etc.).
+Upon startup, the server sets up the default project called `main`.
 
-[//]: # (TODO: Add a link or a screenshot)
+![](../assets/images/dstack-hub-view-project-empty.png){ width=800 }
+
+Prior to using `dstack`, open the `main` project's settings, and add cloud backends 
+(e.g., [AWS](reference/backends/aws.md), [GCP](reference/backends/gcp.md), [Azure](reference/backends/azure.md), [Lambda](reference/backends/lambda.md), etc.).
 
 [//]: # (Once cloud backends are configured, `dstack` will be able to provision cloud resources across configured clouds, ensuring)
 [//]: # (the best price and higher availability.)
@@ -139,8 +139,8 @@ directory which you want to use as a working directory when running the configur
 ```shell
 $ dstack run . 
 
- RUN          CONFIGURATION  USER   BACKEND  INSTANCE  RESOURCES        SPOT
- fast-moth-1  .dstack.yml    admin  aws      -         5xCPUs, 15987MB  auto  
+ RUN          CONFIGURATION  BACKEND  RESOURCES        SPOT  PRICE
+ fast-moth-1  .dstack.yml    aws      5xCPUs, 15987MB  yes   $0.0547
 
 
 Provisioning and starting SSH tunnel...
@@ -148,8 +148,6 @@ Provisioning and starting SSH tunnel...
 
 To open in VS Code Desktop, use this link:
   vscode://vscode-remote/ssh-remote+fast-moth-1/workflow
-
-To exit, press Ctrl+C.
 ```
 
 </div>
@@ -167,13 +165,11 @@ using the `-f` argument:
 ```shell
 $ dstack run . -f serve.dstack.yml
 
- RUN             CONFIGURATION     USER   BACKEND  INSTANCE  RESOURCES        SPOT
- old-lionfish-1  serve.dstack.yml  admin  aws      -         5xCPUs, 15987MB  auto  
+ RUN             CONFIGURATION     BACKEND  RESOURCES        SPOT  PRICE
+ old-lionfish-1  serve.dstack.yml  aws      5xCPUs, 15987MB  yes   $0.0547
 
 Provisioning and starting SSH tunnel...
 ---> 100%
-
-To stop, press Ctrl+C.
 
 Launching in *reload mode* on: http://127.0.0.1:7860 (Press CTRL+C to quit)
 ```

@@ -6,7 +6,7 @@
 .tx-landing__hero_text h1 {
     margin-bottom: 1.7rem;
     font-weight: 800;
-    font-size: 2.5em;
+    font-size: 2.3em;
     background: -webkit-linear-gradient(45deg, #ff00ff, #8500ff);
     -webkit-background-clip: text;
     -webkit-text-fill-color: transparent;
@@ -30,6 +30,11 @@
         margin-top: 1.5rem;
         max-width: 26rem;
     }
+
+    .tx-landing__hero_code {
+        margin-top: 1.5rem;
+        max-width: 26rem;
+    }
 }
 
 @media screen and (min-width: 76.1875em) {
@@ -40,7 +45,7 @@
     .tx-landing__hero {
         display: flex;
         align-items: stretch;
-        margin-bottom: -3rem;
+        margin-bottom: 2.5rem;
         font-size: 19px;
         line-height: 1.5;
     }
@@ -55,6 +60,13 @@
         width: 30rem;
         margin-top: 0.5rem;
         margin-left: 3rem;
+    }
+
+    .tx-landing__hero_code {
+        order: 1;
+        min-width: 34rem;
+        margin-top: 3rem;
+        margin-left: 2rem;
     }
 }
 
@@ -74,7 +86,8 @@
 }
 
 .tx-container .md-button {
-    margin-top: 1rem;
+    margin-top: 1.5rem;
+    margin-bottom: 1.5rem;
     padding: 0.55em 2em;
     font-size: 22px;
     font-weight: 300 !important;
@@ -134,13 +147,13 @@
 }
 
 @media screen and (min-width: 76.1875em) {
-    .tx-landing__integrations {
+    /*.tx-landing__integrations {
         margin-top: -5rem;
-    }
+    }*/
 }
 
 .tx-landing__integrations_text h2 {
-    font-size: 1.8em;
+    font-size: 1.7em;
     max-width: 500px;
     margin-bottom: 1.5em;
     background: -webkit-linear-gradient(45deg, #0048ff, #ce00ff);

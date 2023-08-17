@@ -9,7 +9,7 @@
 </h1>
 
 <h3 align="center">
-Orchestrating LLM workloads across multiple clouds
+Train and deploy LLM models in multiple clouds
 </h3>
 
 <p align="center">
@@ -24,7 +24,7 @@ Orchestrating LLM workloads across multiple clouds
 </div>
 
 `dstack` is an open-source tool that enables the execution of LLM workloads
-across multiple cloud GPU providers – ensuring the best GPU price and availability.
+across multiple cloud providers – ensuring the best GPU price and availability.
 
 Deploy services, run tasks, and provision dev environments
 in a cost-effective manner across multiple cloud GPU providers.

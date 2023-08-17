@@ -15,35 +15,55 @@
     })();
 </script>
 <script type="text/javascript">
-    new Termynal('#train-command-example',
+    new Termynal('.tx-landing__hero_code>[data-termynal]',
         {
             lineData: [
-                {type: 'input', value: 'dstack run . -f train.dstack.yml'},
+                {type: 'input', value: 'dstack run . --gpu A100'},
                 {delay: 0, value: ' ', class: 'newline'},
-                {
-                    delay: 0,
-                    value: 'RUN            USER   INSTANCE       RESOURCES                 SPOT',
-                    class: 'newline'
-                },
-                {
-                    delay: 0,
-                    value: 'wet-mangust-7  peter  a2-highgpu-1g  12xCPUs, 87040MB, 1xA100  yes',
-                    class: 'newline'
-                },
+                {delay: 0, value: ' Configuration               .dstack.yml', class: 'newline'},
+                {delay: 0, value: ' Min resources               2xCPUs, 8GB, 1xA100', class: 'newline'},
+                {delay: 0, value: ' Max price                   -', class: 'newline'},
+                {delay: 0, value: ' Spot policy                 auto', class: 'newline'},
+                {delay: 0, value: ' Max duration                72h', class: 'newline'},
+                {delay: 0, value: ' ', class: 'newline'},
+                {delay: 0, value: ' #  BACKEND  RESOURCES                      SPOT  PRICE', class: 'newline'},
+                {delay: 0, value: ' 1  lambda   30xCPUs, 200GB, 1xA100 (80GB)  yes   $1.1', class: 'newline'},
+                {delay: 0, value: ' 2  gcp      12xCPUs, 85GB, 1xA100 (40GB)   yes   $1.20582', class: 'newline'},
+                {delay: 0, value: ' 3  azure    24xCPUs, 220GB, 1xA100 (80GB)  yes   $1.6469', class: 'newline'},
+                {delay: 0, value: '    ...', class: 'newline'},
                 {delay: 0, value: ' ', class: 'newline'},
                 {delay: 0, startDelay: 0, lineDelay: 0, value: 'Continue? ', class: 'no-newline'},
                 {
                     type: 'input',
                     startDelay: 0,
                     lineDelay: 0,
-                    typeDelay: 1000,
+                    delay: 1000000,
                     prompt: '[y/n]',
-                    value: 'y',
+                    value: '',
                     class: 'no-newline'
                 },
+            ]
+        }
+    )
+    new Termynal('#tx-landing__major_feature_training_terminal',
+        {
+            lineData: [
+                {type: 'input', value: 'dstack run . -f llama-2/train.dstack.yml --gpu 24GB -y'},
                 {delay: 0, value: ' ', class: 'newline'},
-                {delay: 0, value: 'Waiting for capacity... To exit, press Ctrl+C.', class: 'newline'},
-                {delay: 5000, value: ' ', class: 'newline'},
+                {
+                    delay: 0,
+                    value: 'RUN            BACKEND  RESOURCES                      SPOT PRICE',
+                    class: 'newline'
+                },
+                {
+                    delay: 0,
+                    value: 'wet-mangust-7  gcp      12xCPUs, 85GB, 1xA100 (40GB)   yes  $1.20582',
+                    class: 'newline'
+                },
+                {delay: 0, value: ' ', class: 'newline'},
+                {delay: 1000, value: 'Provisioning and starting SSH tunnel...', class: 'newline'},
+                {type: 'progress', progressPercent: 100, typeDelay: 200},
+                {delay: 0, value: ' ', class: 'newline'},
                 {
                     delay: 5000,
                     value: 'Epoch 0:  100% 1719/1719 [00:18<00:00, 92.32it/s, loss=0.0981, acc=0.969]\n',
@@ -63,39 +83,28 @@
             ]
         }
     );
-    new Termynal('#serve-command-example',
+    new Termynal('#tx-landing__major_feature_inference_terminal',
         {
             lineData: [
-                {type: 'input', value: 'dstack run . -f serve.dstack.yml'},
+                {type: 'input', value: 'dstack run . -f llama-2/serve.dstack.yml --gpu 24GB -y'},
                 {delay: 0, value: ' ', class: 'newline'},
                 {
                     delay: 0,
-                    value: 'RUN           USER   INSTANCE       RESOURCES                 SPOT',
+                    value: 'RUN            BACKEND  RESOURCES                      SPOT PRICE',
                     class: 'newline'
                 },
                 {
                     delay: 0,
-                    value: 'mean-snail-1  peter  a2-highgpu-1g  12xCPUs, 87040MB, 1xA100  yes',
+                    value: 'wet-mangust-8  gcp      12xCPUs, 85GB, 1xA100 (40GB)   yes  $1.20582',
                     class: 'newline'
                 },
                 {delay: 0, value: ' ', class: 'newline'},
-                {delay: 0, startDelay: 0, lineDelay: 0, value: 'Continue? ', class: 'no-newline'},
-                {
-                    type: 'input',
-                    startDelay: 0,
-                    lineDelay: 0,
-                    typeDelay: 1000,
-                    prompt: '[y/n]',
-                    value: 'y',
-                    class: 'no-newline'
-                },
-                {delay: 0, value: ' ', class: 'newline'},
-                {delay: 0, value: 'Provisioning...', class: 'newline'},
-                {type: 'progress', progressPercent: 100},
+                {delay: 1000, value: 'Provisioning and starting SSH tunnel...', class: 'newline'},
+                {type: 'progress', progressPercent: 100, typeDelay: 200},
                 {delay: 0, value: ' ', class: 'newline'},
                 {
                     delay: 0,
-                    value: 'Serving HTTP on http://98.71.213.179:80',
+                    value: 'Serving HTTP on https://myservice.mydomain.com',
                     class: 'newline'
                 },
                 {delay: 0, value: ' ', class: 'newline'},
@@ -116,13 +125,15 @@
     <div class="md-grid md-typeset">
         <div class="tx-landing__hero">
             <div class="tx-landing__hero_text">
-                <h1>Orchestrating LLM workloads across multiple clouds</h1>
+                <h1>Train and deploy LLM models in multiple clouds</h1>
                 <p><strong>dstack</strong> is an open-source tool that enables the execution of LLM workloads
-                    across multiple cloud GPU providers – ensuring the best GPU price and availability.
+                    across multiple cloud providers – ensuring the
+                    <strong>best GPU price and availability</strong>.
                 </p>
 
-                <p>Deploy run <strong>tasks</strong>, <strong>services</strong>, and provision
-                    <strong>dev environments</strong>in a cost-effective manner across multiple cloud GPU providers.</p>
+                <!--<p>Deploy run <strong>tasks</strong>, <strong>services</strong>, and provision
+                    <strong>dev environments</strong> in a cost-effective manner across multiple cloud GPU providers.
+                </p>-->
 
                 <a href="/docs" class="md-button md-button--primary">
                     Get started</a>
@@ -131,14 +142,15 @@
                    target="_blank" class="md-button md-button-secondary slack">Join Slack</a>
             </div>
 
-            <div class="tx-landing__hero_image">
-                <img src="assets/images/hero.svg" style="max-width:800px; width:100%"/>
+            <div class="tx-landing__hero_code">
+                <div id="tx-landing__hero_code_terminal" data-termynal>
+                </div>
             </div>
         </div>
 
         <div class="tx-landing__integrations">
             <div class="tx-landing__integrations_text">
-                <h2>Optimal price and availability across multiple GPU providers</h2>
+                <h2>Optimal GPU price and availability across multiple providers</h2>
             </div>
             <div class="tx-landing__integrations_logos">
                 <img class="logo-xlarge" src="assets/images/aws-logo.svg" title="Amazon Web Services">
@@ -154,7 +166,7 @@
                     <h2>Training</h2>
 
                     <p>Using <strong>dstack</strong>, you can define <strong>tasks</strong> and execute them across
-                        multiple cloud GPU providers, ensuring the best GPU price and availability.</p>
+                        multiple cloud providers, ensuring the best GPU price and availability.</p>
 
                     <p><strong>Tasks</strong> facilitate cost-effective on-demand execution of batch jobs and web apps.
                     </p>
@@ -166,7 +178,7 @@
                 </div>
 
                 <div class="block large">
-                    <div id="train-command-example" data-termynal>
+                    <div id="tx-landing__major_feature_training_terminal" data-termynal>
                     </div>
                 </div>
             </div>
@@ -175,15 +187,14 @@
         <div class="tx-landing__major_feature">
             <div class="section">
                 <div class="block large margin">
-                    <div id="serve-command-example" data-termynal>
+                    <div id="tx-landing__major_feature_inference_terminal" data-termynal>
                     </div>
                 </div>
                 <div class="block">
                     <h2>Inference</h2>
 
                     <p>Using <strong>dstack</strong>, you can define and deploy <strong>services</strong> using multiple
-                        cloud GPU
-                        providers, ensuring the best prices and availability.</p>
+                        cloud providers, ensuring the best GPU price and availability.</p>
 
                     <p><strong>Services</strong> enable cost-effective deployment of models and web apps.</p>
 
@@ -199,8 +210,8 @@
             <div class="section">
                 <div class="block margin">
                     <h2>Dev environments</h2>
-                    <p>Using <strong>dstack</strong>, provisioning dev environments over multiple GPU cloud
-                        providers becomes effortless, ensuring the best prices and availability.</p>
+                    <p>Using <strong>dstack</strong>, provisioning dev environments over multiple cloud
+                        providers becomes effortless, ensuring the best GPU price and availability.</p>
 
                     <p>Dev environments are easily accessible through your local desktop IDE.</p>
 
@@ -328,8 +339,7 @@ The server is available at http://127.0.0.1:3000?token=b934d226-e24a-4eab-eb92b3
                     </pre>
                 </div>
                 <p class="tx-landing__bottom_cta_text">
-                    Now you can log in, configure clouds, and you're all set! It's ready to run
-                    <strong>dev environments</strong>, <strong>tasks</strong>, and <strong>services</strong>.
+                    Done! Configure cloud credentials and start training and deploying LLM models.
                 </p>
 
                 <a href="/docs" class="md-button md-button--primary">
