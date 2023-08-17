@@ -43,15 +43,15 @@ class LocalBackendConfig(BaseModel):
 
 class AWSBackendConfigPartial(BaseModel):
     type: Literal["aws"] = "aws"
-    regions: Optional[List[str]]
     s3_bucket_name: Optional[str]
+    regions: Optional[List[str]]
     ec2_subnet_id: Optional[str]
 
 
 class AWSBackendConfig(BaseModel):
     type: Literal["aws"] = "aws"
-    regions: List[str]
     s3_bucket_name: str
+    regions: List[str]
     ec2_subnet_id: Optional[str]
 
 
@@ -81,24 +81,18 @@ class AWSBackendConfigWithCreds(AWSBackendConfig):
 
 class GCPBackendConfigPartial(BaseModel):
     type: Literal["gcp"] = "gcp"
-    area: Optional[str]
-    region: Optional[str]
-    zone: Optional[str]
     bucket_name: Optional[str]
+    regions: Optional[List[str]]
     vpc: Optional[str]
     subnet: Optional[str]
-    extra_regions: Optional[List[str]]
 
 
 class GCPBackendConfig(BaseModel):
     type: Literal["gcp"] = "gcp"
-    area: str
-    region: str
-    zone: str
     bucket_name: str
+    regions: List[str]
     vpc: str
     subnet: str
-    extra_regions: List[str] = []
 
 
 class GCPBackendDefaultCreds(BaseModel):
@@ -289,12 +283,9 @@ class GCPVPCSubnetBackendElement(BaseModel):
 class GCPBackendValues(BaseModel):
     type: Literal["gcp"] = "gcp"
     default_credentials: bool = False
-    area: Optional[BackendElement]
-    region: Optional[BackendElement]
-    zone: Optional[BackendElement]
     bucket_name: Optional[BackendElement]
+    regions: Optional[BackendMultiElement]
     vpc_subnet: Optional[GCPVPCSubnetBackendElement]
-    extra_regions: Optional[BackendMultiElement]
 
 
 class AzureBackendValues(BaseModel):

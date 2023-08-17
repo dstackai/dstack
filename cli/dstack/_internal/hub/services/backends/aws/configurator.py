@@ -94,10 +94,11 @@ class AWSConfigurator(Configurator):
         self, db_backend: DBBackend, include_creds: bool
     ) -> Union[AWSBackendConfig, AWSBackendConfigWithCreds]:
         json_config = json.loads(db_backend.config)
-        regions = json_config.get("regions") or (
-            json_config.get("extra_regions", []) + [json_config.get("region_name")]
-        )
         s3_bucket_name = json_config["s3_bucket_name"]
+        regions = json_config.get("regions")
+        if regions is None:
+            # old regions format
+            regions = json_config.get("extra_regions", []) + [json_config.get("region_name")]
         ec2_subnet_id = json_config["ec2_subnet_id"]
         if include_creds:
             json_auth = json.loads(db_backend.auth)
@@ -116,9 +117,10 @@ class AWSConfigurator(Configurator):
     def get_backend(self, db_backend: DBBackend) -> AwsBackend:
         json_config = json.loads(db_backend.config)
         json_auth = json.loads(db_backend.auth)
-        regions = json_config.get("regions") or (
-            json_config.get("extra_regions", []) + [json_config.get("region_name")]
-        )
+        regions = json_config.get("regions")
+        if regions is None:
+            # old regions format
+            regions = json_config.get("extra_regions", []) + [json_config.get("region_name")]
         config = AWSConfig(
             bucket_name=json_config.get("s3_bucket_name"),
             regions=regions,

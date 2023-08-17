@@ -27,9 +27,7 @@ from dstack._internal.hub.schemas import (
 )
 from dstack._internal.hub.services.backends.base import BackendConfigError, Configurator
 
-DEFAULT_GEOGRAPHIC_AREA = "North America"
-
-GCP_LOCATIONS = [
+LOCATIONS = [
     {
         "name": "North America",
         "regions": [
@@ -108,6 +106,8 @@ GCP_LOCATIONS = [
         "default_zone": "australia-southeast1-c",
     },
 ]
+REGIONS = [r for l in LOCATIONS for r in l["regions"]]
+DEFAULT_REGION = "us-east1"
 
 
 class GCPConfigurator(Configurator):
@@ -138,30 +138,16 @@ class GCPConfigurator(Configurator):
         elif not backend_values.default_credentials:
             self._raise_invalid_credentials_error(fields=[["credentials"]])
 
-        backend_values.area = self._get_hub_geographic_area_element(backend_config.area)
-        location = self._get_location(backend_values.area.selected)
-        backend_values.region, regions = self._get_hub_region_element(
-            location=location,
-            selected=backend_config.region,
-        )
-        backend_values.zone = self._get_hub_zone_element(
-            location=location,
-            region=regions.get(backend_values.region.selected),
-            selected=backend_config.zone,
-        )
         backend_values.bucket_name = self._get_hub_buckets_element(
-            region=backend_values.region.selected,
             selected=backend_config.bucket_name,
         )
+        backend_values.regions = self._get_hub_regions_element(
+            selected=backend_config.regions or [DEFAULT_REGION],
+        )
         backend_values.vpc_subnet = self._get_hub_vpc_subnet_element(
-            region=backend_values.region.selected,
+            region=DEFAULT_REGION,
             selected_vpc=backend_config.vpc,
             selected_subnet=backend_config.subnet,
-        )
-        backend_values.extra_regions = self._get_hub_extra_regions_element(
-            region=backend_values.region.selected,
-            region_names=list(regions.keys()),
-            selected_regions=backend_config.extra_regions or [],
         )
         return backend_values
 
@@ -179,13 +165,10 @@ class GCPConfigurator(Configurator):
             auth_data["service_account_email"] = service_account_email
         config_data = {
             "project": self.project_id,
-            "area": backend_config.area,
-            "region": backend_config.region,
-            "zone": backend_config.zone,
             "bucket_name": backend_config.bucket_name,
+            "regions": backend_config.regions,
             "vpc": backend_config.vpc,
             "subnet": backend_config.subnet,
-            "extra_regions": backend_config.extra_regions,
         }
         return config_data, auth_data
 
@@ -193,121 +176,63 @@ class GCPConfigurator(Configurator):
         self, db_backend: DBBackend, include_creds: bool
     ) -> Union[GCPBackendConfig, GCPBackendConfigWithCreds]:
         config_data = json.loads(db_backend.config)
-        area = config_data["area"]
-        region = config_data["region"]
-        zone = config_data["zone"]
+        regions = config_data.get("regions")
+        if regions is None:
+            # old regions format
+            regions = config_data.get("extra_regions", []) + [config_data.get("region")]
         bucket_name = config_data["bucket_name"]
         vpc = config_data["vpc"]
         subnet = config_data["subnet"]
-        extra_regions = config_data.get("extra_regions", [])
         if include_creds:
             auth_data = json.loads(db_backend.auth)
             return GCPBackendConfigWithCreds(
                 credentials=GCPBackendCreds.parse_obj(auth_data),
-                area=area,
-                region=region,
-                zone=zone,
                 bucket_name=bucket_name,
+                regions=regions,
                 vpc=vpc,
                 subnet=subnet,
-                extra_regions=extra_regions,
             )
         return GCPBackendConfig(
-            area=area,
-            region=region,
-            zone=zone,
             bucket_name=bucket_name,
+            regions=regions,
             vpc=vpc,
             subnet=subnet,
-            extra_regions=extra_regions,
         )
 
     def get_backend(self, db_backend: DBBackend) -> GCPBackend:
         config_data = json.loads(db_backend.config)
         auth_data = json.loads(db_backend.auth)
         project_id = config_data.get("project")
-        # Legacy config_data does not store project
-        if project_id is None:
-            self._auth(auth_data)
-            project_id = self.project_id
+        regions = config_data.get("regions")
+        if regions is None:
+            # old regions format
+            regions = config_data.get("extra_regions", []) + [config_data.get("region")]
         config = GCPConfig(
             project_id=project_id,
-            region=config_data["region"],
-            zone=config_data["zone"],
             bucket_name=config_data["bucket_name"],
+            regions=regions,
             vpc=config_data["vpc"],
             subnet=config_data["subnet"],
-            extra_regions=config_data.get("extra_regions", []),
             credentials=auth_data,
         )
         return GCPBackend(config)
 
-    def _get_hub_geographic_area_element(self, selected: Optional[str]) -> BackendElement:
-        area_names = sorted([l["name"] for l in GCP_LOCATIONS])
-        if selected is None:
-            selected = DEFAULT_GEOGRAPHIC_AREA
-        if selected not in area_names:
-            raise BackendConfigError(f"Invalid GCP area {selected}")
-        element = BackendElement(selected=selected)
-        for area_name in area_names:
-            element.values.append(BackendElementValue(value=area_name, label=area_name))
-        return element
-
-    def _get_hub_region_element(
-        self, location: Dict, selected: Optional[str]
-    ) -> Tuple[BackendElement, Dict]:
-        regions_client = compute_v1.RegionsClient(credentials=self.credentials)
-        regions = regions_client.list(project=self.project_id)
-        region_names = sorted(
-            [r.name for r in regions if r.name in location["regions"]],
-            key=lambda name: (name != location["default_region"], name),
-        )
-        if selected is None:
-            selected = region_names[0]
-        if selected not in region_names:
-            raise BackendConfigError(f"Invalid GCP region {selected} in area {location['name']}")
-        element = BackendElement(selected=selected)
-        for region_name in region_names:
-            element.values.append(BackendElementValue(value=region_name, label=region_name))
-        return element, {r.name: r for r in regions}
-
-    def _get_location(self, area: str) -> Optional[Dict]:
-        for location in GCP_LOCATIONS:
-            if location["name"] == area:
-                return location
-        return None
-
-    def _get_hub_zone_element(
-        self, location: Dict, region: compute_v1.Region, selected: Optional[str]
-    ) -> BackendElement:
-        zone_names = sorted(
-            [gcp_utils.get_resource_name(z) for z in region.zones],
-            key=lambda name: (name != location["default_zone"], name),
-        )
-        if selected is None:
-            selected = zone_names[0]
-        if selected not in zone_names:
-            raise BackendConfigError(f"Invalid GCP zone {selected} in region {region.name}")
-        element = BackendElement(selected=selected)
-        for zone_name in zone_names:
-            element.values.append(BackendElementValue(value=zone_name, label=zone_name))
-        return element
-
-    def _get_hub_buckets_element(
-        self, region: str, selected: Optional[str] = None
-    ) -> BackendElement:
+    def _get_hub_buckets_element(self, selected: Optional[str] = None) -> BackendElement:
         storage_client = storage.Client(credentials=self.credentials)
         buckets = storage_client.list_buckets()
-        bucket_names = [bucket.name for bucket in buckets if bucket.location.lower() == region]
-        if selected is not None and selected not in bucket_names:
-            raise BackendConfigError(
-                f"Invalid bucket {selected} for region {region}",
-                code="invalid_bucket",
-                fields=[["bucket_name"]],
-            )
+        bucket_names = [bucket.name for bucket in buckets]
         element = BackendElement(selected=selected)
         for bucket_name in bucket_names:
             element.values.append(BackendElementValue(value=bucket_name, label=bucket_name))
+        return element
+
+    def _get_hub_regions_element(
+        self,
+        selected: List[str],
+    ) -> BackendMultiElement:
+        element = BackendMultiElement(selected=selected)
+        for region_name in REGIONS:
+            element.values.append(BackendElementValue(value=region_name, label=region_name))
         return element
 
     def _get_hub_vpc_subnet_element(
@@ -348,20 +273,6 @@ class GCPConfigurator(Configurator):
                     else f"No preference (default)",
                 )
             )
-        return element
-
-    def _get_hub_extra_regions_element(
-        self,
-        region: str,
-        region_names: List[str],
-        selected_regions: List[str],
-    ) -> BackendMultiElement:
-        element = BackendMultiElement()
-        for region_name in region_names:
-            if region_name == region:
-                continue
-            element.values.append(BackendElementValue(value=region_name, label=region_name))
-        element.selected = selected_regions
         return element
 
     def _auth(self, credentials_data: Dict):
