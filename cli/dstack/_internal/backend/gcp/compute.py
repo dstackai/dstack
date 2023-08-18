@@ -168,14 +168,12 @@ class GCPCompute(Compute):
         return self._supported_instances_cache
 
     def run_instance(
-        self, job: Job, instance_type: InstanceType, region: Optional[str] = None
+        self, job: Job, instance_type: InstanceType, region: str
     ) -> LaunchedInstanceInfo:
         zones = _get_zones(
             regions_client=self.regions_client,
             project_id=self.gcp_config.project_id,
-            primary_region=region or self.gcp_config.region,
-            primary_zone=self.gcp_config.zone,  # doesn't matter if zone is not from the region
-            extra_regions=[],  # regions are managed at the project level
+            configured_regions=[region],
         )
         # Note: not all zones in the region may offer the chosen instance type,
         # for now, just treat NotFound error as NoCapacity

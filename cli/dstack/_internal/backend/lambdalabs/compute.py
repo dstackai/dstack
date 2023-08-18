@@ -119,7 +119,7 @@ class LambdaCompute:
         return _list_instance_types(self.api_client, self.lambda_config.regions)
 
     def run_instance(
-        self, job: Job, instance_type: InstanceType, region: Optional[str] = None
+        self, job: Job, instance_type: InstanceType, region: str
     ) -> LaunchedInstanceInfo:
         instance_id = _run_instance(
             api_client=self.api_client,

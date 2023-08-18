@@ -41,7 +41,7 @@ class Compute(ABC):
 
     @abstractmethod
     def run_instance(
-        self, job: Job, instance_type: InstanceType, region: Optional[str] = None
+        self, job: Job, instance_type: InstanceType, region: str
     ) -> LaunchedInstanceInfo:
         pass
 

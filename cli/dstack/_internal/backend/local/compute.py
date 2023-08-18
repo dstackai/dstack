@@ -33,7 +33,7 @@ class LocalCompute(Compute):
         return [InstanceType(instance_name="", resources=resources, available_regions=[""])]
 
     def run_instance(
-        self, job: Job, instance_type: InstanceType, region: Optional[str] = None
+        self, job: Job, instance_type: InstanceType, region: str
     ) -> LaunchedInstanceInfo:
         pid = runners.start_runner_process(self.backend_config, job.runner_id)
         return LaunchedInstanceInfo(request_id=pid, location=None)

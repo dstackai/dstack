@@ -119,14 +119,14 @@ class AzureCompute(Compute):
         return list(instances.values())
 
     def run_instance(
-        self, job: Job, instance_type: InstanceType, region: Optional[str] = None
+        self, job: Job, instance_type: InstanceType, region: str
     ) -> LaunchedInstanceInfo:
         return _run_instance(
             compute_client=self._compute_client,
             azure_config=self.azure_config,
             job=job,
             instance_type=instance_type,
-            location=region or self.azure_config.location,
+            location=region,
         )
 
     def get_request_head(self, job: Job, request_id: Optional[str]) -> RequestHead:
