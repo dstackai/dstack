@@ -36,8 +36,7 @@ async def create_backend(
 ) -> Backend:
     if config is None:
         config = {
-            "region_name": "eu-west-1",
-            "extra_regions": [],
+            "regions": ["eu-west-1"],
             "s3_bucket_name": "dstack-test-eu-west-1",
             "ec2_subnet_id": None,
         }
