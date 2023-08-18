@@ -35,7 +35,10 @@ async def update_secret(project_name: str, body: SecretAddUpdate):
     project = await get_project(project_name=project_name)
     backends = await get_backends(project)
     for _, backend in backends:
-        await call_backend(backend.update_secret, body.repo_id, body.secret)
+        secret = await call_backend(backend.get_secret, body.repo_id, body.secret.secret_name)
+        if secret is not None:
+            await call_backend(backend.update_secret, body.repo_id, body.secret)
+        await call_backend(backend.add_secret, body.repo_id, body.secret)
 
 
 @router.post("/{project_name}/secrets/{secret_name}/get")
