@@ -162,8 +162,8 @@ If the configuration file is named other than `.dstack.yml`, pass its path via t
 ```shell
 $ dstack run . -f serve.dstack.yml
 
- RUN           CONFIGURATION     USER   BACKEND  INSTANCE  RESOURCES        SPOT
- yellow-cat-1  serve.dstack.yml  admin  aws      -         5xCPUs, 15987MB  auto  
+ RUN           CONFIGURATION     BACKEND  RESOURCES        SPOT  PRICE
+ yellow-cat-1  serve.dstack.yml  aws      5xCPUs, 15987MB  yes  $0.0547  
 
 Provisioning...
 ---> 100%

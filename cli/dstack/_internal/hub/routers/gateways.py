@@ -22,7 +22,7 @@ async def gateways_create(project_name: str, backend_name: str = Body()) -> Gate
         if backend.name != backend_name:
             continue
         try:
-            return await call_backend(backend.create_gateway, get_hub_ssh_public_key())
+            return await call_backend(backend.create_gateway, project.ssh_public_key)
         except NotImplementedError:
             pass
     raise HTTPException(

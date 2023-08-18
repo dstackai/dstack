@@ -1,6 +1,6 @@
 from typing import List
 
-from sqlalchemy import ForeignKey, Integer, MetaData, String
+from sqlalchemy import ForeignKey, Integer, MetaData, String, Text
 from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column, relationship
 
 constraint_naming_convention = {
@@ -60,5 +60,7 @@ class Project(Base):
     __tablename__ = "projects"
 
     name: Mapped[str] = mapped_column(String(50), primary_key=True)
+    ssh_private_key: Mapped[str] = mapped_column(Text)
+    ssh_public_key: Mapped[str] = mapped_column(Text)
     members: Mapped[List[Member]] = relationship(back_populates="project", lazy="selectin")
     backends: Mapped[List[Backend]] = relationship(back_populates="project", lazy="selectin")

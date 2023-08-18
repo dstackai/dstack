@@ -117,8 +117,8 @@ If the configuration file is named other than `.dstack.yml`, pass its path via t
 ```shell
 $ dstack run . -f train.dstack.yml
 
- RUN            CONFIGURATION     USER   BACKEND  INSTANCE  RESOURCES        SPOT
- wet-mangust-7  train.dstack.yml  admin  aws      -         5xCPUs, 15987MB  auto  
+ RUN            CONFIGURATION     BACKEND  RESOURCES        SPOT  PRICE
+ wet-mangust-7  train.dstack.yml  aws      5xCPUs, 15987MB  yes   $0.0547  
 
 Waiting for capacity... To exit, press Ctrl+C...
 ---> 100%

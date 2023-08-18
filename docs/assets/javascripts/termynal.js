@@ -192,11 +192,13 @@ class Termynal {
         const chars = progressChar.repeat(progressLength);
 		const progressPercent = line.getAttribute(`${this.pfx}-progressPercent`)
 			|| this.progressPercent;
+		const typeDelay = line.getAttribute(`${this.pfx}-typeDelay`)
+			|| this.typeDelay;
         line.textContent = '';
         this.container.appendChild(line);
 
         for (let i = 1; i < chars.length + 1; i++) {
-            await this._wait(this.typeDelay);
+            await this._wait(typeDelay);
             const percent = Math.round(i / chars.length * 100);
             line.textContent = `${chars.slice(0, i)} ${percent}%`;
 			if (percent>progressPercent) {

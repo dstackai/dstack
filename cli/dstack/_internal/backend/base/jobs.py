@@ -122,11 +122,14 @@ def run_job(
     secrets_manager: SecretsManager,
     job: Job,
     failed_to_start_job_new_status: JobStatus,
+    project_private_key: str,
     offer: Optional[InstanceOffer] = None,
 ):
     try:
         if job.configuration_type == ConfigurationType.SERVICE:
-            job = gateway.setup_service_job(job, secrets_manager)
+            job = gateway.setup_service_job(
+                job, secrets_manager, project_private_key=project_private_key
+            )
             update_job(storage, job)
 
         _try_run_job(

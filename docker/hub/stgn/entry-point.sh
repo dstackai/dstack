@@ -1,7 +1,9 @@
 #!/bin/bash
 set -e
 
-pip3 install -i https://test.pypi.org/simple/ --extra-index-url https://pypi.org/simple "dstack[all]==$DSTACK_VERSION" --progress-bar off
+mkdir -p "${HOME}/.dstack/tmp"
+curl "https://dstack-cli-downloads-stgn.s3.eu-west-1.amazonaws.com/dstack-${DSTACK_VERSION}-py3-none-any.whl" --output "${HOME}/.dstack/tmp/dstack-${DSTACK_VERSION}-py3-none-any.whl"
+pip3 install "${HOME}/.dstack/tmp/dstack-${DSTACK_VERSION}-py3-none-any.whl[all]" --progress-bar off
 
 if [ -n "${GOOGLE_APPLICATION_CREDENTIALS_JSON}" ]; then
   GOOGLE_APPLICATION_CREDENTIALS_DIR="${HOME}/.config/gcloud/"

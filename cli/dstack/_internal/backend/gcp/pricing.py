@@ -68,10 +68,6 @@ class GCPPricing(Pricing):
             self._fetch_families()
 
         for instance in instances:
-            region_zones = defaultdict(list)
-            for zone in instance.available_regions:
-                region_zones[zone[:-2]].append(zone)
-
             vm_family = instance.instance_name.split("-")[0]
             gpu_family = None if not instance.resources.gpus else instance.resources.gpus[0].name
             region_spots = self.family_cache["core"].get(vm_family, {}).keys()
@@ -92,8 +88,7 @@ class GCPPricing(Pricing):
                         * self.family_cache["gpu"][gpu_family][region_spot]
                     )
                 region, is_spot = region_spot
-                for zone in region_zones[region]:
-                    self.registry[self.instance_key(instance)][(zone, is_spot)] = cost
+                self.registry[self.instance_key(instance)][(region, is_spot)] = cost
 
     @classmethod
     def instance_key(cls, instance: InstanceType) -> str:

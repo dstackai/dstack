@@ -22,11 +22,11 @@ Here's the list of environment variables which you can override:
 
 - `DSTACK_SERVER_ADMIN_TOKEN` – (Optional) The default token of the `admin` user. By default, it's generated randomly
   at the first startup.
-- `DSTACK_SERVER_DATA` – (Optional) The path to the directory where the `dstack`server stores the state. Defaults to `~/.dstack/server`.
+- `DSTACK_SERVER_DIR` – (Optional) The path to the directory where the `dstack`server stores the state. Defaults to `~/.dstack/server`.
 
 ## Persisting state in a cloud storage
 
-By default, `dstack` saves state in a local directory (see `DSTACK_SERVER_DATA`).
+By default, `dstack` saves state in a local directory (`$DSTACK_SERVER_DIR/data`).
 If you want to persist state automatically to a cloud object storage, you can configure the following environment
 variables.
 

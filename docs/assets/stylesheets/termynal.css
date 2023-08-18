@@ -7,13 +7,18 @@
  */
 
 :root {
-    --color-bg: rgb(30, 35, 45);
+    --color-bg: rgb(21, 22, 29);
     --color-text: #eee;
     --color-text-subtle: #a2a2a2;
 }
 
 [data-termynal] span {
     white-space: pre;
+}
+
+.small > [data-termynal] {
+    font-size: 14px;
+    line-height: 1.4;
 }
 
 [data-termynal] {

@@ -124,6 +124,7 @@ class GCPCompute(Compute):
             configured_regions=self.gcp_config.regions,
         )
         for zone in zones:
+            region = zone[:-2]
             instance_types = _list_instance_types(
                 machine_types_client=self.machine_types_client,
                 project_id=self.gcp_config.project_id,
@@ -134,7 +135,8 @@ class GCPCompute(Compute):
                 if i.instance_name not in instances:
                     instances[i.instance_name] = i
                     i.available_regions = []
-                instances[i.instance_name].available_regions.append(zone)
+                if region not in instances[i.instance_name].available_regions:
+                    instances[i.instance_name].available_regions.append(region)
 
             n1_instance_types = _list_instance_types(
                 machine_types_client=self.machine_types_client,
@@ -160,13 +162,23 @@ class GCPCompute(Compute):
                 if name not in instances:
                     instances[name] = i
                     i.available_regions = []
-                instances[name].available_regions.append(zone)
+                if region not in instances[name].available_regions:
+                    instances[name].available_regions.append(region)
         self._supported_instances_cache = list(instances.values())
         return self._supported_instances_cache
 
     def run_instance(
         self, job: Job, instance_type: InstanceType, region: Optional[str] = None
     ) -> LaunchedInstanceInfo:
+        zones = _get_zones(
+            regions_client=self.regions_client,
+            project_id=self.gcp_config.project_id,
+            primary_region=region or self.gcp_config.region,
+            primary_zone=self.gcp_config.zone,  # doesn't matter if zone is not from the region
+            extra_regions=[],  # regions are managed at the project level
+        )
+        # Note: not all zones in the region may offer the chosen instance type,
+        # for now, just treat NotFound error as NoCapacity
         return _run_instance(
             instances_client=self.instances_client,
             firewalls_client=self.firewalls_client,
@@ -175,7 +187,7 @@ class GCPCompute(Compute):
             gcp_config=self.gcp_config,
             job=job,
             instance_type=instance_type,
-            zone=region or self.gcp_config.zone,
+            zones=zones,
         )
 
     def restart_instance(self, job: Job):
@@ -598,50 +610,51 @@ def _run_instance(
     gcp_config: GCPConfig,
     job: Job,
     instance_type: InstanceType,
-    zone: str,
+    zones: List[str],
 ) -> LaunchedInstanceInfo:
-    try:
-        logger.info(
-            "Requesting %s %s instance in %s...",
-            instance_type.instance_name,
-            "spot" if job.requirements.spot else "",
-            zone,
-        )
-        instance = _launch_instance(
-            instances_client=instances_client,
-            firewalls_client=firewalls_client,
-            project_id=gcp_config.project_id,
-            zone=zone,
-            network=_get_network_resource(gcp_config.vpc),
-            subnet=_get_subnet_resource(gcp_utils.get_zone_region(zone), gcp_config.subnet),
-            machine_type=instance_type.instance_name,
-            image_name=_get_image_name(
-                images_client=images_client,
-                instance_type=instance_type,
-            ),
-            instance_name=job.instance_name,
-            user_data_script=_get_user_data_script(
-                gcp_config=_config_with_zone(gcp_config, zone),
-                job=job,
-                instance_type=instance_type,
-            ),
-            service_account=credentials.service_account_email,
-            spot=instance_type.resources.spot,
-            accelerators=_get_accelerator_configs(
+    for zone in zones:
+        try:
+            logger.info(
+                "Requesting %s %s instance in %s...",
+                instance_type.instance_name,
+                "spot" if job.requirements.spot else "",
+                zone,
+            )
+            instance = _launch_instance(
+                instances_client=instances_client,
+                firewalls_client=firewalls_client,
                 project_id=gcp_config.project_id,
                 zone=zone,
-                instance_type=instance_type,
-            ),
-            labels=_get_labels(
-                bucket=gcp_config.bucket_name,
-                job=job,
-            ),
-            ssh_key_pub=job.ssh_key_pub,
-        )
-        logger.info("Request succeeded")
-        return LaunchedInstanceInfo(request_id=instance.name, location=zone)
-    except NoCapacityError:
-        logger.info("Failed to request instance in %s", zone)
+                network=_get_network_resource(gcp_config.vpc),
+                subnet=_get_subnet_resource(gcp_utils.get_zone_region(zone), gcp_config.subnet),
+                machine_type=instance_type.instance_name,
+                image_name=_get_image_name(
+                    images_client=images_client,
+                    instance_type=instance_type,
+                ),
+                instance_name=job.instance_name,
+                user_data_script=_get_user_data_script(
+                    gcp_config=_config_with_zone(gcp_config, zone),
+                    job=job,
+                    instance_type=instance_type,
+                ),
+                service_account=credentials.service_account_email,
+                spot=instance_type.resources.spot,
+                accelerators=_get_accelerator_configs(
+                    project_id=gcp_config.project_id,
+                    zone=zone,
+                    instance_type=instance_type,
+                ),
+                labels=_get_labels(
+                    bucket=gcp_config.bucket_name,
+                    job=job,
+                ),
+                ssh_key_pub=job.ssh_key_pub,
+            )
+            logger.info("Request succeeded")
+            return LaunchedInstanceInfo(request_id=instance.name, location=zone)
+        except NoCapacityError:
+            logger.info("Failed to request instance in %s", zone)
     raise NoCapacityError()
 
 
@@ -879,7 +892,7 @@ def _create_instance(
     operation = instances_client.insert(request=request)
     try:
         gcp_utils.wait_for_extended_operation(operation, "instance creation")
-    except google.api_core.exceptions.ServiceUnavailable:
+    except (google.api_core.exceptions.ServiceUnavailable, google.api_core.exceptions.NotFound):
         raise NoCapacityError()
 
     return instances_client.get(project=project_id, zone=zone, instance=instance_name)
