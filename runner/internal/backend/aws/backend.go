@@ -223,7 +223,7 @@ func (s *AWSBackend) CreateLogger(ctx context.Context, logGroup, logName string)
 		log.Trace(ctx, "Create Cloudwatch")
 		s.logger, err = NewCloudwatch(&Config{
 			JobID:         s.State.Job.JobID,
-			Region:        s.region,
+			Region:        DEFAULT_REGION,
 			FlushInterval: 200 * time.Millisecond,
 		})
 		if err != nil {
