@@ -8,7 +8,6 @@ import {
     FormMultiselectOptions,
     FormS3BucketSelector,
     FormSelect,
-    FormSelectOptions,
     InfoLink,
     SpaceBetween,
     Spinner,
@@ -20,16 +19,7 @@ import { isRequestFormErrors2, isRequestFormFieldError } from 'libs';
 import { useBackendValuesMutation } from 'services/backend';
 import { GCPCredentialTypeEnum } from 'types';
 
-import {
-    ADDITIONAL_REGIONS_HELP,
-    AREA_HELP,
-    BUCKET_HELP,
-    FIELD_NAMES,
-    REGION_HELP,
-    SERVICE_ACCOUNT_HELP,
-    SUBNET_HELP,
-    ZONE_HELP,
-} from './constants';
+import { BUCKET_HELP, FIELD_NAMES, REGIONS_HELP, SERVICE_ACCOUNT_HELP, SUBNET_HELP } from './constants';
 
 import { IProps, VPCSubnetOption } from './types';
 
@@ -38,11 +28,8 @@ import styles from './styles.module.scss';
 const FIELDS_QUEUE = [
     FIELD_NAMES.CREDENTIALS.TYPE,
     FIELD_NAMES.CREDENTIALS.DATA,
-    FIELD_NAMES.AREA,
-    FIELD_NAMES.REGION,
-    FIELD_NAMES.ZONE,
+    FIELD_NAMES.REGIONS,
     FIELD_NAMES.BUCKET_NAME,
-    FIELD_NAMES.VPC_SUBNET,
     FIELD_NAMES.VPC,
     FIELD_NAMES.SUBNET,
 ];
@@ -59,12 +46,9 @@ export const GCPBackend: React.FC<IProps> = ({ loading }) => {
     } = useFormContext();
     const [files, setFiles] = useState<File[]>([]);
     const [valuesData, setValuesData] = useState<IGCPBackendValues | undefined>();
-    const [areaOptions, setAreaOptions] = useState<FormSelectOptions>([]);
-    const [regionOptions, setRegionOptions] = useState<FormSelectOptions>([]);
-    const [zoneOptions, setZoneOptions] = useState<FormSelectOptions>([]);
+    const [regionsOptions, setRegionsOptions] = useState<FormMultiselectOptions>([]);
     const [bucketNameOptions, setBucketNameOptions] = useState<TAwsBucket[]>([]);
     const [subnetOptions, setSubnetOptions] = useState<VPCSubnetOption[]>([]);
-    const [extraRegions, setExtraRegions] = useState<FormMultiselectOptions>([]);
     const [availableDefaultCredentials, setAvailableDefaultCredentials] = useState<boolean | null>(null);
     const requestRef = useRef<null | ReturnType<typeof getBackendValues>>(null);
     const [pushNotification] = useNotifications();
@@ -116,28 +100,12 @@ export const GCPBackend: React.FC<IProps> = ({ loading }) => {
                 if (response.default_credentials) changeFormHandler().catch(console.log);
             }
 
-            if (response.area?.values) {
-                setAreaOptions(response.area.values);
+            if (response.regions?.values) {
+                setRegionsOptions(response.regions.values);
             }
 
-            if (response.area?.selected !== undefined) {
-                setValue(FIELD_NAMES.AREA, response.area.selected);
-            }
-
-            if (response.region?.values) {
-                setRegionOptions(response.region.values);
-            }
-
-            if (response.region?.selected !== undefined) {
-                setValue(FIELD_NAMES.REGION, response.region.selected);
-            }
-
-            if (response.zone?.values) {
-                setZoneOptions(response.zone.values);
-            }
-
-            if (response.zone?.selected !== undefined) {
-                setValue(FIELD_NAMES.ZONE, response.zone.selected);
+            if (response.regions?.selected !== undefined) {
+                setValue(FIELD_NAMES.REGIONS, response.regions.selected);
             }
 
             if (response.bucket_name?.values) {
@@ -173,14 +141,6 @@ export const GCPBackend: React.FC<IProps> = ({ loading }) => {
                     vpc: valueItem.vpc,
                     subnet: valueItem.subnet,
                 });
-            }
-
-            if (response.extra_regions?.values) {
-                setExtraRegions(response.extra_regions.values);
-            }
-
-            if (response.extra_regions?.selected !== undefined) {
-                setValue(FIELD_NAMES.EXTRA_REGIONS, response.extra_regions.selected);
             }
         } catch (errorResponse) {
             console.log('fetch backends values error:', errorResponse);
@@ -226,25 +186,36 @@ export const GCPBackend: React.FC<IProps> = ({ loading }) => {
         changeFormHandler().catch(console.log);
     };
 
-    const clearFieldByQueueFromField = (name: string) => {
-        const startIndex = FIELDS_QUEUE.findIndex((i) => i === name);
-
-        if (startIndex < 0) return;
-
-        for (let i = startIndex + 1; i < FIELDS_QUEUE.length; i++) {
+    const clearFields = (startIndex: number) => {
+        for (let i = startIndex; i < FIELDS_QUEUE.length; i++) {
             setValue(FIELDS_QUEUE[i], null);
         }
     };
 
+    const clearFieldByQueueFromField = (name: string) => {
+        const startIndex = FIELDS_QUEUE.findIndex((i) => i === name);
+        if (startIndex < 0) return;
+        clearFields(startIndex + 1);
+    };
+
     const getOnChangeSelectFormField = (fieldName: string) => () => {
         lastUpdatedField.current = fieldName;
-        clearFieldByQueueFromField(fieldName);
         onChangeFormField();
     };
 
     const setVPCSubnetFormValue = ({ vpc, subnet }: { vpc: string; subnet: string }) => {
         setValue(FIELD_NAMES.VPC, vpc);
         setValue(FIELD_NAMES.SUBNET, subnet);
+    };
+
+    const onChangeCredentialsTypeField = () => {
+        clearFieldByQueueFromField(FIELD_NAMES.CREDENTIALS.TYPE);
+        onChangeFormField();
+    };
+
+    const onChangeCredentialField = () => {
+        clearFieldByQueueFromField(FIELD_NAMES.CREDENTIALS.DATA);
+        onChangeFormField();
     };
 
     const onChangeVPCSubnet = () => {
@@ -271,14 +242,8 @@ export const GCPBackend: React.FC<IProps> = ({ loading }) => {
         disabledField = disabledField || (lastUpdatedField.current !== fieldName && isLoadingValues);
 
         switch (fieldName) {
-            case FIELD_NAMES.AREA:
-                disabledField = disabledField || !areaOptions.length;
-                break;
-            case FIELD_NAMES.REGION:
-                disabledField = disabledField || !regionOptions.length;
-                break;
-            case FIELD_NAMES.ZONE:
-                disabledField = disabledField || !zoneOptions.length;
+            case FIELD_NAMES.REGIONS:
+                disabledField = disabledField || !regionsOptions.length;
                 break;
             case FIELD_NAMES.VPC_SUBNET:
                 disabledField = disabledField || !subnetOptions.length;
@@ -304,7 +269,7 @@ export const GCPBackend: React.FC<IProps> = ({ loading }) => {
                     label={t('projects.edit.gcp.authorization')}
                     control={control}
                     name={FIELD_NAMES.CREDENTIALS.TYPE}
-                    onChange={onChangeFormField}
+                    onChange={onChangeCredentialsTypeField}
                     // eslint-disable-next-line @typescript-eslint/ban-ts-comment
                     // @ts-ignore
                     errorText={errors?.credentials?.message}
@@ -347,7 +312,7 @@ export const GCPBackend: React.FC<IProps> = ({ loading }) => {
                                     if (text) {
                                         setValue(FIELD_NAMES.CREDENTIALS.DATA, text);
                                         setValue(FIELD_NAMES.CREDENTIALS.FILENAME, file.name);
-                                        onChangeFormField();
+                                        onChangeCredentialField();
                                     }
                                 };
 
@@ -357,44 +322,16 @@ export const GCPBackend: React.FC<IProps> = ({ loading }) => {
                     />
                 )}
 
-                <FormSelect
-                    info={<InfoLink onFollow={() => openHelpPanel(AREA_HELP)} />}
-                    label={t('projects.edit.gcp.area')}
-                    description={t('projects.edit.gcp.area_description')}
-                    placeholder={t('projects.edit.gcp.area_placeholder')}
+                <FormMultiselect
+                    info={<InfoLink onFollow={() => openHelpPanel(REGIONS_HELP)} />}
+                    label={t('projects.edit.gcp.regions')}
+                    description={t('projects.edit.gcp.regions_description')}
+                    placeholder={t('projects.edit.gcp.regions_placeholder')}
                     control={control}
-                    name={FIELD_NAMES.AREA}
-                    options={areaOptions}
-                    onChange={getOnChangeSelectFormField(FIELD_NAMES.AREA)}
-                    disabled={getDisabledByFieldName(FIELD_NAMES.AREA)}
-                    rules={{ required: t('validation.required') }}
-                    secondaryControl={renderSpinner()}
-                />
-
-                <FormSelect
-                    info={<InfoLink onFollow={() => openHelpPanel(REGION_HELP)} />}
-                    label={t('projects.edit.gcp.region')}
-                    description={t('projects.edit.gcp.region_description')}
-                    placeholder={t('projects.edit.gcp.region_placeholder')}
-                    control={control}
-                    name={FIELD_NAMES.REGION}
-                    options={regionOptions}
-                    onChange={getOnChangeSelectFormField(FIELD_NAMES.REGION)}
-                    disabled={getDisabledByFieldName(FIELD_NAMES.REGION)}
-                    rules={{ required: t('validation.required') }}
-                    secondaryControl={renderSpinner()}
-                />
-
-                <FormSelect
-                    info={<InfoLink onFollow={() => openHelpPanel(ZONE_HELP)} />}
-                    label={t('projects.edit.gcp.zone')}
-                    description={t('projects.edit.gcp.zone_description')}
-                    placeholder={t('projects.edit.gcp.zone_placeholder')}
-                    control={control}
-                    name={FIELD_NAMES.ZONE}
-                    options={zoneOptions}
-                    onChange={getOnChangeSelectFormField(FIELD_NAMES.ZONE)}
-                    disabled={getDisabledByFieldName(FIELD_NAMES.ZONE)}
+                    name={FIELD_NAMES.REGIONS}
+                    options={regionsOptions}
+                    onChange={getOnChangeSelectFormField(FIELD_NAMES.REGIONS)}
+                    disabled={getDisabledByFieldName(FIELD_NAMES.REGIONS)}
                     rules={{ required: t('validation.required') }}
                     secondaryControl={renderSpinner()}
                 />
@@ -430,19 +367,6 @@ export const GCPBackend: React.FC<IProps> = ({ loading }) => {
                     disabled={getDisabledByFieldName(FIELD_NAMES.VPC_SUBNET)}
                     rules={{ required: t('validation.required') }}
                     secondaryControl={renderSpinner()}
-                />
-
-                <FormMultiselect
-                    info={<InfoLink onFollow={() => openHelpPanel(ADDITIONAL_REGIONS_HELP)} />}
-                    label={t('projects.edit.gcp.extra_regions')}
-                    description={t('projects.edit.gcp.extra_regions_description')}
-                    placeholder={t('projects.edit.gcp.extra_regions_placeholder')}
-                    control={control}
-                    name={FIELD_NAMES.EXTRA_REGIONS}
-                    onChange={getOnChangeSelectFormField(FIELD_NAMES.EXTRA_REGIONS)}
-                    disabled={getDisabledByFieldName(FIELD_NAMES.EXTRA_REGIONS)}
-                    secondaryControl={renderSpinner()}
-                    options={extraRegions}
                 />
             </SpaceBetween>
         </>

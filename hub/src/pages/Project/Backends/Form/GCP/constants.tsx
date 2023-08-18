@@ -6,14 +6,11 @@ export const FIELD_NAMES = {
         FILENAME: 'credentials.filename',
         DATA: 'credentials.data',
     },
-    AREA: 'area',
-    REGION: 'region',
-    ZONE: 'zone',
+    REGIONS: 'regions',
     BUCKET_NAME: 'bucket_name',
     VPC_SUBNET: 'vpc_subnet',
     VPC: 'vpc',
     SUBNET: 'subnet',
-    EXTRA_REGIONS: 'extra_regions',
 };
 
 export const SERVICE_ACCOUNT_HELP = {
@@ -59,40 +56,15 @@ export const SERVICE_ACCOUNT_HELP = {
     ),
 };
 
-export const AREA_HELP = {
-    header: <h2>Location</h2>,
+export const REGIONS_HELP = {
+    header: <h2>Regions</h2>,
     body: (
         <>
             <p>
-                Select a <i>Location</i> to see the available <i>Regions</i> and <i>Zones</i>.
-            </p>
-        </>
-    ),
-};
-
-export const REGION_HELP = {
-    header: <h2>Region</h2>,
-    body: (
-        <>
-            <p>
-                Select a <i>Region</i> that <i>dstack Hub</i> will use to create resources in your GCP account.
+                Select <i>Regions</i> that <i>dstack Hub</i> will use to create resources in your GCP account.
             </p>
             <p>
-                The selected <i>Region</i> will be used to run workflows and store artifacts.
-            </p>
-        </>
-    ),
-};
-
-export const ZONE_HELP = {
-    header: <h2>Zone</h2>,
-    body: (
-        <>
-            <p>
-                Select a <i>Zone</i> that <i>dstack Hub</i> will use to create resources in your GCP account.
-            </p>
-            <p>
-                The selected <i>Zone</i> will be used to run workflows and store artifacts.
+                The selected <i>Regions</i> will be used to run workflows and store artifacts.
             </p>
         </>
     ),
@@ -121,18 +93,6 @@ export const SUBNET_HELP = {
             <p>
                 Select a <i>Subnet</i> to run workflows in. If no Subnet is specified, <i>dstack Hub</i> will use the default{' '}
                 <i>Subnet</i> configured in your AWS account.
-            </p>
-        </>
-    ),
-};
-
-export const ADDITIONAL_REGIONS_HELP = {
-    header: <h2>Additional regions</h2>,
-    body: (
-        <>
-            <p>
-                dstack will try to provision the instance in additional regions if the primary region has no capacity.{' '}
-                Specifying additional regions increases the chances of provisioning spot instances.
             </p>
         </>
     ),

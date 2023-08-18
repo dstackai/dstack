@@ -121,9 +121,7 @@ class GCPCompute(Compute):
         zones = _get_zones(
             regions_client=self.regions_client,
             project_id=self.gcp_config.project_id,
-            primary_region=self.gcp_config.region,
-            primary_zone=self.gcp_config.zone,
-            extra_regions=self.gcp_config.extra_regions,
+            configured_regions=self.gcp_config.regions,
         )
         for zone in zones:
             region = zone[:-2]
@@ -170,14 +168,12 @@ class GCPCompute(Compute):
         return self._supported_instances_cache
 
     def run_instance(
-        self, job: Job, instance_type: InstanceType, region: Optional[str] = None
+        self, job: Job, instance_type: InstanceType, region: str
     ) -> LaunchedInstanceInfo:
         zones = _get_zones(
             regions_client=self.regions_client,
             project_id=self.gcp_config.project_id,
-            primary_region=region or self.gcp_config.region,
-            primary_zone=self.gcp_config.zone,  # doesn't matter if zone is not from the region
-            extra_regions=[],  # regions are managed at the project level
+            configured_regions=[region],
         )
         # Note: not all zones in the region may offer the chosen instance type,
         # for now, just treat NotFound error as NoCapacity
@@ -663,18 +659,15 @@ def _run_instance(
 def _get_zones(
     regions_client: compute_v1.RegionsClient,
     project_id: str,
-    primary_region: str,
-    primary_zone: str,
-    extra_regions: List[str],
+    configured_regions: List[str],
 ) -> List[str]:
     regions = regions_client.list(project=project_id)
-    region_name_to_zones_map = {
-        r.name: [gcp_utils.get_resource_name(z) for z in r.zones] for r in regions
-    }
-    zones = region_name_to_zones_map[primary_region]
-    zones = sorted(zones, key=lambda x: x != primary_zone)
-    for extra_region in extra_regions:
-        zones += region_name_to_zones_map[extra_region]
+    zones = [
+        gcp_utils.get_resource_name(z)
+        for r in regions
+        for z in r.zones
+        if r.name in configured_regions
+    ]
     return zones
 
 

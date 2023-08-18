@@ -8,9 +8,8 @@ export const FIELD_NAMES = {
         CLIENT_SECRET: 'credentials.client_secret',
     },
     SUBSCRIPTION_ID: 'subscription_id',
-    LOCATION: 'location',
+    LOCATIONS: 'locations',
     STORAGE_ACCOUNT: 'storage_account',
-    EXTRA_LOCATIONS: 'extra_locations',
 };
 
 export const CREDENTIALS_HELP = {
@@ -36,15 +35,15 @@ export const SUBSCRIPTION_HELP = {
     ),
 };
 
-export const LOCATION_HELP = {
-    header: <h2>Location</h2>,
+export const LOCATIONS_HELP = {
+    header: <h2>Locations</h2>,
     body: (
         <>
             <p>
-                Select a <i>Location</i> that <i>dstack Hub</i> will use to create resources in your Azure account.
+                Select <i>Locations</i> that <i>dstack Hub</i> will use to create resources in your Azure account.
             </p>
             <p>
-                The selected <i>Location</i> will be used to run workflows and store artifacts.
+                The selected <i>Locations</i> will be used to run workflows and store artifacts.
             </p>
         </>
     ),
@@ -61,18 +60,6 @@ export const STORAGE_ACCOUNT_HELP = {
             <p>
                 <i>dstack Hub</i> will create all the Azure resource in the resource group of the specified{' '}
                 <i>Storage account</i>.
-            </p>
-        </>
-    ),
-};
-
-export const ADDITIONAL_LOCATIONS_HELP = {
-    header: <h2>Additional locations</h2>,
-    body: (
-        <>
-            <p>
-                dstack will try to provision the instance in additional locations if the primary location has no capacity.{' '}
-                Specifying additional location increases the chances of provisioning spot instances.
             </p>
         </>
     ),

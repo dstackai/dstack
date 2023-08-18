@@ -9,25 +9,26 @@ from dstack._internal.backend.base.config import BackendConfig
 class GCPConfig(BackendConfig, BaseModel):
     backend: Literal["gcp"] = "gcp"
     project_id: str
-    region: str
-    zone: str
+    regions: List[str]
     bucket_name: str
     vpc: str
     subnet: str
-    extra_regions: List[str] = []
     credentials_file: Optional[str] = None
     credentials: Optional[Dict] = None
+    # dynamically set
+    region: Optional[str]
+    zone: Optional[str]
 
     def serialize(self) -> Dict:
         res = {
             "backend": "gcp",
             "project": self.project_id,
-            "region": self.region,
-            "zone": self.zone,
+            "regions": self.regions,
             "bucket": self.bucket_name,
             "vpc": self.vpc,
             "subnet": self.subnet,
-            "extra_regions": self.extra_regions,
+            "region": self.region,
+            "zone": self.zone,
         }
         if self.credentials_file is not None:
             res["credentials_file"] = self.credentials_file

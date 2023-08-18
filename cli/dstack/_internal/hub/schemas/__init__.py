@@ -43,19 +43,15 @@ class LocalBackendConfig(BaseModel):
 
 class AWSBackendConfigPartial(BaseModel):
     type: Literal["aws"] = "aws"
-    region_name: Optional[str]
-    region_name_title: Optional[str]
-    extra_regions: Optional[List[str]]
     s3_bucket_name: Optional[str]
+    regions: Optional[List[str]]
     ec2_subnet_id: Optional[str]
 
 
 class AWSBackendConfig(BaseModel):
     type: Literal["aws"] = "aws"
-    region_name: str
-    region_name_title: Optional[str]
-    extra_regions: List[str] = []
     s3_bucket_name: str
+    regions: List[str]
     ec2_subnet_id: Optional[str]
 
 
@@ -85,24 +81,18 @@ class AWSBackendConfigWithCreds(AWSBackendConfig):
 
 class GCPBackendConfigPartial(BaseModel):
     type: Literal["gcp"] = "gcp"
-    area: Optional[str]
-    region: Optional[str]
-    zone: Optional[str]
     bucket_name: Optional[str]
+    regions: Optional[List[str]]
     vpc: Optional[str]
     subnet: Optional[str]
-    extra_regions: Optional[List[str]]
 
 
 class GCPBackendConfig(BaseModel):
     type: Literal["gcp"] = "gcp"
-    area: str
-    region: str
-    zone: str
     bucket_name: str
+    regions: List[str]
     vpc: str
     subnet: str
-    extra_regions: List[str] = []
 
 
 class GCPBackendDefaultCreds(BaseModel):
@@ -133,9 +123,8 @@ class AzureBackendConfigPartial(BaseModel):
     type: Literal["azure"] = "azure"
     tenant_id: Optional[str]
     subscription_id: Optional[str]
-    location: Optional[str]
     storage_account: Optional[str]
-    extra_locations: Optional[List[str]]
+    locations: Optional[List[str]]
 
 
 class AzureBackendClientCreds(BaseModel):
@@ -162,9 +151,8 @@ class AzureBackendConfig(BaseModel):
     type: Literal["azure"] = "azure"
     tenant_id: str
     subscription_id: str
-    location: str
     storage_account: str
-    extra_locations: List[str] = []
+    locations: List[str]
 
 
 class AzureBackendConfigWithCreds(AzureBackendConfig):
@@ -274,8 +262,7 @@ class AWSBucketBackendElement(BaseModel):
 class AWSBackendValues(BaseModel):
     type: Literal["aws"] = "aws"
     default_credentials: bool = False
-    region_name: Optional[BackendElement]
-    extra_regions: Optional[BackendMultiElement]
+    regions: Optional[BackendMultiElement]
     s3_bucket_name: Optional[AWSBucketBackendElement]
     ec2_subnet_id: Optional[BackendElement]
 
@@ -294,12 +281,9 @@ class GCPVPCSubnetBackendElement(BaseModel):
 class GCPBackendValues(BaseModel):
     type: Literal["gcp"] = "gcp"
     default_credentials: bool = False
-    area: Optional[BackendElement]
-    region: Optional[BackendElement]
-    zone: Optional[BackendElement]
     bucket_name: Optional[BackendElement]
+    regions: Optional[BackendMultiElement]
     vpc_subnet: Optional[GCPVPCSubnetBackendElement]
-    extra_regions: Optional[BackendMultiElement]
 
 
 class AzureBackendValues(BaseModel):
@@ -307,9 +291,8 @@ class AzureBackendValues(BaseModel):
     default_credentials: bool = False
     tenant_id: Optional[BackendElement]
     subscription_id: Optional[BackendElement]
-    location: Optional[BackendElement]
     storage_account: Optional[BackendElement]
-    extra_locations: Optional[BackendMultiElement]
+    locations: Optional[BackendMultiElement]
 
 
 class AWSStorageBackendValues(BaseModel):

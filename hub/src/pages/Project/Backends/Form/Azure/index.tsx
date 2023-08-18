@@ -20,20 +20,13 @@ import { isRequestFormErrors2, isRequestFormFieldError } from 'libs';
 import { useBackendValuesMutation } from 'services/backend';
 import { AzureCredentialTypeEnum } from 'types';
 
-import {
-    ADDITIONAL_LOCATIONS_HELP,
-    CREDENTIALS_HELP,
-    FIELD_NAMES,
-    LOCATION_HELP,
-    STORAGE_ACCOUNT_HELP,
-    SUBSCRIPTION_HELP,
-} from './constants';
+import { CREDENTIALS_HELP, FIELD_NAMES, LOCATIONS_HELP, STORAGE_ACCOUNT_HELP, SUBSCRIPTION_HELP } from './constants';
 
 import { IProps } from './types';
 
 import styles from './styles.module.scss';
 
-const FIELDS_QUEUE = [FIELD_NAMES.SUBSCRIPTION_ID, FIELD_NAMES.LOCATION, FIELD_NAMES.STORAGE_ACCOUNT];
+const FIELDS_QUEUE = [FIELD_NAMES.SUBSCRIPTION_ID, FIELD_NAMES.LOCATIONS, FIELD_NAMES.STORAGE_ACCOUNT];
 
 export const AzureBackend: React.FC<IProps> = ({ loading }) => {
     const { t } = useTranslation();
@@ -42,9 +35,8 @@ export const AzureBackend: React.FC<IProps> = ({ loading }) => {
     const [valuesData, setValuesData] = useState<IAzureBackendValues | undefined>();
     const [subscriptionIds, setSubscriptionIds] = useState<FormSelectOptions>([]);
     const [tenantIds, setTenantIds] = useState<FormSelectOptions>([]);
-    const [locations, setLocations] = useState<FormSelectOptions>([]);
+    const [locations, setLocations] = useState<FormMultiselectOptions>([]);
     const [storageAccounts, setStorageAccounts] = useState<FormSelectOptions>([]);
-    const [extraLocations, setExtraLocations] = useState<FormMultiselectOptions>([]);
     const [availableDefaultCredentials, setAvailableDefaultCredentials] = useState<boolean | null>(null);
     const lastUpdatedField = useRef<string | null>(null);
     const isFirstRender = useRef<boolean>(true);
@@ -114,25 +106,17 @@ export const AzureBackend: React.FC<IProps> = ({ loading }) => {
             if (response.subscription_id?.selected !== undefined) {
                 setValue(FIELD_NAMES.SUBSCRIPTION_ID, response.subscription_id.selected);
             }
-            if (response.location?.values) {
-                setLocations(response.location.values);
+            if (response.locations?.values) {
+                setLocations(response.locations.values);
             }
-            if (response.location?.selected !== undefined) {
-                setValue(FIELD_NAMES.LOCATION, response.location.selected);
+            if (response.locations?.selected !== undefined) {
+                setValue(FIELD_NAMES.LOCATIONS, response.locations.selected);
             }
             if (response.storage_account?.values) {
                 setStorageAccounts(response.storage_account.values);
             }
             if (response.storage_account?.selected !== undefined) {
                 setValue(FIELD_NAMES.STORAGE_ACCOUNT, response.storage_account.selected);
-            }
-
-            if (response.extra_locations?.values) {
-                setExtraLocations(response.extra_locations.values);
-            }
-
-            if (response.extra_locations?.selected !== undefined) {
-                setValue(FIELD_NAMES.EXTRA_LOCATIONS, response.extra_locations.selected);
             }
         } catch (errorResponse) {
             console.log('fetch backends values error:', errorResponse);
@@ -176,12 +160,6 @@ export const AzureBackend: React.FC<IProps> = ({ loading }) => {
         changeFormHandler().catch(console.log);
     };
 
-    const clearFieldByQueueFromField = (name: string) => {
-        const fieldIndex = FIELDS_QUEUE.findIndex((i) => i === name);
-        if (fieldIndex < 0) return;
-        clearFields(fieldIndex + 1);
-    };
-
     const clearFields = (startIndex: number) => {
         for (let i = startIndex; i < FIELDS_QUEUE.length; i++) {
             setValue(FIELDS_QUEUE[i], null);
@@ -190,7 +168,6 @@ export const AzureBackend: React.FC<IProps> = ({ loading }) => {
 
     const getOnChangeSelectField = (fieldName: string) => () => {
         lastUpdatedField.current = fieldName;
-        clearFieldByQueueFromField(fieldName);
         if (requestRef.current) requestRef.current.abort();
         changeFormHandler().catch(console.log);
     };
@@ -218,11 +195,11 @@ export const AzureBackend: React.FC<IProps> = ({ loading }) => {
             case FIELD_NAMES.SUBSCRIPTION_ID:
                 disabledField = disabledField || !subscriptionIds.length;
                 break;
-            case FIELD_NAMES.LOCATION:
+            case FIELD_NAMES.LOCATIONS:
                 disabledField = disabledField || !locations.length;
                 break;
             case FIELD_NAMES.STORAGE_ACCOUNT:
-                disabledField = disabledField || !getValues().location;
+                disabledField = disabledField || !storageAccounts.length;
                 break;
         }
 
@@ -329,18 +306,17 @@ export const AzureBackend: React.FC<IProps> = ({ loading }) => {
                 secondaryControl={renderSpinner()}
             />
 
-            <FormSelect
-                info={<InfoLink onFollow={() => openHelpPanel(LOCATION_HELP)} />}
-                label={t('projects.edit.azure.location')}
-                description={t('projects.edit.azure.location_description')}
-                placeholder={t('projects.edit.azure.location_placeholder')}
+            <FormMultiselect
+                info={<InfoLink onFollow={() => openHelpPanel(LOCATIONS_HELP)} />}
+                label={t('projects.edit.azure.locations')}
+                description={t('projects.edit.azure.locations_description')}
+                placeholder={t('projects.edit.azure.locations_placeholder')}
                 control={control}
-                name={FIELD_NAMES.LOCATION}
-                disabled={getDisabledByFieldName(FIELD_NAMES.LOCATION)}
-                onChange={getOnChangeSelectField(FIELD_NAMES.LOCATION)}
-                options={locations}
-                rules={{ required: t('validation.required') }}
+                name={FIELD_NAMES.LOCATIONS}
+                onChange={getOnChangeSelectField(FIELD_NAMES.LOCATIONS)}
+                disabled={getDisabledByFieldName(FIELD_NAMES.LOCATIONS)}
                 secondaryControl={renderSpinner()}
+                options={locations}
             />
 
             <FormSelect
@@ -354,19 +330,6 @@ export const AzureBackend: React.FC<IProps> = ({ loading }) => {
                 onChange={getOnChangeSelectField(FIELD_NAMES.STORAGE_ACCOUNT)}
                 options={storageAccounts}
                 secondaryControl={renderSpinner()}
-            />
-
-            <FormMultiselect
-                info={<InfoLink onFollow={() => openHelpPanel(ADDITIONAL_LOCATIONS_HELP)} />}
-                label={t('projects.edit.azure.extra_locations')}
-                description={t('projects.edit.azure.extra_locations_description')}
-                placeholder={t('projects.edit.azure.extra_locations_placeholder')}
-                control={control}
-                name={FIELD_NAMES.EXTRA_LOCATIONS}
-                onChange={getOnChangeSelectField(FIELD_NAMES.EXTRA_LOCATIONS)}
-                disabled={getDisabledByFieldName(FIELD_NAMES.EXTRA_LOCATIONS)}
-                secondaryControl={renderSpinner()}
-                options={extraLocations}
             />
         </SpaceBetween>
     );

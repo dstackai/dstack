@@ -27,12 +27,12 @@ class AwsBackend(ComponentBasedBackend):
         self.backend_config = backend_config
         if self.backend_config.credentials is not None:
             self._session = Session(
-                region_name=self.backend_config.region_name,
+                region_name=self.backend_config.region,
                 aws_access_key_id=self.backend_config.credentials.get("access_key"),
                 aws_secret_access_key=self.backend_config.credentials.get("secret_key"),
             )
         else:
-            self._session = Session(region_name=self.backend_config.region_name)
+            self._session = Session(region_name=self.backend_config.region)
         self._storage = AWSStorage(
             s3_client=aws_utils.get_s3_client(self._session),
             bucket_name=self.backend_config.bucket_name,
