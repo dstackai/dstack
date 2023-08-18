@@ -160,12 +160,6 @@ export const AzureBackend: React.FC<IProps> = ({ loading }) => {
         changeFormHandler().catch(console.log);
     };
 
-    const clearFieldByQueueFromField = (name: string) => {
-        const fieldIndex = FIELDS_QUEUE.findIndex((i) => i === name);
-        if (fieldIndex < 0) return;
-        clearFields(fieldIndex + 1);
-    };
-
     const clearFields = (startIndex: number) => {
         for (let i = startIndex; i < FIELDS_QUEUE.length; i++) {
             setValue(FIELDS_QUEUE[i], null);
@@ -174,7 +168,6 @@ export const AzureBackend: React.FC<IProps> = ({ loading }) => {
 
     const getOnChangeSelectField = (fieldName: string) => () => {
         lastUpdatedField.current = fieldName;
-        clearFieldByQueueFromField(fieldName);
         if (requestRef.current) requestRef.current.abort();
         changeFormHandler().catch(console.log);
     };
@@ -206,7 +199,7 @@ export const AzureBackend: React.FC<IProps> = ({ loading }) => {
                 disabledField = disabledField || !locations.length;
                 break;
             case FIELD_NAMES.STORAGE_ACCOUNT:
-                disabledField = disabledField || !getValues().location;
+                disabledField = disabledField || !storageAccounts.length;
                 break;
         }
 

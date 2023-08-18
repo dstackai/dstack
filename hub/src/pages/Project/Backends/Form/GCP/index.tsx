@@ -186,25 +186,36 @@ export const GCPBackend: React.FC<IProps> = ({ loading }) => {
         changeFormHandler().catch(console.log);
     };
 
-    const clearFieldByQueueFromField = (name: string) => {
-        const startIndex = FIELDS_QUEUE.findIndex((i) => i === name);
-
-        if (startIndex < 0) return;
-
-        for (let i = startIndex + 1; i < FIELDS_QUEUE.length; i++) {
+    const clearFields = (startIndex: number) => {
+        for (let i = startIndex; i < FIELDS_QUEUE.length; i++) {
             setValue(FIELDS_QUEUE[i], null);
         }
     };
 
+    const clearFieldByQueueFromField = (name: string) => {
+        const startIndex = FIELDS_QUEUE.findIndex((i) => i === name);
+        if (startIndex < 0) return;
+        clearFields(startIndex + 1);
+    };
+
     const getOnChangeSelectFormField = (fieldName: string) => () => {
         lastUpdatedField.current = fieldName;
-        clearFieldByQueueFromField(fieldName);
         onChangeFormField();
     };
 
     const setVPCSubnetFormValue = ({ vpc, subnet }: { vpc: string; subnet: string }) => {
         setValue(FIELD_NAMES.VPC, vpc);
         setValue(FIELD_NAMES.SUBNET, subnet);
+    };
+
+    const onChangeCredentialsTypeField = () => {
+        clearFieldByQueueFromField(FIELD_NAMES.CREDENTIALS.TYPE);
+        onChangeFormField();
+    };
+
+    const onChangeCredentialField = () => {
+        clearFieldByQueueFromField(FIELD_NAMES.CREDENTIALS.DATA);
+        onChangeFormField();
     };
 
     const onChangeVPCSubnet = () => {
@@ -258,7 +269,7 @@ export const GCPBackend: React.FC<IProps> = ({ loading }) => {
                     label={t('projects.edit.gcp.authorization')}
                     control={control}
                     name={FIELD_NAMES.CREDENTIALS.TYPE}
-                    onChange={onChangeFormField}
+                    onChange={onChangeCredentialsTypeField}
                     // eslint-disable-next-line @typescript-eslint/ban-ts-comment
                     // @ts-ignore
                     errorText={errors?.credentials?.message}
@@ -301,7 +312,7 @@ export const GCPBackend: React.FC<IProps> = ({ loading }) => {
                                     if (text) {
                                         setValue(FIELD_NAMES.CREDENTIALS.DATA, text);
                                         setValue(FIELD_NAMES.CREDENTIALS.FILENAME, file.name);
-                                        onChangeFormField();
+                                        onChangeCredentialField();
                                     }
                                 };
 

@@ -138,14 +138,11 @@ class AzureConfigurator(Configurator):
         self.subscription_id = backend_values.subscription_id.selected
         if self.subscription_id is None:
             return backend_values
-        self.location = backend_values.location.selected
-        if self.location is None:
-            return backend_values
         backend_values.storage_account = self._get_storage_account_element(
             selected=backend_config.storage_account
         )
         backend_values.locations = self._get_locations_element(
-            selected=backend_config.extra_locations or [DEFAULT_LOCATION],
+            selected=backend_config.locations or [DEFAULT_LOCATION],
         )
         return backend_values
 
@@ -154,9 +151,8 @@ class AzureConfigurator(Configurator):
     ) -> Tuple[Dict, Dict]:
         self.tenant_id = backend_config.tenant_id
         self.subscription_id = backend_config.subscription_id
-        self.location = backend_config.location
         self.storage_account = backend_config.storage_account
-        self.extra_locations = backend_config.extra_locations
+        self.locations = backend_config.locations
         if backend_config.credentials.__root__.type == "client":
             self.credential = ClientSecretCredential(
                 tenant_id=backend_config.tenant_id,
@@ -165,7 +161,7 @@ class AzureConfigurator(Configurator):
             )
         else:
             self.credential = DefaultAzureCredential()
-        self.resource_group = self._get_resource_group()
+        self.resource_group, self.location = self._get_resource_group_and_location()
         self._create_storage_container()
         self.vault_url = self._create_key_vault()
         self.runner_principal_id = self._create_runner_managed_identity()
@@ -175,11 +171,10 @@ class AzureConfigurator(Configurator):
         config_data = {
             "tenant_id": self.tenant_id,
             "subscription_id": self.subscription_id,
-            "location": self.location,
+            "locations": self.locations,
             "resource_group": self.resource_group,
             "storage_account": self.storage_account,
             "vault_url": self.vault_url,
-            "extra_locations": self.extra_locations,
         }
         auth_data = backend_config.credentials.__root__.dict()
         return config_data, auth_data
@@ -288,7 +283,7 @@ class AzureConfigurator(Configurator):
         element = BackendElement(selected=selected)
         storage_accounts = []
         for sa in client.storage_accounts.list():
-            if sa.provisioning_state == "Succeeded" and sa.location == self.location:
+            if sa.provisioning_state == "Succeeded":
                 storage_accounts.append(sa.name)
                 element.values.append(BackendElementValue(value=sa.name, label=sa.name))
         if selected is not None and selected not in storage_accounts:
@@ -308,33 +303,13 @@ class AzureConfigurator(Configurator):
         element.selected = selected
         return element
 
-    def _get_resource_group(self) -> str:
+    def _get_resource_group_and_location(self) -> Tuple[str, str]:
         client = StorageManagementClient(
             credential=self.credential, subscription_id=self.subscription_id
         )
         for sa in client.storage_accounts.list():
             if sa.name == self.storage_account:
-                return azure_utils.get_resource_group_from_resource_id(sa.id)
-
-    def _create_storage_account(self, name: str) -> str:
-        resource_manager = ResourceManager(
-            credential=self.credential, subscription_id=self.subscription_id
-        )
-        storage_manager = StorageManager(
-            credential=self.credential, subscription_id=self.subscription_id
-        )
-        try:
-            resource_group = resource_manager.create_resource_group(
-                name=name, location=self.location
-            )
-            storage_account = storage_manager.create_storage_account(
-                resource_group=resource_group,
-                name=name,
-                location=self.location,
-            )
-        except HttpResponseError:
-            return self._ask_storage_account(name)
-        return storage_account, resource_group
+                return azure_utils.get_resource_group_from_resource_id(sa.id), sa.location
 
     def _create_storage_container(self) -> str:
         storage_manager = StorageManager(
@@ -385,7 +360,7 @@ class AzureConfigurator(Configurator):
             )
 
         with ThreadPoolExecutor(max_workers=8) as executor:
-            for location in [self.location] + self.extra_locations:
+            for location in self.locations:
                 executor.submit(func, location)
 
     def _create_logs_resources(self):
