@@ -25,8 +25,13 @@ type AWSStorage struct {
 	//downloader *manager.Downloader
 }
 
-func NewAWSStorage(region, bucket, namespace string) (*AWSStorage, error) {
-	cfg, err := config.LoadDefaultConfig(context.TODO(), config.WithRegion(region))
+func NewAWSStorage(bucket, namespace string) (*AWSStorage, error) {
+	ctx := context.TODO()
+	region, err := getBucketRegion(ctx, bucket)
+	if err != nil {
+		return nil, gerrors.Wrap(err)
+	}
+	cfg, err := config.LoadDefaultConfig(ctx, config.WithRegion(region))
 	if err != nil {
 		return nil, gerrors.Wrap(err)
 	}
@@ -157,4 +162,27 @@ func (s *AWSStorage) List(ctx context.Context, prefix string) (<-chan *base.Stor
 		}
 	}()
 	return ch, errCh
+}
+
+func getBucketRegion(ctx context.Context, bucket string) (string, error) {
+	cfg, err := config.LoadDefaultConfig(context.TODO(), config.WithRegion("us-east-1"))
+	if err != nil {
+		return "", gerrors.Wrap(err)
+	}
+	s3Client := s3.NewFromConfig(cfg)
+	input := &s3.GetBucketLocationInput{
+		Bucket: aws.String(bucket),
+	}
+	result, err := s3Client.GetBucketLocation(ctx, input)
+	if err != nil {
+		return "", err
+	}
+	// AWS S3 returns a location constraint that corresponds to the region.
+	// If the constraint is empty, the bucket is in the default region.
+	// See: https://docs.aws.amazon.com/AmazonS3/latest/dev/LocationSelection.html
+	if result.LocationConstraint == "" {
+		return "us-east-1", nil // Default region
+	}
+
+	return (string)(result.LocationConstraint), nil
 }

@@ -23,6 +23,9 @@ import (
 	"github.com/dstackai/dstack/runner/internal/models"
 )
 
+// used for secrets
+const DEFAULT_REGION = "us-east-1"
+
 type AWSBackend struct {
 	State     *models.State
 	region    string
@@ -58,7 +61,7 @@ func init() {
 }
 
 func New(region, bucket, namespace string) *AWSBackend {
-	storage, err := NewAWSStorage(region, bucket, namespace)
+	storage, err := NewAWSStorage(bucket, namespace)
 	if err != nil {
 		fmt.Printf("Initialization storage service failure: %+v", err)
 		return nil
@@ -69,7 +72,7 @@ func New(region, bucket, namespace string) *AWSBackend {
 		artifacts: nil,
 		storage:   storage,
 		cliEC2:    NewClientEC2(region),
-		cliSecret: NewClientSecret(region),
+		cliSecret: NewClientSecret(DEFAULT_REGION),
 	}
 }
 

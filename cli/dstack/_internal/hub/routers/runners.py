@@ -68,10 +68,10 @@ async def run(project_name: str, body: RunRunners):
             return
         except NoMatchingInstanceError:
             continue
-        except BuildNotFoundError:
+        except BuildNotFoundError as e:
             raise HTTPException(
                 status_code=status.HTTP_400_BAD_REQUEST,
-                detail=error_detail(msg=BuildNotFoundError.message, code=BuildNotFoundError.code),
+                detail=error_detail(msg=e.message, code=e.code),
             )
         except SSHCommandError as e:
             raise HTTPException(

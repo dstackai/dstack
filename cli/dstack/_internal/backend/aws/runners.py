@@ -440,6 +440,7 @@ def _user_data(
     port_range_from: int = 3000,
     port_range_to: int = 4000,
 ) -> str:
+    print(runner_id)
     sysctl_port_range_from = int((port_range_to - port_range_from) / 2) + port_range_from
     sysctl_port_range_to = port_range_to - 1
     runner_port_range_from = port_range_from
@@ -461,7 +462,7 @@ EC2_PUBLIC_HOSTNAME="`wget -q -O - http://169.254.169.254/latest/meta-data/publi
 echo "hostname: $EC2_PUBLIC_HOSTNAME" >> /root/.dstack/{RUNNER_CONFIG_FILENAME}
 mkdir ~/.ssh; chmod 700 ~/.ssh; echo "{ssh_key_pub}" > ~/.ssh/authorized_keys; chmod 600 ~/.ssh/authorized_keys
 {get_dstack_runner()}
-HOME=/root nohup dstack-runner --log-level 6 start --http-port {WS_PORT} &
+# HOME=/root nohup dstack-runner --log-level 6 start --http-port {WS_PORT} &
 """
     return user_data
 

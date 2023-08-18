@@ -20,6 +20,7 @@ class AWSConfig(BackendConfig, BaseModel):
             "backend": "aws",
             "bucket": self.bucket_name,
             "regions": self.regions,
+            "region": self.region,
         }
         if self.subnet_id:
             config_data["subnet"] = self.subnet_id
@@ -37,5 +38,5 @@ class AWSConfig(BackendConfig, BaseModel):
             bucket_name=bucket_name,
             regions=config_data.get("regions", []),
             subnet_id=config_data.get("subnet"),
-            region_name=config_data.get("region"),
+            region=config_data.get("region"),
         )
