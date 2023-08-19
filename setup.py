@@ -1,8 +1,13 @@
 import re
 import sys
 from pathlib import Path
+from shutil import copytree
+from subprocess import check_call
 
-from setuptools import find_packages, setup
+from setuptools import Command, find_packages, setup
+from setuptools.command.build_py import build_py
+from setuptools.command.develop import develop
+from setuptools.command.sdist import sdist
 
 project_dir = Path(__file__).parent
 
@@ -99,6 +104,81 @@ LAMBDA_DEPS = AWS_DEPS
 
 ALL_DEPS = AWS_DEPS + AZURE_DEPS + GCP_DEPS
 
+
+class BaseCommand(Command):
+    user_options = []
+
+    def initialize_options(self):
+        pass
+
+    def finalize_options(self):
+        pass
+
+    def get_inputs(self):
+        return []
+
+    def get_outputs(self):
+        return []
+
+
+class NPM(BaseCommand):
+    user_options = []
+
+    hub_dir = project_dir / "hub"
+
+    node_modules_dir = hub_dir / "node_modules"
+
+    dist_dir = hub_dir / "dist"
+
+    def should_run(self):
+        # TODO: Check if build is up-to-date
+        return True
+
+    def run(self):
+        if not self.should_run():
+            print("Skipping `npm install` and `npm run build`")
+            return
+
+        print("Running `npm install`...")
+        check_call(
+            ["npm", "install"],
+            cwd=project_dir / "hub",
+            shell=False,
+        )
+        print("Running `npm run build`...")
+        check_call(
+            ["npm", "run", "build"],
+            cwd=project_dir / "hub",
+            shell=False,
+        )
+        print("Copying `hub/build` to `cli/dstack/_internal/hub/statics`...")
+        copytree("hub/build", "cli/dstack/_internal/hub/statics", dirs_exist_ok=True)
+
+
+def npm_first(cls, strict=True):
+    class _Command(cls):
+        def run(self):
+            try:
+                self.run_command("npm")
+            except Exception:
+                if strict:
+                    raise
+                else:
+                    pass
+            return super().run()
+
+    return _Command
+
+
+class CustomDevelopInstaller(develop):
+    def run(self):
+        if not self.uninstall:
+            self.distribution.run_command("npm")
+        super().run()
+
+
+is_repo = (project_dir / ".git").exists()
+
 setup(
     name="dstack",
     version=get_version(),
@@ -149,4 +229,10 @@ setup(
         "License :: OSI Approved :: Mozilla Public License 2.0 (MPL 2.0)",
         "Programming Language :: Python :: 3",
     ],
+    cmdclass={
+        "build_py": npm_first(build_py, strict=is_repo),
+        "sdist": npm_first(sdist, strict=True),
+        "npm": NPM,
+        "develop": CustomDevelopInstaller,
+    },
 )
