@@ -12,7 +12,6 @@ class GCPPricing(Pricing):
             if int(row["gpu_count"]) > 0:
                 gpu_memory = round(float(row["gpu_memory"]) * 1024)
                 instance_key += f'-{row["gpu_count"]}x{row["gpu_name"]}-{gpu_memory}'
-            print(instance_key)
             self.registry[instance_key][(row["location"][:-2], row["spot"] == "True")] = float(
                 row["price"]
             )

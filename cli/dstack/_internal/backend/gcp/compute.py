@@ -190,13 +190,14 @@ class GCPCompute(Compute):
         )
 
     def create_gateway(self, instance_name: str, ssh_key_pub: str) -> GatewayHead:
+        region = self.gcp_config.regions[0]
         instance = gateway.create_gateway_instance(
             instances_client=self.instances_client,
             firewalls_client=self.firewalls_client,
             project_id=self.gcp_config.project_id,
             network=_get_network_resource(self.gcp_config.vpc),
-            subnet=_get_subnet_resource(self.gcp_config.region, self.gcp_config.subnet),
-            zone=self.gcp_config.zone,
+            subnet=_get_subnet_resource(region, self.gcp_config.subnet),
+            zone=_get_zones(self.regions_client, self.gcp_config.project_id, [region])[0],
             instance_name=instance_name,
             service_account=self.credentials.service_account_email,
             labels=dict(
@@ -945,12 +946,19 @@ def _restart_instance(
 def _terminate_instance(
     client: compute_v1.InstancesClient, gcp_config: GCPConfig, instance_name: str
 ):
-    _delete_instance(
-        client=client,
-        instance_name=instance_name,
-        project_id=gcp_config.project_id,
-        zone=gcp_config.zone,
-    )
+    request = compute_v1.AggregatedListInstancesRequest()
+    request.project = gcp_config.project_id
+    request.filter = f"name eq {instance_name}"
+    request.max_results = 1
+    agg_list = client.aggregated_list(request=request)
+    for zone, response in agg_list:
+        for _ in response.instances:
+            _delete_instance(
+                client=client,
+                instance_name=instance_name,
+                project_id=gcp_config.project_id,
+                zone=zone[6:],  # strip zones/
+            )
 
 
 def _delete_instance(

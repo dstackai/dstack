@@ -34,7 +34,6 @@ class Pricing(ABC):
         self.fetch(instances, spot)
         offers = []
         for instance in instances:
-            print(self.instance_key(instance))
             for (region, is_spot), price in self.registry[self.instance_key(instance)].items():
                 if not self.region_match(instance.available_regions, region):
                     continue
