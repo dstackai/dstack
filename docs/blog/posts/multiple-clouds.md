@@ -16,7 +16,7 @@ configured cloud providers and regions.
 
 <!-- more -->
 
-## Multiple providers per project
+## Multiple clouds per project
 
 Now, `dstack` leverages price data from multiple configured cloud providers and regions to automatically suggest the
 most cost-effective options.
@@ -79,6 +79,8 @@ YAML (instead of the gateway IP address).
 
 Using the dstack run command, you are now able to utilize options such as `--gpu`, `--memory`, `--env`, `--max-price`,
 and several [other arguments](../../docs/reference/cli/run.md) to override the profile settings.
+
+Lastly, the local backend is no longer supported. Now, you can run everything using only a cloud backend.
 
 The [documentation](../../docs/index.md) is updated to reflect the changes in the release.
 
