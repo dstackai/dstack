@@ -14,8 +14,6 @@ class AzureConfig(BackendConfig, BaseModel):
     storage_account: str
     vault_url: str
     locations: List[str]
-    # set dynamically
-    location: Optional[str]
     network: Optional[str]
     subnet: Optional[str]
     credentials: Optional[Dict] = None

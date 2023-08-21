@@ -102,9 +102,10 @@ class AzureCompute(Compute):
             self.azure_config.storage_account,
         )
 
-    def get_instance_type(self, job: Job) -> Optional[InstanceType]:
+    # TODO: This function is deprecated and will be deleted in 0.11.x
+    def get_instance_type(self, job: Job, region_name: Optional[str]) -> Optional[InstanceType]:
         instance_types = _get_instance_types(
-            client=self._compute_client, location=self.azure_config.location
+            client=self._compute_client, location=region_name or self.azure_config.locations[0]
         )
         return choose_instance_type(instance_types=instance_types, requirements=job.requirements)
 
@@ -158,19 +159,22 @@ class AzureCompute(Compute):
         self.terminate_instance(runner)
 
     def create_gateway(self, instance_name: str, ssh_key_pub: str) -> GatewayHead:
+        # TODO: This must be a configurable field of the gateway
+        default_location = self.azure_config.locations[0]
         vm = gateway.create_gateway(
+            storage_account=self.azure_config.storage_account,
             compute_client=self._compute_client,
             network_client=self._network_client,
             subscription_id=self.azure_config.subscription_id,
-            location=self.azure_config.location,
+            location=default_location,
             resource_group=self.azure_config.resource_group,
             network=azure_utils.get_default_network_name(
                 storage_account=self.azure_config.storage_account,
-                location=self.azure_config.location,
+                location=default_location,
             ),
             subnet=azure_utils.get_default_subnet_name(
                 storage_account=self.azure_config.storage_account,
-                location=self.azure_config.location,
+                location=default_location,
             ),
             instance_name=instance_name,
             ssh_key_pub=ssh_key_pub,

@@ -101,7 +101,8 @@ class GCPCompute(Compute):
             message=None,
         )
 
-    def get_instance_type(self, job: Job) -> Optional[InstanceType]:
+    # TODO: This function is deprecated and will be deleted in 0.11.x
+    def get_instance_type(self, job: Job, region: Optional[str]) -> Optional[InstanceType]:
         return _choose_instance_type(
             machine_types_client=self.machine_types_client,
             accelerator_types_client=self.accelerator_types_client,
@@ -190,14 +191,17 @@ class GCPCompute(Compute):
         )
 
     def create_gateway(self, instance_name: str, ssh_key_pub: str) -> GatewayHead:
-        region = self.gcp_config.regions[0]
+        # TODO: This must be a configurable field of the gateway
+        default_region_name = self.gcp_config.regions[0]
         instance = gateway.create_gateway_instance(
             instances_client=self.instances_client,
             firewalls_client=self.firewalls_client,
             project_id=self.gcp_config.project_id,
             network=_get_network_resource(self.gcp_config.vpc),
-            subnet=_get_subnet_resource(region, self.gcp_config.subnet),
-            zone=_get_zones(self.regions_client, self.gcp_config.project_id, [region])[0],
+            subnet=_get_subnet_resource(default_region_name, self.gcp_config.subnet),
+            zone=_get_zones(
+                self.regions_client, self.gcp_config.project_id, [default_region_name]
+            )[0],
             instance_name=instance_name,
             service_account=self.credentials.service_account_email,
             labels=dict(

@@ -109,13 +109,7 @@ def delete_jobs(storage: Storage, repo_id: str, run_name: str):
         storage.delete_object(job_key)
 
 
-def predict_job_instance(
-    compute: Compute,
-    job: Job,
-) -> Optional[InstanceType]:
-    return compute.get_instance_type(job)
-
-
+# TODO: The `offer` field must be required
 def run_job(
     storage: Storage,
     compute: Compute,
@@ -213,6 +207,7 @@ def update_job_submission(job: Job):
     job.submitted_at = get_milliseconds_since_epoch()
 
 
+# TODO: The `offer` field must be required
 def _try_run_job(
     storage: Storage,
     compute: Compute,
@@ -228,7 +223,7 @@ def _try_run_job(
             and attempt == 0
         )
         job.requirements.spot = spot
-        instance_type = compute.get_instance_type(job)
+        instance_type = compute.get_instance_type(job, region_name=job.location)
     else:
         job.requirements.spot = offer.instance_type.resources.spot
         instance_type = offer.instance_type

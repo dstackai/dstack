@@ -47,20 +47,21 @@ class Backend(ABC):
         return self.NAME
 
     @abstractmethod
-    def predict_instance_type(self, job: Job) -> Optional[InstanceType]:
-        pass
-
-    @abstractmethod
     def create_job(
         self,
         job: Job,
     ):
         pass
 
+    # TODO: Is this function used at all?
+    # TODO: This must use offers from multiple clouds
+    # TODO: Why does `run_job` not pass `project_private_key`?
     def submit_job(self, job: Job, failed_to_start_job_new_status: JobStatus = JobStatus.FAILED):
         self.create_job(job)
         self.run_job(job, failed_to_start_job_new_status)
 
+    # TODO: This must use offers from multiple clouds
+    # TODO: Why does `run_job` not pass `project_private_key`?
     def resubmit_job(self, job: Job, failed_to_start_job_new_status: JobStatus = JobStatus.FAILED):
         base_jobs.update_job_submission(job)
         self.run_job(job, failed_to_start_job_new_status)
@@ -296,9 +297,6 @@ class ComponentBasedBackend(Backend):
     def pricing(self) -> Pricing:
         pass
 
-    def predict_instance_type(self, job: Job) -> Optional[InstanceType]:
-        return base_jobs.predict_job_instance(self.compute(), job)
-
     def create_job(self, job: Job):
         base_jobs.create_job(self.storage(), job)
 
@@ -308,6 +306,7 @@ class ComponentBasedBackend(Backend):
     def list_jobs(self, repo_id: str, run_name: str) -> List[Job]:
         return base_jobs.list_jobs(self.storage(), repo_id, run_name)
 
+    # TODO: The `offer` field must be required
     def run_job(
         self,
         job: Job,
