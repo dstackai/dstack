@@ -200,6 +200,7 @@ class Job(JobHead):
     instance_spot_type: Optional[str]
     instance_type: Optional[str]
     job_id: str
+    # TODO: Rename to `region_name`
     location: Optional[str]
     master_job: Optional[str]  # not implemented
     max_duration: Optional[int]

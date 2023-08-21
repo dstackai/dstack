@@ -12,6 +12,7 @@ from dstack._internal.core.request import RequestHead
 from dstack._internal.core.runners import Runner
 
 
+# TODO: The entire backend is deprecated and will be deleted in 0.11.x
 class LocalCompute(Compute):
     def __init__(self, backend_config: LocalConfig):
         self.backend_config = backend_config
@@ -19,7 +20,7 @@ class LocalCompute(Compute):
     def get_request_head(self, job: Job, request_id: Optional[str]) -> RequestHead:
         return runners.get_request_head(job, request_id)
 
-    def get_instance_type(self, job: Job) -> Optional[InstanceType]:
+    def get_instance_type(self, job: Job, region_name: Optional[str]) -> Optional[InstanceType]:
         resources = runners.check_runner_resources(self.backend_config, job.runner_id)
         instance_type = choose_instance_type(
             instance_types=[InstanceType(instance_name="", resources=resources)],

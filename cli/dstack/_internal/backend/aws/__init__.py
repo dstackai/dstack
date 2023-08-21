@@ -79,6 +79,7 @@ class AwsBackend(ComponentBasedBackend):
     def pricing(self) -> AWSPricing:
         return self._pricing
 
+    # TODO: The `offer` field must be required
     def run_job(
         self,
         job: Job,

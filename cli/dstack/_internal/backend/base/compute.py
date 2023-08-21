@@ -31,8 +31,9 @@ class Compute(ABC):
     def get_request_head(self, job: Job, request_id: Optional[str]) -> RequestHead:
         pass
 
+    # TODO: This function is deprecated and will be deleted in 0.11.x
     @abstractmethod
-    def get_instance_type(self, job: Job) -> Optional[InstanceType]:
+    def get_instance_type(self, job: Job, region_name: Optional[str]) -> Optional[InstanceType]:
         pass
 
     @abstractmethod

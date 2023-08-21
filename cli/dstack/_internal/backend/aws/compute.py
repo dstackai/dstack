@@ -31,9 +31,10 @@ class AWSCompute(Compute):
             request_id=request_id,
         )
 
-    def get_instance_type(self, job: Job) -> Optional[InstanceType]:
+    # TODO: This function is deprecated and will be deleted in 0.11.x
+    def get_instance_type(self, job: Job, region_name: Optional[str]) -> Optional[InstanceType]:
         return runners.get_instance_type(
-            ec2_client=self._get_ec2_client(),
+            ec2_client=self._get_ec2_client(region_name),
             requirements=job.requirements,
         )
 
@@ -78,8 +79,10 @@ class AWSCompute(Compute):
         )
 
     def create_gateway(self, instance_name: str, ssh_key_pub: str) -> GatewayHead:
+        # TODO: This must be a configurable field of the gateway
+        default_region_name = self.backend_config.regions[0]
         instance = gateway.create_gateway_instance(
-            ec2_client=self._get_ec2_client(region=self.backend_config.region_name),
+            ec2_client=self._get_ec2_client(region=default_region_name),
             subnet_id=self.backend_config.subnet_id,
             bucket_name=self.backend_config.bucket_name,
             instance_name=instance_name,
@@ -91,14 +94,17 @@ class AWSCompute(Compute):
             internal_ip=instance["PrivateIpAddress"],
         )
 
+    # TODO: Must be renamed to `delete_gateway_instance`
     def delete_instance(self, instance_name: str):
+        # TODO: This must be a configurable field of the gateway
+        default_region_name = self.backend_config.regions[0]
         try:
             instance_id = gateway.get_instance_id(
-                ec2_client=self._get_ec2_client(region=self.backend_config.region_name),
+                ec2_client=self._get_ec2_client(region=default_region_name),
                 instance_name=instance_name,
             )
             runners.terminate_instance(
-                ec2_client=self._get_ec2_client(region=self.backend_config.region_name),
+                ec2_client=self._get_ec2_client(region=default_region_name),
                 request_id=instance_id,
             )
         except IndexError:

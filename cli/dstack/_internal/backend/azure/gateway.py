@@ -24,9 +24,7 @@ from azure.mgmt.compute.models import (
 from azure.mgmt.network import NetworkManagementClient
 from azure.mgmt.network.models import (
     NetworkInterface,
-    NetworkInterfaceIPConfiguration,
     NetworkSecurityGroup,
-    PublicIPAddress,
     SecurityRule,
     SecurityRuleAccess,
     SecurityRuleDirection,
@@ -38,6 +36,7 @@ from dstack._internal.backend.base.gateway import setup_nginx_certbot
 
 
 def create_gateway(
+    storage_account: str,
     compute_client: ComputeManagementClient,
     network_client: NetworkManagementClient,
     subscription_id: str,
@@ -73,6 +72,7 @@ def create_gateway(
             network_profile=NetworkProfile(
                 network_api_version=NetworkManagementClient.DEFAULT_API_VERSION,
                 network_interface_configurations=gateway_interface_configurations(
+                    storage_account=storage_account,
                     network_client=network_client,
                     subscription_id=subscription_id,
                     location=location,
@@ -113,6 +113,7 @@ def gateway_storage_profile() -> StorageProfile:
 
 
 def gateway_interface_configurations(
+    storage_account: str,
     network_client: NetworkManagementClient,
     subscription_id: str,
     location: str,
@@ -123,7 +124,9 @@ def gateway_interface_configurations(
     conf = VirtualMachineNetworkInterfaceConfiguration(
         name="nic_config",
         network_security_group=SubResource(
-            id=gateway_network_security_group(network_client, location, resource_group)
+            id=gateway_network_security_group(
+                storage_account, network_client, location, resource_group
+            )
         ),
         ip_configurations=[
             VirtualMachineNetworkInterfaceIPConfiguration(
@@ -145,14 +148,21 @@ def gateway_interface_configurations(
     return [conf]
 
 
+def _get_gateway_network_security_group_name(storage_account: str, location: str) -> str:
+    return f"{storage_account}-{location}-gateway-security-group"
+
+
 def gateway_network_security_group(
+    storage_account: str,
     network_client: NetworkManagementClient,
     location: str,
     resource_group: str,
 ) -> str:
     poller = network_client.network_security_groups.begin_create_or_update(
         resource_group_name=resource_group,
-        network_security_group_name="dstack-gateway-network-security-group",
+        network_security_group_name=_get_gateway_network_security_group_name(
+            storage_account, location
+        ),
         parameters=NetworkSecurityGroup(
             location=location,
             security_rules=[
