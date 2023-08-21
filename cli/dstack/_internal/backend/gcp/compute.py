@@ -26,6 +26,7 @@ from dstack._internal.core.instance import InstanceType, LaunchedInstanceInfo
 from dstack._internal.core.job import Job, Requirements
 from dstack._internal.core.request import RequestHead, RequestStatus
 from dstack._internal.core.runners import Gpu, Resources, Runner
+from dstack._internal.hub.utils.catalog import read_catalog_csv
 from dstack._internal.utils.logging import get_logger
 
 logger = get_logger(__name__)
@@ -79,7 +80,6 @@ class GCPCompute(Compute):
         )
         self.zone_operations_client = compute_v1.ZoneOperationsClient(credentials=self.credentials)
         self.regions_client = compute_v1.RegionsClient(credentials=self.credentials)
-        self._supported_instances_cache: Optional[List[InstanceType]] = None
 
     def get_request_head(self, job: Job, request_id: Optional[str]) -> RequestHead:
         if request_id is None:
@@ -111,61 +111,40 @@ class GCPCompute(Compute):
         )
 
     def get_supported_instances(self) -> List[InstanceType]:
-        if self._supported_instances_cache is not None:
-            return self._supported_instances_cache
-        vm_families = ["e2-medium", "e2-standard-*", "e2-highmem-*", "e2-highcpu-*", "m1-*"] + [
-            "a2-*",
-            "g2-*",
-        ]
         instances = {}
-        zones = _get_zones(
-            regions_client=self.regions_client,
-            project_id=self.gcp_config.project_id,
-            configured_regions=self.gcp_config.regions,
-        )
-        for zone in zones:
-            region = zone[:-2]
-            instance_types = _list_instance_types(
-                machine_types_client=self.machine_types_client,
-                project_id=self.gcp_config.project_id,
-                zone=zone,
-                machine_families=vm_families,
-            )
-            for i in instance_types:
-                if i.instance_name not in instances:
-                    instances[i.instance_name] = i
-                    i.available_regions = []
-                if region not in instances[i.instance_name].available_regions:
-                    instances[i.instance_name].available_regions.append(region)
+        for row in read_catalog_csv("gcp.csv"):
+            if row["location"][:-2] not in self.gcp_config.regions:
+                continue
+            if row["spot"] == "True":  # any instance could be spot
+                continue
+            instance_key = row["instance_name"]
+            gpus = None
+            if int(row["gpu_count"]) > 0:
+                instance_key += f'-{row["gpu_count"]}x{row["gpu_name"]}-{row["gpu_memory"]}'
+                gpus = [
+                    Gpu(
+                        name=row["gpu_name"],
+                        memory_mib=round(float(row["gpu_memory"]) * 1024),
+                    )
+                    for _ in range(int(row["gpu_count"]))
+                ]
 
-            n1_instance_types = _list_instance_types(
-                machine_types_client=self.machine_types_client,
-                project_id=self.gcp_config.project_id,
-                zone=zone,
-                machine_families=["n1-*"],
-            )
-            n1_instance_types = [
-                # skip shared-core instances
-                i
-                for i in n1_instance_types
-                if i.instance_name not in ("n1-standard-1", "n1-highcpu-2")
-            ]
-            accelerator_types = _list_accelerator_types(
-                accelerator_types_client=self.accelerator_types_client,
-                project_id=self.gcp_config.project_id,
-                zone=zone,
-                accelerator_families=["nvidia-tesla-t4", "nvidia-tesla-v100", "nvidia-tesla-p100"],
-            )
-            for i in _instances_x_accelerators(n1_instance_types, accelerator_types):
-                gpu = i.resources.gpus[0]
-                name = f"{i.instance_name}-{len(i.resources.gpus)}x{gpu.name}-{gpu.memory_mib}"
-                if name not in instances:
-                    instances[name] = i
-                    i.available_regions = []
-                if region not in instances[name].available_regions:
-                    instances[name].available_regions.append(region)
-        self._supported_instances_cache = list(instances.values())
-        return self._supported_instances_cache
+            if instance_key not in instances:
+                instance = InstanceType(
+                    instance_name=row["instance_name"],
+                    resources=Resources(
+                        cpus=int(row["cpu"]),
+                        memory_mib=round(float(row["memory"]) * 1024),
+                        gpus=gpus,
+                        spot=True,
+                        local=False,
+                    ),
+                    available_regions=[],
+                )
+                instances[instance_key] = instance
+            if row["location"][:-2] not in instances[instance_key].available_regions:
+                instances[instance_key].available_regions.append(row["location"][:-2])
+        return list(instances.values())
 
     def run_instance(
         self, job: Job, instance_type: InstanceType, region: str
@@ -211,13 +190,14 @@ class GCPCompute(Compute):
         )
 
     def create_gateway(self, instance_name: str, ssh_key_pub: str) -> GatewayHead:
+        region = self.gcp_config.regions[0]
         instance = gateway.create_gateway_instance(
             instances_client=self.instances_client,
             firewalls_client=self.firewalls_client,
             project_id=self.gcp_config.project_id,
             network=_get_network_resource(self.gcp_config.vpc),
-            subnet=_get_subnet_resource(self.gcp_config.region, self.gcp_config.subnet),
-            zone=self.gcp_config.zone,
+            subnet=_get_subnet_resource(region, self.gcp_config.subnet),
+            zone=_get_zones(self.regions_client, self.gcp_config.project_id, [region])[0],
             instance_name=instance_name,
             service_account=self.credentials.service_account_email,
             labels=dict(
@@ -966,12 +946,19 @@ def _restart_instance(
 def _terminate_instance(
     client: compute_v1.InstancesClient, gcp_config: GCPConfig, instance_name: str
 ):
-    _delete_instance(
-        client=client,
-        instance_name=instance_name,
-        project_id=gcp_config.project_id,
-        zone=gcp_config.zone,
-    )
+    request = compute_v1.AggregatedListInstancesRequest()
+    request.project = gcp_config.project_id
+    request.filter = f"name eq {instance_name}"
+    request.max_results = 1
+    agg_list = client.aggregated_list(request=request)
+    for zone, response in agg_list:
+        for _ in response.instances:
+            _delete_instance(
+                client=client,
+                instance_name=instance_name,
+                project_id=gcp_config.project_id,
+                zone=zone[6:],  # strip zones/
+            )
 
 
 def _delete_instance(

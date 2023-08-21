@@ -45,7 +45,7 @@ class GCPBackend(ComponentBasedBackend):
             bucket_name=self.backend_config.bucket_name,
             credentials=credentials,
         )
-        self._pricing = GCPPricing(credentials=credentials)
+        self._pricing = GCPPricing()
 
     def storage(self) -> GCPStorage:
         return self._storage
