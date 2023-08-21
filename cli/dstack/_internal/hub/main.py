@@ -8,6 +8,7 @@ from rich.prompt import Confirm
 from starlette.responses import HTMLResponse, JSONResponse
 from starlette.staticfiles import StaticFiles
 
+from dstack import version
 from dstack._internal.cli.utils.config import CLIConfigManager
 from dstack._internal.hub.background import start_background_tasks
 from dstack._internal.hub.db.migrate import migrate
@@ -49,16 +50,15 @@ async def lifespan(app: FastAPI):
     url = f"{base_url}?token={admin_user.token}"
     create_default_project_config(base_url, admin_user.token)
     generate_hub_ssh_key_pair()
-    print(f"\nThe server is available at {url}")
-    add_backend_url = (
-        f"{base_url}/projects/{DEFAULT_PROJECT_NAME}/backends/add?token={admin_user.token}"
-    )
     print(
-        "\nTo start using dstack:\n"
-        f"\n    1. Configure one or more clouds at {add_backend_url}."
-        "\n    2. Initialize a repo with `dstack init`."
-        "\n    3. Define and run a dev environment, a task, or a service. For details, see https://dstack.ai/docs/.\n"
+        f"\nThe dstack server {version.__version__ if version.__version__ else '(no version)'} is running at:\n{url}"
     )
+    backends_exist = await default_project_backends_exist()
+    if not backends_exist:
+        default_project_settings_url = (
+            f"{base_url}/projects/{DEFAULT_PROJECT_NAME}/settings?token={admin_user.token}"
+        )
+        print(f"\nConfigure one or more cloud backends at:\n{default_project_settings_url}")
     yield
     scheduler.shutdown()
 
@@ -81,7 +81,6 @@ app.include_router(repos.router)
 app.include_router(link.router)
 app.include_router(configurations.router)
 app.include_router(gateways.router)
-
 
 DEFAULT_PROJECT_NAME = "main"
 
@@ -123,6 +122,15 @@ async def create_default_project(user: User) -> bool:
         user=user, project_name=DEFAULT_PROJECT_NAME, members=[]
     )
     return True
+
+
+async def default_project_backends_exist() -> bool:
+    default_project = await ProjectManager.get(DEFAULT_PROJECT_NAME)
+    if default_project is not None:
+        backend_infos = await ProjectManager.list_backend_infos(default_project)
+        if len(backend_infos) > 0:
+            return True
+    return False
 
 
 def create_default_project_config(url: str, token: str):
