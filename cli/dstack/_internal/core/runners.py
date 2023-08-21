@@ -1,6 +1,6 @@
 from typing import List, Optional
 
-from pydantic import BaseModel
+from pydantic import BaseModel, validator
 
 from dstack._internal.core.job import Job
 
@@ -13,9 +13,13 @@ class Gpu(BaseModel):
 class Resources(BaseModel):
     cpus: int
     memory_mib: int
-    gpus: Optional[List[Gpu]]
+    gpus: List[Gpu]
     spot: bool
     local: bool
+
+    @validator("gpus")
+    def validate_gpus(cls, value):
+        return value or []
 
 
 class Runner(BaseModel):

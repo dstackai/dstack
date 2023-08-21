@@ -166,7 +166,7 @@ def _instance_type_data_to_instance_type(instance_type_data: Dict) -> Optional[I
     regions = [r["name"] for r in regions_data]
     instance_type_specs = instance_type["specs"]
     gpus = _get_instance_type_gpus(instance_type["name"])
-    if gpus is None:
+    if len(gpus) == 0:
         return None
     return InstanceType(
         instance_name=instance_type["name"],
@@ -181,10 +181,10 @@ def _instance_type_data_to_instance_type(instance_type_data: Dict) -> Optional[I
     )
 
 
-def _get_instance_type_gpus(instance_type_name: str) -> Optional[List[Gpu]]:
+def _get_instance_type_gpus(instance_type_name: str) -> List[Gpu]:
     gpu_data = _INSTANCE_TYPE_TO_GPU_DATA_MAP.get(instance_type_name)
     if gpu_data is None:
-        return None
+        return []
     return [
         Gpu(name=gpu_data["name"], memory_mib=gpu_data["memory_mib"])
         for _ in range(gpu_data["count"])

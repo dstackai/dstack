@@ -119,7 +119,7 @@ class GCPCompute(Compute):
             if row["spot"] == "True":  # any instance could be spot
                 continue
             instance_key = row["instance_name"]
-            gpus = None
+            gpus = []
             if int(row["gpu_count"]) > 0:
                 instance_key += f'-{row["gpu_count"]}x{row["gpu_name"]}-{row["gpu_memory"]}'
                 gpus = [
