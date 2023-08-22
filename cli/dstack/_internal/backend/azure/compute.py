@@ -330,7 +330,6 @@ def _get_image_ref(
 
 def _config_with_location(config: AzureConfig, location: str) -> AzureConfig:
     new_config = config.copy()
-    new_config.location = location
     new_config.network = azure_utils.get_default_network_name(config.storage_account, location)
     new_config.subnet = azure_utils.get_default_subnet_name(config.storage_account, location)
     return new_config
