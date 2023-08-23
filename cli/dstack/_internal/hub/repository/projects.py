@@ -87,6 +87,18 @@ class ProjectManager:
 
     @staticmethod
     @reuse_or_make_session
+    async def set_default_gateway(
+        project_name: str, default_gateway: Optional[str], session: Optional[AsyncSession] = None
+    ):
+        await session.execute(
+            update(Project)
+            .where(Project.name == project_name)
+            .values(default_gateway=default_gateway)
+        )
+        await session.commit()
+
+    @staticmethod
+    @reuse_or_make_session
     async def get_member(
         user: User, project: Project, session: Optional[AsyncSession] = None
     ) -> Optional[DBMember]:

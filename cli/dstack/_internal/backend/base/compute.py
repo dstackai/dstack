@@ -57,7 +57,9 @@ class Compute(ABC):
     def cancel_spot_request(self, runner: Runner):
         pass
 
-    def create_gateway(self, instance_name: str, ssh_key_pub: str) -> GatewayHead:
+    def create_gateway(
+        self, instance_name: str, ssh_key_pub: str, region: Optional[str]
+    ) -> GatewayHead:
         raise NotImplementedError()
 
     def delete_instance(self, instance_name: str):

@@ -78,11 +78,12 @@ class AWSCompute(Compute):
             request_id=runner.request_id,
         )
 
-    def create_gateway(self, instance_name: str, ssh_key_pub: str) -> GatewayHead:
-        # TODO: This must be a configurable field of the gateway
-        default_region_name = self.backend_config.regions[0]
+    def create_gateway(
+        self, instance_name: str, ssh_key_pub: str, region: Optional[str]
+    ) -> GatewayHead:
+        region = region or self.backend_config.regions[0]
         instance = gateway.create_gateway_instance(
-            ec2_client=self._get_ec2_client(region=default_region_name),
+            ec2_client=self._get_ec2_client(region=region),
             subnet_id=self.backend_config.subnet_id,
             bucket_name=self.backend_config.bucket_name,
             instance_name=instance_name,
@@ -92,6 +93,7 @@ class AWSCompute(Compute):
             instance_name=instance_name,
             external_ip=instance["PublicIpAddress"],
             internal_ip=instance["PrivateIpAddress"],
+            region=region,
         )
 
     # TODO: Must be renamed to `delete_gateway_instance`

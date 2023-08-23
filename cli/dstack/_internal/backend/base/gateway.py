@@ -1,8 +1,7 @@
 import re
 import subprocess
-import time
 from tempfile import NamedTemporaryFile
-from typing import List, Optional
+from typing import List, Optional, Tuple, Union
 
 import pkg_resources
 
@@ -11,6 +10,7 @@ from dstack._internal.backend.base.head import (
     delete_head_object,
     list_head_objects,
     put_head_object,
+    replace_head_object,
 )
 from dstack._internal.backend.base.secrets import SecretsManager
 from dstack._internal.backend.base.storage import Storage
@@ -23,25 +23,40 @@ from dstack._internal.utils.interpolator import VariablesInterpolator
 from dstack._internal.utils.random_names import generate_name
 
 
-def create_gateway(compute: Compute, storage: Storage, ssh_key_pub: str) -> GatewayHead:
+def create_gateway(
+    compute: Compute, storage: Storage, ssh_key_pub: str, region: Optional[str]
+) -> GatewayHead:
     # todo generate while instance name is not unique
     instance_name = f"dstack-gateway-{generate_name()}"
-    head = compute.create_gateway(instance_name, ssh_key_pub)
+    head = compute.create_gateway(instance_name, ssh_key_pub, region=region)
     put_head_object(storage, head)
     return head
 
 
-def list_gateways(storage: Storage) -> List[GatewayHead]:
-    return list_head_objects(storage, GatewayHead)
+def list_gateways(
+    storage: Storage, include_key: bool = False
+) -> List[Union[GatewayHead, Tuple[str, GatewayHead]]]:
+    return list_head_objects(storage, GatewayHead, include_key=include_key)
 
 
 def delete_gateway(compute: Compute, storage: Storage, instance_name: str):
-    heads = list_gateways(storage)
-    for head in heads:
+    heads = list_gateways(storage, include_key=True)
+    for key, head in heads:
         if head.instance_name != instance_name:
             continue
         compute.delete_instance(instance_name)
-        delete_head_object(storage, head)
+        storage.delete_object(key)
+
+
+def update_gateway(storage: Storage, instance_name: str, wildcard_domain: str):
+    heads = list_gateways(storage, include_key=True)
+    for key, head in heads:
+        if head.instance_name != instance_name:
+            continue
+        head.wildcard_domain = wildcard_domain
+        replace_head_object(storage, key, head)
+        return head
+    raise KeyError(f"Gateway {instance_name} not found")
 
 
 def resolve_hostname(secrets_manager: SecretsManager, repo_id: str, hostname: str) -> str:

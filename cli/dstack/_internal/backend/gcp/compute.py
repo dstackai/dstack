@@ -190,18 +190,17 @@ class GCPCompute(Compute):
             instance_name=runner.request_id,
         )
 
-    def create_gateway(self, instance_name: str, ssh_key_pub: str) -> GatewayHead:
-        # TODO: This must be a configurable field of the gateway
-        default_region_name = self.gcp_config.regions[0]
+    def create_gateway(
+        self, instance_name: str, ssh_key_pub: str, region: Optional[str]
+    ) -> GatewayHead:
+        region = region or self.gcp_config.regions[0]
         instance = gateway.create_gateway_instance(
             instances_client=self.instances_client,
             firewalls_client=self.firewalls_client,
             project_id=self.gcp_config.project_id,
             network=_get_network_resource(self.gcp_config.vpc),
-            subnet=_get_subnet_resource(default_region_name, self.gcp_config.subnet),
-            zone=_get_zones(
-                self.regions_client, self.gcp_config.project_id, [default_region_name]
-            )[0],
+            subnet=_get_subnet_resource(region, self.gcp_config.subnet),
+            zone=_get_zones(self.regions_client, self.gcp_config.project_id, [region])[0],
             instance_name=instance_name,
             service_account=self.credentials.service_account_email,
             labels=dict(
@@ -214,6 +213,7 @@ class GCPCompute(Compute):
             instance_name=instance_name,
             external_ip=instance.network_interfaces[0].access_configs[0].nat_i_p,
             internal_ip=instance.network_interfaces[0].network_i_p,
+            region=region,
         )
 
     def delete_instance(self, instance_name: str):

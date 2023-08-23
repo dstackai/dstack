@@ -9,7 +9,7 @@ import dstack._internal.configurators as configurators
 from dstack._internal.api.repos import get_local_repo_credentials
 from dstack._internal.backend.base import artifacts as base_artifacts
 from dstack._internal.core.artifact import Artifact
-from dstack._internal.core.gateway import GatewayHead
+from dstack._internal.core.gateway import Gateway, GatewayHead
 from dstack._internal.core.job import Job, JobHead, JobStatus
 from dstack._internal.core.log_event import LogEvent
 from dstack._internal.core.plan import RunPlan
@@ -278,11 +278,11 @@ class HubClient:
         self.update_repo_last_run_at(last_run_at=int(round(time.time() * 1000)))
         return run_name, jobs
 
-    def create_gateway(self, backend: str) -> GatewayHead:
+    def create_gateway(self, backend: str) -> Gateway:
         return self._api_client.create_gateway(backend=backend)
 
-    def list_gateways(self) -> Dict[str, List[GatewayHead]]:
+    def list_gateways(self) -> List[Gateway]:
         return self._api_client.list_gateways()
 
-    def delete_gateway(self, instance_name: str, backend: str):
-        self._api_client.delete_gateway(instance_name, backend=backend)
+    def delete_gateway(self, instance_name: str):
+        self._api_client.delete_gateway(instance_name)

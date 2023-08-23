@@ -6,7 +6,6 @@ from typing_extensions import Literal
 
 from dstack._internal.core.job import Job
 from dstack._internal.core.repo import RemoteRepoCredentials, RepoSpec
-from dstack._internal.core.repo.base import RepoRef
 from dstack._internal.core.repo.head import RepoHead
 from dstack._internal.core.run import RunHead
 from dstack._internal.core.secret import Secret
@@ -467,8 +466,3 @@ class DeleteUsers(BaseModel):
 
 class FileObject(BaseModel):
     object_key: str
-
-
-class GatewayDelete(BaseModel):
-    instance_name: str
-    backend: str

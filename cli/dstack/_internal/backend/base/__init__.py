@@ -258,7 +258,7 @@ class Backend(ABC):
         pass
 
     @abstractmethod
-    def create_gateway(self, ssh_key_pub: str) -> GatewayHead:
+    def create_gateway(self, ssh_key_pub: str, region: Optional[str]) -> GatewayHead:
         pass
 
     @abstractmethod
@@ -267,6 +267,9 @@ class Backend(ABC):
 
     @abstractmethod
     def delete_gateway(self, instance_name: str):
+        pass
+
+    def update_gateway(self, instance_name: str, wildcard_domain: str) -> GatewayHead:
         pass
 
     @abstractmethod
@@ -509,14 +512,17 @@ class ComponentBasedBackend(Backend):
             self.storage(), job, dstack._internal.core.build.DockerPlatform.amd64
         )
 
-    def create_gateway(self, ssh_key_pub: str) -> GatewayHead:
-        return gateway.create_gateway(self.compute(), self.storage(), ssh_key_pub)
+    def create_gateway(self, ssh_key_pub: str, region: Optional[str]) -> GatewayHead:
+        return gateway.create_gateway(self.compute(), self.storage(), ssh_key_pub, region=region)
 
     def list_gateways(self) -> List[GatewayHead]:
         return gateway.list_gateways(self.storage())
 
     def delete_gateway(self, instance_name: str):
         gateway.delete_gateway(self.compute(), self.storage(), instance_name)
+
+    def update_gateway(self, instance_name: str, wildcard_domain: str) -> GatewayHead:
+        return gateway.update_gateway(self.storage(), instance_name, wildcard_domain)
 
     def get_instance_candidates(
         self, requirements: Requirements, spot_policy: SpotPolicy

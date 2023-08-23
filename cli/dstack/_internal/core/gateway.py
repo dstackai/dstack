@@ -1,7 +1,7 @@
 import time
 from typing import Optional
 
-from pydantic import Field
+from pydantic import BaseModel, Field
 
 from dstack._internal.core.head import BaseHead
 
@@ -11,8 +11,15 @@ class GatewayHead(BaseHead):
     external_ip: str
     internal_ip: str
     created_at: int = Field(default_factory=lambda: int(time.time() * 1000))
+    region: Optional[str]
     wildcard_domain: Optional[str]
 
     @classmethod
     def prefix(cls) -> str:
         return "gateways/l;"
+
+
+class Gateway(BaseModel):
+    backend: str
+    head: GatewayHead
+    default: bool

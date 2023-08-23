@@ -64,3 +64,4 @@ class Project(Base):
     ssh_public_key: Mapped[str] = mapped_column(Text)
     members: Mapped[List[Member]] = relationship(back_populates="project", lazy="selectin")
     backends: Mapped[List[Backend]] = relationship(back_populates="project", lazy="selectin")
+    default_gateway: Mapped[str] = mapped_column(String(50), nullable=True)

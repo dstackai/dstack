@@ -158,23 +158,24 @@ class AzureCompute(Compute):
     def cancel_spot_request(self, runner: Runner):
         self.terminate_instance(runner)
 
-    def create_gateway(self, instance_name: str, ssh_key_pub: str) -> GatewayHead:
-        # TODO: This must be a configurable field of the gateway
-        default_location = self.azure_config.locations[0]
+    def create_gateway(
+        self, instance_name: str, ssh_key_pub: str, region: Optional[str]
+    ) -> GatewayHead:
+        location = region or self.azure_config.locations[0]
         vm = gateway.create_gateway(
             storage_account=self.azure_config.storage_account,
             compute_client=self._compute_client,
             network_client=self._network_client,
             subscription_id=self.azure_config.subscription_id,
-            location=default_location,
+            location=location,
             resource_group=self.azure_config.resource_group,
             network=azure_utils.get_default_network_name(
                 storage_account=self.azure_config.storage_account,
-                location=default_location,
+                location=location,
             ),
             subnet=azure_utils.get_default_subnet_name(
                 storage_account=self.azure_config.storage_account,
-                location=default_location,
+                location=location,
             ),
             instance_name=instance_name,
             ssh_key_pub=ssh_key_pub,
@@ -191,6 +192,7 @@ class AzureCompute(Compute):
             instance_name=instance_name,
             external_ip=public_ip,
             internal_ip=interface.ip_configurations[0].private_ip_address,
+            region=location,
         )
 
     def delete_instance(self, instance_name: str):
