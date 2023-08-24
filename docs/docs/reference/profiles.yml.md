@@ -1,29 +1,56 @@
 # profiles.yml
 
-Profiles configure the project to use and the resources required for the run.
+Instead of configuring resources, spot and retry policies, max price, and other parameters 
+through [`dstack run`](cli/run.md), you can use profiles. 
+To set up a profile, create the `.dstack/profiles.yml` file in the root folder of the project. 
 
-Profiles are defined in the `.dstack/profiles.yml` file within your project directory.
+## Usage example
 
-Below is a full reference of all available properties.
+<div editor-title=".dstack/profiles.yml"> 
 
-- `profiles` - (Required) The root property (of an `array` type)
-    - `name` - (Required) The name of the profile
-    - `backends` - (Optional) A list of backends that will be tried for provisioning. Supported backends are `local`, `aws`, `azure`, `gcp`, and `lambda`. If not specified, all configured backends are tried.
-    - `resources` - (Optional) The minimum required resources
-        - `memory` - (Optional) The minimum size of RAM memory (e.g., `"16GB"`). 
-        - `gpu` - (Optional) The minimum number of GPUs, their model name and memory
-            - `name` - (Optional) The name of the GPU model (e.g., `"K80"`, `"V100"`, `"A100"`, etc)
-            - `count` - (Optional) The minimum number of GPUs. Defaults to `1`.
-            - `memory` - (Optional) The minimum size of GPU memory (e.g., `"16GB"`)
-        - `shm_size` - (Optional) The size of shared memory (e.g., `"8GB"`). If you are using parallel communicating
-          processes (e.g., dataloaders in PyTorch), you may need to configure this.
-    - `spot_policy` - (Optional) The policy for provisioning spot or on-demand instances: `spot`, `on-demand`, or `auto`. `spot` provisions a spot instance. `on-demand` provisions a on-demand instance. `auto` first tries to provision a spot instance and then tries on-demand if spot is not available. Defaults to `on-demand` for dev environments and to `auto` for tasks.
-    - `retry_policy` - (Optional) The policy for re-submitting the run.
-        - `retry` - (Optional) Whether to retry the run on failure or not. Default to `false`
-        - `limit` - (Optional) The maximum period of retrying the run, e.g., `4h` or `1d`. Defaults to `1h` if `retry` is `true`.
-    - `max_duration` - (Optional) The maximum duration of a run (e.g., `2h`, `1d`, etc). After it elapses, the run is forced to stop. Protects from running idle instances. Defaults to `6h` for dev environments and to `72h` for tasks. Use `max_duration: off` to disable maximum run duration.
-    - `max_price` - (Optional) The maximum price per hour, in dollars
+```yaml
+profiles:
+  - name: large
 
-[//]: # (TODO: Add examples)
+    resources:
+      memory: 24GB  # (Optional) The minimum amount of RAM memory
+      gpu:
+        name: A100 # (Optional) The name of the GPU
+        memory: 40GB # (Optional) The minimum amount of GPU memory 
+      shm_size: 8GB # (Optional) The size of shared memory
+    
+    spot_policy: auto # (Optional) The spot policy. Supports `spot`, `on-demand, and `auto`.
 
-[//]: # (TODO: Add more explanations of how it works, incl. how to pass defined profiles to the CLI)
+    max_price: 1.5 # (Optional) The maximum price per instance per hour
+    
+    max_duration: 1d # (Optional) The maximum duration of the run.
+
+    retry:
+      retry-limit: 3h # (Optional) To wait for capacity
+    
+    backends: [azure, lambda]  # (Optional) Use only listed backends 
+
+    default: true # (Optional) Activate the profile by default
+```
+
+</div>
+
+### Schema reference
+
+- <a href="#PROFILES"><code id="PROFILES">profiles</code></a> - (Required)
+    - <a href="#NAME"><code id="NAME">name</code></a> - (Required) The name of the profile. Can be passed via [`--profile PROFILE`](cli/run.md#PROFILE) to `dstack run`
+    - <a href="#RESOURCES"><code id="RESOURCES">resources</code></a> - (Optional)
+        - <a href="#MEMORY"><code id="MEMORY">memory</code></a> - (Optional) The minimum size of memory. Example: `64GB` 
+        - <a href="#GPU"><code id="GPU">gpu</code></a> - (Optional)
+            - <a href="#NAME"><code id="NAME">name</code></a> - (Optional) The name of the GPU. Examples: `T4`, `V100`, `A10`, `L4`, `A100`, etc.)
+            - <a href="#COUNT"><code id="COUNT">count</code></a> - (Optional) The minimum number of GPUs. Defaults to `1`.
+            - <a href="#MEMORY"><code id="MEMORY">memory</code></a> - (Optional) The minimum size of GPU memory. Example: `20GB`
+        - <a href="#SHM_SIZE"><code id="SHM_SIZE">shm_size</code></a> - (Optional) The size of shared memory. 
+  Required to set if you are using parallel communicating processes. Example: `8GB`
+    - <a href="#SPOT_POLICY"><code id="SPOT_POLICY">spot_policy</code></a> - (Optional) The spot policy. Example: `spot` (spot instances only), `on-demand` (on-demand instances only), or `auto` (spot if available or on-demand otherwise). Defaults to `on-demand` for dev environments and to `auto` for tasks and services.
+    - <a href="#RETRY_POLICY"><code id="RETRY_POLICY">retry_policy</code></a> - (Optional) The policy for re-submitting the run.
+        - <a href="#LIMIT"><code id="LIMIT">limit</code></a> - (Optional) The duration to wait for capacity. Example: `3h` or `2d`.
+    - <a href="#MAX_DURATION"><code id="MAX_DURATION">max_duration</code></a> - (Optional) The maximum duration of a run. After it elapses, the run is forced to stop. Protects from running idle instances. Defaults to `6h` for dev environments and to `72h` for tasks. Examples: `3h` or `2d` or `off`.
+    - <a href="#MAX_PRICE"><code id="MAX_PRICE">max_price</code></a> - (Optional) The maximum price per hour, in dollars. Example: `1.1` or `0.8`
+    - <a href="#BACKENDS"><code id="BACKENDS">backends</code></a> - (Optional) Force using listed backends only. Possible values: `aws`, `azure`, `gcp`, `lambda`. If not specified, all configured backends are tried.
+    - <a href="#DEFAULT"><code id="DEFAULT">default</code></a> - (Optional) If set to `true`, it will be activated by default

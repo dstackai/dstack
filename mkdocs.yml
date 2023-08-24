@@ -142,8 +142,8 @@ nav:
               - pip: docs/installation/pip.md
               - Docker: docs/installation/docker.md
               - HF Spaces: docs/installation/hf-spaces.md
-#          - Projects: docs/projects.md
       - Guides:
+          - Clouds: docs/guides/clouds.md
           - Dev environments: docs/guides/dev-environments.md
           - Tasks: docs/guides/tasks.md
           - Services: docs/guides/services.md

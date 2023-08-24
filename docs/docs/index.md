@@ -18,14 +18,12 @@ The server is available at http://127.0.0.1:3000?token=b934d226-e24a-4eab-eb92b3
 
 </div>
 
-## Configure backends
+## Configure clouds
 
 Upon startup, the server sets up the default project called `main`.
+Prior to using `dstack`, make sure to [configure clouds](guides/clouds.md#configuring-backends).
 
-![](../assets/images/dstack-hub-view-project-empty.png){ width=800 }
-
-Prior to using `dstack`, open the `main` project's settings, and add cloud backends 
-(e.g., [AWS](reference/backends/aws.md), [GCP](reference/backends/gcp.md), [Azure](reference/backends/azure.md), [Lambda](reference/backends/lambda.md), etc.).
+[//]: # (![]&#40;../assets/images/dstack-hub-view-project-empty.png&#41;{ width=800 })
 
 [//]: # (Once cloud backends are configured, `dstack` will be able to provision cloud resources across configured clouds, ensuring)
 [//]: # (the best price and higher availability.)
@@ -125,7 +123,7 @@ the [gateway](guides/services.md#configure-a-gateway-address).
 [//]: # (    )
 [//]: # (    Each folder may have one default configuration file named `.dstack.yml`.)
 
-For more details on the syntax of configuration file, refer to the [`.dstack.yml` Reference](../docs/reference/dstack.yml/index.md).
+For more details on the file syntax, refer to [`.dstack.yml`](../docs/reference/dstack.yml/index.md).
 
 ## Run the configuration
 
@@ -179,55 +177,18 @@ Launching in *reload mode* on: http://127.0.0.1:7860 (Press CTRL+C to quit)
 [//]: # (!!! info "Port forwarding")
 [//]: # (    By default, `dstack` forwards the ports used by dev environments and tasks to your local machine for convenient access.)
 
-For more details on how the `dstack run` command works, refer to the [CLI Reference](reference/cli/run.md).
+For more details on the run command, refer to [`dstack run`](reference/cli/run.md).
 
-[//]: # (TODO: Not sure if port forwarding is worth mentioning)
-[//]: # (TODO: Mention resource configuration and/or profiles)
-[//]: # (TODO: Move .gitignore to the `dstack run`'s reference page)
+### Requesting resources
 
-[//]: # (## Profiles)
-[//]: # ()
-[//]: # (If you have [configured]&#40;projects.md&#41; a project that runs dev environments and tasks in the cloud, you can define multiple)
-[//]: # (profiles. Each profile can configure the project to use and the resources required for the run.)
-[//]: # ()
-[//]: # (To define profiles, create the `profiles.yml` file in the `.dstack` folder within your project directory. Here's an example:)
-[//]: # ()
-[//]: # (<div editor-title=".dstack/profiles.yml"> )
-[//]: # ()
-[//]: # (```yaml)
-[//]: # (profiles:)
-[//]: # (  - name: gcp-t4)
-[//]: # (    project: gcp)
-[//]: # (    )
-[//]: # (    resources:)
-[//]: # (      memory: 24GB)
-[//]: # (      gpu:)
-[//]: # (        name: T4)
-[//]: # (        )
-[//]: # (    spot_policy: auto)
-[//]: # (    retry_policy:)
-[//]: # (      limit: 30min)
-[//]: # (    max_duration: 1d)
-[//]: # (      )
-[//]: # (    default: true)
-[//]: # (```)
-[//]: # ()
-[//]: # (</div>)
+You can request resources using the [`--gpu`](reference/cli/run.md#GPU) 
+and [`--memory`](reference/cli/run.md#MEMORY) arguments with `dstack run`, 
+or through [`resources`](reference/profiles.yml.md#RESOURCES) with `.dstack/profiles.yml`.
 
-[//]: # (!!! info "Spot instances")
-[//]: # (    If `spot_policy` is set to `auto`, `dstack` prioritizes spot instances.)
-[//]: # (    If these are unavailable, it uses `on-demand` instances. To cut costs, set `spot_policy` to `spot`.)
-[//]: # (    )
-[//]: # (    If `dstack` can't find capacity, an error displays. To enable continuous capacity search, use `retry_policy` with a )
-[//]: # (    `limit`. For example, setting it to `30min` makes `dstack` search for capacity for 30 minutes.)
-[//]: # ()
-[//]: # (    Note that spot instances are significantly cheaper but can be interrupted. Your code should ideally )
-[//]: # (    handle interruptions and resume work from saved checkpoints.)
-[//]: # ()
-[//]: # (Now, if you use the `dstack run` command, `dstack` will use the default profile.)
-[//]: # ()
-[//]: # (!!! info "Multiple profiles")
-[//]: # (    You can define multiple profiles according to your needs and use any of them with the `dstack run` command by specifying)
-[//]: # (    the desired profile using the `--profile` argument.)
-[//]: # ()
-[//]: # (For more details on the syntax of the `profiles.yml` file, refer to the [Reference]&#40;reference/profiles.yml.md&#41;.)
+Both the [`dstack run`](reference/cli/run.md) command and [`.dstack/profiles.yml`](reference/profiles.yml.md)
+support various other options, including requesting spot instances, defining the maximum run duration or price, and
+more.
+
+!!! info "Automatic instance discovery"
+    `dstack` will automatically select the suitable instance type from a cloud provider and region with the best
+    price and availability.

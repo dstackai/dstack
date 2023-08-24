@@ -32,7 +32,7 @@ Before running a service, you need to configure a gateway address to run the ser
 
 ??? info "Gateway"
 
-    ### Configure a gateway address 
+    ### Configure a gateway 
 
     First, you have to create a gateway in one of the clouds of your choice.
     
@@ -148,7 +148,7 @@ You can install packages using `pip` and `conda` executables from `commands`.
     If there is no pre-built image, the `dstack run` command will build it and upload it to the storage. If the pre-built
     image is already available, the `dstack run` command will reuse it.
 
-The `.dstack.yml` has many other properties. To view them all, refer to the [Reference](../reference/dstack.yml/service.md).
+For more details on the file syntax, refer to [`.dstack.yml`](../reference/dstack.yml/service.md).
 
 ## Run the configuration
 
@@ -175,58 +175,18 @@ Serving HTTP on https://myservice.mydomain.com ...
 
 This command deploys the service, and forwards the traffic to the gateway address.
 
-### Configure resources, price, etc
+### Requesting resources
 
-For every run, you can specify hardware resources like memory and GPU, along with various run policies (e.g., maximum
-hourly price, use of spot instances, etc.).
+You can request resources using the [`--gpu`](../reference/cli/run.md#GPU) 
+and [`--memory`](../reference/cli/run.md#MEMORY) arguments with `dstack run`, 
+or through [`resources`](../reference/profiles.yml.md#RESOURCES) with `.dstack/profiles.yml`.
 
-| Example                     | Description                                |
-|-----------------------------|--------------------------------------------|
-| `dstack run . --gpu A10`    | Use an instance with `NVIDIA A10` GPU      |
-| `dstack run . --gpu A100:8` | Use an instance with 8 `NVIDIA A100` GPUs  |
-| `dstack run . --gpu 24GB`   | Use an instance with a GPU that has `24GB` |
+Both the [`dstack run`](../reference/cli/run.md) command and [`.dstack/profiles.yml`](../reference/profiles.yml.md)
+support various other options, including requesting spot instances, defining the maximum run duration or price, and
+more.
 
-The `dstack run` command has many options. To view them, refer to the [Reference](../reference/cli/run.md).
+!!! info "Automatic instance discovery"
+    `dstack` will automatically select the suitable instance type from a cloud provider and region with the best
+    price and availability.
 
-??? info "Profiles"
-    ### Configure profiles (optional) 
-
-    Instead of configuring resources, price, and policies through `dstack run`, you can use profiles. To set up a profile, 
-    create the `.dstack/profiles.yml` file in the root folder of the project. 
-    
-    <div editor-title=".dstack/profiles.yml"> 
-    
-    ```yaml
-    profiles:
-      - name: large
-
-        resources:
-          memory: 24GB  # (Optional) The minimum amount of RAM memory
-          gpu:
-            memory: 48GB  # (Optional) The minimum amount of GPU memory 
-            
-        max_price: 1.5 # (Optional) The maximim price per instance, in dollards.
-
-        max_duration: 1d # (Optional) The maximum duration of the run.
-
-        spot_policy: auto # (Optional) The spot policy. Supports `spot`, `on-demand, and `auto`.
-
-        backends: [azure, lambda]  # (Optional) Use only listed backends 
-
-        default: true # (Optional)
-    ```
-    
-    </div>
-
-    #### Spot instances
-
-    If `spot_policy` is set to `auto`, `dstack` gives priority to spot instances. If unavailable, it uses on-demand instances. 
-    To reduce costs, set `spot_policy` to `spot`. Keep in mind that spot instances are much cheaper but may be interrupted. 
-    Your code should handle interruptions and resume from saved checkpoints.
-
-    #### Default profile
-    
-    By default, the `dstack run` command uses the default profile. You 
-    can override it by passing the `--profile` argument to the `dstack run` command.
-    
-    For more details on the syntax of the `profiles.yml` file, refer to the [Reference](../reference/profiles.yml.md).
+For more details on the run command, refer to [`dstack run`](reference/cli/run.md).

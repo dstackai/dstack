@@ -344,7 +344,7 @@
 }
 
 .md-typeset :not(pre) > a code {
-    color: #8752d7;
+    color: #ce00ff;
 }
 
 .md-typeset pre > code {
@@ -483,9 +483,9 @@ code .md-code__nav:hover .md-code__button {
 }
 
 [data-md-color-scheme=slate][data-md-color-primary=black], [data-md-color-primary=white] {
-    --md-primary-fg-color: #6e14ed;
-    --md-accent-fg-color: #6e14ed;
-    --md-typeset-a-color: #6e14ed;
+    --md-primary-fg-color: #0048ff;
+    --md-accent-fg-color: #ce00ff;
+    --md-typeset-a-color: #ce00ff;
     --md-code-hl-function-color: #e3b4fb;
     --md-code-hl-keyword-color: #e37cff;
     --md-code-hl-string-color: #b4f9c6;
@@ -858,14 +858,16 @@ html .md-footer-meta.md-typeset a:is(:focus,:hover) {
     color: var(--md-typeset-a-color);
 }
 
-.md-typeset .grid.cards>:-webkit-any(ul,ol)>li a, .md-typeset .grid>.card a {
+.md-typeset .grid.cards > :-webkit-any(ul,ol) > li a,
+.md-typeset .grid.cards > :-webkit-any(ul,ol) > li span,
+.md-typeset .grid > .card a {
     color: var(--md-default-fg-color);
     text-decoration: none;
     display: block;
     margin: 0;
     padding: 1rem 1.4rem;
     border-radius: 6px;
-    border: rgba(0,0,0,0.6) 1px solid;
+    border: rgba(0,0,0,0.6) 0.5px solid;
 }
 
 .md-typeset .grid.cards>ol>li:focus-within,.md-typeset .grid.cards>ol>li:hover,.md-typeset .grid.cards>ul>li:focus-within,.md-typeset .grid.cards>ul>li:hover,.md-typeset .grid>.card:focus-within,.md-typeset .grid>.card:hover {
