@@ -87,7 +87,7 @@ export const BUCKET_HELP = {
 };
 
 export const SUBNET_HELP = {
-    header: <h2>Backend type</h2>,
+    header: <h2>Subnet</h2>,
     body: (
         <>
             <p>
