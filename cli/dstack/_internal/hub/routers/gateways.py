@@ -5,6 +5,7 @@ from typing import List
 import dns.exception
 import dns.resolver
 from fastapi import APIRouter, Body, Depends, HTTPException, status
+from pydantic import BaseModel
 
 from dstack._internal.core.gateway import Gateway
 from dstack._internal.hub.db.models import Project
@@ -28,13 +29,21 @@ router = APIRouter(
 supported_backends = ["aws", "azure", "gcp"]
 
 
+class Message(BaseModel):
+    msg: str
+
+
 @router.get("/{project_name}/gateways/list_backends")
 async def gateways_list_backends(project_name: str) -> List[GatewayBackend]:
     project = await get_project(project_name=project_name)
     return await _get_gateway_backends(project)
 
 
-@router.post("/{project_name}/gateways/create", dependencies=[Depends(ProjectAdmin())])
+@router.post(
+    "/{project_name}/gateways/create",
+    dependencies=[Depends(ProjectAdmin())],
+    responses={400: {"model": Message}},
+)
 async def gateway_create(project_name: str, body: GatewayCreate = Body()) -> Gateway:
     project = await get_project(project_name=project_name)
     backends = await get_backends(project)
@@ -105,7 +114,11 @@ async def gateway_update(project_name: str, instance_name: str, body: GatewayUpd
         await call_backend(backend.update_gateway, instance_name, body.wildcard_domain)
 
 
-@router.post("/{project_name}/gateways/{instance_name}/test_domain")
+@router.post(
+    "/{project_name}/gateways/{instance_name}/test_domain",
+    dependencies=[Depends(ProjectAdmin())],
+    responses={400: {"model": Message}},
+)
 async def gateway_test_domain(
     project_name: str, instance_name: str, body: GatewayTestDomain = Body()
 ):
