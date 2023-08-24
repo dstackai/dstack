@@ -20,3 +20,7 @@ class GatewayBackend(BaseModel):
 class GatewayUpdate(BaseModel):
     wildcard_domain: Optional[str]
     default: Optional[bool]
+
+
+class GatewayTestDomain(BaseModel):
+    domain: str

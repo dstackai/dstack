@@ -29,6 +29,7 @@ cryptography
 filelock
 watchfiles
 docker
+dnspython
 
 # AWS
 boto3

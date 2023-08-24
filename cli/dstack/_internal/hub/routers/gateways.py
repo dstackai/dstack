@@ -2,6 +2,8 @@ import asyncio
 from collections import defaultdict
 from typing import List
 
+import dns.exception
+import dns.resolver
 from fastapi import APIRouter, Body, Depends, HTTPException, status
 
 from dstack._internal.core.gateway import Gateway
@@ -13,6 +15,7 @@ from dstack._internal.hub.schemas.gateways import (
     GatewayBackend,
     GatewayCreate,
     GatewayDelete,
+    GatewayTestDomain,
     GatewayUpdate,
 )
 from dstack._internal.hub.security.permissions import ProjectAdmin, ProjectMember
@@ -102,7 +105,30 @@ async def gateway_update(project_name: str, instance_name: str, body: GatewayUpd
         await call_backend(backend.update_gateway, instance_name, body.wildcard_domain)
 
 
-# todo test wildcard record
+@router.post("/{project_name}/gateways/{instance_name}/test_domain")
+async def gateway_test_domain(
+    project_name: str, instance_name: str, body: GatewayTestDomain = Body()
+):
+    project = await get_project(project_name)
+    gateway = await _get_gateway(project, instance_name)
+
+    try:
+        for rdata in dns.resolver.resolve("*." + body.domain, "A"):
+            if rdata.address == gateway.head.external_ip:
+                return
+    except dns.exception.DNSException:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=error_detail(
+                msg="DNS error occurred during the test",
+            ),
+        )
+    raise HTTPException(
+        status_code=status.HTTP_400_BAD_REQUEST,
+        detail=error_detail(
+            msg="Wildcard record is not pointing to the gateway",
+        ),
+    )
 
 
 async def _list_gateways(project: Project) -> List[Gateway]:
