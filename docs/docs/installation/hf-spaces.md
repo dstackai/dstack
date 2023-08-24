@@ -1,7 +1,5 @@
 # Hugging Face Spaces
 
-## Create a space
-
 !!! info "NOTE:"
     Before creating a Hugging Face Space, make sure you're logged in to Hugging Face.
 
@@ -12,7 +10,7 @@ by clicking the button below.
 <a href="https://huggingface.co/spaces/dstackai/dstack-template?duplicate=true&visibility=public" 
     class="md-button md-button--primary" target="_blank">Create a Space</a>
 
-## Configure the settings
+## Space settings
 
 Once the space is created, click on `Settings` and proceed to configure the visibility and secrets of the space.
 
@@ -59,3 +57,7 @@ If you don't do that, `dstack` will generate it randomly and print it to the `Lo
     users, projects, and configure the `dstack` CLI. This allows you to collaborate as a team, running development
     environments, pipelines, and apps securely and conveniently in the cloud without the need to host the `dstack` server
     yourself.
+
+## Configure clouds
+
+Prior to using `dstack`, make sure to [configure clouds](../guides/clouds.md#configuring-clouds-with-dstack).

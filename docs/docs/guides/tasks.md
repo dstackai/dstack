@@ -221,4 +221,4 @@ more.
     This feature allows you to run an app in the cloud while continuing to edit the source code locally and have the app
     reload changes on the fly.
 
-For more details on the run command, refer to [`dstack run`](reference/cli/run.md).
+For more details on the run command, refer to [`dstack run`](../reference/cli/run.md).

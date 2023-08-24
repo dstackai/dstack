@@ -21,7 +21,7 @@ The server is available at http://127.0.0.1:3000?token=b934d226-e24a-4eab-eb92b3
 ## Configure clouds
 
 Upon startup, the server sets up the default project called `main`.
-Prior to using `dstack`, make sure to [configure clouds](guides/clouds.md#configuring-backends).
+Prior to using `dstack`, make sure to [configure clouds](guides/clouds.md#configuring-clouds-with-dstack).
 
 [//]: # (![]&#40;../assets/images/dstack-hub-view-project-empty.png&#41;{ width=800 })
 

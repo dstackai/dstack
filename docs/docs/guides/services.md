@@ -189,4 +189,4 @@ more.
     `dstack` will automatically select the suitable instance type from a cloud provider and region with the best
     price and availability.
 
-For more details on the run command, refer to [`dstack run`](reference/cli/run.md).
+For more details on the run command, refer to [`dstack run`](../reference/cli/run.md).

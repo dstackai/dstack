@@ -79,3 +79,25 @@ more.
     Remember, you can't specify an instance type by name. Instead, ask for resources by GPU name or memory amount. 
     `dstack` will automatically select the suitable instance type from a cloud provider and region with the best
     price and availability.
+
+<div class="termy small">
+
+```shell
+$ dstack run . -f llama-2/train.dstack.yml --gpu A100
+
+ Configuration       llama-2/train.dstack.yml
+ Min resources       2xCPUs, 8GB, 1xA100
+ Max price           no
+ Spot policy         auto
+ Max duration        72h
+
+ #  BACKEND  RESOURCES                      SPOT  PRICE
+ 2  lambda   30xCPUs, 200GB, 1xA100 (80GB)  yes   $1.1
+ 3  gcp      12xCPUs, 85GB, 1xA100 (40GB)   yes   $1.20582
+ 1  azure    24xCPUs, 220GB, 1xA100 (80GB)  yes   $1.6469
+    ...
+
+Continue? [y/n]:
+```
+
+</div>
