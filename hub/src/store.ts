@@ -4,6 +4,7 @@ import notificationsReducer from 'components/Notifications/slice';
 
 import { artifactApi } from 'services/artifact';
 import { backendApi } from 'services/backend';
+import { gatewayApi } from 'services/gateway';
 import { projectApi } from 'services/project';
 import { runApi } from 'services/run';
 import { secretApi } from 'services/secret';
@@ -22,6 +23,7 @@ export const store = configureStore({
         [artifactApi.reducerPath]: artifactApi.reducer,
         [tagApi.reducerPath]: tagApi.reducer,
         [userApi.reducerPath]: userApi.reducer,
+        [gatewayApi.reducerPath]: gatewayApi.reducer,
         [secretApi.reducerPath]: secretApi.reducer,
     },
 
@@ -35,6 +37,7 @@ export const store = configureStore({
             .concat(artifactApi.middleware)
             .concat(tagApi.middleware)
             .concat(secretApi.middleware)
+            .concat(gatewayApi.middleware)
             .concat(userApi.middleware),
 });
 

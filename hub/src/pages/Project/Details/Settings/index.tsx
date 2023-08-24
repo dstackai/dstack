@@ -1,6 +1,6 @@
 import React, { useCallback } from 'react';
 import { useTranslation } from 'react-i18next';
-import { useNavigate, useParams } from 'react-router-dom';
+import { useParams } from 'react-router-dom';
 import { debounce } from 'lodash';
 
 import { Box, Button, Container, Header, Loader, Popover, SpaceBetween, StatusIndicator } from 'components';
@@ -8,12 +8,14 @@ import { Box, Button, Container, Header, Loader, Popover, SpaceBetween, StatusIn
 import { useAppSelector, useBreadcrumbs, useNotifications } from 'hooks';
 import { copyToClipboard } from 'libs';
 import { ROUTES } from 'routes';
-import { useDeleteProjectBackendMutation, useGetProjectBackendsQuery } from 'services/backend';
 import { useGetProjectQuery, useUpdateProjectMembersMutation } from 'services/project';
 
 import { selectAuthToken, selectUserData } from 'App/slice';
 
+import { useBackendsTable } from '../../Backends/hooks';
 import { BackendsTable } from '../../Backends/Table';
+import { GatewaysTable } from '../../Gateways';
+import { useGatewaysTable } from '../../Gateways/hooks';
 import { ProjectMembers } from '../../Members';
 
 import styles from './styles.module.scss';
@@ -24,16 +26,31 @@ export const ProjectSettings: React.FC = () => {
     const userData = useAppSelector(selectUserData);
     const userGlobalRole = userData?.global_role ?? '';
     const paramProjectName = params.name ?? '';
-    const navigate = useNavigate();
     const { data, isLoading } = useGetProjectQuery({ name: paramProjectName });
-    const { data: backendsData, isLoading: isLoadingBackends } = useGetProjectBackendsQuery({ projectName: paramProjectName });
     const [updateProjectMembers] = useUpdateProjectMembersMutation();
-    const [deleteBackend, { isLoading: isDeleting }] = useDeleteProjectBackendMutation();
+
+    const {
+        data: backendsData,
+        isLoading: isLoadingBackends,
+        isDeleting: isDeletingBackend,
+        addBackend,
+        deleteBackend,
+        editBackend,
+    } = useBackendsTable(paramProjectName);
+
+    const {
+        data: gatewaysData,
+        isLoading: isLoadingGateways,
+        isDeleting: isDeletingGateways,
+        editGateway,
+        deleteGateway,
+        addGateway,
+    } = useGatewaysTable(paramProjectName);
 
     const currentUserToken = useAppSelector(selectAuthToken);
     const [pushNotification] = useNotifications();
 
-    const isLoadingPage = isLoading || !data || isLoadingBackends;
+    const isLoadingPage = isLoading || !data || isLoadingBackends || isLoadingGateways;
 
     useBreadcrumbs([
         {
@@ -72,21 +89,6 @@ export const ProjectSettings: React.FC = () => {
 
     const debouncedMembersHandler = useCallback(debounce(changeMembersHandler, 1000), []);
 
-    const goToBackendEdit = (backend: IProjectBackend) => {
-        navigate(ROUTES.PROJECT.BACKEND.EDIT.FORMAT(paramProjectName, backend.name));
-    };
-
-    const deleteBackendHandler = (backends: readonly IProjectBackend[] | IProjectBackend[]) => {
-        deleteBackend({
-            projectName: paramProjectName,
-            backends: backends.map((backend) => backend.name),
-        });
-    };
-
-    const addBackendHandler = () => {
-        navigate(ROUTES.PROJECT.BACKEND.ADD.FORMAT(paramProjectName));
-    };
-
     if (isLoadingPage)
         return (
             <Container>
@@ -96,14 +98,22 @@ export const ProjectSettings: React.FC = () => {
 
     return (
         <>
-            {data && backendsData && (
+            {data && backendsData && gatewaysData && (
                 <SpaceBetween size="l">
                     <BackendsTable
                         backends={backendsData}
-                        onClickAddBackend={addBackendHandler}
-                        editBackend={goToBackendEdit}
-                        deleteBackends={deleteBackendHandler}
-                        isDisabledDelete={isDeleting}
+                        onClickAddBackend={addBackend}
+                        editBackend={editBackend}
+                        deleteBackends={deleteBackend}
+                        isDisabledDelete={isDeletingBackend}
+                    />
+
+                    <GatewaysTable
+                        gateways={gatewaysData}
+                        addItem={addGateway}
+                        editItem={editGateway}
+                        deleteItem={deleteGateway}
+                        isDisabledDelete={isDeletingGateways}
                     />
 
                     <Container

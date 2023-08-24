@@ -66,6 +66,19 @@ export const API = {
             `${API.PROJECT_BACKENDS.BASE(projectName)}/${backendName}/config_info`,
     },
 
+    PROJECT_GATEWAYS: {
+        BASE: (projectName: IProject['project_name']) => `${API.BASE()}/project/${projectName}/gateways`,
+        LIST_BACKENDS: (projectName: IProject['project_name']) => `${API.PROJECT_GATEWAYS.BASE(projectName)}/list_backends`,
+        DELETE: (projectName: IProject['project_name']) => `${API.PROJECT_GATEWAYS.BASE(projectName)}/delete`,
+        CREATE: (projectName: IProject['project_name']) => `${API.PROJECT_GATEWAYS.BASE(projectName)}/create`,
+        DETAILS: (projectName: IProject['project_name'], instanceName: string) =>
+            `${API.PROJECT_GATEWAYS.BASE(projectName)}/${instanceName}`,
+        UPDATE: (projectName: IProject['project_name'], instanceName: string) =>
+            `${API.PROJECT_GATEWAYS.DETAILS(projectName, instanceName)}/update`,
+        TEST_DOMAIN: (projectName: IProject['project_name'], instanceName: string) =>
+            `${API.PROJECT_GATEWAYS.DETAILS(projectName, instanceName)}/test_domain`,
+    },
+
     RUNS: {
         BASE: () => `${API.BASE()}/runs`,
         LIST: () => `${API.RUNS.BASE()}/list`,
