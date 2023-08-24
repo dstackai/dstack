@@ -8,6 +8,7 @@ from dstack._internal.core.gateway import Gateway
 from dstack._internal.hub.db.models import Project
 from dstack._internal.hub.repository.projects import ProjectManager
 from dstack._internal.hub.routers.util import call_backend, error_detail, get_backends, get_project
+from dstack._internal.hub.schemas import AWSBackendConfig, AzureBackendConfig, GCPBackendConfig
 from dstack._internal.hub.schemas.gateways import (
     GatewayBackend,
     GatewayCreate,
@@ -15,40 +16,44 @@ from dstack._internal.hub.schemas.gateways import (
     GatewayUpdate,
 )
 from dstack._internal.hub.security.permissions import ProjectAdmin, ProjectMember
+from dstack._internal.hub.services.backends import get_configurator
+from dstack._internal.utils.random_names import generate_name
 
 router = APIRouter(
     prefix="/api/project", tags=["gateways"], dependencies=[Depends(ProjectMember())]
 )
+supported_backends = ["aws", "azure", "gcp"]
 
 
 @router.get("/{project_name}/gateways/list_backends")
 async def gateways_list_backends(project_name: str) -> List[GatewayBackend]:
     project = await get_project(project_name=project_name)
-    backends = await get_backends(project)
-    supported_backends = ["aws", "azure", "gcp"]
-    return [
-        GatewayBackend(backend=backend.name, regions=[])  # todo regions
-        for _, backend in backends
-        if backend.name in supported_backends
-    ]
+    return await _get_gateway_backends(project)
 
 
 @router.post("/{project_name}/gateways/create", dependencies=[Depends(ProjectAdmin())])
 async def gateway_create(project_name: str, body: GatewayCreate = Body()) -> Gateway:
     project = await get_project(project_name=project_name)
     backends = await get_backends(project)
-    for _, backend in backends:
-        if backend.name != body.backend:
-            continue
-        try:
-            head = await call_backend(backend.create_gateway, project.ssh_public_key, body.region)
+
+    gateway_names = {gateway.head.instance_name for gateway in await _list_gateways(project)}
+    while True:
+        instance_name = f"dstack-gateway-{generate_name()}"
+        if instance_name not in gateway_names:
+            break
+
+    if body.backend in supported_backends:
+        for _, backend in backends:
+            if backend.name != body.backend:
+                continue
+            head = await call_backend(
+                backend.create_gateway, instance_name, project.ssh_public_key, body.region
+            )
             return Gateway(backend=backend.name, head=head, default=False)
-        except NotImplementedError:
-            pass
     raise HTTPException(
         status_code=status.HTTP_400_BAD_REQUEST,
         detail=error_detail(
-            msg=f"Can't create gateway for {project_name} project. No backend supporting gateway",
+            msg=f"Can't create gateway for {project_name} project. No {body.backend} backend supporting gateway",
             code="not_implemented",
         ),
     )
@@ -122,3 +127,21 @@ async def _get_gateway(project: Project, instance_name: str) -> Gateway:
         if gateway.head.instance_name == instance_name:
             return gateway
     raise HTTPException(status_code=status.HTTP_404_NOT_FOUND)
+
+
+async def _get_gateway_backends(project: Project) -> List[GatewayBackend]:
+    gateway_backends = []
+    backends = await get_backends(project)
+    for db_backend, backend in backends:
+        if backend.name not in supported_backends:
+            continue
+        configurator = get_configurator(backend.name)
+        regions = []
+        if configurator is not None:
+            config = configurator.get_backend_config(db_backend, include_creds=False)
+            if isinstance(config, (AWSBackendConfig, GCPBackendConfig)):
+                regions = config.regions
+            elif isinstance(config, AzureBackendConfig):
+                regions = config.locations
+        gateway_backends.append(GatewayBackend(backend=backend.name, regions=regions))
+    return gateway_backends

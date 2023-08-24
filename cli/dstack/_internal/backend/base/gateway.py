@@ -20,14 +20,11 @@ from dstack._internal.core.job import Job
 from dstack._internal.utils.common import PathLike, removeprefix
 from dstack._internal.utils.crypto import generate_rsa_key_pair_bytes
 from dstack._internal.utils.interpolator import VariablesInterpolator
-from dstack._internal.utils.random_names import generate_name
 
 
 def create_gateway(
-    compute: Compute, storage: Storage, ssh_key_pub: str, region: Optional[str]
+    compute: Compute, storage: Storage, instance_name: str, ssh_key_pub: str, region: Optional[str]
 ) -> GatewayHead:
-    # todo generate while instance name is not unique
-    instance_name = f"dstack-gateway-{generate_name()}"
     head = compute.create_gateway(instance_name, ssh_key_pub, region=region)
     put_head_object(storage, head)
     return head
