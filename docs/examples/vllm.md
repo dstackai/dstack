@@ -71,8 +71,7 @@ env:
 port: 8000
 
 commands:
-  - conda install cuda # Required since vLLM will rebuild the CUDA kernel
-  - pip install vllm # Takes 5-10 minutes
+  - pip install vllm
   - python -m vllm.entrypoints.openai.api_server --model $MODEL --port 8000
 ```
 
