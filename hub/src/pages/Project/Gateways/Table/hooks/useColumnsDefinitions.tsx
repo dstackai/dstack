@@ -1,7 +1,7 @@
 import React, { useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
 
-import { Button } from 'components';
+import { Button, Icon } from 'components';
 import { ButtonWithConfirmation } from 'components/ButtonWithConfirmation';
 
 import styles from '../styles.module.scss';
@@ -19,17 +19,29 @@ export const useColumnsDefinitions = ({ loading, onDeleteClick, onEditClick }: h
         return [
             {
                 id: 'type',
-                header: t('gateway.table.backend'),
+                header: t('gateway.edit.backend'),
                 cell: (gateway: IGateway) => gateway.backend,
             },
 
             {
-                id: 'bucket',
-                header: t('gateway.table.region'),
+                id: 'region',
+                header: t('gateway.edit.region'),
+                cell: (gateway: IGateway) => gateway.head.region,
+            },
+
+            {
+                id: 'default',
+                header: t('gateway.edit.default'),
+                cell: (gateway: IGateway) => gateway.default && <Icon name={'check'} />,
+            },
+
+            {
+                id: 'wildcard_domain',
+                header: t('gateway.edit.wildcard_domain'),
 
                 cell: (gateway: IGateway) => (
                     <div className={styles.cell}>
-                        <div>{gateway.head.region}</div>
+                        <div>{gateway.head.wildcard_domain}</div>
 
                         <div className={styles.contextMenu}>
                             {onEditClick && (

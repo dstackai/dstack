@@ -1,25 +1,22 @@
 import { useNavigate } from 'react-router-dom';
 
 import { ROUTES } from 'routes';
-import { useGetProjectGatewaysQuery } from 'services/gateway';
+import { useDeleteProjectGatewayMutation, useGetProjectGatewaysQuery } from 'services/gateway';
 
 export const useGatewaysTable = (projectName: IProject['project_name']) => {
     const navigate = useNavigate();
     const { data, isLoading } = useGetProjectGatewaysQuery({ projectName });
-    const isDeleting = false;
-    // const [deleteBackendRequest, { isLoading: isDeleting }] = useDeleteProjectBackendMutation();
+    const [deleteGatewayRequest, { isLoading: isDeleting }] = useDeleteProjectGatewayMutation();
 
     const editGateway = (gateway: IGateway) => {
-        console.log(gateway);
-        // navigate(ROUTES.PROJECT.BACKEND.EDIT.FORMAT(projectName, gateway.head.instance_name));
+        navigate(ROUTES.PROJECT.GATEWAY.EDIT.FORMAT(projectName, gateway.head.instance_name));
     };
 
     const deleteGateway = (gateways: readonly IGateway[] | IGateway[]) => {
-        console.log(gateways);
-        // deleteBackendRequest({
-        //     projectName,
-        //     backends: backends.map((backend) => backend.name),
-        // });
+        deleteGatewayRequest({
+            projectName,
+            instance_names: gateways.map((gateway) => gateway.head.instance_name),
+        });
     };
 
     const addGateway = () => {

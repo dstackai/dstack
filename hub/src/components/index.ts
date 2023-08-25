@@ -1,6 +1,7 @@
 export { default as Alert } from '@cloudscape-design/components/alert';
 export type { AlertProps } from '@cloudscape-design/components/alert';
 export { default as Button } from '@cloudscape-design/components/button';
+export { default as Icon } from '@cloudscape-design/components/icon';
 export type { ButtonProps } from '@cloudscape-design/components/button';
 export { default as AppLayout } from '@cloudscape-design/components/app-layout';
 export type { AppLayoutProps } from '@cloudscape-design/components/app-layout';
@@ -23,6 +24,7 @@ export { default as BreadcrumbGroup } from '@cloudscape-design/components/breadc
 export type { BreadcrumbGroupProps } from '@cloudscape-design/components/breadcrumb-group';
 export { default as FormUI } from '@cloudscape-design/components/form';
 export { default as FormField } from '@cloudscape-design/components/form-field';
+export { default as CheckboxCSD } from '@cloudscape-design/components/checkbox';
 export { default as InputCSD } from '@cloudscape-design/components/input';
 export { default as SelectCSD } from '@cloudscape-design/components/select';
 export type { SelectProps as SelectCSDProps } from '@cloudscape-design/components/select';
@@ -45,6 +47,7 @@ export { NavigateLink } from './NavigateLink';
 export { ListEmptyMessage } from './ListEmptyMessage';
 export { DetailsHeader } from './DetailsHeader';
 export { Loader } from './Loader';
+export { FormCheckbox } from './form/Checkbox';
 export { FormInput } from './form/Input';
 export { FormMultiselect } from './form/Multiselect';
 export { FormSelect } from './form/Select';
