@@ -3,11 +3,11 @@ from typing import Optional
 import boto3
 
 from dstack._internal.backend.aws import utils as aws_utils
+from dstack._internal.backend.aws.config import DEFAULT_REGION
 from dstack._internal.backend.aws.logs import AWSLogging
 from dstack._internal.backend.aws.secrets import AWSSecretsManager
 from dstack._internal.backend.aws.storage import AWSStorage
 from dstack._internal.backend.base import ComponentBasedBackend
-from dstack._internal.backend.base import runs as base_runs
 from dstack._internal.backend.lambdalabs.compute import LambdaCompute
 from dstack._internal.backend.lambdalabs.config import LambdaConfig
 from dstack._internal.backend.lambdalabs.pricing import LambdaPricing
@@ -35,13 +35,15 @@ class LambdaBackend(ComponentBasedBackend):
             namespace=self.name,
         )
         self._secrets_manager = AWSSecretsManager(
-            secretsmanager_client=aws_utils.get_secretsmanager_client(self._session),
+            secretsmanager_client=aws_utils.get_secretsmanager_client(
+                self._session, region_name=DEFAULT_REGION
+            ),
             iam_client=aws_utils.get_iam_client(self._session),
             sts_client=aws_utils.get_sts_client(self._session),
             bucket_name=self.backend_config.storage_config.bucket,
         )
         self._logging = AWSLogging(
-            logs_client=aws_utils.get_logs_client(self._session),
+            logs_client=aws_utils.get_logs_client(self._session, region_name=DEFAULT_REGION),
             bucket_name=self.backend_config.storage_config.bucket,
         )
         self._pricing = LambdaPricing()
@@ -76,9 +78,7 @@ class LambdaBackend(ComponentBasedBackend):
         offer: Optional[InstanceOffer] = None,
     ):
         self._logging.create_log_groups_if_not_exist(
-            aws_utils.get_logs_client(self._session),
-            self.backend_config.storage_config.bucket,
-            job.repo_ref.repo_id,
+            self.backend_config.storage_config.bucket, job.repo_ref.repo_id
         )
         super().run_job(
             job,
@@ -86,11 +86,3 @@ class LambdaBackend(ComponentBasedBackend):
             project_private_key=project_private_key,
             offer=offer,
         )
-
-    def create_run(self, repo_id: str, run_name: Optional[str]) -> str:
-        self._logging.create_log_groups_if_not_exist(
-            aws_utils.get_logs_client(self._session),
-            self.backend_config.storage_config.bucket,
-            repo_id,
-        )
-        return base_runs.create_run(self._storage, run_name)
