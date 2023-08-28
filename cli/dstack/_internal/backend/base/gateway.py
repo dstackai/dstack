@@ -7,7 +7,6 @@ import pkg_resources
 
 from dstack._internal.backend.base.compute import Compute
 from dstack._internal.backend.base.head import (
-    delete_head_object,
     list_head_objects,
     put_head_object,
     replace_head_object,
@@ -131,13 +130,7 @@ def is_ip_address(hostname: str) -> bool:
     return re.match(r"^\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3}$", hostname) is not None
 
 
-def setup_service_job(job: Job, secrets_manager: SecretsManager, project_private_key: str) -> Job:
-    job.gateway.hostname = resolve_hostname(
-        secrets_manager, job.repo_ref.repo_id, job.gateway.hostname
-    )
-    job.gateway.secure = not is_ip_address(job.gateway.hostname)
-    if job.gateway.secure and job.gateway.public_port == 80:
-        job.gateway.public_port = 443
+def setup_service_job(job: Job, project_private_key: str) -> Job:
     private_bytes, public_bytes = generate_rsa_key_pair_bytes(comment=job.run_name)
     job.gateway.sock_path = publish(
         job.gateway.hostname,

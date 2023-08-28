@@ -1,4 +1,3 @@
-import asyncio
 from collections import defaultdict
 from typing import List
 
@@ -21,6 +20,7 @@ from dstack._internal.hub.schemas.gateways import (
 )
 from dstack._internal.hub.security.permissions import ProjectAdmin, ProjectMember
 from dstack._internal.hub.services.backends import get_configurator
+from dstack._internal.hub.utils.gateway import get_gateway, list_gateways
 from dstack._internal.utils.random_names import generate_name
 
 router = APIRouter(
@@ -48,7 +48,7 @@ async def gateway_create(project_name: str, body: GatewayCreate = Body()) -> Gat
     project = await get_project(project_name=project_name)
     backends = await get_backends(project)
 
-    gateway_names = {gateway.head.instance_name for gateway in await _list_gateways(project)}
+    gateway_names = {gateway.head.instance_name for gateway in await list_gateways(project)}
     while True:
         instance_name = f"dstack-gateway-{generate_name()}"
         if instance_name not in gateway_names:
@@ -78,14 +78,14 @@ async def gateway_create(project_name: str, body: GatewayCreate = Body()) -> Gat
 @router.get("/{project_name}/gateways")
 async def gateways_list(project_name: str) -> List[Gateway]:
     project = await get_project(project_name=project_name)
-    return await _list_gateways(project)
+    return await list_gateways(project)
 
 
 @router.post("/{project_name}/gateways/delete", dependencies=[Depends(ProjectAdmin())])
 async def gateway_delete(project_name: str, body: GatewayDelete = Body()):
     project = await get_project(project_name=project_name)
     backend_gateways = defaultdict(list)
-    for gateway in await _list_gateways(project):
+    for gateway in await list_gateways(project):
         backend_gateways[gateway.backend].append((gateway.head.instance_name, gateway.head.region))
 
     backends = await get_backends(project, selected_backends=list(backend_gateways.keys()))
@@ -98,7 +98,10 @@ async def gateway_delete(project_name: str, body: GatewayDelete = Body()):
 @router.get("/{project_name}/gateways/{instance_name}")
 async def gateway_get(project_name: str, instance_name: str) -> Gateway:
     project = await get_project(project_name=project_name)
-    return await _get_gateway(project, instance_name)
+    gateway = await get_gateway(project, instance_name)
+    if not gateway:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND)
+    return gateway
 
 
 @router.post(
@@ -106,7 +109,9 @@ async def gateway_get(project_name: str, instance_name: str) -> Gateway:
 )
 async def gateway_update(project_name: str, instance_name: str, body: GatewayUpdate = Body()):
     project = await get_project(project_name=project_name)
-    gateway = await _get_gateway(project, instance_name)
+    gateway = await get_gateway(project, instance_name)
+    if not gateway:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND)
     backend = (await get_backends(project, selected_backends=[gateway.backend]))[0][1]
 
     if body.default:
@@ -127,7 +132,9 @@ async def gateway_test_domain(
     project_name: str, instance_name: str, body: GatewayTestDomain = Body()
 ):
     project = await get_project(project_name)
-    gateway = await _get_gateway(project, instance_name)
+    gateway = await get_gateway(project, instance_name)
+    if not gateway:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND)
 
     try:
         for rdata in dns.resolver.resolve("*." + body.domain, "A"):
@@ -146,30 +153,6 @@ async def gateway_test_domain(
             msg="Wildcard record is not pointing to the gateway",
         ),
     )
-
-
-async def _list_gateways(project: Project) -> List[Gateway]:
-    backends = await get_backends(project)
-    tasks = [call_backend(backend.list_gateways) for _, backend in backends]
-    gateways = []
-    for (_, backend), backend_gateways in zip(backends, await asyncio.gather(*tasks)):
-        for gateway in backend_gateways:
-            gateways.append(
-                Gateway(
-                    backend=backend.name,
-                    head=gateway,
-                    default=gateway.instance_name == project.default_gateway,
-                )
-            )
-    return gateways
-
-
-async def _get_gateway(project: Project, instance_name: str) -> Gateway:
-    gateways = await _list_gateways(project)
-    for gateway in gateways:
-        if gateway.head.instance_name == instance_name:
-            return gateway
-    raise HTTPException(status_code=status.HTTP_404_NOT_FOUND)
 
 
 async def _get_gateway_backends(project: Project) -> List[GatewayBackend]:

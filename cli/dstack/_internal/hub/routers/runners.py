@@ -3,8 +3,8 @@ import datetime
 from fastapi import APIRouter, Depends, HTTPException, status
 
 from dstack._internal.core.build import BuildNotFoundError
-from dstack._internal.core.error import NoMatchingInstanceError, SSHCommandError
-from dstack._internal.core.job import Job, JobStatus
+from dstack._internal.core.error import NoGatewayError, NoMatchingInstanceError, SSHCommandError
+from dstack._internal.core.job import ConfigurationType, Job, JobStatus
 from dstack._internal.hub.routers.util import (
     call_backend,
     error_detail,
@@ -16,6 +16,7 @@ from dstack._internal.hub.routers.util import (
 )
 from dstack._internal.hub.schemas import RunRunners, StopRunners
 from dstack._internal.hub.security.permissions import ProjectMember
+from dstack._internal.hub.utils.gateway import setup_job_gateway
 from dstack._internal.utils.logging import get_logger
 
 logger = get_logger(__name__)
@@ -48,36 +49,38 @@ async def run(project_name: str, body: RunRunners):
         len(candidates),
         str(datetime.datetime.now() - start),
     )
-
-    for backend, offer in candidates:
-        logger.info(
-            "Trying %s in %s/%s for $%0.4f per hour",
-            offer.instance_type.instance_name,
-            backend.name,
-            offer.region,
-            offer.price,
+    try:
+        if body.job.configuration_type == ConfigurationType.SERVICE:
+            await setup_job_gateway(project, body.job)
+        for backend, offer in candidates:
+            logger.info(
+                "Trying %s in %s/%s for $%0.4f per hour",
+                offer.instance_type.instance_name,
+                backend.name,
+                offer.region,
+                offer.price,
+            )
+            try:
+                await call_backend(
+                    backend.run_job,
+                    body.job,
+                    failed_to_start_job_new_status,
+                    project.ssh_private_key,
+                    offer,
+                )
+                return
+            except NoMatchingInstanceError:
+                continue
+    except BuildNotFoundError:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=error_detail(msg=BuildNotFoundError.message, code=BuildNotFoundError.code),
         )
-        try:
-            await call_backend(
-                backend.run_job,
-                body.job,
-                failed_to_start_job_new_status,
-                project.ssh_private_key,
-                offer,
-            )
-            return
-        except NoMatchingInstanceError:
-            continue
-        except BuildNotFoundError:
-            raise HTTPException(
-                status_code=status.HTTP_400_BAD_REQUEST,
-                detail=error_detail(msg=BuildNotFoundError.message, code=BuildNotFoundError.code),
-            )
-        except SSHCommandError as e:
-            raise HTTPException(
-                status_code=status.HTTP_400_BAD_REQUEST,
-                detail=error_detail(msg=e.message, code=e.code),
-            )
+    except (SSHCommandError, NoGatewayError) as e:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=error_detail(msg=e.message, code=e.code),
+        )
     raise HTTPException(
         status_code=status.HTTP_400_BAD_REQUEST,
         detail=error_detail("Run failed due to no capacity", code=NoMatchingInstanceError.code),

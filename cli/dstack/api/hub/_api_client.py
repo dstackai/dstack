@@ -10,6 +10,7 @@ from dstack._internal.core.build import BuildNotFoundError
 from dstack._internal.core.error import (
     BackendNotAvailableError,
     BackendValueError,
+    NoGatewayError,
     NoMatchingInstanceError,
     SSHCommandError,
 )
@@ -205,6 +206,7 @@ class HubAPIClient:
                 NoMatchingInstanceError.code,
                 BuildNotFoundError.code,
                 SSHCommandError.code,
+                NoGatewayError.code,
             ):
                 raise HubClientError(body["detail"]["msg"])
         resp.raise_for_status()

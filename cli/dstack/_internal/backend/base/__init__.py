@@ -323,7 +323,6 @@ class ComponentBasedBackend(Backend):
         base_jobs.run_job(
             self.storage(),
             self.compute(),
-            self.secrets_manager(),
             job,
             failed_to_start_job_new_status,
             project_private_key=project_private_key,
