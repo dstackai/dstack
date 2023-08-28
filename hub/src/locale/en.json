@@ -98,16 +98,23 @@
       "region_description": "Select a region",
       "default": "Default",
       "default_checkbox": "Turn on default",
+      "internal_ip": "Internal IP",
       "wildcard_domain": "Wildcard domain",
       "wildcard_domain_description": "Enter a wildcard domain",
+      "wildcard_domain_placeholder": "*.mydomain.com",
       "delete_gateway_confirm_title": "Delete gateway",
       "delete_gateway_confirm_message": "Are you sure you want to delete this gateway?",
       "delete_gateways_confirm_title": "Delete gateways",
-      "delete_gateways_confirm_message": "Are you sure you want to delete these gateways?"
+      "delete_gateways_confirm_message": "Are you sure you want to delete these gateways?",
+
+      "validation": {
+        "wildcard_domain_format": "Should use next format: {{pattern}}"
+      }
     },
 
     "create": {
-      "success_notification": "Gateway is created"
+      "success_notification": "Gateway is created",
+      "creating_notification": "The gateway is creating. It may take some time"
     },
 
     "update": {

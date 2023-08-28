@@ -3,9 +3,21 @@ import { useForm } from 'react-hook-form';
 import { useTranslation } from 'react-i18next';
 import { useNavigate, useParams } from 'react-router-dom';
 
-import { Button, Container, FormCheckbox, FormInput, FormUI, Header, SpaceBetween, Spinner } from 'components';
+import {
+    Button,
+    Container,
+    FormCheckbox,
+    FormField,
+    FormInput,
+    FormUI,
+    Header,
+    InfoLink,
+    InputCSD,
+    SpaceBetween,
+    Spinner,
+} from 'components';
 
-import { useBreadcrumbs, useNotifications } from 'hooks';
+import { useBreadcrumbs, useHelpPanel, useNotifications } from 'hooks';
 import { ROUTES } from 'routes';
 import {
     useGetProjectGatewayQuery,
@@ -14,6 +26,7 @@ import {
 } from 'services/gateway';
 
 import { isRequestFormErrors2, isRequestFormFieldError } from '../../../../libs';
+import { WILDCARD_DOMAIN_HELP } from './constants';
 
 import { FieldPath } from 'react-hook-form/dist/types/path';
 
@@ -31,6 +44,7 @@ export const EditGateway: React.FC = () => {
     const paramInstanceName = params.instance ?? '';
     const navigate = useNavigate();
     const [pushNotification] = useNotifications();
+    const [openHelpPanel] = useHelpPanel();
 
     const { data, isLoading: isLoadingGateway } = useGetProjectGatewayQuery({
         projectName: paramProjectName,
@@ -166,6 +180,18 @@ export const EditGateway: React.FC = () => {
                 <SpaceBetween size="l">
                     <Container header={<Header variant="h2">{t('gateway.edit_gateway')}</Header>}>
                         <SpaceBetween size="l">
+                            <FormField label={t('gateway.edit.backend')} secondaryControl={renderSpinner()}>
+                                <InputCSD readOnly disabled={isDisabledFields} value={data?.backend ?? ''} />
+                            </FormField>
+
+                            <FormField label={t('gateway.edit.region')} secondaryControl={renderSpinner()}>
+                                <InputCSD readOnly disabled={isDisabledFields} value={data?.head.region ?? ''} />
+                            </FormField>
+
+                            <FormField label={t('gateway.edit.internal_ip')} secondaryControl={renderSpinner()}>
+                                <InputCSD readOnly disabled={isDisabledFields} value={data?.head.internal_ip ?? ''} />
+                            </FormField>
+
                             <FormCheckbox
                                 label={t('gateway.edit.default')}
                                 checkboxLabel={t('gateway.edit.default_checkbox')}
@@ -176,13 +202,22 @@ export const EditGateway: React.FC = () => {
                             />
 
                             <FormInput
+                                info={<InfoLink onFollow={() => openHelpPanel(WILDCARD_DOMAIN_HELP)} />}
                                 label={t('gateway.edit.wildcard_domain')}
                                 description={t('gateway.edit.wildcard_domain_description')}
+                                placeholder={t('gateway.edit.wildcard_domain_placeholder')}
                                 control={control}
                                 name={FIELD_NAMES.WILDCARD_DOMAIN}
                                 disabled={isDisabledFields}
                                 rules={{
                                     required: t('validation.required'),
+
+                                    pattern: {
+                                        value: /^\*\..+\..+/,
+                                        message: t('gateway.edit.validation.wildcard_domain_format', {
+                                            pattern: t('gateway.edit.wildcard_domain_placeholder'),
+                                        }),
+                                    },
                                 }}
                                 secondaryControl={
                                     renderSpinner() ?? (

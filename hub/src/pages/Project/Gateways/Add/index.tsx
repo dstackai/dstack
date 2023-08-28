@@ -1,4 +1,4 @@
-import React, { useMemo } from 'react';
+import React, { useEffect, useState } from 'react';
 import { useForm } from 'react-hook-form';
 import { useTranslation } from 'react-i18next';
 import { useNavigate, useParams } from 'react-router-dom';
@@ -26,6 +26,7 @@ export const AddGateway: React.FC = () => {
     const paramProjectName = params.name ?? '';
     const navigate = useNavigate();
     const [pushNotification] = useNotifications();
+    const [regionOptions, setRegionOptions] = useState<FormSelectOptions>([]);
 
     const { data, isLoading: isLoadingBackends } = useGetProjectGatewayBackendsQuery({
         projectName: paramProjectName,
@@ -33,7 +34,7 @@ export const AddGateway: React.FC = () => {
 
     const [createGateway, { isLoading: isCreating }] = useCreateProjectGatewayMutation();
 
-    const { handleSubmit, control, watch, setError } = useForm<TCreateGatewayParams>();
+    const { handleSubmit, control, watch, setValue, setError } = useForm<TCreateGatewayParams>();
 
     const backendFormValue = watch(FIELD_NAMES.BACKEND);
 
@@ -60,12 +61,16 @@ export const AddGateway: React.FC = () => {
 
     const backendOptions: FormSelectOptions = data?.map((i) => ({ label: i.backend, value: i.backend })) ?? [];
 
-    const regionOptions: FormSelectOptions = useMemo(() => {
-        if (!data || !backendFormValue) return [];
+    useEffect(() => {
+        if (data && backendFormValue) {
+            const backend = data.find((b) => b.backend === backendFormValue)!;
 
-        const backend = data.find((b) => b.backend === backendFormValue)!;
+            setRegionOptions(backend.regions.map((region) => ({ label: region, value: region })));
 
-        return backend.regions.map((region) => ({ label: region, value: region }));
+            setValue(FIELD_NAMES.REGION, backend.regions[0]);
+        } else {
+            setRegionOptions([]);
+        }
     }, [backendFormValue]);
 
     const onCancel = () => {
@@ -73,18 +78,23 @@ export const AddGateway: React.FC = () => {
     };
 
     const onSubmit = (gateway: TCreateGatewayParams) => {
+        pushNotification({
+            type: 'info',
+            content: t('gateway.create.creating_notification'),
+        });
+
         createGateway({
             projectName: paramProjectName,
             gateway,
         })
             .unwrap()
-            .then(() => {
+            .then((response) => {
                 pushNotification({
                     type: 'success',
                     content: t('gateway.create.success_notification'),
                 });
 
-                navigate(ROUTES.PROJECT.DETAILS.SETTINGS.FORMAT(paramProjectName));
+                navigate(ROUTES.PROJECT.GATEWAY.EDIT.FORMAT(paramProjectName, response.head.instance_name));
             })
             .catch((errorResponse) => {
                 const errorRequestData = errorResponse?.data;
@@ -160,6 +170,9 @@ export const AddGateway: React.FC = () => {
                                 control={control}
                                 name={FIELD_NAMES.REGION}
                                 disabled={isDisabledFields || !backendFormValue}
+                                rules={{
+                                    required: t('validation.required'),
+                                }}
                                 options={regionOptions}
                                 secondaryControl={renderSpinner()}
                             />
