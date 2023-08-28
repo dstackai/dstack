@@ -28,10 +28,6 @@ router = APIRouter(
 async def run(project_name: str, body: RunRunners):
     project = await get_project(project_name=project_name)
     backends = await get_backends(project)
-    failed_to_start_job_new_status = JobStatus.FAILED
-    if body.job.retry_policy.retry:
-        failed_to_start_job_new_status = JobStatus.PENDING
-
     # todo use run plan?
     start = datetime.datetime.now()
     candidates = await get_instance_candidates(
@@ -61,7 +57,6 @@ async def run(project_name: str, body: RunRunners):
             await call_backend(
                 backend.run_job,
                 body.job,
-                failed_to_start_job_new_status,
                 project.ssh_private_key,
                 offer,
             )

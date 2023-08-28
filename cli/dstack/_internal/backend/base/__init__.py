@@ -53,18 +53,11 @@ class Backend(ABC):
     ):
         pass
 
-    # TODO: Is this function used at all?
     # TODO: This must use offers from multiple clouds
     # TODO: Why does `run_job` not pass `project_private_key`?
-    def submit_job(self, job: Job, failed_to_start_job_new_status: JobStatus = JobStatus.FAILED):
-        self.create_job(job)
-        self.run_job(job, failed_to_start_job_new_status)
-
-    # TODO: This must use offers from multiple clouds
-    # TODO: Why does `run_job` not pass `project_private_key`?
-    def resubmit_job(self, job: Job, failed_to_start_job_new_status: JobStatus = JobStatus.FAILED):
+    def resubmit_job(self, job: Job):
         base_jobs.update_job_submission(job)
-        self.run_job(job, failed_to_start_job_new_status)
+        self.run_job(job)
 
     @abstractmethod
     def get_job(self, repo_id: str, job_id: str) -> Optional[Job]:
@@ -78,7 +71,6 @@ class Backend(ABC):
     def run_job(
         self,
         job: Job,
-        failed_to_start_job_new_status: JobStatus,
         project_private_key: str,
         offer: Optional[InstanceOffer] = None,
     ):
@@ -110,7 +102,6 @@ class Backend(ABC):
         repo_id: str,
         run_name: Optional[str] = None,
         include_request_heads: bool = True,
-        interrupted_job_new_status: JobStatus = JobStatus.FAILED,
     ) -> List[RunHead]:
         pass
 
@@ -119,13 +110,11 @@ class Backend(ABC):
         repo_id: str,
         run_name: str,
         include_request_heads: bool = True,
-        interrupted_job_new_status: JobStatus = JobStatus.FAILED,
     ) -> Optional[RunHead]:
         run_heads_list = self.list_run_heads(
             repo_id=repo_id,
             run_name=run_name,
             include_request_heads=include_request_heads,
-            interrupted_job_new_status=interrupted_job_new_status,
         )
         if len(run_heads_list) == 0:
             return None
@@ -310,7 +299,6 @@ class ComponentBasedBackend(Backend):
     def run_job(
         self,
         job: Job,
-        failed_to_start_job_new_status: JobStatus,
         project_private_key: str,
         offer: Optional[InstanceOffer] = None,
     ):
@@ -320,7 +308,6 @@ class ComponentBasedBackend(Backend):
             self.compute(),
             self.secrets_manager(),
             job,
-            failed_to_start_job_new_status,
             project_private_key=project_private_key,
             offer=offer,
         )
@@ -348,7 +335,6 @@ class ComponentBasedBackend(Backend):
         repo_id: str,
         run_name: Optional[str] = None,
         include_request_heads: bool = True,
-        interrupted_job_new_status: JobStatus = JobStatus.FAILED,
     ) -> List[RunHead]:
         job_heads = self.list_job_heads(repo_id=repo_id, run_name=run_name)
         return base_runs.get_run_heads(
@@ -356,7 +342,6 @@ class ComponentBasedBackend(Backend):
             self.compute(),
             job_heads,
             include_request_heads,
-            interrupted_job_new_status,
         )
 
     def poll_logs(

@@ -71,7 +71,6 @@ class LambdaBackend(ComponentBasedBackend):
     def run_job(
         self,
         job: Job,
-        failed_to_start_job_new_status: JobStatus,
         project_private_key: str,
         offer: Optional[InstanceOffer] = None,
     ):
@@ -82,7 +81,6 @@ class LambdaBackend(ComponentBasedBackend):
         )
         super().run_job(
             job,
-            failed_to_start_job_new_status,
             project_private_key=project_private_key,
             offer=offer,
         )

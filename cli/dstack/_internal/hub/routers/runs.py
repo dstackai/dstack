@@ -52,7 +52,6 @@ async def list_all_runs() -> List[RunInfo]:
             repo_head.repo_id,
             None,
             False,
-            JobStatus.PENDING,
         )
         for run_head in run_heads:
             run_info = RunInfo(
@@ -138,7 +137,6 @@ async def create_run(project_name: str, body: RunsCreate) -> str:
 async def list_runs(project_name: str, body: RunsList) -> List[RunInfo]:
     project = await get_project(project_name=project_name)
     backends = await get_backends(project)
-    # TODO sort
     run_infos = []
     for db_backend, backend in backends:
         run_heads = await call_backend(
@@ -146,7 +144,6 @@ async def list_runs(project_name: str, body: RunsList) -> List[RunInfo]:
             body.repo_id,
             body.run_name,
             body.include_request_heads,
-            JobStatus.PENDING,
         )
         for run_head in run_heads:
             run_info = RunInfo(

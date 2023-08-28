@@ -99,7 +99,6 @@ class HubClient:
         self,
         run_name: Optional[str] = None,
         include_request_heads: bool = True,
-        interrupted_job_new_status: JobStatus = JobStatus.FAILED,
         repo_id: Optional[str] = None,
     ) -> List[RunInfo]:
         return self._api_client.list_runs(

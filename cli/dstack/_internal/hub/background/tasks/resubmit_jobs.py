@@ -44,7 +44,6 @@ def _resubmit_backend_jobs(backend: Backend):
             repo_id=repo_head.repo_id,
             run_name=None,
             include_request_heads=True,
-            interrupted_job_new_status=JobStatus.PENDING,
         )
         for run_head in run_heads:
             job_heads = backend.list_job_heads(
@@ -56,18 +55,6 @@ def _resubmit_backend_jobs(backend: Backend):
                     and curr_time - job_head.submitted_at > RESUBMISSION_INTERVAL * 1000
                 ):
                     job = backend.get_job(repo_id=repo_head.repo_id, job_id=job_head.job_id)
-                    if (
-                        job.retry_policy is not None
-                        and job.retry_policy.retry
-                        and curr_time - job.created_at < job.retry_policy.limit * 1000
-                    ):
-                        backend.resubmit_job(
-                            job=job,
-                            failed_to_start_job_new_status=JobStatus.PENDING,
-                        )
-                    else:
-                        backend.resubmit_job(
-                            job=job,
-                            failed_to_start_job_new_status=JobStatus.FAILED,
-                        )
+                    # TODO
+                    backend.resubmit_job(job=job)
                     logger.info("Resubmitted job %s", job.job_id)

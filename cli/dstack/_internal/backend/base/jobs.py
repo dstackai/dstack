@@ -115,7 +115,6 @@ def run_job(
     compute: Compute,
     secrets_manager: SecretsManager,
     job: Job,
-    failed_to_start_job_new_status: JobStatus,
     project_private_key: str,
     offer: Optional[InstanceOffer] = None,
 ):
@@ -130,7 +129,6 @@ def run_job(
             storage=storage,
             compute=compute,
             job=job,
-            failed_to_start_job_new_status=failed_to_start_job_new_status,
             offer=offer,
         )
     except Exception as e:
@@ -212,7 +210,6 @@ def _try_run_job(
     storage: Storage,
     compute: Compute,
     job: Job,
-    failed_to_start_job_new_status: JobStatus,
     offer: Optional[InstanceOffer] = None,
     attempt: int = 0,
 ):
@@ -234,7 +231,6 @@ def _try_run_job(
                 storage=storage,
                 compute=compute,
                 job=job,
-                failed_to_start_job_new_status=failed_to_start_job_new_status,
                 attempt=attempt + 1,
             )
         else:
@@ -255,7 +251,6 @@ def _try_run_job(
                 storage=storage,
                 compute=compute,
                 job=job,
-                failed_to_start_job_new_status=failed_to_start_job_new_status,
                 attempt=attempt + 1,
             )
         else:
