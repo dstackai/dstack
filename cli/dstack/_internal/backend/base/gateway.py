@@ -7,7 +7,6 @@ import pkg_resources
 
 from dstack._internal.backend.base.compute import Compute
 from dstack._internal.backend.base.head import (
-    delete_head_object,
     list_head_objects,
     put_head_object,
     replace_head_object,
@@ -23,7 +22,7 @@ from dstack._internal.utils.interpolator import VariablesInterpolator
 
 
 def create_gateway(
-    compute: Compute, storage: Storage, instance_name: str, ssh_key_pub: str, region: Optional[str]
+    compute: Compute, storage: Storage, instance_name: str, ssh_key_pub: str, region: str
 ) -> GatewayHead:
     head = compute.create_gateway(instance_name, ssh_key_pub, region=region)
     put_head_object(storage, head)
@@ -36,12 +35,12 @@ def list_gateways(
     return list_head_objects(storage, GatewayHead, include_key=include_key)
 
 
-def delete_gateway(compute: Compute, storage: Storage, instance_name: str):
+def delete_gateway(compute: Compute, storage: Storage, instance_name: str, region: str):
     heads = list_gateways(storage, include_key=True)
     for key, head in heads:
         if head.instance_name != instance_name:
             continue
-        compute.delete_instance(instance_name)
+        compute.delete_instance(instance_name, region=region)
         storage.delete_object(key)
 
 
@@ -131,13 +130,7 @@ def is_ip_address(hostname: str) -> bool:
     return re.match(r"^\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3}$", hostname) is not None
 
 
-def setup_service_job(job: Job, secrets_manager: SecretsManager, project_private_key: str) -> Job:
-    job.gateway.hostname = resolve_hostname(
-        secrets_manager, job.repo_ref.repo_id, job.gateway.hostname
-    )
-    job.gateway.secure = not is_ip_address(job.gateway.hostname)
-    if job.gateway.secure and job.gateway.public_port == 80:
-        job.gateway.public_port = 443
+def setup_service_job(job: Job, project_private_key: str) -> Job:
     private_bytes, public_bytes = generate_rsa_key_pair_bytes(comment=job.run_name)
     job.gateway.sock_path = publish(
         job.gateway.hostname,

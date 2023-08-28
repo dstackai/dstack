@@ -78,10 +78,7 @@ class AWSCompute(Compute):
             request_id=runner.request_id,
         )
 
-    def create_gateway(
-        self, instance_name: str, ssh_key_pub: str, region: Optional[str]
-    ) -> GatewayHead:
-        region = region or self.backend_config.regions[0]
+    def create_gateway(self, instance_name: str, ssh_key_pub: str, region: str) -> GatewayHead:
         instance = gateway.create_gateway_instance(
             ec2_client=self._get_ec2_client(region=region),
             subnet_id=self.backend_config.subnet_id,
@@ -97,16 +94,15 @@ class AWSCompute(Compute):
         )
 
     # TODO: Must be renamed to `delete_gateway_instance`
-    def delete_instance(self, instance_name: str):
-        # TODO: This must be a configurable field of the gateway
-        default_region_name = self.backend_config.regions[0]
+    def delete_instance(self, instance_name: str, region: str = None):
+        region = region or self.backend_config.regions[0]
         try:
             instance_id = gateway.get_instance_id(
-                ec2_client=self._get_ec2_client(region=default_region_name),
+                ec2_client=self._get_ec2_client(region=region),
                 instance_name=instance_name,
             )
             runners.terminate_instance(
-                ec2_client=self._get_ec2_client(region=default_region_name),
+                ec2_client=self._get_ec2_client(region=region),
                 request_id=instance_id,
             )
         except IndexError:

@@ -23,7 +23,8 @@ from dstack._internal.core.repo import (
 
 
 class Gateway(BaseModel):
-    hostname: str
+    gateway_name: Optional[str]
+    hostname: Optional[str]
     service_port: int
     public_port: int = 80
     secure: bool = False

@@ -190,10 +190,7 @@ class GCPCompute(Compute):
             instance_name=runner.request_id,
         )
 
-    def create_gateway(
-        self, instance_name: str, ssh_key_pub: str, region: Optional[str]
-    ) -> GatewayHead:
-        region = region or self.gcp_config.regions[0]
+    def create_gateway(self, instance_name: str, ssh_key_pub: str, region: str) -> GatewayHead:
         instance = gateway.create_gateway_instance(
             instances_client=self.instances_client,
             firewalls_client=self.firewalls_client,
@@ -216,7 +213,7 @@ class GCPCompute(Compute):
             region=region,
         )
 
-    def delete_instance(self, instance_name: str):
+    def delete_instance(self, instance_name: str, region: str = None):
         _terminate_instance(
             client=self.instances_client,
             gcp_config=self.gcp_config,

@@ -27,7 +27,6 @@ class ServiceConfigurator(JobConfigurator):
 
     def gateway(self) -> Optional[job.Gateway]:
         return job.Gateway(
-            hostname=self.conf.gateway,
             service_port=self.conf.port.container_port,
             public_port=self.conf.port.local_port,
         )

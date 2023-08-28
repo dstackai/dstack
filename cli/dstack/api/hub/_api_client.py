@@ -10,10 +10,11 @@ from dstack._internal.core.build import BuildNotFoundError
 from dstack._internal.core.error import (
     BackendNotAvailableError,
     BackendValueError,
+    NoGatewayError,
     NoMatchingInstanceError,
     SSHCommandError,
 )
-from dstack._internal.core.gateway import Gateway, GatewayHead
+from dstack._internal.core.gateway import Gateway, GatewayBackend
 from dstack._internal.core.job import Job, JobHead
 from dstack._internal.core.log_event import LogEvent
 from dstack._internal.core.plan import RunPlan
@@ -205,6 +206,7 @@ class HubAPIClient:
                 NoMatchingInstanceError.code,
                 BuildNotFoundError.code,
                 SSHCommandError.code,
+                NoGatewayError.code,
             ):
                 raise HubClientError(body["detail"]["msg"])
         resp.raise_for_status()
@@ -720,14 +722,14 @@ class HubAPIClient:
             return
         resp.raise_for_status()
 
-    def create_gateway(self, backend: str) -> Gateway:
+    def create_gateway(self, backend: str, region: str) -> Gateway:
         url = _project_url(url=self.url, project=self.project, additional_path="/gateways/create")
         resp = _make_hub_request(
             requests.post,
             host=self.url,
             url=url,
             headers=self._headers(),
-            data=GatewayCreate(backend=backend).json(),
+            data=GatewayCreate(backend=backend, region=region).json(),
         )
         if resp.ok:
             return Gateway.parse_obj(resp.json())
@@ -736,6 +738,19 @@ class HubAPIClient:
             if body["detail"]["code"] == "not_implemented":
                 raise HubClientError(body["detail"]["msg"])
         resp.raise_for_status()
+
+    def get_gateway_backends(self) -> List[GatewayBackend]:
+        url = _project_url(
+            url=self.url, project=self.project, additional_path="/gateways/list_backends"
+        )
+        resp = _make_hub_request(
+            requests.get,
+            host=self.url,
+            url=url,
+            headers=self._headers(),
+        )
+        resp.raise_for_status()
+        return parse_obj_as(List[GatewayBackend], resp.json())
 
     def list_gateways(self) -> List[Gateway]:
         url = _project_url(url=self.url, project=self.project, additional_path="/gateways")
