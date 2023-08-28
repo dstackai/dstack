@@ -268,7 +268,7 @@ class Backend(ABC):
         pass
 
     @abstractmethod
-    def delete_gateway(self, instance_name: str):
+    def delete_gateway(self, instance_name: str, region: str):
         pass
 
     def update_gateway(self, instance_name: str, wildcard_domain: str) -> GatewayHead:
@@ -524,8 +524,8 @@ class ComponentBasedBackend(Backend):
     def list_gateways(self) -> List[GatewayHead]:
         return gateway.list_gateways(self.storage())
 
-    def delete_gateway(self, instance_name: str):
-        gateway.delete_gateway(self.compute(), self.storage(), instance_name)
+    def delete_gateway(self, instance_name: str, region: str):
+        gateway.delete_gateway(self.compute(), self.storage(), instance_name, region)
 
     def update_gateway(self, instance_name: str, wildcard_domain: str) -> GatewayHead:
         return gateway.update_gateway(self.storage(), instance_name, wildcard_domain)

@@ -62,7 +62,7 @@ class Compute(ABC):
     ) -> GatewayHead:
         raise NotImplementedError()
 
-    def delete_instance(self, instance_name: str):
+    def delete_instance(self, instance_name: str, region: str = None):
         raise NotImplementedError()
 
 

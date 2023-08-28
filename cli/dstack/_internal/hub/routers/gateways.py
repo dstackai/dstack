@@ -61,7 +61,11 @@ async def gateway_create(project_name: str, body: GatewayCreate = Body()) -> Gat
             head = await call_backend(
                 backend.create_gateway, instance_name, project.ssh_public_key, body.region
             )
-            return Gateway(backend=backend.name, head=head, default=False)
+            default = False
+            if not gateway_names:  # first gateway becomes default
+                default = True
+                await ProjectManager.set_default_gateway(project_name, instance_name)
+            return Gateway(backend=backend.name, head=head, default=default)
     raise HTTPException(
         status_code=status.HTTP_400_BAD_REQUEST,
         detail=error_detail(
@@ -82,13 +86,13 @@ async def gateway_delete(project_name: str, body: GatewayDelete = Body()):
     project = await get_project(project_name=project_name)
     backend_gateways = defaultdict(list)
     for gateway in await _list_gateways(project):
-        backend_gateways[gateway.backend].append(gateway.head.instance_name)
+        backend_gateways[gateway.backend].append((gateway.head.instance_name, gateway.head.region))
 
     backends = await get_backends(project, selected_backends=list(backend_gateways.keys()))
     for _, backend in backends:
-        for instance_name in backend_gateways[backend.name]:
+        for instance_name, region in backend_gateways[backend.name]:
             if instance_name in body.instance_names:
-                await call_backend(backend.delete_gateway, instance_name)
+                await call_backend(backend.delete_gateway, instance_name, region)
 
 
 @router.get("/{project_name}/gateways/{instance_name}")

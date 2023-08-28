@@ -216,7 +216,7 @@ class GCPCompute(Compute):
             region=region,
         )
 
-    def delete_instance(self, instance_name: str):
+    def delete_instance(self, instance_name: str, region: str = None):
         _terminate_instance(
             client=self.instances_client,
             gcp_config=self.gcp_config,

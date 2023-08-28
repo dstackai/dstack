@@ -36,12 +36,12 @@ def list_gateways(
     return list_head_objects(storage, GatewayHead, include_key=include_key)
 
 
-def delete_gateway(compute: Compute, storage: Storage, instance_name: str):
+def delete_gateway(compute: Compute, storage: Storage, instance_name: str, region: str):
     heads = list_gateways(storage, include_key=True)
     for key, head in heads:
         if head.instance_name != instance_name:
             continue
-        compute.delete_instance(instance_name)
+        compute.delete_instance(instance_name, region=region)
         storage.delete_object(key)
 
 

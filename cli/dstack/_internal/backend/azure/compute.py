@@ -195,7 +195,7 @@ class AzureCompute(Compute):
             region=location,
         )
 
-    def delete_instance(self, instance_name: str):
+    def delete_instance(self, instance_name: str, region: str = None):
         _terminate_instance(
             compute_client=self._compute_client,
             resource_group=self.azure_config.resource_group,
