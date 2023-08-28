@@ -240,7 +240,6 @@ def _try_run_job(
         else:
             raise NoMatchingInstanceError()
     job.instance_type = instance_type.instance_name
-    update_job(storage, job)
     runner = Runner(
         runner_id=job.runner_id, request_id=None, resources=instance_type.resources, job=job
     )
