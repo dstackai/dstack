@@ -6,13 +6,12 @@ import dns.resolver
 from fastapi import APIRouter, Body, Depends, HTTPException, status
 from pydantic import BaseModel
 
-from dstack._internal.core.gateway import Gateway
+from dstack._internal.core.gateway import Gateway, GatewayBackend
 from dstack._internal.hub.db.models import Project
 from dstack._internal.hub.repository.projects import ProjectManager
 from dstack._internal.hub.routers.util import call_backend, error_detail, get_backends, get_project
 from dstack._internal.hub.schemas import AWSBackendConfig, AzureBackendConfig, GCPBackendConfig
 from dstack._internal.hub.schemas.gateways import (
-    GatewayBackend,
     GatewayCreate,
     GatewayDelete,
     GatewayTestDomain,

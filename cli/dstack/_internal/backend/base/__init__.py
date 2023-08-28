@@ -513,9 +513,7 @@ class ComponentBasedBackend(Backend):
             self.storage(), job, dstack._internal.core.build.DockerPlatform.amd64
         )
 
-    def create_gateway(
-        self, instance_name: str, ssh_key_pub: str, region: Optional[str]
-    ) -> GatewayHead:
+    def create_gateway(self, instance_name: str, ssh_key_pub: str, region: str) -> GatewayHead:
         return gateway.create_gateway(
             self.compute(), self.storage(), instance_name, ssh_key_pub, region=region
         )

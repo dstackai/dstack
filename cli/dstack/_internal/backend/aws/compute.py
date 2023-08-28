@@ -78,10 +78,7 @@ class AWSCompute(Compute):
             request_id=runner.request_id,
         )
 
-    def create_gateway(
-        self, instance_name: str, ssh_key_pub: str, region: Optional[str]
-    ) -> GatewayHead:
-        region = region or self.backend_config.regions[0]
+    def create_gateway(self, instance_name: str, ssh_key_pub: str, region: str) -> GatewayHead:
         instance = gateway.create_gateway_instance(
             ec2_client=self._get_ec2_client(region=region),
             subnet_id=self.backend_config.subnet_id,

@@ -22,7 +22,7 @@ from dstack._internal.utils.interpolator import VariablesInterpolator
 
 
 def create_gateway(
-    compute: Compute, storage: Storage, instance_name: str, ssh_key_pub: str, region: Optional[str]
+    compute: Compute, storage: Storage, instance_name: str, ssh_key_pub: str, region: str
 ) -> GatewayHead:
     head = compute.create_gateway(instance_name, ssh_key_pub, region=region)
     put_head_object(storage, head)

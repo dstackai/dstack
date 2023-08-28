@@ -55,9 +55,15 @@ class GatewayCommand(BasicCommand):
         args.sub_func(hub_client, args)
 
     def create_gateway(self, hub_client: HubClient, args: Namespace):
-        print("Creating gateway, it may take some time...")
-        gateway = hub_client.create_gateway(backend=args.backend)
-        print_gateways_table([gateway])
+        for backend in hub_client.get_gateway_backends():
+            if backend.backend != args.backend:
+                continue
+            region = backend.regions[0]
+            print(f"Creating gateway in {region}, it may take some time...")
+            gateway = hub_client.create_gateway(backend=args.backend, region=backend.regions[0])
+            print_gateways_table([gateway])
+            return
+        exit(f"No {args.backend} backend is available")
 
     def list_gateways(self, hub_client: HubClient, args: Namespace):
         gateways = hub_client.list_gateways()
@@ -82,8 +88,8 @@ def print_gateways_table(gateways: List[Gateway]):
     table.add_column("REGION")
     table.add_column("NAME")
     table.add_column("ADDRESS")
-    # todo default
-    # todo wildcard domain
+    table.add_column("DEFAULT")
+
     gateways = sorted(gateways, key=lambda g: g.backend)
     for backend, backend_gateways in itertools.groupby(gateways, key=lambda g: g.backend):
         for i, gateway in enumerate(backend_gateways):
@@ -92,6 +98,7 @@ def print_gateways_table(gateways: List[Gateway]):
                 gateway.head.region,
                 gateway.head.instance_name,
                 gateway.head.external_ip,
+                "✓" if gateway.default else "",
             )
     console.print(table)
     console.print()

@@ -9,12 +9,7 @@ class GatewayDelete(BaseModel):
 
 class GatewayCreate(BaseModel):
     backend: str
-    region: Optional[str]
-
-
-class GatewayBackend(BaseModel):
-    backend: str
-    regions: List[str]
+    region: str
 
 
 class GatewayUpdate(BaseModel):

@@ -1,5 +1,5 @@
 import time
-from typing import Optional
+from typing import List, Optional
 
 from pydantic import BaseModel, Field
 
@@ -23,3 +23,8 @@ class Gateway(BaseModel):
     backend: str
     head: GatewayHead
     default: bool
+
+
+class GatewayBackend(BaseModel):
+    backend: str
+    regions: List[str]
