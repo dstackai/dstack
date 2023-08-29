@@ -198,9 +198,6 @@ setup(
             "statics/**/*",
             "statics/**/**/*",
         ],
-        "dstack._internal.backend": [
-            "resources/*.csv",
-        ],
     },
     include_package_data=True,
     scripts=[],

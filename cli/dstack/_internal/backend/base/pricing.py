@@ -1,37 +1,27 @@
-import time
 from abc import ABC, abstractmethod
 from collections import defaultdict
-from typing import Dict, List, Optional, Tuple
+from typing import Dict, List, Optional, Tuple, Union
 
 from dstack._internal.core.instance import InstanceOffer, InstanceType
+from dstack._internal.hub.utils.catalog import read_catalog_csv
 
 RegionSpot = Tuple[str, bool]
-DEFAULT_TTL = 24 * 60 * 60  # 24 hours
 
 
 class Pricing(ABC):
     def __init__(self):
         # instance_key -> { (region, spot) -> price }
         self.registry: Dict[str, Dict[RegionSpot, float]] = defaultdict(dict)
-        self._last_updated: Dict[str, float] = {}
-
-    def _need_update(self, key: str, ttl: int = DEFAULT_TTL):
-        now = time.monotonic()
-        if key not in self._last_updated or now - self._last_updated[key] > ttl:
-            self._last_updated[key] = now
-            return True
-        return False
 
     @abstractmethod
-    def fetch(self, instances: List[InstanceType], spot: Optional[bool]):
-        # ignores instances[i].resources.spot
+    def fetch(self):
         pass
 
     def get_prices(
         self, instances: List[InstanceType], spot: Optional[bool] = None
     ) -> List[InstanceOffer]:
         """Estimate the cost in USD of running the specified instance for 1 hour in specified regions"""
-        self.fetch(instances, spot)
+        self.fetch()
         offers = []
         for instance in instances:
             for (region, is_spot), price in self.registry[self.instance_key(instance)].items():
@@ -53,5 +43,19 @@ class Pricing(ABC):
         return requested is None or spot == requested
 
     @classmethod
-    def instance_key(cls, instance: InstanceType) -> str:
-        return instance.instance_name
+    def instance_key(cls, instance: Union[dict, InstanceType]) -> str:
+        if isinstance(instance, InstanceType):
+            return instance.instance_name
+        return instance["instance_name"]
+
+
+class CatalogPricing(Pricing):
+    def __init__(self, catalog_name: str):
+        super().__init__()
+        self.catalog_name = catalog_name
+
+    def fetch(self):
+        for row in read_catalog_csv(self.catalog_name):
+            instance_key = self.instance_key(row)
+            region_spot = (row["location"], row["spot"] == "True")
+            self.registry[instance_key][region_spot] = float(row["price"])

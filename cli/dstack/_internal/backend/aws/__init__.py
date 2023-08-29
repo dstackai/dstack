@@ -53,7 +53,7 @@ class AwsBackend(ComponentBasedBackend):
             logs_client=aws_utils.get_logs_client(self._session, region_name=DEFAULT_REGION),
             bucket_name=self.backend_config.bucket_name,
         )
-        self._pricing = AWSPricing(session=self._session)
+        self._pricing = AWSPricing()
         self._check_credentials()
 
     @classmethod
