@@ -16,7 +16,6 @@ from dstack._internal.core.job import (
     JobErrorCode,
     JobHead,
     JobStatus,
-    SpotPolicy,
     TerminationPolicy,
 )
 from dstack._internal.core.repo import RepoRef
@@ -109,14 +108,13 @@ def delete_jobs(storage: Storage, repo_id: str, run_name: str):
         storage.delete_object(job_key)
 
 
-# TODO: The `offer` field must be required
 def run_job(
     storage: Storage,
     compute: Compute,
     secrets_manager: SecretsManager,
     job: Job,
     project_private_key: str,
-    offer: Optional[InstanceOffer] = None,
+    offer: InstanceOffer,
 ):
     try:
         if job.configuration_type == ConfigurationType.SERVICE:
@@ -199,44 +197,16 @@ def stop_job(
             _update_job_head(storage, job_head)
 
 
-def update_job_submission(job: Job):
-    job.status = JobStatus.SUBMITTED
-    job.submission_num += 1
-    job.submitted_at = get_milliseconds_since_epoch()
-
-
-# TODO: The `offer` field must be required
 def _try_run_job(
     storage: Storage,
     compute: Compute,
     job: Job,
-    offer: Optional[InstanceOffer] = None,
-    attempt: int = 0,
+    offer: InstanceOffer,
 ):
-    if offer is None:
-        spot = (
-            job.spot_policy is SpotPolicy.SPOT
-            or job.spot_policy is SpotPolicy.AUTO
-            and attempt == 0
-        )
-        job.requirements.spot = spot
-        instance_type = compute.get_instance_type(job, region_name=job.location)
-    else:
-        job.requirements.spot = offer.instance_type.resources.spot
-        instance_type = offer.instance_type
-        job.price = offer.price
-    if instance_type is None:
-        if job.spot_policy == SpotPolicy.AUTO and attempt == 0:
-            return _try_run_job(
-                storage=storage,
-                compute=compute,
-                job=job,
-                attempt=attempt + 1,
-            )
-        else:
-            raise NoMatchingInstanceError()
+    job.requirements.spot = offer.instance_type.resources.spot
+    instance_type = offer.instance_type
+    job.price = offer.price
     job.instance_type = instance_type.instance_name
-    update_job(storage, job)
     runner = Runner(
         runner_id=job.runner_id, request_id=None, resources=instance_type.resources, job=job
     )
@@ -246,15 +216,7 @@ def _try_run_job(
         runner.request_id = job.request_id = launched_instance_info.request_id
         job.location = launched_instance_info.location
     except NoCapacityError:
-        if offer is None and job.spot_policy == SpotPolicy.AUTO and attempt == 0:
-            return _try_run_job(
-                storage=storage,
-                compute=compute,
-                job=job,
-                attempt=attempt + 1,
-            )
-        else:
-            raise NoMatchingInstanceError()
+        raise NoMatchingInstanceError()
     else:
         runners.update_runner(storage, runner)
         update_job(storage, job)

@@ -20,8 +20,8 @@ from dstack._internal.backend.base.storage import Storage
 from dstack._internal.core.artifact import Artifact
 from dstack._internal.core.build import BuildPlan
 from dstack._internal.core.gateway import GatewayHead
-from dstack._internal.core.instance import InstanceOffer, InstanceType
-from dstack._internal.core.job import Job, JobHead, JobStatus, Requirements, SpotPolicy
+from dstack._internal.core.instance import InstanceOffer
+from dstack._internal.core.job import Job, JobHead, Requirements, SpotPolicy
 from dstack._internal.core.log_event import LogEvent
 from dstack._internal.core.repo import RemoteRepoCredentials, RepoHead, RepoSpec
 from dstack._internal.core.repo.base import Repo
@@ -47,17 +47,8 @@ class Backend(ABC):
         return self.NAME
 
     @abstractmethod
-    def create_job(
-        self,
-        job: Job,
-    ):
+    def create_job(self, job: Job):
         pass
-
-    # TODO: This must use offers from multiple clouds
-    # TODO: Why does `run_job` not pass `project_private_key`?
-    def resubmit_job(self, job: Job):
-        base_jobs.update_job_submission(job)
-        self.run_job(job)
 
     @abstractmethod
     def get_job(self, repo_id: str, job_id: str) -> Optional[Job]:
@@ -68,11 +59,15 @@ class Backend(ABC):
         pass
 
     @abstractmethod
+    def update_job(self, job: Job):
+        pass
+
+    @abstractmethod
     def run_job(
         self,
         job: Job,
         project_private_key: str,
-        offer: Optional[InstanceOffer] = None,
+        offer: InstanceOffer,
     ):
         pass
 
@@ -295,12 +290,14 @@ class ComponentBasedBackend(Backend):
     def list_jobs(self, repo_id: str, run_name: str) -> List[Job]:
         return base_jobs.list_jobs(self.storage(), repo_id, run_name)
 
-    # TODO: The `offer` field must be required
+    def update_job(self, job: Job):
+        base_jobs.update_job(self.storage(), job)
+
     def run_job(
         self,
         job: Job,
         project_private_key: str,
-        offer: Optional[InstanceOffer] = None,
+        offer: InstanceOffer,
     ):
         self.predict_build_plan(job)  # raises exception on missing build
         base_jobs.run_job(

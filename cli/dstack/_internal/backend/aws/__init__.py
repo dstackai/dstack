@@ -79,12 +79,11 @@ class AwsBackend(ComponentBasedBackend):
     def pricing(self) -> AWSPricing:
         return self._pricing
 
-    # TODO: The `offer` field must be required
     def run_job(
         self,
         job: Job,
         project_private_key: str,
-        offer: Optional[InstanceOffer] = None,
+        offer: InstanceOffer,
     ):
         self._logging.create_log_groups_if_not_exist(
             aws_utils.get_logs_client(self._session),

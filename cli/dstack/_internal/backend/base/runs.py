@@ -122,12 +122,7 @@ def _create_run(
         request_head = compute.get_request_head(job, request_id)
         request_heads.append(request_head)
         if request_head.status == RequestStatus.NO_CAPACITY:
-            curr_time = get_milliseconds_since_epoch()
-            if (
-                job.retry_policy is not None
-                and job.retry_policy.retry
-                and curr_time - job.created_at < job.retry_policy.limit * 1000
-            ):
+            if job.retry_active():
                 interrupted_job_new_status = JobStatus.PENDING
             else:
                 interrupted_job_new_status = JobStatus.FAILED
@@ -203,12 +198,7 @@ def _update_run(
             request_head = compute.get_request_head(job, request_id)
             run.request_heads.append(request_head)
             if request_head.status == RequestStatus.NO_CAPACITY:
-                curr_time = get_milliseconds_since_epoch()
-                if (
-                    job.retry_policy is not None
-                    and job.retry_policy.retry
-                    and curr_time - job.created_at < job.retry_policy.limit * 1000
-                ):
+                if job.retry_active():
                     interrupted_job_new_status = JobStatus.PENDING
                 else:
                     interrupted_job_new_status = JobStatus.FAILED
