@@ -15,8 +15,6 @@ in any folder but must be named with a suffix `.dstack.yml`.
 ```yaml
 type: service
 
-gateway: ${{ secrets.GATEWAY_ADDRESS }}
-
 port: 7860
 
 python: "3.11" # (Optional) If not specified, your local version is used.
@@ -49,18 +47,11 @@ Before running a service, you need to configure a gateway address to run the ser
     
     </div>
 
-    Once the gateway is up, create a secret with the gateway's address.
-    
-    <div class="termy">
-    
-    ```shell
-    $ dstack secrets add GATEWAY_ADDRESS 98.71.213.179
-    ```
-    </div>
-    
+    Once the gateway is up, it will be used as default by all services in the project.
+
     ### Configure a domain and enable HTTPS (optional)
     
-    By default, if you run the service, it will be available at `http://<gateway address>`.
+    By default, if you run the service, it will be available at `http://<gateway ip address>`.
     
     If you wish to enable HTTPS and run multiple services on the same gateway, the best approach is to configure a wildcard
     domain.
@@ -68,20 +59,12 @@ Before running a service, you need to configure a gateway address to run the ser
     To do this, go to your domain provider, and create a wildcard `A` DNS record (e.g. `*.mydomain.com`) pointing to the 
     address of the gateway (e.g. `98.71.213.179`).
      
-    Now, replace the value of the `GATEWAY_ADDRESS` secret with the subdomain to which you want to deploy your service.
+    Now, edit the gateway and add the wildcard domain in the project settings.
     
-    <div class="termy">
-    
-    ```shell
-    $ dstack secrets add GATEWAY_ADDRESS `myservice.mydomain.com`
-    ```
-    </div>
-    
-    If you are using a domain name as the gateway address for your service, dstack enables HTTPS automatically using [Let's
+    If you are using a wildcard domain with the gateway, dstack picks a random subdomain and enables HTTPS automatically using [Let's
     Encrypt](https://letsencrypt.org/).
     
-    For more details on the [`dstack gateway`](../reference/cli/gateway.md) and [`dstack secrets`](../reference/cli/secrets.md) 
-    commands, refer to their reference pages.
+    For more details on the [`dstack gateway`](../reference/cli/gateway.md).
 
 ### Configure the environment
 
@@ -97,8 +80,6 @@ You can install packages using `pip` and `conda` executables from `commands`.
     ```yaml
     type: service
 
-    gateway: ${{ secrets.GATEWAY_ADDRESS }}
-    
     port: 7860
     
     image: nvcr.io/nvidia/pytorch:22.12-py3
@@ -120,8 +101,6 @@ You can install packages using `pip` and `conda` executables from `commands`.
     ```yaml
     type: service
 
-    gateway: ${{ secrets.GATEWAY_ADDRESS }}
-    
     port: 7860
 
     python: "3.11" # (Optional) If not specified, your local version is used.
@@ -168,7 +147,7 @@ $ dstack run . -f serve.dstack.yml
 Provisioning...
 ---> 100%
 
-Serving HTTP on https://myservice.mydomain.com ...
+Serving HTTP on https://yellow-cat-1.mydomain.com ...
 ```
 
 </div>
