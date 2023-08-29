@@ -36,9 +36,9 @@ export const useColumnsDefinitions = ({ loading, onDeleteClick, onEditClick }: h
             },
 
             {
-                id: 'internal_ip',
-                header: t('gateway.edit.internal_ip'),
-                cell: (gateway: IGateway) => gateway.head.internal_ip,
+                id: 'external_ip',
+                header: t('gateway.edit.external_ip'),
+                cell: (gateway: IGateway) => gateway.head.external_ip,
             },
 
             {

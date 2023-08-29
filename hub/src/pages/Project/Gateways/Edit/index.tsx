@@ -188,8 +188,8 @@ export const EditGateway: React.FC = () => {
                                 <InputCSD readOnly disabled={isDisabledFields} value={data?.head.region ?? ''} />
                             </FormField>
 
-                            <FormField label={t('gateway.edit.internal_ip')} secondaryControl={renderSpinner()}>
-                                <InputCSD readOnly disabled={isDisabledFields} value={data?.head.internal_ip ?? ''} />
+                            <FormField label={t('gateway.edit.external_ip')} secondaryControl={renderSpinner()}>
+                                <InputCSD readOnly disabled={isDisabledFields} value={data?.head.external_ip ?? ''} />
                             </FormField>
 
                             <FormCheckbox
@@ -210,8 +210,6 @@ export const EditGateway: React.FC = () => {
                                 name={FIELD_NAMES.WILDCARD_DOMAIN}
                                 disabled={isDisabledFields}
                                 rules={{
-                                    required: t('validation.required'),
-
                                     pattern: {
                                         value: /^\*\..+\..+/,
                                         message: t('gateway.edit.validation.wildcard_domain_format', {

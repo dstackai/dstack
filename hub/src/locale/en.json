@@ -98,7 +98,7 @@
       "region_description": "Select a region",
       "default": "Default",
       "default_checkbox": "Turn on default",
-      "internal_ip": "Internal IP",
+      "external_ip": "External IP",
       "wildcard_domain": "Wildcard domain",
       "wildcard_domain_description": "Enter a wildcard domain",
       "wildcard_domain_placeholder": "*.mydomain.com",
