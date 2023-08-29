@@ -43,7 +43,7 @@ async def setup_job_gateway(project: Project, job: Job):
 
     if gateway.head.wildcard_domain:
         job.gateway.secure = True
-        job.gateway.hostname = f"{job.run_name}.{gateway.head.wildcard_domain}"
+        job.gateway.hostname = f"{job.run_name}.{gateway.head.wildcard_domain[2:]}"  # strip *.
         job.gateway.public_port = 443
     else:
         job.gateway.secure = False
