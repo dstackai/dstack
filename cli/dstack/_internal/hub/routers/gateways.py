@@ -136,7 +136,7 @@ async def gateway_test_domain(
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND)
 
     try:
-        for rdata in dns.resolver.resolve("*." + body.domain, "A"):
+        for rdata in dns.resolver.resolve(body.domain, "A"):
             if rdata.address == gateway.head.external_ip:
                 return
     except dns.exception.DNSException:

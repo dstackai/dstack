@@ -1,6 +1,8 @@
 from typing import List, Optional
 
-from pydantic import BaseModel
+from pydantic import BaseModel, constr
+
+WildcardDomain = constr(strip_whitespace=True, regex=r"^\*\.(.+)$")
 
 
 class GatewayDelete(BaseModel):
@@ -13,9 +15,9 @@ class GatewayCreate(BaseModel):
 
 
 class GatewayUpdate(BaseModel):
-    wildcard_domain: Optional[str]
+    wildcard_domain: Optional[WildcardDomain]
     default: Optional[bool]
 
 
 class GatewayTestDomain(BaseModel):
-    domain: str
+    domain: WildcardDomain
