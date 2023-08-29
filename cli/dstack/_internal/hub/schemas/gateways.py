@@ -1,6 +1,7 @@
-from typing import List, Optional
+from typing import List, Optional, Union
 
 from pydantic import BaseModel, constr
+from typing_extensions import Literal
 
 WildcardDomain = constr(strip_whitespace=True, regex=r"^\*\.(.+)$")
 
@@ -15,7 +16,7 @@ class GatewayCreate(BaseModel):
 
 
 class GatewayUpdate(BaseModel):
-    wildcard_domain: Optional[WildcardDomain]
+    wildcard_domain: Optional[Union[WildcardDomain, Literal[""]]]
     default: Optional[bool]
 
 
