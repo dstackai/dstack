@@ -1,5 +1,5 @@
 import re
-from typing import List, Optional
+from typing import List
 
 import yaml
 
@@ -11,7 +11,6 @@ from dstack._internal.core.artifact import ArtifactHead
 from dstack._internal.core.error import BackendValueError
 from dstack._internal.core.job import JobErrorCode, JobHead, JobStatus
 from dstack._internal.core.run import RequestStatus, RunHead, generate_remote_run_name_prefix
-from dstack._internal.utils.common import get_milliseconds_since_epoch
 
 
 def create_run(storage: Storage, run_name: str) -> str:

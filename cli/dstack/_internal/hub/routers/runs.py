@@ -5,7 +5,7 @@ from fastapi import APIRouter, Depends, HTTPException, status
 from fastapi.responses import PlainTextResponse
 
 from dstack._internal.backend.base import Backend
-from dstack._internal.core.error import BackendValueError, NoMatchingInstanceError
+from dstack._internal.core.error import BackendValueError
 from dstack._internal.core.instance import InstanceCandidate
 from dstack._internal.core.job import JobStatus
 from dstack._internal.core.plan import JobPlan, RunPlan
@@ -13,14 +13,9 @@ from dstack._internal.core.repo.head import RepoHead
 from dstack._internal.core.run import generate_remote_run_name_prefix
 from dstack._internal.hub.db.models import Backend as DBBackend
 from dstack._internal.hub.db.models import Project, User
+from dstack._internal.hub.repository.jobs import JobManager
 from dstack._internal.hub.repository.projects import ProjectManager
-from dstack._internal.hub.routers.util import (
-    call_backend,
-    error_detail,
-    get_backends,
-    get_instance_candidates,
-    get_project,
-)
+from dstack._internal.hub.routers.util import call_backend, error_detail, get_project
 from dstack._internal.hub.schemas import (
     RunInfo,
     RunsCreate,
@@ -30,6 +25,7 @@ from dstack._internal.hub.schemas import (
     RunsStop,
 )
 from dstack._internal.hub.security.permissions import Authenticated, ProjectMember
+from dstack._internal.hub.services.common import get_backends, get_instance_candidates
 from dstack._internal.utils.logging import get_logger
 
 logger = get_logger(__name__)
@@ -74,6 +70,8 @@ async def list_all_runs() -> List[RunInfo]:
                 coros.append(get_run_infos(project, db_backend, backend, repo_head))
     res = await asyncio.gather(*coros)
     run_infos = [run_info for l in res for run_info in l]
+    for project in projects:
+        run_infos += await _get_not_started_run_infos(project)
     run_infos = sorted(run_infos, key=lambda x: -x.run_head.submitted_at)
     return run_infos
 
@@ -83,20 +81,13 @@ async def get_run_plan(
     project_name: str, body: RunsGetPlan, user: User = Depends(Authenticated())
 ) -> RunPlan:
     project = await get_project(project_name=project_name)
-    backends = await get_backends(project, selected_backends=body.backends)
+    backends = await get_backends(project, selected_backends=body.jobs[0].backends)
     backends = [backend for _, backend in backends]
 
     job_candidates = [(job, get_instance_candidates(backends, job)) for job in body.jobs]
     job_plans = []
     for job, candidates in job_candidates:
         candidates = await candidates
-        if not candidates:
-            msg = f"No available instance type matching requirements ({job.requirements.pretty_format()})"
-            raise HTTPException(
-                status_code=status.HTTP_400_BAD_REQUEST,
-                detail=error_detail(msg=msg, code=NoMatchingInstanceError.code),
-            )
-        candidates.sort(key=lambda i: i[1].price)
 
         job_plan = JobPlan(
             job=job,
@@ -111,7 +102,6 @@ async def get_run_plan(
             ],
         )
         job_plans.append(job_plan)
-
     run_plan = RunPlan(
         project=project_name,
         hub_user_name=user.name,
@@ -153,6 +143,7 @@ async def list_runs(project_name: str, body: RunsList) -> List[RunInfo]:
                 run_head=run_head,
             )
             run_infos.append(run_info)
+    run_infos += await _get_not_started_run_infos(project)
     run_infos = sorted(run_infos, key=lambda x: -x.run_head.submitted_at)
     return run_infos
 
@@ -164,6 +155,7 @@ async def stop_runs(project_name: str, body: RunsStop):
     project = await get_project(project_name=project_name)
     backends = await get_backends(project)
     for run_name in body.run_names:
+        await JobManager.stop_jobs(project_name=project_name, run_name=run_name)
         for _, backend in backends:
             run_head = await call_backend(
                 backend.get_run_head,
@@ -190,6 +182,7 @@ async def delete_runs(project_name: str, body: RunsDelete):
     project = await get_project(project_name=project_name)
     backends = await get_backends(project)
     for run_name in body.run_names:
+        await JobManager.delete_run_jobs(project_name=project_name, run_name=run_name)
         for _, backend in backends:
             run_head = await call_backend(
                 backend.get_run_head,
@@ -246,3 +239,17 @@ async def _create_run(project: Project, repo_id: str, run_name: Optional[str]) -
         if run_name not in run_names:
             return run_name
         i += 1
+
+
+async def _get_not_started_run_infos(project: Project) -> List[RunInfo]:
+    run_infos = []
+    pending_runs = await JobManager.list_runs(project_name=project.name)
+    for run_head in pending_runs:
+        run_info = RunInfo(
+            project=project.name,
+            repo_id=run_head.job_heads[0].repo_ref.repo_id,
+            backend=None,
+            run_head=run_head,
+        )
+        run_infos.append(run_info)
+    return run_infos

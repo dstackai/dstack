@@ -13,7 +13,7 @@ logger = get_logger(__name__)
 cache = {}
 
 
-async def get_backends(project: Project) -> List[Tuple[DBBackend, Backend]]:
+async def get_project_backends(project: Project) -> List[Tuple[DBBackend, Backend]]:
     key = project.name
     backends = cache.get(key)
     if backends is not None:

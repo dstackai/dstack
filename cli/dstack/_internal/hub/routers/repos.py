@@ -3,9 +3,10 @@ from typing import List
 from fastapi import APIRouter, Depends, HTTPException, status
 
 from dstack._internal.core.repo import RemoteRepoCredentials, RepoHead, RepoRef
-from dstack._internal.hub.routers.util import call_backend, error_detail, get_backends, get_project
+from dstack._internal.hub.routers.util import call_backend, error_detail, get_project
 from dstack._internal.hub.schemas import RepoHeadGet, ReposDelete, ReposUpdate, SaveRepoCredentials
 from dstack._internal.hub.security.permissions import ProjectMember
+from dstack._internal.hub.services.common import get_backends
 
 router = APIRouter(prefix="/api/project", tags=["repos"], dependencies=[Depends(ProjectMember())])
 

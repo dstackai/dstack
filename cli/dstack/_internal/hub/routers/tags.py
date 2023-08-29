@@ -7,12 +7,12 @@ from dstack._internal.core.tag import TagHead
 from dstack._internal.hub.routers.util import (
     call_backend,
     error_detail,
-    get_backends,
     get_project,
     get_run_backend,
 )
 from dstack._internal.hub.schemas import AddTagPath, AddTagRun
 from dstack._internal.hub.security.permissions import ProjectMember
+from dstack._internal.hub.services.common import get_backends
 
 router = APIRouter(prefix="/api/project", tags=["tags"], dependencies=[Depends(ProjectMember())])
 

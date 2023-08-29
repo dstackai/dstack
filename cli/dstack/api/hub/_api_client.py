@@ -93,7 +93,7 @@ class HubAPIClient:
             return [BackendInfo.parse_obj(i) for i in body]
         resp.raise_for_status()
 
-    def get_run_plan(self, jobs: List[Job], backends: Optional[List[str]]) -> RunPlan:
+    def get_run_plan(self, jobs: List[Job]) -> RunPlan:
         url = _project_url(
             url=self.url,
             project=self.project,
@@ -104,7 +104,7 @@ class HubAPIClient:
             host=self.url,
             url=url,
             headers=self._headers(),
-            data=RunsGetPlan(jobs=jobs, backends=backends).json(),
+            data=RunsGetPlan(jobs=jobs).json(),
         )
         if resp.ok:
             body = resp.json()
@@ -185,7 +185,7 @@ class HubAPIClient:
             return [Job.parse_obj(job) for job in body]
         resp.raise_for_status()
 
-    def run_job(self, job: Job, backends: Optional[List[str]]):
+    def run_job(self, job: Job):
         url = _project_url(
             url=self.url,
             project=self.project,
@@ -196,7 +196,7 @@ class HubAPIClient:
             host=self.url,
             url=url,
             headers=self._headers(),
-            data=RunRunners(job=job, backends=backends).json(),
+            data=RunRunners(job=job).json(),
         )
         if resp.ok:
             return

@@ -64,8 +64,8 @@ class HubClient:
     def list_jobs(self, run_name: str) -> List[Job]:
         return self._api_client.list_jobs(run_name=run_name)
 
-    def run_job(self, job: Job, backends: Optional[List[str]]):
-        self._api_client.run_job(job=job, backends=backends)
+    def run_job(self, job: Job):
+        self._api_client.run_job(job=job)
 
     def restart_job(self, job: Job):
         self._api_client.restart_job(job)
@@ -242,7 +242,7 @@ class HubClient:
             repo_code_filename="",
             ssh_key_pub="",
         )
-        run_plan = self._api_client.get_run_plan(jobs, configurator.profile.backends)
+        run_plan = self._api_client.get_run_plan(jobs)
         return run_plan
 
     def run_configuration(
@@ -271,7 +271,7 @@ class HubClient:
                 run_plan=run_plan,
             )
             for job in jobs:
-                self.run_job(job, configurator.profile.backends)
+                self.run_job(job)
             run_info = self.list_runs(run_name)[0]
             self._storage.upload_file(run_info.backend, f.name, repo_code_filename, lambda _: ...)
         self.update_repo_last_run_at(last_run_at=int(round(time.time() * 1000)))

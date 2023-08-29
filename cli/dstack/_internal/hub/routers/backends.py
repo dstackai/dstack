@@ -10,7 +10,6 @@ from dstack._internal.hub.routers.util import (
     error_detail,
     get_backend_by_type,
     get_backend_configurator,
-    get_backends,
 )
 from dstack._internal.hub.schemas import (
     BackendConfigWithCreds,
@@ -25,6 +24,7 @@ from dstack._internal.hub.security.permissions import Authenticated, ProjectAdmi
 from dstack._internal.hub.services.backends import list_avaialble_backend_types
 from dstack._internal.hub.services.backends.base import BackendConfigError
 from dstack._internal.hub.services.backends.cache import clear_backend_cache
+from dstack._internal.hub.services.common import get_backends
 from dstack._internal.hub.utils.common import run_async
 
 root_router = APIRouter(

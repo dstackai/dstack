@@ -4,9 +4,10 @@ from typing import Dict, List
 from fastapi import APIRouter, Body, Depends, HTTPException, status
 
 from dstack._internal.core.gateway import GatewayHead
-from dstack._internal.hub.routers.util import call_backend, error_detail, get_backends, get_project
+from dstack._internal.hub.routers.util import call_backend, error_detail, get_project
 from dstack._internal.hub.schemas import GatewayDelete
 from dstack._internal.hub.security.permissions import ProjectAdmin, ProjectMember
+from dstack._internal.hub.services.common import get_backends
 from dstack._internal.hub.utils.ssh import get_hub_ssh_public_key
 
 router = APIRouter(

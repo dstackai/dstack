@@ -5,17 +5,17 @@ from fastapi import APIRouter, Depends, HTTPException, status
 from dstack._internal.core.build import BuildNotFoundError
 from dstack._internal.core.error import NoMatchingInstanceError, SSHCommandError
 from dstack._internal.core.job import Job, JobStatus
+from dstack._internal.hub.repository.jobs import JobManager
 from dstack._internal.hub.routers.util import (
     call_backend,
     error_detail,
-    get_backends,
-    get_instance_candidates,
     get_job_backend,
     get_project,
     get_run_backend,
 )
 from dstack._internal.hub.schemas import RunRunners, StopRunners
 from dstack._internal.hub.security.permissions import ProjectMember
+from dstack._internal.hub.services.common import get_backends, get_instance_candidates
 from dstack._internal.utils.logging import get_logger
 
 logger = get_logger(__name__)
@@ -26,19 +26,13 @@ router = APIRouter(
 
 @router.post("/{project_name}/runners/run")
 async def run(project_name: str, body: RunRunners):
+    job = body.job
     project = await get_project(project_name=project_name)
-    backends = await get_backends(project)
+    backends = await get_backends(project, selected_backends=body.job.backends)
+    backends = [backend for _, backend in backends]
     # todo use run plan?
     start = datetime.datetime.now()
-    candidates = await get_instance_candidates(
-        [
-            backend
-            for db_backend, backend in backends
-            if not body.backends or db_backend.type in body.backends
-        ],
-        body.job,
-    )
-    candidates.sort(key=lambda i: i[1].price)
+    candidates = await get_instance_candidates(backends, job)
     logger.debug(
         f"Found %d instance candidates in %s",
         len(candidates),
@@ -56,7 +50,7 @@ async def run(project_name: str, body: RunRunners):
         try:
             await call_backend(
                 backend.run_job,
-                body.job,
+                job,
                 project.ssh_private_key,
                 offer,
             )
@@ -73,6 +67,15 @@ async def run(project_name: str, body: RunRunners):
                 status_code=status.HTTP_400_BAD_REQUEST,
                 detail=error_detail(msg=e.message, code=e.code),
             )
+    if body.job.retry_active():
+        job.status = JobStatus.PENDING
+        await JobManager.create(project_name=project.name, job=job)
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=error_detail(
+                "No capacity. The run will be retried later.", code=NoMatchingInstanceError.code
+            ),
+        )
     raise HTTPException(
         status_code=status.HTTP_400_BAD_REQUEST,
         detail=error_detail("Run failed due to no capacity", code=NoMatchingInstanceError.code),

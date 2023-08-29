@@ -180,6 +180,7 @@ class Job(JobHead):
     app_specs: Optional[List[AppSpec]]
     artifact_paths: Optional[List[str]]
     artifact_specs: Optional[List[ArtifactSpec]]
+    backends: Optional[List[str]]
     build_commands: Optional[List[str]]
     build_policy: BuildPolicy = BuildPolicy.USE_BUILD
     cache_specs: List[CacheSpec]

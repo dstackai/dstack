@@ -339,7 +339,6 @@ class AddTagPath(BaseModel):
 
 class RunRunners(BaseModel):
     job: Job
-    backends: Optional[List[str]]
 
 
 class StopRunners(BaseModel):
@@ -369,7 +368,6 @@ class ReposDelete(BaseModel):
 
 class RunsGetPlan(BaseModel):
     jobs: List[Job]
-    backends: Optional[List[str]]
 
 
 class RunsCreate(BaseModel):
@@ -397,7 +395,7 @@ class RunsDelete(BaseModel):
 class RunInfo(BaseModel):
     project: str
     repo_id: str
-    backend: str
+    backend: Optional[str]
     run_head: RunHead
     repo: Optional[RepoHead]
 

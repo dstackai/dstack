@@ -12,7 +12,7 @@ from dstack._internal.utils import random_names
 class RunHead(BaseModel):
     run_name: str
     workflow_name: Optional[str]
-    provider_name: str
+    provider_name: Optional[str]
     configuration_path: Optional[str]
     hub_user_name: Optional[str]
     artifact_heads: Optional[List[ArtifactHead]]

@@ -129,7 +129,16 @@ def print_run_plan(configurator: JobConfigurator, run_plan: RunPlan, candidates_
 
     console.print(props)
     console.print()
-    console.print(candidates)
+    if len(job_plan.candidates) == 0:
+        console.print(
+            f"No instances matching requirements ({job_plan.job.requirements.pretty_format()})."
+        )
+        if job_plan.job.retry_active():
+            console.print(f"The run will be resubmitted according to retry policy.")
+        else:
+            exit(1)
+    else:
+        console.print(candidates)
     console.print()
 
 

@@ -173,6 +173,7 @@ class JobConfigurator(ABC):
         configured_job = job.Job(
             app_specs=self.app_specs(),
             artifact_specs=self.artifact_specs(),
+            backends=self.profile.backends,
             build_commands=self.build_commands(),
             build_policy=self.build_policy,
             cache_specs=self.cache_specs(),
@@ -255,7 +256,11 @@ class JobConfigurator(ABC):
         if self.conf.image is not None:
             return self.conf.image
         if run_plan is not None:
-            if len(run_plan.job_plans[0].candidates[0].instance.resources.gpus) > 0:
+            if (
+                run_plan is None
+                or len(run_plan.job_plans[0].candidates) == 0
+                or len(run_plan.job_plans[0].candidates[0].instance.resources.gpus) > 0
+            ):
                 return f"dstackai/base:py{self.python()}-{version.base_image}-cuda-11.8"
         return f"dstackai/base:py{self.python()}-{version.base_image}"
 
