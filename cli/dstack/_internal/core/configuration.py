@@ -143,9 +143,6 @@ class ServiceConfiguration(BaseConfiguration):
         Union[ValidPort, constr(regex=r"^[0-9]+:[0-9]+$"), PortMapping],
         Field(description="The port, that application listens to or the mapping"),
     ]
-    gateway: Annotated[
-        str, Field(description="The gateway IP address or domain to publish the service")
-    ]
 
     @validator("port")
     def convert_port(cls, v) -> PortMapping:

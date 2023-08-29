@@ -42,3 +42,7 @@ class SSHCommandError(BackendError):
     def __init__(self, cmd: List[str], message: str):
         super().__init__(message)
         self.cmd = cmd
+
+
+class NoGatewayError(BackendError):
+    code = "no_gateway"

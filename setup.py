@@ -65,6 +65,7 @@ BASE_DEPS = [
     "filelock",
     "watchfiles",
     "docker>=6.0.0",
+    "dnspython",
 ]
 
 AWS_DEPS = [

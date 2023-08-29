@@ -1,16 +1,15 @@
 import re
 import subprocess
-import time
 from tempfile import NamedTemporaryFile
-from typing import List, Optional
+from typing import List, Optional, Tuple, Union
 
 import pkg_resources
 
 from dstack._internal.backend.base.compute import Compute
 from dstack._internal.backend.base.head import (
-    delete_head_object,
     list_head_objects,
     put_head_object,
+    replace_head_object,
 )
 from dstack._internal.backend.base.secrets import SecretsManager
 from dstack._internal.backend.base.storage import Storage
@@ -20,28 +19,40 @@ from dstack._internal.core.job import Job
 from dstack._internal.utils.common import PathLike, removeprefix
 from dstack._internal.utils.crypto import generate_rsa_key_pair_bytes
 from dstack._internal.utils.interpolator import VariablesInterpolator
-from dstack._internal.utils.random_names import generate_name
 
 
-def create_gateway(compute: Compute, storage: Storage, ssh_key_pub: str) -> GatewayHead:
-    # todo generate while instance name is not unique
-    instance_name = f"dstack-gateway-{generate_name()}"
-    head = compute.create_gateway(instance_name, ssh_key_pub)
+def create_gateway(
+    compute: Compute, storage: Storage, instance_name: str, ssh_key_pub: str, region: str
+) -> GatewayHead:
+    head = compute.create_gateway(instance_name, ssh_key_pub, region=region)
     put_head_object(storage, head)
     return head
 
 
-def list_gateways(storage: Storage) -> List[GatewayHead]:
-    return list_head_objects(storage, GatewayHead)
+def list_gateways(
+    storage: Storage, include_key: bool = False
+) -> List[Union[GatewayHead, Tuple[str, GatewayHead]]]:
+    return list_head_objects(storage, GatewayHead, include_key=include_key)
 
 
-def delete_gateway(compute: Compute, storage: Storage, instance_name: str):
-    heads = list_gateways(storage)
-    for head in heads:
+def delete_gateway(compute: Compute, storage: Storage, instance_name: str, region: str):
+    heads = list_gateways(storage, include_key=True)
+    for key, head in heads:
         if head.instance_name != instance_name:
             continue
-        compute.delete_instance(instance_name)
-        delete_head_object(storage, head)
+        compute.delete_instance(instance_name, region=region)
+        storage.delete_object(key)
+
+
+def update_gateway(storage: Storage, instance_name: str, wildcard_domain: str):
+    heads = list_gateways(storage, include_key=True)
+    for key, head in heads:
+        if head.instance_name != instance_name:
+            continue
+        head.wildcard_domain = wildcard_domain
+        replace_head_object(storage, key, head)
+        return head
+    raise KeyError(f"Gateway {instance_name} not found")
 
 
 def resolve_hostname(secrets_manager: SecretsManager, repo_id: str, hostname: str) -> str:
@@ -119,13 +130,7 @@ def is_ip_address(hostname: str) -> bool:
     return re.match(r"^\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3}$", hostname) is not None
 
 
-def setup_service_job(job: Job, secrets_manager: SecretsManager, project_private_key: str) -> Job:
-    job.gateway.hostname = resolve_hostname(
-        secrets_manager, job.repo_ref.repo_id, job.gateway.hostname
-    )
-    job.gateway.secure = not is_ip_address(job.gateway.hostname)
-    if job.gateway.secure and job.gateway.public_port == 80:
-        job.gateway.public_port = 443
+def setup_service_job(job: Job, project_private_key: str) -> Job:
     private_bytes, public_bytes = generate_rsa_key_pair_bytes(comment=job.run_name)
     job.gateway.sock_path = publish(
         job.gateway.hostname,

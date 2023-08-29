@@ -6,6 +6,7 @@ import App from 'App';
 import { Logout } from 'App/Logout';
 import { ProjectAdd, ProjectDetails, ProjectList, ProjectSettings } from 'pages/Project';
 import { BackendAdd, BackendEdit } from 'pages/Project/Backends';
+import { AddGateway, EditGateway } from 'pages/Project/Gateways';
 import { RepositoryDetails, RepositoryList, RepositorySettings } from 'pages/Repositories';
 import { Artifacts as RunArtifacts, List as MainRunList, Logs as RunLogs, RunDetails, RunList } from 'pages/Runs';
 import { TagDetails, TagList } from 'pages/Tags';
@@ -50,6 +51,16 @@ export const router = createBrowserRouter([
                     {
                         path: ROUTES.PROJECT.BACKEND.EDIT.TEMPLATE,
                         element: <BackendEdit />,
+                    },
+
+                    {
+                        path: ROUTES.PROJECT.GATEWAY.ADD.TEMPLATE,
+                        element: <AddGateway />,
+                    },
+
+                    {
+                        path: ROUTES.PROJECT.GATEWAY.EDIT.TEMPLATE,
+                        element: <EditGateway />,
                     },
                 ],
             },
