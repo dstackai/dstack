@@ -111,16 +111,13 @@ def delete_jobs(storage: Storage, repo_id: str, run_name: str):
 def run_job(
     storage: Storage,
     compute: Compute,
-    secrets_manager: SecretsManager,
     job: Job,
     project_private_key: str,
     offer: InstanceOffer,
 ):
     try:
         if job.configuration_type == ConfigurationType.SERVICE:
-            job = gateway.setup_service_job(
-                job, secrets_manager, project_private_key=project_private_key
-            )
+            job = gateway.setup_service_job(job, project_private_key)
             update_job(storage, job)
 
         _try_run_job(

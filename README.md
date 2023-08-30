@@ -104,8 +104,6 @@ A service is an application that is accessible through a public endpoint.
 ```yaml
 type: service
 
-gateway: ${{ secrets.GATEWAY_ADDRESS }}
-
 port: 7860
 
 commands:

@@ -1,4 +1,3 @@
-import json
 from datetime import datetime
 from typing import Dict, Generator, List, Optional
 from urllib.parse import urlencode, urlparse, urlunparse
@@ -11,10 +10,11 @@ from dstack._internal.core.build import BuildNotFoundError
 from dstack._internal.core.error import (
     BackendNotAvailableError,
     BackendValueError,
+    NoGatewayError,
     NoMatchingInstanceError,
     SSHCommandError,
 )
-from dstack._internal.core.gateway import GatewayHead
+from dstack._internal.core.gateway import Gateway, GatewayBackend
 from dstack._internal.core.job import Job, JobHead
 from dstack._internal.core.log_event import LogEvent
 from dstack._internal.core.plan import RunPlan
@@ -25,7 +25,6 @@ from dstack._internal.hub.schemas import (
     AddTagRun,
     ArtifactsList,
     BackendInfo,
-    GatewayDelete,
     JobHeadList,
     JobsGet,
     JobsList,
@@ -43,6 +42,7 @@ from dstack._internal.hub.schemas import (
     StopRunners,
     StorageLink,
 )
+from dstack._internal.hub.schemas.gateways import GatewayCreate, GatewayDelete
 from dstack.api.hub.errors import HubClientError
 
 
@@ -206,6 +206,7 @@ class HubAPIClient:
                 NoMatchingInstanceError.code,
                 BuildNotFoundError.code,
                 SSHCommandError.code,
+                NoGatewayError.code,
             ):
                 raise HubClientError(body["detail"]["msg"])
         resp.raise_for_status()
@@ -721,24 +722,37 @@ class HubAPIClient:
             return
         resp.raise_for_status()
 
-    def create_gateway(self, backend: str) -> GatewayHead:
+    def create_gateway(self, backend: str, region: str) -> Gateway:
         url = _project_url(url=self.url, project=self.project, additional_path="/gateways/create")
         resp = _make_hub_request(
             requests.post,
             host=self.url,
             url=url,
             headers=self._headers(),
-            data=json.dumps(backend),
+            data=GatewayCreate(backend=backend, region=region).json(),
         )
         if resp.ok:
-            return GatewayHead.parse_obj(resp.json())
+            return Gateway.parse_obj(resp.json())
         if resp.status_code == 400:
             body = resp.json()
             if body["detail"]["code"] == "not_implemented":
                 raise HubClientError(body["detail"]["msg"])
         resp.raise_for_status()
 
-    def list_gateways(self) -> Dict[str, List[GatewayHead]]:
+    def get_gateway_backends(self) -> List[GatewayBackend]:
+        url = _project_url(
+            url=self.url, project=self.project, additional_path="/gateways/list_backends"
+        )
+        resp = _make_hub_request(
+            requests.get,
+            host=self.url,
+            url=url,
+            headers=self._headers(),
+        )
+        resp.raise_for_status()
+        return parse_obj_as(List[GatewayBackend], resp.json())
+
+    def list_gateways(self) -> List[Gateway]:
         url = _project_url(url=self.url, project=self.project, additional_path="/gateways")
         resp = _make_hub_request(
             requests.get,
@@ -748,16 +762,16 @@ class HubAPIClient:
         )
         if not resp.ok:
             resp.raise_for_status()
-        return parse_obj_as(Dict[str, List[GatewayHead]], resp.json())
+        return parse_obj_as(List[Gateway], resp.json())
 
-    def delete_gateway(self, instance_name: str, backend: str):
+    def delete_gateway(self, instance_name: str):
         url = _project_url(url=self.url, project=self.project, additional_path="/gateways/delete")
         resp = _make_hub_request(
             requests.post,
             host=self.url,
             url=url,
             headers=self._headers(),
-            data=GatewayDelete(instance_name=instance_name, backend=backend).json(),
+            data=GatewayDelete(instance_names=[instance_name]).json(),
         )
         resp.raise_for_status()
 

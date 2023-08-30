@@ -24,7 +24,8 @@ from dstack._internal.utils.common import get_milliseconds_since_epoch
 
 
 class Gateway(BaseModel):
-    hostname: str
+    gateway_name: Optional[str]
+    hostname: Optional[str]
     service_port: int
     public_port: int = 80
     secure: bool = False

@@ -67,6 +67,17 @@ export const ROUTES = {
                     buildRoute(ROUTES.PROJECT.BACKEND.EDIT.TEMPLATE, { name, backend: backendName }),
             },
         },
+        GATEWAY: {
+            ADD: {
+                TEMPLATE: `/projects/:name/gateways/add`,
+                FORMAT: (name: string) => buildRoute(ROUTES.PROJECT.GATEWAY.ADD.TEMPLATE, { name }),
+            },
+            EDIT: {
+                TEMPLATE: `/projects/:name/gateways/:instance`,
+                FORMAT: (name: string, instanceName: string) =>
+                    buildRoute(ROUTES.PROJECT.GATEWAY.EDIT.TEMPLATE, { name, instance: instanceName }),
+            },
+        },
     },
 
     RUNS: {

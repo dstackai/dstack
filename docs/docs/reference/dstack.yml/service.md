@@ -12,7 +12,6 @@ Service allows running an application and exposing it over HTTP to the global in
 ## Runtime properties:
 
 - `commands` - The list of commands to be executed every restart of the environment.
-- `gateway` - The gateway IP address or domain. Supports secrets interpolation `${{ secrets.GATEWAY_IP }}`.
 - `port` - The exposed port or mapping. Allowed formats:
     - `8000` - expose port `8000` at gateway's port `80`.
     - `3333:8000` - expose port `8000` at gateway's port `3333`.
@@ -43,7 +42,6 @@ Service allows running an application and exposing it over HTTP to the global in
 
 ```yaml
 type: service
-gateway: ${{ secrets.GATEWAY_IP }}
 port: 8000
 commands:
   - python -m http.server 8000

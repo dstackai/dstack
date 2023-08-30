@@ -70,13 +70,13 @@ class AWSLogging(Logging):
             else:
                 raise e
 
-    def create_log_groups_if_not_exist(
-        self, logs_client: BaseClient, bucket_name: str, repo_id: str
-    ):
+    def create_log_groups_if_not_exist(self, bucket_name: str, repo_id: str):
         _create_log_group_if_not_exists(
-            logs_client, bucket_name, f"/dstack/jobs/{bucket_name}/{repo_id}"
+            self.logs_client, bucket_name, f"/dstack/jobs/{bucket_name}/{repo_id}"
         )
-        _create_log_group_if_not_exists(logs_client, bucket_name, f"/dstack/runners/{bucket_name}")
+        _create_log_group_if_not_exists(
+            self.logs_client, bucket_name, f"/dstack/runners/{bucket_name}"
+        )
 
 
 def _filter_logs_events_kwargs(
