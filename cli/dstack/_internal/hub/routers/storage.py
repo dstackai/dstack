@@ -7,14 +7,10 @@ from typing_extensions import Annotated
 
 from dstack._internal.backend.base import Backend
 from dstack._internal.backend.local import LocalBackend
-from dstack._internal.hub.routers.util import (
-    error_detail,
-    get_backend_by_type,
-    get_backends,
-    get_project,
-)
+from dstack._internal.hub.routers.util import error_detail, get_backend_by_type, get_project
 from dstack._internal.hub.schemas import FileObject
 from dstack._internal.hub.security.permissions import ProjectMember
+from dstack._internal.hub.services.common import get_backends
 
 
 async def project_member_from_query(project_name: str, token: Annotated[str, Query()]):

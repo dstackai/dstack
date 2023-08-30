@@ -20,6 +20,7 @@ from dstack._internal.core.repo import (
     RepoData,
     RepoRef,
 )
+from dstack._internal.utils.common import get_milliseconds_since_epoch
 
 
 class Gateway(BaseModel):
@@ -180,6 +181,7 @@ class Job(JobHead):
     app_specs: Optional[List[AppSpec]]
     artifact_paths: Optional[List[str]]
     artifact_specs: Optional[List[ArtifactSpec]]
+    backends: Optional[List[str]]
     build_commands: Optional[List[str]]
     build_policy: BuildPolicy = BuildPolicy.USE_BUILD
     cache_specs: List[CacheSpec]
@@ -263,6 +265,15 @@ class Job(JobHead):
             return RemoteRepo(repo_ref=self.repo_ref, repo_data=self.repo_data)
         elif isinstance(self.repo_data, LocalRepoData):
             return LocalRepo(repo_ref=self.repo_ref, repo_data=self.repo_data)
+
+    def retry_active(self, curr_time: Optional[int] = None) -> bool:
+        if curr_time is None:
+            curr_time = get_milliseconds_since_epoch()
+        return (
+            self.retry_policy is not None
+            and self.retry_policy.retry
+            and curr_time - self.created_at < self.retry_policy.limit * 1000
+        )
 
 
 def check_dict(element: Any, field: str):

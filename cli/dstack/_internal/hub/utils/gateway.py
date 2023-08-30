@@ -5,7 +5,8 @@ from dstack._internal.core.error import NoGatewayError
 from dstack._internal.core.gateway import Gateway
 from dstack._internal.core.job import Job
 from dstack._internal.hub.db.models import Project
-from dstack._internal.hub.routers.util import call_backend, get_backends
+from dstack._internal.hub.routers.util import call_backend
+from dstack._internal.hub.services.common import get_backends
 
 
 async def list_gateways(project: Project) -> List[Gateway]:

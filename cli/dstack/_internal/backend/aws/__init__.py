@@ -80,20 +80,17 @@ class AwsBackend(ComponentBasedBackend):
     def pricing(self) -> AWSPricing:
         return self._pricing
 
-    # TODO: The `offer` field must be required
     def run_job(
         self,
         job: Job,
-        failed_to_start_job_new_status: JobStatus,
         project_private_key: str,
-        offer: Optional[InstanceOffer] = None,
+        offer: InstanceOffer,
     ):
         self._logging.create_log_groups_if_not_exist(
             self.backend_config.bucket_name, job.repo_ref.repo_id
         )
         super().run_job(
             job,
-            failed_to_start_job_new_status,
             project_private_key=project_private_key,
             offer=offer,
         )

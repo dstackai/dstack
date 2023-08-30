@@ -2,8 +2,9 @@ from fastapi import APIRouter, Depends
 
 from dstack._internal.core.repo import RepoRef
 from dstack._internal.hub.db.models import User
-from dstack._internal.hub.routers.util import call_backend, get_backends, get_project
+from dstack._internal.hub.routers.util import call_backend, get_project
 from dstack._internal.hub.security.permissions import Authenticated, ProjectMember
+from dstack._internal.hub.services.common import get_backends
 
 router = APIRouter(
     prefix="/api/project", tags=["configurations"], dependencies=[Depends(ProjectMember())]

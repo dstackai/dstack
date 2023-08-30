@@ -3,14 +3,10 @@ from fastapi.responses import PlainTextResponse
 from fastapi.security.http import HTTPAuthorizationCredentials, HTTPBearer
 
 from dstack._internal.backend.local import LocalBackend
-from dstack._internal.hub.routers.util import (
-    call_backend,
-    get_backend_by_type,
-    get_backends,
-    get_project,
-)
+from dstack._internal.hub.routers.util import call_backend, get_backend_by_type, get_project
 from dstack._internal.hub.schemas import StorageLink
 from dstack._internal.hub.security.permissions import ProjectMember
+from dstack._internal.hub.services.common import get_backends
 
 router = APIRouter(prefix="/api/project", tags=["link"], dependencies=[Depends(ProjectMember())])
 

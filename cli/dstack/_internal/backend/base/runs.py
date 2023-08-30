@@ -1,5 +1,5 @@
 import re
-from typing import List, Optional
+from typing import List
 
 import yaml
 
@@ -29,19 +29,25 @@ def get_run_heads(
     compute: Compute,
     job_heads: List[JobHead],
     include_request_heads: bool,
-    interrupted_job_new_status: JobStatus = JobStatus.FAILED,
 ) -> List[RunHead]:
     runs_by_id = {}
     for job_head in job_heads:
         run_id = ",".join([job_head.run_name, job_head.workflow_name or ""])
         if run_id not in runs_by_id:
             runs_by_id[run_id] = _create_run(
-                storage, compute, job_head, include_request_heads, interrupted_job_new_status
+                storage,
+                compute,
+                job_head,
+                include_request_heads,
             )
         else:
             run = runs_by_id[run_id]
             _update_run(
-                storage, compute, run, job_head, include_request_heads, interrupted_job_new_status
+                storage,
+                compute,
+                run,
+                job_head,
+                include_request_heads,
             )
     run_heads = list(sorted(runs_by_id.values(), key=lambda r: r.submitted_at, reverse=True))
     return run_heads
@@ -79,7 +85,6 @@ def _create_run(
     compute: Compute,
     job_head: JobHead,
     include_request_heads: bool,
-    interrupted_job_new_status: JobStatus,
 ) -> RunHead:
     app_heads = (
         list(
@@ -116,9 +121,12 @@ def _create_run(
         request_head = compute.get_request_head(job, request_id)
         request_heads.append(request_head)
         if request_head.status == RequestStatus.NO_CAPACITY:
-            job.status = job_head.status = interrupted_job_new_status
-            if interrupted_job_new_status == JobStatus.FAILED:
+            if job.retry_active():
+                interrupted_job_new_status = JobStatus.PENDING
+            else:
+                interrupted_job_new_status = JobStatus.FAILED
                 job.error_code = JobErrorCode.INTERRUPTED_BY_NO_CAPACITY
+            job.status = job_head.status = interrupted_job_new_status
             jobs.update_job(storage, job)
         elif request_head.status == RequestStatus.TERMINATED:
             # We should check the job status again, to ensure it hasn't been updated just
@@ -151,7 +159,6 @@ def _update_run(
     run: RunHead,
     job_head: JobHead,
     include_request_heads: bool,
-    interrupted_job_new_status: JobStatus,
 ):
     run.submitted_at = min(run.submitted_at, job_head.submitted_at)
     if job_head.artifact_paths:
@@ -190,9 +197,12 @@ def _update_run(
             request_head = compute.get_request_head(job, request_id)
             run.request_heads.append(request_head)
             if request_head.status == RequestStatus.NO_CAPACITY:
-                job.status = job_head.status = interrupted_job_new_status
-                if interrupted_job_new_status == JobStatus.FAILED:
+                if job.retry_active():
+                    interrupted_job_new_status = JobStatus.PENDING
+                else:
+                    interrupted_job_new_status = JobStatus.FAILED
                     job.error_code = JobErrorCode.INTERRUPTED_BY_NO_CAPACITY
+                job.status = job_head.status = interrupted_job_new_status
                 jobs.update_job(storage, job)
             elif request_head.status == RequestStatus.TERMINATED:
                 job = jobs.get_job(storage, job_head.repo_ref.repo_id, job_head.job_id)

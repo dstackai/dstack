@@ -65,3 +65,19 @@ class Project(Base):
     members: Mapped[List[Member]] = relationship(back_populates="project", lazy="selectin")
     backends: Mapped[List[Backend]] = relationship(back_populates="project", lazy="selectin")
     default_gateway: Mapped[str] = mapped_column(String(50), nullable=True)
+
+
+class Job(Base):
+    """
+    This table stores not started jobs that are not stored in any backend.
+    After the job is successfully submitted to a backed, it is deleted from the table.
+    """
+
+    __tablename__ = "jobs"
+
+    job_id: Mapped[str] = mapped_column(String(50), primary_key=True)
+    run_name = mapped_column(String(50), index=True)
+    project_name: Mapped[str] = mapped_column(ForeignKey("projects.name", ondelete="CASCADE"))
+    project: Mapped["Project"] = relationship()
+    status: Mapped[str] = mapped_column(String(30), index=True)
+    job_data: Mapped[str] = mapped_column(Text)

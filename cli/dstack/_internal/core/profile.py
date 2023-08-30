@@ -1,7 +1,7 @@
 import re
 from typing import List, Optional, Union
 
-from pydantic import Field, confloat, validator
+from pydantic import Field, confloat, root_validator, validator
 from typing_extensions import Annotated, Literal
 
 from dstack._internal.core.configuration import ForbidExtra
@@ -104,8 +104,22 @@ class ProfileRetryPolicy(ForbidExtra):
     limit: Annotated[
         Union[int, str],
         Field(description="The maximum period of retrying the run, e.g., 4h or 1d"),
-    ] = DEFAULT_RETRY_LIMIT
-    _validate_limit = validator("limit", pre=True, allow_reuse=True)(parse_duration)
+    ] = None
+
+    @validator("limit", pre=True, allow_reuse=True)
+    def _validate_limit(cls, v: Union[int, str, None]):
+        if v is None:
+            ValueError()
+        return parse_duration(v)
+
+    @root_validator()
+    @classmethod
+    def _validate_fields(cls, field_values):
+        if field_values["retry"] and "limit" not in field_values:
+            field_values["limit"] = DEFAULT_RETRY_LIMIT
+        if field_values["limit"] is not None:
+            field_values["retry"] = True
+        return field_values
 
 
 class Profile(ForbidExtra):

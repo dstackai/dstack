@@ -22,6 +22,7 @@ type Job struct {
 	Apps              []App             `yaml:"app_specs,omitempty"`
 	ArtifactPaths     []string          `yaml:"artifact_paths,omitempty"` // head
 	Artifacts         []Artifact        `yaml:"artifact_specs,omitempty"`
+	Backends          []string          `yaml:"backends,omitempty"`
 	BuildCommands     []string          `yaml:"build_commands,omitempty"`
 	BuildPolicy       BuildPolicy       `yaml:"build_policy"`
 	Cache             []Cache           `yaml:"cache_specs"`
