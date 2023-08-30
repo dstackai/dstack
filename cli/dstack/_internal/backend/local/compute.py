@@ -6,7 +6,12 @@ from dstack._internal.backend.base.compute import Compute, choose_instance_type
 from dstack._internal.backend.local import runners
 from dstack._internal.backend.local.config import LocalConfig
 from dstack._internal.core.error import BackendValueError
-from dstack._internal.core.instance import InstanceType, LaunchedInstanceInfo
+from dstack._internal.core.instance import (
+    InstanceOffer,
+    InstancePricing,
+    InstanceType,
+    LaunchedInstanceInfo,
+)
 from dstack._internal.core.job import Job
 from dstack._internal.core.request import RequestHead
 from dstack._internal.core.runners import Runner
@@ -52,3 +57,6 @@ class LocalCompute(Compute):
 
     def cancel_spot_request(self, runner: Runner):
         pass
+
+    def get_availability(self, offers: List[InstancePricing]) -> List[InstanceOffer]:
+        raise NotImplementedError()

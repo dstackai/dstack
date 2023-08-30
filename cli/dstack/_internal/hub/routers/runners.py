@@ -4,6 +4,7 @@ from fastapi import APIRouter, Depends, HTTPException, status
 
 from dstack._internal.core.build import BuildNotFoundError
 from dstack._internal.core.error import NoGatewayError, NoMatchingInstanceError, SSHCommandError
+from dstack._internal.core.instance import InstanceAvailability
 from dstack._internal.core.job import ConfigurationType, Job, JobStatus
 from dstack._internal.hub.repository.jobs import JobManager
 from dstack._internal.hub.routers.util import (
@@ -31,21 +32,28 @@ async def run(project_name: str, body: RunRunners):
     project = await get_project(project_name=project_name)
     backends = await get_backends(project, selected_backends=job.backends)
     backends = [backend for _, backend in backends]
-    # todo use run plan?
+
     start = datetime.datetime.now()
     candidates = await get_instance_candidates(backends, job)
+    exclude_availability = {InstanceAvailability.NOT_AVAILABLE, InstanceAvailability.NO_QUOTA}
+    candidates = [
+        (backend, offer)
+        for backend, offer in candidates
+        if offer.availability not in exclude_availability
+    ]
     logger.debug(
         f"Found %d instance candidates in %s",
         len(candidates),
         str(datetime.datetime.now() - start),
     )
+
     try:
         if job.configuration_type == ConfigurationType.SERVICE:
             await setup_job_gateway(project, job)
         for backend, offer in candidates:
             logger.info(
                 "Trying %s in %s/%s for $%0.4f per hour",
-                offer.instance_type.instance_name,
+                offer.instance.instance_name,
                 backend.name,
                 offer.region,
                 offer.price,

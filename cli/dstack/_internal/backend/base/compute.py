@@ -6,7 +6,13 @@ from typing import List, Optional
 import dstack.version as version
 from dstack._internal.core.error import BackendError
 from dstack._internal.core.gateway import GatewayHead
-from dstack._internal.core.instance import InstanceType, LaunchedInstanceInfo
+from dstack._internal.core.instance import (
+    InstanceAvailability,
+    InstanceOffer,
+    InstancePricing,
+    InstanceType,
+    LaunchedInstanceInfo,
+)
 from dstack._internal.core.job import Job, Requirements
 from dstack._internal.core.request import RequestHead
 from dstack._internal.core.runners import Resources, Runner
@@ -55,6 +61,10 @@ class Compute(ABC):
 
     @abstractmethod
     def cancel_spot_request(self, runner: Runner):
+        pass
+
+    @abstractmethod
+    def get_availability(self, offers: List[InstancePricing]) -> List[InstanceOffer]:
         pass
 
     def create_gateway(self, instance_name: str, ssh_key_pub: str, region: str) -> GatewayHead:

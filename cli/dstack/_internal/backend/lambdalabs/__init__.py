@@ -11,8 +11,8 @@ from dstack._internal.backend.base import ComponentBasedBackend
 from dstack._internal.backend.lambdalabs.compute import LambdaCompute
 from dstack._internal.backend.lambdalabs.config import LambdaConfig
 from dstack._internal.backend.lambdalabs.pricing import LambdaPricing
-from dstack._internal.core.instance import InstanceOffer
-from dstack._internal.core.job import Job, JobStatus
+from dstack._internal.core.instance import InstancePricing
+from dstack._internal.core.job import Job
 
 
 class LambdaBackend(ComponentBasedBackend):
@@ -74,7 +74,7 @@ class LambdaBackend(ComponentBasedBackend):
         self,
         job: Job,
         project_private_key: str,
-        offer: InstanceOffer,
+        offer: InstancePricing,
     ):
         self._logging.create_log_groups_if_not_exist(
             self.backend_config.storage_config.bucket, job.repo_ref.repo_id

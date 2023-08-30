@@ -13,7 +13,7 @@ from dstack._internal.backend.aws.storage import AWSStorage
 from dstack._internal.backend.base import ComponentBasedBackend
 from dstack._internal.core.error import BackendAuthError
 from dstack._internal.core.instance import InstanceOffer
-from dstack._internal.core.job import Job, JobStatus
+from dstack._internal.core.job import Job
 
 
 class AwsBackend(ComponentBasedBackend):

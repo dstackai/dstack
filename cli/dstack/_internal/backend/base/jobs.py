@@ -9,7 +9,7 @@ from dstack._internal.backend.base.compute import Compute, InstanceNotFoundError
 from dstack._internal.backend.base.secrets import SecretsManager
 from dstack._internal.backend.base.storage import Storage
 from dstack._internal.core.error import BackendError, BackendValueError, NoMatchingInstanceError
-from dstack._internal.core.instance import InstanceOffer, InstanceType
+from dstack._internal.core.instance import InstancePricing, InstanceType
 from dstack._internal.core.job import (
     ConfigurationType,
     Job,
@@ -113,7 +113,7 @@ def run_job(
     compute: Compute,
     job: Job,
     project_private_key: str,
-    offer: InstanceOffer,
+    offer: InstancePricing,
 ):
     try:
         if job.configuration_type == ConfigurationType.SERVICE:
@@ -198,10 +198,10 @@ def _try_run_job(
     storage: Storage,
     compute: Compute,
     job: Job,
-    offer: InstanceOffer,
+    offer: InstancePricing,
 ):
-    job.requirements.spot = offer.instance_type.resources.spot
-    instance_type = offer.instance_type
+    job.requirements.spot = offer.instance.resources.spot
+    instance_type = offer.instance
     job.price = offer.price
     job.instance_type = instance_type.instance_name
     runner = Runner(
@@ -209,7 +209,7 @@ def _try_run_job(
     )
     runners.create_runner(storage, runner)
     try:
-        launched_instance_info = compute.run_instance(job, instance_type, region=offer.region)
+        launched_instance_info = compute.run_instance(job, instance, region=offer.region)
         runner.request_id = job.request_id = launched_instance_info.request_id
         job.location = launched_instance_info.location
     except NoCapacityError:

@@ -27,3 +27,7 @@ class GCPPricing(CatalogPricing):
             gpu_memory = round(float(instance["gpu_memory"]) * 1024)
             return f'{instance["instance_name"]}-{instance["gpu_count"]}x{instance["gpu_name"]}-{gpu_memory}'
         return instance["instance_name"]
+
+    @classmethod
+    def get_region(cls, row: dict) -> str:
+        return row["location"][:-2]  # strip the zone suffix

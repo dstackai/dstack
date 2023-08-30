@@ -22,7 +22,13 @@ from dstack._internal.backend.gcp import utils as gcp_utils
 from dstack._internal.backend.gcp.config import GCPConfig
 from dstack._internal.core.error import BackendValueError
 from dstack._internal.core.gateway import GatewayHead
-from dstack._internal.core.instance import InstanceType, LaunchedInstanceInfo
+from dstack._internal.core.instance import (
+    InstanceAvailability,
+    InstanceOffer,
+    InstancePricing,
+    InstanceType,
+    LaunchedInstanceInfo,
+)
 from dstack._internal.core.job import Job, Requirements
 from dstack._internal.core.request import RequestHead, RequestStatus
 from dstack._internal.core.runners import Gpu, Resources, Runner
@@ -219,6 +225,17 @@ class GCPCompute(Compute):
             gcp_config=self.gcp_config,
             instance_name=instance_name,
         )
+
+    def get_availability(self, offers: List[InstancePricing]) -> List[InstanceOffer]:
+        availability_offers = []
+        for offer in offers:
+            if offer.region not in self.gcp_config.regions:
+                continue
+            # todo quotas
+            availability_offers.append(
+                InstanceOffer(**offer.dict(), availability=InstanceAvailability.UNKNOWN)
+            )
+        return availability_offers
 
 
 def _config_with_zone(config: GCPConfig, zone: str) -> GCPConfig:

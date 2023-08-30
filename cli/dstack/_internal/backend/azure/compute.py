@@ -51,7 +51,13 @@ from dstack._internal.backend.base.compute import (
 from dstack._internal.backend.base.config import BACKEND_CONFIG_FILENAME, RUNNER_CONFIG_FILENAME
 from dstack._internal.backend.base.runners import serialize_runner_yaml
 from dstack._internal.core.gateway import GatewayHead
-from dstack._internal.core.instance import InstanceType, LaunchedInstanceInfo
+from dstack._internal.core.instance import (
+    InstanceAvailability,
+    InstanceOffer,
+    InstancePricing,
+    InstanceType,
+    LaunchedInstanceInfo,
+)
 from dstack._internal.core.job import Job
 from dstack._internal.core.request import RequestHead, RequestStatus
 from dstack._internal.core.runners import Gpu, Resources, Runner
@@ -199,6 +205,17 @@ class AzureCompute(Compute):
             resource_group=self.azure_config.resource_group,
             instance_name=instance_name,
         )
+
+    def get_availability(self, offers: List[InstancePricing]) -> List[InstanceOffer]:
+        availability_offers = []
+        for offer in offers:
+            if offer.region not in self.azure_config.locations:
+                continue
+            # todo quotas
+            availability_offers.append(
+                InstanceOffer(**offer.dict(), availability=InstanceAvailability.UNKNOWN)
+            )
+        return availability_offers
 
 
 def _get_instance_types(client: ComputeManagementClient, location: str) -> List[InstanceType]:

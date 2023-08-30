@@ -1,4 +1,4 @@
-from dataclasses import dataclass
+from enum import Enum
 from typing import List, Optional
 
 from pydantic import BaseModel
@@ -17,15 +17,22 @@ class LaunchedInstanceInfo(BaseModel):
     location: Optional[str] = None
 
 
-@dataclass(frozen=True)
-class InstanceOffer:
-    instance_type: InstanceType
-    region: str
-    price: float
+class InstanceAvailability(Enum):
+    UNKNOWN = "unknown"
+    AVAILABLE = "available"
+    NOT_AVAILABLE = "not_available"
+    NO_QUOTA = "no_quota"
 
 
-class InstanceCandidate(BaseModel):
-    backend: str
-    region: str
+class InstancePricing(BaseModel):
     instance: InstanceType
+    region: str
     price: float
+
+
+class InstanceOffer(InstancePricing):
+    availability: InstanceAvailability
+
+
+class InstanceCandidate(InstanceOffer):
+    backend: str

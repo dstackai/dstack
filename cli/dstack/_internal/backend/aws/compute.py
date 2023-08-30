@@ -8,7 +8,13 @@ from dstack._internal.backend.aws import utils as aws_utils
 from dstack._internal.backend.aws.config import AWSConfig
 from dstack._internal.backend.base.compute import Compute
 from dstack._internal.core.gateway import GatewayHead
-from dstack._internal.core.instance import InstanceType, LaunchedInstanceInfo
+from dstack._internal.core.instance import (
+    InstanceAvailability,
+    InstanceOffer,
+    InstancePricing,
+    InstanceType,
+    LaunchedInstanceInfo,
+)
 from dstack._internal.core.job import Job
 from dstack._internal.core.request import RequestHead
 from dstack._internal.core.runners import Runner
@@ -107,6 +113,17 @@ class AWSCompute(Compute):
             )
         except IndexError:
             return
+
+    def get_availability(self, offers: List[InstancePricing]) -> List[InstanceOffer]:
+        availability_offers = []
+        for offer in offers:
+            if offer.region not in self.backend_config.regions:
+                continue
+            # todo quotas
+            availability_offers.append(
+                InstanceOffer(**offer.dict(), availability=InstanceAvailability.UNKNOWN)
+            )
+        return availability_offers
 
     def _get_ec2_client(self, region: Optional[str] = None):
         if region is None:
