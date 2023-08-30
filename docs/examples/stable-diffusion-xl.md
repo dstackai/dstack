@@ -3,7 +3,7 @@
 Stable Diffusion XL (SDXL) 1.0 is the latest version of the open-source model that is capable 
 of generating high-quality images from text.
 
-This example demonstrates how to use `dstack` to serve SDXL as a REST endpoint in a cloud of your choice for image
+The example below demonstrates how to use `dstack` to serve SDXL as a REST endpoint in a cloud of your choice for image
 generation and refinement.
 
 ## Define endpoints
@@ -156,31 +156,7 @@ async def refine(request: RefineRequest):
 
 The code for the endpoints is ready. Now, let's explore how to use `dstack` to serve it on a cloud account of your choice.
 
-## Define a profile
-
-SDXL requires at least `12GB` of GPU memory and at least `16GB` of RAM. 
-To inform `dstack` about the required resources, you need to 
-[define](../docs/reference/profiles.yml.md) a profile via the `.dstack/profiles.yaml` file within your project:
-
-<div editor-title=".dstack/profiles.yml"> 
-
-```yaml
-profiles:
-  - name: xs-serve
-    
-    resources:
-      memory: 16GB
-      gpu:
-        memory: 12GB
-        
-    spot_policy: auto # (Optional) Use spot instances if available
-      
-    default: true
-```
-
-</div>
-
-## Serve the endpoints
+## Define the configuration
 
 ??? info "Tasks"
     If you want to serve an application for development purposes only, you can use 
@@ -201,9 +177,6 @@ type: service
 # (Optional) If not specified, it will use your local version
 python: "3.11"
 
-# (Required) Create a gateway using `dstack gateway create` and set its address with `dstack secrets add`.
-gateway: ${{ secrets.GATEWAY_ADDRESS }}
-
 port: 8000
 
 commands: 
@@ -215,33 +188,10 @@ commands:
 
 </div>
 
-Before you can run a service, you have to ensure that there is a gateway configured for your project.
+## Run the configuration
 
-??? info "Gateways"
-    First, you have to create a gateway in one of the clouds of your choice.
-    
-    <div class="termy">
-    
-    ```shell
-    $ dstack gateway create --backend aws
-    
-    Creating gateway...
-    
-     BACKEND    NAME                        ADDRESS    
-     aws        dstack-gateway-fast-walrus  98.71.213.179 
-    
-    ```
-    
-    </div>
-    
-    Once the gateway is up, create a secret with the gateway's address.
-    
-    <div class="termy">
-    
-    ```shell
-    $ dstack secrets add GATEWAY_ADDRESS 98.71.213.179
-    ```
-    </div>
+!!! warning "NOTE:"
+    Before running a service, ensure that you have configured a [gateway](../docs/guides/clouds.md#configuring-gateways).
 
 After the gateway is configured, go ahead run the service.
 
@@ -253,21 +203,23 @@ $ dstack run . -f stable-diffusion-xl/api.dstack.yml
 
 </div>
 
-Once the service is up, you can query the endpoint using the gateway address:
+!!! info "Endpoint URL"
+    If you've configured a [wildcard domain](clouds.md#configuring-gateways) for the gateway, 
+    `dstack` enables HTTPS automatically and serves the service at 
+    `https://<run name>.<your domain name>`.
+
+    If you wish to customize the run name, you can use the `-n` argument with the `dstack run` command.
+
+Once the service is up, you can query the endpoint:
 
 <div class="termy">
 
 ```shell
-$ curl -X POST --location http://98.71.213.179/generate \
+$ curl -X POST --location https://yellow-cat-1.mydomain.com/generate \
     -H 'Content-Type: application/json' \
     -d '{ "prompt": "A cat in a hat" }'
 ```
 
 </div>
-
-!!! info "Configure a domain and enable HTTPS"
-    Please refer to the [services](../docs/guides/services.md#configure-a-domain-and-enable-https-optional) guide to learn how to configure a custom domain and enable HTTPS.
-
-For more details on SDXL, check its [documentation](https://huggingface.co/docs/diffusers/api/pipelines/stable_diffusion/stable_diffusion_xl) on Hugging Face's website.
 
 [Source code](https://github.com/dstackai/dstack-examples){ .md-button .md-button--github }

@@ -1,6 +1,6 @@
 # Serving LLMs with TGI
 
-Serving LLMs can be slow, even on expensive hardware. This example demonstrates how to utilize
+Serving LLMs can be slow. The example below demonstrates how to use
 [Text Generation Inference](https://github.com/huggingface/text-generation-inference) (TGI) to serve LLMs with
 optimized performance. 
 
@@ -14,33 +14,7 @@ GPU parallelism, streaming output, quantization, water-marking, and more.
 
 To try TGI with `dstack`, follow the instructions below.
 
-## Define a profile
-
-Each LLM model requires specific resources. To inform `dstack` about the required resources, you need to 
-[define](../docs/reference/profiles.yml.md) a profile via the `.dstack/profiles.yaml` file within your project.
-
-Below is a profile that will provision a cloud instance with `24GB` of memory and a `A10` GPU in the `gcp` project.
-
-<div editor-title=".dstack/profiles.yml"> 
-
-```yaml
-profiles:
-  - name: a10-serve
-    project: gcp
-    
-    resources:
-      memory: 24GB
-      gpu:
-        name: A10
-     
-    spot_policy: auto  # (Optional) Use spot instances if available
-      
-    default: true
-```
-
-</div>
-
-## Serve the endpoint
+## Define the configuration
 
 ??? info "Tasks"
     If you want to serve an application for development purposes only, you can use 
@@ -59,16 +33,11 @@ Here's the configuration that uses services:
 type: service
 # This configuration deploys a given LLM model as an API
 
-# (Required) Create a gateway using `dstack gateway create` and set its address with `dstack secrets add`.
-gateway: ${{ secrets.GATEWAY_ADDRESS }}
-
-image: ghcr.io/huggingface/text-generation-inference:1.0.0
+image: ghcr.io/huggingface/text-generation-inference:latest
 
 env:
   # (Required) Specify the name of the model
-  - MODEL_ID=NousResearch/Llama-2-7b-hf
-  # (Optional) Specify your Hugging Face token
-  - HUGGING_FACE_HUB_TOKEN=
+  - MODEL_ID=tiiuae/falcon-7b
 
 port: 8000
 
@@ -78,52 +47,32 @@ commands:
 
 </div>
 
-Before you can run a service, you have to ensure that there is a gateway configured for your project.
+## Run the configuration
 
-??? info "Gateways"
-    First, you have to create a gateway in one of the clouds of your choice.
-    
-    <div class="termy">
-    
-    ```shell
-    $ dstack gateway create --backend aws
-    
-    Creating gateway...
-    
-     BACKEND    NAME                        ADDRESS    
-     aws        dstack-gateway-fast-walrus  98.71.213.179 
-    
-    ```
-    
-    </div>
-    
-    Once the gateway is up, create a secret with the gateway's address.
-    
-    <div class="termy">
-    
-    ```shell
-    $ dstack secrets add GATEWAY_ADDRESS 98.71.213.179
-    ```
-    </div>
-
-After the gateway is configured, go ahead run the service.
+!!! warning "NOTE:"
+    Before running a service, ensure that you have configured a [gateway](../docs/guides/clouds.md#configuring-gateways).
 
 <div class="termy">
 
 ```shell
-$ dstack run . -f text-generation-inference/serve.dstack.yml
+$ dstack run . -f text-generation-inference/serve.dstack.yml --gpu 24GB
 ```
 
 </div>
 
-Once the service is up, you can query the endpoint using the gateway address:
+!!! info "Endpoint URL"
+    If you've configured a [wildcard domain](clouds.md#configuring-gateways) for the gateway, 
+    `dstack` enables HTTPS automatically and serves the service at 
+    `https://<run name>.<your domain name>`.
 
-Now, you can query the endpoint:
+    If you wish to customize the run name, you can use the `-n` argument with the `dstack run` command.
+
+Once the service is up, you can query the endpoint:
 
 <div class="termy">
 
 ```shell
-$ curl -X POST --location http://98.71.213.179/generate \
+$ curl -X POST --location https://yellow-cat-1.mydomain.com \
     -H 'Content-Type: application/json' \
     -d '{
           "inputs": "What is Deep Learning?",
@@ -135,36 +84,33 @@ $ curl -X POST --location http://98.71.213.179/generate \
 
 </div>
 
-!!! info "Configure a domain and enable HTTPS"
-    Please refer to the [services](../docs/guides/services.md#configure-a-domain-and-enable-https-optional) guide to learn how to configure a custom domain and enable HTTPS.
+!!! info "Gated models"
+    To use a model with gated access, ensure configuring either the `HUGGING_FACE_HUB_TOKEN` secret
+    (using [`dstack secrets`](../docs/reference/cli/secrets.md#dstack-secrets-add)),
+    or environment variable (with [`--env`](../docs/reference/cli/run.md#ENV) in `dstack run` or 
+    using [`env`](../docs/reference/dstack.yml/service.md#env) in the configuration file).
 
-For more details on how `text-generation-inference` works, check their [repo](https://github.com/huggingface/text-generation-inference).
+??? info "Dev environments"
 
-## Dev environments
-
-Dev environments require the Docker image to have `openssh-server` pre-installed. 
-While `dstack`'s default Docker images include it, the `ghcr.io/huggingface/text-generation-inference` Docker 
-image lacks it. Therefore, ensure that you manually install `openssh-server` using the `build` property.
-
-<div editor-title="text-generation-inference/.dstack.yml">
-
-```yaml
-type: dev-environment
-
-image: ghcr.io/huggingface/text-generation-inference:1.0.0
-
-build:
-  - apt-get update
-  - DEBIAN_FRONTEND=noninteractive apt-get install -y openssh-server
-  - rm -rf /var/lib/apt/lists/*
-
-ide: vscode
-```
-
-</div>
-
-!!! info "NOTE:"
-    Since version 1.0.0, TGI has [changed](https://github.com/huggingface/text-generation-inference/issues/726) 
-    the license. This means that you cannot use TGI to provide the API as a service, although you can still use TGI for commercial purposes.
+    Dev environments require the Docker image to have `openssh-server` pre-installed. 
+    While `dstack`'s default Docker images include it, the `ghcr.io/huggingface/text-generation-inference` Docker 
+    image lacks it. Therefore, ensure that you manually install `openssh-server` using the `build` property.
+    
+    <div editor-title="text-generation-inference/.dstack.yml">
+    
+    ```yaml
+    type: dev-environment
+    
+    image: ghcr.io/huggingface/text-generation-inference:latest
+    
+    build:
+      - apt-get update
+      - DEBIAN_FRONTEND=noninteractive apt-get install -y openssh-server
+      - rm -rf /var/lib/apt/lists/*
+    
+    ide: vscode
+    ```
+    
+    </div>
 
 [Source code](https://github.com/dstackai/dstack-examples){ .md-button .md-button--github }

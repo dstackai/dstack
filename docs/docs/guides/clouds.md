@@ -4,7 +4,7 @@ With `dstack`, you can run LLM workloads using compute resources from multiple c
 All you need to do is sign up with these providers, and then pass
 their credentials to `dstack`.
 
-### Why multiple clouds?
+## Why multiple clouds?
 
 <div class="grid cards" markdown>
 - <span>**GPU availability**
@@ -17,7 +17,7 @@ their credentials to `dstack`.
 
 ## Creating cloud accounts
 
-First, you have to create accounts with each cloud provider.
+To use clouds with `dstack`, you need to first create an account with each cloud provider.
 
 Currently, `dstack` supports [AWS](https://portal.aws.amazon.com/billing/signup), 
 [GCP](https://console.cloud.google.com/freetrial), 
@@ -40,10 +40,9 @@ relevant issues in [our tracker](https://github.com/dstackai/dstack/issues).
     To use spot instances with certain cloud providers (e.g. AWS), you should request quotes
     for such instances separately.
 
-## Configuring clouds with dstack
+## Configuring backends
 
-First, you need to start the `dstack` server, log in to the UI, open the project settings, and add a backend for each
-cloud.
+To use your cloud accounts with `dstack`, open the project settings and configure a backend for each cloud.
 
 ![](../../assets/images/dstack-hub-view-project-empty.png){ width=800 }
 
@@ -65,20 +64,25 @@ Configuring backends involves providing cloud credentials, and specifying storag
 
 </div>
 
+## Configuring gateways
+
+If you intend to use [services](services.md) (e.g. to deploy public endpoints), you must also configure a gateway. 
+Configuring a backend involves selecting a backend and a region.
+
+![](../../assets/images/dstack-hub-edit-gateway.png){ width=800 }
+
+### Configure the wildcard domain
+
+After the gateway is created (and assigned an external IP), set up an A record at your DNS provider to map 
+`*.<your domain name>` to the gateway's IP.
+
+Then, in the gateway's settings, specify the wildcard domain.
+
 ## Requesting resources
 
 You can request resources using the [`--gpu`](../reference/cli/run.md#GPU) 
 and [`--memory`](../reference/cli/run.md#MEMORY) arguments with `dstack run`, 
 or through [`resources`](../reference/profiles.yml.md#RESOURCES) with `.dstack/profiles.yml`.
-
-Both the [`dstack run`](../reference/cli/run.md) command and [`.dstack/profiles.yml`](../reference/profiles.yml.md)
-support various other options, including requesting spot instances, defining the maximum run duration or price, and
-more.
-
-!!! info "Automatic instance discovery"
-    Remember, you can't specify an instance type by name. Instead, ask for resources by GPU name or memory amount. 
-    `dstack` will automatically select the suitable instance type from a cloud provider and region with the best
-    price and availability.
 
 <div class="termy small">
 
@@ -101,3 +105,12 @@ Continue? [y/n]:
 ```
 
 </div>
+
+!!! info "Automatic instance discovery"
+    Remember, you can't specify an instance type by name. Instead, ask for resources by GPU name or memory amount. 
+    `dstack` will automatically select the suitable instance type from a cloud provider and region with the best
+    price and availability.
+
+Refer to [`dstack run`](../reference/cli/run.md) and [`.dstack/profiles.yml`](../reference/profiles.yml.md)
+for details on all supported options, including requesting spot instances, defining the maximum price and run duration,
+and more.

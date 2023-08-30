@@ -17,7 +17,7 @@ export const CREDENTIALS_HELP = {
     body: (
         <>
             <p>
-                To use Azure with <i>dstack Hub</i>, you'll need to create an Azure Active Directory app and specify the app
+                To use Azure with <i>dstack</i>, you'll need to create an Azure Active Directory app and specify the app
                 credentials as the <i>Tenant ID</i>, <i>Client ID</i> and <i>Client secret</i> fields.
             </p>
         </>
@@ -29,7 +29,7 @@ export const SUBSCRIPTION_HELP = {
     body: (
         <>
             <p>
-                Select a <i>Subscription ID</i> that <i>dstack Hub</i> will use to create resources in your Azure account.
+                Select a <i>Subscription ID</i> that <i>dstack</i> will use to create resources in your Azure account.
             </p>
         </>
     ),
@@ -40,7 +40,7 @@ export const LOCATIONS_HELP = {
     body: (
         <>
             <p>
-                Select <i>Locations</i> that <i>dstack Hub</i> will use to create resources in your Azure account.
+                Select <i>Locations</i> that <i>dstack</i> will use to create resources in your Azure account.
             </p>
             <p>
                 The selected <i>Locations</i> will be used to run workflows and store artifacts.
@@ -58,7 +58,7 @@ export const STORAGE_ACCOUNT_HELP = {
                 selected.
             </p>
             <p>
-                <i>dstack Hub</i> will create all the Azure resource in the resource group of the specified{' '}
+                <i>dstack</i> will create all the Azure resource in the resource group of the specified{' '}
                 <i>Storage account</i>.
             </p>
         </>

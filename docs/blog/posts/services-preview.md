@@ -48,8 +48,6 @@ This is why we introduce the `service` configuration type.
 ```yaml
 type: service
 
-gateway: ${{ secrets.GATEWAY_ADDRESS }}
-
 image: ghcr.io/huggingface/text-generation-inference:0.9.3
 
 port: 8000

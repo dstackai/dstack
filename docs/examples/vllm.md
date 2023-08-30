@@ -1,6 +1,6 @@
 # Serving LLMs with vLLM
 
-Serving LLMs can be slow, even on expensive hardware. This example demonstrates how to utilize the 
+Serving LLMs can be slow. The example below demonstrates how to use the 
 [`vllm`](https://vllm.ai/) library to serve LLMs with optimized performance.
 
 ## What is vLLM?
@@ -13,32 +13,7 @@ GPU parallelism, streaming output, OpenAI-compatibility, and more.
 
 To try `vllm` with `dstack`, follow the instructions below.
 
-## Define a profile
-
-Each LLM model requires specific resources. To inform `dstack` about the required resources, you need to 
-[define](../docs/reference/profiles.yml.md) a profile via the `.dstack/profiles.yaml` file within your project.
-
-Below is a profile that will provision a cloud instance with `24GB` of memory and a `T4` GPU in the `gcp` project.
-
-<div editor-title=".dstack/profiles.yml"> 
-
-```yaml
-profiles:
-  - name: t4-serve
-    
-    resources:
-      memory: 24GB
-      gpu:
-        name: T4
-     
-    spot_policy: auto # (Optional) Use spot instances if available
-      
-    default: true
-```
-
-</div>
-
-## Serve the endpoint
+## Define the configuration
 
 ??? info "Tasks"
     If you want to serve an application for development purposes only, you can use 
@@ -59,14 +34,9 @@ type: service
 # (Optional) If not specified, it will use your local version
 python: "3.11"
 
-# (Required) Create a gateway using `dstack gateway create` and set its address with `dstack secrets add`.
-gateway: ${{ secrets.GATEWAY_ADDRESS }}
-
 env:
   # (Required) Specify the name of the model
   - MODEL=facebook/opt-125m
-  # (Optional) Specify your Hugging Face token
-  - HUGGING_FACE_HUB_TOKEN=
 
 port: 8000
 
@@ -77,49 +47,32 @@ commands:
 
 </div>
 
-Before you can run a service, you have to ensure that there is a gateway configured for your project.
+## Run the configuration
 
-??? info "Gateways"
-    First, you have to create a gateway in one of the clouds of your choice.
-    
-    <div class="termy">
-    
-    ```shell
-    $ dstack gateway create --backend aws
-    
-    Creating gateway...
-    
-     BACKEND    NAME                        ADDRESS    
-     aws        dstack-gateway-fast-walrus  98.71.213.179 
-    ```
-    
-    </div>
-    
-    Once the gateway is up, create a secret with the gateway's address.
-    
-    <div class="termy">
-    
-    ```shell
-    $ dstack secrets add GATEWAY_ADDRESS 98.71.213.179
-    ```
-    </div>
-
-After the gateway is configured, go ahead run the service.
+!!! warning "NOTE:"
+    Before running a service, ensure that you have configured a [gateway](../docs/guides/clouds.md#configuring-gateways).
 
 <div class="termy">
 
 ```shell
-$ dstack run . -f vllm/serve.dstack.yml
+$ dstack run . -f vllm/serve.dstack.yml --gpu 24GB
 ```
 
 </div>
 
-Once the service is up, you can query the endpoint using the gateway address:
+!!! info "Endpoint URL"
+    If you've configured a [wildcard domain](clouds.md#configuring-gateways) for the gateway, 
+    `dstack` enables HTTPS automatically and serves the service at 
+    `https://<run name>.<your domain name>`.
+
+    If you wish to customize the run name, you can use the `-n` argument with the `dstack run` command.
+
+Once the service is up, you can query the endpoint:
 
 <div class="termy">
 
 ```shell
-$ curl -X POST --location http://98.71.213.179/v1/completions \
+$ curl -X POST --location https://yellow-cat-1.mydomain.com/v1/completions \
     -H "Content-Type: application/json" \
     -d '{
           "model": "facebook/opt-125m",
@@ -131,16 +84,10 @@ $ curl -X POST --location http://98.71.213.179/v1/completions \
 
 </div>
 
-!!! info "Configure a domain and enable HTTPS"
-    Please refer to the [services](../docs/guides/services.md#configure-a-domain-and-enable-https-optional) guide to learn how to configure a custom domain and enable HTTPS.
-
-For more details on how `vllm` works, check their [documentation](https://vllm.readthedocs.io/).
+!!! info "Gated models"
+    To use a model with gated access, ensure configuring either the `HUGGING_FACE_HUB_TOKEN` secret
+    (using [`dstack secrets`](../docs/reference/cli/secrets.md#dstack-secrets-add)),
+    or environment variable (with [`--env`](../docs/reference/cli/run.md#ENV) in `dstack run` or 
+    using [`env`](../docs/reference/dstack.yml/service.md#env) in the configuration file).
 
 [Source code](https://github.com/dstackai/dstack-examples){ .md-button .md-button--github }
-
-## Limitations
-
-To use `vllm` with `dstack`, be aware of the following limitations:
-
-1. The `vllm` library currently supports a [limited set](https://vllm.readthedocs.io/en/latest/models/supported_models.html) of LLMs, but Llama 2 is supported.
-2. The `vllm` library lacks quantization support. Check the progress [here](https://github.com/vllm-project/vllm/issues/316).

@@ -18,7 +18,7 @@ export const SERVICE_ACCOUNT_HELP = {
     body: (
         <>
             <p>
-                In order to use GCP with <i>dstack Hub</i>, you'll need to set up a <i>Service account</i> in your GCP project.
+                In order to use GCP with <i>dstack</i>, you'll need to set up a <i>Service account</i> in your GCP project.
             </p>
 
             <h4>Enable APIs</h4>
@@ -61,7 +61,7 @@ export const REGIONS_HELP = {
     body: (
         <>
             <p>
-                Select <i>Regions</i> that <i>dstack Hub</i> will use to create resources in your GCP account.
+                Select <i>Regions</i> that <i>dstack</i> will use to create resources in your GCP account.
             </p>
             <p>
                 The selected <i>Regions</i> will be used to run workflows and store artifacts.
@@ -91,7 +91,7 @@ export const SUBNET_HELP = {
     body: (
         <>
             <p>
-                Select a <i>Subnet</i> to run workflows in. If no Subnet is specified, <i>dstack Hub</i> will use the default{' '}
+                Select a <i>Subnet</i> to run workflows in. If no Subnet is specified, <i>dstack</i> will use the default{' '}
                 <i>Subnet</i> configured in your AWS account.
             </p>
         </>

@@ -136,7 +136,7 @@ You can install packages using `pip` and `conda` executables from `commands`.
 
 For more details on the file syntax, refer to [`.dstack.yml`](../reference/dstack.yml/task.md).
 
-## Run the task
+## Run the configuration
 
 To run a task, use the `dstack run` command followed by the path to the directory you want to use as the
 working directory.
@@ -190,6 +190,22 @@ $ dstack run . -f args.dstack.yml --train_batch_size=1 --num_train_epochs=100
 </div>
 
 The `dstack run` command will pass `--train_batch_size=1` and `--num_train_epochs=100` as arguments to `train.py`.
+
+### Configure a retry limit
+
+By default, tf `dstack` is unable to find capacity, the `dstack run` command will fail. However, you may
+pass the [`--retry-limit`](../reference/cli/run.md#RETRY_LIMIT) option to `dstack run` to specify the timeframe in which `dstack` should search for
+capacity and automatically resubmit the run.
+
+Here's an example of the command, wait for available capacity for up to three hours:
+
+<div class="termy">
+
+```shell
+$ dstack run . -f train.dstack.yml --retry-limit 3h
+```
+
+</div>
 
 ### Requesting resources
 

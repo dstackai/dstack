@@ -56,7 +56,7 @@ ide: vscode
 ```yaml
 type: dev-environment
 ide: vscode
-image: ghcr.io/huggingface/text-generation-inference:0.9.3
+image: ghcr.io/huggingface/text-generation-inference:latest
 build:
   - apt-get update
   - DEBIAN_FRONTEND=noninteractive apt-get install -y openssh-server

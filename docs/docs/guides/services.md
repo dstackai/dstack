@@ -5,6 +5,9 @@ A service is an application that is accessible through a public endpoint.
 Using `dstack`, you can define such a service through a configuration file and run it on the
 configured clouds that offer the best price and availability.
 
+!!! info "NOTE:"
+    Before running a service, ensure that you have configured a [gateway](clouds.md#configuring-gateways).
+
 ## Define a configuration
 
 To configure a service, create its configuration file. It can be defined
@@ -25,46 +28,6 @@ commands:
 ```
 
 </div>
-
-Before running a service, you need to configure a gateway address to run the service on.
-
-??? info "Gateway"
-
-    ### Configure a gateway 
-
-    First, you have to create a gateway in one of the clouds of your choice.
-    
-    <div class="termy">
-    
-    ```shell
-    $ dstack gateway create --backend aws
-    
-    Creating gateway...
-    
-     BACKEND  NAME                        ADDRESS    
-     aws      dstack-gateway-fast-walrus  98.71.213.179  
-    ```
-    
-    </div>
-
-    Once the gateway is up, it will be used as default by all services in the project.
-
-    ### Configure a domain and enable HTTPS (optional)
-    
-    By default, if you run the service, it will be available at `http://<gateway ip address>`.
-    
-    If you wish to enable HTTPS and run multiple services on the same gateway, the best approach is to configure a wildcard
-    domain.
-
-    To do this, go to your domain provider, and create a wildcard `A` DNS record (e.g. `*.mydomain.com`) pointing to the 
-    address of the gateway (e.g. `98.71.213.179`).
-     
-    Now, edit the gateway and add the wildcard domain in the project settings.
-    
-    If you are using a wildcard domain with the gateway, dstack picks a random subdomain and enables HTTPS automatically using [Let's
-    Encrypt](https://letsencrypt.org/).
-    
-    For more details on the [`dstack gateway`](../reference/cli/gateway.md).
 
 ### Configure the environment
 
@@ -152,7 +115,14 @@ Serving HTTP on https://yellow-cat-1.mydomain.com ...
 
 </div>
 
-This command deploys the service, and forwards the traffic to the gateway address.
+This command deploys the service, and forwards the traffic to the gateway's endpoint.
+
+!!! info "Endoint URL"
+    If you've configured a [wildcard domain](clouds.md#configuring-gateways) for the gateway, 
+    `dstack` enables HTTPS automatically and serves the service at 
+    `https://<run name>.<your domain name>`.
+
+    If you wish to customize the run name, you can use the `-n` argument with the `dstack run` command. 
 
 ### Requesting resources
 

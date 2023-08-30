@@ -232,7 +232,7 @@ profiles:
 
 </div>
 
-## Run the task
+## Define the configuration
 
 Here's the configuration that runs the training task via `dstack`:
 
@@ -259,6 +259,8 @@ commands:
 ```
 
 </div>
+
+## Run the configuration 
 
 Here's how you run it with `dstack`:
 

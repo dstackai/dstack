@@ -16,7 +16,7 @@ export const CREDENTIALS_HELP = {
     body: (
         <>
             <p>
-                To use AWS with <i>dstack Hub</i>, you'll need to create an IAM user in your AWS account, grant this user
+                To use AWS with <i>dstack</i>, you'll need to create an IAM user in your AWS account, grant this user
                 permissions to perform actions on <i>S3</i>, <i>CloudWatch Logs</i>, <i>Secrets Manager</i>, <i>EC2</i>, and{' '}
                 <i>IAM</i> services, create credentials for that user, and specify them here as the <i>Access key ID</i> and{' '}
                 <i>Secret access</i> key.
@@ -44,7 +44,7 @@ export const REGIONS_HELP = {
     body: (
         <>
             <p>
-                Select <i>Regions</i> that <i>dstack Hub</i> will use to create resources in your AWS account.
+                Select <i>Regions</i> that <i>dstack</i> will use to create resources in your AWS account.
             </p>
             <p>
                 The selected <i>Regions</i> will be used to run workflows and store artifacts.
@@ -73,7 +73,7 @@ export const SUBNET_HELP = {
     body: (
         <>
             <p>
-                Select a <i>Subnet</i> to run workflows in. If no Subnet is specified, <i>dstack Hub</i> will use the default{' '}
+                Select a <i>Subnet</i> to run workflows in. If no Subnet is specified, <i>dstack</i> will use the default{' '}
                 <i>Subnet</i> configured in your AWS account.
             </p>
         </>
