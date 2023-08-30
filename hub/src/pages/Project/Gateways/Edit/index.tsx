@@ -54,7 +54,7 @@ export const EditGateway: React.FC = () => {
     const [updateGateway, { isLoading: isUpdating }] = useUpdateProjectGatewayMutation();
     const [testDomain, { isLoading: isTesting }] = useTestProjectGatewayDomainMutation();
 
-    const { handleSubmit, control, setError, watch, getValues, setValue } = useForm<TUpdateGatewayParams>({
+    const { handleSubmit, control, setError, clearErrors, watch, getValues, setValue } = useForm<TUpdateGatewayParams>({
         defaultValues: { [FIELD_NAMES.DEFAULT]: false },
     });
     const domainFieldValue = watch(FIELD_NAMES.WILDCARD_DOMAIN);
@@ -88,6 +88,8 @@ export const EditGateway: React.FC = () => {
     ]);
 
     const onTest = () => {
+        clearErrors(FIELD_NAMES.WILDCARD_DOMAIN);
+
         testDomain({
             projectName: paramProjectName,
             instanceName: paramInstanceName,
@@ -101,10 +103,21 @@ export const EditGateway: React.FC = () => {
                 }),
             )
             .catch((errorResponse) => {
-                pushNotification({
-                    type: 'error',
-                    content: errorResponse?.data?.detail?.msg,
-                });
+                const errorRequestData = errorResponse?.data;
+
+                if (isRequestFormErrors2(errorRequestData)) {
+                    setError(FIELD_NAMES.WILDCARD_DOMAIN, {
+                        type: 'custom',
+                        message: errorRequestData.detail[0].msg,
+                    });
+                } else {
+                    pushNotification({
+                        type: 'error',
+                        content: t('common.server_error', {
+                            error: errorRequestData?.detail?.msg,
+                        }),
+                    });
+                }
             });
     };
 
