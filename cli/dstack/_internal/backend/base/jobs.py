@@ -209,7 +209,7 @@ def _try_run_job(
     )
     runners.create_runner(storage, runner)
     try:
-        launched_instance_info = compute.run_instance(job, instance, region=offer.region)
+        launched_instance_info = compute.run_instance(job, instance_type, region=offer.region)
         runner.request_id = job.request_id = launched_instance_info.request_id
         job.location = launched_instance_info.location
     except NoCapacityError:
