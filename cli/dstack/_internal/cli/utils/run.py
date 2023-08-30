@@ -7,11 +7,13 @@ from typing import Dict, Iterator, List, Optional, Tuple
 
 import websocket
 from cursor import cursor
+from rich.control import Control
 from rich.progress import Progress, SpinnerColumn, TextColumn
 from rich.prompt import Confirm
 from rich.table import Table
 from websocket import WebSocketApp
 
+from dstack._internal.api.runs import list_runs_hub
 from dstack._internal.backend.base.logs import fix_urls
 from dstack._internal.cli.utils.common import console, print_runs
 from dstack._internal.cli.utils.config import config
@@ -129,17 +131,9 @@ def print_run_plan(configurator: JobConfigurator, run_plan: RunPlan, candidates_
 
     console.print(props)
     console.print()
-    if len(job_plan.candidates) == 0:
-        console.print(
-            f"No instances matching requirements ({job_plan.job.requirements.pretty_format()})."
-        )
-        if job_plan.job.retry_active():
-            console.print(f"The run will be resubmitted according to retry policy.")
-        else:
-            exit(1)
-    else:
+    if len(job_plan.candidates) > 0:
         console.print(candidates)
-    console.print()
+        console.print()
 
 
 def poll_run(
@@ -157,6 +151,10 @@ def poll_run(
         _print_failed_run_message(run)
         exit(1)
     run_name = run.run_name
+
+    printed_pending = False
+    if run_info.run_head.status == JobStatus.PENDING:
+        printed_pending = True
 
     try:
         with Progress(
@@ -209,6 +207,14 @@ def poll_run(
                 pass
             progress.update(task, total=100)
 
+        run_info = hub_client.list_runs(run_name)[0]
+        run = run_info.run_head
+
+        if printed_pending:
+            console.control(Control.move(0, -3))
+            print_runs([run_info])
+            console.print()
+
         # attach to the instance, attach to the container in the background
         jobs = [hub_client.get_job(job_head.job_id) for job_head in job_heads]
         ports = _attach(hub_client, run_info, jobs[0], ssh_key, ports_locks)
@@ -216,7 +222,6 @@ def poll_run(
         console.print("[grey58]To stop, press Ctrl+C.[/]")
         console.print()
 
-        run = hub_client.list_runs(run_name)[0].run_head
         if run.status.is_unfinished() or run.status == JobStatus.DONE:
             if watcher is not None and watcher.is_alive():  # reload is enabled
                 if run_info.backend == "local":
@@ -406,7 +411,7 @@ def _run_container_ssh_tunnel(hub_client: HubClient, run_name: str, ports_lock: 
             "[red]ERROR[/] Can't establish SSH tunnel with the container\n"
             "[grey58]Aborting...[/]"
         )
-        hub_client.stop_jobs(run_name, terminate=True, abort=True)
+        hub_client.stop_run(run_name, terminate=True, abort=True)
         exit(1)
 
 
@@ -482,7 +487,7 @@ def _ask_on_interrupt(hub_client: HubClient, run_name: str):
             console.print("\n")
             if Confirm.ask(f"[red]Stop the run '{run_name}'?[/]"):
                 interrupt_count += 1
-                hub_client.stop_jobs(run_name, terminate=False, abort=False)
+                hub_client.stop_run(run_name, terminate=False, abort=False)
                 console.print("\n[grey58]Stopping... To abort press Ctrl+C[/]", end="")
             else:
                 console.print("\n[grey58]Detaching...[/]")
@@ -493,7 +498,7 @@ def _ask_on_interrupt(hub_client: HubClient, run_name: str):
             interrupt_count += 1
     if interrupt_count > 0:
         console.print("\n[grey58]Aborting...[/]")
-        hub_client.stop_jobs(run_name, terminate=False, abort=True)
+        hub_client.stop_run(run_name, terminate=False, abort=True)
         console.print("[grey58]Aborted[/]")
         ssh_config_remove_host(config.ssh_config_path, f"{run_name}-host")
         ssh_config_remove_host(config.ssh_config_path, run_name)

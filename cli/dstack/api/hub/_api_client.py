@@ -37,6 +37,7 @@ from dstack._internal.hub.schemas import (
     RunsDelete,
     RunsGetPlan,
     RunsList,
+    RunsStop,
     SaveRepoCredentials,
     SecretAddUpdate,
     StopRunners,
@@ -408,6 +409,28 @@ class HubAPIClient:
         if resp.ok:
             body = resp.json()
             return [RunInfo.parse_obj(run) for run in body]
+        resp.raise_for_status()
+
+    def stop_runs(self, run_names: List[str], terminate: bool, abort: bool):
+        url = _project_url(
+            url=self.url,
+            project=self.project,
+            additional_path=f"/runs/stop",
+        )
+        resp = _make_hub_request(
+            requests.post,
+            host=self.url,
+            url=url,
+            headers=self._headers(),
+            data=RunsStop(
+                repo_id=self.repo.repo_id,
+                run_names=run_names,
+                abort=abort,
+                terminate=terminate,
+            ).json(),
+        )
+        if resp.ok:
+            return
         resp.raise_for_status()
 
     def delete_runs(self, run_names: List[str]):

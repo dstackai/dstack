@@ -169,7 +169,7 @@ async def stop_runs(project_name: str, body: RunsStop):
                         backend.stop_job,
                         body.repo_id,
                         job_head.job_id,
-                        False,
+                        body.terminate,
                         body.abort,
                     )
                 break

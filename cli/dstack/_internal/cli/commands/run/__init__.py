@@ -119,8 +119,17 @@ class RunCommand(BasicCommand):
             configurator.apply_args(configurator_args)
 
             run_plan = hub_client.get_run_plan(configurator)
+            job_plan = run_plan.job_plans[0]
             console.print("dstack will execute the following plan:\n")
             print_run_plan(configurator, run_plan, args.max_offers)
+            if len(job_plan.candidates) == 0:
+                console.print(
+                    f"No instances matching requirements ({job_plan.job.requirements.pretty_format()})."
+                )
+                if job_plan.job.retry_active():
+                    console.print("The run will be resubmitted according to retry policy.")
+                else:
+                    exit(1)
             if not args.yes and not Confirm.ask("Continue?"):
                 console.print("\nExiting...")
                 exit(0)

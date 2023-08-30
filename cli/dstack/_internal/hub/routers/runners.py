@@ -73,12 +73,7 @@ async def run(project_name: str, body: RunRunners):
     if job.retry_active():
         job.status = JobStatus.PENDING
         await JobManager.create(project_name=project.name, job=job)
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail=error_detail(
-                "No capacity. The run will be retried later.", code=NoMatchingInstanceError.code
-            ),
-        )
+        return
     raise HTTPException(
         status_code=status.HTTP_400_BAD_REQUEST,
         detail=error_detail("Run failed due to no capacity.", code=NoMatchingInstanceError.code),

@@ -67,8 +67,7 @@ class StopCommand(BasicCommand):
             if len(job_heads) == 0:
                 console.print(f"Cannot find the run '{args.run_name}'")
                 exit(1)
-            for job_head in job_heads:
-                hub_client.stop_job(job_head.job_id, terminate=args.terminate, abort=args.abort)
+            hub_client.stop_run(args.run_name, terminate=args.terminate, abort=args.abort)
             ssh_config_remove_host(config.ssh_config_path, f"{args.run_name}-host")
             ssh_config_remove_host(config.ssh_config_path, args.run_name)
             console.print(f"[grey58]OK[/]")

@@ -70,36 +70,13 @@ class HubClient:
     def restart_job(self, job: Job):
         self._api_client.restart_job(job)
 
-    def stop_job(self, job_id: str, terminate: bool, abort: bool):
-        self._api_client.stop_job(job_id=job_id, terminate=terminate, abort=abort)
-
-    def stop_jobs(self, run_name: Optional[str], terminate: bool, abort: bool):
-        job_heads = self.list_job_heads(run_name)
-        for job_head in job_heads:
-            self.stop_job(job_head.job_id, terminate, abort)
-
     def list_job_heads(self, run_name: Optional[str] = None) -> List[JobHead]:
         return self._api_client.list_job_heads(run_name=run_name)
-
-    def delete_job_head(self, job_id: str):
-        self._api_client.delete_job_head(job_id=job_id)
-
-    def delete_job_heads(self, run_name: Optional[str]):
-        job_heads = []
-        for job_head in self.list_job_heads(run_name):
-            if job_head.status.is_finished():
-                job_heads.append(job_head)
-            else:
-                if run_name:
-                    raise HubClientError("The run is not finished yet. Stop the run first.")
-        for job_head in job_heads:
-            self.delete_job_head(job_head.job_id)
 
     def list_runs(
         self,
         run_name: Optional[str] = None,
         include_request_heads: bool = True,
-        repo_id: Optional[str] = None,
     ) -> List[RunInfo]:
         return self._api_client.list_runs(
             run_name=run_name,
@@ -108,6 +85,9 @@ class HubClient:
 
     def delete_run(self, run_name: str):
         self._api_client.delete_runs([run_name])
+
+    def stop_run(self, run_name: str, terminate: bool, abort: bool):
+        self._api_client.stop_runs(run_names=[run_name], terminate=terminate, abort=abort)
 
     def poll_logs(
         self,
@@ -273,7 +253,15 @@ class HubClient:
             for job in jobs:
                 self.run_job(job)
             run_info = self.list_runs(run_name)[0]
-            self._storage.upload_file(run_info.backend, f.name, repo_code_filename, lambda _: ...)
+            if run_info.backend is not None:
+                self._storage.upload_file(
+                    run_info.backend, f.name, repo_code_filename, lambda _: ...
+                )
+            else:
+                # The run has not been submitted, so we upload the code to any potential backend
+                backends = job.backends or [b.name for b in self.list_backends()]
+                for backend in backends:
+                    self._storage.upload_file(backend, f.name, repo_code_filename, lambda _: ...)
         self.update_repo_last_run_at(last_run_at=int(round(time.time() * 1000)))
         return run_name, jobs
 

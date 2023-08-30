@@ -384,6 +384,7 @@ class RunsStop(BaseModel):
     repo_id: str
     run_names: List[str]
     abort: bool
+    terminate: Optional[bool] = False
 
 
 class RunsDelete(BaseModel):
