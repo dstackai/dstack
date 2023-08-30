@@ -1,3 +1,5 @@
+import { useEffect, useRef } from 'react';
+
 import { push, remove } from 'components/Notifications/slice';
 import { Notification } from 'components/Notifications/types';
 
@@ -7,11 +9,24 @@ import useAppDispatch from './useAppDispatch';
 
 const NOTIFICATION_LIFE_TIME = 6000;
 
-export const useNotifications = () => {
-    const dispatch = useAppDispatch();
+type TUseNotificationsArgs = { temporary?: boolean; liveTime?: number } | undefined;
 
-    const removeNotification = (id: Notification['id']) => {
+const defaultArgs: NonNullable<Required<TUseNotificationsArgs>> = { temporary: true, liveTime: NOTIFICATION_LIFE_TIME };
+export const useNotifications = (args: TUseNotificationsArgs = defaultArgs) => {
+    const dispatch = useAppDispatch();
+    const notificationIdsSet = useRef(new Set<ReturnType<typeof getUid>>());
+
+    const { temporary, liveTime } = {
+        ...defaultArgs,
+        ...args,
+    };
+
+    const removeNotification = (id: NonNullable<Notification['id']>) => {
         dispatch(remove(id));
+
+        if (notificationIdsSet.current.has(id)) {
+            notificationIdsSet.current.delete(id);
+        }
     };
 
     const pushNotification = (notification: Omit<Notification, 'id' | 'dismissible' | 'onDismiss'>) => {
@@ -28,10 +43,22 @@ export const useNotifications = () => {
             }),
         );
 
-        setTimeout(() => {
-            removeNotification(id);
-        }, NOTIFICATION_LIFE_TIME);
+        if (temporary) {
+            setTimeout(() => {
+                removeNotification(id);
+            }, liveTime);
+        } else {
+            notificationIdsSet.current.add(id);
+        }
     };
+
+    useEffect(() => {
+        return () => {
+            notificationIdsSet.current.forEach((notificationId) => {
+                removeNotification(notificationId);
+            });
+        };
+    }, []);
 
     return [pushNotification];
 };

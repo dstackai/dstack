@@ -5,7 +5,7 @@ declare interface IGateway {
         external_ip: string,
         internal_ip: string,
         created_at?: number,
-        region?: string,
+        region: string,
         wildcard_domain?: string
     },
     default: boolean
