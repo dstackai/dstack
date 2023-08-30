@@ -26,6 +26,7 @@ export const AddGateway: React.FC = () => {
     const paramProjectName = params.name ?? '';
     const navigate = useNavigate();
     const [pushNotification] = useNotifications();
+    const [pushPermanentNotification] = useNotifications({ temporary: false });
     const [regionOptions, setRegionOptions] = useState<FormSelectOptions>([]);
 
     const { data, isLoading: isLoadingBackends } = useGetProjectGatewayBackendsQuery({
@@ -78,7 +79,7 @@ export const AddGateway: React.FC = () => {
     };
 
     const onSubmit = (gateway: TCreateGatewayParams) => {
-        pushNotification({
+        pushPermanentNotification({
             type: 'info',
             content: t('gateway.create.creating_notification'),
         });

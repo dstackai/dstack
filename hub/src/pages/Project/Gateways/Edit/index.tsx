@@ -18,6 +18,7 @@ import {
 } from 'components';
 
 import { useBreadcrumbs, useHelpPanel, useNotifications } from 'hooks';
+import { isRequestFormErrors2, isRequestFormFieldError } from 'libs';
 import { ROUTES } from 'routes';
 import {
     useGetProjectGatewayQuery,
@@ -25,7 +26,6 @@ import {
     useUpdateProjectGatewayMutation,
 } from 'services/gateway';
 
-import { isRequestFormErrors2, isRequestFormFieldError } from '../../../../libs';
 import { WILDCARD_DOMAIN_HELP } from './constants';
 
 import { FieldPath } from 'react-hook-form/dist/types/path';
@@ -54,7 +54,9 @@ export const EditGateway: React.FC = () => {
     const [updateGateway, { isLoading: isUpdating }] = useUpdateProjectGatewayMutation();
     const [testDomain, { isLoading: isTesting }] = useTestProjectGatewayDomainMutation();
 
-    const { handleSubmit, control, setError, watch, getValues, setValue } = useForm<TUpdateGatewayParams>();
+    const { handleSubmit, control, setError, watch, getValues, setValue } = useForm<TUpdateGatewayParams>({
+        defaultValues: { [FIELD_NAMES.DEFAULT]: false },
+    });
     const domainFieldValue = watch(FIELD_NAMES.WILDCARD_DOMAIN);
 
     useEffect(() => {
@@ -98,12 +100,12 @@ export const EditGateway: React.FC = () => {
                     content: t('gateway.test_domain.success_notification'),
                 }),
             )
-            .catch((errorResponse) =>
+            .catch((errorResponse) => {
                 pushNotification({
                     type: 'error',
                     content: errorResponse?.data?.detail?.msg,
-                }),
-            );
+                });
+            });
     };
 
     const onCancel = () => {

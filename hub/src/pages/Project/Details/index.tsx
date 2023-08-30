@@ -39,6 +39,8 @@ export const ProjectDetails: React.FC = () => {
 
     const isSettingsPage = pathname === ROUTES.PROJECT.DETAILS.SETTINGS.FORMAT(paramProjectName);
 
+    const settingButtonIsAvailable = pathname === ROUTES.PROJECT.DETAILS.REPOSITORIES.FORMAT(paramProjectName);
+
     return (
         <>
             <ContentLayout
@@ -59,7 +61,7 @@ export const ProjectDetails: React.FC = () => {
                                     </ButtonWithConfirmation>
                                 )}
 
-                                {!isSettingsPage ? (
+                                {settingButtonIsAvailable ? (
                                     <Button
                                         href={ROUTES.PROJECT.DETAILS.SETTINGS.FORMAT(paramProjectName)}
                                         onClick={goToProjectSettings}
