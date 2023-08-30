@@ -207,15 +207,29 @@ class AzureCompute(Compute):
         )
 
     def get_availability(self, offers: List[InstancePricing]) -> List[InstanceOffer]:
-        availability_offers = []
+        availability_offers = {}
+        locations = set()
         for offer in offers:
-            if offer.region not in self.azure_config.locations:
+            location = offer.region
+            if location not in self.azure_config.locations:
                 continue
-            # todo quotas
-            availability_offers.append(
-                InstanceOffer(**offer.dict(), availability=InstanceAvailability.UNKNOWN)
+            locations.add(location)
+            instance_name = offer.instance.instance_name
+            spot = offer.instance.resources.spot
+            availability_offers[(instance_name, location, spot)] = InstanceOffer(
+                **offer.dict(), availability=InstanceAvailability.NO_QUOTA
             )
-        return availability_offers
+
+        for location in locations:
+            resources = self._compute_client.resource_skus.list(filter=f"location eq '{location}'")
+            for resource in resources:
+                if resource.resource_type != "virtualMachines" or not _vm_type_available(resource):
+                    continue
+                for spot in (True, False):
+                    key = (resource.name, location, spot)
+                    if key in availability_offers:
+                        availability_offers[key].availability = InstanceAvailability.UNKNOWN
+        return list(availability_offers.values())
 
 
 def _get_instance_types(client: ComputeManagementClient, location: str) -> List[InstanceType]:
