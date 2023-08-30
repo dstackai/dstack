@@ -227,14 +227,22 @@ class GCPCompute(Compute):
         )
 
     def get_availability(self, offers: List[InstancePricing]) -> List[InstanceOffer]:
+        quotas = {region: {} for region in self.gcp_config.regions}
+        for region in self.regions_client.list(project=self.gcp_config.project_id):
+            if region.name not in self.gcp_config.regions:
+                continue
+            for quota in region.quotas:
+                quotas[region.name][quota.metric] = quota.limit - quota.usage
+
         availability_offers = []
         for offer in offers:
             if offer.region not in self.gcp_config.regions:
                 continue
-            # todo quotas
-            availability_offers.append(
-                InstanceOffer(**offer.dict(), availability=InstanceAvailability.UNKNOWN)
-            )
+            availability = InstanceAvailability.UNKNOWN
+            if not _has_gpu_quota(quotas[offer.region], offer.instance.resources):
+                availability = InstanceAvailability.NO_QUOTA
+            # todo quotas: cpu, memory, global gpu
+            availability_offers.append(InstanceOffer(**offer.dict(), availability=availability))
         return availability_offers
 
 
@@ -991,3 +999,15 @@ def _delete_instance(
         client.delete(delete_request)
     except google.api_core.exceptions.NotFound:
         pass
+
+
+def _has_gpu_quota(quotas: Dict[str, int], resources: Resources) -> bool:
+    if not resources.gpus:
+        return True
+    gpu = resources.gpus[0]
+    quota_name = f"NVIDIA_{gpu.name}_GPUS"
+    if gpu.name == "A100" and gpu.memory_mib == 80 * 1024:
+        quota_name = "NVIDIA_A100_80GB_GPUS"
+    if resources.spot:
+        quota_name = "PREEMPTIBLE_" + quota_name
+    return len(resources.gpus) <= quotas.get(quota_name, 0)
