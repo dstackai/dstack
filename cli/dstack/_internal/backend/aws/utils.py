@@ -30,6 +30,10 @@ def get_sts_client(session: Session, **kwargs) -> BaseClient:
     return _get_client(session, "sts", **kwargs)
 
 
+def get_service_quotas_client(session: Session, region: str, **kwargs) -> BaseClient:
+    return _get_client(session, "service-quotas", region_name=region, **kwargs)
+
+
 def _get_client(session: Session, client_name: str, **kwargs) -> BaseClient:
     return session.client(client_name, **kwargs)
 
