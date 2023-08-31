@@ -51,7 +51,13 @@ from dstack._internal.backend.base.compute import (
 from dstack._internal.backend.base.config import BACKEND_CONFIG_FILENAME, RUNNER_CONFIG_FILENAME
 from dstack._internal.backend.base.runners import serialize_runner_yaml
 from dstack._internal.core.gateway import GatewayHead
-from dstack._internal.core.instance import InstanceType, LaunchedInstanceInfo
+from dstack._internal.core.instance import (
+    InstanceAvailability,
+    InstanceOffer,
+    InstancePricing,
+    InstanceType,
+    LaunchedInstanceInfo,
+)
 from dstack._internal.core.job import Job
 from dstack._internal.core.request import RequestHead, RequestStatus
 from dstack._internal.core.runners import Gpu, Resources, Runner
@@ -199,6 +205,31 @@ class AzureCompute(Compute):
             resource_group=self.azure_config.resource_group,
             instance_name=instance_name,
         )
+
+    def get_availability(self, offers: List[InstancePricing]) -> List[InstanceOffer]:
+        availability_offers = {}
+        locations = set()
+        for offer in offers:
+            location = offer.region
+            if location not in self.azure_config.locations:
+                continue
+            locations.add(location)
+            instance_name = offer.instance.instance_name
+            spot = offer.instance.resources.spot
+            availability_offers[(instance_name, location, spot)] = InstanceOffer(
+                **offer.dict(), availability=InstanceAvailability.NO_QUOTA
+            )
+
+        for location in locations:
+            resources = self._compute_client.resource_skus.list(filter=f"location eq '{location}'")
+            for resource in resources:
+                if resource.resource_type != "virtualMachines" or not _vm_type_available(resource):
+                    continue
+                for spot in (True, False):
+                    key = (resource.name, location, spot)
+                    if key in availability_offers:
+                        availability_offers[key].availability = InstanceAvailability.UNKNOWN
+        return list(availability_offers.values())
 
 
 def _get_instance_types(client: ComputeManagementClient, location: str) -> List[InstanceType]:

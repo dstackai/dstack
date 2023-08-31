@@ -21,10 +21,9 @@ from dstack._internal.cli.utils.ssh_tunnel import PortsLock, run_ssh_tunnel
 from dstack._internal.cli.utils.watcher import LocalCopier, SSHCopier, Watcher
 from dstack._internal.configurators import JobConfigurator
 from dstack._internal.core.app import AppSpec
-from dstack._internal.core.instance import InstanceType
+from dstack._internal.core.instance import InstanceAvailability
 from dstack._internal.core.job import ConfigurationType, Job, JobErrorCode, JobHead, JobStatus
 from dstack._internal.core.plan import RunPlan
-from dstack._internal.core.profile import Profile
 from dstack._internal.core.request import RequestStatus
 from dstack._internal.core.run import RunHead
 from dstack._internal.hub.schemas import RunInfo
@@ -101,6 +100,7 @@ def print_run_plan(configurator: JobConfigurator, run_plan: RunPlan, candidates_
     candidates.add_column("RESOURCES")
     candidates.add_column("SPOT")
     candidates.add_column("PRICE")
+    candidates.add_column()
 
     job_plan.candidates = job_plan.candidates[:candidates_limit]
 
@@ -116,6 +116,9 @@ def print_run_plan(configurator: JobConfigurator, run_plan: RunPlan, candidates_
             )
         else:
             resources = pretty_format_resources(r.cpus, r.memory_mib / 1024)
+        availability = ""
+        if c.availability in {InstanceAvailability.NOT_AVAILABLE, InstanceAvailability.NO_QUOTA}:
+            availability = c.availability.value.replace("_", " ").title()
         candidates.add_row(
             f"{i}",
             c.backend,
@@ -124,6 +127,7 @@ def print_run_plan(configurator: JobConfigurator, run_plan: RunPlan, candidates_
             resources,
             "yes" if r.spot else "no",
             f"${c.price:g}",
+            availability,
             style=None if i == 1 else "grey58",
         )
     if len(job_plan.candidates) == candidates_limit:

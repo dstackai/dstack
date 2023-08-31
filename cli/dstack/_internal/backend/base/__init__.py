@@ -20,7 +20,7 @@ from dstack._internal.backend.base.storage import Storage
 from dstack._internal.core.artifact import Artifact
 from dstack._internal.core.build import BuildPlan
 from dstack._internal.core.gateway import GatewayHead
-from dstack._internal.core.instance import InstanceOffer
+from dstack._internal.core.instance import InstanceOffer, InstancePricing
 from dstack._internal.core.job import Job, JobHead, Requirements, SpotPolicy
 from dstack._internal.core.log_event import LogEvent
 from dstack._internal.core.repo import RemoteRepoCredentials, RepoHead, RepoSpec
@@ -67,7 +67,7 @@ class Backend(ABC):
         self,
         job: Job,
         project_private_key: str,
-        offer: InstanceOffer,
+        offer: InstancePricing,
     ):
         pass
 
@@ -302,7 +302,7 @@ class ComponentBasedBackend(Backend):
         self,
         job: Job,
         project_private_key: str,
-        offer: InstanceOffer,
+        offer: InstancePricing,
     ):
         self.predict_build_plan(job)  # raises exception on missing build
         base_jobs.run_job(
@@ -512,20 +512,17 @@ class ComponentBasedBackend(Backend):
     def get_instance_candidates(
         self, requirements: Requirements, spot_policy: SpotPolicy
     ) -> List[InstanceOffer]:
-        spot_query = {SpotPolicy.SPOT: True, SpotPolicy.ONDEMAND: False, SpotPolicy.AUTO: None}[
-            spot_policy
-        ]
-
         start = datetime.now()
-        instances = self.compute().get_supported_instances()
-        logger.debug("[%s] got supported instances in %s", self.name, datetime.now() - start)
-
-        instances = [i for i in instances if _matches_requirements(i.resources, requirements)]
-
-        start = datetime.now()
-        offers = self.pricing().get_prices(instances, spot_query)
-        logger.debug("[%s] got prices in %s", self.name, datetime.now() - start)
+        offers = self.pricing().get_instances_pricing()
 
         if requirements.max_price is not None:
-            offers = [o for o in offers if o.price <= requirements.max_price]
+            offers = [i for i in offers if i.price <= requirements.max_price]
+        offers = [i for i in offers if _matches_requirements(i.instance.resources, requirements)]
+        if spot_policy != SpotPolicy.AUTO:
+            offers = [
+                i for i in offers if i.instance.resources.spot == (spot_policy == SpotPolicy.SPOT)
+            ]
+
+        offers = self.compute().get_availability(offers)  # InstancePricing to InstanceOffer
+        logger.debug("[%s] got instance candidates in %s", self.name, datetime.now() - start)
         return offers

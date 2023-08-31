@@ -1,4 +1,4 @@
-from typing import List, Optional
+from typing import Dict, List, Optional
 
 from boto3 import Session
 
@@ -8,7 +8,13 @@ from dstack._internal.backend.aws import utils as aws_utils
 from dstack._internal.backend.aws.config import AWSConfig
 from dstack._internal.backend.base.compute import Compute
 from dstack._internal.core.gateway import GatewayHead
-from dstack._internal.core.instance import InstanceType, LaunchedInstanceInfo
+from dstack._internal.core.instance import (
+    InstanceAvailability,
+    InstanceOffer,
+    InstancePricing,
+    InstanceType,
+    LaunchedInstanceInfo,
+)
 from dstack._internal.core.job import Job
 from dstack._internal.core.request import RequestHead
 from dstack._internal.core.runners import Runner
@@ -108,7 +114,37 @@ class AWSCompute(Compute):
         except IndexError:
             return
 
+    def get_availability(self, offers: List[InstancePricing]) -> List[InstanceOffer]:
+        regions = set(
+            offer.region for offer in offers if offer.region in self.backend_config.regions
+        )
+        quotas = {region: {} for region in regions}
+        for region in regions:
+            client = aws_utils.get_service_quotas_client(self.session, region)
+            for page in client.get_paginator("list_service_quotas").paginate(ServiceCode="ec2"):
+                for q in page["Quotas"]:
+                    if "On-Demand" in q["QuotaName"]:
+                        quotas[region][q["UsageMetric"]["MetricDimensions"]["Class"]] = q["Value"]
+
+        availability_offers = []
+        for offer in offers:
+            if offer.region not in self.backend_config.regions:
+                continue
+            availability = InstanceAvailability.UNKNOWN
+            if not _has_quota(quotas[offer.region], offer.instance.instance_name):
+                availability = InstanceAvailability.NO_QUOTA
+            availability_offers.append(InstanceOffer(**offer.dict(), availability=availability))
+        return availability_offers
+
     def _get_ec2_client(self, region: Optional[str] = None):
         if region is None:
             return aws_utils.get_ec2_client(self.session)
         return aws_utils.get_ec2_client(self.session, region_name=region)
+
+
+def _has_quota(quotas: Dict[str, float], instance_name: str) -> bool:
+    if instance_name.startswith("p"):
+        return quotas.get("P/OnDemand", 0) > 0
+    if instance_name.startswith("g"):
+        return quotas.get("G/OnDemand", 0) > 0
+    return quotas.get("Standard/OnDemand", 0) > 0

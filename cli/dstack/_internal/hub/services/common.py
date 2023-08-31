@@ -2,12 +2,14 @@ import asyncio
 from typing import List, Optional, Tuple
 
 from dstack._internal.backend.base import Backend
-from dstack._internal.core.instance import InstanceOffer
+from dstack._internal.core.instance import InstanceAvailability, InstanceOffer
 from dstack._internal.core.job import Job
 from dstack._internal.hub.db.models import Backend as DBBackend
 from dstack._internal.hub.db.models import Project
 from dstack._internal.hub.services.backends import cache as backends_cache
 from dstack._internal.hub.utils.common import run_async
+
+not_available = {InstanceAvailability.NOT_AVAILABLE, InstanceAvailability.NO_QUOTA}
 
 
 async def get_backends(
@@ -24,7 +26,7 @@ async def get_backends(
 
 
 async def get_instance_candidates(
-    backends: List[Backend], job: Job
+    backends: List[Backend], job: Job, exclude_not_available: bool = False
 ) -> List[Tuple[Backend, InstanceOffer]]:
     """
     Returns list of instances satisfying minimal resource requirements sorted by price
@@ -35,6 +37,9 @@ async def get_instance_candidates(
         for backend in backends
     ]
     for backend, backend_candidates in zip(backends, await asyncio.gather(*tasks)):
-        for instance in backend_candidates:
-            candidates.append((backend, instance))
-    return sorted(candidates, key=lambda x: x[1].price)
+        for offer in backend_candidates:
+            if not exclude_not_available or offer.availability not in not_available:
+                candidates.append((backend, offer))
+
+    # Put NOT_AVAILABLE and NO_QUOTA instances at the end
+    return sorted(candidates, key=lambda i: (i[1].availability in not_available, i[1].price))

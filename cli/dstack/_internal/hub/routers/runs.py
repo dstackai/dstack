@@ -5,8 +5,8 @@ from fastapi import APIRouter, Depends, HTTPException, status
 from fastapi.responses import PlainTextResponse
 
 from dstack._internal.backend.base import Backend
-from dstack._internal.core.error import BackendValueError
-from dstack._internal.core.instance import InstanceCandidate
+from dstack._internal.core.error import BackendValueError, NoMatchingInstanceError
+from dstack._internal.core.instance import InstanceAvailability, InstanceCandidate
 from dstack._internal.core.job import JobStatus
 from dstack._internal.core.plan import JobPlan, RunPlan
 from dstack._internal.core.repo.head import RepoHead
@@ -88,16 +88,17 @@ async def get_run_plan(
     job_plans = []
     for job, candidates in job_candidates:
         candidates = await candidates
+        if not candidates:
+            msg = f"No available instance type matching requirements ({job.requirements.pretty_format()})"
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail=error_detail(msg=msg, code=NoMatchingInstanceError.code),
+            )
 
         job_plan = JobPlan(
             job=job,
             candidates=[
-                InstanceCandidate(
-                    backend=backend.name,
-                    region=offer.region,
-                    instance=offer.instance_type,
-                    price=offer.price,
-                )
+                InstanceCandidate(**offer.dict(), backend=backend.name)
                 for backend, offer in candidates[:50]
             ],
         )
