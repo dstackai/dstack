@@ -31,12 +31,10 @@ Here's the configuration that uses services to run an LLM as an OpenAI-compatibl
 ```yaml
 type: service
 
-# (Optional) If not specified, it will use your local version
 python: "3.11"
 
 env:
-  # (Required) Specify the name of the model
-  - MODEL=facebook/opt-125m
+  - MODEL=NousResearch/Llama-2-7b-hf
 
 port: 8000
 
@@ -75,7 +73,7 @@ Once the service is up, you can query the endpoint:
 $ curl -X POST --location https://yellow-cat-1.mydomain.com/v1/completions \
     -H "Content-Type: application/json" \
     -d '{
-          "model": "facebook/opt-125m",
+          "model": "NousResearch/Llama-2-7b-hf",
           "prompt": "San Francisco is a",
           "max_tokens": 7,
           "temperature": 0
@@ -84,10 +82,18 @@ $ curl -X POST --location https://yellow-cat-1.mydomain.com/v1/completions \
 
 </div>
 
-!!! info "Gated models"
-    To use a model with gated access, ensure configuring either the `HUGGING_FACE_HUB_TOKEN` secret
-    (using [`dstack secrets`](../docs/reference/cli/secrets.md#dstack-secrets-add)),
-    or environment variable (with [`--env`](../docs/reference/cli/run.md#ENV) in `dstack run` or 
-    using [`env`](../docs/reference/dstack.yml/service.md#env) in the configuration file).
+### Gated models
+
+To use a gated-access model from Hugging Face Hub, make sure to set up either the `HUGGING_FACE_HUB_TOKEN` secret
+(using [`dstack secrets`](../docs/reference/cli/secrets.md#dstack-secrets-add)),
+or environment variable (with [`--env`](../docs/reference/cli/run.md#ENV) in `dstack run` or 
+using [`env`](../docs/reference/dstack.yml/service.md#env) in the configuration file).
+
+<div class="termy">
+
+```shell
+$ dstack run . -f vllm/serve.dstack.yml --env HUGGING_FACE_HUB_TOKEN=&lt;token&gt; --gpu 24GB
+```
+</div>
 
 [Source code](https://github.com/dstackai/dstack-examples){ .md-button .md-button--github }

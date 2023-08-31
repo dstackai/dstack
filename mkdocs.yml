@@ -3,7 +3,7 @@ site_name: dstack
 site_url: https://dstack.ai
 site_author: dstack GmbH
 site_description: >-
-  dstack is an open-source tool that streamlines LLM development and deployment across multiple clouds.
+  dstack is an open-source toolkit for running LLM workloads across any clouds.
 
 # Repository
 repo_url: https://github.com/dstackai/dstack
@@ -180,9 +180,9 @@ nav:
     - examples/index.md
     - Examples:
       - Fine-tuning Llama 2: examples/finetuning-llama-2.md
+      - Serving LLMs with TGI: examples/text-generation-inference.md
       - Serving SDXL with FastAPI: examples/stable-diffusion-xl.md
       - Serving LLMs with vLLM: examples/vllm.md
-      - Serving LLMs with TGI: examples/text-generation-inference.md
       - LLM as Chatbot: examples/llmchat.md
   - Blog:
       - blog/index.md

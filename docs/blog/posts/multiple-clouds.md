@@ -7,7 +7,7 @@ categories:
 - Releases
 ---
 
-# Discover GPU across multiple clouds
+# Automatic GPU discovery across clouds 
 
 __The 0.11 update significantly cuts GPU costs and boosts their availability.__
 
@@ -16,7 +16,7 @@ configured cloud providers and regions.
 
 <!-- more -->
 
-## Multiple clouds per project
+## Multiple backends per project
 
 Now, `dstack` leverages price data from multiple configured cloud providers and regions to automatically suggest the
 most cost-effective options.

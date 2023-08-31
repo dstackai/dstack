@@ -9,7 +9,7 @@
 </h1>
 
 <h3 align="center">
-Train and deploy LLM models in multiple clouds
+Run LLM workloads across any clouds
 </h3>
 
 <p align="center">
@@ -23,18 +23,16 @@ Train and deploy LLM models in multiple clouds
 [![PyPI - License](https://img.shields.io/pypi/l/dstack?style=flat-square&color=blue)](https://github.com/dstackai/dstack/blob/master/LICENSE.md)
 </div>
 
-`dstack` is an open-source tool that enables the execution of LLM workloads
-across multiple cloud providers – ensuring the best GPU price and availability.
+`dstack` is an open-source toolkit for running LLM workloads across any clouds, offering a
+cost-efficient and user-friendly interface for training, inference, and development.
 
-Deploy services, run tasks, and provision dev environments
-in a cost-effective manner across multiple cloud GPU providers.
-
-## Latest news
+## Latest news ✨
 
 - [2023/08] [Fine-tuning with Llama 2](https://dstack.ai/examples/finetuning-llama-2) (Example)
 - [2023/08] [An early preview of services](https://dstack.ai/blog/2023/08/07/services-preview) (Release)
-- [2023/07] [Port mapping, max duration, and more](https://dstack.ai/blog/2023/07/25/port-mapping-max-duration-and-more) (Release)
-- [2023/07] [Serving with vLLM](https://dstack.ai/examples/vllm) (Example)
+- [2023/08] [Serving SDXL with FastAPI](https://dstack.ai/examples/stable-diffusion-xl) (Example)
+- [2023/07] [Serving LLMS with TGI](https://dstack.ai/examples/text-generation-inference) (Example)
+- [2023/07] [Serving LLMS with vLLM](https://dstack.ai/examples/vllm) (Example)
 
 ## Installation
 

@@ -31,13 +31,11 @@ Here's the configuration that uses services:
 
 ```yaml
 type: service
-# This configuration deploys a given LLM model as an API
 
 image: ghcr.io/huggingface/text-generation-inference:latest
 
 env:
-  # (Required) Specify the name of the model
-  - MODEL_ID=tiiuae/falcon-7b
+      - MODEL_ID=NousResearch/Llama-2-7b-hf
 
 port: 8000
 
@@ -84,11 +82,50 @@ $ curl -X POST --location https://yellow-cat-1.mydomain.com \
 
 </div>
 
-!!! info "Gated models"
-    To use a model with gated access, ensure configuring either the `HUGGING_FACE_HUB_TOKEN` secret
-    (using [`dstack secrets`](../docs/reference/cli/secrets.md#dstack-secrets-add)),
-    or environment variable (with [`--env`](../docs/reference/cli/run.md#ENV) in `dstack run` or 
-    using [`env`](../docs/reference/dstack.yml/service.md#env) in the configuration file).
+### Gated models
+
+To use a model with gated access, ensure configuring either the `HUGGING_FACE_HUB_TOKEN` secret
+(using [`dstack secrets`](../docs/reference/cli/secrets.md#dstack-secrets-add)),
+or environment variable (with [`--env`](../docs/reference/cli/run.md#ENV) in `dstack run` or 
+using [`env`](../docs/reference/dstack.yml/service.md#env) in the configuration file).
+
+<div class="termy">
+
+```shell
+$ dstack run . -f text-generation-inference/serve.dstack.yml --env HUGGING_FACE_HUB_TOKEN=&lt;token&gt; --gpu 24GB
+```
+</div>
+
+### Memory usage and quantization
+
+An LLM typically requires twice the GPU memory compared to its parameter count. For instance, a model with `13B` parameters
+needs around `26GB` of GPU memory. To decrease memory usage and fit the model on a smaller GPU, consider using
+quantization, which TGI offers as `bitsandbytes` and `gptq` methods. 
+
+Here's an example of the Llama 2 13B model tailored for a `24GB` GPU (A10 or L4):
+
+<div editor-title="text-generation-inference/serve.dstack.yml"> 
+
+```yaml
+type: service
+
+image: ghcr.io/huggingface/text-generation-inference:latest
+
+env:
+  - MODEL_ID=TheBloke/Llama-2-13B-GPTQ
+
+port: 8000
+
+commands: 
+  - text-generation-launcher --hostname 0.0.0.0 --port 8000 --trust-remote-code --quantize gptq
+```
+
+</div>
+
+A similar approach allows running the Llama 2 70B model on an `80GB` GPU (A100).
+
+To calculate the exact GPU memory required for a specific model with different quantization methods, you can use the
+[hf-accelerate/memory-model-usage](https://huggingface.co/spaces/hf-accelerate/model-memory-usage) Space.
 
 ??? info "Dev environments"
 

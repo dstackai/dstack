@@ -1,6 +1,6 @@
 ---
 template: home.html
-title: Train and deploy LLM models in multiple clouds
+title: Run LLM workloads across any clouds
 hide:
    - navigation
    - toc
