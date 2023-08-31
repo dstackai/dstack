@@ -1,7 +1,6 @@
 package gateway
 
 import (
-	"bytes"
 	"fmt"
 	"github.com/dstackai/dstack/runner/internal/gerrors"
 	"os"
@@ -51,15 +50,29 @@ func (c *SSHControl) exec(args []string, command string) ([]byte, error) {
 	if command != "" {
 		allArgs = append(allArgs, command)
 	}
-	fmt.Println(allArgs)
 	cmd := exec.Command("ssh", allArgs...)
-	var stdout, stderr bytes.Buffer
-	cmd.Stdout = &stdout
-	cmd.Stderr = &stderr
-	if err := cmd.Run(); err != nil {
-		return nil, gerrors.Newf("ssh exec: %s", stderr.String())
+
+	stdoutFile, err := os.CreateTemp("", "")
+	if err != nil {
+		panic(err)
 	}
-	return stdout.Bytes(), nil
+	defer func() { _ = os.Remove(stdoutFile.Name()) }()
+	stderrFile, err := os.CreateTemp("", "")
+	if err != nil {
+		panic(err)
+	}
+	defer func() { _ = os.Remove(stderrFile.Name()) }()
+	// OpenSSH 8.2 (on Ubuntu 20.04) doesn't close stdout/stderr when running in the background (-f option).
+	// Run command waits indefinitely for closing pipes, but exits immediately if we are using files.
+	cmd.Stdout = stdoutFile
+	cmd.Stderr = stderrFile
+
+	if err := cmd.Run(); err != nil {
+		stderr, _ := os.ReadFile(stderrFile.Name())
+		return nil, gerrors.Newf("ssh exec: %s", string(stderr))
+	}
+	stdout, _ := os.ReadFile(stdoutFile.Name())
+	return stdout, nil
 }
 
 func (c *SSHControl) Publish(localPort, sockPath string) error {
