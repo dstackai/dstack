@@ -9,7 +9,11 @@ from dstack._internal.hub.db.models import Project
 from dstack._internal.hub.repository.jobs import JobManager
 from dstack._internal.hub.repository.projects import ProjectManager
 from dstack._internal.hub.services.backends.cache import get_project_backends
-from dstack._internal.hub.services.common import get_backends, get_instance_candidates
+from dstack._internal.hub.services.common import (
+    get_backends,
+    get_instance_candidates,
+    not_available,
+)
 from dstack._internal.hub.utils.common import run_async
 from dstack._internal.utils.common import get_milliseconds_since_epoch
 from dstack._internal.utils.logging import get_logger
@@ -109,6 +113,7 @@ def _resubmit_interrupted_jobs(project: Project, backend: Backend):
                     offers = backend.get_instance_candidates(
                         requirements=job.requirements, spot_policy=job.spot_policy
                     )
+                    offers = [offer for offer in offers if offer.availability not in not_available]
                     offers = sorted(offers, key=lambda x: x.price)
                     for offer in offers:
                         logger.debug(
