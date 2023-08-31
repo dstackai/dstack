@@ -34,13 +34,7 @@ async def run(project_name: str, body: RunRunners):
     backends = [backend for _, backend in backends]
 
     start = datetime.datetime.now()
-    candidates = await get_instance_candidates(backends, job)
-    exclude_availability = {InstanceAvailability.NOT_AVAILABLE, InstanceAvailability.NO_QUOTA}
-    candidates = [
-        (backend, offer)
-        for backend, offer in candidates
-        if offer.availability not in exclude_availability
-    ]
+    candidates = await get_instance_candidates(backends, job, exclude_not_available=True)
     logger.debug(
         f"Found %d instance candidates in %s",
         len(candidates),

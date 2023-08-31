@@ -20,7 +20,7 @@ from dstack._internal.backend.base.storage import Storage
 from dstack._internal.core.artifact import Artifact
 from dstack._internal.core.build import BuildPlan
 from dstack._internal.core.gateway import GatewayHead
-from dstack._internal.core.instance import InstanceOffer
+from dstack._internal.core.instance import InstanceOffer, InstancePricing
 from dstack._internal.core.job import Job, JobHead, Requirements, SpotPolicy
 from dstack._internal.core.log_event import LogEvent
 from dstack._internal.core.repo import RemoteRepoCredentials, RepoHead, RepoSpec
@@ -67,7 +67,7 @@ class Backend(ABC):
         self,
         job: Job,
         project_private_key: str,
-        offer: InstanceOffer,
+        offer: InstancePricing,
     ):
         pass
 
@@ -302,7 +302,7 @@ class ComponentBasedBackend(Backend):
         self,
         job: Job,
         project_private_key: str,
-        offer: InstanceOffer,
+        offer: InstancePricing,
     ):
         self.predict_build_plan(job)  # raises exception on missing build
         base_jobs.run_job(

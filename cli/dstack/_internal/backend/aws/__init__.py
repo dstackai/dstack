@@ -12,7 +12,7 @@ from dstack._internal.backend.aws.secrets import AWSSecretsManager
 from dstack._internal.backend.aws.storage import AWSStorage
 from dstack._internal.backend.base import ComponentBasedBackend
 from dstack._internal.core.error import BackendAuthError
-from dstack._internal.core.instance import InstanceOffer
+from dstack._internal.core.instance import InstancePricing
 from dstack._internal.core.job import Job
 
 
@@ -84,7 +84,7 @@ class AwsBackend(ComponentBasedBackend):
         self,
         job: Job,
         project_private_key: str,
-        offer: InstanceOffer,
+        offer: InstancePricing,
     ):
         self._logging.create_log_groups_if_not_exist(
             self.backend_config.bucket_name, job.repo_ref.repo_id

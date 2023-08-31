@@ -94,9 +94,6 @@ async def get_run_plan(
                 status_code=status.HTTP_400_BAD_REQUEST,
                 detail=error_detail(msg=msg, code=NoMatchingInstanceError.code),
             )
-        # Put NOT_AVAILABLE and NO_QUOTA instances at the end
-        low_priority = {InstanceAvailability.NOT_AVAILABLE, InstanceAvailability.NO_QUOTA}
-        candidates.sort(key=lambda i: (i[1].availability in low_priority, i[1].price))
 
         job_plan = JobPlan(
             job=job,

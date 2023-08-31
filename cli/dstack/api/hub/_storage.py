@@ -30,7 +30,7 @@ class HUBStorage:
     def download_file(
         self, backend: str, source_path: str, dest_path: str, callback: Callable[[int], None]
     ):
-        url = self._client.download_file(dest_path=source_path)
+        url = self._client.download_file(backend=backend, dest_path=source_path)
         if not (url is None):
             resp = requests.get(url)
             if resp.ok:

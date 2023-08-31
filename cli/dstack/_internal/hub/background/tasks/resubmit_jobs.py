@@ -57,11 +57,11 @@ async def _resubmit_not_started_jobs(project: Project):
             continue
         backends = await get_backends(project, selected_backends=job.backends)
         backends = [b for _, b in backends]
-        candidates = await get_instance_candidates(backends, job)
+        candidates = await get_instance_candidates(backends, job, exclude_not_available=True)
         for backend, offer in candidates:
             logger.info(
                 "Trying %s in %s/%s for $%0.4f per hour",
-                offer.instance_type.instance_name,
+                offer.instance.instance_name,
                 backend.name,
                 offer.region,
                 offer.price,
@@ -113,7 +113,7 @@ def _resubmit_interrupted_jobs(project: Project, backend: Backend):
                     for offer in offers:
                         logger.debug(
                             "Trying %s in %s/%s for $%0.4f per hour",
-                            offer.instance_type.instance_name,
+                            offer.instance.instance_name,
                             backend.name,
                             offer.region,
                             offer.price,
