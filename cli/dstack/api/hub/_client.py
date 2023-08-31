@@ -1,6 +1,7 @@
 import copy
 import tempfile
 import time
+from concurrent.futures import ThreadPoolExecutor
 from datetime import datetime
 from pathlib import Path
 from typing import Dict, Generator, List, Optional, Tuple
@@ -250,18 +251,20 @@ class HubClient:
                 ssh_key_pub=ssh_key_pub,
                 run_plan=run_plan,
             )
+            # We upload code patch to all backends since we don't know which one will be used.
+            # This can be optimized if we upload to the server first.
+            considered_backends = jobs[0].backends or [b.name for b in self.list_backends()]
+            with ThreadPoolExecutor(max_workers=4) as executor:
+                for backend in considered_backends:
+                    executor.submit(
+                        self._storage.upload_file,
+                        backend,
+                        f.name,
+                        repo_code_filename,
+                        lambda _: ...,
+                    )
             for job in jobs:
                 self.run_job(job)
-            run_info = self.list_runs(run_name)[0]
-            if run_info.backend is not None:
-                self._storage.upload_file(
-                    run_info.backend, f.name, repo_code_filename, lambda _: ...
-                )
-            else:
-                # The run has not been submitted, so we upload the code to any potential backend
-                backends = job.backends or [b.name for b in self.list_backends()]
-                for backend in backends:
-                    self._storage.upload_file(backend, f.name, repo_code_filename, lambda _: ...)
         self.update_repo_last_run_at(last_run_at=int(round(time.time() * 1000)))
         return run_name, jobs
 
