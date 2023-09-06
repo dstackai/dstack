@@ -1,4 +1,5 @@
 import argparse
+import os
 
 from rich.prompt import Confirm
 
@@ -77,10 +78,12 @@ class BuildCommand(BasicCommand):
             ):
                 raise RepoNotInitializedError("No credentials", project_name=project_name)
 
-            if not config.repo_user_config.ssh_key_path:
+            repo_user_config = config.repo_user_config(os.getcwd())
+
+            if not repo_user_config.ssh_key_path:
                 ssh_key_pub = None
             else:
-                ssh_key_pub = read_ssh_key_pub(config.repo_user_config.ssh_key_path)
+                ssh_key_pub = read_ssh_key_pub(repo_user_config.ssh_key_path)
 
             configurator_args, run_args = configurator.get_parser().parse_known_args(
                 args.args + args.unknown
@@ -112,7 +115,7 @@ class BuildCommand(BasicCommand):
                 hub_client,
                 run,
                 jobs,
-                ssh_key=config.repo_user_config.ssh_key_path,
+                ssh_key=repo_user_config.ssh_key_path,
                 watcher=None,
                 ports_locks=ports_locks,
             )
