@@ -1,6 +1,8 @@
 import os
 import sys
 import threading
+from abc import ABC
+from datetime import datetime, timedelta, timezone
 from queue import Queue
 from typing import Generator, List, Optional, Tuple
 
@@ -9,17 +11,17 @@ from dstack._internal.cli.utils.config import get_hub_client
 from dstack._internal.cli.utils.configuration import get_configurator
 from dstack._internal.cli.utils.init import init_repo
 from dstack._internal.cli.utils.run import (
+    _detach,
     _poll_run_head,
     get_run_plan,
     poll_logs_light,
     run_configuration,
-    _detach,
 )
 from dstack._internal.cli.utils.ssh_tunnel import PortsLock
 from dstack._internal.core.configuration import (
     BaseConfiguration,
-    TaskConfiguration,
     ServiceConfiguration,
+    TaskConfiguration,
 )
 from dstack._internal.core.job import JobHead, JobStatus
 from dstack._internal.core.profile import (
@@ -50,7 +52,34 @@ class RepoCollection:
         init_repo(self._hub_client, git_identity_file, oauth_token, ssh_identity_file)
 
 
-class Run:
+class Run(ABC):
+    def __init__(
+        self,
+        hub_client: HubClient,
+        run_info: RunInfo,
+    ) -> None:
+        super().__init__()
+        self._hub_client = hub_client
+        self._run_info = run_info
+
+    def logs(
+        self, start_time: datetime = (datetime.now(tz=timezone.utc) - timedelta(days=1))
+    ) -> Generator[bytes, None, None]:
+        for event in self._hub_client.poll_logs(
+            run_name=self._run_info.run_head.run_name, start_time=start_time, diagnose=False
+        ):
+            yield event.log_message
+
+    @property
+    def status(self) -> JobStatus:
+        return next(_poll_run_head(self._hub_client, self._run_info.run_head.run_name)).status
+
+    def stop(self, abort: bool = False):
+        self._hub_client.stop_run(self._run_info.run_head.run_name, terminate=True, abort=abort)
+        _detach(self._run_info.run_head.run_name)
+
+
+class SubmittedRun(Run):
     def __init__(
         self,
         hub_client: HubClient,
@@ -60,15 +89,15 @@ class Run:
         port_locks: Tuple[PortsLock, PortsLock],
         detach: bool,
     ) -> None:
-        super().__init__()
-        self._hub_client = hub_client
-        self._run_info = run_info
+        super().__init__(hub_client, run_info)
         self._job_heads = job_heads
         self._ssh_key = ssh_key
         self._port_locks = port_locks
         self._detach = detach
 
-    def logs(self) -> Generator[bytes, None, None]:
+    def logs(
+        self, start_time: datetime = datetime.now() - timedelta(days=1)
+    ) -> Generator[bytes, None, None]:
         if not self._detach:
             for _ in _poll_run_head(
                 self._hub_client,
@@ -110,14 +139,8 @@ class Run:
                     break
                 else:
                     yield item
-
-    @property
-    def status(self) -> JobStatus:
-        return next(_poll_run_head(self._hub_client, self._run_info.run_head.run_name)).status
-
-    def stop(self, abort: bool = False):
-        self._hub_client.stop_run(self._run_info.run_head.run_name, terminate=True, abort=abort)
-        _detach(self._run_info.run_head.run_name)
+        else:
+            return super().logs(start_time)
 
 
 class RunCollection:
@@ -149,7 +172,11 @@ class RunCollection:
         run_infos = list_runs_hub(self._hub_client, run_name=run_name)
         run_info = run_infos[0]
         ssh_key = repo_user_config.ssh_key_path
-        return Run(self._hub_client, run_info, jobs, ssh_key, ports_locks, detach)
+        return SubmittedRun(self._hub_client, run_info, jobs, ssh_key, ports_locks, detach)
+
+    def list(self, run_name: Optional[str] = None, all: bool = False) -> List[Run]:
+        run_infos = list_runs_hub(self._hub_client, run_name=run_name, all=all)
+        return [Run(self._hub_client, run_info) for run_info in run_infos]
 
 
 class Client:
