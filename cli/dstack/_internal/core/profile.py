@@ -63,7 +63,7 @@ def parse_max_duration(v: Union[int, str]) -> int:
     return parse_duration(v)
 
 
-class ProfileGPU(ForbidExtra):
+class GPU(ForbidExtra):
     name: Optional[str]
     count: int = 1
     memory: Annotated[
@@ -77,8 +77,8 @@ class ProfileGPU(ForbidExtra):
         return name.upper()
 
 
-class ProfileResources(ForbidExtra):
-    gpu: Optional[Union[int, ProfileGPU]]
+class Resources(ForbidExtra):
+    gpu: Optional[Union[int, GPU]]
     memory: Annotated[
         Union[int, str], Field(description='The minimum size of RAM memory (e.g., "16GB")')
     ] = parse_memory(DEFAULT_MEM)
@@ -93,13 +93,13 @@ class ProfileResources(ForbidExtra):
     _validate_mem = validator("memory", "shm_size", pre=True, allow_reuse=True)(parse_memory)
 
     @validator("gpu", pre=True)
-    def _validate_gpu(cls, v: Optional[Union[int, ProfileGPU]]) -> Optional[ProfileGPU]:
+    def _validate_gpu(cls, v: Optional[Union[int, GPU]]) -> Optional[GPU]:
         if isinstance(v, int):
-            v = ProfileGPU(count=v)
+            v = GPU(count=v)
         return v
 
 
-class ProfileRetryPolicy(ForbidExtra):
+class RetryPolicy(ForbidExtra):
     retry: Annotated[bool, Field(description="Whether to retry the run on failure or not")] = False
     limit: Annotated[
         Union[int, str],
@@ -123,9 +123,9 @@ class ProfileRetryPolicy(ForbidExtra):
 
 
 class Profile(ForbidExtra):
-    name: str
+    name: Optional[str]
     backends: Optional[List[BackendType]]
-    resources: ProfileResources = ProfileResources()
+    resources: Resources = Resources()
     spot_policy: Annotated[
         Optional[SpotPolicy],
         Field(
@@ -133,8 +133,8 @@ class Profile(ForbidExtra):
         ),
     ]
     retry_policy: Annotated[
-        ProfileRetryPolicy, Field(description="The policy for re-submitting the run")
-    ] = ProfileRetryPolicy()
+        RetryPolicy, Field(description="The policy for re-submitting the run")
+    ] = RetryPolicy()
     termination_policy: Annotated[
         Optional[TerminationPolicy],
         Field(description="(Experimental) The policy for terminating the run"),

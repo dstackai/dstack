@@ -20,7 +20,7 @@ from dstack._internal.core.configuration import (
 )
 from dstack._internal.core.error import DstackError
 from dstack._internal.core.plan import RunPlan
-from dstack._internal.core.profile import Profile, ProfileGPU, parse_duration, parse_max_duration
+from dstack._internal.core.profile import GPU, Profile, parse_duration, parse_max_duration
 from dstack._internal.core.repo import Repo
 from dstack._internal.utils.common import get_milliseconds_since_epoch
 from dstack._internal.utils.interpolator import VariablesInterpolator
@@ -115,9 +115,9 @@ class JobConfigurator(ABC):
                 self.conf.env[key] = value
 
         if args.gpu is not None:
-            gpu = (self.profile.resources.gpu or ProfileGPU()).dict(exclude_defaults=True)
+            gpu = (self.profile.resources.gpu or GPU()).dict(exclude_defaults=True)
             gpu.update(args.gpu)
-            self.profile.resources.gpu = ProfileGPU.parse_obj(gpu)
+            self.profile.resources.gpu = GPU.parse_obj(gpu)
 
         if args.max_price is not None:
             self.profile.max_price = args.max_price
