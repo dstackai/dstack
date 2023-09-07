@@ -79,6 +79,12 @@ class Run(ABC):
         self._hub_client.stop_run(self._run_info.run_head.run_name, terminate=True, abort=abort)
         _detach(self._run_info.run_head.run_name)
 
+    def __str__(self) -> str:
+        return f"<Run '{self.name}'>"
+
+    def __repr__(self) -> str:
+        return f"<Run '{self.name}'>"
+
 
 class SubmittedRun(Run):
     def __init__(
@@ -164,7 +170,7 @@ class RunCollection:
             configuration,
             configuration_path,
             working_dir or ".",
-            profile or Profile(name="default"),
+            profile or Profile(),
         )
         repo_user_config, run_plan = get_run_plan(self._hub_client, configurator, run_name)
         run_name, jobs, ports_locks = run_configuration(
@@ -175,9 +181,13 @@ class RunCollection:
         ssh_key = repo_user_config.ssh_key_path
         return SubmittedRun(self._hub_client, run_info, jobs, ssh_key, ports_locks, detach)
 
-    def list(self, run_name: Optional[str] = None, all: bool = False) -> List[Run]:
-        run_infos = list_runs_hub(self._hub_client, run_name=run_name, all=all)
+    def list(self, all: bool = False) -> List[Run]:
+        run_infos = list_runs_hub(self._hub_client, all=all)
         return [Run(self._hub_client, run_info) for run_info in run_infos]
+
+    def get(self, run_name: str) -> Optional[Run]:
+        run_infos = list_runs_hub(self._hub_client, run_name=run_name)
+        return next(iter([Run(self._hub_client, run_info) for run_info in run_infos]), None)
 
 
 class Client:
@@ -204,6 +214,5 @@ class Client:
             self.repos.init(git_identity_file, oauth_token, ssh_identity_file)
 
     @staticmethod
-    def from_config(repo_dir: Optional[os.PathLike] = None, project_name: Optional[str] = None):
-        _repo_dir: os.PathLike = repo_dir or tempfile.mkdtemp()
-        return Client(get_hub_client(project_name=project_name, repo_dir=_repo_dir), _repo_dir)
+    def from_config(repo_dir: os.PathLike, project_name: Optional[str] = None):
+        return Client(get_hub_client(project_name=project_name, repo_dir=repo_dir), repo_dir)

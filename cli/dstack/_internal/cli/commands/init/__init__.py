@@ -43,7 +43,7 @@ class InitCommand(BasicCommand):
         self._parser.add_argument("--local", action="store_true", help="Do not use git")
 
     def _command(self, args: Namespace):
-        hub_client = get_hub_client(project_name=args.project, local=args.local)
+        hub_client = get_hub_client(project_name=args.project, local_repo=args.local)
         try:
             init_repo(
                 hub_client,
