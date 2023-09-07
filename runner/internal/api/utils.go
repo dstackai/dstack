@@ -108,27 +108,16 @@ func setHandleFunc(mux *http.ServeMux, method string, path string, handler func(
 	})
 }
 
-func jobStateEventsAfter(events []JobStateEvent, timestamp int64) []JobStateEvent {
-	left := 0
-	right := len(events)
-	for left < right {
-		mid := (left + right) / 2
-		if events[mid].Timestamp <= timestamp {
-			left = mid + 1
-		} else {
-			right = mid
-		}
-	}
-	return events[left:]
+type OrderedEvent interface {
+	GetTimestamp() int64
 }
 
-func logEventsAfter(events []LogEvent, timestamp int64) []LogEvent {
-	// have to copy-paste because Go doesn't allow casting slices (to make linear complexity explicit)
+func eventsAfter[T OrderedEvent](events []T, timestamp int64) []T {
 	left := 0
 	right := len(events)
 	for left < right {
 		mid := (left + right) / 2
-		if events[mid].Timestamp <= timestamp {
+		if events[mid].GetTimestamp() <= timestamp {
 			left = mid + 1
 		} else {
 			right = mid

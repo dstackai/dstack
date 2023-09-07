@@ -45,7 +45,7 @@ func (s *Server) uploadCodePostHandler(w http.ResponseWriter, r *http.Request) (
 	}
 
 	r.Body = http.MaxBytesReader(w, r.Body, 10*1024*1024)
-	file, err := os.Create(filepath.Join(s.tempDir, "code.tar"))
+	file, err := os.Create(filepath.Join(s.tempDir, "code"))
 	if err != nil {
 		log.Error(r.Context(), "Failed to create code file", "err", err)
 		return http.StatusInternalServerError, ""
@@ -91,9 +91,9 @@ func (s *Server) pullGetHandler(w http.ResponseWriter, r *http.Request) (int, st
 	}
 
 	return writeJSONResponse(w, http.StatusOK, PullResponse{
-		JobStates:   jobStateEventsAfter(s.jobStateHistory, timestamp),
-		JobLogs:     logEventsAfter(s.jobLogsHistory, timestamp),
-		RunnerLogs:  logEventsAfter(s.runnerLogsHistory, timestamp),
+		JobStates:   eventsAfter(s.jobStateHistory, timestamp),
+		JobLogs:     eventsAfter(s.jobLogsHistory, timestamp),
+		RunnerLogs:  eventsAfter(s.runnerLogsHistory, timestamp),
 		LastUpdated: s.timestamp.GetLatest(),
 	})
 }

@@ -85,3 +85,11 @@ func (d *RepoData) FormatURL(format string) string {
 	}
 	return fmt.Sprintf(format, host, d.RepoUserName, d.RepoName)
 }
+
+func (e JobStateEvent) GetTimestamp() int64 {
+	return e.Timestamp
+}
+
+func (e LogEvent) GetTimestamp() int64 {
+	return e.Timestamp
+}

@@ -43,6 +43,9 @@ func (ex *Executor) Run(ctx context.Context) error {
 		return gerrors.New("job was terminated before it started")
 		// todo timeout
 	}
+	// get job
+	// get code
+	// run
 
 	// todo wait for code?
 
@@ -75,6 +78,8 @@ func (ex *Executor) Run(ctx context.Context) error {
 }
 
 func (ex *Executor) execJob(ctx context.Context) error {
+	// todo recover
+
 	cmd := exec.CommandContext(ctx, "echo", "123")
 
 	// todo dir
