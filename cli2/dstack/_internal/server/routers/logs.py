@@ -1,6 +1,6 @@
 from fastapi import APIRouter
 
-from dstack._internal.core.log import JobSubmissionLogs
+from dstack._internal.core.logs import JobSubmissionLogs
 from dstack._internal.server.schemas.logs import PollLogsRequest
 
 router = APIRouter(

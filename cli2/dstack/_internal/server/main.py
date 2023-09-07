@@ -2,7 +2,7 @@ from contextlib import asynccontextmanager
 
 from fastapi import FastAPI
 
-from dstack._internal.server.routers import logs, repos, runs, secrets
+from dstack._internal.server.routers import logs, repos, runs, secrets, users
 
 
 @asynccontextmanager
@@ -11,6 +11,7 @@ async def lifespan(app: FastAPI):
 
 
 app = FastAPI(docs_url="/api/docs", lifespan=lifespan)
+app.include_router(users.router)
 app.include_router(repos.router)
 app.include_router(runs.router)
 app.include_router(logs.router)

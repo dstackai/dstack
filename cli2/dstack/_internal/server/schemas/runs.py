@@ -2,8 +2,8 @@ from typing import Annotated, Optional
 
 from pydantic import BaseModel, Field
 
-from dstack._internal.core.configuration import AnyRunConfiguration
-from dstack._internal.core.profile import Profile
+from dstack._internal.core.configurations import AnyRunConfiguration
+from dstack._internal.core.profiles import Profile
 from dstack._internal.core.repo import AnyRepoData
 
 

@@ -4,9 +4,13 @@ from typing import Annotated, Dict, List, Optional
 
 from pydantic import UUID4, BaseModel, Field
 
-from dstack._internal.core.configuration import AnyRunConfiguration, RegistryAuth, RunConfiguration
-from dstack._internal.core.instance import InstanceCandidate, InstanceType
-from dstack._internal.core.profile import Profile, SpotPolicy
+from dstack._internal.core.configurations import (
+    AnyRunConfiguration,
+    RegistryAuth,
+    RunConfiguration,
+)
+from dstack._internal.core.instances import InstanceCandidate, InstanceType
+from dstack._internal.core.profiles import Profile, SpotPolicy
 from dstack._internal.core.repo import AnyRepoData
 
 

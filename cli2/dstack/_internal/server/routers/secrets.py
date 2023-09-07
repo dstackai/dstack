@@ -2,8 +2,8 @@ from typing import List
 
 from fastapi import APIRouter
 
-from dstack._internal.core.run import Run
-from dstack._internal.core.secret import Secret
+from dstack._internal.core.runs import Run
+from dstack._internal.core.secrets import Secret
 from dstack._internal.server.schemas.runs import SubmitRunRequest
 from dstack._internal.server.schemas.secrets import (
     AddSecretRequest,
