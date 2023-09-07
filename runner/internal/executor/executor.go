@@ -655,7 +655,7 @@ func (ex *Executor) newSpec(ctx context.Context, credPath string) (*docker.Spec,
 		Image:              job.Image,
 		RegistryAuthBase64: makeRegistryAuthBase64(username, password),
 		WorkDir:            path.Join("/workflow", job.WorkingDir),
-		Commands:           docker.ShellCommands(docker.InsertEnvs(commands, job.Environment)),
+		Commands:           docker.ShellCommands(commands),
 		Entrypoint:         job.Entrypoint,
 		Env:                ex.environment(ctx, true),
 		Mounts:             uniqueMount(bindings),
@@ -693,6 +693,7 @@ func (ex *Executor) environment(ctx context.Context, includeRun bool) []string {
 		}
 		env.AddMapString(cons)
 	}
+	env.AddMapString(job.Environment)
 	secrets, err := ex.backend.Secrets(ctx)
 	if err != nil {
 		log.Error(ctx, "Fail fetching secrets", "err", err)

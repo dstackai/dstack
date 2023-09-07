@@ -217,7 +217,7 @@ class JobConfigurator(ABC):
         pass
 
     @abstractmethod
-    def commands(self) -> List[str]:
+    def commands(self) -> Optional[List[str]]:
         pass
 
     @abstractmethod

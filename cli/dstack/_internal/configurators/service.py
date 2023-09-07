@@ -9,7 +9,7 @@ from dstack._internal.core.configuration import ServiceConfiguration
 class ServiceConfigurator(JobConfigurator):
     conf: ServiceConfiguration
 
-    def commands(self) -> List[str]:
+    def commands(self) -> Optional[List[str]]:
         return self.conf.commands
 
     def artifact_specs(self) -> List[job.ArtifactSpec]:

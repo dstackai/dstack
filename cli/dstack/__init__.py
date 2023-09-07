@@ -62,6 +62,7 @@ class Run(ABC):
         super().__init__()
         self._hub_client = hub_client
         self._run_info = run_info
+        self.name = run_info.run_head.run_name
 
     def logs(
         self, start_time: datetime = (datetime.now(tz=timezone.utc) - timedelta(days=1))
