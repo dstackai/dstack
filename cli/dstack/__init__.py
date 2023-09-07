@@ -1,5 +1,6 @@
 import os
 import sys
+import tempfile
 import threading
 from abc import ABC
 from datetime import datetime, timedelta, timezone
@@ -70,7 +71,6 @@ class Run(ABC):
         ):
             yield event.log_message
 
-    @property
     def status(self) -> JobStatus:
         return next(_poll_run_head(self._hub_client, self._run_info.run_head.run_name)).status
 
@@ -181,15 +181,28 @@ class RunCollection:
 
 class Client:
     _hub_client: HubClient
+    repo_dir: os.PathLike
     repos: RepoCollection
     runs: RunCollection
 
-    def __init__(self, hub_client: HubClient) -> None:
+    def __init__(
+        self,
+        hub_client: HubClient,
+        repo_dir: os.PathLike,
+        init: bool = True,
+        git_identity_file: Optional[str] = None,
+        oauth_token: Optional[str] = None,
+        ssh_identity_file: Optional[str] = None,
+    ) -> None:
         super().__init__()
         self._hub_client = hub_client
+        self.repo_dir = repo_dir
         self.repos = RepoCollection(hub_client)
         self.runs = RunCollection(hub_client)
+        if init:
+            self.repos.init(git_identity_file, oauth_token, ssh_identity_file)
 
     @staticmethod
-    def from_config(repo_dir: os.PathLike, project_name: Optional[str] = None):
-        return Client(get_hub_client(project_name=project_name, repo_dir=repo_dir))
+    def from_config(repo_dir: Optional[os.PathLike] = None, project_name: Optional[str] = None):
+        _repo_dir: os.PathLike = repo_dir or tempfile.mkdtemp()
+        return Client(get_hub_client(project_name=project_name, repo_dir=_repo_dir), _repo_dir)
