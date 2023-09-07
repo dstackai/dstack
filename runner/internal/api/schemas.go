@@ -15,7 +15,7 @@ type LogEvent struct {
 
 type SubmitBody struct {
 	Run             Run               `json:"run"`
-	JobSpec         JobSpec           `json:"job"`
+	JobSpec         JobSpec           `json:"job_spec"`
 	Secrets         map[string]string `json:"secrets"`
 	RepoCredentials *RepoCredentials  `json:"repo_credentials"`
 }

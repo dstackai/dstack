@@ -66,7 +66,7 @@ func (ex *Executor) prepareGit(ctx context.Context) error {
 	}
 
 	log.Trace(ctx, "Applying diff")
-	repoDiff, err := os.ReadFile(ex.codeFilename)
+	repoDiff, err := os.ReadFile(ex.codePath)
 	if err != nil {
 		return err
 	}
@@ -79,12 +79,12 @@ func (ex *Executor) prepareGit(ctx context.Context) error {
 }
 
 func (ex *Executor) prepareArchive(ctx context.Context) error {
-	file, err := os.Open(ex.codeFilename)
+	file, err := os.Open(ex.codePath)
 	if err != nil {
 		return gerrors.Wrap(err)
 	}
 	defer func() { _ = file.Close() }()
-	log.Trace(ctx, "Extracting code archive", "src", ex.codeFilename, "dst", ex.workingDir)
+	log.Trace(ctx, "Extracting code archive", "src", ex.codePath, "dst", ex.workingDir)
 	if err := extract.Archive(ctx, file, ex.workingDir, nil); err != nil {
 		return gerrors.Wrap(err)
 	}

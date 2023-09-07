@@ -10,18 +10,23 @@ import (
 )
 
 type Server struct {
-	srv      *http.Server
-	tempDir  string
-	shutdown chan interface{} // todo how to use it?
+	srv        *http.Server
+	tempDir    string
+	shutdownCh chan interface{} // todo how to use it?
 
-	jobTerminatedCh chan interface{}
-	done            chan interface{}
-	serverState     string
-	stateMutex      sync.RWMutex
+	jobTerminatedCh chan interface{} // job terminated from the outside
+	doneCh          chan interface{} // all logs have been collected
 
-	jobStateCh   chan string
-	jobLogsCh    chan []byte
-	runnerLogsCh chan []byte
+	stateMutex  sync.RWMutex
+	serverState string // runner state machine
+	// todo timeout waiting for the job or code or run
+	jobCh  chan SubmitBody  // user submitted a job
+	codeCh chan string      // user submitted a code
+	runCh  chan interface{} // user triggered a run
+
+	jobStateCh   chan string // executor sets job state
+	jobLogsCh    chan []byte // executor writes job logs
+	runnerLogsCh chan []byte // context logger writes runner logs
 
 	historyMutex      sync.RWMutex
 	timestamp         *MonotonicTimestamp
@@ -37,13 +42,17 @@ func NewServer(tempDir string, address string) *Server {
 			Addr:    address,
 			Handler: mux,
 		},
-		tempDir:  tempDir,
-		shutdown: make(chan interface{}),
+		tempDir:    tempDir,
+		shutdownCh: make(chan interface{}),
 
 		jobTerminatedCh: make(chan interface{}),
-		done:            make(chan interface{}),
-		serverState:     WaitSubmit,
-		stateMutex:      sync.RWMutex{},
+		doneCh:          make(chan interface{}),
+
+		stateMutex:  sync.RWMutex{},
+		serverState: WaitSubmit,
+		jobCh:       make(chan SubmitBody),
+		codeCh:      make(chan string),
+		runCh:       make(chan interface{}),
 
 		jobStateCh:   make(chan string),
 		jobLogsCh:    make(chan []byte),
@@ -74,15 +83,17 @@ func (s *Server) Run() error {
 }
 
 func (s *Server) Stop(ctx context.Context) error {
-	close(s.shutdown)
+	close(s.shutdownCh)
 	return gerrors.Wrap(s.srv.Shutdown(ctx))
 }
 
 func (s *Server) GetAdapter() *ServerAdapter {
-	return NewServerAdapter(
-		s.jobStateCh,
-		// todo JobRun
-	)
+	return &ServerAdapter{
+		jobStateCh: s.jobStateCh,
+		jobCh:      s.jobCh,
+		codeCh:     s.codeCh,
+		runCh:      s.runCh,
+	}
 }
 
 func (s *Server) JobTerminated() <-chan interface{} {
@@ -90,7 +101,7 @@ func (s *Server) JobTerminated() <-chan interface{} {
 }
 
 func (s *Server) Done() <-chan interface{} {
-	return s.done
+	return s.doneCh
 }
 
 func (s *Server) RunnerLogsWriter() io.Writer {
@@ -113,7 +124,7 @@ func (s *Server) collect() {
 		case message := <-s.runnerLogsCh:
 			s.historyMutex.Lock()
 			s.runnerLogsHistory = append(s.runnerLogsHistory, LogEvent{message, s.timestamp.Next()})
-		case <-s.shutdown:
+		case <-s.shutdownCh:
 			return
 		}
 		s.historyMutex.Unlock()

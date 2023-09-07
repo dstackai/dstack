@@ -23,7 +23,7 @@ func (s *Server) submitPostHandler(w http.ResponseWriter, r *http.Request) (int,
 
 	var body SubmitBody
 	if err := decodeJSONBody(w, r, &body, true); err != nil {
-		// todo log
+		log.Error(r.Context(), "Failed to decode submit body", "err", err)
 		var mr *malformedRequest
 		if errors.As(err, &mr) {
 			return mr.status, mr.msg
@@ -31,7 +31,9 @@ func (s *Server) submitPostHandler(w http.ResponseWriter, r *http.Request) (int,
 			return http.StatusInternalServerError, ""
 		}
 	}
-	// todo pass to executor
+
+	s.jobCh <- body
+	close(s.jobCh)
 
 	s.serverState = WaitCode
 	return 200, "ok"
@@ -45,7 +47,8 @@ func (s *Server) uploadCodePostHandler(w http.ResponseWriter, r *http.Request) (
 	}
 
 	r.Body = http.MaxBytesReader(w, r.Body, 10*1024*1024)
-	file, err := os.Create(filepath.Join(s.tempDir, "code"))
+	codePath := filepath.Join(s.tempDir, "code")
+	file, err := os.Create(codePath)
 	if err != nil {
 		log.Error(r.Context(), "Failed to create code file", "err", err)
 		return http.StatusInternalServerError, ""
@@ -60,6 +63,9 @@ func (s *Server) uploadCodePostHandler(w http.ResponseWriter, r *http.Request) (
 		}
 	}
 
+	s.codeCh <- codePath
+	close(s.codeCh)
+
 	s.serverState = WaitRun
 	return 200, "ok"
 }
@@ -71,8 +77,7 @@ func (s *Server) runPostHandler(w http.ResponseWriter, r *http.Request) (int, st
 		return http.StatusConflict, ""
 	}
 
-	// todo add code path
-	// todo pass job and secrets to executor
+	close(s.runCh) // triggers executor to start the run
 
 	s.serverState = ServeLogs
 	return 200, "ok"
@@ -104,6 +109,8 @@ func (s *Server) stopPostHandler(w http.ResponseWriter, r *http.Request) (int, s
 	if s.serverState != ServeLogs {
 		return http.StatusConflict, ""
 	}
+
+	// todo do not stop twice, do not stop stopped
 
 	close(s.jobTerminatedCh)
 	return 200, "ok"

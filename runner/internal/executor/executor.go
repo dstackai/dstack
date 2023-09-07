@@ -8,6 +8,7 @@ import (
 	"github.com/dstackai/dstack/runner/internal/log"
 	"io"
 	"os/exec"
+	"path/filepath"
 )
 
 type Executor struct {
@@ -19,7 +20,7 @@ type Executor struct {
 	jobSpec         api.JobSpec
 	secrets         map[string]string
 	repoCredentials *api.RepoCredentials
-	codeFilename    string
+	codePath        string
 }
 
 func NewExecutor(workingDir string, jobLogsWriter io.Writer, adapter *api.ServerAdapter) *Executor {
@@ -33,21 +34,35 @@ func NewExecutor(workingDir string, jobLogsWriter io.Writer, adapter *api.Server
 func (ex *Executor) Run(ctx context.Context) error {
 	select {
 	case body := <-ex.server.GetJob():
-		log.Trace(ctx, "Executor received a job")
+		log.Debug(ctx, "Executor received a job")
 		ex.run = body.Run
 		ex.jobSpec = body.JobSpec
 		ex.secrets = body.Secrets
 		ex.repoCredentials = body.RepoCredentials
 	case <-ctx.Done():
 		ex.server.SetJobState(states.Terminated)
-		return gerrors.New("job was terminated before it started")
+		return gerrors.New("executor was terminated before it received a job")
 		// todo timeout
 	}
-	// get job
-	// get code
-	// run
 
-	// todo wait for code?
+	select {
+	case codePath := <-ex.server.GetCode():
+		log.Debug(ctx, "Executor received a code")
+		ex.codePath = codePath
+	case <-ctx.Done():
+		ex.server.SetJobState(states.Terminated)
+		return gerrors.New("executor was terminated before it received a code")
+		// todo timeout
+	}
+
+	select {
+	case <-ex.server.WaitRun():
+		log.Debug(ctx, "Executor received a start signal")
+	case <-ctx.Done():
+		ex.server.SetJobState(states.Terminated)
+		return gerrors.New("executor was terminated before it received a start signal")
+		// todo timeout
+	}
 
 	if err := ex.setupRepo(ctx); err != nil {
 		ex.server.SetJobState(states.Failed)
@@ -79,12 +94,10 @@ func (ex *Executor) Run(ctx context.Context) error {
 
 func (ex *Executor) execJob(ctx context.Context) error {
 	// todo recover
-
-	cmd := exec.CommandContext(ctx, "echo", "123")
-
-	// todo dir
-	// todo env
-	// todo if shell
+	args := makeArgs(ex.jobSpec.Entrypoint, ex.jobSpec.Commands)
+	cmd := exec.CommandContext(ctx, ex.jobSpec.Entrypoint[0], args...)
+	cmd.Env = makeEnv(ex.jobSpec.Env, ex.secrets)
+	cmd.Dir = filepath.Join(ex.workingDir, ex.jobSpec.WorkingDir) // todo error on illegal path
 	// todo call SIGINT in cmd.Cancel
 
 	cmdReader, err := cmd.StdoutPipe()

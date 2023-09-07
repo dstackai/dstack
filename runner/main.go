@@ -75,7 +75,7 @@ func start(logLevel int, httpPort int, workingDir string, tempDir string) {
 
 	log.Info(runnerCtx, fmt.Sprintf("Log level: %v", runnerLogger.Logger.Level.String()))
 
-	jobLogFile, err := log.CreateAppendFile(filepath.Join(tempDir, "runner.log"))
+	jobLogFile, err := log.CreateAppendFile(filepath.Join(tempDir, "job.log"))
 	if err != nil {
 		log.Error(context.TODO(), "Failed to create runner log file", "err", err)
 		os.Exit(1)

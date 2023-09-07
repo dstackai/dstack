@@ -2,14 +2,9 @@ package api
 
 type ServerAdapter struct {
 	jobStateCh chan<- string
-	submitJob  <-chan SubmitBody
-	// todo run job channel
-}
-
-func NewServerAdapter(jobStateCh chan<- string) *ServerAdapter {
-	return &ServerAdapter{
-		jobStateCh: jobStateCh,
-	}
+	jobCh      <-chan SubmitBody
+	codeCh     <-chan string
+	runCh      <-chan interface{}
 }
 
 func (a *ServerAdapter) SetJobState(state string) {
@@ -17,5 +12,13 @@ func (a *ServerAdapter) SetJobState(state string) {
 }
 
 func (a *ServerAdapter) GetJob() <-chan SubmitBody {
-	return a.submitJob
+	return a.jobCh
+}
+
+func (a *ServerAdapter) GetCode() <-chan string {
+	return a.codeCh
+}
+
+func (a *ServerAdapter) WaitRun() <-chan interface{} {
+	return a.runCh
 }

@@ -35,7 +35,7 @@ func (s *Server) streamJobLogs(conn *websocket.Conn) {
 	for {
 		s.historyMutex.RLock()
 		select {
-		case <-s.shutdown:
+		case <-s.shutdownCh:
 			if currentPos >= len(s.jobLogsHistory) {
 				s.historyMutex.RUnlock()
 				return
