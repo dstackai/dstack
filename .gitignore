@@ -1,15 +1,16 @@
 **/__pycache__/
 *.py[co]
 
-/venv/
-/.cache/
+venv/
+.cache/
 
-/cli/dstack.egg-info/
-/cli/dstack/_internal/hub/statics/
+cli/dstack.egg-info/
+cli/dstack/_internal/hub/statics/
 
-/runner/runner
-
-/my/
+runner/runner
 
 .idea/
 dist/
+
+build
+.pytest_cache
