@@ -123,7 +123,7 @@ class RunCommand(BasicCommand):
                 configurator,
                 args.name,
                 run_plan,
-                args.detach,
+                not args.detach,
                 run_args,
                 repo_user_config,
             )

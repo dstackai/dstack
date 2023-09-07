@@ -57,8 +57,8 @@ def parse_duration(v: Union[int, str]) -> int:
     return amount * multiplier
 
 
-def parse_max_duration(v: Union[int, str]) -> int:
-    if v == "off":
+def parse_max_duration(v: Optional[Union[int, str]]) -> int:
+    if v is None or v == "off":
         return -1
     return parse_duration(v)
 

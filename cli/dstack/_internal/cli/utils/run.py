@@ -287,20 +287,6 @@ def _detach(run_name):
     ssh_config_remove_host(config.ssh_config_path, run_name)
 
 
-def poll_logs_light(
-    hub_client: HubClient,
-    run_info: RunInfo,
-    job_heads: List[JobHead],
-    ssh_key: Optional[str],
-    ports_locks: Tuple[PortsLock, PortsLock],
-    log_handler: Callable[[bytes], None],
-):
-    jobs = [hub_client.get_job(job_head.job_id) for job_head in job_heads]
-    ports = _attach(hub_client, run_info, jobs[0], ssh_key, ports_locks)
-    _poll_logs_ws(hub_client, jobs[0], ports, log_handler)
-    _detach(run_info.run_head.run_name)
-
-
 def _print_failed_run_message(run: RunHead):
     if run.job_heads[0].error_code is JobErrorCode.FAILED_TO_START_DUE_TO_NO_CAPACITY:
         console.print("Provisioning failed due to no capacity\n")
@@ -587,12 +573,12 @@ def run_configuration(
     configurator: JobConfigurator,
     run_name: Optional[str],
     run_plan: RunPlan,
-    detach: bool,
+    lock_ports: bool,
     run_args: List[str],
     repo_user_config: RepoUserConfig,
 ) -> Tuple[str, List[Job], Optional[Tuple[PortsLock, PortsLock]]]:
     ports_locks = None
-    if not detach:
+    if lock_ports:
         ports_locks = reserve_ports(
             apps=configurator.app_specs(),
             local_backend=run_plan.local_backend,
