@@ -21,9 +21,9 @@ from dstack._internal.cli.utils.run import (
 from dstack._internal.cli.utils.ssh_tunnel import PortsLock
 from dstack._internal.core.configuration import (
     BaseConfiguration,
+    RegistryAuth,
     ServiceConfiguration,
     TaskConfiguration,
-    RegistryAuth,
 )
 from dstack._internal.core.job import Job, JobHead, JobStatus
 from dstack._internal.core.profile import (
