@@ -1,15 +1,16 @@
 """empty message
 
-Revision ID: efff754e360d
+Revision ID: 76b1921bfc01
 Revises: 
-Create Date: 2023-09-07 14:12:17.832401
+Create Date: 2023-09-08 09:25:40.479397
 
 """
 import sqlalchemy as sa
+import sqlalchemy_utils
 from alembic import op
 
 # revision identifiers, used by Alembic.
-revision = "efff754e360d"
+revision = "76b1921bfc01"
 down_revision = None
 branch_labels = None
 depends_on = None
@@ -31,9 +32,10 @@ def upgrade() -> None:
         sa.Column("id", sqlalchemy_utils.types.uuid.UUIDType(binary=False), nullable=False),
         sa.Column("name", sa.String(length=50), nullable=False),
         sa.Column("token", sa.String(length=200), nullable=False),
-        sa.Column("global_role", sa.Enum("admin", "user", name="globalrole"), nullable=False),
+        sa.Column("global_role", sa.Enum("ADMIN", "USER", name="globalrole"), nullable=False),
         sa.PrimaryKeyConstraint("id", name=op.f("pk_users")),
         sa.UniqueConstraint("name", name=op.f("uq_users_name")),
+        sa.UniqueConstraint("token", name=op.f("uq_users_token")),
     )
     op.create_table(
         "clouds",
@@ -62,7 +64,7 @@ def upgrade() -> None:
         ),
         sa.Column("user_id", sqlalchemy_utils.types.uuid.UUIDType(binary=False), nullable=False),
         sa.Column(
-            "project_role", sa.Enum("admin", "run", "read", name="projectrole"), nullable=False
+            "project_role", sa.Enum("ADMIN", "RUN", "READ", name="projectrole"), nullable=False
         ),
         sa.ForeignKeyConstraint(
             ["project_id"],

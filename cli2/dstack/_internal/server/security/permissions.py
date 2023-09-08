@@ -19,7 +19,7 @@ class Authenticated:
         session: AsyncSession = Depends(get_session),
         token: HTTPAuthorizationCredentials = Security(HTTPBearer()),
     ) -> UserModel:
-        user = await get_user_model_by_token(session=session, token=token)
+        user = await get_user_model_by_token(session=session, token=token.credentials)
         if user is None:
             _raise_invalid_token()
         return user
@@ -31,7 +31,7 @@ class GlobalAdmin:
         session: AsyncSession = Depends(get_session),
         token: HTTPAuthorizationCredentials = Security(HTTPBearer()),
     ) -> UserModel:
-        user = await get_user_model_by_token(session=session, token=token)
+        user = await get_user_model_by_token(session=session, token=token.credentials)
         if user is None:
             _raise_invalid_token()
         if user.global_role == GlobalRole.ADMIN:
@@ -46,7 +46,7 @@ class ProjectAdmin:
         session: AsyncSession = Depends(get_session),
         token: HTTPAuthorizationCredentials = Security(HTTPBearer()),
     ) -> Tuple[UserModel, ProjectModel]:
-        user = await get_user_model_by_token(session=session, token=token)
+        user = await get_user_model_by_token(session=session, token=token.credentials)
         if user is None:
             _raise_invalid_token()
         project = await get_project_model_by_name(session=session, project_name=project_name)
@@ -59,8 +59,6 @@ class ProjectAdmin:
         _raise_forbidden()
 
 
-# In the current roles model every User has at least "read" global role,
-# so every user has read access to every project.
 class ProjectMember:
     async def __call__(
         self,
@@ -69,7 +67,7 @@ class ProjectMember:
         project_name: str,
         token: HTTPAuthorizationCredentials = Security(HTTPBearer()),
     ) -> Tuple[UserModel, ProjectModel]:
-        user = await get_user_model_by_token(session=session, token=token)
+        user = await get_user_model_by_token(session=session, token=token.credentials)
         if user is None:
             _raise_invalid_token()
         project = await get_project_model_by_name(session=session, project_name=project_name)

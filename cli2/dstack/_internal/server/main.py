@@ -2,11 +2,13 @@ from contextlib import asynccontextmanager
 
 from fastapi import FastAPI
 
+from dstack._internal.server.db import migrate
 from dstack._internal.server.routers import logs, repos, runs, secrets, users
 
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
+    await migrate()
     yield
 
 

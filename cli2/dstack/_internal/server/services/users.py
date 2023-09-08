@@ -1,6 +1,7 @@
+import uuid
 from typing import List, Optional
 
-from sqlalchemy import select
+from sqlalchemy import select, update
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from dstack._internal.core.users import GlobalRole, User, UserTokenCreds, UserWithCreds
@@ -20,13 +21,40 @@ async def get_user_with_creds_by_name(
     current_user: UserModel,
     username: str,
 ) -> Optional[User]:
-    res = await session.execute(select(UserModel).where(UserModel.name == username))
-    user_model = res.scalar()
+    user_model = await get_user_model_by_name(session=session, username=username)
     if user_model is None:
         return None
     if current_user.global_role == GlobalRole.ADMIN or current_user.id == user_model.id:
         return user_model_to_user_with_creds(user_model)
     return None
+
+
+async def create_user(session: AsyncSession, username: str, global_role: GlobalRole) -> UserModel:
+    user = UserModel(name=username, global_role=global_role, token=str(uuid.uuid4()))
+    session.add(user)
+    await session.commit()
+    return user
+
+
+async def update_user_role(
+    session: AsyncSession, username: str, global_role: GlobalRole
+) -> Optional[UserModel]:
+    await session.execute(
+        update(UserModel).where(UserModel.name == username).values(global_role=global_role)
+    )
+    return get_user_model_by_name(session=session, username=username)
+
+
+async def refresh_user_token(session: AsyncSession, username: str) -> Optional[UserModel]:
+    await session.execute(
+        update(UserModel).where(UserModel.name == username).values(token=uuid.uuid4())
+    )
+    return get_user_model_by_name(session=session, username=username)
+
+
+async def get_user_model_by_name(session: AsyncSession, username: str) -> Optional[UserModel]:
+    res = await session.execute(select(UserModel).where(UserModel.name == username))
+    return res.scalar()
 
 
 async def get_user_model_by_token(session: AsyncSession, token: str) -> Optional[UserModel]:
