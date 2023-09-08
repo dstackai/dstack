@@ -47,7 +47,6 @@ class ProjectModel(BaseModel):
     backends: Mapped[List["BackendModel"]] = relationship(
         back_populates="project", lazy="selectin"
     )
-    # default_gateway: Mapped[str] = mapped_column(String(50), nullable=True)
 
 
 class MemberModel(BaseModel):

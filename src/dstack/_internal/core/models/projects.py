@@ -2,6 +2,7 @@ from typing import List
 
 from pydantic import UUID4, BaseModel
 
+from dstack._internal.core.models.backends import BackendInfo
 from dstack._internal.core.models.users import ProjectRole, User
 
 

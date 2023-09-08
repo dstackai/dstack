@@ -12,12 +12,11 @@ def get_auth_headers(token: str) -> Dict:
     return {"Authorization": f"Bearer {token}"}
 
 
-@reuse_or_make_session
 async def create_user(
+    session: AsyncSession,
     name: str = "test_user",
     global_role: GlobalRole = GlobalRole.ADMIN,
     token: str = "1234",
-    session: Optional[AsyncSession] = None,
 ) -> UserModel:
     user = UserModel(
         name=name,
@@ -29,12 +28,20 @@ async def create_user(
     return user
 
 
-# async def create_project(
-#     name: str = "test_project",
-# ) -> Project:
-#     project = Project(name=name, ssh_private_key="", ssh_public_key="")
-#     await ProjectManager._create(project)
-#     return project
+async def create_project(
+    session: AsyncSession,
+    name: str = "test_project",
+    ssh_private_key: str = "",
+    ssh_public_key: str = "",
+) -> ProjectModel:
+    project = ProjectModel(
+        name=name,
+        ssh_private_key=ssh_private_key,
+        ssh_public_key=ssh_public_key,
+    )
+    session.add(project)
+    await session.commit()
+    return project
 
 
 # async def create_backend(

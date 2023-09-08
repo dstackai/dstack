@@ -13,8 +13,8 @@ class TestListUsers:
         assert response.status_code in [401, 403]
 
     @pytest.mark.asyncio
-    async def test_returns_users(self, test_db):
-        user = await create_user()
+    async def test_returns_users(self, test_db, session):
+        user = await create_user(session=session)
         response = client.post("/api/users/list", headers=get_auth_headers(user.token))
         assert response.status_code in [200]
         assert response.json() == [
@@ -32,8 +32,8 @@ class TestGetMyUser:
         assert response.status_code in [401, 403]
 
     @pytest.mark.asyncio
-    async def test_returns_logged_in_user(self, test_db):
-        user = await create_user()
+    async def test_returns_logged_in_user(self, test_db, session):
+        user = await create_user(session=session)
         response = client.post("/api/users/get_my_user", headers=get_auth_headers(user.token))
         assert response.status_code in [200]
         assert response.json() == {

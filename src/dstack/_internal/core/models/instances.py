@@ -3,6 +3,8 @@ from typing import List, Optional
 
 from pydantic import BaseModel
 
+from dstack._internal.core.models.backends import BackendType
+
 
 class Gpu(BaseModel):
     name: str
@@ -20,12 +22,12 @@ class Resources(BaseModel):
 class InstanceType(BaseModel):
     name: str
     resources: Resources
-    available_regions: Optional[List[str]] = None
 
 
 class LaunchedInstanceInfo(BaseModel):
-    request_id: str
-    location: str
+    instance_id: str
+    spot_request_id: Optional[str]
+    region: str
 
 
 class InstanceAvailability(Enum):
@@ -35,15 +37,15 @@ class InstanceAvailability(Enum):
     NO_QUOTA = "no_quota"
 
 
-class InstancePricing(BaseModel):
+class InstanceOffer(BaseModel):
     instance: InstanceType
     region: str
     price: float
 
 
-class InstanceOffer(InstancePricing):
+class InstanceOfferWithAvailability(InstanceOffer):
     availability: InstanceAvailability
 
 
 class InstanceCandidate(InstanceOffer):
-    backend: str
+    backend: BackendType

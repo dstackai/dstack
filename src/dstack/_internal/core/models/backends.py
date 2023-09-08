@@ -27,17 +27,39 @@ class AWSConfigInfoWithCreds(AWSConfigInfo):
     creds: AWSAccessKeyCreds
 
 
-class GCPConfig(BaseModel):
+class GCPConfigInfo(BaseModel):
     type: Literal["gcp"] = "gcp"
     regions: List[str]
 
 
-AnyBackendConfig = Union[
+class GCPServiceAccountCreds(BaseModel):
+    type: Literal["service_account"] = "service_account"
+    filename: str
+    data: str
+
+
+class GCPConfigInfoWithCreds(GCPConfigInfo):
+    creds: GCPServiceAccountCreds
+
+
+AnyBackendConfigWithoutCreds = Union[
     AWSConfigInfo,
-    GCPConfig,
+    GCPConfigInfo,
 ]
+
+
+AnyBackendConfigWithCreds = Union[
+    AWSConfigInfoWithCreds,
+    GCPConfigInfoWithCreds,
+]
+
+
+AnyBackendConfig = Union[AnyBackendConfigWithoutCreds, AnyBackendConfigWithCreds]
 
 
 class BackendInfo(BaseModel):
     name: str
-    config: AnyBackendConfig
+    config: AnyBackendConfigWithoutCreds
+
+
+ConfigValues = ...

@@ -13,3 +13,9 @@ async def test_db():
         await conn.run_sync(BaseModel.metadata.create_all)
         yield conn
         await conn.run_sync(BaseModel.metadata.drop_all)
+
+
+@pytest_asyncio.fixture
+async def session():
+    async with db.get_session() as session:
+        yield session
