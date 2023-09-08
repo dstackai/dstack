@@ -10,11 +10,28 @@ from dstack._internal.configurators.dev_environment import DevEnvironmentConfigu
 from dstack._internal.configurators.service import ServiceConfigurator
 from dstack._internal.configurators.task import TaskConfigurator
 from dstack._internal.core.configuration import (
+    BaseConfiguration,
     DevEnvironmentConfiguration,
     ServiceConfiguration,
     TaskConfiguration,
     parse,
 )
+from dstack._internal.core.profile import Profile
+
+
+def get_configurator(
+    configuration: BaseConfiguration, configuration_path: str, working_dir: str, profile: Profile
+):
+    if isinstance(configuration, DevEnvironmentConfiguration):
+        return DevEnvironmentConfigurator(
+            working_dir, str(configuration_path), configuration, profile
+        )
+    elif isinstance(configuration, TaskConfiguration):
+        return TaskConfigurator(working_dir, str(configuration_path), configuration, profile)
+    elif isinstance(configuration, ServiceConfiguration):
+        return ServiceConfigurator(working_dir, str(configuration_path), configuration, profile)
+
+    exit(f"Unsupported configuration {type(configuration)}")
 
 
 def load_configuration(
@@ -35,16 +52,7 @@ def load_configuration(
     else:
         profile = profiles.default()
 
-    if isinstance(configuration, DevEnvironmentConfiguration):
-        return DevEnvironmentConfigurator(
-            working_dir, str(configuration_path), configuration, profile
-        )
-    elif isinstance(configuration, TaskConfiguration):
-        return TaskConfigurator(working_dir, str(configuration_path), configuration, profile)
-    elif isinstance(configuration, ServiceConfiguration):
-        return ServiceConfigurator(working_dir, str(configuration_path), configuration, profile)
-
-    exit(f"Unsupported configuration {type(configuration)}")
+    return get_configurator(configuration, configuration_path, working_dir, profile)
 
 
 def resolve_configuration_path(file_name: str, working_dir: str) -> Path:

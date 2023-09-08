@@ -1,3 +1,4 @@
+import os
 from os import PathLike
 from pathlib import Path
 from typing import Dict, List, Optional, Type, TypeVar
@@ -7,7 +8,6 @@ from pydantic import BaseModel, ValidationError
 
 from dstack._internal.api.repos import load_repo
 from dstack._internal.cli.errors import CLIError
-from dstack._internal.cli.profiles import load_profiles
 from dstack._internal.core.error import RepoNotInitializedError
 from dstack._internal.core.repo.remote import RepoError
 from dstack._internal.core.userconfig import RepoUserConfig
@@ -37,23 +37,22 @@ class ConfigManager:
     def repos(self) -> Path:
         return self.home / "repos"
 
-    def repo_user_config_path(self, repo_dir: Optional[PathLike] = None) -> Path:
+    def repo_user_config_path(self, repo_dir: PathLike) -> Path:
         """
         :param repo_dir: target repo directory path (default is cwd)
         :returns: a path to a local repo config
         """
-        repo_dir = Path.cwd() if repo_dir is None else Path(repo_dir).resolve()
+        repo_dir = Path(Path(repo_dir).expanduser()).resolve()
         return self.repos / f"{'.'.join(repo_dir.parts[1:])}.yaml"
 
-    @property
-    def repo_user_config(self) -> RepoUserConfig:
+    def repo_user_config(self, repo_dir: PathLike) -> RepoUserConfig:
         try:
-            return self._cached_read(self.repo_user_config_path(), RepoUserConfig)
+            return self._cached_read(self.repo_user_config_path(repo_dir), RepoUserConfig)
         except FileNotFoundError:
             raise RepoNotInitializedError("No repo user config found")
 
-    def save_repo_user_config(self, value: RepoUserConfig):
-        self._cached_write(self.repo_user_config_path(), value, mkdir=True)
+    def save_repo_user_config(self, repo_dir: PathLike, value: RepoUserConfig):
+        self._cached_write(self.repo_user_config_path(repo_dir), value, mkdir=True)
 
     @staticmethod
     def write(path: PathLike, model: BaseModel, *, mkdir: bool = False, **kwargs):
@@ -149,9 +148,10 @@ class CLIConfigManager:
         return None
 
 
-def get_hub_client(project_name: Optional[str] = None) -> HubClient:
+def get_hub_client(
+    project_name: Optional[str] = None, repo_dir: PathLike = os.getcwd(), local_repo: bool = False
+) -> HubClient:
     cli_config_manager = CLIConfigManager()
-    project_config = cli_config_manager.get_default_project_config()
     if project_name is not None:
         project_config = cli_config_manager.get_project_config(project_name)
         if project_config is None:
@@ -164,22 +164,13 @@ def get_hub_client(project_name: Optional[str] = None) -> HubClient:
             raise CLIError(
                 f"No default project is configured. Call `dstack start` or `dstack config`."
             )
-    repo_config = _read_repo_config_or_error_with_project_name(project_name)
     try:
-        repo = load_repo(repo_config)
+        repo = load_repo(repo_dir, local_repo)
     except RepoError as e:
         raise CLIError(e.message)
     hub_client_config = HubClientConfig(url=project_config.url, token=project_config.token)
     hub_client = HubClient(config=hub_client_config, project=project_config.name, repo=repo)
     return hub_client
-
-
-def _read_repo_config_or_error_with_project_name(project_name: Optional[str]) -> RepoUserConfig:
-    try:
-        return config.repo_user_config
-    except RepoNotInitializedError as e:
-        e.project_name = project_name
-        raise e
 
 
 def _mkdir_parent(path: Path) -> Path:

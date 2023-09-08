@@ -3,7 +3,7 @@ import sys
 import threading
 import time
 from pathlib import Path
-from typing import Dict, Iterator, List, Optional, Tuple
+from typing import AnyStr, Callable, Dict, Iterator, List, Optional, Tuple
 
 import websocket
 from cursor import cursor
@@ -15,17 +15,21 @@ from websocket import WebSocketApp
 
 from dstack._internal.api.runs import list_runs_hub
 from dstack._internal.backend.base.logs import fix_urls
+from dstack._internal.cli.errors import CLIError
 from dstack._internal.cli.utils.common import console, print_runs
 from dstack._internal.cli.utils.config import config
 from dstack._internal.cli.utils.ssh_tunnel import PortsLock, run_ssh_tunnel
 from dstack._internal.cli.utils.watcher import LocalCopier, SSHCopier, Watcher
 from dstack._internal.configurators import JobConfigurator
 from dstack._internal.core.app import AppSpec
+from dstack._internal.core.error import RepoNotInitializedError
 from dstack._internal.core.instance import InstanceAvailability
 from dstack._internal.core.job import ConfigurationType, Job, JobErrorCode, JobHead, JobStatus
 from dstack._internal.core.plan import RunPlan
+from dstack._internal.core.repo import LocalRepo, RemoteRepo
 from dstack._internal.core.request import RequestStatus
 from dstack._internal.core.run import RunHead
+from dstack._internal.core.userconfig import RepoUserConfig
 from dstack._internal.hub.schemas import RunInfo
 from dstack._internal.utils.ssh import (
     include_ssh_config,
@@ -221,6 +225,7 @@ def poll_run(
 
         # attach to the instance, attach to the container in the background
         jobs = [hub_client.get_job(job_head.job_id) for job_head in job_heads]
+        console.print("Starting SSH tunnel...")
         ports = _attach(hub_client, run_info, jobs[0], ssh_key, ports_locks)
         console.print()
         console.print("[grey58]To stop, press Ctrl+C.[/]")
@@ -241,7 +246,12 @@ def poll_run(
                         ssh_host=f"{run_name}-host",
                         dst_root=f".dstack/tmp/runs/{run_name}/{jobs[0].job_id}",
                     )
-            _poll_logs_ws(hub_client, jobs[0], ports)
+
+            def log_handler(message: bytes):
+                sys.stdout.buffer.write(message)
+                sys.stdout.buffer.flush()
+
+            _poll_logs_ws(hub_client, jobs[0], ports, log_handler)
     except KeyboardInterrupt:
         _ask_on_interrupt(hub_client, run_name)
 
@@ -265,12 +275,16 @@ def poll_run(
                     status = run.status.name
                     break
         console.print(f"[grey58]{status.capitalize()}[/]")
-        ssh_config_remove_host(config.ssh_config_path, f"{run_name}-host")
-        ssh_config_remove_host(config.ssh_config_path, run_name)
+        _detach(run_name)
     except KeyboardInterrupt:
         global interrupt_count
         interrupt_count = 1
         _ask_on_interrupt(hub_client, run_name)
+
+
+def _detach(run_name):
+    ssh_config_remove_host(config.ssh_config_path, f"{run_name}-host")
+    ssh_config_remove_host(config.ssh_config_path, run_name)
 
 
 def _print_failed_run_message(run: RunHead):
@@ -332,7 +346,6 @@ def _attach(
 
     if backend_type != "local" and not ENABLE_LOCAL_CLOUD:
         # cloud backend, need to forward logs websocket
-        console.print("Starting SSH tunnel...")
         if ssh_server_port is None:
             # ssh in the container: no need to forward app ports
             app_ports = {}
@@ -419,7 +432,9 @@ def _run_container_ssh_tunnel(hub_client: HubClient, run_name: str, ports_lock: 
         exit(1)
 
 
-def _poll_logs_ws(hub_client: HubClient, job: Job, ports: Dict[int, int]):
+def _poll_logs_ws(
+    hub_client: HubClient, job: Job, ports: Dict[int, int], log_handler: Callable[[bytes], None]
+):
     hostname = "127.0.0.1"
     secure = False
     if job.configuration_type == ConfigurationType.SERVICE:
@@ -429,8 +444,7 @@ def _poll_logs_ws(hub_client: HubClient, job: Job, ports: Dict[int, int]):
 
     def on_message(ws: WebSocketApp, message):
         message = fix_urls(message, job, ports, hostname=hostname, secure=secure)
-        sys.stdout.buffer.write(message)
-        sys.stdout.buffer.flush()
+        log_handler(message)
 
     def on_error(_: WebSocketApp, err: Exception):
         if isinstance(err, KeyboardInterrupt):
@@ -529,3 +543,65 @@ def pretty_format_resources(
         if gpu_memory:
             s += f" ({gpu_memory:g}GB)"
     return s
+
+
+def get_run_plan(
+    hub_client: HubClient,
+    configurator: JobConfigurator,
+    run_name: Optional[str] = None,
+) -> Tuple[RepoUserConfig, RunPlan]:
+    if isinstance(hub_client.repo, RemoteRepo):
+        repo_dir = hub_client.repo.local_repo_dir
+    elif isinstance(hub_client.repo, LocalRepo):
+        repo_dir = hub_client.repo.repo_data.repo_dir
+    else:
+        raise TypeError(f"Unknown repo type: {type(hub_client.repo)}")
+
+    if hub_client.repo.repo_data.repo_type != "local" and not hub_client.get_repo_credentials():
+        raise RepoNotInitializedError("No credentials", project_name=hub_client.project)
+
+    if run_name:
+        _check_run_name(hub_client, run_name)
+
+    repo_user_config = config.repo_user_config(repo_dir)
+
+    return repo_user_config, hub_client.get_run_plan(configurator)
+
+
+def run_configuration(
+    hub_client: HubClient,
+    configurator: JobConfigurator,
+    run_name: Optional[str],
+    run_plan: RunPlan,
+    lock_ports: bool,
+    run_args: List[str],
+    repo_user_config: RepoUserConfig,
+) -> Tuple[str, List[Job], Optional[Tuple[PortsLock, PortsLock]]]:
+    ports_locks = None
+    if lock_ports:
+        ports_locks = reserve_ports(
+            apps=configurator.app_specs(),
+            local_backend=run_plan.local_backend,
+        )
+
+    if not repo_user_config.ssh_key_path:
+        ssh_key_pub = None
+    else:
+        ssh_key_pub = read_ssh_key_pub(repo_user_config.ssh_key_path)
+
+    run_name, jobs = hub_client.run_configuration(
+        configurator=configurator,
+        ssh_key_pub=ssh_key_pub,
+        run_name=run_name,
+        run_args=run_args,
+        run_plan=run_plan,
+    )
+
+    return run_name, jobs, ports_locks
+
+
+def _check_run_name(hub_client: HubClient, run_name: str):
+    runs = list_runs_hub(hub_client, run_name=run_name)
+    if len(runs) == 0:
+        return
+    raise CLIError("The run with this name already exists. Delete the run first with `dstack rm`.")

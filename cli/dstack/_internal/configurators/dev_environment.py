@@ -66,7 +66,7 @@ class DevEnvironmentConfigurator(JobConfiguratorWithPorts):
         ]
         return commands
 
-    def commands(self) -> List[str]:
+    def commands(self) -> Optional[List[str]]:
         commands = []
         commands += self.sshd.get_start_commands()
         commands += self.conf.init

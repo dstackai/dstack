@@ -7,7 +7,7 @@ from dstack._internal.core.profile import Profile
 from dstack._internal.core.repo import RemoteRepo
 
 
-def configure_job(commands: List[str], entrypoint: Optional[str]) -> Job:
+def configure_job(commands: Optional[List[str]], entrypoint: Optional[str]) -> Job:
     conf = TaskConfiguration(
         image="ubuntu:20.04",
         commands=commands,
@@ -20,8 +20,8 @@ def configure_job(commands: List[str], entrypoint: Optional[str]) -> Job:
 
 class TestEntrypoint(unittest.TestCase):
     def test_no_commands(self):
-        job = configure_job([], None)
-        self.assertListEqual(job.commands, [])
+        job = configure_job(None, None)
+        self.assertIsNone(job.commands)
         self.assertEqual(job.entrypoint, None)
 
     def test_no_entrypoint(self):
@@ -32,7 +32,7 @@ class TestEntrypoint(unittest.TestCase):
 
     def test_only_entrypoint(self):
         job = configure_job([], "/bin/bash -ic")
-        self.assertListEqual(job.commands, [])
+        self.assertIsNone(job.commands)
         self.assertListEqual(job.entrypoint, ["/bin/bash", "-ic"])
 
     def test_entrypoint_override(self):

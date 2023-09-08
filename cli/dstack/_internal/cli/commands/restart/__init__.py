@@ -47,11 +47,14 @@ class RestartCommand(BasicCommand):
         runs = list_runs_hub(hub_client, run_name=args.run_name)
         run = runs[0]
         # TODO watcher
+
+        repo_user_config = config.repo_user_config(os.getcwd())
+
         poll_run(
             hub_client,
             run,
             jobs,
-            ssh_key=config.repo_user_config.ssh_key_path,
+            ssh_key=repo_user_config.ssh_key_path,
             watcher=Watcher(os.getcwd()),
             ports_locks=ports_locks,
         )

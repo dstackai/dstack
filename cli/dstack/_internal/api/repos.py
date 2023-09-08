@@ -5,7 +5,7 @@ from typing import Optional
 import git
 import requests
 import yaml
-from git.exc import GitCommandError
+from git.exc import GitCommandError, InvalidGitRepositoryError
 
 from dstack._internal.core.error import DstackError
 from dstack._internal.core.repo import (
@@ -16,7 +16,6 @@ from dstack._internal.core.repo import (
     Repo,
     RepoProtocol,
 )
-from dstack._internal.core.userconfig import RepoUserConfig
 from dstack._internal.utils.common import PathLike
 from dstack._internal.utils.ssh import (
     get_host_config,
@@ -131,9 +130,10 @@ def check_remote_repo_credentials(
         return RemoteRepoCredentials(protocol=protocol, private_key=private_key, oauth_token=None)
 
 
-def load_repo(user_config: RepoUserConfig) -> Repo:
-    if user_config.repo_type == "remote":
-        return RemoteRepo(repo_ref=user_config.repo_ref, local_repo_dir=os.getcwd())
-    elif user_config.repo_type == "local":
-        return LocalRepo(repo_ref=user_config.repo_ref, repo_dir=os.getcwd())
-    raise TypeError(f"Unknown repo_type: {user_config.repo_type}")
+def load_repo(repo_dir: PathLike, local: bool = False) -> Repo:
+    if not local:
+        try:
+            return RemoteRepo(local_repo_dir=os.path.expanduser(repo_dir))
+        except InvalidGitRepositoryError:
+            pass
+    return LocalRepo(repo_dir=os.path.expanduser(repo_dir))

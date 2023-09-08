@@ -37,12 +37,12 @@ class TaskConfigurator(JobConfiguratorWithPorts):
         commands += self.conf.setup
         return commands
 
-    def commands(self) -> List[str]:
+    def commands(self) -> Optional[List[str]]:
         commands = []
         if self.conf.image is None:
             commands += self.sshd.get_start_commands()
-        commands += self.conf.commands
-        return commands
+        commands += self.conf.commands or []
+        return commands or None
 
     def default_max_duration(self) -> Optional[int]:
         return DEFAULT_MAX_DURATION_SECONDS

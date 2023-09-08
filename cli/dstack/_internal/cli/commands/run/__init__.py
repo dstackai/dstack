@@ -7,18 +7,16 @@ from rich.prompt import Confirm
 from dstack._internal.api.runs import list_runs_hub
 from dstack._internal.cli.commands import BasicCommand
 from dstack._internal.cli.utils.common import add_project_argument, check_init, console
-from dstack._internal.cli.utils.config import config, get_hub_client
+from dstack._internal.cli.utils.config import get_hub_client
 from dstack._internal.cli.utils.configuration import load_configuration
 from dstack._internal.cli.utils.run import (
+    get_run_plan,
     poll_run,
     print_run_plan,
-    read_ssh_key_pub,
-    reserve_ports,
+    run_configuration,
 )
 from dstack._internal.cli.utils.watcher import Watcher
 from dstack._internal.configurators.ports import PortUsedError
-from dstack._internal.core.error import RepoNotInitializedError
-from dstack.api.hub import HubClient
 
 
 class RunCommand(BasicCommand):
@@ -99,26 +97,12 @@ class RunCommand(BasicCommand):
             if args.reload:
                 watcher.start()
             hub_client = get_hub_client(project_name=project_name)
-            if (
-                hub_client.repo.repo_data.repo_type != "local"
-                and not hub_client.get_repo_credentials()
-            ):
-                raise RepoNotInitializedError("No credentials", project_name=project_name)
-
-            if args.name:
-                _check_run_name(hub_client, args.name)
-
-            if not config.repo_user_config.ssh_key_path:
-                ssh_key_pub = None
-            else:
-                ssh_key_pub = read_ssh_key_pub(config.repo_user_config.ssh_key_path)
-
             configurator_args, run_args = configurator.get_parser().parse_known_args(
                 args.args + args.unknown
             )
             configurator.apply_args(configurator_args)
 
-            run_plan = hub_client.get_run_plan(configurator)
+            repo_user_config, run_plan = get_run_plan(hub_client, configurator, args.name)
             job_plan = run_plan.job_plans[0]
             console.print("dstack will execute the following plan:\n")
             print_run_plan(configurator, run_plan, args.max_offers)
@@ -133,21 +117,15 @@ class RunCommand(BasicCommand):
             if not args.yes and not Confirm.ask("Continue?"):
                 console.print("\nExiting...")
                 exit(0)
-
-            ports_locks = None
-            if not args.detach:
-                ports_locks = reserve_ports(
-                    apps=configurator.app_specs(),
-                    local_backend=run_plan.local_backend,
-                )
-
             console.print("\nProvisioning...\n")
-            run_name, jobs = hub_client.run_configuration(
-                configurator=configurator,
-                ssh_key_pub=ssh_key_pub,
-                run_name=args.name,
-                run_args=run_args,
-                run_plan=run_plan,
+            run_name, jobs, ports_locks = run_configuration(
+                hub_client,
+                configurator,
+                args.name,
+                run_plan,
+                not args.detach,
+                run_args,
+                repo_user_config,
             )
             runs = list_runs_hub(hub_client, run_name=run_name)
             run = runs[0]
@@ -156,7 +134,7 @@ class RunCommand(BasicCommand):
                     hub_client,
                     run,
                     jobs,
-                    ssh_key=config.repo_user_config.ssh_key_path,
+                    ssh_key=repo_user_config.ssh_key_path,
                     watcher=watcher,
                     ports_locks=ports_locks,
                 )
@@ -166,12 +144,3 @@ class RunCommand(BasicCommand):
             if watcher.is_alive():
                 watcher.stop()
                 watcher.join()
-
-
-def _check_run_name(hub_client: HubClient, run_name: str):
-    runs = list_runs_hub(hub_client, run_name=run_name)
-    if len(runs) == 0:
-        return
-    if not Confirm.ask(f"[red]Run {run_name} already exist. Override?[/]"):
-        exit(0)
-    hub_client.delete_run(run_name)

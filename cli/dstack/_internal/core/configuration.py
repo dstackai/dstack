@@ -5,7 +5,7 @@ from typing import Dict, List, Optional, Union
 from pydantic import BaseModel, Extra, Field, conint, constr, validator
 from typing_extensions import Annotated, Literal
 
-CommandsList = List[str]
+CommandsList = Optional[List[str]]
 ValidPort = conint(gt=0, le=65536)
 
 
