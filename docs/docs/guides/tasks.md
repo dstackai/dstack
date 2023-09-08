@@ -1,9 +1,11 @@
 # Tasks
 
-A task can be any batch job or a web application that you may want to run on demand.
+A task in `dstack` can be a batch job or a web app for on-demand execution. When running a web app as a task, `dstack`
+conveniently forwards the application's ports to your local machine.
 
-With `dstack`, you can define such a task through a configuration file and run it on one of the
-configured clouds that offer the best price and availability.
+!!! info "NOTE:"
+    Tasks are ideal for batch jobs (such as training or fine-tuning), as well as for running web apps (e.g., LLMs) for
+    development purposes. If you intend to run a web app for production purposes, please refer to [services](services.md).
 
 ## Define a configuration
 

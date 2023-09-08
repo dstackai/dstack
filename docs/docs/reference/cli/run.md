@@ -94,7 +94,7 @@ Usage: dstack run WORKING_DIR [-f CONFIGURATION_FILE] [-n RUN_NAME]
 
 - <a href="#BUILD"><code id="BUILD">--build</code></a> – Pre-build the environment (if you're using the `build` property in [`dstack.yml`](../dstack.yml/index.md)) if it's not pre-built yet.
   Example: `dstack run . --build`
-- <a href="#FORCE_BUILD"><code id="FORCE_BUILD">--force-build</code></a> – Force pre-building the environment (if you're using the `build` property in [`dstack.yml`](../dstack.yml), even if it has been pre-built before.
+- <a href="#FORCE_BUILD"><code id="FORCE_BUILD">--force-build</code></a> – Force pre-building the environment (if you're using the `build` property in [`dstack.yml`](../dstack.yml/index.md), even if it has been pre-built before.
   Example: `dstack run . --force-build`
 - <a href="#RELOAD"><code id="RELOAD">--reload</code></a> – (Optional) Enable auto-reloading of your local changes into the running task.
   Maybe be used together with Streamlit, Fast API, Gradio for auto-reloading local changes.

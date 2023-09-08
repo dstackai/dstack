@@ -102,7 +102,7 @@ class Resources(ForbidExtra):
 class RetryPolicy(ForbidExtra):
     retry: Annotated[bool, Field(description="Whether to retry the run on failure or not")] = False
     limit: Annotated[
-        Union[int, str],
+        Union[int, str, None],
         Field(description="The maximum period of retrying the run, e.g., 4h or 1d"),
     ] = None
 

@@ -1,12 +1,11 @@
 # Services
 
-A service is an application that is accessible through a public endpoint.
-
-Using `dstack`, you can define such a service through a configuration file and run it on the
-configured clouds that offer the best price and availability.
+A service in `dstack` is a web app accessible through a public endpoint. When running a web app as a service,
+`dstack` automatically creates a public endpoint, enabling you to use your domain and HTTPS.
 
 !!! info "NOTE:"
-    Before running a service, ensure that you have configured a [gateway](clouds.md#configuring-gateways).
+    Services are ideal for deploying wep apps (e.g., LLMs) for production purposes.
+    If you intend to run a web app for development purposes, please refer to [tasks](tasks.md).
 
 ## Define a configuration
 
@@ -93,6 +92,9 @@ You can install packages using `pip` and `conda` executables from `commands`.
 For more details on the file syntax, refer to [`.dstack.yml`](../reference/dstack.yml/service.md).
 
 ## Run the configuration
+
+!!! info "NOTE:"
+    Before running a service, ensure that you have configured a [gateway](clouds.md#configuring-gateways).
 
 To run a service, use the `dstack run` command followed by the path to the directory you want to use as the
 working directory.

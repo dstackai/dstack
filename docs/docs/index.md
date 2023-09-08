@@ -1,7 +1,7 @@
 # Quickstart
 
-`dstack` is an open-source tool that enables the execution of LLM workloads across multiple cloud GPU providers, ensuring
-optimal GPU pricing and availability.
+`dstack` is an open-source toolkit for running LLM workloads across any clouds, offering a cost-efficient and
+user-friendly interface for training, inference, and development
 
 ## Installation
 

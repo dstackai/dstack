@@ -4,16 +4,14 @@ With `dstack`, you can run LLM workloads using compute resources from multiple c
 All you need to do is sign up with these providers, and then pass
 their credentials to `dstack`.
 
-## Why multiple clouds?
+??? info "Why multiple clouds?"
 
-<div class="grid cards" markdown>
-- <span>**GPU availability**
-   Because of high demand, it's easier to obtain GPU from various cloud providers through a single interface.</span>
-- <span>**GPU price**
-   Leverage smaller cloud services (e.g., Lambda Cloud) and spot instances across larger providers.</span>
-- <span>**No vendor lock-in**
-   An open-source and cloud-agnostic interface enables easy switching between cloud providers.</span>
-</div>
+    1. <span>**GPU availability**
+       Because of high demand, it's easier to obtain GPU from various cloud providers through a single interface.</span>
+    2. <span>**GPU price**
+       Leverage smaller cloud services (e.g., Lambda Cloud) and spot instances across larger providers.</span>
+    3. <span>**No vendor lock-in**
+       An open-source and cloud-agnostic interface enables easy switching between cloud providers.</span>
 
 ## Creating cloud accounts
 

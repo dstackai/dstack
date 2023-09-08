@@ -573,12 +573,12 @@ def run_configuration(
     configurator: JobConfigurator,
     run_name: Optional[str],
     run_plan: RunPlan,
-    lock_ports: bool,
+    verify_ports: bool,
     run_args: List[str],
     repo_user_config: RepoUserConfig,
 ) -> Tuple[str, List[Job], Optional[Tuple[PortsLock, PortsLock]]]:
     ports_locks = None
-    if lock_ports:
+    if verify_ports:
         ports_locks = reserve_ports(
             apps=configurator.app_specs(),
             local_backend=run_plan.local_backend,

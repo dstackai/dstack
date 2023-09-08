@@ -35,7 +35,7 @@ type: service
 image: ghcr.io/huggingface/text-generation-inference:latest
 
 env:
-      - MODEL_ID=NousResearch/Llama-2-7b-hf
+  - MODEL_ID=NousResearch/Llama-2-7b-hf
 
 port: 8000
 
@@ -59,7 +59,7 @@ $ dstack run . -f text-generation-inference/serve.dstack.yml --gpu 24GB
 </div>
 
 !!! info "Endpoint URL"
-    If you've configured a [wildcard domain](clouds.md#configuring-gateways) for the gateway, 
+    If you've configured a [wildcard domain](../docs/guides/clouds.md#configuring-gateways) for the gateway, 
     `dstack` enables HTTPS automatically and serves the service at 
     `https://<run name>.<your domain name>`.
 

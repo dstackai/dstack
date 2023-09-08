@@ -23,6 +23,7 @@ from dstack._internal.core.configuration import (
     BaseConfiguration,
     ServiceConfiguration,
     TaskConfiguration,
+    RegistryAuth,
 )
 from dstack._internal.core.job import Job, JobHead, JobStatus
 from dstack._internal.core.profile import (
@@ -38,6 +39,7 @@ from dstack.api.hub import HubClient
 
 Task = TaskConfiguration
 Service = ServiceConfiguration
+RunStatus = JobStatus
 
 
 class RepoCollection:
@@ -75,7 +77,7 @@ class Run(ABC):
         ):
             yield event.log_message
 
-    def status(self) -> JobStatus:
+    def status(self) -> RunStatus:
         return next(_poll_run_head(self._hub_client, self._run_info.run_head.run_name)).status
 
     def stop(self, abort: bool = False):
@@ -112,9 +114,9 @@ class SubmittedRun(Run):
                 self._hub_client,
                 self._run_info.run_head.run_name,
                 loop_statuses=[
-                    JobStatus.PENDING,
-                    JobStatus.SUBMITTED,
-                    JobStatus.DOWNLOADING,
+                    RunStatus.PENDING,
+                    RunStatus.SUBMITTED,
+                    RunStatus.DOWNLOADING,
                 ],
             ):
                 pass
@@ -182,7 +184,7 @@ class RunCollection:
         max_price: Optional[float] = None,
         working_dir: Optional[str] = None,
         run_name: Optional[str] = None,
-        lock_ports: bool = True,
+        verify_ports: bool = True,
     ) -> SubmittedRun:
         profile = Profile(
             backends=backends,
@@ -201,7 +203,7 @@ class RunCollection:
         )
         repo_user_config, run_plan = get_run_plan(self._hub_client, configurator, run_name)
         run_name, jobs, ports_locks = run_configuration(
-            self._hub_client, configurator, run_name, run_plan, lock_ports, [], repo_user_config
+            self._hub_client, configurator, run_name, run_plan, verify_ports, [], repo_user_config
         )
         run_infos = list_runs_hub(self._hub_client, run_name=run_name)
         run_info = run_infos[0]

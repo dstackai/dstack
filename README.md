@@ -28,8 +28,8 @@ cost-efficient and user-friendly interface for training, inference, and developm
 
 ## Latest news ✨
 
+- [2023/09] [Managed gateways for serving LLMs across clouds](https://dstack.ai/blog/2023/09/01/managed-gateways) (Release)
 - [2023/08] [Fine-tuning with Llama 2](https://dstack.ai/examples/finetuning-llama-2) (Example)
-- [2023/08] [An early preview of services](https://dstack.ai/blog/2023/08/07/services-preview) (Release)
 - [2023/08] [Serving SDXL with FastAPI](https://dstack.ai/examples/stable-diffusion-xl) (Example)
 - [2023/07] [Serving LLMS with TGI](https://dstack.ai/examples/text-generation-inference) (Example)
 - [2023/07] [Serving LLMS with vLLM](https://dstack.ai/examples/vllm) (Example)
@@ -118,20 +118,18 @@ To run a configuration, use the [`dstack run`](https://dstack.ai/docs/reference/
 working directory and the path to the configuration file.
 
 ```shell
-dstack run . -f serve.dstack.yml
+dstack run . -f text-generation-inference/serve.dstack.yml --gpu A100 -y
+
+ RUN           BACKEND  INSTANCE              SPOT  PRICE STATUS    SUBMITTED
+ tasty-zebra-1 lambda   200GB, 1xA100 (80GB)  no    $1.1  Submitted now
+ 
+Privisioning...
+
+Serving on https://tasty-zebra-1.mydomain.com
 ```
 
 `dstack` automatically provisions cloud resources based in the 
 configured clouds that offer the best price and availability.
-
-For every run, you can specify hardware resources like memory and GPU, along with various run policies (e.g., maximum
-hourly price, use of spot instances, etc.).
-
-| Example                     | Description                                |
-|-----------------------------|--------------------------------------------|
-| `dstack run . --gpu A10`    | Use an instance with `NVIDIA A10` GPU      |
-| `dstack run . --gpu A100:8` | Use an instance with 8 `NVIDIA A100` GPUs  |
-| `dstack run . --gpu 24GB`   | Use an instance with a GPU that has `24GB` |
 
 ## More information
 
