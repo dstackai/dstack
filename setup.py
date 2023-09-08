@@ -185,8 +185,8 @@ setup(
     version=get_version(),
     author="Andrey Cheptsov",
     author_email="andrey@dstack.ai",
-    package_dir={"": "cli2"},
-    packages=find_packages("cli2"),
+    package_dir={"": "src"},
+    packages=find_packages("src"),
     package_data={
         "dstack._internal": [
             "schemas/*.json",
