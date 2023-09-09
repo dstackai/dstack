@@ -3,7 +3,7 @@ import sys
 import threading
 import time
 from pathlib import Path
-from typing import AnyStr, Callable, Dict, Iterator, List, Optional, Tuple
+from typing import Callable, Dict, Iterator, List, Optional, Tuple
 
 import websocket
 from cursor import cursor
@@ -26,16 +26,11 @@ from dstack._internal.core.error import RepoNotInitializedError
 from dstack._internal.core.instance import InstanceAvailability
 from dstack._internal.core.job import ConfigurationType, Job, JobErrorCode, JobHead, JobStatus
 from dstack._internal.core.plan import RunPlan
-from dstack._internal.core.repo import LocalRepo, RemoteRepo
 from dstack._internal.core.request import RequestStatus
 from dstack._internal.core.run import RunHead
 from dstack._internal.core.userconfig import RepoUserConfig
 from dstack._internal.hub.schemas import RunInfo
-from dstack._internal.utils.ssh import (
-    include_ssh_config,
-    ssh_config_add_host,
-    ssh_config_remove_host,
-)
+from dstack._internal.utils.ssh import include_ssh_config, update_ssh_config
 from dstack.api.hub import HubClient
 
 POLL_PROVISION_RATE_SECS = 3
@@ -283,8 +278,8 @@ def poll_run(
 
 
 def _detach(run_name):
-    ssh_config_remove_host(config.ssh_config_path, f"{run_name}-host")
-    ssh_config_remove_host(config.ssh_config_path, run_name)
+    update_ssh_config(config.ssh_config_path, f"{run_name}-host")
+    update_ssh_config(config.ssh_config_path, run_name)
 
 
 def _print_failed_run_message(run: RunHead):
@@ -366,7 +361,7 @@ def _attach(
         }
         if backend_type != "local" and not ENABLE_LOCAL_CLOUD:
             options["ProxyJump"] = f"{job.run_name}-host"
-        ssh_config_add_host(config.ssh_config_path, job.run_name, options)
+        update_ssh_config(config.ssh_config_path, job.run_name, options)
         del app_ports[ssh_server_port]
         if app_ports:
             # save mapping, but don't release ports yet
@@ -384,7 +379,7 @@ def _attach(
 def _run_host_ssh_tunnel(
     job: Job, ssh_key_path: str, ports_lock: PortsLock, backend_type: str
 ) -> Dict[int, int]:
-    ssh_config_add_host(
+    update_ssh_config(
         config.ssh_config_path,
         f"{job.run_name}-host",
         {
@@ -518,8 +513,8 @@ def _ask_on_interrupt(hub_client: HubClient, run_name: str):
         console.print("\n[grey58]Aborting...[/]")
         hub_client.stop_run(run_name, terminate=False, abort=True)
         console.print("[grey58]Aborted[/]")
-        ssh_config_remove_host(config.ssh_config_path, f"{run_name}-host")
-        ssh_config_remove_host(config.ssh_config_path, run_name)
+        update_ssh_config(config.ssh_config_path, f"{run_name}-host")
+        update_ssh_config(config.ssh_config_path, run_name)
         exit(0)
 
 
@@ -549,23 +544,14 @@ def get_run_plan(
     hub_client: HubClient,
     configurator: JobConfigurator,
     run_name: Optional[str] = None,
-) -> Tuple[RepoUserConfig, RunPlan]:
-    if isinstance(hub_client.repo, RemoteRepo):
-        repo_dir = hub_client.repo.local_repo_dir
-    elif isinstance(hub_client.repo, LocalRepo):
-        repo_dir = hub_client.repo.repo_data.repo_dir
-    else:
-        raise TypeError(f"Unknown repo type: {type(hub_client.repo)}")
-
+) -> RunPlan:
     if hub_client.repo.repo_data.repo_type != "local" and not hub_client.get_repo_credentials():
         raise RepoNotInitializedError("No credentials", project_name=hub_client.project)
 
     if run_name:
-        _check_run_name(hub_client, run_name)
+        _check_run_name(hub_client, run_name, True)
 
-    repo_user_config = config.repo_user_config(repo_dir)
-
-    return repo_user_config, hub_client.get_run_plan(configurator)
+    return hub_client.get_run_plan(configurator)
 
 
 def run_configuration(
@@ -600,8 +586,15 @@ def run_configuration(
     return run_name, jobs, ports_locks
 
 
-def _check_run_name(hub_client: HubClient, run_name: str):
+def _check_run_name(hub_client: HubClient, run_name: str, auto_delete: bool):
     runs = list_runs_hub(hub_client, run_name=run_name)
     if len(runs) == 0:
         return
-    raise CLIError("The run with this name already exists. Delete the run first with `dstack rm`.")
+    elif auto_delete and runs[0].run_head.status.is_unfinished():
+        raise CLIError("The run with this name is unfinished.")
+    elif auto_delete and runs[0].run_head.status.is_finished():
+        hub_client.delete_run(run_name)
+    else:
+        raise CLIError(
+            "The run with this name already exists. Delete the run first with `dstack rm`."
+        )

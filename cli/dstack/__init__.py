@@ -7,7 +7,7 @@ from queue import Queue
 from typing import Generator, List, Optional, Tuple, Union
 
 from dstack._internal.api.runs import list_runs_hub
-from dstack._internal.cli.utils.config import get_hub_client
+from dstack._internal.cli.utils.config import config, get_hub_client
 from dstack._internal.cli.utils.configuration import get_configurator
 from dstack._internal.cli.utils.init import init_repo
 from dstack._internal.cli.utils.run import (
@@ -16,9 +16,11 @@ from dstack._internal.cli.utils.run import (
     _poll_logs_ws,
     _poll_run_head,
     get_run_plan,
+    reserve_ports,
     run_configuration,
 )
 from dstack._internal.cli.utils.ssh_tunnel import PortsLock
+from dstack._internal.configurators.ports import PortUsedError
 from dstack._internal.core.configuration import (
     BaseConfiguration,
     RegistryAuth,
@@ -34,6 +36,7 @@ from dstack._internal.core.profile import (
     RetryPolicy,
     SpotPolicy,
 )
+from dstack._internal.core.userconfig import RepoUserConfig
 from dstack._internal.hub.schemas import RunInfo
 from dstack.api.hub import HubClient
 
@@ -62,12 +65,18 @@ class Run(ABC):
     def __init__(
         self,
         hub_client: HubClient,
+        repo_user_config: RepoUserConfig,
         run_info: RunInfo,
     ) -> None:
         super().__init__()
         self._hub_client = hub_client
+        self._repo_user_config = repo_user_config
         self._run_info = run_info
         self.name = run_info.run_head.run_name
+        self._port_locks = None
+        self._is_attached = False
+        self._ports = None
+        self._jobs = None
 
     def logs(
         self, start_time: datetime = (datetime.now(tz=timezone.utc) - timedelta(days=1))
@@ -84,30 +93,6 @@ class Run(ABC):
         self._hub_client.stop_run(self._run_info.run_head.run_name, terminate=True, abort=abort)
         _detach(self._run_info.run_head.run_name)
 
-    def __str__(self) -> str:
-        return f"<Run '{self.name}'>"
-
-    def __repr__(self) -> str:
-        return f"<Run '{self.name}'>"
-
-
-class SubmittedRun(Run):
-    def __init__(
-        self,
-        hub_client: HubClient,
-        run_info: RunInfo,
-        job_heads: List[JobHead],
-        ssh_key: Optional[str],
-        port_locks: Tuple[PortsLock, PortsLock],
-    ) -> None:
-        super().__init__(hub_client, run_info)
-        self._job_heads = job_heads
-        self._ssh_key = ssh_key
-        self._port_locks = port_locks
-        self._is_attached = False
-        self._jobs: Optional[List[Job]] = None
-        self._ports: Optional[dict[int, int]] = None
-
     def attach(self):
         if not self._is_attached:
             for _ in _poll_run_head(
@@ -122,10 +107,20 @@ class SubmittedRun(Run):
                 pass
 
             self._jobs = [
-                self._hub_client.get_job(job_head.job_id) for job_head in self._job_heads
+                self._hub_client.get_job(job_head.job_id)
+                for job_head in self._run_info.run_head.job_heads
             ]
+            if self._port_locks is None:
+                self._port_locks = reserve_ports(
+                    apps=self._jobs[0].app_specs,
+                    local_backend=False,
+                )
             self._ports = _attach(
-                self._hub_client, self._run_info, self._jobs[0], self._ssh_key, self._port_locks
+                self._hub_client,
+                self._run_info,
+                self._jobs[0],
+                self._repo_user_config.ssh_key_path,
+                self._port_locks,
             )
             self._is_attached = True
 
@@ -135,6 +130,27 @@ class SubmittedRun(Run):
             self._is_attached = False
             self._ports = None
             self._jobs = None
+
+    def __str__(self) -> str:
+        return f"<Run '{self.name}'>"
+
+    def __repr__(self) -> str:
+        return f"<Run '{self.name}'>"
+
+
+class SubmittedRun(Run):
+    def __init__(
+        self,
+        hub_client: HubClient,
+        repo_user_config: RepoUserConfig,
+        run_info: RunInfo,
+        port_locks: Tuple[PortsLock, PortsLock],
+    ) -> None:
+        super().__init__(hub_client, repo_user_config, run_info)
+        self._port_locks = port_locks
+        self._is_attached = False
+        self._jobs: Optional[List[Job]] = None
+        self._ports: Optional[dict[int, int]] = None
 
     def logs(
         self, start_time: datetime = datetime.now() - timedelta(days=1)
@@ -169,9 +185,10 @@ class SubmittedRun(Run):
 class RunCollection:
     _hub_client: HubClient
 
-    def __init__(self, hub_client: HubClient) -> None:
+    def __init__(self, hub_client: HubClient, repo_user_config: RepoUserConfig) -> None:
         super().__init__()
         self._hub_client = hub_client
+        self._repo_user_config = repo_user_config
 
     def submit(
         self,
@@ -201,22 +218,37 @@ class RunCollection:
             working_dir or ".",
             profile or Profile(),
         )
-        repo_user_config, run_plan = get_run_plan(self._hub_client, configurator, run_name)
+        run_plan = get_run_plan(self._hub_client, configurator, run_name)
         run_name, jobs, ports_locks = run_configuration(
-            self._hub_client, configurator, run_name, run_plan, verify_ports, [], repo_user_config
+            self._hub_client,
+            configurator,
+            run_name,
+            run_plan,
+            verify_ports,
+            [],
+            self._repo_user_config,
         )
         run_infos = list_runs_hub(self._hub_client, run_name=run_name)
         run_info = run_infos[0]
-        ssh_key = repo_user_config.ssh_key_path
-        return SubmittedRun(self._hub_client, run_info, jobs, ssh_key, ports_locks)
+        return SubmittedRun(
+            self._hub_client,
+            self._repo_user_config,
+            run_info,
+            ports_locks,
+        )
 
     def list(self, all: bool = False) -> List[Run]:
         run_infos = list_runs_hub(self._hub_client, all=all)
-        return [Run(self._hub_client, run_info) for run_info in run_infos]
+        return [Run(self._hub_client, self._repo_user_config, run_info) for run_info in run_infos]
 
     def get(self, run_name: str) -> Optional[Run]:
         run_infos = list_runs_hub(self._hub_client, run_name=run_name)
-        return next(iter([Run(self._hub_client, run_info) for run_info in run_infos]), None)
+        return next(
+            iter(
+                [Run(self._hub_client, self._repo_user_config, run_info) for run_info in run_infos]
+            ),
+            None,
+        )
 
 
 class Client:
@@ -238,9 +270,10 @@ class Client:
         self._hub_client = hub_client
         self.repo_dir = str(Path(os.path.expanduser(repo_dir)).resolve())
         self.repos = RepoCollection(hub_client)
-        self.runs = RunCollection(hub_client)
         if init:
             self.repos.init(git_identity_file, oauth_token, ssh_identity_file)
+        self._repo_user_config = config.repo_user_config(repo_dir)
+        self.runs = RunCollection(hub_client, self._repo_user_config)
 
     @staticmethod
     def from_config(
@@ -249,3 +282,10 @@ class Client:
         return Client(
             get_hub_client(project_name=project_name, repo_dir=repo_dir), repo_dir, local_repo
         )
+
+
+if __name__ == "__main__":
+    client = Client.from_config("~/dstack-examples")
+    run = client.runs.get("streamlist-hello")
+    run.attach()
+    print(run)

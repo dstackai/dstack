@@ -7,7 +7,7 @@ from rich.prompt import Confirm
 from dstack._internal.api.runs import list_runs_hub
 from dstack._internal.cli.commands import BasicCommand
 from dstack._internal.cli.utils.common import add_project_argument, check_init, console
-from dstack._internal.cli.utils.config import get_hub_client
+from dstack._internal.cli.utils.config import config, get_hub_client
 from dstack._internal.cli.utils.configuration import load_configuration
 from dstack._internal.cli.utils.run import (
     get_run_plan,
@@ -102,7 +102,7 @@ class RunCommand(BasicCommand):
             )
             configurator.apply_args(configurator_args)
 
-            repo_user_config, run_plan = get_run_plan(hub_client, configurator, args.name)
+            run_plan = get_run_plan(hub_client, configurator, args.name)
             job_plan = run_plan.job_plans[0]
             console.print("dstack will execute the following plan:\n")
             print_run_plan(configurator, run_plan, args.max_offers)
@@ -118,6 +118,7 @@ class RunCommand(BasicCommand):
                 console.print("\nExiting...")
                 exit(0)
             console.print("\nProvisioning...\n")
+            repo_user_config = config.repo_user_config(os.getcwd())
             run_name, jobs, ports_locks = run_configuration(
                 hub_client,
                 configurator,

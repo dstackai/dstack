@@ -5,7 +5,7 @@ from rich.prompt import Confirm
 from dstack._internal.cli.commands import BasicCommand
 from dstack._internal.cli.utils.common import add_project_argument, check_init, console
 from dstack._internal.cli.utils.config import config, get_hub_client
-from dstack._internal.utils.ssh import ssh_config_remove_host
+from dstack._internal.utils.ssh import update_ssh_config
 
 
 def _verb(abort: bool):
@@ -68,6 +68,6 @@ class StopCommand(BasicCommand):
                 console.print(f"Cannot find the run '{args.run_name}'")
                 exit(1)
             hub_client.stop_run(args.run_name, terminate=args.terminate, abort=args.abort)
-            ssh_config_remove_host(config.ssh_config_path, f"{args.run_name}-host")
-            ssh_config_remove_host(config.ssh_config_path, args.run_name)
+            update_ssh_config(config.ssh_config_path, f"{args.run_name}-host")
+            update_ssh_config(config.ssh_config_path, args.run_name)
             console.print(f"[grey58]OK[/]")
