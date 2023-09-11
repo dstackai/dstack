@@ -1,3 +1,4 @@
+import math
 import re
 import time
 from typing import Dict, List, Optional
@@ -156,13 +157,7 @@ class GCPCompute(Compute):
     def run_instance(
         self, job: Job, instance_type: InstanceType, region: str
     ) -> LaunchedInstanceInfo:
-        zones = _get_zones(
-            regions_client=self.regions_client,
-            project_id=self.gcp_config.project_id,
-            configured_regions=[region],
-        )
-        # Note: not all zones in the region may offer the chosen instance type,
-        # for now, just treat NotFound error as NoCapacity
+        zones = _get_instance_zones(instance_type, region)
         return _run_instance(
             instances_client=self.instances_client,
             firewalls_client=self.firewalls_client,
@@ -896,7 +891,7 @@ def _create_instance(
     operation = instances_client.insert(request=request)
     try:
         gcp_utils.wait_for_extended_operation(operation, "instance creation")
-    except (google.api_core.exceptions.ServiceUnavailable, google.api_core.exceptions.NotFound):
+    except google.api_core.exceptions.ServiceUnavailable:
         raise NoCapacityError()
 
     return instances_client.get(project=project_id, zone=zone, instance=instance_name)
@@ -1011,3 +1006,28 @@ def _has_gpu_quota(quotas: Dict[str, int], resources: Resources) -> bool:
     if resources.spot:
         quota_name = "PREEMPTIBLE_" + quota_name
     return len(resources.gpus) <= quotas.get(quota_name, 0)
+
+
+def _get_instance_zones(instance_type: InstanceType, region: str) -> List[str]:
+    zones = []
+    for row in read_catalog_csv("gcp.csv"):
+        if row["location"][:-2] != region:
+            continue
+        if row["instance_name"] != instance_type.instance_name:
+            continue
+        if row["spot"] != str(instance_type.resources.spot):
+            continue
+        # n1- instances could have a wide range of GPUs attached to them
+        if int(row["gpu_count"]) != len(instance_type.resources.gpus):
+            continue
+        if instance_type.resources.gpus:
+            if row["gpu_name"] != instance_type.resources.gpus[0].name:
+                continue
+            if not math.isclose(
+                float(row["gpu_memory"]),
+                instance_type.resources.gpus[0].memory_mib / 1024,
+                rel_tol=1e-5,
+            ):
+                continue
+        zones.append(row["location"])
+    return zones
